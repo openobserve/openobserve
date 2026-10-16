@@ -38,7 +38,7 @@ const REVIEWED: Record<string, { pins: Record<string, string>; banned: RegExp }>
       "oncall.pagesNav": "Alarmierungen",
     },
     banned:
-      /[Rr]ohrleitung|Ausfallzeit|Torsch[üu]tze|Holzversender|Benutzerüberwachung|Verbrennungsrate|Warnmeldung/,
+      /[Rr]ohrleitung|Ausfallzeit|Torsch[üu]tze|Holzversender|Benutzerüberwachung|Verbrennungsrate|Warnmeldung|\b(?:du|dein|deine|deinen|deinem|deiner|dich|dir)\b/,
   },
   "es-ES": {
     pins: {
@@ -51,7 +51,7 @@ const REVIEWED: Record<string, { pins: Record<string, string>; banned: RegExp }>
       "aiObservability.nav.scorers": "Evaluadores",
     },
     banned:
-      /[Tt]uber[ií]a|[Cc]analizaci|[Oo]leoduct|[Gg]asoduct|[Gg]oleador|[Pp]untuador|[Aa]notador|[Ee]mpleos|[Aa]rroyo|[Tt]ransportista|Tiempos? de inactividad/,
+      /[Tt]uber[ií]a|[Cc]analizaci|[Oo]leoduct|[Gg]asoduct|[Gg]oleador|[Pp]untuador|[Aa]notador|[Ee]mpleos|[Aa]rroyo|[Tt]ransportista|Tiempos? de inactividad|\b[Rr]eport(?:e|es|ar)\b/,
   },
   "it-IT": {
     pins: {
@@ -114,6 +114,7 @@ const REVIEWED: Record<string, { pins: Record<string, string>; banned: RegExp }>
       "slos.column.burnRate": "Tükenme hızı",
       "aiObservability.nav.scorers": "Puanlayıcılar",
       "function.streamPipeline": "Veri İşlem Hatları",
+      "menu.incidents": "Vakalar",
     },
     banned:
       /[Bb]oru [Hh]att|[Gg]olcü|[Yy]utma|[Ee]fsane|[Kk]ütük|İthalat|İhracat|[Jj]eton|İş İlanları/,

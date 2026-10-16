@@ -10268,7 +10268,7 @@
       "sloCorrections": {
         "title": "Correzioni di stato:",
         "item": "{name} ({status})",
-        "shorterThanSlice": "più breve dell'intervallo dello SLO, nessun minuto corretto"
+        "shorterThanSlice": "più breve della slice dello SLO, nessun minuto corretto"
       },
       "notify": {
         "title": "Notifica",
@@ -10564,7 +10564,7 @@
     "channelTitlesDescription": "Usa un titolo diverso su canali specifici — ad es. un oggetto più breve per l'email.",
     "namePlaceholder": "ad es. Tasso di errore elevato",
     "nameLockedHint": "Avvisi e destinazioni fanno riferimento a questo template per nome, quindi non può essere rinominato. Clona il template per creare una copia con un nuovo nome.",
-    "rawBodyCaption": "Inviato esattamente come scritto, con {'{'}variables{'}'} sostituite. Vedi la Guida alle variabili per tutto ciò che è disponibile.",
+    "rawBodyCaption": "Inviato esattamente come scritto, con {'{'}variabili{'}'} sostituite. Vedi la Guida alle variabili per tutto ciò che è disponibile.",
     "contentTitlePlaceholder": "{'{'}alert_name{'}'} · {'{'}stream_name{'}'}",
     "fieldLabelPlaceholder": "ad es. Valore",
     "fieldValuePlaceholder": "ad es. {'{'}alert_agg_value{'}'}",
@@ -19302,7 +19302,7 @@
     "title": "SLO",
     "notFound": "SLO non trovato",
     "notFoundDescription": "Questo SLO non esiste più, oppure non hai accesso ad esso. Potrebbe essere stato eliminato.",
-    "subtitle": "Obiettivi di livello di servizio: target, error budget, avvisi sul tasso di consumo",
+    "subtitle": "Obiettivi di livello di servizio: target, budget di errore, avvisi sul tasso di consumo",
     "new": "Nuovo SLO",
     "newTitle": "Nuovo SLO",
     "editTitle": "Modifica SLO",
@@ -19335,11 +19335,11 @@
     "deleteBudgetNote": "Le slice già scritte rimangono su disco finché non scadono, quindi la prenotazione delle righe di questo SLO viene rilasciata in quel momento piuttosto che ora.",
     "groupedSliceNote": "Gli SLO raggruppati usano slice di 5 minuti.",
     "sliceNote": {
-      "count": "La larghezza dell'intervallo non modifica i numeri di questo SLO. Gli stessi eventi vengono contati in entrambi i casi. Gli intervalli di 5 minuti memorizzano un quinto della cronologia.",
-      "perSlice": "Ogni intervallo viene valutato come buono o cattivo nel suo insieme, quindi la larghezza è la quantità minima di budget che un singolo errore può consumare. Con un obiettivo del 99,9% su 7 giorni, un singolo intervallo negativo di 5 minuti consuma circa metà del budget. Scegli 1 minuto per obiettivi stringenti su finestre brevi."
+      "count": "La larghezza della slice non modifica i numeri di questo SLO. Gli stessi eventi vengono contati in entrambi i casi. Le slice di 5 minuti memorizzano un quinto della cronologia.",
+      "perSlice": "Ogni slice viene valutata come buona o cattiva nel suo insieme, quindi la larghezza è la quantità minima di budget che un singolo errore può consumare. Con un obiettivo del 99,9% su 7 giorni, una singola slice cattiva di 5 minuti consuma circa metà del budget. Scegli 1 minuto per obiettivi stringenti su finestre brevi."
     },
     "backfillNote": "Il backfill viene eseguito al salvataggio: a blocchi, dalla cronologia più recente. Gli avvisi restano congelati finché la copertura non supera la soglia minima.",
-    "budgetHint": "budget degli errori = {budget}",
+    "budgetHint": "budget di errore = {budget}",
     "budgetDays": "{n} giorni",
     "budgetHours": "{n} ore",
     "budgetMinutes": "{n} minuti",
@@ -19355,8 +19355,8 @@
       "all": "Tutti",
       "count": "Conteggio",
       "countDescription": "eventi buoni / eventi totali da una singola query",
-      "timeSlice": "Intervallo di tempo",
-      "timeSliceDescription": "una condizione per intervallo, es. p95 < 500 ms; disponibilità = intervalli buoni",
+      "timeSlice": "Slice temporale",
+      "timeSliceDescription": "una condizione per slice, es. p95 < 500 ms; disponibilità = slice buone",
       "alert": "Basato su avvisi",
       "alertDescription": "uptime di un avviso esistente"
     },
@@ -19421,13 +19421,13 @@
       "aggregate": "Aggregato",
       "aggregateHint": "Aggregato su ogni slice, poi confrontato con la soglia sottostante, es. approx_percentile_cont(duration_ms, 0.95)",
       "aggregatePromql": "Espressione PromQL",
-      "aggregatePromqlHint": "Uno stream di metriche viene interrogato in PromQL. L'espressione viene valutata alla fine di ogni intervallo e confrontata con la soglia sottostante, quindi assegna al suo selettore di intervallo la larghezza di un intervallo e riducila a una singola serie: histogram_quantile(0.95, sum by (le) (rate(http_latency_bucket[5m])))",
+      "aggregatePromqlHint": "Uno stream di metriche viene interrogato in PromQL. L'espressione viene valutata alla fine di ogni slice e confrontata con la soglia sottostante, quindi assegna al suo selettore di intervallo la larghezza di una slice e riducila a una singola serie: histogram_quantile(0.95, sum by (le) (rate(http_latency_bucket[5m])))",
       "countGoodPromql": "Eventi buoni (PromQL)",
       "countGoodPromqlHint": "Il numeratore: l'incremento del contatore sugli eventi che contano come buoni — di solito il contatore del totale ristretto da un selettore di etichette.",
       "countTotalPromql": "Eventi totali (PromQL)",
       "countTotalPromqlHint": "Il denominatore, non il complemento del numeratore: lo stesso contatore senza il filtro dei buoni. Lo SLI è buoni diviso totale.",
-      "countPromqlRangeHint": "Assegna a entrambe le espressioni un selettore di intervallo largo un intervallo — increase(http_requests_total[{range}]) per un intervallo di {range}. Una finestra più ampia o più stretta conta silenziosamente in eccesso o in difetto.",
-      "promqlAbsentHint": "Una metrica che smette di essere scritta continua a rispondere per alcuni minuti, quindi una lettura istantanea nota il silenzio in ritardo. Aggrega su una finestra uguale all'intervallo — avg_over_time(metric[5m]) per un intervallo di 5 minuti — così un intervallo senza campioni non restituisce nulla, ed è ciò che viene registrato come negativo.",
+      "countPromqlRangeHint": "Assegna a entrambe le espressioni un selettore di intervallo largo una slice — increase(http_requests_total[{range}]) per una slice di {range}. Una finestra più ampia o più stretta conta silenziosamente in eccesso o in difetto.",
+      "promqlAbsentHint": "Una metrica che smette di essere scritta continua a rispondere per alcuni minuti, quindi una lettura istantanea nota il silenzio in ritardo. Aggrega su una finestra uguale alla slice — avg_over_time(metric[5m]) per una slice di 5 minuti — così una slice senza campioni non restituisce nulla, ed è ciò che viene registrato come cattivo.",
       "comparator": "Comparatore",
       "threshold": "Soglia",
       "target": "Obiettivo",
@@ -19446,7 +19446,7 @@
     },
     "empty": {
       "title": "Ancora nessuno SLO",
-      "description": "Un SLO misura quale frazione di richieste, o di tempo, ha raggiunto un obiettivo e fornisce agli avvisi un budget di errori da consumare."
+      "description": "Un SLO misura quale frazione di richieste, o di tempo, ha raggiunto un obiettivo e fornisce agli avvisi un budget di errore da consumare."
     },
     "groups": {
       "emptyTitle": "Ancora nessun gruppo misurato",
@@ -19463,7 +19463,7 @@
     },
     "regenerate": {
       "title": "Questa modifica riavvia la misurazione",
-      "body": "Hai modificato il significato di intervallo, quindi inizia una nuova generazione e le misurazioni della finestra corrente vengono scartate. Modificare solo l'obiettivo non causerebbe questo; l'obiettivo viene applicato quando l'SLO viene letto."
+      "body": "Hai modificato il significato di una slice, quindi inizia una nuova generazione e le misurazioni della finestra corrente vengono scartate. Modificare solo l'obiettivo non causerebbe questo; l'obiettivo viene applicato quando l'SLO viene letto."
     },
     "alertSli": {
       "source": "Avviso sorgente",
@@ -19504,7 +19504,7 @@
     },
     "alert": {
       "sloLabel": "Obiettivo di livello di servizio",
-      "sloSummary": "target {target} · finestra mobile {window} · {slice} slice · tasso di consumo massimo ×{max}",
+      "sloSummary": "obiettivo {target} · finestra mobile {window} · {slice} slice · tasso di consumo massimo ×{max}",
       "suggested": "Configurazioni suggerite",
       "suggestedFor": "Righe suggerite per un SLO di {window}",
       "presetDetail": "{long} lungo / {short} corto · scatta al {budget}% del budget",
@@ -19525,10 +19525,10 @@
       "multiAlertHint": "Propaga l'avviso tra i gruppi dello SLO, ciascuno con il proprio stato.",
       "kind": {
         "burnRate": "Tasso di consumo",
-        "errorBudget": "Error budget"
+        "errorBudget": "Budget di errore"
       },
       "preset": {
-        "fast": "Consumo rapido: chiamata",
+        "fast": "Consumo rapido: notifica di reperibilità",
         "mid": "Consumo medio: notifica",
         "slow": "Consumo lento: ticket"
       }
@@ -19550,12 +19550,12 @@
       "needsPromqlDefinition": "Definisci entrambe le espressioni PromQL per l'anteprima",
       "sliceValues": "Valore della slice vs soglia",
       "sliceValue": "Valore della slice",
-      "sliceTally": "{sli}% di buono ({good}/{total} intervalli)",
-      "sliceGaps": "{n}/{total} slot in questo intervallo non hanno prodotto dati: non misurati, non negativi. La percentuale sopra è sul resto.",
+      "sliceTally": "{sli}% di buono ({good}/{total} slice)",
+      "sliceGaps": "{n}/{total} slot in questo intervallo non hanno prodotto dati: non misurati, non cattivi. La percentuale sopra è sul resto.",
       "thresholdLabel": "Soglia {value}",
       "noSlices": "Nessuna slice in questo intervallo per ora",
-      "multiSeries": "Questa espressione restituisce {n} serie e l'SLO non è raggruppato. Un intervallo contiene un valore, quindi le serie che cadono sullo stesso intervallo vengono eliminate e l'intervallo risulta non misurato. Riduci l'espressione a una singola serie o raggruppa l'SLO per le etichette che le distinguono.",
-      "multiSeriesGrouped": "Questa espressione restituisce {n} serie, una per gruppo, e l'SLO valuta ciascuna separatamente. L'anteprima legge un singolo valore per intervallo, quindi non può rappresentarle insieme.",
+      "multiSeries": "Questa espressione restituisce {n} serie e l'SLO non è raggruppato. Una slice contiene un valore, quindi le serie che cadono sulla stessa slice vengono eliminate e la slice risulta non misurata. Riduci l'espressione a una singola serie o raggruppa l'SLO per le etichette che le distinguono.",
+      "multiSeriesGrouped": "Questa espressione restituisce {n} serie, una per gruppo, e l'SLO valuta ciascuna separatamente. L'anteprima legge un singolo valore per slice, quindi non può rappresentarle insieme.",
       "loadFailed": "Impossibile eseguire la query di anteprima"
     },
     "chart": {
@@ -19575,10 +19575,10 @@
       "sli": "SLI",
       "unmeasured": "Non misurato",
       "errorsAffordable": "Errori ancora sostenibili",
-      "slicesAffordable": "Slice negative ancora sostenibili",
-      "budgetExplain": "Quanto del budget di errore è ancora non speso, eroso cumulativamente lungo la finestra. Ogni bucket aggiunge i suoi eventi negativi a un totale progressivo, quindi la linea scende sempre.",
-      "budgetFormula": "restante % = 100 × (1 − negativi finora ÷ budget)\nbudget = eventi totali nella finestra × (100% − target)\nnegativi = totali − buoni\n\nasse destro (errori ancora sostenibili):\n= budget × restante % ÷ 100",
-      "budgetFormulaPerSlice": "percentuale rimanente = 100 × (1 − errori finora ÷ budget)\nbudget = secondi misurati nella finestra × (100% − obiettivo)\n\nUn'intera slice è valutata buona o cattiva, quindi questo SLI conta i SECONDI.\n\nasse destro (slice cattive ancora sostenibili):\n= budget × percentuale rimanente ÷ 100 ÷ intervallo della slice",
+      "slicesAffordable": "Slice cattive ancora sostenibili",
+      "budgetExplain": "Quanto del budget di errore è ancora non speso, eroso cumulativamente lungo la finestra. Ogni bucket aggiunge i suoi eventi cattivi a un totale progressivo, quindi la linea scende sempre.",
+      "budgetFormula": "percentuale rimanente = 100 × (1 − cattivi finora ÷ budget)\nbudget = eventi totali nella finestra × (100% − obiettivo)\ncattivi = totali − buoni\n\nasse destro (errori ancora sostenibili):\n= budget × percentuale rimanente ÷ 100",
+      "budgetFormulaPerSlice": "percentuale rimanente = 100 × (1 − cattivi finora ÷ budget)\nbudget = secondi misurati nella finestra × (100% − obiettivo)\n\nUn'intera slice è valutata buona o cattiva, quindi questo SLI conta i SECONDI.\n\nasse destro (slice cattive ancora sostenibili):\n= budget × percentuale rimanente ÷ 100 ÷ intervallo della slice",
       "budgetNote": "L'ultimo punto equivale al riquadro Budget rimanente sopra. La linea tratteggiata allo 0% è l'esaurimento; al di sotto di essa, l'SLO ha speso più errori di quanto l'obiettivo consenta. Le lacune sono bucket senza nulla misurato, che non è la stessa cosa di zero.",
       "burnExplain": "Quanto velocemente il budget si consuma in ogni singolo bucket, come multiplo del tasso neutro rispetto al budget.",
       "burnFormula": "tasso di consumo = (100% − SLI) ÷ (100% − obiettivo)\nSLI = 100 × buoni ÷ totale, per quel singolo bucket\n\nasse destro (la stessa linea letta come SLI):\nSLI = 100% − tasso di consumo × (100% − obiettivo)",
@@ -19596,7 +19596,7 @@
       "loadFailed": "Impossibile caricare gli avvisi di questo SLO.",
       "editTargetMissing": "Questo avviso non è più su questo SLO.",
       "describeBurn": "Tasso di consumo > {critical} su {long} e {short}",
-      "describeBudget": "Budget errori consumato > {critical}%"
+      "describeBudget": "Budget di errore consumato > {critical}%"
     },
     "validation": {
       "nameRequired": "Il nome dello SLO è obbligatorio.",
@@ -19614,7 +19614,7 @@
       "thresholdRequired": "La soglia è obbligatoria",
       "thresholdNumber": "La soglia deve essere un numero",
       "alertSourceRequired": "L'avviso di origine è obbligatorio",
-      "groupedSlice": "Gli SLO raggruppati devono usare un intervallo di 5 minuti",
+      "groupedSlice": "Gli SLO raggruppati devono usare una slice di 5 minuti",
       "alertCannotGroup": "Un SLI basato su avvisi non può essere raggruppato",
       "frequencyRequired": "La frequenza è obbligatoria",
       "frequencyPositive": "La frequenza deve essere di almeno 1 minuto",
@@ -21980,7 +21980,7 @@
     "rotationNameHint": "I livelli di escalation fanno riferimento a questa posizione per nome. La rinomina è sicura.",
     "rotationNameClash": "{name} usa già questo nome.",
     "rotationSectionRules": "Regole dei turni",
-    "rotationNeedsRules": "Aggiungi una regola di turno — una rotazione senza regole non allerta nessuno.",
+    "rotationNeedsRules": "Aggiungi una regola di turno — una rotazione senza regole non avvisa nessuno.",
     "rotationRuleCount": "{count} regola | {count} regole",
     "rotationOnCallNow": "Reperibile",
     "rotationUpNext": "Prossimo",
@@ -23628,10 +23628,10 @@
     "problems": {
       "ordersDisk": {
         "title": "orders-db esaurirà lo spazio su disco in circa 3 giorni",
-        "summary": "Il suo disco si riempie di circa 18 GB al giorno da quando il rilascio di orders di giovedì ha attivato l'audit logging, quindi si riempirà intorno a mercoledì mattina. Quando accadrà, checkout, orders e refunds inizieranno a fallire. Non è ancora nulla di rotto, quindi ho inviato un avviso preventivo al tuo team invece di una chiamata di reperibilità.",
+        "summary": "Il suo disco si riempie di circa 18 GB al giorno da quando il rilascio di orders di giovedì ha attivato l'audit logging, quindi si riempirà intorno a mercoledì mattina. Quando accadrà, checkout, orders e refunds inizieranno a fallire. Non è ancora nulla di rotto, quindi ho inviato un avviso preventivo al tuo team invece di una notifica di reperibilità.",
         "notify1": "orders-db esaurirà lo spazio su disco in circa 3 giorni, intorno a mercoledì 11:00.",
         "notify2": "Causa: da quando orders 3.8.0 è stato rilasciato giovedì, l'audit logging scrive circa 18 GB al giorno. Prima il disco cresceva di circa 6 GB al giorno.",
-        "notify3": "Riduci di nuovo l'audit logging o aggiungi spazio su disco prima di mercoledì. Quando si riempirà, checkout, orders e refunds falliranno. Non è ancora nulla di rotto, quindi questo è un avviso preventivo, non una chiamata di reperibilità.",
+        "notify3": "Riduci di nuovo l'audit logging o aggiungi spazio su disco prima di mercoledì. Quando si riempirà, checkout, orders e refunds falliranno. Non è ancora nulla di rotto, quindi questo è un avviso preventivo, non una notifica di reperibilità.",
         "chartCaption": "disco · pieno ~mer 11:00",
         "chartLabel": "L'uso del disco è cresciuto da 334 a 445 GB su 500 in 14 giorni, più rapidamente da giovedì, e si prevede che sarà pieno intorno a mercoledì 11:00"
       },
@@ -23662,7 +23662,7 @@
         "summary": "Connessioni non rilasciate hanno esaurito tutte quelle libere e i pagamenti hanno iniziato ad andare in timeout. Hai approvato la loro chiusura, quindi l'ho fatto. I pagamenti si sono ripresi 2 minuti dopo.",
         "notify1": "Checkout ha esaurito le connessioni al database e circa 1 pagamento su 9 va in timeout dalle 11:18.",
         "notify2": "Causa: 48 connessioni su 50 sono tenute da esportazioni di rimborsi che non le hanno mai restituite. È la perdita CHK-482, terza volta in due settimane.",
-        "notify3": "Chiudere solo le connessioni non rilasciate dovrebbe risolvere; i pagamenti in corso non vengono toccati. Rispondi \"sì\" e lo farò.",
+        "notify3": "Chiudere solo le connessioni non rilasciate dovrebbe risolvere; i pagamenti in corso non vengono toccati. Rispondi \"yes\" e lo faccio.",
         "chartCaption": "timeout · picco 1 su 9",
         "chartLabel": "I timeout dei pagamenti sono saliti a circa 1 su 9 alle 11:18 e si sono ripresi 2 minuti dopo la correzione alle 11:21"
       },
@@ -23732,19 +23732,19 @@
       },
       "poolSep": {
         "title": "Checkout ha esaurito le connessioni al database",
-        "summary": "Le connessioni perse hanno esaurito tutte quelle libere e i pagamenti hanno iniziato ad andare in timeout. Ho risalito la perdita fino alle esportazioni dei rimborsi e hai approvato la chiusura delle connessioni perse. I pagamenti si sono ripresi 2 minuti dopo.",
+        "summary": "Le connessioni non rilasciate hanno esaurito tutte quelle libere e i pagamenti hanno iniziato ad andare in timeout. Ho risalito la perdita fino alle esportazioni dei rimborsi e hai approvato la chiusura delle connessioni non rilasciate. I pagamenti si sono ripresi 2 minuti dopo.",
         "notify1": "Checkout ha esaurito le connessioni al database e circa 1 pagamento su 9 va in timeout, dalle 15:42.",
         "notify2": "Causa: 47 connessioni su 50 sono occupate da esportazioni di rimborsi che non le hanno mai restituite. Sembra una perdita nel codice dell'esportazione dei rimborsi.",
-        "notify3": "Chiudere solo le connessioni perse dovrebbe risolvere; i pagamenti in corso non vengono toccati. Rispondi \"yes\" e procedo.",
+        "notify3": "Chiudere solo le connessioni non rilasciate dovrebbe risolvere; i pagamenti in corso non vengono toccati. Rispondi \"yes\" e lo faccio.",
         "chartCaption": "timeout · picco 1 su 9",
         "chartLabel": "I timeout dei pagamenti sono saliti a circa 1 su 9 alle 15:42 e si sono ripresi 2 minuti dopo la correzione alle 15:45"
       },
       "poolOct": {
         "title": "Checkout ha esaurito di nuovo le connessioni al database",
-        "summary": "Era la stessa perdita dell'esportazione dei rimborsi (CHK-482). Hai approvato la chiusura delle connessioni perse e i pagamenti si sono ripresi 2 minuti dopo.",
+        "summary": "Era la stessa perdita dell'esportazione dei rimborsi (CHK-482). Hai approvato la chiusura delle connessioni non rilasciate e i pagamenti si sono ripresi 2 minuti dopo.",
         "notify1": "Checkout ha esaurito le connessioni al database e circa 1 pagamento su 9 va in timeout, dalle 10:05.",
         "notify2": "Causa: 46 connessioni su 50 sono occupate dalle esportazioni di rimborsi. È di nuovo la perdita CHK-482, la seconda volta in 8 giorni.",
-        "notify3": "Chiudere solo le connessioni perse dovrebbe risolvere; i pagamenti in corso non vengono toccati. Rispondi \"yes\" e procedo.",
+        "notify3": "Chiudere solo le connessioni non rilasciate dovrebbe risolvere; i pagamenti in corso non vengono toccati. Rispondi \"yes\" e lo faccio.",
         "chartCaption": "timeout · picco 1 su 9",
         "chartLabel": "I timeout dei pagamenti sono saliti a circa 1 su 9 alle 10:05 e si sono ripresi 2 minuti dopo la correzione alle 10:08"
       },
@@ -24074,8 +24074,8 @@
         "euStopped": "Non è arrivato nulla dal cluster {cluster} da questo momento. Te l'ho detto qui e su Slack.",
         "fridaySummary": "Ho inviato il riepilogo di venerdì con {count} problema minore. | Ho inviato il riepilogo di venerdì con {count} problemi minori.",
         "emailHeld": "Ho trattenuto un problema minore con le email degli ordini per il riepilogo di venerdì.",
-        "poolFixed": "Ho chiuso le connessioni al database rimaste aperte di checkout. I pagamenti si sono ripresi 2 minuti dopo.",
-        "poolApproved": "Hai approvato la chiusura delle connessioni al database lasciate aperte da checkout.",
+        "poolFixed": "Ho chiuso le connessioni al database non rilasciate di checkout. I pagamenti si sono ripresi 2 minuti dopo.",
+        "poolApproved": "Hai approvato la chiusura delle connessioni al database non rilasciate di checkout.",
         "billingWatch": "Ho iniziato a monitorare billing-api, billing-worker e invoice-service.",
         "checkoutPaged": "Ho avvisato la reperibilità per i pagamenti non riusciti di checkout.",
         "recsHeld": "Ho messo da parte un problema minore con recommendations per il riepilogo di venerdì.",
@@ -24145,7 +24145,7 @@
       "excluded": "Servizi che dovrei ignorare",
       "excludedNone": "Nessuno",
       "kinds": {
-        "pool": "Chiudi le connessioni al database rimaste aperte",
+        "pool": "Chiudi le connessioni al database non rilasciate",
         "queueWorker": "Aggiungi worker della coda durante un arretrato",
         "retune": "Alza la soglia di un avviso rumoroso",
         "rollback": "Esegui il rollback di un deploy",

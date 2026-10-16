@@ -124,7 +124,7 @@
     },
     "noRoleLimits": {
       "title": "Geen rollimieten geconfigureerd",
-      "description": "Rollimieten bepalen de opname- en queryquota die worden toegepast op individuele rollen binnen een organisatie."
+      "description": "Rollimieten bepalen de ingestie- en queryquota die worden toegepast op individuele rollen binnen een organisatie."
     },
     "noIngestionTokens": {
       "title": "Nog geen ingestietokens",
@@ -294,7 +294,7 @@
     },
     "noStreams": {
       "title": "Sluit een bron aan om je eerste stream te maken",
-      "description": "Streams worden automatisch aangemaakt op het moment dat gegevens binnenkomen. Stel de opname via je app, agent of verzamelaar in om aan de slag te gaan.",
+      "description": "Streams worden automatisch aangemaakt op het moment dat gegevens binnenkomen. Stel de ingestie via je app, agent of verzamelaar in om aan de slag te gaan.",
       "action": "Ingestie instellen",
       "actionDesc": "Een gegevensbron aansluiten",
       "createAction": "Nieuwe stream",
@@ -868,7 +868,7 @@
     "removeField": "Verwijder {name}",
     "dialog": "Dialoog",
     "drawer": "Zijpaneel",
-    "warningIngestionQuota": "Waarschuwing: {percent}% van de opnamelimiet gebruikt",
+    "warningIngestionQuota": "Waarschuwing: {percent}% van de ingestielimiet gebruikt",
     "notificationsCount": "{count} meldingen",
     "failedTimesInWindow": "Mislukt {count} keer in dit venster",
     "loadingLabel": "Laden",
@@ -2408,7 +2408,7 @@
     "your_complete_license_key": "Uw volledige licentiesleutel:",
     "copy_key": "Sleutel kopiëren",
     "usage_information": "Informatie over het gebruik",
-    "license_allows_ingestion": "De huidige licentie staat <strong>{limit} GB</strong> aan gegevensopname per dag toe.",
+    "license_allows_ingestion": "De huidige licentie staat <strong>{limit} GB</strong> aan data-ingestie per dag toe.",
     "license_allows_unlimited_ingestion": "De huidige licentie staat onbeperkte gegevensinvoer toe.",
     "limit_exceeded_days": "De limiet werd overschreden op <strong class=\"{colorClass}\">{days} dag</strong> deze maand | De limiet werd overschreden op <strong class=\"{colorClass}\">{days} dagen</strong> deze maand",
     "limit_exceeded_warning": ", terwijl het maximum {max} dag is. Als gevolg hiervan kunnen sommige applicatiefuncties tijdelijk worden beperkt | , terwijl het maximum {max} dagen is. Als gevolg hiervan kunnen sommige applicatiefuncties tijdelijk worden beperkt",
@@ -2577,7 +2577,7 @@
         },
         "rate_limiting": {
           "name": "Snelheidsbeperking",
-          "note": "Controleer de vraag- en opnamesnelheden"
+          "note": "Controleer de query- en ingestiesnelheden"
         },
         "broadcast_join": {
           "name": "Uitzenden Doe mee",
@@ -5043,7 +5043,7 @@
     },
     "manageTokensBtnLabel": "Tokens beheren",
     "orgLevelExplanation": "Dit zijn ingestietokens op organisatieniveau. Ze zijn niet gebonden aan individuele gebruikers en blijven werken, zelfs als de gebruiker die ze heeft aangemaakt de organisatie verlaat. Tokens kunnen alleen worden gebruikt op ingestie-eindpunten.",
-    "orgLevelSummary": "Tokens op organisatieniveau voor eindpunten voor opname.",
+    "orgLevelSummary": "Tokens op organisatieniveau voor ingestie-eindpunten.",
     "tokenManagementTitle": "Ingestietokens beheren",
     "createTokenBtn": "Maak een nieuw token",
     "createTokenTitle": "Token aanmaken",
@@ -5052,7 +5052,7 @@
     "tokenDescriptionLabel": "Omschrijving",
     "tokenAuthHeader": "Autorisatie",
     "authHeaderLabel": "Autorisatiekop (klaar voor gebruik)",
-    "authHeaderHelp": "Plak dit in de autorisatiekop van uw opnameverzoek — geen handmatige codering nodig.",
+    "authHeaderHelp": "Plak dit in de autorisatiekop van uw ingestieverzoek — geen handmatige codering nodig.",
     "copyAuthHeaderBtn": "Koptekst voor autorisatie kopiëren",
     "copyRawTokenBtn": "Kopieer het onbewerkte token",
     "newTokenRevealed": "Nieuw token gegenereerd",
@@ -7441,7 +7441,7 @@
     "rtAlert": "Waarschuwingen in realtime",
     "noDataState": {
       "title": "Nog geen gegevens opgenomen",
-      "description": "Deze organisatie heeft geen gegevens ontvangen, dus er is niets om in kaart te brengen. Zodra de gebeurtenissen beginnen te verlopen, worden hier automatisch uw <strong>opnamevolume, opslag en querygebruik</strong> weergegeven.",
+      "description": "Deze organisatie heeft geen gegevens ontvangen, dus er is niets om in kaart te brengen. Zodra de gebeurtenissen beginnen te verlopen, worden hier automatisch uw <strong>ingestievolume, opslag en querygebruik</strong> weergegeven.",
       "logs": "Logs verzenden",
       "logsDesc": "{product1}, {product2}, {product3}, {product4} en meer",
       "traces": "Verstuur traces",
@@ -7711,7 +7711,7 @@
       },
       "alert": {
         "title": "Een alarm aanmaken",
-        "description": "Drempelwaarden of geplande alarmen en VRL-pipelines die tijdens de looptijd worden gebruikt.",
+        "description": "Drempel- of geplande alarmen en VRL-pipelines die tijdens de ingestie worden uitgevoerd.",
         "prompt": "Help me een alarm of pipeline aan te maken"
       }
     },
@@ -7865,11 +7865,11 @@
     "usageTrends": {
       "dailyUsage": "Dagelijks gebruik",
       "enableTitle": "Bekijk uw dagelijkse gebruik",
-      "enableSubtitle": "Schakel gebruiksrapportage in om uw opname- en queryvolume dagelijks in kaart te brengen. Uw totalen hierboven blijven in beide gevallen beschikbaar.",
+      "enableSubtitle": "Schakel gebruiksrapportage in om uw ingestie- en queryvolume dagelijks in kaart te brengen. Uw totalen hierboven blijven in beide gevallen beschikbaar.",
       "enableButton": "Gebruiksrapportage inschakelen",
       "enablePending": "Gebruiksrapportage ingeschakeld. Uw dagelijkse grafiek begint zich binnenkort te vullen zodra nieuw gebruik wordt geregistreerd.",
       "enableConfirmTitle": "Gebruiksrapportage inschakelen?",
-      "enableConfirmMessage": "Hiermee begint het vastleggen van het gebruik van uw organisatie naar een eigen stream, zodat we het dagelijkse opname- en queryvolume in kaart kunnen brengen. Dit is alleen van toepassing op deze organisatie en kan later worden uitgeschakeld in de organisatie-instellingen.",
+      "enableConfirmMessage": "Hiermee begint het vastleggen van het gebruik van uw organisatie naar een eigen stream, zodat we het dagelijkse ingestie- en queryvolume in kaart kunnen brengen. Dit is alleen van toepassing op deze organisatie en kan later worden uitgeschakeld in de organisatie-instellingen.",
       "waitingTitle": "Wachten op gebruiksgegevens",
       "waitingForData": "Uw dagelijkse grafiek verschijnt hier zodra het gebruik voor deze organisatie wordt gerapporteerd."
     },
@@ -9157,13 +9157,13 @@
       "helpPreviewHeading": "Een sjabloon bekijken",
       "helpPreviewSelectPlaceholder": "Selecteer een sjabloon om een voorbeeld te bekijken",
       "helpApplyToAlert": "Op alarm toepassen",
-      "helpVariablesExplain": "Variabelen zijn uw eigen waarden die u in een meldingsbericht kunt plaatsen. Geef ze hier allemaal een naam en een waarde en schrijf vervolgens {'{'} your_name {'}'} op een willekeurige plek in de sjabloon — deze wordt ingevuld wanneer het alarm afgaat.",
+      "helpVariablesExplain": "Variabelen zijn uw eigen waarden die u in een meldingsbericht kunt plaatsen. Geef ze hier allemaal een naam en een waarde en schrijf vervolgens {'{'}your_name{'}'} op een willekeurige plek in de sjabloon — deze wordt ingevuld wanneer het alarm afgaat.",
       "helpBuiltInHeading": "Bekijk de ingebouwde variabelen",
       "helpBuiltInIntro": "{product} vult deze automatisch in — klik op een om het te kopiëren.",
-      "helpBuiltInFooter": "De velden van je stream werken ook als variabelen. Geavanceerd: {'{'} Rows:n {'}'} beperkt het aantal rijen dat wordt weergegeven; {'{'} var:n {'}'} verkort een waarde.",
+      "helpBuiltInFooter": "De velden van je stream werken ook als variabelen. Geavanceerd: {'{'}rows:N{'}'} beperkt het aantal rijen dat wordt weergegeven; {'{'}var:N{'}'} verkort een waarde.",
       "helpYourVariablesHeading": "Variabelen die je hebt toegevoegd",
       "helpYourVariablesEmpty": "Je hebt nog geen variabelen toegevoegd.",
-      "helpRowTemplateExplain": "Een alarm kan met veel rijen overeenkomen. De rijsjabloon bepaalt hoe een enkele rij eruitziet. Vervolgens worden {'{'} rijen {'}'} in je hoofdsjabloon weergegeven in elke overeenkomende rij, die al is opgemaakt.",
+      "helpRowTemplateExplain": "Een alarm kan met veel rijen overeenkomen. De rijsjabloon bepaalt hoe een enkele rij eruitziet. Vervolgens worden {'{'}rows{'}'} in je hoofdsjabloon weergegeven in elke overeenkomende rij, die al is opgemaakt.",
       "helpRowTemplateTypeHeading": "String versus JSON",
       "helpRowTemplateTypeExplain": "String produceert platte tekst per rij. JSON produceert een JSON-object per rij, geschikt voor gestructureerde bestemmingen.",
       "helpRowTemplateTypeCurrent": "Momenteel geselecteerd:",
@@ -9180,10 +9180,10 @@
       "helpTemplateWhenHeading": "Wanneer moet ik overschrijven?",
       "helpTemplateWhenDesc": "Laat dit leeg en elke bestemming gebruikt zijn eigen sjabloon. Stel een overschrijving in wanneer je wilt dat dit ene alarm hetzelfde, consistente bericht naar elke bestemming stuurt — zonder de sjabloon van elke bestemming te bewerken.",
       "helpRowTemplateWhyHeading": "Waarom een rijsjabloon?",
-      "helpRowTemplateWhyDesc": "Een alarm kan veel records evenaren. Het rijsjabloon formatteert één record; {'{'} rows {'}'} plaatst vervolgens elk opgemaakte record in de hoofdsjabloon, zodat je alle overeenkomsten opsomt zonder een lus te schrijven.",
-      "helpRowTemplateExampleCaption": "Elke overeenkomende rij wordt opgemaakt volgens het rijsjabloon, en in {'{'} rows {'}'} worden ze vervolgens allemaal in de hoofdsjabloon geplaatst:",
+      "helpRowTemplateWhyDesc": "Een alarm kan veel records evenaren. Het rijsjabloon formatteert één record; {'{'}rows{'}'} plaatst vervolgens elk opgemaakte record in de hoofdsjabloon, zodat je alle overeenkomsten opsomt zonder een lus te schrijven.",
+      "helpRowTemplateExampleCaption": "Elke overeenkomende rij wordt opgemaakt volgens het rijsjabloon, en in {'{'}rows{'}'} worden ze vervolgens allemaal in de hoofdsjabloon geplaatst:",
       "helpRowTemplateExampleRowLabel": "Rijsjabloon (formatteert één record)",
-      "helpRowTemplateExampleMainLabel": "Hoofdsjabloon (gebruikt {'{'} rijen {'}'})",
+      "helpRowTemplateExampleMainLabel": "Hoofdsjabloon (gebruikt {'{'}rows{'}'})",
       "helpRowTemplatePreviewEmpty": "Nog geen rijsjabloon — typ er een op het tabblad Aanvullende instellingen om het hier te bekijken.",
       "helpPreviewSelectEmpty": "Kies hierboven een sjabloon om een voorbeeld te bekijken van het bericht dat zou worden verzonden.",
       "helpCurrentBodyEmpty": "Dit sjabloon heeft geen hoofdtekst om vooraf te bekijken.",
@@ -10391,7 +10391,7 @@
     "alertCount": "{count} melding | {count} meldingen",
     "noCollectorTitle": "Niets hier komt nog overeen met uw gegevens.",
     "noCollectorDescription": "Geen van deze {count} meldingen voert een query uit op een stream die deze organisatie ontvangt. Stuur {group}-telemetrie naar OpenObserve en ze lichten hier op.",
-    "setupGuide": "Opnamehandleiding",
+    "setupGuide": "Ingestiehandleiding",
     "emptyLibraryTitle": "De alertbibliotheek is leeg",
     "emptyLibraryDescription": "De catalogus is geladen maar bevat geen alarmen. Dit is een publicatieprobleem, geen filter — probeer het binnenkort opnieuw.",
     "noMatchesTitle": "Geen alarmen voldoen aan deze filters",
@@ -10430,7 +10430,7 @@
       "neverIngested": "Nog geen gegevens",
       "neverIngestedCallout": "{stream} bestaat maar heeft nooit gegevens ontvangen, dus dit alarm heeft niets om op af te gaan.",
       "lastData": "Laatste gegevens {when}",
-      "staleCallout": "{stream} ontving voor het laatst gegevens {when}. Dit alarm blijft stil totdat de opname wordt hervat.",
+      "staleCallout": "{stream} ontving voor het laatst gegevens {when}. Dit alarm blijft stil totdat de ingestie wordt hervat.",
       "unknownTime": "op een onbekend tijdstip"
     },
     "install": {
@@ -11433,7 +11433,7 @@
     "tracesHeading": "Traces",
     "traceIdFieldName": "Veldnaam trace-ID",
     "spanIdFieldName": "Veldnaam span-ID",
-    "toggleIngestionLogsLabel": "Logs voor opname in- en uitschakelen",
+    "toggleIngestionLogsLabel": "Ingestielogs in- en uitschakelen",
     "usageStreamEnabledLabel": "Usage Stream inschakelen",
     "redInsightsEnabledLabel": "Automatische RED-inzichten voor traces inschakelen",
     "redInsightsEnabledHelp": "Maakt anomaliedetectoren voor frequentie, fouten en p95-latentie aan voor de drukste services, in de alarmmap \"RED insights\". Alleen beheerders zien die map totdat deze wordt gedeeld.",
@@ -11478,7 +11478,7 @@
     "blockAllUsersFromDomain": "Blokkeer alle gebruikers van {domain}",
     "allUsersAllowedMessage": "Alle gebruikers met e-mailadressen die eindigen op {domain} kunnen inloggen.",
     "allUsersBlockedMessage": "Alle externe SSO-gebruikers met e-mailadressen die eindigen op {domain} worden geblokkeerd van het systeem (UI, API en ingestie).",
-    "blockedUsersHint": "Geblokkeerde vermeldingen zijn alleen van toepassing op externe SSO-identiteiten (SSO-gebruikers en SSO-/tokenserviceaccounts). Ze negeren elke toestemingsregel en hebben betrekking op de gebruikersinterface, API en opname. Native accounts en door de API aangemaakte accounts worden niet beïnvloed. Verwijder ze in plaats daarvan.",
+    "blockedUsersHint": "Geblokkeerde vermeldingen zijn alleen van toepassing op externe SSO-identiteiten (SSO-gebruikers en SSO-/tokenserviceaccounts). Ze negeren elke toestemingsregel en hebben betrekking op de gebruikersinterface, API en ingestie. Native accounts en door de API aangemaakte accounts worden niet beïnvloed. Verwijder ze in plaats daarvan.",
     "addBlockedEmail": "E-mailadres blokkeren",
     "blockedEmailPlaceholder": "bijv. gebruiker{domain}",
     "domainNeedsBlockedEmails": "Domein '{domain}' moet minstens één e-mailadres hebben om specifieke gebruikers te kunnen blokkeren",
@@ -11540,7 +11540,7 @@
     "deleteFactMembers": "Raakt {n} lid | Raakt {n} leden",
     "deleteFactMembersDetail": "Alle toegang wordt onmiddellijk ingetrokken",
     "deleteOrganizationConfirm": "Hiermee worden \"{name}\" en alle bijbehorende streams, dashboards, alarmen, pipelines, gebruikers en instellingen ingepland voor verwijdering.",
-    "deleteOrganizationWarning": "De organisatie is onmiddellijk niet meer beschikbaar en wordt verborgen voor iedereen die haar gebruikt. Opname wordt geblokkeerd en geplande alarmen, pipelines en rapporten stoppen, dus er worden geen meldingen verzonden zolang de verwijdering gepland staat.",
+    "deleteOrganizationWarning": "De organisatie is onmiddellijk niet meer beschikbaar en wordt verborgen voor iedereen die haar gebruikt. Ingestie wordt geblokkeerd en geplande alarmen, pipelines en rapporten stoppen, dus er worden geen meldingen verzonden zolang de verwijdering gepland staat.",
     "deleteOrganizationRecoverable": "Tijdens het herstelvenster kan het nog worden teruggehaald, maar niet door jou — je verliest toegang tot deze organisatie zodra de verwijdering start, en alleen OpenObserve-support kan het herstellen. Zodra het venster sluit, worden de gegevens permanent verwijderd en kunnen ze door niemand worden hersteld.",
     "deleteOrganizationTypeToConfirm": "Typ ter bevestiging {name} hieronder:",
     "deleteOrganizationInitiated": "Organisatie gepland voor verwijdering. Deze is nu verborgen; neem contact op met support om deze te herstellen voordat het herstelvenster sluit.",
@@ -13320,7 +13320,7 @@
     "error_summary": "Samenvatting van de fout",
     "node_errors": "Knooppuntfouten",
     "close": "Sluiten",
-    "resume_pipeline_title": "De opname van de pipeline hervatten",
+    "resume_pipeline_title": "De ingestie van de pipeline hervatten",
     "state": "Status",
     "stateActive": "Actief",
     "statePaused": "Gepauzeerd",
@@ -16175,7 +16175,7 @@
       "otelDesc": "Leveranciersonafhankelijke OTLP-ingestie voor logs, traces en metrieken.",
       "or": "Of:",
       "aws": "AWS/CloudWatch",
-      "askAi": "Vraag AI om de opname in te stellen"
+      "askAi": "Vraag AI om de ingestie in te stellen"
     },
     "noStream": {
       "title": "Kies een stream om te beginnen met verkennen",
@@ -18276,7 +18276,7 @@
       "panelEditor": "Paneel-editor",
       "traceDetail": "Trace-detail",
       "runningQueries": "Zoekopdrachten uitvoeren",
-      "ingestionTokens": "IAM — Tokens voor opname",
+      "ingestionTokens": "IAM — Ingestietokens",
       "syntheticsTokens": "IAM — Synthetics-tokens",
       "alertIncidents": "Alarmen — Incidenten",
       "pipelineDestinations": "Pipelines — Bestemmingen",
@@ -19457,7 +19457,7 @@
       "body": "Slechts {coverage} van dit venster is gemeten, onder de {floor}-ondergrens. De SLO wordt gelezen als geen gegevens en de alarmen worden niet geactiveerd noch opgelost, dus ongemeten tijd wordt nooit gerapporteerd als uptime.",
       "alertGapsBody": "Slechts {coverage} van dit venster is gemeten, onder de ondergrens van {floor}: het bronalarm evalueerde de rest niet, of het nu gepauzeerd, gedempt of falend was. De SLO wordt gelezen als geen gegevens en zijn alarmen activeren noch herstellen, dus ongemeten tijd wordt nooit als uptime gerapporteerd.",
       "alertStaleTitle": "Bevroren: het bronalarm is gestopt met evalueren",
-      "alertStaleBody": "De bron-alarm heeft sinds {since} niet geëvalueerd, dus de meting is bevroren: het venster blijft zoals het was en de alarmen van de SLO activeren noch herstellen. De cijfers hieronder zijn de laatste echte meting, niet de huidige toestand.",
+      "alertStaleBody": "Het bronalarm heeft sinds {since} niet geëvalueerd, dus de meting is bevroren: het venster blijft zoals het was en de alarmen van de SLO activeren noch herstellen. De cijfers hieronder zijn de laatste echte meting, niet de huidige toestand.",
       "measuringSinceTitle": "Meten sinds {since}",
       "measuringSinceBody": "Deze SLO heeft {measured} van de {window} dagen geschiedenis: er is geen bruikbaar record van het bronalarm vóór {since}. Elk cijfer hieronder beschrijft de daadwerkelijk gemeten dagen, niet het volledige venster, en het venster vult zich naarmate de tijd verstrijkt."
     },

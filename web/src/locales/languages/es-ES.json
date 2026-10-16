@@ -43,7 +43,7 @@
     "allCaughtUp": "Estás al día",
     "noPanels": {
       "title": "Aún no hay paneles aquí",
-      "description": "Agrega un panel para empezar a visualizar registros, métricas y trazas.",
+      "description": "Agrega un panel para empezar a visualizar logs, métricas y trazas.",
       "action": "Añadir panel",
       "actionDesc": "Gráficos, tablas y más"
     },
@@ -56,22 +56,22 @@
       "actionDesc": "Restablecer todos los filtros aplicados"
     },
     "noLogs": {
-      "title": "No hay registros en este rango",
-      "description": "No hemos encontrado ningún registro para el stream y el intervalo de tiempo seleccionados. Prueba con un intervalo de tiempo más amplio o con un stream diferente.",
+      "title": "No hay logs en este rango",
+      "description": "No hemos encontrado ningún log para el stream y el intervalo de tiempo seleccionados. Prueba con un intervalo de tiempo más amplio o con un stream diferente.",
       "action": "Ampliar el rango de tiempo",
       "actionDesc": "Buscar en un periodo más largo"
     },
     "noPatterns": {
       "title": "No se ha encontrado ningún patrón",
-      "description": "Intente aumentar el intervalo de tiempo o seleccionar un stream diferente con más datos de registro. La extracción de patrones funciona mejor con al menos 1000 registros.",
-      "logsAnalyzed": "Solo se analizaron los registros de {count}."
+      "description": "Intente aumentar el intervalo de tiempo o seleccionar un stream diferente con más datos de logs. La extracción de patrones funciona mejor con al menos 1000 logs.",
+      "logsAnalyzed": "Solo se analizaron {count} logs."
     },
     "noStreamSelected": {
       "title": "Selecciona un stream para empezar",
       "description": "Elige un stream y, a continuación, ejecuta la consulta para explorar sus datos. Refina los resultados con filtros y un intervalo de tiempo personalizado."
     },
     "noQueryApplied": {
-      "title": "Ejecute una consulta para ver los registros",
+      "title": "Ejecute una consulta para ver los resultados",
       "description": "Ajusta los filtros y haz clic en «Ejecutar consulta» para cargar los eventos de este stream.",
       "action": "Ejecutar consulta",
       "actionDesc": "Cargar eventos para los filtros seleccionados"
@@ -127,8 +127,8 @@
       "description": "Los límites de funciones definen las cuotas de ingesta y consulta que se aplican a las funciones individuales de una organización."
     },
     "noIngestionTokens": {
-      "title": "Aún no hay tokens de ingestión",
-      "description": "Los tokens de ingesta autentican las fuentes de datos al enviar registros, métricas y trazas.",
+      "title": "Aún no hay tokens de ingesta",
+      "description": "Los tokens de ingesta autentican las fuentes de datos al enviar logs, métricas y trazas.",
       "action": "Nuevo token",
       "actionDesc": "Generar un token de ingesta"
     },
@@ -172,7 +172,7 @@
     },
     "noEnrichmentTables": {
       "title": "Aún no hay tablas de enriquecimiento",
-      "description": "Las tablas de enriquecimiento le permiten adjuntar contexto adicional a los datos de registro en el momento de la consulta.",
+      "description": "Las tablas de enriquecimiento le permiten adjuntar contexto adicional a los datos de logs en el momento de la consulta.",
       "action": "Mesa nueva",
       "actionDesc": "Crear una tabla de enriquecimiento"
     },
@@ -204,7 +204,7 @@
     },
     "noSourceMaps": {
       "title": "No se han subido mapas de origen",
-      "description": "Cargue los source maps para que los stack traces sean legibles en sus reportes de errores de RUM.",
+      "description": "Cargue los source maps para que los stack traces sean legibles en sus informes de errores de RUM.",
       "action": "Cargar",
       "actionDesc": "Cargar un archivo de mapa fuente"
     },
@@ -294,8 +294,8 @@
     },
     "noStreams": {
       "title": "Conecta una fuente para crear tu primer stream",
-      "description": "Los streams se crean automáticamente en el momento en que llegan los datos. Configura la ingesta desde tu aplicación, agente o recopilador para empezar.",
-      "action": "Configurar la ingestión",
+      "description": "Los streams se crean automáticamente en el momento en que llegan los datos. Configura la ingesta desde tu aplicación, agente o colector para empezar.",
+      "action": "Configurar la ingesta",
       "actionDesc": "Conectar una fuente de datos",
       "createAction": "Nuevo stream",
       "createActionDesc": "Definir manualmente un esquema de stream"
@@ -399,9 +399,9 @@
       "actionDesc": "Invita a un compañero de equipo por correo electrónico"
     },
     "noReports": {
-      "title": "Aún no hay reportes",
-      "description": "Programa un reporte para recibir los Dashboards en tu bandeja de entrada.",
-      "action": "Nuevo reporte",
+      "title": "Aún no hay informes",
+      "description": "Programa un informe para recibir los Dashboards en tu bandeja de entrada.",
+      "action": "Nuevo informe",
       "actionDesc": "Programe la entrega de un Dashboard"
     },
     "noVariables": {
@@ -449,7 +449,7 @@
       "searches": "búsquedas",
       "searchJobs": "trabajos de búsqueda",
       "users": "usuarios",
-      "reports": "reportes",
+      "reports": "informes",
       "queries": "consultas",
       "serviceAccounts": "cuentas de servicio",
       "invitations": "invitaciones",
@@ -547,7 +547,7 @@
       "noLogs": "No hay logs en el rango",
       "noPipelines": "No hay pipelines (primera ejecución)",
       "noQueries": "No hay consultas en ejecución",
-      "noReports": "No hay reportes",
+      "noReports": "No hay informes",
       "noSearchHistory": "No hay historial de búsqueda",
       "noSearchResults": "No hay resultados de búsqueda",
       "noServiceAccounts": "No hay cuentas de servicio",
@@ -617,7 +617,7 @@
     "viewTrace": "Ver traza",
     "networkRequests": "Solicitudes de red",
     "noNetworkRequestsFound": "No se encontraron solicitudes de red para este evento",
-    "consoleLogsComingSoon": "Registros de consola próximamente",
+    "consoleLogsComingSoon": "Logs de consola próximamente",
     "performanceMetricsComingSoon": "Métricas de rendimiento próximamente",
     "pageNotFound": "Página no encontrada",
     "pageNotFoundDescription": "La página que buscas no existe o ha sido movida.",
@@ -993,7 +993,7 @@
     "metrics": "Métricas",
     "selectIndex": "Selecciona el índice primero",
     "selectStreamFirst": "Selecciona primero un stream",
-    "selectLogsStreamFirst": "Selecciona el stream de registros primero",
+    "selectLogsStreamFirst": "Selecciona el stream de logs primero",
     "searchField": "Buscar en un campo",
     "searchDimension": "Buscar dimensiones",
     "maxRecords": "Número máximo de registros a devolver",
@@ -1022,7 +1022,7 @@
     "patternPercentage": "Porcentaje",
     "patternAnomalyDetected": "Anomalía detectada",
     "patternAnomalyScore": "Este patrón se detecta como un patrón poco frecuente (puntuación de anomalía: {score}%)",
-    "patternAnomalyRare": "Este patrón se detecta como un patrón poco frecuente ({pct}% de los registros, {freq} ocurrencia) | Este patrón se detecta como un patrón poco frecuente ({pct}% de los registros, {freq} ocurrencias)",
+    "patternAnomalyRare": "Este patrón se detecta como un patrón poco frecuente ({pct}% de los logs, {freq} ocurrencia) | Este patrón se detecta como un patrón poco frecuente ({pct}% de los logs, {freq} ocurrencias)",
     "patternAnomalyLowFreq": "Este patrón aparece con menos frecuencia de lo esperado ({freq} vs avg {avg}, z-score: {z})",
     "patternZScore": "Puntuación Z: {zScore} (frecuencia promedio: {avgFrequency})",
     "patternVariablesHeader": "Variables",
@@ -1032,7 +1032,7 @@
     "patternVariablesWithCount": "Variables ({count})",
     "patternVariableNameColumn": "Nombre de variable",
     "patternVariableTypeColumn": "Tipo",
-    "patternExampleLogsWithCount": "Registros de ejemplo ({count})",
+    "patternExampleLogsWithCount": "Logs de ejemplo ({count})",
     "patternNavPrevious": "Anterior",
     "patternNavNext": "Próxima",
     "patternNoValuesAvailable": "No hay valores disponibles",
@@ -1165,7 +1165,7 @@
     "flattened": "Aplanado",
     "original": "Original",
     "resetFilters": "Restablecer filtros",
-    "redirect_to_logs_page": "Volver a la página de registros",
+    "redirect_to_logs_page": "Volver a la página de Logs",
     "visualize": "Visualiza",
     "enableSqlModeOrSelectSingleStream": "Habilite el modo SQL para visualizar",
     "drillDown": "Profundizar",
@@ -1236,7 +1236,7 @@
     "scanSize": "Tamaño de escaneo",
     "deltaScanSize": "Tamaño de escaneo delta",
     "histogramTitleError": "Error al generar el título del histograma.",
-    "selectLogStream": "Seleccione el stream de registros",
+    "selectLogStream": "Seleccione el stream de logs",
     "searchInspect": "Buscar e inspeccionar",
     "vrlOnlyForTableWarning": "La función VRL solo es compatible con el gráfico de tablas.",
     "customDownloadTitle": "Descarga personalizada",
@@ -1434,7 +1434,7 @@
     "rum": "RUM",
     "settings": "Ajustes",
     "iam": "IAM",
-    "report": "Reportes",
+    "report": "Informes",
     "pipeline": "Pipelines",
     "workflows": "Flujos de trabajo",
     "language": "Idioma",
@@ -2015,10 +2015,10 @@
         "step1EmptyTitle": "{unit} no alcanzaron el paso 1 en este rango",
         "step1EmptyDescription": "Nadie alcanzó {step} en este rango. Amplía el rango o empieza desde una página principal.",
         "breakdownTimeHidden": "El tiempo de conversión se muestra para el embudo sin desglose.",
-        "alertMe": "Avisarme cuando la conversión caiga por debajo de la de hoy",
+        "alertMe": "Alertarme cuando la conversión caiga por debajo de la de hoy",
         "alertNeedsRun": "Crea un embudo de dos o más pasos para alertar sobre él",
         "alertWaiting": "Espera a que el embudo termine de contar",
-        "alertNoResult": "Avisarme necesita los recuentos del embudo; vuelve a ejecutar el embudo primero",
+        "alertNoResult": "Alertarme necesita los recuentos del embudo; vuelve a ejecutar el embudo primero",
         "alertPartial": "Estos recuentos pueden estar incompletos, por lo que no pueden establecer un umbral de alerta",
         "alertSource": "Embudo de {app}",
         "alertSourceNoApp": "Embudo",
@@ -2345,7 +2345,7 @@
     "feature_traces": "Trazas",
     "feature_alerts": "Alertas",
     "feature_dashboards": "Dashboards",
-    "feature_reports": "Reportes",
+    "feature_reports": "Informes",
     "feature_vrl_functions": "Funciones VRL",
     "feature_pipelines": "Pipelines",
     "feature_high_availability": "Alta disponibilidad",
@@ -2356,7 +2356,7 @@
     "feature_rbac": "Control de acceso basado en roles (RBAC)",
     "feature_federated_search": "Búsqueda federada/Superclúster",
     "feature_correlation_management": "Gestión de correlaciones",
-    "feature_log_patterns": "Patrones de registro",
+    "feature_log_patterns": "Patrones de logs",
     "feature_query_management": "Gestión de consultas",
     "feature_workload_management": "Administración de cargas de trabajo (QoS)",
     "feature_audit_trail": "Registro de auditoría",
@@ -2451,7 +2451,7 @@
       "enterprise_with_license": {
         "hero_title": "Su edición empresarial",
         "offer_text": "Está ejecutando OpenObserve Enterprise con todas las funciones habilitadas",
-        "badge_text_unlimited": "Límite de ingestión: ilimitado",
+        "badge_text_unlimited": "Límite de ingesta: ilimitado",
         "badge_text_limited": "Límite de ingesta: {limit}GB / día",
         "features_title": "Funciones empresariales activas",
         "features_subtitle": "Todas las funciones desbloqueadas y listas para usar",
@@ -2468,7 +2468,7 @@
       "core_features": {
         "logs_metrics_traces": {
           "name": "Buscar, Métricas, Trazas",
-          "note": "Ingestión y análisis completos de datos de observabilidad"
+          "note": "Ingesta y análisis completos de datos de observabilidad"
         },
         "rum": {
           "note": "Monitorización de usuarios reales para el rendimiento de la interfaz"
@@ -2482,8 +2482,8 @@
           "note": "Dashboards de visualización personalizables"
         },
         "reports": {
-          "name": "Reportes",
-          "note": "Reportes programados y bajo demanda"
+          "name": "Informes",
+          "note": "Informes programados y bajo demanda"
         },
         "vrl_functions": {
           "name": "Funciones VRL",
@@ -2568,8 +2568,8 @@
           "note": "Agregación automática de métricas a lo largo del tiempo"
         },
         "log_patterns": {
-          "name": "Patrones de registro",
-          "note": "Descubra patrones en los datos de registro"
+          "name": "Patrones de logs",
+          "note": "Descubra patrones en los datos de logs"
         },
         "mcp_server": {
           "name": "Servidor MCP",
@@ -2889,7 +2889,7 @@
     "searchRole": "Buscar rol",
     "searchGroup": "Buscar grupo",
     "serviceAccounts": "Cuentas de servicio",
-    "ingestionTokens": "Tokens de ingestión",
+    "ingestionTokens": "Tokens de ingesta",
     "syntheticsTokens": "Tokens sintéticos",
     "syntheticsTokensDesc": "Tokens o2syn_ a nivel de organización que tus agentes sintéticos privados utilizan para extraer trabajos",
     "serviceAccountsName": "Nombre de las cuentas de servicio",
@@ -2969,7 +2969,7 @@
       "scopeThisFolderHint": "Concesiones sobre la propia carpeta",
       "openFolder": "Abrir carpeta",
       "moduleGroupData": "Datos",
-      "moduleGroupDashboards": "Dashboards y reportes",
+      "moduleGroupDashboards": "Dashboards y informes",
       "moduleGroupAlerting": "Alertas",
       "moduleGroupPipelines": "Pipelines y flujos de trabajo",
       "moduleGroupMonitoring": "Monitorización",
@@ -4646,7 +4646,7 @@
   },
   "connectDataSourcePopup": {
     "title": "Para empezar, conectemos tu primera fuente de datos.",
-    "description": "Tenemos mucho que mostrarte, pero primero necesitamos conectar tus datos. La mayoría de los equipos ven sus primeros registros en aproximadamente un minuto.",
+    "description": "Tenemos mucho que mostrarte, pero primero necesitamos conectar tus datos. La mayoría de los equipos ven sus primeros logs en aproximadamente un minuto.",
     "connectButton": "Conectar una fuente de datos",
     "slackLink": "Únete también a nuestra comunidad de Slack"
   },
@@ -4891,7 +4891,7 @@
     "metricsLabel": "Métricas",
     "profilesLabel": "Perfiles",
     "tracesLabel": "Trazas",
-    "redirectionIngestionMsg": "Nota: Para acceder a páginas distintas de IAM, la ingestión de datos debe iniciarse dentro de la organización actual.",
+    "redirectionIngestionMsg": "Nota: Para acceder a páginas distintas de IAM, la ingesta de datos debe iniciarse dentro de la organización actual.",
     "databaseLabel": "bases de datos",
     "securityLabel": "Seguridad",
     "devopsLabel": "DevOps",
@@ -5042,9 +5042,9 @@
       "skillsRepo": "Ver las habilidades en {host}"
     },
     "manageTokensBtnLabel": "Administrar los tokens",
-    "orgLevelExplanation": "Se trata de tokens de ingestión a nivel de organización. No están vinculados a usuarios individuales y seguirán funcionando aunque el usuario que los creó abandone la organización. Los tokens solo se pueden usar en los puntos finales de ingestión.",
-    "orgLevelSummary": "Tokens a nivel de organización para puntos finales de ingestión.",
-    "tokenManagementTitle": "Gestione los tokens de ingestión",
+    "orgLevelExplanation": "Se trata de tokens de ingesta a nivel de organización. No están vinculados a usuarios individuales y seguirán funcionando aunque el usuario que los creó abandone la organización. Los tokens solo se pueden usar en los endpoints de ingesta.",
+    "orgLevelSummary": "Tokens a nivel de organización para endpoints de ingesta.",
+    "tokenManagementTitle": "Gestione los tokens de ingesta",
     "createTokenBtn": "Crear un token nuevo",
     "createTokenTitle": "Crear token",
     "searchToken": "Buscar tokens",
@@ -5075,14 +5075,14 @@
     "splunkHecUrlHelp": "Apunta tu forwarder de Splunk a esta URL y envía el token como el valor del encabezado Authorization \"Splunk <token>\".",
     "setupCard": {
       "advancedInstallDescCloud": "Para configuraciones personalizadas, o para fijar versiones y personalizar los valores del chart. Ejecuta los pasos en orden.",
-      "advancedInstallDescSelfHosted": "Para configuraciones personalizadas, o para fijar versiones y personalizar los valores del chart. Ejecuta los pasos en orden. Si OpenObserve se ejecuta en este mismo clúster, reemplaza los puntos de conexión del exportador con `{url}`.",
+      "advancedInstallDescSelfHosted": "Para configuraciones personalizadas, o para fijar versiones y personalizar los valores del chart. Ejecuta los pasos en orden. Si OpenObserve se ejecuta en este mismo clúster, reemplaza los endpoints del exportador con `{url}`.",
       "advancedInstallLabel": "Instalación avanzada (pasos manuales)",
       "aerospikeHostLabel": "Host de Aerospike",
       "aerospikeTagline": "Recopila métricas de Aerospike con el OpenTelemetry Collector y envíalas a OpenObserve.",
       "agentServiceFixTitle": "Compruebe el servicio del agente",
       "agentTroubleInstanceIdA": "Esa es la variante EC2 sin su rol de IAM. {iamNote} Adjunte el rol y luego reinicie el agente.",
       "agentTroubleInstanceIdQ": "Los hosts aparecen bajo un ID de instancia en lugar de un nombre",
-      "agentTroubleNoDataA": "Compruebe que el agente se está ejecutando con {hint}. Un 401 en sus registros significa que el token de ingesta está obsoleto — vuelva a copiar el comando de esta página, que siempre incluye el token actual de esta organización.",
+      "agentTroubleNoDataA": "Compruebe que el agente se está ejecutando con {hint}. Un 401 en sus logs significa que el token de ingesta está obsoleto — vuelva a copiar el comando de esta página, que siempre incluye el token actual de esta organización.",
       "agentTroubleNoDataQ": "El script de instalación se ejecuta, pero no llegan datos.",
       "agentTroubleUnreachableA": "El agente necesita acceso de salida a este endpoint de OpenObserve. Confírmelo con `curl -v` desde el propio host — la causa habitual suele ser un proxy o un firewall de salida.",
       "agentTroubleUnreachableQ": "El endpoint no es accesible desde el host",
@@ -5101,7 +5101,7 @@
       "cassandraJmxNote": "Habilita el acceso remoto JMX en Cassandra para que el receptor se conecte.",
       "cassandraTagline": "Recopila métricas de Cassandra a través del receptor JMX del OpenTelemetry Collector y envíalas a OpenObserve.",
       "checking": "Comprobando…",
-      "checkingForLogs": "Buscando registros…",
+      "checkingForLogs": "Buscando logs…",
       "checkingForMetrics": "Buscando métricas…",
       "checkingForSpans": "Comprobando si hay spans…",
       "chipDashboard": "Dashboard",
@@ -5112,7 +5112,7 @@
       "chipRun": "Ejecutar",
       "chipTerminal": "Terminal",
       "chipTraces": "Trazas",
-      "clusterNameHelp": "Identifica este clúster en tus registros, métricas y Dashboards.",
+      "clusterNameHelp": "Identifica este clúster en tus logs, métricas y Dashboards.",
       "clusterNameLabel": "Nombre del clúster",
       "collectorInstallDesc": "El receptor solo está en la compilación Contrib: elige tu plataforma.",
       "collectorInstallTitle": "Instalar OpenTelemetry Collector Contrib",
@@ -5123,13 +5123,13 @@
       "connectedLogsHeadline": "Conectado: los logs están fluyendo",
       "connectedMetricsHeadline": "Conectado: las métricas están fluyendo",
       "connectedTracesHeadline": "Conectado: las trazas están fluyendo",
-      "countLogs": "{count} registro | {count} registros",
+      "countLogs": "{count} log | {count} logs",
       "countMetricStreams": "{count} flujo de métricas | {count} flujos de métricas",
       "countSpans": "{count} span | {count} spans",
       "dashboardReadyDesc": "Después de que verifiques lo anterior, añadimos el dashboard de Métricas de host a tu carpeta Predeterminada; ábrelo abajo.",
       "dashboardReadyTitle": "Obtén tu dashboard",
       "downloadEnvTooltip": "Descargar .env",
-      "downloadJmxJarDesc": "El receptor JMX ejecuta este JAR auxiliar (requiere Java en el host recolector).",
+      "downloadJmxJarDesc": "El receptor JMX ejecuta este JAR auxiliar (requiere Java en el host colector).",
       "downloadJmxJarTitle": "Descargar el JAR de métricas JMX",
       "dynamodbFirehoseEndpointDesc": "Úsalos como destino **HTTP Endpoint** al crear tu flujo de entrega de Kinesis Data Firehose.",
       "dynamodbFirehoseEndpointTitle": "Endpoint de Firehose de OpenObserve",
@@ -5146,19 +5146,19 @@
       "gcpFixTitle": "Comprobar la suscripción de push",
       "gcpPushUrlNote": "Mantén esta URL en secreto — incrusta la clave de ingesta. Rótala desde el encabezado de esta página si se filtra.",
       "gcpSinkDesc": "En la consola de GCP, crea un **sink de Log Router** (Logging → Log Router → Create sink) con Pub/Sub como destino y deja que cree el tema. El filtro de inclusión del sink decide qué logs llegan a OpenObserve.",
-      "gcpSinkTitle": "Enrutar registros a un tema de Pub/Sub",
+      "gcpSinkTitle": "Enrutar logs a un tema de Pub/Sub",
       "gcpSinkWriterNote": "Otorga a la identidad de escritor del receptor el rol de Publicador de Pub/Sub en el tema, o no publicará nada en silencio.",
-      "gcpStreamHelp": "Se usa en la URL de envío anterior y lo vigila la comprobación siguiente. Un stream dedicado mantiene los registros de GCP separados.",
+      "gcpStreamHelp": "Se usa en la URL de envío anterior y lo vigila la comprobación siguiente. Un stream dedicado mantiene los logs de GCP separados.",
       "gcpSubscriptionDesc": "Crea una suscripción **push** en ese tema y pega esto como la URL del endpoint. Ya incluye esta organización y su clave de ingesta.",
       "gcpSubscriptionTitle": "Enviar el tema a OpenObserve",
       "gcpTroubleDeliveryA": "Un 401 significa que la `API-Key` en la URL está obsoleta — vuelve a copiar el endpoint de esta página. Un 404 normalmente significa que el segmento de org o de stream fue editado manualmente; la URL de arriba ya es correcta para esta organización.",
       "gcpTroubleDeliveryQ": "La suscripción muestra errores de entrega",
       "gcpTroublePartialA": "Ese es el filtro de inclusión del receptor, no OpenObserve. Amplía el `--log-filter` en el receptor para cubrir los servicios y severidades que esperas.",
-      "gcpTroublePartialQ": "Solo llegan algunos registros",
+      "gcpTroublePartialQ": "Solo llegan algunos logs",
       "gcpTroubleTopicA": "La **identidad de escritor** del receptor necesita el rol de Publicador de Pub/Sub en el tema. GCP crea el receptor correctamente sin él y luego descarta todo, en silencio.",
       "gcpTroubleTopicQ": "El receptor existe pero el tema no recibe nada",
       "gcpTroubleWorkspaceA": "Sí — Workspace exporta a Cloud Logging, por lo que el mismo receptor de Log Router lo recoge una vez que se habilita la exportación. Abre la guía de **Google Workspace** enlazada al final de esta página para la configuración de la exportación.",
-      "gcpTroubleWorkspaceQ": "¿Puedo enviar también registros de auditoría de Google Workspace?",
+      "gcpTroubleWorkspaceQ": "¿Puedo enviar también logs de auditoría de Google Workspace?",
       "genericLinuxVariant": "Linux genérico",
       "genericWindowsVariant": "Windows genérico",
       "hideToken": "Ocultar token",
@@ -5193,22 +5193,22 @@
       "k8sTroubleEndpointQ": "¿Qué endpoint debo usar: el externo o el interno?",
       "k8sTroubleExampleA": "Sí: **HOT Commerce** es una aplicación de ejemplo configurada de principio a fin, y la documentación del **OpenTelemetry Operator** contiene la referencia completa de anotaciones. Ambas están enlazadas al final de esta página.",
       "k8sTroubleExampleQ": "¿Puedo ver un ejemplo en funcionamiento?",
-      "k8sTroubleNoDataA": "Revisa los logs del propio collector con `kubectl logs -n openobserve-collector -l app.kubernetes.io/name=openobserve-collector`. Un 401 significa que la clave de acceso está obsoleta: vuelve a copiar el comando desde esta página. Un timeout de conexión suele significar que el clúster no puede alcanzar el endpoint: si OpenObserve se ejecuta en este mismo clúster, cambia al **endpoint interno** de arriba.",
+      "k8sTroubleNoDataA": "Revisa los logs del propio colector con `kubectl logs -n openobserve-collector -l app.kubernetes.io/name=openobserve-collector`. Un 401 significa que la clave de acceso está obsoleta: vuelve a copiar el comando desde esta página. Un timeout de conexión suele significar que el clúster no puede alcanzar el endpoint: si OpenObserve se ejecuta en este mismo clúster, cambia al **endpoint interno** de arriba.",
       "k8sTroubleNoDataQ": "Los pods del colector están ejecutándose pero no llega nada",
       "k8sTroubleWebhookA": "El webhook del operador de OpenTelemetry necesita que el webhook de cert-manager esté sirviendo primero. Ejecuta `kubectl wait --for=condition=Available --timeout=300s -n cert-manager deployment/cert-manager-webhook`, y luego vuelve a ejecutar la instalación — es idempotente.",
       "k8sTroubleWebhookQ": "La instalación falla con un error sobre el webhook de admisión",
-      "linuxAgentFixBody": "El instalador inicia el agente como un servicio systemd. Si no llega nada, confirma que esté ejecutándose y lee sus registros en busca de un error de autenticación o conectividad:",
+      "linuxAgentFixBody": "El instalador inicia el agente como un servicio systemd. Si no llega nada, confirma que esté ejecutándose y lee sus logs en busca de un error de autenticación o conectividad:",
       "prepareMariadbTitle": "Preparar MariaDB",
       "prepareMariadbDesc": "Crea el usuario de monitoreo — ejecútalo en un cliente SQL, **no** en tu shell.",
       "runCollectorMariadbDesc": "Inicia el colector (la contraseña del usuario mediante una variable de entorno).",
       "mariadbHostLabel": "Host de MariaDB",
-      "verifyMariadbMetricsDesc": "La comprobación de abajo se pone verde cuando llegan los datos, o revisa Streams para las métricas `mysql_*` (MariaDB reporta a través del receptor de MySQL).",
+      "verifyMariadbMetricsDesc": "La comprobación de abajo se pone verde cuando llegan los datos, o revisa Streams para las métricas `mysql_*` (MariaDB informa a través del receptor de MySQL).",
       "mariadbTagline": "Recopila métricas de MariaDB con el OpenTelemetry Collector y envíalas a OpenObserve.",
-      "logsStreamNameLabel": "Nombre del stream de registros",
-      "macosAgentFixBody": "El instalador registra dos demonios launchd: el propio agente y el puente de registros unificado. Si no llega nada, confirma que ambos estén cargados y lee el registro del agente en busca de un error de autenticación o conectividad:",
+      "logsStreamNameLabel": "Nombre del stream de logs",
+      "macosAgentFixBody": "El instalador registra dos demonios launchd: el propio agente y el puente del registro unificado. Si no llega nada, confirma que ambos estén cargados y lee el log del agente en busca de un error de autenticación o conectividad:",
       "macosAgentServicesFixTitle": "Comprobar los servicios del agente",
       "macosTroubleEmptyLogA": "Eso es lo esperado. El agente registra desde `warn` hacia arriba, por lo que una instalación saludable escribe casi nada. Para depurar, auméntalo temporalmente: `sudo sed -i '' 's/level: warn/level: info/' /etc/otel-config.yaml` y luego reinicia el servicio.",
-      "macosTroubleEmptyLogQ": "El archivo de registro del propio agente está vacío",
+      "macosTroubleEmptyLogQ": "El archivo de log del propio agente está vacío",
       "macosTroubleUnifiedLogA": "Ese es el demonio del puente, no el agente. Comprueba `sudo launchctl print system/ai.openobserve.macos-unified-log`, y que el agente esté escuchando con `sudo lsof -nP -iTCP:54525 -sTCP:LISTEN`.",
       "macosTroubleUnifiedLogQ": "Las métricas del host llegan pero no hay entradas de registro unificado",
       "macosTroubleVolumeA": "Es de alto volumen por defecto: cientos de eventos por segundo en un Mac inactivo. Redúcelo con los controles `LEVEL` y `PREDICATE` en la parte superior de `/opt/openobserve-collector/macos-unified-log.sh`, y luego aplícalo con `sudo launchctl kickstart -k system/ai.openobserve.macos-unified-log`.",
@@ -5232,7 +5232,7 @@
       "otlpFixBody": "Definir un exportador no es suficiente — debe estar listado en un pipeline. Esta es la razón más común por la que una configuración de aspecto correcto no envía nada:",
       "otlpFixTitle": "Verifica que el exportador esté realmente integrado en el pipeline",
       "otlpGrpcCloudNote": "La puerta de enlace gRPC pública de OpenObserve Cloud: menor sobrecarga que HTTP para grandes volúmenes de spans, sin necesidad de configurar redes propias.",
-      "otlpGrpcNote": "Menos sobrecarga que HTTP para volúmenes altos de spans. El puerto 5081 debe ser accesible desde el collector.",
+      "otlpGrpcNote": "Menos sobrecarga que HTTP para volúmenes altos de spans. El puerto 5081 debe ser accesible desde el colector.",
       "otlpHttpNote": "El valor predeterminado para OpenTelemetry Collector — funciona en todas partes, incluso detrás de proxies y balanceadores de carga.",
       "otlpSdkEnvNote": "Variables de entorno OTEL_* estándar — todo SDK de OpenTelemetry las lee, por lo que no se necesita ningún cambio de código.",
       "otlpTracesStreamHelp": "Se escribe en la configuración anterior como `stream-name`, y lo vigila la comprobación siguiente.",
@@ -5247,7 +5247,7 @@
       "pillActiveBackends": "Backends activos",
       "pillAndroidVerified": "Android verificado",
       "pillApplication": "Aplicación",
-      "pillAuditLogs": "Registros de auditoría",
+      "pillAuditLogs": "Logs de auditoría",
       "pillBatchRequestRate": "Tasa de solicitudes por lote",
       "pillBillingCredits": "Créditos de facturación",
       "pillBlocksRead": "Bloques leídos",
@@ -5303,7 +5303,7 @@
       "pillSqlCompilationRate": "Tasa de compilación SQL",
       "pillStorageBytes": "Bytes de almacenamiento",
       "pillSystem": "Sistema",
-      "pillSystemLogs": "Registros del sistema",
+      "pillSystemLogs": "Logs del sistema",
       "pillSystemStats": "Estadísticas del sistema",
       "pillTablespaceUsage": "Uso de tablespace",
       "pillThreads": "Hilos",
@@ -5315,7 +5315,7 @@
       "pillWarehouseUsage": "Uso del almacén",
       "pillWireframeCapture": "Captura de wireframe",
       "pillWriteLatency": "Latencia de escritura",
-      "pointExporterDesc": "Agregue esto a la configuración de su recopilador, o establezca las variables de entorno si su aplicación exporta directamente. Todo ya está completado para esta organización.",
+      "pointExporterDesc": "Agregue esto a la configuración de su colector, o establezca las variables de entorno si su aplicación exporta directamente. Todo ya está completado para esta organización.",
       "pointExporterTitle": "Apunte su exportador a OpenObserve",
       "portLabel": "Puerto",
       "postgresqlHostLabel": "Host de PostgreSQL",
@@ -5333,7 +5333,7 @@
       "prepareSqlServerTitle": "Preparar SQL Server",
       "providerNameOtlpTraces": "Trazas (OpenTelemetry)",
       "providerNameRum": "Monitoreo de usuarios reales",
-      "quickInstallDesc": "Instala el recolector de OpenObserve con un **solo comando** — solo establece el nombre de tu clúster y ejecuta. El nombre etiqueta cada registro, para que puedas distinguir los clústeres cuando varios estén informando.",
+      "quickInstallDesc": "Instala el colector de OpenObserve con un **solo comando** — solo establece el nombre de tu clúster y ejecuta. El nombre etiqueta cada registro, para que puedas distinguir los clústeres cuando varios estén informando.",
       "quickInstallTitle": "Instalación rápida (recomendada)",
       "redisHostLabel": "Host de Redis",
       "redisNoAuthNote": "Usa REDIS_PASSWORD='' si Redis no tiene autenticación.",
@@ -5385,18 +5385,18 @@
       "rumTroublePlainHttpQ": "Mi endpoint de OpenObserve es HTTP plano",
       "rumTroubleTokenVisibleA": "Sí — el `clientToken` es un token de lado del cliente por diseño, como el de todo producto RUM de navegador. Las configuraciones de NPM lo exponen dentro del bundle JS y las de CDN lo incluyen en el HTML; DevTools lo revela de cualquier manera. Solo puede **escribir** eventos RUM — no concede acceso de lectura y es independiente del código de acceso de ingesta. Si alguien lo usa indebidamente para enviar eventos falsos, regenéralo desde el encabezado de esta página y redespliega tu aplicación.",
       "rumTroubleTokenVisibleQ": "¿Es seguro que el token sea visible en el código fuente de mi página?",
-      "runCollectorDesc": "Inicie el recopilador.",
-      "runCollectorMysqlDesc": "Inicie el recopilador (la contraseña del usuario mediante variable de entorno).",
-      "runCollectorPostgresqlDesc": "Inicie el recopilador (la contraseña del rol mediante variable de entorno).",
-      "runCollectorRedisDesc": "Inicie el recopilador (la contraseña de AUTH de Redis mediante variable de entorno).",
+      "runCollectorDesc": "Inicie el colector.",
+      "runCollectorMysqlDesc": "Inicie el colector (la contraseña del usuario mediante variable de entorno).",
+      "runCollectorPostgresqlDesc": "Inicie el colector (la contraseña del rol mediante variable de entorno).",
+      "runCollectorRedisDesc": "Inicie el colector (la contraseña de AUTH de Redis mediante variable de entorno).",
       "runCollectorTitle": "Ejecutar el OpenTelemetry Collector",
       "runtimeAny": "Cualquiera",
       "runtimeBrowser": "Navegador",
       "runtimeCluster": "Clúster",
       "runtimeHost": "Host",
       "seeAllTroubleshooting": "Ver toda la solución de problemas",
-      "sendNotebookLogsDesc": "Pégalo en una celda de cuaderno de Databricks: envía registros a la API de registros de OpenObserve.",
-      "sendNotebookLogsTitle": "Enviar registros desde tu cuaderno",
+      "sendNotebookLogsDesc": "Pégalo en una celda de cuaderno de Databricks: envía registros a la API de logs de OpenObserve.",
+      "sendNotebookLogsTitle": "Enviar logs desde tu cuaderno",
       "setup": "Configurar",
       "setupTime1Min": "~1 min",
       "setupTime2Min": "~2 min",
@@ -5434,7 +5434,7 @@
       "androidTroubleScreenNamesQ": "Las sesiones aparecen pero todas las pantallas tienen el mismo nombre",
       "androidTroubleScreenNamesA": "El seguimiento de vistas no está conectado. Pasa un `useViewTrackingStrategy(...)` — por ejemplo, `ActivityViewTrackingStrategy(trackExtras = true)` para Activities, o `NavigationViewTrackingStrategy(...)` si usas AndroidX Navigation — al construir la `RumConfiguration`.",
       "setupTime5Min": "~5 min",
-      "snowflakeCollectorVersionNote": "Snowflake necesita el collector v0.92.0 — las versiones más nuevas tienen un error conocido.",
+      "snowflakeCollectorVersionNote": "Snowflake necesita el colector v0.92.0 — las versiones más nuevas tienen un error conocido.",
       "snowflakeTagline": "Recopila métricas de cuenta de Snowflake con el OpenTelemetry Collector y envíalas a OpenObserve.",
       "sqlClientGuiVariant": "Cliente SQL (GUI)",
       "sqlServerHostLabel": "Host de SQL Server",
@@ -5446,12 +5446,12 @@
       "streamNameError": "Usa solo letras, números y _.",
       "streamNameLabel": "Nombre del stream",
       "stuck": "¿Atascado?",
-      "taglineDatabricks": "Envía registros de notebooks de Databricks a OpenObserve a través de la API de registros.",
-      "taglineGcp": "Transmite registros de Google Cloud a OpenObserve con una suscripción push de Pub/Sub: no hay que ejecutar ningún agente ni recolector.",
-      "taglineKubernetes": "Despliega el collector de OpenObserve en tu clúster: registros de contenedores, eventos de Kubernetes y métricas del clúster, además de trazas sin código para tus cargas de trabajo.",
-      "taglineLinux": "Instala el agente de OpenObserve en cualquier host Linux: registros del sistema y de journald, además de métricas de CPU, memoria, disco y red.",
-      "taglineMacos": "Instala el agente de OpenObserve en cualquier Mac: el registro unificado y los archivos de registro estándar, además de métricas de CPU, memoria, disco y red.",
-      "taglineOtlpTraces": "Apunta cualquier exportador de OpenTelemetry a OpenObserve: recolector o SDK, HTTP o gRPC. Tu endpoint y token se completan a continuación.",
+      "taglineDatabricks": "Envía logs de cuadernos de Databricks a OpenObserve a través de la API de logs.",
+      "taglineGcp": "Transmite logs de Google Cloud a OpenObserve con una suscripción push de Pub/Sub: no hay que ejecutar ningún agente ni colector.",
+      "taglineKubernetes": "Despliega el colector de OpenObserve en tu clúster: logs de contenedores, eventos de Kubernetes y métricas del clúster, además de trazas sin código para tus cargas de trabajo.",
+      "taglineLinux": "Instala el agente de OpenObserve en cualquier host Linux: logs del sistema y de journald, además de métricas de CPU, memoria, disco y red.",
+      "taglineMacos": "Instala el agente de OpenObserve en cualquier Mac: el registro unificado y los archivos de log estándar, además de métricas de CPU, memoria, disco y red.",
+      "taglineOtlpTraces": "Apunta cualquier exportador de OpenTelemetry a OpenObserve: colector o SDK, HTTP o gRPC. Tu endpoint y token se completan a continuación.",
       "taglineWindows": "Instala el agente de OpenObserve en cualquier host Windows: Registro de eventos, contadores de rendimiento y métricas del host.",
       "testAgain": "Probar de nuevo",
       "tracesStreamNameLabel": "Nombre del stream de trazas",
@@ -5459,7 +5459,7 @@
       "trackScreensTitle": "Rastrear pantallas automáticamente (opcional)",
       "troubleshooting": "Solución de problemas",
       "uninstallAgentDescLinux": "Ejecuta con `sudo`. Detiene y desactiva el servicio systemd, luego elimina el archivo de unidad, el binario, la configuración y el usuario `openobserve-agent`.",
-      "uninstallAgentDescMac": "Ejecuta con `sudo`. Detiene ambos demonios launchd — el agente y el puente de registros unificado — luego elimina sus plists, el binario, la configuración y los registros del agente.",
+      "uninstallAgentDescMac": "Ejecuta con `sudo`. Detiene ambos demonios launchd — el agente y el puente del registro unificado — luego elimina sus plists, el binario, la configuración y los logs del agente.",
       "uninstallAgentDescWindows": "Ejecuta en **PowerShell como administrador**. Detiene el servicio del agente y elimina su directorio de instalación.",
       "uninstallAgentLabel": "Desinstalar el agente",
       "verifyAerospikeMetricsDesc": "La comprobación de abajo se pone verde cuando llegan los datos, o revisa Streams para las métricas `aerospike_*`.",
@@ -5511,7 +5511,7 @@
       "verifyAndroidRumDesc": "Ejecuta la aplicación en un emulador o dispositivo y navega entre algunas pantallas; la comprobación de abajo se pone verde cuando llegan los datos: los eventos nativos de Android llegan al stream `_rumdata`.",
       "verifyIosRumDesc": "Ejecuta la aplicación en un simulador o dispositivo y navega entre algunas pantallas; la comprobación de abajo se pone verde cuando llegan los datos: los eventos nativos de iOS llegan al stream `_rumdata`.",
       "dbmPreparePostgresTitle": "Monitoreo de bases de datos · Otorgar acceso (opcional)",
-      "dbmPreparePostgresDesc": "**Todo lo anterior es suficiente por sí solo** — los tiempos de consulta ya llegan a Bases de datos desde las trazas de tu aplicación, sin configuración aquí. Estos últimos pasos añaden lo que una traza nunca puede ver: interbloqueos y consultas bloqueadas, que solo la propia base de datos registra. Concede `pg_monitor` para que el collector pueda leer las consultas de otras sesiones — ejecútalo en un cliente SQL, **no** en tu shell.",
+      "dbmPreparePostgresDesc": "**Todo lo anterior es suficiente por sí solo** — los tiempos de consulta ya llegan a Bases de datos desde las trazas de tu aplicación, sin configuración aquí. Estos últimos pasos añaden lo que una traza nunca puede ver: interbloqueos y consultas bloqueadas, que solo la propia base de datos registra. Concede `pg_monitor` para que el colector pueda leer las consultas de otras sesiones — ejecútalo en un cliente SQL, **no** en tu shell.",
       "dbmPrepareMysqlTitle": "Monitoreo de bases de datos · Conservar historial de interbloqueos (opcional)",
       "dbmPrepareMariadbTitle": "Monitoreo de bases de datos · Conservar historial de interbloqueos (opcional)",
       "dbmPrepareMysqlDesc": "**Todo lo anterior es suficiente por sí solo** — los tiempos de consulta ya llegan a Bases de datos desde las trazas de tu aplicación, sin configuración aquí. Estos últimos pasos añaden lo que una traza nunca puede ver: interbloqueos y consultas bloqueadas, que solo la propia base de datos registra. Activa el historial completo de interbloqueos — ejecútalo en un cliente SQL, **no** en tu shell.",
@@ -5541,14 +5541,14 @@
       "dbmMysqlLogPathHelp": "El colector debe poder leer este archivo. Encuéntralo con: SHOW VARIABLES LIKE 'log_error';",
       "dbmMariadbLogPathHelp": "El colector debe poder leer este archivo. Encuéntralo con: SHOW VARIABLES LIKE 'log_error';",
       "dbmPrepareMssqlTitle": "Monitoreo de base de datos · Otorgar acceso (opcional)",
-      "dbmPrepareMssqlDesc": "**Todo lo anterior es suficiente por sí solo** — los tiempos de consulta ya llegan a Bases de datos desde las trazas de tu aplicación, sin configuración aquí. Este último grupo añade lo que una traza nunca puede ver: interbloqueos y consultas bloqueadas, que solo la propia base de datos registra. Se necesitan ambos permisos: uno permite que el collector lea otras sesiones y el otro le permite leer el historial de interbloqueos. Ejecútalos en un cliente SQL, **no** en tu shell.",
-      "dbmConfigureMssqlDesc": "Escribe `dbm-config.yaml` — configure la base de datos a la que conectarse a continuación. SQL Server obtiene deadlocks, consultas bloqueadas, muestras de actividad, consultas principales y planes de ejecución aquí. El receptor sqlserver lee en toda la instancia, por lo que la actividad y las consultas principales no se limitan a la base de datos que nombre arriba.",
+      "dbmPrepareMssqlDesc": "**Todo lo anterior es suficiente por sí solo** — los tiempos de consulta ya llegan a Bases de datos desde las trazas de tu aplicación, sin configuración aquí. Este último grupo añade lo que una traza nunca puede ver: interbloqueos y consultas bloqueadas, que solo la propia base de datos registra. Se necesitan ambos permisos: uno permite que el colector lea otras sesiones y el otro le permite leer el historial de interbloqueos. Ejecútalos en un cliente SQL, **no** en tu shell.",
+      "dbmConfigureMssqlDesc": "Escribe `dbm-config.yaml` — configure la base de datos a la que conectarse a continuación. SQL Server obtiene interbloqueos, consultas bloqueadas, muestras de actividad, consultas principales y planes de ejecución aquí. El receptor sqlserver lee en toda la instancia, por lo que la actividad y las consultas principales no se limitan a la base de datos que nombre arriba.",
       "dbmRunMssqlDesc": "Ejecuta ambas configuraciones juntas. Use el mismo inicio de sesión y contraseña que creó en el paso 1.",
       "dbmVerifyBlockingDesc": "Abra **Infra → Bases de datos → Consultas bloqueadas**. Las sesiones que esperan un bloqueo aparecen tan pronto como se muestrea una — una pestaña vacía allí le indica si nada está bloqueado o si no se está recopilando nada.",
-      "dbmVerifyFullNoSampleTextDesc": "Abra **Infra → Bases de datos** y elija una pestaña a continuación. Los deadlocks y las consultas bloqueadas aparecen tan pronto como su base de datos informa uno; la pestaña Actividad se llena con sesiones muestreadas dentro de un minuto de que el recolector comience, y las consultas principales llevan sus planes en la página de detalle de una consulta. MariaDB no expone el texto de la sentencia muestreada, por lo que una fila de actividad nombra la sesión sin su SQL. La salud de la tabla se llena después de la primera instantánea de 60 segundos.",
-      "dbmVerifyFullPlainPlansDesc": "Abra **Infra → Bases de datos** y elija una pestaña a continuación. Los deadlocks y las consultas bloqueadas aparecen tan pronto como su base de datos informa uno; la pestaña Actividad se llena con sesiones muestreadas dentro de un minuto de que el recolector comience, y los planes de ejecución aparecen en la página de detalle de una consulta. La salud de la tabla se llena después de la primera instantánea de 60 segundos.",
-      "dbmVerifyFullSlowTableHealthDesc": "Abra **Infra → Bases de datos** y elija una pestaña a continuación. Los deadlocks y las consultas bloqueadas aparecen tan pronto como su base de datos informa uno; la pestaña Actividad se llena con sesiones muestreadas dentro de un minuto de que el recolector comience, y los planes estimados aparecen en la página de detalle de una consulta. La salud de la tabla toma hasta cinco minutos — leer los tamaños de las tablas se vuelve más lento a medida que su esquema crece, por lo que se ejecuta con menos frecuencia que el resto.",
-      "dbmVerifyTableHealthDesc": "Abra **Infra → Bases de datos** y elija una pestaña a continuación. Los deadlocks y las consultas bloqueadas aparecen tan pronto como su base de datos informa uno — una pestaña vacía allí le indica si no sucedió nada o si no se está recopilando nada. La salud de la tabla se llena después de la primera instantánea de 60 segundos.",
+      "dbmVerifyFullNoSampleTextDesc": "Abra **Infraestructura → Bases de datos** y elija una pestaña a continuación. Los interbloqueos y las consultas bloqueadas aparecen tan pronto como su base de datos informa uno; la pestaña Actividad se llena con sesiones muestreadas dentro de un minuto de que el colector comience, y las consultas principales llevan sus planes en la página de detalle de una consulta. MariaDB no expone el texto de la sentencia muestreada, por lo que una fila de actividad nombra la sesión sin su SQL. La salud de la tabla se llena después de la primera instantánea de 60 segundos.",
+      "dbmVerifyFullPlainPlansDesc": "Abra **Infraestructura → Bases de datos** y elija una pestaña a continuación. Los interbloqueos y las consultas bloqueadas aparecen tan pronto como su base de datos informa uno; la pestaña Actividad se llena con sesiones muestreadas dentro de un minuto de que el colector comience, y los planes de ejecución aparecen en la página de detalle de una consulta. La salud de la tabla se llena después de la primera instantánea de 60 segundos.",
+      "dbmVerifyFullSlowTableHealthDesc": "Abra **Infraestructura → Bases de datos** y elija una pestaña a continuación. Los interbloqueos y las consultas bloqueadas aparecen tan pronto como su base de datos informa uno; la pestaña Actividad se llena con sesiones muestreadas dentro de un minuto de que el colector comience, y los planes estimados aparecen en la página de detalle de una consulta. La salud de la tabla toma hasta cinco minutos — leer los tamaños de las tablas se vuelve más lento a medida que su esquema crece, por lo que se ejecuta con menos frecuencia que el resto.",
+      "dbmVerifyTableHealthDesc": "Abra **Infraestructura → Bases de datos** y elija una pestaña a continuación. Los interbloqueos y las consultas bloqueadas aparecen tan pronto como su base de datos informa uno — una pestaña vacía allí le indica si no sucedió nada o si no se está recopilando nada. La salud de la tabla se llena después de la primera instantánea de 60 segundos.",
       "gpuPlatformDocker": "Docker (host de GPU)",
       "gpuTagline": "Utilización, memoria, temperatura, potencia, relojes y errores XID de cada GPU NVIDIA, recopilados por DCGM Exporter y enviados con el OpenTelemetry Collector.",
       "gpuRuntime": "Hosts de GPU",
@@ -5556,7 +5556,7 @@
       "gpuPrereqTitle": "Verificar el host de GPU",
       "gpuPrereqDesc": "DCGM Exporter necesita el controlador de NVIDIA y acceso a las GPU desde los contenedores. Elige dónde se ejecutan tus GPU.",
       "gpuPrereqDockerNote": "Necesita el controlador **R535+** (**R550+** para H200) y el **NVIDIA Container Toolkit**. Los sistemas NVSwitch (HGX/DGX) también necesitan `nvidia-fabricmanager` en ejecución.",
-      "gpuPrereqK8sNote": "Cada nodo de GPU debería reportar un recuento. El colector de OpenObserve scrapea el exporter por ti, lo que requiere el chart **0.4.3** o posterior. Si falta o es anterior, instálalo o actualízalo primero desde **Recomendado → Kubernetes**.",
+      "gpuPrereqK8sNote": "Cada nodo de GPU debería informar de un recuento. El colector de OpenObserve scrapea el exporter por ti, lo que requiere el chart **0.4.3** o posterior. Si falta o es anterior, instálalo o actualízalo primero desde **Recomendado → Kubernetes**.",
       "gpuExporterTitle": "Ejecutar DCGM Exporter",
       "gpuExporterDesc": "El exporter de NVIDIA lee la telemetría de la GPU a través de DCGM y la sirve en el puerto `9400`.",
       "gpuExporterDockerNote": "`--network host` mantiene el nombre real de la máquina en la etiqueta `Hostname`, y el listener permanece en `127.0.0.1` para que los datos de la GPU no queden expuestos a la red. `SYS_ADMIN` solo es necesario para las métricas de profiling (`DCGM_FI_PROF_*`).",
@@ -5583,7 +5583,7 @@
       "gpuTroubleExporterQ": "DCGM Exporter se cierra o no muestra ninguna GPU",
       "gpuTroubleExporterA": "Ejecuta `docker logs dcgm-exporter`. \"Failed to initialize NVML\" significa que el contenedor no puede ver las GPU: instala el NVIDIA Container Toolkit y reinicia Docker. En sistemas NVSwitch, inicia `nvidia-fabricmanager`.",
       "gpuTroubleProfilingQ": "Faltan las métricas de profiling (`DCGM_FI_PROF_*`)",
-      "gpuTroubleProfilingA": "Necesitan la capacidad `SYS_ADMIN` (el comando de Docker la añade, y el chart de Helm también) y una GPU de centro de datos (A100, H100, L40 y similares). Las GPU de consumo solo reportan las métricas del dispositivo, y el dashboard funciona con ellas.",
+      "gpuTroubleProfilingA": "Necesitan la capacidad `SYS_ADMIN` (el comando de Docker la añade, y el chart de Helm también) y una GPU de centro de datos (A100, H100, L40 y similares). Las GPU de consumo solo informan de las métricas del dispositivo, y el dashboard funciona con ellas.",
       "gpuTroubleOperatorQ": "Ya uso el NVIDIA GPU Operator",
       "gpuTroubleOperatorA": "Ya despliega DCGM Exporter, así que omite el paso 2: una segunda copia duplicaría todas las series de GPU. Configura `dcgmExporter.annotations` en los valores de Helm del GPU Operator con las dos anotaciones `prometheus.io` del paso 2, y el colector de OpenObserve lo scrapeará. En las comprobaciones del paso 3, usa el namespace `gpu-operator`, la etiqueta `app=nvidia-dcgm-exporter` y `service/nvidia-dcgm-exporter`.",
       "gpuTroubleK8sPendingQ": "No hay pods del exporter, o están en Pending, en Kubernetes",
@@ -5614,37 +5614,37 @@
           "description": "Proteger las aplicaciones web de exploits web comunes y bots"
         },
         "alb": {
-          "description": "Supervisar los registros de acceso de ALB para patrones de solicitudes, errores y latencia"
+          "description": "Supervisar los logs de acceso de ALB para patrones de solicitudes, errores y latencia"
         },
         "cloudwatch-logs": {
-          "description": "Transmitir los registros de CloudWatch a OpenObserve para su análisis"
+          "description": "Transmitir los logs de CloudWatch a OpenObserve para su análisis"
         },
         "cloudwatch-metrics": {
           "description": "Recopilar y analizar métricas de CloudWatch"
         },
         "vpc-flow-logs": {
           "description": "Analizar el tráfico de red en tu VPC",
-          "cloudwatchIntegrationDescription": "Transmitir los registros de flujo de VPC mediante CloudWatch a OpenObserve",
-          "firehoseIntegrationDescription": "Transmitir los registros de flujo de VPC directamente mediante Kinesis Firehose"
+          "cloudwatchIntegrationDescription": "Transmitir los logs de flujo de VPC mediante CloudWatch a OpenObserve",
+          "firehoseIntegrationDescription": "Transmitir los logs de flujo de VPC directamente mediante Kinesis Firehose"
         },
         "ec2": {
-          "description": "Recopilar registros de instancias EC2",
+          "description": "Recopilar logs de instancias EC2",
           "cloudwatchViaSsmDescription": "Desplegar el agente de CloudWatch en instancias EC2 mediante AWS Systems Manager",
-          "opentelemetryViaSsmDescription": "Desplegar el recopilador de OpenTelemetry en instancias EC2 mediante AWS Systems Manager",
-          "windowsManualInstallDescription": "Instalar manualmente el recopilador de OpenObserve en instancias EC2 de Windows",
-          "linuxUnixMacosManualInstallDescription": "Instalar manualmente el recopilador de OpenObserve en instancias EC2 de Linux/Unix/MacOS"
+          "opentelemetryViaSsmDescription": "Desplegar el colector de OpenTelemetry en instancias EC2 mediante AWS Systems Manager",
+          "windowsManualInstallDescription": "Instalar manualmente el colector de OpenObserve en instancias EC2 de Windows",
+          "linuxUnixMacosManualInstallDescription": "Instalar manualmente el colector de OpenObserve en instancias EC2 de Linux/Unix/MacOS"
         },
         "rds": {
-          "description": "Monitorear los registros de la base de datos RDS"
+          "description": "Monitorear los logs de la base de datos RDS"
         },
         "s3": {
           "description": "Rastrear el acceso y las operaciones del bucket S3"
         },
         "lambda": {
-          "description": "Monitorear los registros de las funciones de AWS Lambda"
+          "description": "Monitorear los logs de las funciones de AWS Lambda"
         },
         "api-gateway": {
-          "description": "Analizar los registros de acceso de API Gateway"
+          "description": "Analizar los logs de acceso de API Gateway"
         },
         "cognito": {
           "description": "Monitorear los eventos de autenticación de Cognito"
@@ -5655,12 +5655,12 @@
           "directIntegrationDescription": "Transmitir datos de DynamoDB directamente a OpenObserve"
         },
         "cloudfront": {
-          "description": "Analizar los registros de acceso de CloudFront",
-          "directIntegrationDescription": "Transmitir los registros de CloudFront directamente a OpenObserve",
-          "s3IntegrationDescription": "Ingerir los registros de CloudFront desde el bucket S3"
+          "description": "Analizar los logs de acceso de CloudFront",
+          "directIntegrationDescription": "Transmitir los logs de CloudFront directamente a OpenObserve",
+          "s3IntegrationDescription": "Ingerir los logs de CloudFront desde el bucket S3"
         },
         "route53": {
-          "description": "Monitorear los registros de consultas DNS"
+          "description": "Monitorear los logs de consultas DNS"
         },
         "eventbridge": {
           "description": "Capturar eventos de EventBridge/CloudWatch"
@@ -5676,52 +5676,52 @@
       },
       "azure": {
         "aks": {
-          "description": "Recopilar registros y métricas de los clústeres de Azure Kubernetes Service"
+          "description": "Recopilar logs y métricas de los clústeres de Azure Kubernetes Service"
         },
         "front-door": {
-          "description": "Monitorear los registros de acceso y las métricas de Azure Front Door"
+          "description": "Monitorear los logs de acceso y las métricas de Azure Front Door"
         },
         "app-service": {
-          "description": "Recopilar registros de las aplicaciones de Azure App Service"
+          "description": "Recopilar logs de las aplicaciones de Azure App Service"
         },
         "sql-database": {
-          "description": "Monitorear los registros de Azure SQL Database y las métricas de rendimiento"
+          "description": "Monitorear los logs de Azure SQL Database y las métricas de rendimiento"
         },
         "storage-account": {
-          "description": "Rastrear las operaciones de Azure Storage y los registros de acceso"
+          "description": "Rastrear las operaciones de Azure Storage y los logs de acceso"
         },
         "virtual-machines": {
-          "description": "Recopilar registros y métricas de las máquinas virtuales de Azure"
+          "description": "Recopilar logs y métricas de las máquinas virtuales de Azure"
         },
         "application-gateway": {
-          "description": "Monitorear los registros de acceso y el rendimiento de Application Gateway"
+          "description": "Monitorear los logs de acceso y el rendimiento de Application Gateway"
         },
         "load-balancer": {
-          "description": "Recopilar métricas y registros de Azure Load Balancer"
+          "description": "Recopilar métricas y logs de Azure Load Balancer"
         },
         "network-security-group": {
-          "description": "Monitorear los registros de flujo de NSG y los eventos de seguridad"
+          "description": "Monitorear los logs de flujo de NSG y los eventos de seguridad"
         },
         "key-vault": {
-          "description": "Rastrear el acceso a Key Vault y los registros de auditoría"
+          "description": "Rastrear el acceso a Key Vault y los logs de auditoría"
         },
         "active-directory": {
-          "description": "Monitorear los registros de inicio de sesión y auditoría de AAD"
+          "description": "Monitorear los logs de inicio de sesión y auditoría de AAD"
         },
         "cosmos-db": {
-          "description": "Recopilar los registros de operaciones y las métricas de Cosmos DB"
+          "description": "Recopilar los logs de operaciones y las métricas de Cosmos DB"
         },
         "functions": {
-          "description": "Monitorear los registros de ejecución de Azure Functions"
+          "description": "Monitorear los logs de ejecución de Azure Functions"
         },
         "api-management": {
-          "description": "Rastrear los registros de la puerta de enlace de API Management"
+          "description": "Rastrear los logs de la puerta de enlace de API Management"
         },
         "container-instances": {
-          "description": "Recopilar registros de Azure Container Instances"
+          "description": "Recopilar logs de Azure Container Instances"
         },
         "virtual-network": {
-          "description": "Monitorear los registros de flujo y los diagnósticos de Virtual Network"
+          "description": "Monitorear los logs de flujo y los diagnósticos de Virtual Network"
         },
         "activity-logs": {
           "description": "Transmitir los registros de actividad de la suscripción de Azure a OpenObserve mediante Event Hub y Event Publisher"
@@ -5730,7 +5730,7 @@
     },
     "tokenRotateError": "No se pudo rotar el token.",
     "tokenDeleteError": "No se pudo eliminar el token.",
-    "noTokensFound": "No se ha encontrado ningún token de ingestión.",
+    "noTokensFound": "No se ha encontrado ningún token de ingesta.",
     "tokenStatus": "Estado",
     "errorWhileGeneratingRumToken": "Error al generar el token RUM.",
     "errorWhileRefreshingRumToken": "Error al actualizar el token RUM.",
@@ -6207,7 +6207,7 @@
     "textbox": "Cuadro de texto",
     "newFolder": "Nueva carpeta",
     "updateFolder": "Actualizar carpeta",
-    "newReport": "Nuevo reporte",
+    "newReport": "Nuevo informe",
     "scheduledDashboards": "Dashboards programados",
     "panelHeight": "Altura del panel",
     "none": "Ninguna",
@@ -6363,7 +6363,7 @@
     "createDrilldown": "Crear un desglose",
     "editDrilldown": "Editar Drilldown",
     "goTo": "Ir a:",
-    "selectLogsMode": "Seleccione el modo de registros:",
+    "selectLogsMode": "Seleccione el modo de logs:",
     "enterCustomQuery": "Consulta SQL personalizada*:",
     "sqlQueryRequired": "La consulta SQL es obligatoria",
     "variableNameRequired": "El nombre de la variable es obligatorio.",
@@ -6797,7 +6797,7 @@
       "panelDeletionFailed": "Error al eliminar el panel",
       "panelMoved": "¡Panel movido correctamente!",
       "panelMoveFailed": "Error al mover el panel",
-      "failedToFetchReports": "Error al obtener los reportes",
+      "failedToFetchReports": "Error al obtener los informes",
       "failedToUpdateJson": "Error al actualizar el JSON del dashboard: método de guardado no disponible",
       "failedToSaveChanges": "Error al guardar los cambios del dashboard"
     },
@@ -7109,7 +7109,7 @@
     "failedToCancelRunningQuery": "No se pudo cancelar la consulta en ejecución",
     "failedToDownloadCsv": "No se pudieron descargar los datos como CSV",
     "failedToDownloadJson": "No se pudieron descargar los datos como JSON",
-    "failedToNavigateToLogs": "No se pudo navegar a los registros",
+    "failedToNavigateToLogs": "No se pudo navegar a los logs",
     "invalidColumns": "Columnas no válidas",
     "noDataAvailableToDownload": "No hay datos disponibles para descargar",
     "noPermissionHomeDashboard": "No tienes permiso para cambiar el Dashboard de inicio",
@@ -7441,7 +7441,7 @@
     "rtAlert": "Alertas en tiempo real",
     "noDataState": {
       "title": "Aún no se han ingerido datos",
-      "description": "Esta organización no ha recibido ningún dato, por lo que no hay nada que registrar. Una vez que los eventos empiecen a fluir, el <strong>volumen de ingesta, el almacenamiento y el uso de las consultas</strong> aparecerán aquí automáticamente.",
+      "description": "Esta organización no ha recibido ningún dato, por lo que no hay nada que representar en gráficos. Una vez que los eventos empiecen a fluir, el <strong>volumen de ingesta, el almacenamiento y el uso de las consultas</strong> aparecerán aquí automáticamente.",
       "logs": "Enviar logs",
       "logsDesc": "{product1}, {product2}, {product3}, {product4} y más",
       "traces": "Enviar trazas",
@@ -7503,7 +7503,7 @@
     "emptyActionAlerts": "Ver reglas de alertas",
     "emptyActionAlertsDesc": "Revise las alertas y los umbrales configurados",
     "emptyActionLogs": "Explorar logs",
-    "emptyActionLogsDesc": "Busque y filtre sus streams de registro",
+    "emptyActionLogsDesc": "Busque y filtre sus streams de logs",
     "emptyActionTraces": "Explora las trazas",
     "emptyActionTracesDesc": "Inspecciona trazas distribuidas y la latencia del servicio",
     "anomalyDetectedTitle": "Anomalía detectada — {name}",
@@ -7716,7 +7716,7 @@
       }
     },
     "suggestions": {
-      "vrlParseJson": "Escriba VRL para analizar JSON desde mis registros de nginx",
+      "vrlParseJson": "Escriba VRL para analizar JSON desde mis logs de nginx",
       "regexRedact": "Genere un patrón de expresiones regulares para redactar correos electrónicos",
       "mapStreamSchema": "Mapear el esquema de mi stream \"default\"",
       "promqlCpu": "Escriba ProMQL para pods con más del 80% de CPU",
@@ -7725,7 +7725,7 @@
     },
     "placeholderRotation": {
       "one": "Muéstrame los errores de la última hora...",
-      "two": "Escriba VRL para analizar JSON desde los registros de nginx...",
+      "two": "Escriba VRL para analizar JSON desde los logs de nginx...",
       "three": "Cree un Dashboard para el estado de los nodos de K8..."
     },
     "autoNavigation": {
@@ -7798,7 +7798,7 @@
         "alert": "alerta",
         "dashboard": "Dashboard",
         "pipeline": "pipeline",
-        "report": "reporte",
+        "report": "informe",
         "function": "función",
         "stream": "stream",
         "folder": "carpeta",
@@ -7865,13 +7865,13 @@
     "usageTrends": {
       "dailyUsage": "Uso diario",
       "enableTitle": "Consulte su uso diario",
-      "enableSubtitle": "Active el reporte de uso para gráficar su volumen de ingesta y consultas día a día. Sus totales anteriores permanecen disponibles de cualquier manera.",
-      "enableButton": "Habilitar reporte de uso",
-      "enablePending": "Reporte de uso habilitado. Su gráfico diario comenzará a llenarse pronto a medida que se registre nuevo uso.",
-      "enableConfirmTitle": "¿Habilitar reporte de uso?",
-      "enableConfirmMessage": "Esto comienza a registrar el uso de su organización en su propio stream para que podamos gráficar el volumen diario de ingesta y consultas. Se aplica solo a esta organización y se puede desactivar más tarde en la configuración de la organización.",
+      "enableSubtitle": "Active los informes de uso para graficar su volumen de ingesta y consultas día a día. Sus totales anteriores permanecen disponibles de cualquier manera.",
+      "enableButton": "Habilitar informes de uso",
+      "enablePending": "Informes de uso habilitados. Su gráfico diario comenzará a llenarse pronto a medida que se registre nuevo uso.",
+      "enableConfirmTitle": "¿Habilitar informes de uso?",
+      "enableConfirmMessage": "Esto comienza a registrar el uso de su organización en su propio stream para que podamos graficar el volumen diario de ingesta y consultas. Se aplica solo a esta organización y se puede desactivar más tarde en la configuración de la organización.",
       "waitingTitle": "Esperando datos de uso",
-      "waitingForData": "Su gráfico diario aparecerá aquí una vez que se comience a reportar el uso para esta organización."
+      "waitingForData": "Su gráfico diario aparecerá aquí una vez que se comience a informar del uso para esta organización."
     },
     "aiCredits": "Créditos de IA",
     "aiModeFree": "Gratuito",
@@ -7976,14 +7976,14 @@
     "activationTimeoutContactSupport": "Tiempo de activación agotado. Contacta al soporte si el problema persiste.",
     "alertStatus": "Estado de alerta",
     "contactAdministratorToResolve": "Contacta a tu administrador para resolver este problema.",
-    "contactAdministratorUsageReporting": "Contacta a tu administrador para asegurar que se restablezca el reporte de uso.",
+    "contactAdministratorUsageReporting": "Contacta a tu administrador para asegurar que se restablezcan los informes de uso.",
     "credits": "Créditos",
     "dataRetention": "Retención de datos",
     "event": "Evento",
     "ingestion": "Ingesta",
     "failedAlerts": "Alertas fallidas",
     "failedToCreateOrganization": "No se pudo crear la organización",
-    "failedToEnableUsageReporting": "No se pudo habilitar el reporte de uso",
+    "failedToEnableUsageReporting": "No se pudieron habilitar los informes de uso",
     "failedToLinkAwsSubscription": "No se pudo vincular la suscripción de AWS",
     "failedToLinkAzureSubscription": "No se pudo vincular la suscripción de Azure",
     "last15Minutes": "Últimos 15 minutos",
@@ -8001,8 +8001,8 @@
     "time": "Tiempo",
     "trialPeriodHasExpired": "Tu período de prueba ha expirado.",
     "trialDaysRemaining": "{count} día restante en tu cuenta de prueba | {count} días restantes en tu cuenta de prueba",
-    "usageReportingFailedForDays": "El reporte de uso ha fallado durante {count} día, las funciones de RBAC y SSO están deshabilitadas hasta que el uso se reporte correctamente | El reporte de uso ha fallado durante {count} días, las funciones de RBAC y SSO están deshabilitadas hasta que el uso se reporte correctamente",
-    "usageReportingFailingForHours": "El reporte de uso ha estado fallando durante {count} hora, algunas funciones se deshabilitarán pronto | El reporte de uso ha estado fallando durante {count} horas, algunas funciones se deshabilitarán pronto"
+    "usageReportingFailedForDays": "Los informes de uso han fallado durante {count} día, las funciones de RBAC y SSO están deshabilitadas hasta que el uso se informe correctamente | Los informes de uso han fallado durante {count} días, las funciones de RBAC y SSO están deshabilitadas hasta que el uso se informe correctamente",
+    "usageReportingFailingForHours": "Los informes de uso llevan fallando {count} hora, algunas funciones se deshabilitarán pronto | Los informes de uso llevan fallando {count} horas, algunas funciones se deshabilitarán pronto"
   },
   "awsMarketplace": {
     "noTokenFound": "No se encontró ningún token de Marketplace",
@@ -8197,7 +8197,7 @@
       "filterAll": "Todos",
       "showingCapped": "Mostrando {shown} de {total} hallazgos: la búsqueda se detuvo en {count} registros.",
       "perSubjectNote": "Un hallazgo que menciona varias alertas tiene una tarjeta para cada una, por lo que las tarjetas superan en número a los hallazgos.",
-      "nothingTitle": "Nada que reportar",
+      "nothingTitle": "Nada que informar",
       "nothingDescription": "Sin brechas de cobertura y nada rechazado: en {count} alertas en alcance, la calibración de alertas no encontró nada.",
       "noneFoundTitle": "No se encontró ninguno",
       "noneFoundGap": "Esta ejecución tuvo una brecha de cobertura, por lo que no pudo evaluar todas las alertas.",
@@ -8242,7 +8242,7 @@
       "frequency": "Ejecutar cada",
       "frequencyHelp": "Entre 1 hora y 30 días.",
       "window": "Ventana de análisis",
-      "windowHelp": "Hasta dónde retrocede cada ejecución, entre 1 minuto y 90 días. Una ventana más larga que la cadencia hace que las ejecuciones consecutivas se solapen y reporten los mismos hallazgos de nuevo.",
+      "windowHelp": "Hasta dónde retrocede cada ejecución, entre 1 minuto y 90 días. Una ventana más larga que la cadencia hace que las ejecuciones consecutivas se solapen e informen de los mismos hallazgos de nuevo.",
       "noConfig": "Esta organización aún no tiene ajustes de calibración de alertas. Los valores a continuación son los predeterminados que almacenará tu primer guardado.",
       "warnGap": "Se ejecuta cada {every} pero solo mira atrás {window}, así que el tiempo entre ventanas nunca se analiza.",
       "warnStarved": "Una ventana de {window} es demasiado corta para {rules}, así que cada ejecución las descarta en todas las alertas.",
@@ -8739,7 +8739,7 @@
       "theLastMinute": "el último minuto | los últimos {count} minutos",
       "theLastHour": "la última hora | las últimas {count} horas",
       "plainEnglish": {
-        "realTime": "Avisarme inmediatamente cuando se produzcan eventos coincidentes en tiempo real",
+        "realTime": "Alertarme inmediatamente cuando se produzcan eventos coincidentes en tiempo real",
         "conditionAtLeast": "{threshold}+ eventos",
         "conditionMoreThan": "más de {threshold} eventos",
         "conditionExactly": "exactamente {threshold} evento | exactamente {threshold} eventos",
@@ -8751,7 +8751,7 @@
         "alertMeWhenHours": "Alértame cuando {condition} ocurran en cualquier período de {count} horas",
         "pendingPeriodClause": ", después de esperar durante {duration}",
         "cooldownClause": ", pero no más de una vez cada {cooldown}",
-        "defaultConditions": "Avisarme cuando se cumplan las condiciones configuradas"
+        "defaultConditions": "Alertarme cuando se cumplan las condiciones configuradas"
       }
     },
     "correlation": {
@@ -8906,7 +8906,7 @@
       "alertCount": "Alertas",
       "alertCountAxis": "Número de alertas",
       "correlatedAlertsCount": "Alertas: {count} alertas correlacionadas",
-      "noCorrelatedLogs": "No se encontraron registros correlacionados",
+      "noCorrelatedLogs": "No se encontraron logs correlacionados",
       "noCorrelatedMetrics": "No se encontraron métricas correlacionadas",
       "noCorrelatedTraces": "No se encontraron trazas correlacionadas",
       "lastAlertAt": "Última alerta",
@@ -8952,9 +8952,9 @@
       "rcaCompleted": "Se completó el análisis de la causa raíz",
       "rcaAnalyzeIncident": "Analizar incidente",
       "rcaAnalyzing": "AI SRE Agent está analizando este incidente, espere…",
-      "rcaAnalyzingHint": "El reporte aparecerá aquí una vez que el análisis esté completo.",
+      "rcaAnalyzingHint": "El informe aparecerá aquí una vez que el análisis esté completo.",
       "rcaReanalyzing": "AI SRE Agent está viendo qué cambió desde el último análisis…",
-      "rcaReanalyzingHint": "El reporte se actualizará una vez que el análisis esté completo.",
+      "rcaReanalyzingHint": "El informe se actualizará una vez que el análisis esté completo.",
       "rcaStartedAgo": "Comenzó hace {time}",
       "rcaCancel": "Cancelar",
       "rcaCancelling": "Cancelando…",
@@ -8966,19 +8966,19 @@
       "rcaRetry": "Reintentar análisis",
       "rcaStale": "Este análisis ha estado ejecutándose durante un tiempo inusualmente largo y puede haberse detenido. Puede cancelarlo e intentarlo de nuevo.",
       "rcaAnalyzedAgo": "Analizado hace {time}",
-      "rcaCopy": "Copiar reporte",
-      "rcaCopied": "Reporte copiado al portapapeles",
-      "rcaCopyFailed": "Error al copiar el reporte",
+      "rcaCopy": "Copiar informe",
+      "rcaCopied": "Informe copiado al portapapeles",
+      "rcaCopyFailed": "Error al copiar el informe",
       "rcaDownload": "Descargar como Markdown",
       "rcaReanalyze": "Reanalizar",
       "rcaFreshAnalysis": "Análisis nuevo",
-      "rcaFreshAnalysisHint": "Analizar desde cero, ignorando el reporte anterior",
-      "rcaBuildOnPrevious": "Basarse en el reporte anterior",
-      "rcaBuildOnPreviousHint": "Enviar el reporte actual para que el agente lo extienda",
-      "rcaHistory": "Historial de reportes",
+      "rcaFreshAnalysisHint": "Analizar desde cero, ignorando el informe anterior",
+      "rcaBuildOnPrevious": "Basarse en el informe anterior",
+      "rcaBuildOnPreviousHint": "Enviar el informe actual para que el agente lo extienda",
+      "rcaHistory": "Historial de informes",
       "rcaHistoryCurrent": "Actual",
-      "rcaViewingArchived": "Está viendo un reporte anterior",
-      "rcaBackToCurrent": "Volver al reporte actual",
+      "rcaViewingArchived": "Está viendo un informe anterior",
+      "rcaBackToCurrent": "Volver al informe actual",
       "goBack": "Volver",
       "incident": "Incidente",
       "uniqueAlerts": "Alertas únicas",
@@ -9300,7 +9300,7 @@
         "p99": "p99"
       },
       "functionTooltips": {
-        "totalEvents": "Cuenta el número total de eventos de registro que coinciden con tus filtros (COUNT(*))",
+        "totalEvents": "Cuenta el número total de eventos de log que coinciden con tus filtros (COUNT(*))",
         "count": "Cuenta los valores no nulos de un campo específico (COUNT(campo))",
         "avg": "Valor promedio de un campo numérico",
         "min": "Valor mínimo de un campo numérico",
@@ -9759,7 +9759,7 @@
         },
         "logs": {
           "label": "Crear alerta",
-          "toast": "Consulta importada desde tu búsqueda de registros"
+          "toast": "Consulta importada desde tu búsqueda de logs"
         },
         "patterns": {
           "label": "Crear alerta",
@@ -9786,7 +9786,7 @@
           "toast": "Importado de Monitoreo de base de datos (vista de servidor): \"{sourceLabel}\""
         },
         "rumfunnel": {
-          "label": "Avisarme",
+          "label": "Alertarme",
           "toast": "Importado de Product Analytics: \"{sourceLabel}\""
         }
       },
@@ -10550,13 +10550,13 @@
     "rowsMax": "Máximo de filas",
     "rowsFormat": "Formato de fila (opcional)",
     "rowsFormatLint": "El formato hace referencia a una columna que esta plantilla no restringe a las filas",
-    "rowsFormatCaption": "Genera una línea por cada fila de registro que coincida. Los tokens son los nombres de campo de esa fila — p. ej. {'{'}level{'}'} {'{'}message{'}'} para una fila con campos level y message. Déjalo vacío para mostrar todos los campos.",
+    "rowsFormatCaption": "Genera una línea por cada fila de log que coincida. Los tokens son los nombres de campo de esa fila — p. ej. {'{'}level{'}'} {'{'}message{'}'} para una fila con campos level y message. Déjalo vacío para mostrar todos los campos.",
     "bodyMarkdownLint": "La línea {line} comienza con \"{marker}\" pero no tiene un espacio después, por lo que se mostrará como texto sin formato, no como lista o encabezado. Agrega un espacio para corregirlo.",
     "addToTemplate": "Añadir a esta plantilla",
     "addToTemplateCaption": "Campos, enlaces, filas coincidentes, títulos de canal, gráfico",
     "fieldsSectionDescription": "Datos clave mostrados junto al mensaje — valor, umbral, lo que importe de un vistazo.",
     "linksSectionDescription": "Enlaces de acción. La URL de la alerta siempre se añade automáticamente.",
-    "rowsSectionDescription": "Las líneas de registro que activaron la alerta.",
+    "rowsSectionDescription": "Las líneas de log que activaron la alerta.",
     "chartSection": "Gráfico",
     "chartSectionDescription": "Una imagen de la métrica previa a la alerta — valor a lo largo del tiempo con tus umbrales marcados. Se envía como imagen con la notificación.",
     "chartEnabled": "Incluir imagen del gráfico",
@@ -11429,11 +11429,11 @@
     "deleteLogoMessage": "¿Estás seguro de que deseas eliminar esta imagen del logotipo? Haz clic en Aceptar para eliminarla.",
     "customLogoText": "Texto de logotipo personalizado",
     "orgLabel": "Parámetros de organización",
-    "logDetails": "Detalles del registro",
+    "logDetails": "Detalles de logs",
     "tracesHeading": "Trazas",
     "traceIdFieldName": "Nombre del campo de ID de traza",
     "spanIdFieldName": "Nombre del campo de ID de span",
-    "toggleIngestionLogsLabel": "Alternar registros de ingestión",
+    "toggleIngestionLogsLabel": "Alternar logs de ingesta",
     "usageStreamEnabledLabel": "Habilitar stream de uso",
     "redInsightsEnabledLabel": "Activar insights RED automáticos para las trazas",
     "redInsightsEnabledHelp": "Crea detectores de anomalías de tasa, error y latencia p95 para los servicios con más actividad, en la carpeta de alertas \"RED insights\". Solo los administradores ven esa carpeta hasta que se comparta.",
@@ -11540,7 +11540,7 @@
     "deleteFactMembers": "Afecta a {n} miembro | Afecta a {n} miembros",
     "deleteFactMembersDetail": "Se revoca todo el acceso de inmediato",
     "deleteOrganizationConfirm": "Esto programará la eliminación de \"{name}\" y de todos sus streams, Dashboards, alertas, pipelines, usuarios y configuraciones.",
-    "deleteOrganizationWarning": "La organización deja de estar disponible de inmediato y se oculta a todas las personas que la usan. Se bloquea la ingesta y se detienen las alertas, pipelines y reportes programados, por lo que no se envía ninguna notificación mientras esté programada para su eliminación.",
+    "deleteOrganizationWarning": "La organización deja de estar disponible de inmediato y se oculta a todas las personas que la usan. Se bloquea la ingesta y se detienen las alertas, pipelines y informes programados, por lo que no se envía ninguna notificación mientras esté programada para su eliminación.",
     "deleteOrganizationRecoverable": "Durante la ventana de recuperación aún se puede recuperar, pero no por ti — pierdes el acceso a esta organización tan pronto como comienza la eliminación, y solo el soporte de OpenObserve puede restaurarlo. Una vez que la ventana se cierra, sus datos se eliminan permanentemente y nadie puede recuperarlos.",
     "deleteOrganizationTypeToConfirm": "Para confirmar, escriba {name} a continuación:",
     "deleteOrganizationInitiated": "Organización programada para eliminación. Ahora está oculta; contacta al soporte para restaurarla antes de que cierre la ventana de recuperación.",
@@ -11598,7 +11598,7 @@
       "fieldAliasesSaveError": "No se pudieron guardar los alias de campos",
       "fieldAliasesUnsavedConfirm": "Tienes cambios de asignación de campos sin guardar. ¿Descartarlos y salir?",
       "discoveredServicesTitle": "Servicios descubiertos",
-      "discoveredServicesDescription": "Los servicios se descubren automáticamente a partir de tus datos de telemetría y se agrupan por su nombre de servicio para la correlación. Los servicios que comparten el mismo nombre de servicio se correlacionan entre registros, trazas y métricas.",
+      "discoveredServicesDescription": "Los servicios se descubren automáticamente a partir de tus datos de telemetría y se agrupan por su nombre de servicio para la correlación. Los servicios que comparten el mismo nombre de servicio se correlacionan entre logs, trazas y métricas.",
       "noServicesYet": "Aún no se ha descubierto ningún servicio",
       "noServicesDescription": "Los servicios aparecerán aquí a medida que los datos de telemetría se ingieran con los atributos de identificación del servicio (como k8s-deployment, nombre del servicio, etc.)",
       "searchServiceName": "Buscar nombre de servicio o stream...",
@@ -11655,7 +11655,7 @@
       "instancesCount": "({count} instancias)",
       "noDimensions": "sin dimensiones",
       "defaultSetWarningTitle": "La correlación puede no ser confiable.",
-      "defaultSetWarningBody": "Esta instancia no tiene desambiguación — se descubrió sin ninguna coincidencia de carga de trabajo (sin contexto de clúster, espacio de nombres o entorno). Los registros y las trazas pueden provenir de diferentes despliegues del mismo nombre de servicio.",
+      "defaultSetWarningBody": "Esta instancia no tiene desambiguación — se descubrió sin ninguna coincidencia de carga de trabajo (sin contexto de clúster, espacio de nombres o entorno). Los logs y las trazas pueden provenir de diferentes despliegues del mismo nombre de servicio.",
       "instanceIdentity": "Identidad de instancia",
       "noDimensionsCatchAll": "Sin dimensiones — instancia general",
       "streamSources": "Orígenes de stream",
@@ -12020,16 +12020,16 @@
       "weeks": "semanas",
       "months": "meses"
     },
-    "cachedReportHint": "Nota: los reportes en caché se almacenan para un acceso rápido a los Dashboards; compartir está deshabilitado para estos reportes.",
+    "cachedReportHint": "Nota: los informes en caché se almacenan para un acceso rápido a los Dashboards; compartir está deshabilitado para estos informes.",
     "selectDashboardStep": "Seleccionar Dashboard",
-    "timeRangeDescription": "Genera un reporte con los datos del rango de tiempo especificado",
+    "timeRangeDescription": "Genera un informe con los datos del rango de tiempo especificado",
     "pngPageLimitNote": "PNG captura solo la primera página visible del Dashboard. Usa PDF si el Dashboard abarca varias páginas.",
     "widthPlaceholder": "p. ej. 1440",
     "heightPlaceholder": "p. ej. 900",
     "dimensionsDefaultHint": "Deja en blanco para usar los valores predeterminados del servidor",
     "continue": "Continuar",
     "scheduleStep": "Programar",
-    "scheduleNowHint": "\"Programar ahora\" programará el reporte usando la fecha, hora y zona horaria actuales.",
+    "scheduleNowHint": "\"Programar ahora\" programará el informe usando la fecha, hora y zona horaria actuales.",
     "scheduleLaterHint": "En \"Programar más tarde\" puedes personalizar la fecha, hora y zona horaria.",
     "repeatEvery": "Repetir cada",
     "shareStep": "Compartir",
@@ -12039,23 +12039,23 @@
     "searchAllFoldersTitle": "Buscar en todas las carpetas",
     "never": "Nunca",
     "startDate": "Fecha de inicio",
-    "header": "Reportes",
-    "subtitle": "Reportes y exportaciones programados",
+    "header": "Informes",
+    "subtitle": "Informes y exportaciones programados",
     "searchThisFolder": "Esta carpeta",
     "searchAllFolders": "Todas las carpetas",
-    "reloadReports": "Recargar reportes",
+    "reloadReports": "Recargar informes",
     "moveToFolder": "Mover a la carpeta",
-    "deleteReportsTitle": "Eliminar reportes",
-    "deleteReportsMsg": "¿Seguro que deseas eliminar {count} reporte? | ¿Seguro que deseas eliminar {count} reportes?",
-    "add": "Nuevo reporte",
-    "search": "Buscar reporte",
-    "update": "Actualizar reporte",
+    "deleteReportsTitle": "Eliminar informes",
+    "deleteReportsMsg": "¿Seguro que deseas eliminar {count} informe? | ¿Seguro que deseas eliminar {count} informes?",
+    "add": "Nuevo informe",
+    "search": "Buscar informe",
+    "update": "Actualizar informe",
     "folder": "Carpeta",
     "dashboardFolder": "Carpeta",
     "dashboard": "Dashboard",
     "dashboardTab": "Pestaña del Dashboard",
     "recipients": "Destinatarios",
-    "name": "Nombre del reporte",
+    "name": "Nombre del informe",
     "title": "Título",
     "description": "Descripción",
     "cron": "Trabajo Cron",
@@ -12077,10 +12077,10 @@
     "createdAt": "Creado en",
     "tab": "Pestaña",
     "cached": "En caché",
-    "cachedReport": "Reporte en caché",
+    "cachedReport": "Informe en caché",
     "scheduled": "Programado",
-    "reportFormat": "Formato del reporte",
-    "reportType": "Tipo de reporte",
+    "reportFormat": "Formato del informe",
+    "reportType": "Tipo de informe",
     "reportTypePdf": "{format} (predeterminado)",
     "reportTypePng": "{format} (Imagen)",
     "reportTypeCsv": "{format} (Datos)",
@@ -12099,15 +12099,15 @@
       "invalidEmails": "¡Agregue correos electrónicos válidos!"
     },
     "destinationDefault": "Predeterminado",
-    "fetchReportError": "Error al obtener el reporte!",
-    "cancelReportChangesConfirm": "¿Estás seguro de que quieres cancelar los cambios del reporte?",
-    "fetchReportsError": "Error al obtener los reportes!",
-    "updateReportStateError": "Error al actualizar el estado del reporte!",
-    "deleteReportError": "Error al eliminar el reporte!",
-    "bulkDeleteReportsError": "Error al eliminar reportes.",
-    "deleteReportTitle": "Eliminar reporte",
-    "deleteReportMessage": "¿Estás seguro de que quieres eliminar el reporte?",
-    "deleteReportNamedMessage": "Estás seguro de que quieres eliminar el reporte \"{name}\""
+    "fetchReportError": "Error al obtener el informe!",
+    "cancelReportChangesConfirm": "¿Estás seguro de que quieres cancelar los cambios del informe?",
+    "fetchReportsError": "Error al obtener los informes!",
+    "updateReportStateError": "Error al actualizar el estado del informe!",
+    "deleteReportError": "Error al eliminar el informe!",
+    "bulkDeleteReportsError": "Error al eliminar informes.",
+    "deleteReportTitle": "Eliminar informe",
+    "deleteReportMessage": "¿Estás seguro de que quieres eliminar el informe?",
+    "deleteReportNamedMessage": "Estás seguro de que quieres eliminar el informe \"{name}\""
   },
   "queries": {
     "durationOptions": {
@@ -12284,19 +12284,19 @@
       "errorRequestTimeout": "La solicitud expiró. El gráfico de servicio puede estar procesando grandes cantidades de datos. Inténtelo de nuevo.",
       "errorApiNotFound": "No se encontró el endpoint de la API del gráfico de servicio. Asegúrese de estar ejecutando la versión empresarial de OpenObserve.",
       "errorAccessDenied": "Acceso denegado. Es posible que no tenga permiso para ver el gráfico de servicio de esta organización.",
-      "errorServerError": "Ocurrió un error del servidor. Consulte los registros del servidor para obtener más detalles.",
+      "errorServerError": "Ocurrió un error del servidor. Consulte los logs del servidor para obtener más detalles.",
       "errorNetwork": "Error de red. Verifique su conexión a Internet.",
-      "errorLoadFailed": "No se pudieron cargar los datos del gráfico de servicio. Consulte los registros del servidor."
+      "errorLoadFailed": "No se pudieron cargar los datos del gráfico de servicio. Consulte los logs del servidor."
     },
     "openInFullView": "Abrir a la vista",
     "viewLogs": "Ver logs",
-    "viewLogsUnavailable": "No se pudieron abrir los registros para este span.",
+    "viewLogsUnavailable": "No se pudieron abrir los logs para este span.",
     "viewProfile": "Ver perfil",
     "backToLogs": "Volver a Logs",
     "openInTraces": "Abrir en Trazas",
     "loadingStream": "Cargando Stream...",
-    "noLogsAvailableForService": "No hay registros disponibles para este servicio",
-    "noCorrelatedLogsFound": "No se encontraron registros correlacionados para este span",
+    "noLogsAvailableForService": "No hay logs disponibles para este servicio",
+    "noCorrelatedLogsFound": "No se encontraron logs correlacionados para este span",
     "spanHasNoLogsShowingTrace": "Este span no tiene logs. Mostrando los logs de toda la traza.",
     "noData": {
       "title": "Comienza a enviar trazas a {product}",
@@ -12848,7 +12848,7 @@
       "backendTraceNotAvailable": "Los datos de traza del backend aún no están disponibles. Los datos de traza pueden tardar hasta 30 segundos en ingerirse."
     },
     "failedToAnalyzeDimensions": "Error al analizar las dimensiones",
-    "failedToFetchCorrelatedLogs": "Error al obtener los registros correlacionados",
+    "failedToFetchCorrelatedLogs": "Error al obtener los logs correlacionados",
     "failedToFetchLlmInsights": "Error al obtener la información de LLM",
     "failedToFetchQueryData": "Error al obtener los datos de la consulta",
     "failedToFetchRawSample": "Error al obtener la muestra sin procesar",
@@ -12862,7 +12862,7 @@
     "latencyPercentile": "Percentil de latencia",
     "max": "Máx",
     "correlationServiceNotFound": "No se encontró el servicio de correlación. Es posible que el servidor no admita esta función.",
-    "noLogStreamForCorrelation": "No hay ningún stream de registros disponible para la correlación",
+    "noLogStreamForCorrelation": "No hay ningún stream de logs disponible para la correlación",
     "noMatchingServiceForStream": "No se encontró ningún servicio coincidente para este stream con las dimensiones proporcionadas.",
     "noRecognizableDimensionsForCorrelation": "No se encontraron dimensiones reconocibles en el contexto para la correlación",
     "noSemanticGroupsAvailable": "No hay grupos semánticos disponibles",
@@ -13190,7 +13190,7 @@
     "correlatedMetrics": "Métricas correlacionadas",
     "correlatedTraces": "Trazas",
     "loadingCorrelation": "Cargando datos de correlación...",
-    "clickToLoadLogs": "Haga clic para cargar los registros correlacionados",
+    "clickToLoadLogs": "Haga clic para cargar los logs correlacionados",
     "clickToLoadMetrics": "Haga clic para cargar métricas correlacionadas",
     "clickToLoadTraces": "Haz clic para cargar trazas correlacionadas",
     "logs": {
@@ -13199,9 +13199,9 @@
       "loading": "Cargando logs...",
       "errorDetails": "Ocurrió un error al obtener los datos de logs. Inténtalo de nuevo.",
       "noData": "No se han encontrado logs",
-      "noDataDetails": "No se encontró ningún registro que coincida con los filtros de correlación.",
+      "noDataDetails": "No se encontró ningún log que coincida con los filtros de correlación. Pruebe a ajustar los filtros o el intervalo de tiempo.",
       "unstableDimension": "Dimensión inestable: puede cambiar al reiniciar el pod",
-      "resultsCount": "{count} registros encontrados en {stream} ({time} ms)",
+      "resultsCount": "{count} logs encontrados en {stream} ({time} ms)",
       "timeRange": {
         "startBeforeEnd": "La hora de inicio debe ser anterior a la hora de finalización",
         "endAfterStart": "La hora de finalización debe ser posterior a la hora de inicio"
@@ -13210,7 +13210,7 @@
     "loadingLogs": "Cargando logs...",
     "noLogsFound": "No se han encontrado logs",
     "noDataFound": "No se han encontrado datos",
-    "noLogsDescription": "No se han encontrado registros para esta correlación en el intervalo de tiempo seleccionado.",
+    "noLogsDescription": "No se han encontrado logs para esta correlación en el intervalo de tiempo seleccionado.",
     "correlatedTracesFor": "Trazas correlacionadas para el servicio: {service}",
     "all": "Todas",
     "loadingTraces": "Cargando trazas...",
@@ -13266,11 +13266,11 @@
     "noMetricStreamsFor": "No se encontraron streams de métricas para este {kind}",
     "correlatedStreamsFor": "Streams correlacionados - {service}",
     "metricsDashboardDescription": "Streams correlacionados con el servicio {service}",
-    "logsDashboardDescription": "Registros correlacionados con el servicio {service}",
+    "logsDashboardDescription": "Logs correlacionados con el servicio {service}",
     "panelTimeSeriesFor": "Serie temporal para {stream}",
     "panelTimeSeriesForWithType": "Serie temporal para {stream} ({type})",
     "logsPanelTitle": "Logs - {stream}",
-    "logsPanelDescription": "Registros correlacionados para el servicio {service}"
+    "logsPanelDescription": "Logs correlacionados para el servicio {service}"
   },
   "search_scheduler_job": {
     "title": "Planificador de tareas de búsqueda",
@@ -14230,7 +14230,7 @@
         "previewIncomplete": "Completa la sección de tarea para ver lo que se ejecutará.",
         "providerRefresh": "Actualizar proveedores",
         "providerRefreshError": "Error al actualizar los proveedores",
-        "providerEndpointLabel": "Punto de conexión:",
+        "providerEndpointLabel": "Endpoint:",
         "providerDefaultModelLabel": "Modelo predeterminado:",
         "providerHelp": "Elige el proveedor de LLM al que llama este experimento. Gestiona los proveedores en {settingsLink}.",
         "providerHelpSettingsLink": "Configuración",
@@ -16167,15 +16167,15 @@
   "logs": {
     "noData": {
       "title": "Comienza a enviar datos a {product}",
-      "description": "Aún no hay datos en esta organización, por lo que no hay streams que explorar. Envía tus primeros registros y se mostrarán aquí automáticamente. Elige cómo quieres empezar.",
+      "description": "Aún no hay datos en esta organización, por lo que no hay streams que explorar. Envía tus primeros logs y se mostrarán aquí automáticamente. Elige cómo quieres empezar.",
       "curl": "Enviar a través de la API Curl/HTTP",
-      "curlDesc": "La forma más rápida: pega un comando y los registros comienzan a fluir",
+      "curlDesc": "La forma más rápida: pega un comando y los logs comienzan a fluir",
       "shippers": "Usa un agente de envío de logs",
       "shippersDesc": "{product1}, {product2}, {product3}, {product4}, {product5} y más",
       "otelDesc": "Ingesta OTLP independiente del proveedor para logs, trazas y métricas",
       "or": "O:",
       "aws": "AWS/CloudWatch",
-      "askAi": "Pídele a la IA que configure la ingestión"
+      "askAi": "Pídele a la IA que configure la ingesta"
     },
     "noStream": {
       "title": "Elige un stream para empezar a explorar",
@@ -16356,7 +16356,7 @@
     },
     "index": {
       "searchHistoryNotEnabled": "El historial de búsqueda no está habilitado.",
-      "enableUsageReporting": "Establezca ZO_USAGE_REPORTING_ENABLED en true para habilitar el reporte de uso.",
+      "enableUsageReporting": "Establezca ZO_USAGE_REPORTING_ENABLED en true para habilitar los informes de uso.",
       "selectStreamToExtractPatterns": "Seleccione un stream para extraer patrones",
       "patternsUnavailableForMultiStream": "Los patrones no están disponibles cuando se seleccionan varios streams. Seleccione un único stream.",
       "errorExtractingPatterns": "Error al extraer patrones. Intente nuevamente.",
@@ -16404,7 +16404,7 @@
       "durationMinutes": "{n} minuto | {n} minutos",
       "durationHours": "{n} hora | {n} horas",
       "durationDays": "{n} día | {n} días",
-      "exactCountTooltip": "≈{count} registros coincidentes en este rango de tiempo",
+      "exactCountTooltip": "≈{count} logs coincidentes en este rango de tiempo",
       "serviceOthers": "{count} otros servicios",
       "statusError": "Error",
       "statusWarning": "Advertencia",
@@ -16423,7 +16423,7 @@
       "badgeSpikeDesc": "Volumen subiendo bruscamente vs su línea base reciente",
       "badgeNewDesc": "Solo comenzó a aparecer recientemente en este rango de tiempo",
       "badgeDropDesc": "Volumen bajando bruscamente vs su línea base reciente",
-      "badgeRareDesc": "Coincide con menos del 1% de los registros en este rango de tiempo",
+      "badgeRareDesc": "Coincide con menos del 1% de los logs en este rango de tiempo",
       "badgeAnomalyDesc": "Frecuencia estadísticamente inusual frente a otros patrones",
       "actionsLabel": "Acciones",
       "includeInQuery": "Incluir en la consulta",
@@ -17114,7 +17114,7 @@
       "noSteps": "Aún no hay pasos",
       "filterClearedForErrors": "Filtro borrado para que los pasos que necesitan corrección sean visibles.",
       "filterClearedForNewStep": "Filtro borrado para que el nuevo paso sea visible.",
-      "preflightDescription": "La extensión del grabador se detuvo antes de ejecutar el primer paso. Su reporte se muestra a continuación.",
+      "preflightDescription": "La extensión del grabador se detuvo antes de ejecutar el primer paso. Su informe se muestra a continuación.",
       "preflightTitle": "La reproducción no pudo iniciarse",
       "replayInProgressDescription": "Otra reproducción aún se está ejecutando en la extensión del grabador. Espera a que termine o recarga la extensión y vuelve a intentarlo.",
       "replayInProgressTitle": "Ya hay una reproducción en ejecución",
@@ -17593,7 +17593,7 @@
       "loadFailedDetail": "Detalles: {error}",
       "loadFailedExpired": "El enlace de descarga de este paquete de evidencia ha caducado. Vuelve a cargar la ejecución para obtener uno nuevo.",
       "loadFailedMissing": "Este paquete de evidencia ya no está almacenado. Los paquetes se eliminan cuando la ejecución supera su período de retención.",
-      "loadFailedServer": "El almacenamiento no pudo devolver este paquete de evidencia. La ejecución en sí no se ve afectada — solo falta el registro de consola y red capturado.",
+      "loadFailedServer": "El almacenamiento no pudo devolver este paquete de evidencia. La ejecución en sí no se ve afectada — solo falta el log de consola y red capturado.",
       "loadFailedUnauthorized": "No tienes autorización para leer este paquete de evidencia. Es posible que tu sesión haya caducado — recarga la página e inicia sesión de nuevo.",
       "loadFailedUnreachable": "No se pudo acceder al almacenamiento de evidencia. Comprueba tu conexión e inténtalo de nuevo.",
       "reload": "Recargar página",
@@ -17763,7 +17763,7 @@
       "retriesOnFailure": "Se vuelve a intentar en caso de error",
       "retriesOnFailureSuffix": "veces.",
       "retriesMaxHint": "Máximo {max}. Los reintentos se ejecutan dentro del mismo trabajo, por lo que toda la secuencia debe caber en el presupuesto de la verificación.",
-      "retriesMaxBrowserHint": "Máximo {max} para verificaciones de navegador. Cada intento vuelve a ejecutar el recorrido en cada dispositivo, por lo que más excedería el tiempo de espera de la sonda y reportaría una falla que su sitio nunca tuvo.",
+      "retriesMaxBrowserHint": "Máximo {max} para verificaciones de navegador. Cada intento vuelve a ejecutar el recorrido en cada dispositivo, por lo que más excedería el tiempo de espera de la sonda e informaría de un fallo que su sitio nunca tuvo.",
       "retryDelay": "Espera a",
       "retryDelaySuffix": "ms entre reintentos.",
       "schedule": "Programación",
@@ -18243,7 +18243,7 @@
       "streams": "Streams",
       "pipelines": "Pipelines",
       "functions": "Funciones",
-      "reports": "Reportes",
+      "reports": "Informes",
       "iam": "SOY YO",
       "settings": "Ajustes",
       "onlineEvals": "Evaluaciones en línea",
@@ -18265,7 +18265,7 @@
       "streams": "Streams",
       "pipelines": "Pipelines",
       "functions": "Funciones",
-      "reports": "Reportes",
+      "reports": "Informes",
       "iamUsers": "IAM — Usuarios",
       "iamRoles": "IAM — Funciones",
       "iamGroups": "IAM — Grupos",
@@ -18276,7 +18276,7 @@
       "panelEditor": "Editor de paneles",
       "traceDetail": "Detalle de traza",
       "runningQueries": "Ejecución de consultas",
-      "ingestionTokens": "IAM — Tokens de ingestión",
+      "ingestionTokens": "IAM — Tokens de ingesta",
       "syntheticsTokens": "IAM — Tokens de Synthetics",
       "alertIncidents": "Alertas — Incidentes",
       "pipelineDestinations": "Pipelines — Destinos",
@@ -18352,7 +18352,7 @@
       "pipelinesRefresh": "Actualizar lista",
       "functionsAdd": "Añadir nueva función",
       "functionsRefresh": "Actualizar lista",
-      "reportsAdd": "Crear un nuevo reporte",
+      "reportsAdd": "Crear un nuevo informe",
       "reportsRefresh": "Actualizar lista",
       "iamUsersAdd": "Agregar usuario nuevo",
       "iamUsersRefresh": "Actualizar lista",
@@ -19029,7 +19029,7 @@
         "pipelines": "Pipelines",
         "destinations": "Destinos",
         "templates": "Plantillas",
-        "reports": "Reportes",
+        "reports": "Informes",
         "llmModelPricing": "Precios de modelos LLM",
         "passcode": "Token de ingesta"
       },
@@ -19177,23 +19177,23 @@
       "selectedDashboardTabHasBeenDeleted": "¡La pestaña del dashboard seleccionada ha sido eliminada!",
       "selectedDashboardHasBeenDeleted": "¡El dashboard seleccionado ha sido eliminado!",
       "selectedFolderHasBeenDeleted": "¡La carpeta seleccionada ha sido eliminada!",
-      "reportUpdatedSuccessfully": "Reporte actualizado correctamente.",
-      "reportSavedSuccessfully": "Reporte guardado correctamente.",
+      "reportUpdatedSuccessfully": "Informe actualizado correctamente.",
+      "reportSavedSuccessfully": "Informe guardado correctamente.",
       "pleaseWait": "Por favor espere...",
-      "reportsDeletedSuccessfully": "{count} reporte eliminado correctamente | {count} reportes eliminados correctamente",
-      "failedToDeleteReports": "Error al eliminar {count} reporte | Error al eliminar {count} reportes",
+      "reportsDeletedSuccessfully": "{count} informe eliminado correctamente | {count} informes eliminados correctamente",
+      "failedToDeleteReports": "Error al eliminar {count} informe | Error al eliminar {count} informes",
       "deletedFailed": "{count} eliminados, {failed} fallidos",
-      "noReportsSelectedForDeletion": "No se seleccionaron reportes para eliminar",
-      "deletingReports": "Eliminando reportes...",
-      "reportDeletedSuccessfully": "Reporte eliminado correctamente.",
-      "deletingReport": "Eliminando reporte \"{name}\"",
-      "reportStartedSuccessfully": "Reporte iniciado correctamente.",
-      "reportStoppedSuccessfully": "Reporte detenido correctamente.",
-      "startingReport": "Iniciando reporte \"{name}\"",
-      "stoppingReport": "Deteniendo reporte \"{name}\"",
-      "pleaseWaitWhileFetchingReports": "Por favor espere mientras se obtienen los reportes...",
-      "errorWhileSaving": "Error al guardar el reporte.",
-      "errorWhileUpdating": "Error al actualizar el reporte."
+      "noReportsSelectedForDeletion": "No se seleccionaron informes para eliminar",
+      "deletingReports": "Eliminando informes...",
+      "reportDeletedSuccessfully": "Informe eliminado correctamente.",
+      "deletingReport": "Eliminando informe \"{name}\"",
+      "reportStartedSuccessfully": "Informe iniciado correctamente.",
+      "reportStoppedSuccessfully": "Informe detenido correctamente.",
+      "startingReport": "Iniciando informe \"{name}\"",
+      "stoppingReport": "Deteniendo informe \"{name}\"",
+      "pleaseWaitWhileFetchingReports": "Por favor espere mientras se obtienen los informes...",
+      "errorWhileSaving": "Error al guardar el informe.",
+      "errorWhileUpdating": "Error al actualizar el informe."
     },
     "correlation": {
       "refreshingTraceData": "Actualizando datos de traza...",
@@ -19454,7 +19454,7 @@
     },
     "frozen": {
       "title": "Congelado: cobertura insuficiente",
-      "body": "Solo {coverage} de esta ventana fue medido, por debajo del umbral {floor}. El SLO se lee como sin datos y sus alertas ni se activan ni se resuelven, por lo que el tiempo no medido nunca se reporta como tiempo activo.",
+      "body": "Solo {coverage} de esta ventana fue medido, por debajo del umbral {floor}. El SLO se lee como sin datos y sus alertas ni se activan ni se resuelven, por lo que el tiempo no medido nunca se informa como tiempo activo.",
       "alertGapsBody": "Solo se midió {coverage} de esta ventana, por debajo del mínimo {floor}: la alerta de origen no se evaluó durante el resto, ya sea pausada, silenciada o con errores. El SLO se lee como sin datos y sus alertas ni se disparan ni se resuelven, por lo que el tiempo no medido nunca se informa como tiempo de actividad.",
       "alertStaleTitle": "Congelado: la alerta de origen dejó de evaluarse",
       "alertStaleBody": "La alerta de origen no se ha evaluado desde {since}, por lo que la medición está congelada: la ventana permanece donde estaba y las alertas del SLO ni se disparan ni se resuelven. Las cifras a continuación son la última medición real, no el estado actual.",
@@ -19834,7 +19834,7 @@
     "aiRemoteTaskEdit": "Editar tarea remota",
     "aiRemoteTaskDetail": "Tarea remota",
     "notFound": "404 - No encontrado",
-    "createReport": "Crear reporte",
+    "createReport": "Crear informe",
     "addCheck": "Agregar verificación",
     "incidentDetail": "Detalle del incidente",
     "groups": "Grupos",
@@ -20030,7 +20030,7 @@
       "emptyHeadline": "Aún no hay telemetría de hosts visible para ti",
       "emptyRbacHint": "Si tu equipo ya recopila métricas de host, es posible que no tengas acceso a los streams de métricas system_*; consulta con tu administrador.",
       "fleetCount": "{total} host, {active} activo | {total} hosts, {active} activos",
-      "livenessBanner": "No se pudo determinar qué hosts están reportando actualmente; el estado se muestra como Desconocido.",
+      "livenessBanner": "No se pudo determinar qué hosts están informando actualmente; el estado se muestra como Desconocido.",
       "lastSeenBanner": "Los hosts inactivos y la última conexión no están disponibles en este momento.",
       "retry": "Reintentar",
       "pageError": "No se pudo cargar la lista de hosts.",
@@ -20053,7 +20053,7 @@
       "columnLastSeen": "Visto por última vez",
       "memoryAbsolute": "{used} / {total}",
       "loadPerCore": "({value}/núcleo)",
-      "windowsLivenessNote": "Los hosts Windows aparecen en esta lista solo cuando el agente reporta la métrica de carga (system_cpu_load_average_15m); si tus agentes Windows se están ejecutando pero no aparecen aquí, habilita el scraper de carga en la configuración del colector o actualiza el agente.",
+      "windowsLivenessNote": "Los hosts Windows aparecen en esta lista solo cuando el agente informa de la métrica de carga (system_cpu_load_average_15m); si tus agentes Windows se están ejecutando pero no aparecen aquí, habilita el scraper de carga en la configuración del colector o actualiza el agente.",
       "panel": {
         "cpuBusy": "CPU ocupada",
         "cpuByState": "CPU por estado",
@@ -20070,14 +20070,14 @@
       "group": {
         "hostMetrics": "CPU, memoria, disco y red (receptor hostmetrics)",
         "hostMetricsCap": "La CPU, la memoria, el disco y la red del host no están disponibles",
-        "hostMetricsHint": "Instala el colector de OpenObserve en este host: su receptor hostmetrics reporta estas métricas del sistema."
+        "hostMetricsHint": "Instala el colector de OpenObserve en este host: su receptor hostmetrics informa de estas métricas del sistema."
       }
     },
     "workload": {
       "kubernetesTitle": "Kubernetes",
       "awsTitle": "AWS",
       "setupHeadline": "Conecta esta carga de trabajo para verla aquí",
-      "awsSetupCta": "Abrir la Ingestión de datos de AWS"
+      "awsSetupCta": "Abrir las fuentes de datos de AWS"
     },
     "curated": {
       "checking": "Comprobando qué datos de {workload} están llegando...",
@@ -20091,7 +20091,7 @@
       "hiddenSummaryMore": "{first} y {count} más",
       "hiddenFootnote": "Aquí también aparecen las fuentes de datos a las que no tienes acceso.",
       "streamsMissing": "{count} fuente de datos no encontrada: {list} | {count} fuentes de datos no encontradas: {list}",
-      "streamsStale": "{list} dejó de reportar - últimos datos {date}",
+      "streamsStale": "{list} dejó de informar - últimos datos {date}",
       "probeEmpty": "No hay eventos coincidentes en el stream \"{stream}\" para el rango de tiempo seleccionado.",
       "probeFieldsMissing": "El stream \"{stream}\" no tiene columnas {list}.",
       "fieldUnresolved": "No se encontró ningún campo {display} en {stream}.",
@@ -20103,9 +20103,9 @@
       "staleNoDataBannerShort": "{capability} aún no ha enviado datos",
       "stoppedAgo": "se detuvo hace {duration}",
       "aboutNumbers": "Sobre estas cifras",
-      "staleNoDataBanner": "{capability} aún no tiene datos: el stream existe, pero nunca ha reportado. Los paneles a continuación permanecerán vacíos hasta que lo haga.",
-      "dormantHeadline": "{workload} ha dejado de reportar",
-      "dormantBody": "El collector está instalado pero dejó de enviar datos. Reinícialo y luego actualiza.",
+      "staleNoDataBanner": "{capability} aún no tiene datos: el stream existe, pero nunca ha informado. Los paneles a continuación permanecerán vacíos hasta que lo haga.",
+      "dormantHeadline": "{workload} ha dejado de informar",
+      "dormantBody": "El colector está instalado pero dejó de enviar datos. Reinícialo y luego actualiza.",
       "staleBadge": "sin datos durante {duration} (visto por última vez {date})",
       "staleNoDataBadge": "aún sin datos",
       "staleBadgeTooltip": "Según la última actualización de la lista de streams.",
@@ -20131,19 +20131,19 @@
         "nodes": "Nodos",
         "workloads": "Cargas de trabajo",
         "utilization": "Utilización",
-        "utilizationNote": "Los ratios comparan el uso de un pod con su propia request o limit declarados, así que un pod que no declara ninguna request no reporta ningún ratio y es invisible para estos paneles. Las tablas de desperdicio también omiten los pods que no usan nada de CPU ni memoria: las tarjetas ya los cuentan, y 43 de ellos empatan al 100% de desperdicio, lo que de otro modo llenaría la tabla de forma arbitraria. Las tarjetas cuentan objetos de todo el clúster seleccionado e ignoran el filtro de namespace; las tablas de abajo sí lo respetan. Todos los números leen el instante actual.",
+        "utilizationNote": "Los ratios comparan el uso de un pod con su propia request o limit declarados, así que un pod que no declara ninguna request no informa de ningún ratio y es invisible para estos paneles. Las tablas de desperdicio también omiten los pods que no usan nada de CPU ni memoria: las tarjetas ya los cuentan, y 43 de ellos empatan al 100% de desperdicio, lo que de otro modo llenaría la tabla de forma arbitraria. Las tarjetas cuentan objetos de todo el clúster seleccionado e ignoran el filtro de namespace; las tablas de abajo sí lo respetan. Todos los números leen el instante actual.",
         "health": "Salud",
         "healthNote": "Los contenedores en espera incluyen estados de inicio normales (ContainerCreating, PodInitializing) junto con fallos reales como CrashLoopBackOff: lee el motivo, no solo el recuento; la tabla ordena los fallos primero para que nunca queden ocultos. Los motivos de terminación muestran solo la última salida de cada contenedor, por lo que un OOM kill anterior puede no aparecer. Las tablas de Deployment y StatefulSet informan la preparación: 0 % significa que no hay nada en ejecución, 67 % significa dos de tres, porque una simple cifra de déficit no distingue una caída total de una parcial. Las tarjetas cuentan objetos de todo el clúster seleccionado e ignoran el filtro de namespace; las tablas de abajo sí lo respetan. Todos los números reflejan el instante actual.",
         "overview": "Resumen",
-        "overviewNote": "Todos los números de esta pestaña leen el instante actual en todos los clústeres, por lo que el cuadrante y los totales de la flota coinciden. El selector de tiempo no amplía estas lecturas; un clúster que ha dejado de reportar desaparece en lugar de mostrar su último valor conocido."
+        "overviewNote": "Todos los números de esta pestaña leen el instante actual en todos los clústeres, por lo que el cuadrante y los totales de la flota coinciden. El selector de tiempo no amplía estas lecturas; un clúster que ha dejado de informar desaparece en lugar de mostrar su último valor conocido."
       },
       "group": {
         "nodeMetrics": "CPU y memoria de nodos (receptor kubeletstats)",
         "nodeMetricsCap": "La CPU y la memoria de los nodos no están disponibles",
-        "nodeMetricsHint": "Instale el colector de OpenObserve: su receptor kubeletstats reporta la CPU y la memoria de los nodos.",
+        "nodeMetricsHint": "Instale el colector de OpenObserve: su receptor kubeletstats informa de la CPU y la memoria de los nodos.",
         "podMetrics": "CPU, memoria y red de pods (receptor kubeletstats)",
         "podMetricsCap": "La CPU, la memoria y la red por pod no están disponibles",
-        "podMetricsHint": "Habilite el receptor kubeletstats en su colector para reportar el uso de recursos por pod.",
+        "podMetricsHint": "Habilite el receptor kubeletstats en su colector para informar del uso de recursos por pod.",
         "kubeState": "Salud de pods y disponibilidad de nodos (receptor de clúster)",
         "kubeStateCap": "La salud de los pods y la disponibilidad de los nodos no están disponibles: no llegan las métricas de estado del clúster",
         "kubeStateHint": "Las fases de los pods y las condiciones de los nodos provienen de las métricas de kube-state; habilite el receptor de clúster en el colector."
@@ -20260,7 +20260,7 @@
       "warnFooter": "Eventos de advertencia de la última hora",
       "nodeIsNotReady": "El nodo no está listo",
       "warningsIncomplete": "Los datos de advertencia están incompletos",
-      "objectsNotObserved": "Las etiquetas, los roles, las condiciones y los detalles del contenedor aparecen una vez que el recopilador observa un cambio en el objeto",
+      "objectsNotObserved": "Las etiquetas, los roles, las condiciones y los detalles del contenedor aparecen una vez que el colector observa un cambio en el objeto",
       "filtered": "Filtrado:",
       "items": "{count} elemento | {count} elementos",
       "itemsCapped": "{count} elementos (límite)",
@@ -20581,9 +20581,9 @@
       "suggestFixHint": "Abre el asistente de IA con esta consulta, su motor y sus números de latencia, y pregunta qué cambiar. No cambia nada por sí mismo.",
       "rowSuggestFix": "Preguntar a la IA cómo solucionar esto",
       "deadlockFix": "¿Cómo detengo este bloqueo?",
-      "deadlockFixHint": "Envía tanto las declaraciones en conflicto como la evidencia del orden de las filas al asistente de IA.",
+      "deadlockFixHint": "Envía tanto las sentencias en conflicto como la evidencia del orden de las filas al asistente de IA.",
       "blockingFix": "¿Por qué está bloqueando?",
-      "blockingFixHint": "Envía la declaración de la sesión raíz, su tiempo de inactividad y cuántas sesiones están atascadas detrás de ella al asistente de IA."
+      "blockingFixHint": "Envía la sentencia de la sesión raíz, su tiempo de inactividad y cuántas sesiones están atascadas detrás de ella al asistente de IA."
     },
     "filters": {
       "allEngines": "Todos los motores",
@@ -20618,7 +20618,7 @@
     "databases": {
       "searchPlaceholder": "Buscar base de datos o servicio…",
       "unnamedInstance": "Instancia sin nombre",
-      "unnamedInstanceHint": "Los reportes de sentencias de la propia base de datos demuestran que este motor está en ejecución, pero no nombran un host. La fila mostrará una dirección una vez que se configure una fuente que la incluya — muestreo de sesión o métricas de instancia —.",
+      "unnamedInstanceHint": "Los informes de sentencias de la propia base de datos demuestran que este motor está en ejecución, pero no nombran un host. La fila mostrará una dirección una vez que se configure una fuente que la incluya — muestreo de sesión o métricas de instancia —.",
       "moreServices": "+{count}",
       "columns": {
         "instance": "Base de datos",
@@ -20692,7 +20692,7 @@
       "otherRowDetail": "— {calls} llamadas. No tenemos números por consulta para estas, solo este total combinado. Contado en cada total anterior.",
       "foldRowText": "1 consulta más pequeña | {count} consultas más pequeñas",
       "serverList": {
-        "title": "Consultas reportadas por tus bases de datos",
+        "title": "Consultas informadas por tus bases de datos",
         "subtitle": "Contado dentro de la base de datos en todos los clientes, las más ejecutadas primero. No llegó ninguna llamada de aplicación trazada en esta ventana, por lo que la lista habitual está vacía: esto es lo que las bases de datos vieron mientras tanto.",
         "truncated": "Las {count} consultas más ejecutadas con frecuencia — se ejecutaron más de las que se muestran aquí.",
         "columns": {
@@ -20722,7 +20722,7 @@
         "max": "La única llamada más lenta en esta ventana: una llamada real, no un promedio.",
         "errors": "Cuántas de estas llamadas devolvieron un error.",
         "perTrace": "Cuántas veces se ejecuta esto dentro de una sola solicitud. Un número alto generalmente significa un bucle.",
-        "load": "Tiempo total que esta consulta pasó en la base de datos, según lo que reporta tu base de datos: tiempo de ejecución en Postgres, tiempo de espera en MySQL y MariaDB; cada fila indica cuál. Las filas con el icono de trazas se miden a partir de las trazas de tu aplicación, por lo que también incluyen el viaje de ida y vuelta a la base de datos."
+        "load": "Tiempo total que esta consulta pasó en la base de datos, según lo que informa tu base de datos: tiempo de ejecución en Postgres, tiempo de espera en MySQL y MariaDB; cada fila indica cuál. Las filas con el icono de trazas se miden a partir de las trazas de tu aplicación, por lo que también incluyen el viaje de ida y vuelta a la base de datos."
       },
       "errorsNone": "ninguna",
       "errorsAll": "todas",
@@ -20737,8 +20737,8 @@
       "otherRowTextFor": "Todas las demás consultas en {database}",
       "otherRowDetailShort": "— {calls} llamadas.",
       "columnSubLabels": {
-        "calls": "servidor donde se reportó",
-        "load": "servidor donde se reportó"
+        "calls": "servidor donde se informó",
+        "load": "servidor donde se informó"
       }
     },
     "insights": {
@@ -20840,7 +20840,7 @@
           "ok": "La monitorización de bases de datos está activada",
           "okDetail": "para esta organización",
           "no": "La monitorización de bases de datos está desactivada",
-          "noDetail": "Un administrador puede activarla para esta organización y luego reiniciar el recolector."
+          "noDetail": "Un administrador puede activarla para esta organización y luego reiniciar el colector."
         },
         "traces": {
           "ok": "Tus trazas están llegando",
@@ -20903,7 +20903,7 @@
       "backToQueries": "consultas principales",
       "backToActivity": "actividad",
       "backToSamples": "llamadas más lentas",
-      "backToDeadlocks": "deadlocks",
+      "backToDeadlocks": "interbloqueos",
       "latencyTitle": "Velocidad a lo largo del tiempo",
       "volumeTitle": "Llamadas y fallos a lo largo del tiempo",
       "endpointsTitle": "Desde dónde se llama",
@@ -21002,7 +21002,7 @@
         "driftCallout": "La forma del plan cambió en esta ventana. Se capturaron {count} formas diferentes, lo que suele significar un cambio de esquema o de estadísticas, como la eliminación de un índice o la repartición de una tabla.",
         "viewPlans": "Ver planes",
         "noPlans": "No se capturaron planes",
-        "noPlansHint": "Ningún recolector ha enviado un plan para esta base de datos todavía. Activa la recopilación de consultas principales en la receta de tu recolector para empezar a capturar planes — la página de configuración explica cómo hacerlo.",
+        "noPlansHint": "Ningún colector ha enviado un plan para esta base de datos todavía. Activa la recopilación de consultas principales en la receta de tu colector para empezar a capturar planes — la página de configuración explica cómo hacerlo.",
         "noPlanForQuery": "Sin plan para esta consulta",
         "noPlanForQueryHint": "Estamos capturando planes para esta base de datos — esta consulta simplemente no tiene uno. Eso es normal para sentencias que la base de datos no puede explicar, como COMMIT, ROLLBACK y SHOW.",
         "planHash": "Plan",
@@ -21015,7 +21015,7 @@
         "title": "Lo que registró la propia base de datos",
         "subtitle": "Desde tu base de datos: cada aplicación que se conecta",
         "clientSubtitle": "Las cifras marcadas se miden a partir de las trazas de tu aplicación: las llamadas que tus aplicaciones completaron en esta ventana",
-        "instance": "Reportado por {instance}",
+        "instance": "Informado por {instance}",
         "instanceWide": "Todas las bases de datos en esta instancia",
         "calls": "Ejecuciones",
         "rows": "Filas devueltas",
@@ -21025,26 +21025,26 @@
         "sharedBlksRead": "Bloques desde disco",
         "tempBlksWritten": "Bloques temporales escritos",
         "noMatch": "No hay registro del lado del servidor para esta consulta",
-        "noMatchHint": "Su base de datos informa las declaraciones que ejecutó, y esta no está entre ellas. Es normal: las dos vistas identifican una consulta de manera diferente, por lo que no siempre coinciden. Todo lo anterior aún se mide desde su aplicación.",
+        "noMatchHint": "Su base de datos informa las sentencias que ejecutó, y esta no está entre ellas. Es normal: las dos vistas identifican una consulta de manera diferente, por lo que no siempre coinciden. Todo lo anterior aún se mide desde su aplicación.",
         "ambiguous": "Más de una base de datos podría ser esta consulta",
         "ambiguousHint": "Varias instancias informan una base de datos con este nombre, por lo que no hay forma de saber cuál ejecutó esta consulta. Mostrar números de la instancia incorrecta sería peor que no mostrar ninguno. Candidatas: {instances}.",
         "off": "No se recopilaron métricas del lado del servidor",
-        "offHint": "Su recopilador aún no está recopilando métricas por declaración de la base de datos. Active la recopilación de consultas principales en su receta de recopilador — la página de configuración lo guía.",
+        "offHint": "Su colector aún no está recopilando métricas por sentencia de la base de datos. Active la recopilación de consultas principales en su receta de colector — la página de configuración lo guía.",
         "setUp": "Configurar",
         "readFailed": "No se pudieron leer las métricas del lado del servidor",
-        "readFailedHint": "La lectura falló, por lo que esto no dice nada sobre si su base de datos está informando declaraciones. Todo lo anterior aún se mide desde su aplicación."
+        "readFailedHint": "La lectura falló, por lo que esto no dice nada sobre si su base de datos está informando sentencias. Todo lo anterior aún se mide desde su aplicación."
       },
       "callingServices": {
         "title": "Cuál de sus servicios llamó a esto",
-        "unjoinable": "No se muestra — esta declaración se ejecuta en más de un tipo de base de datos aquí, y asociar a los llamadores sin saber cuál nombraría a los servicios equivocados.",
+        "unjoinable": "No se muestra — esta sentencia se ejecuta en más de un tipo de base de datos aquí, y asociar a los llamadores sin saber cuál nombraría a los servicios equivocados.",
         "tracedCalls": "{calls} llamadas trazadas",
         "coverage": "{count} servicios vistos en {traced} de las {executions} ejecuciones anteriores. El resto provino de llamadores que aún no está trazando.",
-        "coverageUnknown": "{count} servicios vistos en {traced} llamadas trazadas. Su base de datos no informó un total para esta declaración, por lo que no hay proporción que dar.",
+        "coverageUnknown": "{count} servicios vistos en {traced} llamadas trazadas. Su base de datos no informó un total para esta sentencia, por lo que no hay proporción que dar.",
         "noneNamed": "{traced} llamadas fueron trazadas, pero ninguna pudo vincularse a un servicio — sus trazas comienzan fuera de este rango de tiempo."
       },
       "callersEmpty": {
         "title": "Aún no hay llamadas trazadas para esta consulta",
-        "description": "Su base de datos informó esta declaración, pero nada trazó la aplicación que la ejecutó, por lo que no hay un llamador para nombrar ni una ejecución individual para abrir. Instrumente los servicios que se comunican con esta base de datos y aparecerán aquí.",
+        "description": "Su base de datos informó esta sentencia, pero nada trazó la aplicación que la ejecutó, por lo que no hay un llamador para nombrar ni una ejecución individual para abrir. Instrumente los servicios que se comunican con esta base de datos y aparecerán aquí.",
         "checklistTitle": "Qué debe ser cierto",
         "setUp": "Configurar trazado",
         "checks": {
@@ -21065,7 +21065,7 @@
     },
     "appSource": {
       "marker": "Medido a partir de las trazas de tu aplicación",
-      "markerHint": "Medido a partir de las trazas de tu aplicación, añadiendo la visión de tus aplicaciones a lo que reporta tu base de datos.",
+      "markerHint": "Medido a partir de las trazas de tu aplicación, añadiendo la visión de tus aplicaciones a lo que informa tu base de datos.",
       "legend": "Desde las trazas de tu aplicación"
     },
     "page": {
@@ -21075,8 +21075,8 @@
         "metricsHint": "Carga de la base de datos por evento de espera, y todas las métricas que recopilan tus receptores de base de datos.",
         "queries": "Consultas principales",
         "samples": "Llamadas más lentas",
-        "samplesHintClient": "Llamadas medidas a partir de las trazas de tu aplicación en esta ventana, añadiendo la visión de tus aplicaciones a lo que reporta tu base de datos. La tabla muestra las más lentas.",
-        "samplesHintServer": "Declaraciones que sus bases de datos informaron como completadas en esta ventana, contadas dentro de la base de datos. La tabla muestra las más lentas de ellas.",
+        "samplesHintClient": "Llamadas medidas a partir de las trazas de tu aplicación en esta ventana, añadiendo la visión de tus aplicaciones a lo que informa tu base de datos. La tabla muestra las más lentas.",
+        "samplesHintServer": "Sentencias que sus bases de datos informaron como completadas en esta ventana, contadas dentro de la base de datos. La tabla muestra las más lentas de ellas.",
         "samplesHintUnknown": "Las llamadas individuales más lentas a la base de datos en esta ventana.",
         "deadlocks": "Interbloqueos",
         "blocked": "Consultas bloqueadas",
@@ -21159,7 +21159,7 @@
           "desc": "Filas activas y muertas por tabla"
         },
         "host": {
-          "managedNote": "Esta base de datos se ejecuta en un endpoint gestionado en la nube (como Amazon RDS), por lo que su proveedor no expone un host para que lo monitoricen tus colectores. Borra el filtro de base de datos para ver las métricas de host de los hosts que tus colectores sí reportan.",
+          "managedNote": "Esta base de datos se ejecuta en un endpoint gestionado en la nube (como Amazon RDS), por lo que su proveedor no expone un host para que lo monitoricen tus colectores. Borra el filtro de base de datos para ver las métricas de host de los hosts que tus colectores sí informan.",
           "title": "Host",
           "desc": "CPU, memoria y E/S del host de la base de datos",
           "loopbackHint": "instancia conectada vía localhost — mostrando todos los hosts",
@@ -21209,7 +21209,7 @@
         "checks": {
           "receivers": {
             "no": "Ningún receptor de base de datos está enviando métricas",
-            "noDetail": "Las tarjetas de configuración de PostgreSQL y MySQL en Ingestión de datos configuran el receptor de métricas del colector junto con los feeds de monitorización."
+            "noDetail": "Las tarjetas de configuración de PostgreSQL y MySQL en Fuentes de datos configuran el receptor de métricas del colector junto con los feeds de monitorización."
           },
           "enabled": {
             "ok": "La monitorización de base de datos está habilitada",
@@ -21221,11 +21221,11 @@
       }
     },
     "samples": {
-      "logOffTitle": "Sus bases de datos aún no registran declaraciones lentas",
+      "logOffTitle": "Sus bases de datos aún no registran sentencias lentas",
       "notCollecting": {
-        "description": "Nada trazó estas llamadas, así que preguntamos a las bases de datos por sus propias declaraciones más lentas — y no registran ninguna. Comprobamos cuatro cosas.",
+        "description": "Nada trazó estas llamadas, así que preguntamos a las bases de datos por sus propias sentencias más lentas — y no registran ninguna. Comprobamos cuatro cosas.",
         "checklistTitle": "Lo que comprobamos",
-        "setUp": "Configurar el registro de declaraciones",
+        "setUp": "Configurar el registro de sentencias",
         "checks": {
           "queries": {
             "ok": "Tus datos de consulta están llegando",
@@ -21241,12 +21241,12 @@
             "noDetail": "Actívalo en Configuración para comenzar a recopilar."
           },
           "log": {
-            "no": "Las declaraciones lentas no se están registrando",
-            "noDetail": "Esta lista proviene del registro de declaraciones de PostgreSQL (log_min_duration_statement), que está desactivado por defecto — el paso de registro de la tarjeta de configuración lo activa."
+            "no": "Las sentencias lentas no se están registrando",
+            "noDetail": "Esta lista proviene del log de sentencias de PostgreSQL (log_min_duration_statement), que está desactivado por defecto — el paso de registro de la tarjeta de configuración lo activa."
           },
           "engines": {
             "title": "Solo PostgreSQL, por ahora",
-            "detail": "La captura por declaración actualmente es solo de PostgreSQL, por lo que MySQL y MariaDB no pueden alimentar esta lista aún. Las consultas principales pueden mostrarle qué se ejecuta más, porque leen las tablas de contadores en su lugar."
+            "detail": "La captura por sentencia actualmente es solo de PostgreSQL, por lo que MySQL y MariaDB no pueden alimentar esta lista aún. Las consultas principales pueden mostrarle qué se ejecuta más, porque leen las tablas de contadores en su lugar."
           }
         }
       },
@@ -21273,9 +21273,9 @@
         "filtered": "Mostrando {count} de {total} llamadas."
       },
       "serverList": {
-        "title": "Llamadas más lentas reportadas por sus bases de datos",
-        "subtitle": "Medido dentro de cada base de datos en el momento en que una declaración finalizó — se cuenta cada cliente, pero no la espera de red ni de conexión. Ninguna llamada de aplicación rastreada llegó a esta ventana, por lo que la lista habitual está vacía; qué llamadas aparecen aquí depende del umbral de registro de la propia base de datos. Estos reportes por declaración provienen actualmente solo de PostgreSQL — las recetas del recolector no capturan los registros de declaraciones de otros motores aún, por lo que las llamadas de MySQL y MariaDB no aparecerán aquí.",
-        "truncated": "Las {count} llamadas reportadas más lentas — más cruzaron el umbral de las que se muestran aquí",
+        "title": "Llamadas más lentas informadas por sus bases de datos",
+        "subtitle": "Medido dentro de cada base de datos en el momento en que una sentencia finalizó — se cuenta cada cliente, pero no la espera de red ni de conexión. Ninguna llamada de aplicación rastreada llegó a esta ventana, por lo que la lista habitual está vacía; qué llamadas aparecen aquí depende del umbral de registro de la propia base de datos. Estos informes por sentencia provienen actualmente solo de PostgreSQL — las recetas del colector no capturan los logs de sentencias de otros motores aún, por lo que las llamadas de MySQL y MariaDB no aparecerán aquí.",
+        "truncated": "Las {count} llamadas informadas más lentas — más cruzaron el umbral de las que se muestran aquí",
         "columns": {
           "query": "Consulta",
           "when": "Cuándo",
@@ -21283,7 +21283,7 @@
           "user": "Usuario"
         },
         "columnHints": {
-          "took": "Tiempo dentro de la base de datos desde el inicio de la declaración hasta su finalización, según lo midió el motor. No es lo que experimentó ningún llamador — no se incluyen la espera de red ni de conexión."
+          "took": "Tiempo dentro de la base de datos desde el inicio de la sentencia hasta su finalización, según lo midió el motor. No es lo que experimentó ningún llamador — no se incluyen la espera de red ni de conexión."
         }
       }
     },
@@ -21316,7 +21316,7 @@
         "finished": "Finalizado"
       },
       "coverage": {
-        "complete": "Cada interbloqueo que tus bases de datos reportaron está aquí — {deadlocks} en esta ventana, de {pairs}.",
+        "complete": "Cada interbloqueo que tus bases de datos informaron está aquí — {deadlocks} en esta ventana, de {pairs}.",
         "capped": "Ocurrieron más interbloqueos de los que pudimos leer de una vez. Estos son los {deadlocks} que tenemos, de {pairs} — el número real es mayor.",
         "readUpTo": "Leído hasta {time}.",
         "mysqlPartial": "Tu base de datos MySQL guarda solo el interbloqueo más reciente a menos que innodb_print_all_deadlocks esté activado."
@@ -21344,7 +21344,7 @@
         "transaction": "transacción {id}",
         "eachWaits": "Cada uno espera al otro",
         "deadlock": "Interbloqueo",
-        "noQueryCaptured": "El registro capturó este interbloqueo pero no la sentencia.",
+        "noQueryCaptured": "El log capturó este interbloqueo pero no la sentencia.",
         "waitingFor": "Estaba esperando que {target} terminara.",
         "waitingForRow": "Estaba esperando que {target} terminara — la otra sesión ya había cambiado la fila que quería.",
         "rawLock": "{mode} · {target}",
@@ -21364,10 +21364,10 @@
         "seeInTopQueries": "Ver en Consultas principales",
         "whichService": "¿Qué servicio?",
         "partialTitle": "Solo un lado de este interbloqueo llegó hasta nosotros",
-        "partialBody": "MySQL escribe cada lado de un interbloqueo como una entrada de registro separada. La entrada complementaria no ha llegado — puede estar fuera de esta ventana, o el registro puede haberse rotado entre los dos. Lo que se muestra es real; la otra declaración simplemente falta.",
-        "copyHint": "Copia solo la declaración de este lado.",
-        "copySqlTooltip": "Copiar la declaración de este lado",
-        "copyForSlackHint": "Ambas declaraciones, con qué frecuencia este par ha entrado en interbloqueo y cuándo fue la última vez — escrito como un mensaje que puedes pegar en un canal o en un ticket."
+        "partialBody": "MySQL escribe cada lado de un interbloqueo como una entrada de log separada. La entrada complementaria no ha llegado — puede estar fuera de esta ventana, o el log puede haberse rotado entre los dos. Lo que se muestra es real; la otra sentencia simplemente falta.",
+        "copyHint": "Copia solo la sentencia de este lado.",
+        "copySqlTooltip": "Copiar la sentencia de este lado",
+        "copyForSlackHint": "Ambas sentencias, con qué frecuencia este par ha entrado en interbloqueo y cuándo fue la última vez — escrito como un mensaje que puedes pegar en un canal o en un ticket."
       },
       "storm": {
         "title": "Tormenta de interbloqueos.",
@@ -21386,7 +21386,7 @@
         "collectionHealthy": "Recopilación saludable",
         "checks": {
           "reading": {
-            "title": "Estamos leyendo los registros de tus bases de datos",
+            "title": "Estamos leyendo los logs de tus bases de datos",
             "detail": "{databases} · línea más reciente leída {age}",
             "detailNoFleet": "Línea más reciente leída {age}",
             "detailUnknown": "{databases} — el pipeline de logs está conectado",
@@ -21400,7 +21400,7 @@
             "titleUnknown": "Comprueba que la notificación de interbloqueos está activada"
           },
           "traffic": {
-            "title": "Vimos {lines} otras líneas de registro de estas bases de datos",
+            "title": "Vimos {lines} otras líneas de log de estas bases de datos",
             "detail": "por lo que el pipeline está transportando tráfico — un interbloqueo habría pasado por él",
             "titleUnknown": "El pipeline de logs está transportando tráfico"
           },
@@ -21432,14 +21432,14 @@
             "noDetail": "Actívalo en Configuración para comenzar a recopilar."
           },
           "log": {
-            "no": "Ninguna base de datos nos está enviando su registro",
-            "noDetail": "Los tiempos de consulta provienen de tus aplicaciones, pero los interbloqueos solo se escriben en el registro de la propia base de datos. Apunta tu recopilador al archivo de registro de Postgres o MySQL y esta pestaña se llena sola.",
-            "ok": "Un registro de base de datos está llegando",
+            "no": "Ninguna base de datos nos está enviando su log",
+            "noDetail": "Los tiempos de consulta provienen de tus aplicaciones, pero los interbloqueos solo se escriben en el log de la propia base de datos. Apunta tu colector al archivo de log de Postgres o MySQL y esta pestaña se llena sola.",
+            "ok": "Está llegando un log de base de datos",
             "okDetail": "así que un interbloqueo nos llegaría — simplemente no ha habido ninguno."
           },
           "settings": {
             "title": "Vale la pena saber antes de empezar",
-            "detail": "Postgres escribe un interbloqueo en dos líneas de registro y MySQL en varias — las consultas participantes están en las últimas. Una configuración que solo coincide con la primera línea registra que ocurrió un interbloqueo y pierde cada consulta. Nuestra receta maneja ambos."
+            "detail": "Postgres escribe un interbloqueo en dos líneas de log y MySQL en varias — las consultas participantes están en las últimas. Una configuración que solo coincide con la primera línea registra que ocurrió un interbloqueo y pierde cada consulta. Nuestra receta maneja ambos."
           }
         }
       }
@@ -21531,7 +21531,7 @@
           "sampling": {
             "title": "Estamos revisando las tablas de bloqueo de tus bases de datos",
             "detail": "cada {interval} segundos · última revisión {age}",
-            "detailUnknown": "según el horario con el que está configurado tu recolector"
+            "detailUnknown": "según el horario con el que está configurado tu colector"
           },
           "sessions": {
             "title": "Las sesiones se están ejecutando normalmente",
@@ -21585,8 +21585,8 @@
       },
       "disclosure": {
         "sampled": "Muestreado cada {interval} segundos — esta es una serie de instantáneas, no una grabación continua, por lo que una sesión más corta que el lapso entre muestras puede ejecutarse y terminar sin ser vista.",
-        "sampledUnknown": "Muestreado según un horario — esta es una serie de instantáneas, no una grabación continua. Todavía no hemos visto suficientes muestras para determinar con qué frecuencia sondea tu recopilador.",
-        "filtered": "La muestra ya está filtrada por tu recopilador: las sesiones inactivas más antiguas que la consulta en ejecución más reciente se omiten a menos que estén bloqueando a alguien. Por lo tanto, esta no es una lista completa de todas las conexiones.",
+        "sampledUnknown": "Muestreado según un horario — esta es una serie de instantáneas, no una grabación continua. Todavía no hemos visto suficientes muestras para determinar con qué frecuencia sondea tu colector.",
+        "filtered": "La muestra ya está filtrada por tu colector: las sesiones inactivas más antiguas que la consulta en ejecución más reciente se omiten a menos que estén bloqueando a alguien. Por lo tanto, esta no es una lista completa de todas las conexiones.",
         "short": "Muestreado cada {interval}s y pre-filtrado",
         "shortUnknown": "Muestreado según un horario y pre-filtrado",
         "more": "Qué significa esto"
@@ -21609,7 +21609,7 @@
         "idleInTransaction": "Inactiva en transacción"
       },
       "state": {
-        "unknown": "Estado no reportado"
+        "unknown": "Estado no informado"
       },
       "counts": {
         "capped": "Se muestrearon más sesiones de las que pudimos leer a la vez. Estas son las {count} que tenemos.",
@@ -21626,7 +21626,7 @@
           "sampling": {
             "title": "Estamos muestreando las tablas de sesiones de tus bases de datos",
             "detail": "cada {interval} segundos · última revisión {age}",
-            "detailUnknown": "según el horario con el que está configurado tu recopilador"
+            "detailUnknown": "según el horario con el que está configurado tu colector"
           },
           "pipeline": {
             "title": "Tus bases de datos están llegando a nosotros",
@@ -21659,14 +21659,14 @@
           },
           "sampling": {
             "no": "Nada está muestreando las tablas de sesión de tus bases de datos",
-            "noDetail": "Las muestras de sesión provienen de tu recopilador: habilita db.server.query_sample en la receta del recopilador en el host de la base de datos — la página de configuración lo explica. OpenObserve acepta este suministro siempre que la supervisión de bases de datos esté activada, así que la solución está en el lado del recopilador."
+            "noDetail": "Las muestras de sesión provienen de tu colector: habilita db.server.query_sample en la receta del colector en el host de la base de datos — la página de configuración lo explica. OpenObserve acepta este suministro siempre que la supervisión de bases de datos esté activada, así que la solución está en el lado del colector."
           }
         }
       }
     },
     "instanceMetrics": {
       "columnHeader": "Salud de la instancia",
-      "columnHint": "Conexiones respecto al límite, a partir de las métricas que tu recopilador ya envía. En blanco hasta que un receptor informe de esta instancia.",
+      "columnHint": "Conexiones respecto al límite, a partir de las métricas que tu colector ya envía. En blanco hasta que un receptor informe de esta instancia.",
       "connectionsOf": "{used} de {limit} conexiones",
       "connectionsNoLimit": "{used} conexiones",
       "noLimitHint": "El receptor de este motor no publica un límite de conexiones por sí mismo, por lo que solo se muestra el recuento. La receta de límite de conexiones de la tarjeta de configuración (sqlquery/mysql_limits) recopila max_connections y lo convierte en un porcentaje.",
@@ -21676,23 +21676,23 @@
       "lagSeconds": "Réplica {value} por detrás",
       "deadlocks": "{count} interbloqueo | {count} interbloqueos",
       "noTraffic": "Sin tráfico de aplicaciones en esta ventana",
-      "noTrafficHint": "Tu recopilador informa de esta instancia, pero ninguna aplicación la consultó durante esta ventana. Sus columnas de consulta están vacías porque nada las midió, no porque fuera rápida.",
+      "noTrafficHint": "Tu colector informa de esta instancia, pero ninguna aplicación la consultó durante esta ventana. Sus columnas de consulta están vacías porque nada las midió, no porque fuera rápida.",
       "unmatched": {
         "pooler": "Ninguna métrica de instancia coincidió con esta dirección",
-        "poolerHint": "Esta fila es la dirección a la que se conectó tu aplicación. Tu recopilador informa de hosts diferentes, lo cual es lo que parece cuando hay un pooler de conexiones en medio: la dirección del pooler y la base de datos real nunca coinciden.",
+        "poolerHint": "Esta fila es la dirección a la que se conectó tu aplicación. Tu colector informa de hosts diferentes, lo cual es lo que parece cuando hay un pooler de conexiones en medio: la dirección del pooler y la base de datos real nunca coinciden.",
         "loopback": "Ninguna métrica de instancia coincidió con esta dirección",
-        "loopbackHint": "Esta fila apunta a localhost. El recopilador reescribe un endpoint de bucle local a su propio nombre de host, por lo que los dos nombres nunca pueden coincidir, incluso cuando ambos están sanos.",
+        "loopbackHint": "Esta fila apunta a localhost. El colector reescribe un endpoint de bucle local a su propio nombre de host, por lo que los dos nombres nunca pueden coincidir, incluso cuando ambos están sanos.",
         "noReceiver": "El receptor de {engine} no está informando",
-        "noReceiverHint": "Tus aplicaciones están consultando esta base de datos, pero ningún receptor de {engine} está enviando métricas de servidor para ella. Añade el receptor de {engine} a tu recopilador para completar esta columna.",
+        "noReceiverHint": "Tus aplicaciones están consultando esta base de datos, pero ningún receptor de {engine} está enviando métricas de servidor para ella. Añade el receptor de {engine} a tu colector para completar esta columna.",
         "noReceiverMariadbHint": "Tus aplicaciones están consultando este servidor MariaDB, pero nada está enviando métricas de servidor para él. No hay un receptor MariaDB separado: apunta un receptor MySQL a esta instancia y sus métricas completarán esta columna.",
         "engineUnsupported": "No recopilado para {engine}",
         "engineUnsupportedHint": "Las métricas de instancia se recopilan para PostgreSQL, MySQL y MariaDB — aún no hay ningún receptor conectado para {engine}, por lo que esta columna permanece vacía. Es una nota de cobertura, no un veredicto de salud.",
         "unreadable": "No se pudieron leer las métricas de instancia",
         "unreadableHint": "Los streams de métricas existen pero no se pudieron leer. Normalmente es un problema de permisos y no algo incorrecto en la base de datos."
       },
-      "limitUnknownHint": "El recuento de conexiones llegó pero el límite no, por lo que no se puede mostrar un porcentaje. Comprueba que la métrica de límite de conexiones esté habilitada en este recopilador.",
+      "limitUnknownHint": "El recuento de conexiones llegó pero el límite no, por lo que no se puede mostrar un porcentaje. Comprueba que la métrica de límite de conexiones esté habilitada en este colector.",
       "noReading": "Sin lectura en esta ventana",
-      "noReadingHint": "Tu recopilador informa de esta instancia, pero no envió ninguna métrica de conexión durante esta ventana. La métrica puede estar desactivada en el receptor, o la instancia puede haber dejado de informar.",
+      "noReadingHint": "Tu colector informa de esta instancia, pero no envió ninguna métrica de conexión durante esta ventana. La métrica puede estar desactivada en el receptor, o la instancia puede haber dejado de informar.",
       "lagLabel": "Retraso de réplica",
       "deadlockLabel": "interbloqueos"
     },
@@ -21703,12 +21703,12 @@
       "tuplesEstimated": "Los recuentos de filas y el porcentaje de bloat son estimaciones estadísticas del motor de la base de datos, no recuentos exactos.",
       "aboutNumbers": "Sobre estas cifras",
       "notCollectingTitle": "Aún no hay estadísticas de tabla",
-      "notCollectingDescription": "Nada ha informado estadísticas de tabla en este rango de tiempo. Esta señal se envía como una receta de recopilador separada.",
+      "notCollectingDescription": "Nada ha informado estadísticas de tabla en este rango de tiempo. Esta señal se envía como una receta de colector separada.",
       "engineUnsupportedTitle": "No recopilado para este motor",
-      "engineUnsupportedDescription": "La salud de las tablas se recopila mediante una receta de recopilador por motor, y no hay receta para este motor — por lo que no se recopila nada para él. Esto no es una señal de todo en orden.",
+      "engineUnsupportedDescription": "La salud de las tablas se recopila mediante una receta de colector por motor, y no hay receta para este motor — por lo que no se recopila nada para él. Esto no es una señal de todo en orden.",
       "checklistTitle": "Para empezar a recopilar",
-      "checkRecipe": "Añade la receta pg_table_stats de la guía de configuración de bases de datos a tu configuración de recopilador.",
-      "checkGrant": "Otorga pg_monitor al usuario del recopilador para que pueda leer pg_stat_user_tables.",
+      "checkRecipe": "Añade la receta pg_table_stats de la guía de configuración de bases de datos a tu configuración de colector.",
+      "checkGrant": "Otorga pg_monitor al usuario del colector para que pueda leer pg_stat_user_tables.",
       "checkRange": "Amplía el rango de tiempo — la receta informa una vez cada 60 segundos.",
       "columns": {
         "relation": "Tabla",
@@ -21732,7 +21732,7 @@
     },
     "recommendations": {
       "title": "Recomendaciones",
-      "subtitle": "Comprobaciones deterministas sobre lo que ya informa el recopilador. Cada una indica la medición y el umbral que superó.",
+      "subtitle": "Comprobaciones deterministas sobre lo que ya informa el colector. Cada una indica la medición y el umbral que superó.",
       "countersCumulative": "Los recuentos de escaneos de índice son totales acumulados desde el último reinicio de estadísticas, no recuentos para el intervalo de tiempo seleccionado.",
       "andMore": "y {count} más como este",
       "unused-index": {
@@ -21788,7 +21788,7 @@
     "tabOverview": "Resumen",
     "tabActivity": "Actividad",
     "tabPriorCauses": "Causas previas",
-    "tabReport": "Reporte de IA",
+    "tabReport": "Informe de IA",
     "statEscalatesIn": "Escala en",
     "statNobodyLeft": "No queda nadie",
     "statUnackedFor": "Sin confirmar durante",
@@ -21805,15 +21805,15 @@
     "calendarShownIn": "Horas mostradas en {zone}",
     "calendarTeamTime": "Hora del equipo",
     "calendarMyTime": "Mi tiempo",
-    "escalation": "Escalamiento",
-    "escalationLoading": "Cargando escalamiento",
+    "escalation": "Escalada",
+    "escalationLoading": "Cargando la escalada",
     "ladderNext": "Siguiente: {who}, {when}",
     "ladderIn": "en {duration}",
     "ladderImminent": "en cualquier momento",
-    "ladderExhausted": "El escalamiento se ha agotado. Nadie reconoció la alerta y ya no queda nadie a quien escalar.",
-    "ladderStopped_acknowledged": "Escalamiento detenido — alguien ya se hizo cargo.",
-    "ladderStopped_snoozed": "El escalamiento se pausa mientras la alerta esté pospuesta.",
-    "ladderStopped_resolved": "El escalamiento se detuvo cuando la alerta se resolvió.",
+    "ladderExhausted": "La escalada se ha agotado. Nadie reconoció el aviso y ya no queda nadie a quien escalar.",
+    "ladderStopped_acknowledged": "Escalada detenida — alguien ya se hizo cargo.",
+    "ladderStopped_snoozed": "La escalada se pausa mientras el aviso esté pospuesto.",
+    "ladderStopped_resolved": "La escalada se detuvo cuando el aviso se resolvió.",
     "ladderNothingSent": "Aún no se ha avisado a nadie.",
     "escalationAcked": "Reconocido",
     "escalationSnoozedShort": "Pospuesto",
@@ -21843,7 +21843,7 @@
     "attentionUnacked": "Sin reconocer",
     "attentionEscalatesIn": "1 se escala en {duration} | {count} se escalan en {duration}",
     "attentionAssigned": "{count} está asignado a ti. | {count} están asignados a ti.",
-    "attentionOldest": "La alerta más antigua lleva {duration} sonando sin que nadie la reconozca.",
+    "attentionOldest": "El aviso más antiguo lleva {duration} sonando sin que nadie lo reconozca.",
     "attentionClear": "Nada requiere atención humana.",
     "whoIsOnCallNow": "Quién está de guardia ahora",
     "coverageGapShort": "Laguna de cobertura",
@@ -22009,7 +22009,7 @@
     "editTeam": "Editar equipo",
     "defaultTeamBadge": "Predeterminado",
     "setDefaultTeam": "Establecer como equipo predeterminado",
-    "manageTeamCta": "Administrar miembros, horarios y escalamiento",
+    "manageTeamCta": "Administrar miembros, horarios y escalada",
     "teamName": "Nombre",
     "teamNameHint": "Cómo se hace referencia a este equipo en un aviso",
     "teamNameRequired": "El nombre del equipo es obligatorio",
@@ -22155,7 +22155,7 @@
     "promoted": "Promovido a {incident}",
     "promoteFailed": "No se pudo promover este aviso",
     "resolveTitle": "¿Resolver este aviso?",
-    "resolveMessage": "Esto cierra el registro y detiene cualquier escalamiento posterior.",
+    "resolveMessage": "Esto cierra el registro y detiene cualquier escalada posterior.",
     "resolved": "Aviso resuelto",
     "resolveFailed": "No se pudo resolver el aviso.",
     "loadResponsesFailed": "No se pudieron cargar los avisos.",
@@ -22448,7 +22448,7 @@
     "declareIncident": "Declarar incidente",
     "declareIncidentHint": "Para cuando esto necesite correlacionarse con otras señales. No desbloquea nada más — ninguna de las opciones anteriores estuvo jamás bloqueada.",
     "autoResolved": "Resuelto automáticamente — la señal se recuperó",
-    "eventKind_exhausted": "Escalamiento agotado",
+    "eventKind_exhausted": "Escalada agotada",
     "responderRole_owner": "Propietario",
     "responderRole_impacted": "Afectado",
     "impactedOf": "Abierto junto con el aviso de otro equipo",
@@ -23460,7 +23460,7 @@
       "phase2Hint": "Correcciones en producción. Cada clase se gana su nivel según su historial medido y nunca actúa por encima de él.",
       "investigation": "Investigación",
       "outcomesTitle": "Resultados",
-      "outcomesBody": "AutoObserve mide lo que hizo cada acción: si la tasa de errores se recuperó, si cesaron los avisos de guardia, si se deshizo. Una clase que sigue funcionando bien gana más autonomía, de a una clase por vez; un fallo cuenta en su contra, y una corrección que se sigue necesitando se reporta como un bug en lugar de automatizarse.",
+      "outcomesBody": "AutoObserve mide lo que hizo cada acción: si la tasa de errores se recuperó, si cesaron los avisos de guardia, si se deshizo. Una clase que sigue funcionando bien gana más autonomía, de a una clase por vez; un fallo cuenta en su contra, y una corrección que se sigue necesitando se informa como un bug en lugar de automatizarse.",
       "outcomesExample": "ScaleQueueWorkers pasó a Auto tras 7 escalados aprobados que funcionaron. Su único fallo, el 2 de octubre, añadió una comprobación previa, y un segundo fallo lo devuelve a Sugerir. AbortRollout espera tu OK; RollbackDeploy permanece Desactivado hasta tener un historial.",
       "triage": {
         "parallel": "Paralelo",
@@ -23558,7 +23558,7 @@
       "trail": "Rastro de evidencia",
       "seeInUnfold": "Ver en Cómo se desarrolló",
       "nextStep": "Siguiente paso",
-      "fullReport": "Reporte completo",
+      "fullReport": "Informe completo",
       "fullReportHint": "Todo lo anterior en un solo documento, listo para copiar o descargar"
     }
   },
@@ -24181,7 +24181,7 @@
       "s4Title": "Explico cada aviso",
       "s4": "Cada mensaje indica qué se rompió, desde cuándo y mi mejor interpretación del porqué, junto con mi nivel de certeza.",
       "s5Title": "Arreglo lo que me hayas permitido",
-      "s5": "Solo arreglo las cosas que me hayas dicho que puedo. Una solución que funciona me gana un poco de confianza, y una que no ayuda cuenta en mi contra. Si sigo necesitando la misma solución, es un error que reporto a tu equipo, no un hábito que automatizo."
+      "s5": "Solo arreglo las cosas que me hayas dicho que puedo. Una solución que funciona me gana un poco de confianza, y una que no ayuda cuenta en mi contra. Si sigo necesitando la misma solución, es un error del que informo a tu equipo, no un hábito que automatizo."
     },
     "topbar": {
       "brand": "AutoObserve",
