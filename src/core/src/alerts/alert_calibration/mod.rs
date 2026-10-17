@@ -20,6 +20,7 @@ pub mod sink;
 use std::pin::Pin;
 
 use config::{
+    cluster::LOCAL_NODE,
     ider,
     meta::{
         cluster::RoleGroup,
@@ -31,6 +32,9 @@ use o2_enterprise::enterprise::{
     alert_calibration_collect::collector::AlertCalibrationSearchPort, alert_calibration_service,
 };
 use search_service::grpc_search::grpc_search;
+
+/// A wait this short only ever expires because another scheduler node is already backfilling.
+const BACKFILL_LOCK_WAIT_SECS: u64 = 5;
 
 /// Enterprise cannot depend on `search_service`, so its collector's search is injected from here.
 pub(crate) struct SearchAdapter;
@@ -70,10 +74,24 @@ pub async fn ensure_org_config(org: &str) {
 
 /// Every org gets a config, so the default cadence runs without anyone opening the settings.
 pub async fn backfill_org_configs() -> Result<(), anyhow::Error> {
-    if !alert_calibration_service::is_enabled() {
+    // Only scheduler nodes run the passes, so only they have a reason to mint the rows.
+    if !alert_calibration_service::is_enabled() || !LOCAL_NODE.is_scheduler() {
         return Ok(());
     }
-    let locker = infra::dist_lock::lock("/alert_calibration/org_config_backfill", 0).await?;
+    let locker = match infra::dist_lock::lock(
+        "/alert_calibration/org_config_backfill",
+        BACKFILL_LOCK_WAIT_SECS,
+    )
+    .await
+    {
+        Ok(locker) => locker,
+        Err(e) => {
+            log::info!(
+                "[alert_calibration] default config backfill is running elsewhere, skipping: {e}"
+            );
+            return Ok(());
+        }
+    };
     let orgs = crate::organization::list_all_orgs(None)
         .await
         .unwrap_or_default();
