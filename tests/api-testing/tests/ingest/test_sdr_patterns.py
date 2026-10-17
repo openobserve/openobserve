@@ -375,3 +375,148 @@ def test_sdr_08_search_around_is_single_stream(create_session, base_url, redacte
         redacted_stream["stream"]
     }
     assert not foreign, f"rows from other streams came back: {sorted(foreign)}"
+
+
+# ---------------------------------------------------------------------------
+# SDR-09..11 — DELETE /re_patterns/bulk
+# ---------------------------------------------------------------------------
+#
+# This route had no test of any kind. #15361 fixed a cross-org hole in it: it
+# took ids straight from the body and called `db::re_pattern::remove(&id)` with
+# no org anywhere in the path, so any org could delete any other org's patterns
+# by id — and the fix shipped with nothing pinning it. SDR-10 is that
+# regression.
+#
+# Its contract differs from the pipelines and functions bulk routes, which
+# record per id and delete what they can: this one validates every id first and
+# returns early if ANY of them fails, so one bad id in a batch deletes nothing.
+# SDR-11 pins that, because "partial success" is the behaviour a caller would
+# otherwise assume from the shared `{successful, unsuccessful, err}` envelope.
+
+
+@pytest.fixture(scope="module")
+def other_org(create_session, base_url):
+    """Identifier of a second org, for the cross-org case.
+
+    Teardown is best-effort: `DELETE /api/organizations/{id}` answers 404 even
+    for a just-created org on this build (#15241, and
+    `tests/orgs/test_organisations.py::test_delete_organization_observed_broken`
+    pins it as an xfail), so this leaves one org behind for now. Trying the
+    delete anyway means it starts cleaning up by itself once #15394 lands.
+    Names take alphanumerics and underscores only.
+    """
+    resp = create_session.post(
+        f"{base_url}api/organizations", json={"name": f"sdr_auto_org_{_suffix()}"}
+    )
+    if resp.status_code != 200:
+        pytest.skip(f"cannot create a second org ({resp.status_code}); cross-org case cannot run")
+    identifier = resp.json().get("identifier")
+    assert identifier, f"created org has no identifier: {resp.text}"
+
+    yield identifier
+
+    create_session.delete(f"{base_url}api/organizations/{identifier}")
+
+
+def _bulk_delete(session, base_url, ids, org=ORG_ID):
+    return session.delete(f"{base_url}api/{org}/re_patterns/bulk", json={"ids": ids})
+
+
+def test_sdr_09_bulk_delete_removes_every_listed_pattern(create_session, base_url, request):
+    """Two unassociated patterns in one call: both reported successful, both gone."""
+    names = [f"sdr_auto_bulk_{_suffix()}" for _ in range(2)]
+    ids = []
+    for name in names:
+        created = _create_pattern(create_session, base_url, name, "[0-9]{16}")
+        assert created.status_code == 200, f"setup: {created.status_code} {created.text}"
+        pattern_id = _pattern_id(create_session, base_url, name)
+        assert pattern_id, f"setup: {name} created but not in the list"
+        ids.append(pattern_id)
+
+    def _sweep():
+        # Only reached if the bulk delete did not do its job; keeps a failed run
+        # from leaving org-level patterns behind for the next one.
+        for pattern_id in ids:
+            create_session.delete(f"{base_url}api/{ORG_ID}/re_patterns/{pattern_id}")
+
+    request.addfinalizer(_sweep)
+
+    resp = _bulk_delete(create_session, base_url, ids)
+    assert resp.status_code == 200, f"bulk delete failed: {resp.status_code} {resp.text}"
+
+    body = resp.json()
+    assert sorted(body.get("successful", [])) == sorted(ids), f"both ids should delete: {body}"
+    assert body.get("unsuccessful") == [], f"nothing should fail: {body}"
+
+    remaining = {p["id"] for p in _list_patterns(create_session, base_url)}
+    assert not remaining & set(ids), f"patterns survived the bulk delete: {remaining & set(ids)}"
+
+
+def test_sdr_10_bulk_delete_cannot_reach_a_pattern_in_another_org(
+    create_session, base_url, other_org, request
+):
+    """A pattern owned by `default` survives a bulk delete sent as another org (#15361).
+
+    Before the fix this deleted the pattern and answered success. The guard is
+    `get_pattern_org(id)`: an id the calling org does not own is refused with
+    "not found in current org" and nothing is removed.
+    """
+    name = f"sdr_auto_xorg_{_suffix()}"
+    created = _create_pattern(create_session, base_url, name, "[0-9]{16}")
+    assert created.status_code == 200, f"setup: {created.status_code} {created.text}"
+    pattern_id = _pattern_id(create_session, base_url, name)
+    assert pattern_id, f"setup: {name} created but not in the list"
+
+    request.addfinalizer(
+        lambda: create_session.delete(f"{base_url}api/{ORG_ID}/re_patterns/{pattern_id}")
+    )
+
+    resp = _bulk_delete(create_session, base_url, [pattern_id], org=other_org)
+    assert resp.status_code == 200, f"bulk delete failed: {resp.status_code} {resp.text}"
+
+    body = resp.json()
+    assert body.get("successful") == [], \
+        f"another org must not report deleting {pattern_id}: {body}"
+    assert body.get("unsuccessful") == [pattern_id], f"the cross-org id should be refused: {body}"
+    assert "not found in current org" in (body.get("err") or ""), \
+        f"unexpected rejection reason: {body}"
+
+    # The assertion the fix exists for: the pattern is still owned by its org.
+    still_there = [p for p in _list_patterns(create_session, base_url) if p["id"] == pattern_id]
+    assert still_there, f"{name} was deleted from {ORG_ID} by a request scoped to {other_org}"
+
+
+def test_sdr_11_bulk_delete_is_all_or_nothing_when_one_id_is_in_use(
+    create_session, base_url, redacted_stream, request
+):
+    """An associated id in the batch blocks the whole batch — the free pattern survives too.
+
+    Not a nicety: the response envelope is shared with the pipelines and
+    functions bulk routes, which do delete what they can, so the difference has
+    to be pinned somewhere or a caller reading `unsuccessful` will assume the
+    rest went through.
+    """
+    free_name = f"sdr_auto_bulk_free_{_suffix()}"
+    created = _create_pattern(create_session, base_url, free_name, "[0-9]{16}")
+    assert created.status_code == 200, f"setup: {created.status_code} {created.text}"
+    free_id = _pattern_id(create_session, base_url, free_name)
+    assert free_id, f"setup: {free_name} created but not in the list"
+
+    request.addfinalizer(
+        lambda: create_session.delete(f"{base_url}api/{ORG_ID}/re_patterns/{free_id}")
+    )
+
+    # redacted_stream's pattern is associated with a stream, so it cannot be deleted.
+    resp = _bulk_delete(create_session, base_url, [free_id, redacted_stream["id"]])
+    assert resp.status_code == 200, f"bulk delete failed: {resp.status_code} {resp.text}"
+
+    body = resp.json()
+    assert body.get("unsuccessful") == [redacted_stream["id"]], \
+        f"the associated pattern should be the one refused: {body}"
+    assert body.get("successful") == [], \
+        f"the batch should delete nothing once an id fails validation: {body}"
+    assert "associated" in (body.get("err") or "").lower(), f"unexpected reason: {body}"
+
+    ids = {p["id"] for p in _list_patterns(create_session, base_url)}
+    assert free_id in ids, "the free pattern was deleted despite the batch being refused"
+    assert redacted_stream["id"] in ids, "the associated pattern was deleted"
