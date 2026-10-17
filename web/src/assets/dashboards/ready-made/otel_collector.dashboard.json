@@ -1,0 +1,778 @@
+{
+  "version": 8,
+  "dashboardId": "",
+  "title": "OTel Collector / Overview",
+  "description": "Points accepted, refused, sent and failed, exporter queues, memory and CPU for OpenTelemetry Collectors that send their own metrics.",
+  "role": "ready-made:otelcol/overview:1",
+  "owner": "",
+  "created": "2026-10-12T00:00:00.000Z",
+  "tabs": [
+    {
+      "tabId": "default",
+      "name": "Overview",
+      "panels": [
+        {
+          "id": "otelcol_note",
+          "type": "markdown",
+          "title": "",
+          "description": "",
+          "config": {
+            "show_legends": false,
+            "legends_position": null
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "",
+              "vrlFunctionQuery": "",
+              "customQuery": false,
+              "fields": {
+                "stream": "",
+                "stream_type": "logs",
+                "x": [],
+                "y": [],
+                "z": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 0,
+            "w": 192,
+            "h": 6,
+            "i": 0
+          },
+          "htmlContent": "",
+          "markdownContent": "Ready-made by OpenObserve. Charts fill in within a few minutes of new data. Edit or delete anything, including this note. Setup help for the collector's own metrics is at the end of this dashboard."
+        },
+        {
+          "id": "otelcol_collectors",
+          "type": "table",
+          "title": "Collectors and uptime",
+          "description": "Each collector sending its own metrics, named by its pod in Kubernetes and by its service.instance.id elsewhere, with its uptime in the Value column.",
+          "config": {
+            "show_legends": false,
+            "legends_position": "bottom",
+            "unit": "seconds",
+            "unit_custom": null,
+            "decimals": 1,
+            "drilldown": [],
+            "promql_table_mode": "all"
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "max by (collector)(label_replace(label_replace(otelcol_process_uptime{service_instance_id=~\"$instance\"}, \"collector\", \"$1\", \"service_instance_id\", \"(.+)\"), \"collector\", \"$1\", \"k8s_pod_name\", \"(.+)\"))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "otelcol_process_uptime",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 6,
+            "w": 96,
+            "h": 18,
+            "i": 1
+          }
+        },
+        {
+          "id": "otelcol_accepted_rate",
+          "type": "metric",
+          "title": "Accepted/s",
+          "description": "Metric points the receivers pushed into the pipelines per second.",
+          "config": {
+            "show_legends": false,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 1,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum(rate(otelcol_receiver_accepted_metric_points{service_instance_id=~\"$instance\"}[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "otelcol_receiver_accepted_metric_points",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 96,
+            "y": 6,
+            "w": 48,
+            "h": 9,
+            "i": 2
+          }
+        },
+        {
+          "id": "otelcol_refused_rate",
+          "type": "metric",
+          "title": "Refused/s",
+          "description": "Metric points the receivers could not push into the pipelines per second; 0 when none were reported. 0 is healthy: nothing was refused.",
+          "config": {
+            "show_legends": false,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 2,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum(rate(otelcol_receiver_refused_metric_points{service_instance_id=~\"$instance\"}[5m])) or vector(0)",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "otelcol_receiver_refused_metric_points",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 144,
+            "y": 6,
+            "w": 48,
+            "h": 9,
+            "i": 3
+          }
+        },
+        {
+          "id": "otelcol_send_failed_rate",
+          "type": "metric",
+          "title": "Failed/s",
+          "description": "Metric points the exporters failed to send per second; 0 when none were reported (newer collectors only report it after a failure). 0 is healthy: every send succeeded.",
+          "config": {
+            "show_legends": false,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 2,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum(rate(otelcol_exporter_send_failed_metric_points{service_instance_id=~\"$instance\"}[5m])) or vector(0)",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "otelcol_exporter_send_failed_metric_points",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 96,
+            "y": 15,
+            "w": 48,
+            "h": 9,
+            "i": 4
+          }
+        },
+        {
+          "id": "otelcol_queue_fill",
+          "type": "metric",
+          "title": "Queue fill",
+          "description": "The fullest exporter retry queue as a share of its capacity; data is dropped at 100%. Near 0% is healthy: the exporters keep up.",
+          "config": {
+            "show_legends": false,
+            "legends_position": "bottom",
+            "unit": "percent",
+            "unit_custom": null,
+            "decimals": 1,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "100 * max(max by (service_instance_id, exporter, data_type)(otelcol_exporter_queue_size{service_instance_id=~\"$instance\"}) / on (service_instance_id, exporter) group_left max by (service_instance_id, exporter)(otelcol_exporter_queue_capacity{service_instance_id=~\"$instance\"}))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "otelcol_exporter_queue_size",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 144,
+            "y": 15,
+            "w": 48,
+            "h": 9,
+            "i": 5
+          }
+        },
+        {
+          "id": "otelcol_accepted_vs_refused",
+          "type": "line",
+          "title": "Accepted vs refused points/s",
+          "description": "Metric points the receivers accepted and refused per second. Refused at 0 is healthy. Refused points never reach the pipeline.",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 1,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum(rate(otelcol_receiver_accepted_metric_points{service_instance_id=~\"$instance\"}[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "otelcol_receiver_accepted_metric_points",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "accepted"
+              }
+            },
+            {
+              "query": "sum(rate(otelcol_receiver_refused_metric_points{service_instance_id=~\"$instance\"}[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "otelcol_receiver_refused_metric_points",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "refused"
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 24,
+            "w": 96,
+            "h": 16,
+            "i": 6
+          }
+        },
+        {
+          "id": "otelcol_sent_vs_failed",
+          "type": "line",
+          "title": "Sent vs send-failed points/s",
+          "description": "Metric points the exporters sent and failed to send per second. Send-failed at 0 is healthy. Newer collectors only report failures after the first one.",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 1,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum(rate(otelcol_exporter_sent_metric_points{service_instance_id=~\"$instance\"}[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "otelcol_exporter_sent_metric_points",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "sent"
+              }
+            },
+            {
+              "query": "sum(rate(otelcol_exporter_send_failed_metric_points{service_instance_id=~\"$instance\"}[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "otelcol_exporter_send_failed_metric_points",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "send failed"
+              }
+            }
+          ],
+          "layout": {
+            "x": 96,
+            "y": 24,
+            "w": 96,
+            "h": 16,
+            "i": 7
+          }
+        },
+        {
+          "id": "otelcol_accepted_by_receiver",
+          "type": "line",
+          "title": "Accepted points/s by receiver",
+          "description": "Metric points accepted per second, per receiver.",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 1,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum by (receiver)(rate(otelcol_receiver_accepted_metric_points{service_instance_id=~\"$instance\"}[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "otelcol_receiver_accepted_metric_points",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{receiver}"
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 40,
+            "w": 96,
+            "h": 16,
+            "i": 8
+          }
+        },
+        {
+          "id": "otelcol_sent_by_exporter",
+          "type": "line",
+          "title": "Sent points/s by exporter",
+          "description": "Metric points sent per second, per exporter.",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 1,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum by (exporter)(rate(otelcol_exporter_sent_metric_points{service_instance_id=~\"$instance\"}[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "otelcol_exporter_sent_metric_points",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{exporter}"
+              }
+            }
+          ],
+          "layout": {
+            "x": 96,
+            "y": 40,
+            "w": 96,
+            "h": 16,
+            "i": 9
+          }
+        },
+        {
+          "id": "otelcol_queue",
+          "type": "line",
+          "title": "Exporter queue size vs capacity",
+          "description": "Batches waiting in each exporter's retry queue against the queue's capacity. A queue size near 0 is healthy. A full queue drops data.",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 0,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum by (exporter)(otelcol_exporter_queue_size{service_instance_id=~\"$instance\"})",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "otelcol_exporter_queue_size",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{exporter} size"
+              }
+            },
+            {
+              "query": "sum by (exporter)(otelcol_exporter_queue_capacity{service_instance_id=~\"$instance\"})",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "otelcol_exporter_queue_capacity",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{exporter} capacity"
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 56,
+            "w": 96,
+            "h": 16,
+            "i": 10
+          }
+        },
+        {
+          "id": "otelcol_heap",
+          "type": "line",
+          "title": "Heap allocated",
+          "description": "Go heap in use by each collector process; steady growth points at a leak or an oversized batch.",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "bytes",
+            "unit_custom": null,
+            "decimals": 1,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum by (collector)(label_replace(label_replace(otelcol_process_runtime_heap_alloc_bytes{service_instance_id=~\"$instance\"}, \"collector\", \"$1\", \"service_instance_id\", \"(.+)\"), \"collector\", \"$1\", \"k8s_pod_name\", \"(.+)\"))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "otelcol_process_runtime_heap_alloc_bytes",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{collector}"
+              }
+            }
+          ],
+          "layout": {
+            "x": 96,
+            "y": 56,
+            "w": 96,
+            "h": 16,
+            "i": 11
+          }
+        },
+        {
+          "id": "otelcol_memory_rss",
+          "type": "line",
+          "title": "Memory (RSS)",
+          "description": "Resident memory of each collector process.",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "bytes",
+            "unit_custom": null,
+            "decimals": 1,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum by (collector)(label_replace(label_replace(otelcol_process_memory_rss{service_instance_id=~\"$instance\"}, \"collector\", \"$1\", \"service_instance_id\", \"(.+)\"), \"collector\", \"$1\", \"k8s_pod_name\", \"(.+)\"))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "otelcol_process_memory_rss",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{collector}"
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 72,
+            "w": 96,
+            "h": 16,
+            "i": 12
+          }
+        },
+        {
+          "id": "otelcol_cpu",
+          "type": "line",
+          "title": "CPU",
+          "description": "CPU used by each collector process, as a percent of one core.",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "percent",
+            "unit_custom": null,
+            "decimals": 1,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "100 * sum by (collector)(label_replace(label_replace(rate(otelcol_process_cpu_seconds{service_instance_id=~\"$instance\"}[5m]), \"collector\", \"$1\", \"service_instance_id\", \"(.+)\"), \"collector\", \"$1\", \"k8s_pod_name\", \"(.+)\"))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "otelcol_process_cpu_seconds",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{collector}"
+              }
+            }
+          ],
+          "layout": {
+            "x": 96,
+            "y": 72,
+            "w": 96,
+            "h": 16,
+            "i": 13
+          }
+        },
+        {
+          "id": "otelcol_setup",
+          "type": "markdown",
+          "title": "Send the collector's own metrics",
+          "description": "",
+          "config": {
+            "show_legends": false,
+            "legends_position": null
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "",
+              "vrlFunctionQuery": "",
+              "customQuery": false,
+              "fields": {
+                "stream": "",
+                "stream_type": "logs",
+                "x": [],
+                "y": [],
+                "z": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 88,
+            "w": 192,
+            "h": 24,
+            "i": 14
+          },
+          "htmlContent": "",
+          "markdownContent": "**Needs the collector's own metrics (`otelcol_*`), which are off by default.** Add this under `service:` in the collector config, with the URL, org and token of your OpenObserve exporter, then restart the collector:\n\n```yaml\nservice:\n  telemetry:\n    metrics:\n      readers:\n        - periodic:\n            interval: 30000\n            exporter:\n              otlp:\n                protocol: http/protobuf\n                endpoint: <url>/api/<org>/v1/metrics\n                headers:\n                  Authorization: Basic <token>\n```\n\nChecked on collector 0.115.1. `headers` must be a map, not a `- name:` list; `endpoint` is the full `/api/<org>/v1/metrics` URL."
+        }
+      ]
+    }
+  ],
+  "variables": {
+    "list": [
+      {
+        "type": "query_values",
+        "name": "instance",
+        "label": "Collector",
+        "query_data": {
+          "stream_type": "metrics",
+          "stream": "otelcol_process_uptime",
+          "field": "service_instance_id",
+          "max_record_size": 100,
+          "filter": []
+        },
+        "value": "",
+        "options": [],
+        "multiSelect": true,
+        "selectAllValueForMultiSelect": "all",
+        "scope": "global"
+      }
+    ],
+    "showDynamicFilters": true
+  },
+  "defaultDatetimeDuration": {
+    "type": "relative",
+    "relativeTimePeriod": "15m",
+    "startTime": 0,
+    "endTime": 0
+  }
+}

@@ -20,6 +20,7 @@
 import { raw, type TranslateFn } from "@/types/i18n";
 
 import { getImageURL } from "@/utils/zincutils";
+import { getReadyMadeSource } from "@/composables/readyMade/catalog";
 import type { CardSubstitutions, RichCardContent } from "../types";
 import { collectorInstallStep, writeConfigVariants, sharedToolIcons } from "./otelShared";
 import {
@@ -173,6 +174,14 @@ export default function sqlServerCard(subs: CardSubstitutions, t: TranslateFn): 
           t("ingestion.setupCard.pillLockWaitRate"),
           t("ingestion.setupCard.pillBufferCacheHitRatio"),
         ],
+        action: {
+          id: "open-ready-made-dashboard",
+          label: t("ingestion.setupCard.readyMadeOpenOne", {
+            name: getReadyMadeSource("sqlserver").name,
+          }),
+          icon: "dashboard",
+          showOnDetect: true,
+        },
       },
       // ── Database Monitoring (optional) ──────────────────────────────────
       // Every DBM tab this product has: deadlocks (shredded from the

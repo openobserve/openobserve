@@ -239,6 +239,12 @@ export default function kubernetesCard(subs: CardSubstitutions, t: TranslateFn):
           t("ingestion.setupCard.pillPodMetrics"),
           t("common.traces"),
         ],
+        action: {
+          id: "open-ready-made-dashboard",
+          label: t("ingestion.setupCard.readyMadeOpenKubernetes"),
+          icon: "dashboard",
+          showOnDetect: true,
+        },
       },
     ],
     // Collector logs carry the k8sattributes processor's resource attributes;

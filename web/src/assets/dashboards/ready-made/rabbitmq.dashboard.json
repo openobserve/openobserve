@@ -1,0 +1,766 @@
+{
+  "version": 8,
+  "dashboardId": "",
+  "title": "RabbitMQ / Overview",
+  "description": "Queues, backlog, consumers and message flow for RabbitMQ brokers reporting through the OpenTelemetry rabbitmq receiver.",
+  "role": "ready-made:rabbitmq/overview:1",
+  "owner": "",
+  "created": "2026-10-15T00:00:00.000Z",
+  "tabs": [
+    {
+      "tabId": "default",
+      "name": "Overview",
+      "panels": [
+        {
+          "id": "rabbitmq_note",
+          "type": "markdown",
+          "title": "",
+          "description": "",
+          "config": {
+            "show_legends": false,
+            "legends_position": null
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "",
+              "vrlFunctionQuery": "",
+              "customQuery": false,
+              "fields": {
+                "stream": "",
+                "stream_type": "logs",
+                "x": [],
+                "y": [],
+                "z": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 0,
+            "w": 192,
+            "h": 6,
+            "i": 0
+          },
+          "htmlContent": "",
+          "markdownContent": "Ready-made by OpenObserve. Charts fill in within a few minutes of new data. Edit or delete anything, including this note. The data comes from the rabbitmq receiver of the OpenTelemetry Collector Contrib."
+        },
+        {
+          "id": "rabbitmq_queues",
+          "type": "metric",
+          "title": "Queues",
+          "description": "Queues the receiver reports for the selected nodes, vhosts and queues.",
+          "config": {
+            "show_legends": false,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 0,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "count(max by (rabbitmq_node_name, rabbitmq_vhost_name, rabbitmq_queue_name)(rabbitmq_consumer_count{rabbitmq_node_name=~\"$node\",rabbitmq_vhost_name=~\"$vhost\",rabbitmq_queue_name=~\"$queue\"}))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "rabbitmq_consumer_count",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 6,
+            "w": 64,
+            "h": 6,
+            "i": 1
+          }
+        },
+        {
+          "id": "rabbitmq_ready",
+          "type": "metric",
+          "title": "Messages ready",
+          "description": "Messages waiting in queues for a consumer.",
+          "config": {
+            "show_legends": false,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 0,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum(rabbitmq_message_current{rabbitmq_node_name=~\"$node\",rabbitmq_vhost_name=~\"$vhost\",rabbitmq_queue_name=~\"$queue\",state=\"ready\"})",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "rabbitmq_message_current",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 64,
+            "y": 6,
+            "w": 64,
+            "h": 6,
+            "i": 2
+          }
+        },
+        {
+          "id": "rabbitmq_unacked",
+          "type": "metric",
+          "title": "Unacknowledged",
+          "description": "Messages handed to consumers and not acknowledged yet.",
+          "config": {
+            "show_legends": false,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 0,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum(rabbitmq_message_current{rabbitmq_node_name=~\"$node\",rabbitmq_vhost_name=~\"$vhost\",rabbitmq_queue_name=~\"$queue\",state=\"unacknowledged\"})",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "rabbitmq_message_current",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 128,
+            "y": 6,
+            "w": 64,
+            "h": 6,
+            "i": 3
+          }
+        },
+        {
+          "id": "rabbitmq_consumers",
+          "type": "metric",
+          "title": "Consumers",
+          "description": "Consumers attached to the selected queues.",
+          "config": {
+            "show_legends": false,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 0,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum(rabbitmq_consumer_count{rabbitmq_node_name=~\"$node\",rabbitmq_vhost_name=~\"$vhost\",rabbitmq_queue_name=~\"$queue\"})",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "rabbitmq_consumer_count",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 12,
+            "w": 64,
+            "h": 6,
+            "i": 4
+          }
+        },
+        {
+          "id": "rabbitmq_published_rate",
+          "type": "metric",
+          "title": "Published/s",
+          "description": "Messages published to the selected queues per second (5-minute average).",
+          "config": {
+            "show_legends": false,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 1,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum(rate(rabbitmq_message_published{rabbitmq_node_name=~\"$node\",rabbitmq_vhost_name=~\"$vhost\",rabbitmq_queue_name=~\"$queue\"}[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "rabbitmq_message_published",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 64,
+            "y": 12,
+            "w": 64,
+            "h": 6,
+            "i": 5
+          }
+        },
+        {
+          "id": "rabbitmq_delivered_rate",
+          "type": "metric",
+          "title": "Delivered/s",
+          "description": "Messages delivered to consumers per second (5-minute average).",
+          "config": {
+            "show_legends": false,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 1,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum(rate(rabbitmq_message_delivered{rabbitmq_node_name=~\"$node\",rabbitmq_vhost_name=~\"$vhost\",rabbitmq_queue_name=~\"$queue\"}[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "rabbitmq_message_delivered",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 128,
+            "y": 12,
+            "w": 64,
+            "h": 6,
+            "i": 6
+          }
+        },
+        {
+          "id": "rabbitmq_queues_without_consumers",
+          "type": "line",
+          "title": "Queues without consumers",
+          "description": "Queues with no consumer attached; their messages pile up until one connects. 0 is healthy unless a queue is meant to sit idle.",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 1,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "count(max by (rabbitmq_node_name, rabbitmq_vhost_name, rabbitmq_queue_name)(rabbitmq_consumer_count{rabbitmq_node_name=~\"$node\",rabbitmq_vhost_name=~\"$vhost\",rabbitmq_queue_name=~\"$queue\"}) == 0) or vector(0)",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "rabbitmq_consumer_count",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "queues"
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 18,
+            "w": 96,
+            "h": 16,
+            "i": 7
+          }
+        },
+        {
+          "id": "rabbitmq_unacked_by_queue",
+          "type": "line",
+          "title": "Unacknowledged messages by queue",
+          "description": "Messages consumers hold without acknowledging. A flat line at the consumers' prefetch limit is expected; one that keeps rising means a consumer is stuck. Dropped (unroutable) messages are not charted: the receiver reports them only after the broker has dropped one.",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 1,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum by (rabbitmq_node_name, rabbitmq_vhost_name, rabbitmq_queue_name)(rabbitmq_message_current{rabbitmq_node_name=~\"$node\",rabbitmq_vhost_name=~\"$vhost\",rabbitmq_queue_name=~\"$queue\",state=\"unacknowledged\"})",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "rabbitmq_message_current",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{rabbitmq_queue_name} ({rabbitmq_vhost_name})"
+              }
+            }
+          ],
+          "layout": {
+            "x": 96,
+            "y": 18,
+            "w": 96,
+            "h": 16,
+            "i": 8
+          }
+        },
+        {
+          "id": "rabbitmq_message_flow",
+          "type": "line",
+          "title": "Message flow/s",
+          "description": "Messages published, delivered and acknowledged per second (5-minute average). Published above delivered for long means the backlog is growing.",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 1,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum(rate(rabbitmq_message_published{rabbitmq_node_name=~\"$node\",rabbitmq_vhost_name=~\"$vhost\",rabbitmq_queue_name=~\"$queue\"}[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "rabbitmq_message_published",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "published"
+              }
+            },
+            {
+              "query": "sum(rate(rabbitmq_message_delivered{rabbitmq_node_name=~\"$node\",rabbitmq_vhost_name=~\"$vhost\",rabbitmq_queue_name=~\"$queue\"}[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "rabbitmq_message_delivered",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "delivered"
+              }
+            },
+            {
+              "query": "sum(rate(rabbitmq_message_acknowledged{rabbitmq_node_name=~\"$node\",rabbitmq_vhost_name=~\"$vhost\",rabbitmq_queue_name=~\"$queue\"}[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "rabbitmq_message_acknowledged",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "acknowledged"
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 34,
+            "w": 96,
+            "h": 16,
+            "i": 9
+          }
+        },
+        {
+          "id": "rabbitmq_published_by_queue",
+          "type": "line",
+          "title": "Published/s by queue",
+          "description": "Messages published to each queue per second (5-minute average).",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 1,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum by (rabbitmq_node_name, rabbitmq_vhost_name, rabbitmq_queue_name)(rate(rabbitmq_message_published{rabbitmq_node_name=~\"$node\",rabbitmq_vhost_name=~\"$vhost\",rabbitmq_queue_name=~\"$queue\"}[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "rabbitmq_message_published",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{rabbitmq_queue_name} ({rabbitmq_vhost_name})"
+              }
+            }
+          ],
+          "layout": {
+            "x": 96,
+            "y": 34,
+            "w": 96,
+            "h": 16,
+            "i": 10
+          }
+        },
+        {
+          "id": "rabbitmq_ready_by_queue",
+          "type": "line",
+          "title": "Messages ready by queue",
+          "description": "Backlog per queue: messages waiting for a consumer. A queue with a length limit flattens at that limit and then drops or rejects new messages, depending on its overflow setting.",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 1,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum by (rabbitmq_node_name, rabbitmq_vhost_name, rabbitmq_queue_name)(rabbitmq_message_current{rabbitmq_node_name=~\"$node\",rabbitmq_vhost_name=~\"$vhost\",rabbitmq_queue_name=~\"$queue\",state=\"ready\"})",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "rabbitmq_message_current",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{rabbitmq_queue_name} ({rabbitmq_vhost_name})"
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 50,
+            "w": 96,
+            "h": 16,
+            "i": 11
+          }
+        },
+        {
+          "id": "rabbitmq_consumers_by_queue",
+          "type": "line",
+          "title": "Consumers by queue",
+          "description": "Consumers attached to each queue.",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 1,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum by (rabbitmq_node_name, rabbitmq_vhost_name, rabbitmq_queue_name)(rabbitmq_consumer_count{rabbitmq_node_name=~\"$node\",rabbitmq_vhost_name=~\"$vhost\",rabbitmq_queue_name=~\"$queue\"})",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "rabbitmq_consumer_count",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{rabbitmq_queue_name} ({rabbitmq_vhost_name})"
+              }
+            }
+          ],
+          "layout": {
+            "x": 96,
+            "y": 50,
+            "w": 96,
+            "h": 16,
+            "i": 12
+          }
+        },
+        {
+          "id": "rabbitmq_backlog_top",
+          "type": "table",
+          "title": "Largest backlogs (top 10)",
+          "description": "The 10 queues with the most messages waiting for a consumer.",
+          "config": {
+            "show_legends": false,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 0,
+            "drilldown": [],
+            "promql_table_mode": "all"
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "topk(10, sum by (rabbitmq_node_name, rabbitmq_vhost_name, rabbitmq_queue_name)(rabbitmq_message_current{rabbitmq_node_name=~\"$node\",rabbitmq_vhost_name=~\"$vhost\",rabbitmq_queue_name=~\"$queue\",state=\"ready\"}))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "rabbitmq_message_current",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 66,
+            "w": 192,
+            "h": 16,
+            "i": 13
+          }
+        }
+      ]
+    }
+  ],
+  "variables": {
+    "list": [
+      {
+        "type": "query_values",
+        "name": "node",
+        "label": "Node",
+        "query_data": {
+          "stream_type": "metrics",
+          "stream": "rabbitmq_consumer_count",
+          "field": "rabbitmq_node_name",
+          "max_record_size": 100,
+          "filter": []
+        },
+        "value": "",
+        "options": [],
+        "multiSelect": true,
+        "selectAllValueForMultiSelect": "all",
+        "scope": "global"
+      },
+      {
+        "type": "query_values",
+        "name": "vhost",
+        "label": "Vhost",
+        "query_data": {
+          "stream_type": "metrics",
+          "stream": "rabbitmq_consumer_count",
+          "field": "rabbitmq_vhost_name",
+          "max_record_size": 100,
+          "filter": [
+            {
+              "name": "rabbitmq_node_name",
+              "operator": "IN",
+              "value": "$node"
+            }
+          ]
+        },
+        "value": "",
+        "options": [],
+        "multiSelect": true,
+        "selectAllValueForMultiSelect": "all",
+        "scope": "global"
+      },
+      {
+        "type": "query_values",
+        "name": "queue",
+        "label": "Queue",
+        "query_data": {
+          "stream_type": "metrics",
+          "stream": "rabbitmq_consumer_count",
+          "field": "rabbitmq_queue_name",
+          "max_record_size": 100,
+          "filter": [
+            {
+              "name": "rabbitmq_node_name",
+              "operator": "IN",
+              "value": "$node"
+            },
+            {
+              "name": "rabbitmq_vhost_name",
+              "operator": "IN",
+              "value": "$vhost"
+            }
+          ]
+        },
+        "value": "",
+        "options": [],
+        "multiSelect": true,
+        "selectAllValueForMultiSelect": "all",
+        "scope": "global"
+      }
+    ],
+    "showDynamicFilters": true
+  },
+  "defaultDatetimeDuration": {
+    "type": "relative",
+    "relativeTimePeriod": "15m",
+    "startTime": 0,
+    "endTime": 0
+  }
+}
