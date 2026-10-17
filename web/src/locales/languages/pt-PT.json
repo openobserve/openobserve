@@ -8143,8 +8143,7 @@
       "definitionsWithoutFacts": "{count} alerta não tinha linhas de gatilho na janela, o que não é contado como lacuna. | {count} alertas não tinham linhas de gatilho na janela, o que não é contado como lacuna.",
       "transitionsTruncated": "As transições de estado foram truncadas.",
       "countersTruncated": "Os contadores foram truncados, então os alertas além do corte não foram avaliados.",
-      "errorClustersTruncated": "Os clusters de erro foram truncados.",
-      "metaFallbackUsed": "Lido do stream de gatilhos da organização _meta, o que não é contado como lacuna."
+      "errorClustersTruncated": "Os clusters de erro foram truncados."
     },
     "digests": {
       "schedule": "Agendamento",
@@ -9164,7 +9163,7 @@
       "helpYourVariablesEmpty": "Você ainda não adicionou nenhuma variável.",
       "helpRowTemplateExplain": "Um alerta pode corresponder a várias linhas. O modelo de linha decide a aparência de uma única linha. Em seguida, {'{'} linhas {'}'} em seu modelo principal aparecem em todas as linhas correspondentes, já formatadas.",
       "helpRowTemplateTypeHeading": "String versus JSON",
-      "helpRowTemplateTypeExplain": "String produz texto simples por linha. JSON produz um objeto JSON por linha, adequado para destinos estruturados.",
+      "helpRowTemplateTypeExplain": "String gera texto simples por linha. JSON gera um objeto JSON por linha, adequado para destinos estruturados. Use {'{'}...row{'}'} como o modelo inteiro para incluir todos os campos da linha automaticamente. Um campo de linha chamado ...row tem precedência.",
       "helpRowTemplateTypeCurrent": "Selecionado atualmente:",
       "helpPreviewHeadingShort": "prévia",
       "helpWhyHeading": "Por que usar uma variável?",
@@ -9235,8 +9234,8 @@
       "selectTemplate": "Selecionar Modelo",
       "templateTypeString": "String",
       "templateTypeJson": "JSON",
-      "rowTemplatePlaceholderJson": "exemplo - {'{'}\"user\": \"{'{'}name{'}'}\", \"timestamp\": \"{'{'}timestamp{'}'}\"{'}'}",
-      "rowTemplatePlaceholderString": "exemplo - Alerta foi acionado às {'{'}timestamp{'}'}"
+      "rowTemplatePlaceholderJson": "ex.: {'{'}\"user\": \"{'{'}name{'}'}\", \"timestamp\": \"{'{'}timestamp{'}'}\"{'}'} ou {'{'}...row{'}'}",
+      "rowTemplatePlaceholderString": "ex.: O alerta foi disparado em {'{'}timestamp{'}'}"
     },
     "editJson": "Editar alerta JSON",
     "additional_settings": "Configurações adicionais",
@@ -10549,7 +10548,7 @@
     "rowsMax": "Máximo de linhas",
     "rowsFormat": "Formato da linha (opcional)",
     "rowsFormatLint": "O formato referencia uma coluna à qual este modelo não restringe linhas.",
-    "rowsFormatCaption": "Gera uma linha por linha de log correspondente. Os tokens são os nomes dos campos dessa própria linha — por exemplo, {'{'}level{'}'} {'{'}message{'}'} para uma linha com campos level e message. Deixe vazio para mostrar todos os campos.",
+    "rowsFormatCaption": "Gera uma linha para cada linha de registro correspondente. Os tokens são os nomes dos campos da própria linha — ex.: {'{'}level{'}'} {'{'}message{'}'} para uma linha com os campos level e message. Use {'{'}...row{'}'} para incluir todos os campos como texto JSON serializado. Um campo de linha chamado ...row tem precedência. Deixe em branco para mostrar todos os campos.",
     "bodyMarkdownLint": "A linha {line} começa com \"{marker}\" mas não tem espaço depois, então será renderizada como texto simples, não como lista ou título. Adicione um espaço para corrigir.",
     "addToTemplate": "Adicionar a este modelo",
     "addToTemplateCaption": "Campos, links, linhas correspondentes, títulos de canal, gráfico",

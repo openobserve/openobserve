@@ -36,7 +36,6 @@ export interface Coverage {
   coverage_error_clusters_truncated: boolean;
   coverage_error_clusters_unattributed: number;
   coverage_stream_substrate_empty: boolean;
-  coverage_meta_fallback_used: boolean;
 }
 
 /** One run as the timeline lists it; a run is identified by its window, not by an id. */
@@ -88,7 +87,6 @@ const COVERAGE_COLUMNS: (keyof Coverage)[] = [
   "coverage_error_clusters_truncated",
   "coverage_error_clusters_unattributed",
   "coverage_stream_substrate_empty",
-  "coverage_meta_fallback_used",
 ];
 
 const SEVERITY_RANK: Record<Severity, number> = { High: 3, Medium: 2, Low: 1, Info: 0 };
@@ -149,7 +147,6 @@ export function runIdentity(record: DigestRecord): RunRow {
     coverage_error_clusters_truncated: record.coverage_error_clusters_truncated,
     coverage_error_clusters_unattributed: record.coverage_error_clusters_unattributed,
     coverage_stream_substrate_empty: record.coverage_stream_substrate_empty,
-    coverage_meta_fallback_used: record.coverage_meta_fallback_used,
   };
 }
 
@@ -249,7 +246,6 @@ export function coverageNotes(t: TranslateFn, row: RunRow): I18nText[] {
     ["coverage_transitions_truncated", "alertCalibration.coverage.transitionsTruncated"],
     ["coverage_counters_truncated", "alertCalibration.coverage.countersTruncated"],
     ["coverage_error_clusters_truncated", "alertCalibration.coverage.errorClustersTruncated"],
-    ["coverage_meta_fallback_used", "alertCalibration.coverage.metaFallbackUsed"],
   ];
   for (const [column, key] of counts) {
     const count = Number(row[column]);

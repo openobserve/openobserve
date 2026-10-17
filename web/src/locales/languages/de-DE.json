@@ -8143,8 +8143,7 @@
       "definitionsWithoutFacts": "{count} Alarm hatte keine Auslösezeilen im Fenster, was nicht als Lücke gezählt wird. | {count} Alarme hatten keine Auslösezeilen im Fenster, was nicht als Lücke gezählt wird.",
       "transitionsTruncated": "Zustandsübergänge wurden abgeschnitten.",
       "countersTruncated": "Zähler wurden abgeschnitten, daher wurden Alarme jenseits der Grenze nicht bewertet.",
-      "errorClustersTruncated": "Fehlercluster wurden abgeschnitten.",
-      "metaFallbackUsed": "Aus dem triggers-Stream der Organisation _meta gelesen, was nicht als Lücke gezählt wird."
+      "errorClustersTruncated": "Fehlercluster wurden abgeschnitten."
     },
     "digests": {
       "schedule": "Zeitplan",
@@ -9164,7 +9163,7 @@
       "helpYourVariablesEmpty": "Sie haben noch keine Variablen hinzugefügt.",
       "helpRowTemplateExplain": "Eine Warnung kann vielen Zeilen entsprechen. Die Zeilenvorlage entscheidet, wie eine einzelne Zeile aussieht. Dann werden {'{'} rows {'}'} in deiner Hauptvorlage in jeder passenden Zeile eingefügt, die bereits formatiert ist.",
       "helpRowTemplateTypeHeading": "Zeichenfolge im Vergleich zu JSON",
-      "helpRowTemplateTypeExplain": "String erzeugt einfachen Text pro Zeile. JSON erzeugt ein JSON-Objekt pro Zeile, geeignet für strukturierte Ziele.",
+      "helpRowTemplateTypeExplain": "String erzeugt reinen Text pro Zeile. JSON erzeugt ein JSON-Objekt pro Zeile, geeignet für strukturierte Ziele. Verwenden Sie {'{'}...row{'}'} als gesamte Vorlage, um alle Zeilenfelder automatisch einzubeziehen. Ein Zeilenfeld mit dem Namen ...row hat Vorrang.",
       "helpRowTemplateTypeCurrent": "Aktuell ausgewählt:",
       "helpPreviewHeadingShort": "Vorschau",
       "helpWhyHeading": "Warum eine Variable verwenden?",
@@ -9235,8 +9234,8 @@
       "selectTemplate": "Vorlage auswählen",
       "templateTypeString": "Zeichenfolge",
       "templateTypeJson": "JSON",
-      "rowTemplatePlaceholderJson": "z. B. - {'{'}\"user\": \"{'{'}name{'}'}\", \"timestamp\": \"{'{'}timestamp{'}'}\"{'}'}",
-      "rowTemplatePlaceholderString": "z. B. - Alert wurde um {'{'}timestamp{'}'} ausgelöst"
+      "rowTemplatePlaceholderJson": "z. B. {'{'} \"user\": \"{'{'}name{'}'}\", \"timestamp\": \"{'{'}timestamp{'}'}\"{'}'} oder {'{'}...row{'}'}",
+      "rowTemplatePlaceholderString": "z. B. Alarm wurde um {'{'}timestamp{'}'} ausgelöst"
     },
     "editJson": "Alert-JSON bearbeiten",
     "additional_settings": "Zusätzliche Einstellungen",
@@ -10549,7 +10548,7 @@
     "rowsMax": "Max. Zeilen",
     "rowsFormat": "Zeilenformat (optional)",
     "rowsFormatLint": "Format verweist auf eine Spalte, auf die diese Vorlage Zeilen nicht einschränkt.",
-    "rowsFormatCaption": "Erzeugt für jede passende Log-Zeile eine Zeile. Tokens sind die Feldnamen dieser Zeile — z. B. {'{'}level{'}'} {'{'}message{'}'} für eine Zeile mit den Feldern level und message. Leer lassen, um alle Felder anzuzeigen.",
+    "rowsFormatCaption": "Erzeugt eine Zeile pro passender Log-Zeile. Tokens sind die Feldnamen der jeweiligen Zeile – z. B. {'{'}level{'}'} {'{'}message{'}'} für eine Zeile mit den Feldern level und message. Verwenden Sie {'{'}...row{'}'}, um alle Felder als serialisierten JSON-Text einzubeziehen. Ein Zeilenfeld mit dem Namen ...row hat Vorrang. Leer lassen, um alle Felder anzuzeigen.",
     "bodyMarkdownLint": "Zeile {line} beginnt mit \"{marker}\", hat aber kein Leerzeichen danach, daher wird sie als normaler Text gerendert, nicht als Liste oder Überschrift. Füge ein Leerzeichen hinzu, um das zu beheben.",
     "addToTemplate": "Zu dieser Vorlage hinzufügen",
     "addToTemplateCaption": "Felder, Links, passende Zeilen, Kanaltitel, Diagramm",

@@ -23,7 +23,7 @@ export const MAX_WINDOW_MINUTES = 129_600;
 
 /** The columns' defaults, which the first save stores for any field it leaves out. */
 export const CONFIG_DEFAULTS = {
-  enabled: false,
+  enabled: true,
   frequency_minutes: 1440,
   window_minutes: 43_200,
 };

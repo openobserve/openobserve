@@ -8143,8 +8143,7 @@
       "definitionsWithoutFacts": "{count} alarm had geen triggerrijen in het venster, wat niet als een gat wordt geteld. | {count} alarmen hadden geen triggerrijen in het venster, wat niet als een gat wordt geteld.",
       "transitionsTruncated": "Statusovergangen zijn afgekapt.",
       "countersTruncated": "Tellers zijn afgekapt, dus alarmen na de afkap zijn niet beoordeeld.",
-      "errorClustersTruncated": "Foutclusters zijn afgekapt.",
-      "metaFallbackUsed": "Gelezen uit de triggers-stream van de _meta-organisatie, wat niet als een gat wordt geteld."
+      "errorClustersTruncated": "Foutclusters zijn afgekapt."
     },
     "digests": {
       "schedule": "Planning",
@@ -9164,7 +9163,7 @@
       "helpYourVariablesEmpty": "Je hebt nog geen variabelen toegevoegd.",
       "helpRowTemplateExplain": "Een waarschuwing kan met veel rijen overeenkomen. De rijsjabloon bepaalt hoe een enkele rij eruitziet. Vervolgens worden {'{'} rijen {'}'} in je hoofdsjabloon weergegeven in elke overeenkomende rij, die al is opgemaakt.",
       "helpRowTemplateTypeHeading": "String versus JSON",
-      "helpRowTemplateTypeExplain": "String produceert platte tekst per rij. JSON produceert een JSON-object per rij, geschikt voor gestructureerde bestemmingen.",
+      "helpRowTemplateTypeExplain": "String produceert platte tekst per rij. JSON produceert een JSON-object per rij, geschikt voor gestructureerde bestemmingen. Gebruik {'{'}...row{'}'} als de volledige template om automatisch alle rijvelden op te nemen. Een rijveld met de naam ...row heeft voorrang.",
       "helpRowTemplateTypeCurrent": "Momenteel geselecteerd:",
       "helpPreviewHeadingShort": "voorsmaak",
       "helpWhyHeading": "Waarom een variabele gebruiken?",
@@ -9235,8 +9234,8 @@
       "selectTemplate": "Sjabloon selecteren",
       "templateTypeString": "Tekst",
       "templateTypeJson": "JSON",
-      "rowTemplatePlaceholderJson": "bijv. - {'{'}\"user\": \"{'{'}name{'}'}\", \"timestamp\": \"{'{'}timestamp{'}'}\"{'}'}",
-      "rowTemplatePlaceholderString": "bijv. - Alert werd geactiveerd om {'{'}timestamp{'}'}"
+      "rowTemplatePlaceholderJson": "bijv. {'{'} \"user\": \"{'{'}name{'}'}\", \"timestamp\": \"{'{'}timestamp{'}'}\"{'}'} of {'{'}...row{'}'}",
+      "rowTemplatePlaceholderString": "bijv. Alarm is geactiveerd om {'{'}timestamp{'}'}"
     },
     "editJson": "Waarschuwings-JSON bewerken",
     "additional_settings": "Aanvullende instellingen",
@@ -10549,7 +10548,7 @@
     "rowsMax": "Max. rijen",
     "rowsFormat": "Rijopmaak (optioneel)",
     "rowsFormatLint": "Het formaat verwijst naar een kolom waar deze sjabloon rijen niet toe beperkt.",
-    "rowsFormatCaption": "Bouwt één regel per overeenkomende logregel. Tokens zijn de veldnamen van die rij — bijvoorbeeld {'{'}level{'}'} {'{'}message{'}'} voor een rij met velden level en message. Laat leeg om elk veld te tonen.",
+    "rowsFormatCaption": "Bouwt één regel per overeenkomende logrij. Tokens zijn de eigen veldnamen van die rij — bijv. {'{'}level{'}'} {'{'}message{'}'} voor een rij met velden level en message. Gebruik {'{'}...row{'}'} om alle velden als geserialiseerde JSON-tekst op te nemen. Een rijveld met de naam ...row heeft voorrang. Laat leeg om alle velden te tonen.",
     "bodyMarkdownLint": "Regel {line} begint met \"{marker}\" maar heeft geen spatie erna, dus wordt het weergegeven als platte tekst, niet als lijst of kop. Voeg een spatie toe om dit te corrigeren.",
     "addToTemplate": "Toevoegen aan deze sjabloon",
     "addToTemplateCaption": "Velden, links, overeenkomende rijen, kanaaltitels, grafiek",

@@ -8143,8 +8143,7 @@
       "definitionsWithoutFacts": "{count} 件のアラートにはウィンドウ内にトリガー行がありませんでしたが、これはギャップとしてカウントされません。 | {count} 件のアラートにはウィンドウ内にトリガー行がありませんでしたが、これはギャップとしてカウントされません。",
       "transitionsTruncated": "状態遷移が切り捨てられました。",
       "countersTruncated": "カウンターが切り捨てられたため、カットオフ以降のアラートは判定されませんでした。",
-      "errorClustersTruncated": "エラークラスターが切り捨てられました。",
-      "metaFallbackUsed": "_meta 組織のトリガーストリームから読み取られました。これはギャップとしてカウントされません。"
+      "errorClustersTruncated": "エラークラスターが切り捨てられました。"
     },
     "digests": {
       "schedule": "スケジュール",
@@ -9164,7 +9163,7 @@
       "helpYourVariablesEmpty": "変数はまだ追加されていません。",
       "helpRowTemplateExplain": "アラートは複数の行と一致する可能性があります。行テンプレートは 1 つの行の表示方法を決定します。次に、メインテンプレートの {'{'} rows {'}'} は、既にフォーマットされているマッチしたすべての行にドロップされます。",
       "helpRowTemplateTypeHeading": "文字列とJSON",
-      "helpRowTemplateTypeExplain": "String は行ごとにプレーンテキストを生成します。JSON は行ごとに JSON オブジェクトを生成し、構造化された宛先に適しています。",
+      "helpRowTemplateTypeExplain": "文字列は行ごとにプレーンテキストを生成します。JSON は行ごとに JSON オブジェクトを生成し、構造化された宛先に適しています。すべての行フィールドを自動的に含めるには、テンプレート全体として {'{'}...row{'}'} を使用します。...row という名前の行フィールドが優先されます。",
       "helpRowTemplateTypeCurrent": "現在選択されているもの:",
       "helpPreviewHeadingShort": "プレビュー",
       "helpWhyHeading": "なぜ変数を使うの？",
@@ -9235,8 +9234,8 @@
       "selectTemplate": "テンプレートを選択",
       "templateTypeString": "文字列",
       "templateTypeJson": "JSON",
-      "rowTemplatePlaceholderJson": "例 - {'{'}\"user\": \"{'{'}name{'}'}\", \"timestamp\": \"{'{'}timestamp{'}'}\"{'}'}",
-      "rowTemplatePlaceholderString": "例 - アラートは {'{'}timestamp{'}'}にトリガーされました"
+      "rowTemplatePlaceholderJson": "例: {'{'} \"user\": \"{'{'}name{'}'}\", \"timestamp\": \"{'{'}timestamp{'}'}\"{'}'} または {'{'}...row{'}'}",
+      "rowTemplatePlaceholderString": "例: アラートが {'{'}timestamp{'}'} にトリガーされました"
     },
     "editJson": "アラート JSON の編集",
     "additional_settings": "その他の設定",
@@ -10549,7 +10548,7 @@
     "rowsMax": "最大行数",
     "rowsFormat": "行形式（オプション）",
     "rowsFormatLint": "フォーマットがこのテンプレートで制限されていない列を参照しています",
-    "rowsFormatCaption": "一致するログ行ごとに1行を生成します。トークンはその行のフィールド名です。例: {'{'}level{'}'} {'{'}message{'}'} (level と message フィールドを持つ行の場合)。空のままにするとすべてのフィールドを表示します。",
+    "rowsFormatCaption": "一致するログ行ごとに 1 行を生成します。トークンはその行自体のフィールド名です。例: level フィールドと message フィールドを持つ行の場合、{'{'}level{'}'} {'{'}message{'}'}。すべてのフィールドをシリアル化された JSON テキストとして含めるには、{'{'}...row{'}'} を使用します。...row という名前の行フィールドが優先されます。すべてのフィールドを表示するには空のままにします。",
     "bodyMarkdownLint": "行 {line} は \"{marker}\" で始まりますが、その後にスペースがないため、リストや見出しではなくプレーンテキストとして表示されます。スペースを追加して修正してください。",
     "addToTemplate": "このテンプレートに追加",
     "addToTemplateCaption": "フィールド、リンク、一致する行、チャネルタイトル、チャート",
