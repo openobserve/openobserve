@@ -562,6 +562,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             @update:model-value="formDirtyFlag = true"
                           />
                         </div>
+
+                        <div
+                          v-if="showDynamicMergeToggle"
+                          class="text-compact flex items-center justify-between px-3 py-2.5"
+                        >
+                          <span class="flex items-center gap-2">
+                            {{ t("logStream.dynamicMerge") }}
+                            <span class="flex items-center">
+                              <OIcon
+                                name="info"
+                                size="sm"
+                                class="text-text-secondary cursor-pointer"
+                              />
+                              <OTooltip
+                                side="right"
+                                :content="t('logStream.dynamicMergeTooltip')"
+                              />
+                            </span>
+                            <OTag
+                              v-if="dynamicMergeIsDefault"
+                              data-test="log-stream-dynamic-merge-default-tag"
+                              :label="t('logStream.dynamicMergeDefault')"
+                              variant="default-soft"
+                              size="xs"
+                            />
+                          </span>
+                          <OSwitch
+                            data-test="log-stream-dynamic-merge-toggle-btn"
+                            v-model="dynamicMerge"
+                            @update:model-value="onDynamicMergeChange"
+                          />
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -996,6 +1028,10 @@ export default defineComponent({
     const activeMainTab = ref("schemaSettings");
     let previousSchemaVersion: any = null;
     const approxPartition = ref(false);
+    const dynamicMerge = ref(false);
+    // unset on the server means the stream follows the server default; only a change is saved
+    const dynamicMergeIsDefault = ref(true);
+    const dynamicMergeChanged = ref(false);
 
     const streamCrossLinks = ref<any[]>([]);
     const orgCrossLinks = computed(
@@ -1208,6 +1244,17 @@ export default defineComponent({
       approxPartition.value = false;
     });
 
+    const showDynamicMergeToggle = computed(() => {
+      const type = modelValue.stream_type;
+      return type === "logs" || type === "metrics" || type === "traces";
+    });
+
+    const onDynamicMergeChange = () => {
+      dynamicMergeChanged.value = true;
+      dynamicMergeIsDefault.value = false;
+      formDirtyFlag.value = true;
+    };
+
     const showStoreOriginalDataToggle = computed(() => {
       return modelValue.stream_type !== "traces";
     });
@@ -1418,6 +1465,9 @@ export default defineComponent({
       storeOriginalData.value = streamResponse.settings.store_original_data || false;
       enableDistinctFields.value = streamResponse.settings.enable_distinct_fields || false;
       approxPartition.value = streamResponse.settings.approx_partition || false;
+      dynamicMergeIsDefault.value = typeof streamResponse.settings.dynamic_merge !== "boolean";
+      dynamicMerge.value = streamResponse.settings.dynamic_merge === true;
+      dynamicMergeChanged.value = false;
 
       if (!streamResponse.schema) {
         loadingState.value = false;
@@ -1508,6 +1558,7 @@ export default defineComponent({
         store_original_data?: boolean;
         enable_distinct_fields?: boolean;
         approx_partition?: boolean;
+        dynamic_merge?: boolean;
         flatten_level?: number;
       }
       let settings: StreamSettingsPayload = {
@@ -1542,6 +1593,10 @@ export default defineComponent({
       settings["store_original_data"] = storeOriginalData.value;
       settings["enable_distinct_fields"] = enableDistinctFields.value;
       settings["approx_partition"] = approxPartition.value;
+      // sending the key pins the stream to a value: only when the user changed the switch
+      if (dynamicMergeChanged.value) {
+        settings["dynamic_merge"] = dynamicMerge.value;
+      }
 
       if (flattenLevel.value !== undefined) {
         settings["flatten_level"] = Number(flattenLevel.value);
@@ -2499,6 +2554,9 @@ export default defineComponent({
       storeOriginalData,
       enableDistinctFields,
       approxPartition,
+      dynamicMerge,
+      dynamicMergeIsDefault,
+      onDynamicMergeChange,
       maxQueryRange,
       flattenLevel,
       showDataRetention,
@@ -2569,6 +2627,7 @@ export default defineComponent({
       deleteDates,
       IsdeleteBtnVisible,
       showStoreOriginalDataToggle,
+      showDynamicMergeToggle,
       patternAssociations,
       sdrAccess,
       patternAssociationDialog,
