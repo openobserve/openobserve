@@ -15,7 +15,7 @@
 
 // Shared pieces for the host-agent cards (Linux, Windows). Both install the same
 // OpenObserve agent from the openobserve/agents repo and differ only by shell,
-// script path and what the agent collects — so the environment choice
+// script path and what the agent collects — so the Windows environment choice
 // (generic host vs AWS EC2), the EC2 IAM prerequisite and the detection config
 // live here rather than being duplicated in both cards.
 

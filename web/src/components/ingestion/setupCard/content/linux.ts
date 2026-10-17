@@ -13,10 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// Linux host agent setup card. The environment choice (generic host vs AWS EC2)
-// was previously two hand-built clickable <div> cards plus a conditional amber
-// callout; it is now a variant toggle, with the EC2 IAM prerequisite riding on
-// the EC2 variant's note where it is actually relevant.
+// Linux host agent setup card. A single install command: the standard install
+// script also collects EC2 instance metadata, so there is no separate AWS EC2
+// variant.
 
 import { raw, type TranslateFn } from "@/types/i18n";
 
@@ -24,22 +23,18 @@ import { getImageURL } from "@/utils/zincutils";
 import type { CardSubstitutions, RichCardContent } from "../types";
 import {
   AGENTS_REPO,
-  EC2_IAM_NOTE_KEY,
   agentCode,
   agentUninstall,
   dashboardReadyStep,
-  envIcons,
   hostMetricsDetect,
   sharedAgentTroubleshooting,
 } from "./osAgent";
 
-const install = (env: "" | "/ec2") =>
-  `curl -O ${AGENTS_REPO}/linux${env}/install.sh \\
+const install = `curl -O ${AGENTS_REPO}/linux/install.sh \\
   && chmod +x install.sh \\
   && sudo ./install.sh {url}/api/{org}/ {token}`;
 
 export default function linuxCard(subs: CardSubstitutions, t: TranslateFn): RichCardContent {
-  const icon = envIcons();
   return {
     provider: {
       id: "linux",
@@ -59,22 +54,8 @@ export default function linuxCard(subs: CardSubstitutions, t: TranslateFn): Rich
         chip: { kind: "terminal", labelKey: "ingestion.setupCard.chipTerminal" },
         required: true,
         completeOn: "copy",
-        variants: [
-          {
-            id: "generic",
-            labelKey: "ingestion.setupCard.genericLinuxVariant",
-            icon: icon.linux,
-            code: agentCode(install(""), subs, "bash"),
-            note: t("ingestion.setupCard.anyLinuxHostNote"),
-          },
-          {
-            id: "ec2",
-            label: raw("AWS EC2"),
-            icon: icon.ec2,
-            code: agentCode(install("/ec2"), subs, "bash"),
-            note: t(EC2_IAM_NOTE_KEY),
-          },
-        ],
+        code: agentCode(install, subs, "bash"),
+        note: t("ingestion.setupCard.anyLinuxHostNote"),
       },
       {
         id: "verify",
