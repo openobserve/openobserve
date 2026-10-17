@@ -19,6 +19,7 @@ import {
   filterFields,
   firstRecordSql,
   ingestWindow,
+  rangeRoute,
   recordRange,
   sinceWindow,
 } from "./confirmQuery";
@@ -116,5 +117,14 @@ describe("filterFields", () => {
     expect(filterFields("\"service.name\" = 'api'")).toEqual(["service.name"]);
     expect(filterFields("")).toEqual([]);
     expect(filterFields(undefined)).toEqual([]);
+  });
+});
+
+describe("rangeRoute", () => {
+  it("opens a profiles stream on the Profiles page, with the range in microseconds", () => {
+    expect(rangeRoute("acme", "profiles", "default", { startUs: 10, endUs: 20 })).toEqual({
+      name: "profiles",
+      query: { org_identifier: "acme", stream: "default", from: "10", to: "20" },
+    });
   });
 });

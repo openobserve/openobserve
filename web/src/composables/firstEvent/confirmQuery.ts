@@ -107,7 +107,7 @@ export function filterFields(filter?: string): string[] {
   return [...fields];
 }
 
-/** Logs and Traces read from/to in microseconds; the Metrics explorer's picker reads milliseconds. */
+/** Logs, Traces and Profiles read from/to in microseconds; the Metrics explorer's picker reads milliseconds. */
 export function rangeRoute(
   org: string,
   streamType: string,
@@ -127,6 +127,9 @@ export function rangeRoute(
   }
   if (streamType === "traces") {
     return { name: "traces", query: { org_identifier: org, stream, ...time } };
+  }
+  if (streamType === "profiles") {
+    return { name: "profiles", query: { org_identifier: org, stream, ...time } };
   }
   return { name: "logs", query: { org_identifier: org, stream, stream_type: "logs", ...time } };
 }

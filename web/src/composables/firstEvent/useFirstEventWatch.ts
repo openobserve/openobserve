@@ -29,7 +29,9 @@ import useStreams from "@/composables/useStreams";
 import { gt } from "@/types/i18n";
 import {
   USER_DATA_STREAM_TYPES,
+  isInternalStreamName,
   isUserDataStream,
+  isUserDataStreamType,
   type UserDataStreamType,
 } from "@/utils/internalStreams";
 import { FIRST_EVENT_BUDGET, cadenceAt } from "./firstEventBudget";
@@ -47,7 +49,11 @@ import {
 } from "./confirmQuery";
 import { markDetectionSeen } from "./useFirstDataNotice";
 
-export type StreamSignal = UserDataStreamType;
+// Profiles are watched only on their own setup page; "any" (no signal) still means logs, metrics and traces.
+export type StreamSignal = UserDataStreamType | "profiles";
+/** A stream the watch may count: user data of the watched type, never one O2 writes itself. */
+const isWatchedStream = (name: string, type: string) =>
+  type === "profiles" ? !isInternalStreamName(name) : isUserDataStream(name, type);
 export type FirstEventState =
   "idle" | "waiting" | "received" | "rejected" | "no-requests" | "stopped";
 export type DiagnosisTrigger = "auto" | "troubleshoot";
@@ -311,7 +317,7 @@ export function useFirstEventWatch(
       total = res.total;
       rows.push(
         ...(res.list as StreamRow[]).filter(
-          (s) => s?.name?.includes(keyword) && isUserDataStream(s.name, s.stream_type ?? ctx.type),
+          (s) => s?.name?.includes(keyword) && isWatchedStream(s.name, s.stream_type ?? ctx.type),
         ),
       );
       if (offset + STREAM_PROBE_PAGE >= res.total) break;
@@ -354,7 +360,8 @@ export function useFirstEventWatch(
     });
     // the Vuex stream store holds the selected org's lists only, so a late answer for another org stays out
     if (!list || stale(ctx) || ctx.org !== selectedOrg()) return;
-    setStreams(ctx.type, list);
+    // The Vuex stream store has no profiles list.
+    if (isUserDataStreamType(ctx.type)) setStreams(ctx.type, list);
   };
 
   const receive = async (ctx: PollContext, stream: string, c: Confirmation, sinceUs?: number) => {
@@ -516,7 +523,7 @@ export function useFirstEventWatch(
       if (!list || stale(ctx)) return;
       known.total = res.total;
       for (const s of list) {
-        if (!known.names.has(s.name) && isUserDataStream(s.name, s.stream_type ?? type)) {
+        if (!known.names.has(s.name) && isWatchedStream(s.name, s.stream_type ?? type)) {
           pending.set(s.name, s);
         }
       }
