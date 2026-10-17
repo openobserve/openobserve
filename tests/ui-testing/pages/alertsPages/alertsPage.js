@@ -3299,6 +3299,11 @@ export class AlertsPage {
         return ((await valueEl.textContent()) ?? '').trim();
     }
 
+    /** Display-mode alert name value element (OFormInlineEdit span, not an <input>). */
+    getAlertNameValueLocator() {
+        return this.page.locator('[data-test="add-alert-name-input-value"]').first();
+    }
+
     /**
      * Select stream type from dropdown
      * OSelect popover pattern: open trigger, wait for popover, click option keyed by data-test-value (§4)
