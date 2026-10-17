@@ -19,6 +19,11 @@ export interface ProgressBarProps {
   start?: number;
   /** Semantic color state. Default: "default" */
   variant?: ProgressBarVariant;
+  /**
+   * A category colour for the fill, such as a chart series colour, so a bar can
+   * match the legend or chart it sits beside. Overrides `variant` when set.
+   */
+  color?: string;
   /** Track height. Default: "sm" */
   size?: ProgressBarSize;
 }

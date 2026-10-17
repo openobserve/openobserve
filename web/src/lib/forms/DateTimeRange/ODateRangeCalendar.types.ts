@@ -14,6 +14,13 @@ export interface DateRangeCalendarProps {
   minDate?: string;
   /** Latest selectable date — YYYY/MM/DD */
   maxDate?: string;
+  /**
+   * Days before this date are greyed out and cannot be picked, but, unlike
+   * `minDate`, the user can still page back to those months — YYYY/MM/DD.
+   */
+  unavailableBefore?: string;
+  /** Shown on hover over a day greyed out by `unavailableBefore`, saying why. */
+  unavailableReason?: string;
   /** When true, all cell interactions are disabled */
   disabled?: boolean;
 }

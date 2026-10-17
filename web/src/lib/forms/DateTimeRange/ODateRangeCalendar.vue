@@ -84,6 +84,14 @@ const calendarMaxDate = computed(() =>
   props.maxDate ? tryParseDate(toIso(props.maxDate)) : undefined,
 );
 
+const unavailableBeforeDate = computed(() =>
+  props.unavailableBefore ? tryParseDate(toIso(props.unavailableBefore)) : undefined,
+);
+
+function isUnavailable(d: DateValue): boolean {
+  return !!unavailableBeforeDate.value && d.compare(unavailableBeforeDate.value) < 0;
+}
+
 // "Awaiting second click" — start is picked but end isn't. While in this
 // state, cells get a dashed-outline preview based on hover position.
 const isAwaitingEndClick = computed(() => !!internalStart.value && !internalEnd.value);
@@ -136,6 +144,7 @@ function handleRangeChange(value: DateRange | undefined) {
     :model-value="calendarRange"
     :min-value="calendarMinDate"
     :max-value="calendarMaxDate"
+    :is-date-unavailable="unavailableBeforeDate ? isUnavailable : undefined"
     :disabled="disabled"
     week-start-on="0"
     :class="['o-range-cal', isAwaitingEndClick ? 'o-range-cal--awaiting' : 'o-range-cal--complete']"
@@ -203,7 +212,13 @@ function handleRangeChange(value: DateRange | undefined) {
             :key="idx"
             class="mb-1 flex gap-1"
           >
-            <RangeCalendarCell v-for="d in weekDates" :key="d.toString()" :date="d">
+            <!-- The reason sits on the cell: an unavailable trigger has pointer-events off. -->
+            <RangeCalendarCell
+              v-for="d in weekDates"
+              :key="d.toString()"
+              :date="d"
+              :title="isUnavailable(d) ? unavailableReason : undefined"
+            >
               <RangeCalendarCellTrigger
                 :day="d"
                 :month="month.value"
