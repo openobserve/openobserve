@@ -33,6 +33,10 @@ NOT_APP_TOKEN = (
     "This is not an app-level token. Generate one on the app's Basic Information page › App-Level Tokens "
     "with the connections:write scope; it starts with xapp-"
 )
+TOKEN_REFUSED = (
+    "Slack refused this refresh token: each one works once and it was already used or replaced. "
+    "Generate a new token and paste its refresh token"
+)
 APP_TOKEN_REFUSED = (
     "Slack refused the app-level token: it was revoked or mistyped. Generate a new one on the app's "
     "Basic Information page › App-Level Tokens"
@@ -84,9 +88,23 @@ def test_a_refused_token_stores_nothing(client: OpenObserveClient, slack_org: st
     before = installation_ids(client, slack_org)
     status, body = create(client, slack_org, "xoxe-1-expired")
     assert status == 422, body
-    assert body["message"] == "This token has expired. Generate a new one"
+    assert body["message"] == TOKEN_REFUSED
     assert installation_ids(client, slack_org) == before
     assert ready.calls("apps.manifest.create") == []
+
+
+def test_a_used_config_token_names_the_cause(client: OpenObserveClient, slack_org: str, ready: SlackMock) -> None:
+    """Slack answers ``invalid_refresh_token`` for a token it already rotated; the message names that cause."""
+    token = f"xoxe-1-{uuid.uuid4().hex}"
+    status, body = create(client, slack_org, token)
+    assert status == 201, body
+    before = installation_ids(client, slack_org)
+    creates = len(ready.calls("apps.manifest.create"))
+
+    status, body = create(client, slack_org, token)
+    assert (status, body["message"]) == (422, TOKEN_REFUSED), body
+    assert installation_ids(client, slack_org) == before
+    assert len(ready.calls("apps.manifest.create")) == creates
 
 
 def test_forget_clears_only_o2s_copy(client: OpenObserveClient, slack_org: str, ready: SlackMock) -> None:
@@ -183,7 +201,7 @@ def test_start_over_reports_an_app_slack_kept(client: OpenObserveClient, slack_o
     assert over.status_code == 200, over.text
     result = over.json()
     assert result["app_deleted"] is False
-    assert result["app_delete_error"] == "This token has expired. Generate a new one"
+    assert result["app_delete_error"] == TOKEN_REFUSED
     assert result["delete_app_url"] == f"https://api.slack.com/apps/{app_id}/general"
     assert ready.calls("apps.manifest.delete") == []
     assert [a["app_id"] for a in ready.apps()] == [app_id], "the app is still in Slack"
