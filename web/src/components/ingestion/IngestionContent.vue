@@ -48,6 +48,7 @@ const SIGNAL_PARENT_ROUTES: Record<string, StreamSignal> = {
   ingestLogs: "logs",
   ingestMetrics: "metrics",
   ingestTraces: "traces",
+  ingestProfiles: "profiles",
 };
 // the curl guide posts its test record to this stream (Curl.vue)
 const TEST_GUIDES: Record<string, string> = { curl: "default" };

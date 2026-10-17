@@ -537,6 +537,19 @@ describe("LogStream Component", () => {
     });
   });
 
+  describe("explore a profiles stream", () => {
+    it("opens the Profiles page on that stream, not Logs", async () => {
+      const routerPushSpy = vi.spyOn(router, "push");
+
+      await wrapper.vm.exploreStream({ row: { name: "prof_stream", stream_type: "profiles" } });
+
+      expect(routerPushSpy).toHaveBeenCalledWith({
+        name: "profiles",
+        query: { org_identifier: "default", stream: "prof_stream", period: "15m" },
+      });
+    });
+  });
+
   describe("ODialog — Confirm Delete (single)", () => {
     beforeEach(async () => {
       await wrapper.vm.confirmDeleteAction({

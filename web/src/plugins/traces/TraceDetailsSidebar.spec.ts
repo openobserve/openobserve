@@ -2684,14 +2684,14 @@ describe("TraceDetailsSidebar — span to profile link", () => {
     w.unmount();
   });
 
-  it("shows View profile only when a stream has matching samples", async () => {
+  it("shows View Profile only when a stream has matching samples", async () => {
     setStreams({ prof: FULL_SCHEMA });
     profileHits.prof = [
       { profile_type: "cpu", profile_unit: "nanoseconds", service_name: "api", c: 3 },
     ];
     const w = await mountWith();
     expect(w.find(BUTTON).exists()).toBe(true);
-    expect(w.find(BUTTON).text()).toBe("View profile");
+    expect(w.find(BUTTON).text()).toBe("View Profile");
     w.unmount();
   });
 
@@ -2703,7 +2703,7 @@ describe("TraceDetailsSidebar — span to profile link", () => {
         (profileHits.prof = Object.assign(new Error("forbidden"), { response: { status: 403 } })),
     ],
     ["listing the streams fails", () => mockStreamNameList.mockRejectedValue(new Error("boom"))],
-  ])("hides View profile when %s", async (_label, arrange) => {
+  ])("hides View Profile when %s", async (_label, arrange) => {
     setStreams({ prof: FULL_SCHEMA });
     arrange();
     const w = await mountWith();
@@ -2711,7 +2711,7 @@ describe("TraceDetailsSidebar — span to profile link", () => {
     w.unmount();
   });
 
-  it("neither detects nor shows View profile outside standalone mode", async () => {
+  it("neither detects nor shows View Profile outside standalone mode", async () => {
     setStreams({ prof: FULL_SCHEMA });
     profileHits.prof = [{ profile_type: "cpu", profile_unit: "nanoseconds", c: 1 }];
     const w = await mountWith({}, { parentMode: "embedded" });

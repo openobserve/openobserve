@@ -145,16 +145,28 @@ const profiles = {
     );
   },
 
-  series: (orgIdentifier: string, streamName: string, payload: ProfilesQueryBody) =>
+  series: (
+    orgIdentifier: string,
+    streamName: string,
+    payload: ProfilesQueryBody,
+    options: { signal?: AbortSignal } = {},
+  ) =>
     http().post<ProfilesSeriesResponse>(
       `/api/${orgIdentifier}/${encodeURIComponent(streamName)}/profiles/series`,
       payload,
+      options,
     ),
 
-  merge: (orgIdentifier: string, streamName: string, payload: ProfilesQueryBody) =>
+  merge: (
+    orgIdentifier: string,
+    streamName: string,
+    payload: ProfilesQueryBody,
+    options: { signal?: AbortSignal } = {},
+  ) =>
     http().post<ProfilesMergeResponse>(
       `/api/${orgIdentifier}/${encodeURIComponent(streamName)}/profiles/merge`,
       payload,
+      options,
     ),
 
   tagValues: (

@@ -15,182 +15,252 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="bg-card-glass-bg flex h-full min-h-0 flex-col">
-    <!-- Below lg the bar wraps (selects two-up on phones), so the date picker and Run query stay on screen. -->
-    <div
-      class="border-border-default flex shrink-0 flex-nowrap items-center gap-1.5 border-b p-1.5 max-lg:flex-wrap"
-    >
-      <div
-        class="max-w-36 min-w-0 flex-1 max-lg:min-w-32 max-md:max-w-none max-md:basis-[calc(50%-0.1875rem)]"
-      >
-        <OSelect
-          v-model="selectedStream"
-          :label="t('profiles.stream')"
-          label-position="inside"
-          :options="streamOptions"
-          :disabled="!streamOptions.length"
-          class="w-full"
-          data-test="profiles-stream-select"
-        />
-      </div>
-      <div
-        class="max-w-36 min-w-0 flex-1 max-lg:min-w-32 max-md:max-w-none max-md:basis-[calc(50%-0.1875rem)]"
-      >
-        <OSelect
-          v-model="selectedService"
-          :label="t('profiles.service')"
-          label-position="inside"
-          :options="serviceOptions"
-          class="w-full"
-          data-test="profiles-service-select"
-        />
-      </div>
-      <div
-        class="max-w-44 min-w-0 flex-1 max-lg:min-w-32 max-md:max-w-none max-md:basis-[calc(50%-0.1875rem)]"
-      >
-        <OSelect
-          v-model="selectedProfileType"
-          :label="t('profiles.profileType')"
-          label-position="inside"
-          :options="profileTypeOptions"
-          class="w-full"
-          data-test="profiles-type-select"
-        />
-      </div>
-      <div
-        class="max-w-36 min-w-0 flex-1 max-lg:min-w-32 max-md:max-w-none max-md:basis-[calc(50%-0.1875rem)]"
-      >
-        <OSelect
-          v-model="draftTagKey"
-          :label="t('profiles.tagKey')"
-          label-position="inside"
-          :options="tagKeyOptions"
-          :disabled="!tagKeyOptions.length"
-          clearable
-          class="w-full"
-          data-test="profiles-tag-key-select"
-        />
-      </div>
-      <div
-        class="max-w-36 min-w-0 flex-1 max-lg:min-w-32 max-md:max-w-none max-md:basis-[calc(50%-0.1875rem)]"
-      >
-        <OSelect
-          v-model="draftTagValue"
-          :label="t('profiles.tagValue')"
-          label-position="inside"
-          :options="tagValueOptions"
-          :disabled="!draftTagKey || tagValuesLoading"
-          :loading="tagValuesLoading"
-          clearable
-          class="w-full"
-          data-test="profiles-tag-value-select"
-        />
-      </div>
-      <OButton
-        class="shrink-0"
+  <OPageLayout
+    class="bg-card-glass-bg"
+    data-test="profiles-page"
+    :title="t('profiles.title')"
+    :subtitle="t('profiles.subtitle')"
+    icon="memory"
+    title-data-test="profiles-page-title"
+    bleed
+  >
+    <template #title>
+      <span class="inline-flex items-center gap-2">
+        {{ t("profiles.title") }}
+        <BetaBadge />
+      </span>
+    </template>
+    <template #actions>
+      <!-- Applies a picked window at once, as on Logs and Traces: Run query is the apply step. -->
+      <DateTimePickerDashboard
+        ref="datePickerRef"
+        v-model="dateState"
+        :auto-apply-dashboard="true"
+        :hide-range-shift="isMobile"
+        class="h-8"
+        data-test="profiles-date-picker"
+      />
+      <ShareButton
+        :url="shareUrl"
         variant="outline"
-        size="sm-toolbar"
-        icon-left="add"
-        :disabled="!canAddFilter"
-        data-test="profiles-add-filter"
-        @click="addFilter"
-      >
-        {{ t("profiles.addFilter") }}
-      </OButton>
-
-      <div class="ms-auto flex shrink-0 items-center gap-2">
-        <DateTimePickerDashboard v-model="dateState" />
+        size="icon-toolbar"
+        :disabled="!hasProfileData"
+        class="h-8"
+        data-test="profiles-share-btn"
+      />
+      <!-- Run, Cancel and the Auto Run switch, as on RUM Performance and Dashboards (shared useAutoRunToggle). -->
+      <OButtonGroup>
+        <!-- All labels share one grid cell, so the button keeps the widest label's width in every language. -->
         <OButton
-          variant="primary"
+          :variant="queryLoading ? 'cancel-query' : runPending ? 'warning' : 'primary'"
           size="sm-toolbar"
-          icon-left="search"
-          :loading="queryLoading"
-          :disabled="queryLoading || !canQuery"
-          data-test="profiles-run-query"
-          @click="runQuery"
+          :disabled="!queryLoading && !canQuery"
+          :data-run-pending="runPending && !queryLoading ? 'true' : undefined"
+          :data-test="queryLoading ? 'profiles-cancel-query' : 'profiles-run-query'"
+          :class="isAutoRunAvailable ? 'border-y-0! border-s-0! border-e!' : 'border-0!'"
+          @click="queryLoading ? cancelQuery() : runQuery()"
         >
-          {{ t("profiles.runQuery") }}
+          <span class="grid">
+            <span
+              class="invisible col-start-1 row-start-1 flex items-center gap-1"
+              aria-hidden="true"
+            >
+              <OIcon name="autorenew" size="xs" />{{ t("profiles.runQuery") }}
+            </span>
+            <span class="invisible col-start-1 row-start-1" aria-hidden="true">{{
+              t("search.cancel")
+            }}</span>
+            <span class="col-start-1 row-start-1 flex items-center justify-center gap-1">
+              <OIcon v-if="!queryLoading && isAutoRunOn" name="autorenew" size="xs" />
+              {{ queryLoading ? t("search.cancel") : t("profiles.runQuery") }}
+            </span>
+          </span>
+          <OTooltip
+            v-if="!queryLoading && (runPending || isAutoRunOn)"
+            :content="runPending ? t('search.autoRunPendingDot') : t('search.autoRunEnabled')"
+          />
         </OButton>
-      </div>
-    </div>
-
-    <div
-      v-if="appliedFilters.length"
-      class="border-border-default flex shrink-0 flex-wrap items-center gap-2 border-b px-1.5 py-1.5"
-      data-test="profiles-applied-filters"
-    >
-      <OTag
-        v-for="filter in appliedFilters"
-        :key="`${filter.key}=${filter.value}`"
-        type="fieldTag"
-        value="primarysm"
-        class="max-w-62.5"
-        :data-test="`profiles-filter-chip-${filter.key}`"
-      >
-        <OTruncatedText class="font-mono text-xs"
-          >{{ filter.key }} = {{ filter.value }}</OTruncatedText
+        <ODropdown
+          v-if="isAutoRunAvailable"
+          v-model:open="runOptionsOpen"
+          align="end"
+          side="bottom"
         >
-        <template #trailing>
-          <button
-            type="button"
-            class="ms-1 inline-flex cursor-pointer items-center"
-            :aria-label="t('profiles.removeFilter', { key: filter.key, value: filter.value })"
-            :data-test="`profiles-filter-remove-${filter.key}`"
-            @click.stop="removeFilter(filter)"
-          >
-            <OIcon name="close" size="xs" />
-          </button>
-        </template>
-      </OTag>
-    </div>
+          <template #trigger>
+            <OButton
+              :variant="queryLoading ? 'cancel-query' : runPending ? 'warning' : 'primary'"
+              size="sm-toolbar"
+              icon-left="arrow-drop-down"
+              class="px-1"
+              :disabled="!queryLoading && !canQuery"
+              :aria-label="t('profiles.runOptions')"
+              data-test="profiles-run-options"
+            />
+          </template>
+          <ODropdownItem data-test="profiles-auto-run-toggle" @select="toggleAutoRun">
+            <template #icon-left>
+              <OIcon
+                :name="isAutoRunOn ? 'autorenew' : 'sync-disabled'"
+                size="sm"
+                :class="isAutoRunOn ? 'text-accent' : ''"
+              />
+            </template>
+            <span>
+              <div class="font-medium">
+                {{ isAutoRunOn ? t("search.turnOffLiveMode") : t("search.turnOnLiveMode") }}
+              </div>
+              <div class="text-text-secondary text-xs">
+                {{ t("search.liveModeTooltip") }}
+              </div>
+            </span>
+          </ODropdownItem>
+        </ODropdown>
+      </OButtonGroup>
+    </template>
+
+    <template #subnav>
+      <OContent class="flex flex-nowrap items-center gap-1.5 py-1.5 max-lg:flex-wrap">
+        <div
+          class="max-w-36 min-w-0 flex-1 max-lg:min-w-32 max-md:max-w-none max-md:basis-[calc(50%-0.1875rem)]"
+        >
+          <OSelect
+            v-model="selectedStream"
+            :label="t('profiles.stream')"
+            label-position="inside"
+            :options="streamOptions"
+            :disabled="!streamOptions.length"
+            class="w-full"
+            data-test="profiles-stream-select"
+          />
+        </div>
+        <div
+          class="max-w-36 min-w-0 flex-1 max-lg:min-w-32 max-md:max-w-none max-md:basis-[calc(50%-0.1875rem)]"
+        >
+          <OSelect
+            v-model="selectedService"
+            :label="t('profiles.service')"
+            label-position="inside"
+            :options="serviceOptions"
+            class="w-full"
+            data-test="profiles-service-select"
+          />
+        </div>
+        <div
+          class="max-w-44 min-w-0 flex-1 max-lg:min-w-32 max-md:max-w-none max-md:basis-[calc(50%-0.1875rem)]"
+        >
+          <OSelect
+            v-model="selectedProfileType"
+            :label="t('profiles.profileType')"
+            label-position="inside"
+            :options="profileTypeOptions"
+            class="w-full"
+            data-test="profiles-type-select"
+          />
+        </div>
+      </OContent>
+
+      <OContent class="border-border-default border-t py-1.5">
+        <ProfilesLabelFilters
+          v-model:editing-index="editingFilterIndex"
+          v-model:draft-key="draftTagKey"
+          v-model:draft-value="draftTagValue"
+          :filters="appliedFilters"
+          :label-options="tagKeyOptions"
+          :value-options="tagValueOptions"
+          :values-loading="tagValuesLoading"
+          @apply="applyDraftFilter"
+          @remove="removeFilter"
+        />
+      </OContent>
+    </template>
 
     <div
-      class="min-h-0 flex-1 overflow-y-auto"
+      ref="resultsScrollEl"
+      class="min-h-0 flex-1 overflow-y-auto md:flex md:flex-col md:overflow-hidden"
       :class="!hasProfileData && streamOptions.length ? 'flex flex-col' : ''"
     >
+      <!-- Same states as the Metrics explorer: a load error with Retry, and a no-data state that links to setup. -->
       <div
-        v-if="errorMessage"
-        class="bg-surface-panel border-border-default text-status-error-text rounded-default m-2.5 border p-3 text-sm"
-        data-test="profiles-error"
+        v-if="errorMessage && !hasProfileData"
+        class="flex min-h-0 flex-1 flex-col items-center justify-center p-3"
       >
-        {{ errorMessage }}
+        <OEmptyState
+          size="block"
+          preset="load-error"
+          :description="raw(errorMessage)"
+          data-test="profiles-error"
+          @action="retry"
+        />
       </div>
 
       <div
-        v-if="!streamOptions.length"
-        class="bg-surface-panel border-border-default rounded-default m-2.5 border p-6 text-center"
-        data-test="profiles-no-stream"
+        v-else-if="streamsLoaded && !streamOptions.length"
+        class="flex min-h-0 flex-1 flex-col items-center justify-center p-3"
       >
-        {{ t("profiles.noStreams") }}
+        <OEmptyState
+          size="block"
+          preset="no-streams"
+          :title="t('profiles.noStreams')"
+          :actions="noStreamsActions"
+          data-test="profiles-no-stream"
+          @action="openProfilesIngestion"
+        />
+      </div>
+
+      <!-- As on Logs: a cancelled query with nothing on screen is not "no data". -->
+      <div
+        v-else-if="!hasProfileData && !showSkeleton && queryCancelled"
+        class="flex min-h-0 flex-1 flex-col items-center justify-center p-3"
+        data-test="profiles-search-cancelled"
+      >
+        <OEmptyState preset="search-cancelled" size="block" @action="runQuery" />
       </div>
 
       <div
-        v-else-if="queryLoading && !hasProfileData"
-        class="text-text-secondary flex flex-1 flex-col items-center justify-center gap-2.5 opacity-80"
-        data-test="profiles-loading"
-      >
-        <OSpinner size="lg" />
-        <span>{{ t("profiles.loading") }}</span>
-      </div>
-
-      <div
-        v-else-if="!hasProfileData"
+        v-else-if="!hasProfileData && !showSkeleton"
         class="flex min-h-0 flex-1 flex-col items-center justify-center p-3"
         data-test="profiles-no-results"
       >
         <OEmptyState preset="no-profiles" size="block" :hide-action="true" />
       </div>
 
-      <OContent v-else class="flex flex-col gap-2.5 py-2.5">
-        <section class="bg-surface-panel border-border-default rounded-default border">
+      <OContent v-else class="flex flex-col gap-2.5 py-2.5 md:min-h-0 md:flex-1">
+        <!-- A failed re-run keeps the last results and says so. -->
+        <OBanner
+          v-if="errorMessage"
+          variant="error"
+          dense
+          inline-actions
+          class="shrink-0"
+          data-test="profiles-error-banner"
+        >
+          {{ errorMessage }}
+          <template #actions>
+            <OButton variant="outline" size="sm" data-test="profiles-error-retry" @click="retry">{{
+              t("emptyState.loadError.action")
+            }}</OButton>
+          </template>
+        </OBanner>
+        <section
+          v-show="!resultsExpanded"
+          class="bg-surface-panel border-border-default rounded-default shrink-0 border"
+          data-test="profiles-series-card"
+        >
           <header class="border-border-default border-b px-3 py-2 text-sm font-semibold">
             {{ t("profiles.timeSeriesTitle") }}
           </header>
           <div class="h-36 p-3">
+            <OSkeleton
+              v-if="showSkeleton"
+              type="rect"
+              class="rounded-default h-full w-full"
+              data-test="profiles-series-skeleton"
+            />
             <ChartRenderer
-              v-if="seriesPoints.length"
+              v-else-if="seriesPoints.length"
               :data="seriesChartData"
               class="h-full w-full"
+              @updated:data-zoom="onRangeSelect"
             />
             <div
               v-else
@@ -202,216 +272,357 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </section>
 
-        <section class="bg-surface-panel border-border-default rounded-default border">
+        <section
+          class="bg-surface-panel border-border-default rounded-default overflow-hidden border md:flex md:min-h-0 md:flex-1 md:flex-col"
+        >
           <header
-            class="border-border-default flex flex-wrap items-center justify-between gap-2 border-b px-3 py-2"
+            class="border-border-default flex shrink-0 flex-wrap items-center justify-between gap-2 border-b px-3 py-2"
           >
-            <div class="text-sm font-semibold">{{ t("profiles.resultTitle") }}</div>
-            <div class="flex flex-wrap items-center gap-2">
-              <div class="w-56">
-                <OSearchInput
-                  v-model="searchQuery"
-                  :placeholder="t('profiles.searchFrames')"
-                  data-test="profiles-search-frames"
-                />
-              </div>
-              <div class="flex items-center gap-1">
-                <OButton
-                  :variant="activeView === 'top' ? 'primary' : 'ghost'"
-                  size="sm"
-                  data-test="profiles-view-top"
-                  @click="activeView = 'top'"
-                >
-                  {{ t("profiles.viewTop") }}
-                </OButton>
-                <OButton
-                  :variant="activeView === 'flame' ? 'primary' : 'ghost'"
-                  size="sm"
-                  data-test="profiles-view-flame"
-                  @click="activeView = 'flame'"
-                >
-                  {{ t("profiles.viewFlame") }}
-                </OButton>
-                <OButton
-                  :variant="activeView === 'tree' ? 'primary' : 'ghost'"
-                  size="sm"
-                  data-test="profiles-view-tree"
-                  @click="activeView = 'tree'"
-                >
-                  {{ t("profiles.viewTree") }}
-                </OButton>
-              </div>
-            </div>
-          </header>
-          <div class="p-3">
-            <div v-if="activeView === 'top'" class="overflow-auto">
-              <table class="w-full table-fixed text-sm">
-                <thead class="bg-surface-page text-left">
-                  <tr>
-                    <th class="min-w-0 px-2 py-1">{{ t("function.header") }}</th>
-                    <th class="w-40 px-2 py-1 text-right">
-                      <button
-                        type="button"
-                        class="hover:text-text-body inline-flex cursor-pointer items-center gap-1"
-                        :aria-label="t('profiles.sortBySelf')"
-                        data-test="profiles-sort-self"
-                        @click="toggleTopSort('self')"
-                      >
-                        {{ valueColumnLabel(t("profiles.self")) }}
-                        <span v-if="topSortKey === 'self'" class="text-text-secondary">{{
-                          topSortAsc ? "↑" : "↓"
-                        }}</span>
-                      </button>
-                    </th>
-                    <th class="w-40 px-2 py-1 text-right">
-                      <button
-                        type="button"
-                        class="hover:text-text-body inline-flex cursor-pointer items-center gap-1"
-                        :aria-label="t('profiles.sortByTotal')"
-                        data-test="profiles-sort-total"
-                        @click="toggleTopSort('total')"
-                      >
-                        {{ valueColumnLabel(t("profiles.total")) }}
-                        <span v-if="topSortKey === 'total'" class="text-text-secondary">{{
-                          topSortAsc ? "↑" : "↓"
-                        }}</span>
-                      </button>
-                    </th>
-                    <th class="w-16 px-2 py-1 text-right">{{ t("profiles.percent") }}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr
-                    v-for="row in topRows"
-                    :key="row.name"
-                    class="border-border-default hover:bg-table-row-hover-bg border-t"
-                  >
-                    <td class="max-w-0 px-2 py-1 font-mono text-xs">
-                      <span class="block truncate" v-html="highlightName(row.name)" />
-                      <OTooltip
-                        :content="raw(row.name)"
-                        side="top"
-                        align="start"
-                        hoverable
-                        max-width="40rem"
-                        content-class="font-mono text-xs break-all"
-                      />
-                    </td>
-                    <td class="px-2 py-1 text-right whitespace-nowrap">
-                      {{ formatTableValue(row.self) }}
-                    </td>
-                    <td class="px-2 py-1 text-right whitespace-nowrap">
-                      {{ formatTableValue(row.total) }}
-                    </td>
-                    <td class="px-2 py-1 text-right whitespace-nowrap">
-                      {{ formatPercent(row.total, mergeResult?.total ?? 0) }}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-
-            <div v-else-if="activeView === 'flame'" class="overflow-auto">
-              <CommonFlameGraph
-                :root="mergeResult?.root ?? null"
-                :summary-label="t('profiles.total')"
-                :summary-value="formatTableValue(mergeResult?.total ?? 0)"
-                :unit-label="tableUnitLabel"
-                :empty-label="t('profiles.noProfilesFound')"
-                :value-formatter="formatTableValue"
-                :search-query="searchQuery"
+            <OToggleGroup
+              :model-value="activeView"
+              data-test="profiles-view"
+              @update:model-value="setView"
+            >
+              <OToggleGroupItem
+                value="top"
+                size="sm"
+                icon-left="table-chart"
+                data-test="profiles-view-top"
+              >
+                {{ t("profiles.viewTop") }}
+              </OToggleGroupItem>
+              <OToggleGroupItem
+                value="flame"
+                size="sm"
+                icon-left="flame"
+                data-test="profiles-view-flame"
+              >
+                {{ t("profiles.viewFlame") }}
+              </OToggleGroupItem>
+              <OToggleGroupItem
+                value="tree"
+                size="sm"
+                icon-left="account-tree"
+                data-test="profiles-view-tree"
+              >
+                {{ t("profiles.viewTree") }}
+              </OToggleGroupItem>
+              <OToggleGroupItem
+                value="sandwich"
+                size="sm"
+                icon-left="swap-vert"
+                data-test="profiles-view-sandwich"
+              >
+                {{ t("profiles.viewSandwich") }}
+              </OToggleGroupItem>
+            </OToggleGroup>
+            <div class="min-w-0 flex-1 max-md:min-w-40">
+              <OSearchInput
+                v-model="searchQuery"
+                :placeholder="t('profiles.searchFunctions')"
+                data-test="profiles-search-functions"
               />
             </div>
+            <span
+              v-if="searchSummary"
+              class="text-text-secondary text-xs whitespace-nowrap tabular-nums"
+              data-test="profiles-search-summary"
+              >{{ searchSummary }}</span
+            >
+            <!-- Same expand toggle as the Logs query editor: the results take the chart's space too. -->
+            <OButton
+              :icon-left="resultsExpanded ? 'fullscreen-exit' : 'fullscreen'"
+              variant="ghost"
+              size="icon-toolbar"
+              :aria-label="resultsExpanded ? t('search.collapse') : t('search.expand')"
+              data-test="profiles-results-expand"
+              @click="resultsExpanded = !resultsExpanded"
+            >
+              <OTooltip :content="resultsExpanded ? t('search.collapse') : t('search.expand')" />
+            </OButton>
+          </header>
+          <OBanner
+            v-if="sampledPercent"
+            variant="info"
+            icon="info"
+            dense
+            bar
+            class="shrink-0"
+            data-test="profiles-partial-result"
+          >
+            {{ t("profiles.partialResult", { percent: sampledPercent }) }}
+          </OBanner>
+          <!-- Views on the left, Function Details beside them (below them on phones). -->
+          <div class="md:flex md:min-h-0 md:flex-1">
+            <div class="md:flex md:min-h-0 md:min-w-0 md:flex-1 md:flex-col">
+              <OTable
+                v-if="activeView === 'top'"
+                :data="topRows"
+                :loading="showSkeleton"
+                :columns="profileColumns"
+                :default-columns="false"
+                row-key="name"
+                sorting="client"
+                sort-by="total"
+                sort-order="desc"
+                pagination="none"
+                virtual-scroll
+                :overscan="isMobile ? 100 : 20"
+                :scroll-el="isMobile ? resultsScrollEl : null"
+                :scroll-margin="0"
+                :show-global-filter="false"
+                :frame="false"
+                :fill-height="!isMobile"
+                class="md:min-h-0 md:flex-1"
+                :row-height="28"
+                :enable-column-resize="true"
+                data-test="profiles-top-table"
+              >
+                <template #cell-name="{ row, index }">
+                  <span class="flex min-w-0 items-center gap-1">
+                    <ProfilesFunctionMenu
+                      :name="row.name"
+                      :data-test="`profiles-top-row-${index}`"
+                      @copy="copyFunctionName"
+                      @search="searchForFunction"
+                      @show="showInFlameGraph(row.name)"
+                      @sandwich="showSandwich"
+                      @details="showDetails"
+                    />
+                    <span
+                      class="text-text-body min-w-0 truncate font-mono text-xs"
+                      v-html="highlightName(row.name)"
+                    />
+                  </span>
+                </template>
+                <template v-for="cell in VALUE_CELLS" :key="cell.id" #[`cell-${cell.id}`]="{ row }">
+                  <ODataBarCell
+                    v-if="cell.bar"
+                    :value="shareOf(row[cell.field])"
+                    :max="100"
+                    :display="formatPercent(row[cell.field], mergeResult?.total ?? 0)"
+                    class="text-text-body font-mono text-xs"
+                    :class="{ 'pt-1.5': shareOf(row[cell.field]) > 0 }"
+                  />
+                  <span v-else class="text-text-body font-mono text-xs">{{
+                    formatTableValue(row[cell.field])
+                  }}</span>
+                </template>
+              </OTable>
 
-            <div v-else class="overflow-auto">
-              <table class="w-full table-fixed text-sm">
-                <thead class="bg-surface-page text-left">
-                  <tr>
-                    <th class="min-w-0 px-2 py-1">{{ t("function.header") }}</th>
-                    <th class="w-40 px-2 py-1 text-right">
-                      {{ valueColumnLabel(t("profiles.self")) }}
-                    </th>
-                    <th class="w-40 px-2 py-1 text-right">
-                      {{ valueColumnLabel(t("profiles.total")) }}
-                    </th>
-                    <th class="w-16 px-2 py-1 text-right">{{ t("profiles.percent") }}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr
-                    v-for="row in visibleStackRows"
-                    :key="row.id"
-                    class="border-border-default hover:bg-table-row-hover-bg border-t"
-                    :data-test="`profiles-stack-row-${row.id}`"
+              <div
+                v-else-if="activeView === 'flame'"
+                class="overflow-auto p-3 md:min-h-0 md:flex-1"
+              >
+                <!-- Same skeleton idea as the tables: bars that narrow as they go down, like a flame graph. -->
+                <div
+                  v-if="showSkeleton"
+                  class="flex flex-col gap-1.5"
+                  data-test="profiles-flame-skeleton"
+                >
+                  <OSkeleton
+                    v-for="width in FLAME_SKELETON_WIDTHS"
+                    :key="width"
+                    type="rect"
+                    class="rounded-default h-6"
+                    :class="width"
+                  />
+                </div>
+                <CommonFlameGraph
+                  v-else
+                  ref="flameGraphRef"
+                  :root="mergeResult?.root ?? null"
+                  @focus="flameFocus = $event"
+                  :summary-label="t('profiles.total')"
+                  :summary-value="formatTableValue(mergeResult?.total ?? 0)"
+                  v-bind="flameGraphProps"
+                  v-on="flameGraphEvents"
+                />
+              </div>
+
+              <!-- Sandwich: who calls the function (root at the bottom) above what it calls. -->
+              <div
+                v-else-if="activeView === 'sandwich'"
+                class="flex flex-col gap-3 overflow-auto p-3 md:min-h-0 md:flex-1"
+                data-test="profiles-sandwich"
+              >
+                <div class="flex flex-wrap items-center gap-2">
+                  <div class="max-w-120 min-w-0 flex-1 max-md:min-w-full">
+                    <OSelect
+                      :model-value="sandwichName"
+                      :label="t('profiles.function')"
+                      label-position="inside"
+                      :options="functionOptions"
+                      searchable
+                      class="w-full"
+                      data-test="profiles-sandwich-function"
+                      @update:model-value="sandwichFunction = $event ? String($event) : null"
+                    />
+                  </div>
+                  <span
+                    v-if="sandwichCoverage"
+                    class="text-text-secondary text-xs"
+                    data-test="profiles-sandwich-coverage"
+                    >{{ t("profiles.treeCoverage", { percent: sandwichCoverage }) }}</span
                   >
-                    <td class="max-w-0 px-2 py-1 font-mono text-xs">
-                      <button
-                        type="button"
-                        class="inline-flex max-w-full min-w-0 items-center gap-1 text-start"
-                        :class="row.hasChildren ? 'cursor-pointer' : 'cursor-default'"
-                        :style="{ paddingInlineStart: `${row.depth}rem` }"
-                        :aria-expanded="
-                          row.hasChildren ? expandedStackNodeIds.has(row.id) : undefined
-                        "
-                        @click="row.hasChildren && toggleStackNode(row.id)"
-                      >
-                        <span
-                          class="text-text-secondary inline-flex h-4 w-4 shrink-0 items-center justify-center text-xs"
-                          aria-hidden="true"
-                        >
-                          <template v-if="row.hasChildren">
-                            {{ expandedStackNodeIds.has(row.id) ? "▾" : "▸" }}
-                          </template>
-                        </span>
-                        <span class="min-w-0 truncate" v-html="highlightName(row.name)" />
-                      </button>
-                      <OTooltip
-                        :content="raw(row.name)"
-                        side="top"
-                        align="start"
-                        hoverable
-                        max-width="40rem"
-                        content-class="font-mono text-xs break-all"
-                      />
-                    </td>
-                    <td class="px-2 py-1 text-right whitespace-nowrap">
-                      {{ formatTableValue(row.self) }}
-                    </td>
-                    <td class="px-2 py-1 text-right whitespace-nowrap">
-                      {{ formatTableValue(row.total) }}
-                    </td>
-                    <td class="px-2 py-1 text-right whitespace-nowrap">
-                      {{ formatPercent(row.total, mergeResult?.total ?? 0) }}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+                </div>
+                <div
+                  v-if="showSkeleton"
+                  class="flex flex-col gap-1.5"
+                  data-test="profiles-sandwich-skeleton"
+                >
+                  <OSkeleton
+                    v-for="width in FLAME_SKELETON_WIDTHS"
+                    :key="width"
+                    type="rect"
+                    class="rounded-default h-6"
+                    :class="width"
+                  />
+                </div>
+                <section v-if="!showSkeleton" data-test="profiles-sandwich-callers">
+                  <CommonFlameGraph
+                    :key="`callers-${sandwichName}`"
+                    :root="sandwichCallers"
+                    :summary-label="t('profiles.callers')"
+                    :summary-value="formatTableValue(sandwichCallers?.total ?? 0)"
+                    v-bind="flameGraphProps"
+                    initial-root-at-bottom
+                    v-on="flameGraphEvents"
+                  />
+                </section>
+                <section v-if="!showSkeleton" data-test="profiles-sandwich-callees">
+                  <CommonFlameGraph
+                    :key="`callees-${sandwichName}`"
+                    :root="sandwichCallees"
+                    :summary-label="t('profiles.callees')"
+                    :summary-value="formatTableValue(sandwichCallees?.total ?? 0)"
+                    v-bind="flameGraphProps"
+                    v-on="flameGraphEvents"
+                  />
+                </section>
+              </div>
+
+              <OTable
+                v-else
+                v-model:expanded-ids="expandedStackIds"
+                :data="stackTree"
+                :loading="showSkeleton"
+                :columns="profileColumns"
+                :default-columns="false"
+                row-key="id"
+                tree
+                tree-column-id="name"
+                sorting="none"
+                pagination="none"
+                :show-global-filter="false"
+                :frame="false"
+                :fill-height="!isMobile"
+                class="md:min-h-0 md:flex-1"
+                :row-height="28"
+                :enable-column-resize="true"
+                data-test="profiles-stack-table"
+              >
+                <template #cell-name="{ row, index }">
+                  <span class="flex min-w-0 items-center gap-1">
+                    <ProfilesFunctionMenu
+                      :name="row.name"
+                      focusable
+                      :data-test="`profiles-tree-row-${index}`"
+                      @copy="copyFunctionName"
+                      @search="searchForFunction"
+                      @show="focusInFlameGraph(row.id)"
+                      @sandwich="showSandwich"
+                      @details="showDetails"
+                    />
+                    <span
+                      class="text-text-body min-w-0 truncate font-mono text-xs"
+                      v-html="highlightName(row.name)"
+                    />
+                    <span
+                      v-if="row.childCount"
+                      class="text-text-secondary shrink-0 text-xs whitespace-nowrap"
+                      :data-test="`profiles-tree-row-${index}-counts`"
+                      >{{ t("profiles.childCount", { count: row.childCount }, row.childCount) }} ·
+                      {{ t("profiles.nodeCount", { count: row.nodeCount }, row.nodeCount) }}</span
+                    >
+                  </span>
+                </template>
+                <template v-for="cell in VALUE_CELLS" :key="cell.id" #[`cell-${cell.id}`]="{ row }">
+                  <ODataBarCell
+                    v-if="cell.bar"
+                    :value="shareOf(row[cell.field])"
+                    :max="100"
+                    :display="formatPercent(row[cell.field], mergeResult?.total ?? 0)"
+                    class="text-text-body font-mono text-xs"
+                    :class="{ 'pt-1.5': shareOf(row[cell.field]) > 0 }"
+                  />
+                  <span v-else class="text-text-body font-mono text-xs">{{
+                    formatTableValue(row[cell.field])
+                  }}</span>
+                </template>
+              </OTable>
             </div>
+            <ProfilesFunctionDetails
+              v-if="detailsRow"
+              :name="detailsRow.name"
+              :self="detailsRow.self"
+              :total="detailsRow.total"
+              :grand-total="mergeResult?.total ?? 0"
+              :call-paths="detailsCallPaths"
+              :coverage="detailsCoverage"
+              :folded="detailsFolded"
+              :callers="detailsCallers"
+              :callees="detailsCallees"
+              :value-formatter="formatTableValue"
+              class="border-border-default max-md:border-t md:w-80 md:shrink-0 md:border-s"
+              @close="detailsName = null"
+              @copy="copyFunctionName"
+              @sandwich="showSandwich"
+              @show="showInFlameGraph"
+            />
           </div>
         </section>
       </OContent>
     </div>
-  </div>
+  </OPageLayout>
 </template>
 
 <script setup lang="ts">
-import { computed, defineAsyncComponent, ref, watch } from "vue";
+import { computed, defineAsyncComponent, nextTick, ref, watch } from "vue";
 import { useStore } from "vuex";
-import { useRoute, type LocationQuery } from "vue-router";
+import { useRoute, useRouter, type LocationQuery } from "vue-router";
+import type { EmptyStateAction } from "@/lib/core/EmptyState/presets";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OContent from "@/lib/core/Content/OContent.vue";
+import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OTag from "@/lib/core/Badge/OTag.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import { useAutoRunToggle } from "@/composables/dashboard/useAutoRunToggle";
+import OContent from "@/lib/core/Content/OContent.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import ODataBarCell from "@/lib/core/Table/cells/ODataBarCell.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import CommonFlameGraph from "@/components/common/FlameGraphView.vue";
+import ShareButton from "@/components/common/ShareButton.vue";
+import BetaBadge from "@/components/common/BetaBadge.vue";
+import ProfilesLabelFilters from "./ProfilesLabelFilters.vue";
+import ProfilesFunctionMenu from "./ProfilesFunctionMenu.vue";
+import ProfilesFunctionDetails from "./ProfilesFunctionDetails.vue";
+import { calleesOf, callersOf } from "./sandwich";
+import { copyToClipboard } from "@/utils/clipboard";
 import streamService from "@/services/stream";
 import profilesService, {
+  encodeProfileFilters,
   parseProfileFilters,
   type ProfileFilter,
   type ProfilesMergeResponse,
@@ -421,37 +632,51 @@ import profilesService, {
 } from "@/services/profiles";
 import { getConsumableRelativeTime } from "@/utils/date";
 import { escapeHtml } from "@/utils/html";
+import { niceStep } from "@/utils/slos/chartScale";
+import { formatUnitValue, getUnitValue } from "@/utils/dashboard/convertDataIntoUnitValue";
+import { formatEventCount } from "@/utils/formatters";
+import { dataZoomBrushStyle } from "@/utils/chartTheme";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import useBreakpoint from "@/composables/useBreakpoint";
 
 const ChartRenderer = defineAsyncComponent(
   () => import("@/components/dashboards/panels/ChartRenderer.vue"),
 );
 
 type SelectOption = { label: I18nText; value: string };
-type ProfileView = "top" | "flame" | "tree";
-type TopSortKey = "self" | "total";
-type StackRow = {
+type ProfileView = "top" | "flame" | "tree" | "sandwich";
+type StackNode = {
   id: string;
-  depth: number;
   name: string;
   self: number;
   total: number;
-  hasChildren: boolean;
+  /** Direct callees, and every node below this one. */
+  childCount: number;
+  nodeCount: number;
+  children?: StackNode[];
 };
 type RouteSeed = {
   stream: string;
   range: { startTime: number; endTime: number } | null;
+  /** A relative window such as "15m", written when the picker is relative. */
+  period: string | null;
   service: string | null;
   profileType: string | null;
   filters: ProfileFilter[];
   view: ProfileView | null;
+  sandwichFunction: string | null;
+  search: string;
+  focus: string | null;
+  details: string | null;
 };
 
-const PROFILE_VIEWS: ProfileView[] = ["top", "flame", "tree"];
+const PROFILE_VIEWS: ProfileView[] = ["top", "flame", "tree", "sandwich"];
 
 const { t } = useI18nTyped();
+const { isMobile } = useBreakpoint();
 const store = useStore();
 const route = useRoute();
+const router = useRouter();
 const pageRouteName = route.name;
 
 const defaultDateState = () => ({
@@ -461,6 +686,10 @@ const defaultDateState = () => ({
   valueType: "relative",
 });
 const dateState = ref(defaultDateState());
+const datePickerRef = ref<{
+  setCustomDate: (type: string, range: { start: Date; end: Date }) => void;
+  setSavedDate: (date: Record<string, unknown>) => void;
+} | null>(null);
 const streamOptions = ref<SelectOption[]>([]);
 const selectedStream = ref<string | null>(null);
 const selectedService = ref<string | null>(null);
@@ -470,11 +699,79 @@ const draftTagValue = ref<string | null>(null);
 const tagValueOptions = ref<SelectOption[]>([]);
 const tagValuesLoading = ref(false);
 const appliedFilters = ref<ProfileFilter[]>([]);
+const editingFilterIndex = ref<number | null>(null);
 const searchQuery = ref("");
-const topSortKey = ref<TopSortKey>("total");
-const topSortAsc = ref(false);
 const activeView = ref<ProfileView>("top");
-const expandedStackNodeIds = ref<Set<string>>(new Set());
+const setView = (value: unknown) => {
+  const next = PROFILE_VIEWS.find((view) => view === value);
+  if (next) activeView.value = next;
+};
+const expandedStackIds = ref<string[]>([]);
+// On phones the page body is the one scroller and the Top Table virtualizes against it; from md up each table scrolls itself.
+const resultsScrollEl = ref<HTMLElement | null>(null);
+const resultsExpanded = ref(false);
+const flameGraphRef = ref<{ focus: (path: string) => void } | null>(null);
+// The function the Sandwich view shows; null means the one with the most self samples.
+const sandwichFunction = ref<string | null>(null);
+// The function in the Function Details panel; null hides the panel.
+const detailsName = ref<string | null>(null);
+// The focused flame graph frame, kept here so it outlives a view switch and goes into the URL.
+const flameFocus = ref<string | null>(null);
+
+/** Matching functions from the Top list, and their share of samples from the tree, with nested matches counted once. */
+const searchSummary = computed(() => {
+  const needle = searchQuery.value.trim().toLowerCase();
+  const result = mergeResult.value;
+  if (!needle || !result?.root?.total) return "";
+  const count = result.top.filter((row) => row.name.toLowerCase().includes(needle)).length;
+  if (!count) return t("profiles.searchNoMatches");
+  let matched = 0;
+  const walk = (node: ProfilesTreeNode, inMatch: boolean) => {
+    const hit = node.name.toLowerCase().includes(needle);
+    if (hit && !inMatch) matched += node.total;
+    for (const child of node.children ?? []) walk(child, inMatch || hit);
+  };
+  for (const child of result.root.children ?? []) walk(child, false);
+  const percent = `${((matched / result.root.total) * 100).toFixed(1)}%`;
+  return t("profiles.searchSummary", { count, percent }, count);
+});
+
+// Row and frame menu actions (ProfilesFunctionMenu, the flame graph frame menu).
+const copyFunctionName = (name: string) =>
+  copyToClipboard(name, t, { successMessage: t("common.copiedToClipboard") });
+const searchForFunction = (name: string) => {
+  searchQuery.value = name;
+};
+/** A Top Table row is a whole function: open the flame graph with every call of it highlighted. */
+const showInFlameGraph = (name: string) => {
+  searchQuery.value = name;
+  activeView.value = "flame";
+};
+const showDetails = (name: string) => {
+  detailsName.value = name;
+};
+const showSandwich = (name: string) => {
+  sandwichFunction.value = name;
+  activeView.value = "sandwich";
+};
+// The props and events every flame graph on the page shares.
+const flameGraphProps = computed(() => ({
+  unitLabel: tableUnitLabel.value,
+  emptyLabel: t("profiles.noProfilesFound"),
+  valueFormatter: formatTableValue,
+  searchQuery: searchQuery.value,
+}));
+const flameGraphEvents = {
+  search: searchForFunction,
+  sandwich: showSandwich,
+  details: showDetails,
+};
+/** Call Tree ids are the flame graph's frame paths, so a row can focus that exact frame. */
+const focusInFlameGraph = async (path: string) => {
+  activeView.value = "flame";
+  await nextTick();
+  flameGraphRef.value?.focus(path);
+};
 
 const metaResponse = ref<{
   services: string[];
@@ -483,9 +780,28 @@ const metaResponse = ref<{
 } | null>(null);
 const seriesResponse = ref<ProfilesSeriesResponse | null>(null);
 const mergeResult = ref<ProfilesMergeResponse | null>(null);
+// The inputs and window of the run on screen; the URL and the share link describe it, not unrun changes.
+const lastRun = ref<{
+  query: Record<string, string>;
+  range: { startTime: number; endTime: number };
+} | null>(null);
 
 const queryLoading = ref(false);
+// Auto Run (server ZO_AUTO_QUERY_ENABLED plus the user's switch, shared with Logs and Traces).
+const { isAutoRunAvailable, isAutoRunOn, toggleAutoRun } = useAutoRunToggle();
+// The inputs changed since the last run while Auto Run is off; Run query turns amber until it runs.
+const runPending = ref(false);
+// The last query was cancelled before it answered.
+const queryCancelled = ref(false);
+const runOptionsOpen = ref(false);
 const errorMessage = ref("");
+// False until the stream list answers, so "no streams" does not flash while it loads.
+const streamsLoaded = ref(false);
+// True while initPage loads streams, meta and the first query, so no empty state flashes in between.
+const initializing = ref(false);
+// While a query runs, every view shows a skeleton in place of the old results, as Logs does.
+const showSkeleton = computed(() => queryLoading.value || initializing.value);
+const FLAME_SKELETON_WIDTHS = ["w-full", "w-11/12", "w-3/4", "w-7/12", "w-5/12", "w-1/4"];
 let metaRequestSeq = 0;
 let queryRequestSeq = 0;
 let tagValuesRequestSeq = 0;
@@ -493,6 +809,13 @@ let initRunSeq = 0;
 // Holds the stream and date watchers off while a route seed is applied or dropped, so they cannot reset it or reload.
 let seeding = false;
 let lastRunSeeded = false;
+// Set while a watcher reloads meta, which can pick a new service or type: the select watcher must not run a second query.
+let reloadingMeta = false;
+// Set by a drag on the chart: that is a direct action on the results, so it runs even with Auto Run off.
+let runNextRange = false;
+let queryAbort: AbortController | null = null;
+// The seed this page last wrote to the URL, so the route watcher does not reload for its own write.
+let syncedSeedKey = "";
 
 const orgIdentifier = computed(
   () => store.state.selectedOrganization?.identifier as string | undefined,
@@ -523,9 +846,12 @@ const canQuery = computed(
   () => !!orgIdentifier.value && !!selectedStream.value && !!currentProfileType.value,
 );
 const hasProfileData = computed(() => (mergeResult.value?.total ?? 0) > 0);
-const canAddFilter = computed(
-  () => !!draftTagKey.value && !!draftTagValue.value && !queryLoading.value,
-);
+// The server keeps the most common stacks only; say how much of the data the views show.
+const sampledPercent = computed(() => {
+  const result = mergeResult.value;
+  if (!result?.truncated || !result.total) return "";
+  return `${((result.merged_total / result.total) * 100).toFixed(1)}%`;
+});
 const seriesPoints = computed(() => seriesResponse.value?.series ?? []);
 const seriesStepSecs = computed(() => Math.max(1, seriesResponse.value?.step_secs ?? 1));
 const currentUnit = computed(
@@ -539,23 +865,47 @@ const isCpuMetric = computed(
 );
 
 const seriesChartData = computed(() => {
-  const unit = seriesUnitLabel(currentType.value, currentUnit.value);
   const seriesData = seriesPoints.value.map((point) => [
     Math.floor(point.timestamp / 1000),
     seriesDisplayValue(point.value),
   ]);
   return {
     options: {
+      // Tooltip, grid and y axis follow the Logs histogram (utils/logs/convertLogData.ts).
       tooltip: {
+        show: true,
         trigger: "axis",
+        textStyle: { fontSize: 12 },
+        axisPointer: { type: "cross", label: { show: true, fontSize: 12 } },
         valueFormatter: (v: number) => formatSeriesValue(v as number),
       },
-      grid: { left: 36, right: 16, top: 24, bottom: 30 },
+      grid: { containLabel: true, left: 20, right: 20, top: 8, bottom: 5 },
+      // Drag across the chart to pick a time range, as on the Logs histogram; the toolbox itself stays hidden.
+      toolbox: {
+        show: true,
+        showTitle: false,
+        tooltip: { show: false },
+        itemSize: 0,
+        itemGap: 0,
+        bottom: "100%",
+        feature: {
+          dataZoom: { brushStyle: dataZoomBrushStyle(), show: true, yAxisIndex: "none" },
+        },
+      },
       xAxis: { type: "time" },
       yAxis: {
         type: "value",
-        name: unit,
-        axisLabel: { formatter: (v: number) => formatSeriesAxisLabel(v) },
+        axisLine: { show: true },
+        axisPointer: {
+          label: { formatter: ({ value }: { value: number }) => formatSeriesAxisLabel(value) },
+        },
+        // Same tick count as the Logs histogram; drop any label that still collides.
+        splitNumber: 3,
+        interval: isBytesUnit.value ? byteAxisInterval(seriesData) : undefined,
+        axisLabel: {
+          hideOverlap: true,
+          formatter: (v: number) => formatSeriesAxisLabel(v),
+        },
       },
       series: [
         {
@@ -575,48 +925,138 @@ const topRows = computed(() => {
   const rows = [...(mergeResult.value?.top ?? [])].filter((row) =>
     needle ? row.name.toLowerCase().includes(needle) : true,
   );
-  const key = topSortKey.value;
-  const direction = topSortAsc.value ? 1 : -1;
-  rows.sort((a, b) => {
-    const delta = a[key] - b[key];
-    if (delta !== 0) return delta * direction;
-    return a.name.localeCompare(b.name);
-  });
-  return rows.slice(0, 200);
+  return rows;
 });
-const stackRows = computed<StackRow[]>(() => {
+const functionOptions = computed<SelectOption[]>(() =>
+  [...(mergeResult.value?.top ?? [])]
+    .sort((a, b) => b.total - a.total)
+    .map((row) => ({ label: raw(row.name), value: row.name })),
+);
+const sandwichName = computed(() => {
+  const top = mergeResult.value?.top ?? [];
+  if (sandwichFunction.value && top.some((row) => row.name === sandwichFunction.value))
+    return sandwichFunction.value;
+  return (
+    top.reduce<{ name: string; self: number } | null>(
+      (best, row) => (!best || row.self > best.self ? row : best),
+      null,
+    )?.name ?? null
+  );
+});
+const sandwichCallers = computed(() =>
+  sandwichName.value ? callersOf(mergeResult.value?.root ?? null, sandwichName.value) : null,
+);
+const sandwichCallees = computed(() =>
+  sandwichName.value ? calleesOf(mergeResult.value?.root ?? null, sandwichName.value) : null,
+);
+/** Share of a function's samples that the cut call tree still holds, or "" when it holds them all. */
+const treeCoverage = (name: string | null, drawn: number) => {
+  const exact = mergeResult.value?.top.find((row) => row.name === name)?.total ?? 0;
+  if (exact <= 0 || drawn / exact >= 0.995) return "";
+  return `${((drawn / exact) * 100).toFixed(1)}%`;
+};
+const sandwichCoverage = computed(() =>
+  treeCoverage(sandwichName.value, sandwichCallees.value?.total ?? 0),
+);
+// Function Details: exact Self and Total from the Top list, callers and callees from the drawn tree.
+const detailsRow = computed(
+  () => mergeResult.value?.top.find((row) => row.name === detailsName.value) ?? null,
+);
+const detailsCallers = computed(() =>
+  detailsRow.value ? callersOf(mergeResult.value?.root ?? null, detailsRow.value.name) : null,
+);
+const detailsCallees = computed(() =>
+  detailsRow.value ? calleesOf(mergeResult.value?.root ?? null, detailsRow.value.name) : null,
+);
+const detailsCoverage = computed(() =>
+  treeCoverage(detailsRow.value?.name ?? null, detailsCallees.value?.total ?? 0),
+);
+// More self time in the tree than in the Top list means the server folded callees into this frame.
+const detailsFolded = computed(
+  () => !!detailsRow.value && (detailsCallees.value?.self ?? 0) > detailsRow.value.self * 1.005,
+);
+const detailsCallPaths = computed(() => {
+  const name = detailsRow.value?.name;
+  let count = 0;
+  const walk = (node: ProfilesTreeNode) => {
+    if (node.name === name) count += 1;
+    node.children?.forEach(walk);
+  };
+  if (name && mergeResult.value?.root) walk(mergeResult.value.root);
+  return count;
+});
+/** The merged call tree, children by total descending, with path ids for OTable tree mode. */
+const stackTree = computed<StackNode[]>(() => {
   const root = mergeResult.value?.root;
   if (!root) return [];
-  const rows: StackRow[] = [];
-  const walk = (node: ProfilesTreeNode, depth: number, nodeId: string) => {
-    const children = [...(node.children ?? [])].sort((a, b) => b.total - a.total);
-    rows.push({
-      id: nodeId,
-      depth,
+  const build = (node: ProfilesTreeNode, id: string): StackNode => {
+    const children = [...(node.children ?? [])]
+      .sort((a, b) => b.total - a.total)
+      .map((child, index) => build(child, `${id}/${index}`));
+    return {
+      id,
       name: node.name,
       self: node.self,
       total: node.total,
-      hasChildren: children.length > 0,
-    });
-    for (const [index, child] of children.entries()) {
-      walk(child, depth + 1, `${nodeId}/${index}`);
-    }
+      childCount: children.length,
+      nodeCount: children.reduce((sum, child) => sum + 1 + child.nodeCount, 0),
+      ...(children.length ? { children } : {}),
+    };
   };
-  walk(root, 0, "root");
-  return rows;
+  return [build(root, "root")];
 });
-const visibleStackRows = computed<StackRow[]>(() => {
-  const visibleRows: StackRow[] = [];
-  const hiddenPrefixes: string[] = [];
-  for (const row of stackRows.value) {
-    const hidden = hiddenPrefixes.some((prefix) => row.id.startsWith(`${prefix}/`));
-    if (hidden) continue;
-    visibleRows.push(row);
-    if (row.hasChildren && !expandedStackNodeIds.value.has(row.id)) {
-      hiddenPrefixes.push(row.id);
-    }
-  }
-  return visibleRows;
+/** The value cells both tables share: a plain value, or a share of all samples with a bar. */
+const VALUE_CELLS = [
+  { id: "self", field: "self", bar: false },
+  { id: "selfPercent", field: "self", bar: true },
+  { id: "total", field: "total", bar: false },
+  { id: "totalPercent", field: "total", bar: true },
+] as const;
+// As in RankedKeysTable: the name column takes the spare width, and the number columns stay narrow and right-aligned, like the shared data-bar cell.
+const profileColumns = computed<OTableColumnDef[]>(() => {
+  const left = { align: "left" as const };
+  const right = { align: "right" as const };
+  return [
+    {
+      id: "name",
+      header: t("profiles.functions"),
+      accessorKey: "name",
+      size: 320,
+      meta: { ...left, fillRemaining: true },
+    },
+    {
+      id: "self",
+      header: t("profiles.self"),
+      accessorKey: "self",
+      sortable: true,
+      size: 120,
+      meta: right,
+    },
+    {
+      id: "selfPercent",
+      header: t("profiles.selfPercent"),
+      accessorKey: "self",
+      sortable: true,
+      size: 110,
+      meta: right,
+    },
+    {
+      id: "total",
+      header: t("profiles.total"),
+      accessorKey: "total",
+      sortable: true,
+      size: 120,
+      meta: right,
+    },
+    {
+      id: "totalPercent",
+      header: t("profiles.totalPercent"),
+      accessorKey: "total",
+      sortable: true,
+      size: 110,
+      meta: right,
+    },
+  ];
 });
 
 const seriesUnitLabel = (profileType: string, unit: string) => {
@@ -626,8 +1066,6 @@ const seriesUnitLabel = (profileType: string, unit: string) => {
   if (!unit) return "count";
   return unit;
 };
-
-const valueColumnLabel = (title: string) => `${title} (${tableUnitLabel.value})`;
 
 const tableUnitLabel = computed(() => {
   if (isCpuMetric.value) return t("profiles.cpuDuration");
@@ -667,7 +1105,7 @@ const formatTableValue = (value: number) => {
   if (isCpuMetric.value) return formatDurationNanos(value);
   if (/byte|^b$/i.test(currentUnit.value)) return formatBytes(value);
   if (/nanosecond|^ns$/i.test(currentUnit.value)) return formatDurationNanos(value);
-  return Number(value || 0).toLocaleString();
+  return formatEventCount(Number(value || 0));
 };
 
 const seriesDisplayValue = (value: number) => {
@@ -687,20 +1125,36 @@ const formatCpuCore = (value: number) => {
   return `${value.toLocaleString(undefined, { maximumFractionDigits: digits })} cores`;
 };
 
+const isBytesUnit = computed(() => /byte|^b$/i.test(currentUnit.value));
+
+/** Byte ticks on round binary steps (0, 2.5, 5 GB), not decimal steps shown as 3.73 GB. */
+const byteAxisInterval = (points: number[][]) => {
+  const max = Math.max(0, ...points.map(([, value]) => value));
+  if (!max) return undefined;
+  const unitSize = 1024 ** Math.min(4, Math.floor(Math.log(max) / Math.log(1024)));
+  return niceStep(max / unitSize / 3) * unitSize;
+};
+
+/** Short axis labels from the shared chart formatter, as on the Logs histogram (1.50K, 2.50GB, 2.00s). */
 const formatSeriesAxisLabel = (value: number) => {
-  if (isCpuMetric.value) return formatCpuCore(value);
-  if (/byte|^b$/i.test(currentUnit.value)) return formatBytes(value);
-  if (/nanosecond|^ns$/i.test(currentUnit.value)) return formatDurationNanos(value);
-  return Number(value).toLocaleString();
+  let unit = "numbers";
+  if (isBytesUnit.value) unit = "bytes";
+  else if (!isCpuMetric.value && /nanosecond|^ns$/i.test(currentUnit.value)) unit = "nanoseconds";
+  return formatUnitValue(getUnitValue(value, unit, "", 2));
 };
 
 const formatSeriesValue = (value: number) => {
   if (isCpuMetric.value) return formatCpuCore(value);
   if (/byte|^b$/i.test(currentUnit.value)) return formatBytes(value);
   if (/nanosecond|^ns$/i.test(currentUnit.value)) return formatDurationNanos(value);
-  return `${Number(value).toLocaleString()} ${seriesUnitLabel(currentType.value, currentUnit.value)}`.trim();
+  return Number(value).toLocaleString();
 };
 
+/** Share of all samples, 0–100, for the % column bars. */
+const shareOf = (value: number) => {
+  const total = mergeResult.value?.total ?? 0;
+  return total > 0 ? (value / total) * 100 : 0;
+};
 const formatPercent = (value: number, total: number) =>
   total > 0 ? `${((value / total) * 100).toFixed(2)}%` : "0.00%";
 
@@ -726,32 +1180,25 @@ const highlightName = (name: string) => {
   return html;
 };
 
-const toggleTopSort = (key: TopSortKey) => {
-  if (topSortKey.value === key) {
-    topSortAsc.value = !topSortAsc.value;
-    return;
-  }
-  topSortKey.value = key;
-  topSortAsc.value = false;
-};
-
-const toggleStackNode = (nodeId: string) => {
-  if (!nodeId) return;
-  const next = new Set(expandedStackNodeIds.value);
-  if (next.has(nodeId)) {
-    next.delete(nodeId);
-  } else {
-    next.add(nodeId);
-  }
-  expandedStackNodeIds.value = next;
-};
-
 const resetStackExpansion = (root?: ProfilesTreeNode) => {
   if (root?.children?.length) {
-    expandedStackNodeIds.value = new Set(["root"]);
+    expandedStackIds.value = ["root"];
     return;
   }
-  expandedStackNodeIds.value = new Set();
+  expandedStackIds.value = [];
+};
+
+/** A drag on the chart sets the picker to that range, in whole minutes, and the query runs, as on Metrics. */
+const onRangeSelect = async ({ start, end }: { start: number; end: number }) => {
+  if (!start || !end || end <= start) return;
+  const range = { start: new Date(start), end: new Date(end) };
+  range.start.setSeconds(0, 0);
+  range.end.setSeconds(0, 0);
+  if (range.start.getTime() === range.end.getTime())
+    range.end.setMinutes(range.end.getMinutes() + 1);
+  // The picker applies at once, so setCustomDate alone emits the range; a refresh() would emit it twice.
+  runNextRange = true;
+  datePickerRef.value?.setCustomDate("absolute", range);
 };
 
 const resolveTimeRange = () => {
@@ -797,6 +1244,7 @@ const invalidateTagValuesRequest = () => {
 
 const clearDraftTag = () => {
   invalidateTagValuesRequest();
+  editingFilterIndex.value = null;
   draftTagKey.value = null;
   draftTagValue.value = null;
   tagValueOptions.value = [];
@@ -807,35 +1255,58 @@ const resetProfilesState = () => {
   selectedProfileType.value = null;
   appliedFilters.value = [];
   searchQuery.value = "";
-  topSortKey.value = "total";
-  topSortAsc.value = false;
   clearDraftTag();
   seriesResponse.value = null;
   mergeResult.value = null;
-  expandedStackNodeIds.value = new Set();
+  lastRun.value = null;
+  expandedStackIds.value = [];
   activeView.value = "top";
+  sandwichFunction.value = null;
+  detailsName.value = null;
+  flameFocus.value = null;
   errorMessage.value = "";
 };
 
-const addFilter = async () => {
+/** Stops waiting for the query: the last results stay, and Run query shows the inputs as pending. */
+const cancelQuery = () => {
+  queryAbort?.abort();
+  queryAbort = null;
+  queryRequestSeq += 1;
+  queryLoading.value = false;
+  runPending.value = true;
+  queryCancelled.value = true;
+};
+
+/** With Auto Run on, a changed input runs the query; with it off, Run query shows the change as pending. */
+const runOrMarkPending = async () => {
+  if (isAutoRunOn.value) {
+    await runQuery();
+    return;
+  }
+  runPending.value = true;
+};
+
+/** Adds the draft filter, or replaces the one being edited, then closes the menu and re-runs. */
+const applyDraftFilter = async () => {
   const key = draftTagKey.value;
   const value = draftTagValue.value;
   if (!key || !value) return;
-  const exists = appliedFilters.value.some(
-    (filter) => filter.key === key && filter.value === value,
-  );
-  if (!exists) {
-    appliedFilters.value = [...appliedFilters.value, { key, op: "=", value }];
+  const index = editingFilterIndex.value ?? -1;
+  const next = appliedFilters.value.filter((_, i) => i !== index);
+  if (!next.some((filter) => filter.key === key && filter.value === value)) {
+    next.splice(index >= 0 ? index : next.length, 0, { key, op: "=", value });
   }
-  draftTagValue.value = null;
-  await runQuery();
+  appliedFilters.value = next;
+  editingFilterIndex.value = null;
+  draftTagKey.value = null;
+  await runOrMarkPending();
 };
 
 const removeFilter = async (filter: ProfileFilter) => {
   appliedFilters.value = appliedFilters.value.filter(
     (item) => !(item.key === filter.key && item.value === filter.value),
   );
-  await runQuery();
+  await runOrMarkPending();
 };
 
 const loadTagValues = async () => {
@@ -857,7 +1328,10 @@ const loadTagValues = async () => {
       service_name: selectedService.value || undefined,
       profile_type: profileType?.type,
       profile_unit: profileType?.unit,
-      filters: appliedFilters.value.map((filter) => ({ ...filter })),
+      // The filter being edited must not narrow its own value list.
+      filters: appliedFilters.value
+        .filter((_, index) => index !== editingFilterIndex.value)
+        .map((filter) => ({ ...filter })),
       tag,
     });
     if (requestSeq !== tagValuesRequestSeq) return;
@@ -871,10 +1345,10 @@ const loadTagValues = async () => {
     ) {
       draftTagValue.value = null;
     }
-  } catch (error) {
+  } catch {
+    // As the Metrics label filter does: the value list stays empty, and the results stay.
     if (requestSeq !== tagValuesRequestSeq) return;
     tagValueOptions.value = [];
-    errorMessage.value = buildErrorMessage(error);
   } finally {
     if (requestSeq === tagValuesRequestSeq) {
       tagValuesLoading.value = false;
@@ -886,8 +1360,19 @@ const loadStreams = async () => {
   const org = orgIdentifier.value;
   if (!org) return;
   const run = initRunSeq;
-  const response = await streamService.nameList(org, "profiles", false);
+  streamsLoaded.value = false;
+  let response;
+  try {
+    response = await streamService.nameList(org, "profiles", false);
+  } catch (error) {
+    if (isStaleRun(run, org)) return;
+    streamOptions.value = [];
+    selectedStream.value = null;
+    errorMessage.value = buildErrorMessage(error);
+    return;
+  }
   if (isStaleRun(run, org)) return;
+  streamsLoaded.value = true;
   const list = Array.isArray(response?.data?.list) ? response.data.list : [];
   streamOptions.value = list
     .map((item: Record<string, unknown>) => String(item.name ?? item.stream_name ?? ""))
@@ -920,7 +1405,11 @@ const loadMeta = async () => {
     if (requestSeq !== metaRequestSeq || isStaleRun(run, org)) return;
     metaResponse.value = response.data;
     const firstService = serviceOptions.value[0]?.value ?? null;
-    const firstProfileType = profileTypeOptions.value[0]?.value ?? null;
+    // CPU first, as the Traces "View Profile" link does; the server lists types alphabetically (alloc_objects first).
+    const firstProfileType =
+      profileTypeOptions.value.find((option) => option.value.startsWith("cpu\u0000"))?.value ??
+      profileTypeOptions.value[0]?.value ??
+      null;
 
     if (
       !selectedService.value ||
@@ -951,20 +1440,27 @@ const runQuery = async () => {
   const stream = selectedStream.value;
   const range = resolveTimeRange();
   const payload = queryPayload(range);
-  if (!org || !stream || !payload) return;
+  if (!org || !stream || !payload || !range) return;
+  const runState = { query: pageQuery(), range };
   const requestSeq = ++queryRequestSeq;
   const run = initRunSeq;
+  queryAbort?.abort();
+  const abort = (queryAbort = new AbortController());
   queryLoading.value = true;
+  runPending.value = false;
+  queryCancelled.value = false;
   errorMessage.value = "";
   try {
     const [seriesResult, mergeResponseValue] = await Promise.all([
-      profilesService.series(org, stream, payload),
-      profilesService.merge(org, stream, { ...payload, max_nodes: 4096 }),
+      profilesService.series(org, stream, payload, { signal: abort.signal }),
+      profilesService.merge(org, stream, { ...payload, max_nodes: 4096 }, { signal: abort.signal }),
     ]);
     if (requestSeq !== queryRequestSeq || isStaleRun(run, org)) return;
     seriesResponse.value = seriesResult.data;
     mergeResult.value = mergeResponseValue.data;
+    lastRun.value = runState;
     resetStackExpansion(mergeResponseValue.data.root);
+    syncUrl();
   } catch (error) {
     if (requestSeq !== queryRequestSeq || isStaleRun(run, org)) return;
     errorMessage.value = buildErrorMessage(error);
@@ -987,20 +1483,127 @@ const parseRouteSeed = (query: LocationQuery): RouteSeed | null => {
   return {
     stream,
     range: from > 0 && to > from ? { startTime: from, endTime: to } : null,
+    period: queryString(query.period) || null,
     service: queryString(query.service_name) || null,
     profileType: type ? `${type}\u0000${queryString(query.profile_unit)}` : null,
     filters: parseProfileFilters(queryString(query.filters)),
     view: PROFILE_VIEWS.find((item) => item === view) ?? null,
+    sandwichFunction: queryString(query.fn) || null,
+    search: queryString(query.search),
+    focus: queryString(query.focus) || null,
+    details: queryString(query.details) || null,
   };
+};
+
+/** The picker reads its v-model only on mount, so a window set later must be passed to it. */
+const showDateInPicker = () => {
+  const date = dateState.value;
+  datePickerRef.value?.setSavedDate(
+    date.valueType === "relative"
+      ? { type: "relative", relativeTimePeriod: date.relativeTimePeriod }
+      : { type: "absolute", startTime: date.startTime, endTime: date.endTime },
+  );
 };
 
 const applyRouteSeed = (seed: RouteSeed) => {
   selectedStream.value = seed.stream;
   if (seed.range) {
     dateState.value = { ...seed.range, relativeTimePeriod: "", valueType: "absolute" };
+  } else if (seed.period) {
+    dateState.value = { ...defaultDateState(), relativeTimePeriod: seed.period };
   }
   selectedService.value = seed.service;
   selectedProfileType.value = seed.profileType;
+};
+
+/** The page state as URL query: the same keys the Traces "View Profile" link sends, plus `period`. */
+const pageQuery = (range?: { startTime: number; endTime: number } | null) => {
+  const profileType = currentProfileType.value;
+  const query: Record<string, string> = {
+    org_identifier: orgIdentifier.value ?? "",
+    stream: selectedStream.value ?? "",
+  };
+  if (range) {
+    query.from = String(range.startTime);
+    query.to = String(range.endTime);
+  } else if (dateState.value.valueType === "relative") {
+    query.period = dateState.value.relativeTimePeriod;
+  } else {
+    query.from = String(dateState.value.startTime);
+    query.to = String(dateState.value.endTime);
+  }
+  if (selectedService.value) query.service_name = selectedService.value;
+  if (profileType) {
+    query.profile_type = profileType.type;
+    query.profile_unit = profileType.unit;
+  }
+  const filters = encodeProfileFilters(appliedFilters.value);
+  if (filters) query.filters = filters;
+  query.view = activeView.value;
+  return query;
+};
+
+/** Writes the page state to the URL (replace, no history entry), as Metrics does, so a reload keeps it. */
+/** What is on screen beyond the run inputs: the view, Sandwich function, search, focus and open details. */
+const viewQuery = () => {
+  const query: Record<string, string> = { view: activeView.value };
+  if (sandwichFunction.value) query.fn = sandwichFunction.value;
+  if (searchQuery.value.trim()) query.search = searchQuery.value.trim();
+  if (flameFocus.value) query.focus = flameFocus.value;
+  if (detailsName.value) query.details = detailsName.value;
+  return query;
+};
+
+const syncUrl = () => {
+  if (route.name !== pageRouteName || !lastRun.value) return;
+  const query: Record<string, string> = { ...lastRun.value.query, ...viewQuery() };
+  const changed =
+    Object.keys(query).some((key) => query[key] !== queryString(route.query[key])) ||
+    Object.keys(route.query).some((key) => !(key in query));
+  if (!changed) return;
+  syncedSeedKey = routeKey(query);
+  lastRunSeeded = true;
+  router.replace({ query }).catch(() => {});
+};
+
+// A share link freezes the window of the run on screen, so the person who opens it sees the same samples.
+const shareUrl = computed(() => {
+  const run = lastRun.value;
+  if (!run) return "";
+  const url = new URL(window.location.origin + window.location.pathname);
+  const query: Record<string, string> = {
+    ...run.query,
+    from: String(run.range.startTime),
+    to: String(run.range.endTime),
+    ...viewQuery(),
+  };
+  delete query.period;
+  for (const [key, value] of Object.entries(query)) url.searchParams.set(key, value);
+  return url.href;
+});
+
+/** Retry from the step that failed: the stream list, or the meta load and query. */
+const retry = async () => {
+  if (!streamsLoaded.value || !selectedStream.value) {
+    await initPage();
+    return;
+  }
+  errorMessage.value = "";
+  await loadMeta();
+  await runQuery();
+};
+
+const noStreamsActions: EmptyStateAction[] = [
+  {
+    id: "setup-ingestion",
+    icon: "cloud-upload",
+    titleKey: "profiles.setupIngestion",
+    descriptionKey: "profiles.setupIngestionDesc",
+  },
+];
+/** The in-app Data Sources profiles page, where ingestion is set up. */
+const openProfilesIngestion = () => {
+  router.push({ name: "ingestProfiles", query: { org_identifier: orgIdentifier.value } });
 };
 
 const initPage = async () => {
@@ -1008,7 +1611,9 @@ const initPage = async () => {
   const run = ++initRunSeq;
   const unseed = !seed && lastRunSeeded;
   lastRunSeeded = !!seed;
-  seeding = !!seed || unseed;
+  // Always hold the watchers: loadStreams picks a stream, and the stream watcher must not run a second query.
+  seeding = true;
+  initializing.value = true;
   try {
     resetProfilesState();
     if (seed) applyRouteSeed(seed);
@@ -1016,6 +1621,7 @@ const initPage = async () => {
       selectedStream.value = null;
       dateState.value = defaultDateState();
     }
+    if (seed || unseed) showDateInPicker();
     await loadStreams();
     if (run !== initRunSeq || !selectedStream.value) return;
     await loadMeta();
@@ -1023,10 +1629,17 @@ const initPage = async () => {
     if (seed) {
       appliedFilters.value = seed.filters;
       if (seed.view) activeView.value = seed.view;
+      searchQuery.value = seed.search;
+      sandwichFunction.value = seed.sandwichFunction;
+      detailsName.value = seed.details;
+      flameFocus.value = seed.focus;
     }
     await runQuery();
   } finally {
-    if (run === initRunSeq) seeding = false;
+    if (run === initRunSeq) {
+      seeding = false;
+      initializing.value = false;
+    }
   }
 };
 
@@ -1041,43 +1654,82 @@ watch(draftTagKey, async (key, previousKey) => {
   await loadTagValues();
 });
 
+/** Reloads meta for a new stream or window, holding the select watcher so it does not query halfway. */
+const reloadMeta = async () => {
+  reloadingMeta = true;
+  try {
+    await loadMeta();
+  } finally {
+    reloadingMeta = false;
+  }
+};
+
+// A new service or profile type runs the query (Auto Run) or marks Run query pending.
 watch([selectedService, selectedProfileType], async () => {
-  if (!draftTagKey.value) return;
-  draftTagValue.value = null;
-  await loadTagValues();
+  if (seeding || reloadingMeta) return;
+  if (draftTagKey.value) {
+    draftTagValue.value = null;
+    await loadTagValues();
+  }
+  await runOrMarkPending();
 });
 
 watch(selectedStream, async (stream, previousStream) => {
   if (seeding || !stream || stream === previousStream) return;
   clearDraftTag();
-  selectedService.value = null;
   appliedFilters.value = [];
-  await loadMeta();
-  await runQuery();
+  selectedService.value = null;
+  await reloadMeta();
+  await runOrMarkPending();
 });
 
+// A new window reloads meta, then runs (Auto Run, or a drag on the chart) or marks Run query pending.
 watch(dateState, async () => {
   if (seeding) return;
-  await loadMeta();
+  const fromChart = runNextRange;
+  runNextRange = false;
+  await reloadMeta();
   if (draftTagKey.value) {
     await loadTagValues();
   }
+  if (fromChart) await runQuery();
+  else await runOrMarkPending();
 });
+
+/** The org in the URL and the page state it seeds. */
+const routeKey = (query: LocationQuery) =>
+  JSON.stringify([queryString(query.org_identifier), parseRouteSeed(query)]);
+// An org switch changes the store before the URL, so the URL can still name the old org for a moment.
+const routeNamesOtherOrg = () => {
+  const org = queryString(route.query.org_identifier);
+  return !!org && org !== orgIdentifier.value;
+};
 
 watch(
   orgIdentifier,
   async (org, previousOrg) => {
     if (!org || org === previousOrg) return;
+    // On a switch, the route watcher loads the page once the new URL lands.
+    if (previousOrg && routeNamesOtherOrg()) return;
     await initPage();
   },
   { immediate: true },
 );
 
 watch(
-  () => JSON.stringify(parseRouteSeed(route.query)),
-  async () => {
-    if (route.name !== pageRouteName) return;
+  () => routeKey(route.query),
+  async (key) => {
+    if (route.name !== pageRouteName || key === syncedSeedKey || routeNamesOtherOrg()) return;
     await initPage();
   },
 );
+
+watch([activeView, sandwichFunction, searchQuery, flameFocus, detailsName], () => {
+  if (!seeding && mergeResult.value) syncUrl();
+});
+
+// The graph keeps its own focus, so a graph that mounts again (or from a link) gets the page's focus.
+watch(flameGraphRef, (graph) => {
+  if (graph && flameFocus.value) graph.focus(flameFocus.value);
+});
 </script>
