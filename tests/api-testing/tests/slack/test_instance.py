@@ -529,7 +529,7 @@ def test_org_access_put_writes_one_audit_record(
     assert put_org_access(client, inst["id"], {"orgs": [META, x], "preview": True}).status_code == 200
     assert put_org_access(client, inst["id"], {"orgs": [META, x]}).status_code == 200
     where = (f"(http_path LIKE '%{inst['id']}%' OR http_body LIKE '%{inst['id']}%') "
-             "AND http_body LIKE '%before%' AND http_body LIKE '%after%'")
+             "AND http_body LIKE '%before%' AND http_body LIKE '%after%' AND http_path NOT LIKE '%_search%'")
     wait_until(lambda: audit_rows(client, where, since), "the org-access audit record (O2_AUDIT_PUBLISH_INTERVAL=1)",
                timeout=40)
     time.sleep(3)
