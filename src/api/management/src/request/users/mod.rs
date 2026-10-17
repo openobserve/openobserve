@@ -529,7 +529,14 @@ pub async fn delete(
     Headers(user_email): Headers<UserEmail>,
 ) -> Response {
     let initiator_id = user_email.user_id;
-    match users::remove_user_from_org(&org_id, &email_id, &initiator_id).await {
+    match users::remove_user_from_org(
+        &org_id,
+        &email_id,
+        &initiator_id,
+        users::RemovalTarget::User,
+    )
+    .await
+    {
         Ok(resp) => resp,
         Err(e) => MetaHttpResponse::internal_error(e),
     }
@@ -593,7 +600,14 @@ pub async fn delete_bulk(
     let mut err = None;
 
     for email in req.ids {
-        match users::remove_user_from_org(&org_id, &email, &initiator_id).await {
+        match users::remove_user_from_org(
+            &org_id,
+            &email,
+            &initiator_id,
+            users::RemovalTarget::User,
+        )
+        .await
+        {
             Ok(v) => {
                 // Check if response is successful by examining the status code
                 let (parts, _body) = v.into_parts();

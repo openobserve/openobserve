@@ -25,7 +25,11 @@ use config::meta::{
     stream::StreamType,
 };
 use hashbrown::{HashMap, HashSet};
-use opentelemetry::{global, propagation::Extractor, trace::TraceContextExt};
+use opentelemetry::{
+    global,
+    propagation::Extractor,
+    trace::{TraceContextExt, TraceId},
+};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 #[inline(always)]
@@ -177,7 +181,7 @@ pub fn get_or_create_trace_id(headers: &HeaderMap, span: &tracing::Span) -> Stri
             let ctx = global::get_text_map_propagator(|propagator| {
                 propagator.extract(&RequestHeaderExtractor::new(headers))
             });
-            let trace_id = ctx.span().span_context().trace_id().to_string();
+            let trace_id = span_trace_id_or_fresh(ctx.span().span_context().trace_id());
             if !span.is_none() {
                 let _ = span.set_parent(ctx);
             }
@@ -201,7 +205,7 @@ pub fn get_or_create_trace_id(headers: &HeaderMap, span: &tracing::Span) -> Stri
             config::ider::generate_trace_id()
         }
     } else if !span.is_none() {
-        span.context().span().span_context().trace_id().to_string()
+        span_trace_id_or_fresh(span.context().span().span_context().trace_id())
     } else {
         config::ider::generate_trace_id()
     }
@@ -276,6 +280,15 @@ pub fn get_dashboard_info_from_request(query: &HashMap<String, String>) -> Optio
         tab_id,
         tab_name,
     })
+}
+
+/// A span without an OpenTelemetry context reports an all-zero id that every request would share.
+fn span_trace_id_or_fresh(trace_id: TraceId) -> String {
+    if trace_id == TraceId::INVALID {
+        config::ider::generate_trace_id()
+    } else {
+        trace_id.to_string()
+    }
 }
 
 #[cfg(test)]
@@ -554,6 +567,42 @@ mod tests {
         // Should generate a new trace ID (32 characters hex)
         assert_eq!(trace_id.len(), 32);
         assert!(trace_id.chars().all(|c| c.is_ascii_hexdigit()));
+    }
+
+    #[test]
+    fn test_get_or_create_trace_id_replaces_an_unset_span_trace_id() {
+        struct EnabledSubscriber;
+        impl tracing::Subscriber for EnabledSubscriber {
+            fn enabled(&self, _: &tracing::Metadata<'_>) -> bool {
+                true
+            }
+            fn new_span(&self, _: &tracing::span::Attributes<'_>) -> tracing::span::Id {
+                tracing::span::Id::from_u64(1)
+            }
+            fn record(&self, _: &tracing::span::Id, _: &tracing::span::Record<'_>) {}
+            fn record_follows_from(&self, _: &tracing::span::Id, _: &tracing::span::Id) {}
+            fn event(&self, _: &tracing::Event<'_>) {}
+            fn enter(&self, _: &tracing::span::Id) {}
+            fn exit(&self, _: &tracing::span::Id) {}
+        }
+
+        tracing::subscriber::with_default(EnabledSubscriber, || {
+            let span = tracing::info_span!("request");
+            assert!(!span.is_none());
+            assert_eq!(
+                span.context().span().span_context().trace_id(),
+                TraceId::INVALID
+            );
+            let trace_id = get_or_create_trace_id(&HeaderMap::new(), &span);
+            assert_eq!(trace_id.len(), 32);
+            assert!(!trace_id.chars().all(|c| c == '0'), "{trace_id}");
+            assert_ne!(trace_id, get_or_create_trace_id(&HeaderMap::new(), &span));
+        });
+        let valid = TraceId::from_hex("4bf92f3577b34da6a3ce929d0e0e4736").unwrap();
+        assert_eq!(
+            span_trace_id_or_fresh(valid),
+            "4bf92f3577b34da6a3ce929d0e0e4736"
+        );
     }
 
     #[test]

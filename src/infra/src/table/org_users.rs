@@ -543,6 +543,21 @@ pub async fn list_orgs_by_user(email: &str) -> Result<Vec<UserOrgExpandedRecord>
     Ok(records)
 }
 
+/// Reads on the writer, so a membership committed moments ago is never missed by replica lag.
+pub async fn list_org_ids_by_user_on_writer(email: &str) -> Result<Vec<String>, errors::Error> {
+    let client = get_orm_client_rw().await;
+    Entity::find()
+        .filter(
+            Expr::expr(Func::lower(Expr::col((Entity, Column::Email)))).eq(email.to_lowercase()),
+        )
+        .select_only()
+        .column(Column::OrgId)
+        .into_tuple::<String>()
+        .all(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
+}
+
 pub async fn list(limit: Option<i64>) -> Result<Vec<OrgUserRecord>, errors::Error> {
     let client = get_orm_client_ro().await;
     let mut res = Entity::find().order_by(Column::CreatedAt, Order::Desc);

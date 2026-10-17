@@ -341,7 +341,14 @@ pub async fn delete(
     }
 
     let initiator_id = user_email.user_id;
-    match users::remove_user_from_org(&org_id, &email_id, &initiator_id).await {
+    match users::remove_user_from_org(
+        &org_id,
+        &email_id,
+        &initiator_id,
+        users::RemovalTarget::ServiceAccount,
+    )
+    .await
+    {
         Ok(resp) => resp,
         Err(e) => MetaHttpResponse::internal_error(e),
     }
@@ -432,7 +439,14 @@ pub async fn delete_bulk(
             continue;
         }
 
-        match users::remove_user_from_org(&org_id, &email, &initiator_id).await {
+        match users::remove_user_from_org(
+            &org_id,
+            &email,
+            &initiator_id,
+            users::RemovalTarget::ServiceAccount,
+        )
+        .await
+        {
             Ok(v) => {
                 if v.status().is_success() {
                     successful.push(email);

@@ -17,8 +17,8 @@ use std::time::Duration;
 
 use axum::{
     Router,
-    extract::{DefaultBodyLimit, FromRequestParts, Path, Request},
-    http::{Method, StatusCode, Uri, header},
+    extract::{DefaultBodyLimit, FromRequestParts, Path, RawPathParams, Request},
+    http::{Method, StatusCode, Uri, header, request::Parts},
     middleware::{self, Next},
     response::{IntoResponse, Redirect, Response},
     routing::{delete, get, patch, post, put},
@@ -39,7 +39,7 @@ use openobserve_api_pipelines::request::{enrichment_table, functions, pipeline, 
 use openobserve_api_search::{
     profiles as profiles_query, promql, rum as rum_query, search, traces,
 };
-use openobserve_core::auth::AuthExtractor;
+use openobserve_core::auth::{AuthExtractor, org_from_path, routed_path};
 use tower_http::{
     cors::{AllowOrigin, CorsLayer},
     decompression::RequestDecompressionLayer,
@@ -72,8 +72,8 @@ use crate::{
     common::meta::{middleware_data::RumExtraData, proxy::PathParamProxyURL},
     handler::http::{
         auth::validator::{
-            RequestData, oo_validator, validator_aws, validator_gcp, validator_proxy_url,
-            validator_rum,
+            AuthError, RequestData, oo_validator, validator_aws, validator_gcp,
+            validator_proxy_url, validator_rum,
         },
         router::middlewares::{
             blocked_orgs_middleware, ingest_rejections_middleware, password_policy_middleware,
@@ -256,6 +256,19 @@ fn attach_mcp_www_authenticate(_org_id: &str, resp: Response) -> Response {
     resp
 }
 
+/// Whether the router bound `{org_id}` to a segment other than the one the auth layers check.
+async fn routed_org_differs(parts: &mut Parts) -> bool {
+    let Ok(params) = RawPathParams::from_request_parts(parts, &()).await else {
+        return false;
+    };
+    let Some((_, routed_org)) = params.iter().find(|(name, _)| *name == "org_id") else {
+        return false;
+    };
+    let path_columns: Vec<&str> = routed_path(parts.uri.path()).split('/').collect();
+    // The router hands over the decoded param, so compare it with the decoded segment.
+    !urlencoding::decode(org_from_path(&path_columns)).is_ok_and(|org| org == routed_org)
+}
+
 /// Authentication middleware for API routes.
 ///
 /// Pair it with `password_policy_middleware` layered inside it on every router that uses it: this
@@ -272,6 +285,10 @@ pub async fn auth_middleware(request: Request, next: Next) -> Response {
     // Extract auth info from request (synchronous now, no await)
     let (mut parts, body) = request.into_parts();
     let uri = req_data.uri.clone();
+    // The auth layers check one org, so the handler must serve that same org.
+    if routed_org_differs(&mut parts).await {
+        return AuthError::Forbidden("Unauthorized Access".to_string()).into_response();
+    }
     let auth_info = match AuthExtractor::from_request_parts(&mut parts, &()).await {
         Ok(info) => info,
         Err(e) => return maybe_add_mcp_www_authenticate(&uri, e.into_response()),
@@ -2602,6 +2619,34 @@ mod tests {
             audited(Method::POST, "api/org/settings/logo", "png"),
             "cG5n"
         );
+    }
+
+    #[tokio::test]
+    async fn the_routed_org_must_be_the_org_the_auth_layers_check() {
+        async fn guard(request: axum::extract::Request, next: Next) -> Response {
+            let (mut parts, body) = request.into_parts();
+            if routed_org_differs(&mut parts).await {
+                return StatusCode::FORBIDDEN.into_response();
+            }
+            next.run(Request::from_parts(parts, body)).await
+        }
+        let app = Router::new()
+            .route("/v2/{org_id}/alerts", get(|| async { "ok" }))
+            .route("/v2/{org_id}/folders/{folder_type}", get(|| async { "ok" }))
+            .route("/{org_id}/kv/{key}", get(|| async { "ok" }))
+            .layer(middleware::from_fn(guard));
+        for (uri, expected) in [
+            ("/v2/acme/alerts", StatusCode::OK),
+            ("/acme/kv/note", StatusCode::OK),
+            ("/acme%20labs/kv/note", StatusCode::OK),
+            ("/v2/acme%2Dlabs/alerts", StatusCode::OK),
+            ("/v2/kv/note", StatusCode::OK),
+            ("/v2/kv/folders", StatusCode::FORBIDDEN),
+        ] {
+            let request = Request::get(uri).body(Body::empty()).unwrap();
+            let status = app.clone().oneshot(request).await.unwrap().status();
+            assert_eq!(status, expected, "{uri}");
+        }
     }
 
     #[tokio::test]
