@@ -193,6 +193,8 @@ export interface AssistantStoreInternal extends AssistantStoreApi {
   annotate(sid: Sid, blockId: string, patch: BlockAnnotation): void;
   /** A save in flight keeps the session from being released until it settles. */
   trackSave(sid: Sid, save: Promise<unknown>): void;
+  /** Once per restore: the draft came back from storage and how many images it lost (CT-06 AC 3). */
+  takeRestoredDraft(sid: Sid): { imageCount: number } | null;
 }
 
 export interface AssistantStoreOptions {
@@ -259,6 +261,8 @@ interface StoreCore {
   endedAt: Map<Sid, number>;
   savesPending: Map<Sid, number>;
   notices: Record<Sid, I18nKey>;
+  /** Drafts restored from storage this page load, until the composer announces them once. */
+  restoredDrafts: Map<Sid, { imageCount: number }>;
   focusRequest: Ref<FocusRequest | null>;
   sidebarModeStored: Ref<boolean>;
   forcedPinned: Ref<boolean>;
@@ -466,6 +470,7 @@ function createCore(
     endedAt: new Map(),
     savesPending: new Map(),
     notices: reactive<Record<Sid, I18nKey>>({}),
+    restoredDrafts: reactive(new Map<Sid, { imageCount: number }>()),
     focusRequest: shallowRef<FocusRequest | null>(null),
     sidebarModeStored: ref(false),
     forcedPinned: ref(false),
@@ -476,12 +481,13 @@ function createCore(
     writable: (session) => state.ready && session.userOrgKey === state.userOrgKey,
     persistDraft(session) {
       if (!core.writable(session)) return;
-      const { text, chips, timeOverride, removedPageKeys } = toRaw(session.composer);
+      const { text, chips, timeOverride, removedPageKeys, images } = toRaw(session.composer);
       core.drafts.schedule(session.userOrgKey, session.sid, {
         text,
         chips,
         timeOverride,
         removedPageKeys,
+        imageCount: images.length,
       });
     },
     persistPlacement() {
@@ -714,6 +720,7 @@ function createComposerSlice(core: StoreCore) {
     | "selectVersion"
     | "entryNotice"
     | "setEntryNotice"
+    | "takeRestoredDraft"
   > = {
     stage(sid, payload) {
       edit(sid, (composer) => {
@@ -765,12 +772,13 @@ function createComposerSlice(core: StoreCore) {
       if (composer.images.length >= MAX_IMAGES) return { ok: false, cap: "images" };
       if (!ALLOWED_IMAGE_TYPES.includes(image.mimeType)) return { ok: false, cap: "type" };
       if (image.size > MAX_IMAGE_SIZE_BYTES) return { ok: false, cap: "size" };
-      composer.images.push(withImageId(image, deps.uuid));
+      edit(sid, (current) => current.images.push(withImageId(image, deps.uuid)));
       return { ok: true };
     },
     removeImage(sid, id) {
-      const composer = core.session(sid)?.composer;
-      if (composer) composer.images = composer.images.filter((i) => i.id !== id);
+      edit(sid, (composer) => {
+        composer.images = composer.images.filter((i) => i.id !== id);
+      });
     },
     setTimeOverride(sid, range) {
       edit(sid, (composer) => {
@@ -841,6 +849,11 @@ function createComposerSlice(core: StoreCore) {
       if (ui) ui.activeVersion[turnId] = n;
     },
     entryNotice: (sid) => core.notices[sid] ?? null,
+    takeRestoredDraft(sid) {
+      const restored = core.restoredDrafts.get(sid) ?? null;
+      core.restoredDrafts.delete(sid);
+      return restored;
+    },
     setEntryNotice(sid, key) {
       if (key) core.notices[sid] = key;
       else delete core.notices[sid];
@@ -955,7 +968,10 @@ function createLifecycleSlice(core: StoreCore, openSession: AssistantStoreApi["o
     else if (stored?.placement.kind === "docked" && stored.previousPlacement?.kind === "sidebar")
       state.shell.placement = { ...stored.previousPlacement };
     const selected = recallSelection(userOrgKey);
-    if (selected) void openSession({ sid: selected }).catch(() => undefined);
+    if (selected)
+      void openSession({ sid: selected }).catch((err: unknown) =>
+        afterOpenFailed(core, selected, err),
+      );
   };
 
   const updateReady = () => {
@@ -1169,6 +1185,7 @@ function snapshotOf(composer: ComposerState): ComposerSnapshot {
     images: [...composer.images],
     mentions: [],
     timeOverride: composer.timeOverride ? { ...composer.timeOverride } : null,
+    removedPageKeys: [...composer.removedPageKeys],
   };
 }
 
@@ -1254,7 +1271,36 @@ function restoreStoredDraft(core: StoreCore, sid: Sid): void {
   const session = core.session(sid);
   if (!session || !core.writable(session) || session.composer.text) return;
   const draft = core.drafts.read(session.userOrgKey, sid);
-  if (draft) Object.assign(session.composer, draft);
+  if (!draft) return;
+  const { imageCount = 0, ...stored } = draft;
+  Object.assign(session.composer, stored);
+  core.restoredDrafts.set(sid, { imageCount });
+}
+
+// Only an unavailable history revives the chat; only a chat history calls gone (404) or forbidden (403) loses its draft (S9).
+function afterOpenFailed(core: StoreCore, sid: Sid, err: unknown): void {
+  if (!core.deps.history.canReload.value) return reviveDraft(core, sid);
+  const status = httpStatusOf(err);
+  if ((status === 404 || status === 403) && core.state.userOrgKey)
+    core.drafts.remove(core.state.userOrgKey, sid);
+}
+
+function httpStatusOf(err: unknown): number | undefined {
+  const value = err as { status?: unknown; response?: { status?: unknown } } | null;
+  const status = value?.status ?? value?.response?.status;
+  return typeof status === "number" ? status : undefined;
+}
+
+// History cannot re-read this chat yet, so a stored draft comes back on a blank chat of the same id (CT-06 AC 3).
+function reviveDraft(core: StoreCore, sid: Sid): void {
+  const { state, deps } = core;
+  const key = state.userOrgKey;
+  if (!key || state.sessions[sid] || !core.drafts.read(key, sid)) return;
+  state.sessions[sid] = blankSession(sid, key, deps, {
+    origin: { entryKind: "empty_state", objectKind: "none", container: "sidebar" },
+  });
+  restoreStoredDraft(core, sid);
+  core.setActive(sid);
 }
 
 function requestFocus(core: StoreCore): void {

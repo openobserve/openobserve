@@ -56,8 +56,13 @@ export class AssistantPage {
     await this.container().locator('[data-test="assistant-shell-close"]').click();
   }
 
-  async send(_text, _scenario) {
-    notYet("WP-05");
+  /** Types into the visible composer and presses Enter; `scenario` picks the next chat_stream answer. */
+  async send(text, scenario) {
+    if (scenario) await this.page.evaluate((name) => (window.__o2mock.next = name), scenario);
+    const box = this.composer();
+    await box.click();
+    await box.fill(text);
+    await box.press("Enter");
   }
 
   async stop() {
@@ -109,11 +114,20 @@ export class AssistantPage {
   }
 
   tray() {
-    return notYet("WP-05");
+    return this.container().locator('[data-test="assistant-context-tray"]');
   }
 
+  /** The textbox itself; its wrapper carries `data-test="assistant-composer"` and `data-state`. */
   composer() {
-    return notYet("WP-05");
+    return this.container().locator('[data-test="assistant-composer-field"]');
+  }
+
+  composerState() {
+    return this.container().locator('[data-test="assistant-composer"]');
+  }
+
+  chips() {
+    return this.tray().locator("[data-assistant-chip]");
   }
 
   helper(_hostId) {

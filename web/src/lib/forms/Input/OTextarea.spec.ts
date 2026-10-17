@@ -59,4 +59,29 @@ describe("OTextarea", () => {
     });
     expect(wrapper.text()).toContain("5/200");
   });
+
+  it("puts inputAttrs on the textarea itself and exposes focus and the element", async () => {
+    wrapper = mount(OTextarea, {
+      props: { inputAttrs: { "aria-label": "Message", "data-x": "1" } },
+      attrs: { "data-test": "box" },
+      attachTo: document.body,
+    });
+    const textarea = wrapper.get("textarea");
+    expect(textarea.attributes("aria-label")).toBe("Message");
+    expect(textarea.attributes("data-x")).toBe("1");
+    expect(wrapper.get('[data-test="box"]').attributes("aria-label")).toBeUndefined();
+    const vm = wrapper.vm as unknown as { focus(): void; textarea: HTMLTextAreaElement | null };
+    vm.focus();
+    expect(document.activeElement).toBe(textarea.element);
+    expect(vm.textarea).toBe(textarea.element);
+  });
+
+  it("gives an informative placeholder secondary-text contrast with placeholderTone strong", () => {
+    wrapper = mount(OTextarea, {
+      props: { placeholderTone: "strong", placeholder: "Ask" as never },
+    });
+    expect(wrapper.get("textarea").classes()).toContain("placeholder:text-text-secondary");
+    wrapper = mount(OTextarea, { props: { placeholder: "Ask" as never } });
+    expect(wrapper.get("textarea").classes()).toContain("placeholder:text-input-placeholder");
+  });
 });

@@ -132,6 +132,9 @@ function openPicker() {
   inputRef.value?.click();
 }
 
+/** Opens the OS file picker; for a control that hides the field behind its own button. */
+defineExpose({ open: openPicker });
+
 function onDragOver(event: DragEvent) {
   if (props.disabled || !props.dropZone) return;
   event.preventDefault();

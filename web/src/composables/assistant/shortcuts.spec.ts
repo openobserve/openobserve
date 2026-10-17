@@ -253,6 +253,32 @@ describe("container rungs f and h", () => {
     wrapper.unmount();
   });
 
+  it("lets the assistant's open popover take Escape first (rung a), but not a page's own menu", async () => {
+    const { wrapper } = mountShortcuts("available");
+    await flushPromises();
+    const close = vi.fn();
+    registerContainerCloser(close);
+    const pageMenu = document.createElement("div");
+    pageMenu.setAttribute("role", "menu");
+    pageMenu.dataset.state = "open";
+    document.body.appendChild(pageMenu);
+    expect(runEscapeLadder(escapeFrom(rootWith("sidebar")))).toBe(true);
+    expect(close).toHaveBeenCalledTimes(1);
+    pageMenu.remove();
+    close.mockClear();
+    const popover = document.createElement("div");
+    popover.setAttribute("data-o-popover-content", "");
+    popover.dataset.state = "open";
+    popover.innerHTML = '<div data-test="assistant-composer-hints-popover"></div>';
+    document.body.appendChild(popover);
+    expect(runEscapeLadder(escapeFrom(rootWith("sidebar")))).toBe(true);
+    expect(close).not.toHaveBeenCalled();
+    popover.remove();
+    expect(runEscapeLadder(escapeFrom(rootWith("sidebar")))).toBe(true);
+    expect(close).toHaveBeenCalledTimes(1);
+    wrapper.unmount();
+  });
+
   it("keeps the full view open and swallows the key there", async () => {
     const { wrapper } = mountShortcuts("available");
     await flushPromises();

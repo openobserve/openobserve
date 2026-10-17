@@ -231,7 +231,7 @@ describe("AssistantSidebarHost", () => {
     expect(track).not.toHaveBeenCalledWith("ai_container_closed", expect.anything());
   });
 
-  it("keeps the sheet's shell mounted, so an explicit open below lg focuses and announces", async () => {
+  it("keeps the sheet's shell mounted, so an explicit open below lg focuses the composer and announces", async () => {
     lg.value = false;
     const { open } = await setup();
     const sheetRoot = () =>
@@ -241,7 +241,7 @@ describe("AssistantSidebarHost", () => {
     expect(sheetRoot()).not.toBeNull();
     open();
     await flushPromises();
-    expect(document.activeElement).toBe(sheetRoot());
+    expect(document.activeElement).toBe(sheetRoot()!.querySelector("[data-assistant-composer]"));
     expect(
       sheetRoot()!.querySelector('[data-test="assistant-status-region"]')?.textContent,
     ).toContain("O2 Assistant opened.");

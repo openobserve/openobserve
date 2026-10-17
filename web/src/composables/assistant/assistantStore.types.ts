@@ -78,6 +78,8 @@ export interface ComposerSnapshot {
   images: ImageAttachment[];
   mentions: { chipId: string; start: number; end: number }[];
   timeOverride: ComposerState["timeOverride"];
+  /** The page fields removed at Send, so a retry sends what was on screen then. */
+  removedPageKeys?: string[];
 }
 
 /** Token counters from `usage`/`complete.usage`; never credits (constraint 33). */
@@ -389,6 +391,8 @@ export interface AssistantCapability {
   publicLinks: boolean;
   publicMaxExpiryDays: number;
   retentionDays?: number;
+  /** B-09: the server takes typed `attachments` and echoes `context_used`. */
+  attachments?: boolean;
   /** Absent off Cloud; doors read it for the cost line (`80` §3.3). */
   creditMode?: CreditMode;
   isAdmin: boolean;
@@ -708,15 +712,39 @@ export interface SendRequest {
   /** Only the new message; history goes by `knownSeq` when persisted (constraint 18). */
   message: { text: string; images?: ImageAttachment[] };
   knownSeq?: number;
-  context: PageContextWire & { client: ClientContext; user_timezone: string };
+  context: PageContextWire & { client: ClientContext; user_timezone: string; locale?: string };
   mode?: "chat" | "generate_query" | "rca";
   ephemeral?: boolean;
+  /** B-09: the chips as typed attachments instead of delimiter blocks in `message.text`. */
+  attachments?: WireAttachment[];
+}
+
+/** One B-09 attachment (`00` §6.3). */
+export interface WireAttachment {
+  kind: ContextChip["kind"];
+  ref?: ContextChip["ref"];
+  data: unknown;
+}
+
+/** What the engine knows of the turn being built: the page context captured at `queued` and the server flags. */
+export interface RequestTurn {
+  pageContext: PageContext | null;
+  turnId: string;
+  mode?: "chat" | "generate_query" | "rca";
+  ephemeral?: boolean;
+  /** Index of this turn's user message, for the browser-only transcript. */
+  userIndex: number;
+  persisted: boolean;
+  /** B-09 `attachments` capability. */
+  attachments: boolean;
+  now: number;
 }
 
 export type RequestBuilder = (
   session: AssistantSession,
   snapshot: ComposerSnapshot,
   client: ClientContext,
+  turn?: RequestTurn,
 ) => SendRequest;
 
 export interface TurnEngine {
