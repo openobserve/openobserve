@@ -88,7 +88,6 @@ pub trait Scheduler: Sync + Send + 'static {
     async fn get(&self, org: &str, module: TriggerModule, key: &str) -> Result<Trigger>;
     async fn list(&self, module: Option<TriggerModule>) -> Result<Vec<Trigger>>;
     async fn list_by_org(&self, org: &str, module: Option<TriggerModule>) -> Result<Vec<Trigger>>;
-    async fn clean_complete(&self) -> Result<()>;
     async fn watch_timeout(&self) -> Result<()>;
     async fn len_module(&self, module: TriggerModule) -> usize;
     async fn len(&self) -> usize;
@@ -255,13 +254,6 @@ pub async fn get(org: &str, module: TriggerModule, key: &str) -> Result<Trigger>
     CLIENT.get(org, module, key).await
 }
 
-/// Background job that frequently (with the given interval) cleans "Completed" jobs
-/// or jobs with retries >= scheduler_max_retries set through environment config
-#[inline]
-pub async fn clean_complete() -> Result<()> {
-    CLIENT.clean_complete().await
-}
-
 /// Background job that watches for timeout of a job
 /// Steps:
 /// - Select all the records with status = "Processing"
@@ -306,11 +298,12 @@ pub async fn clear() -> Result<()> {
     CLIENT.clear().await
 }
 
-/// Returns the scheduler_max_retries set through environment config
-/// The bool element in the tuple indicates if the max retries value is included
-pub fn get_scheduler_max_retries() -> (bool, i32) {
-    let max_retries = config::get_config().limit.scheduler_max_retries;
-    (max_retries > 0, max_retries.unsigned_abs() as i32)
+/// `i32::MIN` has no positive magnitude, so `abs` would wrap it back to a negative cap.
+pub fn get_scheduler_max_retries() -> i32 {
+    config::get_config()
+        .limit
+        .scheduler_max_retries
+        .saturating_abs()
 }
 
 /// Realtime alert triggers are cached on every node; the trigger rides in the
@@ -407,10 +400,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_scheduler_max_retries_returns_tuple() {
-        let (has_max, _max) = get_scheduler_max_retries();
-        // when config is default (0), should return false and abs(0) = 0
-        let max_retries = config::get_config().limit.scheduler_max_retries;
-        assert_eq!(has_max, max_retries > 0);
+    fn test_get_scheduler_max_retries_is_never_negative() {
+        assert!(get_scheduler_max_retries() >= 0);
     }
 }

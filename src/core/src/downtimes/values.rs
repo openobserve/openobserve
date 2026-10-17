@@ -37,7 +37,7 @@ use o2_enterprise::enterprise::{
 
 use super::{
     DowntimeError,
-    matching::{Inventory, Visibility},
+    matching::{Inventory, Item, Visibility},
 };
 
 /// The suggestion list stops here, and the search runs only while fewer values are known.
@@ -126,7 +126,11 @@ pub async fn values(
     let pairs = narrowing_pairs(req.condition.as_ref(), &req.key);
     let prefix = normalize_value(&req.prefix);
     let inventory = super::inventory::cached(org).await?;
-    let visibility = super::access::visibility(org, user_id).await?;
+    let candidates = inventory_items(&inventory, &req.key, &pairs, &prefix)
+        .into_iter()
+        .map(|(module, item)| (module, item.id.as_str(), item.folder_id.as_str()))
+        .collect();
+    let visibility = super::access::visibility(org, user_id, candidates).await?;
     let records = registry_records(org, &pairs).await?;
     let mut known = inventory_values(&inventory, &visibility, &req.key, &pairs);
     let readable = searchable_records(org, user_id, &records).await;
@@ -232,23 +236,9 @@ pub fn inventory_values(
     pairs: &[(String, String)],
 ) -> Vec<Found> {
     let mut counts: BTreeMap<String, usize> = BTreeMap::new();
-    for module in IDENTITY_MODULES {
-        let visible = inventory
-            .items(module)
-            .iter()
-            .filter(|item| visibility.sees(module, &item.folder_id));
-        for item in visible {
-            let Some(value) = item.dims.get(key) else {
-                continue;
-            };
-            let carries = pairs.iter().all(|(k, want)| {
-                item.dims
-                    .get(k)
-                    .is_some_and(|actual| pair_matches(want, &normalize_value(actual)))
-            });
-            if carries {
-                *counts.entry(normalize_value(value)).or_default() += 1;
-            }
+    for (module, item) in inventory_items(inventory, key, pairs, "") {
+        if visibility.sees(module, &item.id) {
+            *counts.entry(normalize_value(&item.dims[key])).or_default() += 1;
         }
     }
     counts
@@ -543,6 +533,34 @@ pub fn streams_of(record: &ServiceMetadata) -> Vec<(StreamType, String)> {
     out.into_iter()
         .map(|((_, name), stream_type)| (stream_type, name))
         .collect()
+}
+
+fn inventory_items<'a>(
+    inventory: &'a Inventory,
+    key: &str,
+    pairs: &[(String, String)],
+    prefix: &str,
+) -> Vec<(TargetModule, &'a Item)> {
+    let mut candidates = Vec::new();
+    for module in IDENTITY_MODULES {
+        for item in inventory.items(module) {
+            if !item
+                .dims
+                .get(key)
+                .is_some_and(|value| normalize_value(value).contains(prefix))
+            {
+                continue;
+            }
+            if pairs.iter().all(|(key, want)| {
+                item.dims
+                    .get(key)
+                    .is_some_and(|actual| pair_matches(want, &normalize_value(actual)))
+            }) {
+                candidates.push((module, item));
+            }
+        }
+    }
+    candidates
 }
 
 fn stream_names(record: &ServiceMetadata) -> Vec<String> {
@@ -944,8 +962,10 @@ mod tests {
         let mut inventory = acme_inventory();
         inventory.alerts[1].folder_id = "mine".to_string();
         let visibility = Visibility {
-            alert_folders: Some(HashSet::from(["mine".to_string()])),
-            synthetics_folders: None,
+            readable: Some(HashMap::from([(
+                TargetModule::Alerts,
+                HashSet::from([inventory.alerts[1].id.clone()]),
+            )])),
         };
         let records = vec![record("payments-api", "node-2", 2, "app_logs", &[])];
         let readable = readable_records(&records, |_, _| async { false }).await;
@@ -954,6 +974,20 @@ mod tests {
         let resp = answer("", known, false, no_search).await;
         let values: Vec<&str> = resp.values.iter().map(|v| v.value.as_str()).collect();
         assert_eq!(values, ["node-1"]);
+    }
+
+    #[test]
+    fn inventory_authorization_candidates_match_the_key_pairs_and_normalized_prefix() {
+        let inventory = acme_inventory();
+        let pairs = [("service".to_string(), "payments-*".to_string())];
+        let candidates = inventory_items(&inventory, "host", &pairs, "node-1");
+        assert_eq!(candidates.len(), 1);
+        assert_eq!(candidates[0].0, TargetModule::Alerts);
+        assert_eq!(candidates[0].1.id, "payments-api-latency-node1");
+        assert!(inventory_items(&inventory, "missing", &[], "").is_empty());
+        assert!(inventory_items(&inventory, "host", &pairs, "unknown").is_empty());
+        let other_pairs = [("service".to_string(), "checkout".to_string())];
+        assert!(inventory_items(&inventory, "host", &other_pairs, "").is_empty());
     }
 
     #[test]
