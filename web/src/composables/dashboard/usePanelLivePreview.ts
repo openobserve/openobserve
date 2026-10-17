@@ -50,9 +50,15 @@ const queryPayload = (query: any) => ({
   vrl: query?.vrlFunctionQuery ?? "",
   streamType: query?.fields?.stream_type ?? "",
   step: query?.config?.step_value ?? null,
+  queryType: query?.config?.query_type ?? null,
+  timeShift: query?.config?.time_shift ?? [],
+  formula: query?.config?.formula ?? null,
+  hide: query?.config?.hide ?? false,
+  // The chart renders the last-run snapshot, so a new legend format shows only after a run.
+  legend: query?.config?.promql_legend ?? "",
 });
 
-/** What the backend would receive for this panel, minus time range and variables. */
+/** What the backend would receive for this panel (minus time range and variables), plus the legend format applied on run. */
 export const panelPayloadSignature = (panel: any): string =>
   JSON.stringify({
     queryType: panel?.queryType ?? "",

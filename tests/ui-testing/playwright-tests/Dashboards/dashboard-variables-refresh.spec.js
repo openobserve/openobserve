@@ -78,9 +78,9 @@ test.describe("Dashboard Variables - Refresh Indicators & Panel Reload", { tag: 
     const globalRefreshBtn = scopedVars.getDashboardRefreshBtnLocator();
     await globalRefreshBtn.waitFor({ state: "visible", timeout: 10000 });
 
-    // Wait for the refresh indicator to appear (button should change from outline to warning variant)
+    // Wait for the refresh indicator to appear (button should change from outline to pending variant)
     // OButton exposes variant via data-o2-variant attribute
-    await expect(globalRefreshBtn).toHaveAttribute('data-o2-variant', 'warning', { timeout: 10000 });
+    await expect(globalRefreshBtn).toHaveAttribute('data-o2-variant', 'pending', { timeout: 10000 });
 
     // Check for visual indicator using helper function
     const hasIndicator = await hasRefreshIndicator(page, "global");
@@ -547,7 +547,7 @@ test.describe("Dashboard Variables - Refresh Indicators & Panel Reload", { tag: 
 
     // Wait for the refresh indicator to appear
     const globalRefreshBtn = scopedVars.getDashboardRefreshBtnLocator();
-    await expect(globalRefreshBtn).toHaveAttribute('data-o2-variant', 'warning', { timeout: 10000 });
+    await expect(globalRefreshBtn).toHaveAttribute('data-o2-variant', 'pending', { timeout: 10000 });
 
     // Verify indicator shows
     let hasIndicator = await hasRefreshIndicator(page, "global");

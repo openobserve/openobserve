@@ -110,7 +110,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="config.isEnterprise === 'false'"
                 :variant="applyVariant"
                 size="sm-action"
-                :class="{ 'border-e-button-group-divider': showApplyMenu }"
+                :class="{
+                  'border-e-button-group-divider': showApplyMenu && applyVariant !== 'pending',
+                }"
+                :aria-description="applyVariant === 'pending' ? applyTooltip : undefined"
                 data-test="dashboard-apply"
                 :loading="searchRequestTraceIds.length > 0"
                 :disabled="searchRequestTraceIds.length > 0"
@@ -125,7 +128,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 "
                 :variant="applyVariant"
                 size="sm-action"
-                class="border-e-button-group-divider"
+                :class="{ 'border-e-button-group-divider': applyVariant !== 'pending' }"
+                :aria-description="applyVariant === 'pending' ? applyTooltip : undefined"
                 @click="onApplyBtnClick"
               >
                 {{ searchRequestTraceIds.length > 0 ? t("panel.cancel") : t("panel.apply") }}
@@ -1817,7 +1821,7 @@ export default defineComponent({
       if (config.isEnterprise === "true" && searchRequestTraceIds.value.length > 0) {
         return "destructive";
       }
-      return livePreview.isPending.value ? "warning" : "primary";
+      return livePreview.isPending.value ? "pending" : "primary";
     });
 
     const showApplyMenu = computed(

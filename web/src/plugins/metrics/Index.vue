@@ -73,15 +73,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
         <OButton
           v-else
-          variant="primary"
+          :variant="isRunQueryPending ? 'pending' : 'primary'"
           size="sm-toolbar"
           data-test="metrics-apply"
+          :data-run-pending="isRunQueryPending ? 'true' : undefined"
+          :aria-label="isRunQueryPending ? t('search.runQueryPendingLabel') : undefined"
           :loading="disable"
           :disabled="disable"
           @click="onUserRun"
         >
           {{ t("metrics.runQuery") }}
-          <OTooltip :content="t('metrics.runQuery')" shortcut-id="metricsRunQuery" />
+          <OTooltip
+            :content="isRunQueryPending ? t('search.autoRunPendingDot') : t('metrics.runQuery')"
+            shortcut-id="metricsRunQuery"
+          />
         </OButton>
       </template>
     </template>
@@ -133,6 +138,7 @@ import config from "@/aws-exports";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import { checkIfConfigChangeRequiredApiCallOrNot } from "@/utils/dashboard/checkConfigChangeApiCall";
+import { panelPayloadSignature } from "@/composables/dashboard/usePanelLivePreview";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars -- PanelEditorVariablesData is used only in a template `as` cast (:variablesData), which eslint-plugin-vue cannot see; vue-tsc keeps it honest
 import { PanelEditor, type PanelEditorVariablesData } from "@/components/dashboards/PanelEditor";
 import { saveMetricsStream, restoreMetricsStream } from "@/utils/streamPersist";
@@ -586,6 +592,16 @@ export default defineComponent({
       disable.value = panelsValues.some((item: any) => item === true);
     });
 
+    // The editor's isOutDated ignores builders with no x/y/z fields (every PromQL query), so compare the payload too.
+    const isRunQueryPending = computed(() => {
+      if (disable.value) return false;
+      if (panelEditorRef.value?.isOutDated) return true;
+      if (!chartData.value?.queries) return false;
+      return (
+        panelPayloadSignature(chartData.value) !== panelPayloadSignature(dashboardPanelData.data)
+      );
+    });
+
     const addToDashboard = () => {
       const errors: any = [];
       // will push errors in errors array
@@ -678,6 +694,7 @@ export default defineComponent({
       searchRequestTraceIds,
       cancelAddPanelQuery,
       disable,
+      isRunQueryPending,
       config,
       showAddToDashboardDialog,
       addPanelToDashboard,

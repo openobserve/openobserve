@@ -10948,6 +10948,7 @@
     },
     "add": "添加",
     "runQuery": "查询",
+    "runQueryOptions": "查询运行选项",
     "explorer": {
       "detail": {
         "loading": "正在加载指标详情...",
