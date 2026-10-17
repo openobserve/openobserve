@@ -127,6 +127,7 @@ async fn report_org_no_ingestion(start_hour: i64, duration: &str) {
         created_after: Some(now - h_end_micro),
         created_before: Some(now - h_start_micro),
         limit: None,
+        exclude_deleted: true,
     };
 
     let orgs = match infra::table::organizations::list(filter).await {

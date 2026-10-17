@@ -95,6 +95,8 @@ mod tests {
             env::set_var("ZO_PRINT_KEY_SQL", "true");
             env::set_var("ZO_SMTP_ENABLED", "true");
             env::set_var("ZO_CREATE_ORG_THROUGH_INGESTION", "true");
+            env::set_var("ZO_SKIP_SSRF_CHECKS", "true");
+            env::set_var("O2_ORG_DELETION_GRACE_PERIOD_DAYS", "0");
 
             env_logger::init_from_env(
                 env_logger::Env::new().default_filter_or(&get_config().log.level),
@@ -198,7 +200,16 @@ mod tests {
 
     async fn e2e_100_tear_down() {
         log::info!("Tear Down Invoked");
-        fs::remove_dir_all("./data").expect("Delete local dir failed");
+        // The WAL push job can still be moving files of the last ingests while the dir is removed.
+        let mut result = fs::remove_dir_all("./data");
+        for _ in 0..20 {
+            if result.is_ok() {
+                break;
+            }
+            tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+            result = fs::remove_dir_all("./data");
+        }
+        result.expect("Delete local dir failed");
     }
 
     /// Helper function to flush memtable to ensure proper test isolation
@@ -289,7 +300,7 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
-    #[ignore]
+    #[ignore = "e2e: wipes ./data and starts the gRPC server; CI runs it separately"]
     async fn e2e_test() {
         // make sure data dir is deleted before we run integration tests
         fs::remove_dir_all("./data")
@@ -482,6 +493,9 @@ mod tests {
         test_backfill_job_delete_by_pipeline().await;
         test_backfill_job_enable_disable().await;
 
+        // Own fn: inline spawns widen e2e_test's frame and overflow the debug stack.
+        e2e_org_deletion().await;
+
         // others
         e2e_health_check().await;
         e2e_config().await;
@@ -489,6 +503,89 @@ mod tests {
 
         // clear
         e2e_delete_stream().await;
+    }
+
+    async fn e2e_org_deletion() {
+        // org deletion: each runs in its own task so one red test does not hide the others
+        let mut failed = Vec::new();
+        if tokio::spawn(e2e_meta_prefix_reads_are_org_exact())
+            .await
+            .is_err()
+        {
+            failed.push("e2e_meta_prefix_reads_are_org_exact");
+        }
+        if tokio::spawn(e2e_org_setting_writers_do_not_lose_updates())
+            .await
+            .is_err()
+        {
+            failed.push("e2e_org_setting_writers_do_not_lose_updates");
+        }
+        assert!(failed.is_empty(), "org deletion e2e failed: {failed:?}");
+    }
+
+    /// A per-run suffix: on Postgres the meta store outlives `./data`, so fixed ids would collide.
+    fn run_suffix() -> String {
+        (Utc::now().timestamp_micros() % 1_000_000_000).to_string()
+    }
+
+    async fn e2e_meta_prefix_reads_are_org_exact() {
+        setup();
+        let db = infra::db::get_db().await;
+        let suffix = run_suffix();
+        let orgs = ["a_b", "aXb", "a-b", "A_B"].map(|o| format!("{o}{suffix}"));
+        for org in &orgs {
+            db.put(
+                &format!("/organization/savedviews/{org}/v1"),
+                "{}".into(),
+                false,
+                None,
+            )
+            .await
+            .unwrap();
+        }
+        let target = format!("/organization/savedviews/{}/", orgs[0]);
+        let keys = db.list_keys(&target).await.unwrap();
+        assert_eq!(keys.len(), 1, "{keys:?}");
+        assert_eq!(db.count(&target).await.unwrap(), 1);
+        db.delete(&target, true, false, None).await.unwrap();
+        for org in &orgs[1..] {
+            let keys = db
+                .list_keys(&format!("/organization/savedviews/{org}/"))
+                .await
+                .unwrap();
+            assert_eq!(keys.len(), 1, "{org} lost its view: {keys:?}");
+        }
+    }
+
+    async fn e2e_org_setting_writers_do_not_lose_updates() {
+        setup();
+        let org = format!("orgsetw{}", run_suffix());
+        let writers: Vec<_> = (0..16)
+            .map(|i| {
+                let org = org.clone();
+                tokio::spawn(async move {
+                    db::organization::update_org_setting(&org, move |s| {
+                        s.cross_links.push(config::meta::stream::CrossLink {
+                            name: format!("link{i}"),
+                            url: "https://example.com".to_string(),
+                            fields: vec![],
+                        });
+                        true
+                    })
+                    .await
+                    .unwrap()
+                })
+            })
+            .collect();
+        for writer in writers {
+            assert!(writer.await.unwrap());
+        }
+        let stored = db::organization::get_org_setting(&org).await.unwrap();
+        assert_eq!(
+            stored.cross_links.len(),
+            16,
+            "concurrent settings writes were lost"
+        );
     }
 
     async fn e2e_1_post_bulk() {
@@ -1024,7 +1121,7 @@ mod tests {
         let auth = setup();
         let body_str = r#"{
                                 "email": "nonadmin@example.com",
-                                "new_password": "Newpass12!",
+                                "new_password": "Newpass12!Abcde",
                                 "change_password": true
                             }"#;
         let app = init_test_router();

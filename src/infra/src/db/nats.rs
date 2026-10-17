@@ -415,8 +415,9 @@ impl super::Db for NatsDb {
                 .purge(encode_key)
                 .await
                 .map_err(|e| Error::Message(format!("[NATS:delete] bucket.purge error: {e}")))?;
-            if need_watch && !use_kv_watcher(&purge_key) {
-                coordinator::events::delete_event(&purge_key, start_dt).await?;
+            let event_key = watched_key(&self.prefix, &bucket.name, &purge_key);
+            if need_watch && !use_kv_watcher(&event_key) {
+                coordinator::events::delete_event(&event_key, start_dt).await?;
             }
         }
         Ok(())
@@ -1128,6 +1129,11 @@ pub(crate) fn bucket_has_ttl(bucket_name: &str) -> bool {
     bucket_ttl(bucket_name).is_some()
 }
 
+/// The full key watchers filter on, from a key relative to its bucket.
+fn watched_key(nats_prefix: &str, bucket_name: &str, relative: &str) -> String {
+    format!("/{}{relative}", bucket_name.trim_start_matches(nats_prefix))
+}
+
 #[inline]
 fn use_kv_watcher(key: &str) -> bool {
     config::NATS_KV_WATCH_MODULES
@@ -1138,6 +1144,18 @@ fn use_kv_watcher(key: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_prefix_delete_events_carry_the_full_key() {
+        assert_eq!(
+            watched_key("o2_", "o2_function", "/t1/f1"),
+            "/function/t1/f1"
+        );
+        assert_eq!(
+            watched_key("", "metrics_leader", "/t1/c1"),
+            "/metrics_leader/t1/c1"
+        );
+    }
 
     #[test]
     fn test_use_kv_watcher() {

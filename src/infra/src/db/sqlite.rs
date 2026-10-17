@@ -504,7 +504,7 @@ impl super::Db for SqliteDb {
             // find all keys then send event
             let items = if with_prefix {
                 let db = super::get_db().await;
-                db.list_keys(key).await?
+                db.list_keys_from_primary(key).await?
             } else {
                 vec![new_key.to_string()]
             };
@@ -562,24 +562,28 @@ impl super::Db for SqliteDb {
                         .await?;
                 }
             } else {
-                // module = $1, key1 = $2, key2 = $3, key2/% = $4 [, start_dt = $5]
+                // module = $1, key1 = $2, key2 = $3, key2/ = $4 [, start_dt = $5]
+                let key2_prefix = format!("{key2}/");
                 if let Some(dt) = start_dt {
-                    sqlx::query("DELETE FROM meta WHERE module = $1 AND key1 = $2 AND (key2 = $3 OR key2 LIKE $4) AND start_dt = $5")
+                    sqlx::query(&format!("DELETE FROM meta WHERE module = $1 AND key1 = $2 AND (key2 = $3 OR {}) AND start_dt = $5", key2_prefix_match(&key2_prefix, 4)))
                         .bind(&module)
                         .bind(&key1)
                         .bind(&key2)
-                        .bind(format!("{}/%", key2))
+                        .bind(&key2_prefix)
                         .bind(dt)
                         .execute(&client)
                         .await?;
                 } else {
-                    sqlx::query("DELETE FROM meta WHERE module = $1 AND key1 = $2 AND (key2 = $3 OR key2 LIKE $4)")
-                        .bind(&module)
-                        .bind(&key1)
-                        .bind(&key2)
-                        .bind(format!("{}/%", key2))
-                        .execute(&client)
-                        .await?;
+                    sqlx::query(&format!(
+                        "DELETE FROM meta WHERE module = $1 AND key1 = $2 AND (key2 = $3 OR {})",
+                        key2_prefix_match(&key2_prefix, 4)
+                    ))
+                    .bind(&module)
+                    .bind(&key1)
+                    .bind(&key2)
+                    .bind(&key2_prefix)
+                    .execute(&client)
+                    .await?;
                 }
             }
         } else {
@@ -619,14 +623,7 @@ impl super::Db for SqliteDb {
             params.push(key1);
         }
         if !key2.is_empty() {
-            sql.push_str(&format!(
-                " AND (key2 = ${} OR key2 LIKE ${})",
-                params.len() + 1,
-                params.len() + 2
-            ));
-            let key2_prefix = format!("{}/%", key2);
-            params.push(key2);
-            params.push(key2_prefix);
+            push_key2_filter(&mut sql, &mut params, key2);
         }
         sql.push_str(" ORDER BY start_dt ASC");
 
@@ -648,41 +645,7 @@ impl super::Db for SqliteDb {
     }
 
     async fn list_keys(&self, prefix: &str) -> Result<Vec<String>> {
-        let (module, key1, key2) = super::parse_key(prefix);
-        let mut sql =
-            "SELECT id, module, key1, key2, start_dt, '' AS value FROM meta WHERE 1=1".to_string();
-        let mut params = Vec::new();
-
-        if !module.is_empty() {
-            sql.push_str(" AND module = $1");
-            params.push(module);
-        }
-        if !key1.is_empty() {
-            sql.push_str(&format!(" AND key1 = ${}", params.len() + 1));
-            params.push(key1);
-        }
-        if !key2.is_empty() {
-            sql.push_str(&format!(
-                " AND (key2 = ${} OR key2 LIKE ${})",
-                params.len() + 1,
-                params.len() + 2
-            ));
-            let key2_prefix = format!("{}/%", key2);
-            params.push(key2);
-            params.push(key2_prefix);
-        }
-
-        sql.push_str(" ORDER BY start_dt ASC");
-        let pool = CLIENT_RO.clone();
-        let mut query = sqlx::query(&sql);
-        for p in params {
-            query = query.bind(p);
-        }
-        let ret = decode_meta_records(query.fetch_all(&pool).await?)?;
-        Ok(ret
-            .into_iter()
-            .map(|r| format!("/{}/{}/{}", r.module, r.key1, r.key2))
-            .collect())
+        list_keys_in(&CLIENT_RO.clone(), prefix).await
     }
 
     async fn list_values(&self, prefix: &str) -> Result<Vec<Bytes>> {
@@ -737,14 +700,7 @@ impl super::Db for SqliteDb {
             params.push(key1);
         }
         if !key2.is_empty() {
-            sql.push_str(&format!(
-                " AND (key2 = ${} OR key2 LIKE ${})",
-                params.len() + 1,
-                params.len() + 2
-            ));
-            let key2_prefix = format!("{}/%", key2);
-            params.push(key2);
-            params.push(key2_prefix);
+            push_key2_filter(&mut sql, &mut params, key2);
         }
 
         let pool = CLIENT_RO.clone();
@@ -984,14 +940,7 @@ pub(crate) fn build_list_by_start_dt_sql(
         params.push(key1);
     }
     if !key2.is_empty() {
-        sql.push_str(&format!(
-            " AND (key2 = ${} OR key2 LIKE ${})",
-            params.len() + 1,
-            params.len() + 2
-        ));
-        let key2_prefix = format!("{key2}/%");
-        params.push(key2);
-        params.push(key2_prefix);
+        push_key2_filter(&mut sql, &mut params, key2);
     }
     // min_dt / max_dt are intentionally NOT pushed into params here.
     // The caller binds them as i64 after the string-params loop.
@@ -1007,10 +956,66 @@ pub(crate) fn build_list_by_start_dt_sql(
     (sql, params)
 }
 
+async fn list_keys_in(pool: &Pool<Sqlite>, prefix: &str) -> Result<Vec<String>> {
+    let (module, key1, key2) = super::parse_key(prefix);
+    let mut sql =
+        "SELECT id, module, key1, key2, start_dt, '' AS value FROM meta WHERE 1=1".to_string();
+    let mut params = Vec::new();
+
+    if !module.is_empty() {
+        sql.push_str(" AND module = $1");
+        params.push(module);
+    }
+    if !key1.is_empty() {
+        sql.push_str(&format!(" AND key1 = ${}", params.len() + 1));
+        params.push(key1);
+    }
+    if !key2.is_empty() {
+        push_key2_filter(&mut sql, &mut params, key2);
+    }
+
+    sql.push_str(" ORDER BY start_dt ASC");
+    let mut query = sqlx::query(&sql);
+    for p in params {
+        query = query.bind(p);
+    }
+    let ret = decode_meta_records(query.fetch_all(pool).await?)?;
+    Ok(ret
+        .into_iter()
+        .map(|r| format!("/{}/{}/{}", r.module, r.key1, r.key2))
+        .collect())
+}
+
+// SQLite's LIKE is case-insensitive and needs an ESCAPE clause; substr is an exact prefix match.
+fn key2_prefix_match(prefix: &str, n: usize) -> String {
+    format!("substr(key2, 1, {}) = ${n}", prefix.chars().count())
+}
+
+fn push_key2_filter(sql: &mut String, params: &mut Vec<String>, key2: String) {
+    let n = params.len();
+    let key2_prefix = format!("{key2}/");
+    sql.push_str(&format!(
+        " AND (key2 = ${} OR {})",
+        n + 1,
+        key2_prefix_match(&key2_prefix, n + 2)
+    ));
+    params.push(key2);
+    params.push(key2_prefix);
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::db::MetaRecord;
+
+    #[test]
+    fn test_watched_prefix_delete_finds_its_keys_on_the_primary() {
+        let src = include_str!("sqlite.rs");
+        let start = src.find("    async fn delete(\n").expect("delete");
+        let body = src[start..].split("\n    }\n").next().expect("body");
+        assert!(body.contains("db.list_keys_from_primary(key)"));
+        assert!(!body.contains("db.list_keys(key)"));
+    }
 
     #[test]
     fn test_sqlite_db_new() {
@@ -1308,14 +1313,14 @@ mod tests {
         assert_eq!(params[0], "module");
         assert_eq!(params[1], "key1");
         assert_eq!(params[2], "key2");
-        assert_eq!(params[3], "key2/%");
+        assert_eq!(params[3], "key2/");
         assert!(
             sql.contains("AND module = $1"),
             "module param missing: {sql}"
         );
         assert!(sql.contains("AND key1 = $2"), "key1 param missing: {sql}");
         assert!(
-            sql.contains("AND (key2 = $3 OR key2 LIKE $4)"),
+            sql.contains("AND (key2 = $3 OR substr(key2, 1, 5) = $4)"),
             "key2 param missing: {sql}"
         );
         assert!(
@@ -1368,8 +1373,8 @@ mod tests {
     #[test]
     fn test_build_list_by_start_dt_sql_key2_prefix_pattern() {
         let (sql, params) = build_list_by_start_dt_sql("/m/k1/k2", 0, 0);
-        assert_eq!(params[3], "k2/%");
-        assert!(sql.contains("OR key2 LIKE $4"));
+        assert_eq!(params[3], "k2/");
+        assert!(sql.contains("OR substr(key2, 1, 3) = $4"));
     }
 
     #[test]

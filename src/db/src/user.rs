@@ -255,24 +255,26 @@ pub async fn update(
 
 pub async fn delete(name: &str) -> Result<(), anyhow::Error> {
     let key = format!("{USER_RECORD_KEY}{name}");
-    // First delete all org_user entries for this user
-    org_users::remove_by_user(name).await?;
-    match users::remove(name).await {
-        Ok(_) => {
-            delete_from_db_coordinator(&key, false, true, None)
-                .await
-                .inspect_err(|e| {
-                    log::error!("error sending delete user to nats {name} : {e}");
-                })?;
-            #[cfg(feature = "enterprise")]
-            super_cluster::delete_user_from_super_cluster(name).await?;
-            Ok(())
-        }
-        Err(e) => {
-            log::error!("Error deleting user: {e}");
-            Err(anyhow::anyhow!("Error deleting user: {}", e))
-        }
-    }
+    // One transaction: a failed notification must not leave a users row whose memberships are gone.
+    users::remove_with_memberships(name).await.map_err(|e| {
+        log::error!("Error deleting user: {e}");
+        anyhow::anyhow!("Error deleting user: {}", e)
+    })?;
+    org_users::notify_removed_by_user(name).await?;
+    delete_from_db_coordinator(&key, false, true, None)
+        .await
+        .inspect_err(|e| {
+            log::error!("error sending delete user to nats {name} : {e}");
+        })?;
+    #[cfg(feature = "enterprise")]
+    super_cluster::delete_user_from_super_cluster(name).await?;
+    Ok(())
+}
+
+/// Evicts a user from every node's cache and leaves its row in place.
+pub async fn evict_cached(name: &str) -> Result<(), anyhow::Error> {
+    delete_from_db_coordinator(&format!("{USER_RECORD_KEY}{name}"), false, true, None).await?;
+    Ok(())
 }
 
 #[cfg(feature = "cloud")]
