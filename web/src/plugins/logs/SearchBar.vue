@@ -710,15 +710,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <ODropdownItem
                 data-test="search-download-csv-btn"
                 icon-left="grid-on"
-                :disabled="isDownloadDisabled"
-                @select="downloadLogs(searchObj.data.queryResults.hits, 'csv')"
+                :disabled="isDownloadDisabled || isDownloadingAll"
+                @select="downloadAllResults('csv', downloadLogs)"
                 >{{ t("search.downloadCSV") }}</ODropdownItem
               >
               <ODropdownItem
                 data-test="search-download-json-btn"
                 icon-left="data-object"
-                :disabled="isDownloadDisabled"
-                @select="downloadLogs(searchObj.data.queryResults.hits, 'json')"
+                :disabled="isDownloadDisabled || isDownloadingAll"
+                @select="downloadAllResults('json', downloadLogs)"
                 >{{ t("search.downloadJSON") }}</ODropdownItem
               >
             </ODropdownSub>
@@ -1762,6 +1762,7 @@ import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
 import { useVrlPlaceholder } from "@/composables/useVrlPlaceholder";
 import { logsUtils, removeFieldFromWhereAST } from "@/composables/useLogs/logsUtils";
 import { searchState } from "@/composables/useLogs/searchState";
+import { useDownloadAllResults } from "@/composables/useLogs/downloadAllResults";
 import {
   getVisualizationConfig,
   encodeVisualizationConfig,
@@ -3155,6 +3156,8 @@ export default defineComponent({
         });
       }
     };
+
+    const { downloadAllResults, isDownloadingAll } = useDownloadAllResults();
 
     onMounted(async () => {
       searchObj.data.transformType = router.currentRoute.value.query.transformType || "function";
@@ -4933,6 +4936,8 @@ export default defineComponent({
       updateQuery,
       showRanQuery,
       downloadLogs,
+      downloadAllResults,
+      isDownloadingAll,
       saveFunction,
       resetFunctionContent,
       resetEditorLayout,
