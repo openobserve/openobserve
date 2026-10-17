@@ -157,7 +157,7 @@ pub async fn release_folder(org: &str, folder_pk: &str) -> Result<bool, errors::
 }
 
 /// Removes every row of an org and returns the removed ids.
-pub async fn delete_by_org(org: &str) -> Result<Vec<String>, errors::Error> {
+pub async fn delete_by_org(org: &str) -> Result<Vec<(String, String)>, errors::Error> {
     let client = get_orm_client_rw().await;
     delete_by_org_with(client, org).await
 }
@@ -651,26 +651,41 @@ pub async fn move_to_folder_with<C: ConnectionTrait>(
     Ok(res.rows_affected)
 }
 
-pub async fn delete_by_org_with<C: ConnectionTrait>(
+/// Every id of the org, tombstones included, as [delete_by_org_with] removes them.
+pub async fn list_ids_by_org_with<C: ConnectionTrait>(
     conn: &C,
     org: &str,
 ) -> Result<Vec<String>, errors::Error> {
-    let ids: Vec<String> = Entity::find()
+    Ok(Entity::find()
         .filter(Column::Org.eq(org))
         .all(conn)
         .await?
         .into_iter()
         .map(|m| m.id)
-        .collect();
+        .collect())
+}
+
+/// Deletes every row of the org, tombstones included; returns each `(id, folder_id)`.
+pub async fn delete_by_org_with<C: ConnectionTrait + TransactionTrait>(
+    conn: &C,
+    org: &str,
+) -> Result<Vec<(String, String)>, errors::Error> {
+    let txn = conn.begin().await?;
     notifications::Entity::delete_many()
         .filter(notifications::Column::Org.eq(org))
-        .exec(conn)
+        .exec(&txn)
         .await?;
-    Entity::delete_many()
-        .filter(Column::Org.eq(org))
-        .exec(conn)
-        .await?;
-    Ok(ids)
+    let delete = Entity::delete_many().filter(Column::Org.eq(org));
+    let removed = super::delete_returning_models(&txn, delete).await?;
+    let slugs = folder_slugs(&txn, &removed).await?;
+    txn.commit().await?;
+    Ok(removed
+        .into_iter()
+        .map(|m| {
+            let folder_id = slugs.get(&m.folder_id).cloned().unwrap_or(m.folder_id);
+            (m.id, folder_id)
+        })
+        .collect())
 }
 
 /// One compare-and-swap against `stored`; `None` when another write moved the row first.
@@ -1504,9 +1519,34 @@ mod tests {
         log_sent(&db, "acme", "d1").await;
         log_sent(&db, "other", "d2").await;
 
-        assert_eq!(delete_by_org_with(&db, "acme").await.unwrap(), ["d1"]);
+        let removed = delete_by_org_with(&db, "acme").await.unwrap();
+        assert_eq!(removed.len(), 1);
+        assert_eq!(removed[0].0, "d1");
         assert_eq!(ids(&list_all_with(&db).await.unwrap()), ["d2"]);
         assert_eq!(logged(&db).await, ["d2"]);
+    }
+
+    #[tokio::test]
+    async fn the_org_id_listing_keeps_tombstones_the_row_listing_skips() {
+        let db = db().await;
+        for id in ["d1", "d2"] {
+            put_with(&db, &downtime(id, Repeat::None, Some(11 * DAY)))
+                .await
+                .unwrap();
+        }
+        let mut foreign = downtime("d3", Repeat::None, Some(11 * DAY));
+        foreign.org = "other".to_string();
+        put_with(&db, &foreign).await.unwrap();
+        delete_with(&db, "acme", "d2").await.unwrap().unwrap();
+
+        let mut listed = list_ids_by_org_with(&db, "acme").await.unwrap();
+        listed.sort();
+        assert_eq!(
+            listed,
+            ["d1", "d2"],
+            "a tombstone still needs its cross-region delete"
+        );
+        assert_eq!(ids(&list_with(&db, "acme", None).await.unwrap()), ["d1"]);
     }
 
     /// The test schema with `downtimes_folder_fk` enforced, as the migration creates it.

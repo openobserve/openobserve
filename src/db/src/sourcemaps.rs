@@ -44,6 +44,9 @@ type SourceMapKey = (
     String,
 );
 
+/// `(service, env, version)`: the rows one [`delete_group`] call removes.
+type GroupKey = (Option<String>, Option<String>, Option<String>);
+
 #[derive(Serialize, Clone)]
 pub struct ParamValues {
     services: Vec<String>,
@@ -190,78 +193,19 @@ pub async fn delete_group(
     let deleted =
         infra::table::source_maps::delete_group(org, service.clone(), env.clone(), version.clone())
             .await?;
-    if let Err(e) = delete_stored_files(&deleted).await {
-        log::error!("error deleting sourcemap files from storage for org_id {org} : {e}");
+    release_group(org, service, env, version, &deleted).await
+}
+
+/// Org teardown: one delete, then each group's files, caches and events, as [`delete_group`] does.
+pub async fn delete_by_org(org: &str) -> Result<(), errors::Error> {
+    let mut groups: HashMap<GroupKey, Vec<SourceMap>> = HashMap::new();
+    for row in infra::table::source_maps::delete_by_org(org).await? {
+        let key = (row.service.clone(), row.env.clone(), row.version.clone());
+        groups.entry(key).or_default().push(row);
     }
-
-    {
-        let mut cache = CACHE.write().await;
-        let mut keys = Vec::new();
-        for (k, _) in cache.iter() {
-            let (org_id, s, e, v, _) = &k;
-            if org_id == org && s == &service && e == &env && v == &version {
-                keys.push(k.clone());
-            }
-        }
-        for k in keys {
-            cache.remove(&k);
-        }
+    for ((service, env, version), deleted) in groups {
+        release_group(org, service, env, version, &deleted).await?;
     }
-
-    {
-        let mut cache = VALUES_CACHE.write().await;
-        cache.remove(org);
-        drop(cache);
-    }
-
-    // trigger watch event by putting value to cluster coordinator
-    let cluster_coordinator = get_coordinator().await;
-    cluster_coordinator
-        .delete(
-            &format!(
-                "{SOURCEMAP_PREFIX}{org}/{}/{}/{}",
-                service.as_deref().unwrap_or(""),
-                env.as_deref().unwrap_or(""),
-                version.as_deref().unwrap_or("")
-            ),
-            false,
-            true,
-            None,
-        )
-        .await?;
-
-    #[cfg(feature = "enterprise")]
-    {
-        let config = o2_enterprise::enterprise::common::config::get_config();
-        if config.super_cluster.enabled {
-            match o2_enterprise::enterprise::super_cluster::queue::delete_sourcemaps(
-                org,
-                service.clone(),
-                env.clone(),
-                version.clone(),
-            )
-            .await
-            {
-                Ok(_) => {
-                    log::info!(
-                        "successfully sent sourcemap delete notification to super cluster queue for {org}/{}/{}/{}",
-                        service.unwrap_or_default(),
-                        env.unwrap_or_default(),
-                        version.unwrap_or_default()
-                    );
-                }
-                Err(e) => {
-                    log::error!(
-                        "error in sending sourcemap delete notification to super cluster queue for {org}/{}/{}/{} : {e}",
-                        service.unwrap_or_default(),
-                        env.unwrap_or_default(),
-                        version.unwrap_or_default()
-                    );
-                }
-            }
-        }
-    }
-
     Ok(())
 }
 
@@ -399,6 +343,89 @@ pub async fn watch() -> Result<(), anyhow::Error> {
             Event::Empty => {}
         }
     }
+}
+
+/// Releases a deleted group's stored files, caches and cluster copies.
+async fn release_group(
+    org: &str,
+    service: Option<String>,
+    env: Option<String>,
+    version: Option<String>,
+    deleted: &[SourceMap],
+) -> Result<(), errors::Error> {
+    if let Err(e) = delete_stored_files(deleted).await {
+        log::error!("error deleting sourcemap files from storage for org_id {org} : {e}");
+    }
+
+    {
+        let mut cache = CACHE.write().await;
+        let mut keys = Vec::new();
+        for (k, _) in cache.iter() {
+            let (org_id, s, e, v, _) = &k;
+            if org_id == org && s == &service && e == &env && v == &version {
+                keys.push(k.clone());
+            }
+        }
+        for k in keys {
+            cache.remove(&k);
+        }
+    }
+
+    {
+        let mut cache = VALUES_CACHE.write().await;
+        cache.remove(org);
+        drop(cache);
+    }
+
+    // trigger watch event by putting value to cluster coordinator
+    let cluster_coordinator = get_coordinator().await;
+    cluster_coordinator
+        .delete(
+            &format!(
+                "{SOURCEMAP_PREFIX}{org}/{}/{}/{}",
+                service.as_deref().unwrap_or(""),
+                env.as_deref().unwrap_or(""),
+                version.as_deref().unwrap_or("")
+            ),
+            false,
+            true,
+            None,
+        )
+        .await?;
+
+    #[cfg(feature = "enterprise")]
+    {
+        let config = o2_enterprise::enterprise::common::config::get_config();
+        if config.super_cluster.enabled {
+            match o2_enterprise::enterprise::super_cluster::queue::delete_sourcemaps(
+                org,
+                service.clone(),
+                env.clone(),
+                version.clone(),
+            )
+            .await
+            {
+                Ok(_) => {
+                    log::info!(
+                        "successfully sent sourcemap delete notification to super cluster queue for {org}/{}/{}/{}",
+                        service.unwrap_or_default(),
+                        env.unwrap_or_default(),
+                        version.unwrap_or_default()
+                    );
+                }
+                Err(e) => {
+                    log::error!(
+                        "error in sending sourcemap delete notification to super cluster queue for {org}/{}/{}/{} : {e}",
+                        service.unwrap_or_default(),
+                        env.unwrap_or_default(),
+                        version.unwrap_or_default()
+                    );
+                }
+            }
+        }
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]

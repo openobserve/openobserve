@@ -15,7 +15,7 @@
 
 //! Stream discovery, org gate, claim, learning trigger and the per-stream window loop.
 
-use std::sync::Arc;
+use std::{path::Path, sync::Arc};
 
 use config::{
     cluster::LOCAL_NODE,
@@ -30,7 +30,10 @@ use tokio::sync::{Mutex, RwLock};
 use super::{
     LEARN_INTERVAL_SECS, MAX_BACKLOG_MICROS, MAX_WINDOWS_PER_TICK, ORG_RETAINED, ORG_TABLES,
     RETAINED, SNAPSHOT_INTERVAL_SECS, STREAM_STATES, Settings, TableRef,
-    resolution::{ResolutionTable, read_snapshot_file, snapshot_path, write_snapshot_file},
+    resolution::{
+        ResolutionTable, read_snapshot_file, remove_snapshot_file, snapshot_path,
+        write_snapshot_file,
+    },
     resolve::{CONNECTION_MODEL, CONNECTION_TOOL, SeriesKey, Staging},
     sql::{
         AgentEdgeRow, AgentForm, Columns, PairingRow, Q0Row, Q1Row, Q2Row, Q3Row, Q4Row,
@@ -147,7 +150,9 @@ pub async fn run_tick(settings: &Settings) {
             continue;
         }
         let offsets: Vec<i64> = claimed.iter().map(|(_, o)| *o).collect();
-        let table = org_table(&org, &offsets, settings, now).await;
+        let Some(table) = org_table(&org, &offsets, settings, now).await else {
+            continue;
+        };
         let learn_due =
             now - table.read().await.last_learn_at >= LEARN_INTERVAL_SECS * SECOND_MICRO_SECS;
         if learn_due {
@@ -168,6 +173,12 @@ pub async fn run_tick(settings: &Settings) {
             process_stream(job, &settings, now).await;
         })
         .await;
+}
+
+/// Drops the org's resolution table and its snapshot; every node runs it when the org goes.
+pub fn forget_org(org: &str) {
+    ORG_TABLES.remove(org);
+    remove_snapshot_file(&snapshot_path(org));
 }
 
 async fn discover() -> Vec<(String, Vec<String>)> {
@@ -207,9 +218,9 @@ async fn discover() -> Vec<(String, Vec<String>)> {
     out
 }
 
-/// Mirrors the two sources `check_ingestion_allowed` reads; that function is ingester-only.
+/// Skips orgs being deleted, then mirrors the two sources `check_ingestion_allowed` reads.
 async fn org_allowed(org: &str) -> bool {
-    if crate::db::file_list::BLOCKED_ORGS.contains(org) {
+    if super::super::org_being_deleted(org) || crate::db::file_list::BLOCKED_ORGS.contains(org) {
         return false;
     }
     #[cfg(feature = "cloud")]
@@ -262,10 +273,31 @@ async fn claim_under_lock(org: &str, stream: &str) -> Option<i64> {
     claimed
 }
 
-async fn org_table(org: &str, claimed_offsets: &[i64], settings: &Settings, now: i64) -> TableRef {
-    if let Some(t) = ORG_TABLES.get(org) {
-        return t.clone();
+/// `None` when the org turned blocked while the tick was claiming its streams.
+async fn org_table(
+    org: &str,
+    claimed_offsets: &[i64],
+    settings: &Settings,
+    now: i64,
+) -> Option<TableRef> {
+    let cached = ORG_TABLES.get(org).map(|t| t.clone());
+    let table = match cached {
+        Some(table) => table,
+        None => load_org_table(org, claimed_offsets, settings, now).await,
+    };
+    // The status cache is marked before `forget_org` runs, so any entry it missed is removed here.
+    if crate::db::org_status::is_gone(org) {
+        ORG_TABLES.remove(org);
     }
+    (!super::super::org_being_deleted(org)).then_some(table)
+}
+
+async fn load_org_table(
+    org: &str,
+    claimed_offsets: &[i64],
+    settings: &Settings,
+    now: i64,
+) -> TableRef {
     let path = snapshot_path(org);
     let loaded = tokio::task::spawn_blocking(move || read_snapshot_file(&path, now))
         .await
@@ -396,16 +428,37 @@ async fn snapshot_if_due(org: &str, table: &TableRef, now: i64) {
         t.snapshot()
     };
     let path = snapshot_path(org);
+    let owner = org.to_string();
     // JSON encoding of up to 200k keys happens off the lock and off the runtime threads
     let write = move || {
-        let bytes = snap.to_json().map_err(std::io::Error::other)?;
-        write_snapshot_file(&path, &bytes)
+        persist_snapshot(&owner, &path, |path| {
+            let bytes = snap.to_json().map_err(std::io::Error::other)?;
+            write_snapshot_file(path, &bytes)
+        })
     };
     match tokio::task::spawn_blocking(write).await {
         Ok(Ok(())) => {}
         Ok(Err(e)) => log::warn!("[ServiceGraph] org {org}: snapshot write failed: {e}"),
         Err(e) => log::warn!("[ServiceGraph] org {org}: snapshot task failed: {e}"),
     }
+}
+
+/// Skips a blocked org, and undoes a write, even a failed one, that raced the org's `forget_org`.
+fn persist_snapshot(
+    org: &str,
+    path: &Path,
+    write: impl FnOnce(&Path) -> std::io::Result<()>,
+) -> std::io::Result<()> {
+    if super::super::org_being_deleted(org) {
+        return Ok(());
+    }
+    let written = write(path);
+    // The status cache is marked before `forget_org` runs, so this sees any removal it missed.
+    if crate::db::org_status::is_gone(org) {
+        remove_snapshot_file(path);
+        return Ok(());
+    }
+    written
 }
 
 async fn process_stream(job: StreamJob, settings: &Settings, now: i64) {
@@ -956,5 +1009,164 @@ mod tests {
         assert_eq!(t.pairing_up_to, 100);
         settle_ql_trigger(&mut t, false, 900);
         assert_eq!(t.pairing_up_to, 900);
+    }
+
+    #[tokio::test]
+    async fn test_org_not_active_is_not_allowed() {
+        use common::{infra::config::ORG_STATUS_CACHE, meta::organization::OrgStatus};
+        let org = "sg-v4-pending-org";
+        ORG_STATUS_CACHE.insert(org.to_string(), OrgStatus::PendingDeletion);
+        let allowed = org_allowed(org).await;
+        ORG_STATUS_CACHE.remove(org);
+        assert!(!allowed, "a pending org's traces were still scheduled");
+    }
+
+    fn snapshot_dir(name: &str) -> std::path::PathBuf {
+        std::env::temp_dir().join(format!("sg_persist_{name}_{}", std::process::id()))
+    }
+
+    #[test]
+    fn test_persist_snapshot_writes_for_an_active_org_only() {
+        use common::{infra::config::ORG_STATUS_CACHE, meta::organization::OrgStatus};
+        let dir = snapshot_dir("active");
+        let path = dir.join("org.json");
+        let write = |p: &Path| write_snapshot_file(p, b"{}");
+        persist_snapshot("sg-v4-persist-active", &path, write).unwrap();
+        assert!(path.exists());
+
+        let gone = "sg-v4-persist-gone";
+        let gone_path = dir.join("gone.json");
+        ORG_STATUS_CACHE.insert(gone.to_string(), OrgStatus::Deleting);
+        persist_snapshot(gone, &gone_path, write).unwrap();
+        ORG_STATUS_CACHE.remove(gone);
+        assert!(!gone_path.exists(), "a deleting org's snapshot was written");
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn test_persist_snapshot_undoes_a_write_that_raced_the_deletion() {
+        use common::{infra::config::ORG_STATUS_CACHE, meta::organization::OrgStatus};
+        let org = "sg-v4-persist-raced";
+        let dir = snapshot_dir("raced");
+        let path = dir.join("org.json");
+        persist_snapshot(org, &path, |p| {
+            // The deleted broadcast and its forget_org land while this write is in flight.
+            ORG_STATUS_CACHE.insert(org.to_string(), OrgStatus::Deleted);
+            write_snapshot_file(p, b"{}")
+        })
+        .unwrap();
+        ORG_STATUS_CACHE.remove(org);
+        assert!(
+            !path.exists(),
+            "a write that finished after forget_org left the file"
+        );
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn test_persist_snapshot_keeps_a_pending_orgs_snapshot_written_during_the_soft_delete() {
+        use common::{infra::config::ORG_STATUS_CACHE, meta::organization::OrgStatus};
+        let org = "sg-v4-persist-pending";
+        let dir = snapshot_dir("pending");
+        let path = dir.join("org.json");
+        persist_snapshot(org, &path, |p| {
+            // A soft delete may be restored, so its learned table must survive on disk.
+            ORG_STATUS_CACHE.insert(org.to_string(), OrgStatus::PendingDeletion);
+            write_snapshot_file(p, b"{}")
+        })
+        .unwrap();
+        ORG_STATUS_CACHE.remove(org);
+        assert!(path.exists(), "a pending org's fresh snapshot was removed");
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn test_persist_snapshot_reports_no_failure_for_a_write_the_deletion_broke() {
+        use common::{infra::config::ORG_STATUS_CACHE, meta::organization::OrgStatus};
+        let org = "sg-v4-persist-broken";
+        let dir = snapshot_dir("broken");
+        let path = dir.join("org.json");
+        let result = persist_snapshot(org, &path, |p| {
+            write_snapshot_file(p, b"{}")?;
+            ORG_STATUS_CACHE.insert(org.to_string(), OrgStatus::Deleting);
+            // forget_org removed the temp file before the rename.
+            Err(std::io::ErrorKind::NotFound.into())
+        });
+        ORG_STATUS_CACHE.remove(org);
+        assert!(result.is_ok(), "{result:?}");
+        assert!(!path.exists());
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[tokio::test]
+    async fn test_org_table_does_not_keep_a_table_for_an_org_deleted_mid_tick() {
+        use common::{infra::config::ORG_STATUS_CACHE, meta::organization::OrgStatus};
+        let settings = Settings {
+            interval_secs: 60,
+            flush_secs: 60,
+            cache_delay_secs: 0,
+        };
+        let now = now_micros();
+        for (org, status, kept) in [
+            ("sg-v4-table-deleting", OrgStatus::Deleting, false),
+            ("sg-v4-table-deleted", OrgStatus::Deleted, false),
+            ("sg-v4-table-pending", OrgStatus::PendingDeletion, true),
+        ] {
+            // The status lands after org_allowed and the stream claims, before the table load.
+            ORG_STATUS_CACHE.insert(org.to_string(), status);
+            let table = org_table(org, &[now], &settings, now).await;
+            ORG_STATUS_CACHE.remove(org);
+            assert!(table.is_none(), "{org} was still processed");
+            assert_eq!(ORG_TABLES.remove(org).is_some(), kept, "{org}");
+        }
+        let active = org_table("sg-v4-table-active", &[now], &settings, now).await;
+        assert!(active.is_some());
+        assert!(ORG_TABLES.remove("sg-v4-table-active").is_some());
+    }
+
+    #[tokio::test]
+    async fn test_org_table_skips_a_cached_org_that_turned_blocked() {
+        use common::{infra::config::ORG_STATUS_CACHE, meta::organization::OrgStatus};
+        let settings = Settings {
+            interval_secs: 60,
+            flush_secs: 60,
+            cache_delay_secs: 0,
+        };
+        let now = now_micros();
+        for (org, status, kept) in [
+            ("sg-v4-cached-deleting", OrgStatus::Deleting, false),
+            ("sg-v4-cached-deleted", OrgStatus::Deleted, false),
+            ("sg-v4-cached-pending", OrgStatus::PendingDeletion, true),
+        ] {
+            ORG_TABLES.insert(
+                org.to_string(),
+                Arc::new(RwLock::new(ResolutionTable::new(0, 0))),
+            );
+            ORG_STATUS_CACHE.insert(org.to_string(), status);
+            let table = org_table(org, &[now], &settings, now).await;
+            ORG_STATUS_CACHE.remove(org);
+            assert!(table.is_none(), "{org} was still processed");
+            assert_eq!(ORG_TABLES.remove(org).is_some(), kept, "{org}");
+        }
+        let org = "sg-v4-cached-active";
+        let cached = Arc::new(RwLock::new(ResolutionTable::new(0, 0)));
+        ORG_TABLES.insert(org.to_string(), cached.clone());
+        let table = org_table(org, &[now], &settings, now).await;
+        assert!(table.is_some_and(|t| Arc::ptr_eq(&t, &cached)));
+        assert!(ORG_TABLES.remove(org).is_some());
+    }
+
+    #[tokio::test]
+    async fn test_forget_org_removes_the_snapshot_and_the_table() {
+        let org = "sg-v4-forget-org";
+        let path = snapshot_path(org);
+        write_snapshot_file(&path, b"{}").unwrap();
+        ORG_TABLES.insert(
+            org.to_string(),
+            Arc::new(RwLock::new(ResolutionTable::new(0, 0))),
+        );
+        forget_org(org);
+        assert!(!path.exists());
+        assert!(!ORG_TABLES.contains_key(org));
     }
 }

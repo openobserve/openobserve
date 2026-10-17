@@ -517,14 +517,59 @@ pub async fn delete_all<C: ConnectionTrait>(conn: &C) -> Result<(), Error> {
     Ok(())
 }
 
-/// Deletes all reports belonging to the given org.
-pub async fn delete_by_org(org_id: &str) -> Result<(), Error> {
-    let client = crate::db::get_orm_client_rw().await;
-    reports::Entity::delete_many()
+/// Deletes every report of the org; returns each `(id, folder_id)`, the folder's own id.
+pub async fn delete_by_org(org_id: &str) -> Result<Vec<(String, String)>, Error> {
+    use sea_orm::QuerySelect;
+
+    use super::entity::folders;
+
+    let txn = crate::db::get_orm_client_rw().await.begin().await?;
+    let folder_ids: std::collections::HashMap<String, String> = folders::Entity::find()
+        .select_only()
+        .column(folders::Column::Id)
+        .column(folders::Column::FolderId)
+        .filter(folders::Column::Org.eq(org_id))
+        .into_tuple::<(String, String)>()
+        .all(&txn)
+        .await?
+        .into_iter()
+        .collect();
+    let delete = reports::Entity::delete_many().filter(reports::Column::Org.eq(org_id));
+    let deleted: Vec<(String, String)> = crate::table::delete_returning(
+        &txn,
+        delete,
+        &[reports::Column::Id, reports::Column::FolderId],
+    )
+    .await?;
+    txn.commit().await?;
+    Ok(deleted
+        .into_iter()
+        .map(|(id, pk)| (id, folder_ids.get(&pk).cloned().unwrap_or(pk)))
+        .collect())
+}
+
+/// Each report of the org with its folder's `folder_id`, including reports no dashboard joins.
+pub async fn list_ids_by_org<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+) -> Result<Vec<(String, String)>, Error> {
+    use sea_orm::{QuerySelect, RelationTrait};
+
+    use super::entity::folders;
+
+    let ids = reports::Entity::find()
+        .select_only()
+        .column(reports::Column::Id)
+        .column(folders::Column::FolderId)
+        .join(
+            sea_orm::JoinType::InnerJoin,
+            reports::Relation::Folders.def(),
+        )
         .filter(reports::Column::Org.eq(org_id))
-        .exec(client)
+        .into_tuple::<(String, String)>()
+        .all(conn)
         .await?;
-    Ok(())
+    Ok(ids)
 }
 
 /// Lists the reports the satisfy the given parameters.

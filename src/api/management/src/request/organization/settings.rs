@@ -270,11 +270,16 @@ async fn check_domain_org_mappings(
         return Ok(settings);
     }
     for mapping in &mut mappings {
-        if openobserve_core::organization::get_org(&mapping.org_id)
-            .await
-            .is_none()
-        {
-            return Err(format!("No org with org id {} found", mapping.org_id));
+        // A deleted org keeps its row as a tombstone, so the row alone does not make it a target.
+        match db::org_status::read_active(&mapping.org_id).await {
+            Ok(true) => {}
+            Ok(false) => return Err(format!("No org with org id {} found", mapping.org_id)),
+            Err(e) => {
+                return Err(format!(
+                    "cannot read the status of org {}: {e}",
+                    mapping.org_id
+                ));
+            }
         }
 
         if mapping.domain.is_empty() || mapping.domain.contains(' ') {

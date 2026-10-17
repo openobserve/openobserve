@@ -269,6 +269,16 @@ impl super::FileList for SqliteFileList {
         Ok(())
     }
 
+    async fn release_deleted(&self, ids: &[i64], created_at: i64) -> Result<()> {
+        let pool = CLIENT_RW.clone();
+        for ids in ids.chunks(100) {
+            let ids = ids.iter().map(i64::to_string).collect::<Vec<_>>().join(",");
+            let sql = format!("UPDATE file_list_deleted SET created_at = $1 WHERE id IN ({ids});");
+            sqlx::query(&sql).bind(created_at).execute(&pool).await?;
+        }
+        Ok(())
+    }
+
     async fn get(&self, file: &str) -> Result<FileMeta> {
         let pool = CLIENT_RO.clone();
         let (stream_key, date_key, file_name) =
@@ -761,6 +771,42 @@ SELECT date
                 flattened: r.flattened,
             })
             .collect())
+    }
+
+    async fn remove_deleted_unless_org_deleting(&self, org_id: &str, ids: &[i64]) -> Result<bool> {
+        let pool = CLIENT_RW.clone();
+        let mut tx = pool.begin().await?;
+        let status: Option<String> =
+            sqlx::query_scalar("SELECT status FROM organizations WHERE identifier = $1;")
+                .bind(org_id)
+                .fetch_optional(&mut *tx)
+                .await?;
+        if matches!(status.as_deref(), Some("deleting" | "deleted")) {
+            tx.rollback().await?;
+            return Ok(false);
+        }
+        for chunk in ids.chunks(100) {
+            let mut query =
+                QueryBuilder::<Sqlite>::new("DELETE FROM file_list_deleted WHERE id IN (");
+            let mut list = query.separated(", ");
+            for id in chunk {
+                list.push_bind(*id);
+            }
+            query.push(")");
+            query.build().execute(&mut *tx).await?;
+        }
+        tx.commit().await?;
+        Ok(true)
+    }
+
+    async fn has_deleted_by_org(&self, org_id: &str) -> Result<bool> {
+        let pool = CLIENT_RO.clone();
+        let any: bool =
+            sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM file_list_deleted WHERE org = $1);")
+                .bind(org_id)
+                .fetch_one(&pool)
+                .await?;
+        Ok(any)
     }
 
     async fn get_min_date(
@@ -1530,28 +1576,109 @@ WHERE org = $1 AND account = $2;"#;
         Ok(ret.unwrap_or_default())
     }
 
-    async fn delete_by_org(&self, org_id: &str) -> Result<()> {
-        let client = CLIENT_RW.clone();
-        let created_at = now_micros();
-        let mut tx = client.begin().await?;
-        // Move remaining rows into file_list_deleted first so the file GC removes
-        // the backing S3 objects. A bare DELETE would orphan those files in object
-        // store. (Normal per-stream deletion already routes files here; this is the
-        // catch-all for rows whose stream schema is already gone.)
-        sqlx::query(
-            r#"INSERT INTO file_list_deleted (account, org, stream, date, file, index_file, mindex_file, flattened, created_at)
-               SELECT account, org, stream, date, file, index_file, mindex_size > 0, flattened, $2
-               FROM file_list WHERE org = $1;"#,
+    async fn list_stats_streams_by_org(&self, org_id: &str) -> Result<Vec<String>> {
+        let client = CLIENT_RO.clone();
+        let streams =
+            sqlx::query_scalar("SELECT DISTINCT stream FROM stream_stats WHERE org = $1;")
+                .bind(org_id)
+                .fetch_all(&client)
+                .await?;
+        Ok(streams)
+    }
+
+    async fn list_streams_updated_between(
+        &self,
+        org_id: &str,
+        time_range: (i64, i64),
+    ) -> Result<Vec<String>> {
+        let client = CLIENT_RO.clone();
+        let streams = sqlx::query_scalar(
+            r#"SELECT stream FROM file_list WHERE updated_at >= $2 AND updated_at < $3 AND org = $1
+               UNION
+               SELECT stream FROM file_list_history WHERE updated_at >= $2 AND updated_at < $3 AND org = $1;"#,
         )
         .bind(org_id)
-        .bind(created_at)
-        .execute(&mut *tx)
+        .bind(time_range.0)
+        .bind(time_range.1)
+        .fetch_all(&client)
         .await?;
-        sqlx::query("DELETE FROM file_list WHERE org = $1;")
+        Ok(streams)
+    }
+
+    async fn list_org_streams_by_scan(&self, org_id: &str) -> Result<Vec<String>> {
+        let client = CLIENT_RO.clone();
+        let streams = sqlx::query_scalar(
+            r#"SELECT stream FROM file_list WHERE org = $1
+               UNION
+               SELECT stream FROM file_list_history WHERE org = $1
+               UNION
+               SELECT stream FROM file_list_jobs WHERE org = $1;"#,
+        )
+        .bind(org_id)
+        .fetch_all(&client)
+        .await?;
+        Ok(streams)
+    }
+
+    async fn remove_stream_batch(
+        &self,
+        table: super::StreamRowsTable,
+        org_id: &str,
+        stream: &str,
+        limit: i64,
+        to_deleted: bool,
+    ) -> Result<u64> {
+        let table = table.name();
+        let client = CLIENT_RW.clone();
+        let batch =
+            format!("SELECT id FROM {table} WHERE stream = $1 AND org = $2 ORDER BY id LIMIT $3");
+        let mut tx = client.begin().await?;
+        if to_deleted {
+            sqlx::query(&format!(
+                r#"INSERT INTO file_list_deleted (account, org, stream, date, file, index_file, mindex_file, flattened, created_at)
+                   SELECT account, org, stream, date, file, index_size > 0, mindex_size > 0, flattened, $4
+                   FROM {table} WHERE id IN ({batch});"#
+            ))
+            .bind(stream)
             .bind(org_id)
+            .bind(limit)
+            .bind(now_micros())
             .execute(&mut *tx)
             .await?;
+        }
+        let removed = sqlx::query(&format!("DELETE FROM {table} WHERE id IN ({batch});"))
+            .bind(stream)
+            .bind(org_id)
+            .bind(limit)
+            .execute(&mut *tx)
+            .await?
+            .rows_affected();
         tx.commit().await?;
+        Ok(removed)
+    }
+
+    async fn delete_jobs_by_streams(&self, org_id: &str, streams: &[String]) -> Result<()> {
+        if streams.is_empty() {
+            return Ok(());
+        }
+        let client = CLIENT_RW.clone();
+        let mut query = QueryBuilder::<Sqlite>::new("DELETE FROM file_list_jobs WHERE org = ");
+        query.push_bind(org_id).push(" AND stream IN (");
+        let mut list = query.separated(", ");
+        for stream in streams {
+            list.push_bind(stream);
+        }
+        list.push_unseparated(")");
+        query.build().execute(&client).await?;
+        Ok(())
+    }
+
+    async fn delete_stream_stats_by_org(&self, org_id: &str) -> Result<()> {
+        let client = CLIENT_RW.clone();
+        sqlx::query("DELETE FROM stream_stats WHERE org = $1;")
+            .bind(org_id)
+            .execute(&client)
+            .await?;
         Ok(())
     }
 }

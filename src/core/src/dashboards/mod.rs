@@ -518,6 +518,22 @@ async fn reconcile_home_dashboard_on_move(org_id: &str, dashboard_id: &str, to_f
     }
 }
 
+/// Drops the dashboard's distinct-value rows and its ownership tuples.
+async fn forget_dashboard(
+    org_id: &str,
+    dashboard_id: &str,
+    folder_id: &str,
+) -> Result<(), DashboardError> {
+    distinct_values::batch_remove(OriginType::Dashboard, dashboard_id).await?;
+    let dashboard = Authz {
+        obj_id: dashboard_id.to_owned(),
+        parent_type: "folders".to_owned(),
+        parent: folder_id.to_owned(),
+    };
+    remove_ownership(org_id, "dashboards", dashboard).await;
+    Ok(())
+}
+
 /// Clear the org's pinned `home_dashboard` setting when the pinned dashboard is
 /// deleted. Best-effort — never fails the caller.
 async fn reconcile_home_dashboard_on_delete(org_id: &str, dashboard_id: &str) {
@@ -593,6 +609,48 @@ pub async fn delete_dashboard(org_id: &str, dashboard_id: &str) -> Result<(), Da
         .await;
     }
 
+    Ok(())
+}
+
+/// Org teardown: deletes each listed dashboard by its primary row, then drops the unparsable rows.
+pub async fn delete_by_org(org_id: &str) -> Result<(), DashboardError> {
+    let dashboards: Vec<(String, String)> =
+        table::dashboards::list_skipping_invalid(ListDashboardsParams::new(org_id))
+            .await?
+            .into_iter()
+            .filter_map(|(folder, dashboard)| {
+                Some((dashboard.dashboard_id()?.to_string(), folder.folder_id))
+            })
+            .collect();
+    let local = |(dashboard_id, _): (String, String)| async move {
+        common::infra::config::DASHBOARD_ID_TO_ORG
+            .write()
+            .await
+            .remove(&dashboard_id);
+    };
+    let broadcast = |(dashboard_id, _): (String, String)| async move {
+        infra::coordinator::dashboards::emit_delete_event(org_id, &dashboard_id).await?;
+        Ok::<(), DashboardError>(())
+    };
+    db::teardown::evict_then_delete(
+        dashboards,
+        &local,
+        &broadcast,
+        |(dashboard_id, folder_id): (String, String)| async move {
+            forget_dashboard(org_id, &dashboard_id, &folder_id).await?;
+            table::dashboards::delete_from_folder(org_id, &folder_id, &dashboard_id).await?;
+            reconcile_home_dashboard_on_delete(org_id, &dashboard_id).await;
+            Ok(())
+        },
+    )
+    .await?;
+    // Also unparseable rows; the delete names each row the listing missed, which goes after it.
+    for (dashboard_id, folder_id) in table::dashboards::delete_by_org(org_id).await? {
+        forget_dashboard(org_id, &dashboard_id, &folder_id).await?;
+        reconcile_home_dashboard_on_delete(org_id, &dashboard_id).await;
+        let item = (dashboard_id, folder_id);
+        db::teardown::evict(local(item.clone()), broadcast(item)).await?;
+    }
     Ok(())
 }
 

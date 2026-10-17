@@ -61,7 +61,7 @@ use crate::MetricsQueryRequest;
 
 mod cache;
 pub mod grpc;
-pub use cache::get_cache_stats;
+pub use cache::{get_cache_stats, remove_org_results};
 
 #[derive(Debug)]
 pub struct SearchResponse {

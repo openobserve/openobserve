@@ -24,7 +24,9 @@ use config::{
 };
 use sea_orm::{
     ColumnTrait, EntityTrait, FromQueryResult, Order, PaginatorTrait, QueryFilter, QueryOrder,
-    QuerySelect, Schema, Set, entity::prelude::*, sea_query::Func,
+    QuerySelect, Schema, Set, TransactionTrait,
+    entity::prelude::*,
+    sea_query::{Func, Query},
 };
 use serde::{Deserialize, Serialize};
 
@@ -89,6 +91,14 @@ impl From<Model> for OrgUserRecord {
             allow_static_token: model.allow_static_token,
         }
     }
+}
+
+/// A membership `remove_all_members` deleted, and whether its user went with it.
+#[derive(Debug, PartialEq)]
+pub struct RemovedMember {
+    pub email: String,
+    pub role: UserRole,
+    pub user_removed: bool,
 }
 
 #[derive(Debug)]
@@ -602,6 +612,81 @@ pub async fn is_empty() -> bool {
     len().await == 0
 }
 
+/// Removes the membership and, if that leaves the user in no org, the user; returns whether it did.
+pub async fn remove_member(org_id: &str, email: &str) -> Result<bool, errors::Error> {
+    let db_err = |e: DbErr| Error::DbError(DbError::SeaORMError(e.to_string()));
+    let txn = get_orm_client_rw().await.begin().await.map_err(db_err)?;
+    Entity::delete_many()
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Expr::expr(Func::lower(Expr::col(Column::Email))).eq(email.to_lowercase()))
+        .exec(&txn)
+        .await
+        .map_err(db_err)?;
+    let removed = remove_orphaned_users(&txn, &[email.to_string()])
+        .await
+        .map_err(db_err)?;
+    txn.commit().await.map_err(db_err)?;
+    Ok(!removed.is_empty())
+}
+
+/// Removes every membership of the org, and each user it leaves in no org, in one transaction.
+pub async fn remove_all_members(org_id: &str) -> Result<Vec<RemovedMember>, errors::Error> {
+    let db_err = |e: DbErr| Error::DbError(DbError::SeaORMError(e.to_string()));
+    let txn = get_orm_client_rw().await.begin().await.map_err(db_err)?;
+    let delete = Entity::delete_many().filter(Column::OrgId.eq(org_id));
+    let members: Vec<(String, i16)> =
+        super::delete_returning(&txn, delete, &[Column::Email, Column::Role])
+            .await
+            .map_err(db_err)?;
+    let emails: Vec<String> = members.iter().map(|(email, _)| email.clone()).collect();
+    let removed = remove_orphaned_users(&txn, &emails).await.map_err(db_err)?;
+    txn.commit().await.map_err(db_err)?;
+    Ok(members
+        .into_iter()
+        .map(|(email, role)| RemovedMember {
+            user_removed: removed.contains(&email.to_lowercase()),
+            email,
+            role: role.into(),
+        })
+        .collect())
+}
+
+/// Deletes each of `emails` whose user holds no membership any more, then the auth rows it returns.
+async fn remove_orphaned_users<C: ConnectionTrait>(
+    txn: &C,
+    emails: &[String],
+) -> Result<Vec<String>, DbErr> {
+    if emails.is_empty() {
+        return Ok(vec![]);
+    }
+    let user_email = || {
+        Expr::expr(Func::lower(Expr::col((
+            users::Entity,
+            users::Column::Email,
+        ))))
+    };
+    let membership = Query::select()
+        .expr(Expr::val(1))
+        .from(Entity)
+        .and_where(
+            Expr::expr(Func::lower(Expr::col((Entity, Column::Email)))).eq(Func::lower(Expr::col(
+                (users::Entity, users::Column::Email),
+            ))),
+        )
+        .to_owned();
+    let delete = users::Entity::delete_many()
+        .filter(user_email().is_in(emails.iter().map(|e| e.to_lowercase())))
+        .filter(Expr::exists(membership).not());
+    let removed: Vec<String> =
+        super::delete_returning(txn, delete, &[users::Column::Email]).await?;
+    if removed.is_empty() {
+        return Ok(vec![]);
+    }
+    super::user_password_history::delete_all_for_users_on(txn, &removed).await?;
+    super::user_auth_state::delete_for_users_on(txn, &removed).await?;
+    Ok(removed.into_iter().map(|e| e.to_lowercase()).collect())
+}
+
 #[cfg(test)]
 mod tests {
     use config::meta::user::UserRole;
@@ -671,5 +756,129 @@ mod tests {
         assert_eq!(rec.rum_token.as_deref(), Some("rum-abc"));
         assert!(rec.allow_static_token);
         assert_eq!(rec.created_at, 1_000_000);
+    }
+
+    /// A users row, then a membership in each of `orgs`.
+    async fn member_of(email: &str, orgs: &[&str]) {
+        use super::super::entity::users as user_entity;
+        user_entity::ActiveModel {
+            id: Set(ider::uuid()),
+            email: Set(email.to_string()),
+            first_name: Set(String::new()),
+            last_name: Set(String::new()),
+            password: Set(String::new()),
+            salt: Set(String::new()),
+            is_root: Set(false),
+            password_ext: Set(None),
+            user_type: Set(UserType::Internal.into()),
+            created_at: Set(0),
+            updated_at: Set(0),
+            must_reset_password: Set(false),
+            password_reset_reason: Set(None),
+            flagged_at: Set(None),
+            password_updated_at: Set(None),
+        }
+        .insert(get_orm_client_rw().await)
+        .await
+        .unwrap();
+        for org in orgs {
+            add(org, email, UserRole::Admin, &ider::uuid(), None)
+                .await
+                .unwrap();
+        }
+        let auth = crate::table::user_auth_state::insert_first_failure(email, 1).await;
+        assert!(auth.unwrap());
+    }
+
+    async fn user_rows(email: &str) -> (bool, bool) {
+        let user = crate::table::users::get(email).await.is_ok();
+        let auth = crate::table::user_auth_state::get(email).await.unwrap();
+        (user, auth.is_some())
+    }
+
+    #[tokio::test]
+    async fn test_removing_a_member_keeps_a_user_another_org_still_holds() {
+        if !crate::table::testing::meta_store().await {
+            return;
+        }
+        let org = crate::table::testing::unique("t_rm_member");
+        let other = format!("{org}_other");
+        for org in [&org, &other] {
+            crate::table::organizations::add(org, org, OrganizationType::Custom)
+                .await
+                .unwrap();
+        }
+        let (shared, sole) = (
+            format!("{org}_shared@example.com"),
+            format!("{org}_sole@example.com"),
+        );
+        member_of(&shared, &[&org, &other]).await;
+        member_of(&sole, &[&org]).await;
+
+        let shared_removed = remove_member(&org, &shared.to_uppercase()).await.unwrap();
+        let sole_removed = remove_member(&org, &sole).await.unwrap();
+        let shared_rows = user_rows(&shared).await;
+        let sole_rows = user_rows(&sole).await;
+        let kept_membership = get(&other, &shared).await.is_ok();
+        let last_removed = remove_member(&other, &shared).await.unwrap();
+        let shared_gone = user_rows(&shared).await;
+        for org in [&org, &other] {
+            crate::table::organizations::remove(org).await.unwrap();
+        }
+
+        assert!(
+            !shared_removed,
+            "a user with a membership in another org was deleted"
+        );
+        assert_eq!(shared_rows, (true, true));
+        assert!(kept_membership);
+        assert!(sole_removed);
+        assert_eq!(
+            sole_rows,
+            (false, false),
+            "a sole-org user or its auth row survived"
+        );
+        assert!(last_removed);
+        assert_eq!(shared_gone, (false, false));
+    }
+
+    #[tokio::test]
+    async fn test_removing_all_members_deletes_only_users_left_in_no_org() {
+        if !crate::table::testing::meta_store().await {
+            return;
+        }
+        let org = crate::table::testing::unique("t_rm_all");
+        let other = format!("{org}_other");
+        for org in [&org, &other] {
+            crate::table::organizations::add(org, org, OrganizationType::Custom)
+                .await
+                .unwrap();
+        }
+        let (shared, sole) = (
+            format!("{org}_shared@example.com"),
+            format!("{org}_sole@example.com"),
+        );
+        member_of(&shared, &[&org, &other]).await;
+        member_of(&sole, &[&org]).await;
+
+        let mut removed: Vec<(String, bool)> = remove_all_members(&org)
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|member| (member.email, member.user_removed))
+            .collect();
+        removed.sort();
+        let left = list_users_by_org(&org).await.unwrap();
+        let shared_rows = user_rows(&shared).await;
+        let sole_rows = user_rows(&sole).await;
+        remove_all_members(&other).await.unwrap();
+        for org in [&org, &other] {
+            crate::table::organizations::remove(org).await.unwrap();
+        }
+
+        assert_eq!(removed, [(shared.clone(), false), (sole.clone(), true)]);
+        assert!(left.is_empty());
+        assert_eq!(shared_rows, (true, true));
+        assert_eq!(sole_rows, (false, false));
     }
 }

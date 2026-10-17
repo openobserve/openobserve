@@ -261,6 +261,17 @@ pub async fn remove(id: &str) -> Result<(), errors::Error> {
     Ok(())
 }
 
+/// Deletes an org's private locations; public locations carry no org and stay.
+pub async fn delete_by_org(org_id: &str) -> Result<(), errors::Error> {
+    Entity::delete_many()
+        .filter(Column::OrgId.eq(org_id))
+        .exec(get_orm_client_rw().await)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+    invalidate_and_publish().await;
+    Ok(())
+}
+
 /// Claims the right to send this location's "location down" notification,
 /// returning whether THIS caller won it.
 ///

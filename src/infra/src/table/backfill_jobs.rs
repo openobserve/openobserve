@@ -127,14 +127,11 @@ pub async fn delete(org: &str, job_id: &str) -> Result<(), errors::Error> {
     }
 }
 
-/// Deletes all backfill jobs belonging to the given org.
-pub async fn delete_by_org(org: &str) -> Result<(), errors::Error> {
+/// Deletes all backfill jobs belonging to the given org and returns their ids.
+pub async fn delete_by_org(org: &str) -> Result<Vec<String>, errors::Error> {
     let client = get_orm_client_rw().await;
-    Entity::delete_many()
-        .filter(Column::Org.eq(org))
-        .exec(client)
-        .await?;
-    Ok(())
+    let delete = Entity::delete_many().filter(Column::Org.eq(org));
+    Ok(super::delete_returning(client, delete, &[Column::Id]).await?)
 }
 
 pub async fn update(job: &BackfillJob) -> Result<(), errors::Error> {
@@ -238,5 +235,39 @@ mod tests {
         assert!(job.chunk_period_minutes.is_none());
         assert!(job.delay_between_chunks_secs.is_none());
         assert!(!job.delete_before_backfill);
+    }
+
+    #[tokio::test]
+    async fn test_org_delete_returns_exactly_the_job_ids_it_removed() {
+        if !crate::table::testing::meta_store().await {
+            return;
+        }
+        let org = crate::table::testing::unique("t_backfill");
+        let other = format!("{org}_other");
+        let job = |id: &str, org: &str| BackfillJob {
+            id: id.to_string(),
+            org: org.to_string(),
+            pipeline_id: "p".to_string(),
+            start_time: 0,
+            end_time: 1,
+            chunk_period_minutes: None,
+            delay_between_chunks_secs: None,
+            delete_before_backfill: false,
+            created_at: 1,
+            enabled: true,
+        };
+        let ids = [format!("{org}_1"), format!("{org}_2"), format!("{org}_3")];
+        for (id, owner) in [(&ids[0], &org), (&ids[1], &org), (&ids[2], &other)] {
+            add(job(id, owner)).await.unwrap();
+        }
+
+        let mut removed = delete_by_org(&org).await.unwrap();
+        removed.sort();
+        let left = list_by_org(&org).await.unwrap();
+        let kept = delete_by_org(&other).await.unwrap();
+
+        assert_eq!(removed, [ids[0].clone(), ids[1].clone()]);
+        assert!(left.is_empty());
+        assert_eq!(kept, [ids[2].clone()]);
     }
 }

@@ -21,7 +21,7 @@ use config::{
 };
 use sea_orm::{
     ActiveModelTrait, ActiveValue::NotSet, ColumnTrait, ConnectionTrait, EntityTrait, ModelTrait,
-    QueryFilter, QueryOrder, Set, TryIntoModel,
+    QueryFilter, QueryOrder, QuerySelect, Set, TryIntoModel,
 };
 
 use crate::{
@@ -31,6 +31,8 @@ use crate::{
 };
 
 const DEFAULT_ORG: &str = "default";
+/// Names per `IN` list, well under every backend's bind-parameter limit.
+const NAMES_PER_QUERY: usize = 500;
 
 impl TryFrom<Model> for Template {
     type Error = TemplateError;
@@ -200,6 +202,91 @@ pub async fn delete_by_org(org_id: &str) -> Result<(), Error> {
     Ok(())
 }
 
+/// `(id, name)` of each template of exactly this org.
+pub async fn list_ids_by_org(org_id: &str) -> Result<Vec<(String, String)>, Error> {
+    let client = get_orm_client_ro().await;
+    let ids = Entity::find()
+        .select_only()
+        .column(Column::Id)
+        .column(Column::Name)
+        .filter(Column::Org.eq(org_id))
+        .into_tuple::<(String, String)>()
+        .all(client)
+        .await?;
+    Ok(ids)
+}
+
+/// The `names` another org holds while not deleting or deleted (no row = live), once per name.
+pub async fn names_held_by_live_orgs(org_id: &str, names: &[String]) -> Result<Vec<String>, Error> {
+    use sea_orm::sea_query::Query;
+
+    use crate::{
+        coordinator::org_status::{STATUS_DELETED, STATUS_DELETING},
+        table::entity::organizations,
+    };
+
+    let client = get_orm_client_ro().await;
+    let mut held = Vec::new();
+    for chunk in names.chunks(NAMES_PER_QUERY) {
+        // The inverse set is small: only orgs being deleted, never every live org.
+        let gone = Query::select()
+            .column(organizations::Column::Identifier)
+            .from(organizations::Entity)
+            .and_where(organizations::Column::Status.is_in([STATUS_DELETING, STATUS_DELETED]))
+            .to_owned();
+        let found = Entity::find()
+            .select_only()
+            .column(Column::Name)
+            .filter(Column::Name.is_in(chunk.iter().cloned()))
+            .filter(Column::Org.ne(org_id))
+            .filter(Column::Org.not_in_subquery(gone))
+            .distinct()
+            .into_tuple::<String>()
+            .all(client)
+            .await?;
+        held.extend(found);
+    }
+    Ok(held)
+}
+
+/// Deletes the template unless another org's destination uses it; never falls back to `default`.
+pub async fn delete_unused_by_id(org_id: &str, id: &str) -> Result<bool, Error> {
+    let client = get_orm_client_rw().await;
+    let deleted = Entity::delete_many()
+        .filter(Column::Id.eq(id))
+        .filter(unused_by_other_orgs(org_id))
+        .exec(client)
+        .await?;
+    Ok(deleted.rows_affected > 0)
+}
+
+/// Deletes every template of the org no other org's destination uses; returns their `(id, name)`.
+pub async fn delete_unused_by_org(org_id: &str) -> Result<Vec<(String, String)>, Error> {
+    let client = get_orm_client_rw().await;
+    let delete = Entity::delete_many().filter(unused_by_other_orgs(org_id));
+    Ok(super::delete_returning(client, delete, &[Column::Id, Column::Name]).await?)
+}
+
+/// The org's templates, minus any another org's destination uses, decided by the same statement.
+fn unused_by_other_orgs(org_id: &str) -> sea_orm::Condition {
+    use sea_orm::sea_query::{Expr, Query};
+
+    use crate::table::entity::destinations;
+
+    let used = Query::select()
+        .expr(Expr::val(1))
+        .from(destinations::Entity)
+        .and_where(
+            Expr::col((destinations::Entity, destinations::Column::TemplateId))
+                .equals((Entity, Column::Id)),
+        )
+        .and_where(Expr::col((destinations::Entity, destinations::Column::Org)).ne(org_id))
+        .to_owned();
+    sea_orm::Condition::all()
+        .add(Column::Org.eq(org_id))
+        .add(Expr::exists(used).not())
+}
+
 #[cfg(test)]
 mod tests {
     use sea_orm::{Database, DatabaseConnection, Schema};
@@ -367,5 +454,64 @@ mod tests {
         model.kind = "content".to_string();
         let tmpl = Template::try_from(model).unwrap();
         assert_eq!(tmpl.kind, TemplateKind::Content);
+    }
+
+    async fn insert_template(org: &str, name: &str) -> String {
+        let id = ider::uuid();
+        ActiveModel {
+            id: Set(id.clone()),
+            org: Set(org.to_string()),
+            name: Set(name.to_string()),
+            is_default: Set(false),
+            r#type: Set("http".to_string()),
+            body: Set("{}".to_string()),
+            title: Set(None),
+            kind: Set("custom".to_string()),
+        }
+        .insert(get_orm_client_rw().await)
+        .await
+        .unwrap();
+        id
+    }
+
+    #[tokio::test]
+    async fn test_a_template_another_orgs_destination_uses_survives_the_org_delete() {
+        use crate::table::entity::destinations;
+        if !crate::table::testing::meta_store().await {
+            return;
+        }
+        let org = crate::table::testing::unique("t_tpl");
+        let other = format!("{org}_other");
+        let unused = insert_template(&org, "unused").await;
+        let shared = insert_template(&org, "shared").await;
+        let destination = ider::uuid();
+        destinations::ActiveModel {
+            id: Set(destination.clone()),
+            org: Set(other.clone()),
+            name: Set("d".to_string()),
+            module: Set("alert".to_string()),
+            template_id: Set(Some(shared.clone())),
+            r#type: Set(serde_json::json!({})),
+        }
+        .insert(get_orm_client_rw().await)
+        .await
+        .unwrap();
+
+        let removed = delete_unused_by_org(&org).await.unwrap();
+        let held = delete_unused_by_id(&org, &shared).await.unwrap();
+        let left = list_ids_by_org(&org).await.unwrap();
+        destinations::Entity::delete_by_id(destination)
+            .exec(get_orm_client_rw().await)
+            .await
+            .unwrap();
+        let freed = delete_unused_by_id(&org, &shared).await.unwrap();
+
+        assert_eq!(removed, [(unused, "unused".to_string())]);
+        assert!(
+            !held,
+            "a template another org's destination uses was deleted"
+        );
+        assert_eq!(left, [(shared, "shared".to_string())]);
+        assert!(freed);
     }
 }

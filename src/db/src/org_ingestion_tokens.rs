@@ -90,10 +90,10 @@ async fn evict_removed_splunk_tokens(org_id: &str) {
 ///
 /// Neither map has a TTL and the validator answers from a cache hit before any
 /// DB lookup, so a row deleted without this stays usable on every node forever.
-fn evict_token_caches(org_id: &str, records: &[OrgIngestionTokenListRecord]) {
-    for record in records {
-        ORG_INGESTION_TOKENS.remove(&cache_key(org_id, &record.token));
-        if let Some(guid) = &record.splunk_token {
+fn evict_token_caches(org_id: &str, tokens: &[(String, Option<String>)]) {
+    for (token, splunk_token) in tokens {
+        ORG_INGESTION_TOKENS.remove(&cache_key(org_id, token));
+        if let Some(guid) = splunk_token {
             SPLUNK_HEC_TOKENS.remove(guid);
         }
     }
@@ -137,7 +137,7 @@ pub async fn rotate_token(org_id: &str, name: &str) -> Result<String, anyhow::Er
 
     // Notify about old token removal
     let old_key = event_key(org_id, &existing.token);
-    let _ = delete_from_db_coordinator(&old_key, false, true, None).await;
+    delete_from_db_coordinator(&old_key, false, true, None).await?;
 
     // Notify about new token
     let new_key = event_key(org_id, &new_token);
@@ -173,7 +173,7 @@ pub async fn set_enabled(org_id: &str, name: &str, enabled: bool) -> Result<(), 
     if enabled {
         let _ = put_into_db_coordinator(&key, Bytes::new(), true, None).await;
     } else {
-        let _ = delete_from_db_coordinator(&key, false, true, None).await;
+        delete_from_db_coordinator(&key, false, true, None).await?;
     }
     // Always replicate the token with its new `enabled` state; the receiving
     // cluster fires the matching coordinator event based on the flag.
@@ -237,15 +237,32 @@ pub async fn set_splunk_token(
 pub async fn delete_by_org(org_id: &str) -> Result<(), anyhow::Error> {
     let existing = org_ingestion_tokens::list_by_org(org_id).await?;
 
-    org_ingestion_tokens::delete_by_org(org_id).await?;
-
-    evict_token_caches(org_id, &existing);
-
+    // Evict cluster-wide while the rows still exist, so a failed event leaves them for the retry.
     for record in &existing {
         let key = event_key(org_id, &record.token);
-        let _ = delete_from_db_coordinator(&key, false, true, None).await;
+        delete_from_db_coordinator(&key, false, true, None).await?;
         #[cfg(feature = "enterprise")]
         super_cluster::org_ingestion_token_delete(&key).await?;
+    }
+
+    let mut tokens: Vec<(String, Option<String>)> = existing
+        .into_iter()
+        .map(|r| (r.token, r.splunk_token))
+        .collect();
+    // The delete names each row the listing missed, which is evicted only after it.
+    for (token, splunk_token) in org_ingestion_tokens::delete_by_org(org_id).await? {
+        if tokens.iter().all(|(listed, _)| *listed != token) {
+            #[cfg(feature = "enterprise")]
+            super_cluster::org_ingestion_token_delete(&event_key(org_id, &token)).await?;
+            tokens.push((token, splunk_token));
+        }
+    }
+
+    evict_token_caches(org_id, &tokens);
+
+    // A delete event that still finds the row keeps its Splunk GUID, so announce again once gone.
+    for (token, _) in &tokens {
+        delete_from_db_coordinator(&event_key(org_id, token), false, true, None).await?;
     }
     Ok(())
 }
@@ -456,17 +473,8 @@ mod tests {
         }
     }
 
-    fn list_record(token: &str, splunk_token: Option<&str>) -> OrgIngestionTokenListRecord {
-        OrgIngestionTokenListRecord {
-            name: token.to_string(),
-            token: token.to_string(),
-            description: String::new(),
-            is_default: false,
-            enabled: true,
-            created_by: String::new(),
-            created_at: 0,
-            splunk_token: splunk_token.map(str::to_string),
-        }
+    fn list_record(token: &str, splunk_token: Option<&str>) -> (String, Option<String>) {
+        (token.to_string(), splunk_token.map(str::to_string))
     }
 
     /// A cached token outliving its deleted org is how a hard-deleted org keeps

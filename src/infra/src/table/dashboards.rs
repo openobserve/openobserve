@@ -555,24 +555,44 @@ fn inner_data_as_json(dashboard: Dashboard) -> Result<JsonValue, errors::Error> 
     Ok(data)
 }
 
-/// Deletes all dashboards belonging to the given org (via folder join).
-pub async fn delete_by_org(org_id: &str) -> Result<(), errors::Error> {
-    let client = get_orm_client_rw().await;
-    // Collect folder PKs for this org
-    let folder_ids: Vec<String> = folders::Entity::find()
+/// Deletes all dashboards of the org (via folder join); returns each `(dashboard_id, folder_id)`.
+pub async fn delete_by_org(org_id: &str) -> Result<Vec<(String, String)>, errors::Error> {
+    use sea_orm::{QuerySelect, sea_query::Query};
+    let txn = get_orm_client_rw().await.begin().await?;
+    let folder_ids: std::collections::HashMap<String, String> = folders::Entity::find()
+        .select_only()
+        .column(folders::Column::Id)
+        .column(folders::Column::FolderId)
         .filter(folders::Column::Org.eq(org_id))
-        .all(client)
+        .into_tuple::<(String, String)>()
+        .all(&txn)
         .await?
         .into_iter()
-        .map(|f| f.id)
         .collect();
-    if !folder_ids.is_empty() {
-        dashboards::Entity::delete_many()
-            .filter(dashboards::Column::FolderId.is_in(folder_ids))
-            .exec(client)
-            .await?;
-    }
-    Ok(())
+    let org_folders = Query::select()
+        .column(folders::Column::Id)
+        .from(folders::Entity)
+        .and_where(folders::Column::Org.eq(org_id))
+        .to_owned();
+    let delete = dashboards::Entity::delete_many()
+        .filter(dashboards::Column::FolderId.in_subquery(org_folders));
+    let deleted: Vec<(String, String)> = super::delete_returning(
+        &txn,
+        delete,
+        &[
+            dashboards::Column::DashboardId,
+            dashboards::Column::FolderId,
+        ],
+    )
+    .await?;
+    txn.commit().await?;
+    Ok(deleted
+        .into_iter()
+        .map(|(dashboard_id, pk)| {
+            let folder_id = folder_ids.get(&pk).cloned().unwrap_or(pk);
+            (dashboard_id, folder_id)
+        })
+        .collect())
 }
 
 #[cfg(test)]

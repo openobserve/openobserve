@@ -440,6 +440,32 @@ pub async fn delete_folder(
     Ok(())
 }
 
+/// Org teardown: every folder without the emptiness checks, its ownership before its row.
+pub async fn delete_by_org(org_id: &str) -> Result<(), FolderError> {
+    let folder_types = [
+        FolderType::Dashboards,
+        FolderType::Alerts,
+        FolderType::Reports,
+        FolderType::Synthetics,
+        FolderType::Workflows,
+        FolderType::Prompts,
+        FolderType::Downtimes,
+    ];
+    for folder_type in folder_types {
+        for folder in table::folders::list_folders(org_id, folder_type).await? {
+            forget_folder(org_id, &folder.folder_id, folder_type).await;
+            table::folders::delete(org_id, &folder.folder_id, folder_type).await?;
+        }
+    }
+    // Also catches rows whose type no variant above maps, which the typed listing cannot see.
+    for (folder_id, folder_type) in table::folders::delete_by_org(org_id).await? {
+        if let Some(folder_type) = table::folders::folder_type_from_i16(folder_type) {
+            forget_folder(org_id, &folder_id, folder_type).await;
+        }
+    }
+    Ok(())
+}
+
 /// A downtime folder travels with the rows filed in it, so it waits for downtime replication too.
 #[cfg(feature = "enterprise")]
 fn publishes(folder_type: FolderType) -> bool {
@@ -578,6 +604,25 @@ async fn permitted_folders(
         }
     }
     Ok(folder_list)
+}
+
+/// Drops the folder's ownership tuples and tells other regions; both only log a failure.
+async fn forget_folder(org_id: &str, folder_id: &str, folder_type: FolderType) {
+    remove_ownership(
+        org_id,
+        folder_type_ofga_name(folder_type),
+        Authz::new(folder_id),
+    )
+    .await;
+    #[cfg(feature = "enterprise")]
+    if publishes(folder_type) {
+        let _ = o2_enterprise::enterprise::super_cluster::queue::folders_delete(
+            org_id,
+            folder_id,
+            folder_type,
+        )
+        .await;
+    }
 }
 
 #[cfg(test)]

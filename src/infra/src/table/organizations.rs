@@ -24,7 +24,7 @@ use config::{RwAHashMap, meta::organization::OrganizationType};
 use hashbrown::HashMap;
 use sea_orm::{
     ColumnTrait, ConnectionTrait, EntityTrait, FromQueryResult, Order, PaginatorTrait, QueryFilter,
-    QueryOrder, QuerySelect, Schema, Set, entity::prelude::*,
+    QueryOrder, QuerySelect, Schema, Set, TransactionTrait, entity::prelude::*,
 };
 
 use super::entity::organizations::{ActiveModel, Column, Entity, Model};
@@ -109,6 +109,18 @@ impl ListFilter {
 #[derive(FromQueryResult, Debug)]
 pub struct OrgId {
     pub identifier: String,
+}
+
+/// A tombstone and its `updated_at`, which tells it apart from a later org with the same id.
+#[derive(FromQueryResult, Debug, Clone, PartialEq)]
+pub struct TombstoneRow {
+    pub identifier: String,
+    pub updated_at: i64,
+}
+
+#[derive(FromQueryResult, Debug)]
+struct OrgStatusRow {
+    status: String,
 }
 
 pub async fn create_table() -> Result<(), errors::Error> {
@@ -258,6 +270,13 @@ pub async fn find(org_id: &str) -> Result<Option<OrganizationRecord>, errors::Er
     };
     fill_cache(org_id, org.clone(), epoch).await;
     Ok(Some(org))
+}
+
+/// The org row read from the database, bypassing the cache and leaving it untouched.
+pub async fn get_from_db(org_id: &str) -> Result<OrganizationRecord, errors::Error> {
+    find_in_db(get_orm_client_ro().await, org_id)
+        .await?
+        .ok_or_else(|| Error::DbError(DbError::SeaORMError("Organization not found".to_string())))
 }
 
 pub async fn list(filter: ListFilter) -> Result<Vec<OrganizationRecord>, errors::Error> {
@@ -427,6 +446,127 @@ pub async fn set_status_if_with_deleted_at(
     }
 }
 
+pub async fn list_ids_by_status(status: &str) -> Result<Vec<String>, errors::Error> {
+    let client = get_orm_client_ro().await;
+    Entity::find()
+        .select_only()
+        .column(Column::Identifier)
+        .filter(Column::Status.eq(status))
+        .into_tuple::<String>()
+        .all(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
+}
+
+/// `list_ids_by_status` with each org's `deleted_at`.
+pub async fn list_ids_and_deleted_at_by_status(
+    status: &str,
+) -> Result<Vec<(String, Option<i64>)>, errors::Error> {
+    let client = get_orm_client_ro().await;
+    Entity::find()
+        .select_only()
+        .column(Column::Identifier)
+        .column(Column::DeletedAt)
+        .filter(Column::Status.eq(status))
+        .into_tuple::<(String, Option<i64>)>()
+        .all(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
+}
+
+/// Tombstones whose deletion finished (`updated_at`) before `before`.
+pub async fn list_expired_tombstone_rows(before: i64) -> Result<Vec<TombstoneRow>, errors::Error> {
+    let client = get_orm_client_ro().await;
+    Entity::find()
+        .select_only()
+        .column(Column::Identifier)
+        .column(Column::UpdatedAt)
+        .filter(Column::Status.eq(STATUS_DELETED))
+        .filter(Column::UpdatedAt.lt(before))
+        .into_model::<TombstoneRow>()
+        .all(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
+}
+
+/// Deletes the org row only while it is the tombstone written at `updated_at`; the caller evicts.
+pub async fn remove_tombstone_at(org_id: &str, updated_at: i64) -> Result<bool, errors::Error> {
+    let client = get_orm_client_rw().await;
+    let result = Entity::delete_many()
+        .filter(Column::Identifier.eq(org_id))
+        .filter(Column::Status.eq(STATUS_DELETED))
+        .filter(Column::UpdatedAt.eq(updated_at))
+        .exec(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+    invalidate_cache(Some(org_id)).await;
+    Ok(result.rows_affected > 0)
+}
+
+/// The row's status read from the database, bypassing the cache; `None` when no row exists.
+pub async fn get_status_uncached(org_id: &str) -> Result<Option<String>, errors::Error> {
+    status_in(get_orm_client_ro().await, org_id).await
+}
+
+/// Flips a pending org to `deleting` only once its `deleted_at` is at or before `deleted_before`.
+pub async fn promote_due_in<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    deleted_before: i64,
+) -> Result<bool, errors::Error> {
+    use crate::coordinator::org_status::{STATUS_DELETING, STATUS_PENDING_DELETION};
+
+    let result = Entity::update_many()
+        .col_expr(Column::Status, Expr::value(STATUS_DELETING))
+        .col_expr(
+            Column::UpdatedAt,
+            Expr::value(config::utils::time::now_micros()),
+        )
+        .filter(Column::Identifier.eq(org_id))
+        .filter(Column::Status.eq(STATUS_PENDING_DELETION))
+        .filter(Column::DeletedAt.lte(deleted_before))
+        .exec(conn)
+        .await
+        .map_err(|e| errors::Error::Message(e.to_string()))?;
+    Ok(result.rows_affected > 0)
+}
+
+/// Flips a pending org to active; returns the `deleted_at` it cleared, or None when not pending.
+pub async fn restore_pending(org_id: &str) -> Result<Option<Option<i64>>, errors::Error> {
+    use crate::coordinator::org_status::STATUS_PENDING_DELETION;
+
+    let db_err = |e: sea_orm::DbErr| Error::DbError(DbError::SeaORMError(e.to_string()));
+    let txn = get_orm_client_rw().await.begin().await.map_err(db_err)?;
+    let pending = Entity::find()
+        .select_only()
+        .column(Column::DeletedAt)
+        .filter(Column::Identifier.eq(org_id))
+        .filter(Column::Status.eq(STATUS_PENDING_DELETION))
+        .into_tuple::<Option<i64>>()
+        .one(&txn)
+        .await
+        .map_err(db_err)?;
+    let Some(deleted_at) = pending else {
+        txn.rollback().await.map_err(db_err)?;
+        return Ok(None);
+    };
+    Entity::update_many()
+        .col_expr(Column::Status, Expr::value("active"))
+        .col_expr(Column::DeletedAt, Expr::value(Option::<i64>::None))
+        .col_expr(
+            Column::UpdatedAt,
+            Expr::value(config::utils::time::now_micros()),
+        )
+        .filter(Column::Identifier.eq(org_id))
+        .filter(Column::Status.eq(STATUS_PENDING_DELETION))
+        .exec(&txn)
+        .await
+        .map_err(db_err)?;
+    txn.commit().await.map_err(db_err)?;
+    invalidate_cache(Some(org_id)).await;
+    Ok(Some(deleted_at))
+}
+
 pub async fn invalidate_cache(org_id: Option<&str>) {
     let mut cache = CACHE.write().await;
     CACHE_EPOCH.fetch_add(1, Ordering::AcqRel);
@@ -447,6 +587,21 @@ async fn find_in_db<C: ConnectionTrait>(
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
     Ok(record.map(OrganizationRecord::from))
+}
+
+async fn status_in<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+) -> Result<Option<String>, errors::Error> {
+    let row = Entity::find()
+        .select_only()
+        .column(Column::Status)
+        .filter(Column::Identifier.eq(org_id))
+        .into_model::<OrgStatusRow>()
+        .one(conn)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+    Ok(row.map(|r| r.status))
 }
 
 fn cache_epoch() -> u64 {

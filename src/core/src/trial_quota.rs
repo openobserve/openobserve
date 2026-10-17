@@ -601,6 +601,20 @@ pub async fn set_limit(org_id: &str, usage_limit: u64) -> Result<(), anyhow::Err
     set_limit_for_pool(org_id, TrialQuotaPool::AiCredits, usage_limit).await
 }
 
+/// Drops every pool's counter, limit and consent of a deleted org from this node.
+pub fn evict_org(org_id: &str) {
+    let owned = |key: &String| {
+        key.split_once('\u{1f}')
+            .is_some_and(|(org, _)| org == org_id)
+    };
+    ORG_USAGE.write().retain(|key, _| !owned(key));
+    ORG_LIMITS.write().retain(|key, _| !owned(key));
+    let mut consent = ORG_PAID_OVERAGE.write();
+    // Bumped under the lock, so a reconciliation snapshot read before the eviction is discarded.
+    ORG_PAID_OVERAGE_EPOCH.fetch_add(1, Ordering::Release);
+    consent.retain(|key, _| !owned(key));
+}
+
 /// Reconcile explicit limits from the database. This runs on the existing
 /// flush interval so missed or out-of-order HA messages remain short-lived.
 ///
@@ -2086,6 +2100,41 @@ mod tests {
             scope("acme", TrialQuotaPool::AiCredits),
             scope("acme_ai_credits", TrialQuotaPool::AiCredits),
         );
+    }
+
+    #[test]
+    fn evict_org_drops_only_that_orgs_scopes() {
+        let gone = "evict-gone";
+        let kept = "evict-gone2";
+        for org in [gone, kept] {
+            set_cached_limit(org, TrialQuotaPool::AiCredits, 7);
+            apply_to_pool_counter(org, TrialQuotaPool::SyntheticsBrowserSteps, 3);
+            set_cached_paid_overage(org, TrialQuotaPool::AiCredits, true);
+        }
+        let epoch = ORG_PAID_OVERAGE_EPOCH.load(Ordering::Acquire);
+        evict_org(gone);
+        assert!(ORG_PAID_OVERAGE_EPOCH.load(Ordering::Acquire) > epoch);
+        assert_eq!(
+            get_pool_limit(gone, TrialQuotaPool::AiCredits),
+            TrialQuotaPool::AiCredits.default_limit()
+        );
+        assert_eq!(
+            get_pool_used(gone, TrialQuotaPool::SyntheticsBrowserSteps),
+            0
+        );
+        assert!(!get_paid_overage_enabled_for_pool(
+            gone,
+            TrialQuotaPool::AiCredits
+        ));
+        assert_eq!(get_pool_limit(kept, TrialQuotaPool::AiCredits), 7);
+        assert_eq!(
+            get_pool_used(kept, TrialQuotaPool::SyntheticsBrowserSteps),
+            3
+        );
+        assert!(get_paid_overage_enabled_for_pool(
+            kept,
+            TrialQuotaPool::AiCredits
+        ));
     }
 
     /// §4.2: this path must emit NO step event. It cannot know browser from

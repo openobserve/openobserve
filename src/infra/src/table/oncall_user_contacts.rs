@@ -95,6 +95,14 @@ pub fn same_person(user_email: &str) -> SimpleExpr {
     .eq(user_email.to_lowercase())
 }
 
+pub async fn delete_by_org<C: ConnectionTrait>(db: &C, org_id: &str) -> Result<u64, errors::Error> {
+    Ok(oncall_user_contacts::Entity::delete_many()
+        .filter(oncall_user_contacts::Column::OrgId.eq(org_id))
+        .exec(db)
+        .await?
+        .rows_affected)
+}
+
 async fn get_in<C: ConnectionTrait>(
     conn: &C,
     org_id: &str,
