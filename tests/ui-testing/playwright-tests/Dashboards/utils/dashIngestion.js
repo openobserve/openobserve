@@ -106,6 +106,91 @@ export const ingestion = async (page, streamName = "e2e_automate") => {
   }
 };
 
+// Ingests a dedicated stream whose breakdown field has more distinct values than
+// the dashboard's series cap (max_dashboard_series, default 100). No existing
+// fixture has a field with >100 distinct values, so this generates `count` records
+// each with a distinct breakdown value plus a numeric measure — the only
+// deterministic route to the series-cap notice. Mirrors the `ingestion()` POST
+// (INGESTION_URL + getAuthHeaders + getOrgIdentifier) above.
+export const ingestionHighCardinality = async (
+  page,
+  streamName,
+  { breakdownField = "breakdown", measureField = "metric_value", count = 150 } = {},
+) => {
+  if (!process.env["INGESTION_URL"]) {
+    throw new Error("Required environment variables are not set");
+  }
+
+  const nowUs = Date.now() * 1000;
+  const records = [];
+  for (let i = 0; i < count; i++) {
+    records.push({
+      [breakdownField]: `series-${i}`,
+      [measureField]: i + 1,
+      _timestamp: nowUs,
+    });
+  }
+
+  // Resolve headers/org per attempt so a refreshed passcode is picked up on retry.
+  const post = () =>
+    fetch(
+      `${process.env.INGESTION_URL}/api/${getOrgIdentifier()}/${streamName}/_json`,
+      {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify(records),
+      }
+    );
+
+  const MAX_ATTEMPTS = 3;
+  let fetchResponse;
+
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    try {
+      fetchResponse = await post();
+    } catch (networkError) {
+      if (attempt === MAX_ATTEMPTS) throw networkError;
+      testLogger.warn(
+        `High-cardinality ingestion request failed (${networkError.message}) — retrying (attempt ${attempt}/${MAX_ATTEMPTS})`
+      );
+      await new Promise((resolve) => setTimeout(resolve, 1000 * attempt));
+      continue;
+    }
+
+    // A rotated per-org passcode surfaces as 401/403 — refresh from the live session.
+    if ((fetchResponse.status === 401 || fetchResponse.status === 403) && page) {
+      testLogger.warn(
+        `High-cardinality ingestion returned ${fetchResponse.status} — refreshing cloud passcode and retrying`
+      );
+      if (await refreshCloudConfig(page)) continue;
+    }
+
+    if (fetchResponse.status >= 500 && attempt < MAX_ATTEMPTS) {
+      testLogger.warn(
+        `High-cardinality ingestion returned ${fetchResponse.status} — retrying (attempt ${attempt}/${MAX_ATTEMPTS})`
+      );
+      await new Promise((resolve) => setTimeout(resolve, 1000 * attempt));
+      continue;
+    }
+
+    break;
+  }
+
+  if (!fetchResponse.ok) {
+    const body = await fetchResponse.text().catch(() => "");
+    throw new Error(
+      `HTTP error! status: ${fetchResponse.status}, response: ${body.slice(0, 200)}`
+    );
+  }
+
+  testLogger.info("High-cardinality stream ingested", {
+    streamName,
+    count,
+    breakdownField,
+  });
+  return await fetchResponse.json();
+};
+
 // Dashboard maps ingestion
 
 // Ingestion function for Geomap and Maps chart
