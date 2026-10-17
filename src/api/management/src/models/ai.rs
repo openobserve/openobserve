@@ -110,6 +110,8 @@ pub struct PromptRequest {
     ///
     /// The frontend should pass the user's currently selected time range and stream context
     /// to enable the AI assistant to search within the relevant data scope.
+    ///
+    /// Also accepts `client` (the door envelope, `context.client`) and `locale`, sent on as is.
     #[serde(default)]
     #[schema(value_type = Object, example = json!({"start_time": 1768406781751488, "end_time": 1768496804185872, "stream_name": "default", "stream_type": "logs"}))]
     pub context: Map<String, Value>,

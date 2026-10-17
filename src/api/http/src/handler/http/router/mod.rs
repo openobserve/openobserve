@@ -534,6 +534,8 @@ pub async fn audit_middleware(request: Request, next: Next) -> Response {
             .to_string()
             .ends_with("_stream")
             || path.ends_with("ai/chat_stream")
+            // The handler writes its own record: the body is the prompt, its images and context.
+            || path.ends_with("ai/chat")
             || common::meta::ingestion_routes::is_ingestion_write(&http_method, ingestion_path))
     {
         let query_params = request.uri().query().unwrap_or("").to_string();

@@ -21,13 +21,17 @@ use axum::{
     Json,
     body::Body,
     extract::{FromRequestParts, Path},
-    http::StatusCode,
+    http::{HeaderValue, StatusCode},
     response::{IntoResponse, Response},
 };
+#[cfg(feature = "enterprise")]
+use bytes::Bytes;
 #[cfg(feature = "enterprise")]
 use config::meta::oncall::rca::RcaContext;
 use openobserve_api_common::{X_O2_ASSISTANT_SESSION_ID, extractors::Headers};
 use serde::Deserialize;
+#[cfg(feature = "enterprise")]
+use serde_json::Value;
 #[cfg(feature = "enterprise")]
 use {
     futures::StreamExt,
@@ -37,13 +41,20 @@ use {
             chat::{PersistSettings, TurnIdentity, TurnSpec, spawn_turn},
             client::{
                 DEFAULT_AGENT_TYPE, ImageAttachment, QueryRequest, RCA_AGENT_TYPE,
-                SESSION_OWNER_UNAVAILABLE, get_agent_client, is_session_owner_unavailable,
+                SESSION_OWNER_UNAVAILABLE, get_agent_client, is_agent_unreachable,
+                is_session_owner_unavailable, upstream_error_code, upstream_error_status,
+                upstream_retry_after,
             },
         },
-        common::config::get_config as get_o2_config,
+        common::config::{Ai, get_config as get_o2_config},
+    },
+    std::sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
     },
 };
 
+use super::error::{self, AiErrorAction, AiErrorCode, AiErrorEnvelope};
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
     models::ai::{PromptRequest, PromptResponse},
@@ -74,9 +85,11 @@ const RCA_CONTEXT_KEYS: [&str; 10] = [
     "is_reanalysis",
 ];
 
-/// Client context keys an RCA chat keeps: incident display fields and timezone, never RCA inputs.
+/// Client keys an RCA chat keeps: display fields, timezone, locale and the door; never RCA inputs.
 #[cfg(feature = "enterprise")]
-const RCA_CHAT_CLIENT_KEYS: [&str; 8] = [
+const RCA_CHAT_CLIENT_KEYS: [&str; 10] = [
+    "client",
+    "locale",
     "incident_title",
     "incident_status",
     "incident_severity",
@@ -86,6 +99,544 @@ const RCA_CHAT_CLIENT_KEYS: [&str; 8] = [
     "request_timestamp",
     "user_timezone",
 ];
+
+/// Frames that only report progress; any other non-terminal frame shows the user something.
+#[cfg(feature = "enterprise")]
+const BOOKKEEPING_FRAMES: [&str; 9] = [
+    "status",
+    "title",
+    "usage",
+    "turn_started",
+    "retrying",
+    "compacting",
+    "sync",
+    "sync_state",
+    "ping",
+];
+/// Frames after which a turn sends nothing; one before any content refunds the turn.
+#[cfg(feature = "enterprise")]
+const FINAL_FRAMES: [&str; 2] = ["complete", "cancelled"];
+#[cfg(feature = "enterprise")]
+const AUDIT_BODY_MAX_BYTES: usize = 8 << 10;
+#[cfg(feature = "enterprise")]
+const AUDIT_KEY_MAX_CHARS: usize = 64;
+/// A line longer than this is passed on in pieces, classified by its head, not buffered further.
+#[cfg(feature = "enterprise")]
+const SSE_LINE_MAX_BYTES: usize = 4 << 20;
+/// A `complete` frame carries the whole history, so it is held this far to add its credits.
+#[cfg(feature = "enterprise")]
+const SSE_COMPLETE_MAX_BYTES: usize = 64 << 20;
+/// How much of an oversized line is read for its `type`.
+#[cfg(feature = "enterprise")]
+const SSE_HEAD_BYTES: usize = 1 << 10;
+/// Bytes a persisted turn may queue for a slow browser before the browser is dropped.
+#[cfg(feature = "enterprise")]
+const BROWSER_MAX_PENDING_BYTES: usize = 8 << 20;
+
+/// Where a turn stands on its credit as its frames go by.
+#[cfg(feature = "enterprise")]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+struct TurnPhase {
+    /// The credit is held and has not been refunded.
+    charged: bool,
+    content: bool,
+}
+
+#[cfg(feature = "enterprise")]
+impl TurnPhase {
+    /// A turn whose credit was taken before its stream was read.
+    fn charged() -> Self {
+        Self {
+            charged: true,
+            content: false,
+        }
+    }
+
+    /// What one forwarded frame means for the charge; content is never forwarded uncharged.
+    fn observe(&mut self, frame_type: &str) -> ChargeStep {
+        if FINAL_FRAMES.contains(&frame_type) {
+            return self.end();
+        }
+        // An error may still be followed by content, so only the final frame decides a refund.
+        if self.content || frame_type == "error" || BOOKKEEPING_FRAMES.contains(&frame_type) {
+            return ChargeStep::Nothing;
+        }
+        self.content = true;
+        if self.charged {
+            return ChargeStep::Settle;
+        }
+        self.charged = true;
+        ChargeStep::ChargeAndSettle
+    }
+
+    /// The turn ended; one that never showed content gives its credit back.
+    fn end(&mut self) -> ChargeStep {
+        if self.charged && !self.content {
+            self.charged = false;
+            return ChargeStep::Refund;
+        }
+        ChargeStep::Nothing
+    }
+}
+
+#[cfg(feature = "enterprise")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ChargeStep {
+    Nothing,
+    /// Content arrived on a turn whose credit was refunded or never taken.
+    ChargeAndSettle,
+    Settle,
+    Refund,
+}
+
+/// Splits an SSE byte stream into whole lines, so `data:` frames can be read and rewritten.
+#[cfg(feature = "enterprise")]
+#[derive(Debug, Default)]
+struct SseLines {
+    partial: Vec<u8>,
+    /// The current line is over the cap and is being passed on piece by piece.
+    passing: bool,
+}
+
+#[cfg(feature = "enterprise")]
+impl SseLines {
+    fn push(&mut self, chunk: &[u8]) -> Vec<SseLine> {
+        let mut lines = Vec::new();
+        let mut rest = chunk;
+        while let Some(at) = rest.iter().position(|b| *b == b'\n') {
+            let (line, tail) = rest.split_at(at + 1);
+            if self.passing {
+                self.passing = false;
+                lines.push(SseLine::Piece {
+                    bytes: Bytes::copy_from_slice(line),
+                    head_type: None,
+                });
+            } else if self.partial.is_empty() {
+                lines.push(SseLine::Whole(Bytes::copy_from_slice(line)));
+            } else {
+                self.partial.extend_from_slice(line);
+                lines.push(SseLine::Whole(Bytes::from(std::mem::take(
+                    &mut self.partial,
+                ))));
+            }
+            rest = tail;
+        }
+        if self.passing {
+            if !rest.is_empty() {
+                lines.push(SseLine::Piece {
+                    bytes: Bytes::copy_from_slice(rest),
+                    head_type: None,
+                });
+            }
+            return lines;
+        }
+        self.partial.extend_from_slice(rest);
+        if self.partial.len() > SSE_LINE_MAX_BYTES {
+            let head_type = head_frame_type(&self.partial);
+            if head_type != "complete" || self.partial.len() > SSE_COMPLETE_MAX_BYTES {
+                self.passing = true;
+                lines.push(SseLine::Piece {
+                    bytes: Bytes::from(std::mem::take(&mut self.partial)),
+                    head_type: Some(head_type),
+                });
+            }
+        }
+        lines
+    }
+
+    /// An unterminated last line, closed so the browser's parser does not join it to the next.
+    fn take_partial(&mut self) -> Option<Bytes> {
+        if std::mem::take(&mut self.passing) {
+            return Some(Bytes::from_static(b"\n\n"));
+        }
+        if self.partial.is_empty() {
+            return None;
+        }
+        let mut line = std::mem::take(&mut self.partial);
+        line.extend_from_slice(b"\n\n");
+        Some(Bytes::from(line))
+    }
+}
+
+/// What [`SseLines`] hands the meter.
+#[cfg(feature = "enterprise")]
+#[derive(Debug, PartialEq, Eq)]
+enum SseLine {
+    /// A whole line, newline included.
+    Whole(Bytes),
+    /// Part of an oversized line; its first piece carries the `type` read from the line's head.
+    Piece {
+        bytes: Bytes,
+        head_type: Option<String>,
+    },
+}
+
+/// One turn's credit: who pays, under which id it is refunded, and what it cost.
+#[cfg(feature = "enterprise")]
+struct TurnCharge {
+    org_id: String,
+    #[cfg(feature = "cloud")]
+    user_id: String,
+    #[cfg(feature = "cloud")]
+    turn_id: String,
+    #[cfg(feature = "cloud")]
+    usage_ctx: openobserve_core::trial_quota::AiUsageContext,
+    /// The charge taken and neither settled nor refunded yet.
+    #[cfg(feature = "cloud")]
+    held: Option<u64>,
+    credits: u64,
+}
+
+#[cfg(feature = "enterprise")]
+impl TurnCharge {
+    #[cfg_attr(not(feature = "cloud"), allow(unused_variables))]
+    fn new(
+        org_id: &str,
+        user_id: &str,
+        trace_id: &str,
+        session_id: Option<&str>,
+        turn_id: &str,
+    ) -> Self {
+        Self {
+            org_id: org_id.to_string(),
+            #[cfg(feature = "cloud")]
+            user_id: user_id.to_string(),
+            #[cfg(feature = "cloud")]
+            turn_id: turn_id.to_string(),
+            #[cfg(feature = "cloud")]
+            usage_ctx: openobserve_core::trial_quota::AiUsageContext {
+                user_email: user_id.to_string(),
+                trace_id: Some(trace_id.to_string()),
+                session_id: session_id.map(str::to_string),
+                incident_id: None,
+            },
+            #[cfg(feature = "cloud")]
+            held: None,
+            credits: 0,
+        }
+    }
+
+    /// Takes the turn's credit; without metering the turn costs nothing.
+    async fn charge(&mut self) -> Result<(), AiErrorEnvelope> {
+        #[cfg(feature = "cloud")]
+        {
+            use openobserve_core::trial_quota::{TrialQuotaFeature, authorize_ai_turn};
+            let feature = TrialQuotaFeature::AiChat;
+            let permit = authorize_ai_turn(&self.org_id, feature, &self.usage_ctx, &self.turn_id)
+                .await
+                .map_err(post_upstream_authorization_error)?;
+            self.held = permit.charge_id();
+            self.credits = feature.cost();
+        }
+        Ok(())
+    }
+
+    fn settle(&mut self) {
+        #[cfg(feature = "cloud")]
+        if let Some(charge_id) = self.held.take() {
+            openobserve_core::trial_quota::settle_ai_turn(&self.org_id, &self.turn_id, charge_id);
+        }
+    }
+
+    async fn refund(&mut self) {
+        #[cfg(feature = "cloud")]
+        if let Some(charge_id) = self.held.take() {
+            openobserve_core::trial_quota::refund_ai_usage(
+                &self.org_id,
+                &self.user_id,
+                &self.turn_id,
+                charge_id,
+            )
+            .await;
+        }
+        self.credits = 0;
+    }
+}
+
+/// Dropped still held means no content was shown (the browser left first), so it is refunded.
+#[cfg(feature = "cloud")]
+impl Drop for TurnCharge {
+    fn drop(&mut self) {
+        let Some(charge_id) = self.held.take() else {
+            return;
+        };
+        let (org_id, user_id, turn_id) = (
+            std::mem::take(&mut self.org_id),
+            std::mem::take(&mut self.user_id),
+            std::mem::take(&mut self.turn_id),
+        );
+        let Ok(handle) = tokio::runtime::Handle::try_current() else {
+            log::warn!("[AI-CHAT] no runtime to refund turn {turn_id}; its charge stands");
+            openobserve_core::trial_quota::settle_ai_turn(&org_id, &turn_id, charge_id);
+            return;
+        };
+        handle.spawn(async move {
+            openobserve_core::trial_quota::refund_ai_usage(&org_id, &user_id, &turn_id, charge_id)
+                .await;
+        });
+    }
+}
+
+/// What the audit trail keeps of a chat request: who, which chat and how much, never content.
+#[cfg(feature = "enterprise")]
+#[derive(Debug, Clone)]
+struct TurnAudit {
+    /// The route as it appears after `/api/{org_id}/ai/`.
+    route: &'static str,
+    org_id: String,
+    user_id: String,
+    trace_id: String,
+    session_id: Option<String>,
+    turn_id: Option<String>,
+    message_count: usize,
+    image_count: usize,
+    bytes: usize,
+    context_keys: Vec<String>,
+}
+
+#[cfg(feature = "enterprise")]
+impl TurnAudit {
+    fn new(
+        org_id: &str,
+        user_id: &str,
+        trace_id: &str,
+        session_id: Option<&str>,
+        turn_id: Option<&str>,
+        prompt: Option<&PromptRequest>,
+        bytes: usize,
+    ) -> Self {
+        Self {
+            route: "chat_stream",
+            org_id: org_id.to_string(),
+            user_id: user_id.to_string(),
+            trace_id: trace_id.to_string(),
+            session_id: session_id.map(str::to_string),
+            turn_id: turn_id.map(|id| id.chars().take(AUDIT_KEY_MAX_CHARS).collect()),
+            message_count: prompt.map_or(0, |p| p.messages.len()),
+            image_count: prompt.and_then(|p| p.images.as_ref()).map_or(0, Vec::len),
+            bytes,
+            context_keys: prompt
+                .map(|p| {
+                    p.context
+                        .keys()
+                        .map(|key| key.chars().take(AUDIT_KEY_MAX_CHARS).collect())
+                        .collect()
+                })
+                .unwrap_or_default(),
+        }
+    }
+
+    fn on_route(mut self, route: &'static str) -> Self {
+        self.route = route;
+        self
+    }
+
+    /// The record of a finished request; a refusal is named by its status only.
+    async fn report_status(&self, status: StatusCode) {
+        let failure = (!status.is_success()).then(|| status.canonical_reason().unwrap_or("failed"));
+        self.report(status, failure).await;
+    }
+
+    /// The record as stored, at most [`AUDIT_BODY_MAX_BYTES`]: context keys are cut to fit.
+    fn body(&self) -> String {
+        let mut record = serde_json::json!({
+            "org": self.org_id,
+            "user": self.user_id,
+            "session_id": self.session_id,
+            "turn_id": self.turn_id,
+            "message_count": self.message_count,
+            "image_count": self.image_count,
+            "bytes": self.bytes,
+            "context_keys": [],
+        });
+        let mut size = record.to_string().len();
+        let mut kept = Vec::new();
+        for key in &self.context_keys {
+            // A key costs its quotes and comma on top of its own bytes.
+            size += serde_json::Value::from(key.as_str()).to_string().len() + 1;
+            if size > AUDIT_BODY_MAX_BYTES {
+                break;
+            }
+            kept.push(key.as_str());
+        }
+        record["context_keys"] = kept.into();
+        let text = record.to_string();
+        if text.len() <= AUDIT_BODY_MAX_BYTES {
+            return text;
+        }
+        // Identity fields alone over the cap: keep the size; org and user are audit columns.
+        serde_json::json!({"bytes": self.bytes, "truncated": true}).to_string()
+    }
+
+    async fn report(&self, status: StatusCode, error_message: Option<&str>) {
+        report_to_audit(
+            self.user_id.clone(),
+            self.org_id.clone(),
+            self.trace_id.clone(),
+            status.as_u16(),
+            error_message.map(str::to_string),
+            "POST".to_string(),
+            format!("/api/{}/ai/{}", self.org_id, self.route),
+            String::new(),
+            self.body(),
+        )
+        .await;
+    }
+}
+
+/// One `chat_stream` turn, ready to go to o2-ai with or without persistence.
+#[cfg(feature = "enterprise")]
+struct StreamTurn {
+    org_id: String,
+    user_id: String,
+    trace_id: String,
+    /// The browser's `x-o2-assistant-turn-id`, unvalidated.
+    turn_id: Option<String>,
+    agent_type: &'static str,
+    query: QueryRequest,
+    auth: String,
+    forward_headers: Option<std::collections::HashMap<String, String>>,
+    client: Arc<o2_enterprise::enterprise::ai::client::AiAgentClient>,
+    span: Option<opentelemetry::Context>,
+    audit: TurnAudit,
+}
+
+/// Meters one turn's SSE stream and gives its `error` and `complete` frames the envelope keys.
+#[cfg(feature = "enterprise")]
+struct TurnMeter {
+    phase: TurnPhase,
+    lines: SseLines,
+    charge: TurnCharge,
+    /// `(session_id, turn_id)` of a persisted turn, whose first event is stamped on its record.
+    record: Option<(String, String)>,
+    first_event: bool,
+    refused: bool,
+}
+
+#[cfg(feature = "enterprise")]
+impl TurnMeter {
+    fn new(phase: TurnPhase, charge: TurnCharge, record: Option<(String, String)>) -> Self {
+        Self {
+            phase,
+            lines: SseLines::default(),
+            charge,
+            record,
+            first_event: false,
+            refused: false,
+        }
+    }
+
+    /// The bytes to forward for `chunk`; nothing once the turn's charge was refused.
+    async fn feed(&mut self, chunk: &[u8]) -> Vec<Bytes> {
+        let mut out = Vec::new();
+        for line in self.lines.push(chunk) {
+            if self.refused {
+                break;
+            }
+            match line {
+                SseLine::Whole(line) => out.push(self.on_line(line).await),
+                SseLine::Piece { bytes, head_type } => {
+                    if let Some(frame_type) = head_type
+                        && let Err(refusal) = self.observe(&frame_type).await
+                    {
+                        self.refused = true;
+                        out.push(refusal.to_sse_frame());
+                        break;
+                    }
+                    out.push(bytes);
+                }
+            }
+        }
+        out
+    }
+
+    /// Ends a stream the transport broke: the partial line, then `frame`.
+    async fn interrupt(&mut self, frame: Bytes) -> Vec<Bytes> {
+        let mut out: Vec<Bytes> = self.lines.take_partial().into_iter().collect();
+        out.extend(self.feed(&frame).await);
+        out
+    }
+
+    async fn finish(&mut self) -> Vec<Bytes> {
+        let out = self.lines.take_partial().into_iter().collect();
+        if self.phase.end() == ChargeStep::Refund {
+            self.charge.refund().await;
+        }
+        out
+    }
+
+    fn refused(&self) -> bool {
+        self.refused
+    }
+
+    async fn on_line(&mut self, line: Bytes) -> Bytes {
+        let Some(mut frame) = data_frame(&line) else {
+            return line;
+        };
+        let frame_type = frame
+            .get("type")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_string();
+        if let Err(refusal) = self.observe(&frame_type).await {
+            self.refused = true;
+            return refusal.to_sse_frame();
+        }
+        match frame_type.as_str() {
+            "error" => error::normalize_error_frame(&mut frame),
+            "complete" => {
+                let usage = frame
+                    .entry("usage")
+                    .or_insert_with(|| Value::Object(Default::default()));
+                if let Some(usage) = usage.as_object_mut() {
+                    usage.insert("credits".into(), self.charge.credits.into());
+                }
+            }
+            _ => return line,
+        }
+        Bytes::from(format!("data: {}\n", Value::Object(frame)))
+    }
+
+    /// Charges, settles or refunds for one frame, and stamps o2-ai's first event.
+    async fn observe(&mut self, frame_type: &str) -> Result<(), AiErrorEnvelope> {
+        // Error and final frames may be this node's own; o2-ai's first event is anything else.
+        if !self.first_event && frame_type != "error" && !FINAL_FRAMES.contains(&frame_type) {
+            self.first_event = true;
+            self.stamp_first_event();
+        }
+        let step = self.phase.observe(frame_type);
+        self.apply(step).await
+    }
+
+    async fn apply(&mut self, step: ChargeStep) -> Result<(), AiErrorEnvelope> {
+        match step {
+            ChargeStep::Nothing => {}
+            ChargeStep::ChargeAndSettle => {
+                self.charge.charge().await?;
+                self.charge.settle();
+            }
+            ChargeStep::Settle => self.charge.settle(),
+            ChargeStep::Refund => self.charge.refund().await,
+        }
+        Ok(())
+    }
+
+    fn stamp_first_event(&self) {
+        let Some((session_id, turn_id)) = self.record.clone() else {
+            return;
+        };
+        let org_id = self.charge.org_id.clone();
+        let at = config::utils::time::now_micros();
+        tokio::spawn(async move {
+            if let Err(e) =
+                infra::table::ai_chat_turns::set_first_event_at(&org_id, &session_id, &turn_id, at)
+                    .await
+            {
+                log::warn!("[AI-CHAT] cannot stamp the first event of turn {turn_id}: {e}");
+            }
+        });
+    }
+}
 
 /// Picks the agent and its context; RCA only when the caller clears the RCA endpoint's own bar.
 #[cfg(feature = "enterprise")]
@@ -209,98 +760,220 @@ fn require_json(headers: &axum::http::HeaderMap) -> Result<(), Response> {
     if is_json {
         return Ok(());
     }
-    Err((
-        StatusCode::UNSUPPORTED_MEDIA_TYPE,
-        Json(MetaHttpResponse::error(
-            StatusCode::UNSUPPORTED_MEDIA_TYPE,
-            "Content-Type must be application/json",
-        )),
+    Err(AiErrorEnvelope::new(
+        AiErrorCode::InvalidRequest,
+        "Content-Type must be application/json",
     )
-        .into_response())
+    .status(StatusCode::UNSUPPORTED_MEDIA_TYPE)
+    .into_response())
 }
 
 #[cfg(feature = "cloud")]
 pub(crate) fn ai_authorization_error_response(
     error: openobserve_core::trial_quota::AiUsageAuthorizationError,
 ) -> Response {
+    authorization_error(error).into_response()
+}
+
+/// The envelope of a refused usage authorization; `consent` and `remedy` ride along as before.
+#[cfg(feature = "cloud")]
+fn authorization_error(
+    error: openobserve_core::trial_quota::AiUsageAuthorizationError,
+) -> AiErrorEnvelope {
     use openobserve_core::trial_quota::AiUsageAuthorizationError;
 
     match error {
-        AiUsageAuthorizationError::PaidOverageConsentRequired(consent) => (
-            StatusCode::PRECONDITION_FAILED,
-            Json(serde_json::json!({
-                "code": StatusCode::PRECONDITION_FAILED.as_u16(),
-                "message": "Paid usage requires organization consent.",
-                "error_type": "paid_overage_consent_required",
-                "consent": consent,
-            })),
-        )
-            .into_response(),
+        AiUsageAuthorizationError::PaidOverageConsentRequired(consent) => {
+            consent_required_error(serde_json::to_value(consent).unwrap_or_default())
+        }
         AiUsageAuthorizationError::PaymentRequired {
             message,
             remedy,
             payer_org_id,
-        } => (
-            StatusCode::PAYMENT_REQUIRED,
-            Json(serde_json::json!({
-                "code": StatusCode::PAYMENT_REQUIRED.as_u16(),
-                "message": message,
-                "error_type": "ai_credits_exhausted",
-                "remedy": remedy,
-                "payer_org_id": payer_org_id,
-            })),
-        )
-            .into_response(),
-        AiUsageAuthorizationError::Unavailable(message) => (
-            StatusCode::SERVICE_UNAVAILABLE,
-            Json(MetaHttpResponse::error(
-                StatusCode::SERVICE_UNAVAILABLE,
-                message,
-            )),
-        )
-            .into_response(),
+        } => {
+            let remedy = serde_json::to_value(remedy).unwrap_or_default();
+            payment_required_error(message, remedy.as_str().unwrap_or_default(), payer_org_id)
+        }
+        AiUsageAuthorizationError::Unavailable(detail) => {
+            log::error!("[AI-CHAT] AI usage authorization unavailable: {detail}");
+            authorization_unavailable_error()
+        }
     }
 }
 
+/// Consent cannot be asked for once a turn runs, so a late refusal reads as a retryable 402.
 #[cfg(feature = "cloud")]
-fn ai_post_upstream_authorization_error_response(
+fn post_upstream_authorization_error(
     error: openobserve_core::trial_quota::AiUsageAuthorizationError,
-) -> Response {
+) -> AiErrorEnvelope {
     use openobserve_core::trial_quota::AiUsageAuthorizationError;
 
     match error {
         AiUsageAuthorizationError::PaidOverageConsentRequired(_) => {
-            ai_authorization_error_response(AiUsageAuthorizationError::PaymentRequired {
+            authorization_error(AiUsageAuthorizationError::PaymentRequired {
                 message: "AI credit limit was reached while the request was running.".to_string(),
                 remedy: openobserve_core::trial_quota::PaymentRemedy::Retry,
                 payer_org_id: None,
             })
         }
-        error => ai_authorization_error_response(error),
+        error => authorization_error(error),
     }
 }
 
-#[cfg(feature = "enterprise")]
-fn ai_upstream_error_response(error: anyhow::Error) -> Response {
-    let message = error.to_string();
-    if is_session_owner_unavailable(&error) || message.contains(SESSION_OWNER_UNAVAILABLE) {
-        return (
-            StatusCode::CONFLICT,
-            Json(serde_json::json!({
-                "code": SESSION_OWNER_UNAVAILABLE,
-                "error": message,
-            })),
-        )
-            .into_response();
-    }
-    let status = o2_enterprise::enterprise::ai::client::upstream_error_status(&error)
-        .and_then(|status| StatusCode::from_u16(status).ok())
-        .unwrap_or(StatusCode::BAD_GATEWAY);
-    (
-        status,
-        Json(serde_json::json!({ "code": status.as_u16(), "error": message })),
+#[cfg(any(feature = "cloud", test))]
+fn consent_required_error(consent: serde_json::Value) -> AiErrorEnvelope {
+    AiErrorEnvelope::new(
+        AiErrorCode::ConsentRequired,
+        "Paid usage requires organization consent.",
     )
-        .into_response()
+    .with("error_type", "paid_overage_consent_required")
+    .with("consent", consent)
+}
+
+/// `subscribe` is a missing subscription; any other remedy means the credits ran out.
+#[cfg(any(feature = "cloud", test))]
+fn payment_required_error(
+    message: String,
+    remedy: &str,
+    payer_org_id: Option<String>,
+) -> AiErrorEnvelope {
+    let code = if remedy == "subscribe" {
+        AiErrorCode::SubscriptionRequired
+    } else {
+        AiErrorCode::CreditsExhausted
+    };
+    let retry = remedy == "retry";
+    AiErrorEnvelope::new(code, message)
+        .retryable(retry)
+        .action(Some(if retry {
+            AiErrorAction::Retry
+        } else {
+            AiErrorAction::ManageBilling
+        }))
+        .with("error_type", "ai_credits_exhausted")
+        .with("remedy", remedy)
+        .with("payer_org_id", payer_org_id)
+}
+
+#[cfg(any(feature = "cloud", test))]
+fn authorization_unavailable_error() -> AiErrorEnvelope {
+    AiErrorEnvelope::new(
+        AiErrorCode::AuthorizationUnavailable,
+        "AI credits could not be checked right now; please retry",
+    )
+}
+
+/// A failed o2-ai request as the envelope; the upstream text stays in the logs.
+#[cfg(feature = "enterprise")]
+fn upstream_error(error: &anyhow::Error) -> AiErrorEnvelope {
+    let owner_unavailable = is_session_owner_unavailable(error)
+        || error.to_string().contains(SESSION_OWNER_UNAVAILABLE);
+    let unreachable = is_agent_unreachable(error);
+    let status = if unreachable {
+        None
+    } else {
+        upstream_error_status(error)
+    };
+    upstream_failure(
+        owner_unavailable,
+        unreachable,
+        status,
+        upstream_retry_after(error),
+        upstream_error_code(error).as_deref(),
+    )
+}
+
+/// The ledger code of what o2-ai answered: a 429 is the provider's limit, never the turn limit.
+#[cfg(feature = "enterprise")]
+fn upstream_failure(
+    owner_unavailable: bool,
+    unreachable: bool,
+    status: Option<u16>,
+    retry_after: Option<u64>,
+    upstream_code: Option<&str>,
+) -> AiErrorEnvelope {
+    if owner_unavailable {
+        return AiErrorEnvelope::new(
+            AiErrorCode::SessionOwnerUnavailable,
+            "This conversation is unavailable right now; please retry",
+        );
+    }
+    let http = status.and_then(|s| StatusCode::from_u16(s).ok());
+    let stored = upstream_code.and_then(AiErrorCode::from_stored);
+    let envelope = match (http, stored) {
+        (_, Some(AiErrorCode::TurnBusy)) => AiErrorEnvelope::new(
+            AiErrorCode::TurnBusy,
+            "A response is still running in this conversation",
+        ),
+        (Some(StatusCode::TOO_MANY_REQUESTS), _) => AiErrorEnvelope::new(
+            AiErrorCode::RateLimited,
+            "The AI provider is rate-limiting requests; please retry shortly",
+        )
+        .retry_after(retry_after),
+        // OpenObserve already accepted the session, so o2-ai refusing it is a permission matter.
+        (Some(StatusCode::UNAUTHORIZED | StatusCode::FORBIDDEN), _) => AiErrorEnvelope::new(
+            AiErrorCode::PermissionDenied,
+            "The AI service refused this request",
+        ),
+        // The persisted path's split: only no answer at all or a gateway failure is retried.
+        (None, _) if unreachable => AiErrorEnvelope::new(
+            AiErrorCode::AgentUnavailable,
+            "The AI assistant is unavailable right now; please retry",
+        ),
+        (Some(StatusCode::BAD_GATEWAY), _)
+        | (Some(StatusCode::SERVICE_UNAVAILABLE | StatusCode::GATEWAY_TIMEOUT), _) => {
+            AiErrorEnvelope::new(
+                AiErrorCode::AgentUnavailable,
+                "The AI assistant is unavailable right now; please retry",
+            )
+            .retry_after(retry_after)
+        }
+        _ => AiErrorEnvelope::new(
+            AiErrorCode::Internal,
+            "The AI assistant could not answer this request",
+        )
+        .action(Some(AiErrorAction::None)),
+    };
+    envelope.status(http.unwrap_or(StatusCode::BAD_GATEWAY))
+}
+
+#[cfg(feature = "enterprise")]
+fn not_enabled_error() -> Response {
+    error::not_enabled("AI is not enabled")
+}
+
+/// An agent service that is not configured is the assistant being off for this deployment.
+#[cfg(feature = "enterprise")]
+fn agent_not_configured_error() -> Response {
+    error::not_enabled("Agent service not configured")
+}
+
+/// The requested model is not echoed back: it is caller input and lands in Details.
+#[cfg(feature = "enterprise")]
+fn model_not_allowed_error() -> Response {
+    AiErrorEnvelope::new(
+        AiErrorCode::InvalidRequest,
+        "This model is not allowed for AI chat",
+    )
+    .into_response()
+}
+
+/// Today's transport break mid-stream, as the frame the browser gets; the cause is logged.
+#[cfg(feature = "enterprise")]
+fn stream_interrupted_error() -> AiErrorEnvelope {
+    AiErrorEnvelope::new(
+        AiErrorCode::AgentUnavailable,
+        "The response was interrupted. Please try again.",
+    )
+}
+
+#[cfg(feature = "enterprise")]
+fn approval_delivery_failed_error() -> Response {
+    AiErrorEnvelope::new(
+        AiErrorCode::ApprovalDeliveryFailed,
+        "The confirmation did not reach the assistant; please send it again",
+    )
+    .into_response()
 }
 
 /// Refuses a stop or confirmation on someone else's or an unknown persisted chat.
@@ -327,12 +1000,10 @@ async fn check_chat_owner(
             Ok(())
         }
         // Someone else's, deleted or unknown: indistinguishable to the caller.
-        Ok(_) => Err(MetaHttpResponse::not_found("Unknown conversation")),
+        Ok(_) => Err(error::not_found("Unknown conversation")),
         Err(e) => {
             log::error!("[AI-CHAT] cannot read session {org_id}/{session_id}: {e}");
-            Err(MetaHttpResponse::internal_error(
-                "Could not read the conversation",
-            ))
+            Err(error::internal("Could not read the conversation"))
         }
     }
 }
@@ -392,9 +1063,12 @@ async fn cancel_turn(org_id: String, session_id: String, auth: String) -> Respon
             }
             match answered {
                 Some(resp) => relay_response(resp).await,
-                None => {
-                    MetaHttpResponse::internal_error("Failed to cancel the response; please retry")
-                }
+                None => AiErrorEnvelope::new(
+                    AiErrorCode::Internal,
+                    "Failed to cancel the response; please retry",
+                )
+                .retryable(true)
+                .into_response(),
             }
         }
     }
@@ -414,11 +1088,16 @@ fn schedule_cancel_fallback(org_id: String, session_id: String) {
     });
 }
 
+/// o2-ai's answer to a cancel; a refusal is reported by its status, its text only logged.
 #[cfg(feature = "enterprise")]
 async fn relay_response(resp: reqwest::Response) -> Response {
     let status =
         StatusCode::from_u16(resp.status().as_u16()).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
     let body = resp.text().await.unwrap_or_else(|_| "{}".to_string());
+    if !status.is_success() {
+        log::warn!("[AI-CHAT] o2-ai refused a cancel with {status}: {body}");
+        return upstream_failure(false, false, Some(status.as_u16()), None, None).into_response();
+    }
     let json = serde_json::from_str::<serde_json::Value>(&body)
         .unwrap_or_else(|_| serde_json::json!({"message": body}));
     (status, axum::Json(json)).into_response()
@@ -515,244 +1194,67 @@ pub async fn chat(Path(org_id): Path<String>, in_req: axum::extract::Request) ->
     // Extract TraceInfo from headers
     let auth_data = match Headers::<TraceInfo>::from_request_parts(&mut parts, &()).await {
         Ok(Headers(data)) => data,
-        Err(e) => return e.into_response(),
+        Err(_) => return error::invalid_request("The request carries no user identity"),
+    };
+
+    let trace_id = auth_data.get_trace_id();
+    // The router does not audit this route: its body is the prompt, so this record replaces it.
+    #[cfg(feature = "enterprise")]
+    let audit = |prompt: Option<&PromptRequest>, bytes: usize| {
+        let session_id = parts
+            .headers
+            .get(X_O2_ASSISTANT_SESSION_ID.as_str())
+            .and_then(|v| v.to_str().ok());
+        TurnAudit::new(
+            &org_id,
+            &auth_data.user_id,
+            &trace_id,
+            session_id,
+            None,
+            prompt,
+            bytes,
+        )
+        .on_route("chat")
     };
 
     // Parse JSON body
     let body_bytes = match axum::body::to_bytes(body, usize::MAX).await {
         Ok(bytes) => bytes,
         Err(e) => {
-            return MetaHttpResponse::bad_request(format!("Failed to read request body: {e}"));
+            let response = error::invalid_request(format!("Failed to read request body: {e}"));
+            #[cfg(feature = "enterprise")]
+            audit(None, 0).report_status(response.status()).await;
+            return response;
         }
     };
 
     let prompt_body: PromptRequest = match serde_json::from_slice(&body_bytes) {
         Ok(b) => b,
         Err(e) => {
-            return MetaHttpResponse::bad_request(format!("Invalid JSON body: {e}"));
+            let response = error::invalid_request(format!("Invalid JSON body: {e}"));
+            #[cfg(feature = "enterprise")]
+            audit(None, body_bytes.len())
+                .report_status(response.status())
+                .await;
+            return response;
         }
     };
 
     #[cfg(feature = "enterprise")]
     {
-        let trace_id = auth_data.get_trace_id();
-        let user_id = &auth_data.user_id;
-        let org_id_str = org_id.as_str();
-        let o2_cfg = get_o2_config();
-
-        // Check if AI/agent is enabled
-        if !o2_cfg.ai.enabled {
-            return MetaHttpResponse::bad_request("AI is not enabled");
-        }
-
-        if !o2_cfg.ai.has_agent_target() {
-            return MetaHttpResponse::bad_request("AI agent URL is not set");
-        }
-
-        // Quota is checked here, but a credit is only consumed once the upstream succeeds.
-        #[cfg(feature = "cloud")]
-        let usage_ctx = openobserve_core::trial_quota::AiUsageContext {
-            user_email: user_id.to_string(),
-            trace_id: Some(trace_id.clone()),
-            session_id: None,
-            incident_id: None,
-        };
-        #[cfg(feature = "cloud")]
-        if let Err(error) = openobserve_core::trial_quota::precheck_ai_usage(
-            org_id_str,
-            openobserve_core::trial_quota::TrialQuotaFeature::AiChat,
-            user_id,
-        )
-        .await
-        {
-            return ai_authorization_error_response(error);
-        }
-
-        // Extract user auth from headers to pass to the agent
-        let auth_str = openobserve_core::auth::extract_auth_str_from_headers(&parts.headers).await;
-        // Auth header is passed directly to agent - no need to extract user_token
-
-        // Get global agent client singleton
-        let client = match get_agent_client() {
-            Some(c) => c,
-            None => {
-                log::error!(
-                    "[trace_id:{trace_id}] [user_id:{user_id}] [org_id:{org_id_str}] \
-                     Agent service not configured"
-                );
-                return MetaHttpResponse::bad_request("Agent service not configured");
-            }
-        };
-
-        let passthrough_config = ""; // TODO: Replace with config.ai.passthrough_headers once field is added
-        let passthrough_headers = extract_passthrough_headers(&parts.headers, passthrough_config);
-
-        let last_user_message = prompt_body
-            .messages
-            .iter()
-            .rfind(|m| m.role == Role::User)
-            .map(|m| m.content.clone())
-            .unwrap_or_default();
-
-        // Build history from all messages except the last user message
-        let history: Vec<serde_json::Value> = prompt_body
-            .messages
-            .iter()
-            .take(prompt_body.messages.len().saturating_sub(1))
-            .map(|m| {
-                serde_json::json!({
-                    "role": format!("{:?}", m.role).to_lowercase(),
-                    "content": m.content
-                })
-            })
-            .collect();
-
-        // Merge org_id into context
-        let mut context = serde_json::to_value(&prompt_body.context).unwrap_or_default();
-        if let Some(obj) = context.as_object_mut() {
-            obj.insert(
-                "org_id".to_string(),
-                serde_json::Value::String(org_id.clone()),
-            );
-            obj.remove(FORK_SEED_CONTEXT_KEY);
-        }
-
-        // Determine agent type based on context (incident_id -> sre, otherwise o2-ai)
-        // Must be done before context is moved into QueryRequest
-        let (agent_type, context) = chat_agent_and_context(org_id_str, user_id, context).await;
-
-        // Convert images to agent format
-        let images = prompt_body.images.map(|imgs| {
-            imgs.into_iter()
-                .map(|img| ImageAttachment {
-                    data: img.data,
-                    mime_type: img.mime_type,
-                    filename: img.filename,
-                })
-                .collect()
-        });
-
-        let (tool_mcps, tool_clis, tool_skills) =
-            o2_enterprise::enterprise::ai::toolsets::push::load_agent_tools(org_id_str).await;
-        let query_req = QueryRequest {
-            query: last_user_message,
-            context,
-            model: if prompt_body.model.is_empty() {
-                None
-            } else {
-                Some(prompt_body.model)
-            },
-            history: if history.is_empty() {
-                None
-            } else {
-                Some(history)
-            },
-            images,
-            mcps: if tool_mcps.is_empty() {
-                None
-            } else {
-                Some(tool_mcps)
-            },
-            clis: if tool_clis.is_empty() {
-                None
-            } else {
-                Some(tool_clis)
-            },
-            skills: if tool_skills.is_empty() {
-                None
-            } else {
-                Some(tool_skills)
-            },
-            // Set by persistence admission below; absent, o2-ai streams as before.
-            turn_id: None,
-            known_seq: None,
-            known_opencode_session_id: None,
-            session_epoch: None,
-        };
-
-        // Without it every call lands on an arbitrary replica, which starts a new session.
-        let mut forward_headers = std::collections::HashMap::new();
-        if let Some(session_id) = parts.headers.get(X_O2_ASSISTANT_SESSION_ID.as_str())
-            && let Ok(val) = session_id.to_str()
-        {
-            // A persisted chat is only continued through admission (owner check, epoch fence).
-            if o2_enterprise::enterprise::ai::chat::is_enabled() {
-                return MetaHttpResponse::bad_request(
-                    "Use /ai/chat_stream to continue a conversation while chat persistence is \
-                     enabled",
-                );
-            }
-            if is_valid_session_id(val) {
-                forward_headers.insert(
-                    X_O2_ASSISTANT_SESSION_ID.as_str().to_string(),
-                    val.to_ascii_lowercase(),
-                );
-            } else {
-                return MetaHttpResponse::bad_request("Invalid session id");
-            }
-        }
-
-        // No span here, so the caller's traceparent joins the agent's spans to its trace.
-        if let Some(traceparent) = &auth_data.traceparent
-            && !traceparent.is_empty()
-        {
-            forward_headers.insert("traceparent".to_string(), traceparent.clone());
-        }
-
-        if let Some(user_agent) = parts.headers.get("user-agent")
-            && let Ok(val) = user_agent.to_str()
-        {
-            forward_headers.insert("user-agent".to_string(), val.to_string());
-        }
-
-        // Merged last and never overriding the headers set above.
-        for (key, value) in passthrough_headers {
-            forward_headers.entry(key).or_insert(value);
-        }
-
-        let headers_to_forward = if forward_headers.is_empty() {
-            None
-        } else {
-            Some(&forward_headers)
-        };
-
-        return match client
-            .query_with_headers(agent_type, query_req, &auth_str, headers_to_forward)
-            .await
-        {
-            Ok(response) => {
-                #[cfg(feature = "cloud")]
-                if let Err(error) = openobserve_core::trial_quota::authorize_ai_usage(
-                    org_id_str,
-                    openobserve_core::trial_quota::TrialQuotaFeature::AiChat,
-                    &usage_ctx,
-                )
-                .await
-                {
-                    return ai_post_upstream_authorization_error_response(error);
-                }
-                let prompt_response = PromptResponse {
-                    role: Role::Assistant,
-                    content: response.response,
-                };
-                (StatusCode::OK, Json(prompt_response)).into_response()
-            }
-            Err(error) => {
-                log::error!(
-                    "[trace_id:{trace_id}] [user_id:{user_id}] [org_id:{org_id_str}] \
-                     Agent query failed: {error}"
-                );
-                ai_upstream_error_response(error)
-            }
-        };
+        let audit = audit(Some(&prompt_body), body_bytes.len());
+        let response = chat_turn(org_id, parts, auth_data, trace_id, prompt_body).await;
+        audit.report_status(response.status()).await;
+        response
     }
     #[cfg(not(feature = "enterprise"))]
     {
         drop(org_id);
         drop(parts);
         drop(auth_data);
+        drop(trace_id);
         drop(prompt_body);
-        MetaHttpResponse::bad_request("AI chat is only available in enterprise version")
+        error::not_enabled("AI chat is only available in enterprise version")
     }
 }
 
@@ -842,10 +1344,552 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
     // Extract TraceInfo from headers
     let auth_data = match Headers::<TraceInfo>::from_request_parts(&mut parts, &()).await {
         Ok(Headers(data)) => data,
-        Err(e) => return e.into_response(),
+        Err(_) => return error::invalid_request("The request carries no user identity"),
     };
 
     let trace_id = auth_data.get_trace_id();
+    let mut response = stream_turn(org_id, parts, body, auth_data, trace_id.clone()).await;
+    // On refusals too, so a turn refused before any frame still shows its trace in Details.
+    if let Ok(value) = HeaderValue::from_str(&trace_id) {
+        response
+            .headers_mut()
+            .insert(super::chats::X_O2_TRACE_ID, value);
+    }
+    response
+}
+
+/// Forwards feedback on an AI response to o2-ai, which records it.
+pub async fn feedback(Path(org_id): Path<String>, in_req: axum::extract::Request) -> Response {
+    let (parts, body) = in_req.into_parts();
+    if let Err(resp) = require_json(&parts.headers) {
+        return resp;
+    }
+
+    // Extract trace info from headers (user_id may not be present for feedback)
+    let traceparent = parts
+        .headers
+        .get("traceparent")
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.to_string());
+
+    let trace_id = traceparent
+        .as_ref()
+        .and_then(|tp| tp.split('-').nth(1).map(|s| s.to_string()))
+        .unwrap_or_else(|| "unknown".to_string());
+
+    let mut forward_headers = std::collections::HashMap::new();
+
+    // Rejected rather than dropped: feedback is recorded on the owning replica.
+    if let Some(session_id) = parts.headers.get(X_O2_ASSISTANT_SESSION_ID.as_str())
+        && let Ok(val) = session_id.to_str()
+    {
+        if is_valid_session_id(val) {
+            forward_headers.insert(
+                X_O2_ASSISTANT_SESSION_ID.as_str().to_string(),
+                val.to_ascii_lowercase(),
+            );
+        } else {
+            return error::invalid_request("Invalid session id");
+        }
+    }
+
+    // Parse JSON body
+    let body_bytes = match axum::body::to_bytes(body, usize::MAX).await {
+        Ok(bytes) => bytes,
+        Err(e) => {
+            return error::invalid_request(format!("Failed to read request body: {}", e));
+        }
+    };
+
+    let feedback_body: serde_json::Value = match serde_json::from_slice(&body_bytes) {
+        Ok(b) => b,
+        Err(e) => {
+            return error::invalid_request(format!("Invalid JSON body: {}", e));
+        }
+    };
+
+    #[cfg(feature = "enterprise")]
+    {
+        if !get_o2_config().ai.enabled {
+            return not_enabled_error();
+        }
+
+        let client = match get_agent_client() {
+            Some(c) => c,
+            None => {
+                return agent_not_configured_error();
+            }
+        };
+        if let Some(session_id) = forward_headers.get(X_O2_ASSISTANT_SESSION_ID.as_str())
+            && let Err(resp) = check_chat_owner(&parts.headers, &org_id, session_id).await
+        {
+            return resp;
+        }
+
+        // Extract user auth from headers to pass to the agent
+        let auth_str = openobserve_core::auth::extract_auth_str_from_headers(&parts.headers).await;
+
+        let headers_to_forward = if forward_headers.is_empty() {
+            None
+        } else {
+            Some(forward_headers)
+        };
+
+        match client
+            .post_feedback(feedback_body, &auth_str, headers_to_forward.as_ref())
+            .await
+        {
+            Ok(response) => {
+                log::info!(
+                    "[trace_id:{}] Feedback submitted for org={}",
+                    trace_id,
+                    org_id
+                );
+                Json(response).into_response()
+            }
+            Err(e) => {
+                log::error!("[trace_id:{}] Feedback submission failed: {}", trace_id, e);
+                AiErrorEnvelope::new(
+                    AiErrorCode::AgentUnavailable,
+                    "Feedback could not be delivered; please retry",
+                )
+                .status(StatusCode::INTERNAL_SERVER_ERROR)
+                .into_response()
+            }
+        }
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    {
+        drop(org_id);
+        drop(trace_id);
+        drop(feedback_body);
+        error::not_enabled("AI feedback is only available in enterprise version")
+    }
+}
+
+/// ConfirmAction - Proxy confirmation response to o2-sre-agent
+#[utoipa::path(
+    post,
+    path = "/{org_id}/ai/confirm/{session_id}",
+    context_path = "/api",
+    tag = "AI",
+    operation_id = "ConfirmAction",
+    summary = "Confirm or reject a destructive AI tool action",
+    description = "Forwards user confirmation or rejection to the o2-sre-agent service \
+                   for a pending destructive tool call.",
+    security(
+        ("Authorization" = [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("session_id" = String, Path, description = "Chat session ID")
+    ),
+    request_body(
+        content = serde_json::Value,
+        description = "Confirmation payload",
+        example = json!({"approved": true}),
+    ),
+    responses(
+        (status = StatusCode::OK, description = "Confirmation forwarded", body = Object),
+        (status = StatusCode::BAD_REQUEST, description = "Invalid session ID, malformed body, or AI agent not configured", body = Object),
+        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = Object),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+pub async fn confirm_action(
+    Path((org_id, session_id)): Path<(String, String)>,
+    in_req: axum::extract::Request,
+) -> Response {
+    let (parts, body) = in_req.into_parts();
+    if let Err(resp) = require_json(&parts.headers) {
+        return resp;
+    }
+
+    // Parse JSON body
+    let body_bytes = match axum::body::to_bytes(body, usize::MAX).await {
+        Ok(bytes) => bytes,
+        Err(e) => {
+            return error::invalid_request(format!("Failed to read request body: {e}"));
+        }
+    };
+
+    #[cfg(feature = "enterprise")]
+    {
+        let o2_cfg = get_o2_config();
+        if !o2_cfg.ai.enabled {
+            return not_enabled_error();
+        }
+
+        let client = match get_agent_client() {
+            Some(c) => c,
+            None => {
+                return agent_not_configured_error();
+            }
+        };
+
+        // Validated before this caller-supplied segment is interpolated into an outbound URL.
+        if !is_valid_session_id(&session_id) {
+            return error::invalid_request("Invalid session id");
+        }
+        let session_id = session_id.to_ascii_lowercase();
+        if let Err(resp) = check_chat_owner(&parts.headers, &org_id, &session_id).await {
+            return resp;
+        }
+
+        // Extract user auth from headers to pass to the agent
+        let auth_str = openobserve_core::auth::extract_auth_str_from_headers(&parts.headers).await;
+
+        // The session id alone names no org, so pass the authorized one along:
+        // o2-ai refuses to answer a confirmation recorded for a different org.
+        let Some(forward_bytes) = bind_confirm_body_to_org(&body_bytes, &org_id) else {
+            return error::invalid_request("Confirmation body must be a JSON object");
+        };
+
+        // The client routes the confirm to the replica holding the paused turn.
+        match client
+            .confirm_action(&session_id, forward_bytes, &auth_str)
+            .await
+        {
+            Ok(resp) => {
+                let status = resp.status();
+                let response_body = resp.text().await.unwrap_or_else(|_| "{}".to_string());
+
+                if status.is_success() {
+                    (
+                        StatusCode::OK,
+                        axum::Json(
+                            serde_json::from_str::<serde_json::Value>(&response_body)
+                                .unwrap_or_else(|_| serde_json::json!({"ok": true})),
+                        ),
+                    )
+                        .into_response()
+                } else {
+                    log::error!(
+                        "Agent confirm endpoint returned {}: {}",
+                        status,
+                        response_body
+                    );
+                    approval_delivery_failed_error()
+                }
+            }
+            Err(e) => {
+                log::error!("Failed to forward confirmation to agent: {e}");
+                approval_delivery_failed_error()
+            }
+        }
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    {
+        drop(org_id);
+        drop(session_id);
+        drop(parts);
+        drop(body_bytes);
+        error::not_enabled("AI chat is only available in enterprise version")
+    }
+}
+
+/// CancelChat - stop the turn running in a conversation
+#[utoipa::path(
+    post,
+    path = "/{org_id}/ai/chats/{session_id}/cancel",
+    context_path = "/api",
+    tag = "AI",
+    operation_id = "CancelChat",
+    summary = "Stop the AI turn running in a conversation",
+    description = "Stops generation for a chat session. With server-side chat persistence \
+                   enabled the browser no longer holds the connection to the agent, so \
+                   disconnecting does not stop the turn — this does, and what was generated \
+                   up to that point stays saved.",
+    security(
+        ("Authorization" = [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("session_id" = String, Path, description = "Chat session ID")
+    ),
+    responses(
+        (status = StatusCode::OK, description = "Cancellation forwarded", body = Object),
+        (status = StatusCode::BAD_REQUEST, description = "Invalid session ID or AI agent not configured", body = Object),
+        (status = StatusCode::FORBIDDEN, description = "The conversation belongs to another user", body = Object),
+        (status = StatusCode::NOT_FOUND, description = "Unknown conversation", body = Object),
+        (status = StatusCode::UNSUPPORTED_MEDIA_TYPE, description = "The body is not JSON (send {})", body = Object),
+        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = Object),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+pub async fn cancel(
+    Path((org_id, session_id)): Path<(String, String)>,
+    in_req: axum::extract::Request,
+) -> Response {
+    let (parts, _body) = in_req.into_parts();
+    if let Err(resp) = require_json(&parts.headers) {
+        return resp;
+    }
+
+    #[cfg(feature = "enterprise")]
+    {
+        if !get_o2_config().ai.enabled {
+            return not_enabled_error();
+        }
+        // Validated before it reaches an outbound URL and a routing key.
+        if !is_valid_session_id(&session_id) {
+            return error::invalid_request("Invalid session id");
+        }
+        let session_id = session_id.to_ascii_lowercase();
+        if let Err(resp) = check_chat_owner(&parts.headers, &org_id, &session_id).await {
+            return resp;
+        }
+        let auth_str = openobserve_core::auth::extract_auth_str_from_headers(&parts.headers).await;
+        cancel_turn(org_id, session_id, auth_str).await
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    {
+        drop((org_id, session_id, parts));
+        error::not_enabled("AI chat is only available in enterprise version")
+    }
+}
+
+/// The body of [`chat`] once the request is parsed: o2-ai's answer, charged after a 2xx.
+#[cfg(feature = "enterprise")]
+async fn chat_turn(
+    org_id: String,
+    parts: axum::http::request::Parts,
+    auth_data: TraceInfo,
+    trace_id: String,
+    prompt_body: PromptRequest,
+) -> Response {
+    {
+        let user_id = &auth_data.user_id;
+        let org_id_str = org_id.as_str();
+        let o2_cfg = get_o2_config();
+
+        // Check if AI/agent is enabled
+        if !o2_cfg.ai.enabled {
+            return not_enabled_error();
+        }
+
+        if !o2_cfg.ai.has_agent_target() {
+            return error::not_enabled("AI agent URL is not set");
+        }
+
+        let model = Ai::model_override(&prompt_body.model).map(str::to_string);
+        if !o2_cfg
+            .ai
+            .allows_model(model.as_deref().unwrap_or_default(), None)
+        {
+            return model_not_allowed_error();
+        }
+
+        // Quota is checked here, but a credit is only consumed once the upstream succeeds.
+        #[cfg(feature = "cloud")]
+        let usage_ctx = openobserve_core::trial_quota::AiUsageContext {
+            user_email: user_id.to_string(),
+            trace_id: Some(trace_id.clone()),
+            session_id: None,
+            incident_id: None,
+        };
+        #[cfg(feature = "cloud")]
+        if let Err(error) = openobserve_core::trial_quota::precheck_ai_usage(
+            org_id_str,
+            openobserve_core::trial_quota::TrialQuotaFeature::AiChat,
+            user_id,
+        )
+        .await
+        {
+            return ai_authorization_error_response(error);
+        }
+
+        // Extract user auth from headers to pass to the agent
+        let auth_str = openobserve_core::auth::extract_auth_str_from_headers(&parts.headers).await;
+        // Auth header is passed directly to agent - no need to extract user_token
+
+        // Get global agent client singleton
+        let client = match get_agent_client() {
+            Some(c) => c,
+            None => {
+                log::error!(
+                    "[trace_id:{trace_id}] [user_id:{user_id}] [org_id:{org_id_str}] \
+                     Agent service not configured"
+                );
+                return agent_not_configured_error();
+            }
+        };
+
+        let passthrough_config = ""; // TODO: Replace with config.ai.passthrough_headers once field is added
+        let passthrough_headers = extract_passthrough_headers(&parts.headers, passthrough_config);
+
+        let last_user_message = prompt_body
+            .messages
+            .iter()
+            .rfind(|m| m.role == Role::User)
+            .map(|m| m.content.clone())
+            .unwrap_or_default();
+
+        // Build history from all messages except the last user message
+        let history: Vec<serde_json::Value> = prompt_body
+            .messages
+            .iter()
+            .take(prompt_body.messages.len().saturating_sub(1))
+            .map(|m| {
+                serde_json::json!({
+                    "role": format!("{:?}", m.role).to_lowercase(),
+                    "content": m.content
+                })
+            })
+            .collect();
+
+        // Merge org_id into context
+        let mut context = serde_json::to_value(&prompt_body.context).unwrap_or_default();
+        if let Some(obj) = context.as_object_mut() {
+            obj.insert(
+                "org_id".to_string(),
+                serde_json::Value::String(org_id.clone()),
+            );
+            obj.remove(FORK_SEED_CONTEXT_KEY);
+        }
+
+        // Determine agent type based on context (incident_id -> sre, otherwise o2-ai)
+        // Must be done before context is moved into QueryRequest
+        let (agent_type, context) = chat_agent_and_context(org_id_str, user_id, context).await;
+
+        // Convert images to agent format
+        let images = prompt_body.images.map(|imgs| {
+            imgs.into_iter()
+                .map(|img| ImageAttachment {
+                    data: img.data,
+                    mime_type: img.mime_type,
+                    filename: img.filename,
+                })
+                .collect()
+        });
+
+        let (tool_mcps, tool_clis, tool_skills) =
+            o2_enterprise::enterprise::ai::toolsets::push::load_agent_tools(org_id_str).await;
+        let query_req = QueryRequest {
+            query: last_user_message,
+            context,
+            model,
+            history: if history.is_empty() {
+                None
+            } else {
+                Some(history)
+            },
+            images,
+            mcps: if tool_mcps.is_empty() {
+                None
+            } else {
+                Some(tool_mcps)
+            },
+            clis: if tool_clis.is_empty() {
+                None
+            } else {
+                Some(tool_clis)
+            },
+            skills: if tool_skills.is_empty() {
+                None
+            } else {
+                Some(tool_skills)
+            },
+            // Set by persistence admission below; absent, o2-ai streams as before.
+            turn_id: None,
+            known_seq: None,
+            known_opencode_session_id: None,
+            session_epoch: None,
+        };
+
+        // Without it every call lands on an arbitrary replica, which starts a new session.
+        let mut forward_headers = std::collections::HashMap::new();
+        if let Some(session_id) = parts.headers.get(X_O2_ASSISTANT_SESSION_ID.as_str())
+            && let Ok(val) = session_id.to_str()
+        {
+            // A persisted chat is only continued through admission (owner check, epoch fence).
+            if o2_enterprise::enterprise::ai::chat::is_enabled() {
+                return error::invalid_request(
+                    "Use /ai/chat_stream to continue a conversation while chat persistence is \
+                     enabled",
+                );
+            }
+            if is_valid_session_id(val) {
+                forward_headers.insert(
+                    X_O2_ASSISTANT_SESSION_ID.as_str().to_string(),
+                    val.to_ascii_lowercase(),
+                );
+            } else {
+                return error::invalid_request("Invalid session id");
+            }
+        }
+
+        // No span here, so the caller's traceparent joins the agent's spans to its trace.
+        if let Some(traceparent) = &auth_data.traceparent
+            && !traceparent.is_empty()
+        {
+            forward_headers.insert("traceparent".to_string(), traceparent.clone());
+        }
+
+        if let Some(user_agent) = parts.headers.get("user-agent")
+            && let Ok(val) = user_agent.to_str()
+        {
+            forward_headers.insert("user-agent".to_string(), val.to_string());
+        }
+
+        // Merged last and never overriding the headers set above.
+        for (key, value) in passthrough_headers {
+            forward_headers.entry(key).or_insert(value);
+        }
+
+        let headers_to_forward = if forward_headers.is_empty() {
+            None
+        } else {
+            Some(&forward_headers)
+        };
+
+        return match client
+            .query_with_headers(agent_type, query_req, &auth_str, headers_to_forward)
+            .await
+        {
+            Ok(response) => {
+                #[cfg(feature = "cloud")]
+                if let Err(error) = openobserve_core::trial_quota::authorize_ai_usage(
+                    org_id_str,
+                    openobserve_core::trial_quota::TrialQuotaFeature::AiChat,
+                    &usage_ctx,
+                )
+                .await
+                {
+                    return post_upstream_authorization_error(error).into_response();
+                }
+                let prompt_response = PromptResponse {
+                    role: Role::Assistant,
+                    content: response.response,
+                };
+                (StatusCode::OK, Json(prompt_response)).into_response()
+            }
+            Err(error) => {
+                log::error!(
+                    "[trace_id:{trace_id}] [user_id:{user_id}] [org_id:{org_id_str}] \
+                     Agent query failed: {error}"
+                );
+                upstream_error(&error).into_response()
+            }
+        };
+    }
+}
+
+/// The body of [`chat_stream`]: admission, the charge and the metered stream.
+async fn stream_turn(
+    org_id: String,
+    parts: axum::http::request::Parts,
+    body: Body,
+    auth_data: TraceInfo,
+    trace_id: String,
+) -> Response {
     let user_id = auth_data.user_id.clone();
 
     // OTel API directly: tracing-opentelemetry spans in async_stream! are not exported.
@@ -912,7 +1956,7 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
         } else {
             // Rejected, not dropped: an arbitrary replica would read as the assistant forgetting.
             log::warn!("[trace_id:{}] Invalid session ID format: {}", trace_id, val);
-            return MetaHttpResponse::bad_request("Invalid session id");
+            return error::invalid_request("Invalid session id");
         }
     }
 
@@ -969,52 +2013,51 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
     let body_bytes = match axum::body::to_bytes(body, usize::MAX).await {
         Ok(bytes) => bytes,
         Err(e) => {
-            return MetaHttpResponse::bad_request(format!("Failed to read request body: {}", e));
+            return error::invalid_request(format!("Failed to read request body: {}", e));
         }
     };
 
     let prompt_body: PromptRequest = match serde_json::from_slice(&body_bytes) {
         Ok(b) => b,
         Err(e) => {
-            return MetaHttpResponse::bad_request(format!("Invalid JSON body: {}", e));
+            return error::invalid_request(format!("Invalid JSON body: {}", e));
         }
     };
 
     #[cfg(feature = "enterprise")]
     {
         let org_id_str = org_id.clone();
-        let mut code = StatusCode::OK.as_u16();
-        let body_bytes_str = serde_json::to_string(&prompt_body).unwrap_or_default();
+        let audit = TurnAudit::new(
+            &org_id_str,
+            &user_id,
+            &trace_id,
+            forward_headers
+                .get(X_O2_ASSISTANT_SESSION_ID.as_str())
+                .map(String::as_str),
+            persist_turn_id.as_deref(),
+            Some(&prompt_body),
+            body_bytes.len(),
+        );
 
         // Check if AI/agent is enabled
         if !get_o2_config().ai.enabled {
-            let error_message = Some("AI is not enabled".to_string());
-            code = StatusCode::BAD_REQUEST.as_u16();
-            report_to_audit(
-                user_id.clone(),
-                org_id_str.clone(),
-                trace_id.clone(),
-                code,
-                error_message,
-                "POST".to_string(),
-                format!("/api/{}/ai/chat_stream", org_id_str),
-                String::new(),
-                body_bytes_str,
-            )
-            .await;
-            return MetaHttpResponse::bad_request("AI is not enabled");
+            audit
+                .report(StatusCode::BAD_REQUEST, Some("AI is not enabled"))
+                .await;
+            return not_enabled_error();
+        }
+        let model = Ai::model_override(&prompt_body.model).map(str::to_string);
+        if !get_o2_config()
+            .ai
+            .allows_model(model.as_deref().unwrap_or_default(), None)
+        {
+            audit
+                .report(StatusCode::BAD_REQUEST, Some("Model override not allowed"))
+                .await;
+            return model_not_allowed_error();
         }
 
-        // Quota is checked here; the credit is deducted only after the upstream accepts the stream.
-        #[cfg(feature = "cloud")]
-        let usage_ctx = openobserve_core::trial_quota::AiUsageContext {
-            user_email: user_id.clone(),
-            trace_id: Some(trace_id.clone()),
-            session_id: forward_headers
-                .get(X_O2_ASSISTANT_SESSION_ID.as_str())
-                .cloned(),
-            incident_id: None,
-        };
+        // Quota is checked here; the credit is deducted only once o2-ai accepted the turn.
         #[cfg(feature = "cloud")]
         if let Err(error) = openobserve_core::trial_quota::precheck_ai_usage(
             &org_id_str,
@@ -1030,21 +2073,13 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
         let client = match get_agent_client() {
             Some(c) => c,
             None => {
-                let error_message = Some("Agent service not configured".to_string());
-                code = StatusCode::BAD_REQUEST.as_u16();
-                report_to_audit(
-                    user_id.clone(),
-                    org_id_str.clone(),
-                    trace_id.clone(),
-                    code,
-                    error_message,
-                    "POST".to_string(),
-                    format!("/api/{}/ai/chat_stream", org_id_str),
-                    String::new(),
-                    body_bytes_str,
-                )
-                .await;
-                return MetaHttpResponse::bad_request("Agent service not configured");
+                audit
+                    .report(
+                        StatusCode::BAD_REQUEST,
+                        Some("Agent service not configured"),
+                    )
+                    .await;
+                return agent_not_configured_error();
             }
         };
 
@@ -1101,11 +2136,7 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
         let query_req = QueryRequest {
             query: last_user_message,
             context,
-            model: if prompt_body.model.is_empty() {
-                None
-            } else {
-                Some(prompt_body.model)
-            },
+            model,
             history: if history.is_empty() {
                 None
             } else {
@@ -1134,270 +2165,29 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
             session_epoch: None,
         };
 
-        let headers_to_forward = if forward_headers.is_empty() {
-            None
-        } else {
-            Some(forward_headers)
+        let turn = StreamTurn {
+            org_id: org_id_str,
+            user_id,
+            trace_id,
+            turn_id: persist_turn_id,
+            agent_type,
+            query: query_req,
+            auth: auth_str,
+            forward_headers: if forward_headers.is_empty() {
+                None
+            } else {
+                Some(forward_headers)
+            },
+            client,
+            span: otel_chat_span,
+            audit,
         };
-
         // With persistence on, a background task owns the turn; a closed tab drops only its feed.
         if o2_enterprise::enterprise::ai::chat::is_enabled() {
-            let session_id = headers_to_forward
-                .as_ref()
-                .and_then(|h| h.get(X_O2_ASSISTANT_SESSION_ID.as_str()))
-                .cloned();
-            if query_req.query.trim().is_empty()
-                && query_req.images.as_ref().is_none_or(|i| i.is_empty())
-            {
-                return MetaHttpResponse::bad_request("The message is empty");
-            }
-            // Read before admission so a failed read leaves the turn retryable.
-            let fork_seed = match super::shares::fork_seed(
-                &org_id_str,
-                session_id.as_deref(),
-                &user_id,
-            )
-            .await
-            {
-                Ok(seed) => seed,
-                Err(resp) => return resp,
-            };
-            let admitted = match super::chats::admit_turn(
-                &org_id_str,
-                session_id.as_deref(),
-                persist_turn_id.as_deref(),
-                &user_id,
-                agent_type,
-                &query_req.query,
-                &trace_id,
-            )
-            .await
-            {
-                Ok(admitted) => admitted,
-                Err(resp) => return resp,
-            };
-            #[cfg(feature = "cloud")]
-            if let Err(error) = openobserve_core::trial_quota::authorize_ai_usage(
-                &org_id_str,
-                openobserve_core::trial_quota::TrialQuotaFeature::AiChat,
-                &usage_ctx,
-            )
-            .await
-            {
-                super::chats::abandon_turn(admitted, "usage_denied").await;
-                return ai_post_upstream_authorization_error_response(error);
-            }
-            let super::chats::AdmittedTurn {
-                row,
-                owner,
-                turn_id,
-                lease,
-                registration,
-            } = admitted;
-            report_to_audit(
-                user_id.clone(),
-                org_id_str.clone(),
-                trace_id.clone(),
-                code,
-                None,
-                "POST".to_string(),
-                format!("/api/{}/ai/chat_stream", org_id_str),
-                String::new(),
-                body_bytes_str,
-            )
-            .await;
-            let session_id = row.session_id.clone();
-
-            // o2-ai forwards only events past `known_seq` (restore_required when it holds fewer).
-            let mut query_req = query_req;
-            query_req.turn_id = Some(turn_id.clone());
-            query_req.known_seq = Some(row.last_committed_seq);
-            query_req.known_opencode_session_id = row.opencode_session_id.clone();
-            query_req.session_epoch = Some(row.session_epoch);
-            if row.last_committed_seq == infra::table::ai_chat_sessions::NO_SEQ
-                && let Some(seed) = fork_seed
-            {
-                query_req.history = Some(seed);
-                if let Some(context) = query_req.context.as_object_mut() {
-                    context.insert(FORK_SEED_CONTEXT_KEY.to_string(), true.into());
-                }
-            }
-
-            let settings = PersistSettings::from_config();
-            let store = std::sync::Arc::new(openobserve_core::ai_chat::StreamChatStore::new(
-                settings.retention_days,
-            ));
-            let span_for_task = otel_chat_span;
-            let mut rx = spawn_turn(
-                TurnSpec {
-                    identity: TurnIdentity {
-                        org_id: org_id_str.clone(),
-                        session_id,
-                        user_id: owner,
-                        agent_type,
-                        turn_id,
-                        trace_id: trace_id.clone(),
-                        epoch: row.session_epoch,
-                        last_committed_seq: row.last_committed_seq,
-                        opencode_session_id: row.opencode_session_id,
-                    },
-                    request: query_req,
-                    auth_header: auth_str,
-                    forward_headers: headers_to_forward,
-                    client,
-                    store,
-                    lease,
-                    registration,
-                    // The span outlives this response, so the task ends it.
-                    on_end: Some(Box::new(move || {
-                        if let Some(span_cx) = span_for_task {
-                            use opentelemetry::trace::TraceContextExt;
-                            span_cx.span().end();
-                        }
-                    })),
-                },
-                settings,
-            );
-
-            let body = async_stream::stream! {
-                while let Some(chunk) = rx.recv().await {
-                    yield Ok::<bytes::Bytes, std::io::Error>(chunk);
-                }
-            };
-            return axum::http::Response::builder()
-                .status(StatusCode::OK)
-                .header(
-                    axum::http::header::CONTENT_TYPE,
-                    mime::TEXT_EVENT_STREAM.as_ref(),
-                )
-                .header(axum::http::header::CACHE_CONTROL, "no-cache")
-                .header("X-Accel-Buffering", "no")
-                .body(Body::from_stream(body))
-                .unwrap_or_else(|_| Response::new(Body::empty()));
+            persisted_turn(turn).await
+        } else {
+            direct_turn(turn).await
         }
-
-        // The upstream accepts before headers or usage go out, so startup errors keep statuses.
-        let response = match client
-            .query_stream_with_headers(
-                agent_type,
-                query_req,
-                &auth_str,
-                headers_to_forward.as_ref(),
-            )
-            .await
-        {
-            Ok(response) => response,
-            Err(error) => {
-                log::error!(
-                    "[trace_id:{trace_id}] [user_id:{user_id}] [org_id:{org_id_str}] \
-                     Agent query failed: {error}"
-                );
-                let response = ai_upstream_error_response(error);
-                if let Some(span_cx) = otel_chat_span.as_ref() {
-                    use opentelemetry::trace::TraceContextExt;
-                    span_cx.span().end();
-                }
-                report_to_audit(
-                    user_id.clone(),
-                    org_id_str.clone(),
-                    trace_id.clone(),
-                    response.status().as_u16(),
-                    Some("Upstream AI request failed".to_string()),
-                    "POST".to_string(),
-                    format!("/api/{}/ai/chat_stream", org_id_str),
-                    String::new(),
-                    body_bytes_str,
-                )
-                .await;
-                return response;
-            }
-        };
-
-        #[cfg(feature = "cloud")]
-        if let Err(error) = openobserve_core::trial_quota::authorize_ai_usage(
-            &org_id_str,
-            openobserve_core::trial_quota::TrialQuotaFeature::AiChat,
-            &usage_ctx,
-        )
-        .await
-        {
-            let response = ai_post_upstream_authorization_error_response(error);
-            if let Some(span_cx) = otel_chat_span.as_ref() {
-                use opentelemetry::trace::TraceContextExt;
-                span_cx.span().end();
-            }
-            report_to_audit(
-                user_id.clone(),
-                org_id_str.clone(),
-                trace_id.clone(),
-                response.status().as_u16(),
-                Some("AI credit authorization failed after upstream acceptance".to_string()),
-                "POST".to_string(),
-                format!("/api/{}/ai/chat_stream", org_id_str),
-                String::new(),
-                body_bytes_str,
-            )
-            .await;
-            return response;
-        }
-
-        report_to_audit(
-            user_id.clone(),
-            org_id_str.clone(),
-            trace_id.clone(),
-            code,
-            None,
-            "POST".to_string(),
-            format!("/api/{}/ai/chat_stream", org_id_str),
-            String::new(),
-            body_bytes_str,
-        )
-        .await;
-
-        // Keep the OTel span alive for the full stream.
-        let s = async_stream::stream! {
-            let mut agent_stream = response.bytes_stream();
-
-            while let Some(chunk_result) = agent_stream.next().await {
-                match chunk_result {
-                    Ok(bytes) => {
-                        yield Ok::<bytes::Bytes, std::io::Error>(bytes);
-                    }
-                    Err(e) => {
-                        log::error!(
-                            "[trace_id:{trace_id}] [user_id:{user_id}] [org_id:{org_id_str}] \
-                             Agent stream chunk error: {e}"
-                        );
-                        let error_event = serde_json::json!({
-                            "type": "error",
-                            "error": format!("Stream interrupted: {}", e)
-                        });
-                        yield Ok::<bytes::Bytes, std::io::Error>(bytes::Bytes::from(format!("data: {}\n\n", error_event)));
-                        break;
-                    }
-                }
-            }
-            log::info!(
-                "[trace_id:{trace_id}] [user_id:{user_id}] [org_id:{org_id_str}] \
-                 Agent stream ended"
-            );
-            // The BatchSpanProcessor exports a span only once it has ended.
-            if let Some(span_cx) = otel_chat_span {
-                use opentelemetry::trace::TraceContextExt;
-                span_cx.span().end();
-            }
-        };
-
-        axum::http::Response::builder()
-            .status(StatusCode::OK)
-            .header(
-                axum::http::header::CONTENT_TYPE,
-                mime::TEXT_EVENT_STREAM.as_ref(),
-            )
-            .header(axum::http::header::CACHE_CONTROL, "no-cache")
-            .header("X-Accel-Buffering", "no")
-            .body(Body::from_stream(s))
-            .unwrap_or_else(|_| Response::new(Body::empty()))
     }
 
     #[cfg(not(feature = "enterprise"))]
@@ -1407,303 +2197,354 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
         drop(trace_id);
         drop(user_id);
         drop(prompt_body);
-        MetaHttpResponse::bad_request("AI chat is only available in enterprise version")
-    }
-}
-
-/// Forwards feedback on an AI response to o2-ai, which records it.
-pub async fn feedback(Path(org_id): Path<String>, in_req: axum::extract::Request) -> Response {
-    let (parts, body) = in_req.into_parts();
-    if let Err(resp) = require_json(&parts.headers) {
-        return resp;
-    }
-
-    // Extract trace info from headers (user_id may not be present for feedback)
-    let traceparent = parts
-        .headers
-        .get("traceparent")
-        .and_then(|v| v.to_str().ok())
-        .map(|s| s.to_string());
-
-    let trace_id = traceparent
-        .as_ref()
-        .and_then(|tp| tp.split('-').nth(1).map(|s| s.to_string()))
-        .unwrap_or_else(|| "unknown".to_string());
-
-    let mut forward_headers = std::collections::HashMap::new();
-
-    // Rejected rather than dropped: feedback is recorded on the owning replica.
-    if let Some(session_id) = parts.headers.get(X_O2_ASSISTANT_SESSION_ID.as_str())
-        && let Ok(val) = session_id.to_str()
-    {
-        if is_valid_session_id(val) {
-            forward_headers.insert(
-                X_O2_ASSISTANT_SESSION_ID.as_str().to_string(),
-                val.to_ascii_lowercase(),
-            );
-        } else {
-            return MetaHttpResponse::bad_request("Invalid session id");
-        }
-    }
-
-    // Parse JSON body
-    let body_bytes = match axum::body::to_bytes(body, usize::MAX).await {
-        Ok(bytes) => bytes,
-        Err(e) => {
-            return MetaHttpResponse::bad_request(format!("Failed to read request body: {}", e));
-        }
-    };
-
-    let feedback_body: serde_json::Value = match serde_json::from_slice(&body_bytes) {
-        Ok(b) => b,
-        Err(e) => {
-            return MetaHttpResponse::bad_request(format!("Invalid JSON body: {}", e));
-        }
-    };
-
-    #[cfg(feature = "enterprise")]
-    {
-        if !get_o2_config().ai.enabled {
-            return MetaHttpResponse::bad_request("AI is not enabled");
-        }
-
-        let client = match get_agent_client() {
-            Some(c) => c,
-            None => {
-                return MetaHttpResponse::bad_request("Agent service not configured");
-            }
-        };
-        if let Some(session_id) = forward_headers.get(X_O2_ASSISTANT_SESSION_ID.as_str())
-            && let Err(resp) = check_chat_owner(&parts.headers, &org_id, session_id).await
-        {
-            return resp;
-        }
-
-        // Extract user auth from headers to pass to the agent
-        let auth_str = openobserve_core::auth::extract_auth_str_from_headers(&parts.headers).await;
-
-        let headers_to_forward = if forward_headers.is_empty() {
-            None
-        } else {
-            Some(forward_headers)
-        };
-
-        match client
-            .post_feedback(feedback_body, &auth_str, headers_to_forward.as_ref())
-            .await
-        {
-            Ok(response) => {
-                log::info!(
-                    "[trace_id:{}] Feedback submitted for org={}",
-                    trace_id,
-                    org_id
-                );
-                Json(response).into_response()
-            }
-            Err(e) => {
-                log::error!("[trace_id:{}] Feedback submission failed: {}", trace_id, e);
-                MetaHttpResponse::internal_error(format!("Feedback submission failed: {}", e))
-            }
-        }
-    }
-
-    #[cfg(not(feature = "enterprise"))]
-    {
-        drop(org_id);
-        drop(trace_id);
-        drop(feedback_body);
-        MetaHttpResponse::bad_request("AI feedback is only available in enterprise version")
-    }
-}
-
-/// ConfirmAction - Proxy confirmation response to o2-sre-agent
-#[utoipa::path(
-    post,
-    path = "/{org_id}/ai/confirm/{session_id}",
-    context_path = "/api",
-    tag = "AI",
-    operation_id = "ConfirmAction",
-    summary = "Confirm or reject a destructive AI tool action",
-    description = "Forwards user confirmation or rejection to the o2-sre-agent service \
-                   for a pending destructive tool call.",
-    security(
-        ("Authorization" = [])
-    ),
-    params(
-        ("org_id" = String, Path, description = "Organization name"),
-        ("session_id" = String, Path, description = "Chat session ID")
-    ),
-    request_body(
-        content = serde_json::Value,
-        description = "Confirmation payload",
-        example = json!({"approved": true}),
-    ),
-    responses(
-        (status = StatusCode::OK, description = "Confirmation forwarded", body = Object),
-        (status = StatusCode::BAD_REQUEST, description = "Invalid session ID, malformed body, or AI agent not configured", body = Object),
-        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = Object),
-    ),
-    extensions(
-        ("x-o2-mcp" = json!({"enabled": false}))
-    )
-)]
-pub async fn confirm_action(
-    Path((org_id, session_id)): Path<(String, String)>,
-    in_req: axum::extract::Request,
-) -> Response {
-    let (parts, body) = in_req.into_parts();
-    if let Err(resp) = require_json(&parts.headers) {
-        return resp;
-    }
-
-    // Parse JSON body
-    let body_bytes = match axum::body::to_bytes(body, usize::MAX).await {
-        Ok(bytes) => bytes,
-        Err(e) => {
-            return MetaHttpResponse::bad_request(format!("Failed to read request body: {e}"));
-        }
-    };
-
-    #[cfg(feature = "enterprise")]
-    {
-        let o2_cfg = get_o2_config();
-        if !o2_cfg.ai.enabled {
-            return MetaHttpResponse::bad_request("AI is not enabled");
-        }
-
-        let client = match get_agent_client() {
-            Some(c) => c,
-            None => {
-                return MetaHttpResponse::bad_request("Agent service not configured");
-            }
-        };
-
-        // Validated before this caller-supplied segment is interpolated into an outbound URL.
-        if !is_valid_session_id(&session_id) {
-            return MetaHttpResponse::bad_request("Invalid session id");
-        }
-        let session_id = session_id.to_ascii_lowercase();
-        if let Err(resp) = check_chat_owner(&parts.headers, &org_id, &session_id).await {
-            return resp;
-        }
-
-        // Extract user auth from headers to pass to the agent
-        let auth_str = openobserve_core::auth::extract_auth_str_from_headers(&parts.headers).await;
-
-        // The session id alone names no org, so pass the authorized one along:
-        // o2-ai refuses to answer a confirmation recorded for a different org.
-        let Some(forward_bytes) = bind_confirm_body_to_org(&body_bytes, &org_id) else {
-            return MetaHttpResponse::bad_request("Confirmation body must be a JSON object");
-        };
-
-        // The client routes the confirm to the replica holding the paused turn.
-        match client
-            .confirm_action(&session_id, forward_bytes, &auth_str)
-            .await
-        {
-            Ok(resp) => {
-                let status = resp.status();
-                let response_body = resp.text().await.unwrap_or_else(|_| "{}".to_string());
-
-                if status.is_success() {
-                    (
-                        StatusCode::OK,
-                        axum::Json(
-                            serde_json::from_str::<serde_json::Value>(&response_body)
-                                .unwrap_or_else(|_| serde_json::json!({"ok": true})),
-                        ),
-                    )
-                        .into_response()
-                } else {
-                    log::error!(
-                        "Agent confirm endpoint returned {}: {}",
-                        status,
-                        response_body
-                    );
-                    MetaHttpResponse::internal_error(format!(
-                        "Confirmation failed: {}",
-                        response_body
-                    ))
-                }
-            }
-            Err(e) => {
-                log::error!("Failed to forward confirmation to agent: {e}");
-                MetaHttpResponse::internal_error(format!("Failed to forward confirmation: {e}"))
-            }
-        }
-    }
-
-    #[cfg(not(feature = "enterprise"))]
-    {
-        drop(org_id);
-        drop(session_id);
-        drop(parts);
         drop(body_bytes);
-        MetaHttpResponse::bad_request("AI chat is only available in enterprise version")
+        drop(persist_turn_id);
+        error::not_enabled("AI chat is only available in enterprise version")
     }
 }
 
-/// CancelChat - stop the turn running in a conversation
-#[utoipa::path(
-    post,
-    path = "/{org_id}/ai/chats/{session_id}/cancel",
-    context_path = "/api",
-    tag = "AI",
-    operation_id = "CancelChat",
-    summary = "Stop the AI turn running in a conversation",
-    description = "Stops generation for a chat session. With server-side chat persistence \
-                   enabled the browser no longer holds the connection to the agent, so \
-                   disconnecting does not stop the turn — this does, and what was generated \
-                   up to that point stays saved.",
-    security(
-        ("Authorization" = [])
-    ),
-    params(
-        ("org_id" = String, Path, description = "Organization name"),
-        ("session_id" = String, Path, description = "Chat session ID")
-    ),
-    responses(
-        (status = StatusCode::OK, description = "Cancellation forwarded", body = Object),
-        (status = StatusCode::BAD_REQUEST, description = "Invalid session ID or AI agent not configured", body = Object),
-        (status = StatusCode::FORBIDDEN, description = "The conversation belongs to another user", body = Object),
-        (status = StatusCode::NOT_FOUND, description = "Unknown conversation", body = Object),
-        (status = StatusCode::UNSUPPORTED_MEDIA_TYPE, description = "The body is not JSON (send {})", body = Object),
-        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = Object),
-    ),
-    extensions(
-        ("x-o2-mcp" = json!({"enabled": false}))
+/// Admits a persisted turn, takes its credit before o2-ai runs and streams it; no content refunds.
+#[cfg(feature = "enterprise")]
+async fn persisted_turn(turn: StreamTurn) -> Response {
+    let StreamTurn {
+        org_id,
+        user_id,
+        trace_id,
+        turn_id,
+        agent_type,
+        query: mut query_req,
+        auth,
+        forward_headers,
+        client,
+        span,
+        mut audit,
+    } = turn;
+    let session_id = forward_headers
+        .as_ref()
+        .and_then(|h| h.get(X_O2_ASSISTANT_SESSION_ID.as_str()))
+        .cloned();
+    if query_req.query.trim().is_empty() && query_req.images.as_ref().is_none_or(|i| i.is_empty()) {
+        return error::invalid_request("The message is empty");
+    }
+    // Read before admission so a failed read leaves the turn retryable.
+    let fork_seed = match super::shares::fork_seed(&org_id, session_id.as_deref(), &user_id).await {
+        Ok(seed) => seed,
+        Err(resp) => return resp,
+    };
+    let admitted = match super::chats::admit_turn(
+        &org_id,
+        session_id.as_deref(),
+        turn_id.as_deref(),
+        &user_id,
+        agent_type,
+        &query_req.query,
+        &trace_id,
     )
-)]
-pub async fn cancel(
-    Path((org_id, session_id)): Path<(String, String)>,
-    in_req: axum::extract::Request,
-) -> Response {
-    let (parts, _body) = in_req.into_parts();
-    if let Err(resp) = require_json(&parts.headers) {
-        return resp;
+    .await
+    {
+        Ok(admitted) => admitted,
+        Err(resp) => return resp,
+    };
+    audit.turn_id = Some(admitted.turn_id.clone());
+    // Charged before o2-ai can commit anything, so a refusal leaves no answer in the history.
+    let mut charge = TurnCharge::new(
+        &org_id,
+        &user_id,
+        &trace_id,
+        Some(&admitted.row.session_id),
+        &admitted.turn_id,
+    );
+    if let Err(refusal) = charge.charge().await {
+        super::chats::abandon_turn(admitted, "usage_denied").await;
+        audit
+            .report(
+                refusal.http_status(),
+                Some("AI credit authorization failed"),
+            )
+            .await;
+        return refusal.into_response();
+    }
+    let super::chats::AdmittedTurn {
+        row,
+        owner,
+        turn_id,
+        trace_id,
+        lease,
+        registration,
+    } = admitted;
+    audit.report(StatusCode::OK, None).await;
+    let session_id = row.session_id.clone();
+
+    // o2-ai forwards only events past `known_seq` (restore_required when it holds fewer).
+    query_req.turn_id = Some(turn_id.clone());
+    query_req.known_seq = Some(row.last_committed_seq);
+    query_req.known_opencode_session_id = row.opencode_session_id.clone();
+    query_req.session_epoch = Some(row.session_epoch);
+    if row.last_committed_seq == infra::table::ai_chat_sessions::NO_SEQ
+        && let Some(seed) = fork_seed
+    {
+        query_req.history = Some(seed);
+        if let Some(context) = query_req.context.as_object_mut() {
+            context.insert(FORK_SEED_CONTEXT_KEY.to_string(), true.into());
+        }
     }
 
-    #[cfg(feature = "enterprise")]
-    {
-        if !get_o2_config().ai.enabled {
-            return MetaHttpResponse::bad_request("AI is not enabled");
-        }
-        // Validated before it reaches an outbound URL and a routing key.
-        if !is_valid_session_id(&session_id) {
-            return MetaHttpResponse::bad_request("Invalid session id");
-        }
-        let session_id = session_id.to_ascii_lowercase();
-        if let Err(resp) = check_chat_owner(&parts.headers, &org_id, &session_id).await {
-            return resp;
-        }
-        let auth_str = openobserve_core::auth::extract_auth_str_from_headers(&parts.headers).await;
-        cancel_turn(org_id, session_id, auth_str).await
-    }
+    let meter = TurnMeter::new(
+        TurnPhase::charged(),
+        charge,
+        Some((session_id.clone(), turn_id.clone())),
+    );
+    let (stop_org, stop_session, stop_auth) = (org_id.clone(), session_id.clone(), auth.clone());
+    let stop = move || {
+        tokio::spawn(cancel_turn(stop_org, stop_session, stop_auth));
+    };
+    let settings = PersistSettings::from_config();
+    let store = std::sync::Arc::new(openobserve_core::ai_chat::StreamChatStore::new(
+        settings.retention_days,
+    ));
+    let rx = spawn_turn(
+        TurnSpec {
+            identity: TurnIdentity {
+                org_id,
+                session_id,
+                user_id: owner,
+                agent_type,
+                turn_id,
+                trace_id,
+                epoch: row.session_epoch,
+                last_committed_seq: row.last_committed_seq,
+                opencode_session_id: row.opencode_session_id,
+            },
+            request: query_req,
+            auth_header: auth,
+            forward_headers,
+            client,
+            store,
+            lease,
+            registration,
+            // The span outlives this response, so the task ends it.
+            on_end: Some(Box::new(move || {
+                if let Some(span_cx) = span {
+                    use opentelemetry::trace::TraceContextExt;
+                    span_cx.span().end();
+                }
+            })),
+        },
+        settings,
+    );
+    let frames = futures::stream::unfold(rx, |mut rx| async move {
+        rx.recv().await.map(|chunk| (chunk, rx))
+    });
+    let (body, _metering) = meter_persisted_turn(frames, meter, stop);
+    sse_response(Body::from_stream(body))
+}
 
-    #[cfg(not(feature = "enterprise"))]
+/// Streams a turn straight from o2-ai; its answering is the acceptance that takes the credit.
+#[cfg(feature = "enterprise")]
+async fn direct_turn(turn: StreamTurn) -> Response {
+    let StreamTurn {
+        org_id,
+        user_id,
+        trace_id,
+        turn_id,
+        agent_type,
+        query,
+        auth,
+        forward_headers,
+        client,
+        span,
+        audit,
+    } = turn;
+    let end_span = |span: &Option<opentelemetry::Context>| {
+        if let Some(span_cx) = span.as_ref() {
+            use opentelemetry::trace::TraceContextExt;
+            span_cx.span().end();
+        }
+    };
+    // The upstream accepts before headers or usage go out, so startup errors keep statuses.
+    let response = match client
+        .query_stream_with_headers(agent_type, query, &auth, forward_headers.as_ref())
+        .await
     {
-        drop((org_id, session_id, parts));
-        MetaHttpResponse::bad_request("AI chat is only available in enterprise version")
+        Ok(response) => response,
+        Err(e) => {
+            log::error!(
+                "[trace_id:{trace_id}] [user_id:{user_id}] [org_id:{org_id}] \
+                 Agent query failed: {e}"
+            );
+            let refusal = upstream_error(&e);
+            end_span(&span);
+            audit
+                .report(refusal.http_status(), Some("Upstream AI request failed"))
+                .await;
+            return refusal.into_response();
+        }
+    };
+
+    let session_id = forward_headers
+        .as_ref()
+        .and_then(|h| h.get(X_O2_ASSISTANT_SESSION_ID.as_str()));
+    // Without the browser's turn id the trace id keys the refund; both are unique per request.
+    let charge_key = turn_id
+        .as_deref()
+        .and_then(super::chats::normalize_uuid)
+        .unwrap_or_else(|| trace_id.clone());
+    let mut charge = TurnCharge::new(
+        &org_id,
+        &user_id,
+        &trace_id,
+        session_id.map(String::as_str),
+        &charge_key,
+    );
+    if let Err(refusal) = charge.charge().await {
+        end_span(&span);
+        audit
+            .report(
+                refusal.http_status(),
+                Some("AI credit authorization failed after upstream acceptance"),
+            )
+            .await;
+        return refusal.into_response();
+    }
+    audit.report(StatusCode::OK, None).await;
+
+    let mut meter = TurnMeter::new(TurnPhase::charged(), charge, None);
+    // Keep the OTel span alive for the full stream.
+    let s = async_stream::stream! {
+        let mut agent_stream = response.bytes_stream();
+        while let Some(chunk_result) = agent_stream.next().await {
+            let out = match chunk_result {
+                Ok(bytes) => meter.feed(&bytes).await,
+                Err(e) => {
+                    log::error!(
+                        "[trace_id:{trace_id}] [user_id:{user_id}] [org_id:{org_id}] \
+                         Agent stream chunk error: {e}"
+                    );
+                    let out = meter.interrupt(stream_interrupted_error().to_sse_frame()).await;
+                    for chunk in out {
+                        yield Ok::<Bytes, std::io::Error>(chunk);
+                    }
+                    break;
+                }
+            };
+            for chunk in out {
+                yield Ok::<Bytes, std::io::Error>(chunk);
+            }
+            if meter.refused() {
+                break;
+            }
+        }
+        for chunk in meter.finish().await {
+            yield Ok::<Bytes, std::io::Error>(chunk);
+        }
+        log::info!(
+            "[trace_id:{trace_id}] [user_id:{user_id}] [org_id:{org_id}] \
+             Agent stream ended"
+        );
+        // The BatchSpanProcessor exports a span only once it has ended.
+        end_span(&span);
+    };
+    sse_response(Body::from_stream(s))
+}
+
+#[cfg(feature = "enterprise")]
+fn sse_response(body: Body) -> Response {
+    axum::http::Response::builder()
+        .status(StatusCode::OK)
+        .header(
+            axum::http::header::CONTENT_TYPE,
+            mime::TEXT_EVENT_STREAM.as_ref(),
+        )
+        .header(axum::http::header::CACHE_CONTROL, "no-cache")
+        .header("X-Accel-Buffering", "no")
+        .body(body)
+        .unwrap_or_else(|_| Response::new(Body::empty()))
+}
+
+/// Meters a persisted turn and reads on after the browser leaves, so a background turn still pays.
+#[cfg(feature = "enterprise")]
+fn meter_persisted_turn(
+    frames: impl futures::Stream<Item = Bytes> + Send + 'static,
+    mut meter: TurnMeter,
+    stop: impl FnOnce() + Send + 'static,
+) -> (
+    impl futures::Stream<Item = Result<Bytes, std::io::Error>>,
+    tokio::task::JoinHandle<TurnMeter>,
+) {
+    let (tx, mut body_rx) = tokio::sync::mpsc::unbounded_channel::<Bytes>();
+    let pending = Arc::new(AtomicUsize::new(0));
+    let queued = pending.clone();
+    let metering = tokio::spawn(async move {
+        let mut frames = Box::pin(frames);
+        let mut browser = Some(tx);
+        let mut stop = Some(stop);
+        while let Some(chunk) = frames.next().await {
+            let out = meter.feed(&chunk).await;
+            send_to_browser(&mut browser, &queued, out);
+            if meter.refused()
+                && let Some(stop) = stop.take()
+            {
+                // The turn may not run on uncharged; it stops as a user's Stop would.
+                stop();
+                browser = None;
+            }
+        }
+        let out = meter.finish().await;
+        send_to_browser(&mut browser, &queued, out);
+        meter
+    });
+    let body = async_stream::stream! {
+        while let Some(chunk) = body_rx.recv().await {
+            pending.fetch_sub(chunk.len(), Ordering::SeqCst);
+            yield Ok::<Bytes, std::io::Error>(chunk);
+        }
+    };
+    (body, metering)
+}
+
+/// A closed or lagging browser is dropped, never waited for, as the turn's own feed does.
+#[cfg(feature = "enterprise")]
+fn send_to_browser(
+    browser: &mut Option<tokio::sync::mpsc::UnboundedSender<Bytes>>,
+    pending: &AtomicUsize,
+    out: Vec<Bytes>,
+) {
+    for chunk in out {
+        let Some(tx) = browser.as_ref() else {
+            return;
+        };
+        let len = chunk.len();
+        if pending.load(Ordering::SeqCst) + len > BROWSER_MAX_PENDING_BYTES
+            || tx.send(chunk).is_err()
+        {
+            *browser = None;
+            return;
+        }
+        pending.fetch_add(len, Ordering::SeqCst);
+    }
+}
+
+/// The `type` named in the head of an oversized frame; empty, so counted as content, if unread.
+#[cfg(feature = "enterprise")]
+fn head_frame_type(line: &[u8]) -> String {
+    const KEY: &str = "\"type\"";
+    let head = String::from_utf8_lossy(&line[..line.len().min(SSE_HEAD_BYTES)]);
+    head.find(KEY)
+        .and_then(|at| head[at + KEY.len()..].trim_start().strip_prefix(':'))
+        .and_then(|value| value.trim_start().strip_prefix('"'))
+        .and_then(|value| value.split_once('"'))
+        .map(|(frame_type, _)| frame_type.to_string())
+        .unwrap_or_default()
+}
+
+/// The JSON object of one `data:` line; `None` for comments, blank lines and unparsable data.
+#[cfg(feature = "enterprise")]
+fn data_frame(line: &[u8]) -> Option<serde_json::Map<String, Value>> {
+    let text = std::str::from_utf8(line).ok()?;
+    let data = text.strip_prefix("data:")?.trim();
+    match serde_json::from_str::<Value>(data).ok()? {
+        Value::Object(frame) => Some(frame),
+        _ => None,
     }
 }
 
@@ -1789,14 +2630,593 @@ mod tests {
         let error = o2_enterprise::enterprise::ai::client::session_owner_unavailable(
             "01234567-89ab-cdef-0123-456789abcdef",
         );
-        let response = ai_upstream_error_response(error);
+        let response = upstream_error(&error).into_response();
 
         assert_eq!(response.status(), StatusCode::CONFLICT);
+        let body = body_of(response).await;
+        assert_eq!(body["code"], SESSION_OWNER_UNAVAILABLE);
+        assert_eq!(body["retryable"], true);
+        assert!(
+            !body.to_string().contains("01234567"),
+            "upstream text stays in the logs"
+        );
+    }
+
+    async fn body_of(response: Response) -> serde_json::Value {
         let body = axum::body::to_bytes(response.into_body(), usize::MAX)
             .await
             .unwrap();
-        let body: serde_json::Value = serde_json::from_slice(&body).unwrap();
-        assert_eq!(body["code"], SESSION_OWNER_UNAVAILABLE);
+        serde_json::from_slice(&body).unwrap()
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn a_provider_429_is_rate_limited_with_retry_after_not_the_turn_limit() {
+        let response = upstream_failure(false, false, Some(429), Some(42), None).into_response();
+        assert_eq!(response.status(), StatusCode::TOO_MANY_REQUESTS);
+        assert_eq!(response.headers()[axum::http::header::RETRY_AFTER], "42");
+        let body = body_of(response).await;
+        assert_eq!(body["code"], "rate_limited");
+        assert_eq!(body["retry_after"], 42);
+        assert!(
+            body.get("error_code").is_none(),
+            "never the turn limit's error_code"
+        );
+        let turn_limit = body_of(super::super::chats::turn_limit_response("user")).await;
+        assert_eq!(turn_limit["code"], "turn_limit");
+        assert_ne!(turn_limit["code"], body["code"]);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn o2_ai_down_is_agent_unavailable_and_its_transport_text_is_not_sent() {
+        for status in [None, Some(502), Some(503), Some(504)] {
+            let response =
+                upstream_failure(false, status.is_none(), status, None, None).into_response();
+            assert_eq!(
+                response.status().as_u16(),
+                status.unwrap_or(502),
+                "{status:?}"
+            );
+            let body = body_of(response).await;
+            assert_eq!(body["code"], "agent_unavailable");
+            assert_eq!(body["retryable"], true);
+        }
+        let busy = body_of(
+            upstream_failure(false, false, Some(409), None, Some("turn_in_progress"))
+                .into_response(),
+        )
+        .await;
+        assert_eq!(busy["code"], "turn_busy");
+        assert_eq!(busy["retryable"], false);
+        assert_eq!(busy["action"], "none");
+        let crashed = upstream_failure(false, false, Some(500), None, None).into_response();
+        assert_eq!(crashed.status(), StatusCode::INTERNAL_SERVER_ERROR);
+        let crashed = body_of(crashed).await;
+        assert_eq!(crashed["code"], "internal", "as the persisted path says");
+        // Reached but answered nothing usable (read timeout, bad body): not an outage.
+        let garbled =
+            body_of(upstream_failure(false, false, None, None, None).into_response()).await;
+        assert_eq!(garbled["code"], "internal");
+        assert_eq!(garbled["retryable"], false);
+        assert_eq!(garbled["action"], "none");
+        let decode = upstream_error(&anyhow::anyhow!("error decoding response body"));
+        assert_eq!(
+            decode.code(),
+            AiErrorCode::Internal,
+            "no status, yet o2-ai was reached"
+        );
+        assert_eq!(crashed["retryable"], false);
+
+        let frame = stream_interrupted_error().to_sse_frame();
+        let frame = data_frame(frame.split(|b| *b == b'\n').next().unwrap()).unwrap();
+        assert_eq!(frame["code"], "agent_unavailable");
+        assert_eq!(frame["retryable"], true);
+        assert!(
+            !frame["message"]
+                .as_str()
+                .unwrap()
+                .contains("Stream interrupted:")
+        );
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn o2_ai_refusing_the_session_is_permission_denied_as_history_reads_say() {
+        for status in [401, 403] {
+            let response = upstream_failure(false, false, Some(status), None, None).into_response();
+            assert_eq!(response.status().as_u16(), status);
+            let body = body_of(response).await;
+            assert_eq!(body["code"], "permission_denied", "{status}");
+            assert_eq!(body["action"], "ask_admin", "{status}");
+        }
+        assert_eq!(
+            AiErrorCode::from_stored("unauthorized"),
+            Some(AiErrorCode::PermissionDenied)
+        );
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn an_unlisted_model_is_an_invalid_request_that_does_not_echo_it() {
+        let response = model_not_allowed_error();
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+        let body = body_of(response).await;
+        assert_eq!(body["code"], "invalid_request");
+        assert_eq!(body["action"], "none");
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn content_settles_the_charge_and_is_never_uncharged() {
+        let mut phase = TurnPhase::charged();
+        assert_eq!(phase.observe("status"), ChargeStep::Nothing);
+        assert_eq!(phase.observe("title"), ChargeStep::Nothing);
+        assert_eq!(phase.observe("message_delta"), ChargeStep::Settle);
+        assert_eq!(phase.observe("message_delta"), ChargeStep::Nothing);
+        assert_eq!(phase.observe("error"), ChargeStep::Nothing);
+        assert_eq!(
+            phase.observe("complete"),
+            ChargeStep::Nothing,
+            "content was shown"
+        );
+        assert_eq!(phase.end(), ChargeStep::Nothing);
+
+        // Every frame sequence: no shown frame is observed while the turn is uncharged.
+        let frames = [
+            "status",
+            "message_delta",
+            "error",
+            "complete",
+            "confirmation_required",
+            "title",
+            "findings",
+        ];
+        for a in frames {
+            for b in frames {
+                for c in frames {
+                    for start in [TurnPhase::charged(), TurnPhase::default()] {
+                        let mut phase = start;
+                        for frame in [a, b, c] {
+                            phase.observe(frame);
+                            let shown = !BOOKKEEPING_FRAMES.contains(&frame)
+                                && !FINAL_FRAMES.contains(&frame)
+                                && frame != "error";
+                            if shown {
+                                assert!(phase.charged, "{a} {b} {c}");
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn any_frame_the_browser_shows_keeps_the_credit() {
+        for shown in [
+            "confirmation_required",
+            "navigation_action",
+            "findings",
+            "query",
+            "permission_denied",
+            "a_type_from_a_newer_agent",
+            "",
+        ] {
+            let mut phase = TurnPhase::charged();
+            phase.observe("status");
+            assert_eq!(phase.observe(shown), ChargeStep::Settle, "{shown:?}");
+            assert_eq!(phase.observe("complete"), ChargeStep::Nothing, "{shown:?}");
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn a_turn_that_fails_before_content_is_refunded_once() {
+        let mut failed = TurnPhase::charged();
+        assert_eq!(failed.observe("status"), ChargeStep::Nothing);
+        assert_eq!(
+            failed.observe("error"),
+            ChargeStep::Nothing,
+            "content may still follow an error"
+        );
+        assert_eq!(failed.observe("complete"), ChargeStep::Refund);
+        assert_eq!(
+            failed.observe("cancelled"),
+            ChargeStep::Nothing,
+            "refunded once"
+        );
+        assert_eq!(failed.end(), ChargeStep::Nothing);
+        assert_eq!(
+            failed.observe("message_delta"),
+            ChargeStep::ChargeAndSettle,
+            "late content is charged again"
+        );
+
+        let mut dropped = TurnPhase::charged();
+        assert_eq!(dropped.observe("status"), ChargeStep::Nothing);
+        assert_eq!(dropped.end(), ChargeStep::Refund);
+        assert_eq!(dropped.end(), ChargeStep::Nothing);
+
+        let mut never = TurnPhase::default();
+        assert_eq!(never.observe("error"), ChargeStep::Nothing);
+        assert_eq!(never.end(), ChargeStep::Nothing, "nothing to refund");
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn sse_lines_are_split_whole_across_chunks() {
+        let mut lines = SseLines::default();
+        assert!(lines.push(b"data: {\"type\":").is_empty());
+        let out = lines.push(b"\"status\"}\n\ndata: x");
+        assert_eq!(
+            out,
+            vec![
+                SseLine::Whole(Bytes::from("data: {\"type\":\"status\"}\n")),
+                SseLine::Whole(Bytes::from("\n")),
+            ]
+        );
+        assert_eq!(lines.take_partial(), Some(Bytes::from("data: x\n\n")));
+        assert_eq!(lines.take_partial(), None);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn an_oversized_line_is_classified_by_its_head_and_a_complete_one_is_held() {
+        let big = "x".repeat(SSE_LINE_MAX_BYTES);
+        let mut lines = SseLines::default();
+        let head = format!("data: {{\"type\": \"tool_result\", \"output\": \"{big}");
+        let out = lines.push(head.as_bytes());
+        assert_eq!(out.len(), 1);
+        assert!(matches!(
+            &out[0],
+            SseLine::Piece { head_type: Some(t), .. } if t == "tool_result"
+        ));
+        let out = lines.push(b"tail\"}\n\n");
+        assert!(matches!(
+            &out[0],
+            SseLine::Piece {
+                head_type: None,
+                ..
+            }
+        ));
+        assert_eq!(out[1], SseLine::Whole(Bytes::from("\n")));
+
+        let mut lines = SseLines::default();
+        let complete = format!("data: {{\"type\":\"complete\",\"history\":\"{big}");
+        assert!(
+            lines.push(complete.as_bytes()).is_empty(),
+            "held to add credits"
+        );
+        let out = lines.push(b"\"}\n");
+        assert!(matches!(&out[0], SseLine::Whole(_)));
+        assert_eq!(head_frame_type(b"data: {\"a\":1}"), "");
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn oversized_content_still_counts_as_content() {
+        let mut meter = test_meter(1);
+        let big = "x".repeat(SSE_LINE_MAX_BYTES);
+        let frame = format!("data: {{\"type\":\"message_delta\",\"text\":\"{big}\"}}\n\n");
+        meter.feed(frame.as_bytes()).await;
+        assert!(meter.phase.content);
+        assert_eq!(meter.finish().await, Vec::<Bytes>::new());
+        assert_eq!(meter.charge.credits, 1, "not refunded");
+    }
+
+    #[cfg(feature = "enterprise")]
+    fn test_meter(credits: u64) -> TurnMeter {
+        let mut charge = TurnCharge::new("org", "u@x", "trace", None, "turn");
+        charge.credits = credits;
+        TurnMeter::new(TurnPhase::charged(), charge, None)
+    }
+
+    #[cfg(feature = "enterprise")]
+    fn frames_of(out: &[Bytes]) -> Vec<serde_json::Map<String, Value>> {
+        out.iter().filter_map(|line| data_frame(line)).collect()
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn complete_says_what_the_turn_cost() {
+        let mut meter = test_meter(1);
+        let out = meter
+            .feed(b"data: {\"type\":\"message_delta\",\"text\":\"hi\"}\n\ndata: {\"type\":\"complete\",\"usage\":{\"total_tokens\":5}}\n\n")
+            .await;
+        let frames = frames_of(&out);
+        assert_eq!(frames[1]["usage"]["credits"], 1);
+        assert_eq!(frames[1]["usage"]["total_tokens"], 5);
+        assert_eq!(
+            out[0],
+            Bytes::from("data: {\"type\":\"message_delta\",\"text\":\"hi\"}\n"),
+            "content passes byte for byte"
+        );
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn a_failure_before_content_completes_at_zero_credits() {
+        let mut meter = test_meter(1);
+        let out = meter
+            .feed(b"data: {\"type\":\"status\"}\n\ndata: {\"type\":\"error\",\"code\":\"agent_unreachable\",\"error\":\"down\",\"recoverable\":true}\n\ndata: {\"type\":\"complete\"}\n\n")
+            .await;
+        let frames = frames_of(&out);
+        assert_eq!(frames[1]["code"], "agent_unavailable");
+        assert_eq!(frames[1]["error_code"], "agent_unreachable");
+        assert_eq!(frames[1]["retryable"], true);
+        assert_eq!(frames[2]["usage"]["credits"], 0);
+        assert_eq!(meter.charge.credits, 0);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn a_confirmation_only_turn_keeps_its_credit() {
+        let mut meter = test_meter(1);
+        let out = meter
+            .feed(b"data: {\"type\":\"status\"}\n\ndata: {\"type\":\"confirmation_required\",\"tool\":\"x\"}\n\ndata: {\"type\":\"complete\"}\n\n")
+            .await;
+        assert_eq!(frames_of(&out)[2]["usage"]["credits"], 1);
+        assert_eq!(meter.finish().await, Vec::<Bytes>::new());
+        assert_eq!(meter.charge.credits, 1);
+    }
+
+    #[cfg(feature = "enterprise")]
+    async fn collect_body(
+        body: impl futures::Stream<Item = Result<Bytes, std::io::Error>>,
+    ) -> Vec<Bytes> {
+        body.map(|chunk| chunk.unwrap()).collect().await
+    }
+
+    #[cfg(feature = "enterprise")]
+    fn frames(lines: &[&str]) -> impl futures::Stream<Item = Bytes> + Send + 'static {
+        let chunks: Vec<Bytes> = lines
+            .iter()
+            .map(|line| Bytes::from(format!("data: {line}\n\n")))
+            .collect();
+        futures::stream::iter(chunks)
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn a_persisted_turn_that_ends_before_content_is_refunded() {
+        let (body, metering) = meter_persisted_turn(
+            frames(&[r#"{"type":"status"}"#, r#"{"type":"complete"}"#]),
+            test_meter(1),
+            || panic!("a granted turn is never stopped"),
+        );
+        let out = collect_body(body).await;
+        assert_eq!(frames_of(&out)[1]["usage"]["credits"], 0);
+        let meter = metering.await.unwrap();
+        assert_eq!(meter.charge.credits, 0);
+        assert!(!meter.phase.charged);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn a_browser_that_left_does_not_stop_the_meter() {
+        let (body, metering) = meter_persisted_turn(
+            frames(&[
+                r#"{"type":"status"}"#,
+                r#"{"type":"message_delta","text":"hi"}"#,
+                r#"{"type":"complete"}"#,
+            ]),
+            test_meter(1),
+            || panic!("a granted turn is never stopped"),
+        );
+        drop(body);
+        let meter = metering.await.unwrap();
+        assert!(meter.phase.content, "the turn was read to its end");
+        assert_eq!(meter.charge.credits, 1, "and kept its credit");
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn a_refused_meter_forwards_nothing_more_and_stops_the_turn() {
+        let stopped = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let flag = stopped.clone();
+        let mut meter = test_meter(1);
+        meter.refused = true;
+        let (body, metering) = meter_persisted_turn(
+            frames(&[r#"{"type":"message_delta","text":"hi"}"#]),
+            meter,
+            move || flag.store(true, Ordering::SeqCst),
+        );
+        assert!(collect_body(body).await.is_empty());
+        metering.await.unwrap();
+        assert!(stopped.load(Ordering::SeqCst));
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn a_lagging_browser_is_dropped_not_waited_for() {
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<Bytes>();
+        let pending = AtomicUsize::new(BROWSER_MAX_PENDING_BYTES - 4);
+        let mut browser = Some(tx);
+        send_to_browser(&mut browser, &pending, vec![Bytes::from("abc")]);
+        assert!(browser.is_some());
+        send_to_browser(&mut browser, &pending, vec![Bytes::from("de")]);
+        assert!(browser.is_none(), "over the byte budget");
+        assert_eq!(rx.try_recv().unwrap(), Bytes::from("abc"));
+        assert!(rx.try_recv().is_err());
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn an_unset_model_allowlist_restricts_nothing() {
+        assert!(
+            get_o2_config().ai.model_allowlist.trim().is_empty(),
+            "unset in tests"
+        );
+        assert!(get_o2_config().ai.allows_model("any-model-today", None));
+        assert!(get_o2_config().ai.allows_model("", None));
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn the_audit_record_never_holds_prompts_images_or_context_values() {
+        let prompt: PromptRequest = serde_json::from_value(serde_json::json!({
+            "messages": [{"role": "user", "content": "my api_key: abc and password hunter2"}],
+            "context": {"api_key": "abc", "client": {"container": "sidebar"}, "stream": "logs"},
+            "images": [{"data": "iVBORw0KGgoAAAANSUhEUg", "mime_type": "image/png"}],
+        }))
+        .unwrap();
+        let body = TurnAudit::new(
+            "org",
+            "u@x",
+            "t",
+            Some("sid"),
+            Some("turn"),
+            Some(&prompt),
+            321,
+        )
+        .body();
+        for secret in ["abc", "hunter2", "iVBORw0KGgo", "sidebar", "logs\""] {
+            assert!(!body.contains(secret), "{secret} leaked into {body}");
+        }
+        let record: serde_json::Value = serde_json::from_str(&body).unwrap();
+        assert_eq!(record["message_count"], 1);
+        assert_eq!(record["image_count"], 1);
+        assert_eq!(record["bytes"], 321);
+        assert_eq!(record["session_id"], "sid");
+        let mut keys: Vec<&str> = record["context_keys"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|k| k.as_str().unwrap())
+            .collect();
+        keys.sort_unstable();
+        assert_eq!(keys, vec!["api_key", "client", "stream"]);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn the_audit_record_is_capped_at_8_kib() {
+        let context: serde_json::Map<String, Value> = (0..2000)
+            .map(|i| (format!("key_{i:05}_{}", "k".repeat(50)), Value::Null))
+            .collect();
+        let prompt: PromptRequest =
+            serde_json::from_value(serde_json::json!({"messages": [], "context": context}))
+                .unwrap();
+        let body = TurnAudit::new("org", "u@x", "t", None, None, Some(&prompt), 1).body();
+        assert!(body.len() <= AUDIT_BODY_MAX_BYTES, "{}", body.len());
+        let record: serde_json::Value = serde_json::from_str(&body).unwrap();
+        assert!(!record["context_keys"].as_array().unwrap().is_empty());
+    }
+
+    /// WP-01 fixtures that predate §3 (`""` = no action); WP-06 aligns them and drops this table.
+    #[cfg(feature = "enterprise")]
+    const FIXTURE_ACTION_WORDS: [(&str, &str, &str); 10] = [
+        ("credits_exhausted", "upgrade", "manage_billing"),
+        ("subscription_required", "upgrade", "manage_billing"),
+        ("not_enabled", "contact_admin", "ask_admin"),
+        ("permission_denied", "contact_admin", "ask_admin"),
+        ("rate_limited", "wait", "retry"),
+        ("turn_limit", "wait", "retry"),
+        ("turn_busy", "wait", "none"),
+        ("agent_unavailable", "", "retry"),
+        ("session_owner_unavailable", "", "retry"),
+        ("persistence_failed", "", "none"),
+    ];
+
+    /// The server case behind every B-01 envelope fixture, as the response or frame it sends.
+    #[cfg(feature = "enterprise")]
+    async fn server_case(code: &str) -> (Option<u16>, serde_json::Value) {
+        use super::super::chats;
+        let wire = |name: &str| -> serde_json::Value {
+            let path = format!(
+                "{}/../../../web/src/composables/assistant/__fixtures__/errors/wire/{name}.json",
+                env!("CARGO_MANIFEST_DIR")
+            );
+            let text = std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("{path}: {e}"));
+            serde_json::from_str::<serde_json::Value>(&text).unwrap()["body"].clone()
+        };
+        let forwarded = |name: &str| {
+            let mut frame = wire(name);
+            error::normalize_error_frame(frame.as_object_mut().unwrap());
+            (None, frame)
+        };
+        let response = match code {
+            "session_expired" => error::session_expired("Unauthorized"),
+            "permission_denied" => {
+                error::permission_denied("Chat history is only available to registered users")
+            }
+            "not_enabled" => not_enabled_error(),
+            "credits_exhausted" => {
+                payment_required_error("out".into(), "contact_account_manager", None)
+                    .into_response()
+            }
+            "subscription_required" => {
+                payment_required_error("out".into(), "subscribe", None).into_response()
+            }
+            "consent_required" => {
+                consent_required_error(serde_json::json!({"feature": "ai_credits"})).into_response()
+            }
+            "authorization_unavailable" => authorization_unavailable_error().into_response(),
+            "turn_limit" => chats::turn_limit_response("user"),
+            "rate_limited" => {
+                upstream_failure(false, false, Some(429), Some(30), None).into_response()
+            }
+            "turn_busy" => chats::lease_busy(None).into_response(),
+            "already_submitted" => chats::already_submitted().into_response(),
+            "agent_unavailable" => {
+                upstream_failure(false, false, Some(503), None, None).into_response()
+            }
+            "session_owner_unavailable" => {
+                upstream_failure(true, false, Some(409), None, None).into_response()
+            }
+            "history_unavailable" => chats::history_unreadable().into_response(),
+            "approval_delivery_failed" => approval_delivery_failed_error(),
+            "persistence_failed" => return forwarded("I1.persistence_failed_frame"),
+            "provider_error" => return forwarded("H.llm_overload_frame"),
+            "restore_required" => return forwarded("M1.restore_required_frame"),
+            "stale_epoch" => return forwarded("M1.stale_epoch_frame"),
+            other => panic!("no server case for the `{other}` fixture"),
+        };
+        let status = response.status().as_u16();
+        (Some(status), body_of(response).await)
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn every_envelope_fixture_is_what_the_server_sends() {
+        let dir = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../../web/src/composables/assistant/__fixtures__/errors/envelope"
+        );
+        let mut seen = 0;
+        for entry in std::fs::read_dir(dir).unwrap() {
+            let path = entry.unwrap().path();
+            let code = path.file_stem().unwrap().to_str().unwrap().to_string();
+            let fixture: serde_json::Value =
+                serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+            let expected = &fixture["body"];
+            let (status, body) = server_case(&code).await;
+            if let Some(want) = fixture["status"].as_u64() {
+                assert_eq!(status, Some(want as u16), "{code}: status");
+            }
+            for key in ["code", "retryable", "retry_after", "type"] {
+                assert_eq!(body.get(key), expected.get(key), "{code}: `{key}`");
+            }
+            let want = expected.get("action").and_then(serde_json::Value::as_str);
+            let want = FIXTURE_ACTION_WORDS
+                .iter()
+                .find(|(c, fixture, _)| *c == code && *fixture == want.unwrap_or_default())
+                .map_or(want, |(_, _, server)| Some(*server));
+            assert_eq!(
+                body.get("action").and_then(serde_json::Value::as_str),
+                want,
+                "{code}: `action`"
+            );
+            assert_eq!(
+                body["code"],
+                code.as_str(),
+                "{code}: the file name is the code"
+            );
+            seen += 1;
+        }
+        assert!(seen >= 19, "only {seen} envelope fixtures were read");
     }
 
     #[test]
@@ -2099,6 +3519,8 @@ mod tests {
             "incident_title": "Checkout errors",
             "request_timestamp": 1_700_000_000_000_000_i64,
             "user_timezone": "Europe/Berlin",
+            "locale": "de",
+            "client": {"container": "incident", "entry_kind": "door"},
         });
 
         let (agent, context) = select_chat_agent(client, Some(incident_rca_context()));
@@ -2115,6 +3537,8 @@ mod tests {
                 "incident_title": "Checkout errors",
                 "request_timestamp": 1_700_000_000_000_000_i64,
                 "user_timezone": "Europe/Berlin",
+                "locale": "de",
+                "client": {"container": "incident", "entry_kind": "door"},
             })
         );
     }

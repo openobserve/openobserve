@@ -85,6 +85,7 @@ pub async fn admit_with<C: ConnectionTrait>(
         end_seq: Set(None),
         started_at: Set(now),
         ended_at: Set(None),
+        first_event_at: Set(None),
     };
     let admission = match Entity::insert(record).exec(conn).await {
         Ok(_) => Admission::Admitted,
@@ -165,6 +166,35 @@ pub async fn finish_with<C: ConnectionTrait>(
     Ok(result.rows_affected == 1)
 }
 
+/// Stamps the turn's first forwarded o2-ai event once; `false` if it already had one.
+pub async fn set_first_event_at(
+    org_id: &str,
+    session_id: &str,
+    turn_id: &str,
+    at: i64,
+) -> Result<bool, errors::Error> {
+    set_first_event_at_with(get_orm_client_rw().await, org_id, session_id, turn_id, at).await
+}
+
+pub async fn set_first_event_at_with<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    session_id: &str,
+    turn_id: &str,
+    at: i64,
+) -> Result<bool, errors::Error> {
+    let result = Entity::update_many()
+        .col_expr(Column::FirstEventAt, Expr::value(Some(at)))
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::SessionId.eq(session_id))
+        .filter(Column::TurnId.eq(turn_id))
+        .filter(Column::FirstEventAt.is_null())
+        .exec(conn)
+        .await
+        .map_err(db_err)?;
+    Ok(result.rows_affected == 1)
+}
+
 /// Every turn record of a chat, oldest first.
 pub async fn list_for_session(org_id: &str, session_id: &str) -> Result<Vec<Model>, errors::Error> {
     list_for_session_with(get_orm_client_ro().await, org_id, session_id).await
@@ -228,6 +258,7 @@ async fn retry_failed_with<C: ConnectionTrait>(
         .col_expr(Column::StartSeq, Expr::value(Some(start_seq)))
         .col_expr(Column::StartedAt, Expr::value(now))
         .col_expr(Column::EndedAt, Expr::value(Option::<i64>::None))
+        .col_expr(Column::FirstEventAt, Expr::value(Option::<i64>::None))
         .filter(Column::OrgId.eq(org_id))
         .filter(Column::SessionId.eq(session_id))
         .filter(Column::TurnId.eq(turn_id))
@@ -502,6 +533,32 @@ mod tests {
         let row = record(&db, "t").await;
         assert!(is_running(&row, 50));
         assert!(!is_running(&row, 150));
+    }
+
+    #[tokio::test]
+    async fn the_first_event_is_stamped_once_and_cleared_by_a_retry() {
+        let db = db().await;
+        admit_with(&db, ORG, SID, "t", 0, 10).await.unwrap();
+        assert_eq!(record(&db, "t").await.first_event_at, None);
+        assert!(
+            set_first_event_at_with(&db, ORG, SID, "t", 11)
+                .await
+                .unwrap()
+        );
+        assert!(
+            !set_first_event_at_with(&db, ORG, SID, "t", 12)
+                .await
+                .unwrap()
+        );
+        assert_eq!(record(&db, "t").await.first_event_at, Some(11));
+        finish_with(&db, ORG, SID, "t", TURN_FAILED, Some("x"), None, None, 13)
+            .await
+            .unwrap();
+        assert_eq!(
+            admit_with(&db, ORG, SID, "t", 0, 20).await.unwrap(),
+            Admission::Retried
+        );
+        assert_eq!(record(&db, "t").await.first_event_at, None);
     }
 
     #[tokio::test]

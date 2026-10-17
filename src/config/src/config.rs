@@ -107,7 +107,8 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 107: add redact_tools to ai_chat_shares.
 // 108: create oncall_phone_verifications and org_telephony.
 // 109: add last_run columns to reports.
-pub const DB_SCHEMA_VERSION: u64 = 109;
+// 110: add first_event_at to ai_chat_turns.
+pub const DB_SCHEMA_VERSION: u64 = 110;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
