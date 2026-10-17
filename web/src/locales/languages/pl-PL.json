@@ -20089,7 +20089,23 @@
       "maxDoc": "Największa wartość w polu. Agregat — użyj z GROUP BY.",
       "minDoc": "Najmniejsza wartość w polu. Agregat — użyj z GROUP BY.",
       "arrayExtractDoc": "Wyciąga pojedynczy element z tablicy według indeksu zaczynającego się od 1, np. `array_extract(regexp_match(log, '...'), 1)`.",
-      "approxTopkDoc": "Przybliż k najczęstszych wartości pola. Znacznie tańsze niż dokładne GROUP BY ... ORDER BY count DESC na polach o wysokiej kardynalności."
+      "approxTopkDoc": "Przybliż k najczęstszych wartości pola. Znacznie tańsze niż dokładne GROUP BY ... ORDER BY count DESC na polach o wysokiej kardynalności.",
+      "valuesLoading": "Trwa wczytywanie wartości dla {field}",
+      "valuesLoadingRow": "Trwa wczytywanie wartości",
+      "valuesLoadingHint": "Pisz dalej lub naciśnij Esc, a następnie Ctrl+Space",
+      "valuesEmpty": "Brak wartości dla {field} w ciągu ostatnich {minutes} minut",
+      "valuesFailed": "Nie udało się wczytać wartości dla {field}",
+      "chainedMenuAnnouncement": "{count} sugestia, Tab, aby zaakceptować | {count} sugestii, Tab, aby zaakceptować",
+      "valuesCap": "{count} wyświetlona wartość · wpisz, aby filtrować | {count} wyświetlonych wartości · wpisz, aby filtrować",
+      "groupValues": "Wartości · ostatnie",
+      "groupValuesName": "Wartości",
+      "groupFields": "Pola",
+      "groupOperators": "Operatory",
+      "groupFunctionsAndFields": "Funkcje i pola",
+      "groupFunctions": "Funkcje",
+      "wrapStrMatch": "podciąg",
+      "wrapReMatch": "regex",
+      "wrapReNotMatch": "regex, zanegowany"
     },
     "diagnostics": {
       "incompleteAnd": "Niepełny warunek — oczekiwano wyrażenia po AND",
@@ -20145,6 +20161,8 @@
       "duplicateColumn": "Kolumna '{col}' jest zdefiniowana więcej niż raz — usuń duplikat lub nadaj mu alias",
       "tableNotFound": "Nieznana tabela '{tbl}' — ta tabela lub CTE nie istnieje",
       "functionSignature": "Funkcja '{fn}' została wywołana z nieprawidłowym typem (typami) argumentów — dodaj jawne rzutowanie",
+      "notACondition": "`{field}` to tekst, a nie warunek. Porównaj go: `{field} = '…'` lub `str_match({field}, '…')`",
+      "notAConditionValue": "`{field}` nie jest warunkiem. Porównaj go, np. `{field} = …`",
       "syntaxError": "Błąd składni SQL"
     },
     "hover": {

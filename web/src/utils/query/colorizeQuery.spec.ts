@@ -28,6 +28,8 @@ vi.mock("monaco-editor/esm/vs/editor/editor.api", () => ({
   },
 }));
 
+vi.mock("monaco-editor/esm/vs/editor/editor.all.js", () => ({}));
+
 // Mock SQL contribution
 vi.mock("monaco-editor/esm/vs/basic-languages/sql/sql.contribution.js", () => ({}));
 

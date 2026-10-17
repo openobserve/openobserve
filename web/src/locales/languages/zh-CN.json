@@ -20089,7 +20089,23 @@
       "maxDoc": "字段中的最大值。聚合 — 与 GROUP BY 搭配使用。",
       "minDoc": "字段中的最小值。聚合 — 与 GROUP BY 搭配使用。",
       "arrayExtractDoc": "按从 1 开始的索引从数组中提取单个元素，例如 `array_extract(regexp_match(log, '...'), 1)`。",
-      "approxTopkDoc": "近似计算字段的 k 个最频繁值。在高基数字段上比精确的 GROUP BY ... ORDER BY count DESC 便宜得多。"
+      "approxTopkDoc": "近似计算字段的 k 个最频繁值。在高基数字段上比精确的 GROUP BY ... ORDER BY count DESC 便宜得多。",
+      "valuesLoading": "仍在加载 {field} 的值",
+      "valuesLoadingRow": "仍在加载值",
+      "valuesLoadingHint": "继续输入，或按 Esc 然后按 Ctrl+Space",
+      "valuesEmpty": "最近 {minutes} 分钟内没有 {field} 的值",
+      "valuesFailed": "无法加载 {field} 的值",
+      "chainedMenuAnnouncement": "{count} 条建议，按 Tab 接受 | {count} 条建议，按 Tab 接受",
+      "valuesCap": "已显示 {count} 个值 · 输入以过滤 | 已显示 {count} 个值 · 输入以过滤",
+      "groupValues": "值 · 最近",
+      "groupValuesName": "值",
+      "groupFields": "字段",
+      "groupOperators": "运算符",
+      "groupFunctionsAndFields": "函数和字段",
+      "groupFunctions": "函数",
+      "wrapStrMatch": "子字符串",
+      "wrapReMatch": "正则表达式",
+      "wrapReNotMatch": "正则表达式，取反"
     },
     "diagnostics": {
       "incompleteAnd": "条件不完整 — AND 后应有一个表达式",
@@ -20145,6 +20161,8 @@
       "duplicateColumn": "列 '{col}' 被定义了多次 — 请移除重复项或为其设置别名",
       "tableNotFound": "未知表 '{tbl}' — 此表或 CTE 不存在",
       "functionSignature": "函数 '{fn}' 使用了错误的参数类型调用 — 请添加显式转换",
+      "notACondition": "`{field}` 是文本，不是条件。请进行比较：`{field} = '…'` 或 `str_match({field}, '…')`",
+      "notAConditionValue": "`{field}` 不是条件。请进行比较，例如 `{field} = …`",
       "syntaxError": "SQL 语法错误"
     },
     "hover": {

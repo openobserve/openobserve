@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { reactive, onBeforeMount, nextTick } from "vue";
+import { reactive, onBeforeMount, nextTick, watch } from "vue";
 import type { TranslateFn } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -257,18 +257,44 @@ const useLogs = (t: TranslateFn) => {
       const autoRun = useLogsAutoRun();
       const wasLoading = searchObj.loading;
       autoRun.engine.resetScope(reason === "url" ? "url" : "org");
+      const generationAtStart = autoRun.engine.currentGeneration("grid")?.id;
+      // Sync, because a run cancelled or failed before it completes clears its pending record again.
+      const sentDuringLoad = new Set<number>();
+      const stopWatchingSends = watch(
+        () => searchObj.meta.pendingExecution?.generation,
+        (generation) => generation !== undefined && sentDuringLoad.add(generation),
+        { flush: "sync" },
+      );
       searchObj.loading = wasLoading;
       resetFunctions();
 
       const query = router.currentRoute.value.query;
       const fromUrl = !options.ignoreUrl && (!!query.stream || query.sql_mode === "true");
-      await getStreamList(true, { fromUrl });
-      await getFunctions();
-      await extractFields();
-      searchObj.loading = false;
+      try {
+        await getStreamList(true, { fromUrl });
+        await getFunctions();
+        await extractFields();
+      } finally {
+        stopWatchingSends();
+      }
+      const latest = autoRun.engine.currentGeneration("grid");
+      const userSearchInFlight =
+        latest?.kind === "explicit" &&
+        latest.id !== generationAtStart &&
+        searchObj.meta.pendingExecution?.generation === latest.id;
+      // A search the user sent meanwhile owns the loading state; its completion or cancel clears it.
+      if (!userSearchInFlight) searchObj.loading = false;
       if (searchObj.meta.jobId == "") {
+        // A search the user sent while the stream metadata loaded, even one cancelled since, supersedes this landing run.
+        const userSearchSent =
+          latest?.kind === "explicit" &&
+          latest.id !== generationAtStart &&
+          (sentDuringLoad.has(latest.id) ||
+            [searchObj.meta.pendingExecution, searchObj.meta.executed].some(
+              (run) => run?.generation === latest.id,
+            ));
         const result =
-          searchObj.data.stream.selectedStream.length > 0
+          searchObj.data.stream.selectedStream.length > 0 && !userSearchSent
             ? autoRun.request(fromUrl ? "url" : reason, { origin: options.origin })
             : "skipped-ineligible";
         if (result !== "scheduled" && result !== "dispatched") showNoQueryAppliedIfIdle();
