@@ -54,6 +54,10 @@ These hurt maintainability or make tests flaky, but do not by themselves void co
 - Tagging/structure nitpicks unless a tag is clearly wrong or missing on a new spec.
 - Anything in application or backend code — out of scope for this reviewer.
 - A selector you verified *does* exist in a component (report nothing for it).
+- A `describe`-scoped `let pm` / `let page` reassigned in `beforeEach` under `mode: 'parallel'` or
+  `fullyParallel: true`. Playwright runs parallel tests in separate worker processes and a worker
+  executes its tests one at a time, so the variable is never shared by two running tests — this is
+  not a race and not a coverage-integrity failure.
 
 ## Severity discipline
 
