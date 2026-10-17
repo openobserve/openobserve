@@ -482,6 +482,7 @@ async fn start_turn(
         turn_id,
         lease,
         registration,
+        ..
     } = admitted;
 
     let started = TurnStarted {

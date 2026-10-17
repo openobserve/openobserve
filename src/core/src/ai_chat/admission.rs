@@ -63,6 +63,8 @@ pub struct AdmittedTurn {
     pub row: Model,
     pub owner: String,
     pub turn_id: String,
+    /// The id the turn's spans and audit record carry; returned to the browser at admission.
+    pub trace_id: String,
     pub lease: TurnLease,
     pub registration: Registration,
 }
@@ -187,6 +189,7 @@ pub async fn admit_turn(
             row,
             owner,
             turn_id,
+            trace_id: trace_id.to_string(),
             lease,
             registration,
         }),
