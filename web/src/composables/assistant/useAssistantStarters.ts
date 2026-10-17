@@ -400,15 +400,18 @@ function stringField(context: PageContext | null, field: string): string | null 
   return typeof value === "string" && value ? value : null;
 }
 
-// Logs providers report `{ relativeTimePeriod, startTime, endTime }` in microseconds; typed ones `{ from, to }`.
+// Providers report `{ relativeTimePeriod, startTime, endTime }` in microseconds; host adapters `{ from, to }` in ms.
 function rangeOf(context: PageContext | null): StarterFacts["range"] {
   const range = context?.timeRange as
-    | (PageContext["timeRange"] & {
+    | {
+        from?: number;
+        to?: number;
+        period?: string;
         relativeTimePeriod?: string;
         startTime?: number;
         endTime?: number;
         type?: string;
-      })
+      }
     | undefined;
   if (!range) return null;
   const from = range.from ?? (range.startTime ? Math.round(range.startTime / 1000) : undefined);
@@ -425,7 +428,8 @@ function rangeOf(context: PageContext | null): StarterFacts["range"] {
   return null;
 }
 
-function periodText(period: string, locale: string): string | null {
+/** "15 min", "1 h", "7 days" for a relative period such as `15m`; `null` for anything else. */
+export function periodText(period: string, locale: string): string | null {
   const match = /^(\d+)([smhdwMy])$/.exec(period);
   if (!match) return null;
   const count = Number(match[1]);

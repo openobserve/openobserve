@@ -35,4 +35,18 @@ describe("contextProviders types", () => {
     const result = provider.getContext();
     expectTypeOf(result).toMatchTypeOf<PageContext | Promise<PageContext>>();
   });
+  it("types the whitelist fields and keeps extras as unknown", () => {
+    const context: PageContext = {
+      currentPage: "logs",
+      selectedStreams: ["default"],
+      streamType: "logs",
+      timeRange: { type: "relative", relativeTimePeriod: "15m", startTime: 1, endTime: 2 },
+      quickMode: true,
+    };
+
+    expectTypeOf(context.selectedStreams).toEqualTypeOf<string[] | undefined>();
+    expectTypeOf(context.timeRange?.startTime).toEqualTypeOf<number | undefined>();
+    expectTypeOf(context.quickMode).toEqualTypeOf<unknown>();
+    expect(context.quickMode).toBe(true);
+  });
 });

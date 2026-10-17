@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :variant="variant"
     :size="size === 'toolbar' ? 'icon-toolbar' : 'icon-sm'"
     :disabled="disabled"
+    :loading="loading"
     :focusable-unavailable="unavailable"
     :aria-label="label"
     :aria-pressed="pressed"
@@ -49,6 +50,7 @@ const props = withDefaults(defineProps<AssistantIconButtonProps>(), {
   variant: "ghost",
   size: "sm",
   pressed: undefined,
+  loading: false,
   disabled: false,
   disabledReason: undefined,
 });

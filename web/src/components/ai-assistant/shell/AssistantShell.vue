@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :data-state="state"
     :data-test="`assistant-shell-${placement}`"
     tabindex="-1"
-    class="bg-surface-base flex h-full min-h-0 flex-col outline-none"
+    class="bg-surface-base data-[dragging]:ring-border-strong flex h-full min-h-0 flex-col outline-none data-[dragging]:ring-2 data-[dragging]:ring-inset"
     @keydown="recordKeydown"
   >
     <!-- ① chrome row; WP-11's thread header takes the title slot -->
@@ -96,7 +96,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <AssistantStatusRegion ref="region" />
 
     <!-- ③ body: the only scroll container -->
-    <div class="min-h-0 flex-1 overflow-y-auto" data-test="assistant-shell-body">
+    <!-- Below md the body keeps room for the welcome's first block, so a half sheet never shows a single cut line (U4) -->
+    <div class="min-h-0 flex-1 overflow-y-auto max-md:min-h-20" data-test="assistant-shell-body">
       <AssistantGateState
         v-if="state === 'gate'"
         :reason="gateReason"
@@ -140,6 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :starters="welcome.starters.value"
         :loading="welcome.loading.value"
         :container="container"
+        :sid="activeSid"
         @select-starter="onStarter"
         @open-chat="onOpenChat"
       />
@@ -149,11 +151,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <slot v-if="state === 'conversation'" name="cards" />
     </div>
 
-    <template v-if="state !== 'gate' && !isTerminalBody">
+    <!-- Below md the body yields down to its floor first; the lower stack scrolls only when even that is not enough -->
+    <div
+      v-if="state !== 'gate' && !isTerminalBody"
+      ref="lower"
+      class="flex shrink-0 flex-col max-md:min-h-0 max-md:shrink max-md:overflow-y-auto"
+      data-test="assistant-shell-lower"
+    >
       <!-- ④ status strip with its one keyboard bridge (Review request or Go to answer); WP-06 and WP-10 -->
       <slot name="status-strip" />
-      <!-- ⑤ context tray; WP-05 -->
-      <slot name="tray" />
+      <slot name="tray">
+        <AssistantContextTray :sid="activeSid" :collapsed="trayCollapsed" :visible="visible" />
+      </slot>
       <p
         v-if="unknownNotice"
         class="text-text-secondary shrink-0 px-3 pb-1 text-xs"
@@ -161,7 +170,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         {{ t("assistant.gate.noPermission.unknownNotice", { product }) }}
       </p>
-      <!-- ⑥ composer; WP-05. With B-06 reporting down, the gate replaces it -->
+      <!-- With B-06 reporting down, the gate replaces the composer -->
       <AssistantGateState
         v-if="composerLocked"
         reason="unhealthy"
@@ -169,10 +178,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :is-admin="capability.isAdmin"
         :context="{ org }"
       />
-      <slot v-else name="composer" />
-      <!-- ⑦ disclosure line; WP-05 -->
-      <slot name="disclosure" />
-    </template>
+      <slot v-else name="composer">
+        <AssistantComposer
+          ref="composer"
+          :sid="activeSid"
+          :density="density"
+          :ghost="ghost"
+          :host="host"
+          :visible="visible"
+        />
+      </slot>
+      <slot name="disclosure">
+        <div class="flex shrink-0 flex-col gap-1.5 px-3 pb-2">
+          <OBanner
+            v-if="disclosureBanner"
+            variant="default"
+            dense
+            inline-actions
+            :content="t('assistant.context.disclosure')"
+            data-test="assistant-context-disclosure-banner"
+          >
+            <template #actions>
+              <AssistantIconButton
+                :label="t('assistant.context.disclosureDismiss')"
+                :icon="assistantGlyph.close"
+                data-test="assistant-context-disclosure-dismiss"
+                @click="dismissDisclosure"
+              />
+            </template>
+          </OBanner>
+          <OText variant="meta" as="p" data-test="assistant-context-disclosure">
+            {{ t("assistant.context.disclosureLine") }}
+          </OText>
+        </div>
+      </slot>
+    </div>
 
     <ODialog
       :open="learnOpen"
@@ -245,11 +285,16 @@ import { useStore } from "vuex";
 import AssistantIconButton from "@/components/ai-assistant/common/AssistantIconButton.vue";
 import AssistantMark from "@/components/ai-assistant/common/AssistantMark.vue";
 import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
+import AssistantComposer from "@/components/ai-assistant/composer/AssistantComposer.vue";
+import { composerUi, noteDraftCleared } from "@/components/ai-assistant/composer/composerUi";
+import AssistantContextTray from "@/components/ai-assistant/context/AssistantContextTray.vue";
 import AssistantGateState, {
   type GateCta,
 } from "@/components/ai-assistant/gate/AssistantGateState.vue";
 import AssistantWelcome from "@/components/ai-assistant/welcome/AssistantWelcome.vue";
 import {
+  markHintSeen,
+  readHints,
   useAssistantCapability,
   useAssistantName,
   useAssistantStarters,
@@ -261,6 +306,7 @@ import {
 import useBreakpoint from "@/composables/useBreakpoint";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OText from "@/lib/core/Typography/OText.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
@@ -300,12 +346,16 @@ const router = useRouter();
 const vuex = useStore();
 const { lgUp } = useBreakpoint();
 const root = ref<HTMLElement | null>(null);
+const lower = ref<HTMLElement | null>(null);
 const region = ref<InstanceType<typeof AssistantStatusRegion> | null>(null);
+const composer = ref<InstanceType<typeof AssistantComposer> | null>(null);
 const learnOpen = ref(false);
 const openedByUser = ref(false);
+const disclosureDismissed = ref(false);
 
 const org = computed<string>(() => vuex.state.selectedOrganization?.identifier ?? "");
 const session = computed(() => store.state.sessions[store.state.shell.activeSid ?? ""] ?? null);
+const activeSid = computed(() => store.state.shell.activeSid);
 const gateReason = computed<GateReason>(() =>
   capability.gate.value === "off_for_org" ? "off_for_org" : "no_permission",
 );
@@ -352,6 +402,25 @@ const landmark = computed(() => {
   return { tag: "section", attrs: { role: "region", "aria-label": name } };
 });
 
+// Docked, the sheet and a sidebar at the 24 rem default or narrower show the collapsed tray (`40` §1.2).
+const trayCollapsed = computed(
+  () =>
+    props.sheet ||
+    props.placement === "docked" ||
+    (props.placement === "sidebar" && store.state.shell.sidebarWidthRem <= 24),
+);
+
+// The fuller disclosure shows once per user+org on the first attachment, and again in a shared chat (CT-04 AC 5).
+const disclosureBanner = computed(() => {
+  const current = session.value;
+  const key = store.state.userOrgKey;
+  if (!current || !key || disclosureDismissed.value) return false;
+  // One notice at a time: the cleared notice wins while its Undo is offered.
+  if (composerUi(current.sid).cleared) return false;
+  if (!current.composer.chips.some((chip) => chip.provenance !== "page")) return false;
+  return !!current.share || !readHints(key).disclosure;
+});
+
 // The welcome's data is built only once the welcome shows, so a gated container never reads it (IW-05 AC 10).
 const welcomeScope = effectScope();
 const welcome = shallowRef<ReturnType<typeof useAssistantStarters> | null>(null);
@@ -367,11 +436,27 @@ watch(
 );
 onScopeDispose(() => welcomeScope.stop());
 
+// The ghost is the first starter the welcome offers, never a recent chat (`70` §5).
+const ghost = computed(() => {
+  const first =
+    state.value === "empty" ? welcome.value?.starters.value.find((s) => s.kind !== "recent") : null;
+  return first
+    ? { label: first.label, text: first.prompt, chips: first.chips, kind: first.kind }
+    : null;
+});
+
+function dismissDisclosure(): void {
+  disclosureDismissed.value = true;
+  const key = store.state.userOrgKey;
+  if (key) markHintSeen(key, "disclosure");
+}
+
 function recordKeydown(): void {
   lastKeydownAt = Date.now();
 }
 
 function focusEntry(): void {
+  if (composer.value) return composer.value.focusInput("end");
   const el = root.value;
   const target =
     el?.querySelector<HTMLElement>("[data-assistant-composer]") ??
@@ -391,6 +476,7 @@ function ensureSession(): string {
 
 function onStarter(starter: Starter): void {
   const sid = ensureSession();
+  if (composer.value) return composer.value.prefill({ text: starter.prompt, chips: starter.chips });
   const draft = store.state.sessions[sid]?.composer.text.trim() ?? "";
   store.stage(sid, {
     chips: starter.chips,
@@ -404,10 +490,17 @@ function onOpenChat(chatId: number): void {
   void store.openSession({ chatId }, { focus: true }).catch(() => undefined);
 }
 
+// The previous chat keeps its draft; "Bring it here" moves it into the new chat (SH-03 AC 6, CT-06 AC 5, V6).
 function newChat(): void {
   if (routeContext) return routeContext.newChat();
+  const previous = session.value;
+  const { text = "", chips = [], images = [] } = previous?.composer ?? {};
+  const drafted = !!text.trim() || chips.length > 0 || images.length > 0;
   store.setActive(null);
-  ensureSession();
+  const sid = ensureSession();
+  if (!previous || !drafted || previous.sid === sid) return;
+  noteDraftCleared(sid, { token: null, from: previous.sid, at: Date.now() });
+  trackAssistant("ai_composer_cleared", { reason: "new_chat", undone: false });
 }
 
 function retry(): void {
@@ -449,7 +542,7 @@ function isAtRest(turn: string): boolean {
   return ["idle", "done", "failed", "refused", "stopped"].includes(turn);
 }
 
-// An explicit open focuses the composer region once; WP-05's composer registers the real target.
+// An explicit open focuses the composer once; the sheet keeps it mounted, so this works there too.
 watch(
   () => store.focusRequest.value?.seq,
   async (seq) => {
@@ -498,4 +591,38 @@ watch(
     if (loading) region.value?.announce(t("assistant.shell.loadingChat"));
   },
 );
+
+// A half sheet whose composer area no longer fits grows to full, so no chip, cap line or control hides in a scroll box (V5).
+watch(lower, (el, _was, onCleanup) => {
+  if (!el || !props.sheet || typeof ResizeObserver === "undefined") return;
+  // Only content that grew moves the snap; a user who drags back to half is not bounced to full.
+  let lastContent = 0;
+  const grow = () => {
+    // A peeked or closed sheet measures 0; that is not content shrinking, so it never makes the next show look like growth.
+    if (!el.clientHeight) return;
+    const grew = el.scrollHeight > lastContent + 1;
+    lastContent = el.scrollHeight;
+    if (!grew) return;
+    const shell = root.value;
+    const overflows =
+      el.scrollHeight > el.clientHeight + 1 ||
+      (!!shell && shell.scrollHeight > shell.clientHeight + 1);
+    if (!overflows || store.state.shell.sheetSnap !== "half") return;
+    store.setSheetSnap("full");
+    region.value?.announce(t("assistant.announce.sheetExpanded"));
+  };
+  const sizes = new ResizeObserver(grow);
+  const watchChildren = () => {
+    sizes.disconnect();
+    sizes.observe(el);
+    for (const child of Array.from(el.children)) sizes.observe(child);
+  };
+  const children = new MutationObserver(watchChildren);
+  children.observe(el, { childList: true });
+  watchChildren();
+  onCleanup(() => {
+    sizes.disconnect();
+    children.disconnect();
+  });
+});
 </script>

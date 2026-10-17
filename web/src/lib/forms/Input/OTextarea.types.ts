@@ -59,6 +59,16 @@ export interface TextareaProps {
    * inside a flex container that has a bounded height.
    */
   fill?: boolean;
+  /** `strong` gives the placeholder body-secondary contrast, for a placeholder that carries information. */
+  placeholderTone?: "default" | "strong";
+  /** Attributes for the `<textarea>` itself (ARIA, `data-*`); the rest of `$attrs` stays on the wrapper. */
+  inputAttrs?: Record<string, string | number | boolean | undefined>;
+}
+
+export interface TextareaExposed {
+  focus(options?: FocusOptions): void;
+  /** The native element, for caret and selection work. */
+  readonly textarea: HTMLTextAreaElement | null;
 }
 
 export interface TextareaEmits {

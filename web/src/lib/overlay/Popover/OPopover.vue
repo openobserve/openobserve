@@ -9,8 +9,8 @@
   Shares ODropdown's overlay coordination so descendant overlays (OSelect /
   OCombobox / nested dropdowns) opening INSIDE the popover never dismiss it.
 
-  Props: open (v-model) | side | align | sideOffset | hideWhenDetached | modal | ariaLabel | contentClass
-  Slots: trigger | default
+  Props: open (v-model) | side | align | sideOffset | hideWhenDetached | modal | ariaLabel | contentClass | autoFocus
+  Slots: trigger | anchor (positions without a trigger) | default
 -->
 <script lang="ts">
 import type { I18nText } from "@/types/i18n";
@@ -39,7 +39,7 @@ if (typeof document !== "undefined" && !(globalThis as any)[_oPopKey]) {
 </script>
 
 <script setup lang="ts">
-import { PopoverRoot, PopoverTrigger, PopoverPortal, PopoverContent } from "reka-ui";
+import { PopoverAnchor, PopoverRoot, PopoverTrigger, PopoverPortal, PopoverContent } from "reka-ui";
 import { inject, onBeforeUnmount, provide, ref, watch, type Ref } from "vue";
 import useBreakpoint from "@/composables/useBreakpoint";
 import {
@@ -66,6 +66,8 @@ const props = withDefaults(
     zIndex?: number;
     /** Extra classes merged onto the content surface. */
     contentClass?: string;
+    /** `false` keeps focus where it is on open and close: a listbox driven from a textbox. */
+    autoFocus?: boolean;
   }>(),
   {
     modal: false,
@@ -74,8 +76,73 @@ const props = withDefaults(
     sideOffset: 4,
     hideWhenDetached: true,
     zIndex: 6000,
+    autoFocus: true,
   },
 );
+
+const slots = defineSlots<{
+  trigger?: () => unknown;
+  anchor?: () => unknown;
+  default?: () => unknown;
+}>();
+
+const FOCUSABLE =
+  "button:not([disabled]), [href], input, textarea, select, [tabindex]:not([tabindex='-1'])";
+
+const anchorRef = ref<{ $el?: Element } | null>(null);
+let closedFromOutside = false;
+let invoker: HTMLElement | null = null;
+
+// An anchor can hold several controls; the one the user last pressed or focused is the one focus returns to.
+function rememberInvoker(event: Event) {
+  const el = event.target instanceof Element ? event.target.closest<HTMLElement>(FOCUSABLE) : null;
+  if (el) invoker = el;
+}
+
+watch(
+  () => anchorRef.value?.$el,
+  (el, _was, onCleanup) => {
+    if (!(el instanceof HTMLElement)) return;
+    el.addEventListener("focusin", rememberInvoker);
+    el.addEventListener("pointerdown", rememberInvoker, true);
+    onCleanup(() => {
+      el.removeEventListener("focusin", rememberInvoker);
+      el.removeEventListener("pointerdown", rememberInvoker, true);
+    });
+  },
+  { flush: "post" },
+);
+
+function onOpenAutoFocus(event: Event) {
+  closedFromOutside = false;
+  if (!props.autoFocus) event.preventDefault();
+}
+
+// Reka returns focus only to a trigger, so an anchored popover hands it back to its anchor unless the user clicked away.
+function onCloseAutoFocus(event: Event) {
+  if (!props.autoFocus) return event.preventDefault();
+  const anchor = anchorRef.value?.$el;
+  if (!slots.anchor || !(anchor instanceof HTMLElement) || closedFromOutside) return;
+  event.preventDefault();
+  // The exit animation delays this past the caller's own focus move (Tab out, the open chord); never undo it.
+  const active = document.activeElement;
+  const content = event.target;
+  if (
+    active &&
+    active !== document.body &&
+    !(content instanceof Element && content.contains(active))
+  )
+    return;
+  const pressed = invoker?.isConnected && anchor.contains(invoker) ? invoker : null;
+  const target =
+    pressed ?? (anchor.matches(FOCUSABLE) ? anchor : anchor.querySelector<HTMLElement>(FOCUSABLE));
+  target?.focus();
+}
+
+// An IME candidate list owns its Escape: cancelling it never closes the popover.
+function onEscapeKeyDown(event: KeyboardEvent) {
+  if (event.isComposing || event.keyCode === 229) event.preventDefault();
+}
 
 const emit = defineEmits<{ "update:open": [boolean] }>();
 
@@ -167,12 +234,16 @@ onBeforeUnmount(() => {
 function handlePointerDownOutside(event: Event) {
   if (nestedOverlayCount.value > 0 || withinNestedCloseGrace()) {
     event.preventDefault();
+    return;
   }
+  closedFromOutside = true;
 }
 function handleFocusOutside(event: Event) {
   if (nestedOverlayCount.value > 0 || withinNestedCloseGrace()) {
     event.preventDefault();
+    return;
   }
+  closedFromOutside = true;
 }
 
 // Close on ancestor scroll so the portal never floats detached from its trigger.
@@ -215,7 +286,10 @@ onBeforeUnmount(() => {
 
 <template>
   <PopoverRoot :open="internalOpen" :modal="modal" @update:open="handleOpenChange">
-    <PopoverTrigger ref="triggerRef" as-child>
+    <PopoverAnchor v-if="slots.anchor" ref="anchorRef" as-child>
+      <slot name="anchor" />
+    </PopoverAnchor>
+    <PopoverTrigger v-if="slots.trigger" ref="triggerRef" as-child>
       <slot name="trigger" />
     </PopoverTrigger>
 
@@ -231,6 +305,9 @@ onBeforeUnmount(() => {
         :style="{ zIndex }"
         @pointer-down-outside="handlePointerDownOutside"
         @focus-outside="handleFocusOutside"
+        @open-auto-focus="onOpenAutoFocus"
+        @close-auto-focus="onCloseAutoFocus"
+        @escape-key-down="onEscapeKeyDown"
         :class="[
           'outline-none max-lg:max-w-[calc(100vw-1rem)]',
           'max-lg:max-h-[var(--reka-popper-available-height,75vh)] max-lg:overflow-y-auto',

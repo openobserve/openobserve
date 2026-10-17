@@ -194,6 +194,7 @@ function wireBody(req: ClientSendRequest): Record<string, unknown> {
     ...(images && { images }),
     ...(req.mode && req.mode !== "chat" && { mode: req.mode }),
     ...(req.ephemeral && { ephemeral: true }),
+    ...(req.attachments?.length && { attachments: req.attachments }),
   };
 }
 

@@ -39,6 +39,8 @@ export interface ContextChip {
   id: string;
   kind: ChipKind;
   label: I18nText;
+  /** The name alone, shown below md where the icon says the kind; always a part of `label` (CT-01 AC 9). */
+  short?: I18nText;
   secondary?: I18nText;
   ref?: {
     type: string;
@@ -58,28 +60,14 @@ export interface ContextChip {
   count?: number;
   /** What the agent receives today (constraint 40). */
   sent: "whitelist" | "serialized" | "not_read";
+  /** Fields cut to fit the 32 KB cap, longest values first (CT-02 AC 8). */
+  truncated?: string[];
+  /** "Hide internal fields" turned off: `_o2_id` and `_original` are sent too (CT-03 AC 2). */
+  includeInternal?: boolean;
 }
 
-/** The provider contract, typed from the agent whitelist. */
-export interface PageContext {
-  org_id?: string;
-  /** Route name (B-09/B-13); the localised title goes in `pageTitle`. */
-  currentPage: string;
-  pageTitle?: string;
-  selectedStreams?: string[];
-  streamType?: string;
-  timeRange?: { from: number; to: number; period?: string };
-  currentSQLQuery?: string;
-  currentVRLQuery?: string;
-  currentQuery?: string;
-  dashboardId?: string;
-  panelId?: string;
-  alertId?: string;
-  pipelineId?: string;
-  incident_id?: string;
-  /** Kept for providers; the tray marks extras "not read". */
-  [extra: string]: unknown;
-}
+/** The provider contract (`00` §6.1); one type for the providers, the tray and the wire. */
+export type { PageContext, PageTimeRange } from "@/composables/contextProviders/types";
 
 /** B-13 envelope sent as `context.client`. */
 export interface ClientContext {
