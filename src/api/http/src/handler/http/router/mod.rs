@@ -1159,25 +1159,12 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/dashboards/{dashboard_id}/panels", post(dashboards::add_panel))
         .route("/{org_id}/dashboards/{dashboard_id}/panels/{panel_id}", put(dashboards::update_panel).delete(dashboards::delete_panel))
 
-        // Reports
-        .route("/{org_id}/reports", get(dashboards::reports::list_reports).post(dashboards::reports::create_report))
-        .route("/{org_id}/reports/{name}", get(dashboards::reports::get_report).put(dashboards::reports::update_report).delete(dashboards::reports::delete_report))
-        .route("/{org_id}/reports/bulk", delete(dashboards::reports::delete_report_bulk))
-        .route("/{org_id}/reports/{name}/enable", put(dashboards::reports::enable_report))
-        .route("/{org_id}/reports/{name}/trigger", put(dashboards::reports::trigger_report))
+        .merge(report_routes())
 
         // Timed annotations
         .route("/{org_id}/dashboards/{dashboard_id}/annotations", get(dashboards::timed_annotations::get_annotations).post(dashboards::timed_annotations::create_annotations).delete(dashboards::timed_annotations::delete_annotations))
         .route("/{org_id}/dashboards/{dashboard_id}/annotations/{timed_annotation_id}", put(dashboards::timed_annotations::update_annotations))
         .route("/{org_id}/dashboards/{dashboard_id}/annotations/panels/{timed_annotation_id}", delete(dashboards::timed_annotations::delete_annotation_panels))
-
-        // Reports (v2) — /bulk and /move must precede /{report_id} to avoid route conflicts
-        .route("/v2/{org_id}/reports", get(dashboards::reports::list_reports_v2).post(dashboards::reports::create_report_v2))
-        .route("/v2/{org_id}/reports/bulk", delete(dashboards::reports::delete_report_bulk_v2))
-        .route("/v2/{org_id}/reports/move", patch(dashboards::reports::move_reports))
-        .route("/v2/{org_id}/reports/{report_id}", get(dashboards::reports::get_report_v2).put(dashboards::reports::update_report_v2).delete(dashboards::reports::delete_report_v2))
-        .route("/v2/{org_id}/reports/{report_id}/enable", patch(dashboards::reports::enable_report_v2))
-        .route("/v2/{org_id}/reports/{report_id}/trigger", put(dashboards::reports::trigger_report_v2))
 
         // SLOs. Deliberately NOT enterprise-gated: nothing about SLO
         // measurement is an enterprise capability. Literal segments are
@@ -1973,6 +1960,25 @@ pub fn downtime_routes() -> Router {
         .route("/v2/{org_id}/downtimes/{downtime_id}", get(downtimes::get_downtime).put(downtimes::update_downtime).delete(downtimes::delete_downtime))
         .route("/v2/{org_id}/downtimes/{downtime_id}/cancel", post(downtimes::cancel_downtime))
         .route("/v2/{org_id}/downtimes/{downtime_id}/extend", post(downtimes::extend_downtime))
+}
+
+/// Dashboard report routes, v1 by name and v2 by id.
+#[rustfmt::skip]
+fn report_routes() -> Router {
+    Router::new()
+        .route("/{org_id}/reports", get(dashboards::reports::list_reports).post(dashboards::reports::create_report))
+        .route("/{org_id}/reports/{name}", get(dashboards::reports::get_report).put(dashboards::reports::update_report).delete(dashboards::reports::delete_report))
+        .route("/{org_id}/reports/bulk", delete(dashboards::reports::delete_report_bulk))
+        .route("/{org_id}/reports/{name}/enable", put(dashboards::reports::enable_report))
+        .route("/{org_id}/reports/{name}/trigger", put(dashboards::reports::trigger_report))
+        // /bulk, /move and /history must precede /{report_id} to avoid route conflicts
+        .route("/v2/{org_id}/reports", get(dashboards::reports::list_reports_v2).post(dashboards::reports::create_report_v2))
+        .route("/v2/{org_id}/reports/bulk", delete(dashboards::reports::delete_report_bulk_v2))
+        .route("/v2/{org_id}/reports/move", patch(dashboards::reports::move_reports))
+        .route("/v2/{org_id}/reports/history", get(dashboards::reports_history::get_report_history))
+        .route("/v2/{org_id}/reports/{report_id}", get(dashboards::reports::get_report_v2).put(dashboards::reports::update_report_v2).delete(dashboards::reports::delete_report_v2))
+        .route("/v2/{org_id}/reports/{report_id}/enable", patch(dashboards::reports::enable_report_v2))
+        .route("/v2/{org_id}/reports/{report_id}/trigger", put(dashboards::reports::trigger_report_v2))
 }
 
 /// On-call management routes; the caller mounts them only when on-call is enabled.
