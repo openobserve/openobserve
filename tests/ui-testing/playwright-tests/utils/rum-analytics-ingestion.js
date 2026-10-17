@@ -127,6 +127,12 @@ class SessionBuilder {
     this.rows.push({ ...this.base('error'), error_type: 'TypeError', error_message: message, error_source: 'source' });
     return this;
   }
+
+  /** Idle time before the next row, on top of the 5 s every row already adds. */
+  wait(ms) {
+    this.t += ms;
+    return this;
+  }
 }
 
 function buildSeed(appId, nowMs = Date.now()) {
@@ -304,7 +310,7 @@ function buildSyntheticMixSeed(appId, nowMs = Date.now()) {
   for (let i = 0; i < 5; i++) {
     const s = new SessionBuilder(appId, `${appId}-s${i}`, nowMs - (i + 2) * HOUR_MS, {
       user: `y${i}@e2e.test`,
-      sessionType: i < 3 ? 'user' : 'synthetic',
+      sessionType: i < 3 ? 'user' : 'synthetics',
     });
     s.view('https://shop.example.com/web/a');
     rows.push(...s.rows);
@@ -495,6 +501,7 @@ module.exports = {
   seedPlaceholderIdentityApp,
   seedLongPageApp,
   buildSeed,
+  SessionBuilder,
   runAppId,
   weekStartUtc,
   PAGE_KEY_VECTORS,
