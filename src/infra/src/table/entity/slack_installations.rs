@@ -48,6 +48,8 @@ pub struct Model {
     #[sea_orm(column_type = "Text")]
     pub auto_link_domains: String,
     pub mode: String,
+    pub scope: String,
+    pub org_access: String,
     pub home_region: String,
     pub installed_by: String,
     pub installed_org_id: String,

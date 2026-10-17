@@ -26,6 +26,7 @@ pub struct Model {
     pub org_id: String,
     pub connected_by: String,
     pub help_contact: Option<String>,
+    pub source: String,
     pub created_at: i64,
     pub updated_at: i64,
     pub origin_region: String,

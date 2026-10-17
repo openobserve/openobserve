@@ -13,7 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Section 7.2 rows 1-10, 14-17 and 19: install, prerequisites, credentials, connection, uninstall.
+//! Section 7.2 rows 1-10, 14-17, 19 and 24: install, prerequisites, credentials, connection,
+//! uninstall, org access.
 
 use axum::{
     Json,
@@ -689,6 +690,96 @@ pub async fn uninstall(
     }
 }
 
+/// SlackGetOrgAccess
+#[utoipa::path(
+    get,
+    path = "/{org_id}/slack/installations/{installation_id}/org-access",
+    context_path = "/api",
+    tag = "Slack",
+    operation_id = "SlackGetOrgAccess",
+    summary = "Get the instance workspace's organization access",
+    description = "Self-hosted instance workspace only, from `_meta`: all organizations or the listed ones, each served organization with its channel defaults, links and members, and every organization on the server for the picker.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name; only `_meta`"),
+        ("installation_id" = String, Path, description = "Slack installation id"),
+    ),
+    responses(
+        (status = 200, description = "`{\"all\", \"orgs\": [{\"org_id\", \"org_name\", \"source\", \"added_by\", \"added_at\", \"channel_defaults\", \"links\", \"members\"}], \"organizations\": [{\"org_id\", \"org_name\", \"members\"}], \"other_apps_in_team\": [{\"installation_id\", \"org_ids\"}]}`", content_type = "application/json", body = Object),
+        (status = 403, description = "Not an instance admin, or the OSS build", content_type = "application/json", body = ()),
+        (status = 404, description = "Slack is not enabled, not `_meta`, Cloud, or unknown installation", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Slack", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+pub async fn get_org_access(
+    Path((org_id, installation_id)): Path<(String, String)>,
+    Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        respond(
+            ent::access::get_org_access(&caller(&org_id, &user_email.user_id), &installation_id)
+                .await,
+        )
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, installation_id, user_email);
+        not_supported()
+    }
+}
+
+/// SlackPutOrgAccess
+#[utoipa::path(
+    put,
+    path = "/{org_id}/slack/installations/{installation_id}/org-access",
+    context_path = "/api",
+    tag = "Slack",
+    operation_id = "SlackPutOrgAccess",
+    summary = "Set the instance workspace's organization access",
+    description = "Self-hosted, from `_meta`: serve all organizations or the listed ones. Removed organizations lose their channel defaults, threads and connection, and their links move to another served organization or are unlinked. `preview: true` changes nothing and reports what Save would remove. On an organization workspace the call takes it over as the instance workspace.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name; only `_meta`"),
+        ("installation_id" = String, Path, description = "Slack installation id"),
+    ),
+    request_body(content = Object, description = "`{\"all\": true}` or `{\"orgs\": [string]}`, plus optional `\"preview\": true`", content_type = "application/json"),
+    responses(
+        (status = 200, description = "OrgAccessView, with `removed`: [{\"org_id\", \"org_name\", \"channels\", \"links_moving\", \"links_unlinked\"}] when organizations are or would be removed", content_type = "application/json", body = Object),
+        (status = 400, description = "Bad body", content_type = "application/json", body = ()),
+        (status = 403, description = "Not an instance admin, or the OSS build", content_type = "application/json", body = ()),
+        (status = 404, description = "Slack is not enabled, not `_meta`, Cloud, or unknown installation", content_type = "application/json", body = ()),
+        (status = 409, description = "The take-over is refused: the workspace is not active, or its team already has an instance workspace", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Slack", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+pub async fn put_org_access(
+    Path((org_id, installation_id)): Path<(String, String)>,
+    Headers(user_email): Headers<UserEmail>,
+    body: Result<Json<serde_json::Value>, JsonRejection>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        let req: ent::access::OrgAccessRequest = match parse(&org_id, body) {
+            Ok(req) => req,
+            Err(response) => return response,
+        };
+        let caller = caller(&org_id, &user_email.user_id);
+        respond(ent::access::put_org_access(&caller, &installation_id, &req).await)
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, installation_id, user_email, body);
+        not_supported()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     #[cfg(not(feature = "enterprise"))]
@@ -722,6 +813,8 @@ mod tests {
             connect(one(), user(), body()).await,
             disconnect(one(), user()).await,
             uninstall(one(), user()).await,
+            get_org_access(one(), user()).await,
+            put_org_access(one(), user(), body()).await,
         ];
         for response in responses {
             assert_eq!(response.status(), StatusCode::FORBIDDEN);

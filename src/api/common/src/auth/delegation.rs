@@ -27,7 +27,7 @@ use std::{
 use axum::http::Method;
 #[cfg(any(feature = "enterprise", test))]
 use config::{
-    meta::slack::{ExternalIdentityLink, SlackInstallation, SlackOrgConnection},
+    meta::slack::{ExternalIdentityLink, SlackInstallation},
     utils::delegation::{Claims, DelegationError, Keys, SCOPE_ASSISTANT, verify},
 };
 use openobserve_core::auth::AuthExtractor;
@@ -169,7 +169,7 @@ struct ScopeRoute {
     methods: &'static [&'static str],
 }
 
-/// What the link row, its installation and its connections say, cached for 30 s per link.
+/// What the link row, its installation and the orgs it serves say, cached for 30 s per link.
 #[cfg(any(feature = "enterprise", test))]
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct LinkFacts {
@@ -186,7 +186,7 @@ impl LinkFacts {
     fn from_rows(
         link: Option<ExternalIdentityLink>,
         installation: Option<SlackInstallation>,
-        connections: Vec<SlackOrgConnection>,
+        orgs: HashSet<String>,
         loaded: Instant,
     ) -> Self {
         let Some(link) = link else {
@@ -203,7 +203,7 @@ impl LinkFacts {
             installation_id: link.installation_id,
             user_email: link.user_email,
             refusal,
-            orgs: connections.into_iter().map(|c| c.org_id).collect(),
+            orgs,
             last_used_at: link.last_used_at,
             loaded,
         }
@@ -444,17 +444,14 @@ async fn link_facts(lid: &str, now: Instant) -> Result<LinkFacts, AuthError> {
     }
     let load = async {
         let Some(link) = store::external_identity_links::get(lid).await? else {
-            return Ok(LinkFacts::from_rows(None, None, vec![], now));
+            return Ok(LinkFacts::from_rows(None, None, HashSet::new(), now));
         };
         let installation = store::slack_installations::get(&link.installation_id).await?;
-        let connections =
-            store::slack_org_connections::list_by_installation(&link.installation_id).await?;
-        anyhow::Ok(LinkFacts::from_rows(
-            Some(link),
-            installation,
-            connections,
-            now,
-        ))
+        let orgs = match &installation {
+            Some(installation) => store::served_org_ids(installation).await?,
+            None => HashSet::new(),
+        };
+        anyhow::Ok(LinkFacts::from_rows(Some(link), installation, orgs, now))
     };
     let facts = loaded_facts(load.await, lid)?;
     remember_link(lid, facts.clone());
@@ -533,7 +530,7 @@ fn unauthorized() -> AuthError {
 mod tests {
     use base64::{Engine, prelude::BASE64_STANDARD};
     use config::{
-        meta::slack::RevokedReason,
+        meta::slack::{DisabledReason, InstallScope, OrgAccess, RevokedReason},
         utils::delegation::{TOKEN_VERSION, effective_keys, sign},
     };
 
@@ -597,22 +594,14 @@ mod tests {
         }
     }
 
-    fn connection(org: &str) -> SlackOrgConnection {
-        SlackOrgConnection {
-            installation_id: "I1".to_string(),
-            org_id: org.to_string(),
-            ..Default::default()
-        }
-    }
-
     fn admitted(
         link: Option<ExternalIdentityLink>,
         installation: Option<SlackInstallation>,
         orgs: &[&str],
         claims: &Claims,
     ) -> u16 {
-        let connections = orgs.iter().map(|o| connection(o)).collect();
-        status(LinkFacts::from_rows(link, installation, connections, Instant::now()).admit(claims))
+        let orgs = orgs.iter().map(|o| o.to_string()).collect();
+        status(LinkFacts::from_rows(link, installation, orgs, Instant::now()).admit(claims))
     }
 
     #[test]
@@ -638,6 +627,25 @@ mod tests {
             )),
             200
         );
+        for reason in [
+            DisabledReason::Edition,
+            DisabledReason::Flag,
+            DisabledReason::MasterKey,
+            DisabledReason::SuperCluster,
+        ] {
+            let enabled_for = |_: &str| Some(reason).is_none();
+            assert_eq!(
+                status(verified_claims(
+                    &token,
+                    true,
+                    || Ok(keys()),
+                    NOW_SECS,
+                    enabled_for
+                )),
+                401,
+                "{reason:?}"
+            );
+        }
         let no_key = verified_claims(
             &token,
             true,
@@ -665,8 +673,12 @@ mod tests {
     fn a_link_that_cannot_be_loaded_is_503_not_a_denial() {
         let failed = loaded_facts(Err(anyhow::anyhow!("database is down")), "lnk_01");
         assert_eq!(status(failed), 503);
-        let facts =
-            LinkFacts::from_rows(Some(link()), Some(installation()), vec![], Instant::now());
+        let facts = LinkFacts::from_rows(
+            Some(link()),
+            Some(installation()),
+            HashSet::new(),
+            Instant::now(),
+        );
         assert_eq!(loaded_facts(Ok(facts.clone()), "lnk_01").ok(), Some(facts));
     }
 
@@ -922,9 +934,43 @@ mod tests {
     }
 
     #[test]
+    fn an_org_served_under_all_is_admitted_and_a_removed_org_is_refused() {
+        let created_later = claims("created-later");
+        let instance = SlackInstallation {
+            scope: InstallScope::Instance,
+            org_access: OrgAccess::All,
+            ..installation()
+        };
+        assert_eq!(
+            admitted(
+                Some(link()),
+                Some(instance.clone()),
+                &["_meta", "acme", "created-later"],
+                &created_later
+            ),
+            200
+        );
+        let listed = SlackInstallation {
+            org_access: OrgAccess::Listed,
+            ..instance
+        };
+        assert_eq!(
+            admitted(
+                Some(link()),
+                Some(listed),
+                &["_meta", "acme"],
+                &created_later
+            ),
+            403,
+            "removed from access"
+        );
+    }
+
+    #[test]
     fn link_facts_live_30_seconds_and_touches_wait_a_minute() {
         let loaded = Instant::now();
-        let facts = LinkFacts::from_rows(Some(link()), Some(installation()), vec![], loaded);
+        let facts =
+            LinkFacts::from_rows(Some(link()), Some(installation()), HashSet::new(), loaded);
         assert!(facts.is_fresh(loaded));
         assert!(facts.is_fresh(loaded + LINK_CACHE_TTL - Duration::from_nanos(1)));
         assert!(!facts.is_fresh(loaded + LINK_CACHE_TTL));

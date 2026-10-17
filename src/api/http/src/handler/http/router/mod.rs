@@ -2360,6 +2360,7 @@ pub fn slack_routes() -> Router {
         .route("/{org_id}/slack/installations/{installation_id}/channel-defaults", get(set::channel_defaults))
         .route("/{org_id}/slack/installations/{installation_id}/channel-defaults/{channel_id}", get(set::get_channel_default).put(set::put_channel_default).delete(set::delete_channel_default))
         .route("/{org_id}/slack/installations/{installation_id}/help-contact", get(set::get_help_contact).put(set::put_help_contact))
+        .route("/{org_id}/slack/installations/{installation_id}/org-access", get(inst::get_org_access).put(inst::put_org_access))
 }
 
 /// Create other service routes (AWS, GCP, RUM)
@@ -2681,6 +2682,8 @@ mod tests {
             ),
             (Method::GET, "/default/slack/installations/I1/help-contact"),
             (Method::PUT, "/default/slack/installations/I1/help-contact"),
+            (Method::GET, "/_meta/slack/installations/I1/org-access"),
+            (Method::PUT, "/_meta/slack/installations/I1/org-access"),
             (Method::POST, "/default/slack/link-requests/R1/start"),
             (Method::POST, "/default/slack/link-requests/confirm"),
             (Method::POST, "/default/slack/link-requests/R1/resend"),
@@ -2716,6 +2719,7 @@ mod tests {
             (Method::POST, "/default/slack/installations"),
             (Method::PUT, "/default/slack/installations/I1/credentials"),
             (Method::PUT, "/default/slack/installations/I1/linking"),
+            (Method::PUT, "/_meta/slack/installations/I1/org-access"),
             (Method::POST, "/default/slack/link-requests/confirm"),
         ] {
             for (content_type, body) in [("application/json", "{not json"), ("text/plain", "{}")] {
@@ -2799,6 +2803,7 @@ mod tests {
             (Method::DELETE, "org/slack/installations/I1/connection"),
             (Method::POST, "org/slack/installations/I1/link-all"),
             (Method::PUT, "org/slack/installations/I1/linking"),
+            (Method::PUT, "_meta/slack/installations/I1/org-access"),
             (Method::GET, "org/slack/installations/I1/credentials"),
             (Method::POST, "org/slack/link-requests/R1/start"),
             (Method::POST, "org/slack/link-requests/R1/resend"),

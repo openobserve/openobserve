@@ -335,6 +335,8 @@ use crate::{
         openobserve_api_management::request::slack::installations::connect,
         openobserve_api_management::request::slack::installations::disconnect,
         openobserve_api_management::request::slack::installations::uninstall,
+        openobserve_api_management::request::slack::installations::get_org_access,
+        openobserve_api_management::request::slack::installations::put_org_access,
         openobserve_api_management::request::slack::settings::get_linking,
         openobserve_api_management::request::slack::settings::put_linking,
         openobserve_api_management::request::slack::settings::link_matches,
@@ -1196,6 +1198,14 @@ mod tests {
         (
             "put",
             "/api/{org_id}/slack/installations/{installation_id}/help-contact",
+        ),
+        (
+            "get",
+            "/api/{org_id}/slack/installations/{installation_id}/org-access",
+        ),
+        (
+            "put",
+            "/api/{org_id}/slack/installations/{installation_id}/org-access",
         ),
         (
             "post",

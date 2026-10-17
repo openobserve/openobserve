@@ -69,6 +69,34 @@ class TestSlackTables:
         with pytest.raises(psycopg2.errors.UniqueViolation):
             db_cursor.execute(INSERT_LINK, (_id(), slack_installation_id, "U1"))
 
+    def test_instance_columns_have_their_defaults(self, db_cursor, slack_app_id):
+        installation_id = _id()
+        db_cursor.execute(INSERT_INSTALLATION, (installation_id, slack_app_id, "", "T1"))
+        db_cursor.execute(
+            "SELECT scope, org_access FROM slack_installations WHERE id = %s",
+            (installation_id,),
+        )
+        assert db_cursor.fetchone() == ("org", "")
+        try:
+            db_cursor.execute(
+                """
+                INSERT INTO slack_org_connections (
+                    installation_id, org_id, connected_by, created_at, updated_at, origin_region
+                ) VALUES (%s, 'default', 'root@example.com', 1, 1, 'default')
+                """,
+                (installation_id,),
+            )
+            db_cursor.execute(
+                "SELECT source FROM slack_org_connections WHERE installation_id = %s",
+                (installation_id,),
+            )
+            assert db_cursor.fetchone() == ("org",)
+        finally:
+            db_cursor.execute(
+                "DELETE FROM slack_org_connections WHERE installation_id = %s",
+                (installation_id,),
+            )
+
     def test_every_table_keeps_the_replication_columns(self, db_cursor):
         tables = (
             "external_identity_links",

@@ -111,6 +111,8 @@ enum SlackInstallations {
     AutoLinkEnabled,
     AutoLinkDomains,
     Mode,
+    Scope,
+    OrgAccess,
     HomeRegion,
     InstalledBy,
     InstalledOrgId,
@@ -125,6 +127,7 @@ enum SlackOrgConnections {
     OrgId,
     ConnectedBy,
     HelpContact,
+    Source,
     CreatedAt,
 }
 
@@ -367,6 +370,8 @@ fn installations_table() -> TableCreateStatement {
                     .default("[]"),
             )
             .col(varchar(T::Mode, 8))
+            .col(varchar(T::Scope, 8).default("org"))
+            .col(varchar(T::OrgAccess, 8).default(""))
             .col(varchar(T::HomeRegion, 64))
             .col(varchar(T::InstalledBy, 256))
             .col(varchar(T::InstalledOrgId, 256))
@@ -385,6 +390,7 @@ fn org_connections_table() -> TableCreateStatement {
             .col(varchar(T::OrgId, 256))
             .col(varchar(T::ConnectedBy, 256))
             .col(ColumnDef::new(T::HelpContact).string_len(256).null())
+            .col(varchar(T::Source, 16).default("org"))
             .col(bigint(T::CreatedAt))
             .primary_key(
                 Index::create()
@@ -535,6 +541,8 @@ mod tests {
                 "auto_link_enabled" bool NOT NULL,
                 "auto_link_domains" text NOT NULL DEFAULT '[]',
                 "mode" varchar(8) NOT NULL,
+                "scope" varchar(8) NOT NULL DEFAULT 'org',
+                "org_access" varchar(8) NOT NULL DEFAULT '',
                 "home_region" varchar(64) NOT NULL,
                 "installed_by" varchar(256) NOT NULL,
                 "installed_org_id" varchar(256) NOT NULL,
@@ -552,6 +560,7 @@ mod tests {
                 "org_id" varchar(256) NOT NULL,
                 "connected_by" varchar(256) NOT NULL,
                 "help_contact" varchar(256) NULL,
+                "source" varchar(16) NOT NULL DEFAULT 'org',
                 "created_at" bigint NOT NULL,
                 "updated_at" bigint NOT NULL,
                 "origin_region" varchar(64) NOT NULL,
@@ -655,8 +664,8 @@ mod tests {
         let row = db
             .query_one(Statement::from_string(
                 DbBackend::Sqlite,
-                "SELECT enterprise_id, manifest_options, auto_link_domains FROM \
-                 slack_installations WHERE id = 'i1'",
+                "SELECT enterprise_id, manifest_options, auto_link_domains, scope, org_access \
+                 FROM slack_installations WHERE id = 'i1'",
             ))
             .await
             .unwrap()
@@ -667,5 +676,22 @@ mod tests {
             row.try_get::<String>("", "auto_link_domains").unwrap(),
             "[]"
         );
+        assert_eq!(row.try_get::<String>("", "scope").unwrap(), "org");
+        assert_eq!(row.try_get::<String>("", "org_access").unwrap(), "");
+        db.execute_unprepared(
+            "INSERT INTO slack_org_connections (installation_id, org_id, connected_by, \
+             created_at, updated_at, origin_region) VALUES ('i1', 'org', 'a@b.c', 1, 1, 'default')",
+        )
+        .await
+        .unwrap();
+        let row = db
+            .query_one(Statement::from_string(
+                DbBackend::Sqlite,
+                "SELECT source FROM slack_org_connections WHERE installation_id = 'i1'",
+            ))
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(row.try_get::<String>("", "source").unwrap(), "org");
     }
 }

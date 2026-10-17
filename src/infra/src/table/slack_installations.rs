@@ -246,6 +246,8 @@ fn to_active(row: &SlackInstallation, key: Option<&[u8]>) -> Result<ActiveModel,
         auto_link_enabled: Set(row.auto_link_enabled),
         auto_link_domains: Set(json::to_string(&row.auto_link_domains)?),
         mode: Set(enum_text(&row.mode)?),
+        scope: Set(enum_text(&row.scope)?),
+        org_access: Set(enum_text(&row.org_access)?),
         home_region: Set(row.home_region.clone()),
         installed_by: Set(row.installed_by.clone()),
         installed_org_id: Set(row.installed_org_id.clone()),
@@ -288,8 +290,8 @@ fn from_model(model: Model, key: Option<&[u8]>) -> Result<SlackInstallation, Err
         auto_link_enabled: model.auto_link_enabled,
         auto_link_domains: parse_json("auto_link_domains", Some(&model.auto_link_domains))?,
         mode: parse_enum("mode", &model.mode)?,
-        scope: Default::default(),
-        org_access: Default::default(),
+        scope: parse_enum("scope", &model.scope)?,
+        org_access: parse_enum("org_access", &model.org_access)?,
         home_region: model.home_region,
         installed_by: model.installed_by,
         installed_org_id: model.installed_org_id,
@@ -305,7 +307,7 @@ fn from_model(model: Model, key: Option<&[u8]>) -> Result<SlackInstallation, Err
 #[cfg(test)]
 mod tests {
     use config::{
-        meta::slack::{ManifestOptions, Mode},
+        meta::slack::{InstallScope, ManifestOptions, Mode, OrgAccess},
         utils::encryption::decrypt_secret_value,
     };
     use sea_orm::{Database, DatabaseConnection, DbBackend, EntityTrait, Statement};
@@ -406,6 +408,21 @@ mod tests {
             .iter()
             .map(|c| row.try_get::<Option<String>>("", c).unwrap())
             .collect()
+    }
+
+    async fn stored_scope(db: &DatabaseConnection, id: &str) -> (String, String) {
+        let row = db
+            .query_one(Statement::from_string(
+                DbBackend::Sqlite,
+                format!("SELECT scope, org_access FROM slack_installations WHERE id = '{id}'"),
+            ))
+            .await
+            .unwrap()
+            .unwrap();
+        (
+            row.try_get("", "scope").unwrap(),
+            row.try_get("", "org_access").unwrap(),
+        )
     }
 
     async fn stored_model(db: &DatabaseConnection, id: &str) -> Model {
@@ -563,5 +580,48 @@ mod tests {
         delete_with(&db, "i2").await.unwrap();
         assert!(get_with(&db, "i2").await.unwrap().is_none());
         assert_eq!(list_with(&db).await.unwrap().len(), 2);
+    }
+
+    #[tokio::test]
+    async fn scope_and_org_access_round_trip() {
+        let db = db().await;
+        let instance = SlackInstallation {
+            scope: InstallScope::Instance,
+            org_access: OrgAccess::Listed,
+            ..installation("i1", "T1")
+        };
+        put_with(&db, &instance).await.unwrap();
+        let read = get_with(&db, "i1").await.unwrap().unwrap();
+        assert_eq!(
+            (read.scope, read.org_access),
+            (InstallScope::Instance, OrgAccess::Listed)
+        );
+        assert_eq!(
+            stored_scope(&db, "i1").await,
+            ("instance".into(), "listed".into())
+        );
+
+        let all = SlackInstallation {
+            org_access: OrgAccess::All,
+            ..instance
+        };
+        put_with(&db, &all).await.unwrap();
+        assert_eq!(
+            get_with(&db, "i1").await.unwrap().unwrap().org_access,
+            OrgAccess::All
+        );
+
+        let org = SlackInstallation {
+            scope: InstallScope::Org,
+            org_access: OrgAccess::Unset,
+            ..installation("i2", "T2")
+        };
+        put_with(&db, &org).await.unwrap();
+        let read = get_with(&db, "i2").await.unwrap().unwrap();
+        assert_eq!(
+            (read.scope, read.org_access),
+            (InstallScope::Org, OrgAccess::Unset)
+        );
+        assert_eq!(stored_scope(&db, "i2").await, ("org".into(), String::new()));
     }
 }

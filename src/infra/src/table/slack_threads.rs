@@ -209,11 +209,16 @@ pub async fn delete_by_installation_with<C: ConnectionTrait>(
 }
 
 pub async fn delete_by_installation_and_org_with<C: ConnectionTrait>(
-    _conn: &C,
-    _installation_id: &str,
-    _org_id: &str,
+    conn: &C,
+    installation_id: &str,
+    org_id: &str,
 ) -> Result<u64, Error> {
-    Err(Error::Message("slack iw: not implemented".into()))
+    let result = Entity::delete_many()
+        .filter(Column::InstallationId.eq(installation_id))
+        .filter(Column::OrgId.eq(org_id))
+        .exec(conn)
+        .await?;
+    Ok(result.rows_affected)
 }
 
 async fn touch_columns<C: ConnectionTrait>(
@@ -517,5 +522,26 @@ mod tests {
         assert_eq!(get_with(&db, "i1", "C1", "1.2").await.unwrap(), None);
         assert_eq!(get_with(&db, "i2", "C1", "1.1").await.unwrap(), Some(other));
         assert_eq!(delete_by_installation_with(&db, "i1").await.unwrap(), 0);
+    }
+
+    #[tokio::test]
+    async fn delete_by_installation_and_org_leaves_other_orgs_and_installations() {
+        let db = db().await;
+        put_with(&db, &thread("1.1", "acme", 100)).await.unwrap();
+        put_with(&db, &thread("1.2", "globex", 100)).await.unwrap();
+        let other = SlackThread {
+            installation_id: "i2".to_string(),
+            ..thread("1.1", "acme", 100)
+        };
+        put_with(&db, &other).await.unwrap();
+        assert_eq!(
+            delete_by_installation_and_org_with(&db, "i1", "acme")
+                .await
+                .unwrap(),
+            1
+        );
+        assert_eq!(get_with(&db, "i1", "C1", "1.1").await.unwrap(), None);
+        assert!(get_with(&db, "i1", "C1", "1.2").await.unwrap().is_some());
+        assert_eq!(get_with(&db, "i2", "C1", "1.1").await.unwrap(), Some(other));
     }
 }

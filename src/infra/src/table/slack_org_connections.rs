@@ -21,7 +21,7 @@ use sea_orm::{
 
 use super::{
     entity::slack_org_connections::{ActiveModel, Column, Entity, Model},
-    slack_shared::db_err,
+    slack_shared::{db_err, decode_all, enum_text, parse_enum},
 };
 use crate::{
     db::{get_orm_client_ro, get_orm_client_rw},
@@ -54,7 +54,7 @@ pub async fn delete_by_org(org_id: &str) -> Result<u64, Error> {
 
 pub async fn put_with<C: ConnectionTrait>(conn: &C, row: &SlackOrgConnection) -> Result<(), Error> {
     let key = [Column::InstallationId, Column::OrgId];
-    Entity::insert(to_active(row))
+    Entity::insert(to_active(row)?)
         .on_conflict(
             OnConflict::columns(key)
                 .update_columns(
@@ -73,40 +73,47 @@ pub async fn get_with<C: ConnectionTrait>(
     installation_id: &str,
     org_id: &str,
 ) -> Result<Option<SlackOrgConnection>, Error> {
-    Ok(live()
+    live()
         .filter(Column::InstallationId.eq(installation_id))
         .filter(Column::OrgId.eq(org_id))
         .one(conn)
         .await?
-        .map(from_model))
+        .map(from_model)
+        .transpose()
 }
 
 pub async fn list_by_installation_with<C: ConnectionTrait>(
     conn: &C,
     installation_id: &str,
 ) -> Result<Vec<SlackOrgConnection>, Error> {
-    Ok(live()
+    let models = live()
         .filter(Column::InstallationId.eq(installation_id))
         .order_by_asc(Column::OrgId)
         .all(conn)
-        .await?
-        .into_iter()
-        .map(from_model)
-        .collect())
+        .await?;
+    Ok(decode_all(
+        "slack_org_connections",
+        models,
+        connection_key,
+        from_model,
+    ))
 }
 
 pub async fn list_by_org_with<C: ConnectionTrait>(
     conn: &C,
     org_id: &str,
 ) -> Result<Vec<SlackOrgConnection>, Error> {
-    Ok(live()
+    let models = live()
         .filter(Column::OrgId.eq(org_id))
         .order_by_asc(Column::InstallationId)
         .all(conn)
-        .await?
-        .into_iter()
-        .map(from_model)
-        .collect())
+        .await?;
+    Ok(decode_all(
+        "slack_org_connections",
+        models,
+        connection_key,
+        from_model,
+    ))
 }
 
 pub async fn delete_with<C: ConnectionTrait>(
@@ -134,36 +141,42 @@ fn live() -> Select<Entity> {
     Entity::find().filter(Column::DeletedAt.is_null())
 }
 
-fn to_active(row: &SlackOrgConnection) -> ActiveModel {
-    ActiveModel {
+fn connection_key(model: &Model) -> String {
+    format!("{}/{}", model.installation_id, model.org_id)
+}
+
+fn to_active(row: &SlackOrgConnection) -> Result<ActiveModel, Error> {
+    Ok(ActiveModel {
         installation_id: Set(row.installation_id.clone()),
         org_id: Set(row.org_id.clone()),
         connected_by: Set(row.connected_by.clone()),
         help_contact: Set(row.help_contact.clone()),
+        source: Set(enum_text(&row.source)?),
         created_at: Set(row.created_at),
         updated_at: Set(row.updated_at),
         origin_region: Set(row.origin_region.clone()),
         deleted_at: Set(row.deleted_at),
-    }
+    })
 }
 
-fn from_model(model: Model) -> SlackOrgConnection {
-    SlackOrgConnection {
+fn from_model(model: Model) -> Result<SlackOrgConnection, Error> {
+    Ok(SlackOrgConnection {
         installation_id: model.installation_id,
         org_id: model.org_id,
         connected_by: model.connected_by,
         help_contact: model.help_contact,
-        source: Default::default(),
+        source: parse_enum("source", &model.source)?,
         created_at: model.created_at,
         updated_at: model.updated_at,
         origin_region: model.origin_region,
         deleted_at: model.deleted_at,
-    }
+    })
 }
 
 #[cfg(test)]
 mod tests {
-    use sea_orm::{Database, DatabaseConnection};
+    use config::meta::slack::ConnectionSource;
+    use sea_orm::{Database, DatabaseConnection, DbBackend, Statement};
 
     use super::*;
     use crate::table::slack::create_tables_for_test;
@@ -244,5 +257,30 @@ mod tests {
         assert_eq!(get_with(&db, "i1", "globex").await.unwrap(), None);
         assert_eq!(delete_by_org_with(&db, "acme").await.unwrap(), 3);
         assert!(list_by_org_with(&db, "acme").await.unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn source_round_trips_and_defaults_to_org() {
+        let db = db().await;
+        let listed = SlackOrgConnection {
+            source: ConnectionSource::Instance,
+            ..connection("i1", "acme")
+        };
+        put_with(&db, &listed).await.unwrap();
+        let read = get_with(&db, "i1", "acme").await.unwrap().unwrap();
+        assert_eq!(read.source, ConnectionSource::Instance);
+        let stored = db
+            .query_one(Statement::from_string(
+                DbBackend::Sqlite,
+                "SELECT source FROM slack_org_connections WHERE org_id = 'acme'",
+            ))
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(stored.try_get::<String>("", "source").unwrap(), "instance");
+
+        put_with(&db, &connection("i1", "globex")).await.unwrap();
+        let read = get_with(&db, "i1", "globex").await.unwrap().unwrap();
+        assert_eq!(read.source, ConnectionSource::Org);
     }
 }
