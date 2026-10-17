@@ -66,6 +66,8 @@ pub mod providers;
 pub mod public_rate_limit;
 pub mod query_history;
 #[cfg(feature = "enterprise")]
+pub mod quality;
+#[cfg(feature = "enterprise")]
 pub mod remote_tasks;
 pub mod rum_analytics;
 #[cfg(feature = "enterprise")]
