@@ -170,7 +170,7 @@ pub async fn get_password_complexity(Path(_org_id): Path<String>) -> Response {
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "create"})),
-        ("x-o2-mcp" = json!({"description": "Configure the instance password policy", "category": "system", "requires_confirmation": true}))
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 pub async fn set_policy(

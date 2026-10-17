@@ -79,7 +79,7 @@ use crate::common::meta::http::HttpResponse as MetaHttpResponse;
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Organizations", "operation": "assume"})),
-        ("x-o2-mcp" = json!({"description": "Assume service account identity", "category": "users"}))
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 #[cfg(feature = "enterprise")]
@@ -233,6 +233,7 @@ pub async fn assume_service_account(
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal server error"),
         (status = 501, description = "Not available in non-enterprise builds"),
     ),
+    extensions(("x-o2-mcp" = json!({"enabled": false}))),
 )]
 pub async fn assume_service_account(
     Path(_org_id): Path<String>,

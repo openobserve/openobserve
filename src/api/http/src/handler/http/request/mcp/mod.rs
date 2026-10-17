@@ -625,10 +625,44 @@ pub async fn oauth_protected_resource_metadata_root() -> Response {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashSet;
+
     use serde_json::{Value, json};
     use utoipa::OpenApi;
 
     use super::*;
+
+    const AGENT_FORBIDDEN_OPERATIONS: &[&str] = &[
+        "SetPaidOverageStatus",
+        "UserSave",
+        "UserUpdate",
+        "AddUserToOrg",
+        "RemoveUserFromOrg",
+        "ServiceAccountSave",
+        "ServiceAccountUpdate",
+        "RemoveServiceAccount",
+        "CreateRoles",
+        "UpdateRoles",
+        "DeleteRole",
+        "CreateGroup",
+        "UpdateGroup",
+        "DeleteGroup",
+        "UpdateStreamSettings",
+        "AssumeServiceAccount",
+        "OrganizationSettingCreate",
+        "SetPasswordPolicy",
+        "StreamDelete",
+    ];
+
+    const AGENT_READ_OPERATIONS: &[&str] = &[
+        "SearchSQL",
+        "StreamList",
+        "StreamSchema",
+        "UserList",
+        "ServiceAccountsList",
+        "ListRoles",
+        "ListGroups",
+    ];
 
     fn ping_request() -> MCPRequest {
         MCPRequest {
@@ -665,6 +699,32 @@ mod tests {
             headers.insert(MCP_NAME_HEADER, name.parse().unwrap());
         }
         headers
+    }
+
+    // init_mcp_tools fills process-wide caches that refuse a second init, so tests share one
+    fn oss_mcp_tool_names() -> HashSet<String> {
+        static INIT: std::sync::Once = std::sync::Once::new();
+        INIT.call_once(|| {
+            let api = crate::handler::http::router::openapi::ApiDoc::openapi();
+            openobserve_mcp::tools::init_mcp_tools(&api).unwrap();
+        });
+        openobserve_mcp::tools::get_mcp_tools()
+            .into_iter()
+            .map(|tool| tool.name)
+            .collect()
+    }
+
+    fn documented_operation_ids() -> HashSet<String> {
+        let spec =
+            serde_json::to_value(crate::handler::http::router::openapi::ApiDoc::openapi()).unwrap();
+        spec["paths"]
+            .as_object()
+            .unwrap()
+            .values()
+            .filter_map(Value::as_object)
+            .flat_map(|item| item.values())
+            .filter_map(|op| op["operationId"].as_str().map(str::to_string))
+            .collect()
     }
 
     #[tokio::test]
@@ -788,15 +848,36 @@ mod tests {
 
     #[test]
     fn oss_openapi_initializes_mcp_tools() {
-        let api = crate::handler::http::router::openapi::ApiDoc::openapi();
-
-        openobserve_mcp::tools::init_mcp_tools(&api).unwrap();
-
-        let tools = openobserve_mcp::tools::get_mcp_tools();
+        let tools = oss_mcp_tool_names();
         assert!(!tools.is_empty());
         // stream-scoped time range stays an MCP tool; the org-level one opted out
-        assert!(tools.iter().any(|tool| tool.name == "GetTraceTimeRange"));
-        assert!(tools.iter().all(|tool| tool.name != "GetOrgTraceTimeRange"));
+        assert!(tools.contains("GetTraceTimeRange"));
+        assert!(!tools.contains("GetOrgTraceTimeRange"));
+    }
+
+    #[test]
+    fn billing_iam_and_retention_mutations_are_not_mcp_tools() {
+        let documented = documented_operation_ids();
+        let tools = oss_mcp_tool_names();
+        for op in AGENT_FORBIDDEN_OPERATIONS {
+            // the absence check is vacuous unless the operation is in this build's spec
+            let in_this_build = match *op {
+                "SetPaidOverageStatus" => cfg!(feature = "cloud"),
+                "SetPasswordPolicy" => cfg!(feature = "enterprise"),
+                // the enterprise ApiDoc merge drops the /users/{email_id} write ops
+                "UserUpdate" | "AddUserToOrg" | "RemoveUserFromOrg" => {
+                    !cfg!(feature = "enterprise")
+                }
+                _ => true,
+            };
+            if in_this_build {
+                assert!(documented.contains(*op), "{op} is not in the OpenAPI doc");
+            }
+            assert!(!tools.contains(*op), "{op} is exposed as an MCP tool");
+        }
+        for op in AGENT_READ_OPERATIONS {
+            assert!(tools.contains(*op), "read tool {op} is missing");
+        }
     }
 
     #[test]

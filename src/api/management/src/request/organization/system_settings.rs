@@ -25,7 +25,9 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use config::meta::{
-    system_settings::{SettingScope, SystemSetting, SystemSettingPayload, SystemSettingQuery},
+    system_settings::{
+        SettingScope, SystemSetting, SystemSettingPayload, SystemSettingQuery, keys,
+    },
     user::UserRole,
 };
 use db::system_settings;
@@ -36,13 +38,17 @@ use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 
 /// Keys owned by endpoints with stricter authorization than the generic settings API.
 fn is_reserved_key(key: &str) -> bool {
-    key.trim()
-        .to_ascii_lowercase()
-        .starts_with(db::prompt_settings::PROMPT_SETTINGS_PREFIX)
+    let key = key.trim().to_ascii_lowercase();
+    key.starts_with(db::prompt_settings::PROMPT_SETTINGS_PREFIX) || key == keys::PASSWORD_POLICY
 }
 
-fn reserved_key_response() -> Response {
-    MetaHttpResponse::forbidden("This setting is managed by /prompts/settings")
+fn reserved_key_response(key: &str) -> Response {
+    let owner = if key.trim().eq_ignore_ascii_case(keys::PASSWORD_POLICY) {
+        "/settings/password_policy"
+    } else {
+        "/prompts/settings"
+    };
+    MetaHttpResponse::forbidden(format!("This setting is managed by {owner}"))
 }
 
 /// Own settings are the caller's; another user's need root, Admin, or an OpenFGA users write.
@@ -203,7 +209,7 @@ pub async fn set_org_setting(
     Json(payload): Json<SystemSettingPayload>,
 ) -> Response {
     if is_reserved_key(&payload.setting_key) {
-        return reserved_key_response();
+        return reserved_key_response(&payload.setting_key);
     }
     let mut setting = SystemSetting::new_org(&org_id, &payload.setting_key, payload.setting_value);
     if let Some(cat) = payload.setting_category.as_deref() {
@@ -252,7 +258,7 @@ pub async fn set_user_setting(
     Json(payload): Json<SystemSettingPayload>,
 ) -> Response {
     if is_reserved_key(&payload.setting_key) {
-        return reserved_key_response();
+        return reserved_key_response(&payload.setting_key);
     }
     if !may_access_user_settings(&org_id, &user_email.user_id, &user_id).await {
         return foreign_user_response();
@@ -305,7 +311,7 @@ pub async fn set_user_setting(
 )]
 pub async fn delete_org_setting(Path((org_id, key)): Path<(String, String)>) -> Response {
     if is_reserved_key(&key) {
-        return reserved_key_response();
+        return reserved_key_response(&key);
     }
     match system_settings::delete(&SettingScope::Org, Some(&org_id), None, &key).await {
         Ok(true) => (StatusCode::OK, Json(serde_json::json!({"deleted": true}))).into_response(),
@@ -347,7 +353,7 @@ pub async fn delete_user_setting(
     Headers(user_email): Headers<UserEmail>,
 ) -> Response {
     if is_reserved_key(&key) {
-        return reserved_key_response();
+        return reserved_key_response(&key);
     }
     if !may_access_user_settings(&org_id, &user_email.user_id, &user_id).await {
         return foreign_user_response();
@@ -371,17 +377,30 @@ mod tests {
         assert!(!is_reserved_key("my_prompt_settings/default"));
     }
 
+    #[test]
+    fn password_policy_key_is_reserved() {
+        assert!(is_reserved_key(keys::PASSWORD_POLICY));
+        assert!(is_reserved_key(" Password_Policy "));
+        assert!(!is_reserved_key("password_policy_hint"));
+    }
+
     #[tokio::test]
-    async fn generic_api_rejects_prompt_settings_writes() {
+    async fn generic_api_rejects_reserved_key_writes() {
+        for key in ["prompt_settings/default", keys::PASSWORD_POLICY] {
+            assert_reserved_writes_forbidden(key).await;
+        }
+    }
+
+    async fn assert_reserved_writes_forbidden(key: &str) {
         let payload = || {
             Json(SystemSettingPayload {
-                setting_key: "prompt_settings/default".to_string(),
+                setting_key: key.to_string(),
                 setting_value: serde_json::json!({"protectedLabels": ["x"]}),
                 setting_category: None,
                 description: None,
             })
         };
-        let key = "prompt_settings/default".to_string();
+        let key = key.to_string();
         let org = "default".to_string();
         for response in [
             set_org_setting(Path(org.clone()), payload()).await,
