@@ -280,7 +280,7 @@ fn validate_org_id(org_id: &str) -> Option<&'static str> {
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Users", "operation": "create"})),
-        ("x-o2-mcp" = json!({"description": "Create a new user", "category": "users"}))
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 pub async fn save(
@@ -357,8 +357,7 @@ pub async fn save(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Users", "operation": "update"})),
-        // Enterprise exposes only UserGet on this path as an MCP tool.
-        ("x-o2-mcp" = json!({"enabled": !cfg!(feature = "enterprise"), "description": "Update user details", "category": "users"}))
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 pub async fn update(
@@ -460,8 +459,7 @@ pub async fn update(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Users", "operation": "create"})),
-        // Enterprise exposes only UserGet on this path as an MCP tool.
-        ("x-o2-mcp" = json!({"enabled": !cfg!(feature = "enterprise"), "description": "Add user to organization", "category": "users"}))
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 pub async fn add_user_to_org(
@@ -541,8 +539,7 @@ fn _prepare_cookie<'a, T: Serialize + ?Sized, E: Into<time::OffsetDateTime>>(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Users", "operation": "delete"})),
-        // Enterprise exposes only UserGet on this path as an MCP tool.
-        ("x-o2-mcp" = json!({"enabled": !cfg!(feature = "enterprise"), "description": "Remove user from organization", "category": "users", "requires_confirmation": true}))
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 pub async fn delete(

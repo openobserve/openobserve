@@ -79,7 +79,7 @@ use crate::common::meta::http::HttpResponse as MetaHttpResponse;
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Organizations", "operation": "create"})),
-        ("x-o2-mcp" = json!({"description": "Assume service account identity", "category": "users"}))
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 #[cfg(feature = "enterprise")]
@@ -231,7 +231,7 @@ pub async fn assume_service_account(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Organizations", "operation": "create"})),
-        ("x-o2-mcp" = json!({"enabled": true}))
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 pub async fn assume_service_account(

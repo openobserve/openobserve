@@ -145,7 +145,7 @@ pub async fn list(Path(org_id): Path<String>, Headers(user_email): Headers<UserE
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Service Accounts", "operation": "create"})),
-        ("x-o2-mcp" = json!({"description": "Create service account", "category": "users"}))
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 pub async fn save(
@@ -203,7 +203,7 @@ pub async fn save(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Service Accounts", "operation": "update"})),
-        ("x-o2-mcp" = json!({"description": "Update service account", "category": "users"}))
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 pub async fn update(
@@ -339,7 +339,7 @@ pub async fn update(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Service Accounts", "operation": "delete"})),
-        ("x-o2-mcp" = json!({"description": "Delete service account", "category": "users", "requires_confirmation": true}))
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 pub async fn delete(

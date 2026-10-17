@@ -953,7 +953,7 @@ pub async fn get_paid_overage_status(
         (status = 503, description = "Billing or quota state unavailable"),
     ),
     extensions(
-        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-mcp" = json!({"enabled": false})),
         ("x-o2-ratelimit" = json!({"module": "Organizations", "operation": "update"}))
     )
 )]

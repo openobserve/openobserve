@@ -66,7 +66,7 @@ struct ResourceView {
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "create"})),
-        ("x-o2-mcp" = json!({"description": "Create a role", "category": "authorization"}))
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 pub async fn create_role(
@@ -126,7 +126,7 @@ pub async fn create_role(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "create"})),
-        ("x-o2-mcp" = json!({"enabled": true}))
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 pub async fn create_role(
@@ -160,7 +160,7 @@ pub async fn create_role(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "delete"})),
-        ("x-o2-mcp" = json!({"description": "Delete a role", "category": "authorization", "requires_confirmation": true}))
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 pub async fn delete_role(Path((org_id, role_name)): Path<(String, String)>) -> Response {
@@ -297,7 +297,7 @@ pub async fn delete_role_bulk(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "delete"})),
-        ("x-o2-mcp" = json!({"enabled": true, "requires_confirmation": true}))
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 pub async fn delete_role(Path(_path): Path<(String, String)>) -> Response {
@@ -426,7 +426,7 @@ pub async fn get_roles(Path(_org_id): Path<String>) -> Response {
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "update"})),
-        ("x-o2-mcp" = json!({"description": "Update a role", "category": "authorization"}))
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 pub async fn update_role(
@@ -479,7 +479,7 @@ pub async fn update_role(
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-mcp" = json!({"enabled": false})),
         ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "update"}))
     )
 )]
@@ -907,7 +907,7 @@ pub async fn get_groups_for_user(Path(_path): Path<(String, String)>) -> Respons
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-mcp" = json!({"enabled": false})),
         ("x-o2-ratelimit" = json!({"module": "Groups", "operation": "create"}))
     )
 )]
@@ -958,7 +958,7 @@ pub async fn create_group(
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-mcp" = json!({"enabled": false})),
         ("x-o2-ratelimit" = json!({"module": "Groups", "operation": "create"}))
     )
 )]
@@ -993,7 +993,7 @@ pub async fn create_group(
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-mcp" = json!({"enabled": false})),
         ("x-o2-ratelimit" = json!({"module": "Groups", "operation": "update"}))
     )
 )]
@@ -1062,7 +1062,7 @@ pub async fn update_group(
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-mcp" = json!({"enabled": false})),
         ("x-o2-ratelimit" = json!({"module": "Groups", "operation": "update"}))
     )
 )]
@@ -1337,7 +1337,7 @@ pub async fn get_resources(Path(_org_id): Path<String>) -> Response {
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-mcp" = json!({"enabled": true, "requires_confirmation": true})),
+        ("x-o2-mcp" = json!({"enabled": false})),
         ("x-o2-ratelimit" = json!({"module": "Groups", "operation": "delete"}))
     )
 )]
@@ -1475,7 +1475,7 @@ pub async fn delete_group_bulk(
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-mcp" = json!({"enabled": true, "requires_confirmation": true})),
+        ("x-o2-mcp" = json!({"enabled": false})),
         ("x-o2-ratelimit" = json!({"module": "Groups", "operation": "delete"}))
     )
 )]
