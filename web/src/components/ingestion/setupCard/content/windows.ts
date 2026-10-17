@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 // Windows host agent setup card — the PowerShell twin of ./linux.ts. Shared
-// scaffolding (environment toggle, EC2 IAM prerequisite, host-metrics detection)
+// scaffolding (install code block, host-metrics detection, troubleshooting rows)
 // comes from ./osAgent; this file holds the PowerShell command and the
 // Windows-specific collection list.
 
@@ -24,21 +24,17 @@ import { getImageURL } from "@/utils/zincutils";
 import type { CardSubstitutions, RichCardContent } from "../types";
 import {
   AGENTS_REPO,
-  EC2_IAM_NOTE_KEY,
   agentCode,
   agentUninstall,
   dashboardReadyStep,
-  envIcons,
   hostMetricsDetect,
   sharedAgentTroubleshooting,
 } from "./osAgent";
 
-const install = (env: "" | "/ec2") =>
-  `Invoke-WebRequest -Uri ${AGENTS_REPO}/windows${env}/install.ps1 -OutFile install.ps1
+const install = `Invoke-WebRequest -Uri ${AGENTS_REPO}/windows/install.ps1 -OutFile install.ps1
 .\\install.ps1 -URL {url}/api/{org}/ -AUTH_KEY {token}`;
 
 export default function windowsCard(subs: CardSubstitutions, t: TranslateFn): RichCardContent {
-  const icon = envIcons();
   return {
     provider: {
       id: "windows",
@@ -58,22 +54,8 @@ export default function windowsCard(subs: CardSubstitutions, t: TranslateFn): Ri
         chip: { kind: "terminal", label: raw("PowerShell") },
         required: true,
         completeOn: "copy",
-        variants: [
-          {
-            id: "generic",
-            labelKey: "ingestion.setupCard.genericWindowsVariant",
-            icon: icon.windows,
-            code: agentCode(install(""), subs, "powershell"),
-            note: t("ingestion.setupCard.anyWindowsHostNote"),
-          },
-          {
-            id: "ec2",
-            label: raw("AWS EC2"),
-            icon: icon.ec2,
-            code: agentCode(install("/ec2"), subs, "powershell"),
-            note: t(EC2_IAM_NOTE_KEY),
-          },
-        ],
+        code: agentCode(install, subs, "powershell"),
+        note: t("ingestion.setupCard.anyWindowsHostNote"),
       },
       {
         id: "verify",
