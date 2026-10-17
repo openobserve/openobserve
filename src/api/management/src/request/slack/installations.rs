@@ -13,8 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Section 7.2 rows 1-10, 14-17, 19 and 24: install, prerequisites, credentials, connection,
-//! uninstall, org access.
+//! Section 7.2 rows 1-10, 14-17, 19 and 24.
 
 use axum::{
     Json,

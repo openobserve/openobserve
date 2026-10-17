@@ -27,7 +27,7 @@ use std::{
 use axum::http::Method;
 #[cfg(any(feature = "enterprise", test))]
 use config::{
-    meta::slack::{ExternalIdentityLink, SlackInstallation},
+    meta::slack::{DisabledReason, ExternalIdentityLink, SlackInstallation},
     utils::delegation::{Claims, DelegationError, Keys, SCOPE_ASSISTANT, verify},
 };
 use openobserve_core::auth::AuthExtractor;
@@ -251,7 +251,13 @@ pub async fn validate_delegated(
 
     let now_secs = config::utils::time::now_micros() / 1_000_000;
     let slack_on = get_o2_config().slack.enabled;
-    let claims = verified_claims(token, slack_on, signing_keys, now_secs, slack::enabled_for)?;
+    let claims = verified_claims(
+        token,
+        slack_on,
+        signing_keys,
+        now_secs,
+        slack::disabled_reason,
+    )?;
     check_route(path, path_prefix, method, &claims)?;
     let facts = link_facts(&claims.lid, Instant::now()).await?;
     facts.admit(&claims)?;
@@ -352,7 +358,7 @@ fn verified_claims(
     slack_on: bool,
     keys: impl FnOnce() -> anyhow::Result<Keys>,
     now_secs: i64,
-    enabled_for: impl Fn(&str) -> bool,
+    disabled_reason: impl Fn(&str) -> Option<DisabledReason>,
 ) -> Result<Claims, AuthError> {
     if !slack_on {
         return Err(unauthorized());
@@ -365,7 +371,8 @@ fn verified_claims(
         log::debug!("delegated token refused: {e}");
         unauthorized()
     })?;
-    if !enabled_for(&claims.org) {
+    if let Some(reason) = disabled_reason(&claims.org) {
+        log::debug!("delegated token refused: Slack is off ({reason:?})");
         return Err(unauthorized());
     }
     if claims.scope != SCOPE_ASSISTANT {
@@ -530,7 +537,7 @@ fn unauthorized() -> AuthError {
 mod tests {
     use base64::{Engine, prelude::BASE64_STANDARD};
     use config::{
-        meta::slack::{DisabledReason, InstallScope, OrgAccess, RevokedReason},
+        meta::slack::{InstallScope, OrgAccess, RevokedReason},
         utils::delegation::{TOKEN_VERSION, effective_keys, sign},
     };
 
@@ -613,7 +620,7 @@ mod tests {
                 true,
                 || Ok(keys()),
                 NOW_SECS,
-                |_| false
+                |_| Some(DisabledReason::Flag)
             )),
             401
         );
@@ -623,7 +630,7 @@ mod tests {
                 true,
                 || Ok(keys()),
                 NOW_SECS,
-                |_| true
+                |_| None
             )),
             200
         );
@@ -633,14 +640,20 @@ mod tests {
             DisabledReason::MasterKey,
             DisabledReason::SuperCluster,
         ] {
-            let enabled_for = |_: &str| Some(reason).is_none();
+            // A new reason must join this list: the match stops compiling until it does.
+            match reason {
+                DisabledReason::Edition
+                | DisabledReason::Flag
+                | DisabledReason::MasterKey
+                | DisabledReason::SuperCluster => {}
+            }
             assert_eq!(
                 status(verified_claims(
                     &token,
                     true,
                     || Ok(keys()),
                     NOW_SECS,
-                    enabled_for
+                    |_| Some(reason)
                 )),
                 401,
                 "{reason:?}"
@@ -651,7 +664,7 @@ mod tests {
             true,
             || Err(anyhow::anyhow!("no master key")),
             NOW_SECS,
-            |_| true,
+            |_| None,
         );
         assert_eq!(status(no_key), 401);
     }
@@ -664,7 +677,7 @@ mod tests {
             false,
             || panic!("signing keys were read with Slack off"),
             NOW_SECS,
-            |_| true,
+            |_| None,
         );
         assert_eq!(status(refused), 401);
     }
@@ -683,9 +696,9 @@ mod tests {
     }
 
     #[test]
-    fn enabled_for_is_asked_about_the_token_org() {
+    fn the_disabled_reason_is_asked_about_the_token_org() {
         let token = token(&claims("acme"));
-        let only_other = |org: &str| org == "other";
+        let only_other = |org: &str| (org != "other").then_some(DisabledReason::Flag);
         assert_eq!(
             status(verified_claims(
                 &token,
@@ -725,7 +738,7 @@ mod tests {
                     true,
                     || Ok(keys()),
                     NOW_SECS,
-                    |_| true
+                    |_| None
                 )),
                 401,
                 "{bad}"
@@ -745,7 +758,7 @@ mod tests {
                 true,
                 || Ok(keys()),
                 NOW_SECS,
-                |_| true
+                |_| None
             )),
             403
         );

@@ -1,4 +1,3 @@
-// Instance workspace screens: Organizations card in _meta (SlackOrgAccess.vue), the managed card and channel defaults in a served org, the not-included banner (SlackConnectEmpty.vue).
 const { expect } = require('@playwright/test');
 const { SlackSettingsPage } = require('./slackSettingsPage.js');
 

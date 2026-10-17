@@ -1,4 +1,3 @@
-// Instance workspace installed from _meta on a self-hosted server: org access, the managed card, the not-included banner (AC-14.19).
 const path = require('path');
 const { test, expect } = require('@playwright/test');
 const testLogger = require('../utils/test-logger.js');

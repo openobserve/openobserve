@@ -236,8 +236,7 @@ struct ConfigResponse<'a> {
     synthetics_enabled: bool,
     oncall_enabled: bool,
     slack_enabled: bool,
-    /// Why Slack is off (`edition`, `flag`, `master_key`, `super_cluster`), the same for every
-    /// org; null when on.
+    /// The same reason for every org, null when on.
     slack_disabled_reason: Option<DisabledReason>,
     /// Enterprise-only private locations; the UI gates their views on this flag.
     synthetics_private_locations_enabled: bool,
