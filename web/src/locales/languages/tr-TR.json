@@ -9163,7 +9163,7 @@
       "helpYourVariablesEmpty": "Henüz herhangi bir değişken eklemediniz.",
       "helpRowTemplateExplain": "Bir uyarı birçok satırla eşleşebilir. Satır şablonu, tek bir satırın nasıl görüneceğine karar verir. Ardından, ana şablonunuzdaki {'{'} satırları {'}'}, zaten biçimlendirilmiş olan eşleşen her satıra düşer.",
       "helpRowTemplateTypeHeading": "Dize ve JSON",
-      "helpRowTemplateTypeExplain": "String her satır için düz metin üretir. JSON, yapılandırılmış hedefler için uygun, her satır için bir JSON nesnesi üretir.",
+      "helpRowTemplateTypeExplain": "String, her satır için düz metin üretir. JSON, her satır için yapılandırılmış hedeflere uygun bir JSON nesnesi üretir. Tüm satır alanlarını otomatik olarak dahil etmek için şablonun tamamı olarak {'{'}...row{'}'} kullanın. ...row adlı bir satır alanı önceliklidir.",
       "helpRowTemplateTypeCurrent": "Şu anda seçilmiş:",
       "helpPreviewHeadingShort": "Önizleme",
       "helpWhyHeading": "Neden bir değişken kullanıyorsunuz?",
@@ -9234,8 +9234,8 @@
       "selectTemplate": "Şablon Seç",
       "templateTypeString": "Metin",
       "templateTypeJson": "JSON",
-      "rowTemplatePlaceholderJson": "ör. - {'{'}\"user\": \"{'{'}name{'}'}\", \"timestamp\": \"{'{'}timestamp{'}'}\"{'}'}",
-      "rowTemplatePlaceholderString": "ör. - Uyarı {'{'}timestamp{'}'} zamanında tetiklendi"
+      "rowTemplatePlaceholderJson": "örn. {'{'} \"user\": \"{'{'}name{'}'}\", \"timestamp\": \"{'{'}timestamp{'}'}\"{'}'} veya {'{'}...row{'}'}",
+      "rowTemplatePlaceholderString": "örn. Uyarı {'{'}timestamp{'}'} zamanında tetiklendi"
     },
     "editJson": "Uyarı JSON'unu Düzenle",
     "additional_settings": "Ek Ayarlar",
@@ -10548,7 +10548,7 @@
     "rowsMax": "Maksimum satır",
     "rowsFormat": "Satır biçimi (isteğe bağlı)",
     "rowsFormatLint": "Format, bu şablonun satırları kısıtlamadığı bir sütuna başvuruyor.",
-    "rowsFormatCaption": "Eşleşen her günlük satırı için bir satır oluşturur. Belirteçler, o satırın kendi alan adlarıdır — örn. level ve message alanları olan bir satır için {'{'}level{'}'} {'{'}message{'}'}. Tüm alanları göstermek için boş bırakın.",
+    "rowsFormatCaption": "Eşleşen her günlük satırı için tek satır oluşturur. Belirteçler o satırın kendi alan adlarıdır — örneğin, level ve message alanlarına sahip bir satır için {'{'}level{'}'} {'{'}message{'}'}. Tüm alanları serileştirilmiş JSON metni olarak dahil etmek için {'{'}...row{'}'} kullanın. ...row adlı bir satır alanı önceliklidir. Her alanı göstermek için boş bırakın.",
     "bodyMarkdownLint": "{line} satırı \"{marker}\" ile başlıyor ancak ardından boşluk yok, bu yüzden liste veya başlık olarak değil düz metin olarak işlenecek. Düzeltmek için bir boşluk ekleyin.",
     "addToTemplate": "Bu şablona ekle",
     "addToTemplateCaption": "Alanlar, bağlantılar, eşleşen satırlar, kanal başlıkları, grafik",

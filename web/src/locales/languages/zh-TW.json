@@ -9158,7 +9158,7 @@
       "helpYourVariablesEmpty": "您尚未新增任何變數。",
       "helpRowTemplateExplain": "一個警示可以比對多行。列範本決定單一列的呈現方式。然後主範本中的 {'{'}rows{'}'} 會插入每個已格式化的比對列。",
       "helpRowTemplateTypeHeading": "字串 vs JSON",
-      "helpRowTemplateTypeExplain": "String 為每列產生純文字。JSON 為每列產生 JSON 物件，適用於結構化目標。",
+      "helpRowTemplateTypeExplain": "字串會為每列產生純文字。JSON 會為每列產生 JSON 物件，適合結構化目標。使用 {'{'}...row{'}'} 作為整個範本，即可自動包含所有列欄位。名為 ...row 的列欄位優先。",
       "helpRowTemplateTypeCurrent": "目前已選取：",
       "helpPreviewHeadingShort": "預覽",
       "helpWhyHeading": "為什麼使用變數？",
@@ -9229,8 +9229,8 @@
       "selectTemplate": "選擇範本",
       "templateTypeString": "字串",
       "templateTypeJson": "JSON",
-      "rowTemplatePlaceholderJson": "例如 - {'{'}\"user\": \"{'{'}name{'}'}\", \"timestamp\": \"{'{'}timestamp{'}'}\"{'}'}",
-      "rowTemplatePlaceholderString": "例如 - 警示在 {'{'}timestamp{'}'} 觸發"
+      "rowTemplatePlaceholderJson": "例如 {'{'}\"user\": \"{'{'}name{'}'}\", \"timestamp\": \"{'{'}timestamp{'}'}\"{'}'} 或 {'{'}...row{'}'}",
+      "rowTemplatePlaceholderString": "例如警示已於 {'{'}timestamp{'}'} 觸發"
     },
     "editJson": "編輯警示 JSON",
     "additional_settings": "額外設定",
@@ -10543,7 +10543,7 @@
     "rowsMax": "最大列數",
     "rowsFormat": "列格式（選填）",
     "rowsFormatLint": "格式引用的欄位不在此範本限定的列範圍內",
-    "rowsFormatCaption": "將每個相符的日誌列建置為一行。Token 是該列自身的欄位名稱 — 例如 {'{'}level{'}'} {'{'}message{'}'} 用於具有 level 和 message 欄位的列。留空以顯示所有欄位。",
+    "rowsFormatCaption": "為每個符合的日誌列建立一行。符記就是該列本身的欄位名稱 — 例如，對於含有 level 和 message 欄位的列，可使用 {'{'}level{'}'} {'{'}message{'}'}。使用 {'{'}...row{'}'} 即可將所有欄位以序列化 JSON 文字納入。名為 ...row 的列欄位優先。留空則顯示所有欄位。",
     "bodyMarkdownLint": "行 {line} 以 \"{marker}\" 開頭，但其後沒有空格，因此會以純文字呈現，而非清單或標題。請加入一個空格來修正。",
     "addToTemplate": "新增至此範本",
     "addToTemplateCaption": "欄位、連結、相符的列、頻道標題、圖表",

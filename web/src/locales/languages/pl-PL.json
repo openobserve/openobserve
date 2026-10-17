@@ -9163,7 +9163,7 @@
       "helpYourVariablesEmpty": "Nie dodałeś jeszcze żadnych zmiennych.",
       "helpRowTemplateExplain": "An alert can match many rows. The row template decides how a single row looks. Then {'{'}rows{'}'} in your main template drops in every matched row, already formatted.",
       "helpRowTemplateTypeHeading": "String vs JSON",
-      "helpRowTemplateTypeExplain": "String generuje zwykły tekst dla każdego wiersza. JSON generuje obiekt JSON dla każdego wiersza, odpowiedni dla strukturalnych miejsc docelowych.",
+      "helpRowTemplateTypeExplain": "String generuje zwykły tekst dla każdego wiersza. JSON generuje obiekt JSON dla każdego wiersza, odpowiedni dla ustrukturyzowanych miejsc docelowych. Użyj {'{'}...row{'}'} jako całego szablonu, aby automatycznie uwzględnić wszystkie pola wiersza. Pole wiersza o nazwie ...row ma pierwszeństwo.",
       "helpRowTemplateTypeCurrent": "Obecnie wybrane:",
       "helpPreviewHeadingShort": "Podgląd",
       "helpWhyHeading": "Po co używać zmiennej?",
@@ -9234,8 +9234,8 @@
       "selectTemplate": "Wybierz szablon",
       "templateTypeString": "Ciąg znaków",
       "templateTypeJson": "JSON",
-      "rowTemplatePlaceholderJson": "np. - {'{'}\"user\": \"{'{'}name{'}'}\", \"timestamp\": \"{'{'}timestamp{'}'}\"{'}'}",
-      "rowTemplatePlaceholderString": "np. - Powiadomienie zostało wywołane o {'{'}timestamp{'}'}"
+      "rowTemplatePlaceholderJson": "np. {'{'} \"user\": \"{'{'}name{'}'}\", \"timestamp\": \"{'{'}timestamp{'}'}\"{'}'} lub {'{'}...row{'}'}",
+      "rowTemplatePlaceholderString": "np. Alert został wyzwolony o {'{'}timestamp{'}'}"
     },
     "editJson": "Edytuj JSON powiadomienia",
     "additional_settings": "Ustawienia dodatkowe",
@@ -10548,7 +10548,7 @@
     "rowsMax": "Maks. wierszy",
     "rowsFormat": "Format wiersza (opcjonalnie)",
     "rowsFormatLint": "Format odnosi się do kolumny, do której ten szablon nie ogranicza wierszy",
-    "rowsFormatCaption": "Tworzy jedną linię na każdy pasujący wiersz logu. Tokeny to nazwy pól tego wiersza — np. {'{'}level{'}'} {'{'}message{'}'} dla wiersza z polami level i message. Pozostaw puste, aby pokazać wszystkie pola.",
+    "rowsFormatCaption": "Tworzy jedną linię dla każdego pasującego wiersza logu. Tokeny to nazwy pól własnych tego wiersza — np. {'{'}level{'}'} {'{'}message{'}'} dla wiersza z polami level i message. Użyj {'{'}...row{'}'}, aby uwzględnić wszystkie pola jako tekst zserializowanego JSON. Pole wiersza o nazwie ...row ma pierwszeństwo. Pozostaw puste, aby pokazać wszystkie pola.",
     "bodyMarkdownLint": "Linia {line} zaczyna się od \"{marker}\", ale nie ma po nim spacji, więc zostanie wyrenderowana jako zwykły tekst, a nie lista lub nagłówek. Dodaj spację, aby to naprawić.",
     "addToTemplate": "Dodaj do tego szablonu",
     "addToTemplateCaption": "Pola, linki, pasujące wiersze, tytuły kanałów, wykres",

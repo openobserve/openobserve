@@ -9163,7 +9163,7 @@
       "helpYourVariablesEmpty": "لم تقم بإضافة أي متغيرات بعد.",
       "helpRowTemplateExplain": "يمكن أن يتطابق التنبيه مع عدة صفوف. قالب الصف يحدد كيف يبدو الصف الواحد. ثم {'{'}rows{'}'} في القالب الرئيسي يسقط في كل صف مطابق، وهو منسق بالفعل.",
       "helpRowTemplateTypeHeading": "الوتر مقابل JSON",
-      "helpRowTemplateTypeExplain": "تنتج السلسلة نصا عاديا لكل صف. JSON تنتج كائنا JSON لكل صف، مناسبة للوجهات المنظمة.",
+      "helpRowTemplateTypeExplain": "ينتج String نصًا عاديًا لكل صف. وينتج JSON كائن JSON لكل صف، مناسب للوجهات المهيكلة. استخدم {'{'}...row{'}'} كالقالب بأكمله لتضمين جميع حقول الصف تلقائيًا. تكون الأولوية لحقل صف باسم ...row.",
       "helpRowTemplateTypeCurrent": "المختارون حاليا:",
       "helpPreviewHeadingShort": "معاينة",
       "helpWhyHeading": "لماذا نستخدم متغيرا؟",
@@ -9234,8 +9234,8 @@
       "selectTemplate": "اختر القالب",
       "templateTypeString": "الوتر",
       "templateTypeJson": "JSON",
-      "rowTemplatePlaceholderJson": "مثلا - {'{'}\"user\": \"{'{'}name{'}'}\", \"timestamp\": \"{'{'}timestamp{'}'}\"{'}'}",
-      "rowTemplatePlaceholderString": "مثلا - تم تفعيل التنبيه عند {'{'}timestamp{'}'}"
+      "rowTemplatePlaceholderJson": "مثال: {'{'} \"user\": \"{'{'}name{'}'}\", \"timestamp\": \"{'{'}timestamp{'}'}\"{'}'} أو {'{'}...row{'}'}",
+      "rowTemplatePlaceholderString": "مثال: تم إطلاق التنبيه عند {'{'}timestamp{'}'}"
     },
     "editJson": "تنبيه تعديل JSON",
     "additional_settings": "إعدادات إضافية",
@@ -10548,7 +10548,7 @@
     "rowsMax": "أقصى عدد من الصفوف",
     "rowsFormat": "تنسيق الصف (اختياري)",
     "rowsFormatLint": "يشير التنسيق إلى عمود هذا القالب لا يقيد الصفوف به",
-    "rowsFormatCaption": "ينشئ سطرًا واحدًا لكل صف سجل مطابق. الرموز هي أسماء الحقول الخاصة بذلك الصف — على سبيل المثال {'{'}level{'}'} {'{'}message{'}'} لصف يحتوي على حقول المستوى والرسالة. اتركه فارغًا لعرض كل الحقول.",
+    "rowsFormatCaption": "ينشئ سطرًا واحدًا لكل صف سجل مطابق. الرموز المميزة هي أسماء حقول الصف نفسه — مثل {'{'}level{'}'} {'{'}message{'}'} لصف يحتوي على حقلي level وmessage. استخدم {'{'}...row{'}'} لتضمين جميع الحقول كنص JSON متسلسل. تكون الأولوية لحقل صف باسم ...row. اتركه فارغًا لعرض كل الحقول.",
     "bodyMarkdownLint": "السطر {line} يبدأ بـ \"{marker}\" لكنه لا يحتوي على فراغ بعده، لذلك سيتم عرضه كنص عادي، وليس كقائمة أو عنوان. أضف فراغًا لإصلاحه.",
     "addToTemplate": "أضف إلى هذا القالب",
     "addToTemplateCaption": "الحقول، الروابط، الصفوف المطابقة، عناوين القنوات، الرسم البياني",

@@ -9163,7 +9163,7 @@
       "helpYourVariablesEmpty": "Non hai ancora aggiunto alcuna variabile.",
       "helpRowTemplateExplain": "Un avviso può corrispondere a più righe. Il modello di riga decide l'aspetto di una singola riga. Quindi {'{'} rows {'}'} nel modello principale viene inserito in ogni riga corrispondente, già formattata.",
       "helpRowTemplateTypeHeading": "Stringa e JSON",
-      "helpRowTemplateTypeExplain": "String genera testo semplice per riga. JSON genera un oggetto JSON per riga, adatto per destinazioni strutturate.",
+      "helpRowTemplateTypeExplain": "String produce testo semplice per riga. JSON produce un oggetto JSON per riga, adatto a destinazioni strutturate. Utilizza {'{'}...row{'}'} come intero modello per includere automaticamente tutti i campi della riga. Un campo della riga denominato ...row ha la precedenza.",
       "helpRowTemplateTypeCurrent": "Attualmente selezionato:",
       "helpPreviewHeadingShort": "Anteprima",
       "helpWhyHeading": "Perché usare una variabile?",
@@ -9234,8 +9234,8 @@
       "selectTemplate": "Seleziona template",
       "templateTypeString": "Stringa",
       "templateTypeJson": "JSON",
-      "rowTemplatePlaceholderJson": "es. - {'{'}\"user\": \"{'{'}name{'}'}\", \"timestamp\": \"{'{'}timestamp{'}'}\"{'}'}",
-      "rowTemplatePlaceholderString": "es. - L'allarme è stato attivato alle {'{'}timestamp{'}'}"
+      "rowTemplatePlaceholderJson": "ad es. {'{'}\"user\": \"{'{'}name{'}'}\", \"timestamp\": \"{'{'}timestamp{'}'}\"{'}'} oppure {'{'}...row{'}'}",
+      "rowTemplatePlaceholderString": "ad es. Avviso attivato alle {'{'}timestamp{'}'}"
     },
     "editJson": "Modifica avviso JSON",
     "additional_settings": "Impostazioni aggiuntive",
@@ -10548,7 +10548,7 @@
     "rowsMax": "Max righe",
     "rowsFormat": "Formato riga (opzionale)",
     "rowsFormatLint": "Il formato fa riferimento a una colonna a cui questo modello non limita le righe.",
-    "rowsFormatCaption": "Genera una riga per ogni riga di log corrispondente. I token sono i nomi dei campi della riga stessa — ad es. {'{'}level{'}'} {'{'}message{'}'} per una riga con campi level e message. Lasciare vuoto per mostrare tutti i campi.",
+    "rowsFormatCaption": "Crea una riga per ogni riga di log corrispondente. I token sono i nomi dei campi della riga stessa — ad es. {'{'}level{'}'} {'{'}message{'}'} per una riga con i campi level e message. Utilizza {'{'}...row{'}'} per includere tutti i campi come testo JSON serializzato. Un campo della riga denominato ...row ha la precedenza. Lascia vuoto per mostrare tutti i campi.",
     "bodyMarkdownLint": "La riga {line} inizia con \"{marker}\" ma non ha uno spazio dopo, quindi verrà visualizzata come testo normale, non come elenco o intestazione. Aggiungi uno spazio per correggere.",
     "addToTemplate": "Aggiungi a questo modello",
     "addToTemplateCaption": "Campi, link, righe corrispondenti, titoli dei canali, grafico",

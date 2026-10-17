@@ -9163,7 +9163,7 @@
       "helpYourVariablesEmpty": "Aún no has agregado ninguna variable.",
       "helpRowTemplateExplain": "Una alerta puede coincidir con muchas filas. La plantilla de filas decide el aspecto de una sola fila. Luego, {'{'} rows {'}'} de tu plantilla principal se coloca en todas las filas coincidentes que ya estén formateadas.",
       "helpRowTemplateTypeHeading": "Cadena frente a JSON",
-      "helpRowTemplateTypeExplain": "String produce texto plano por fila. JSON produce un objeto JSON por fila, adecuado para destinos estructurados.",
+      "helpRowTemplateTypeExplain": "String genera texto plano por fila. JSON genera un objeto JSON por fila, adecuado para destinos estructurados. Usa {'{'}...row{'}'} como plantilla completa para incluir todos los campos de la fila automáticamente. Un campo de fila llamado ...row tiene prioridad.",
       "helpRowTemplateTypeCurrent": "Seleccionado actualmente:",
       "helpPreviewHeadingShort": "Vista previa",
       "helpWhyHeading": "¿Por qué usar una variable?",
@@ -9234,8 +9234,8 @@
       "selectTemplate": "Seleccionar plantilla",
       "templateTypeString": "Cadena",
       "templateTypeJson": "JSON",
-      "rowTemplatePlaceholderJson": "p. ej. - {'{'}\"user\": \"{'{'}name{'}'}\", \"timestamp\": \"{'{'}timestamp{'}'}\"{'}'}",
-      "rowTemplatePlaceholderString": "p. ej. - Alerta se activó a las {'{'}timestamp{'}'}"
+      "rowTemplatePlaceholderJson": "p. ej. {'{'}\"user\": \"{'{'}name{'}'}\", \"timestamp\": \"{'{'}timestamp{'}'}\"{'}'} o {'{'}...row{'}'}",
+      "rowTemplatePlaceholderString": "p. ej. La alerta se activó a las {'{'}timestamp{'}'}"
     },
     "editJson": "Editar alerta JSON",
     "additional_settings": "Ajustes adicionales",
@@ -10548,7 +10548,7 @@
     "rowsMax": "Máximo de filas",
     "rowsFormat": "Formato de fila (opcional)",
     "rowsFormatLint": "El formato hace referencia a una columna que esta plantilla no restringe a las filas",
-    "rowsFormatCaption": "Genera una línea por cada fila de registro que coincida. Los tokens son los nombres de campo de esa fila — p. ej. {'{'}level{'}'} {'{'}message{'}'} para una fila con campos level y message. Déjalo vacío para mostrar todos los campos.",
+    "rowsFormatCaption": "Genera una línea por cada fila de log coincidente. Los tokens son los nombres de los campos de esa misma fila; p. ej., {'{'}level{'}'} {'{'}message{'}'} para una fila con los campos level y message. Usa {'{'}...row{'}'} para incluir todos los campos como texto JSON serializado. Un campo de fila llamado ...row tiene prioridad. Déjalo vacío para mostrar todos los campos.",
     "bodyMarkdownLint": "La línea {line} comienza con \"{marker}\" pero no tiene un espacio después, por lo que se mostrará como texto sin formato, no como lista o encabezado. Agrega un espacio para corregirlo.",
     "addToTemplate": "Añadir a esta plantilla",
     "addToTemplateCaption": "Campos, enlaces, filas coincidentes, títulos de canal, gráfico",

@@ -9163,7 +9163,7 @@
       "helpYourVariablesEmpty": "Vous n'avez encore ajouté aucune variable.",
       "helpRowTemplateExplain": "Une alerte peut correspondre à de nombreuses lignes. Le modèle de ligne détermine l'apparence d'une seule ligne. Ensuite, {'{'}rows{'}'} dans votre modèle principal insère chaque ligne correspondante, déjà formatée.",
       "helpRowTemplateTypeHeading": "String contre JSON",
-      "helpRowTemplateTypeExplain": "String produit un texte brut par ligne. JSON produit un objet JSON par ligne, adapté aux destinations structurées.",
+      "helpRowTemplateTypeExplain": "String produit du texte brut par ligne. JSON produit un objet JSON par ligne, adapté aux destinations structurées. Utilisez {'{'}...row{'}'} comme modèle complet pour inclure automatiquement tous les champs de la ligne. Un champ de ligne nommé ...row est prioritaire.",
       "helpRowTemplateTypeCurrent": "Actuellement sélectionné :",
       "helpPreviewHeadingShort": "Aperçu",
       "helpWhyHeading": "Pourquoi utiliser une variable ?",
@@ -9234,8 +9234,8 @@
       "selectTemplate": "Sélectionner un modèle",
       "templateTypeString": "Chaîne",
       "templateTypeJson": "JSON",
-      "rowTemplatePlaceholderJson": "ex. - {'{'}\"user\": \"{'{'}name{'}'}\", \"timestamp\": \"{'{'}timestamp{'}'}\"{'}'}",
-      "rowTemplatePlaceholderString": "ex. - L'alerte a été déclenchée à {'{'}timestamp{'}'}"
+      "rowTemplatePlaceholderJson": "ex. : {'{'}\"user\": \"{'{'}name{'}'}\", \"timestamp\": \"{'{'}timestamp{'}'}\"{'}'} ou {'{'}...row{'}'}",
+      "rowTemplatePlaceholderString": "ex. : L'alerte a été déclenchée à {'{'}timestamp{'}'}"
     },
     "editJson": "Modifier le JSON d'alerte",
     "additional_settings": "Réglages supplémentaires",
@@ -10548,7 +10548,7 @@
     "rowsMax": "Nombre maximal de lignes",
     "rowsFormat": "Format de ligne (facultatif)",
     "rowsFormatLint": "Le format référence une colonne à laquelle ce modèle ne restreint pas les lignes",
-    "rowsFormatCaption": "Génère une ligne par ligne de log correspondante. Les jetons sont les noms de champs propres à cette ligne — par ex. {'{'}level{'}'} {'{'}message{'}'} pour une ligne avec les champs level et message. Laissez vide pour afficher tous les champs.",
+    "rowsFormatCaption": "Génère une ligne pour chaque ligne de log correspondante. Les jetons sont les noms de champs propres à cette ligne — par ex. {'{'}level{'}'} {'{'}message{'}'} pour une ligne comportant les champs level et message. Utilisez {'{'}...row{'}'} pour inclure tous les champs sous forme de texte JSON sérialisé. Un champ de ligne nommé ...row est prioritaire. Laissez vide pour afficher tous les champs.",
     "bodyMarkdownLint": "La ligne {line} commence par \"{marker}\" mais n'a pas d'espace après, elle sera donc rendue comme texte brut, pas comme liste ou titre. Ajoutez un espace pour corriger.",
     "addToTemplate": "Ajouter à ce modèle",
     "addToTemplateCaption": "Champs, liens, lignes correspondantes, titres de canal, graphique",

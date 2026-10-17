@@ -9163,7 +9163,7 @@
       "helpYourVariablesEmpty": "아직 변수를 추가하지 않았습니다.",
       "helpRowTemplateExplain": "알림은 여러 행과 일치할 수 있습니다.행 템플릿은 단일 행의 모양을 결정합니다.그러면 기본 템플릿의 {'{'} rows {'}'} 가 이미 서식이 지정된 모든 일치하는 행에 드롭됩니다.",
       "helpRowTemplateTypeHeading": "문자열과 JSON 비교",
-      "helpRowTemplateTypeExplain": "문자열은 각 행에 대해 일반 텍스트를 생성합니다. JSON은 각 행에 대해 JSON 객체를 생성하며 구조화된 대상에 적합합니다.",
+      "helpRowTemplateTypeExplain": "문자열은 행마다 일반 텍스트를 생성합니다. JSON은 행마다 JSON 객체를 생성하며, 구조화된 대상에 적합합니다. 모든 행 필드를 자동으로 포함하려면 {'{'}...row{'}'}를 전체 템플릿으로 사용하세요. ...row라는 행 필드가 우선합니다.",
       "helpRowTemplateTypeCurrent": "현재 선택됨:",
       "helpPreviewHeadingShort": "시사",
       "helpWhyHeading": "왜 변수를 사용할까요?",
@@ -9234,8 +9234,8 @@
       "selectTemplate": "템플릿 선택",
       "templateTypeString": "문자열",
       "templateTypeJson": "JSON",
-      "rowTemplatePlaceholderJson": "예 - {'{'}\"user\": \"{'{'}name{'}'}\", \"timestamp\": \"{'{'}timestamp{'}'}\"{'}'}",
-      "rowTemplatePlaceholderString": "예 - Alert was triggered at {'{'}timestamp{'}'}"
+      "rowTemplatePlaceholderJson": "예: {'{'} \"user\": \"{'{'}name{'}'}\", \"timestamp\": \"{'{'}timestamp{'}'}\"{'}'} 또는 {'{'}...row{'}'}",
+      "rowTemplatePlaceholderString": "예: {'{'}timestamp{'}'}에 알림이 트리거되었습니다"
     },
     "editJson": "알림 JSON 편집",
     "additional_settings": "추가 설정",
@@ -10548,7 +10548,7 @@
     "rowsMax": "최대 행 수",
     "rowsFormat": "행 형식 (선택 사항)",
     "rowsFormatLint": "형식에 이 템플릿이 행을 제한하지 않는 열이 포함되어 있습니다.",
-    "rowsFormatCaption": "일치하는 로그 행마다 한 줄을 생성합니다. 토큰은 해당 행의 자체 필드 이름입니다. 예: level 및 message 필드가 있는 행의 경우 {'{'}level{'}'} {'{'}message{'}'}. 모든 필드를 표시하려면 비워 두세요.",
+    "rowsFormatCaption": "일치하는 로그 행마다 한 줄을 생성합니다. 토큰은 해당 행 자체의 필드 이름입니다. 예를 들어 level 및 message 필드가 있는 행의 경우 {'{'}level{'}'} {'{'}message{'}'}입니다. 직렬화된 JSON 텍스트로 모든 필드를 포함하려면 {'{'}...row{'}'}를 사용하세요. ...row라는 행 필드가 우선합니다. 모든 필드를 표시하려면 비워 두세요.",
     "bodyMarkdownLint": "줄 {line}은(는) \"{marker}\"(으)로 시작하지만 뒤에 공백이 없어 목록이나 제목이 아닌 일반 텍스트로 렌더링됩니다. 공백을 추가하여 수정하세요.",
     "addToTemplate": "이 템플릿에 추가",
     "addToTemplateCaption": "필드, 링크, 일치하는 행, 채널 제목, 차트",

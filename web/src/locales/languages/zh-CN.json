@@ -9163,7 +9163,7 @@
       "helpYourVariablesEmpty": "你还没有添加任何变量。",
       "helpRowTemplateExplain": "告警可匹配多行。行模板决定单行格式，主模板中的 {'{'}rows{'}'} 会插入所有已格式化的匹配行。",
       "helpRowTemplateTypeHeading": "字符串与 JSON",
-      "helpRowTemplateTypeExplain": "String 模式每行生成纯文本。JSON 模式每行生成 JSON 对象，适用于结构化目标。",
+      "helpRowTemplateTypeExplain": "字符串会为每一行生成纯文本。JSON 会为每一行生成一个 JSON 对象，适用于结构化目标。使用 {'{'}...row{'}'} 作为整个模板可自动包含所有行字段。名为 ...row 的行字段优先。",
       "helpRowTemplateTypeCurrent": "当前已选择：",
       "helpPreviewHeadingShort": "预览",
       "helpWhyHeading": "为什么要使用变量？",
@@ -9234,8 +9234,8 @@
       "selectTemplate": "选择模板",
       "templateTypeString": "字符串",
       "templateTypeJson": "JSON",
-      "rowTemplatePlaceholderJson": "例如 - {'{'}\"user\": \"{'{'}name{'}'}\", \"timestamp\": \"{'{'}timestamp{'}'}\"{'}'}",
-      "rowTemplatePlaceholderString": "例如 - 告警在 {'{'}timestamp{'}'} 时触发"
+      "rowTemplatePlaceholderJson": "例如 {'{'} \"user\": \"{'{'}name{'}'}\", \"timestamp\": \"{'{'}timestamp{'}'}\" {'}'} 或 {'{'}...row{'}'}",
+      "rowTemplatePlaceholderString": "例如：告警在 {'{'}timestamp{'}'} 触发"
     },
     "editJson": "编辑告警 JSON",
     "additional_settings": "其他设置",
@@ -10548,7 +10548,7 @@
     "rowsMax": "最大行数",
     "rowsFormat": "行格式（可选）",
     "rowsFormatLint": "格式引用了此模板未限制行的列",
-    "rowsFormatCaption": "每个匹配的日志行生成一行。令牌是该行自身的字段名 — 例如，对于具有 level 和 message 字段的行，使用 {'{'}level{'}'} {'{'}message{'}'}。留空以显示所有字段。",
+    "rowsFormatCaption": "为每个匹配的日志行生成一行。令牌是该行自身的字段名——例如，对于包含 level 和 message 字段的行，使用 {'{'}level{'}'} {'{'}message{'}'}。使用 {'{'}...row{'}'} 可将所有字段以序列化 JSON 文本形式包含。名为 ...row 的行字段优先。留空则显示所有字段。",
     "bodyMarkdownLint": "第 {line} 行以 \"{marker}\" 开头，但后面没有空格，因此它将渲染为纯文本，而不是列表或标题。添加一个空格来修复它。",
     "addToTemplate": "添加到此模板",
     "addToTemplateCaption": "字段、链接、匹配行、频道标题、图表",

@@ -9163,7 +9163,7 @@
       "helpYourVariablesEmpty": "Bạn chưa thêm biến nào.",
       "helpRowTemplateExplain": "Một cảnh báo có thể khớp với nhiều dòng. Mẫu dòng quyết định cách một dòng đơn hiển thị. Sau đó {'{'}rows{'}'} trong mẫu chính của bạn sẽ đưa vào mỗi dòng khớp, đã được định dạng.",
       "helpRowTemplateTypeHeading": "Chuỗi so với JSON",
-      "helpRowTemplateTypeExplain": "Chuỗi (String) tạo ra văn bản thuần cho mỗi hàng. JSON tạo ra một đối tượng JSON cho mỗi hàng, phù hợp cho các đích đến có cấu trúc.",
+      "helpRowTemplateTypeExplain": "Chuỗi tạo ra văn bản thuần cho mỗi hàng. JSON tạo ra một đối tượng JSON cho mỗi hàng, phù hợp với các đích có cấu trúc. Dùng {'{'}...row{'}'} làm toàn bộ mẫu để tự động bao gồm tất cả trường của hàng. Trường hàng có tên ...row sẽ được ưu tiên.",
       "helpRowTemplateTypeCurrent": "Đã chọn hiện tại:",
       "helpPreviewHeadingShort": "Xem trước",
       "helpWhyHeading": "Tại sao sử dụng biến?",
@@ -9234,8 +9234,8 @@
       "selectTemplate": "Chọn mẫu",
       "templateTypeString": "Chuỗi",
       "templateTypeJson": "JSON",
-      "rowTemplatePlaceholderJson": "e.g - {'{'}\"user\": \"{'{'}name{'}'}\", \"timestamp\": \"{'{'}timestamp{'}'}\"{'}'}",
-      "rowTemplatePlaceholderString": "e.g - Alert was triggered at {'{'}timestamp{'}'}"
+      "rowTemplatePlaceholderJson": "ví dụ: {'{'} \"user\": \"{'{'}name{'}'}\", \"timestamp\": \"{'{'}timestamp{'}'}\"{'}'} hoặc {'{'}...row{'}'}",
+      "rowTemplatePlaceholderString": "ví dụ: Cảnh báo đã được kích hoạt lúc {'{'}timestamp{'}'}"
     },
     "editJson": "Chỉnh sửa JSON cảnh báo",
     "additional_settings": "Cài đặt bổ sung",
@@ -10548,7 +10548,7 @@
     "rowsMax": "Số hàng tối đa",
     "rowsFormat": "Định dạng hàng (tùy chọn)",
     "rowsFormatLint": "Định dạng tham chiếu đến một cột mà mẫu này không giới hạn hàng",
-    "rowsFormatCaption": "Tạo một dòng cho mỗi hàng log khớp. Token là tên trường của chính hàng đó — ví dụ: {'{'}level{'}'} {'{'}message{'}'} cho một hàng có trường level và message. Để trống để hiển thị mọi trường.",
+    "rowsFormatCaption": "Tạo một dòng cho mỗi hàng nhật ký khớp. Token là tên trường riêng của hàng đó — ví dụ: {'{'}level{'}'} {'{'}message{'}'} cho một hàng có các trường level và message. Dùng {'{'}...row{'}'} để bao gồm tất cả trường dưới dạng văn bản JSON đã tuần tự hóa. Trường hàng có tên ...row sẽ được ưu tiên. Để trống để hiển thị mọi trường.",
     "bodyMarkdownLint": "Dòng {line} bắt đầu bằng \"{marker}\" nhưng không có khoảng trắng sau nó, vì vậy nó sẽ hiển thị dưới dạng văn bản thường, không phải danh sách hay tiêu đề. Hãy thêm khoảng trắng để sửa.",
     "addToTemplate": "Thêm vào mẫu này",
     "addToTemplateCaption": "Trường, liên kết, hàng khớp, tiêu đề kênh, biểu đồ",
