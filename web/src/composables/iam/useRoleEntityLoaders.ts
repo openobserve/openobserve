@@ -121,6 +121,7 @@ export const useRoleEntityLoaders = (deps: LoaderDeps) => {
       synthetic_environment: getSyntheticEnvironments,
       workflow_folder: getWorkflowFolders,
       workflows: getWorkflows,
+      fleets: getFleets,
       re_patterns: getRePatterns,
       provider: getProviders,
       score_config: getScoreConfigs,
@@ -399,6 +400,18 @@ export const useRoleEntityLoaders = (deps: LoaderDeps) => {
     return new Promise((resolve) => {
       resolve(true);
     });
+  };
+  // Collectors are not FGA objects, so a fleet has no child entities to expand.
+  const getFleets = async () => {
+    const fleets: any = await commonService.list_Folders(
+      store.state.selectedOrganization.identifier,
+      "fleets",
+    );
+    if (!fleets.data.list.find((folder: any) => folder.folderId === "default")) {
+      fleets.data.list.unshift({ folderId: "default", name: "default" });
+    }
+    updateResourceEntities("fleets", ["folderId"], [...fleets.data.list], false, "name");
+    return true;
   };
   const _getGroups = async () => {
     const groups = await getGroups(store.state.selectedOrganization.identifier);
@@ -784,6 +797,7 @@ export const useRoleEntityLoaders = (deps: LoaderDeps) => {
     getSyntheticEnvironments,
     getWorkflowFolders,
     getWorkflows,
+    getFleets,
     _getGroups,
     _getRoles,
     getFunctions,

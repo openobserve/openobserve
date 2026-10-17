@@ -1,0 +1,322 @@
+<!-- Copyright 2026 OpenObserve Inc.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-->
+
+<template>
+  <ODrawer
+    :open="open"
+    size="lg"
+    :title="mode === 'list' ? t('fleet.enrollment.tokens') : t('fleet.enrollment.newToken')"
+    :sub-title="fleetName"
+    data-test="fleet-tokens-drawer"
+    @update:open="onOpen"
+  >
+    <div class="flex flex-col gap-4">
+      <OText variant="meta" data-test="fleet-tokens-security-note">{{
+        t("fleet.enrollment.securityNote")
+      }}</OText>
+      <div v-if="mode !== 'list'" class="flex flex-col gap-5">
+        <div>
+          <OButton
+            variant="ghost"
+            size="sm"
+            icon-left="arrow-back"
+            data-test="fleet-tokens-back"
+            @click="toList"
+          >
+            {{ t("fleet.enrollment.allTokens") }}
+          </OButton>
+        </div>
+        <FleetTokenForm v-if="mode === 'create'" :fleet-id="fleetId" @created="onCreated" />
+        <div v-else-if="created" class="flex flex-col gap-3">
+          <OBanner variant="warning" dense :content="t('fleet.enrollment.copyOnce')" />
+          <OCodeBlock
+            :code="created.token"
+            lang="plaintext"
+            chrome="editor"
+            :filename="t('fleet.enrollment.tokenLabel')"
+            data-test="fleet-tokens-new-token"
+          />
+          <div>
+            <OButton
+              variant="primary"
+              size="sm-action"
+              data-test="fleet-tokens-done"
+              @click="toList"
+            >
+              {{ t("fleet.common.done") }}
+            </OButton>
+          </div>
+        </div>
+      </div>
+
+      <OTable
+        v-else
+        :data="tokens"
+        :columns="columns"
+        row-key="id"
+        :frame="false"
+        pagination="client"
+        :page-size="20"
+        :show-global-filter="false"
+        :loading="loading"
+        :error="loadError"
+        :forbidden="forbidden"
+        :row-tone="(row: TokenRow) => (stateOf(row) === 'active' ? null : 'muted')"
+        data-test="fleet-tokens-table"
+      >
+        <template #toolbar>
+          <div class="min-w-0 flex-1 max-md:min-w-40">
+            <OSearchInput
+              v-model="search"
+              class="w-full"
+              size="sm"
+              clearable
+              :placeholder="t('fleet.enrollment.search')"
+              data-test="fleet-tokens-search"
+            />
+          </div>
+        </template>
+
+        <template #toolbar-trailing>
+          <ORefreshButton
+            layout="inline"
+            variant="outline"
+            :last-run-at="lastUpdatedAt"
+            :loading="fetching"
+            data-test="fleet-tokens-refresh"
+            @click="refresh"
+          />
+          <OButton
+            variant="outline"
+            size="sm"
+            icon-left="add"
+            data-test="fleet-tokens-create"
+            @click="mode = 'create'"
+          >
+            {{ t("fleet.enrollment.newToken") }}
+          </OButton>
+        </template>
+
+        <template #cell-name="{ row }">
+          <div class="flex min-w-0 flex-col">
+            <span class="truncate font-medium">{{ row.name }}</span>
+            <span
+              class="text-text-secondary font-mono text-xs"
+              :data-test="`fleet-tokens-prefix-${row.id}`"
+              >{{ masked(row.prefix) }}</span
+            >
+          </div>
+        </template>
+
+        <template #cell-state="{ row }">
+          <span :data-test="`fleet-tokens-state-${row.id}`">
+            <OTag :variant="STATE_VARIANT[stateOf(row)]" dot :label="stateLabel(row)" />
+          </span>
+        </template>
+
+        <template #cell-uses="{ row }">
+          <span class="tabular-nums" :data-test="`fleet-tokens-uses-${row.id}`">{{
+            row.maxUses !== null
+              ? t("fleet.enrollment.usesOf", { uses: row.uses, max: row.maxUses })
+              : t("fleet.enrollment.usesUnlimited", { uses: row.uses })
+          }}</span>
+        </template>
+
+        <template #cell-expiresAt="{ row }">
+          <OTimeCell v-if="row.expiresAt" :value="row.expiresAt" unit="ms" mode="date" />
+          <span v-else class="text-text-secondary">{{ t("fleet.enrollment.never") }}</span>
+        </template>
+
+        <template #cell-createdAt="{ row }">
+          <OTimeCell :value="row.createdAt" unit="ms" mode="relative" />
+        </template>
+
+        <template #cell-actions="{ row }">
+          <OButton
+            v-if="!row.revoked"
+            variant="ghost-destructive"
+            size="icon-sm"
+            icon-left="block"
+            :aria-label="t('fleet.enrollment.revoke')"
+            :disabled="revokeToken.isPending.value"
+            :data-test="`fleet-tokens-revoke-${row.id}`"
+            @click="revoke(row)"
+          >
+            <OTooltip :content="t('fleet.enrollment.revoke')" />
+          </OButton>
+        </template>
+
+        <template #empty>
+          <div data-test="fleet-tokens-empty">
+            <OEmptyState size="block" preset="no-data" :filtered="!!search" @action="search = ''" />
+          </div>
+        </template>
+
+        <template #error>
+          <div data-test="fleet-tokens-error">
+            <OEmptyState size="block" preset="load-error" @action="refresh" />
+          </div>
+        </template>
+      </OTable>
+    </div>
+  </ODrawer>
+</template>
+
+<script setup lang="ts">
+import { computed, ref, watch } from "vue";
+import { useMutation } from "@tanstack/vue-query";
+import OTable from "@/lib/core/Table/OTable.vue";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OText from "@/lib/core/Typography/OText.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import { useConfirmDialog } from "@/composables/useConfirmDialog";
+import { useOrgId } from "@/composables/query/useOrgId";
+import { revokeFleetTokenMutation } from "@/services/fleet.queries";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import FleetTokenForm from "./FleetTokenForm.vue";
+import {
+  isForbidden,
+  serverMessage,
+  tokenState,
+  useFleetTokens,
+  type TokenRow,
+  type TokenState,
+} from "./useFleetApi";
+
+const props = defineProps<{ open: boolean; fleetId: string; fleetName: I18nText }>();
+const emit = defineEmits<{ "update:open": [value: boolean] }>();
+
+const STATE_VARIANT: Record<
+  TokenState,
+  "success-soft" | "default-soft" | "warning-soft" | "error-soft"
+> = {
+  active: "success-soft",
+  expired: "default-soft",
+  exhausted: "warning-soft",
+  revoked: "error-soft",
+};
+
+const { t } = useI18nTyped();
+const { confirm } = useConfirmDialog();
+const orgId = useOrgId();
+
+const list = useFleetTokens(() => props.open);
+const loading = list.loading;
+const fetching = list.fetching;
+const lastUpdatedAt = list.lastUpdatedAt;
+const forbidden = computed(() => isForbidden(list.error.value));
+const refresh = () => list.refetch();
+const revokeToken = useMutation(() => revokeFleetTokenMutation(orgId.value));
+
+const search = ref("");
+const mode = ref<"list" | "create" | "created">("list");
+const created = ref<{ id: string; token: string } | null>(null);
+
+const fleetTokens = computed(() => list.rows.value.filter((tok) => tok.fleetId === props.fleetId));
+const tokens = computed(() => {
+  const q = search.value.trim().toLowerCase();
+  return q
+    ? fleetTokens.value.filter((tok) => tok.name.toLowerCase().includes(q))
+    : fleetTokens.value;
+});
+// Judged on this fleet's rows: other fleets' cached tokens must not hide a failed read.
+const loadError = computed(() =>
+  list.error.value && !forbidden.value && !fleetTokens.value.length
+    ? String(list.error.value)
+    : null,
+);
+
+// A plaintext shown for one org or fleet must not stay on screen after a switch.
+watch([orgId, () => props.fleetId], () => {
+  toList();
+  search.value = "";
+});
+
+const stateOf = (row: TokenRow) => tokenState(row, Date.now());
+const masked = (prefix: string) => raw(`${prefix}••••••••••••`);
+
+function stateLabel(row: TokenRow): I18nText {
+  const labels: Record<TokenState, I18nText> = {
+    active: t("fleet.enrollment.active"),
+    expired: t("fleet.enrollment.expired"),
+    exhausted: t("fleet.enrollment.exhausted"),
+    revoked: t("fleet.enrollment.revoked"),
+  };
+  return labels[stateOf(row)];
+}
+
+const columns = computed<OTableColumnDef<TokenRow>[]>(() => [
+  { id: "name", header: t("fleet.common.name"), accessorKey: "name", size: 200, sortable: true },
+  { id: "state", header: t("fleet.common.status"), accessorKey: "revoked", size: 110 },
+  { id: "uses", header: t("fleet.enrollment.uses"), accessorKey: "uses", size: 110 },
+  { id: "expiresAt", header: t("fleet.enrollment.expires"), accessorKey: "expiresAt", size: 120 },
+  { id: "createdAt", header: t("fleet.enrollment.created"), accessorKey: "createdAt", size: 120 },
+  { id: "actions", header: raw(""), isAction: true, size: 56 },
+]);
+
+function toList() {
+  mode.value = "list";
+  created.value = null;
+}
+
+function onOpen(open: boolean) {
+  if (!open) toList();
+  emit("update:open", open);
+}
+
+function onCreated(token: { id: string; token: string }) {
+  // A create that resolves after the drawer closed or left the form must not reopen its plaintext.
+  if (!props.open || mode.value !== "create") return;
+  created.value = token;
+  mode.value = "created";
+}
+
+async function revoke(row: TokenRow) {
+  const org = orgId.value;
+  const fleet = props.fleetId;
+  const ok = await confirm({
+    title: t("fleet.enrollment.revokeTitle", { name: raw(row.name) }),
+    message: t("fleet.enrollment.revokeMessage"),
+    confirmLabel: t("fleet.enrollment.revoke"),
+    confirmVariant: "destructive",
+    focusCancel: true,
+  });
+  // The row belongs to the org and fleet the confirm was opened in; the mutation follows the current ones.
+  if (!ok || orgId.value !== org || props.fleetId !== fleet) return;
+  try {
+    await revokeToken.mutateAsync(row.id);
+    toast({
+      variant: "success",
+      message: t("fleet.enrollment.revokedToast", { name: raw(row.name) }),
+    });
+  } catch (err) {
+    toast({
+      variant: "error",
+      message: raw(serverMessage(err)) || t("fleet.common.requestFailed"),
+    });
+  }
+}
+</script>

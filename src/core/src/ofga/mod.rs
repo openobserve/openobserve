@@ -77,6 +77,7 @@ struct PendingMigrations {
     query_history: bool,
     downtimes: bool,
     ai_chat_shares: bool,
+    fleet: bool,
 }
 
 pub async fn init() -> Result<(), anyhow::Error> {
@@ -542,6 +543,9 @@ fn all_org_ownership_keys(pending: &PendingMigrations) -> Vec<&'static str> {
     if pending.ai_chat_shares {
         keys.push("ai_chat_shares");
     }
+    if pending.fleet {
+        keys.extend(["fleet", "fleets"]);
+    }
     keys
 }
 
@@ -584,6 +588,7 @@ fn pending_migrations(latest: &str, existing: &str) -> PendingMigrations {
     let v0_0_53 = version_compare::Version::from("0.0.53").unwrap();
     let v0_0_54 = version_compare::Version::from("0.0.54").unwrap();
     let v0_0_55 = version_compare::Version::from("0.0.55").unwrap();
+    let v0_0_57 = version_compare::Version::from("0.0.57").unwrap();
 
     if meta_version > v0_0_5 && existing_model_version < v0_0_6 {
         pending.pipeline = true;
@@ -712,6 +717,10 @@ fn pending_migrations(latest: &str, existing: &str) -> PendingMigrations {
         log::info!("[OFGA:Local] AI chat share permissions migration needed");
         pending.ai_chat_shares = true;
     }
+    if meta_version >= v0_0_57 && existing_model_version < v0_0_57 {
+        log::info!("[OFGA:Local] fleet permissions migration needed");
+        pending.fleet = true;
+    }
 
     pending
 }
@@ -764,5 +773,21 @@ mod tests {
 
         assert!(!pending_migrations("0.0.54", "0.0.53").ai_chat_shares);
         assert!(all_org_ownership_keys(&pending_migrations("0.0.55", "0.0.55")).is_empty());
+    }
+
+    #[test]
+    fn fleet_ownership_backfill_keys_on_the_version_fleet_ships_at() {
+        assert!(
+            pending_migrations("0.0.57", "0.0.56").fleet,
+            "alert calibration shipped 0.0.56 without fleet"
+        );
+        assert!(!pending_migrations("0.0.56", "0.0.55").fleet);
+        assert!(!pending_migrations("0.0.57", "0.0.57").fleet);
+        assert!(all_org_ownership_keys(&pending_migrations("0.0.57", "0.0.57")).is_empty());
+        assert!(all_org_ownership_keys(&pending_migrations("0.0.57", "0.0.56")).contains(&"fleet"));
+        assert!(
+            all_org_ownership_keys(&pending_migrations("0.0.57", "0.0.56")).contains(&"fleets")
+        );
+        assert!(OFGA_MODELS.contains_key("fleet"));
     }
 }

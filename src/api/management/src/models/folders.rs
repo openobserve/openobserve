@@ -58,6 +58,7 @@ pub enum FolderType {
     Workflows,
     Prompts,
     Downtimes,
+    Fleets,
 }
 
 /// Common folder fields used in HTTP request and response bodies.
@@ -113,6 +114,7 @@ impl From<FolderType> for config::meta::folder::FolderType {
             FolderType::Workflows => Self::Workflows,
             FolderType::Prompts => Self::Prompts,
             FolderType::Downtimes => Self::Downtimes,
+            FolderType::Fleets => Self::Fleets,
         }
     }
 }

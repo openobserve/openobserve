@@ -190,6 +190,12 @@ static INGESTION_ROUTES: &[IngestionRoute] = &[
         methods: &["POST"],
         kind: IngestionKind::Write,
     },
+    // `/{org}/v1/opamp` (OpAMP); GET is the WS upgrade and must stay a Write (header-only auth).
+    IngestionRoute {
+        segments: &[Param, Lit("v1"), Lit("opamp")],
+        methods: &["GET", "POST"],
+        kind: IngestionKind::Write,
+    },
     // ---- Elasticsearch-compatibility handshake / template stubs ----
     // NOTE: the ES root version ping `GET /{org}/` is matched directly in
     // `classify` (on its mandatory trailing slash) rather than as a table row,
@@ -305,6 +311,16 @@ pub fn is_ingestion_write(method: &Method, path: &str) -> bool {
 /// the read-only ES handshake stubs — nothing else.
 pub fn is_ingestion_allowed(method: &Method, path: &str) -> bool {
     classify(method, path).is_some()
+}
+
+/// Is this exactly `{org}/v1/opamp`, the OpAMP route whose auth differs from other writes?
+pub fn is_opamp(path: &str) -> bool {
+    let path = path.strip_prefix('/').unwrap_or(path);
+    let mut columns: Vec<&str> = path.split('/').collect();
+    if columns.len() > 1 && columns.last() == Some(&"") {
+        columns.pop();
+    }
+    matches!(columns.as_slice(), [org, "v1", "opamp"] if !org.is_empty())
 }
 
 #[cfg(test)]
@@ -438,8 +454,7 @@ mod tests {
 
     #[test]
     fn wrong_method_is_rejected() {
-        // Writes are POST-only; ES stubs are GET/HEAD (+POST only for the create
-        // stubs). PUT/DELETE/PATCH never classify.
+        // PUT, DELETE and PATCH never classify, on writes or on ES stubs.
         for method in [Method::PUT, Method::DELETE, Method::PATCH] {
             assert_eq!(classify_path(&method, "default/_bulk"), None);
             assert_eq!(classify_path(&method, "default/traces"), None);
@@ -496,5 +511,26 @@ mod tests {
         }
         // A non-GET/HEAD to `/{org}/` is not the ping either.
         assert_eq!(classify_path(&Method::POST, "default/"), None);
+    }
+
+    #[test]
+    fn opamp_get_and_post_are_ingestion_writes() {
+        for method in [Method::GET, Method::POST] {
+            assert_eq!(
+                classify_path(&method, "default/v1/opamp"),
+                Some(IngestionKind::Write),
+                "{method} /default/v1/opamp must be a header-only ingestion write"
+            );
+        }
+        assert_eq!(classify_path(&Method::PUT, "default/v1/opamp"), None);
+    }
+
+    #[test]
+    fn is_opamp_matches_only_the_org_opamp_path() {
+        assert!(is_opamp("default/v1/opamp"));
+        assert!(is_opamp("default/v1/opamp/"));
+        for path in ["default/v1/opamp/x", "default/v1/logs", "v1/opamp", ""] {
+            assert!(!is_opamp(path), "{path}");
+        }
     }
 }

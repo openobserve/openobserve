@@ -306,6 +306,30 @@ use crate::{
         openobserve_api_management::request::downtimes::extend_downtime,
         openobserve_api_management::request::downtimes::move_downtimes,
         openobserve_api_management::request::downtimes::delete_downtime,
+        openobserve_api_management::request::fleet::list_collectors,
+        openobserve_api_management::request::fleet::get_collector,
+        openobserve_api_management::request::fleet::summary,
+        openobserve_api_management::request::fleet::list_fleets,
+        openobserve_api_management::request::fleet::set_desired,
+        openobserve_api_management::request::fleet::move_collectors,
+        openobserve_api_management::request::fleet::unenroll_collector,
+        openobserve_api_management::request::fleet::list_tokens,
+        openobserve_api_management::request::fleet::create_token,
+        openobserve_api_management::request::fleet::revoke_token,
+        openobserve_api_management::request::fleet::list_configs,
+        openobserve_api_management::request::fleet::create_config,
+        openobserve_api_management::request::fleet::get_config,
+        openobserve_api_management::request::fleet::delete_config,
+        openobserve_api_management::request::fleet::save_config_draft,
+        openobserve_api_management::request::fleet::publish_config_version,
+        openobserve_api_management::request::fleet::get_config_version,
+        openobserve_api_management::request::fleet::validate_config,
+        openobserve_api_management::request::fleet::list_audit,
+        openobserve_api_management::request::fleet::list_rollouts,
+        openobserve_api_management::request::fleet::get_rollout,
+        openobserve_api_management::request::fleet::get_flow,
+        openobserve_api_management::request::fleet::get_settings,
+        openobserve_api_management::request::fleet::update_settings,
         synthetics::list_synthetics,
         synthetics::create_synthetic,
         synthetics::get_synthetic,
@@ -594,6 +618,69 @@ use crate::{
             config::meta::synthetics::SyntheticFrequency,
             config::meta::synthetics::SyntheticFrequencyType,
             config::meta::synthetics::SyntheticAuth,
+            config::meta::fleet::Collector,
+            config::meta::fleet::CollectorList,
+            config::meta::fleet::CollectorDetail,
+            config::meta::fleet::CollectorStatus,
+            config::meta::fleet::CollectorHealth,
+            config::meta::fleet::ComponentHealth,
+            config::meta::fleet::EffectiveConfig,
+            config::meta::fleet::FleetSummary,
+            config::meta::fleet::StatusCounts,
+            config::meta::fleet::VersionCount,
+            config::meta::fleet::EnrollmentToken,
+            config::meta::fleet::TokenList,
+            config::meta::fleet::CreateTokenRequest,
+            config::meta::fleet::CreatedToken,
+            config::meta::fleet::CollectorFleet,
+            config::meta::fleet::Fleet,
+            config::meta::fleet::FleetList,
+            config::meta::fleet::FleetState,
+            config::meta::fleet::FleetVersion,
+            config::meta::fleet::FleetRevision,
+            config::meta::fleet::MoveCollectorsRequest,
+            config::meta::fleet::MoveCollectorsResponse,
+            config::meta::fleet::FleetConfig,
+            config::meta::fleet::FleetConfigList,
+            config::meta::fleet::ConfigDraft,
+            config::meta::fleet::VersionState,
+            config::meta::fleet::ConfigVersionSummary,
+            config::meta::fleet::FleetConfigDetail,
+            config::meta::fleet::CreateConfigRequest,
+            config::meta::fleet::SaveDraftRequest,
+            config::meta::fleet::DraftSaved,
+            config::meta::fleet::PublishRequest,
+            config::meta::fleet::Published,
+            config::meta::fleet::ConfigVersion,
+            config::meta::fleet::ValidateRequest,
+            config::meta::fleet::ValidationResult,
+            config::meta::fleet::IssueSeverity,
+            config::meta::fleet::ConfigIssue,
+            config::meta::fleet::ValidationFailed,
+            config::meta::fleet::AuditEvent,
+            config::meta::fleet::AuditList,
+            config::meta::fleet::DeliveryState,
+            config::meta::fleet::RolloutStrategy,
+            config::meta::fleet::RolloutStatus,
+            config::meta::fleet::HaltKind,
+            config::meta::fleet::SetDesiredRequest,
+            config::meta::fleet::RolloutBatch,
+            config::meta::fleet::RolloutPhase,
+            config::meta::fleet::RolloutGate,
+            config::meta::fleet::RolloutFailure,
+            config::meta::fleet::RolloutEvent,
+            config::meta::fleet::Rollout,
+            config::meta::fleet::RolloutDetail,
+            config::meta::fleet::RolloutList,
+            config::meta::fleet::FlowWindow,
+            config::meta::fleet::FlowSignal,
+            config::meta::fleet::FlowIssueKind,
+            config::meta::fleet::FlowIssue,
+            config::meta::fleet::SignalRates,
+            config::meta::fleet::FlowDestination,
+            config::meta::fleet::FlowLink,
+            config::meta::fleet::FlowResponse,
+            config::meta::fleet::FleetSettings,
             config::meta::synthetics::SyntheticVariable,
             config::meta::synthetics::SyntheticListItem,
             config::meta::synthetics::SyntheticListResponse,
@@ -645,6 +732,7 @@ use crate::{
         (name = "Service Streams", description = "Multi-signal correlation across logs, traces, and metrics (enterprise)"),
         (name = "Synthetics", description = "Synthetic monitoring — uptime and browser checks (enterprise)"),
         (name = "Downtimes", description = "Scheduled windows that keep evaluating alerts, anomaly detections, synthetics checks and SLOs but notify nobody (enterprise)"),
+        (name = "Fleet", description = "Fleet Manager: OpAMP collector inventory (enterprise)"),
         (name = "Announcements", description = "Operator-authored announcement banners shown across organizations (enterprise)"),
         (name = "Alert Calibration", description = "Per-org alert calibration settings and on-demand runs (enterprise)"),
     ),
@@ -985,6 +1073,151 @@ mod tests {
         let schemas = spec["components"]["schemas"].as_object().unwrap();
         for name in ["RecentRejections", "IngestRejection", "RejectionReason"] {
             assert!(schemas.contains_key(name), "schema {name} missing");
+        }
+    }
+
+    #[test]
+    fn fleet_reads_are_documented_with_their_403() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        for path in [
+            "/api/{org_id}/fleet/collectors",
+            "/api/{org_id}/fleet/collectors/{id}",
+            "/api/{org_id}/fleet/summary",
+            "/api/{org_id}/fleet/settings",
+        ] {
+            let get = &spec["paths"][path]["get"];
+            assert!(get["responses"]["403"].is_object(), "{path}");
+        }
+        assert!(
+            spec["paths"]["/api/{org_id}/fleet/collectors/{id}"]["get"]["responses"]["404"]
+                .is_object()
+        );
+    }
+
+    #[test]
+    fn fleet_endpoints_are_documented_and_the_removed_ones_are_not() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        for (path, method, codes) in [
+            ("/api/{org_id}/fleet/tokens", "get", &["200", "403"][..]),
+            (
+                "/api/{org_id}/fleet/tokens",
+                "post",
+                &["201", "400", "403", "404", "409"][..],
+            ),
+            (
+                "/api/{org_id}/fleet/tokens/{id}/revoke",
+                "post",
+                &["200", "403", "404"][..],
+            ),
+            (
+                "/api/{org_id}/fleet/collectors/{id}",
+                "delete",
+                &["204", "403", "404", "409"][..],
+            ),
+            ("/api/{org_id}/fleet/fleets", "get", &["200", "403"][..]),
+            (
+                "/api/{org_id}/fleet/fleets/{fleet_id}/desired",
+                "put",
+                &["201", "400", "403", "404", "409"][..],
+            ),
+            (
+                "/api/v2/{org_id}/fleets/move",
+                "patch",
+                &["200", "400", "403", "404", "409"][..],
+            ),
+            ("/api/{org_id}/fleet/configs", "get", &["200", "403"][..]),
+            (
+                "/api/{org_id}/fleet/configs",
+                "post",
+                &["201", "400", "403", "409"][..],
+            ),
+            (
+                "/api/{org_id}/fleet/configs/{id}",
+                "get",
+                &["200", "403", "404"][..],
+            ),
+            (
+                "/api/{org_id}/fleet/configs/{id}",
+                "delete",
+                &["204", "403", "404", "409"][..],
+            ),
+            (
+                "/api/{org_id}/fleet/configs/{id}/draft",
+                "put",
+                &["200", "403", "404"][..],
+            ),
+            (
+                "/api/{org_id}/fleet/configs/{id}/versions",
+                "post",
+                &["201", "400", "403", "404", "409", "422"][..],
+            ),
+            (
+                "/api/{org_id}/fleet/configs/{id}/versions/{version}",
+                "get",
+                &["200", "400", "403", "404"][..],
+            ),
+            (
+                "/api/{org_id}/fleet/configs/validate",
+                "post",
+                &["200", "403"][..],
+            ),
+            (
+                "/api/{org_id}/fleet/audit",
+                "get",
+                &["200", "400", "403"][..],
+            ),
+            (
+                "/api/{org_id}/fleet/settings",
+                "put",
+                &["200", "400", "403"][..],
+            ),
+            ("/api/{org_id}/fleet/rollouts", "get", &["200", "403"][..]),
+            (
+                "/api/{org_id}/fleet/rollouts/{id}",
+                "get",
+                &["200", "403", "404"][..],
+            ),
+            (
+                "/api/{org_id}/fleet/flow",
+                "get",
+                &["200", "400", "403"][..],
+            ),
+        ] {
+            for code in codes {
+                assert!(
+                    spec["paths"][path][method]["responses"][*code].is_object(),
+                    "{method} {path} {code}"
+                );
+            }
+        }
+        for (path, method) in [
+            ("/api/{org_id}/fleet/collectors/{id}", "patch"),
+            ("/api/{org_id}/fleet/rollouts", "post"),
+            ("/api/{org_id}/fleet/rollouts/{id}", "patch"),
+            ("/api/{org_id}/fleet/rollouts/{id}/rollback", "post"),
+            ("/api/{org_id}/fleet/rollouts/{id}/pause", "post"),
+            ("/api/{org_id}/fleet/rollouts/{id}/resume", "post"),
+            ("/api/{org_id}/fleet/rollouts/{id}/stop", "post"),
+        ] {
+            assert!(spec["paths"][path][method].is_null(), "{method} {path}");
+        }
+        for schema in [
+            "SetDesiredRequest",
+            "FleetList",
+            "MoveCollectorsRequest",
+            "CollectorFleet",
+        ] {
+            assert!(
+                spec["components"]["schemas"][schema].is_object(),
+                "{schema}"
+            );
+        }
+        for gone in [
+            "CreateRolloutRequest",
+            "UpdateRolloutRequest",
+            "UpdateCollectorRequest",
+        ] {
+            assert!(spec["components"]["schemas"][gone].is_null(), "{gone}");
         }
     }
 

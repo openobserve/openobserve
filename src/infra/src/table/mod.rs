@@ -14,6 +14,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use migration::Migrator;
+#[cfg(any(test, feature = "test-utils"))]
+pub use migration::create_fleet_collectors_for_test;
 use sea_orm::DatabaseConnection;
 use sea_orm_migration::{MigratorTrait, SchemaManager};
 
@@ -44,6 +46,12 @@ pub mod enrichment_tables;
 pub mod entity;
 pub mod evaluation_watermarks;
 pub mod external_alerts;
+pub mod fleet_collectors;
+pub mod fleet_configs;
+pub mod fleet_rollouts;
+pub mod fleet_settings;
+pub mod fleet_tokens;
+pub mod fleets;
 pub mod folders;
 pub mod gen_ai_agents;
 pub mod incident_events;

@@ -51,13 +51,16 @@ use {
     audit::audit,
     axum::body::{Body, to_bytes},
     config::utils::time::now_micros,
-    o2_enterprise::enterprise::common::{
-        auditor::{AuditMessage, Protocol, ResponseMeta},
-        config::get_config as get_o2_config,
+    o2_enterprise::enterprise::{
+        common::{
+            auditor::{AuditMessage, Protocol, ResponseMeta},
+            config::get_config as get_o2_config,
+        },
+        fleet::opamp,
     },
     openobserve_api_management::request::{
         ai, alert_calibration, annotation_queues, annotations, anomaly_detection, datasets,
-        discovery, domain_management, eval_jobs, experiments, gen_ai, keys, license, oncall,
+        discovery, domain_management, eval_jobs, experiments, fleet, gen_ai, keys, license, oncall,
         playground, prompts, providers, remote_tasks, score_configs, scorers, service_streams,
         workflows,
     },
@@ -430,6 +433,12 @@ fn audit_body(method: &Method, path: &str, content_type: Option<&str>, body: Vec
     use base64::Engine as _;
     if is_secret_write(method, path) {
         return "[REDACTED: secret write]".to_string();
+    }
+    #[cfg(feature = "enterprise")]
+    if let Some(body) =
+        o2_enterprise::enterprise::fleet::audit::redact_config_write(method, path, &body)
+    {
+        return body;
     }
     if path.ends_with("/settings/logo") {
         return base64::engine::general_purpose::STANDARD.encode(&body);
@@ -1550,7 +1559,7 @@ pub fn service_routes() -> Router {
 
     #[cfg(feature = "enterprise")]
     {
-        router = router
+        router = opamp_routes(router)
             // Search jobs
             .route("/{org_id}/search_jobs", get(search::search_job::list_status).post(search::search_job::submit_job))
             .route("/{org_id}/search_jobs/{job_id}", get(search::search_job::get_status).delete(search::search_job::delete_job))
@@ -2201,6 +2210,68 @@ fn oncall_routes(router: Router) -> Router {
                 .put(oncall::put_telephony)
                 .delete(oncall::delete_telephony),
         )
+}
+
+// Private and before the next `pub fn`, so the ROUTE_PERMISSIONS router scrape still reads it.
+#[cfg(feature = "enterprise")]
+fn opamp_routes(router: Router) -> Router {
+    if !get_o2_config().opamp.enabled {
+        return router;
+    }
+    router
+        .route("/{org_id}/v1/opamp", get(opamp::serve).post(opamp::serve))
+        .route("/{org_id}/fleet/collectors", get(fleet::list_collectors))
+        .route(
+            "/{org_id}/fleet/collectors/{id}",
+            get(fleet::get_collector).delete(fleet::unenroll_collector),
+        )
+        .route("/{org_id}/fleet/summary", get(fleet::summary))
+        .route("/{org_id}/fleet/fleets", get(fleet::list_fleets))
+        .route(
+            "/{org_id}/fleet/fleets/{fleet_id}/desired",
+            put(fleet::set_desired),
+        )
+        .route("/v2/{org_id}/fleets/move", patch(fleet::move_collectors))
+        .route(
+            "/{org_id}/fleet/tokens",
+            get(fleet::list_tokens).post(fleet::create_token),
+        )
+        .route(
+            "/{org_id}/fleet/tokens/{id}/revoke",
+            post(fleet::revoke_token),
+        )
+        .route(
+            "/{org_id}/fleet/configs",
+            get(fleet::list_configs).post(fleet::create_config),
+        )
+        .route(
+            "/{org_id}/fleet/configs/validate",
+            post(fleet::validate_config),
+        )
+        .route(
+            "/{org_id}/fleet/configs/{id}",
+            get(fleet::get_config).delete(fleet::delete_config),
+        )
+        .route(
+            "/{org_id}/fleet/configs/{id}/draft",
+            put(fleet::save_config_draft),
+        )
+        .route(
+            "/{org_id}/fleet/configs/{id}/versions",
+            post(fleet::publish_config_version),
+        )
+        .route(
+            "/{org_id}/fleet/configs/{id}/versions/{version}",
+            get(fleet::get_config_version),
+        )
+        .route("/{org_id}/fleet/audit", get(fleet::list_audit))
+        .route(
+            "/{org_id}/fleet/settings",
+            get(fleet::get_settings).put(fleet::update_settings),
+        )
+        .route("/{org_id}/fleet/rollouts", get(fleet::list_rollouts))
+        .route("/{org_id}/fleet/rollouts/{id}", get(fleet::get_rollout))
+        .route("/{org_id}/fleet/flow", get(fleet::get_flow))
 }
 
 /// Create other service routes (AWS, GCP, RUM)
