@@ -116,6 +116,7 @@ const runLinkAll = async (): Promise<void> => {
         </p>
       </div>
       <OButton
+        v-if="!managed"
         variant="ghost-primary"
         size="sm"
         data-test="slack-linking-manage"

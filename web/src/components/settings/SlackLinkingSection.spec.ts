@@ -189,4 +189,11 @@ describe("SlackLinkingSection (row 11)", () => {
     await flushPromises();
     expect(slack.updateLinking).not.toHaveBeenCalled();
   });
+
+  it("a managed workspace has no Manage link", async () => {
+    const w = await mountSection(linkingView(), managedView());
+    expect(w.find('[data-test="slack-linking-manage"]').exists()).toBe(false);
+    const own = await mountSection(linkingView());
+    expect(own.find('[data-test="slack-linking-manage"]').exists()).toBe(true);
+  });
 });
