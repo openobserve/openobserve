@@ -75,43 +75,29 @@ describe("linuxCard builder", () => {
     });
   });
 
-  it("offers generic and EC2 environments as one toggle", () => {
-    // Replaces two hand-built clickable <div> cards plus a conditional callout.
+  it("offers a single install command with no environment toggle", () => {
+    // The standard script also collects EC2 instance metadata — no AWS EC2 variant.
     const install = linuxCard(SUBS, gt).steps[0];
     expect(install.required).toBe(true);
-    expect(install.variants?.map((v) => v.id)).toEqual(["generic", "ec2"]);
-    expect(install.variants!.every((v) => !!v.icon)).toBe(true);
-  });
-
-  it("points each variant at its matching install script", () => {
-    const [generic, ec2] = linuxCard(SUBS, gt).steps[0].variants!;
-    expect(generic.code.raw).toContain("/linux/install.sh");
-    expect(generic.code.raw).not.toContain("/ec2/");
-    expect(ec2.code.raw).toContain("/linux/ec2/install.sh");
-  });
-
-  it("carries the IAM prerequisite only on the EC2 variant", () => {
-    // Previously an amber callout rendered above the command for everyone.
-    const [generic, ec2] = linuxCard(SUBS, gt).steps[0].variants!;
-    expect(ec2.note).toContain("ec2:DescribeTags");
-    expect(generic.note).not.toContain("ec2:DescribeTags");
+    expect(install.variants).toBeUndefined();
+    expect(install.code?.raw).toContain("/linux/install.sh");
+    expect(install.code?.raw).not.toContain("/ec2/");
   });
 
   it("offers the uninstall command", () => {
     const uninstall = linuxCard(SUBS, gt).extras?.uninstall;
     expect(uninstall?.code.raw).toContain("/linux/uninstall.sh");
     expect(uninstall?.code.lang).toBe("bash");
-    // One uninstall script serves both the generic and EC2 installs.
     expect(uninstall?.code.raw).not.toContain("/ec2/");
   });
 
   it("substitutes url/org and masks the ingestion token", () => {
-    const generic = linuxCard(SUBS, gt).steps[0].variants![0];
-    expect(generic.code.raw).toContain(`${SUBS.url}/api/${SUBS.org}/`);
-    expect(generic.code.raw).toContain(SUBS.token);
+    const code = linuxCard(SUBS, gt).steps[0].code!;
+    expect(code.raw).toContain(`${SUBS.url}/api/${SUBS.org}/`);
+    expect(code.raw).toContain(SUBS.token);
     // The old page rendered a literal [BASIC_PASSCODE] placeholder instead.
-    expect(generic.code.raw).not.toContain("[BASIC_PASSCODE]");
-    expect(generic.code.masked).not.toContain(SUBS.token);
+    expect(code.raw).not.toContain("[BASIC_PASSCODE]");
+    expect(code.masked).not.toContain(SUBS.token);
   });
 });
 

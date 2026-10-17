@@ -167,7 +167,7 @@ describe("SetupCardRenderer — key-as-data copy", () => {
         variants: [
           {
             id: "generic",
-            labelKey: "ingestion.setupCard.genericWindowsVariant",
+            labelKey: "ingestion.setupCard.jmxPortLabel",
             code: { lang: "bash", raw: "echo hi" },
           },
         ],
@@ -183,7 +183,7 @@ describe("SetupCardRenderer — key-as-data copy", () => {
     // inlineMd turns the `config.yaml` backticks into <code>, so match the prose.
     expect(text).toContain("set the host/port below");
     expect(text).toContain("JMX Host");
-    expect(text).toContain("Generic Windows");
+    expect(text).toContain("JMX Port");
     expect(text).not.toContain("ingestion.setupCard.");
   });
 });
