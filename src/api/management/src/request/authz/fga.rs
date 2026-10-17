@@ -52,7 +52,7 @@ use crate::{
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "create"})),
-        ("x-o2-mcp" = json!({"description": "Create a role", "category": "authorization"}))
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 pub async fn create_role(
@@ -103,7 +103,8 @@ pub async fn create_role(
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "create"}))
+        ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 pub async fn create_role(
@@ -136,7 +137,7 @@ pub async fn create_role(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "delete"})),
-        ("x-o2-mcp" = json!({"description": "Delete a role", "category": "authorization", "requires_confirmation": true}))
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 pub async fn delete_role(Path((org_id, role_name)): Path<(String, String)>) -> Response {
@@ -273,7 +274,8 @@ pub async fn delete_role_bulk(
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "delete"}))
+        ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 pub async fn delete_role(Path(_path): Path<(String, String)>) -> Response {
@@ -400,7 +402,7 @@ pub async fn get_roles(Path(_org_id): Path<String>) -> Response {
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "update"})),
-        ("x-o2-mcp" = json!({"description": "Update a role", "category": "authorization"}))
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 pub async fn update_role(
@@ -441,7 +443,8 @@ pub async fn update_role(
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
-    )
+    ),
+    extensions(("x-o2-mcp" = json!({"enabled": false})))
 )]
 pub async fn update_role(
     Path(_path): Path<(String, String)>,
@@ -795,7 +798,8 @@ pub async fn get_groups_for_user(Path(_path): Path<(String, String)>) -> Respons
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
-    )
+    ),
+    extensions(("x-o2-mcp" = json!({"enabled": false})))
 )]
 pub async fn create_group(
     Path(org_id): Path<String>,
@@ -837,7 +841,8 @@ pub async fn create_group(
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
-    )
+    ),
+    extensions(("x-o2-mcp" = json!({"enabled": false})))
 )]
 pub async fn create_group(
     Path(_org_id): Path<String>,
@@ -867,7 +872,8 @@ pub async fn create_group(
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
-    )
+    ),
+    extensions(("x-o2-mcp" = json!({"enabled": false})))
 )]
 pub async fn update_group(
     Path((org_id, group_name)): Path<(String, String)>,
@@ -910,7 +916,8 @@ pub async fn update_group(
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
-    )
+    ),
+    extensions(("x-o2-mcp" = json!({"enabled": false})))
 )]
 pub async fn update_group(
     Path(_path): Path<(String, String)>,
@@ -1148,7 +1155,8 @@ pub async fn get_resources(Path(_org_id): Path<String>) -> Response {
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
-    )
+    ),
+    extensions(("x-o2-mcp" = json!({"enabled": false})))
 )]
 pub async fn delete_group(Path((org_id, group_name)): Path<(String, String)>) -> Response {
     match o2_openfga::authorizer::groups::delete_group(&org_id, &group_name).await {
@@ -1282,7 +1290,8 @@ pub async fn delete_group_bulk(
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
-    )
+    ),
+    extensions(("x-o2-mcp" = json!({"enabled": false})))
 )]
 pub async fn delete_group(Path(_path): Path<(String, String)>) -> Response {
     MetaHttpResponse::forbidden("Not Supported")

@@ -86,3 +86,105 @@ pub mod users;
 pub mod workflows;
 
 use openobserve_api_common::request::{BulkDeleteRequest, BulkDeleteResponse};
+
+#[cfg(test)]
+mod tests {
+    use std::{
+        collections::HashMap,
+        path::{Path, PathBuf},
+    };
+
+    use serde_json::Value;
+
+    const MCP_FORBIDDEN_OPERATIONS: &[&str] = &[
+        "SetPaidOverageStatus",
+        "UserSave",
+        "UserUpdate",
+        "AddUserToOrg",
+        "RemoveUserFromOrg",
+        "ServiceAccountSave",
+        "ServiceAccountUpdate",
+        "RemoveServiceAccount",
+        "CreateRoles",
+        "UpdateRoles",
+        "DeleteRole",
+        "CreateGroup",
+        "UpdateGroup",
+        "DeleteGroup",
+        "UpdateStreamSettings",
+        "AssumeServiceAccount",
+        "OrganizationSettingCreate",
+        "SetPasswordPolicy",
+        "StreamDelete",
+    ];
+
+    const MCP_EXTENSION_START: &str = "\"x-o2-mcp\" = json!(";
+
+    fn rust_sources(dir: &Path, out: &mut Vec<PathBuf>) {
+        for entry in std::fs::read_dir(dir).unwrap() {
+            let path = entry.unwrap().path();
+            if path.is_dir() {
+                rust_sources(&path, out);
+            } else if path.extension().is_some_and(|ext| ext == "rs") {
+                out.push(path);
+            }
+        }
+    }
+
+    fn utoipa_paths(source: &str) -> Vec<(&str, &str)> {
+        source
+            .split("#[utoipa::path(")
+            .skip(1)
+            .filter_map(|rest| {
+                let block = &rest[..rest.find("\n)]").unwrap_or(rest.len())];
+                let id_start = block.find("operation_id = \"")? + "operation_id = \"".len();
+                let id_len = block[id_start..].find('"')?;
+                Some((&block[id_start..id_start + id_len], block))
+            })
+            .collect()
+    }
+
+    fn mcp_extension(annotation: &str) -> Option<Value> {
+        let start = annotation.find(MCP_EXTENSION_START)? + MCP_EXTENSION_START.len();
+        let body = &annotation[start..];
+        let mut depth = 0usize;
+        let end = body.char_indices().find_map(|(i, c)| {
+            match c {
+                '{' => depth += 1,
+                '}' => depth -= 1,
+                _ => {}
+            }
+            (depth == 0 && c == '}').then_some(i + 1)
+        })?;
+        serde_json::from_str(&body[..end]).ok()
+    }
+
+    // reads the sources so enterprise and cloud variants are checked by a default-feature build
+    #[test]
+    fn mcp_forbidden_operations_opt_out_in_every_cfg_variant() {
+        let mut files = Vec::new();
+        rust_sources(
+            &Path::new(env!("CARGO_MANIFEST_DIR")).join("src"),
+            &mut files,
+        );
+        let mut seen: HashMap<&str, usize> = HashMap::new();
+        let mut exposed = Vec::new();
+        for file in &files {
+            let source = std::fs::read_to_string(file).unwrap();
+            for (op, annotation) in utoipa_paths(&source) {
+                let Some(op) = MCP_FORBIDDEN_OPERATIONS.iter().find(|f| **f == op) else {
+                    continue;
+                };
+                *seen.entry(op).or_default() += 1;
+                let ext = mcp_extension(annotation);
+                if ext.as_ref().and_then(|e| e["enabled"].as_bool()) != Some(false) {
+                    exposed.push(format!("{}: {op} has x-o2-mcp {ext:?}", file.display()));
+                }
+            }
+        }
+        for op in MCP_FORBIDDEN_OPERATIONS {
+            assert!(seen.contains_key(op), "no #[utoipa::path] declares {op}");
+        }
+        assert!(exposed.is_empty(), "{exposed:#?}");
+    }
+}

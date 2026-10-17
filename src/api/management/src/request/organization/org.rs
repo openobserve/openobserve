@@ -859,6 +859,7 @@ pub async fn get_paid_overage_status(
         (status = 409, description = "Organization is not eligible for paid overage"),
         (status = 503, description = "Billing or quota state unavailable"),
     ),
+    extensions(("x-o2-mcp" = json!({"enabled": false})))
 )]
 pub async fn set_paid_overage_status(
     Path((org_id, feature)): Path<(String, String)>,
