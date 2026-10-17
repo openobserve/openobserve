@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="org-storage-settings h-full">
+  <div class="h-full">
     <OPageLayout
       v-if="currentAction === 'list'"
       :title="t('storage_settings.title')"
@@ -40,29 +40,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- ========== NOT CONFIGURED: cloud hero ========== -->
       <div
         v-else-if="!isConfigured && isCloud"
-        class="hero-page flex min-h-[calc(100vh-var(--navbar-height)-6.25rem)] flex-col"
+        class="flex min-h-[calc(100vh-var(--navbar-height)-6.25rem)] flex-col"
       >
-        <div class="hero-page__body flex flex-1 items-center justify-between gap-14 px-20 py-18">
+        <div class="flex flex-1 items-center justify-between gap-14 px-20 py-18">
           <!-- left -->
-          <div class="hero-page__left max-w-120 flex-1">
-            <div
-              class="hero-page__headline text-text-heading mb-4.5 text-4xl leading-tight font-bold tracking-tight"
-            >
+          <div class="max-w-120 flex-1">
+            <div class="text-text-heading mb-4.5 text-4xl leading-tight font-bold tracking-tight">
               {{ t("storage_settings.heroHeadline") }}
-              <span class="hero-page__brand-text text-theme-accent">{{
-                t("storage_settings.heroBrand")
-              }}</span>
+              <span class="text-theme-accent">{{ t("storage_settings.heroBrand") }}</span>
             </div>
 
-            <div class="hero-page__sub text-text-secondary mb-9 max-w-100 text-base leading-[1.7]">
+            <div class="text-text-secondary mb-9 max-w-100 text-base leading-[1.7]">
               {{ t("storage_settings.heroSub") }}
             </div>
 
-            <div class="hero-page__actions mb-7">
+            <div class="mb-7">
               <OButton
                 data-test="storage-settings-configure-btn"
                 variant="primary"
-                class="no-border o2-primary-button hero-cta-btn h-11 px-7 text-base font-semibold"
+                size="lg"
                 @click="navigateToCreate"
               >
                 {{ t("storage_settings.configureStorage") }}
@@ -70,21 +66,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- supported infrastructure -->
-            <div class="hero-page__inline-providers flex items-center gap-3">
-              <span
-                class="hero-page__inline-label text-text-muted text-compact font-medium whitespace-nowrap"
-                >{{ t("storage_settings.supportedProviders") }}</span
-              >
-              <div class="hero-page__inline-logos flex items-center gap-2.5">
+            <div class="flex items-center gap-3">
+              <span class="text-text-secondary text-compact font-medium whitespace-nowrap">{{
+                t("storage_settings.supportedProviders")
+              }}</span>
+              <div class="flex items-center gap-2.5">
                 <div
                   v-for="p in availableProviders"
                   :key="p.value"
-                  class="hero-page__inline-logo-wrap flex h-7 w-7 shrink-0 cursor-default items-center justify-center opacity-70 transition-opacity duration-150 hover:opacity-100"
+                  class="flex h-7 w-7 shrink-0 cursor-default items-center justify-center opacity-70 transition-opacity duration-150 hover:opacity-100"
                 >
                   <img
                     :src="p.image"
                     :alt="p.label"
-                    class="hero-page__inline-logo block h-7 max-h-7 w-7 max-w-7 object-contain"
+                    class="block h-7 max-h-7 w-7 max-w-7 object-contain"
                   />
                   <OTooltip :content="p.label" />
                 </div>
@@ -93,26 +88,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- right: feature cards -->
-          <div class="hero-page__right flex w-85 shrink-0 flex-col gap-3.5">
+          <div class="flex w-85 shrink-0 flex-col gap-3.5">
             <div
               v-for="feature in features"
               :key="feature.title"
-              class="feature-card rounded-default border-border-default bg-surface-base flex items-start gap-4 border px-5.5 py-5 shadow-md transition-all duration-200 hover:-translate-y-px hover:shadow-lg"
+              class="rounded-default border-border-default bg-surface-base flex items-start gap-4 border px-5.5 py-5 shadow-md transition-all duration-200 hover:-translate-y-px hover:shadow-lg"
             >
               <div
-                class="feature-card__icon-box rounded-default bg-theme-accent/8 flex h-10 w-10 shrink-0 items-center justify-center"
+                class="rounded-default bg-theme-accent/8 flex h-10 w-10 shrink-0 items-center justify-center"
               >
-                <OIcon
-                  :name="feature.icon"
-                  size="md"
-                  class="feature-card__icon text-theme-accent opacity-85"
-                />
+                <OIcon :name="feature.icon" size="md" class="text-theme-accent opacity-85" />
               </div>
-              <div class="feature-card__content flex-1 pt-0.5">
-                <div class="feature-card__title text-text-heading mb-1.25 text-sm font-bold">
+              <div class="flex-1 pt-0.5">
+                <div class="text-text-heading mb-1.25 text-sm font-bold">
                   {{ feature.title }}
                 </div>
-                <div class="feature-card__desc text-text-secondary text-compact leading-[1.55]">
+                <div class="text-text-secondary text-compact leading-[1.55]">
                   {{ feature.desc }}
                 </div>
               </div>
@@ -157,7 +148,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- supported providers -->
             <div class="flex items-center gap-3">
-              <span class="text-text-disabled text-xs font-medium whitespace-nowrap">{{
+              <span class="text-text-secondary text-xs font-medium whitespace-nowrap">{{
                 t("storage_settings.supportedProviders")
               }}</span>
               <div class="flex items-center gap-2.5">
@@ -182,7 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- ========== CONFIGURED ========== -->
       <div v-else>
         <div class="p-3">
-          <OCard class="storage-card rounded-default bg-surface-base max-w-170">
+          <OCard class="rounded-default bg-surface-base max-w-170">
             <!-- Card header: logo + name + badge | update button -->
             <OCardSection role="header">
               <div class="flex flex-1 flex-nowrap items-center gap-3.5">
@@ -202,7 +193,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="storage-settings-update-btn"
                 variant="primary"
                 size="sm"
-                class="no-border o2-primary-button"
                 @click="navigateToEdit"
               >
                 {{ t("storage_settings.updateStorage") }}
@@ -213,66 +203,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Field grid -->
             <OCardSection role="body">
-              <div class="storage-detail-grid grid grid-cols-2 gap-x-8 gap-y-5">
-                <div v-if="storageData.bucket_name" class="storage-field">
-                  <div
-                    class="storage-field__label text-text-label mb-0.75 text-xs font-medium capitalize"
-                  >
-                    {{ t("storage_settings.bucketName") }}
+              <div class="grid grid-cols-2 gap-x-8 gap-y-5">
+                <div
+                  v-for="field in configuredFields"
+                  :key="field.key"
+                  :data-test="`storage-settings-detail-${field.key}`"
+                >
+                  <div class="text-text-label mb-0.75 text-xs font-medium">
+                    {{ field.label }}
                   </div>
-                  <div class="storage-field__value text-text-body text-sm break-all">
-                    {{ storageData.bucket_name }}
-                  </div>
-                </div>
-                <div v-if="storageData.region" class="storage-field">
-                  <div
-                    class="storage-field__label text-text-label mb-0.75 text-xs font-medium capitalize"
-                  >
-                    {{ t("storage_settings.region") }}
-                  </div>
-                  <div class="storage-field__value text-text-body text-sm break-all">
-                    {{ storageData.region }}
-                  </div>
-                </div>
-                <div v-if="storageData.server_url && !isCloud" class="storage-field">
-                  <div
-                    class="storage-field__label text-text-label mb-0.75 text-xs font-medium capitalize"
-                  >
-                    {{ t("storage_settings.serverUrl") }}
-                  </div>
-                  <div class="storage-field__value text-text-body text-sm break-all">
-                    {{ storageData.server_url }}
-                  </div>
-                </div>
-                <div v-if="storageData.access_key" class="storage-field">
-                  <div
-                    class="storage-field__label text-text-label mb-0.75 text-xs font-medium capitalize"
-                  >
-                    {{ t("storage_settings.accessKey") }}
-                  </div>
-                  <div class="storage-field__value text-text-body text-sm break-all">
-                    {{ storageData.access_key }}
-                  </div>
-                </div>
-                <div v-if="storageData.secret_key" class="storage-field">
-                  <div
-                    class="storage-field__label text-text-label mb-0.75 text-xs font-medium capitalize"
-                  >
-                    {{ t("storage_settings.secretKey") }}
-                  </div>
-                  <div class="storage-field__value text-text-body text-sm break-all">
-                    {{ storageData.secret_key }}
-                  </div>
-                </div>
-                <div v-if="storageData.role_arn" class="storage-field">
-                  <div
-                    class="storage-field__label text-text-label mb-0.75 text-xs font-medium capitalize"
-                  >
-                    {{ t("storage_settings.roleArn") }}
-                  </div>
-                  <div class="storage-field__value text-text-body text-sm break-all">
-                    {{ storageData.role_arn }}
-                  </div>
+                  <div class="text-text-body text-sm break-all">{{ field.value }}</div>
                 </div>
               </div>
             </OCardSection>
@@ -283,17 +223,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OCardSection v-if="configTimestamps">
               <div class="flex gap-10">
                 <div v-if="configTimestamps.created_at" class="flex items-center gap-1.5">
-                  <span
-                    class="storage-field__label text-text-label mb-0 text-xs font-medium capitalize"
-                    >{{ t("storage_settings.createdAt") }}</span
-                  >
+                  <span class="text-text-label text-xs font-medium">{{
+                    t("storage_settings.createdAt")
+                  }}</span>
                   <span class="text-sm">{{ configTimestamps.created_at }}</span>
                 </div>
                 <div v-if="configTimestamps.updated_at" class="flex items-center gap-1.5">
-                  <span
-                    class="storage-field__label text-text-label mb-0 text-xs font-medium capitalize"
-                    >{{ t("storage_settings.updatedAt") }}</span
-                  >
+                  <span class="text-text-label text-xs font-medium">{{
+                    t("storage_settings.updatedAt")
+                  }}</span>
                   <span class="text-sm">{{ configTimestamps.updated_at }}</span>
                 </div>
               </div>
@@ -316,7 +254,7 @@ import { ref, computed, onMounted } from "vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import config from "@/aws-exports";
 import orgStorageService from "@/services/org_storage";
@@ -361,6 +299,31 @@ const isConfigured = computed(() => existingConfig.value?.provider != null);
 // data is already a parsed object from the API
 const storageData = computed(() => existingConfig.value?.data || {});
 
+// Union of every provider's fields; each renders only when the config carries it,
+// so one list covers all four providers.
+const configuredFields = computed(() => {
+  const data = storageData.value;
+  const rows: Array<{ key: string; label: I18nText; value: string }> = [
+    { key: "bucket_name", label: t("storage_settings.bucketName"), value: data.bucket_name },
+    { key: "region", label: t("storage_settings.region"), value: data.region },
+    {
+      key: "server_url",
+      label: t("storage_settings.serverUrl"),
+      value: isCloud.value ? "" : data.server_url,
+    },
+    { key: "access_key", label: t("storage_settings.accessKey"), value: data.access_key },
+    { key: "secret_key", label: t("storage_settings.secretKey"), value: data.secret_key },
+    { key: "role_arn", label: t("storage_settings.roleArn"), value: data.role_arn },
+    { key: "project_name", label: t("storage_settings.projectName"), value: data.project_name },
+    {
+      key: "service_account_name",
+      label: t("storage_settings.serviceAccountName"),
+      value: data.service_account_name,
+    },
+  ];
+  return rows.filter((row) => !!row.value);
+});
+
 const configuredProviderLabel = computed(() => {
   const found = providerDefinitions.find((p) => p.value === existingConfig.value?.provider);
   return found?.label || existingConfig.value?.provider || "";
@@ -395,11 +358,11 @@ const providerDefinitions = [
     value: "AzureCredentials",
     image: getImageURL("images/org_storage/azure.png"),
   },
-  // {
-  //   label: "GCP Credentials",
-  //   value: "GcpCredentials",
-  //   image: getImageURL("images/org_storage/gcp.png"),
-  // },
+  {
+    label: t("settings.orgStorageSettings.googleCloudStorage"),
+    value: "GcpServiceAccount",
+    image: getImageURL("images/org_storage/gcp.png"),
+  },
   {
     label: t("settings.orgStorageSettings.awsRoleArn"),
     value: "AwsRoleArn",
