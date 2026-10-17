@@ -1698,6 +1698,7 @@
     "span": "الامتداد",
     "spans": "الامتدادات",
     "errorTraces": "آثار الأخطاء",
+    "slowTraceFilter": "بطيء (≥ {seconds} ث)",
     "failedToFetchTraces": "فشل في جلب بيانات التتبع. يرجى المحاولة مرة أخرى.",
     "seekToMoment": "ابحث عن هذه اللحظة في الجلسة",
     "route": "المسار",

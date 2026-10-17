@@ -1698,6 +1698,7 @@
     "span": "span",
     "spans": "spans",
     "errorTraces": "error traces",
+    "slowTraceFilter": "Slow (≥ {seconds} s)",
     "failedToFetchTraces": "Failed to fetch trace data. Please try again.",
     "seekToMoment": "Seek to this moment in the session",
     "route": "Route",
