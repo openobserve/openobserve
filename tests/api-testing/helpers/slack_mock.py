@@ -23,6 +23,8 @@ Control endpoints (JSON):
 - ``POST /_mock/fail``                   ``{"method", "error", "times"?, "http_status"?, "retry_after"?}``
 - ``POST /_mock/apps``                   register an app: ``{"app_id", "client_id", "client_secret", "signing_secret"?}``
 - ``POST /_mock/teams``                  add or replace a team: ``{"team_id", "team_name", "channels"?, "members"?}``
+- ``POST /_mock/config_tokens``          ``{"refresh_token", "team_id"}``: ``tooling.tokens.rotate`` answers that team for the
+  token and its successors (an unregistered token answers ``T0MOCK``)
 - ``POST /_mock/uninstall_events``       ``{"settle": s}``: ``apps.uninstall`` first POSTs Slack's signed ``tokens_revoked``
   and ``app_uninstalled`` events to the app's HTTP request URL, as live Slack does, then waits ``s`` seconds
 - ``GET  /_mock/code?claims=<json>``     the ``mock.`` code for those claims
@@ -162,6 +164,7 @@ class MockState:
         self.bot_tokens: dict[str, dict[str, Any]] = {}
         self.config_tokens: set[str] = set()
         self.used_refresh_tokens: set[str] = set()
+        self.token_teams: dict[str, str] = {}
         self.revoked: set[str] = set()
         self.uninstall_settle: float | None = None
         self.outbox: list[tuple[str, str, bytes]] = []
@@ -350,11 +353,14 @@ def m_tooling_tokens_rotate(st: MockState, form: dict[str, str], _bearer: str | 
     st.used_refresh_tokens.add(refresh)
     token = f"xoxe.xoxp-1-mock-{st.next_id('')}"
     st.config_tokens.add(token)
+    team_id = st.token_teams.get(refresh, DEFAULT_TEAM)
+    successor = f"xoxe-1-mock-{st.next_id('')}"
+    st.token_teams[successor] = team_id
     now = int(time.time())
     return {
         "token": token,
-        "refresh_token": f"xoxe-1-mock-{st.next_id('')}",
-        "team_id": DEFAULT_TEAM,
+        "refresh_token": successor,
+        "team_id": team_id,
         "user_id": DEFAULT_USER,
         "iat": now,
         "exp": now + 43200,
@@ -701,6 +707,8 @@ class SlackMockHandler(BaseHTTPRequestHandler):
             elif path == "/_mock/teams":
                 team = default_team(body["team_id"], body.get("team_name", body["team_id"]))
                 st.teams[body["team_id"]] = {**team, **body}
+            elif path == "/_mock/config_tokens":
+                st.token_teams[body["refresh_token"]] = body["team_id"]
             else:
                 return self.reply(404, {"ok": False, "error": "unknown_path"})
         self.reply(200, {"ok": True})

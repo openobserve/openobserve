@@ -1,4 +1,4 @@
-"""AC-5.3, AC-5.4 and AC-5.5: who may change Slack, with OpenFGA off (section 7 permission rule)."""
+"""AC-5.3, AC-5.4 and AC-5.5: who may change Slack, with OpenFGA off (section 7 permission rule); row 24 with it on."""
 from __future__ import annotations
 
 import uuid
@@ -7,12 +7,14 @@ import pytest
 
 from support.client import OpenObserveClient
 
+from .instance_helpers import META, meta_install, meta_role_user, org_access_path, rbac_enabled
 from .slack_helpers import (
     SlackMock,
     add_to_org,
     connect_with_proof,
     make_slack_org,
     make_user,
+    new_team,
     self_hosted_install,
 )
 
@@ -97,3 +99,23 @@ def test_an_admin_of_org_b_cannot_change_org_a_channel_default(
     row = client.get(path, org=slack_org).json()
     assert row["answer_mode"] == "thread"
     assert row["set_by_this_org"] is True
+
+
+def test_org_access_route_rows_follow_the_openfga_grant(
+    client: OpenObserveClient, slack_on: None, self_hosted: None, mock: SlackMock
+) -> None:
+    """Section 7.6: row 24 checks LIST for GET and PUT for PUT on ``slack_integration:_meta``."""
+    if not rbac_enabled(client):
+        pytest.skip("run against a server with O2_OPENFGA_ENABLED=true")
+    inst = meta_install(client, mock, new_team(mock))
+    try:
+        path, body = org_access_path(inst["id"]), {"orgs": [META]}
+        lister = meta_role_user(client, ["AllowList"])
+        assert lister.get(path, org=META).status_code == 200
+        refused = lister.put(path, json=body, org=META)
+        assert refused.status_code == 403, refused.text
+        writer = meta_role_user(client, ["AllowList", "AllowPut"])
+        allowed = writer.put(path, json=body, org=META)
+        assert allowed.status_code == 200, allowed.text
+    finally:
+        client.delete(f"slack/installations/{inst['id']}", org=META)
