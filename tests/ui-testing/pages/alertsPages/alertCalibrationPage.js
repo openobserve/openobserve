@@ -22,6 +22,15 @@ export class AlertCalibrationPage {
     this.dashboardEmptyTitle = 'No runs in the last';
   }
 
+  // build_type from the authenticated full config — the exact value the route
+  // guard reads, so the spec skips instead of timing out on the alertList bounce.
+  async detectBuildType(org) {
+    const orgId = org || process.env["ORGNAME"] || "default";
+    const baseUrl = (process.env["INGESTION_URL"] || process.env["ZO_BASE_URL"]).replace(/\/+$/, "");
+    const response = await this.page.request.get(`${baseUrl}/api/${orgId}/config`);
+    return (await response.json()).build_type;
+  }
+
   async navigateToDashboard() {
     await this.page.goto(this.dashboardUrl, { waitUntil: 'domcontentloaded' });
     await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});

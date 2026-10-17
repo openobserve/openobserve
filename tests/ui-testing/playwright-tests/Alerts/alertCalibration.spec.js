@@ -14,6 +14,13 @@ test.describe("Alert Calibration testcases", () => {
     testLogger.testStart(testInfo.title, testInfo.file);
     await navigateToBase(page);
     pm = new PageManager(page);
+    // Alert calibration is enterprise/cloud-gated: on OSS the route guard
+    // bounces /alert-calibration* to alertList, so skip instead of timing out.
+    const buildType = await pm.alertCalibrationPage.detectBuildType();
+    test.skip(
+      buildType !== "enterprise" && buildType !== "cloud",
+      `Alert calibration is enterprise/cloud-gated (build: ${buildType})`,
+    );
     testLogger.info("Test setup completed");
   });
 
