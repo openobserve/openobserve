@@ -892,6 +892,7 @@
     "enterValueOrVariable": "Enter value or $variable",
     "all": "All",
     "jsonFilesOnlyHint": ".json files only",
+    "justNow": "just now",
     "fileUploadJsonTab": "File Upload / JSON",
     "urlImportTab": "URL Import",
     "relativeTimeAgo": "{value} {unit} ago",
@@ -7806,6 +7807,40 @@
         "user": "user",
         "action": "action"
       }
+    }
+  },
+  "assistant": {
+    "beta": "Beta",
+    "name": "O2 Assistant"
+  },
+  "llmObservability": {
+    "playground": {
+      "progress": {
+        "almostThere": "Almost there...",
+        "analyzing": "Analyzing...",
+        "checkingDetails": "Checking details...",
+        "connectingTheDots": "Connecting the dots...",
+        "crunchingNumbers": "Crunching numbers...",
+        "divingDeeper": "Diving deeper...",
+        "evaluatingOptions": "Evaluating options...",
+        "examiningData": "Examining data...",
+        "exploringPossibilities": "Exploring possibilities...",
+        "formulatingResponse": "Formulating response...",
+        "gatheringInsights": "Gathering insights...",
+        "makingProgress": "Making progress...",
+        "piecingTogether": "Piecing together...",
+        "processing": "Processing...",
+        "refiningAnswer": "Refining answer...",
+        "reviewingContext": "Reviewing context...",
+        "stillThinking": "Still thinking...",
+        "synthesizingInformation": "Synthesizing information...",
+        "thinking": "Thinking...",
+        "workingOnIt": "Working on it..."
+      }
+    },
+    "threadView": {
+      "assistant": "Assistant",
+      "userNamed": "User {user}"
     }
   },
   "billing": {

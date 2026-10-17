@@ -24,6 +24,7 @@ import incidents from "./incidents";
 import { getDefaultTheme } from "@/constants/themes";
 import { purgeAllQueries } from "@/composables/query/queryClient";
 import { setSeverityInferenceEnabled } from "@/utils/logs/statusParser";
+import { setOrgTimeZoneSource } from "@/utils/formatters";
 
 const pos = window.location.pathname.indexOf("/web/");
 
@@ -89,7 +90,7 @@ const organizationObj = {
   }>,
 };
 
-export default createStore({
+const store = createStore({
   state: {
     API_ENDPOINT: API_ENDPOINT,
     userInfo: {},
@@ -599,3 +600,7 @@ export default createStore({
     incidents,
   },
 });
+
+setOrgTimeZoneSource(() => store.state.timezone);
+
+export default store;
