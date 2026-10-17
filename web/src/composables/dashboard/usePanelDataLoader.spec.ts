@@ -1934,6 +1934,81 @@ describe("usePanelDataLoader", () => {
         expect(loader.isCachedDataDifferWithCurrentTimeRange.value).toBeDefined();
       });
 
+      describe("a cached result from another time range", () => {
+        const svc = {
+          name: "svc",
+          type: "query_values",
+          query_data: { custom_query: true },
+          multiSelect: true,
+          value: ["checkout", "payments"],
+          options: [],
+          isVariablePartialLoaded: true,
+        };
+        const restoreWith = async (variable: any, cachedRangeMs: number) => {
+          const panelSchema = createMockPanelSchema({
+            queryConfig: { query: "SELECT * FROM test WHERE s IN ($svc)" },
+          });
+          const variablesData = createMockVariablesData({ values: [variable] });
+          mockCacheData = {
+            key: {
+              panelSchema: panelSchema.value,
+              variablesData: [variable],
+              forceLoad: false,
+              dashboardId: "test-dashboard",
+              folderId: "test-folder",
+            },
+            value: {
+              data: [{ test: "cached_data" }],
+              loading: false,
+              errorDetail: { message: "", code: "" },
+              metadata: { queries: [] },
+              annotations: [],
+              resultMetaData: [],
+              lastTriggeredAt: Date.now(),
+              isPartialData: false,
+              isOperationCancelled: false,
+            },
+            cacheTimeRange: { start_time: Date.now() - cachedRangeMs, end_time: Date.now() },
+          };
+          allowPanelToBecomeVisible();
+          const loader = usePanelDataLoader(
+            panelSchema,
+            ref({ start_time: new Date(Date.now() - 300000), end_time: new Date() }),
+            variablesData,
+            ref({ offsetWidth: 1000 }),
+            ref(false),
+            ref("dashboards"),
+            ref("test-dashboard"),
+            ref("test-folder"),
+            ref(null),
+            ref(null),
+            ref(null),
+            ref(null),
+            ref(null),
+            ref(false),
+          );
+          await loader.loadData();
+          return loader;
+        };
+
+        it("is not shown when the panel reads a query variable", async () => {
+          const loader = await restoreWith(svc, 21600000);
+          expect(loader.data.value).not.toEqual([{ test: "cached_data" }]);
+          expect(loader.isCachedDataDifferWithCurrentTimeRange.value).toBeFalsy();
+        });
+
+        it("is still shown, flagged, for other variable types", async () => {
+          const loader = await restoreWith({ ...svc, type: "custom" }, 21600000);
+          expect(loader.data.value).toEqual([{ test: "cached_data" }]);
+          expect(loader.isCachedDataDifferWithCurrentTimeRange.value).toBe(true);
+        });
+
+        it("is shown for a query variable when the range length matches", async () => {
+          const loader = await restoreWith(svc, 300000);
+          expect(loader.data.value).toEqual([{ test: "cached_data" }]);
+        });
+      });
+
       it("should handle cache retrieval errors", async () => {
         const panelSchema = createMockPanelSchema();
         const selectedTimeObj = createMockSelectedTimeObj();

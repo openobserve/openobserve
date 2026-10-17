@@ -46,6 +46,7 @@ import { usePanelSearchHandlers } from "./usePanelSearchHandlers";
 import { DASHBOARD_FRESH_PANEL_TIME } from "./dashboardFreshPanelTime";
 import { parseSearchError } from "@/utils/query/searchError";
 import { PANEL_KEY_IGNORED_PATHS, normalizeVariablesForCache } from "@/composables/query/panelKey";
+import { isCustomQueryVariable } from "@/utils/dashboard/variables/queryVariableUtils";
 import { summarizePanelDiagnostics } from "@/utils/dashboard/panelDiagnostics";
 
 /**
@@ -882,12 +883,20 @@ export const usePanelDataLoader = (
     const cachedIncompleteLoad =
       tempPanelCacheValue?.loading === true || tempPanelCacheValue?.isPartialData === true;
 
+    const cachedRangeDiffers =
+      selectedTimeObj?.value?.end_time - selectedTimeObj?.value?.start_time !==
+      cache?.cacheTimeRange?.end_time - cache?.cacheTimeRange?.start_time;
+    // A query variable's values come from the time range, so a result from another range was filtered by other values.
+    const rangeBoundToQueryVariable =
+      cachedRangeDiffers && (getDependentVariablesData() ?? []).some(isCustomQueryVariable);
+
     // Check if it is stale or not
     if (
       tempPanelCacheValue &&
       Object.keys(tempPanelCacheValue).length > 0 &&
       cacheKeysMatch &&
       !cachedIncompleteLoad &&
+      !rangeBoundToQueryVariable &&
       refreshAfterRestore.acceptsCachedWindow(cache.cacheTimeRange, selectedTimeObj?.value)
     ) {
       // const cache = getPanelCache();
@@ -915,10 +924,7 @@ export const usePanelDataLoader = (
       }
 
       // if selected time range is not matched with the cache time range
-      if (
-        selectedTimeObj?.value?.end_time - selectedTimeObj?.value?.start_time !==
-        cache?.cacheTimeRange?.end_time - cache?.cacheTimeRange?.start_time
-      ) {
+      if (cachedRangeDiffers) {
         state.isCachedDataDifferWithCurrentTimeRange = true;
       }
 

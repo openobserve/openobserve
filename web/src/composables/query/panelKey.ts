@@ -26,6 +26,13 @@
  */
 
 import { omit } from "lodash-es";
+import {
+  isQueryVariableAllPending,
+  resolveQueryVariableValue,
+} from "@/utils/dashboard/variables/queryVariableUtils";
+
+// An "All" still waiting for its options cannot name the rows it stands for, so it matches no saved result.
+const PENDING_ALL_CACHE_VALUE = "_o2_all_pending_";
 
 /**
  * Schema paths that do not affect the query result. Bumping a version or
@@ -48,7 +55,7 @@ export const normalizeVariablesForCache = (variables: any[]): any[] => {
   return variables.map((v) => ({
     name: v.name,
     type: v.type,
-    value: v.value,
+    value: isQueryVariableAllPending(v) ? PENDING_ALL_CACHE_VALUE : resolveQueryVariableValue(v),
     scope: v.scope,
     multiSelect: v.multiSelect,
     query_data: v.query_data,
