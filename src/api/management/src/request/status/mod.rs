@@ -236,10 +236,9 @@ struct ConfigResponse<'a> {
     synthetics_enabled: bool,
     oncall_enabled: bool,
     slack_enabled: bool,
-    /// Why Slack is off for this org (`edition`, `flag`, `allowlist`, ...); null when on.
+    /// Why Slack is off (`edition`, `flag`, `master_key`, `super_cluster`), the same for every
+    /// org; null when on.
     slack_disabled_reason: Option<DisabledReason>,
-    /// The region that runs Slack; set only with super cluster on.
-    slack_home_region: Option<String>,
     /// Enterprise-only private locations; the UI gates their views on this flag.
     synthetics_private_locations_enabled: bool,
     /// Server-side step cap (`ZO_SYNTHETICS_BROWSER_MAX_STEPS`); the UI budget must follow it.
@@ -505,8 +504,6 @@ pub async fn zo_config(
         Some(DisabledReason::Edition),
         o2_enterprise::enterprise::slack::disabled_reason(&org_id)
     );
-    let slack_home_region =
-        enterprise_value!(None, o2_enterprise::enterprise::slack::home_region());
 
     #[cfg(feature = "cloud")]
     let build_type = "cloud";
@@ -632,7 +629,6 @@ pub async fn zo_config(
         oncall_enabled,
         slack_enabled: slack_disabled_reason.is_none(),
         slack_disabled_reason,
-        slack_home_region,
         synthetics_private_locations_enabled,
         synthetics_browser_max_steps,
         synthetics_recorder_extension_url: synthetics_recorder_extension_url.to_string(),
@@ -2505,7 +2501,7 @@ mod tests {
         } else {
             "edition"
         };
-        for org in ["default", "acme_eu"] {
+        for org in ["default", "acme_eu", "_meta"] {
             let response = zo_config(Path(org.to_string()), None).await.into_response();
             let body = axum::body::to_bytes(response.into_body(), usize::MAX)
                 .await
@@ -2513,7 +2509,8 @@ mod tests {
             let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
             assert_eq!(json["slack_enabled"], false, "{org}: {json}");
             assert_eq!(json["slack_disabled_reason"], reason, "{org}: {json}");
-            assert!(json["slack_home_region"].is_null(), "{org}: {json}");
+            assert_ne!(json["slack_disabled_reason"], "allowlist", "{org}: {json}");
+            assert!(json.get("slack_home_region").is_none(), "{org}: {json}");
         }
     }
 }

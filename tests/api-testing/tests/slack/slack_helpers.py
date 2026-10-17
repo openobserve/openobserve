@@ -5,11 +5,11 @@ The server under test is a debug enterprise build in local mode with SQLite, sta
 
 - flag off (``O2_SLACK_ENABLED`` unset): ``test_disabled.py`` runs, everything else skips;
 - flag on (``O2_SLACK_ENABLED=true``, ``O2_MASTER_ENCRYPTION_KEY`` set, ``ZO_SSRF_ALLOW_LOOPBACK=true``):
-  the install, RBAC and allowlist tests run and ``test_disabled.py`` skips.
+  the install and RBAC tests run and ``test_disabled.py`` skips.
 
 ``SLACK_MOCK_URL`` is the mock's root (default ``http://127.0.0.1:5099``). ``SLACK_SUITE_REQUIRED=1`` turns
 every harness skip (no enterprise build, a mock unreachable, AI off, no signing key) into a failure; skips
-that only say which server run a test belongs to (flag on or off, allowlist, Cloud) stay skips.
+that only say which server run a test belongs to (flag on or off, Cloud) stay skips.
 """
 from __future__ import annotations
 
@@ -117,7 +117,7 @@ def slack_config(client: OpenObserveClient, org: str) -> dict[str, Any]:
     resp = client.get("config", org=org)
     assert resp.status_code == 200, resp.text
     body = resp.json()
-    return {k: body.get(k) for k in ("slack_enabled", "slack_disabled_reason", "slack_home_region", "build_type")}
+    return {k: body.get(k) for k in ("slack_enabled", "slack_disabled_reason", "build_type")}
 
 
 def make_org(client: OpenObserveClient) -> str:
@@ -128,11 +128,10 @@ def make_org(client: OpenObserveClient) -> str:
 
 
 def make_slack_org(client: OpenObserveClient) -> str:
-    """A fresh org with Slack on; skips under an ``O2_SLACK_ALLOWED_ORGS`` that leaves fresh orgs out."""
+    """A fresh org; Slack is on or off for the whole deployment, never per org (R-92)."""
     org = make_org(client)
     state = slack_config(client, org)
-    if not state["slack_enabled"]:
-        pytest.skip(f"a fresh org has Slack off ({state['slack_disabled_reason']}); run without O2_SLACK_ALLOWED_ORGS")
+    assert state["slack_enabled"], state
     return org
 
 
@@ -335,7 +334,7 @@ def link_prompt(mock: SlackMock, user_id: str, seen: int = 0) -> tuple[str, str]
 
 
 def http_install(client: OpenObserveClient, org: str, team_id: str) -> dict[str, Any]:
-    """An allowed HTTP-mode installation in ``team_id``, as the installations list shows it."""
+    """An HTTP-mode installation in ``team_id``, as the installations list shows it."""
     exchanged = self_hosted_install(client, org, team_id=team_id, mode="http")
     resp = client.get("slack/installations", org=org)
     assert resp.status_code == 200, resp.text

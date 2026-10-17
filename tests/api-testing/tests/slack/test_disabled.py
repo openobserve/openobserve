@@ -31,11 +31,13 @@ def member(client: OpenObserveClient, slack_org: str, slack_off: dict) -> OpenOb
     return as_member
 
 
-def test_org_config_says_why_slack_is_off(slack_off: dict) -> None:
+def test_org_config_says_why_slack_is_off(client: OpenObserveClient, slack_org: str, slack_off: dict) -> None:
     want = "edition" if slack_off["build_type"] == "opensource" else "flag"
     assert slack_off["slack_enabled"] is False
     assert slack_off["slack_disabled_reason"] == want
-    assert slack_off["slack_home_region"] is None
+    resp = client.get("config", org=slack_org)
+    assert resp.status_code == 200, resp.text
+    assert "slack_home_region" not in resp.json()
 
 
 @pytest.mark.parametrize(("method", "path", "body"), ROUTES, ids=[f"{m} {p}" for m, p, _ in ROUTES])

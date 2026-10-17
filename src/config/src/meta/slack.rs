@@ -102,10 +102,7 @@ pub enum SetFrom {
 pub enum DisabledReason {
     Edition,
     Flag,
-    Allowlist,
     MasterKey,
-    HomeRegionUnset,
-    OtherRegion,
     SuperCluster,
 }
 
@@ -412,6 +409,20 @@ mod tests {
             serde_json::to_string(&DisabledReason::SuperCluster).unwrap(),
             "\"super_cluster\""
         );
+    }
+
+    #[test]
+    fn disabled_reasons_are_the_four_v1_strings() {
+        for r in ["edition", "flag", "master_key", "super_cluster"] {
+            let parsed: DisabledReason = serde_json::from_str(&format!("\"{r}\"")).unwrap();
+            assert_eq!(serde_json::to_string(&parsed).unwrap(), format!("\"{r}\""));
+        }
+        for gone in ["allowlist", "home_region_unset", "other_region"] {
+            assert!(
+                serde_json::from_str::<DisabledReason>(&format!("\"{gone}\"")).is_err(),
+                "{gone}"
+            );
+        }
     }
 
     #[test]

@@ -1,16 +1,15 @@
 """Commit 11 bridge, end to end: a signed Slack event becomes a delegated turn and an answer in Slack.
 
-AC-10.3 (I), AC-1.7 (I, questions half) and the answer flow of design 1.4: a signed ``app_mention`` reaches
+AC-10.3 (I) and the answer flow of design 1.4: a signed ``app_mention`` reaches
 the turn runner, which calls O2's own ``chat_stream`` over loopback with the asker's delegated token; the
 o2-ai mock records what reaches the agent and the Slack mock records the answer the bot posts.
 
 Needs the flag-on self-hosted server with ``O2_AI_ENABLED=true`` and ``O2_AGENT_URL`` at
-``helpers/o2ai_mock.py`` (``run/p11/start.sh``). The allowlist test also needs ``SLACK_ALLOWED_ORGS``.
+``helpers/o2ai_mock.py`` (``run/p11/start.sh``).
 """
 from __future__ import annotations
 
 import json
-import os
 import time
 import uuid
 from typing import Any
@@ -21,9 +20,7 @@ from support.client import OpenObserveClient
 
 from .slack_helpers import (
     SlackMock,
-    dms_to,
     http_install,
-    make_org,
     make_user,
     my_links,
     new_team,
@@ -183,25 +180,3 @@ def test_a_colleagues_mention_is_seeded_and_only_the_askers_reply_skips_the_ment
     assert f"what about eu? {tag}" not in queries, "a colleague's reply without a mention is not answered"
     assert len(queries) == 4, queries
     assert queries[-1] == f"and apac? {tag}", queries
-
-
-def test_a_question_for_an_org_outside_the_allowlist_gets_a_private_refusal(
-    client: OpenObserveClient, slack_org: str, ready: SlackMock, o2ai: O2aiMock,  # noqa: F811
-) -> None:
-    allowed = [o.strip() for o in os.environ.get("SLACK_ALLOWED_ORGS", "").split(",") if o.strip()]
-    if slack_org not in allowed:
-        pytest.skip("export SLACK_ALLOWED_ORGS (the server's O2_SLACK_ALLOWED_ORGS) including the test org")
-    outside = make_org(client)
-    team, inst, _ = setup_team(client, slack_org, ready, "U0ANN")
-    tag = uniq()
-    body, _, _ = event(inst, team, "U0ANN", f"<@U0BOT> in:{outside} how many errors? {tag}")
-    send(client, inst, body)
-    note = f"Slack answers are not enabled for org *{outside}*."
-    dm = wait_until(lambda: [f for f in dms_to(ready, "U0ANN") if note in f.get("text", "")], "the private refusal DM")
-    assert dm
-    ephemeral = [c["form"] for c in ready.calls("chat.postEphemeral")
-                 if c["form"].get("user") == "U0ANN" and note in c["form"].get("text", "")]
-    assert ephemeral
-    assert ephemeral[0]["channel"] == CHANNEL
-    assert not [c for c in ready.calls("chat.postMessage") if c["form"].get("channel") == CHANNEL]
-    assert turns_for(o2ai, tag) == []
