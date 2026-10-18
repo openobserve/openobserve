@@ -33,6 +33,10 @@ const { t } = useI18nTyped();
 const byId = computed(() => new Map(props.options.map((option) => [option.alert_id, option])));
 const count = computed(() => props.modelValue.length);
 const atCap = computed(() => count.value >= props.max);
+// No free candidate (not loaded yet, or all picked) makes add() a no-op, so the button must not look clickable.
+const hasFreeOption = computed(() =>
+  props.options.some((option) => !props.modelValue.includes(option.alert_id)),
+);
 
 const optionsFor = (currentId: string) =>
   props.options
@@ -75,7 +79,7 @@ const childLink = (child: CompositeChildOption): string =>
         variant="outline"
         size="xs"
         icon-left="add"
-        :disabled="atCap"
+        :disabled="atCap || !hasFreeOption"
         data-test="alerts-composite-child-add"
         @click="add"
       >

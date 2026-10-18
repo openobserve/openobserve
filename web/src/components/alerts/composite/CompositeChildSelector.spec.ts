@@ -77,6 +77,24 @@ describe("CompositeChildSelector", () => {
     ).toBeDefined();
   });
 
+  it("disables Add while the candidate alerts have not loaded, and enables it once they have", async () => {
+    const wrapper = mountSelector([], []);
+    const addButton = () => wrapper.find('[data-test="alerts-composite-child-add"]');
+
+    expect(addButton().attributes("disabled")).toBeDefined();
+
+    await wrapper.setProps({ options: [child(1), child(2)] });
+    expect(addButton().attributes("disabled")).toBeUndefined();
+  });
+
+  it("disables Add when every candidate alert is already selected", () => {
+    const wrapper = mountSelector(["child-1", "child-2"], [child(1), child(2)]);
+
+    expect(
+      wrapper.find('[data-test="alerts-composite-child-add"]').attributes("disabled"),
+    ).toBeDefined();
+  });
+
   it("keeps an inaccessible child removable by its ID without revealing a name or level", () => {
     const wrapper = mountSelector(["secret-id"], [child(1)]);
 
