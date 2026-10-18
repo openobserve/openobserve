@@ -101,6 +101,23 @@ pub async fn delete_by_installation_and_org(
     delete_by_installation_and_org_with(get_orm_client_rw().await, installation_id, org_id).await
 }
 
+/// Marks the org's live rows in the installation as removed; they keep their expiry.
+pub async fn mark_org_removed(
+    installation_id: &str,
+    org_id: &str,
+    at: i64,
+    origin_region: &str,
+) -> Result<u64, Error> {
+    mark_org_removed_with(
+        get_orm_client_rw().await,
+        installation_id,
+        org_id,
+        at,
+        Some(origin_region),
+    )
+    .await
+}
+
 pub async fn put_with<C: ConnectionTrait>(conn: &C, row: &SlackThread) -> Result<(), Error> {
     let key = [Column::InstallationId, Column::ChannelId, Column::ThreadTs];
     Entity::insert(to_active(row)?)
@@ -221,6 +238,26 @@ pub async fn delete_by_installation_and_org_with<C: ConnectionTrait>(
     Ok(result.rows_affected)
 }
 
+pub async fn mark_org_removed_with<C: ConnectionTrait>(
+    conn: &C,
+    installation_id: &str,
+    org_id: &str,
+    at: i64,
+    origin_region: Option<&str>,
+) -> Result<u64, Error> {
+    let update = Entity::update_many()
+        .col_expr(Column::OrgRemovedAt, Expr::value(at))
+        .col_expr(Column::UpdatedAt, Expr::value(at));
+    let result = with_region(update, Column::OriginRegion, origin_region)
+        .filter(Column::InstallationId.eq(installation_id))
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::OrgRemovedAt.is_null())
+        .filter(Column::DeletedAt.is_null())
+        .exec(conn)
+        .await?;
+    Ok(result.rows_affected)
+}
+
 async fn touch_columns<C: ConnectionTrait>(
     conn: &C,
     key: &SlackThreadKey,
@@ -293,6 +330,7 @@ fn to_active(row: &SlackThread) -> Result<ActiveModel, Error> {
         created_at: Set(row.created_at),
         last_activity_at: Set(row.last_activity_at),
         expires_at: Set(row.expires_at),
+        org_removed_at: Set(row.org_removed_at),
         updated_at: Set(row.updated_at),
         origin_region: Set(row.origin_region.clone()),
         deleted_at: Set(row.deleted_at),
@@ -313,6 +351,7 @@ fn from_model(model: Model) -> Result<SlackThread, Error> {
         created_at: model.created_at,
         last_activity_at: model.last_activity_at,
         expires_at: model.expires_at,
+        org_removed_at: model.org_removed_at,
         updated_at: model.updated_at,
         origin_region: model.origin_region,
         deleted_at: model.deleted_at,
@@ -359,6 +398,7 @@ mod tests {
             created_at: 100,
             last_activity_at: 150,
             expires_at,
+            org_removed_at: None,
             updated_at: 150,
             origin_region: "default".to_string(),
             deleted_at: None,
@@ -392,6 +432,15 @@ mod tests {
         };
         put_with(&db, &empty).await.unwrap();
         assert_eq!(get_with(&db, "i1", "C1", "1.2").await.unwrap(), Some(empty));
+        let marked = SlackThread {
+            org_removed_at: Some(120),
+            ..thread("1.3", "acme", 1_000)
+        };
+        put_with(&db, &marked).await.unwrap();
+        assert_eq!(
+            get_with(&db, "i1", "C1", "1.3").await.unwrap(),
+            Some(marked)
+        );
     }
 
     #[tokio::test]
@@ -543,5 +592,53 @@ mod tests {
         assert_eq!(get_with(&db, "i1", "C1", "1.1").await.unwrap(), None);
         assert!(get_with(&db, "i1", "C1", "1.2").await.unwrap().is_some());
         assert_eq!(get_with(&db, "i2", "C1", "1.1").await.unwrap(), Some(other));
+    }
+
+    #[tokio::test]
+    async fn mark_org_removed_marks_only_that_orgs_live_rows_in_that_installation() {
+        let db = db().await;
+        put_with(&db, &thread("1.1", "acme", 100)).await.unwrap();
+        put_with(&db, &thread("1.2", "globex", 100)).await.unwrap();
+        let other = SlackThread {
+            installation_id: "i2".to_string(),
+            ..thread("1.1", "acme", 100)
+        };
+        put_with(&db, &other).await.unwrap();
+        let gone = SlackThread {
+            deleted_at: Some(1),
+            ..thread("1.4", "acme", 100)
+        };
+        put_with(&db, &gone).await.unwrap();
+        assert_eq!(
+            mark_org_removed_with(&db, "i1", "acme", 500, Some("eu"))
+                .await
+                .unwrap(),
+            1
+        );
+        let row = get_with(&db, "i1", "C1", "1.1").await.unwrap().unwrap();
+        assert_eq!(
+            (
+                row.org_removed_at,
+                row.updated_at,
+                row.origin_region.as_str()
+            ),
+            (Some(500), 500, "eu")
+        );
+        assert_eq!(row.expires_at, 100, "a marked row keeps its expiry");
+        assert_eq!(
+            mark_org_removed_with(&db, "i1", "acme", 600, None)
+                .await
+                .unwrap(),
+            0,
+            "a marked row keeps its first mark"
+        );
+        let untouched = get_with(&db, "i1", "C1", "1.2").await.unwrap().unwrap();
+        assert_eq!(untouched.org_removed_at, None);
+        assert_eq!(get_with(&db, "i2", "C1", "1.1").await.unwrap(), Some(other));
+        assert_eq!(
+            tss(list_expired_with(&db, 1_000, 10).await.unwrap()),
+            ["1.1", "1.2", "1.1"],
+            "the sweep still expires a marked row"
+        );
     }
 }

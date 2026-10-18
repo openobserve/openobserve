@@ -380,6 +380,9 @@ pub struct SlackThread {
     pub created_at: i64,
     pub last_activity_at: i64,
     pub expires_at: i64,
+    /// Set when the org stopped being served here: the row answers nothing, one reply gets a note.
+    #[serde(default)]
+    pub org_removed_at: Option<i64>,
     pub updated_at: i64,
     pub origin_region: String,
     pub deleted_at: Option<i64>,

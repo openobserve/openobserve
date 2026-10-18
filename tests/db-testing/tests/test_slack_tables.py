@@ -120,3 +120,12 @@ class TestSlackTables:
             assert found[(table, "updated_at")] == ("bigint", "NO"), table
             assert found[(table, "origin_region")] == ("character varying", "NO"), table
             assert found[(table, "deleted_at")] == ("bigint", "YES"), table
+
+    def test_a_thread_row_marks_a_removed_org_in_a_nullable_bigint(self, db_cursor):
+        db_cursor.execute(
+            """
+            SELECT data_type, is_nullable FROM information_schema.columns
+            WHERE table_name = 'slack_threads' AND column_name = 'org_removed_at'
+            """
+        )
+        assert db_cursor.fetchone() == ("bigint", "YES")

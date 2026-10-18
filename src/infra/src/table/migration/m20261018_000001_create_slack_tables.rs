@@ -158,6 +158,7 @@ enum SlackThreads {
     CreatedAt,
     LastActivityAt,
     ExpiresAt,
+    OrgRemovedAt,
 }
 
 #[derive(DeriveIden, Clone, Copy)]
@@ -441,6 +442,7 @@ fn threads_table() -> TableCreateStatement {
             .col(bigint(T::CreatedAt))
             .col(bigint(T::LastActivityAt))
             .col(bigint(T::ExpiresAt))
+            .col(ColumnDef::new(T::OrgRemovedAt).big_integer().null())
             .primary_key(
                 Index::create()
                     .name("pk_slack_threads")
@@ -599,6 +601,7 @@ mod tests {
                 "created_at" bigint NOT NULL,
                 "last_activity_at" bigint NOT NULL,
                 "expires_at" bigint NOT NULL,
+                "org_removed_at" bigint NULL,
                 "updated_at" bigint NOT NULL,
                 "origin_region" varchar(64) NOT NULL,
                 "deleted_at" bigint NULL,
