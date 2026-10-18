@@ -19,6 +19,7 @@ class EnrichmentPage {
         this.listAddBtn = page.locator('[data-test="enrichment-tables-add-btn"]');
         this.searchInput = page.locator('[data-test="enrichment-tables-search-input"]');
         this.searchInputField = page.locator('[data-test="enrichment-tables-search-input-field"]');
+        this.listRefreshBtn = page.locator('[data-test="enrichment-tables-list-refresh-btn"]');
 
         // ────────────────────────────────────────────────────────────────────
         // Add / Update enrichment table form locators (AddEnrichmentTable.vue)
@@ -997,9 +998,12 @@ abc, err = get_enrichment_table_record("${fileName}", {
         // appears; for the negative path (callers expecting non-existence)
         // wait only for the input value to flush so the filter has fired.
         if (expectExists) {
+            // The list is fetched once right after save and can predate the new table, so re-fetch it while the row is missing.
             await expect.poll(async () => {
-                return await this.getRowTypeCell(tableName).isVisible({ timeout: 200 }).catch(() => false);
-            }, { timeout: 15000, intervals: [200, 500, 1000, 2000] }).toBe(true);
+                if (await this.getRowTypeCell(tableName).isVisible().catch(() => false)) return true;
+                if (await this.listRefreshBtn.isEnabled().catch(() => false)) await this.listRefreshBtn.click().catch(() => {});
+                return false;
+            }, { timeout: 45000, intervals: [500, 1000, 2000, 3000] }).toBe(true);
         } else {
             // Negative path: wait for the input value to be committed; callers
             // (verifyTableNotCreated) then poll for count==0 on their own.
