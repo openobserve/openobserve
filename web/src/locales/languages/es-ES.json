@@ -20123,6 +20123,8 @@
       "valuesLoadingRow": "Aún cargando valores",
       "valuesLoadingHint": "Sigue escribiendo, o pulsa Esc y luego Ctrl+Space",
       "valuesEmpty": "Sin valores para {field} en los últimos {minutes} minutos",
+      "valuesEmptyInRange": "No hay valores para {field} en el intervalo de tiempo seleccionado",
+      "closeValueQuote": "Cerrar la comilla del valor",
       "valuesFailed": "No se pudieron cargar los valores para {field}",
       "chainedMenuAnnouncement": "{count} sugerencia, Tab para aceptar | {count} sugerencias, Tab para aceptar",
       "valuesCap": "{count} valor mostrado · escribe para filtrar | {count} valores mostrados · escribe para filtrar",

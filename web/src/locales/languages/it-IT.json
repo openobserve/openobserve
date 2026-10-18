@@ -20123,6 +20123,8 @@
       "valuesLoadingRow": "Caricamento dei valori in corso",
       "valuesLoadingHint": "Continua a digitare, oppure premi Esc e poi Ctrl+Spazio",
       "valuesEmpty": "Nessun valore per {field} negli ultimi {minutes} minuti",
+      "valuesEmptyInRange": "Nessun valore per {field} nell'intervallo di tempo selezionato",
+      "closeValueQuote": "Chiudi le virgolette del valore",
       "valuesFailed": "Impossibile caricare i valori per {field}",
       "chainedMenuAnnouncement": "{count} suggerimento, premi Tab per accettare | {count} suggerimenti, premi Tab per accettare",
       "valuesCap": "{count} valore mostrato · digita per filtrare | {count} valori mostrati · digita per filtrare",

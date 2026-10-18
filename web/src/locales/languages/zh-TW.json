@@ -20118,6 +20118,8 @@
       "valuesLoadingRow": "仍在載入值",
       "valuesLoadingHint": "繼續輸入，或按 Esc 然後按 Ctrl+Space",
       "valuesEmpty": "最近 {minutes} 分鐘內沒有 {field} 的值",
+      "valuesEmptyInRange": "所選時間範圍內沒有 {field} 的值",
+      "closeValueQuote": "關閉值引號",
       "valuesFailed": "無法載入 {field} 的值",
       "chainedMenuAnnouncement": "{count} 個建議，按 Tab 接受 | {count} 個建議，按 Tab 接受",
       "valuesCap": "顯示 {count} 個值 · 輸入以篩選 | 顯示 {count} 個值 · 輸入以篩選",

@@ -20123,6 +20123,8 @@
       "valuesLoadingRow": "Waarden worden nog geladen",
       "valuesLoadingHint": "Blijf typen, of druk op Esc en dan Ctrl+Space",
       "valuesEmpty": "Geen waarden voor {field} in de afgelopen {minutes} minuten",
+      "valuesEmptyInRange": "Geen waarden voor {field} in het geselecteerde tijdsbereik",
+      "closeValueQuote": "Sluit het aanhalingsteken van de waarde",
       "valuesFailed": "Waarden voor {field} konden niet worden geladen",
       "chainedMenuAnnouncement": "{count} suggestie, Tab om te accepteren | {count} suggesties, Tab om te accepteren",
       "valuesCap": "{count} waarde getoond · typ om te filteren | {count} waarden getoond · typ om te filteren",

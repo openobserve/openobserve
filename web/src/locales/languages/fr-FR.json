@@ -20123,6 +20123,8 @@
       "valuesLoadingRow": "Chargement des valeurs en cours",
       "valuesLoadingHint": "Continuez à saisir, ou appuyez sur Échap puis Ctrl+Espace",
       "valuesEmpty": "Aucune valeur pour {field} au cours des {minutes} dernières minutes",
+      "valuesEmptyInRange": "Aucune valeur pour {field} dans la plage horaire sélectionnée",
+      "closeValueQuote": "Fermer la guillemet de valeur",
       "valuesFailed": "Impossible de charger les valeurs pour {field}",
       "chainedMenuAnnouncement": "{count} suggestion, Tab pour accepter | {count} suggestions, Tab pour accepter",
       "valuesCap": "{count} valeur affichée · saisissez pour filtrer | {count} valeurs affichées · saisissez pour filtrer",

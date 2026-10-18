@@ -20123,6 +20123,8 @@
       "valuesLoadingRow": "Đang tải giá trị",
       "valuesLoadingHint": "Tiếp tục nhập, hoặc nhấn Esc rồi Ctrl+Space",
       "valuesEmpty": "Không có giá trị cho {field} trong {minutes} phút qua",
+      "valuesEmptyInRange": "Không có giá trị cho {field} trong khoảng thời gian đã chọn",
+      "closeValueQuote": "Đóng dấu nháy giá trị",
       "valuesFailed": "Không thể tải giá trị cho {field}",
       "chainedMenuAnnouncement": "{count} gợi ý, nhấn Tab để chấp nhận | {count} gợi ý, nhấn Tab để chấp nhận",
       "valuesCap": "Đã hiển thị {count} giá trị · nhập để lọc | Đã hiển thị {count} giá trị · nhập để lọc",

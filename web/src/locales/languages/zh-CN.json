@@ -20123,6 +20123,8 @@
       "valuesLoadingRow": "仍在加载值",
       "valuesLoadingHint": "继续输入，或按 Esc 然后按 Ctrl+Space",
       "valuesEmpty": "最近 {minutes} 分钟内没有 {field} 的值",
+      "valuesEmptyInRange": "所选时间范围内没有 {field} 的值",
+      "closeValueQuote": "闭合值引号",
       "valuesFailed": "无法加载 {field} 的值",
       "chainedMenuAnnouncement": "{count} 条建议，按 Tab 接受 | {count} 条建议，按 Tab 接受",
       "valuesCap": "已显示 {count} 个值 · 输入以过滤 | 已显示 {count} 个值 · 输入以过滤",

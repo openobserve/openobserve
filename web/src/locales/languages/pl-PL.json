@@ -20123,6 +20123,8 @@
       "valuesLoadingRow": "Trwa wczytywanie wartości",
       "valuesLoadingHint": "Pisz dalej lub naciśnij Esc, a następnie Ctrl+Space",
       "valuesEmpty": "Brak wartości dla {field} w ciągu ostatnich {minutes} minut",
+      "valuesEmptyInRange": "Brak wartości dla {field} w wybranym zakresie czasu",
+      "closeValueQuote": "Zamknij cudzysłów wartości",
       "valuesFailed": "Nie udało się wczytać wartości dla {field}",
       "chainedMenuAnnouncement": "{count} sugestia, Tab, aby zaakceptować | {count} sugestii, Tab, aby zaakceptować",
       "valuesCap": "{count} wyświetlona wartość · wpisz, aby filtrować | {count} wyświetlonych wartości · wpisz, aby filtrować",

@@ -20123,6 +20123,8 @@
       "valuesLoadingRow": "لا تزال القيم قيد التحميل",
       "valuesLoadingHint": "استمر في الكتابة، أو اضغط Esc ثم Ctrl+Space",
       "valuesEmpty": "لا توجد قيم لـ {field} في آخر {minutes} دقيقة",
+      "valuesEmptyInRange": "لا توجد قيم لـ {field} في النطاق الزمني المحدد",
+      "closeValueQuote": "إغلاق علامة اقتباس القيمة",
       "valuesFailed": "تعذّر تحميل القيم لـ {field}",
       "chainedMenuAnnouncement": "{count} اقتراح، اضغط Tab للقبول | {count} اقتراحات، اضغط Tab للقبول",
       "valuesCap": "{count} قيمة معروضة · اكتب للتصفية | {count} قيم معروضة · اكتب للتصفية",

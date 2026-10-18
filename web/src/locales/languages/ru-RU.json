@@ -20123,6 +20123,8 @@
       "valuesLoadingRow": "Всё ещё загружаются значения",
       "valuesLoadingHint": "Продолжайте вводить или нажмите Esc, затем Ctrl+Space",
       "valuesEmpty": "Нет значений для {field} за последние {minutes} мин.",
+      "valuesEmptyInRange": "Нет значений для {field} в выбранном временном диапазоне",
+      "closeValueQuote": "Закрыть кавычку значения",
       "valuesFailed": "Не удалось загрузить значения для {field}",
       "chainedMenuAnnouncement": "{count} подсказка, Tab для принятия | {count} подсказок, Tab для принятия",
       "valuesCap": "{count} значение показано · введите для фильтрации | {count} значений показано · введите для фильтрации",

@@ -20123,6 +20123,8 @@
       "valuesLoadingRow": "Değerler hâlâ yükleniyor",
       "valuesLoadingHint": "Yazmaya devam edin veya Esc ardından Ctrl+Space tuşlarına basın",
       "valuesEmpty": "Son {minutes} dakikada {field} için değer yok",
+      "valuesEmptyInRange": "Seçili zaman aralığında {field} için değer yok",
+      "closeValueQuote": "Değer tırnağını kapat",
       "valuesFailed": "{field} için değerler yüklenemedi",
       "chainedMenuAnnouncement": "{count} öneri, kabul etmek için Tab | {count} öneri, kabul etmek için Tab",
       "valuesCap": "{count} değer gösteriliyor · filtrelemek için yazın | {count} değer gösteriliyor · filtrelemek için yazın",

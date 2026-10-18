@@ -20123,6 +20123,8 @@
       "valuesLoadingRow": "Werte werden noch geladen",
       "valuesLoadingHint": "Weitertippen oder Esc und dann Strg+Leertaste drücken",
       "valuesEmpty": "Keine Werte für {field} in den letzten {minutes} Minuten",
+      "valuesEmptyInRange": "Keine Werte für {field} im ausgewählten Zeitbereich",
+      "closeValueQuote": "Das Anführungszeichen für den Wert schließen",
       "valuesFailed": "Werte für {field} konnten nicht geladen werden",
       "chainedMenuAnnouncement": "{count} Vorschlag, Tab zum Übernehmen | {count} Vorschläge, Tab zum Übernehmen",
       "valuesCap": "{count} Wert angezeigt · zum Filtern tippen | {count} Werte angezeigt · zum Filtern tippen",

@@ -20123,6 +20123,8 @@
       "valuesLoadingRow": "값을 아직 불러오는 중",
       "valuesLoadingHint": "계속 입력하거나 Esc를 누른 후 Ctrl+Space를 누르세요",
       "valuesEmpty": "최근 {minutes}분 동안 {field}의 값이 없습니다",
+      "valuesEmptyInRange": "선택한 시간 범위에 {field} 값이 없습니다",
+      "closeValueQuote": "값 따옴표 닫기",
       "valuesFailed": "{field}의 값을 불러오지 못했습니다",
       "chainedMenuAnnouncement": "{count}개 추천, Tab으로 수락 | {count}개 추천, Tab으로 수락",
       "valuesCap": "{count}개 값 표시 · 입력하여 필터링 | {count}개 값 표시 · 입력하여 필터링",
