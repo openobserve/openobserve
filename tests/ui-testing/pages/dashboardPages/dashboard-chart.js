@@ -169,6 +169,14 @@ export default class ChartTypeSelector {
       '[data-test="index-dropdown-stream"]'
     );
 
+    // An already-selected stream can be missing from the open option list (seen on alpha1), so there is nothing to click.
+    const trigger = this.page.locator('[data-test="index-dropdown-stream-trigger"]').first();
+    await streamInput.waitFor({ state: "visible", timeout: 10000 });
+    if ((await trigger.getAttribute("data-test-selected-value", { timeout: 5000 })) === streamName) {
+      testLogger.info(`selectStream: "${streamName}" is already the selected stream`);
+      return;
+    }
+
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         // Close any open dropdown first — click outside (ODropdown closes on outside click)
