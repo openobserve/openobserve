@@ -159,15 +159,22 @@ pub async fn reset(email: &str) -> Result<(), errors::Error> {
     Ok(())
 }
 
-/// Called when a user is deleted. See `user_password_history::delete_all_for_user` for why the
-/// declared cascade is not enough.
 pub async fn delete(email: &str) -> Result<u64, errors::Error> {
-    let client = get_orm_client_rw().await;
-    let result = Entity::delete_many()
-        .filter(email_eq(email))
-        .exec(client)
+    delete_for_users_on(get_orm_client_rw().await, &[email.to_string()])
         .await
-        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
+}
+
+/// Runs in the user delete's transaction, since the cascade fires only where FKs are enforced.
+pub(crate) async fn delete_for_users_on<C: ConnectionTrait>(
+    client: &C,
+    emails: &[String],
+) -> Result<u64, DbErr> {
+    let lowered: Vec<String> = emails.iter().map(|e| e.to_lowercase()).collect();
+    let result = Entity::delete_many()
+        .filter(Expr::expr(Func::lower(Expr::col(Column::Email))).is_in(lowered))
+        .exec(client)
+        .await?;
 
     Ok(result.rows_affected)
 }
