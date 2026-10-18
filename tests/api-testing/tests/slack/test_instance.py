@@ -351,6 +351,34 @@ def test_channel_defaults_on_an_instance_workspace(
     assert defaults_by_channel(client, x, i)["C0GENERAL"]["set_by_this_org"] is True
 
 
+def test_meta_sees_and_moves_the_org_of_any_channel_default_and_org_admins_never_see_it(
+    client: OpenObserveClient, ready: SlackMock, cleanup: list[tuple[str, str]]
+) -> None:
+    inst = instance(client, ready, cleanup, new_team(ready))
+    x, y, unserved = make_slack_org(client), make_slack_org(client), make_slack_org(client)
+    x_admin, meta_admin = org_admin(client, x), make_user(client, META, "admin")[1]
+    assert put_org_access(client, inst["id"], {"orgs": [META, x, y]}).status_code == 200
+    i = inst["id"]
+    assert set_default(x_admin, x, i, "C0MOVE", x).status_code == 200
+
+    own = defaults_by_channel(x_admin, x, i)["C0MOVE"]
+    assert "org_id" not in own, own
+    assert "org_name" not in own, own
+    seen = defaults_by_channel(meta_admin, META, i)["C0MOVE"]
+    assert (seen["org_id"], seen["org_name"]) == (x, org_name(client, x)), seen
+
+    moved = set_default(meta_admin, META, i, "C0MOVE", y)
+    assert moved.status_code == 200, moved.text
+    assert moved.json()["org_id"] == y
+    refused = set_default(meta_admin, META, i, "C0MOVE", unserved)
+    assert refused.status_code == 400, refused.text
+    assert message(refused) == f"Org {unserved} is not connected to this Slack workspace"
+    assert defaults_by_channel(meta_admin, META, i)["C0MOVE"]["org_id"] == y
+    after = defaults_by_channel(x_admin, x, i)["C0MOVE"]
+    assert after["set_by_this_org"] is False
+    assert "org_id" not in after, after
+
+
 def test_connect_and_connect_ticket_refused_on_an_instance_workspace(
     client: OpenObserveClient, ready: SlackMock, cleanup: list[tuple[str, str]]
 ) -> None:
@@ -417,7 +445,7 @@ def test_removing_an_org_cleans_defaults_threads_and_links_at_once(
 ) -> None:
     s = linked_instance(client, ready, cleanup)
     i, x, y = s["inst"]["id"], s["x"], s["y"]
-    # Thread rows have no API; ENT access::tests::removal_* pins their delete.
+    # Thread rows have no API; ENT access::tests::removal_* pins their marking.
     removed = put_org_access(client, i, {"orgs": [META, y]})
     assert removed.status_code == 200, removed.text
     summary = [(r["org_id"], r["channels"], r["links_moving"], r["links_unlinked"]) for r in removed.json()["removed"]]
