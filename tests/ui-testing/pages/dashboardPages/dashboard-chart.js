@@ -710,6 +710,16 @@ export default class ChartTypeSelector {
   }
 
   /**
+   * Wait until the custom SQL has been parsed into these axis fields; Apply validates the panel state, which lags the editor.
+   * @param {string} xAlias
+   * @param {string} yAlias
+   */
+  async waitForCustomQueryAxes(xAlias, yAlias) {
+    await this.page.locator(`[data-test="dashboard-x-item-${xAlias}"]`).first().waitFor({ state: "attached", timeout: 15000 });
+    await this.page.locator(`[data-test="dashboard-y-item-${yAlias}"]`).first().waitFor({ state: "attached", timeout: 15000 });
+  }
+
+  /**
    * End-to-end helper: switch to SQL → Custom query mode and enter the query.
    * @param {string} query - The SQL query to enter
    */
