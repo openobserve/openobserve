@@ -16,6 +16,6 @@
 use sea_orm::{ConnectionTrait, DbErr};
 
 /// Creates the six Slack tables; for tests, since the migrator replays the whole history.
-pub async fn create_tables_for_test<C: ConnectionTrait>(_conn: &C) -> Result<(), DbErr> {
-    Err(DbErr::Custom("slack phase0: not implemented".to_string()))
+pub async fn create_tables_for_test<C: ConnectionTrait>(conn: &C) -> Result<(), DbErr> {
+    super::migration::create_slack_tables(conn).await
 }

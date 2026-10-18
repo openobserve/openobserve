@@ -224,6 +224,7 @@ mod m20261012_000001_create_alert_calibration_configs;
 mod m20261013_000001_create_oncall_phone_verifications;
 mod m20261013_000002_create_org_telephony;
 mod m20261015_000001_reports_add_last_run_columns;
+mod m20261018_000001_create_slack_tables;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
 
@@ -363,6 +364,12 @@ pub(crate) async fn create_rum_pa_tables(db: &sea_orm::DatabaseConnection) -> Re
     m20261008_000001_add_name_to_rum_pa_tombstones::Migration
         .up(&manager)
         .await
+}
+
+/// Apply only the Slack app tables, idempotently, for tests in any crate.
+#[cfg(any(test, feature = "test-utils"))]
+pub(crate) async fn create_slack_tables<C: sea_orm::ConnectionTrait>(db: &C) -> Result<(), DbErr> {
+    m20261018_000001_create_slack_tables::create_all(db).await
 }
 
 pub struct Migrator;
@@ -577,6 +584,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20261013_000001_create_oncall_phone_verifications::Migration),
             Box::new(m20261013_000002_create_org_telephony::Migration),
             Box::new(m20261015_000001_reports_add_last_run_columns::Migration),
+            Box::new(m20261018_000001_create_slack_tables::Migration),
         ]
     }
 }
@@ -645,6 +653,7 @@ mod tests {
         (107, "m20261007_000002_add_redact_tools_to_ai_chat_shares"),
         (108, "m20261013_000002_create_org_telephony"),
         (109, "m20261015_000001_reports_add_last_run_columns"),
+        (110, "m20261018_000001_create_slack_tables"),
     ];
 
     // Two branches that each claim the next version merge cleanly, so a reused number must fail
