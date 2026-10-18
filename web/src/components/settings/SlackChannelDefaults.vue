@@ -38,11 +38,15 @@ import {
   slackChannelDefaultsQuery,
   slackChannelsQuery,
   slackInstallationsQuery,
+  slackOrgAccessQuery,
 } from "@/services/slack.queries";
 import { raw, useI18nTyped } from "@/types/i18n";
 import type { SlackChannel, SlackChannelDefaultRow } from "@/types/slack";
 import { serverMessageOf, statusOf } from "@/utils/slackLink";
 import { makeChannelDefaultSchema, type ChannelDefaultForm } from "./SlackSettings.schema";
+
+/** `org_id` is read only for a `_meta` viewer of an instance workspace, who picks the owning org. */
+type DefaultForm = ChannelDefaultForm & { org_id: string };
 
 const props = defineProps<{ installationId: string }>();
 
@@ -65,6 +69,8 @@ const instanceAdmin = computed(() => onInstance.value && isMetaOrg.value);
 const ownOrgOnly = computed(() => onInstance.value && !isMetaOrg.value);
 const canChange = (row: SlackChannelDefaultRow): boolean =>
   row.set_by_this_org || instanceAdmin.value;
+const ownerName = (row: SlackChannelDefaultRow) =>
+  instanceAdmin.value && row.org_id ? raw(row.org_name || row.org_id) : null;
 
 const defaults = useQuery(() => slackChannelDefaultsQuery(org.value, props.installationId));
 const put = useMutation(() => putChannelDefaultMutation(org.value, props.installationId));
@@ -84,6 +90,18 @@ const channels = useInfiniteQuery(() =>
     enabled: drawerOpen.value,
   }),
 );
+
+// Row 24 lists the served orgs: under `all` every org on the server, else the listed ones.
+const orgAccess = useQuery(() =>
+  Object.assign(slackOrgAccessQuery(org.value, props.installationId), {
+    enabled: instanceAdmin.value && drawerOpen.value,
+  }),
+);
+const orgOptions = computed(() => {
+  const view = orgAccess.data.value;
+  const served = view ? (view.all ? view.organizations : view.orgs) : [];
+  return served.map((o) => ({ label: raw(o.org_name || o.org_id), value: o.org_id }));
+});
 
 const rows = computed<SlackChannelDefaultRow[]>(() => defaults.data.value?.defaults ?? []);
 const otherOrgChannels = computed(
@@ -124,9 +142,10 @@ const loadError = computed(() =>
   defaults.isError.value && !forbidden.value ? t("emptyState.loadError.title") : null,
 );
 const schema = makeChannelDefaultSchema(t);
-const formDefaults = computed<ChannelDefaultForm>(() => ({
+const formDefaults = computed<DefaultForm>(() => ({
   channel_id: editing.value?.channel_id ?? "",
   answer_mode: editing.value?.answer_mode ?? "thread",
+  org_id: editing.value?.org_id ?? org.value,
 }));
 
 const columns = computed<OTableColumnDef<SlackChannelDefaultRow>[]>(() => [
@@ -155,12 +174,13 @@ const confirmRemove = (): void => {
   if (target) remove.mutate(target.channel_id);
 };
 
-const save = async (value: ChannelDefaultForm): Promise<void> => {
+const save = async (value: DefaultForm): Promise<void> => {
   saveError.value = null;
+  const target = instanceAdmin.value && value.org_id ? value.org_id : org.value;
   try {
     await put.mutateAsync({
       channelId: value.channel_id,
-      body: { org_id: org.value, answer_mode: value.answer_mode },
+      body: { org_id: target, answer_mode: value.answer_mode },
     });
     drawerOpen.value = false;
   } catch (error) {
@@ -203,7 +223,8 @@ const save = async (value: ChannelDefaultForm): Promise<void> => {
       <template #cell-channel="{ row }">{{ raw(`#${row.channel_name}`) }}</template>
       <template #cell-default_org="{ row }">
         {{
-          row.set_by_this_org ? t("slackApp.channels.thisOrg") : t("slackApp.channels.anotherOrg")
+          ownerName(row) ??
+          (row.set_by_this_org ? t("slackApp.channels.thisOrg") : t("slackApp.channels.anotherOrg"))
         }}
       </template>
       <template #cell-answers="{ row }">
@@ -327,8 +348,17 @@ const save = async (value: ChannelDefaultForm): Promise<void> => {
             {{ t("slackApp.channels.loadMore") }}
           </OButton>
         </div>
+        <OFormSelect
+          v-if="instanceAdmin"
+          name="org_id"
+          :label="t('slackApp.channels.columnDefaultOrg')"
+          :options="orgOptions"
+          :loading="orgAccess.isFetching.value"
+          :help-text="t('slackApp.channels.servedOrgsHint')"
+          data-test="slack-channel-org-select"
+        />
         <OInput
-          v-if="onInstance"
+          v-else-if="onInstance"
           :model-value="t('slackApp.card.thisOrg', { org })"
           :label="t('slackApp.channels.columnDefaultOrg')"
           :help-text="t('slackApp.channels.ownOrgOnlyHint')"

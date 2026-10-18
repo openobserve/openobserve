@@ -25234,6 +25234,7 @@
       "enabled": "Enabled",
       "saved": "Linking saved",
       "setByInstanceAdmin": "Set by your instance admin",
+      "manualForUnmapped": "For organizations without a domain mapping",
       "managedCounts": "{linked} of your members are linked: {auto} automatically, {manual} with Link your account"
     },
     "card": {
@@ -25321,7 +25322,8 @@
       "removeMessage": "Questions in #{channel} then go to the earliest connected org.",
       "instanceAdminOnly": "Instance admin only",
       "ownOrgOnlyHint": "On an instance workspace you map channels to your own org",
-      "claimableHint": "Unclaimed channels and channels {org} owns"
+      "claimableHint": "Unclaimed channels and channels {org} owns",
+      "servedOrgsHint": "Any organization this workspace serves"
     },
     "people": {
       "title": "Linked people",

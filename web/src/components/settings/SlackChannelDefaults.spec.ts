@@ -29,6 +29,7 @@ import {
   makeSlackStore,
   managedView,
   ok,
+  orgAccessView,
 } from "@/test/unit/helpers/slack";
 import type { InstallationView, SlackChannelDefaultRow } from "@/types/slack";
 
@@ -39,6 +40,7 @@ vi.mock("@/services/slack", () => ({
     deleteChannelDefault: vi.fn(),
     listChannels: vi.fn(),
     listInstallations: vi.fn(),
+    getOrgAccess: vi.fn(),
   },
 }));
 
@@ -75,9 +77,19 @@ const metaStore = () =>
     },
   });
 
-const mountOn = async (installation: InstallationView, store = makeSlackStore()) => {
+/** Row 21 as `_meta` sees an instance workspace: each row names its owning org. */
+const metaRows: SlackChannelDefaultRow[] = [
+  { ...rows[0], org_id: "_meta", org_name: "_meta" },
+  { ...rows[1], org_id: "staging", org_name: "Staging" },
+];
+
+const mountOn = async (
+  installation: InstallationView,
+  store = makeSlackStore(),
+  list: SlackChannelDefaultRow[] = rows,
+) => {
   queryClient.clear();
-  vi.mocked(slack.listChannelDefaults).mockReturnValue(ok({ defaults: rows }) as any);
+  vi.mocked(slack.listChannelDefaults).mockReturnValue(ok({ defaults: list }) as any);
   vi.mocked(slack.listInstallations).mockReturnValue(ok({ installations: [installation] }) as any);
   const w = mount(SlackChannelDefaults, {
     props: { installationId: installation.id },
@@ -374,5 +386,66 @@ describe("SlackChannelDefaults (rows 21-22)", () => {
         answer_mode: "thread",
       }),
     );
+  });
+
+  it("a _meta admin picks the default org from every served org", async () => {
+    vi.mocked(slack.getOrgAccess).mockReturnValue(ok(orgAccessView()) as any);
+    const w = await mountOn(instanceView(), metaStore(), metaRows);
+    await w.find('[data-test="slack-channel-edit-C2"]').trigger("click");
+    await flushPromises();
+    expect(slack.getOrgAccess).toHaveBeenCalledWith("_meta", "inst-1");
+    const picker = w
+      .findAllComponents({ name: "OSelect" })
+      .find((c) => c.attributes("data-test") === "slack-channel-org-select");
+    expect(picker).toBeDefined();
+    const options = picker!.props("options") as { label: string; value: string }[];
+    expect(options.map((o) => o.value)).toEqual(["_meta", "prod", "staging", "payments"]);
+    expect(picker!.props("modelValue")).toBe("staging");
+    expect(body().find('[data-test="slack-channel-default-org"]').exists()).toBe(false);
+    picker!.vm.$emit("update:modelValue", "prod");
+    await flushPromises();
+    await body().find("form").trigger("submit");
+    await vi.waitFor(() =>
+      expect(slack.putChannelDefault).toHaveBeenCalledWith("_meta", "inst-1", "C2", {
+        org_id: "prod",
+        answer_mode: "private",
+      }),
+    );
+
+    w.unmount();
+    vi.mocked(slack.getOrgAccess).mockReturnValue(ok(orgAccessView({ all: true })) as any);
+    const all = await mountOn(instanceView({ org_access: "all" }), metaStore(), metaRows);
+    await all.find('[data-test="slack-channel-set-default"]').trigger("click");
+    await flushPromises();
+    const everyOrg = all
+      .findAllComponents({ name: "OSelect" })
+      .find((c) => c.attributes("data-test") === "slack-channel-org-select");
+    expect((everyOrg!.props("options") as unknown[]).length).toBe(8);
+    expect(everyOrg!.props("modelValue")).toBe("_meta");
+  });
+
+  it("other viewers keep This org", async () => {
+    const w = await mountOn(managedView());
+    await w.find('[data-test="slack-channel-set-default"]').trigger("click");
+    await flushPromises();
+    expect(body().find('[data-test="slack-channel-default-org"]').exists()).toBe(true);
+    expect(body().find('[data-test="slack-channel-org-select"]').exists()).toBe(false);
+    w.unmount();
+    const orgWorkspace = await mountOn(installationView(), metaStore());
+    await orgWorkspace.find('[data-test="slack-channel-set-default"]').trigger("click");
+    await flushPromises();
+    expect(body().find('[data-test="slack-channel-org-select"]').exists()).toBe(false);
+    expect(slack.getOrgAccess).not.toHaveBeenCalled();
+  });
+
+  it("the table names the owning org for _meta", async () => {
+    const w = await mountOn(instanceView(), metaStore(), metaRows);
+    const [mine, theirs] = w.findAll('[data-test-stub="otable-row"]');
+    expect(mine.find('[data-col="default_org"]').text()).toBe("_meta");
+    expect(theirs.find('[data-col="default_org"]').text()).toBe("Staging");
+    w.unmount();
+    const managed = await mountOn(managedView());
+    const cells = managed.findAll('[data-col="default_org"]').map((c) => c.text());
+    expect(cells).toEqual(["This org", "Another org"]);
   });
 });

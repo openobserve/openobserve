@@ -138,6 +138,8 @@ export interface LinkingView {
   source: SlackLinkingSource;
   domains: string[];
   counts: LinkCounts;
+  /** Under a mapping, the installation's manual list; it governs only orgs without a mapping. */
+  manual_domains?: string[];
 }
 
 export interface SlackDestinationRef {
@@ -476,6 +478,9 @@ export interface SlackChannelDefaultRow {
   answer_mode: SlackAnswerMode;
   set_from: SlackSetFrom;
   set_by_this_org: boolean;
+  /** Only a `_meta` viewer of an instance workspace learns the owning org. */
+  org_id?: string;
+  org_name?: string;
 }
 
 export interface SlackChannelDefaultsResponse {

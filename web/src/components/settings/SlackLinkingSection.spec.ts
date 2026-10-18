@@ -69,7 +69,6 @@ describe("SlackLinkingSection (row 11)", () => {
       "Automatic for acme.example · from your organization's domain mapping",
     );
     expect(w.text()).toContain("Domains are read-only here");
-    expect(w.find('[data-test="slack-linking-edit"]').exists()).toBe(false);
   });
 
   it("mapped: turning linking off sends only enabled", async () => {
@@ -195,5 +194,27 @@ describe("SlackLinkingSection (row 11)", () => {
     expect(w.find('[data-test="slack-linking-manage"]').exists()).toBe(false);
     const own = await mountSection(linkingView());
     expect(own.find('[data-test="slack-linking-manage"]').exists()).toBe(true);
+  });
+
+  it("with a mapping source the manual domains stay editable, labelled for orgs without a mapping", async () => {
+    const w = await mountSection(
+      linkingView({ source: "mapping", domains: ["acme.example"], manual_domains: ["acme.dev"] }),
+    );
+    expect(w.find('[data-test="slack-linking-summary"]').text()).toContain("acme.example");
+    await w.find('[data-test="slack-linking-edit"]').trigger("click");
+    const form = w.find('[data-test="slack-linking-form"]');
+    expect(form.text()).toContain("For organizations without a domain mapping");
+    const chips = form.findAll('[data-test="slack-linking-domains"] [data-test^="tag-chip-"]');
+    expect(chips.map((c) => c.text())).toEqual(["acme.dev"]);
+    const input = form.find('[data-test="slack-linking-domains"] [data-test="tag-input-field"]');
+    await input.setValue("acme.io");
+    await input.trigger("keydown", { key: "Enter" });
+    await form.trigger("submit");
+    await vi.waitFor(() =>
+      expect(slack.updateLinking).toHaveBeenCalledWith("acme", "inst-1", {
+        enabled: true,
+        domains: ["acme.dev", "acme.io"],
+      }),
+    );
   });
 });

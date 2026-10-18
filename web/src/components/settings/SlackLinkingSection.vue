@@ -68,12 +68,14 @@ const autoCount = computed(() =>
   view.value ? view.value.counts.email + view.value.counts.admin_bulk : 0,
 );
 const matches = computed(() => (managed.value ? 0 : (view.value?.counts.matches_not_linked ?? 0)));
+const mapped = computed(() => view.value?.source === "mapping");
+// Under a mapping `domains` are the org's mapped ones; the editor edits the manual list beside them.
 const formDefaults = computed<LinkingForm>(() => ({
   enabled: view.value?.enabled ?? true,
-  domains: [...(view.value?.domains ?? [])],
+  domains: [...((mapped.value ? view.value?.manual_domains : view.value?.domains) ?? [])],
 }));
 
-// With a mapping the server owns the domains, so a PUT carrying them is refused.
+// Under a mapping the view's domains are the mapping's, so the toggle must not write them as the manual list.
 const toggle = (value: unknown): void => {
   const enabled = value === true;
   const current = view.value;
@@ -166,7 +168,7 @@ const runLinkAll = async (): Promise<void> => {
           </div>
           <div class="flex items-center gap-2">
             <OButton
-              v-if="view.source === 'manual' && !editing && !managed"
+              v-if="!editing && !managed"
               variant="outline"
               size="sm"
               data-test="slack-linking-edit"
@@ -197,7 +199,7 @@ const runLinkAll = async (): Promise<void> => {
         >
           <div class="flex flex-col gap-1">
             <span class="text-text-label text-compact font-medium">{{
-              t("slackApp.linking.domains")
+              mapped ? t("slackApp.linking.manualForUnmapped") : t("slackApp.linking.domains")
             }}</span>
             <OFormTagInput name="domains" data-test="slack-linking-domains" />
           </div>
