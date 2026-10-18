@@ -776,6 +776,10 @@ watch(popoverOpen, (open) => {
 watch(filteredOptions, () => {
   highlightedIndex.value = -1;
 });
+// The list opens scrolled to the current value; a search keeping that offset hides its best matches above the fold.
+watch(searchTerm, () => {
+  if (listboxScrollEl.value) listboxScrollEl.value.scrollTop = 0;
+});
 
 function scrollHighlightedIntoView() {
   if (highlightedIndex.value < 0 || !listboxScrollEl.value) return;

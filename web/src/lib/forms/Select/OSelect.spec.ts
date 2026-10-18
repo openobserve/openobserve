@@ -278,6 +278,29 @@ describe("OSelect", () => {
       const input = document.body.querySelector('input[placeholder="Search..."]');
       expect(input).not.toBeNull();
     });
+
+    it("starts a new search from the top of the list, not the offset it opened at", async () => {
+      wrapper = mount(OSelect, {
+        attachTo: document.body,
+        props: {
+          modelValue: 150,
+          options: Array.from({ length: 200 }, (_, i) => ({ label: `Option ${i}`, value: i })),
+        },
+      });
+      await wrapper.find("button").trigger("click");
+      await flushPromises();
+      const scroller = document.body.querySelector<HTMLElement>(".overflow-auto.max-h-72")!;
+      scroller.scrollTop = 600;
+
+      const input = document.body.querySelector<HTMLInputElement>(
+        'input[placeholder="Search..."]',
+      )!;
+      input.value = "Option 1";
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      await flushPromises();
+
+      expect(scroller.scrollTop).toBe(0);
+    });
   });
 
   describe("trigger keyboard focus behavior", () => {
