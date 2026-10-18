@@ -28,12 +28,14 @@ import type {
   ComposerSnapshot,
   HistoryService,
   RequestBuilder,
+  RequestTurn,
   Sid,
   TelemetryContainer,
   TurnEngine,
   TurnInput,
   TurnMeta,
 } from "./assistantStore.types";
+import { contextUsedOf, transcriptOf } from "./context/serialize";
 import type { ClientContext, PageContext as AssistantPageContext } from "./context/types";
 import { createEffectsRunner, type EffectScope, type Effects, type EffectsRunner } from "./effects";
 import type { AssistantFrame } from "./frames";
@@ -61,7 +63,6 @@ import type {
   ClientSendRequest,
   FrameSink,
   SendResult,
-  WireMessage,
 } from "./useAssistantClient";
 
 /** Back-off of the three read-only reconnects (HT-06 AC 2). */
@@ -102,6 +103,8 @@ export interface EngineCapability {
   noteAgentUnavailable(): void;
   noteAdmitted(): void;
   persistence(): boolean;
+  /** B-09 typed attachments; absent means delimiter blocks. */
+  attachments?(): boolean;
 }
 
 export interface TurnEngineDeps {
@@ -129,6 +132,8 @@ interface TurnRecord {
   turnId: string;
   snapshot: ComposerSnapshot;
   pageContext: Partial<AssistantPageContext>;
+  /** The provider's context as captured at `queued`; the request builder applies the whitelist. */
+  rawContext: PageContext | AssistantPageContext | null;
   client: ClientContext;
   input: TurnInput;
   mode?: "chat" | "generate_query" | "rca";
@@ -233,6 +238,10 @@ export function createTurnEngine(deps: TurnEngineDeps): TurnEngine {
         rec.stream.messages = session.messages;
         out.stream.push(...reduce(rec.stream, frame, liveCtx(t)));
         mirrorExtras(session.turnMeta, rec.stream);
+      }
+      if (frame.type === "complete") {
+        const used = contextUsedOf(frame);
+        if (used) session.turnMeta.contextUsed = used;
       }
       const event =
         frame.type === "complete" && rec.notSaved ? { ...frame, persisted: false } : frame;
@@ -391,7 +400,12 @@ export function createTurnEngine(deps: TurnEngineDeps): TurnEngine {
     const session = sessionOf(rec.sid);
     if (!entry || !session || rec.settled) return;
     try {
-      const request = builder(session, rec.snapshot, rec.client) as ClientSendRequest;
+      const request = builder(
+        session,
+        rec.snapshot,
+        rec.client,
+        requestTurnOf(rec, deps),
+      ) as ClientSendRequest;
       rec.streamEnded = false;
       rec.idSends += 1;
       const sink = sinkFor(rec);
@@ -581,7 +595,8 @@ export function createTurnEngine(deps: TurnEngineDeps): TurnEngine {
     runtime.set(sid, { controller: new AbortController(), turn: rec });
     runner.flush(sid, (s) => queueTurn(s, rec, deps.now()));
     store.drafts.remove(session.userOrgKey, sid);
-    rec.pageContext = whitelist(await safePageContext(deps), snapshot);
+    rec.rawContext = await safePageContext(deps);
+    rec.pageContext = whitelist(rec.rawContext, snapshot);
     if (sessionOf(rec.sid)?.turn.state === "queued") await attempt(rec);
     return rec.promise;
   };
@@ -707,6 +722,20 @@ function defaultRequestBuilder(
   };
 }
 
+function requestTurnOf(rec: TurnRecord, deps: TurnEngineDeps): RequestTurn {
+  const capability = deps.capability();
+  return {
+    pageContext: rec.rawContext as PageContext | null,
+    turnId: rec.turnId,
+    ...(rec.mode && { mode: rec.mode }),
+    ...(rec.ephemeral && { ephemeral: true }),
+    userIndex: rec.userIndex,
+    persisted: capability.persistence(),
+    attachments: capability.attachments?.() ?? false,
+    now: deps.now(),
+  };
+}
+
 function newRecord(
   session: AssistantSession,
   opts: Parameters<TurnEngine["send"]>[1] & object,
@@ -723,6 +752,7 @@ function newRecord(
     turnId: opts.turnId ?? deps.uuid(),
     snapshot,
     pageContext: {},
+    rawContext: null,
     client: clientContextOf(session, deps.uiVersion?.() ?? ""),
     input: opts.input ?? "typed",
     mode: opts.mode,
@@ -911,6 +941,7 @@ function snapshotOf(composer: AssistantSession["composer"]): ComposerSnapshot {
     images: [...raw.images],
     mentions: [],
     timeOverride: raw.timeOverride ? { ...raw.timeOverride } : null,
+    removedPageKeys: [...raw.removedPageKeys],
   };
 }
 
@@ -935,16 +966,6 @@ async function safePageContext(
   } catch {
     return null;
   }
-}
-
-function transcriptOf(
-  messages: AssistantSession["messages"],
-  upTo: number | undefined,
-): WireMessage[] {
-  const prior = typeof upTo === "number" && upTo >= 0 ? messages.slice(0, upTo) : messages;
-  return prior
-    .map((message) => ({ role: message.role, content: String(message.content ?? "") }))
-    .filter((message) => message.content.trim() !== "");
 }
 
 function ledgerError(code: "stream_oversized" | "unknown"): AssistantError {

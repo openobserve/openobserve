@@ -1,5 +1,5 @@
 // Copyright 2026 OpenObserve Inc.
-// WP-04 shell flows with the flag on (SHELL-01, 02, 08, the full view and A11Y-09); WP-05 adds the composer half.
+// Shell flows with the flag on (SHELL-01, 02, 08, 12, the full view and A11Y-09); WP-05 adds the composer halves.
 
 import { test, expect } from "@playwright/test";
 import { AssistantPage } from "../../pages/assistantPage.js";
@@ -41,6 +41,7 @@ test.describe("assistant shell", () => {
         () => !!document.activeElement?.closest("[data-assistant-root]"),
       );
     await expect.poll(focusedInside).toBe(true);
+    await expect(assistant.composer()).toBeFocused();
     await page.keyboard.press("ControlOrMeta+i");
     await expect(assistant.sidebar).toBeVisible();
     const events = await harness.captureTelemetry(page);
@@ -143,6 +144,7 @@ test.describe("assistant shell", () => {
     const focusedInside = () =>
       page.evaluate(() => !!document.activeElement?.closest("[data-assistant-root]"));
     await expect.poll(focusedInside).toBe(true);
+    await expect(assistant.composer()).toBeFocused();
     await expect(sheet.locator('[data-test="assistant-status-region"]')).toHaveText("O2 Assistant opened.");
     await sheet.locator('[data-test="assistant-shell-sheet-peek"]').click();
     await expect(sheet).toHaveAttribute("data-snap", "peek");
@@ -213,5 +215,23 @@ test.describe("assistant shell", () => {
           parseFloat(getComputedStyle(el).paddingBottom),
       );
     expect(contentBottom).toBeLessThanOrEqual(sheetTop + 1);
+  });
+
+  test("SHELL-12 Escape in the composer closes and never stops a running turn; an IME Escape does nothing", async ({
+    page,
+  }) => {
+    await gotoLogs(page);
+    await assistant.open("header");
+    await assistant.send("keep going", "slow");
+    await expect(assistant.container().locator('[data-test="assistant-stop"]')).toBeVisible();
+    await assistant.composer().dispatchEvent("keydown", { key: "Escape", isComposing: true, bubbles: true });
+    await expect(assistant.sidebar).toBeVisible();
+    await assistant.composer().press("Escape");
+    await expect(assistant.sidebar).toBeHidden();
+    await expect(page.locator('[data-test="assistant-container-status"]')).toHaveText(
+      "O2 Assistant closed. Still answering in the background.",
+    );
+    await expect(assistant.headerButton).toHaveAttribute("data-state", "working");
+    expect(await page.evaluate(() => (window.__o2mock.cancels || []).length)).toBe(0);
   });
 });

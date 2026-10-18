@@ -43,6 +43,10 @@ const UNREGISTERED_GATES: ReadonlySet<GateCode> = new Set([
   "not_configured",
 ]);
 
+/** An open popover, menu or listbox that owns this Escape (rung a); it closes itself. */
+const OPEN_OVERLAY_SELECTOR =
+  "[data-o-popover-content][data-state='open'], [role='menu'][data-state='open'], [role='listbox'][data-state='open']";
+
 // Rung handlers return true when they handled the key, which stops the ladder there.
 const rungs = new Map<EscapeRung, Set<(event: KeyboardEvent) => boolean>>();
 
@@ -172,9 +176,11 @@ export function resetAssistantShortcutsForTests(): void {
   owner().value = undefined;
 }
 
-// Rung f closes the sidebar or sheet (the turn keeps running); rung h keeps the full view and swallows the key.
+// Rung a lets an open overlay take the key; rung f closes the sidebar or sheet (the turn keeps running); rung h keeps the full view.
 function registerContainerRungs(): () => void {
   const off = [
+    // Reka closes the overlay on the same keydown; the DOM still shows it open while the ladder runs.
+    registerEscapeRung("a", (event) => assistantOverlayOpen(event)),
     registerEscapeRung("f", (event) => {
       if (focusedPlacement(event) !== "sidebar" || closers.size === 0) return false;
       for (const close of closers) close();
@@ -183,6 +189,16 @@ function registerContainerRungs(): () => void {
     registerEscapeRung("h", (event) => focusedPlacement(event) === "full"),
   ];
   return () => off.forEach((unregister) => unregister());
+}
+
+// Only an overlay the key came from, or one of the assistant's own, takes the key; a page's open menu does not.
+function assistantOverlayOpen(event: KeyboardEvent): boolean {
+  const target = event.target instanceof Node ? event.target : document.activeElement;
+  return Array.from(document.querySelectorAll(OPEN_OVERLAY_SELECTOR)).some(
+    (overlay) =>
+      (!!target && overlay.contains(target)) ||
+      !!overlay.querySelector('[data-test^="assistant-"]'),
+  );
 }
 
 function focusedPlacement(event: KeyboardEvent): string | null {

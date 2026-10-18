@@ -234,6 +234,81 @@ export function messagesFromTurns(
   return foldTurns(turns, t, audience, phase).messages;
 }
 
+/** One attachment block of a stored user message; `nonce` is `null` for the legacy form. */
+export interface AttachmentBlock {
+  name: string;
+  body: string;
+  nonce: string | null;
+  lines?: { start: number; end: number };
+}
+
+const NONCED_OPENER = /^--- (.+?) \[([a-z2-7]{8})\] ---$/;
+
+const NONCED_CLOSER = /^--- end \[([a-z2-7]{8})\] ---$/;
+
+// Anchored to line starts: the serializer breaks every block-shaped line of typed text, so only the legacy writer's blocks match.
+const LEGACY_BLOCK = /^--- (.+?) (?:\(lines (\d+)-(\d+)\) )?---\n([\s\S]*?)\n--- end ---$/gm;
+
+/** A user message's typed text and blocks: the trailing matching-nonce run, else the legacy chat's un-nonced form (`00` §6.3). */
+export function parseAttachmentBlocks(text: string): { text: string; blocks: AttachmentBlock[] } {
+  const nonced = parseNoncedBlocks(text);
+  if (nonced.blocks.length > 0) return nonced;
+  return parseLegacyBlocks(text);
+}
+
+/** Breaks block syntax in typed text, so nothing the user pasted can pass for an attachment (`00` §6.3). */
+export function neutralizeBlockSyntax(text: string): string {
+  return text
+    .split("\n")
+    .map((line) => (/^--- .* ---$/.test(line) ? `-\u200b${line.slice(1)}` : line))
+    .join("\n");
+}
+
+// The serializer appends its blocks after the typed text, so only the trailing run under the last block's nonce is read.
+function parseNoncedBlocks(text: string): { text: string; blocks: AttachmentBlock[] } {
+  const lines = text.split("\n");
+  const blocks: AttachmentBlock[] = [];
+  let end = lastContentLine(lines, lines.length - 1);
+  const nonce = NONCED_CLOSER.exec(lines[end] ?? "")?.[1];
+  while (nonce && end >= 2 && lines[end] === `--- end [${nonce}] ---`) {
+    const opener = NONCED_OPENER.exec(lines[end - 2]);
+    if (!opener || opener[2] !== nonce) break;
+    blocks.unshift({ name: opener[1], body: lines[end - 1], nonce });
+    end = lastContentLine(lines, end - 3);
+  }
+  if (blocks.length === 0) return { text: text.trim(), blocks };
+  return {
+    text: lines
+      .slice(0, end + 1)
+      .join("\n")
+      .trim(),
+    blocks,
+  };
+}
+
+function lastContentLine(lines: string[], from: number): number {
+  let i = from;
+  while (i >= 0 && lines[i].trim() === "") i -= 1;
+  return i;
+}
+
+function parseLegacyBlocks(text: string): { text: string; blocks: AttachmentBlock[] } {
+  const blocks: AttachmentBlock[] = [];
+  const rest = text.replace(
+    LEGACY_BLOCK,
+    (_all, name: string, start?: string, end?: string, body = "") => {
+      blocks.push({
+        name: name.trim(),
+        body,
+        nonce: null,
+        ...(start && end && { lines: { start: Number(start), end: Number(end) } }),
+      });
+      return "";
+    },
+  );
+  return { text: rest.trim(), blocks };
+}
+
 const hasSeq = (span: { first_seq?: number | null }) => typeof span.first_seq === "number";
 
 type Piece = { span: TurnSpan; messages: ChatMessage[] };

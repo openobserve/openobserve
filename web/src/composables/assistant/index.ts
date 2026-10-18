@@ -29,8 +29,40 @@ export { parseStream, extractFrames } from "./sseParser";
 export { toAssistantError, ASSISTANT_ERROR_CODES } from "./assistantErrors";
 export { turnStatusText } from "./turnStateMachine";
 export { useAssistantStarters } from "./useAssistantStarters";
-export { registerContainerCloser, useAssistantShortcuts } from "./shortcuts";
+export {
+  registerAssistantFocusTarget,
+  registerContainerCloser,
+  registerEscapeRung,
+  useAssistantShortcuts,
+} from "./shortcuts";
+export { refreshPageContext, useAssistantContext } from "./context/useAssistantContext";
+export {
+  INTERNAL_FIELDS,
+  MAX_ATTACHED_BYTES,
+  MAX_ATTACHED_ROWS,
+  byteSize,
+  chipSecondaryOf,
+  chipStateOf,
+  contextChipFor,
+  periodMs,
+  shortLabelFor,
+  timeRangeShortText,
+  timeRangeText,
+  truncateChip,
+} from "./context/contextChips";
+export {
+  legacyAutoSend,
+  legacyPayloadToChips,
+  legacyRelayArgs,
+} from "./context/legacyPayloadToChips";
+export { serialize } from "./context/serialize";
+export { parseAttachmentBlocks } from "./record";
+export { MAX_IMAGES, UNDO_WINDOW_MS, isRunning } from "./assistantStore";
+export { readRecall, readHints, markHintSeen } from "./prefs";
 export type { TurnStatusText } from "./turnStateMachine";
+export type { AssistantContextView } from "./context/useAssistantContext";
+export type { ChipState, SeesRow, TimeWindow } from "./context/contextChips";
+export type { RecallEntry } from "./prefs";
 export type { AssistantScope, AssistantStartersInput, Starter } from "./useAssistantStarters";
 export type { AssistantClient, FrameSink, SendResult, TailResult } from "./useAssistantClient";
 export type * from "./assistantStore.types";

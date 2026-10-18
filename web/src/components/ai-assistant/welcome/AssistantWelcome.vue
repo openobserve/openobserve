@@ -46,21 +46,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <template v-else>
-      <p class="flex flex-wrap items-center gap-1.5" data-test="assistant-welcome-scope">
-        <span class="text-text-secondary text-xs">{{ t("assistant.welcome.scope") }}</span>
-        <OTag
-          v-for="tag in tags"
-          :key="tag.id"
-          variant="default"
-          shape="rounded"
-          size="sm"
-          :label="tag.label"
-          :data-test="`assistant-welcome-scope-${tag.id}`"
-        />
-        <span class="text-text-secondary text-xs" data-test="assistant-welcome-sent-with-first">{{
-          t("assistant.welcome.sentWithFirst")
-        }}</span>
-      </p>
+      <AssistantContextSeesPopover v-model:open="seesOpen" :sid="sid" align="start">
+        <template #anchor>
+          <p class="flex flex-wrap items-center gap-1.5" data-test="assistant-welcome-scope">
+            <span class="text-text-secondary text-xs">{{ t("assistant.welcome.scope") }}</span>
+            <AssistantContextChip
+              v-for="tag in tags"
+              :key="tag.id"
+              :chip="tag"
+              readonly
+              :expanded="seesOpen && openedBy === tag.id"
+              :data-test="`assistant-welcome-scope-${tag.id}`"
+              @open="openSees(tag.id)"
+            />
+            <span
+              class="text-text-secondary text-xs"
+              data-test="assistant-welcome-sent-with-first"
+              >{{ t("assistant.welcome.sentWithFirst") }}</span
+            >
+          </p>
+        </template>
+      </AssistantContextSeesPopover>
 
       <h3 class="sr-only">{{ t("assistant.welcome.suggestions") }}</h3>
       <ul :class="variant === 'roomy' ? 'grid gap-3 xl:grid-cols-3' : 'flex flex-col gap-2'">
@@ -94,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import type { AssistantScope, Container, Starter } from "@/composables/assistant";
+import type { AssistantScope, Container, ContextChip, Sid, Starter } from "@/composables/assistant";
 
 export interface AssistantWelcomeProps {
   variant: "compact" | "roomy";
@@ -105,6 +111,8 @@ export interface AssistantWelcomeProps {
   ghost?: Starter | null;
   /** The telemetry container this welcome renders in. */
   container?: Container;
+  /** The session whose "What the assistant sees" the scope chips open. */
+  sid?: Sid | null;
 }
 
 export interface AssistantWelcomeEmits {
@@ -122,9 +130,10 @@ export function resetWelcomeTelemetryForTests(): void {
 </script>
 
 <script setup lang="ts">
-import { computed, useId, watch } from "vue";
+import { computed, ref, useId, watch } from "vue";
 
-import OTag from "@/lib/core/Badge/OTag.vue";
+import AssistantContextChip from "@/components/ai-assistant/context/AssistantContextChip.vue";
+import AssistantContextSeesPopover from "@/components/ai-assistant/context/AssistantContextSeesPopover.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
@@ -134,12 +143,16 @@ import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 const props = withDefaults(defineProps<AssistantWelcomeProps>(), {
   ghost: null,
   container: "sidebar",
+  sid: null,
 });
 
 const emit = defineEmits<AssistantWelcomeEmits>();
 
 const { t } = useI18nTyped();
 const capabilityId = `assistant-welcome-${useId()}`;
+const seesOpen = ref(false);
+// Only the tag that opened the shared popover reports it as expanded (V7).
+const openedBy = ref<string | null>(null);
 
 const fresh = computed(() => props.scope.streamCount === 0);
 
@@ -149,23 +162,39 @@ const capability = computed(() =>
     : t("assistant.welcome.capability.readWrite"),
 );
 
-const tags = computed(() => {
+// The scope tags are read-only tray chips that open "What the assistant sees" (`70` §8).
+const tags = computed<ContextChip[]>(() => {
   const { org, streamCount, timeRange, pageObject } = props.scope;
-  const list: { id: string; label: I18nText }[] = [];
+  const tag = (id: string, kind: ContextChip["kind"], label: I18nText): ContextChip => ({
+    id,
+    kind,
+    label,
+    sizeBytes: 0,
+    provenance: "page",
+    sent: "whitelist",
+  });
+  const list: ContextChip[] = [];
   if (pageObject?.kind === "dashboard")
-    list.push({
-      id: "object",
-      label: t("assistant.welcome.scopeObject.dashboard", { name: raw(pageObject.name) }),
-    });
-  if (org) list.push({ id: "org", label: t("assistant.welcome.scopeOrg", { org: raw(org) }) });
+    list.push(
+      tag(
+        "object",
+        "panel",
+        t("assistant.welcome.scopeObject.dashboard", { name: raw(pageObject.name) }),
+      ),
+    );
+  if (org) list.push(tag("org", "field", t("assistant.welcome.scopeOrg", { org: raw(org) })));
   if (streamCount !== null)
-    list.push({
-      id: "streams",
-      label: t("assistant.welcome.streams", { count: streamCount }, streamCount),
-    });
-  if (timeRange) list.push({ id: "time", label: timeRange });
+    list.push(
+      tag("streams", "stream", t("assistant.welcome.streams", { count: streamCount }, streamCount)),
+    );
+  if (timeRange) list.push(tag("time", "time", timeRange));
   return list;
 });
+
+function openSees(id: string): void {
+  openedBy.value = id;
+  seesOpen.value = true;
+}
 
 function select(starter: Starter, index: number): void {
   trackAssistant("ai_welcome_starter", { starter_kind: starter.kind, index, via: "click" });
