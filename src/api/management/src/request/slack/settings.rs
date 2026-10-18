@@ -49,7 +49,7 @@ use super::{caller, parse, parse_query, respond};
         ("installation_id" = String, Path, description = "Slack installation id"),
     ),
     responses(
-        (status = 200, description = "LinkingView `{\"enabled\", \"source\", \"domains\", \"counts\"}` (this organization's mapped domains only) plus `\"other_org_domains\"`, `\"truncated\"` and `\"refreshing\"` (the workspace scan runs in the background)", content_type = "application/json", body = Object),
+        (status = 200, description = "LinkingView `{\"enabled\", \"source\", \"domains\", \"counts\"}` (this organization's mapped domains only) plus `\"manual_domains\"` (the list for organizations without a mapping), `\"other_org_domains\"`, `\"truncated\"` and `\"refreshing\"` (the workspace scan runs in the background)", content_type = "application/json", body = Object),
         (status = 403, description = "Not an admin, or the OSS build", content_type = "application/json", body = ()),
         (status = 404, description = "Slack is not enabled for this organization, or unknown installation", content_type = "application/json", body = ()),
     ),
@@ -272,7 +272,7 @@ pub async fn channels(
         ("installation_id" = String, Path, description = "Slack installation id"),
     ),
     responses(
-        (status = 200, description = "`{\"defaults\": [{\"channel_id\", \"channel_name\", \"answer_mode\", \"set_from\", \"set_by_this_org\"}]}`", content_type = "application/json", body = Object),
+        (status = 200, description = "`{\"defaults\": [{\"channel_id\", \"channel_name\", \"answer_mode\", \"set_from\", \"set_by_this_org\", \"org_id\"?, \"org_name\"?}]}`", content_type = "application/json", body = Object),
         (status = 403, description = "Not an admin, or the OSS build", content_type = "application/json", body = ()),
         (status = 404, description = "Slack is not enabled for this organization, or unknown installation", content_type = "application/json", body = ()),
     ),
@@ -312,7 +312,7 @@ pub async fn channel_defaults(
         ("channel_id" = String, Path, description = "Slack channel id"),
     ),
     responses(
-        (status = 200, description = "`{\"channel_id\", \"channel_name\", \"answer_mode\", \"set_from\", \"set_by_this_org\"}`", content_type = "application/json", body = Object),
+        (status = 200, description = "`{\"channel_id\", \"channel_name\", \"answer_mode\", \"set_from\", \"set_by_this_org\", \"org_id\"?, \"org_name\"?}`", content_type = "application/json", body = Object),
         (status = 403, description = "Not an admin, or the OSS build", content_type = "application/json", body = ()),
         (status = 404, description = "Slack is not enabled for this organization, unknown installation or no default", content_type = "application/json", body = ()),
     ),
