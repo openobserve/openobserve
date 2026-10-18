@@ -440,7 +440,8 @@ export function estimateCost(
   const credits = num(input.aiCredits);
   const browserRuns = browserStepRuns(input);
   const apiRuns = apiCheckRuns(input);
-  const lines: EstimateLine[] = [
+  // Typed here, so each meter key stays a MeterKey rather than widening to string.
+  const priced: EstimateLine[] = [
     {
       key: "ingestion",
       quantity: ingestMb,
@@ -473,7 +474,11 @@ export function estimateCost(
       unit: "run",
       cost: apiRuns * unitRate(details.synthetics_protocol),
     },
-  ].map((line) => ({ ...line, cost: Number.isFinite(line.cost) ? line.cost : 0 }));
+  ];
+  const lines = priced.map((line) => ({
+    ...line,
+    cost: Number.isFinite(line.cost) ? line.cost : 0,
+  }));
   return { lines, total: lines.reduce((sum, line) => sum + line.cost, 0) };
 }
 

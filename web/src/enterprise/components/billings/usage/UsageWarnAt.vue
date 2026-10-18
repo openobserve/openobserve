@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="grid grid-cols-[6.5rem_auto_minmax(0,1fr)] items-center gap-2">
       <div class="min-w-0">
         <OInput
-          :model-value="hasBudget ? percentLabel : null"
+          :model-value="hasBudget ? percentLabel : undefined"
           type="number"
           size="md"
           suffix="%"
@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <span class="text-text-secondary text-sm" aria-hidden="true">=</span>
       <div class="min-w-0">
         <OInput
-          :model-value="hasBudget ? amount : null"
+          :model-value="hasBudget ? amount : undefined"
           type="number"
           size="md"
           prefix="$"

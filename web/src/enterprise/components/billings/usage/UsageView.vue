@@ -87,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import { useRoute, useRouter } from "vue-router";
+import { useRoute, useRouter, type LocationQueryRaw } from "vue-router";
 import { useStore } from "vuex";
 import { raw, useI18nTyped } from "@/types/i18n";
 import type { I18nText } from "@/types/i18n";
@@ -133,7 +133,7 @@ const activeTab = computed<UsageTab>(() => {
  */
 const selectTab = (value: unknown) => {
   if (typeof value !== "string" || !TABS.includes(value as UsageTab)) return;
-  const query = { ...route.query, tab: value };
+  const query: LocationQueryRaw = { ...route.query, tab: value };
   if (value !== "overview") {
     delete query.meter;
     delete query.group;

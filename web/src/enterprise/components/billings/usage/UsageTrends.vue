@@ -299,9 +299,9 @@ const selectedOrg = computed<BillingOrg | null>(
 );
 
 const orgOptions = computed(() => [
-  { label: String(t("billing.usageV2.allOrgs")), value: ALL_ORGS },
+  { label: t("billing.usageV2.allOrgs"), value: ALL_ORGS },
   ...props.billingOrgs.map((org) => ({
-    label: org.isSelf ? String(t("billing.usageV2.thisOrg", { org: org.name })) : org.name,
+    label: org.isSelf ? t("billing.usageV2.thisOrg", { org: org.name }) : raw(org.name),
     value: org.id,
   })),
 ]);

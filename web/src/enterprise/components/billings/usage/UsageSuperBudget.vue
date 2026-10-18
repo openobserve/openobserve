@@ -176,11 +176,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #cell-budget="{ row }">
             <div class="w-28">
               <OInput
-                :model-value="row.draft.budget || null"
+                :model-value="row.draft.budget || undefined"
                 type="number"
                 size="sm"
                 prefix="$"
-                placeholder="0.00"
+                :placeholder="raw('0.00')"
                 :aria-label="t('billing.usageV2.budgetFor', { org: row.label })"
                 :data-test="`billings-usagesuperbudget-budget-${row.id}`"
                 @update:model-value="setOrgBudget(row.id, $event)"
@@ -191,7 +191,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="flex items-center gap-2">
               <div class="w-20">
                 <OInput
-                  :model-value="row.draft.budget > 0 ? percentLabel(row.draft) : null"
+                  :model-value="row.draft.budget > 0 ? percentLabel(row.draft) : undefined"
                   type="number"
                   size="sm"
                   suffix="%"
@@ -233,7 +233,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <div class="flex flex-1 flex-col gap-4 p-4">
           <OInput
-            :model-value="totalDraft.budget || null"
+            :model-value="totalDraft.budget || undefined"
             type="number"
             size="md"
             prefix="$"

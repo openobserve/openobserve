@@ -139,12 +139,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div class="flex flex-1 flex-col gap-4 p-4">
           <OInput
-            :model-value="draftTotal || null"
+            :model-value="draftTotal || undefined"
             type="number"
             size="md"
             prefix="$"
             :label="t('billing.usageV2.budgetAmount')"
-            :placeholder="suggestedBudget"
+            :placeholder="raw(suggestedBudget)"
             :help-text="
               projected !== null
                 ? t('billing.usageV2.budgetAmountHelp', { amount: formatCost(projected) })
