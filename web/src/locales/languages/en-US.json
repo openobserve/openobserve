@@ -20118,7 +20118,25 @@
       "maxDoc": "Largest value in the field. Aggregate — pair with GROUP BY.",
       "minDoc": "Smallest value in the field. Aggregate — pair with GROUP BY.",
       "arrayExtractDoc": "Extract a single element from an array by 1-based index, e.g. `array_extract(regexp_match(log, '...'), 1)`.",
-      "approxTopkDoc": "Approximate the k most frequent values of a field. Much cheaper than an exact GROUP BY ... ORDER BY count DESC on high-cardinality fields."
+      "approxTopkDoc": "Approximate the k most frequent values of a field. Much cheaper than an exact GROUP BY ... ORDER BY count DESC on high-cardinality fields.",
+      "valuesLoading": "Still loading values for {field}",
+      "valuesLoadingRow": "Still loading values",
+      "valuesLoadingHint": "Keep typing, or press Esc then Ctrl+Space",
+      "valuesEmpty": "No values for {field} in the last {minutes} minutes",
+      "valuesEmptyInRange": "No values for {field} in the selected time range",
+      "closeValueQuote": "Close the value quote",
+      "valuesFailed": "Couldn't load values for {field}",
+      "chainedMenuAnnouncement": "{count} suggestion, Tab to accept | {count} suggestions, Tab to accept",
+      "valuesCap": "{count} value shown · type to filter | {count} values shown · type to filter",
+      "groupValues": "Values · recent",
+      "groupValuesName": "Values",
+      "groupFields": "Fields",
+      "groupOperators": "Operators",
+      "groupFunctionsAndFields": "Functions and fields",
+      "groupFunctions": "Functions",
+      "wrapStrMatch": "substring",
+      "wrapReMatch": "regex",
+      "wrapReNotMatch": "regex, negated"
     },
     "diagnostics": {
       "incompleteAnd": "Incomplete condition — expected an expression after AND",
@@ -20174,6 +20192,8 @@
       "duplicateColumn": "Column '{col}' is defined more than once — remove or alias the duplicate",
       "tableNotFound": "Unknown table '{tbl}' — this table or CTE does not exist",
       "functionSignature": "Function '{fn}' was called with the wrong argument type(s) — add an explicit cast",
+      "notACondition": "`{field}` is text, not a condition. Compare it: `{field} = '…'` or `str_match({field}, '…')`",
+      "notAConditionValue": "`{field}` is not a condition. Compare it, e.g. `{field} = …`",
       "syntaxError": "SQL syntax error"
     },
     "hover": {

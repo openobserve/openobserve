@@ -20118,7 +20118,25 @@
       "maxDoc": "フィールド内の最大値。集計 — GROUP BY と組み合わせます。",
       "minDoc": "フィールド内の最小値。集計 — GROUP BY と組み合わせます。",
       "arrayExtractDoc": "1から始まるインデックスで配列から単一の要素を抽出します。例: `array_extract(regexp_match(log, '...'), 1)`。",
-      "approxTopkDoc": "フィールドの最頻値k個を近似します。高カーディナリティのフィールドでの正確な GROUP BY ... ORDER BY count DESC よりもはるかにコストが低くなります。"
+      "approxTopkDoc": "フィールドの最頻値k個を近似します。高カーディナリティのフィールドでの正確な GROUP BY ... ORDER BY count DESC よりもはるかにコストが低くなります。",
+      "valuesLoading": "{field} の値をまだ読み込み中です",
+      "valuesLoadingRow": "値をまだ読み込み中です",
+      "valuesLoadingHint": "入力を続けるか、Esc を押してから Ctrl+Space を押してください",
+      "valuesEmpty": "過去 {minutes} 分間に {field} の値がありません",
+      "valuesEmptyInRange": "選択した時間範囲に {field} の値はありません",
+      "closeValueQuote": "値の引用符を閉じる",
+      "valuesFailed": "{field} の値を読み込めませんでした",
+      "chainedMenuAnnouncement": "{count} 件の候補、Tab で確定 | {count} 件の候補、Tab で確定",
+      "valuesCap": "{count} 件の値を表示中 · 入力して絞り込み | {count} 件の値を表示中 · 入力して絞り込み",
+      "groupValues": "値 · 最近",
+      "groupValuesName": "値",
+      "groupFields": "フィールド",
+      "groupOperators": "演算子",
+      "groupFunctionsAndFields": "関数とフィールド",
+      "groupFunctions": "関数",
+      "wrapStrMatch": "部分文字列",
+      "wrapReMatch": "正規表現",
+      "wrapReNotMatch": "正規表現、否定"
     },
     "diagnostics": {
       "incompleteAnd": "不完全な条件 — AND の後に式が必要です",
@@ -20174,6 +20192,8 @@
       "duplicateColumn": "列 '{col}' が複数回定義されています — 重複を削除するかエイリアスを付けてください",
       "tableNotFound": "不明なテーブル '{tbl}' — このテーブルまたは CTE は存在しません",
       "functionSignature": "関数 '{fn}' が誤った引数型で呼び出されました — 明示的なキャストを追加してください",
+      "notACondition": "`{field}` はテキストであり、条件ではありません。比較してください: `{field} = '…'` または `str_match({field}, '…')`",
+      "notAConditionValue": "`{field}` は条件ではありません。比較してください (例: `{field} = …`)",
       "syntaxError": "SQL 構文エラー"
     },
     "hover": {

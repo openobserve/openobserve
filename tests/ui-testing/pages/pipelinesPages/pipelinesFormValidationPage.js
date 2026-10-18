@@ -73,9 +73,9 @@ export class PipelinesFormValidationPage {
 
         // ── Associate Function node ───────────────────────────────────────────
         this.associateFunctionDrawer         = '[data-test="associate-function-drawer"]';
-        this.associateFunctionSelect         = '[data-test="associate-function-select-function-input"]';
         this.associateFunctionSelectPopover  = '[data-test="associate-function-select-function-input-popover"]';
         this.associateFunctionSelectError    = '[data-test="associate-function-select-function-input-error"]';
+        this.associateFunctionSelectTrigger  = '[data-test="associate-function-select-function-input-trigger"]';
         this.createFunctionToggle            = '[data-test="create-function-toggle"]';
         this.associateFunctionAfterFlattening = '[data-test="associate-function-after-flattening-toggle"]';
 
@@ -296,16 +296,23 @@ export class PipelinesFormValidationPage {
         return this.page.locator(this.associateFunctionDrawer);
     }
 
-    getAssociateFunctionSelectLocator() {
-        return this.page.locator(this.associateFunctionSelect);
-    }
-
     getAssociateFunctionSelectPopoverLocator() {
         return this.page.locator(this.associateFunctionSelectPopover);
     }
 
     getAssociateFunctionSelectErrorLocator() {
         return this.page.locator(this.associateFunctionSelectError);
+    }
+
+    // FunctionPicker shows a spinner instead of the form until the functions list loads.
+    getAssociateFunctionSelectTriggerLocator() {
+        return this.page.locator(this.associateFunctionSelectTrigger);
+    }
+
+    getAssociateFunctionSaveBlockedLocator() {
+        return this.page
+            .locator(this.associateFunctionSelectError)
+            .or(this.page.locator(`${this.associateFunctionSaveBtn}:disabled`));
     }
 
     getCreateFunctionToggleLocator() {

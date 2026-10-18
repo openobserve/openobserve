@@ -29,6 +29,8 @@ test.describe.configure({ mode: "parallel" });
 test.describe("Dashboard Variables - Refresh Indicators & Panel Reload", { tag: ['@dashboards', '@dashboardVariables', '@refresh', '@P1'] }, () => {
   test.beforeEach(async ({ page }) => {
     await navigateToBase(page);
+    // These tests cover the manual-refresh indicators; Auto Run (on where auto_query_enabled) applies changes without them.
+    await new PageManager(page).dashboardAutoRun.setStoredAutoRun("false");
     await ingestion(page);
   });
 
