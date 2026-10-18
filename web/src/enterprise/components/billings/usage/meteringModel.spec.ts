@@ -20,7 +20,10 @@ import {
   billingGroupOrgs,
   buildMeterRows,
   cycleProgress,
+  apiCheckRuns,
+  browserStepRuns,
   estimateCost,
+  runsPerMonth,
   effectiveRate,
   projectCycleCost,
   scopedMeterRows,
@@ -253,7 +256,46 @@ describe("estimateCost", () => {
     aiCredits: 4,
     avgStreamMb: 200,
     scanRateMbPerMin: 100,
+    browserChecks: 0,
+    browserSteps: 5,
+    browserRegions: 1,
+    browserDevices: 1,
+    browserIntervalSec: 300,
+    apiChecks: 0,
+    apiRegions: 1,
+    apiIntervalSec: 300,
   };
+
+  it("prices synthetics per run: browser per step, region and device; API per region", () => {
+    const withSynthetics = {
+      ...priced,
+      synthetics_browser: { base_cost: 0.0002574, unit_divisor: 1 },
+      synthetics_protocol: { base_cost: 0.00000494, unit_divisor: 1 },
+    } as unknown as MeteringDetails;
+    const plan = {
+      ...input,
+      browserChecks: 10,
+      browserSteps: 5,
+      browserRegions: 2,
+      browserDevices: 2,
+      apiChecks: 20,
+      apiRegions: 3,
+    };
+    // Every 300 seconds is 8,640 runs in a 30 day month.
+    expect(runsPerMonth(300)).toBe(8640);
+    expect(browserStepRuns(plan)).toBe(1_728_000);
+    expect(apiCheckRuns(plan)).toBe(518_400);
+    const { lines } = estimateCost(withSynthetics, plan);
+    const line = (key: string) => lines.find((entry) => entry.key === key);
+    expect(line("synthetics_browser")).toMatchObject({ quantity: 1_728_000, unit: "run" });
+    expect(line("synthetics_browser")?.cost).toBeCloseTo(1_728_000 * 0.0002574, 6);
+    expect(line("synthetics_protocol")?.cost).toBeCloseTo(518_400 * 0.00000494, 6);
+  });
+
+  it("never runs a check with no interval", () => {
+    expect(runsPerMonth(0)).toBe(0);
+    expect(apiCheckRuns({ ...input, apiChecks: 5, apiIntervalSec: 0 })).toBe(0);
+  });
 
   it("prices every meter from the API rate and sums them", () => {
     const { lines, total } = estimateCost(priced, input);

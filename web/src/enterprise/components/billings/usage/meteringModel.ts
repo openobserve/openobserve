@@ -361,13 +361,21 @@ export interface EstimateInputs {
   avgStreamMb: number;
   /** Converts search minutes into scanned megabytes. */
   scanRateMbPerMin: number;
+  browserChecks: number;
+  browserSteps: number;
+  browserRegions: number;
+  browserDevices: number;
+  browserIntervalSec: number;
+  apiChecks: number;
+  apiRegions: number;
+  apiIntervalSec: number;
 }
 
 export interface EstimateLine {
   key: MeterKey;
-  /** Megabytes for a volume meter, credits for AI. */
+  /** Megabytes for a volume meter, credits for AI, runs for synthetics. */
   quantity: number;
-  unit: "mb" | "credit";
+  unit: "mb" | "credit" | "run";
   cost: number;
 }
 
@@ -379,6 +387,32 @@ export interface Estimate {
 const MB_PER_GB = 1024;
 
 const SECONDS_PER_DAY = 86400;
+
+const DAYS_PER_MONTH = 30;
+
+const finite = (value: number) => (Number.isFinite(Number(value)) ? Number(value) : 0);
+
+/** Scheduled runs in a 30 day month; a check with no interval never runs. */
+export function runsPerMonth(intervalSec: number): number {
+  const interval = finite(intervalSec);
+  return interval > 0 ? (DAYS_PER_MONTH * SECONDS_PER_DAY) / interval : 0;
+}
+
+/** Browser checks bill per step run: every step, in every region, on every device, each time it runs. */
+export function browserStepRuns(input: EstimateInputs): number {
+  return (
+    finite(input.browserChecks) *
+    finite(input.browserSteps) *
+    finite(input.browserRegions) *
+    finite(input.browserDevices) *
+    runsPerMonth(input.browserIntervalSec)
+  );
+}
+
+/** API checks bill per run, in every region. */
+export function apiCheckRuns(input: EstimateInputs): number {
+  return finite(input.apiChecks) * finite(input.apiRegions) * runsPerMonth(input.apiIntervalSec);
+}
 
 /**
  * Cost per stored megabyte per day, derived from this org's own billed
@@ -404,6 +438,8 @@ export function estimateCost(
   const scannedMb = num(input.searchCount) * num(input.searchMinutes) * num(input.scanRateMbPerMin);
   const pipelineMb = num(input.pipelineCount) * num(input.avgStreamMb);
   const credits = num(input.aiCredits);
+  const browserRuns = browserStepRuns(input);
+  const apiRuns = apiCheckRuns(input);
   const lines: EstimateLine[] = [
     {
       key: "ingestion",
@@ -425,6 +461,18 @@ export function estimateCost(
       cost: ingestMb * num(input.retentionDays) * retentionDailyRate(details),
     },
     { key: "ai", quantity: credits, unit: "credit", cost: credits * unitRate(details.ai) },
+    {
+      key: "synthetics_browser",
+      quantity: browserRuns,
+      unit: "run",
+      cost: browserRuns * unitRate(details.synthetics_browser),
+    },
+    {
+      key: "synthetics_protocol",
+      quantity: apiRuns,
+      unit: "run",
+      cost: apiRuns * unitRate(details.synthetics_protocol),
+    },
   ].map((line) => ({ ...line, cost: Number.isFinite(line.cost) ? line.cost : 0 }));
   return { lines, total: lines.reduce((sum, line) => sum + line.cost, 0) };
 }

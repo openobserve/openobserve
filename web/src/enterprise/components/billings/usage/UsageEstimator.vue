@@ -31,7 +31,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   megabyte and a guessed conversion would quietly invent a number.
 -->
 <template>
-  <div class="@container/estimator flex flex-col gap-3" data-test="billings-usageestimator-root">
+  <div
+    class="@container/estimator flex h-full flex-col gap-3"
+    data-test="billings-usageestimator-root"
+  >
     <OEmptyState
       v-if="!details"
       size="block"
@@ -70,8 +73,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </div>
 
+      <!-- Side by side, the panes fill the page and only the form scrolls, so the estimate never leaves the screen. -->
       <div
-        class="grid items-stretch gap-3 @min-[60rem]/estimator:grid-cols-[minmax(0,1.35fr)_minmax(20rem,0.95fr)]"
+        class="grid items-stretch gap-3 @min-[60rem]/estimator:min-h-0 @min-[60rem]/estimator:flex-1 @min-[60rem]/estimator:grid-cols-[minmax(0,1.35fr)_minmax(20rem,0.95fr)] @min-[60rem]/estimator:grid-rows-[minmax(0,1fr)]"
       >
         <!-- ── Inputs ───────────────────────────────────────── -->
         <section
@@ -80,10 +84,64 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <UsagePaneHeader
             :title="t('billing.usageV2.expectedUsage')"
             :subtitle="t('billing.usageV2.expectedUsageHint')"
-          />
+          >
+            <template #actions>
+              <!-- Conversions, not plans: rarely edited, so they wait behind a button instead of taking a block of the form. -->
+              <OPopover align="end" :aria-label="t('billing.usageV2.assumptions')">
+                <template #trigger>
+                  <OButton
+                    variant="outline"
+                    size="xs"
+                    icon-left="tune"
+                    data-test="billings-usageestimator-assumptions"
+                  >
+                    {{ t("billing.usageV2.assumptions") }}
+                  </OButton>
+                </template>
+                <div
+                  class="flex w-80 flex-col gap-3 p-3"
+                  data-test="billings-usageestimator-assumptions-panel"
+                >
+                  <p class="text-text-heading text-sm font-semibold">
+                    {{ t("billing.usageV2.assumptions") }}
+                    <span class="text-text-secondary text-xs font-normal">
+                      {{ t("billing.usageV2.assumptionsFrom") }}
+                    </span>
+                  </p>
+                  <OInput
+                    :model-value="inputs.avgStreamMb"
+                    type="number"
+                    size="md"
+                    :label="t('billing.usageV2.avgStreamSize')"
+                    :suffix="rawMb"
+                    data-test="billings-usageestimator-avg-stream"
+                    @update:model-value="setField('avgStreamMb', $event)"
+                  />
+                  <OInput
+                    :model-value="inputs.scanRateMbPerMin"
+                    type="number"
+                    size="md"
+                    :label="t('billing.usageV2.avgScanRate')"
+                    :suffix="rawMbPerMin"
+                    data-test="billings-usageestimator-scan-rate"
+                    @update:model-value="setField('scanRateMbPerMin', $event)"
+                  />
+                </div>
+              </OPopover>
+            </template>
+          </UsagePaneHeader>
 
-          <div class="grid gap-x-5 gap-y-4 p-4 @min-[36rem]/estimator:grid-cols-2">
-            <div v-for="field in fields" :key="field.key" class="flex min-w-0 flex-col gap-1.5">
+          <div
+            class="grid min-h-0 gap-x-5 gap-y-4 overflow-y-auto p-4 @min-[36rem]/estimator:grid-cols-2"
+            data-test="billings-usageestimator-fields"
+          >
+            <div
+              v-for="field in fields"
+              :key="field.key"
+              class="flex min-w-0 flex-col gap-1.5"
+              :data-test="`billings-usageestimator-field-${field.key}`"
+            >
+              <div v-if="field.title" class="text-xs font-semibold">{{ field.title }}</div>
               <OInput
                 :model-value="inputs[field.key]"
                 type="number"
@@ -107,36 +165,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :data-test="`billings-usageestimator-${field.key}-slider`"
                 @update:model-value="setField(field.key, $event)"
               />
-            </div>
-          </div>
-
-          <!-- Conversions, not plans: quieter, and below the fields they feed. -->
-          <div class="border-border-default bg-surface-subtle mt-auto border-t px-4 pt-2.5 pb-4">
-            <div class="text-xs font-semibold">
-              {{ t("billing.usageV2.assumptions") }}
-              <span class="text-text-secondary font-normal">
-                {{ t("billing.usageV2.assumptionsFrom") }}
-              </span>
-            </div>
-            <div class="mt-2.5 grid gap-x-5 gap-y-4 @min-[36rem]/estimator:grid-cols-2">
-              <OInput
-                :model-value="inputs.avgStreamMb"
-                type="number"
-                size="md"
-                :label="t('billing.usageV2.avgStreamSize')"
-                :suffix="rawMb"
-                data-test="billings-usageestimator-avg-stream"
-                @update:model-value="setField('avgStreamMb', $event)"
-              />
-              <OInput
-                :model-value="inputs.scanRateMbPerMin"
-                type="number"
-                size="md"
-                :label="t('billing.usageV2.avgScanRate')"
-                :suffix="rawMbPerMin"
-                data-test="billings-usageestimator-scan-rate"
-                @update:model-value="setField('scanRateMbPerMin', $event)"
-              />
+              <!-- A check's shape only scales its count, so it takes small boxes rather than a slider each. -->
+              <template v-if="field.shape">
+                <div class="flex flex-wrap gap-x-3 gap-y-2 pt-1">
+                  <OInput
+                    v-for="part in field.shape"
+                    :key="part.key"
+                    :model-value="inputs[part.key]"
+                    type="number"
+                    size="sm"
+                    width="xs"
+                    :label="t(part.labelKey)"
+                    :suffix="part.suffix"
+                    :data-test="`billings-usageestimator-${part.key}`"
+                    @update:model-value="setField(part.key, $event)"
+                  />
+                </div>
+                <span class="text-text-secondary text-xs">{{ runNotes[field.key] }}</span>
+              </template>
             </div>
           </div>
         </section>
@@ -148,7 +194,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <UsagePaneHeader :title="t('billing.usageV2.yourEstimate')" />
 
-          <ul class="m-0 flex list-none flex-col p-0">
+          <ul class="m-0 flex min-h-0 list-none flex-col overflow-y-auto p-0">
             <li
               v-for="line in sortedLines"
               :key="line.key"
@@ -201,10 +247,13 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import { formatSizeFromMB } from "@/utils/formatters";
+import OPopover from "@/lib/overlay/Popover/OPopover.vue";
+import { addCommasToNumber, formatSizeFromMB } from "@/utils/formatters";
 import UsagePaneHeader from "./UsagePaneHeader.vue";
 import { useUsageSearch } from "./useUsageSearch";
 import {
+  apiCheckRuns,
+  browserStepRuns,
   estimateCost,
   formatCost,
   formatRate,
@@ -219,12 +268,22 @@ import { averageStreamSizeSql, searchScanRateSql } from "./usageQueries";
 
 type FieldKey = keyof EstimateInputs;
 
+/** A field that only shapes a check: a small box under the check's count, with no slider. */
+interface ShapeDef {
+  key: FieldKey;
+  labelKey: I18nKey;
+  suffix: string;
+}
+
 type ScenarioKey = "current" | "twice" | "fiveTimes";
 
 interface FieldDef {
   key: FieldKey;
   labelKey: I18nKey;
   meter?: MeterKey;
+  /** Shows the meter's name above the field, for a count that heads its own block. */
+  titled?: boolean;
+  shape?: ShapeDef[];
   suffix: string;
   min: number;
   max: number;
@@ -254,7 +313,14 @@ const SCENARIOS: { value: ScenarioKey; labelKey: I18nKey }[] = [
 ];
 
 /** Growth multiplies the volumes a plan grows by, never the conversion assumptions. */
-const GROWN_FIELDS: FieldKey[] = ["ingestGb", "searchCount", "pipelineCount", "aiCredits"];
+const GROWN_FIELDS: FieldKey[] = [
+  "ingestGb",
+  "searchCount",
+  "pipelineCount",
+  "aiCredits",
+  "browserChecks",
+  "apiChecks",
+];
 
 const FIELDS: FieldDef[] = [
   {
@@ -310,6 +376,36 @@ const FIELDS: FieldDef[] = [
     max: 2000,
     step: 10,
   },
+  {
+    key: "browserChecks",
+    labelKey: "billing.usageV2.browserChecks",
+    meter: "synthetics_browser",
+    titled: true,
+    suffix: "",
+    min: 0,
+    max: 200,
+    step: 1,
+    shape: [
+      { key: "browserSteps", labelKey: "billing.usageV2.stepsPerCheck", suffix: "" },
+      { key: "browserRegions", labelKey: "billing.usageV2.checkRegions", suffix: "" },
+      { key: "browserDevices", labelKey: "billing.usageV2.checkDevices", suffix: "" },
+      { key: "browserIntervalSec", labelKey: "billing.usageV2.checkInterval", suffix: "sec" },
+    ],
+  },
+  {
+    key: "apiChecks",
+    labelKey: "billing.usageV2.apiChecks",
+    meter: "synthetics_protocol",
+    titled: true,
+    suffix: "",
+    min: 0,
+    max: 500,
+    step: 1,
+    shape: [
+      { key: "apiRegions", labelKey: "billing.usageV2.checkRegions", suffix: "" },
+      { key: "apiIntervalSec", labelKey: "billing.usageV2.checkInterval", suffix: "sec" },
+    ],
+  },
 ];
 
 const DEFAULTS: EstimateInputs = {
@@ -321,7 +417,19 @@ const DEFAULTS: EstimateInputs = {
   aiCredits: 0,
   avgStreamMb: 0,
   scanRateMbPerMin: 0,
+  browserChecks: 0,
+  browserSteps: 5,
+  browserRegions: 1,
+  browserDevices: 1,
+  browserIntervalSec: 300,
+  apiChecks: 0,
+  apiRegions: 1,
+  apiIntervalSec: 300,
 };
+
+/** Runs one check makes in a month at the default shape, which turns billed runs back into a check count. */
+const BROWSER_RUNS_PER_CHECK = browserStepRuns({ ...DEFAULTS, browserChecks: 1 });
+const API_RUNS_PER_CHECK = apiCheckRuns({ ...DEFAULTS, apiChecks: 1 });
 
 const inputs = reactive<EstimateInputs>({ ...DEFAULTS });
 
@@ -370,6 +478,18 @@ const currentScenario = computed<EstimateInputs>(() => {
         : DEFAULTS.pipelineCount,
     retentionDays: DEFAULTS.retentionDays,
     aiCredits: Math.round(perMonth(details.ai?.metered_amount)),
+    browserChecks: Math.round(
+      perMonth(details.synthetics_browser?.metered_amount) / BROWSER_RUNS_PER_CHECK,
+    ),
+    browserSteps: DEFAULTS.browserSteps,
+    browserRegions: DEFAULTS.browserRegions,
+    browserDevices: DEFAULTS.browserDevices,
+    browserIntervalSec: DEFAULTS.browserIntervalSec,
+    apiChecks: Math.round(
+      perMonth(details.synthetics_protocol?.metered_amount) / API_RUNS_PER_CHECK,
+    ),
+    apiRegions: DEFAULTS.apiRegions,
+    apiIntervalSec: DEFAULTS.apiIntervalSec,
   };
 });
 
@@ -401,6 +521,16 @@ const scannedText = computed(() => raw(formatSizeFromMB(scannedMb.value)));
 /** Search is planned in minutes but billed on scanned volume, so the field states the conversion. */
 const scanNote = computed(() => t("billing.usageV2.scanNote", { volume: scannedText.value }));
 
+const runCount = (runs: number) => raw(addCommasToNumber(Math.round(runs)));
+
+/** What a check's count and shape add up to, under its boxes. */
+const runNotes = computed<Partial<Record<FieldKey, I18nText>>>(() => ({
+  browserChecks: t("billing.usageV2.browserRunsNote", {
+    runs: runCount(browserStepRuns(inputs)),
+  }),
+  apiChecks: t("billing.usageV2.apiRunsNote", { runs: runCount(apiCheckRuns(inputs)) }),
+}));
+
 const quantityText = (line: EstimateLine): I18nText => {
   const volume = raw(formatSizeFromMB(line.quantity));
   switch (line.key) {
@@ -412,6 +542,10 @@ const quantityText = (line: EstimateLine): I18nText => {
       return t("billing.usageV2.qtyKeptFor", { volume, days: inputs.retentionDays });
     case "ai":
       return t("billing.usageV2.qtyCredits", { count: line.quantity });
+    case "synthetics_browser":
+      return t("billing.usageV2.qtyStepRuns", { count: runCount(line.quantity) });
+    case "synthetics_protocol":
+      return t("billing.usageV2.qtyRuns", { count: runCount(line.quantity) });
     default:
       return volume;
   }
@@ -434,14 +568,15 @@ const fields = computed(() =>
   FIELDS.map((field) => {
     const def = field.meter ? METERS.find((entry) => entry.key === field.meter) : undefined;
     const meter = field.meter ? props.details?.[field.meter] : undefined;
-    if (!def || !meter) return { ...field, rate: undefined, rateHint: undefined };
+    const title = field.titled && field.meter ? meterLabel(field.meter) : undefined;
+    if (!def || !meter) return { ...field, title, rate: undefined, rateHint: undefined };
     const basis = t(def.billedAsKey);
     const priced = Number(meter.base_cost) > 0;
     const rate = priced ? formatRate(meter, def, t) : t("billing.usageV2.rateIncluded");
     const rateHint = priced
       ? t("billing.usageV2.rateTooltip", { rate, basis })
       : t("billing.usageV2.rateIncludedTooltip", { basis });
-    return { ...field, rate, rateHint };
+    return { ...field, title, rate, rateHint };
   }),
 );
 
