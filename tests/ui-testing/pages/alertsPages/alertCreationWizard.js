@@ -457,13 +457,7 @@ export class AlertCreationWizard {
         await this.page.waitForTimeout(1000);
         testLogger.info('Opened SQL Editor dialog');
 
-        // Get the Monaco editor (innermost .monaco-editor element)
-        const monacoEditor = this.page.locator(this.locators.sqlEditorDialog).locator('.monaco-editor').last();
-        await monacoEditor.waitFor({ state: 'visible', timeout: 30000 });
-        await monacoEditor.click({ force: true });
-        await this.page.waitForTimeout(500);
-        await this.page.keyboard.type('SELECT kubernetes_labels_name FROM "e2e_automate" where kubernetes_labels_name = \'ziox-querier\'');
-        testLogger.info('Entered SQL query');
+        await this._replaceSqlEditorQuery('SELECT kubernetes_labels_name FROM "e2e_automate" where kubernetes_labels_name = \'ziox-querier\'');
 
         await this.page.locator(this.locators.runQueryButton).click();
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
@@ -835,20 +829,7 @@ export class AlertCreationWizard {
         await this.page.waitForTimeout(1000);
         testLogger.info('Opened SQL Editor dialog');
 
-        // Get the Monaco editor (innermost .monaco-editor element)
-        const monacoEditor = this.page.locator(this.locators.sqlEditorDialog).locator('.monaco-editor').last();
-        await monacoEditor.waitFor({ state: 'visible', timeout: 30000 });
-        await monacoEditor.click({ force: true });
-        await this.page.waitForTimeout(500);
-        // Clear the editor's pre-populated default query (`SELECT * FROM "<stream>"`) first —
-        // typing without clearing concatenates into malformed SQL
-        // (`SELECT * FROM "..."SELECT ...` → ParserError → the form blocks save with
-        // "Please fix the SQL error before saving." and no success toast ever appears).
-        await this.page.keyboard.press('ControlOrMeta+A');
-        await this.page.keyboard.press('Delete');
-        await this.page.waitForTimeout(300);
-        await this.page.keyboard.type(`SELECT kubernetes_labels_name FROM "${streamName}" where kubernetes_labels_name = 'ziox-querier'`);
-        testLogger.info('Entered SQL query');
+        await this._replaceSqlEditorQuery(`SELECT kubernetes_labels_name FROM "${streamName}" where kubernetes_labels_name = 'ziox-querier'`);
 
         await this.page.locator(this.locators.runQueryButton).click();
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
@@ -1270,6 +1251,25 @@ export class AlertCreationWizard {
         await this._switchToTab('Alert Rules');
     }
 
+    async _replaceSqlEditorQuery(query) {
+        const monacoEditor = this.page.locator(this.locators.sqlEditorDialog).locator('.monaco-editor').last();
+        await monacoEditor.waitFor({ state: 'visible', timeout: 30000 });
+        const readQuery = () => monacoEditor.evaluate((node) => {
+            const editor = window.monaco?.editor?.getEditors?.().find((e) => node.contains(e.getDomNode()));
+            return editor ? editor.getValue() : null;
+        });
+        // The dialog pre-fills `SELECT * FROM "<stream>"` once the stream loads; typing over a late pre-fill glues both into invalid SQL.
+        await expect.poll(async () => {
+            if ((await readQuery()) === query) return true;
+            await monacoEditor.click({ force: true });
+            await this.page.keyboard.press('ControlOrMeta+A');
+            await this.page.keyboard.press('Delete');
+            await this.page.keyboard.type(query);
+            return (await readQuery()) === query;
+        }, { timeout: 30000, intervals: [1000, 2000, 3000] }).toBe(true);
+        testLogger.info('Entered SQL query', { query });
+    }
+
     /**
      * Create a scheduled alert with deduplication for validation testing
      * Uses custom columns (city) and configures for quick evaluation cycles
@@ -1339,13 +1339,7 @@ export class AlertCreationWizard {
 
         // Use SQL query that selects data matching our condition
         const sqlQuery = `SELECT ${column} FROM "${streamName}" WHERE ${column} = '${value}'`;
-        // Get the Monaco editor (innermost .monaco-editor element)
-        const monacoEditor = this.page.locator(this.locators.sqlEditorDialog).locator('.monaco-editor').last();
-        await monacoEditor.waitFor({ state: 'visible', timeout: 30000 });
-        await monacoEditor.click({ force: true });
-        await this.page.waitForTimeout(500);
-        await this.page.keyboard.type(sqlQuery);
-        testLogger.info('Entered SQL query', { sqlQuery });
+        await this._replaceSqlEditorQuery(sqlQuery);
 
         await this.page.locator(this.locators.runQueryButton).click();
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});

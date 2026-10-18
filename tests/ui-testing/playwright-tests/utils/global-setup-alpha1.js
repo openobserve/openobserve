@@ -3,6 +3,7 @@ const path = require('path');
 const fs = require('fs');
 const testLogger = require('./test-logger.js');
 const logsdata = require('../../../test-data/logs_data.json');
+const { generateTrace } = require('./trace-ingestion.js');
 
 // Auth storage paths. Filenames stay canonical (user.json / cloud-config.json)
 // because ~20 spec files and shared utils (cloud-auth.js, enhanced-baseFixtures.js)
@@ -502,6 +503,27 @@ async function fetchCloudConfig(page) {
 }
 
 /**
+ * Seed the default traces stream the way the OSS global setup does, for the Traces specs that query it.
+ */
+async function seedTraces(baseUrl, orgId, headers, count = 20) {
+  let ingested = 0;
+  for (let i = 1; i <= count; i++) {
+    try {
+      const r = await fetch(`${baseUrl}/api/${orgId}/v1/traces`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(generateTrace(i)),
+      });
+      if (r.ok) ingested++;
+      else testLogger.warn(`[alpha1] Trace ${i} ingestion returned ${r.status}`);
+    } catch (e) {
+      testLogger.warn(`[alpha1] Trace ${i} ingestion failed`, { error: e.message });
+    }
+  }
+  testLogger.info(`[alpha1] Ingested ${ingested}/${count} traces into the default traces stream`);
+}
+
+/**
  * Ingest test data into streams so they appear in UI dropdowns.
  * Uses cloud auth (email:passcode) from cloud-config.json.
  */
@@ -554,6 +576,9 @@ async function performGlobalIngestion(page) {
       testLogger.warn(`[alpha1] Failed to ingest into '${stream.name}'`, { error: e.message });
     }
   }
+
+  // Only service-graph.spec.js used to ingest traces on alpha, so the other Traces specs had data only while it ran.
+  await seedTraces((process.env.ZO_BASE_URL || '').replace(/\/$/, ''), orgId, headers);
 
   // Wait for streams to be indexed
   testLogger.info('[alpha1] Waiting for streams to be indexed...');
@@ -709,6 +734,9 @@ async function performGlobalIngestionWithFetch() {
       testLogger.warn(`[alpha1] Failed to ingest into '${stream.name}'`, { error: e.message });
     }
   }
+
+  // Only service-graph.spec.js used to ingest traces on alpha, so the other Traces specs had data only while it ran.
+  await seedTraces((process.env.ZO_BASE_URL || '').replace(/\/$/, ''), orgId, headers);
 
   // Wait for streams to be indexed
   testLogger.info('[alpha1] Waiting for streams to be indexed...');
