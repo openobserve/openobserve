@@ -962,26 +962,10 @@ export class LogsPage {
         }
     }
 
-    /**
-     * True when the current page is this org's logs page and was loaded moments ago, so it has no state to reset.
-     * @param {string} orgId
-     * @param {number} maxAgeMs
-     */
-    async isFreshLogsPage(orgId, maxAgeMs = 15000) {
-        let url;
-        try { url = new URL(this.page.url()); } catch { return false; }
-        if (!url.pathname.endsWith('/web/logs') || url.searchParams.get('org_identifier') !== orgId) return false;
-        const ageMs = await this.page.evaluate(() => performance.now()).catch(() => Infinity);
-        return ageMs < maxAgeMs;
-    }
-
     async selectStream(stream, maxRetries = 5, apiWaitMs = null, skipNavigation = false) {
         // Cloud environments need longer for streams to be indexed after ingestion
         const effectiveApiWaitMs = apiWaitMs ?? (isCloudEnvironment() ? 120000 : 30000);
         testLogger.info(`selectStream: Selecting stream: ${stream} (apiWait: ${effectiveApiWaitMs}ms, skipNavigation: ${skipNavigation})`);
-        const orgId = getOrgIdentifier();
-        // Measured before the API wait, which takes time but leaves the UI untouched.
-        const freshLogsPage = !skipNavigation && await this.isFreshLogsPage(orgId);
 
         // First, wait for the stream to be available via API (skip if apiWaitMs is 0)
         if (effectiveApiWaitMs > 0) {
@@ -998,11 +982,10 @@ export class LogsPage {
         // Navigate to logs page via URL to ensure fresh stream list.
         // skipNavigation=true bypasses page.goto when the caller is already
         // on the logs page and wants to avoid auto-triggering a query.
+        const orgId = getOrgIdentifier();
         const logsUrl = `${process.env.ZO_BASE_URL}/web/logs?org_identifier=${orgId}`;
 
-        if (freshLogsPage) {
-            testLogger.info('selectStream: Logs page just loaded for this org — skipping reload (retries still reload if the stream is missing)');
-        } else if (!skipNavigation) {
+        if (!skipNavigation) {
             testLogger.info(`selectStream: Navigating to logs page: ${logsUrl}`);
             await this.page.goto(logsUrl, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
             // Wait for the index-dropdown wrapper to mount instead of a hard timeout.
@@ -1704,6 +1687,11 @@ export class LogsPage {
     // when the query contains SELECT...FROM. Delegate to the canonical enableSqlModeIfNeeded.
     async enableSQLMode() {
         await this.enableSqlModeIfNeeded();
+    }
+
+    async expectSqlModeActive() {
+        // Filter mode rejects LIMIT client-side, so a run before this flips sends no request at all.
+        await expect.poll(() => this._isSqlModeEnabledViaVue(), { timeout: 10000 }).toBe(true);
     }
 
     // Quick Mode methods (now inside the utilities hamburger menu)
