@@ -153,6 +153,9 @@ import AssistantContextSeesPopover from "./AssistantContextSeesPopover.vue";
 
 const THREAD_WINDOW_MS = 30 * 60_000;
 
+// A page that just loaded fills its fields in over its first reads; that is not a change the user made.
+const PAGE_SETTLE_MS = 3_000;
+
 const props = withDefaults(defineProps<AssistantContextTrayProps>(), {
   collapsed: false,
   visible: true,
@@ -228,14 +231,14 @@ watch(
   },
 );
 
-// A chip a page change adds is announced once; the first read and the time chip's ticks never are (CT-01 AC 12).
-let pageRead = !!context.page.value;
+// A chip a page change adds is announced once; the page's own load and the time chip's ticks never are (CT-01 AC 12).
+let settledAt = context.page.value ? 0 : null;
 watch(
   () => context.chips.value.filter((chip) => chip.provenance === "page" && chip.kind !== "time"),
   (next, previous) => {
-    const first = !pageRead;
-    if (context.page.value) pageRead = true;
-    if (first || !props.visible || !props.sid || !previous) return;
+    if (settledAt === null && context.page.value) settledAt = Date.now() + PAGE_SETTLE_MS;
+    if (settledAt === null || Date.now() < settledAt) return;
+    if (!props.visible || !props.sid || !previous) return;
     const before = new Set(previous.map((chip) => chip.id));
     for (const chip of next)
       if (!before.has(chip.id))

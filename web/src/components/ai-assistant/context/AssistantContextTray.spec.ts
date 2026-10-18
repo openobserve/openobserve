@@ -17,6 +17,10 @@ import { enableAutoUnmount, flushPromises, mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ContextChip } from "@/composables/assistant";
+import {
+  refreshPageContext,
+  resetAssistantContextForTests,
+} from "@/composables/assistant/context/useAssistantContext";
 import { contextRegistry } from "@/composables/contextProviders/registry";
 import { trackAssistant } from "@/services/assistantAnalytics";
 import { raw } from "@/types/i18n";
@@ -317,5 +321,28 @@ describe("AssistantContextTray", () => {
     ]);
     for (const chip of shown) expect(chip.name).toContain(chip.text);
     expect(shown.some((chip) => /SELECT|\ba1\b|\bd1\b/.test(chip.text))).toBe(false);
+  });
+
+  it("never announces the page filling in its own fields as it loads, only later changes (CT-01 AC 12)", async () => {
+    resetAssistantContextForTests();
+    let page: Record<string, unknown> = { ...LOGS, selectedStreams: [] };
+    contextRegistry.register("logs", { getContext: () => page });
+    const now = vi.spyOn(Date, "now");
+    try {
+      const start = 1_800_000_000_000;
+      now.mockReturnValue(start);
+      const { sid } = await setup();
+      page = { ...LOGS };
+      refreshPageContext();
+      await flushPromises();
+      expect(composerUi(sid).status).toBeNull();
+      now.mockReturnValue(start + 3_500);
+      page = { ...LOGS, selectedStreams: ["default"], currentVRLQuery: ".x = 1" };
+      refreshPageContext();
+      await flushPromises();
+      expect(String(composerUi(sid).status?.text)).toBe("VRL · 1 line added to context");
+    } finally {
+      now.mockRestore();
+    }
   });
 });
