@@ -467,6 +467,9 @@ export const usePanelDataLoader = (
 
       state.lastTriggeredAt = new Date().getTime();
 
+      // A panel parked off-screen has nothing in flight; a superseded run's flag would keep the dashboard "loading".
+      if (forceLoad?.value != true && !isVisible.value) state.loading = false;
+
       // Wait for visibility BEFORE the cache restore below — restoring first
       // rendered every cached panel on mount, visible or not.
       await waitForThePanelToBecomeVisible(abortController.signal);

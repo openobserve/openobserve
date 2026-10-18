@@ -1609,6 +1609,44 @@ describe("usePanelDataLoader", () => {
       expect(cacheOperationCount).toBe(cacheWritesBefore);
       await rerun;
     });
+
+    it("an off-screen panel whose print-mode query is superseded stops reporting loading", async () => {
+      global.AbortController = RealAbortController;
+      const streams: any[] = [];
+      streamOverride = (payload, callbacks) => {
+        streams.push({ payload, callbacks });
+        return "held-stream";
+      };
+      const forceLoad = ref(true);
+      const loader = usePanelDataLoader(
+        createMockPanelSchema(),
+        createMockSelectedTimeObj({
+          start_time: new Date(Date.now() - 3600000),
+          end_time: new Date(),
+        }),
+        createMockVariablesData(),
+        ref(null),
+        forceLoad,
+        ref("dashboards"),
+        ref("test-dashboard"),
+        ref("test-folder"),
+        ref(null),
+        ref(null),
+        ref(null),
+        ref(null),
+        ref(null),
+        ref(false),
+      );
+      await loader.loadData();
+      expect(streams).toHaveLength(1);
+      expect(loader.loading.value).toBe(true);
+
+      forceLoad.value = false;
+      await flushPromises();
+
+      expect(streams).toHaveLength(1);
+      expect(loader.loading.value).toBe(false);
+    });
   });
 
   describe("first load waiting on a multi-select child variable", () => {
