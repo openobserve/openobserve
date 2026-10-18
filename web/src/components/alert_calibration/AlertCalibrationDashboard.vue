@@ -140,6 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ t(SEVERITY_LABEL[group.severity]) }}
               </OBadge>
               <OBadge
+                v-if="!RULE_META[group.rule_id].clusterWide"
                 :variant="group.findings.length ? 'default-soft' : 'default-outline'"
                 size="xs"
                 shape="rounded"
@@ -155,13 +156,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
 
             <OText v-if="!group.findings.length" variant="meta" as="p" class="px-4 pb-3">
-              {{ t("alertCalibration.dashboard.nothingFlagged") }}
+              {{
+                RULE_META[group.rule_id].clusterWide
+                  ? t("alertCalibration.dashboard.nothingCongested")
+                  : t("alertCalibration.dashboard.nothingFlagged")
+              }}
             </OText>
             <div v-else class="border-border-default border-t">
               <ul class="divide-border-default flex flex-col divide-y">
                 <li
                   v-for="finding in group.findings"
-                  :key="finding.alert_id ?? finding.alert_name"
+                  :key="finding.alert_id ?? finding.alert_name ?? finding.rule_id"
                   class="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2"
                   :data-test="`alert-calibration-dashboard-alert-${finding.alert_id}`"
                 >
@@ -245,7 +250,7 @@ import {
   type RunRow,
 } from "./digests";
 import { COVERAGE_BADGE, SEVERITY_BADGE, SEVERITY_LABEL } from "./format";
-import { RULE_IDS, RULE_META } from "./rules";
+import { RULE_META, rulesShownFor } from "./rules";
 
 const { t } = useI18nTyped();
 useLeaveIfAlertCalibrationOff("alertList");
@@ -274,7 +279,9 @@ const loading = computed(
   () => configQuery.isPending.value || (data.loading.value && !data.data.value),
 );
 const latest = computed(() => data.data.value?.latest ?? null);
-const groups = computed(() => findingsByRule(RULE_IDS, data.data.value?.findings ?? []));
+const groups = computed(() =>
+  findingsByRule(rulesShownFor(orgId.value), data.data.value?.findings ?? []),
+);
 
 const latestStats = computed<StatItem[]>(() => {
   const run = latest.value;

@@ -75,10 +75,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="alert-calibration-digest-partial"
       >
         <div class="flex min-w-0 flex-col gap-0.5">
-          <span class="text-sm font-medium">{{
-            t("alertCalibration.detail.partialCoverage")
+          <span class="text-sm font-medium">{{ t(partialTitleKey) }}</span>
+          <span v-if="!measuredNothing" class="text-xs">{{
+            t("alertCalibration.detail.partialCoverageDesc")
           }}</span>
-          <span class="text-xs">{{ t("alertCalibration.detail.partialCoverageDesc") }}</span>
           <span v-for="note in notes" :key="note" class="text-xs">{{ note }}</span>
         </div>
       </OBanner>
@@ -127,7 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }}
         </OText>
         <OText v-else-if="findings.length !== run.finding_count" variant="meta" as="div">
-          {{ t("alertCalibration.detail.perAlertNote") }}
+          {{ t("alertCalibration.detail.perSubjectNote") }}
         </OText>
         <div class="flex flex-col gap-3">
           <AlertCalibrationFindingCard
@@ -180,7 +180,7 @@ import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import { b64EncodeUnicode } from "@/utils/formatters";
 import { useLeaveIfAlertCalibrationOff } from "@/composables/alertCalibration/useAlertCalibrationEnabled";
-import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText, type I18nKey } from "@/types/i18n";
 import AlertCalibrationFindingCard from "./AlertCalibrationFindingCard.vue";
 import { useDigestSearch, useLatestRead } from "./useDigestSearch";
 import {
@@ -261,6 +261,14 @@ const onRuleFilter = (value: unknown) => {
 };
 
 const notes = computed(() => (run.value ? coverageNotes(t, run.value) : []));
+
+/** Measured nothing is not a floor on anything, so the floor sentence would mislead. */
+const measuredNothing = computed(() => !!run.value && coverageVerdict(run.value) === "none");
+const partialTitleKey = computed<I18nKey>(() =>
+  measuredNothing.value
+    ? "alertCalibration.coverage.none"
+    : "alertCalibration.detail.partialCoverage",
+);
 
 const stats = computed<StatItem[]>(() => {
   const r = run.value;

@@ -22,7 +22,8 @@ export const RUNS_LOOKBACK_DAYS = 14;
 
 const MICROS_PER_DAY = 86_400_000_000;
 
-export type RuleId = "failure" | "no_destination" | "noise" | "notify_failed" | "silent";
+export type RuleId =
+  "failure" | "no_destination" | "noise" | "notify_failed" | "scheduler_health" | "silent";
 export type Severity = "Info" | "Low" | "Medium" | "High";
 export type Confidence = "Low" | "Medium" | "High";
 
@@ -35,7 +36,6 @@ export interface Coverage {
   coverage_error_clusters_truncated: boolean;
   coverage_error_clusters_unattributed: number;
   coverage_stream_substrate_empty: boolean;
-  coverage_meta_fallback_used: boolean;
 }
 
 /** One run as the timeline lists it; a run is identified by its window, not by an id. */
@@ -70,6 +70,14 @@ export type FindingRecord = DigestRecord &
 
 export type CoverageVerdict = "none" | "gap" | "full";
 
+/** One org or hour a cluster finding lists; the digest stores each list as one JSON column. */
+export interface LagRow {
+  key: string | number;
+  skipped_windows: number;
+  late_evaluations: number;
+  evaluations: number;
+}
+
 const COVERAGE_COLUMNS: (keyof Coverage)[] = [
   "coverage_unreadable_definitions",
   "coverage_facts_without_definition",
@@ -79,7 +87,6 @@ const COVERAGE_COLUMNS: (keyof Coverage)[] = [
   "coverage_error_clusters_truncated",
   "coverage_error_clusters_unattributed",
   "coverage_stream_substrate_empty",
-  "coverage_meta_fallback_used",
 ];
 
 const SEVERITY_RANK: Record<Severity, number> = { High: 3, Medium: 2, Low: 1, Info: 0 };
@@ -140,7 +147,6 @@ export function runIdentity(record: DigestRecord): RunRow {
     coverage_error_clusters_truncated: record.coverage_error_clusters_truncated,
     coverage_error_clusters_unattributed: record.coverage_error_clusters_unattributed,
     coverage_stream_substrate_empty: record.coverage_stream_substrate_empty,
-    coverage_meta_fallback_used: record.coverage_meta_fallback_used,
   };
 }
 
@@ -195,12 +201,37 @@ export const latestRun = (rows: RunRow[]): RunRow | null =>
 export const isClean = (row: RunRow) =>
   row.finding_count === 0 && !row.coverage_gap && row.skip_count === 0;
 
+/** A missing or malformed column lists nothing, and a row without a usable key is dropped. */
+export function parseLagRows(value: unknown, keyField: "org_id" | "hour_start_micros"): LagRow[] {
+  if (typeof value !== "string" || value === "") return [];
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(parsed)) return [];
+  return parsed
+    .filter((item): item is Record<string, unknown> => typeof item === "object" && item !== null)
+    .filter((item) =>
+      keyField === "org_id"
+        ? typeof item.org_id === "string" && item.org_id.trim() !== ""
+        : Number.isFinite(item.hour_start_micros),
+    )
+    .map((item) => ({
+      key: item[keyField] as string | number,
+      skipped_windows: Number(item.skipped_windows) || 0,
+      late_evaluations: Number(item.late_evaluations) || 0,
+      evaluations: Number(item.evaluations) || 0,
+    }));
+}
+
 export function coverageVerdict(row: RunRow): CoverageVerdict {
   if (row.coverage_stream_substrate_empty) return "none";
   return row.coverage_gap ? "gap" : "full";
 }
 
-/** Every coverage column off its default, including the two `coverage_gap` does not count. */
+/** Every coverage column off its default, including the ones `coverage_gap` does not count. */
 export function coverageNotes(t: TranslateFn, row: RunRow): I18nText[] {
   const notes: I18nText[] = [];
   if (row.coverage_stream_substrate_empty)
@@ -215,7 +246,6 @@ export function coverageNotes(t: TranslateFn, row: RunRow): I18nText[] {
     ["coverage_transitions_truncated", "alertCalibration.coverage.transitionsTruncated"],
     ["coverage_counters_truncated", "alertCalibration.coverage.countersTruncated"],
     ["coverage_error_clusters_truncated", "alertCalibration.coverage.errorClustersTruncated"],
-    ["coverage_meta_fallback_used", "alertCalibration.coverage.metaFallbackUsed"],
   ];
   for (const [column, key] of counts) {
     const count = Number(row[column]);

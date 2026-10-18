@@ -474,6 +474,13 @@ fn encode_path_segment(value: &str) -> String {
     encoded
 }
 
+fn structured_content(content_text: &str) -> Option<Value> {
+    // The spec types structuredContent as an object; arrays and scalars stay text-only
+    serde_json::from_str::<Value>(content_text)
+        .ok()
+        .filter(Value::is_object)
+}
+
 /// Execute a tool using the shared HTTP client
 async fn execute_tool(
     org_id: &str,
@@ -521,9 +528,8 @@ async fn execute_tool(
         filter_response(&metadata.name, &http_response.body, detail)
     };
 
-    // Parse content as structured JSON for structuredContent field (2025-11-25)
     let structured_content = if !is_error {
-        serde_json::from_str::<Value>(&content_text).ok()
+        structured_content(&content_text)
     } else {
         None
     };
@@ -539,6 +545,17 @@ async fn execute_tool(
 mod tests {
     use super::*;
     use crate::tools;
+
+    #[test]
+    fn structured_content_is_only_ever_an_object() {
+        assert_eq!(
+            structured_content(r#"{"total":1}"#),
+            Some(json!({"total": 1}))
+        );
+        for text in ["[]", r#"[{"id":"a"}]"#, "42", r#""ok""#, "null", "not json"] {
+            assert_eq!(structured_content(text), None, "{text}");
+        }
+    }
 
     /// Schema shaped like AddPanel: top-level params + a nested request_body
     /// whose properties include `tabId`.

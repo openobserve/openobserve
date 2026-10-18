@@ -560,16 +560,18 @@ async function performGlobalIngestion(page) {
   const maxWaitMs = 90000;
   const pollIntervalMs = 3000;
   const startTime = Date.now();
+  let lastSeen = 'no response';
 
   while (Date.now() - startTime < maxWaitMs) {
     try {
       const streamsResult = await page.evaluate(async ({ orgId, headers }) => {
-        const r = await fetch(`/api/${orgId}/streams?type=logs&page_num=0&page_size=1000`, { headers });
+        const r = await fetch(`/api/${orgId}/streams?type=logs&keyword=e2e_automate`, { headers });
         if (!r.ok) return { ok: false, status: r.status };
         const data = await r.json();
         const names = (data.list || []).map(s => s.name);
-        return { ok: true, names };
+        return { ok: true, status: r.status, names };
       }, { orgId, headers });
+      lastSeen = `HTTP ${streamsResult.status}, names=[${(streamsResult.names || []).join(',')}]`;
 
       if (streamsResult.ok) {
         const hasE2e = streamsResult.names.includes('e2e_automate');
@@ -589,7 +591,7 @@ async function performGlobalIngestion(page) {
   }
 
   if (Date.now() - startTime >= maxWaitMs) {
-    testLogger.warn(`[alpha1] Streams not fully indexed after ${maxWaitMs}ms — tests may fail on stream selection`);
+    testLogger.warn(`[alpha1] Streams not fully indexed after ${maxWaitMs}ms (last: ${lastSeen}) — tests may fail on stream selection`);
   }
 }
 
@@ -709,25 +711,28 @@ async function performGlobalIngestionWithFetch() {
   const maxWaitMs = 90000;
   const pollIntervalMs = 3000;
   const startTime = Date.now();
+  let lastSeen = 'no response';
 
   while (Date.now() - startTime < maxWaitMs) {
     try {
-      const r = await fetch(`${baseUrl}/api/${orgId}/streams?type=logs&page_num=0&page_size=1000`, { headers });
+      const r = await fetch(`${baseUrl}/api/${orgId}/streams?type=logs&keyword=e2e_automate`, { headers });
+      lastSeen = `HTTP ${r.status}`;
       if (r.ok) {
         const data = await r.json();
         const names = (data.list || []).map(s => s.name);
+        lastSeen += `, names=[${names.join(',')}]`;
         if (names.includes('e2e_automate')) {
           testLogger.info(`[alpha1] e2e_automate indexed after ${Date.now() - startTime}ms`);
           return;
         }
       }
     } catch (e) {
-      testLogger.debug(`[alpha1] Error checking streams: ${e.message}`);
+      lastSeen = `error: ${e.message}`;
     }
     await new Promise(r => setTimeout(r, pollIntervalMs));
   }
 
-  testLogger.warn(`[alpha1] Streams not fully indexed after ${maxWaitMs}ms — tests may fail on stream selection`);
+  testLogger.warn(`[alpha1] Streams not fully indexed after ${maxWaitMs}ms (last: ${lastSeen}) — tests may fail on stream selection`);
 }
 
 module.exports = globalSetup;

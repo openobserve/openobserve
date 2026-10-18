@@ -58,7 +58,7 @@ fn table_statement() -> TableCreateStatement {
             ColumnDef::new(AlertCalibrationConfigs::Enabled)
                 .boolean()
                 .not_null()
-                .default(false),
+                .default(true),
         )
         .col(
             ColumnDef::new(AlertCalibrationConfigs::FrequencyMinutes)

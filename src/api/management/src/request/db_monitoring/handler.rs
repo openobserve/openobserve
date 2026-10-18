@@ -90,6 +90,9 @@ use super::{models::*, service::*};
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"description": "List monitored databases with call totals, latency and calling services", "category": "db_monitoring"}))
     )
 )]
 pub async fn get_dbm_databases(
@@ -137,9 +140,14 @@ pub async fn get_dbm_databases(
         ("search" = Option<String>, Query, description = "Free-text search over normalized query text"),
         ("include_server_fallback" = Option<bool>, Query, description = "When the client-vantage answer is an exact zero, also run the database-reported list and return it as `server_fallback` (with per-section forbidden/read-failed flags)"),
         ("fingerprint" = Option<String>, Query, description = "Narrows the `server_fallback` section to one statement (the query-detail row lookup). Does not filter the client-vantage rows."),
+        ("baseline_start_time" = Option<i64>, Query, description = "Δ baseline window start (microseconds); returns baseline_hits under the same filters and sort"),
+        ("baseline_end_time" = Option<i64>, Query, description = "Δ baseline window end (microseconds)"),
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"description": "List top database query fingerprints with call counts and latency", "category": "db_monitoring"}))
     )
 )]
 pub async fn get_dbm_queries(
@@ -178,12 +186,20 @@ pub async fn get_dbm_queries(
         ("start_time" = Option<i64>, Query, description = "Start time (microseconds)"),
         ("end_time" = Option<i64>, Query, description = "End time (microseconds)"),
         ("stream" = Option<String>, Query, description = "Trace stream filter"),
+        ("system" = Option<String>, Query, description = "Database system filter"),
+        ("instance" = Option<String>, Query, description = "Database instance filter"),
+        ("namespace" = Option<String>, Query, description = "Database namespace filter"),
+        ("env" = Option<String>, Query, description = "Environment filter"),
+        ("service" = Option<String>, Query, description = "Calling service filter"),
         ("include_endpoints" = Option<bool>, Query, description = "Also return the FR-5 calling-endpoints aggregation as `endpoints`, run against the trace stream this handler already resolves"),
         ("endpoints_limit" = Option<usize>, Query, description = "Max endpoint rows when include_endpoints is set (default 50, max 500)"),
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Missing fingerprint", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"description": "Time series of calls and latency for one database query fingerprint", "category": "db_monitoring"}))
     )
 )]
 pub async fn get_dbm_query_history(
@@ -224,6 +240,9 @@ pub async fn get_dbm_query_history(
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Missing fingerprint/stream", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"description": "Services and endpoints that call one database query fingerprint", "category": "db_monitoring"}))
     )
 )]
 pub async fn get_dbm_query_endpoints(
@@ -284,6 +303,9 @@ pub async fn get_dbm_query_endpoints(
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"description": "Slowest database calls in a window, with trace ids", "category": "db_monitoring"}))
     )
 )]
 pub async fn get_dbm_samples(
@@ -336,6 +358,9 @@ pub async fn get_dbm_samples(
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"description": "Database deadlock events with participants", "category": "db_monitoring"}))
     )
 )]
 #[cfg(feature = "enterprise")]
@@ -402,6 +427,9 @@ pub async fn get_dbm_deadlocks(
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"description": "Database blocking samples and root-blocker chains", "category": "db_monitoring"}))
     )
 )]
 #[cfg(feature = "enterprise")]
@@ -457,6 +485,9 @@ pub async fn get_dbm_blocking(
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"description": "Sampled active database sessions and wait-event breakdown", "category": "db_monitoring"}))
     )
 )]
 pub async fn get_dbm_activity(
@@ -507,6 +538,9 @@ pub async fn get_dbm_activity(
         ("start_time" = Option<i64>, Query, description = "Start time (microseconds)"),
         ("end_time" = Option<i64>, Query, description = "End time (microseconds)"),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn get_dbm_query_server_metrics(
     Path(org_id): Path<String>,
@@ -551,6 +585,9 @@ pub async fn get_dbm_query_server_metrics(
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"description": "Statements ranked by the database's own counters (pg_stat_statements etc.)", "category": "db_monitoring"}))
     )
 )]
 pub async fn get_dbm_server_queries(
@@ -591,6 +628,9 @@ pub async fn get_dbm_server_queries(
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"description": "Slowest executions captured by the database's own logging", "category": "db_monitoring"}))
     )
 )]
 pub async fn get_dbm_server_samples(
@@ -626,6 +666,9 @@ pub async fn get_dbm_server_samples(
     summary = "Database Monitoring: captured query plans for a query",
     description = "Distinct GENERIC, NULL-BOUND EXPLAIN plans captured for one query fingerprint, with first and last seen. Not the plan Postgres executed, and carries no per-plan latency.",
     security(("Authorization" = [])),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn get_dbm_query_plans(
     Path(org_id): Path<String>,
@@ -681,6 +724,9 @@ pub async fn get_dbm_query_plans(
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Missing fingerprint", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"description": "Captured plans and server-side counters for one database query fingerprint", "category": "db_monitoring"}))
     )
 )]
 pub async fn get_dbm_query_insights(
@@ -714,6 +760,9 @@ pub async fn get_dbm_query_insights(
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"description": "List database instances known to the org", "category": "db_monitoring"}))
     )
 )]
 // NOT enterprise-gated, deliberately. This is the scope filter's instance
@@ -770,6 +819,9 @@ pub async fn get_dbm_instances(
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"description": "Database table size, bloat and vacuum state", "category": "db_monitoring"}))
     )
 )]
 #[cfg(feature = "enterprise")]
@@ -834,6 +886,9 @@ pub async fn get_dbm_table_health(
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 pub async fn get_dbm_badges(
@@ -865,6 +920,9 @@ pub async fn get_dbm_badges(
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"description": "Database instance health: connections, cache hit ratio, replication lag, deadlocks", "category": "db_monitoring"}))
     )
 )]
 pub async fn get_dbm_instance_metrics(

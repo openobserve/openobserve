@@ -962,10 +962,26 @@ export class LogsPage {
         }
     }
 
+    /**
+     * True when the current page is this org's logs page and was loaded moments ago, so it has no state to reset.
+     * @param {string} orgId
+     * @param {number} maxAgeMs
+     */
+    async isFreshLogsPage(orgId, maxAgeMs = 15000) {
+        let url;
+        try { url = new URL(this.page.url()); } catch { return false; }
+        if (!url.pathname.endsWith('/web/logs') || url.searchParams.get('org_identifier') !== orgId) return false;
+        const ageMs = await this.page.evaluate(() => performance.now()).catch(() => Infinity);
+        return ageMs < maxAgeMs;
+    }
+
     async selectStream(stream, maxRetries = 5, apiWaitMs = null, skipNavigation = false) {
         // Cloud environments need longer for streams to be indexed after ingestion
         const effectiveApiWaitMs = apiWaitMs ?? (isCloudEnvironment() ? 120000 : 30000);
         testLogger.info(`selectStream: Selecting stream: ${stream} (apiWait: ${effectiveApiWaitMs}ms, skipNavigation: ${skipNavigation})`);
+        const orgId = getOrgIdentifier();
+        // Measured before the API wait, which takes time but leaves the UI untouched.
+        const freshLogsPage = !skipNavigation && await this.isFreshLogsPage(orgId);
 
         // First, wait for the stream to be available via API (skip if apiWaitMs is 0)
         if (effectiveApiWaitMs > 0) {
@@ -982,10 +998,11 @@ export class LogsPage {
         // Navigate to logs page via URL to ensure fresh stream list.
         // skipNavigation=true bypasses page.goto when the caller is already
         // on the logs page and wants to avoid auto-triggering a query.
-        const orgId = getOrgIdentifier();
         const logsUrl = `${process.env.ZO_BASE_URL}/web/logs?org_identifier=${orgId}`;
 
-        if (!skipNavigation) {
+        if (freshLogsPage) {
+            testLogger.info('selectStream: Logs page just loaded for this org — skipping reload (retries still reload if the stream is missing)');
+        } else if (!skipNavigation) {
             testLogger.info(`selectStream: Navigating to logs page: ${logsUrl}`);
             await this.page.goto(logsUrl, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
             // Wait for the index-dropdown wrapper to mount instead of a hard timeout.
@@ -1270,7 +1287,7 @@ export class LogsPage {
             // Wait for button to leave Cancel/loading state before clicking —
             // otherwise a click on "Cancel" aborts the in-flight query instead
             // of starting a fresh one.
-            await this.page.waitForFunction(
+            const settled = await this.page.waitForFunction(
                 (sel) => {
                     const b = document.querySelector(sel);
                     if (!b) return false;
@@ -1280,8 +1297,13 @@ export class LogsPage {
                 },
                 this.queryButton,
                 { timeout: 30000 },
-            ).catch(() => {});
-            await queryBtn.click();
+            ).then(() => true).catch(() => false);
+            // A retry on a still-busy button would cancel and restart the same search; keep waiting on it instead.
+            if (settled || attempt === 1) {
+                await queryBtn.click();
+            } else {
+                testLogger.debug(`selectRunQuery: search still running on attempt ${attempt} — waiting instead of re-clicking`);
+            }
 
             try {
                 await this.page.waitForSelector('[data-test="logs-search-result-logs-table"]', {

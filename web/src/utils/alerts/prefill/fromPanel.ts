@@ -19,7 +19,7 @@
  * Replaces the two hand-rolled payload builders that used to live in
  * PanelContainer.vue and usePanelActions.ts. Pure and synchronous (invariant 5):
  * the one piece that genuinely needs the async SQL parser — injecting a HAVING
- * clause into a raw SQL panel query — is carried as `meta.sqlHaving` and applied
+ * clause into a SQL panel query, raw or built — is carried as `meta.sqlHaving` and applied
  * by the consumer, which already owns the parser.
  */
 
@@ -36,6 +36,14 @@ import { selectorMetricNames } from "@/utils/dashboard/exemplars/exemplarPlaceme
 
 /** Panel types whose shape has no meaningful row count to alert on. */
 const UNSUPPORTED_PANEL_TYPES = ["markdown", "html", "geomap", "sankey"];
+
+/** The parts of a dashboard panel query the alert adapters read. */
+export interface PanelQueryShape {
+  query?: string;
+  customQuery?: boolean;
+  fields?: { stream?: string; y?: { alias?: string; column?: string }[] };
+  config?: { formula?: string; hide?: boolean };
+}
 
 export interface PanelPrefillInput {
   panelTitle?: string;
@@ -212,6 +220,26 @@ const formulaInputStreams = (
   return [...new Set(names)].map((name) => ({ name, type: "metrics" }));
 };
 
+/** The metrics a code-mode query's text selects, when its inherited `fields.stream` is not one of them. */
+const codeModeStreams = (
+  query: PanelQueryShape | undefined,
+  text: string,
+): AlertPrefillStreamCandidate[] => {
+  if (query?.customQuery !== true) return [];
+  const names = selectorMetricNames(withoutComments(text));
+  const stream = query.fields?.stream;
+  if (stream && names.includes(stream)) return [];
+  return names.map((name) => ({ name, type: "metrics" }));
+};
+
+/** A query with something to alert on: its own text, or a formula over other queries. */
+const isAlertableQuery = (query: PanelQueryShape | undefined): boolean =>
+  isFormulaQuery(query) || !!query?.query?.trim();
+
+/** The shown queries an alert can target; an empty slot runs nothing, but a lone shown query is kept as is. */
+export const alertableQueryIndexes = (queries: PanelQueryShape[], shown: number[]): number[] =>
+  shown.length > 1 ? shown.filter((index) => isAlertableQuery(queries[index])) : shown;
+
 /** The executed text of a panel query's current-period window; shifted windows follow the primaries. */
 export const executedPanelQuery = (
   metadataQueries: any[] | undefined,
@@ -255,11 +283,12 @@ export const buildPrefillFromPanel = (
   }
 
   const isPromql = input.queryType === "promql";
-  const inputStreams =
-    isPromql && isFormulaQuery(query)
-      ? formulaInputStreams(input.queries ?? [], query.config.formula, input.metadataQueries)
-      : [];
   const sourceQuery = input.executedQuery || query?.query || "";
+  const inputStreams = !isPromql
+    ? []
+    : isFormulaQuery(query)
+      ? formulaInputStreams(input.queries ?? [], query.config.formula, input.metadataQueries)
+      : codeModeStreams(query, sourceQuery);
   // Raw text from a query that never ran may still hold dashboard variables the evaluator cannot fill.
   if (!input.executedQuery && /\$(\w|\{)/.test(sourceQuery)) {
     warnings.push(warn("unresolvedQuery", "blocking"));
@@ -278,8 +307,10 @@ export const buildPrefillFromPanel = (
 
   const hasThreshold = input.threshold !== undefined && !!input.condition;
   const operator = input.condition === "above" ? ">=" : "<=";
+  // The form saves a SQL alert's query text and drops its aggregation, so the threshold must live in the HAVING.
+  const thresholdInSql = hasThreshold && !isPromql && !!input.yAxisColumn;
 
-  if (hasThreshold && aggregation) {
+  if (hasThreshold && aggregation && !thresholdInSql) {
     aggregation.having.value = input.threshold as number;
     aggregation.having.operator = operator;
   }
@@ -317,9 +348,8 @@ export const buildPrefillFromPanel = (
     }
   } else {
     prefill.sql = sourceQuery;
-    // Raw-SQL panels get their threshold as a HAVING clause injected into the
-    // query text, which needs the SQL parser — the consumer applies this.
-    if (hasThreshold && !aggregation && input.yAxisColumn) {
+    // Injecting the HAVING needs the async SQL parser, so the consumer applies it.
+    if (thresholdInSql) {
       prefill.meta = {
         ...prefill.meta,
         sqlHaving: {

@@ -614,6 +614,9 @@
   --color-select-item-selected-text: var(--color-primary-700);
   --color-select-item-disabled: var(--color-text-disabled);
 
+  /* Flame graph (components/common/FlameGraphView.vue): label text on the light series fills, in both themes. */
+  --color-flame-frame-text: var(--color-grey-800);
+
   /* Switch (OSwitch) */
   --color-switch-label: var(--color-text-heading);
   --color-switch-label-disabled: var(--color-text-secondary);
@@ -1526,6 +1529,9 @@
   --color-select-item-selected-bg: var(--color-select-item-selected-bg);
   --color-select-item-selected-text: var(--color-select-item-selected-text);
   --color-select-item-disabled: var(--color-select-item-disabled);
+
+  /* Flame graph */
+  --color-flame-frame-text: var(--color-flame-frame-text);
 
   /* Switch (OSwitch) */
   --color-switch-label: var(--color-switch-label);

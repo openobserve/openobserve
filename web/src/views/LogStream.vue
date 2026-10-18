@@ -108,9 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   value="profiles"
                   size="sm"
                 >
-                  <template #icon-left
-                    ><OIcon name="bar-chart" size="xs" class="shrink-0"
-                  /></template>
+                  <template #icon-left><OIcon name="memory" size="xs" class="shrink-0" /></template>
                   {{ t("logStream.labelProfiles") }}
                 </OToggleGroupItem>
                 <OToggleGroupItem value="metadata" size="sm">
@@ -1243,6 +1241,18 @@ export default defineComponent({
     };
 
     const exploreStream = async (props: any) => {
+      // Profiles have their own explorer; Logs cannot read a profiles stream.
+      if (props.row.stream_type === "profiles") {
+        router.push({
+          name: "profiles",
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+            stream: props.row.name,
+            period: "15m",
+          },
+        });
+        return;
+      }
       store.dispatch("logs/setIsInitialized", false);
 
       // We need to check if stream is present in store, if not then we need to fetch the stream
