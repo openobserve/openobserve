@@ -68,7 +68,7 @@ describe("SlackLinkingSection (row 11)", () => {
     expect(w.find('[data-test="slack-linking-summary"]').text()).toBe(
       "Automatic for acme.example · from your organization's domain mapping",
     );
-    expect(w.text()).toContain("Domains are read-only here");
+    expect(w.text()).toContain("Mapped domains are read-only here");
   });
 
   it("mapped: turning linking off sends only enabled", async () => {

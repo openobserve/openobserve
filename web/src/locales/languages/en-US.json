@@ -25214,7 +25214,7 @@
       "auto": "Link people automatically",
       "autoHelp": "Slack members with a confirmed email on these domains are linked to the OpenObserve user with that email in a connected org. Guests and external users link with one click instead.",
       "mappedSummary": "Automatic for {domains} · from your organization's domain mapping",
-      "mappedReadonly": "Domains are read-only here; OpenObserve support changes the mapping. Turning linking off is still yours.",
+      "mappedReadonly": "Mapped domains are read-only here; OpenObserve support changes the mapping. Turning linking off is still yours.",
       "manualSummary": "Automatic for {domains}",
       "offSummary": "Off · people link with one click when they first ask",
       "domains": "Domains",
