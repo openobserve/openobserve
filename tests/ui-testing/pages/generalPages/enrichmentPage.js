@@ -532,10 +532,10 @@ abc, err = get_enrichment_table_record("${fileName}", {
     }
 
     async applyQuery() {
-        // OButton returns early in handleClick when loading=true, so wait for enabled first.
         const refreshBtn = this.page.locator(this.refreshButton);
         await refreshBtn.waitFor({ state: 'visible', timeout: 15000 });
-        await expect(refreshBtn).toBeEnabled({ timeout: 15000 });
+        // An auto-run search makes this button an enabled Cancel, so "enabled" alone would cancel that search.
+        await this.waitForRunQueryIdle(30000);
 
         // Click on the run query button and wait for response
         const search = this.page.waitForResponse("**/api/**/_search**");
@@ -562,28 +562,41 @@ abc, err = get_enrichment_table_record("${fileName}", {
         await this.page.waitForLoadState('domcontentloaded');
     }
 
-    async applyQueryMultipleClicks() {
-        // Click run query button multiple times to ensure it registers (VRL test specific).
-        // NOTE: Do NOT use `{ force: true }` — OButton's @click handler does not
-        // fire on a forced click (Reka Primitive expects a real bubble path).
-        // Key the final click to a _search response so we don't sit in a
-        // 10s networkidle wait for cross-domain background requests.
+    async waitForRunQueryIdle(timeout = 60000) {
+        await this.page.waitForFunction(
+            (selector) => {
+                const el = document.querySelector(selector);
+                if (!el) return false;
+                const busy = el.hasAttribute('disabled') || el.getAttribute('aria-disabled') === 'true';
+                const label = `${el.textContent || ''} ${el.getAttribute('title') || ''}`.toLowerCase();
+                return !busy && !label.includes('cancel');
+            },
+            this.refreshButton,
+            { timeout }
+        );
+    }
+
+    async runQueryAndWaitForResults({ withVrl = false, timeout = 60000 } = {}) {
         const refreshButton = this.page.locator(this.refreshButton);
         await refreshButton.waitFor({ state: 'visible' });
 
-        for (let i = 0; i < 4; i++) {
-            if (i === 3) {
-                const searchResp = this.page.waitForResponse(
-                    (resp) => /\/api\/.*\/_search/.test(resp.url()),
-                    { timeout: 30000 }
-                ).catch(() => null);
-                await refreshButton.click();
-                await searchResp;
-            } else {
-                await refreshButton.click();
-                await this.page.waitForLoadState('domcontentloaded');
-            }
+        for (let attempt = 1; attempt <= 2; attempt++) {
+            // While a search is in flight this button is Cancel, so a click before it reads Run again cancels the search.
+            await this.waitForRunQueryIdle(timeout);
+            const searchResp = this.page.waitForResponse(
+                (resp) => /\/api\/.*\/_search/.test(resp.url())
+                    && (!withVrl || /"query_fn":"[^"]+"/.test(resp.request().postData() || '')),
+                { timeout: 30000 }
+            ).catch(() => null);
+            await refreshButton.click();
+            const resp = await searchResp;
+            await this.waitForRunQueryIdle(timeout);
+            if (resp) return;
+            testLogger.warn(`runQueryAndWaitForResults: no matching search response on attempt ${attempt}`);
         }
+        throw new Error(withVrl
+            ? 'Run query never sent a search carrying the VRL function'
+            : 'Run query never produced a search response');
     }
 
     async verifyNoQueryWarning() {
@@ -595,21 +608,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
     }
 
     async expandFirstLogRow() {
-        // Additional run query clicks to ensure VRL enrichment is fully processed.
-        // NOTE: Do NOT use `{ force: true }` — see applyQueryMultipleClicks().
-        // Key each click to a _search response so we don't burn 10s networkidle
-        // timeouts per iteration.
-        const refreshButton = this.page.locator(this.refreshButton);
-        if (await refreshButton.isVisible()) {
-            for (let i = 0; i < 3; i++) {
-                const searchResp = this.page.waitForResponse(
-                    (resp) => /\/api\/.*\/_search/.test(resp.url()),
-                    { timeout: 15000 }
-                ).catch(() => null);
-                await refreshButton.click();
-                await searchResp;
-            }
-        }
+        await this.waitForRunQueryIdle();
 
         // Wait for timestamp column to be visible and stable
         await this.timestampColumn.first().waitFor({ state: 'visible', timeout: 30000 });
@@ -824,8 +823,8 @@ abc, err = get_enrichment_table_record("${fileName}", {
         // Wait for VRL editor to be fully ready for processing
         await this.waitForVRLEditorReady();
 
-        // Apply query with multiple clicks for VRL test reliability
-        await this.applyQueryMultipleClicks();
+        // The run must carry the VRL, or the enriched protocol_keyword field never appears.
+        await this.runQueryAndWaitForResults({ withVrl: true });
 
         // Wait for query results to load — either the timestamp column appears
         // (success) or the error-details button appears (failure).
@@ -842,7 +841,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
             testLogger.warn('Error detected after first VRL query attempt, waiting 5s and retrying');
 
             // Retry the query — the backend may need a moment to index the new table
-            await this.applyQueryMultipleClicks();
+            await this.runQueryAndWaitForResults({ withVrl: true });
             await Promise.race([
                 timestampCol.waitFor({ state: 'visible', timeout: 30000 }).catch(() => {}),
                 errorDetailsBtn.waitFor({ state: 'visible', timeout: 30000 }).catch(() => {}),

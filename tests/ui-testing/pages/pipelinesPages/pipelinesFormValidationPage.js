@@ -73,6 +73,7 @@ export class PipelinesFormValidationPage {
 
         // ── Associate Function node ───────────────────────────────────────────
         this.associateFunctionDrawer         = '[data-test="associate-function-drawer"]';
+        this.associateFunctionSelect         = '[data-test="associate-function-select-function-input"]';
         this.associateFunctionSelectPopover  = '[data-test="associate-function-select-function-input-popover"]';
         this.associateFunctionSelectError    = '[data-test="associate-function-select-function-input-error"]';
         this.createFunctionToggle            = '[data-test="create-function-toggle"]';
@@ -293,6 +294,10 @@ export class PipelinesFormValidationPage {
 
     getAssociateFunctionDrawerLocator() {
         return this.page.locator(this.associateFunctionDrawer);
+    }
+
+    getAssociateFunctionSelectLocator() {
+        return this.page.locator(this.associateFunctionSelect);
     }
 
     getAssociateFunctionSelectPopoverLocator() {

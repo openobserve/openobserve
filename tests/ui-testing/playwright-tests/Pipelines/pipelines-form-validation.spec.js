@@ -290,18 +290,22 @@ test.describe(
                     pm.pipelinesFormValidation.getAssociateFunctionDrawerLocator()
                 ).toBeVisible({ timeout: 10000 });
 
+                // The picker shows a spinner while it fetches functions; a Save before the select mounts has no field to flag.
+                await expect(
+                    pm.pipelinesFormValidation.getAssociateFunctionSelectLocator()
+                ).toBeVisible({ timeout: 30000 });
+
                 // Attempt to save without selecting a function
                 const saveBtn = pm.pipelinesFormValidation.getAssociateFunctionSaveBtnLocator();
                 await saveBtn.click();
 
-                const errorVisible = await pm.pipelinesFormValidation
-                    .getAssociateFunctionSelectErrorLocator()
-                    .isVisible({ timeout: 3000 })
-                    .catch(() => false);
-
-                const saveDisabled = await saveBtn.isDisabled({ timeout: 1000 }).catch(() => false);
-
-                expect(errorVisible || saveDisabled).toBe(true);
+                const selectError = pm.pipelinesFormValidation.getAssociateFunctionSelectErrorLocator();
+                await expect
+                    .poll(async () => (await selectError.isVisible()) || (await saveBtn.isDisabled()), {
+                        timeout: 10000,
+                    })
+                    .toBe(true);
+                await expect(pm.pipelinesFormValidation.getAssociateFunctionDrawerLocator()).toBeVisible();
             }
         );
 
