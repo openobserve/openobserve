@@ -19,7 +19,7 @@ import {
   averageStreamSizeSql,
   DRILLDOWNS,
   dailyOrgCostSql,
-  dailyTopSql,
+  dailyEntitySql,
   meterTotalSql,
   orgVolumeSql,
   orgEventVolumeSql,
@@ -166,19 +166,12 @@ describe("usageQueries", () => {
     expect(byStream.sql("default")).toContain("stream_name != ''");
   });
 
-  it("bands the chart by the top entities and folds the rest into one band", () => {
-    const spec = DRILLDOWNS.ingestion![0];
-    const sql = dailyTopSql("default", spec, ["app's", "k8s"], 0.001, "Other");
-    expect(sql).toContain(
-      "when stream_name in ('app''s', 'k8s') then stream_name else 'Other' end",
-    );
+  it("splits the chart by every entity, leaving the top few to the chart", () => {
+    const sql = dailyEntitySql("default", DRILLDOWNS.ingestion![0], 0.001);
+    expect(sql).toContain('stream_name as "breakdown_1"');
+    expect(sql).not.toContain("case when");
     expect(sql).toContain("sum(size) * 0.001");
     expect(sql).toContain("event = 'Ingestion'");
-  });
-
-  it("puts every row in the other band when no top entities are known", () => {
-    const sql = dailyTopSql("default", DRILLDOWNS.ingestion![0], [], 0.001, "Other");
-    expect(sql).toContain("'Other' as \"breakdown_1\"");
   });
 
   describe("super org", () => {

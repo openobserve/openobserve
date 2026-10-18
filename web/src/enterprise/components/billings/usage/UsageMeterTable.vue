@@ -86,8 +86,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTooltip :content="t('billing.usageV2.noBreakdownYet')" />
         </span>
       </template>
-      <!-- In #bottom rather than a column footer: a footer only reaches the pane's edge while rows overflow. -->
-      <template #bottom>
+      <!-- In #pagination-bar rather than a column footer: a footer only reaches the pane's edge while rows overflow. -->
+      <template #pagination-bar>
         <div
           class="bg-table-header-bg border-table-header-border text-text-body grid border-t py-2 text-xs font-semibold"
           :style="{ gridTemplateColumns: gridTemplate }"

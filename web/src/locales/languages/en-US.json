@@ -8108,6 +8108,7 @@
       "otherBand": "Other",
       "colTotal": "Total",
       "groupBy": "Group by",
+      "groupNotRecorded": "No {group} usage recorded yet.",
       "metersLabel": "Meters",
       "totalThisCycle": "Total cost this cycle",
       "segmentTitle": "{meter}: {billed} billed, {share} of bill",

@@ -61,8 +61,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span>{{ formatShare(row.share) }}</span>
           </div>
         </template>
-        <!-- In #bottom rather than a column footer: a footer only reaches the pane's edge while rows overflow. -->
-        <template v-if="rows.length" #bottom>
+        <!-- In #pagination-bar rather than a column footer: a footer only reaches the pane's edge while rows overflow. -->
+        <template v-if="rows.length" #pagination-bar>
           <div
             class="bg-table-header-bg border-table-header-border text-text-body flex flex-col gap-1 border-t py-2 text-xs"
             data-test="billings-usagemeterbreakdown-total"
@@ -140,7 +140,7 @@ import {
   USAGE_STREAM_NAME,
   type DrilldownSection,
 } from "./usageQueries";
-import { meterColorFor } from "./usageCharts";
+import { CHART_TOP, meterColorFor } from "./usageCharts";
 import { useUsageSearch } from "./useUsageSearch";
 import { totalsGridTemplate } from "./totalsBar";
 
@@ -159,8 +159,6 @@ interface RawRow {
   retentionDays?: number;
 }
 
-const CHART_TOP = 5;
-
 const RETENTION_STREAM_TYPES = ["logs", "metrics", "traces"];
 
 const props = defineProps<{
@@ -175,11 +173,18 @@ const props = defineProps<{
    */
   scopeOrgId?: string;
 }>();
+/** Every grouping the meter offers; `unavailable` lists those this org has never recorded. */
+type SectionsPayload = {
+  sections: DrilldownSection[];
+  unavailable: string[];
+  activeId: string | undefined;
+};
+
 const emit = defineEmits<{
   "update:group": [group: string];
   "top-names": [payload: { section: DrilldownSection | null; names: string[] }];
   /** The page renders the group-by control in the pane header, so the table starts at the same place in both views. */
-  sections: [payload: { sections: DrilldownSection[]; activeId: string | undefined }];
+  sections: [payload: SectionsPayload];
 }>();
 
 const { t } = useI18nTyped();
@@ -197,6 +202,8 @@ const loading = ref(true);
 const error = ref<string | null>(null);
 const streamMissing = ref(false);
 const schemaFields = ref<Set<string>>(new Set());
+/** Set once the schema read settles, so the group-by control never shows a list it then greys out. */
+const schemaRead = ref(false);
 
 const isRetention = computed(() => props.meterKey === "retention");
 
@@ -208,9 +215,24 @@ const meterLabel = computed(() =>
   meterDef.value ? t(meterDef.value.labelKey) : raw(props.meterKey),
 );
 
+const allSections = computed<DrilldownSection[]>(() => DRILLDOWNS[props.meterKey] ?? []);
+
+/** The groupings that can be queried: a field the stream never recorded would fail the SQL. */
 const sections = computed<DrilldownSection[]>(() =>
-  availableSections(DRILLDOWNS[props.meterKey] ?? [], schemaFields.value),
+  availableSections(allSections.value, schemaFields.value),
 );
+
+/** All groupings every time, so the control does not change shape; the ones with no data are disabled. */
+const emitSections = () => {
+  // Nothing until the schema is read: the chart starts its query from these, and the control must not change shape.
+  if (!isRetention.value && !schemaRead.value) return;
+  const available = new Set(sections.value.map((item) => item.id));
+  emit("sections", {
+    sections: allSections.value,
+    unavailable: allSections.value.filter((item) => !available.has(item.id)).map((item) => item.id),
+    activeId: activeSection.value?.id,
+  });
+};
 
 const activeSection = computed(
   () => sections.value.find((item) => item.id === props.group) ?? sections.value[0],
@@ -426,7 +448,7 @@ const emitTopNames = (payload: TopNames) => {
 };
 
 onActivated(() => {
-  emit("sections", { sections: sections.value, activeId: activeSection.value?.id });
+  emitSections();
   if (lastTopNames) emit("top-names", lastTopNames);
 });
 
@@ -457,7 +479,7 @@ const load = async (force = false) => {
         ? await loadSection(activeSection.value, force, showPartial)
         : { raws: [], sum: 0 };
     if (loadId !== latestLoad) return;
-    // Final only: the chart bands by these raw values, and a partial set would re-key it.
+    // Final only: the chart colours its bands by this ranking, and a partial one would reshuffle them.
     emitTopNames({
       section: isRetention.value ? null : (activeSection.value ?? null),
       names: result.raws.slice(0, CHART_TOP).map((entry) => entry.name),
@@ -491,6 +513,8 @@ const loadSchema = async (force: boolean) => {
     );
   } catch {
     schemaFields.value = new Set();
+  } finally {
+    schemaRead.value = true;
   }
 };
 
@@ -510,11 +534,7 @@ watch(
   { immediate: true },
 );
 
-watch(
-  [sections, () => activeSection.value?.id],
-  () => emit("sections", { sections: sections.value, activeId: activeSection.value?.id }),
-  { immediate: true },
-);
+watch([sections, () => activeSection.value?.id, schemaRead], emitSections, { immediate: true });
 
 watch(
   () => activeSection.value?.id,

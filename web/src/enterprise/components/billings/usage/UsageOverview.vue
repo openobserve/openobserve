@@ -128,6 +128,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-for="item in groupSections"
                     :key="item.id"
                     :value="item.id"
+                    :disabled="unavailableGroupIds.includes(item.id)"
+                    focusable-unavailable
+                    :tooltip="
+                      unavailableGroupIds.includes(item.id)
+                        ? t('billing.usageV2.groupNotRecorded', { group: t(item.columnKey) })
+                        : undefined
+                    "
                     size="sm"
                   >
                     {{ t(item.columnKey) }}
@@ -300,13 +307,15 @@ import {
 import {
   buildStackedCostPanelSchema,
   buildTrendsPanelSchema,
+  CHART_TOP,
   entitySeriesColors,
+  OTHERS_SERIES,
   meterColorFor,
   paletteColor,
 } from "./usageCharts";
 import {
   dailyOrgCostSql,
-  dailyTopSql,
+  dailyEntitySql,
   orgEventVolumeSql,
   type DrilldownSection,
 } from "./usageQueries";
@@ -346,11 +355,15 @@ const { isMobile } = useBreakpoint();
 
 const refreshToken = ref(0);
 const breakdownAnchor = ref<HTMLElement | null>(null);
-const chartSection = ref<DrilldownSection | null>(null);
 const groupSections = ref<DrilldownSection[]>([]);
+/** The view the breakdown's groupings came from; another meter's must not shape this chart. */
+const sectionsFor = ref<string | null>(null);
+/** Groupings this org has never recorded: shown, but disabled. */
+const unavailableGroupIds = ref<string[]>([]);
 const activeGroupId = ref<string | undefined>(undefined);
+/** The table's top names, used only to colour the chart's bands as the table ranks them. */
 const chartNames = ref<string[]>([]);
-/** The view the breakdown names were loaded for; names from another meter must not shape this chart. */
+/** The view and grouping those names were ranked for. */
 const chartNamesFor = ref<string | null>(null);
 
 /** Views a user moves between in one visit: all meters, a few drilldowns, a few orgs. */
@@ -547,8 +560,6 @@ const orgSummary = computed(() => {
 const selectOrg = (key: string | null) => {
   if (key === (selectedOrg.value?.id ?? null)) return;
   if (key && !props.billingOrgs.some((org) => org.id === key)) return;
-  chartSection.value = null;
-  chartNames.value = [];
   router.replace({
     query: { ...route.query, org: key ?? undefined, meter: undefined, group: undefined },
   });
@@ -601,8 +612,14 @@ const meterSummary = computed(() => {
   });
 });
 
-const onSections = (payload: { sections: DrilldownSection[]; activeId: string | undefined }) => {
+const onSections = (payload: {
+  sections: DrilldownSection[];
+  unavailable: string[];
+  activeId: string | undefined;
+}) => {
   groupSections.value = payload.sections;
+  unavailableGroupIds.value = payload.unavailable;
+  sectionsFor.value = viewKey.value;
   activeGroupId.value = payload.activeId;
 };
 
@@ -693,14 +710,21 @@ const viewKey = computed(
   () => `${selectedOrg.value?.id ?? "self"}-${selectedMeter.value ?? "all"}`,
 );
 
-/** A meter's chart is drawn from the breakdown's top names, so until they land it is loading, not empty. */
+/** The grouping the chart splits by, known once the breakdown has read the schema, before its table query ends. */
+const chartSection = computed<DrilldownSection | null>(() =>
+  sectionsFor.value === viewKey.value
+    ? (groupSections.value.find((item) => item.id === activeGroupId.value) ?? null)
+    : null,
+);
+
+/** Until the breakdown names its groupings, a meter's chart is loading, not empty. */
 const chartPending = computed(
   () =>
     !!props.details &&
     usageStreamEnabled.value &&
     !!selectedMeter.value &&
     selectedMeter.value !== "retention" &&
-    chartNamesFor.value !== viewKey.value,
+    sectionsFor.value !== viewKey.value,
 );
 
 const chartSchema = computed(() => {
@@ -731,27 +755,24 @@ const chartSchema = computed(() => {
     });
   }
   const spec = chartSection.value;
-  if (!spec || !chartNames.value.length || chartNamesFor.value !== viewKey.value) return null;
-  const otherLabel = t("billing.usageV2.otherBand");
+  if (!spec) return null;
+  // Runs alongside the table; the names only recolour the bands, which needs no new query.
+  const ranked = chartNamesFor.value === `${viewKey.value}-${spec.id}` ? chartNames.value : [];
   return buildStackedCostPanelSchema({
     id: `usage-overview-${meterKey}-${spec.id}`,
-    sql: dailyTopSql(
-      usageOrgId.value,
-      spec,
-      chartNames.value,
-      effectiveRate(props.details[meterKey]),
-      otherLabel,
-    ),
-    seriesColors: entitySeriesColors(meterKey, chartNames.value, otherLabel),
+    sql: dailyEntitySql(usageOrgId.value, spec, effectiveRate(props.details[meterKey])),
+    seriesColors: entitySeriesColors(meterKey, ranked, OTHERS_SERIES),
+    topResults: CHART_TOP,
+    fixedColor: meterColorFor(meterKey),
     t,
   });
 });
 
-/** Refresh re-runs a chart through the new bill's window, not its key; only a meter view depends on the names. */
+/** Refresh re-runs a chart through the new bill's window, not its key; the names only recolour it in place. */
 const chartKey = computed(() => {
   const view = selectedOrg.value?.id ?? "orgs";
   return selectedMeter.value
-    ? `${view}-${selectedMeter.value}-${chartSection.value?.id}-${chartNames.value.join("|")}`
+    ? `${view}-${selectedMeter.value}-${chartSection.value?.id}`
     : `${view}-all`;
 });
 
@@ -777,15 +798,12 @@ const chartEmptyTitle = computed(() =>
 );
 
 const onTopNames = (payload: { section: DrilldownSection | null; names: string[] }) => {
-  chartSection.value = payload.section;
   chartNames.value = payload.names;
-  chartNamesFor.value = viewKey.value;
+  chartNamesFor.value = `${viewKey.value}-${payload.section?.id}`;
 };
 
 const selectMeter = async (key: MeterKey | null) => {
   if (key === selectedMeter.value) return;
-  chartSection.value = null;
-  chartNames.value = [];
   router.replace({ query: { ...route.query, meter: key ?? undefined, group: undefined } });
   // Stacked on a phone, the breakdown sits below the strip, so bring it into view.
   if (key && isMobile.value) {

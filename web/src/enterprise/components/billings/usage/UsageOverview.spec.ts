@@ -19,6 +19,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import { mockMeteringResponse } from "./meteringMock";
+import { DRILLDOWNS } from "./usageQueries";
 
 const route = reactive<{ query: Record<string, string | undefined> }>({ query: {} });
 vi.mock("vue-router", () => ({
@@ -105,5 +106,51 @@ describe("UsageOverview org drilldown", () => {
     await flushPromises();
 
     expect(search).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("UsageOverview meter drilldown chart", () => {
+  beforeEach(() => {
+    route.query = { meter: "ingestion" };
+    store.state.organizationData.organizationSettings.usage_stream_enabled = true;
+  });
+
+  const mountMeter = () =>
+    mount(UsageOverview, {
+      props: { details: mockMeteringResponse().upcoming, lastLoadedAt: 1, refreshing: false },
+      global: {
+        plugins: [i18n, store],
+        stubs: { UsageCachedChart: true, UsageMeterBreakdown: true, UsageBillStrip: true },
+      },
+    });
+
+  it("starts the chart once the groupings are known, without waiting for the table's ranking", async () => {
+    const wrapper = mountMeter();
+    await flushPromises();
+    expect(wrapper.find('[data-test="billings-usageoverview-daily-pending"]').exists()).toBe(true);
+
+    const [byStream] = DRILLDOWNS.ingestion!;
+    wrapper
+      .findComponent({ name: "UsageMeterBreakdown" })
+      .vm.$emit("sections", { sections: [byStream], unavailable: [], activeId: byStream.id });
+    await flushPromises();
+
+    // No top names have arrived, yet the chart is already running its own query.
+    const chart = wrapper.findComponent({ name: "UsageCachedChart" });
+    expect(chart.exists()).toBe(true);
+    const schema = chart.props("panelSchema") as any;
+    expect(schema.queries[0].query).toContain('stream_name as "breakdown_1"');
+    expect(schema.config.top_results).toBe(5);
+
+    // The table's ranking then recolours the bands in place, with the same query.
+    wrapper
+      .findComponent({ name: "UsageMeterBreakdown" })
+      .vm.$emit("top-names", { section: byStream, names: ["app"] });
+    await flushPromises();
+    const recoloured = wrapper
+      .findComponent({ name: "UsageCachedChart" })
+      .props("panelSchema") as any;
+    expect(recoloured.queries[0].query).toBe(schema.queries[0].query);
+    expect(recoloured.config.color.colorBySeries.map((entry: any) => entry.value)).toContain("app");
   });
 });

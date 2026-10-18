@@ -197,25 +197,11 @@ export const DRILLDOWNS: Partial<Record<MeterKey, DrilldownSection[]>> = {
   synthetics_protocol: [byCheck("SyntheticsProtocolSteps")],
 };
 
-/**
- * Daily cost for one breakdown: the named top entities keep their own band and
- * every other entity folds into one, so the chart stays readable and still adds up.
- */
-export function dailyTopSql(
-  orgId: string,
-  spec: DrilldownSection,
-  topNames: string[],
-  rate: number,
-  otherLabel: string,
-): string {
-  const names = topNames.map((name) => `'${escapeLiteral(name)}'`).join(", ");
-  const band = names
-    ? `case when ${spec.expression} in (${names}) then ${spec.expression} ` +
-      `else '${escapeLiteral(otherLabel)}' end`
-    : `'${escapeLiteral(otherLabel)}'`;
+/** Daily cost per entity; the chart keeps the top few itself, so it need not wait for the table's ranking. */
+export function dailyEntitySql(orgId: string, spec: DrilldownSection, rate: number): string {
   return (
     `SELECT histogram(_timestamp, '1 day') as "x_axis_1", ` +
-    `sum(size) * ${rate} as "y_axis_1", ${band} as "breakdown_1" ` +
+    `sum(size) * ${rate} as "y_axis_1", ${spec.expression} as "breakdown_1" ` +
     `FROM "${USAGE_STREAM_NAME}" WHERE ${sectionWhere(orgId, spec)} ` +
     `GROUP BY x_axis_1, breakdown_1 ORDER BY x_axis_1 ASC`
   );

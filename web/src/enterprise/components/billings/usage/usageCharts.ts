@@ -68,6 +68,12 @@ export function shadeOf(color: string, step: number, toward: string): string {
 }
 
 /** Top entities in shades of their meter, and the remainder in the neutral axis colour. */
+/** Bands a drilldown chart keeps; the table's top rows are the same entities, so they share these shades. */
+export const CHART_TOP = 5;
+
+/** The renderer's own name for the band it folds everything past the top into. */
+export const OTHERS_SERIES = "others";
+
 export function entitySeriesColors(
   meterKey: MeterKey,
   names: string[],
@@ -114,9 +120,13 @@ export function buildStackedCostPanelSchema(opts: {
   seriesColors: SeriesColor[];
   decimals?: number;
   markLines?: MarkLine[];
+  /** Keep only this many bands and fold the rest into `OTHERS_SERIES`. */
+  topResults?: number;
+  /** Colour of a band `seriesColors` does not name, instead of a palette colour. */
+  fixedColor?: string;
   t: TranslateFn;
 }) {
-  const { id, sql, seriesColors, decimals = 2, markLines = [], t } = opts;
+  const { id, sql, seriesColors, decimals = 2, markLines = [], topResults, fixedColor, t } = opts;
   return {
     version: 2,
     id,
@@ -136,9 +146,10 @@ export function buildStackedCostPanelSchema(opts: {
       base_map: { type: "osm" },
       map_view: { zoom: 1, lat: 0, lng: 0 },
       mark_line: markLines,
+      ...(topResults ? { top_results: topResults, top_results_others: true } : {}),
       color: {
-        mode: "palette-classic",
-        fixedColor: [],
+        mode: fixedColor ? "fixed" : "palette-classic",
+        fixedColor: fixedColor ? [fixedColor] : [],
         seriesBy: "last",
         colorBySeries: seriesColors,
       },
