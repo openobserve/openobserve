@@ -1689,6 +1689,11 @@ export class LogsPage {
         await this.enableSqlModeIfNeeded();
     }
 
+    async expectSqlModeActive() {
+        // Filter mode rejects LIMIT client-side, so a run before this flips sends no request at all.
+        await expect.poll(() => this._isSqlModeEnabledViaVue(), { timeout: 10000 }).toBe(true);
+    }
+
     // Quick Mode methods (now inside the utilities hamburger menu)
     async verifyQuickModeToggle() {
         const quickModeToggle = this.page.locator(this.quickModeToggle);
