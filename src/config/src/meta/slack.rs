@@ -277,6 +277,9 @@ pub struct LinkingView {
     pub source: LinkingSource,
     pub domains: Vec<String>,
     pub counts: LinkCounts,
+    /// The installation's manual list, sent only under `mapping`, where it governs unmapped orgs.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub manual_domains: Vec<String>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
