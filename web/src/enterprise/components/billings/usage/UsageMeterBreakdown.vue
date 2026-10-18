@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="billings-usagemeterbreakdown-stream-missing"
     />
 
-    <div v-else class="border-border-default flex min-h-0 flex-1 flex-col border-t">
+    <div v-else class="flex min-h-0 flex-1 flex-col">
       <OTable
         :data="rows"
         :columns="columns"

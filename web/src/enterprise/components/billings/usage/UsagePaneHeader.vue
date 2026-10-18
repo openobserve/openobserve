@@ -14,10 +14,10 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!-- A pane title bar inside a shared panel, matching the LLMPanelCard header it sits among. -->
+<!-- A pane title bar inside a shared panel. Tall enough for a back button and a group-by toggle, so drilling in never moves the content below. -->
 <template>
   <div
-    class="border-border-default flex min-h-7 w-full flex-nowrap items-center gap-2 border-b px-2 py-1"
+    class="border-border-default flex min-h-10 w-full flex-nowrap items-center gap-2 border-b px-2 py-1"
   >
     <slot name="leading" />
     <div class="flex min-w-0 items-baseline gap-2">
