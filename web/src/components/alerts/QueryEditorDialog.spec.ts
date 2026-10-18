@@ -653,6 +653,8 @@ describe("QueryEditorDialog - autocomplete wiring reaches the editor", () => {
 // consumes this module, so mocking it does not affect the rest of the suite.
 vi.mock("@/composables/fieldValueStore", () => ({
   getFieldValuesForSuggestion: vi.fn().mockResolvedValue(["error", "warn"]),
+  requestFieldValues: vi.fn().mockResolvedValue([]),
+  fieldValuesUnavailable: vi.fn(() => false),
 }));
 
 // getSuggestions now awaits a lazy fetch of the server function catalog. Stub it

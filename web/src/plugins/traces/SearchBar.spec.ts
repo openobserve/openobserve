@@ -58,14 +58,20 @@ vi.mock("@/composables/useStreams", () => ({
   }),
 }));
 
+// The last autoCompleteData the component created, so tests can read the stream context it was given.
+const suggestState = vi.hoisted(() => ({ autoCompleteData: null as any }));
+
 vi.mock("@/composables/useSuggestions", () => ({
   default: () => ({
-    autoCompleteData: ref({
+    autoCompleteData: (suggestState.autoCompleteData = ref({
       query: "",
       cursorIndex: 0,
       fieldValues: {},
       popup: { open: vi.fn() },
-    }),
+      org: "",
+      streamType: "",
+      streamName: "",
+    })),
     autoCompleteKeywords: ref(["SELECT", "FROM", "WHERE"]),
     effectiveKeywords: ref([]),
     getSuggestions: vi.fn(),
@@ -329,7 +335,17 @@ const sharedStubs = {
   },
   CodeQueryEditor: {
     template: '<div data-test="code-query-editor-stub" />',
-    props: ["editorId", "query", "keywords", "functions", "language", "class"],
+    props: [
+      "editorId",
+      "query",
+      "keywords",
+      "functions",
+      "language",
+      "class",
+      "filterMode",
+      "debounceTime",
+      "fieldValueResolver",
+    ],
     emits: ["update:query", "run-query", "focus", "blur"],
     setup() {
       return {
@@ -1332,6 +1348,57 @@ describe("SearchBar", () => {
       await flushPromises();
 
       expect(wrapper.find('[data-test="code-query-editor-stub"]').exists()).toBe(false);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  describe("query editor autocomplete wiring", () => {
+    const editorProps = () => wrapper.findComponent({ ref: "queryEditorRef" });
+
+    it("runs the editor in filter mode, since the traces query is a bare WHERE fragment", async () => {
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      expect(editorProps().props("filterMode")).toBe(true);
+    });
+
+    it("hands the query to suggestions after 100 ms, as Logs does", async () => {
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      expect(editorProps().props("debounceTime")).toBe(100);
+    });
+
+    it("sets the stream context on mount, before anything is typed", async () => {
+      wrapper = mountSearchBar({ fieldValues: { service_name: new Set(["api"]) } });
+      await flushPromises();
+
+      const data = suggestState.autoCompleteData.value;
+      expect(data.org).toBe(store.state.selectedOrganization.identifier);
+      expect(data.streamType).toBe("traces");
+      expect(data.streamName).toBe("default");
+      expect([...data.fieldValues.service_name]).toEqual(["api"]);
+    });
+
+    it("follows a stream change without waiting for the query to change", async () => {
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      searchObjInstance.data.stream.selectedStream = { label: "other", value: "other" };
+      await flushPromises();
+
+      expect(suggestState.autoCompleteData.value.streamName).toBe("other");
+    });
+
+    it("picks up span values that arrive after mount", async () => {
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      await wrapper.setProps({ fieldValues: { service_name: new Set(["checkout"]) } });
+
+      expect([...suggestState.autoCompleteData.value.fieldValues.service_name]).toEqual([
+        "checkout",
+      ]);
     });
   });
 

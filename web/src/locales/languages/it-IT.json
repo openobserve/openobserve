@@ -20118,7 +20118,25 @@
       "maxDoc": "Valore più grande nel campo. Aggregato — abbina a GROUP BY.",
       "minDoc": "Valore più piccolo nel campo. Aggregato — abbina a GROUP BY.",
       "arrayExtractDoc": "Estrai un singolo elemento da un array tramite indice 1-based, es. `array_extract(regexp_match(log, '...'), 1)`.",
-      "approxTopkDoc": "Approssima i k valori più frequenti di un campo. Molto più economico di un GROUP BY ... ORDER BY count DESC esatto su campi ad alta cardinalità."
+      "approxTopkDoc": "Approssima i k valori più frequenti di un campo. Molto più economico di un GROUP BY ... ORDER BY count DESC esatto su campi ad alta cardinalità.",
+      "valuesLoading": "Caricamento dei valori per {field} in corso",
+      "valuesLoadingRow": "Caricamento dei valori in corso",
+      "valuesLoadingHint": "Continua a digitare, oppure premi Esc e poi Ctrl+Spazio",
+      "valuesEmpty": "Nessun valore per {field} negli ultimi {minutes} minuti",
+      "valuesEmptyInRange": "Nessun valore per {field} nell'intervallo di tempo selezionato",
+      "closeValueQuote": "Chiudi le virgolette del valore",
+      "valuesFailed": "Impossibile caricare i valori per {field}",
+      "chainedMenuAnnouncement": "{count} suggerimento, premi Tab per accettare | {count} suggerimenti, premi Tab per accettare",
+      "valuesCap": "{count} valore mostrato · digita per filtrare | {count} valori mostrati · digita per filtrare",
+      "groupValues": "Valori · recenti",
+      "groupValuesName": "Valori",
+      "groupFields": "Campi",
+      "groupOperators": "Operatori",
+      "groupFunctionsAndFields": "Funzioni e campi",
+      "groupFunctions": "Funzioni",
+      "wrapStrMatch": "sottostringa",
+      "wrapReMatch": "regex",
+      "wrapReNotMatch": "regex, negato"
     },
     "diagnostics": {
       "incompleteAnd": "Condizione incompleta — prevista un'espressione dopo AND",
@@ -20174,6 +20192,8 @@
       "duplicateColumn": "La colonna '{col}' è definita più di una volta — rimuovi o assegna un alias al duplicato",
       "tableNotFound": "Tabella sconosciuta '{tbl}' — questa tabella o CTE non esiste",
       "functionSignature": "La funzione '{fn}' è stata chiamata con tipi di argomento errati — aggiungi un cast esplicito",
+      "notACondition": "`{field}` è testo, non una condizione. Confrontalo: `{field} = '…'` oppure `str_match({field}, '…')`",
+      "notAConditionValue": "`{field}` non è una condizione. Confrontalo, ad es. `{field} = …`",
       "syntaxError": "Errore di sintassi SQL"
     },
     "hover": {

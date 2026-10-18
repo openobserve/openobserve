@@ -513,6 +513,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :keywords="effectiveKeywords"
           :suggestions="effectiveSuggestions"
           :field-value-resolver="resolveFieldValues"
+          :debounce-time="100"
+          :filter-mode="!searchObj.meta.sqlMode"
           language="sql"
           @update:query="updateQueryValue"
           @run-query="searchData"
@@ -770,18 +772,28 @@ export default defineComponent({
       { immediate: true },
     );
 
+    // Set as soon as the stream is chosen, so a value lookup on the first keystroke is not left without one.
+    const syncSuggestStreamContext = () => {
+      autoCompleteData.value.org = store.state.selectedOrganization?.identifier ?? "";
+      autoCompleteData.value.streamType = "traces";
+      autoCompleteData.value.streamName = searchObj.data.stream.selectedStream?.value ?? "";
+      autoCompleteData.value.fieldValues = props.fieldValues;
+    };
+    watch(
+      () => [
+        store.state.selectedOrganization?.identifier,
+        searchObj.data.stream.selectedStream?.value,
+        props.fieldValues,
+      ],
+      syncSuggestStreamContext,
+      { immediate: true },
+    );
+
     const updateAutoComplete = (value) => {
       autoCompleteData.value.query = value;
-      autoCompleteData.value.cursorIndex = queryEditorRef.value.getCursorIndex();
-      autoCompleteData.value.fieldValues = props.fieldValues;
-      autoCompleteData.value.popup.open = queryEditorRef.value.triggerAutoComplete;
-      // [NEW] Set stream context so getSuggestions can read stored values from
-      // IndexedDB. Traces field expansion already writes to IDB via
-      // captureFromValuesApi (useFieldValuesStream) with stream_type="traces",
-      // so values are already being captured — this just enables the read side.
-      autoCompleteData.value.org = store.state.selectedOrganization.identifier;
-      autoCompleteData.value.streamType = "traces";
-      autoCompleteData.value.streamName = searchObj.data.stream.selectedStream.value ?? "";
+      autoCompleteData.value.cursorIndex = queryEditorRef.value?.getCursorIndex();
+      autoCompleteData.value.popup.open = queryEditorRef.value?.triggerAutoComplete;
+      syncSuggestStreamContext();
       getSuggestions();
     };
 
