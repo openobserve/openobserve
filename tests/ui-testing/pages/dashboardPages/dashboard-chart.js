@@ -189,8 +189,9 @@ export default class ChartTypeSelector {
           .allTextContents();
         testLogger.debug(`Attempt ${attempt}: Looking for "${streamName}". Available options (${allOptions.length}): ${allOptions.slice(0, 10).join(', ')}`);
 
+        // Exact value match: hasText is a substring match, so "e2e_automate" also hit "e2e_automate1_w0".
         const streamOption = this.page
-          .locator('[data-test="index-dropdown-stream-option"]', { hasText: streamName })
+          .locator(`[data-test="index-dropdown-stream-option"][data-test-value="${streamName}"]`)
           .first();
 
         await streamOption.waitFor({ state: "visible", timeout: 15000 });
