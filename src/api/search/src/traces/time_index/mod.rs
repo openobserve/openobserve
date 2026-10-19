@@ -63,7 +63,6 @@ const SESSION_EXPAND_WINDOW: i64 = 7 * DAY_MICROS;
 const MAX_LOOKUP_KEYS: usize = 100;
 const LOOKUP_CONCURRENCY: usize = 8;
 const AFFINITY_STREAMS: usize = 2;
-// A page's IN list multiplies bloom false positives, so list scans trade the 24h guarantee for 1h.
 const LIST_MARGIN: i64 = 60 * 60 * 1_000_000;
 
 static STREAM_AFFINITY: Lazy<RwHashMap<String, Vec<String>>> = Lazy::new(Default::default);
