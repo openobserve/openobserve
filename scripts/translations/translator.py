@@ -60,10 +60,10 @@ LANGUAGE_NAMES = {
     "tr-TR": "Turkish",
     "zh-CN": "Simplified Chinese",
     "fr-FR": "French",
-    "es-ES": "Spanish",
+    "es-ES": "Spanish (Spain)",
     "de-DE": "German",
     "it-IT": "Italian",
-    "pt-PT": "Portuguese",
+    "pt-PT": "European Portuguese (Portugal, not Brazilian)",
     "ja-JP": "Japanese",
     "ko-KR": "Korean",
     "nl-NL": "Dutch",
@@ -135,7 +135,7 @@ TERMS = {
     },
     "event": {
         "sense": "a recorded occurrence in the system (log event, alert event) — "
-        "the record/incident sense, never a social activity or gathering",
+        "the record sense, never a social activity or gathering",
         "zh-CN": "事件",
         "zh-TW": "事件",
         "de-DE": "Ereignis",
@@ -166,6 +166,7 @@ TERMS = {
         "ja-JP": "ライブ",
         "vi-VN": "trực tiếp",
         "ar-SA": "مباشر",
+        "ko-KR": "실시간",
     },
     "trace": {
         "sense": "a distributed trace: one request's recorded path through services",
@@ -337,6 +338,7 @@ TERMS = {
         "nl-NL": "logs",
         "tr-TR": "günlükler",
         "ru-RU": "логи",
+        "es-ES": "logs",
     },
     "metric": {
         "sense": "a measured time-series value — never the metric system or plain "
@@ -386,6 +388,7 @@ TERMS = {
         "de-DE": "LLM-Judge",
         "nl-NL": "LLM Judge",
         "tr-TR": "LLM hakemi",
+        "ko-KR": "LLM 심사자",
     },
     "incident": {
         "sense": "an operational incident under response — never a criminal case or "
@@ -393,6 +396,8 @@ TERMS = {
         "de-DE": "Vorfall",
         "ja-JP": "インシデント",
         "ko-KR": "인시던트",
+        "tr-TR": "vaka",
+        "ar-SA": "الحادث",
     },
     "service account": {
         "sense": "a non-human IAM identity used for API access",
@@ -410,6 +415,7 @@ TERMS = {
         "nl-NL": "ingestie",
         "tr-TR": "veri alımı",
         "ar-SA": "الاستيعاب",
+        "es-ES": "ingesta",
     },
     "legend": {
         "sense": "the key that labels a chart's series — never a myth",
@@ -452,6 +458,7 @@ TERMS = {
     "error budget": {
         "sense": "the failure allowance of an SLO",
         "ja-JP": "エラーバジェット",
+        "it-IT": "budget di errore",
     },
     "apply": {
         "sense": "applying a setting, filter or change — never applying for a job",
@@ -464,6 +471,7 @@ TERMS = {
     "panel": {
         "sense": "one chart on a dashboard — never a committee or the whole dashboard",
         "ar-SA": "اللوحة",
+        "vi-VN": "panel",
     },
     "check": {
         "sense": "a synthetic monitoring check — never a bank cheque",
@@ -483,6 +491,28 @@ TERMS = {
     },
     "docs": {
         "sense": "the product documentation — never doctors",
+    },
+    "slice": {
+        "sense": "a fixed time bucket an SLO's SLI is scored on — never a slice "
+        "of food",
+        "it-IT": "slice",
+        "nl-NL": "slice",
+    },
+    "escalation": {
+        "sense": "on-call: passing an unacknowledged page to the next responder "
+        "level — not a price or conflict escalation",
+        "es-ES": "escalada",
+        "tr-TR": "eskalasyon",
+    },
+    "token": {
+        "sense": "an auth/API/ingestion credential or an LLM usage unit — never "
+        "a coin or game token",
+        "tr-TR": "token",
+    },
+    "run": {
+        "sense": "one execution of a check, eval, job or workflow — never a round "
+        "of a game or a season",
+        "ar-SA": "التشغيل",
     },
     "destination": {
         "sense": "a configured endpoint that alerts or pipeline output are "
@@ -560,7 +590,7 @@ TERMS = {
         "zh-CN": "报表",
         "zh-TW": "報表",
         "de-DE": "Bericht",
-        "es-ES": "reporte",
+        "es-ES": "informe",
         "it-IT": "report",
         "pt-PT": "relatório",
         "nl-NL": "rapport",
