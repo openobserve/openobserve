@@ -2392,7 +2392,7 @@
         "clickRequired": "Voer een kliknaam in",
         "errorRequired": "Voer een foutmelding in",
         "previewNoParam": "Geen enkele weergave in de afgelopen 7 dagen bevat deze parameter",
-        "openInLogs": "Openen in Logboeken",
+        "openInLogs": "Openen in Logs",
         "summaryParam": "URL heeft {name}",
         "summaryParamValue": "URL heeft {name} = {value}",
         "summaryRef": "Referrerhost {value}",
