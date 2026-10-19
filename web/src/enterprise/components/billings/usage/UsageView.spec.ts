@@ -44,12 +44,18 @@ vi.mock("vue-router", () => ({
 
 const metering = vi.fn();
 const members = vi.fn();
+const aiUsage = vi.fn();
 vi.mock("@/services/billings", () => ({
   default: {
     get_data_usage: (...args: unknown[]) => metering(...args),
     list_billing_group_members: (...args: unknown[]) => members(...args),
+    get_ai_usage: (...args: unknown[]) => aiUsage(...args),
   },
 }));
+vi.mock("@/aws-exports", async (importOriginal) => {
+  const actual = await importOriginal<{ default: Record<string, unknown> }>();
+  return { default: { ...actual.default, isCloud: "true" } };
+});
 
 const { default: UsageView } = await import("./UsageView.vue");
 
@@ -114,5 +120,51 @@ describe("UsageView", () => {
     const overview = wrapper.findComponent({ name: "UsageOverview" });
     expect(overview.props("details")).toMatchObject({ total_cost: 1 });
     expect(overview.props("billingOrgs")).toEqual([]);
+  });
+});
+
+describe("UsageView AI credits warning", () => {
+  const usage = (extra: Record<string, unknown>) => ({
+    data: { mode: "exhausted", requires_additional_credits: false, payer_org_id: null, ...extra },
+  });
+
+  const mountView = async () => {
+    metering.mockResolvedValue(bill);
+    members.mockResolvedValue({ data: [] });
+    const wrapper = mount(UsageView, { global: { plugins: [i18n, store] } });
+    await flushPromises();
+    return wrapper;
+  };
+
+  it("tells a contract org to contact sales once its credits run out", async () => {
+    aiUsage.mockResolvedValue(usage({ requires_additional_credits: true }));
+    const wrapper = await mountView();
+    const banner = wrapper.find('[data-test="billings-usageview-ai-exhausted"]');
+    expect(banner.text()).toContain("Contact your account manager");
+    expect(wrapper.find('[data-test="billings-usageview-ai-exhausted-action"]').text()).toBe(
+      "Contact Sales",
+    );
+  });
+
+  it("names the paying org for a member, with nothing to click", async () => {
+    aiUsage.mockResolvedValue(usage({ payer_org_id: "payer-org" }));
+    const wrapper = await mountView();
+    expect(wrapper.find('[data-test="billings-usageview-ai-exhausted"]').text()).toContain(
+      "payer-org",
+    );
+    expect(wrapper.find('[data-test="billings-usageview-ai-exhausted-action"]').exists()).toBe(
+      false,
+    );
+  });
+
+  it("stays out of the way while credits remain or the read fails", async () => {
+    aiUsage.mockResolvedValue({ data: { mode: "free", requires_additional_credits: false } });
+    expect((await mountView()).find('[data-test="billings-usageview-ai-exhausted"]').exists()).toBe(
+      false,
+    );
+    aiUsage.mockRejectedValue(new Error("boom"));
+    expect((await mountView()).find('[data-test="billings-usageview-ai-exhausted"]').exists()).toBe(
+      false,
+    );
   });
 });

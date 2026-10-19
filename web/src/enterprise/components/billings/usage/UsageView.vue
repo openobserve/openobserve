@@ -34,6 +34,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OTab name="estimation" :label="t('billing.usageV2.estimationTab')" />
     </OTabs>
 
+    <!-- Account-wide, so it sits above every tab as it did on main; same cases and wording as the AI chat notice. -->
+    <OBanner
+      v-if="aiCreditsMessage"
+      variant="warning"
+      icon="warning"
+      inline-actions
+      dense
+      data-test="billings-usageview-ai-exhausted"
+    >
+      <span class="font-semibold">{{ t("aiAssistant.creditsExhausted") }}</span>
+      <span class="ms-1">{{ aiCreditsMessage }}</span>
+      <template v-if="aiCreditsAction" #actions>
+        <OButton
+          variant="warning"
+          size="xs"
+          data-test="billings-usageview-ai-exhausted-action"
+          @click="aiCreditsAction.run"
+          >{{ aiCreditsAction.label }}</OButton
+        >
+      </template>
+    </OBanner>
+
     <!-- The page's own shape, not a spinner: nothing moves once the data lands. -->
     <div v-if="loading && lastLoadedAt === null" class="min-h-0 flex-1 overflow-hidden">
       <UsageOverviewSkeleton data-test="billings-usageview-loading" />
@@ -94,7 +116,10 @@ import type { I18nText } from "@/types/i18n";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
-import BillingService from "@/services/billings";
+import OButton from "@/lib/core/Button/OButton.vue";
+import config from "@/aws-exports";
+import { siteURL } from "@/constants/config";
+import BillingService, { type AiUsage } from "@/services/billings";
 import UsageOverview from "./UsageOverview.vue";
 import UsageOverviewSkeleton from "./UsageOverviewSkeleton.vue";
 import { mockMeteringResponse, USE_METERING_MOCK } from "./meteringMock";
@@ -176,7 +201,53 @@ const fetchMetering = async () => {
   return parseMeteringResponse(apiResponse?.data?.price_details);
 };
 
+const aiUsage = ref<AiUsage | null>(null);
+
+/** Cloud only, as on main; a failed read just leaves the warning out. */
+const loadAiUsage = async () => {
+  if (config.isCloud !== "true") return;
+  try {
+    aiUsage.value = (
+      await BillingService.get_ai_usage(store.state.selectedOrganization.identifier)
+    ).data;
+  } catch {
+    aiUsage.value = null;
+  }
+};
+
+/** Why AI stopped, for a contract, a billing-group member, or an org that pays by subscription. */
+const aiCreditsMessage = computed(() => {
+  const usage = aiUsage.value;
+  if (usage?.mode !== "exhausted") return null;
+  if (usage.requires_additional_credits) return t("billing.aiContractExhaustedMessage");
+  if (usage.payer_org_id)
+    return t("billing.aiPayerSubscribeMessage", { payer: usage.payer_org_id });
+  return t("billing.aiExhaustedMessage");
+});
+
+/** A member org has nothing to do here: its message names the org that pays. */
+const aiCreditsAction = computed(() => {
+  const usage = aiUsage.value;
+  if (usage?.mode !== "exhausted") return null;
+  if (usage.requires_additional_credits) {
+    return {
+      label: t("billing.contactLabel"),
+      run: () => window.open(siteURL.contactSales, "_blank"),
+    };
+  }
+  if (usage.payer_org_id) return null;
+  return {
+    label: t("billing.plansLabel"),
+    run: () =>
+      router.push({
+        name: "plans",
+        query: { org_identifier: store.state.selectedOrganization.identifier },
+      }),
+  };
+});
+
 const loadDetails = async () => {
+  void loadAiUsage();
   loading.value = true;
   loadError.value = null;
   try {
