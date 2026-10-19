@@ -34,6 +34,7 @@ import {
   formatCycle,
   formatRate,
   formatVolume,
+  formatGbHours,
   METERS,
   meterForEvent,
   monthlyPace,
@@ -122,6 +123,10 @@ describe("meteringModel", () => {
     expect(formatVolume(details.ingestion)).toBe("1016.00 MB");
     expect(formatVolume(details.query)).toBe("6.48 GB");
     expect(formatVolume(details.ai)).toBe("1,036");
+    expect(formatVolume({ ...details.query, metered_amount: 1361.92 }, "retention")).toBe(
+      "1.33 GB-hours",
+    );
+    expect(formatGbHours(2_560_000)).toBe("2,500.00 GB-hours");
   });
 
   it("renders a dash when a meter is absent", () => {

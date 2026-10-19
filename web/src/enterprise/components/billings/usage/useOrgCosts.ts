@@ -91,7 +91,6 @@ export interface OrgCostsState {
 export function useOrgCosts(
   details: Readonly<Ref<MeteringDetails | null>>,
   billingOrgs: Readonly<Ref<BillingOrg[]>>,
-  refreshToken: Readonly<Ref<number>>,
 ) {
   const { search } = useUsageSearch();
   const costs = ref<Record<string, OrgCost>>({});
@@ -107,14 +106,10 @@ export function useOrgCosts(
   });
 
   let latest = 0;
-  /** The Refresh this cost was last read for; a newer one bypasses the server's result cache. */
-  let readFor = refreshToken.value;
 
   const load = async () => {
     const cycle = details.value;
     if (!billingOrgs.value.length || !cycle) return;
-    const refresh = readFor !== refreshToken.value;
-    readFor = refreshToken.value;
     const id = ++latest;
     loading.value = true;
     failed.value = false;
@@ -126,7 +121,6 @@ export function useOrgCosts(
         end: window.value.end,
         size: 1000,
         key: "orgCosts",
-        refresh,
         onRows: (rows) => {
           if (id === latest) costs.value = priceOrgVolumes(rows, cycle);
         },
@@ -142,7 +136,7 @@ export function useOrgCosts(
     }
   };
 
-  // Not on the Refresh token itself: Refresh always brings a new bill, and two reads would cancel the uncached one.
+  // Refresh always brings a new bill, so this re-reads without watching a refresh signal.
   watch([() => billingOrgs.value.length, details], load, { immediate: true });
 
   return { costs, loading, failed, window };

@@ -272,7 +272,7 @@ describe("UsageTrends range in the URL", () => {
     await flushPromises();
 
     expect(search).toHaveBeenCalledTimes(1);
-    expect(search.mock.calls[0][1].refresh).toBe(true);
+    expect(search.mock.calls[0][1]).not.toHaveProperty("refresh");
   });
 });
 
@@ -305,6 +305,25 @@ describe("UsageTrends projected total", () => {
     expect(card).toContain("at the last 7 days' pace");
 
     // Read from usage records, not the bill, so it does not take the bill's name.
+    const total = wrapper.find('[data-test="billings-usagetrends-kpi-total"]').text();
+    expect(total).toContain("Estimated Cost So Far");
+  });
+
+  it("names the cost an estimate on a cycle's first day, before there is a pace", async () => {
+    const today = Math.floor(Date.now() / 86_400_000) * 86_400;
+    const upcoming = { ...mockMeteringResponse().upcoming!, cycle_start: today };
+    search.mockReset().mockResolvedValue([]);
+    nav.route.query = {};
+    const wrapper = mount(UsageTrends, {
+      props: { details: upcoming, cycles: [upcoming], billingOrgs: [], projected: 5000 },
+      global: {
+        plugins: [i18n, store],
+        stubs: { DateTime: DateTimeStub, AsyncComponentWrapper: true },
+      },
+    });
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="billings-usagetrends-kpi-projected"]').exists()).toBe(false);
     const total = wrapper.find('[data-test="billings-usagetrends-kpi-total"]').text();
     expect(total).toContain("Estimated Cost So Far");
   });

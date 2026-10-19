@@ -68,11 +68,11 @@ describe("useUsageSearch", () => {
 
   it("posts the SQL to the stream with the window, size and logs page type", async () => {
     const { search } = useUsageSearch();
-    const pending = search("select 1", { ...options, refresh: true });
+    const pending = search("select 1", options);
     const { request, handlers } = calls[0];
     expect(request.type).toBe("search");
     expect(request.pageType).toBe("logs");
-    expect(request.clear_cache).toBe(true);
+    expect(request.clear_cache).toBeUndefined();
     expect(request.queryReq.query).toEqual({
       sql: "select 1",
       start_time: 1,
