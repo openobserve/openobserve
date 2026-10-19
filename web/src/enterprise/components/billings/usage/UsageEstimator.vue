@@ -75,8 +75,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Side by side, the panes fill the page and only the form scrolls, so the estimate never leaves the screen. -->
       <div
-        class="grid items-stretch gap-3 @min-[60rem]/estimator:min-h-0 @min-[60rem]/estimator:flex-1 @min-[60rem]/estimator:grid-cols-[minmax(0,1.35fr)_minmax(20rem,0.95fr)] @min-[60rem]/estimator:grid-rows-[minmax(0,1fr)]"
+        class="relative grid items-stretch gap-3 @min-[60rem]/estimator:min-h-0 @min-[60rem]/estimator:flex-1 @min-[60rem]/estimator:grid-cols-[minmax(0,1.35fr)_minmax(20rem,0.95fr)] @min-[60rem]/estimator:grid-rows-[minmax(0,1fr)]"
       >
+        <!-- Until history lands the fields hold placeholders, not this org's usage. -->
+        <OInnerLoading
+          :showing="loadingHistory"
+          size="sm"
+          :label="t('billing.usageV2.loadingHistory')"
+        />
         <!-- ── Inputs ───────────────────────────────────────── -->
         <section
           class="border-border-default rounded-default flex min-w-0 flex-col overflow-hidden border"
@@ -246,6 +252,7 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
+import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import { addCommasToNumber, formatSizeFromMB } from "@/utils/formatters";
@@ -594,9 +601,12 @@ const runScalarQuery = async (sql: string, key: string) => {
   return hits[0] ?? {};
 };
 
+const loadingHistory = ref(false);
+
 /** Defaults come from history; a failed query just leaves the field at zero for the user to fill. */
 const loadDefaults = async () => {
   if (!props.details) return;
+  loadingHistory.value = true;
   try {
     const [streams, scan] = await Promise.all([
       runScalarQuery(averageStreamSizeSql(store.state.selectedOrganization.identifier), "streams"),
@@ -615,8 +625,9 @@ const loadDefaults = async () => {
     inputs.avgStreamMb = inputs.avgStreamMb || 0;
     inputs.scanRateMbPerMin = inputs.scanRateMbPerMin || 0;
   }
-  // The answers land a moment after the tab opens; anything typed by then stays as typed.
-  if (!edited.size) applyScenario("current");
+  loadingHistory.value = false;
+  // The answers land a moment after the tab opens; a preset picked or a value typed by then stays.
+  if (!edited.size) applyScenario(scenario.value);
 };
 
 onMounted(loadDefaults);

@@ -94,6 +94,29 @@ describe("UsageEstimator My Current Usage", () => {
     expect(field(wrapper, "browserIntervalSec").props("modelValue")).toBe(Math.round(300 / exact));
   });
 
+  it("says it is reading history instead of showing defaults as current usage", async () => {
+    const wrapper = mountEstimator();
+    await flushPromises();
+    const loading = () => wrapper.findComponent({ name: "OInnerLoading" }).props("showing");
+    expect(loading()).toBe(true);
+
+    releaseHistory();
+    await flushPromises();
+    expect(loading()).toBe(false);
+  });
+
+  it("keeps a preset picked while history loads", async () => {
+    const wrapper = mountEstimator();
+    await flushPromises();
+    wrapper.findComponent({ name: "OToggleGroup" }).vm.$emit("update:modelValue", "twice");
+    releaseHistory();
+    await flushPromises();
+
+    expect(wrapper.findComponent({ name: "OToggleGroup" }).props("modelValue")).toBe("twice");
+    const current = Number(field(wrapper, "searchCount").props("modelValue"));
+    expect(current).toBe(2);
+  });
+
   it("leaves a value typed before the history lands as typed", async () => {
     const wrapper = mountEstimator();
     await flushPromises();

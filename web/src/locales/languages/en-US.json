@@ -8161,6 +8161,7 @@
       "resetEstimate": "Reset",
       "expectedUsage": "Expected Monthly Usage",
       "expectedUsageHint": "Prefilled from this cycle so far",
+      "loadingHistory": "Reading your usage history…",
       "yourEstimate": "Your Estimate",
       "assumptionsFrom": "From your last 30 days",
       "scanNote": "Scans about {volume} per month.",
