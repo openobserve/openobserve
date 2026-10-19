@@ -213,7 +213,8 @@ import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import { timestampToTimezoneDate } from "@/utils/timezone";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import KpiCardRow from "@/components/common/KpiCardRow.vue";
-import organizations from "@/services/organizations";
+import { useMutation } from "@tanstack/vue-query";
+import { updateOrgSettingsMutation } from "@/services/organizations.queries";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import UsageKpiCard from "./UsageKpiCard.vue";
 import UsagePaneHeader from "./UsagePaneHeader.vue";
@@ -323,18 +324,19 @@ const usageStreamEnabled = computed<boolean>(
 const showEnableConfirm = ref(false);
 const enabling = ref(false);
 
-/** Merge with the current settings so the POST cannot clobber another org parameter. */
+const updateOrgSettings = useMutation(() => updateOrgSettingsMutation(orgId.value));
+
+/** Sends only the opt-in: the backend writes every field it gets, so this page's older copy of the rest would undo newer changes. */
 const enableUsageReporting = async () => {
   showEnableConfirm.value = false;
   if (enabling.value) return;
   enabling.value = true;
-  const updated = {
-    ...(store.state?.organizationData?.organizationSettings ?? {}),
-    usage_stream_enabled: true,
-  };
   try {
-    await organizations.post_organization_settings(orgId.value, updated);
-    store.dispatch("setOrganizationSettings", updated);
+    await updateOrgSettings.mutateAsync({ usage_stream_enabled: true });
+    store.dispatch("setOrganizationSettings", {
+      ...(store.state?.organizationData?.organizationSettings ?? {}),
+      usage_stream_enabled: true,
+    });
     toast({ variant: "success", message: t("billing.usageTrends.enablePending"), timeout: 5000 });
   } catch (e: any) {
     toast({
