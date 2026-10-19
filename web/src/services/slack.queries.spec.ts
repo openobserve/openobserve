@@ -146,9 +146,9 @@ describe("slack queries", () => {
     expect(slackInstallationsQuery(ORG).queryKey).toEqual(slackKeys.installations(ORG));
   });
 
-  it("passes silentForbidden to the prerequisite checks and the form's install start", async () => {
-    await (slackPrerequisitesQuery(ORG, { silentForbidden: true }).queryFn as any)();
-    expect(slack.getPrerequisites).toHaveBeenLastCalledWith(ORG, { silentForbidden: true });
+  it("reads the prerequisite checks plainly and passes silentForbidden to the form's install start", async () => {
+    await (slackPrerequisitesQuery(ORG).queryFn as any)();
+    expect(slack.getPrerequisites).toHaveBeenLastCalledWith(ORG);
 
     await installStartMutation(ORG, { silentForbidden: true }).mutationFn!(
       "destination_form",

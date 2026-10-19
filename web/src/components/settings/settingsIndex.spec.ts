@@ -373,13 +373,21 @@ describe("SettingsIndex.vue", () => {
     });
 
     it.each(["flag", "master_key", "super_cluster"])(
-      "shows self-hosted enterprise the disabled screen entry for reason %s",
+      "AC-1.5 hides Slack on self-hosted enterprise for disabled reason %s",
       (reason) => {
         config.isEnterprise = "true";
         wrapper = createWrapper(slackConfig(false, reason));
-        expect(findSlack(wrapper)?.visible).toBe(true);
+        expect(findSlack(wrapper)?.visible).toBe(false);
       },
     );
+
+    it("AC-1.5 sends a self-hosted deep link to General while Slack is off", () => {
+      config.isEnterprise = "true";
+      mockRouter.currentRoute.value.name = "slack";
+      mockPush.mockClear();
+      wrapper = createWrapper(slackConfig(false, "flag"));
+      expect(mockPush).toHaveBeenCalledWith(expect.objectContaining({ path: "/settings/general" }));
+    });
 
     it.each(["home_region_unset", "other_region", "allowlist"])(
       "hides Slack for the removed reason %s",

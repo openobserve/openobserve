@@ -49,11 +49,10 @@ export const slackInstallationsQuery = (org: string, options?: SlackRequestOptio
     staleTime: LIVE_STALE_TIME,
   });
 
-/** The disabled screen passes `silentForbidden`: only some admins may read the checks there. */
-export const slackPrerequisitesQuery = (org: string, options?: SlackRequestOptions) =>
+export const slackPrerequisitesQuery = (org: string) =>
   queryOptions({
     queryKey: slackKeys.prerequisites(org),
-    queryFn: async () => (await slack.getPrerequisites(org, options)).data,
+    queryFn: async () => (await slack.getPrerequisites(org)).data,
     // The admin fixes a variable and restarts, then comes back expecting the new result.
     staleTime: LIVE_STALE_TIME,
   });

@@ -25063,13 +25063,6 @@
     }
   },
   "slackApp": {
-    "disabled": {
-      "flagTitle": "Slack is turned off on this server",
-      "flagDescription": "Set {variable} to true in the server environment and restart OpenObserve to turn on the Slack app.",
-      "masterKeyTitle": "Slack needs an encryption key",
-      "masterKeyDescription": "Set {variable} in the server environment and restart OpenObserve. Slack tokens are stored encrypted with it.",
-      "superClusterTitle": "Slack is not yet available on super-cluster deployments"
-    },
     "prereq": {
       "title": "Step 0 · Server prerequisites",
       "subtitle": "Checked on this server before any Slack work",

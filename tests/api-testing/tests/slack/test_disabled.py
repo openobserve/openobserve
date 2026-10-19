@@ -110,3 +110,15 @@ def test_inbound_slack_routes_are_404(client: OpenObserveClient, slack_off: dict
     )
     assert resp.status_code == 404, resp.text
     assert resp.json() == {"code": 404, "message": "Slack is not enabled"}
+
+
+def test_role_editor_resources_omit_slack(client: OpenObserveClient, slack_org: str, slack_off: dict) -> None:
+    """Decision 2026-10-19: nothing visible changes while Slack is off, so the role editor lists no Slack resource."""
+    resp = client.get("resources", org=slack_org)
+    if slack_off["build_type"] == "opensource":
+        assert resp.status_code == 403, resp.text
+        return
+    assert resp.status_code == 200, resp.text
+    keys = {r["key"] for r in resp.json()}
+    assert "stream" in keys, keys
+    assert "slack_integration" not in keys, keys

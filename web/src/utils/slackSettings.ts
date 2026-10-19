@@ -20,18 +20,6 @@ export interface SlackOrgState {
   reason: SlackDisabledReason | null;
 }
 
-/** Disabled reasons a self-hosted enterprise admin can fix, so Settings › Slack explains them. */
-export const SLACK_SCREEN_REASONS: readonly SlackDisabledReason[] = [
-  "flag",
-  "master_key",
-  "super_cluster",
-];
-
-const DISABLED_VARIABLES: Partial<Record<SlackDisabledReason, string>> = {
-  flag: "O2_SLACK_ENABLED",
-  master_key: "O2_MASTER_ENCRYPTION_KEY",
-};
-
 // Never prefilled or accepted as a linking domain; the server refuses them too.
 const PUBLIC_EMAIL_DOMAINS = new Set([
   "gmail.com",
@@ -68,23 +56,12 @@ export function readSlackOrgConfig(zoConfig: SlackOrgConfig | null | undefined):
   };
 }
 
-/** Rail visibility of Settings › Slack: enabled orgs, plus self-hosted disabled screens. */
+/** Settings › Slack exists only while Slack is on: a disabled server shows no menu entry or page. */
 export function isSlackSettingsVisible(
   edition: { isEnterprise: boolean; isCloud: boolean },
   slack: SlackOrgState,
 ): boolean {
-  if (!edition.isEnterprise && !edition.isCloud) return false;
-  if (slack.enabled) return true;
-  return (
-    edition.isEnterprise &&
-    !edition.isCloud &&
-    slack.reason !== null &&
-    SLACK_SCREEN_REASONS.includes(slack.reason)
-  );
-}
-
-export function slackDisabledVariable(reason: SlackDisabledReason | null): string | null {
-  return reason ? (DISABLED_VARIABLES[reason] ?? null) : null;
+  return (edition.isEnterprise || edition.isCloud) && slack.enabled;
 }
 
 /** Settings › Slack order: the instance workspace first, then by install time. */

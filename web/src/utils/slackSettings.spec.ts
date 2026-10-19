@@ -21,8 +21,6 @@ import {
   isPublicEmailDomain,
   isSlackSettingsVisible,
   readSlackOrgConfig,
-  SLACK_SCREEN_REASONS,
-  slackDisabledVariable,
 } from "./slackSettings";
 
 describe("readSlackOrgConfig", () => {
@@ -57,28 +55,12 @@ describe("isSlackSettingsVisible", () => {
     expect(isSlackSettingsVisible(oss, on)).toBe(false);
   });
 
-  it("shows the self-hosted disabled screens only for reasons the admin can fix", () => {
-    for (const reason of SLACK_SCREEN_REASONS) {
-      expect(isSlackSettingsVisible(selfHosted, off(reason))).toBe(true);
+  it("hides Settings › Slack for every disabled reason on every edition", () => {
+    for (const reason of ["flag", "master_key", "super_cluster", "edition"]) {
+      expect(isSlackSettingsVisible(selfHosted, off(reason))).toBe(false);
       expect(isSlackSettingsVisible(cloud, off(reason))).toBe(false);
+      expect(isSlackSettingsVisible(oss, off(reason))).toBe(false);
     }
-    expect(isSlackSettingsVisible(selfHosted, off("edition"))).toBe(false);
-  });
-
-  it("the screen reasons are flag, master_key and super_cluster", () => {
-    expect([...SLACK_SCREEN_REASONS]).toEqual(["flag", "master_key", "super_cluster"]);
-  });
-});
-
-describe("slackDisabledVariable", () => {
-  it("names the variable each disabled screen asks for", () => {
-    expect(slackDisabledVariable("flag")).toBe("O2_SLACK_ENABLED");
-    expect(slackDisabledVariable("master_key")).toBe("O2_MASTER_ENCRYPTION_KEY");
-    expect(slackDisabledVariable("edition")).toBe(null);
-  });
-
-  it("super_cluster has no variable", () => {
-    expect(slackDisabledVariable("super_cluster")).toBe(null);
   });
 });
 

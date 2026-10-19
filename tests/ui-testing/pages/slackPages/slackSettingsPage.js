@@ -6,8 +6,6 @@ class SlackSettingsPage {
   constructor(page) {
     this.page = page;
     this.root = page.locator('[data-test="slack-settings"]');
-    this.disabled = page.locator('[data-test="slack-disabled"]');
-    this.disabledStep0 = page.locator('[data-test="slack-disabled-step0"]');
     this.noAccess = page.locator('[data-test="slack-no-access"]');
     this.loadError = page.locator('[data-test="slack-load-error"]');
     this.otherRegion = page.locator('[data-test="slack-other-region"]');

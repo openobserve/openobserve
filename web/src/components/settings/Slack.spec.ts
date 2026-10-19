@@ -53,25 +53,12 @@ const STUBS = {
   SlackLinkingSection: stub("SlackLinkingSection", ["installation"]),
   SlackChannelDefaults: stub("SlackChannelDefaults", ["installationId"]),
   SlackUninstallDialog: stub("SlackUninstallDialog", ["open", "mode", "installation"]),
-  SlackPrerequisites: stub("SlackPrerequisites", ["checks"]),
   SlackOrgAccess: stub("SlackOrgAccess", ["installation"]),
 };
 
 const switchOrg = async (store: ReturnType<typeof makeSlackStore>, identifier: string) => {
   store.state.selectedOrganization = { identifier, name: identifier };
   await flushPromises();
-};
-
-const prereqs = {
-  checks: [
-    {
-      id: "master_key",
-      status: "fail",
-      detail: "Not set",
-      variable: "O2_MASTER_ENCRYPTION_KEY",
-      fix: null,
-    },
-  ],
 };
 
 const mountSlack = (zoConfig: Record<string, unknown>) =>
@@ -89,7 +76,6 @@ beforeEach(() => {
   vi.clearAllMocks();
   config.isEnterprise = "true";
   config.isCloud = "false";
-  vi.mocked(slack.getPrerequisites).mockReturnValue(ok(prereqs) as any);
   vi.mocked(slack.listInstallations).mockReturnValue(
     ok({ installations: [], available: [] }) as any,
   );
@@ -99,71 +85,19 @@ afterEach(() => {
   document.body.innerHTML = "";
 });
 
-describe("Slack settings: disabled screens (self-hosted enterprise)", () => {
-  it("AC-1.5 names O2_SLACK_ENABLED and shows only text outside the _meta org", async () => {
-    const w = mountSlack(disabled("flag", { meta_org: "_meta" }));
-    await flushPromises();
-    expect(w.find('[data-test="slack-disabled"]').text()).toContain("O2_SLACK_ENABLED");
-    expect(slack.getPrerequisites).not.toHaveBeenCalled();
-    expect(w.find('[data-test-stub="SlackPrerequisites"]').exists()).toBe(false);
-    expect(slack.listInstallations).not.toHaveBeenCalled();
-  });
-
-  it("AC-1.5 shows Step 0 inline to a _meta Admin when the flag is off", async () => {
-    const store = makeSlackStore(disabled("flag", { meta_org: "_meta" }));
-    store.state.selectedOrganization.identifier = "_meta";
-    const w = mount(Slack, { global: { plugins: [i18n, store], stubs: STUBS } });
-    await flushPromises();
-    expect(slack.getPrerequisites).toHaveBeenCalledWith("_meta", { silentForbidden: true });
-    expect(w.find('[data-test-stub="SlackPrerequisites"]').exists()).toBe(true);
-  });
-
-  it("AC-1.5 keeps text only for a _meta member the server refuses", async () => {
-    vi.mocked(slack.getPrerequisites).mockRejectedValue(axiosError(403));
-    const store = makeSlackStore(disabled("flag", { meta_org: "_meta" }));
-    store.state.selectedOrganization.identifier = "_meta";
-    const w = mount(Slack, { global: { plugins: [i18n, store], stubs: STUBS } });
-    await flushPromises();
-    expect(w.find('[data-test-stub="SlackPrerequisites"]').exists()).toBe(false);
-    expect(w.find('[data-test="slack-disabled"]').text()).toContain("O2_SLACK_ENABLED");
-  });
-
-  it("AC-1.5 names O2_MASTER_ENCRYPTION_KEY and shows Step 0 to org Admins", async () => {
-    const w = mountSlack(disabled("master_key"));
-    await flushPromises();
-    expect(w.find('[data-test="slack-disabled"]').text()).toContain("O2_MASTER_ENCRYPTION_KEY");
-    expect(slack.getPrerequisites).toHaveBeenCalledWith("acme", { silentForbidden: true });
-    expect(w.find('[data-test-stub="SlackPrerequisites"]').exists()).toBe(true);
-  });
-
-  it("AC-1.5 keeps text only with master_key for a non-admin", async () => {
-    vi.mocked(slack.getPrerequisites).mockRejectedValue(axiosError(403));
-    const w = mountSlack(disabled("master_key"));
-    await flushPromises();
-    expect(w.find('[data-test-stub="SlackPrerequisites"]').exists()).toBe(false);
-  });
-
-  it("super_cluster shows the not-yet-available title with no variable or Step 0", async () => {
-    const store = makeSlackStore(disabled("super_cluster", { meta_org: "_meta" }));
-    store.state.selectedOrganization.identifier = "_meta";
-    const w = mount(Slack, { global: { plugins: [i18n, store], stubs: STUBS } });
-    await flushPromises();
-    const screen = w.find('[data-test="slack-disabled"]');
-    expect(screen.text()).toContain("Slack is not yet available on super-cluster deployments");
-    expect(screen.text()).not.toMatch(/O2_[A-Z_]+/);
-    expect(slack.getPrerequisites).not.toHaveBeenCalled();
-    expect(w.find('[data-test="slack-disabled-step0"]').exists()).toBe(false);
-    expect(slack.listInstallations).not.toHaveBeenCalled();
-  });
-
-  it("AC-1.4 AC-3.3 shows nothing on Cloud while Slack is disabled", async () => {
-    config.isCloud = "true";
-    for (const reason of ["flag", "super_cluster"]) {
-      const w = mountSlack(disabled(reason));
-      await flushPromises();
-      expect(w.find('[data-test="slack-disabled"]').exists()).toBe(false);
-      w.unmount();
+describe("Slack settings: disabled", () => {
+  it("AC-1.4 AC-1.5 renders nothing and calls no Slack API for any disabled reason", async () => {
+    for (const isCloud of ["false", "true"]) {
+      config.isCloud = isCloud;
+      for (const reason of ["flag", "master_key", "super_cluster", "edition"]) {
+        const w = mountSlack(disabled(reason, { meta_org: "_meta" }));
+        await flushPromises();
+        expect(w.find('[data-test="slack-settings"]').text()).toBe("");
+        expect(w.find('[data-test-stub="SlackConnectEmpty"]').exists()).toBe(false);
+        w.unmount();
+      }
     }
+    expect(slack.getPrerequisites).not.toHaveBeenCalled();
     expect(slack.listInstallations).not.toHaveBeenCalled();
   });
 });

@@ -208,7 +208,7 @@ describe("SlackSelfHostedWizard Step 0", () => {
   it("AC-7.1 runs the prerequisite checks and lets a warning through", async () => {
     const w = await mountWizard();
     expect(step(w)).toBe("0");
-    expect(slack.getPrerequisites).toHaveBeenCalledWith("acme", undefined);
+    expect(slack.getPrerequisites).toHaveBeenCalledWith("acme");
     expect(w.find('[data-test="slack-wizard-next"]').attributes("disabled")).toBeUndefined();
   });
 

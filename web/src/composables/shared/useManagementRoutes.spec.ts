@@ -223,15 +223,15 @@ describe("useManagementRoutes", () => {
       });
     });
 
-    it("AC-1.10 registers slack in OSS builds and redirects it to the locked page", () => {
+    it("AC-1.10 registers slack in OSS builds and sends it to General, never the locked page", () => {
       const slackRoute = routes[0].children.find((child: any) => child.name === "slack");
       expect(slackRoute).toBeDefined();
       expect(slackRoute.path).toBe("slack");
       const mockNext = vi.fn();
-      slackRoute.beforeEnter({ query: {} }, {}, mockNext);
+      slackRoute.beforeEnter({ query: { org_identifier: "default" } }, {}, mockNext);
       expect(mockNext).toHaveBeenCalledWith({
-        name: "enterpriseFeatureLocked",
-        query: { feature: "slack" },
+        name: "general",
+        query: { org_identifier: "default" },
       });
     });
 

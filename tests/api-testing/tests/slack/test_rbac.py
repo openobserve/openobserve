@@ -29,6 +29,13 @@ def installed(client: OpenObserveClient, slack_org: str, slack_on: None, self_ho
     return {"id": body["installation"]["id"], "team": team}
 
 
+def test_role_editor_resources_list_slack_while_on(client: OpenObserveClient, slack_org: str, slack_on: None) -> None:
+    resp = client.get("resources", org=slack_org)
+    assert resp.status_code == 200, resp.text
+    slack = [r for r in resp.json() if r["key"] == "slack_integration"]
+    assert [(r["display_name"], r["visible"], r["has_entities"]) for r in slack] == [("Slack", True, False)]
+
+
 def test_a_non_admin_cannot_change_slack(
     client: OpenObserveClient, slack_org: str, installed: dict, mock: SlackMock
 ) -> None:
