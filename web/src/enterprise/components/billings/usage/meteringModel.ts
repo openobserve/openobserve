@@ -303,6 +303,29 @@ export function meterForEvent(event: string): MeterDef | undefined {
   return METERS.find((def) => def.events.includes(event));
 }
 
+/**
+ * Stripe bills a divided meter per started unit, so 297 MB at $0.50 per GB costs $0.50. When that
+ * rounding moves the amount by 1% or more, the row says what was billed, read back from the bill.
+ */
+function billedAs(
+  meter: PricingDetails | null | undefined,
+  def: MeterDef,
+  t: TranslateFn,
+): I18nText | undefined {
+  const base = Number(meter?.base_cost);
+  const divisor = Number(meter?.unit_divisor);
+  const cost = Number(meter?.metered_cost);
+  if (!(divisor > 1 && base > 0 && cost > 0)) return undefined;
+  const billed = cost / base;
+  if (billed <= ((Number(meter?.metered_amount) || 0) / divisor) * 1.01) return undefined;
+  return t("billing.usageV2.volumeAtRateBilled", {
+    volume: formatVolume(meter),
+    rate: formatRate(meter, def, t),
+    amount: raw(addCommasToNumber(Math.round(billed * 100) / 100)),
+    unit: t(def.rateUnitKey),
+  });
+}
+
 export function buildMeterRows(
   details: MeteringDetails | null | undefined,
   t: TranslateFn,
@@ -317,6 +340,7 @@ export function buildMeterRows(
       label: t(def.labelKey),
       volume: formatVolume(meter),
       rate: formatRate(meter, def, t),
+      subline: billedAs(meter, def, t),
       cost: netCost(meter),
       gross: Number(meter?.metered_cost) || 0,
       discount: Number(meter?.discounted_amount) || 0,

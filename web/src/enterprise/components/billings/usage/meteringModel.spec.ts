@@ -178,6 +178,46 @@ describe("meteringModel", () => {
     expect(rows.every((row) => row.missing === false)).toBe(true);
   });
 
+  it("says what was billed when per-started-GB rounding moves the amount, and only then", () => {
+    // 297 MB at $0.50 per GB came to $0.50: Stripe billed one whole GB.
+    const small = buildMeterRows(
+      {
+        ...details,
+        ingestion: {
+          ...details.ingestion,
+          base_cost: 0.5,
+          unit_divisor: 1024,
+          metered_amount: 297,
+          metered_cost: 0.5,
+        },
+      },
+      t,
+    ).find((row) => row.key === "ingestion")!;
+    expect(String(small.subline)).toContain("billing.usageV2.volumeAtRateBilled");
+    expect(String(small.subline)).toContain('"amount":"1"');
+    expect(String(small.subline)).toContain('"unit":"billing.usageV2.unitGb"');
+
+    // 2,855.15 GB billed as 2,856: rounding moves it 0.03%, so the row keeps its plain line.
+    const large = buildMeterRows(
+      {
+        ...details,
+        ingestion: {
+          ...details.ingestion,
+          base_cost: 0.5,
+          unit_divisor: 1024,
+          metered_amount: 2_923_673.6,
+          metered_cost: 1428,
+        },
+      },
+      t,
+    ).find((row) => row.key === "ingestion")!;
+    expect(large.subline).toBeUndefined();
+
+    // A counted meter is billed exactly as counted.
+    const counted = buildMeterRows(details, t).find((row) => row.key === "ai")!;
+    expect(counted.subline).toBeUndefined();
+  });
+
   it("marks a meter the backend failed to price", () => {
     const rows = buildMeterRows(
       { ...details, missing_details: [{ kind: "retention", error: "boom" }] },
