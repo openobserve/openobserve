@@ -32,6 +32,7 @@ use datafusion::{
     arrow::datatypes::{DataType, Schema},
     error::{DataFusionError, Result},
     execution::{SendableRecordBatchStream, TaskContext},
+    physical_expr::PhysicalSortExpr,
     physical_plan::{
         ExecutionPlan, execute_stream_partitioned,
         expressions::Column,
@@ -396,14 +397,16 @@ fn plan_contains_sort(plan: &Arc<dyn ExecutionPlan>) -> bool {
 }
 
 fn hash_ordered(plan: &Arc<dyn ExecutionPlan>) -> bool {
-    plan.properties().output_ordering().is_some_and(|ordering| {
-        let sort = ordering.first();
-        !sort.options.descending
-            && sort
-                .expr
-                .downcast_ref::<Column>()
-                .is_some_and(|column| column.name() == HASH_LABEL)
-    })
+    let Ok(column) = Column::new_with_schema(HASH_LABEL, &plan.schema()) else {
+        return false;
+    };
+    let ordering = PhysicalSortExpr::new_default(Arc::new(column))
+        .asc()
+        .nulls_last();
+    plan.properties()
+        .eq_properties
+        .ordering_satisfy([ordering])
+        .unwrap_or(false)
 }
 
 #[cfg(test)]
