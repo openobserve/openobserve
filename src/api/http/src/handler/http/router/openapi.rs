@@ -1424,8 +1424,7 @@ mod tests {
         );
     }
 
-    /// A declared path parameter with no placeholder makes generated clients demand a phantom
-    /// value.
+    /// A path param with no placeholder makes generated clients demand a phantom value.
     #[cfg(feature = "enterprise")]
     #[test]
     fn gated_route_path_parameters_match_their_templates() {
@@ -1526,6 +1525,63 @@ mod tests {
                 &["201", "400", "403", "500"],
             ),
         ]);
+    }
+
+    /// An undeclared query param the handler branches on is unreachable from a generated client.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn workflows_declare_the_query_params_their_handlers_read() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let paths = spec.get("paths").unwrap().as_object().unwrap();
+        let by_id = "/api/{org_id}/workflows/{id}";
+        let expected: &[(&str, &str, &[&str])] = &[
+            ("/api/{org_id}/workflows", "post", &["folder", "draft"]),
+            (
+                "/api/{org_id}/workflows",
+                "get",
+                &["folder", "all_folders", "search_substring"],
+            ),
+            (by_id, "delete", &["draft"]),
+            (by_id, "put", &["draft"]),
+            ("/api/{org_id}/workflows/test", "post", &["draft"]),
+            ("/api/{org_id}/workflows/{id}/enable", "put", &["value"]),
+            (
+                "/api/{org_id}/workflows/{id}/history",
+                "get",
+                &["start_time", "end_time"],
+            ),
+            (
+                "/api/{org_id}/workflows/promote/{id}",
+                "post",
+                &["trigger_type", "folder"],
+            ),
+        ];
+        let mut wrong = Vec::new();
+        for (path, method, names) in expected {
+            let Some(operation) = paths.get(*path).and_then(|p| p.get(*method)) else {
+                wrong.push(format!("{method} {path}: absent from the spec"));
+                continue;
+            };
+            let declared: BTreeSet<&str> = operation
+                .get("parameters")
+                .and_then(|p| p.as_array())
+                .into_iter()
+                .flatten()
+                .filter(|p| p.get("in").and_then(|i| i.as_str()) == Some("query"))
+                .filter_map(|p| p.get("name").and_then(|n| n.as_str()))
+                .collect();
+            let read: BTreeSet<&str> = names.iter().copied().collect();
+            if declared != read {
+                wrong.push(format!(
+                    "{method} {path}: declares {declared:?}, handler reads {read:?}"
+                ));
+            }
+        }
+        let enable = &paths["/api/{org_id}/workflows/{id}/enable"]["put"];
+        if enable.get("requestBody").is_some() {
+            wrong.push("put .../enable: declares a body the handler never reads".to_string());
+        }
+        assert!(wrong.is_empty(), "{wrong:#?}");
     }
 
     #[cfg(feature = "enterprise")]

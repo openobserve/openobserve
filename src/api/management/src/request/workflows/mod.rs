@@ -533,6 +533,7 @@ pub async fn move_workflows(
     params(
         ("org_id" = String, Path, description = "Organization id"),
         ("id" = String, Path, description = "Workflow id"),
+        ("draft" = Option<bool>, Query, description = "Target the draft instead of the published workflow, defaults to false"),
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = inline(Object)),
@@ -636,6 +637,7 @@ pub async fn delete_workflows(
     params(
         ("org_id" = String, Path, description = "Organization id"),
         ("id" = String, Path, description = "Workflow id"),
+        ("draft" = Option<bool>, Query, description = "Target the draft instead of the published workflow, defaults to false"),
     ),
     request_body(content = inline(Object), description = "Workflow data", content_type = "application/json"),
     responses(
@@ -781,6 +783,7 @@ pub async fn update_workflows(
     ),
     params(
         ("org_id" = String, Path, description = "Organization id"),
+        ("draft" = Option<bool>, Query, description = "Test as a draft, defaults to false"),
     ),
     request_body(content = inline(Object), description = "Workflow inputs", content_type = "application/json"),
     responses(
@@ -996,8 +999,8 @@ pub async fn retry_workflow(
     params(
         ("org_id" = String, Path, description = "Organization id"),
         ("id" = String, Path, description = "Workflow id"),
+        ("value" = Option<bool>, Query, description = "true enables and false disables the workflow, defaults to true"),
     ),
-    request_body(content = inline(Object), description = "retry details", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
@@ -1039,6 +1042,8 @@ pub async fn enable_workflow(
     params(
         ("org_id" = String, Path, description = "Organization id"),
         ("id" = String, Path, description = "Workflow id"),
+        ("start_time" = Option<i64>, Query, description = "Start time in Unix timestamp microseconds, defaults to 7 days before end_time"),
+        ("end_time" = Option<i64>, Query, description = "End time in Unix timestamp microseconds, defaults to now"),
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
@@ -1186,6 +1191,7 @@ pub async fn get_workflow_history(
     params(
         ("org_id" = String, Path, description = "Organization id"),
         ("id" = String, Path, description = "Workflow id"),
+        ("trigger_type" = Option<String>, Query, description = "Trigger type of the promoted workflow; IncidentEvent also associates it with incidents. Defaults to AlertFired"),
         ("folder" = Option<String>, Query, description = "Folder to publish into. The draft's own folder is used when absent."),
     ),
     responses(
