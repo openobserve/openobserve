@@ -582,6 +582,7 @@
   },
   "common": {
     "copiedToClipboard": "Скопировано в буфер обмена",
+    "customLogoAlt": "Логотип организации",
     "queryEditorAriaLabel": "Редактор запросов. Нажмите Escape, чтобы перейти к следующему элементу управления.",
     "inlineEdit": {
       "autoHint": "Нажмите, чтобы переименовать. Пока вы этого не сделаете, это имя генерируется из вашей конфигурации и обновляется при её изменении."
@@ -18960,6 +18961,8 @@
         "resetToDefault": "Сбросить до стандартных",
         "resetColumnWidths": "Сбросить ширину колонок"
       },
+      "selectAllRows": "Выбрать все строки",
+      "selectRow": "Выбрать строку {name}",
       "removeColumnAria": "Удалить колонку",
       "formatColumnAria": "Форматировать колонку",
       "selectedOfTotal": "Выбрано {selected} из {total}",

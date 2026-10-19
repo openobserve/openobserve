@@ -582,6 +582,7 @@
   },
   "common": {
     "copiedToClipboard": "Panoya kopyalandı",
+    "customLogoAlt": "Kuruluş logosu",
     "queryEditorAriaLabel": "Sorgu düzenleyici. Sonraki denetime geçmek için Escape tuşuna basın.",
     "inlineEdit": {
       "autoHint": "Yeniden adlandırmak için tıklayın. Siz yapana kadar bu ad, yapılandırmanızdan oluşturulur ve siz değiştirdikçe güncel kalır."
@@ -18960,6 +18961,8 @@
         "resetToDefault": "Varsayılana sıfırla",
         "resetColumnWidths": "Sütun genişliklerini sıfırla"
       },
+      "selectAllRows": "Tüm satırları seç",
+      "selectRow": "{name} satırını seç",
       "removeColumnAria": "Sütunu kaldır",
       "formatColumnAria": "Sütunu biçimlendir",
       "selectedOfTotal": "{total} öğeden {selected} tanesi seçildi",

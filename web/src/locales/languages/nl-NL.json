@@ -582,6 +582,7 @@
   },
   "common": {
     "copiedToClipboard": "Gekopieerd naar klembord",
+    "customLogoAlt": "Logo van de organisatie",
     "queryEditorAriaLabel": "Query-editor. Druk op Escape om naar het volgende besturingselement te gaan.",
     "inlineEdit": {
       "autoHint": "Klik om te hernoemen. Tot je dat doet, wordt deze naam gegenereerd uit je configuratie en volgt deze je wijzigingen."
@@ -18960,6 +18961,8 @@
         "resetToDefault": "Standaardwaarden herstellen",
         "resetColumnWidths": "Kolombreedtes herstellen"
       },
+      "selectAllRows": "Alle rijen selecteren",
+      "selectRow": "Rij {name} selecteren",
       "removeColumnAria": "Kolom verwijderen",
       "formatColumnAria": "Kolom opmaken",
       "selectedOfTotal": "{selected} van {total} geselecteerd",

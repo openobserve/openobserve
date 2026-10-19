@@ -582,6 +582,7 @@
   },
   "common": {
     "copiedToClipboard": "Đã sao chép vào bộ nhớ tạm",
+    "customLogoAlt": "Logo tổ chức",
     "queryEditorAriaLabel": "Trình soạn truy vấn. Nhấn Escape để chuyển sang điều khiển tiếp theo.",
     "inlineEdit": {
       "autoHint": "Nhấp để đổi tên. Cho đến khi bạn đổi tên, tên này được tạo từ cấu hình của bạn và sẽ cập nhật theo khi bạn thay đổi."
@@ -18960,6 +18961,8 @@
         "resetToDefault": "Đặt lại mặc định",
         "resetColumnWidths": "Đặt lại độ rộng cột"
       },
+      "selectAllRows": "Chọn tất cả các hàng",
+      "selectRow": "Chọn hàng {name}",
       "removeColumnAria": "Xóa cột",
       "formatColumnAria": "Định dạng cột",
       "selectedOfTotal": "Đã chọn {selected} trong {total}",

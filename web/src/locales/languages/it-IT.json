@@ -582,6 +582,7 @@
   },
   "common": {
     "copiedToClipboard": "Copiato negli appunti",
+    "customLogoAlt": "Logo dell'organizzazione",
     "queryEditorAriaLabel": "Editor di query. Premi Escape per passare al controllo successivo.",
     "inlineEdit": {
       "autoHint": "Fai clic per rinominare. Finché non lo fai, questo nome viene generato dalla tua configurazione e si aggiorna man mano che la modifichi."
@@ -18960,6 +18961,8 @@
         "resetToDefault": "Ripristina predefiniti",
         "resetColumnWidths": "Ripristina larghezze colonne"
       },
+      "selectAllRows": "Seleziona tutte le righe",
+      "selectRow": "Seleziona la riga {name}",
       "removeColumnAria": "Rimuovi colonna",
       "formatColumnAria": "Formatta colonna",
       "selectedOfTotal": "{selected} di {total} selezionati",

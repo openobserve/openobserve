@@ -6821,6 +6821,7 @@
     "cronNextCheckAt": "a9d645c4c55c93f8",
     "crossLinks": "40c5f710e2d4c324",
     "custom": "494ca78f7374e46f",
+    "customLogoAlt": "b388a46a37de7478",
     "dataStreamingInProgress": "033dae5dca78d269",
     "dateRangeCopied": "f6572e6cc0308a61",
     "dateRangePasteError": "2c748bcb6075304e",
@@ -7538,6 +7539,8 @@
       },
       "formatColumnAria": "5f0c0af6efc43083",
       "removeColumnAria": "9807a23d19fdf7b2",
+      "selectAllRows": "9cf6c2bf95fb9747",
+      "selectRow": "080517857143b88d",
       "selectedCount": "a59008ba5f776947",
       "selectedOfTotal": "73ffb823f5889bf1"
     },

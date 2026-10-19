@@ -582,6 +582,7 @@
   },
   "common": {
     "copiedToClipboard": "クリップボードにコピーしました",
+    "customLogoAlt": "組織のロゴ",
     "queryEditorAriaLabel": "クエリエディタ。Escape キーを押すと次のコントロールに移動します。",
     "inlineEdit": {
       "autoHint": "クリックして名前を変更します。変更しない限り、この名前は設定から生成され、変更に応じて更新されます。"
@@ -18960,6 +18961,8 @@
         "resetToDefault": "デフォルトにリセット",
         "resetColumnWidths": "列幅をリセット"
       },
+      "selectAllRows": "すべての行を選択",
+      "selectRow": "行 {name} を選択",
       "removeColumnAria": "列を削除",
       "formatColumnAria": "列の書式設定",
       "selectedOfTotal": "{total} 件中 {selected} 件を選択中",

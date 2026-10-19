@@ -582,6 +582,7 @@
   },
   "common": {
     "copiedToClipboard": "已複製到剪貼簿",
+    "customLogoAlt": "組織標誌",
     "queryEditorAriaLabel": "查詢編輯器。按 Escape 移至下一個控制項。",
     "inlineEdit": {
       "autoHint": "按一下以重新命名。在您重新命名前，此名稱會根據您的組態產生，並在您變更時更新。"
@@ -18955,6 +18956,8 @@
         "resetToDefault": "重設為預設值",
         "resetColumnWidths": "重設欄位寬度"
       },
+      "selectAllRows": "選取所有列",
+      "selectRow": "選取列 {name}",
       "removeColumnAria": "移除欄位",
       "formatColumnAria": "格式化欄位",
       "selectedOfTotal": "已選取 {selected} 個，共 {total} 個",
