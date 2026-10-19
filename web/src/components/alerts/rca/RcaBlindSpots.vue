@@ -14,9 +14,6 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!-- "Blind spots" (03 VE8, VE34, VE37): what the agent could not check, each
-     with the one action that closes the gap. "Resume run" emits instead of
-     opening a page, and shows only when the run can be resumed (J9). -->
 <template>
   <section data-test="rca-blind-spots" :aria-labelledby="headingId" class="flex flex-col">
     <div class="mb-2.5 flex flex-wrap items-baseline gap-2">

@@ -14,10 +14,6 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!-- The steer box pinned under the thread (04 SG37, §3 frames F and D): title,
-     the open question and the answer note while paused, prefill chips, the
-     message, "Sending as …" and Send. Refusals show inline (§9.1); a run that
-     takes no more messages is reported by the column that owns `send`. -->
 <template>
   <form
     ref="root"
@@ -196,8 +192,6 @@ const submit = async () => {
     draft.value = "";
     return;
   }
-  // A closed run (04 §13, SG40): the column that owns `send` keeps the text and
-  // offers it as guidance, also after this box hides; the draft stays too.
   if (isClosedRunRefusal(result.code)) return;
   error.value = result.message;
 };

@@ -16,37 +16,8 @@
 import { describe, expect, it } from "vitest";
 import { mount } from "@vue/test-utils";
 import RcaPill from "./RcaPill.vue";
-import { RCA_PILL_TONE_CLASS, type RcaPillTone } from "@/utils/incidents/rcaSummary";
 
 describe("RcaPill", () => {
-  it.each(Object.keys(RCA_PILL_TONE_CLASS) as RcaPillTone[])(
-    "tone %s carries its classes and the slot text",
-    (tone) => {
-      const wrapper = mount(RcaPill, { props: { tone }, slots: { default: "Root cause" } });
-
-      expect(wrapper.text()).toBe("Root cause");
-      for (const cls of RCA_PILL_TONE_CLASS[tone].split(" ")) {
-        expect(wrapper.classes()).toContain(cls);
-      }
-    },
-  );
-
-  it("open statuses are dashed; settled ones are not", () => {
-    expect(RCA_PILL_TONE_CLASS.dash).toContain("border-dashed");
-    expect(RCA_PILL_TONE_CLASS["warn-dash"]).toContain("border-dashed");
-    expect(RCA_PILL_TONE_CLASS.strong).not.toContain("border-dashed");
-  });
-
-  it("wrap lets a long label break inside its column; the default stays on one line", () => {
-    const wrapped = mount(RcaPill, { props: { tone: "strong", wrap: true } });
-    const single = mount(RcaPill, { props: { tone: "strong" } });
-
-    expect(wrapped.classes()).not.toContain("whitespace-nowrap");
-    expect(wrapped.classes()).toContain("max-w-full");
-    expect(single.classes()).toContain("whitespace-nowrap");
-    expect(single.classes()).toContain("shrink-0");
-  });
-
   it("a spinner replaces the icon", () => {
     const withSpinner = mount(RcaPill, {
       props: { tone: "neutral", icon: "verified", spinner: true },

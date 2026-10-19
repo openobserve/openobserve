@@ -254,6 +254,21 @@ describe("RcaThreadColumn", () => {
       expect(wrapper.findAll('[data-test="rca-thread-step"]')).toHaveLength(0);
     });
 
+    it("a run with no transcript to read (v1) shows the no-transcript message, not 'No run'", () => {
+      const wrapper = mountColumn({
+        thread: null,
+        status: "idle",
+        noTranscript: true,
+        runLive: false,
+        runState: "completed",
+      });
+
+      expect(byTest(wrapper, "rca-thread-empty").find("p").text()).toBe(
+        "This run has no stored transcript.",
+      );
+      expect(byTest(wrapper, "rca-thread-retry-btn").exists()).toBe(false);
+    });
+
     it("shows the loading line on the first read", () => {
       const wrapper = mountColumn({ thread: null, status: "loading" });
 

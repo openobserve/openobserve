@@ -13,14 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! What an RCA run recorded, decoded from its chat session (03 VE10, VE26, VE27;
-//! confidence design §5.2; 04 SG19–SG21, SG25, SG26): the evidence ledger calls, the tool
-//! log, the stages that ran, the submitted report, the steering messages with the time the
-//! agent read them, the agent's acknowledgements and its questions. The finalizer, the
-//! summary route and the steering view read a run through [decode_run]; tool parts are read
-//! as the thread reads them ([ToolPart]), and user messages are split at their steering
-//! headers by [split_steers], which the thread uses too.
-
 use std::collections::HashMap;
 
 use config::{
@@ -65,13 +57,11 @@ pub struct RunTranscript {
     pub submit: Option<RcaSubmit>,
     /// The steering messages in the session, in message order (SG19, SG20).
     pub steers: Vec<TranscriptSteer>,
-    /// Completed `acknowledge_steering` calls, in seq order; the first per steer id
-    /// counts (SG21).
+    /// Completed `acknowledge_steering` calls, in seq order; the first per steer id counts (SG21).
     pub acks: Vec<TranscriptAck>,
     /// Completed `ask_responders` calls, in seq order (SG25).
     pub questions: Vec<TranscriptQuestion>,
-    /// The question the run waits on (SG26): the last RCA sentinel is `ask_responders`,
-    /// no `submit_report` follows it and no user message was read after it.
+    /// SG26: the last completed sentinel is an unanswered ask_responders call.
     pub open_question: Option<TranscriptQuestion>,
 }
 
@@ -83,8 +73,6 @@ pub struct TranscriptSteer {
     pub opencode_message_id: String,
     /// µs: the message's `time.created`.
     pub created_us: i64,
-    /// µs: `time.created` of the first assistant message after it (SG20); `None` while
-    /// the agent has not read it.
     pub read_at_us: Option<i64>,
 }
 
@@ -119,11 +107,7 @@ pub(crate) struct SteerBlock {
     pub(crate) text: String,
 }
 
-/// A user message's text split at its steering headers (SG19): the text before the first
-/// header (a turn prompt; empty for a message that only steers), then each steering
-/// message. A header counts on the first line or right after a blank line, where the
-/// joined messages of one prompt start; the server prefixes a responder's own line that
-/// starts with `[o2-` with a space, so only server-written lines parse.
+/// SG19: only server headers at message boundaries split responder text into steering blocks.
 pub(crate) fn split_steers(text: &str) -> (String, Vec<SteerBlock>) {
     let mut preamble: Vec<&str> = Vec::new();
     let mut blocks: Vec<(SteerHeader, Vec<&str>)> = Vec::new();
@@ -185,8 +169,6 @@ pub(crate) fn question_of(call: &ToolPart<'_>) -> TranscriptQuestion {
     }
 }
 
-/// The ack of a completed `acknowledge_steering` part; `None` without a steer id or with
-/// an action other than `applied` or `declined`.
 fn ack_of(call: &ToolPart<'_>) -> Option<TranscriptAck> {
     let steer_id = call.arg("steer_id")?.as_str()?.trim();
     if steer_id.is_empty() {
@@ -214,8 +196,6 @@ fn ack_of(call: &ToolPart<'_>) -> Option<TranscriptAck> {
     })
 }
 
-/// The RCA protocol tools (SG26 "sentinels"): the last completed one decides whether a
-/// question is open.
 fn is_sentinel(call: &ToolPart<'_>) -> bool {
     matches!(call.kind(), ThreadPart::Step(_))
         || [
@@ -228,8 +208,7 @@ fn is_sentinel(call: &ToolPart<'_>) -> bool {
         .contains(&call.tool)
 }
 
-/// Decode the committed events of an RCA session. Each part counts in its final state;
-/// a ledger call's `seq` is the seq of the event that carried that state.
+/// Decode the committed events of an RCA session.
 pub fn decode_run(events: &[DurableEvent]) -> RunTranscript {
     let folded = Folded::fold(events);
     let seqs: HashMap<&str, i64> = events
@@ -246,8 +225,6 @@ pub fn decode_run(events: &[DurableEvent]) -> RunTranscript {
     let mut questions: Vec<(i64, TranscriptQuestion)> = Vec::new();
     // SG20: steers not read yet; the next assistant message reads them all.
     let mut unread: Vec<usize> = Vec::new();
-    // SG26: the newest user message no assistant message has followed yet, and the
-    // newest one that one has followed, as message positions.
     let mut unanswered_user: Option<usize> = None;
     let mut last_read_user: Option<usize> = None;
     // The last completed sentinel: its seq, message position and question, if one.
@@ -442,14 +419,6 @@ pub(crate) mod tests {
         })
     }
 
-    /// A run with one `record_step` per stage, a ledger and a tool log: GetIncident,
-    /// SearchSQL, a `tools_call`-wrapped PrometheusRangeQuery, a failed SearchSQL, a hidden
-    /// `bash` and a still-running GetLatestTraces; `h1` recorded twice (testing, then
-    /// root_cause with one more pending update) around an errored `record_hypothesis`,
-    /// `h2` ruled out, one blind spot. No report: callers add one.
-    ///
-    /// Graded, `h1` has decisive logs and metrics evidence and `h2` a verified rules-out
-    /// item, so a high claim stays high; `e4` cites the failed call.
     pub(crate) fn ledger_session(stages: &[&str]) -> Session {
         let mut s = Session::new();
         s.message("msg_u1", "user", json!({"created": T}));
@@ -651,9 +620,6 @@ pub(crate) mod tests {
         (T + ms) * 1000
     }
 
-    /// VE10, F7: the ledger calls are the completed `record_hypothesis` and
-    /// `record_blind_spot` parts in seq order, each at the seq of its final state and the
-    /// µs start of its call, without the session argument; the errored call is not one.
     #[test]
     fn ledger_calls_are_the_completed_record_calls_in_seq_order() {
         let events = ledger_session(&["context"]).events;
@@ -713,9 +679,6 @@ pub(crate) mod tests {
         );
     }
 
-    /// CG §5.2, VE26, VE27: the tool log holds only the visible calls that completed or
-    /// failed (no hidden `bash`, no ledger sentinels, no running call), each with the
-    /// thread's key argument, its stream type, signal, target and result summary.
     #[test]
     fn the_tool_log_holds_the_visible_finished_calls_as_the_thread_names_them() {
         let events = ledger_session(&["context"]).events;
@@ -790,8 +753,6 @@ pub(crate) mod tests {
         );
     }
 
-    /// TH19, VE34: the stages that ran, each once in first-step order; the submit is the
-    /// last completed `submit_report`, never an errored one.
     #[test]
     fn stages_run_once_each_and_the_last_completed_report_is_the_submit() {
         let mut s = ledger_session(&["context", "topology", "context", "gather", "changes"]);
@@ -825,8 +786,6 @@ pub(crate) mod tests {
         assert_eq!(decode_run(&ledger_session(&[]).events).submit, None);
     }
 
-    /// VE26: a visible shell or `cli_*` call carries its command in `target.command` (for
-    /// "Copy query") and as its key argument; a hidden `bash` call is not in the log.
     #[test]
     fn a_shell_call_carries_its_command_in_the_target() {
         let mut s = Session::new();
@@ -898,8 +857,7 @@ pub(crate) mod tests {
         config::meta::alerts::rca_steering::render_steer_message(&header, text)
     }
 
-    /// A user message with one text part, `created` ms after [T]. Message ids sort in time
-    /// order, as opencode's do.
+    /// A user message with one text part, `created` ms after [T].
     pub(crate) fn user_message(s: &mut Session, id: &str, text: &str, created: i64) {
         s.message(id, "user", json!({"created": T + created}));
         s.part(
@@ -944,9 +902,6 @@ pub(crate) mod tests {
         );
     }
 
-    /// SG19, SG20: each steering header is one steer at its user message; the messages
-    /// sent during one step are all read at the first assistant message after them; a
-    /// message no assistant message follows is unread.
     #[test]
     fn sg20_messages_sent_during_one_step_are_read_at_the_same_assistant_message() {
         let mut s = Session::new();
@@ -1014,9 +969,6 @@ pub(crate) mod tests {
         );
     }
 
-    /// SG18, SG19: the joined messages of one Steer prompt are one steer each in the same
-    /// user message; a header on a later line of a responder's text is not one, nor is the
-    /// first prompt's text.
     #[test]
     fn sg19_the_joined_steer_prompt_holds_one_steer_per_header() {
         let prompt = crate::alerts::rca_turn::RcaPrompt::Steer {
@@ -1083,9 +1035,6 @@ pub(crate) mod tests {
         );
     }
 
-    /// SG21: the acks are the completed `acknowledge_steering` calls in seq order with the
-    /// part's end time and the trimmed note (at most 300 characters); a call with another
-    /// action, no steer id or an error is none. The first per id wins downstream.
     #[test]
     fn sg21_acks_are_the_completed_calls_in_seq_order() {
         let mut s = Session::new();
@@ -1201,8 +1150,6 @@ pub(crate) mod tests {
         assert_eq!(run.open_question, Some(run.questions[0].clone()));
     }
 
-    /// SG26: a question is open only when `ask_responders` is the last completed sentinel,
-    /// no `submit_report` follows it, and no steering message after it was read.
     #[test]
     fn sg26_the_open_question_predicate() {
         let base = || {

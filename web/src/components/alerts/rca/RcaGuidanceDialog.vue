@@ -14,8 +14,6 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!-- "Re-analyze with guidance" (04 §3 frame I, SG33, SG40): the mode and the
-     guidance text; the guidance becomes the first message of the new run. -->
 <template>
   <ODialog
     v-model:open="isOpen"

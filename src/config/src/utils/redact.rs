@@ -48,6 +48,22 @@ static INTERNAL_PATTERNS: LazyLock<Vec<(Regex, &'static str)>> = LazyLock::new(|
     .collect()
 });
 
+static URL_AUTHORITY: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r#"\bhttps?://[^\s/?#'"<>(),;]+"#).expect("valid pattern"));
+
+pub fn redact_rca_details(text: &str, agent_url: &str) -> String {
+    let mut text = redact_internal_details(text);
+    let agent_url = agent_url.trim_end_matches('/');
+    if !agent_url.is_empty() {
+        text = text.replace(agent_url, "[internal endpoint]");
+    }
+    URL_AUTHORITY
+        .replace_all(&text, NoExpand("[internal endpoint]"))
+        .chars()
+        .take(500)
+        .collect()
+}
+
 /// Scrub internal-architecture details (runtime, paths, endpoints) from outbound text.
 pub fn redact_internal_details(text: &str) -> String {
     let mut text = text.to_string();

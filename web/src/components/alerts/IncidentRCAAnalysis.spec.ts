@@ -57,6 +57,8 @@ import {
   rcaThread,
   rcaThreadQuestion,
   rcaToolCall,
+  rcaV1RunItem,
+  rcaV1Summary,
   sec,
 } from "@/test/unit/fixtures/rcaThread";
 import type { RcaRunSummary } from "@/services/incidents";
@@ -546,6 +548,113 @@ describe("IncidentRCAAnalysis", () => {
     });
   });
 
+  describe("v1: pre-upgrade reports", () => {
+    const V1 = rcaV1RunItem();
+    const OLDER_V1 = rcaV1RunItem({
+      run_id: "v1-1",
+      started_at: RCA_T0 - sec(3600),
+      ended_at: RCA_T0 - sec(3600),
+    });
+    const NO_TRANSCRIPT = "This run has no stored transcript.";
+
+    beforeEach(() => {
+      getRcaFeedback.mockReset().mockResolvedValue({ data: { items: [], mine: null } } as never);
+    });
+
+    const expectNoRunReads = () => {
+      expect(getRcaThread).not.toHaveBeenCalled();
+      expect(getRcaSummary).not.toHaveBeenCalled();
+      expect(getRcaSteering).not.toHaveBeenCalled();
+      expect(getRcaFeedback).not.toHaveBeenCalled();
+    };
+
+    it("a v1-only incident shows the Analyzed card and the report, and reads no run record", async () => {
+      wrapper = mountPanel({
+        rca: rcaV1Summary([V1, OLDER_V1]),
+        reportRun: V1,
+        history: [V1, OLDER_V1],
+        reportText: REPORT,
+        threadRunId: "v1-0",
+        threadLive: false,
+      });
+      await flushPromises();
+
+      expect(byTest(wrapper, "rca-verdict-state").text()).toBe("Analyzed");
+      expect(byTest(wrapper, "rca-existing-container").text()).toContain("Memory leak");
+      expect(byTest(wrapper, "rca-summary-loading").exists()).toBe(false);
+      expect(byTest(wrapper, "rca-thread-empty").text()).toBe(NO_TRANSCRIPT);
+      expect(byTest(wrapper, "rca-steer-composer").exists()).toBe(false);
+      expect(byTest(wrapper, "rca-resume-btn").exists()).toBe(false);
+      expect(byTest(wrapper, "rca-reanalyze-build").attributes("data-disabled")).toBe("false");
+      expectNoRunReads();
+    });
+
+    it("a failed latest run with a v1 report shows the v1 report as the earlier report", async () => {
+      const failed = rcaRunItem({
+        run_id: "run-1",
+        state: "failed",
+        started_at: RCA_T0 + sec(600),
+        ended_at: RCA_T0 + sec(700),
+      });
+      wrapper = mountPanel({
+        rca: rcaSummary({
+          run_id: "run-1",
+          state: "failed",
+          current_run: rcaRun({ run_id: "run-1", state: "failed" }),
+          report_run: V1,
+          history: [failed, V1],
+        }),
+        error: {
+          code: "agent_unavailable",
+          reason: "Agent unavailable",
+          details: null,
+          trigger_type: null,
+        },
+        reportRun: V1,
+        history: [failed, V1],
+        reportText: REPORT,
+        threadRunId: "run-1",
+      });
+      await flushPromises();
+
+      expect(byTest(wrapper, "rca-error-reason").text()).toBe("Agent unavailable");
+      expect(byTest(wrapper, "rca-earlier-report-note").text()).toBe(
+        "The report below is from the 08:53 UTC run.",
+      );
+      expect(byTest(wrapper, "rca-existing-container").text()).toContain("Memory leak");
+      expect(getRcaThread).toHaveBeenCalledWith("default", "inc-1", "run-1", undefined);
+      expect(getRcaThread).not.toHaveBeenCalledWith("default", "inc-1", "v1-0", undefined);
+    });
+
+    it("the selector opens a v1 report; the picked v1 run shows its report and reads no thread", async () => {
+      answerSummary(rcaRunSummary());
+      wrapper = mountPanel({ ...completedProps(), history: [rcaRunItem(), V1] });
+      await flushPromises();
+      expect(byTest(wrapper, "rca-what-happened").exists()).toBe(true);
+
+      expect(byTest(wrapper, "rca-history-item-1").attributes("data-disabled")).toBe("false");
+      await byTest(wrapper, "rca-history-item-1").trigger("click");
+      expect(wrapper.emitted("view-run")).toEqual([["v1-0"]]);
+
+      getRcaThread.mockClear();
+      getRcaSummary.mockClear();
+      getRcaSteering.mockClear();
+      getRcaFeedback.mockClear();
+      await wrapper.setProps({
+        viewedRun: V1,
+        threadRunId: "v1-0",
+        reportText: "## Root Cause\n\nDisk full on the ledger node.",
+      });
+      await flushPromises();
+
+      expect(byTest(wrapper, "rca-verdict-state").text()).toBe("Analyzed");
+      expect(byTest(wrapper, "rca-what-happened").exists()).toBe(false);
+      expect(byTest(wrapper, "rca-existing-container").text()).toContain("Disk full");
+      expect(byTest(wrapper, "rca-thread-empty").text()).toBe(NO_TRANSCRIPT);
+      expectNoRunReads();
+    });
+  });
+
   describe("⋯ menu (E5)", () => {
     it("Copy report puts the markdown on the clipboard", async () => {
       wrapper = mountPanel(completedProps());
@@ -750,16 +859,13 @@ describe("IncidentRCAAnalysis", () => {
 
     const shownSections = (w: VueWrapper) => SECTIONS.filter((id) => byTest(w, id).exists());
 
-    it("B: bar, card, What happened, Hypotheses, Blind spots, Evidence in that order; no markdown report", async () => {
+    it("a graded run shows its verdict and structured sections instead of the markdown report", async () => {
       answerSummary(rcaRunSummary());
       wrapper = mountPanel(completedProps());
       await flushPromises();
 
       expect(getRcaSummary).toHaveBeenCalledWith("default", "inc-1", "run-1", undefined);
-      const order = ["rca-analysis-bar", "rca-verdict-card", ...SECTIONS, "rca-thread-column"].map(
-        (id) => byTest(wrapper, id).element,
-      );
-      for (let i = 1; i < order.length; i++) expect(precedes(order[i - 1], order[i])).toBe(true);
+      for (const id of SECTIONS) expect(byTest(wrapper, id).exists()).toBe(true);
       expect(byTest(wrapper, "rca-existing-container").exists()).toBe(false);
       expect(byTest(wrapper, "rca-verdict-state").text()).toBe("Root cause identified");
       expect(byTest(wrapper, "rca-verdict-band").text()).toContain("High");

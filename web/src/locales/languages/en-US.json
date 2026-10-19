@@ -9437,6 +9437,9 @@
         "ago": "{ago} ago",
         "failed": "Failed",
         "cancelledBy": "Cancelled by {user}",
+        "cancelledByAfterChecks": "Cancelled by {user} after {count} checks",
+        "cancelledAfterChecks": "Cancelled after {count} checks",
+        "stageProgress": "Stage {index}/{count}",
         "cancelled": "Cancelled",
         "rerunFailed": "re-run failed",
         "rerunCancelledBy": "re-run cancelled by {user}",
@@ -9897,7 +9900,7 @@
         "timelineEmpty": "The report has no timeline.",
         "marker": {
           "confirmed": "Confirmed",
-          "inferred": "Inferred",
+          "likely": "Likely",
           "unverified": "Unverified",
           "refuted": "Refuted"
         },
@@ -9927,6 +9930,7 @@
         "statusHistory": "Status history · {count}",
         "historyLine": "{time} UTC · {status} ({actor})",
         "historyActorAgent": "agent",
+        "historyActorRunEnded": "run ended",
         "historyActorSteered": "agent · after {author}",
         "blindSpots": "Blind spots",
         "blindSpotsSubtitle": "· What the agent could not check",

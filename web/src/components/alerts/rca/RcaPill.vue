@@ -14,8 +14,6 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!-- The one status pill of the Analysis tab (redesign): outcome, hypothesis
-     status and evidence weight. -->
 <template>
   <span
     class="text-3xs inline-flex items-center gap-1.5 border px-2 font-bold"

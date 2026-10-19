@@ -14,10 +14,6 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!-- The Analysis tab (contract E5, P3 F1): a left analysis column (analysis bar,
-     verdict card, What happened, Hypotheses, Blind spots, Evidence) and the right
-     "Investigation thread" column (02 TH38). A legacy run shows its markdown
-     report in place of the sections (03 VE42). -->
 <template>
   <!-- K: nothing ran yet (02 TH40). -->
   <div
@@ -139,6 +135,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :sending="steerSending"
           @steer-action="sendHypothesisAction"
         />
+        <RcaEvidenceList
+          ref="evidenceList"
+          :evidence="recordSummary.evidence"
+          :unverified="recordSummary.unverified"
+          :hypotheses="recordSummary.hypotheses"
+          :org="orgId"
+        />
         <RcaBlindSpots
           ref="blindSpots"
           :blind-spots="recordSummary.blind_spots"
@@ -148,13 +151,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :resuming="resuming"
           :triggering="triggering"
           @resume="resumeLatest"
-        />
-        <RcaEvidenceList
-          ref="evidenceList"
-          :evidence="recordSummary.evidence"
-          :unverified="recordSummary.unverified"
-          :hypotheses="recordSummary.hypotheses"
-          :org="orgId"
         />
       </template>
       <p
@@ -201,6 +197,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :trigger-label="threadTriggerLabel"
       :context-used="threadContextUsed"
       :run-stats="threadRunStats"
+      :no-transcript="threadRunIsV1"
       :evidence-numbers="evidenceNumbers"
       :steering="steering"
       :can-steer="canSteer"
@@ -300,10 +297,6 @@ const props = withDefaults(
     threadLive?: boolean;
     triggering?: boolean;
     cancelling?: boolean;
-    /**
-     * The run "Resume run" resumes (J9): the latest failed or cancelled run, or
-     * the source of a resume that never ran; null offers no Resume.
-     */
     resumeRunId?: string | null;
     resuming?: boolean;
     /** The incident's title, for the Ask attachment header. */
@@ -354,6 +347,19 @@ const aiEnabled = computed(
 const live = computed(() => isLiveRca(props.rca));
 const currentRun = computed(() => props.rca?.current_run ?? null);
 
+const findRun = (runId: string | null | undefined) =>
+  runId ? (props.history.find((run) => run.run_id === runId) ?? null) : null;
+
+/** A v1 run is a pre-upgrade report: markdown only, with no thread, record, steering or feedback. */
+const threadRunIsV1 = computed(() => {
+  const id = props.threadRunId;
+  const run = findRun(id) ?? (id && id === props.rca?.run_id ? props.rca : null);
+  return run?.report_format === "v1";
+});
+
+// The run-scoped routes answer 404 for a v1 run, so nothing is read for one.
+const recordRunId = computed(() => (threadRunIsV1.value ? null : props.threadRunId));
+
 const {
   thread,
   status: threadStatus,
@@ -361,7 +367,7 @@ const {
 } = useRcaThread(
   toRef(props, "orgId"),
   toRef(props, "incidentId"),
-  toRef(props, "threadRunId"),
+  recordRunId,
   toRef(props, "threadLive"),
 );
 
@@ -369,7 +375,7 @@ const {
 const { summary, status: summaryStatus } = useRcaSummary(
   toRef(props, "orgId"),
   toRef(props, "incidentId"),
-  toRef(props, "threadRunId"),
+  recordRunId,
   toRef(props, "threadLive"),
 );
 
@@ -382,13 +388,8 @@ const recordSummary = computed(() => {
 /** Evidence id → number for the thread's chips (03 VE24); null shows raw ids. */
 const evidenceNumbers = computed(() => rcaEvidenceNumbers(recordSummary.value));
 
-/**
- * The markdown report shows for a legacy run (VE42), when the summary of a
- * finished run cannot be read, and as the earlier result under a run that has
- * not finished (RR-42). A run with a record shows none (F1).
- */
 const showReport = computed(() => {
-  if (summary.value?.legacy) return true;
+  if (summary.value?.legacy || threadRunIsV1.value) return true;
   if (cardState.value !== "analyzed") return earlierReportNote.value !== null;
   if (recordSummary.value) return false;
   return (
@@ -442,9 +443,6 @@ const cardRunId = computed(() => props.viewedRun?.run_id ?? props.rca?.run_id ??
 
 /** The latest run is paused for an answer (03 VE22); a picked run never is. */
 const waitingInput = computed(() => !props.viewedRun && props.rca?.state === "waiting_input");
-
-const findRun = (runId: string | null | undefined) =>
-  runId ? (props.history.find((run) => run.run_id === runId) ?? null) : null;
 
 /** Trigger + age of the shown run: "Auto on incident open · started 1m47s ago". */
 const subtitle = computed<I18nText | string>(() => {
@@ -545,8 +543,7 @@ const threadRunStats = computed<RcaRunStats | null>(() => {
 const threadColumn = ref<InstanceType<typeof RcaThreadColumn> | null>(null);
 const followThread = () => void threadColumn.value?.scrollToLatest();
 
-// Steering (04 SG37–SG40, H16): the rows, the open question and `can_steer` of
-// the thread's run, polled with the thread.
+// Steering (04 SG37–SG40, H16): the rows, the open question and `can_steer` of the thread's run, polled with the thread.
 const {
   steering,
   sending: steerSending,
@@ -554,7 +551,7 @@ const {
 } = useRcaSteering(
   toRef(props, "orgId"),
   toRef(props, "incidentId"),
-  toRef(props, "threadRunId"),
+  recordRunId,
   toRef(props, "threadLive"),
 );
 
@@ -686,8 +683,6 @@ const copyThread = () => {
   );
 };
 
-// J9: the drawer owns the request and the toast; the target may be the latest
-// run's source when the latest is a resume that never ran.
 const resumeLatest = () => {
   if (props.resumeRunId) emit("resume-rca", props.resumeRunId);
 };

@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { onScopeDispose, ref, watch, type Ref } from "vue";
+import { ref, type Ref } from "vue";
 import { isAxiosError } from "axios";
 import incidentsService, {
   type RcaRunState,
@@ -24,6 +24,7 @@ import { useViewerTimezone } from "@/composables/downtimes/useViewerTimezone";
 import { formatTimestampInTimezone } from "@/utils/date";
 import { isClosedRunRefusal } from "@/utils/incidents/rcaSteering";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { useRcaPolling } from "@/composables/useRcaPolling";
 
 /** How often the steering view of a live run is re-read (04 H8; the thread's poll). */
 export const RCA_STEERING_POLL_MS = 4_000;
@@ -67,107 +68,17 @@ export function useRcaSteering(
   const { t } = useI18nTyped();
   const timezone = useViewerTimezone();
 
-  const steering = ref<RcaSteering | null>(null);
-  const sending = ref(false);
-
-  // Bumped when the run changes or the owner unmounts: older answers are dropped.
-  let generation = 0;
-  let readSeq = 0;
-  let appliedSeq = 0;
-  let halted = false;
-  let timer: number | null = null;
-
-  const clearTimer = () => {
-    if (timer !== null) {
-      clearTimeout(timer);
-      timer = null;
-    }
-  };
-
-  const read = async () => {
-    const org = orgRef.value;
-    const incidentId = incidentIdRef.value;
-    const runId = runIdRef.value;
-    if (!incidentId || !runId || halted) return;
-    const gen = generation;
-    const seq = ++readSeq;
-    try {
-      const response = await incidentsService.getRcaSteering(org, incidentId, runId);
-      if (gen !== generation || seq < appliedSeq) return;
-      appliedSeq = seq;
-      steering.value = response.data;
-    } catch (error) {
-      if (gen !== generation || seq < appliedSeq) return;
-      appliedSeq = seq;
-      const status = isAxiosError(error) ? error.response?.status : undefined;
-      if (status === 403 || status === 404) {
-        halted = true;
-        clearTimer();
-        steering.value = null;
-        return;
-      }
-      // Keep the last good view; a live run retries on the next tick.
-      console.error("Failed to load the RCA steering view:", error);
-    }
-  };
-
-  const schedule = () => {
-    clearTimer();
-    if (!liveRef.value || halted) return;
-    const gen = generation;
-    timer = window.setTimeout(async () => {
-      timer = null;
-      await read();
-      if (gen === generation) schedule();
-    }, RCA_STEERING_POLL_MS);
-  };
-
-  watch(
-    [orgRef, incidentIdRef, runIdRef, liveRef] as const,
-    ([org, incidentId, runId, live], previous) => {
-      const sameRun =
-        previous !== undefined &&
-        previous[0] === org &&
-        previous[1] === incidentId &&
-        previous[2] === runId;
-
-      if (!sameRun) {
-        generation++;
-        clearTimer();
-        halted = false;
-        appliedSeq = readSeq;
-        steering.value = null;
-        if (!incidentId || !runId) return;
-        const gen = generation;
-        void read().then(() => {
-          if (gen === generation) schedule();
-        });
-        return;
-      }
-
-      if (live === previous[3]) return;
-      if (live) {
-        schedule();
-      } else {
-        clearTimer();
-        void read();
-      }
+  const { data: steering, refresh } = useRcaPolling<RcaSteering>(
+    orgRef,
+    incidentIdRef,
+    runIdRef,
+    liveRef,
+    {
+      interval: RCA_STEERING_POLL_MS,
+      fetch: (org, incident, run) => incidentsService.getRcaSteering(org, incident, run),
     },
-    { immediate: true },
   );
-
-  onScopeDispose(() => {
-    generation++;
-    clearTimer();
-  });
-
-  /** Re-reads the view now, then keeps the 4 s rhythm while live. */
-  const refresh = async () => {
-    const gen = generation;
-    clearTimer();
-    await read();
-    if (gen === generation) schedule();
-  };
+  const sending = ref(false);
 
   /** The message for a refused send (04 §9.1). */
   const sendErrorMessage = (error: unknown): { code: string | null; message: I18nText } => {

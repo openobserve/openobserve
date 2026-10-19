@@ -13,11 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Creates `rca_runs` (one row per incident analysis run) and adds the run
-//! summary of the latest run plus `rca_off_reason` to `alert_incidents`.
-//!
-//! All new `alert_incidents` columns are nullable: NULL means "never analyzed",
-//! which is correct for every row until the backfill migration runs.
+//! Create RCA runs and nullable incident summaries without changing existing incident states.
 
 use sea_orm_migration::prelude::*;
 
@@ -32,9 +28,6 @@ impl MigrationTrait for Migration {
         manager.create_table(create_statement()).await?;
         manager.create_index(subject_index()).await?;
         manager.create_index(incident_index()).await?;
-        // SQLite allows one alter option per ALTER TABLE (sea-query panics on more), and
-        // `add_column_if_not_exists` is not idempotent there. Hence one guarded statement
-        // per column.
         for (column, ty) in summary_columns() {
             add_column(manager, column, ty).await?;
         }
@@ -123,8 +116,6 @@ fn summary_columns() -> [(AlertIncidents, ColType); 8] {
     ]
 }
 
-/// Add one nullable `alert_incidents` column, skipping it if already present, so a
-/// migration interrupted partway can be retried.
 async fn add_column(
     manager: &SchemaManager<'_>,
     column: AlertIncidents,

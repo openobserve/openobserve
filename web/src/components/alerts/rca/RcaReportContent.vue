@@ -14,8 +14,6 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!-- A rendered RCA report (sanitized HTML from `renderRcaReport` or an equally
-     escaped caller) with the shared `.rca-report-content` styles. -->
 <template>
   <div
     data-test="rca-report-content"

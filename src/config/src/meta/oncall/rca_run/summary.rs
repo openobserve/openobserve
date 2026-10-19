@@ -13,9 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! The body of the run summary route (03 §12): the verdict card, the timeline,
-//! the hypotheses, the evidence and the blind spots of one run. The server sends
-//! data; the web app renders the labels (F10).
+//! Project persisted or live RCA records into the verdict, evidence and hypothesis wire contract.
 
 use std::collections::BTreeMap;
 
@@ -35,8 +33,7 @@ use crate::meta::{
     },
 };
 
-/// The run summary route body. A `not_modified: true` body carries only
-/// `run_id`, `state_version` and `not_modified`; the route builds that one.
+/// The run summary route body.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct RcaRunSummary {
     pub run_id: String,
@@ -65,9 +62,6 @@ pub struct SummaryCard {
     pub outcome: Option<RcaOutcome>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub outcome_reason: Option<OutcomeReason>,
-    /// `probable_cause` for root_cause_identified, contributing_factor and
-    /// blocked; the subject statement for inconclusive (VE17). `None` while live,
-    /// for failed and cancelled runs, and with no subject.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub headline: Option<String>,
     /// Live only.
@@ -181,8 +175,8 @@ pub struct SummaryStatusChange {
     /// Microseconds.
     pub at: i64,
     pub status: HypothesisStatus,
-    /// The email of the author of the steering message that caused the change
-    /// (`trigger_steer_id`), if any (SG36).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub run_ended: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub steered_by: Option<String>,
 }
@@ -200,8 +194,7 @@ fn numbers_of<'a>(
         .collect()
 }
 
-/// The timeline as it shows (VE31): `confirmed` and `refuted` keep their status
-/// only with a verified evidence id, else `unverified`; sorted by `at`.
+/// VE31: confirmed/refuted require verified evidence; otherwise show unverified.
 pub(super) fn timeline_view(
     timeline: &[TimelineEntry],
     evidence: &[EvidenceEntry],
@@ -230,7 +223,6 @@ pub(super) fn timeline_view(
 }
 
 /// Ranked by VE12 and `first_seen_seq`, then `symptom`, then `ruled_out` (VE36).
-/// `steer_authors` names the author of each steer id (SG36).
 fn hypotheses_view(
     ledger: &EvidenceLedger,
     evidence: &[EvidenceEntry],
@@ -273,6 +265,7 @@ fn hypotheses_view(
                     .map(|c| SummaryStatusChange {
                         at: c.at_us,
                         status: c.status,
+                        run_ended: c.run_ended,
                         steered_by: c
                             .trigger_steer_id
                             .as_ref()
@@ -285,8 +278,6 @@ fn hypotheses_view(
         .collect()
 }
 
-/// VE35: confirmed when a verified change item supports a root_cause or
-/// contributing hypothesis, else under test while the run waits, else not read.
 fn shown_change_state(
     state: RunState,
     ledger: &EvidenceLedger,
@@ -376,7 +367,13 @@ pub fn summary_from_record(
         suspect_change,
         impact: record.impact.clone().filter(|_| completed),
         needs: (record.outcome == Some(RcaOutcome::Blocked))
-            .then(|| needs_title(&record.blind_spots).map(str::to_string))
+            .then(|| {
+                if record.outcome_reason == Some(OutcomeReason::AnswerDeadline) {
+                    record.answer_deadline_need.clone()
+                } else {
+                    needs_title(&record.blind_spots).map(str::to_string)
+                }
+            })
             .flatten(),
     };
     RcaRunSummary {
@@ -399,9 +396,6 @@ pub fn summary_from_record(
     }
 }
 
-/// The summary of a live run, computed from its committed ledger calls and tool
-/// log: no grade, no outcome, no timeline (VE-D2, VE-D4, VE-D6, VE22).
-/// `steer_authors` maps the run's steer ids to their authors' emails (SG36).
 pub fn summary_live(
     run_id: &str,
     state: RunState,
@@ -552,8 +546,6 @@ mod tests {
         );
     }
 
-    /// VE18/VE36: a root_cause under an inconclusive outcome keeps its status; the
-    /// hypotheses of frame B come in rank order, then symptom, then ruled out.
     #[test]
     fn hypotheses_keep_status_and_follow_the_display_order() {
         let r = record(
@@ -601,11 +593,13 @@ mod tests {
                 SummaryStatusChange {
                     at: 6_000_000,
                     status: HypothesisStatus::Testing,
+                    run_ended: false,
                     steered_by: None
                 },
                 SummaryStatusChange {
                     at: 9_000_000,
                     status: HypothesisStatus::RootCause,
+                    run_ended: false,
                     steered_by: Some("a.rao@acme.io".into())
                 },
             ]

@@ -42,6 +42,7 @@ import incidentsService, {
 import { incidentKeys } from "@/services/incidents.querykeys";
 import { queryClient } from "@/composables/query/queryClient";
 import { RCA_POLL_INTERVAL_MS, useIncidentRca } from "./useIncidentRca";
+import { rcaV1RunItem, rcaV1Summary } from "@/test/unit/fixtures/rcaThread";
 
 const service = vi.mocked(incidentsService);
 
@@ -61,6 +62,7 @@ function reportRun(runId: string): RcaRunItem {
     confidence: null,
     cancelled_by: null,
     error_reason: null,
+    report_format: "v2",
   };
 }
 
@@ -73,6 +75,7 @@ function rca(state: RcaRunState, runId: string, report: string | null): RcaSumma
     updated_at: T0,
     outcome: null,
     confidence: null,
+    report_format: "v2",
     summary: {
       stage: null,
       stage_index: null,
@@ -100,6 +103,7 @@ interface IncidentRcaApi {
   live: Readonly<Ref<boolean>>;
   state: Readonly<Ref<RcaRunState | null>>;
   displayedRunId: Readonly<Ref<string | null>>;
+  threadRunId: Readonly<Ref<string | null>>;
   reportText: Readonly<Ref<string>>;
   currentError: Readonly<Ref<RcaRunError | null>>;
   triggering: Readonly<Ref<boolean>>;
@@ -109,6 +113,7 @@ interface IncidentRcaApi {
   resume: (runId: string) => Promise<void>;
   cancel: () => Promise<void>;
   reload: () => Promise<void>;
+  viewRun: (runId: string | null) => void;
 }
 
 interface Host {
@@ -201,7 +206,7 @@ describe("useIncidentRca (RR-35)", () => {
     expect(host.api.reportText.value).toBe("report of run-2");
   });
 
-  it("trigger sends reanalysis=true with the chosen mode and re-reads the detail", async () => {
+  it("trigger sends the selected mode and reloads the committed run", async () => {
     service.triggerRca.mockResolvedValue({ data: { run_id: "run-2" } } as never);
     service.get.mockResolvedValue(detail(rca("running", "run-2", "run-1")) as never);
     host = mountHost(rca("completed", "run-1", "run-1"));
@@ -213,7 +218,7 @@ describe("useIncidentRca (RR-35)", () => {
     expect(service.triggerRca.mock.calls[0].slice(0, 3)).toEqual([
       "default",
       "inc-1",
-      { reanalysis: true, build_on_previous: true },
+      { build_on_previous: true },
     ]);
     expect(service.get).toHaveBeenCalledTimes(1);
     expect(host.api.live.value).toBe(true);
@@ -228,7 +233,6 @@ describe("useIncidentRca (RR-35)", () => {
     await host.api.trigger({ buildOnPrevious: false, guidance: "  Check the pool  " });
 
     expect(service.triggerRca.mock.calls[0][2]).toEqual({
-      reanalysis: true,
       build_on_previous: false,
       guidance: "Check the pool",
     });
@@ -328,6 +332,47 @@ describe("useIncidentRca (RR-35)", () => {
     expect(host.api.live.value).toBe(false);
   });
 
+  describe("v1: pre-upgrade reports", () => {
+    const V1_ITEMS = [rcaV1RunItem(), rcaV1RunItem({ run_id: "v1-1" })];
+
+    it("a v1-only incident shows the newest v1 report, read through getRcaRun", async () => {
+      host = mountHost(rcaV1Summary(V1_ITEMS));
+      await flushPromises();
+
+      expect(host.api.displayedRunId.value).toBe("v1-0");
+      expect(host.api.threadRunId.value).toBe("v1-0");
+      expect(service.getRcaRun).toHaveBeenCalledWith("default", "inc-1", "v1-0");
+      expect(host.api.reportText.value).toBe("report of v1-0");
+    });
+
+    it("picking an older v1 report pins it and loads its report", async () => {
+      host = mountHost(rcaV1Summary(V1_ITEMS));
+      await flushPromises();
+
+      host.api.viewRun("v1-1");
+      await flushPromises();
+
+      expect(host.api.displayedRunId.value).toBe("v1-1");
+      expect(host.api.threadRunId.value).toBe("v1-1");
+      expect(service.getRcaRun).toHaveBeenCalledWith("default", "inc-1", "v1-1");
+      expect(host.api.reportText.value).toBe("report of v1-1");
+    });
+
+    it("a failed v2 latest run keeps the v1 report as the shown report", async () => {
+      const failed: RcaSummary = {
+        ...rca("failed", "run-1", null),
+        report_run: V1_ITEMS[0],
+        history: [{ ...reportRun("run-1"), state: "failed" }, ...V1_ITEMS],
+      };
+      host = mountHost(failed);
+      await flushPromises();
+
+      expect(host.api.threadRunId.value).toBe("run-1");
+      expect(host.api.displayedRunId.value).toBe("v1-0");
+      expect(host.api.reportText.value).toBe("report of v1-0");
+    });
+  });
+
   describe("J9: resume", () => {
     /** The latest run as `current_run`, resumable by default: failed with a session and 3 steps. */
     const stopped = (run: Partial<RcaRun> = {}, history: RcaRunItem[] = []): RcaSummary => {
@@ -354,163 +399,6 @@ describe("useIncidentRca (RR-35)", () => {
       state: RcaRunState,
       outcome: RcaRunItem["outcome"] = null,
     ) => ({ ...reportRun(runId), state, outcome }) as RcaRunItem;
-
-    describe("resumeRunId", () => {
-      it.each(["failed", "cancelled"] as const)(
-        "a %s latest run with finished steps",
-        async (state) => {
-          host = mountHost(stopped({ state, error: state === "cancelled" ? null : undefined }));
-
-          expect(host.api.resumeRunId.value).toBe("run-2");
-        },
-      );
-
-      it.each([
-        ["completed", { state: "completed" as const }],
-        ["running", { state: "running" as const }],
-        ["no session", { session_id: null }],
-        ["a report", { report: "# done" }],
-        ["an outcome", { outcome: "inconclusive" as const }],
-        ["only the open step", { stats: { steps: 1 } }],
-        ["no steps", { stats: { steps: 0 } }],
-      ])("null for %s", async (_label, run) => {
-        host = mountHost(stopped(run));
-
-        expect(host.api.resumeRunId.value).toBeNull();
-      });
-
-      it("two recorded steps (one finished plus the open one) are enough", () => {
-        host = mountHost(stopped({ stats: { steps: 2 } }));
-
-        expect(host.api.resumeRunId.value).toBe("run-2");
-      });
-
-      it("falls back to the summary step count without run stats", () => {
-        const summary = stopped({ stats: null });
-        summary.summary.steps = 4;
-        host = mountHost(summary);
-
-        expect(host.api.resumeRunId.value).toBe("run-2");
-      });
-
-      it.each([
-        "turn_limit",
-        "credentials",
-        "agent_unavailable",
-        "busy",
-        "usage_denied",
-        "rca_disabled",
-        "agent_not_configured",
-        "l0_off",
-        "transcript_deleted",
-        "persistence_failed",
-      ])("null for the start or lost-transcript code %s", (code) => {
-        host = mountHost(
-          stopped({ error: { code, reason: code, details: null, trigger_type: null } }),
-        );
-
-        expect(host.api.resumeRunId.value).toBeNull();
-      });
-
-      it("null when current_run is not the latest run", () => {
-        const summary = stopped();
-        summary.run_id = "run-9";
-        host = mountHost(summary);
-
-        expect(host.api.resumeRunId.value).toBeNull();
-      });
-
-      describe("a transparent Resume child (never ran a turn)", () => {
-        const child = (run: Partial<RcaRun>, source: RcaRunItem | null) =>
-          stopped(
-            {
-              run_id: "run-3",
-              trigger: "resume",
-              session_id: null,
-              stats: { steps: 0 },
-              context_used: {
-                resumed_from: {
-                  run_id: "run-2",
-                  steps: 2,
-                  from_step: { index: 3, stage: "metrics", title: "Check metrics" },
-                },
-              },
-              ...run,
-            },
-            [historyItem("run-3", "failed"), ...(source ? [source] : [])],
-          );
-
-        it.each(["resume_failed", "turn_limit", "credentials", "agent_unavailable", "busy"])(
-          "%s resumes the source run instead",
-          (code) => {
-            host = mountHost(
-              child(
-                {
-                  session_id: "ses-fork",
-                  error: { code, reason: code, details: null, trigger_type: null },
-                },
-                historyItem("run-2", "failed"),
-              ),
-            );
-
-            expect(host.api.resumeRunId.value).toBe("run-2");
-          },
-        );
-
-        it("a child without a session is transparent whatever the code", () => {
-          host = mountHost(child({}, historyItem("run-2", "cancelled")));
-
-          expect(host.api.resumeRunId.value).toBe("run-2");
-        });
-
-        it("a cancelled child with no session resumes the source run (E banner)", () => {
-          host = mountHost(
-            child({ state: "cancelled", error: null }, historyItem("run-2", "failed")),
-          );
-
-          expect(host.api.resumeRunId.value).toBe("run-2");
-        });
-
-        it("a cancelled child with a session is not redirected to the source", () => {
-          // A never-ran code means nothing on a cancel: the child is judged on its own.
-          const code = { code: "busy", reason: "busy", details: null, trigger_type: null };
-          host = mountHost(
-            child(
-              { state: "cancelled", session_id: "ses-fork", error: code, stats: { steps: 3 } },
-              historyItem("run-2", "failed"),
-            ),
-          );
-          expect(host.api.resumeRunId.value).not.toBe("run-2");
-          host.wrapper.unmount();
-
-          host = mountHost(
-            child(
-              { state: "cancelled", session_id: "ses-fork", error: null, stats: { steps: 1 } },
-              historyItem("run-2", "failed"),
-            ),
-          );
-          expect(host.api.resumeRunId.value).toBeNull();
-        });
-
-        it.each([
-          ["completed", historyItem("run-2", "completed")],
-          ["graded", historyItem("run-2", "failed", "inconclusive")],
-          ["missing from the history", null],
-        ])("null when the source is %s", (_label, source) => {
-          host = mountHost(child({}, source));
-
-          expect(host.api.resumeRunId.value).toBeNull();
-        });
-
-        it("a child that ran a turn (session, other code) is judged on its own", () => {
-          host = mountHost(
-            child({ session_id: "ses-fork", stats: { steps: 3 } }, historyItem("run-2", "failed")),
-          );
-
-          expect(host.api.resumeRunId.value).toBe("run-3");
-        });
-      });
-    });
 
     const RESUMED = (steps: number) => ({
       data: {

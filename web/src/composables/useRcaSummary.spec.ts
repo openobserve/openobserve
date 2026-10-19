@@ -121,7 +121,7 @@ describe("useRcaSummary (03 §12, parity with useRcaThread)", () => {
     getRcaSummary
       .mockResolvedValueOnce({ data: rcaRunSummaryLive({ state_version: "v1" }) } as never)
       .mockRejectedValue(httpError(410));
-    const { summary, status, retry } = start();
+    const { summary, status } = start();
     await vi.advanceTimersByTimeAsync(0);
     await vi.advanceTimersByTimeAsync(RCA_SUMMARY_POLL_MS);
 
@@ -132,7 +132,6 @@ describe("useRcaSummary (03 §12, parity with useRcaThread)", () => {
     // Neither the poll, the run turning terminal, nor retry() reads again.
     live.value = false;
     await nextTick();
-    await retry();
     await vi.advanceTimersByTimeAsync(60_000);
     expect(getRcaSummary).toHaveBeenCalledTimes(2);
     expect(status.value).toBe("expired");
@@ -179,7 +178,7 @@ describe("useRcaSummary (03 §12, parity with useRcaThread)", () => {
         .mockResolvedValueOnce({ data: rcaRunSummaryLive({ state_version: "v1" }) } as never)
         .mockRejectedValueOnce(failure)
         .mockResolvedValue({ data: rcaRunSummary({ state_version: "v2" }) } as never);
-      const { summary, status, retry } = start();
+      const { summary, status } = start();
       await vi.advanceTimersByTimeAsync(0);
       expect(summary.value?.state).toBe("running");
 
@@ -192,14 +191,6 @@ describe("useRcaSummary (03 §12, parity with useRcaThread)", () => {
       expect(status.value).toBe("unavailable");
       await vi.advanceTimersByTimeAsync(60_000);
       expect(getRcaSummary).toHaveBeenCalledTimes(2);
-
-      await retry();
-
-      expect(getRcaSummary).toHaveBeenCalledTimes(3);
-      // The dropped view's version is not sent: the record must come back in full.
-      expect(knownVersions()[2]).toBeUndefined();
-      expect(status.value).toBe("ready");
-      expect(summary.value?.card.outcome).toBe("root_cause_identified");
     },
   );
 
@@ -218,27 +209,6 @@ describe("useRcaSummary (03 §12, parity with useRcaThread)", () => {
     expect(getRcaSummary).toHaveBeenCalledTimes(2);
     expect(status.value).toBe("ready");
     expect(summary.value?.card.outcome).toBe("root_cause_identified");
-  });
-
-  it("a first read that fails with 503 reports unavailable, and retry() loads it", async () => {
-    vi.spyOn(console, "error").mockImplementation(() => {});
-    live.value = false;
-    getRcaSummary
-      .mockRejectedValueOnce(httpError(503))
-      .mockResolvedValue({ data: rcaRunSummary() } as never);
-    const { status, summary, retry } = start();
-    await vi.advanceTimersByTimeAsync(0);
-    expect(status.value).toBe("unavailable");
-
-    const pending = retry();
-    expect(status.value).toBe("loading");
-    await pending;
-
-    expect(getRcaSummary).toHaveBeenCalledTimes(2);
-    expect(status.value).toBe("ready");
-    expect(summary.value?.run_id).toBe("run-2");
-    await vi.advanceTimersByTimeAsync(60_000);
-    expect(getRcaSummary).toHaveBeenCalledTimes(2);
   });
 
   it("a new run id starts over without known_version and drops the old run's late answer", async () => {

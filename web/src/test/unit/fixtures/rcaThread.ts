@@ -129,6 +129,7 @@ export function rcaRunItem(overrides: Partial<RcaRunItem> = {}): RcaRunItem {
     confidence: null,
     cancelled_by: null,
     error_reason: null,
+    report_format: "v2",
     ...overrides,
   };
 }
@@ -155,6 +156,7 @@ export function rcaRun(overrides: Partial<RcaRun> = {}): RcaRun {
     error: null,
     session_id: "sess-2",
     stats: null,
+    report_format: "v2",
     ...overrides,
   };
 }
@@ -171,6 +173,7 @@ export function rcaSummary(
     updated_at: RCA_T0 + sec(120),
     outcome: null,
     confidence: null,
+    report_format: "v2",
     ...rest,
     summary: {
       stage: null,
@@ -187,6 +190,46 @@ export function rcaSummary(
       ...summary,
     },
   };
+}
+
+/** A pre-upgrade report served at read time; `v1-0` is the newest. Its time is `RCA_T0`. */
+export function rcaV1RunItem(overrides: Partial<RcaRunItem> = {}): RcaRunItem {
+  return rcaRunItem({
+    run_id: "v1-0",
+    trigger: "legacy",
+    started_by: "system",
+    started_at: RCA_T0,
+    ended_at: RCA_T0,
+    report_format: "v1",
+    ...overrides,
+  });
+}
+
+/** The detail `rca` of an incident whose only reports are pre-upgrade ones, newest first. */
+export function rcaV1Summary(items: RcaRunItem[] = [rcaV1RunItem()]): RcaSummary {
+  const newest = items[0];
+  const at = newest.ended_at ?? newest.started_at;
+  return rcaSummary({
+    run_id: newest.run_id,
+    state: "completed",
+    started_at: newest.started_at,
+    updated_at: at,
+    report_format: "v1",
+    current_run: rcaRun({
+      run_id: newest.run_id,
+      trigger: "legacy",
+      started_by: "system",
+      state: "completed",
+      started_at: newest.started_at,
+      updated_at: at,
+      ended_at: at,
+      session_id: null,
+      report_format: "v1",
+    }),
+    report_run: newest,
+    history: items,
+    resume_run_id: null,
+  });
 }
 
 // Summary views (03 §12), one for each redesign frame plus a legacy run.

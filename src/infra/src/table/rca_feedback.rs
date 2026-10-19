@@ -14,10 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 //! Responder feedback on RCA runs (`rca_feedback`, README §9).
-//!
-//! One row per run and author; a second write by the same author replaces the first (the
-//! latest write wins, `created_at` is kept). Rows are not pruned with their run: they are
-//! keyed by subject so a correction keeps feeding later runs' past causes.
 
 use std::str::FromStr;
 
@@ -34,8 +30,6 @@ pub use super::entity::rca_feedback::Model;
 use super::entity::rca_feedback::{ActiveModel, Column, Entity};
 use crate::db::{get_orm_client_ro, get_orm_client_rw};
 
-/// Writes the author's row for the run; an existing row keeps its `created_at` and takes
-/// every other column from `row`. Returns the stored row.
 pub async fn upsert(row: &Model) -> Result<Model, DbErr> {
     upsert_with(get_orm_client_rw().await, row).await
 }
@@ -131,8 +125,7 @@ pub async fn latest_for_run_with<C: ConnectionTrait>(
         .await
 }
 
-/// The subject's `change` rows (corrected causes), newest `updated_at` first, at most
-/// `limit`. `subject_id` must be bare (an alert id without `:group:<team>`).
+/// The subject's `change` rows (corrected causes), newest `updated_at` first, at most `limit`.
 pub async fn list_corrections_for_subject(
     org_id: &str,
     subject_type: &str,
@@ -182,8 +175,7 @@ pub async fn delete_by_org_with<C: ConnectionTrait>(conn: &C, org_id: &str) -> R
     Ok(())
 }
 
-/// The API shape of a row. `None` for a row whose verdict this node cannot read (a newer
-/// node's); an unknown cause or reason is dropped.
+/// The API shape of a row.
 pub fn to_feedback(m: Model) -> Option<RcaFeedback> {
     let verdict = match FeedbackVerdict::from_str(&m.verdict) {
         Ok(v) => v,
@@ -290,8 +282,6 @@ mod tests {
             .collect()
     }
 
-    /// J1: one row per (org, run, author); the second write replaces every column but keeps
-    /// `created_at`.
     #[tokio::test]
     async fn upsert_keeps_one_row_per_author_latest_write_wins() {
         let db = db().await;
@@ -357,8 +347,6 @@ mod tests {
         );
     }
 
-    /// `list_for_run` returns only that run's rows, oldest `created_at` first, even when an
-    /// older row was rewritten later.
     #[tokio::test]
     async fn list_for_run_is_scoped_and_oldest_first() {
         let db = db().await;
@@ -393,8 +381,6 @@ mod tests {
         );
     }
 
-    /// The backtest label: the newest `updated_at` over all authors, so a rewrite of an older
-    /// row makes it the latest.
     #[tokio::test]
     async fn latest_for_run_is_the_newest_update_across_authors() {
         let db = db().await;
@@ -438,8 +424,6 @@ mod tests {
         assert_eq!(latest.created_at, T0);
     }
 
-    /// J3a: only `change` rows of exactly that subject (type and id) in that org, newest
-    /// `updated_at` first, at most `limit`; an alert's `:group:<team>` id is a different key.
     #[tokio::test]
     async fn list_corrections_for_subject_filters_orders_and_limits() {
         let db = db().await;
@@ -550,8 +534,6 @@ mod tests {
         delete_by_org_with(&db, "empty_org").await.unwrap();
     }
 
-    /// Stored values round-trip to the API shape; a newer node's verdict hides the row, a
-    /// newer node's cause or reason is dropped instead of failing the read.
     #[tokio::test]
     async fn to_feedback_round_trips_and_tolerates_unknown_values() {
         let db = db().await;

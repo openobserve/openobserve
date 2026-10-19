@@ -24,32 +24,6 @@ import { raw, useI18nTyped } from "@/types/i18n";
 /** How often the incident detail is re-read while its latest run is live. */
 export const RCA_POLL_INTERVAL_MS = 10_000;
 
-/** Error codes a run cannot be resumed from (J7: start codes and lost transcripts). */
-const NOT_RESUMABLE_CODES: Record<string, true> = {
-  turn_limit: true,
-  credentials: true,
-  agent_unavailable: true,
-  busy: true,
-  usage_denied: true,
-  rca_disabled: true,
-  agent_not_configured: true,
-  l0_off: true,
-  transcript_deleted: true,
-  persistence_failed: true,
-};
-
-/**
- * Codes of a Resume child that never ran a turn on its fork, so it is
- * transparent and its source run stays resumable (server `is_transparent_resume_of`).
- */
-const NEVER_RAN_CODES: Record<string, true> = {
-  resume_failed: true,
-  turn_limit: true,
-  credentials: true,
-  agent_unavailable: true,
-  busy: true,
-};
-
 /** The server message of a rejected request, if it sent one. */
 const serverMessage = (error: unknown): string | null => {
   const body: unknown = isAxiosError(error) ? error.response?.data : null;
@@ -62,24 +36,13 @@ const serverMessage = (error: unknown): string | null => {
     : null;
 };
 
-/**
- * Run-summary-driven RCA state for one incident (01 RR-35).
- *
- * The incident detail's `rca` is the only source of the run state. While the
- * latest run is live the detail is re-read every 10 s; the poll that sees a
- * terminal state is the last one. The report text is never on the detail
- * (RR-29): it is read from the run route whenever the run to show changes.
- *
- * `incidentRef` is the caller's loaded detail. A poll writes the fresh `rca`
- * back onto it, so the caller and this composable never disagree.
- */
+/** RR-35: incident detail owns run state; report text is loaded separately. */
 export function useIncidentRca(orgRef: Ref<string>, incidentRef: Ref<IncidentWithAlerts | null>) {
   const { t } = useI18nTyped();
   const { requestRca, requestResume } = useRcaTrigger();
   const queryClient = useQueryClient();
 
-  // The incidents list shows each row's run summary; drop it whenever a run
-  // starts, is cancelled, or ends here so the list never shows the old state (RR-34).
+  // RR-34: invalidate list summaries whenever a run changes.
   const invalidateList = (org: string) =>
     void queryClient.invalidateQueries({ queryKey: incidentKeys.all(org) });
 
@@ -107,49 +70,9 @@ export function useIncidentRca(orgRef: Ref<string>, incidentRef: Ref<IncidentWit
     };
   });
 
-  /**
-   * The run "Resume run" resumes, or null when there is none. Client mirror of
-   * the server's checks (J7); the server re-checks and its 409/410 message is
-   * shown as is.
-   * - The latest run, when it failed or was cancelled, has a session, finished
-   *   at least one step and has no report.
-   * - A Resume child that never ran a turn is transparent: failed with a
-   *   never-ran code, or failed or cancelled with no session. Its source run is
-   *   resumed instead, if the history shows that run failed or was cancelled
-   *   without an outcome. A cancelled child with a session is not redirected
-   *   (only the server sees its committed events); it is judged as a run of
-   *   its own by the first rule.
-   *   The source's session and steps are not on the list item; the server
-   *   checks them.
-   */
-  const resumeRunId = computed<string | null>(() => {
-    const run = currentRun.value;
-    const latest = summary.value;
-    if (!run || !latest || run.run_id !== latest.run_id) return null;
-    if (run.state !== "failed" && run.state !== "cancelled") return null;
-    const code = run.error?.code ?? "";
-    const resumedFrom = run.context_used?.resumed_from;
-    const sourceRunId = resumedFrom?.run_id;
-    // A Resume child with no turn of its own (server `is_transparent_resume_of`):
-    // no session, or failed with a never-ran code. Codes do not apply to a cancel.
-    const neverRan =
-      run.trigger === "resume" &&
-      !!resumedFrom &&
-      (!run.session_id || (run.state === "failed" && !!NEVER_RAN_CODES[code]));
-    if (sourceRunId && neverRan) {
-      const source = history.value.find((item) => item.run_id === sourceRunId);
-      const sourceStopped = source?.state === "failed" || source?.state === "cancelled";
-      return source && sourceStopped && !source.outcome ? sourceRunId : null;
-    }
-    if (!run.session_id || run.report || run.outcome) return null;
-    if (NOT_RESUMABLE_CODES[code]) return null;
-    // `steps` counts the open step too, so one finished step means two recorded.
-    const steps = run.stats?.steps ?? latest.summary.steps;
-    return steps >= 2 ? run.run_id : null;
-  });
+  const resumeRunId = computed(() => summary.value?.resume_run_id ?? null);
 
-  // A completed run picked from the history; null follows the latest run and
-  // shows the newest report (`report_run`).
+  // Null follows the latest report; a history selection stays pinned.
   const viewedRunId = ref<string | null>(null);
   const viewedRun = computed<RcaRunItem | null>(() => {
     const id = viewedRunId.value;
@@ -227,8 +150,7 @@ export function useIncidentRca(orgRef: Ref<string>, incidentRef: Ref<IncidentWit
     },
   );
 
-  // Each reload takes the next number; only the latest one may write its `rca`,
-  // so an older response that lands late never restores a superseded state.
+  // Ignore older detail reads that finish after a newer one.
   let reloadGeneration = 0;
 
   /** Re-read the incident detail and take its `rca`. */
@@ -283,14 +205,7 @@ export function useIncidentRca(orgRef: Ref<string>, incidentRef: Ref<IncidentWit
     if (run?.state === "completed") viewedRunId.value = runId;
   };
 
-  /**
-   * Start a user run on the spawned path (`reanalysis: true`, 202). The run
-   * state then comes from the detail; a run that fails shows in the banner,
-   * not a toast (RR-47). The server can commit the run and then fail it before
-   * answering (credentials, agent checks: 500/503), so a failed request re-reads
-   * the detail first; only a request that created no run keeps the error toast.
-   * `guidance` becomes the new run's first message (04 SG33).
-   */
+  /** Reload committed failures before deciding whether a trigger error needs a toast. */
   const trigger = async (options: { buildOnPrevious?: boolean; guidance?: string } = {}) => {
     const incident = incidentRef.value;
     if (!incident || triggering.value || resuming.value) return;
@@ -306,7 +221,6 @@ export function useIncidentRca(orgRef: Ref<string>, incidentRef: Ref<IncidentWit
         org,
         incidentId,
         {
-          reanalysis: true,
           build_on_previous: options.buildOnPrevious === true,
           ...(guidance ? { guidance } : {}),
         },
@@ -375,13 +289,7 @@ export function useIncidentRca(orgRef: Ref<string>, incidentRef: Ref<IncidentWit
     }
   };
 
-  /**
-   * Resume the latest failed or cancelled run (J9): a new run that reuses its
-   * finished steps. Consent (402/412) is handled like a trigger. As in
-   * `trigger`, a failed request re-reads the detail first: a run the server
-   * created and then failed shows its banner; only a request that created no
-   * run (409/410 refusals) keeps the server's message as a toast.
-   */
+  /** Resume the latest failed or cancelled run (J9): a new run that reuses its finished steps. */
   const resume = async (runId: string) => {
     const incident = incidentRef.value;
     if (!incident || resuming.value || triggering.value) return;

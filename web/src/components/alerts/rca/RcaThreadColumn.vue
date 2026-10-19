@@ -14,11 +14,6 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!-- The right-hand "Investigation thread" column of the Analysis tab (02 TH38,
-     contract E5): header with Live/Saved and the run stats (no credits, TH37),
-     the start entry with "Context used", the steps, the "Needs input" entries
-     and the responders' messages in time order (04 SG38, SG39), and the steer
-     box while the run takes messages, else the finished note (SG37). -->
 <template>
   <aside
     data-test="rca-thread-column"
@@ -300,8 +295,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </ol>
     </div>
 
-    <!-- A message the run refused because it takes no more (04 §13, SG40): the
-         text stays offered as guidance after the steer box hides. -->
     <div
       v-if="refusal"
       data-test="rca-thread-refusal"
@@ -409,6 +402,8 @@ const props = withDefaults(
     contextUsed?: RcaContextUsed | null;
     /** The run's stored stats; the stats line uses them when the thread has none (TH37). */
     runStats?: RcaRunStats | null;
+    /** The run has no transcript to read (a pre-upgrade report), so no thread was requested. */
+    noTranscript?: boolean;
     /** Evidence id → entry number from the run's summary (03 VE24); null shows raw ids. */
     evidenceNumbers?: Map<string, number> | null;
     /** Steering view of the thread's run (04 §9.2); null while unread or not allowed. */
@@ -425,6 +420,7 @@ const props = withDefaults(
     triggerLabel: null,
     contextUsed: null,
     runStats: null,
+    noTranscript: false,
     evidenceNumbers: null,
     steering: null,
     canSteer: false,
@@ -453,6 +449,7 @@ watch(
 );
 
 const emptyMessage = computed<I18nText | null>(() => {
+  if (props.noTranscript) return t("alerts.incidents.rcaThread.noTranscript");
   switch (props.status) {
     case "expired":
       return t("alerts.incidents.rcaThread.transcriptExpired");
@@ -604,10 +601,7 @@ const focusComposer = () => composer.value?.focus();
 /** The newest message the run refused as closed; cleared by a new run or the user. */
 const refusal = ref<{ text: string; message: I18nText } | null>(null);
 
-/**
- * The composer's send. The column records a closed-run refusal itself: the
- * steering view can hide (unmount) the composer before the send resolves.
- */
+/** The composer's send. */
 const sendFromComposer = async (text: string): Promise<RcaSteerSendResult> => {
   const send = props.send;
   if (!send) {

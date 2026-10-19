@@ -226,7 +226,6 @@ mod m20261013_000002_create_org_telephony;
 mod m20261015_000001_reports_add_last_run_columns;
 mod m20261016_000001_create_rca_runs;
 mod m20261016_000001_create_rum_pa_app_settings;
-mod m20261016_000002_backfill_rca_runs;
 mod m20261017_000001_add_rca_run_progress_columns;
 mod m20261018_000001_create_rca_steering;
 mod m20261018_000001_create_slack_tables;
@@ -598,7 +597,6 @@ impl MigratorTrait for Migrator {
             Box::new(m20261020_000001_create_eval_job_states_tables::Migration),
             Box::new(m20261018_000001_create_slack_tables::Migration),
             Box::new(m20261016_000001_create_rca_runs::Migration),
-            Box::new(m20261016_000002_backfill_rca_runs::Migration),
             Box::new(m20261017_000001_add_rca_run_progress_columns::Migration),
             Box::new(m20261018_000001_create_rca_steering::Migration),
             Box::new(m20261019_000001_create_rca_feedback::Migration),
@@ -674,10 +672,9 @@ mod tests {
         (111, "m20261020_000001_create_eval_job_states_tables"),
         (112, "m20261018_000001_create_slack_tables"),
         (113, "m20261016_000001_create_rca_runs"),
-        (114, "m20261016_000002_backfill_rca_runs"),
-        (115, "m20261017_000001_add_rca_run_progress_columns"),
-        (116, "m20261018_000001_create_rca_steering"),
-        (117, "m20261019_000001_create_rca_feedback"),
+        (114, "m20261017_000001_add_rca_run_progress_columns"),
+        (115, "m20261018_000001_create_rca_steering"),
+        (116, "m20261019_000001_create_rca_feedback"),
     ];
 
     // Two branches that each claim the next version merge cleanly, so a reused number must fail
@@ -815,14 +812,6 @@ mod tests {
             (
                 "m20251204_000001_create_alert_incidents_table",
                 "m20261016_000001_create_rca_runs",
-            ),
-            (
-                "m20260214_000001_create_incident_events_table",
-                "m20261016_000002_backfill_rca_runs",
-            ),
-            (
-                "m20261016_000001_create_rca_runs",
-                "m20261016_000002_backfill_rca_runs",
             ),
             (
                 "m20261016_000001_create_rca_runs",

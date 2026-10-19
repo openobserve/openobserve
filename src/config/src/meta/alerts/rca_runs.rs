@@ -13,8 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Incident analysis runs: one `rca_runs` row per run, and the run summary of the
-//! latest run that `alert_incidents` carries for the list.
+//! Persisted analysis runs and the latest-run summary shown on incidents.
 
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -24,9 +23,14 @@ use super::incidents::AnalysisTriggerType;
 /// Number of stages an analysis run reports progress through.
 pub const RCA_STAGE_COUNT: u8 = 7;
 
-/// Seconds past `O2_INCIDENTS_RCA_TIMEOUT_SECS` after which a `running` run with no
-/// write is stale (RR-9).
 pub const STALE_GRACE_SECS: u64 = 120;
+
+/// `topology_context` key of the newest report written before analysis runs existed.
+pub const V1_REPORT_KEY: &str = "suggested_root_cause";
+/// `topology_context` key of the older pre-run reports, newest first.
+pub const V1_PREVIOUS_REPORTS_KEY: &str = "previous_analyses";
+const V1_RUN_ID_PREFIX: &str = "v1-";
+const V1_STARTED_BY: &str = "system";
 
 /// Declares a snake_case string enum with `as_str`, `Display` and `FromStr`.
 macro_rules! string_enum {
@@ -99,7 +103,7 @@ string_enum! {
         Reanalyze => "reanalyze",
         OncallPage => "oncall_page",
         Resume => "resume",
-        /// Backfilled from a report stored before runs existed.
+        /// A report kept from before analysis runs existed ([ReportFormat::V1]).
         Legacy => "legacy",
     }
 }
@@ -134,6 +138,15 @@ string_enum! {
     RunSubjectType {
         Incident => "incident",
         Alert => "alert",
+    }
+}
+
+string_enum! {
+    /// Where a run's report lives: `v1` in `topology_context` from before runs existed,
+    /// `v2` in an `rca_runs` row.
+    ReportFormat {
+        V1 => "v1",
+        V2 => "v2",
     }
 }
 
@@ -222,6 +235,7 @@ impl Default for RunSummaryFields {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, ToSchema)]
 pub struct RcaSummary {
     pub run_id: String,
+    pub report_format: ReportFormat,
     pub state: RunState,
     /// Computed by the server (RR-9).
     pub stale: bool,
@@ -235,8 +249,7 @@ pub struct RcaSummary {
     pub detail: Option<RcaDetailFields>,
 }
 
-/// The detail endpoint's run fields (RR-29). No report text: the Report tab reads it from
-/// `GET .../rca/runs/{run_id}`.
+/// The detail endpoint's run fields (RR-29).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, ToSchema)]
 pub struct RcaDetailFields {
     /// The latest run, without its report.
@@ -244,12 +257,15 @@ pub struct RcaDetailFields {
     /// The newest `completed` run.
     pub report_run: Option<RcaRunItem>,
     pub history: Vec<RcaRunItem>,
+    #[serde(default)]
+    pub resume_run_id: Option<String>,
 }
 
 /// One row of a run history list.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, ToSchema)]
 pub struct RcaRunItem {
     pub run_id: String,
+    pub report_format: ReportFormat,
     pub subject_type: RunSubjectType,
     pub trigger: RunTrigger,
     pub mode: RunMode,
@@ -268,6 +284,7 @@ pub struct RcaRunItem {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, ToSchema)]
 pub struct RcaRun {
     pub run_id: String,
+    pub report_format: ReportFormat,
     pub subject_type: RunSubjectType,
     pub subject_id: String,
     pub incident_id: Option<String>,
@@ -325,6 +342,86 @@ pub struct ListRcaRunsResponse {
     pub has_more: bool,
 }
 
+/// A report kept in `topology_context` from before analysis runs existed.
+#[derive(Debug, Clone, PartialEq)]
+pub struct V1Report {
+    pub run_id: String,
+    pub report: String,
+    /// When the report was written, µs.
+    pub at: i64,
+}
+
+impl V1Report {
+    pub fn item(&self) -> RcaRunItem {
+        RcaRunItem {
+            run_id: self.run_id.clone(),
+            report_format: ReportFormat::V1,
+            subject_type: RunSubjectType::Incident,
+            trigger: RunTrigger::Legacy,
+            mode: RunMode::Fresh,
+            started_by: V1_STARTED_BY.to_string(),
+            state: RunState::Completed,
+            started_at: self.at,
+            ended_at: Some(self.at),
+            outcome: None,
+            confidence: None,
+            cancelled_by: None,
+            error_reason: None,
+        }
+    }
+
+    /// The report as a run, without its report text.
+    pub fn run(&self, incident_id: &str) -> RcaRun {
+        RcaRun {
+            run_id: self.run_id.clone(),
+            report_format: ReportFormat::V1,
+            subject_type: RunSubjectType::Incident,
+            subject_id: incident_id.to_string(),
+            incident_id: Some(incident_id.to_string()),
+            trigger: RunTrigger::Legacy,
+            mode: RunMode::Fresh,
+            started_by: V1_STARTED_BY.to_string(),
+            guidance: None,
+            state: RunState::Completed,
+            started_at: self.at,
+            updated_at: self.at,
+            ended_at: Some(self.at),
+            cancelled_by: None,
+            outcome: None,
+            confidence: None,
+            report: None,
+            result: None,
+            error: None,
+            session_id: None,
+            stats: None,
+            stage: None,
+            stage_index: None,
+            context_used: None,
+            continuations: 0,
+            oncall_subjects: None,
+            input_deadline_at: None,
+            pending_question_id: None,
+            questions_asked: 0,
+            deadline_closed_at: None,
+        }
+    }
+
+    pub fn summary(&self) -> RcaSummary {
+        RcaSummary {
+            run_id: self.run_id.clone(),
+            report_format: ReportFormat::V1,
+            state: RunState::Completed,
+            stale: false,
+            started_at: self.at,
+            updated_at: self.at,
+            outcome: None,
+            confidence: None,
+            summary: RunSummaryFields::default(),
+            detail: None,
+        }
+    }
+}
+
 /// `(timeout + 120 s)` in µs: a `running` run with no write for longer is stale (RR-9).
 pub fn stale_threshold_us(rca_timeout_secs: u64) -> i64 {
     let secs = rca_timeout_secs.saturating_add(STALE_GRACE_SECS);
@@ -353,9 +450,6 @@ pub fn is_live_blocking(
     }
 }
 
-/// The `previous` a new run's summary carries (RR-41): the replaced run when it completed
-/// (its `rca_updated_at` is its end), else the replaced summary's `previous`, unchanged.
-/// A first run has none.
 pub fn next_previous(
     seen_run_id: Option<&str>,
     seen_state: Option<RunState>,
@@ -380,6 +474,66 @@ pub fn user_local_part(email: &str) -> &str {
     email.split_once('@').map_or(email, |(local, _)| local)
 }
 
+/// Whether `topology_context` still holds reports from before analysis runs existed.
+pub fn has_v1_reports(topology: &serde_json::Value) -> bool {
+    v1_entries(topology).next().is_some()
+}
+
+/// The pre-run reports of `topology_context`, newest first. `completed_at` holds the
+/// `AIAnalysisComplete` times from before the incident's first run, newest first.
+pub fn v1_reports(
+    topology: &serde_json::Value,
+    completed_at: &[i64],
+    created_at: i64,
+) -> Vec<V1Report> {
+    let entries: Vec<_> = v1_entries(topology).collect();
+    entries
+        .iter()
+        .enumerate()
+        .map(|(k, (report, _))| V1Report {
+            run_id: format!("{V1_RUN_ID_PREFIX}{k}"),
+            report: (*report).to_string(),
+            // A report was written when it archived the next older one.
+            at: entries
+                .get(k + 1)
+                .and_then(|(_, archived_at)| *archived_at)
+                .or_else(|| completed_at.get(k).copied())
+                .unwrap_or(created_at),
+        })
+        .collect()
+}
+
+/// Whether `run_id` names a pre-run report rather than an `rca_runs` row.
+pub fn is_v1_run_id(run_id: &str) -> bool {
+    run_id
+        .strip_prefix(V1_RUN_ID_PREFIX)
+        .is_some_and(|k| k.parse::<usize>().is_ok())
+}
+
+/// `(report, archived_at)` of each non-empty pre-run report, newest first.
+fn v1_entries(topology: &serde_json::Value) -> impl Iterator<Item = (&str, Option<i64>)> {
+    let current = topology
+        .get(V1_REPORT_KEY)
+        .and_then(serde_json::Value::as_str)
+        .map(|report| (report, None));
+    let previous = topology
+        .get(V1_PREVIOUS_REPORTS_KEY)
+        .and_then(serde_json::Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(|item| {
+            let report = item.get("content")?.as_str()?;
+            Some((
+                report,
+                item.get("archived_at").and_then(serde_json::Value::as_i64),
+            ))
+        });
+    current
+        .into_iter()
+        .chain(previous)
+        .filter(|(report, _)| !report.trim().is_empty())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -388,8 +542,6 @@ mod tests {
     const TIMEOUT: u64 = 600;
     const NOW: i64 = 10_000 * SEC;
 
-    /// RR-9: with a 600 s timeout the threshold is 720 s; a `running` run blocks at 719 s
-    /// and not at 721 s, and a `waiting_input` run blocks at any age.
     #[test]
     fn rr9_live_blocking_boundary() {
         assert_eq!(stale_threshold_us(TIMEOUT), 720 * SEC);
@@ -451,8 +603,6 @@ mod tests {
         }
     }
 
-    /// RR-41: the replaced run when it completed, else the replaced summary's `previous`,
-    /// and none for a first run.
     #[test]
     fn rr41_next_previous() {
         // A completed seen run becomes `previous`, ended at its `rca_updated_at`.
@@ -580,6 +730,7 @@ mod tests {
     fn rca_summary_detail_is_flattened_and_skipped_when_none() {
         let mut summary = RcaSummary {
             run_id: "R1".to_string(),
+            report_format: ReportFormat::V2,
             state: RunState::Running,
             stale: false,
             started_at: 1,
@@ -597,10 +748,81 @@ mod tests {
             current_run: None,
             report_run: None,
             history: Vec::new(),
+            resume_run_id: None,
         });
         let json = serde_json::to_value(&summary).unwrap();
         assert_eq!(json["history"], serde_json::json!([]));
         let back: RcaSummary = serde_json::from_value(json).unwrap();
         assert_eq!(back, summary);
+    }
+
+    #[test]
+    fn v1_reports_are_newest_first_and_timed_by_the_report_they_replaced() {
+        let topology = serde_json::json!({
+            "nodes": [],
+            V1_REPORT_KEY: "current",
+            V1_PREVIOUS_REPORTS_KEY: [
+                {"content": "older", "archived_at": 300},
+                {"content": "   ", "archived_at": 250},
+                {"content": "oldest", "archived_at": 200},
+                {"archived_at": 150},
+            ],
+        });
+        assert!(has_v1_reports(&topology));
+        let reports = v1_reports(&topology, &[90, 80, 70], 5);
+        let got: Vec<_> = reports
+            .iter()
+            .map(|r| (r.run_id.as_str(), r.report.as_str(), r.at))
+            .collect();
+        // Blank and content-less entries are skipped; the oldest has no archive to read its
+        // time from, so it pairs with the third `AIAnalysisComplete`.
+        assert_eq!(
+            got,
+            vec![
+                ("v1-0", "current", 300),
+                ("v1-1", "older", 200),
+                ("v1-2", "oldest", 70)
+            ]
+        );
+        assert_eq!(v1_reports(&topology, &[], 5)[2].at, 5);
+    }
+
+    #[test]
+    fn a_topology_without_pre_run_reports_has_none() {
+        for topology in [
+            serde_json::json!({"nodes": [], "edges": []}),
+            serde_json::json!({V1_REPORT_KEY: "", V1_PREVIOUS_REPORTS_KEY: []}),
+            serde_json::json!(null),
+        ] {
+            assert!(!has_v1_reports(&topology));
+            assert!(v1_reports(&topology, &[1], 0).is_empty());
+        }
+    }
+
+    #[test]
+    fn v1_ids_are_told_apart_from_run_ids() {
+        assert!(is_v1_run_id("v1-0"));
+        assert!(is_v1_run_id("v1-12"));
+        assert!(!is_v1_run_id("v1-"));
+        assert!(!is_v1_run_id("v1-x"));
+        assert!(!is_v1_run_id("2abcDEFghiJKLmnoPQRstuVWXyz"));
+    }
+
+    #[test]
+    fn a_v1_report_serializes_as_a_completed_legacy_run() {
+        let report = V1Report {
+            run_id: "v1-0".to_string(),
+            report: "## RCA".to_string(),
+            at: 42,
+        };
+        let item = serde_json::to_value(report.item()).unwrap();
+        assert_eq!(item["report_format"], "v1");
+        assert_eq!(item["trigger"], "legacy");
+        assert_eq!(item["state"], "completed");
+        assert_eq!(item["ended_at"], 42);
+        let run = report.run("inc-1");
+        assert_eq!((run.report_format, run.report), (ReportFormat::V1, None));
+        assert_eq!(run.incident_id.as_deref(), Some("inc-1"));
+        assert_eq!(report.summary().report_format, ReportFormat::V1);
     }
 }

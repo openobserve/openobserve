@@ -14,34 +14,22 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 //! RCA run lifecycle: the one writer of `rca_runs` and the incident run summary.
-//!
-//! `infra::table::rca_runs` owns the transactions and the SQL. This module maps
-//! requests onto them, redacts what a reader sees, and fires `IncidentEvent`
-//! workflows after a commit. `alerts::rca_turn` drives a run's turns and ends it.
-
-use std::sync::LazyLock;
 
 use config::{
     meta::alerts::{
         incidents::{IncidentEvent, IncidentEventType},
         rca_runs::{
-            RcaDetailFields, RcaSummary, RunError, RunMode, RunState, RunStats, RunSubjectType,
-            RunTrigger,
+            RcaDetailFields, RcaRun, RcaSummary, ReportFormat, RunError, RunMode, RunState,
+            RunSubjectType, RunTrigger, V1Report, has_v1_reports, v1_reports,
         },
     },
-    utils::time::now_micros,
+    utils::{redact::redact_rca_details, time::now_micros},
 };
 use infra::table::{
     entity::alert_incidents,
-    rca_runs::{self as runs_table, NewRun, RunSummaryPatch, RunUpdate, StartGuards, StartResult},
+    rca_runs::{self as runs_table, NewRun, RunUpdate, StartGuards, StartResult},
 };
 use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
-use regex::{NoExpand, Regex};
-
-use crate::redact::redact_internal_details;
-
-// One `error.reason` per `error.code` (RR-14); every `fail_run` caller passes the pair.
-// The stale pair lives in `infra::table::rca_runs`, next to the start that also writes it.
 
 /// `error.code` of a run whose RCA feature is turned off.
 pub const ERROR_RCA_DISABLED: &str = "rca_disabled";
@@ -100,15 +88,6 @@ pub const ERROR_RESUME_FAILED: &str = "resume_failed";
 /// `error.reason` of a `resume_failed` run.
 pub const RESUME_FAILED_REASON: &str = "The earlier steps could not be reused";
 
-/// Longest `error.details` a run stores after redaction, as the failure event always has.
-const ERROR_DETAILS_MAX_CHARS: usize = 500;
-/// What a redacted internal URL reads as.
-const INTERNAL_ENDPOINT: &str = "[internal endpoint]";
-
-/// Any `http(s)://host[:port]` authority left after the named patterns (RR-47).
-static URL_AUTHORITY: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r#"\bhttps?://[^\s/?#'"<>(),;]+"#).expect("valid pattern"));
-
 /// What a run analyzes.
 #[derive(Debug, Clone, PartialEq)]
 pub enum RunSubject {
@@ -147,45 +126,7 @@ pub enum StartOutcome {
     CoolingDown,
 }
 
-/// One write to a run. Mirrors `infra::table::rca_runs::RunUpdate`; the write time is set here.
-#[derive(Default)]
-pub struct RunPatch {
-    pub state: Option<RunState>,
-    pub report: Option<String>,
-    pub outcome: Option<String>,
-    pub confidence: Option<String>,
-    pub result: Option<serde_json::Value>,
-    pub error: Option<RunError>,
-    pub cancelled_by: Option<String>,
-    pub stats: Option<RunStats>,
-    pub summary: Option<RunSummaryPatch>,
-    pub steered_by_add: Option<String>,
-    pub session_id: Option<String>,
-    pub stage: Option<String>,
-    pub stage_index: Option<i16>,
-    pub context_used: Option<serde_json::Value>,
-    /// Adds one to the run's `continuations`.
-    pub continuations_inc: bool,
-    /// Writes only `stats`, the summary's `steps`/`tool_calls`/`unblocked_by` and, once, the
-    /// `result` of a run that has none and did not complete, on a run in any state (TH22,
-    /// TH42, VE34, SG23); every other field is ignored.
-    pub final_stats_only: bool,
-    /// Timeline event committed with the write. Incident runs only; dropped for alert runs.
-    pub event: Option<IncidentEvent>,
-    /// Answer deadline of a `waiting_input` run (SG26); `Some(None)` clears it.
-    pub input_deadline_at: Option<Option<i64>>,
-    /// The open question (SG26); `Some(None)` clears it.
-    pub pending_question_id: Option<Option<String>>,
-    /// Adds one to the run's `questions_asked`.
-    pub questions_asked_inc: bool,
-    /// When the answer deadline closed (SG27).
-    pub deadline_closed_at: Option<i64>,
-}
-
-/// Start a run when no live run holds the subject.
-///
-/// An incident run commits its `AIAnalysisBegin` event with the run, and its
-/// workflows fire only after that commit (RR-23).
+/// Commit the run and Begin event atomically; dispatch workflows only after commit.
 pub async fn start_run(req: StartRun) -> anyhow::Result<StartOutcome> {
     let StartRun {
         org_id,
@@ -279,12 +220,8 @@ pub async fn start_run(req: StartRun) -> anyhow::Result<StartOutcome> {
     }
 }
 
-/// Apply one write to a run.
-///
-/// Returns `false` when the run is gone or no longer in a state that allows the
-/// write; the caller then stops and writes nothing else (RR-12). Workflows fire
-/// after the commit, except for a cancel (RR-23).
-pub async fn update_run(org_id: &str, run_id: &str, patch: RunPatch) -> anyhow::Result<bool> {
+/// Return false on a lost state guard; dispatch non-cancel workflows after commit.
+pub async fn update_run(org_id: &str, run_id: &str, patch: RunUpdate) -> anyhow::Result<bool> {
     let incident_id = if patch.event.is_some() {
         match runs_table::get_rw(org_id, run_id).await? {
             Some(run) => incident_subject(&runs_table::to_item(&run).subject_type, &run.subject_id),
@@ -299,10 +236,7 @@ pub async fn update_run(org_id: &str, run_id: &str, patch: RunPatch) -> anyhow::
     write_run(org_id, run_id, patch, incident_id.as_deref()).await
 }
 
-/// End a run as `failed`; a write that wins counts the end (TH44).
-///
-/// An incident run appends `AIAnalysisFailed` with the reason, the trigger type
-/// and the details; the list cell shows the reason (D7).
+/// End as failed with one failure event; count only a winning write.
 pub async fn fail_run(
     org_id: &str,
     run_id: &str,
@@ -318,13 +252,12 @@ pub async fn fail_run(
         code,
         reason,
         details,
-        RunPatch::default(),
+        RunUpdate::default(),
     )
     .await
 }
 
-/// [fail_run] that writes `extra` (the run's final stats and summary counts) in the
-/// same write; its state, error and event are the failure's.
+/// Fail atomically with final counts; failure owns the state, error and event.
 pub(crate) async fn fail_run_with(
     org_id: &str,
     run_id: &str,
@@ -332,10 +265,10 @@ pub(crate) async fn fail_run_with(
     code: &str,
     reason: &str,
     details: Option<String>,
-    extra: RunPatch,
+    extra: RunUpdate,
 ) -> anyhow::Result<bool> {
     let failed = failed_patch(trigger, code, reason, details);
-    let patch = RunPatch {
+    let patch = RunUpdate {
         state: failed.state,
         error: failed.error,
         event: failed.event,
@@ -348,16 +281,14 @@ pub(crate) async fn fail_run_with(
     Ok(ended)
 }
 
-/// End a run as `completed` with its report, plus `AIAnalysisComplete` for an
-/// incident run, in one write. `rca_turn`'s finalizer is the only caller; it
-/// delivers the result only when this returns `true` (RR-12).
+/// Commit report and Complete event atomically; only the winning finalizer delivers the verdict.
 pub async fn complete_run(
     org_id: &str,
     run_id: &str,
     report: &str,
-    patch: RunPatch,
+    patch: RunUpdate,
 ) -> anyhow::Result<bool> {
-    let patch = RunPatch {
+    let patch = RunUpdate {
         state: Some(RunState::Completed),
         report: Some(report.to_string()),
         event: Some(IncidentEvent::ai_analysis_complete()),
@@ -373,62 +304,144 @@ pub(crate) fn count_run_end(org_id: &str, trigger: RunTrigger, state: RunState, 
         .inc();
 }
 
-/// The report of the incident's newest completed run, the input of "Build on previous" (RR-27).
+/// Input of "Build on previous" (RR-27): the newest completed report, else the newest pre-run one.
 pub async fn newest_completed_report(
     org_id: &str,
     incident_id: &str,
 ) -> anyhow::Result<Option<String>> {
-    Ok(
-        runs_table::newest_completed_for_incident(org_id, incident_id)
-            .await?
-            .and_then(|run| runs_table::to_run(run).report)
-            .filter(|report| !report.trim().is_empty()),
-    )
+    let stored = runs_table::newest_completed_for_incident(org_id, incident_id)
+        .await?
+        .and_then(|run| runs_table::to_run(run).report)
+        .filter(|report| !report.trim().is_empty());
+    if stored.is_some() {
+        return Ok(stored);
+    }
+    let incident = infra::table::alert_incidents::get(org_id, incident_id).await?;
+    Ok(incident
+        .and_then(|incident| incident.topology_context)
+        .and_then(|topology| v1_reports(&topology, &[], 0).into_iter().next())
+        .map(|report| report.report))
 }
 
-/// The incident detail's `rca`: the summary plus the current run, the run whose
-/// report the Report tab shows, and the history. No report text (RR-29).
+/// RR-29: metadata and history without report text; pre-run reports follow the stored runs.
 pub async fn rca_detail(
     org_id: &str,
     incident: &alert_incidents::Model,
 ) -> anyhow::Result<Option<RcaSummary>> {
     let cfg = get_o2_config();
-    let Some(mut summary) =
-        runs_table::summary_from_incident(incident, now_micros(), cfg.incidents.rca_timeout_secs)
-    else {
+    let v1 = v1_reports_of(org_id, incident).await?;
+    let stored =
+        runs_table::summary_from_incident(incident, now_micros(), cfg.incidents.rca_timeout_secs);
+    let Some(mut summary) = stored.or_else(|| v1.first().map(V1Report::summary)) else {
         return Ok(None);
     };
 
+    let mut detail = match summary.report_format {
+        ReportFormat::V2 => stored_detail(org_id, &incident.id, &summary.run_id).await?,
+        ReportFormat::V1 => RcaDetailFields {
+            current_run: None,
+            report_run: None,
+            history: Vec::new(),
+            resume_run_id: None,
+        },
+    };
+    if let Some(newest) = v1.first() {
+        detail
+            .current_run
+            .get_or_insert_with(|| newest.run(&incident.id));
+        detail.report_run.get_or_insert_with(|| newest.item());
+    }
+    detail.history.extend(v1.iter().map(V1Report::item));
+    summary.detail = Some(detail);
+    Ok(Some(summary))
+}
+
+/// The incident's pre-run reports, newest first; no database read when it has none.
+pub async fn v1_reports_of(
+    org_id: &str,
+    incident: &alert_incidents::Model,
+) -> anyhow::Result<Vec<V1Report>> {
+    let Some(topology) = incident
+        .topology_context
+        .as_ref()
+        .filter(|topology| has_v1_reports(topology))
+    else {
+        return Ok(Vec::new());
+    };
+    // Runs write `AIAnalysisComplete` too; only the ones before the first run are pre-run.
+    let first_run = runs_table::first_started_at_for_incident(org_id, &incident.id).await?;
+    let mut completed_at: Vec<i64> = infra::table::incident_events::get(org_id, &incident.id)
+        .await?
+        .into_iter()
+        .filter(|event| {
+            matches!(event.event_type, IncidentEventType::AIAnalysisComplete)
+                && first_run.is_none_or(|first| event.timestamp < first)
+        })
+        .map(|event| event.timestamp)
+        .collect();
+    completed_at.sort_unstable_by(|a, b| b.cmp(a));
+    Ok(v1_reports(topology, &completed_at, incident.created_at))
+}
+
+/// A pre-run report of the incident as a run, with its report text.
+pub async fn v1_run(
+    org_id: &str,
+    incident_id: &str,
+    run_id: &str,
+) -> anyhow::Result<Option<RcaRun>> {
+    let Some(incident) = infra::table::alert_incidents::get(org_id, incident_id).await? else {
+        return Ok(None);
+    };
+    Ok(v1_reports_of(org_id, &incident)
+        .await?
+        .into_iter()
+        .find(|report| report.run_id == run_id)
+        .map(|report| {
+            let run = report.run(incident_id);
+            RcaRun {
+                report: Some(report.report),
+                ..run
+            }
+        }))
+}
+
+/// The detail fields of an incident whose latest run is an `rca_runs` row.
+async fn stored_detail(
+    org_id: &str,
+    incident_id: &str,
+    latest_run_id: &str,
+) -> anyhow::Result<RcaDetailFields> {
+    let cfg = get_o2_config();
     // Pruning keeps the newest `limit + 1` runs and the newest completed one (RR-25).
     let limit = (cfg.incidents.rca_history_limit as u64).saturating_add(2);
-    let (runs, _) = runs_table::list_for_incident(org_id, &incident.id, limit, None).await?;
+    let (runs, _) = runs_table::list_for_incident(org_id, incident_id, limit, None).await?;
     let history: Vec<_> = runs.iter().map(runs_table::to_item).collect();
     let report_run = match history.iter().find(|run| run.state == RunState::Completed) {
         Some(run) => Some(run.clone()),
-        None => runs_table::newest_completed_for_incident(org_id, &incident.id)
+        None => runs_table::newest_completed_for_incident(org_id, incident_id)
             .await?
             .map(|run| runs_table::to_item(&run)),
     };
     let current_run = runs.into_iter().next().map(|run| {
         let mut run = runs_table::to_run(run);
         run.report = None;
+        run.result = None;
         run
     });
-
-    summary.detail = Some(RcaDetailFields {
+    Ok(RcaDetailFields {
         current_run,
         report_run,
         history,
-    });
-    Ok(Some(summary))
+        resume_run_id: super::rca_resume::resumable_run_id(org_id, incident_id, latest_run_id)
+            .await,
+    })
 }
 
-/// The write behind every run change. `incident_id` is the run's incident subject,
-/// `None` for an alert run, whose event is dropped.
+/// Alert runs have no incident event; core retains redaction and post-commit side effects.
 async fn write_run(
     org_id: &str,
     run_id: &str,
-    mut patch: RunPatch,
+    mut patch: RunUpdate,
     incident_id: Option<&str>,
 ) -> anyhow::Result<bool> {
     // RR-47: no internal host, path or agent URL reaches a reader.
@@ -462,55 +475,9 @@ async fn write_run(
         })
         .cloned();
 
-    let RunPatch {
-        state,
-        report,
-        outcome,
-        confidence,
-        result,
-        error,
-        cancelled_by,
-        stats,
-        summary,
-        steered_by_add,
-        session_id,
-        stage,
-        stage_index,
-        context_used,
-        continuations_inc,
-        final_stats_only,
-        event,
-        input_deadline_at,
-        pending_question_id,
-        questions_asked_inc,
-        deadline_closed_at,
-    } = patch;
-    let update = RunUpdate {
-        state,
-        report,
-        outcome,
-        confidence,
-        result,
-        error,
-        cancelled_by,
-        stats,
-        summary,
-        steered_by_add,
-        session_id,
-        stage,
-        stage_index,
-        context_used,
-        continuations_inc,
-        final_stats_only,
-        event,
-        input_deadline_at,
-        pending_question_id,
-        questions_asked_inc,
-        deadline_closed_at,
-        now_us: now_micros(),
-    };
+    patch.now_us = now_micros();
 
-    if !runs_table::update_run(org_id, run_id, update).await? {
+    if !runs_table::update_run(org_id, run_id, patch).await? {
         log::info!("[RCA_RUNS] run {run_id} not updated: its state no longer allows this write");
         return Ok(false);
     }
@@ -525,9 +492,9 @@ fn failed_patch(
     code: &str,
     reason: &str,
     details: Option<String>,
-) -> RunPatch {
+) -> RunUpdate {
     let trigger_type = trigger.analysis_trigger_type();
-    RunPatch {
+    RunUpdate {
         state: Some(RunState::Failed),
         error: Some(RunError {
             code: code.to_string(),
@@ -549,22 +516,9 @@ fn incident_subject(subject_type: &RunSubjectType, subject_id: &str) -> Option<S
     matches!(subject_type, RunSubjectType::Incident).then(|| subject_id.to_string())
 }
 
-/// RR-47: `redact_internal_details`, then the configured agent URL, then every
-/// other `http(s)://` authority (an HA replica has no configured URL). The cap
-/// comes last, so no replacement pushes the text past it and no URL is cut
-/// before it is matched.
+/// RR-47: redact credentials and internal authorities before truncating details.
 fn redact_details(text: &str) -> String {
-    let mut text = redact_internal_details(text);
-    let cfg = get_o2_config();
-    let agent_url = cfg.ai.agent_url.trim_end_matches('/');
-    if !agent_url.is_empty() {
-        text = text.replace(agent_url, INTERNAL_ENDPOINT);
-    }
-    URL_AUTHORITY
-        .replace_all(&text, NoExpand(INTERNAL_ENDPOINT))
-        .chars()
-        .take(ERROR_DETAILS_MAX_CHARS)
-        .collect()
+    redact_rca_details(text, &get_o2_config().ai.agent_url)
 }
 
 /// Fire the `IncidentEvent` workflows of an event that has committed.
@@ -582,13 +536,19 @@ fn minutes_to_us(minutes: u64) -> i64 {
 #[cfg(test)]
 pub(crate) mod tests {
     use config::meta::{
-        alerts::{incidents::IncidentEventType, rca_runs::RcaRun},
+        alerts::{
+            incidents::IncidentEventType,
+            rca_runs::{RcaRun, RunStats},
+        },
         oncall::{AnalysisStatus, ResponderRole, SubjectType},
         triggers::{Trigger, TriggerModule, TriggerStatus},
     };
-    use infra::table::entity::{
-        ai_chat_sessions, ai_chat_turns, alert_incident_alerts, incident_events, oncall_responses,
-        rca_runs as run_rows,
+    use infra::table::{
+        entity::{
+            ai_chat_sessions, ai_chat_turns, alert_incident_alerts, incident_events,
+            oncall_responses, rca_runs as run_rows,
+        },
+        rca_runs::RunSummaryPatch,
     };
     use o2_enterprise::enterprise::oncall::escalation::EscalationTriggerData;
     use sea_orm::{
@@ -602,12 +562,7 @@ pub(crate) mod tests {
     /// A report whose completed write the database refuses (see [db]).
     pub(crate) const FAIL_THE_WRITE: &str = "FAIL-THE-COMPLETED-WRITE";
 
-    /// The process-wide SQLite meta store with the run and chat tables, held for the whole
-    /// test.
-    ///
-    /// The run functions write through the global client, and the sweeper reads every
-    /// org's running runs, so the tests that use it run one at a time. They refuse any
-    /// other meta store, so a developer `.env` can never point them at a real database.
+    /// Serialize shared-store tests; refuse non-SQLite stores to protect developer databases.
     pub(crate) async fn db() -> MutexGuard<'static, ()> {
         static TABLES: OnceCell<()> = OnceCell::const_new();
         static LOCK: Mutex<()> = Mutex::const_new(());
@@ -819,7 +774,7 @@ pub(crate) mod tests {
 
     /// Ends the run the way a cancel's write does, without the cancel's own release.
     pub(crate) async fn cancel_write(org_id: &str, run_id: &str) {
-        let cancel = RunPatch {
+        let cancel = RunUpdate {
             state: Some(RunState::Cancelled),
             cancelled_by: Some("a.rao@acme.io".to_string()),
             event: Some(IncidentEvent::ai_analysis_cancelled(Some(
@@ -831,8 +786,8 @@ pub(crate) mod tests {
     }
 
     /// The final counts of a run, as the finalizer writes them.
-    pub(crate) fn counts(steps: u32, tool_calls: u32) -> RunPatch {
-        RunPatch {
+    pub(crate) fn counts(steps: u32, tool_calls: u32) -> RunUpdate {
+        RunUpdate {
             stats: Some(RunStats {
                 steps: Some(steps),
                 tool_calls: Some(tool_calls),
@@ -868,11 +823,11 @@ pub(crate) mod tests {
         let before = timeline(&org, &inc).await;
 
         assert!(
-            !complete_run(&org, &run_id, "late report", RunPatch::default())
+            !complete_run(&org, &run_id, "late report", RunUpdate::default())
                 .await
                 .unwrap()
         );
-        let gone = RunPatch {
+        let gone = RunUpdate {
             event: Some(IncidentEvent::ai_analysis_complete()),
             ..Default::default()
         };
@@ -969,8 +924,6 @@ pub(crate) mod tests {
         assert_eq!(failures(&timeline(&org, &inc).await).len(), 1);
     }
 
-    /// RR-16, RR-17, TH23: the report, the state, the counts and the Complete event land
-    /// together; `topology_context` is not touched.
     #[tokio::test]
     async fn a_report_completes_the_run_with_one_complete_event_and_keeps_the_topology() {
         let _db = db().await;
@@ -1022,7 +975,7 @@ pub(crate) mod tests {
         let (org, inc) = new_incident(None).await;
         let first = start(&org, &inc, RunTrigger::Manual).await;
         assert!(
-            complete_run(&org, &first, "first report", RunPatch::default())
+            complete_run(&org, &first, "first report", RunUpdate::default())
                 .await
                 .unwrap()
         );
@@ -1067,7 +1020,7 @@ pub(crate) mod tests {
         for report in ["older report", "newer report"] {
             let run_id = start(&org, &inc, RunTrigger::Manual).await;
             assert!(
-                complete_run(&org, &run_id, report, RunPatch::default())
+                complete_run(&org, &run_id, report, RunUpdate::default())
                     .await
                     .unwrap()
             );
@@ -1084,6 +1037,153 @@ pub(crate) mod tests {
                 .as_deref(),
             Some("newer report")
         );
+    }
+
+    fn pre_run_topology() -> serde_json::Value {
+        serde_json::json!({
+            "nodes": [],
+            "edges": [],
+            "related_incident_ids": [],
+            "suggested_root_cause": "current report",
+            "previous_analyses": [{"content": "older report", "archived_at": 200}],
+        })
+    }
+
+    async fn completed_at(org_id: &str, incident_id: &str, timestamp: i64) {
+        let mut event = IncidentEvent::ai_analysis_complete();
+        event.timestamp = timestamp;
+        infra::table::incident_events::append(org_id, incident_id, event)
+            .await
+            .unwrap();
+    }
+
+    fn ids(detail: &RcaDetailFields) -> Vec<&str> {
+        detail
+            .history
+            .iter()
+            .map(|run| run.run_id.as_str())
+            .collect()
+    }
+
+    /// Reports from before runs existed show as v1 runs, after every stored run.
+    #[tokio::test]
+    async fn pre_run_reports_show_as_v1_runs_after_the_stored_runs() {
+        let _db = db().await;
+        let (org, inc) = new_incident(Some(pre_run_topology())).await;
+        completed_at(&org, &inc, 150).await;
+        completed_at(&org, &inc, 100).await;
+
+        let summary = rca_detail(&org, &incident_row(&org, &inc).await)
+            .await
+            .unwrap()
+            .expect("a v1-only incident still has a detail");
+        assert_eq!(
+            (
+                summary.run_id.as_str(),
+                summary.report_format,
+                summary.state
+            ),
+            ("v1-0", ReportFormat::V1, RunState::Completed)
+        );
+        let detail = summary.detail.unwrap();
+        assert_eq!(ids(&detail), ["v1-0", "v1-1"]);
+        // The current report was written when it archived the older one; the oldest pairs with
+        // the second-newest pre-run `AIAnalysisComplete`.
+        let times: Vec<_> = detail.history.iter().map(|run| run.started_at).collect();
+        assert_eq!(times, [200, 100]);
+        assert_eq!(detail.report_run.unwrap().run_id, "v1-0");
+        let current = detail.current_run.unwrap();
+        assert_eq!((current.run_id.as_str(), current.report), ("v1-0", None));
+        assert_eq!(detail.resume_run_id, None);
+
+        let run = v1_run(&org, &inc, "v1-1").await.unwrap().unwrap();
+        assert_eq!(run.report.as_deref(), Some("older report"));
+        assert_eq!(run.report_format, ReportFormat::V1);
+        assert_eq!(v1_run(&org, &inc, "v1-2").await.unwrap(), None);
+        assert_eq!(
+            newest_completed_report(&org, &inc)
+                .await
+                .unwrap()
+                .as_deref(),
+            Some("current report")
+        );
+
+        // A failed run leads; the newest v1 report stays the report run.
+        let failed = start(&org, &inc, RunTrigger::Manual).await;
+        fail_run(&org, &failed, RunTrigger::Manual, "x", "x", None)
+            .await
+            .unwrap();
+        let detail = rca_detail(&org, &incident_row(&org, &inc).await)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(detail.report_format, ReportFormat::V2);
+        let detail = detail.detail.unwrap();
+        assert_eq!(ids(&detail), [failed.as_str(), "v1-0", "v1-1"]);
+        assert_eq!(detail.report_run.unwrap().run_id, "v1-0");
+        assert_eq!(detail.current_run.unwrap().run_id, failed);
+
+        // A completed run takes over as the report run, and its Complete event moves no v1 time.
+        let done = start(&org, &inc, RunTrigger::Manual).await;
+        assert!(
+            complete_run(&org, &done, "new report", RunUpdate::default())
+                .await
+                .unwrap()
+        );
+        let detail = rca_detail(&org, &incident_row(&org, &inc).await)
+            .await
+            .unwrap()
+            .unwrap()
+            .detail
+            .unwrap();
+        assert_eq!(detail.report_run.unwrap().run_id, done);
+        let v1_times: Vec<_> = detail
+            .history
+            .iter()
+            .filter(|run| run.report_format == ReportFormat::V1)
+            .map(|run| run.started_at)
+            .collect();
+        assert_eq!(v1_times, [200, 100]);
+        assert_eq!(
+            newest_completed_report(&org, &inc)
+                .await
+                .unwrap()
+                .as_deref(),
+            Some("new report")
+        );
+    }
+
+    /// Enrichment rewrites the topology without dropping the pre-run reports.
+    #[tokio::test]
+    async fn a_topology_rewrite_keeps_the_pre_run_reports() {
+        let _db = db().await;
+        let (org, inc) = new_incident(Some(pre_run_topology())).await;
+
+        infra::table::alert_incidents::update_topology(
+            &org,
+            &inc,
+            &config::meta::alerts::incidents::IncidentTopology {
+                related_incident_ids: vec!["inc-2".to_string()],
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+
+        let row = incident_row(&org, &inc).await;
+        let topology = row.topology_context.as_ref().unwrap();
+        assert_eq!(
+            topology["related_incident_ids"],
+            serde_json::json!(["inc-2"])
+        );
+        assert_eq!(topology["suggested_root_cause"], "current report");
+        let v1: Vec<_> = v1_reports_of(&org, &row)
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|report| report.report)
+            .collect();
+        assert_eq!(v1, ["current report", "older report"]);
     }
 
     /// RR-29: the detail names the runs and carries no report text; never analyzed is `None`.
@@ -1104,10 +1204,26 @@ pub(crate) mod tests {
                 &org,
                 &done,
                 "REPORT-TEXT-MUST-NOT-LEAK",
-                RunPatch::default()
+                RunUpdate {
+                    result: Some(serde_json::json!({"verdict": {"probable_cause": "PREVIOUS-VERDICT-MUST-NOT-LEAK"}})),
+                    ..Default::default()
+                }
             )
             .await
             .unwrap()
+        );
+        let completed_detail = rca_detail(&org, &incident_row(&org, &inc).await)
+            .await
+            .unwrap()
+            .unwrap();
+        let serialized = serde_json::to_string(&completed_detail).unwrap();
+        assert!(
+            !serialized.contains("PREVIOUS-VERDICT-MUST-NOT-LEAK"),
+            "{serialized}"
+        );
+        assert!(
+            !serialized.contains("REPORT-TEXT-MUST-NOT-LEAK"),
+            "{serialized}"
         );
         let live = start(&org, &inc, RunTrigger::Reanalyze).await;
 
@@ -1189,7 +1305,7 @@ pub(crate) mod tests {
             panic!("the alert run did not start")
         };
         assert!(
-            complete_run(&org, &done, "alert report", RunPatch::default())
+            complete_run(&org, &done, "alert report", RunUpdate::default())
                 .await
                 .unwrap()
         );
@@ -1199,7 +1315,7 @@ pub(crate) mod tests {
         assert_eq!(run.incident_id, None);
         assert_eq!(run.report.as_deref(), Some("alert report"));
         assert!(
-            !complete_run(&org, &done, "again", RunPatch::default())
+            !complete_run(&org, &done, "again", RunUpdate::default())
                 .await
                 .unwrap()
         );
@@ -1233,7 +1349,7 @@ pub(crate) mod tests {
         let (org, inc) = new_incident(None).await;
         let done = start(&org, &inc, RunTrigger::Manual).await;
         assert!(
-            complete_run(&org, &done, "report", RunPatch::default())
+            complete_run(&org, &done, "report", RunUpdate::default())
                 .await
                 .unwrap()
         );
@@ -1281,8 +1397,6 @@ pub(crate) mod tests {
         assert_eq!(stored(&org, &run_id).await.state, RunState::Running);
     }
 
-    /// TH44, RR-6: a start that replaces a stale run counts that run's end once as
-    /// `failed`/`stale`, under the replaced run's trigger.
     #[tokio::test]
     async fn a_start_that_replaces_a_stale_run_counts_its_end() {
         let _db = db().await;
@@ -1322,8 +1436,6 @@ pub(crate) mod tests {
         assert_eq!(total("manual"), 0);
     }
 
-    /// RR-13, RR-17: a completed write that errors returns the error and writes nothing:
-    /// no report, no Complete event; the run stays for its caller to fail.
     #[tokio::test]
     async fn a_completed_write_that_errors_writes_nothing() {
         let _db = db().await;
@@ -1331,7 +1443,7 @@ pub(crate) mod tests {
         let run_id = start(&org, &inc, RunTrigger::Manual).await;
 
         assert!(
-            complete_run(&org, &run_id, FAIL_THE_WRITE, RunPatch::default())
+            complete_run(&org, &run_id, FAIL_THE_WRITE, RunUpdate::default())
                 .await
                 .is_err()
         );
@@ -1342,8 +1454,6 @@ pub(crate) mod tests {
         assert_eq!(completes(&timeline(&org, &inc).await), 0);
     }
 
-    /// TH22, TH42: a stats-only write on an ended run changes its counts and nothing else:
-    /// not its state, report, error or timeline.
     #[tokio::test]
     async fn a_stats_only_write_on_an_ended_run_changes_only_its_counts() {
         let _db = db().await;
@@ -1353,7 +1463,7 @@ pub(crate) mod tests {
         let before = stored(&org, &run_id).await;
         let events = timeline(&org, &inc).await.len();
 
-        let stats_only = RunPatch {
+        let stats_only = RunUpdate {
             final_stats_only: true,
             // Ignored by a stats-only write.
             state: Some(RunState::Completed),
@@ -1414,8 +1524,6 @@ pub(crate) mod tests {
         assert_eq!(failures(&timeline(&org, &inc).await).len(), 1);
     }
 
-    /// TH1 (7.1), TH10, TH25, TH27: a progress write stores the session, stage, context and
-    /// continuation count, and mirrors the stage into the incident summary.
     #[tokio::test]
     async fn a_progress_write_stores_the_new_run_columns() {
         let _db = db().await;
@@ -1436,7 +1544,7 @@ pub(crate) mod tests {
             "toolsets": ["o2"]
         });
 
-        let progress = RunPatch {
+        let progress = RunUpdate {
             session_id: Some("0195a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b".to_string()),
             stage: Some("metrics".to_string()),
             stage_index: Some(6),
@@ -1449,7 +1557,7 @@ pub(crate) mod tests {
             update_run(
                 &org,
                 &run_id,
-                RunPatch {
+                RunUpdate {
                     continuations_inc: true,
                     ..Default::default()
                 }
@@ -1501,8 +1609,6 @@ pub(crate) mod tests {
         assert_eq!(ids, [older, newer]);
     }
 
-    /// RR-47: a URL that straddles the 500-char cap is redacted before the cut, so no
-    /// fragment of the host survives.
     #[tokio::test]
     async fn an_internal_url_at_the_cap_is_redacted_before_the_cut() {
         let _db = db().await;
@@ -1544,10 +1650,6 @@ pub(crate) mod tests {
         assert_eq!(error_details.as_deref(), Some(stored_details.as_str()));
     }
 
-    /// CG §7 backtest input: `list_completed_between` returns the org's `completed` runs
-    /// with a `result` that ended in `[from, to)`, newest first (then run id), `limit` at
-    /// most; other states, other orgs, runs without a result and runs outside the window
-    /// are left out.
     #[tokio::test]
     async fn completed_runs_with_a_record_list_by_end_time_in_a_half_open_window() {
         let _db = db().await;

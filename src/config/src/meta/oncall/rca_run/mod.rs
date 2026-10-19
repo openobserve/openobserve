@@ -13,9 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! The result of an RCA run: the `submit_report` payload (03 VE1), the evidence
-//! ledger, the outcome label, the numbered evidence list, the stored run record
-//! (§11) and the summary view (§12). Every function here is pure.
+//! RCA report parsing, evidence grading and final run-record policy.
 
 use std::collections::BTreeMap;
 
@@ -57,8 +55,7 @@ use super::{
 /// Version of [RcaRunRecord] written to `rca_runs.result`.
 pub const RCA_RECORD_SCHEMA_VERSION: u32 = 1;
 
-/// The seven stages of the RCA protocol: the `record_step` stage name and its
-/// label (VE34).
+/// The seven stages of the RCA protocol: the `record_step` stage name and its label (VE34).
 pub const RCA_STAGES: [(&str, &str); 7] = [
     ("context", "Context"),
     ("topology", "Topology"),
@@ -69,6 +66,20 @@ pub const RCA_STAGES: [(&str, &str); 7] = [
     ("converge", "Converge"),
 ];
 
+pub fn protocol_stage(stage: &str) -> Option<&'static str> {
+    RCA_STAGES
+        .iter()
+        .find(|(name, _)| *name == stage)
+        .map(|(name, _)| *name)
+}
+
+pub fn stage_index(stage: &str) -> Option<i16> {
+    RCA_STAGES
+        .iter()
+        .position(|(name, _)| *name == stage)
+        .map(|index| (index + 1) as i16)
+}
+
 /// Most characters of a citation's observation in an [EvidenceRef] label (VE39).
 const EVIDENCE_REF_OBSERVATION_CHARS: usize = 120;
 /// Most decisive entries a verdict carries (VE38).
@@ -77,8 +88,7 @@ const MAX_VERDICT_EVIDENCE: usize = 5;
 /// Most timeline entries kept from one submit (VE1).
 pub const MAX_TIMELINE_ENTRIES: usize = 20;
 
-/// What the agent submits with `submit_report`. Unknown keys (e.g. a stray
-/// `evidence_links`) are ignored (VE3).
+/// What the agent submits with `submit_report`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct RcaSubmit {
     pub markdown: String,
@@ -86,9 +96,7 @@ pub struct RcaSubmit {
     pub verdict: Option<SubmittedVerdict>,
     #[serde(default)]
     pub timeline: Vec<TimelineEntry>,
-    /// What [parse_submit] defaulted, took from the top level or dropped, one
-    /// line each (e.g. `verdict.report_ref: taken from top level`). Logged and
-    /// counted by the finalizer; never stored.
+    /// Submit repairs, hoisted fields and dropped values; empty when no repair was needed.
     #[serde(skip)]
     pub defects: Vec<String>,
 }
@@ -195,16 +203,7 @@ impl std::fmt::Display for RcaOutcome {
     }
 }
 
-/// Reads a committed `submit_report` input. `None` without a non-blank `markdown`.
-///
-/// The tool schema is not enforced by every runtime, so the verdict is read field
-/// by field (02 §9.1): a non-blank `probable_cause` is the only requirement. A
-/// field missing or invalid in `verdict` is taken from the top level of the input
-/// when it is valid there, else defaulted: `claimed_confidence` to `low` (it can
-/// only lower the band), `claimed_outcome` to `inconclusive` (a metric only),
-/// `page_recommendation` to `page` (fail-open), `report_ref` to empty, optional
-/// fields to absent. Invalid list and timeline entries are dropped one by one, and
-/// at most [MAX_TIMELINE_ENTRIES] are kept. Each repair is listed in `defects`.
+/// Keep usable report content while repairing known submit-shape drift; reject blank markdown.
 pub fn parse_submit(input: &Value) -> Option<RcaSubmit> {
     let markdown = input.get("markdown")?.as_str()?;
     if markdown.trim().is_empty() {
@@ -340,8 +339,6 @@ impl VerdictReader<'_> {
     }
 }
 
-/// The verdict of a `submit_report` input, repaired field by field; `None`
-/// without a non-blank `probable_cause` (see [parse_submit]).
 fn parse_verdict(input: &Value, defects: &mut Vec<String>) -> Option<SubmittedVerdict> {
     let raw = input.get("verdict").filter(|v| !v.is_null());
     // A model sometimes sends the object as a JSON string.
@@ -404,10 +401,6 @@ fn parse_verdict(input: &Value, defects: &mut Vec<String>) -> Option<SubmittedVe
     })
 }
 
-/// The `AnalysisVerdict` the paging pipeline reads (VE38): the graded band after
-/// VE15, and up to five Decisive entries in number order as [EvidenceRef]s
-/// labelled by code (VE39). Claims, the suspect change state and the impact stay
-/// in the run record.
 pub fn to_analysis_verdict(
     v: &SubmittedVerdict,
     grade: &ConfidenceGrade,
@@ -438,8 +431,6 @@ pub fn to_analysis_verdict(
     }
 }
 
-/// `<kind> · <first stream or target> · <observation>`, the observation of the
-/// first citation cut to 120 characters (VE39). The number is printed apart.
 fn evidence_label(e: &EvidenceEntry) -> String {
     let place = e
         .link
@@ -489,6 +480,8 @@ pub struct RcaRunRecord {
     pub outcome_reason: Option<OutcomeReason>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub claimed_outcome: Option<RcaOutcome>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub answer_deadline_need: Option<String>,
     /// Empty when the run has none.
     #[serde(default)]
     pub ledger: EvidenceLedger,
@@ -509,8 +502,6 @@ pub struct RcaRunRecord {
     /// Only the calls that evidence entries use, in number order.
     #[serde(default)]
     pub cited_calls: Vec<ToolCallRecord>,
-    /// The author email of each steer id the ledger names (`lead_ids`,
-    /// `trigger_steer_id`), so the summary shows people, not ids (SG36).
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub steer_authors: BTreeMap<String, String>,
 }
@@ -566,8 +557,7 @@ fn run_end_blind_spot(stages_run: &[String]) -> Option<BlindSpot> {
     })
 }
 
-/// VE44: "Needs: <title>" of the first blind spot with a fix, else "Needs input". The
-/// finalizer names the open question's `need` instead for an answer deadline (04 SG28).
+/// VE44: "Needs: <title>" of the first blind spot with a fix, else "Needs input".
 fn blocked_detail(blind_spots: &[BlindSpot]) -> String {
     match summary::needs_title(blind_spots) {
         Some(title) => format!("Needs: {title}"),
@@ -575,11 +565,7 @@ fn blocked_detail(blind_spots: &[BlindSpot]) -> String {
     }
 }
 
-/// The whole end-of-run pipeline (VE7, VE14–VE16, VE23–VE31, VE34, VE38, VE44):
-/// build the ledger; for a completed run with a verdict grade it, derive the
-/// outcome and lower the band (VE15); build the evidence; map the verdict. A
-/// failed or cancelled run keeps the partial ledger, blind spots and evidence,
-/// with no verdict, grade or outcome, plus the `run_end` blind spot.
+/// Build the ledger, grade verified evidence and derive the final outcome in precedence order.
 pub fn record_run_end(input: &RunEndInput) -> RunEndResult {
     let (ledger, mut blind_spots, counts) = build_ledger(input.calls, true);
     if !input.completed
@@ -657,6 +643,7 @@ pub fn record_run_end(input: &RunEndInput) -> RunEndResult {
         outcome: outcome.map(|(o, _)| o),
         outcome_reason: outcome.map(|(_, r)| r),
         claimed_outcome: submitted.map(|v| v.claimed_outcome),
+        answer_deadline_need: None,
         has_ledger: ledger.is_some(),
         ledger: ledger.unwrap_or_default(),
         blind_spots,
@@ -986,8 +973,6 @@ mod tests {
         assert!(with_links.verdict.is_some());
     }
 
-    /// 02 §9.1: an invalid `claimed_confidence` keeps the report and the verdict,
-    /// at `low`, and names the repair.
     #[test]
     fn an_invalid_claimed_confidence_keeps_the_verdict_at_low() {
         let mut payload = full_payload();
@@ -1025,8 +1010,6 @@ mod tests {
         );
     }
 
-    /// The S1 E2E `submit_report` input (run 3KlHe7go5Y2srW1hKgkL9hFH1f3, markdown
-    /// cut): `report_ref` sits at the top level, not in the verdict.
     fn s1_payload() -> serde_json::Value {
         json!({
             "report_ref": "3KlHVcu4eNrJQlXXtnDoxGa3Fij",
@@ -1284,732 +1267,727 @@ mod tests {
         );
         assert_eq!(submit.defects, ["timeline: 5 entries over 20 dropped"]);
     }
-}
+    mod run_end_tests {
+        use serde_json::{Value, json};
 
-#[cfg(test)]
-mod run_end_tests {
-    use serde_json::{Value, json};
-
-    use super::{fixtures::*, *};
-    use crate::meta::{
-        alerts::priority::AlertPriority,
-        oncall::{
-            agent::{
-                AnalysisState, AnalysisStatus, L0Mode, L0Modes, L0Policy, PageAction,
-                VerdictOutcome, apply_verdict,
+        use super::{fixtures::*, *};
+        use crate::meta::{
+            alerts::priority::AlertPriority,
+            oncall::{
+                agent::{
+                    AnalysisState, AnalysisStatus, L0Mode, L0Modes, L0Policy, PageAction,
+                    VerdictOutcome, apply_verdict,
+                },
+                confidence::{GradeReason, SignalClass, min_band},
             },
-            confidence::{GradeReason, SignalClass, min_band},
-        },
-    };
+        };
 
-    fn decisive(id: &str, tool: &str, q: &str) -> Value {
-        item(id, tool, q, "supports", "decisive")
-    }
+        fn decisive(id: &str, tool: &str, q: &str) -> Value {
+            item(id, tool, q, "supports", "decisive")
+        }
 
-    fn tool_log() -> Vec<ToolCallRecord> {
-        vec![
-            prom("m1", "pool_active", 1),
-            traces("t1", "slow", 2),
-            logs("l1", "SELECT * FROM app", 3),
-        ]
-    }
+        fn tool_log() -> Vec<ToolCallRecord> {
+            vec![
+                prom("m1", "pool_active", 1),
+                traces("t1", "slow", 2),
+                logs("l1", "SELECT * FROM app", 3),
+            ]
+        }
 
-    fn h(seq: i64, id: &str, status: &str) -> LedgerCall {
-        hyp(seq, id, status, vec![])
-    }
+        fn h(seq: i64, id: &str, status: &str) -> LedgerCall {
+            hyp(seq, id, status, vec![])
+        }
 
-    fn root_with_two_classes(seq: i64, id: &str, leads: &[&str]) -> LedgerCall {
-        hyp_input(
-            seq,
-            json!({"id": id, "statement": format!("{id} statement"), "status": "root_cause", "reason": "r",
+        fn root_with_two_classes(seq: i64, id: &str, leads: &[&str]) -> LedgerCall {
+            hyp_input(
+                seq,
+                json!({"id": id, "statement": format!("{id} statement"), "status": "root_cause", "reason": "r",
                    "lead_ids": leads,
                    "evidence": [decisive("e1", PROM, "pool_active"), decisive("e2", TRACES, "slow")]}),
-        )
-    }
+            )
+        }
 
-    fn ruled_out_verified(seq: i64, id: &str) -> LedgerCall {
-        hyp(
-            seq,
-            id,
-            "ruled_out",
-            vec![item(
-                "e3",
-                SQL,
-                "SELECT * FROM app",
-                "rules_out",
-                "supporting",
-            )],
-        )
-    }
+        fn ruled_out_verified(seq: i64, id: &str) -> LedgerCall {
+            hyp(
+                seq,
+                id,
+                "ruled_out",
+                vec![item(
+                    "e3",
+                    SQL,
+                    "SELECT * FROM app",
+                    "rules_out",
+                    "supporting",
+                )],
+            )
+        }
 
-    fn with_metric(seq: i64, id: &str, status: &str, strength: &str) -> LedgerCall {
-        hyp(
-            seq,
-            id,
-            status,
-            vec![item("e1", PROM, "pool_active", "supports", strength)],
-        )
-    }
+        fn with_metric(seq: i64, id: &str, status: &str, strength: &str) -> LedgerCall {
+            hyp(
+                seq,
+                id,
+                status,
+                vec![item("e1", PROM, "pool_active", "supports", strength)],
+            )
+        }
 
-    fn stages(n: usize) -> Vec<String> {
-        RCA_STAGES
-            .iter()
-            .take(n)
-            .map(|(s, _)| s.to_string())
-            .collect()
-    }
+        fn stages(n: usize) -> Vec<String> {
+            RCA_STAGES
+                .iter()
+                .take(n)
+                .map(|(s, _)| s.to_string())
+                .collect()
+        }
 
-    struct Case {
-        name: &'static str,
-        calls: Vec<LedgerCall>,
-        cause: Option<&'static str>,
-        ended_by: EndedBy,
-        completed: bool,
-        graded: Option<Confidence>,
-        outcome: Option<(RcaOutcome, OutcomeReason)>,
-        shown: Option<Confidence>,
-    }
+        struct Case {
+            name: &'static str,
+            calls: Vec<LedgerCall>,
+            cause: Option<&'static str>,
+            ended_by: EndedBy,
+            completed: bool,
+            graded: Option<Confidence>,
+            outcome: Option<(RcaOutcome, OutcomeReason)>,
+            shown: Option<Confidence>,
+        }
 
-    fn run(
-        calls: &[LedgerCall],
-        submit: Option<&RcaSubmit>,
-        ended_by: EndedBy,
-        completed: bool,
-    ) -> RunEndResult {
-        let log = tool_log();
-        let stages = stages(if completed { 7 } else { 4 });
-        record_run_end(&RunEndInput {
-            submit,
-            calls,
-            tool_log: &log,
-            stages_run: &stages,
-            ended_by,
-            completed,
-            steer_authors: &BTreeMap::new(),
-        })
-    }
+        fn run(
+            calls: &[LedgerCall],
+            submit: Option<&RcaSubmit>,
+            ended_by: EndedBy,
+            completed: bool,
+        ) -> RunEndResult {
+            let log = tool_log();
+            let stages = stages(if completed { 7 } else { 4 });
+            record_run_end(&RunEndInput {
+                submit,
+                calls,
+                tool_log: &log,
+                stages_run: &stages,
+                ended_by,
+                completed,
+                steer_authors: &BTreeMap::new(),
+            })
+        }
 
-    /// 03 §6.4: VE14 + VE15 as one table test through `record_run_end`.
-    #[test]
-    fn the_outcome_table() {
-        use Confidence::*;
-        use EndedBy::*;
-        use OutcomeReason as R;
-        use RcaOutcome as O;
-        let named = Some("orders pool exhausted after PR #812");
-        let cases = vec![
-            Case {
-                name: "T1",
-                calls: vec![
-                    root_with_two_classes(1, "h1", &[]),
-                    h(2, "h2", "contributing"),
-                    h(3, "h3", "symptom"),
-                    ruled_out_verified(4, "h4"),
-                    h(5, "h5", "ruled_out"),
-                    h(6, "h6", "blocked"),
-                ],
-                cause: named,
-                ended_by: Agent,
-                completed: true,
-                graded: Some(High),
-                outcome: Some((O::RootCauseIdentified, R::RootCauseGraded)),
-                shown: Some(High),
-            },
-            Case {
-                name: "T2",
-                calls: vec![
+        /// 03 §6.4: VE14 + VE15 as one table test through `record_run_end`.
+        #[test]
+        fn the_outcome_table() {
+            use Confidence::*;
+            use EndedBy::*;
+            use OutcomeReason as R;
+            use RcaOutcome as O;
+            let named = Some("orders pool exhausted after PR #812");
+            let cases = vec![
+                Case {
+                    name: "T1",
+                    calls: vec![
+                        root_with_two_classes(1, "h1", &[]),
+                        h(2, "h2", "contributing"),
+                        h(3, "h3", "symptom"),
+                        ruled_out_verified(4, "h4"),
+                        h(5, "h5", "ruled_out"),
+                        h(6, "h6", "blocked"),
+                    ],
+                    cause: named,
+                    ended_by: Agent,
+                    completed: true,
+                    graded: Some(High),
+                    outcome: Some((O::RootCauseIdentified, R::RootCauseGraded)),
+                    shown: Some(High),
+                },
+                Case {
+                    name: "T2",
+                    calls: vec![
+                        root_with_two_classes(1, "h1", &["stg_arao"]),
+                        h(2, "h2", "contributing"),
+                        h(3, "h3", "symptom"),
+                        ruled_out_verified(4, "h4"),
+                    ],
+                    cause: named,
+                    ended_by: Agent,
+                    completed: true,
+                    graded: Some(Medium),
+                    outcome: Some((O::RootCauseIdentified, R::RootCauseGraded)),
+                    shown: Some(Medium),
+                },
+                Case {
+                    name: "T3",
+                    calls: vec![
+                        with_metric(1, "h1", "root_cause", "supporting"),
+                        ruled_out_verified(2, "h2"),
+                    ],
+                    cause: named,
+                    ended_by: Agent,
+                    completed: true,
+                    graded: Some(Low),
+                    outcome: Some((O::Inconclusive, R::CauseBelowMedium)),
+                    shown: Some(Low),
+                },
+                Case {
+                    name: "T4",
+                    calls: vec![
+                        with_metric(1, "h1", "root_cause", "decisive"),
+                        h(2, "h2", "root_cause"),
+                    ],
+                    cause: named,
+                    ended_by: Agent,
+                    completed: true,
+                    graded: Some(Low),
+                    outcome: Some((O::Inconclusive, R::AmbiguousCause)),
+                    shown: Some(Low),
+                },
+                Case {
+                    name: "T5",
+                    calls: vec![
+                        with_metric(1, "h1", "contributing", "decisive"),
+                        ruled_out_verified(2, "h2"),
+                    ],
+                    cause: named,
+                    ended_by: Agent,
+                    completed: true,
+                    graded: Some(Medium),
+                    outcome: Some((O::ContributingFactor, R::ContributingGraded)),
+                    shown: Some(Medium),
+                },
+                Case {
+                    name: "T6",
+                    calls: vec![
+                        with_metric(1, "h1", "contributing", "supporting"),
+                        h(2, "h2", "symptom"),
+                    ],
+                    cause: named,
+                    ended_by: Agent,
+                    completed: true,
+                    graded: Some(Low),
+                    outcome: Some((O::Inconclusive, R::NoConfirmedCause)),
+                    shown: Some(Low),
+                },
+                Case {
+                    name: "T7",
+                    calls: vec![
+                        h(1, "h1", "blocked"),
+                        with_metric(2, "h2", "contributing", "decisive"),
+                        h(3, "h3", "symptom"),
+                    ],
+                    cause: named,
+                    ended_by: Agent,
+                    completed: true,
+                    graded: Some(Medium),
+                    outcome: Some((O::Blocked, R::LeadingBlocked)),
+                    shown: Some(Low),
+                },
+                Case {
+                    name: "T8",
+                    calls: vec![
+                        h(1, "h1", "blocked"),
+                        with_metric(2, "h2", "contributing", "decisive"),
+                    ],
+                    cause: named,
+                    ended_by: AnswerDeadline,
+                    completed: true,
+                    graded: Some(Medium),
+                    outcome: Some((O::Blocked, R::AnswerDeadline)),
+                    shown: Some(Low),
+                },
+                Case {
+                    name: "T9",
+                    calls: vec![with_metric(1, "h1", "root_cause", "decisive")],
+                    cause: named,
+                    ended_by: AnswerDeadline,
+                    completed: true,
+                    graded: Some(Medium),
+                    outcome: Some((O::Blocked, R::AnswerDeadline)),
+                    shown: Some(Low),
+                },
+                Case {
+                    name: "T10",
+                    calls: vec![
+                        h(1, "h1", "inconclusive"),
+                        h(2, "h2", "inconclusive"),
+                        h(3, "h3", "symptom"),
+                        ruled_out_verified(4, "h4"),
+                    ],
+                    cause: named,
+                    ended_by: Agent,
+                    completed: true,
+                    graded: Some(Low),
+                    outcome: Some((O::Inconclusive, R::NoConfirmedCause)),
+                    shown: Some(Low),
+                },
+                Case {
+                    name: "T11",
+                    calls: vec![],
+                    cause: Some("cause unknown"),
+                    ended_by: Agent,
+                    completed: true,
+                    graded: Some(Low),
+                    outcome: Some((O::Inconclusive, R::NoHypothesis)),
+                    shown: Some(Low),
+                },
+                Case {
+                    name: "T12",
+                    calls: vec![with_metric(1, "h1", "root_cause", "decisive")],
+                    cause: Some("Cause unknown"),
+                    ended_by: Agent,
+                    completed: true,
+                    graded: Some(Low),
+                    outcome: Some((O::Inconclusive, R::NoConfirmedCause)),
+                    shown: Some(Low),
+                },
+                Case {
+                    name: "T13",
+                    calls: vec![
+                        hyp_input(
+                            1,
+                            json!({"id": "h1", "statement": "s", "status": "likely", "reason": "r", "lead_ids": ["stg_arao"]}),
+                        ),
+                        ruled_out_verified(2, "h2"),
+                    ],
+                    cause: named,
+                    ended_by: Agent,
+                    completed: true,
+                    graded: Some(Low),
+                    outcome: Some((O::Inconclusive, R::NoConfirmedCause)),
+                    shown: Some(Low),
+                },
+                Case {
+                    name: "T14",
+                    calls: vec![with_metric(1, "h1", "testing", "decisive")],
+                    cause: named,
+                    ended_by: Agent,
+                    completed: true,
+                    graded: Some(Low),
+                    outcome: Some((O::Inconclusive, R::NoConfirmedCause)),
+                    shown: Some(Low),
+                },
+                Case {
+                    name: "T15",
+                    calls: vec![
+                        h(1, "h1", "testing"),
+                        h(2, "h2", "untested"),
+                        h(3, "h3", "symptom"),
+                    ],
+                    cause: None,
+                    ended_by: Agent,
+                    completed: false,
+                    graded: None,
+                    outcome: None,
+                    shown: None,
+                },
+                Case {
+                    name: "T16",
+                    calls: vec![h(1, "h1", "blocked")],
+                    cause: None,
+                    ended_by: AnswerDeadline,
+                    completed: true,
+                    graded: None,
+                    outcome: Some((O::Blocked, R::AnswerDeadline)),
+                    shown: None,
+                },
+            ];
+            for case in cases {
+                let submit = case.cause.map(|c| submit(submitted(c, High), vec![]));
+                let r = run(&case.calls, submit.as_ref(), case.ended_by, case.completed);
+                let name = case.name;
+                let rec = &r.record;
+                assert_eq!(
+                    rec.grade.as_ref().map(|g| min_band(g.claimed, g.graded)),
+                    case.graded,
+                    "{name}: graded before VE15"
+                );
+                assert_eq!(
+                    rec.outcome.zip(rec.outcome_reason),
+                    case.outcome,
+                    "{name}: outcome"
+                );
+                assert_eq!(
+                    rec.grade.as_ref().map(|g| g.band),
+                    case.shown,
+                    "{name}: band shown"
+                );
+                assert_eq!(
+                    r.verdict.as_ref().map(|v| v.confidence),
+                    case.shown,
+                    "{name}: verdict band"
+                );
+                assert_eq!(rec.verdict, r.verdict, "{name}");
+            }
+        }
+
+        #[test]
+        fn outcome_table_details() {
+            let named = submit(submitted("orders pool exhausted", Confidence::High), vec![]);
+            let t2 = run(
+                &[
                     root_with_two_classes(1, "h1", &["stg_arao"]),
-                    h(2, "h2", "contributing"),
-                    h(3, "h3", "symptom"),
-                    ruled_out_verified(4, "h4"),
+                    ruled_out_verified(2, "h4"),
                 ],
-                cause: named,
-                ended_by: Agent,
-                completed: true,
-                graded: Some(Medium),
-                outcome: Some((O::RootCauseIdentified, R::RootCauseGraded)),
-                shown: Some(Medium),
-            },
-            Case {
-                name: "T3",
-                calls: vec![
-                    with_metric(1, "h1", "root_cause", "supporting"),
-                    ruled_out_verified(2, "h2"),
-                ],
-                cause: named,
-                ended_by: Agent,
-                completed: true,
-                graded: Some(Low),
-                outcome: Some((O::Inconclusive, R::CauseBelowMedium)),
-                shown: Some(Low),
-            },
-            Case {
-                name: "T4",
-                calls: vec![
-                    with_metric(1, "h1", "root_cause", "decisive"),
-                    h(2, "h2", "root_cause"),
-                ],
-                cause: named,
-                ended_by: Agent,
-                completed: true,
-                graded: Some(Low),
-                outcome: Some((O::Inconclusive, R::AmbiguousCause)),
-                shown: Some(Low),
-            },
-            Case {
-                name: "T5",
-                calls: vec![
-                    with_metric(1, "h1", "contributing", "decisive"),
-                    ruled_out_verified(2, "h2"),
-                ],
-                cause: named,
-                ended_by: Agent,
-                completed: true,
-                graded: Some(Medium),
-                outcome: Some((O::ContributingFactor, R::ContributingGraded)),
-                shown: Some(Medium),
-            },
-            Case {
-                name: "T6",
-                calls: vec![
-                    with_metric(1, "h1", "contributing", "supporting"),
-                    h(2, "h2", "symptom"),
-                ],
-                cause: named,
-                ended_by: Agent,
-                completed: true,
-                graded: Some(Low),
-                outcome: Some((O::Inconclusive, R::NoConfirmedCause)),
-                shown: Some(Low),
-            },
-            Case {
-                name: "T7",
-                calls: vec![
-                    h(1, "h1", "blocked"),
-                    with_metric(2, "h2", "contributing", "decisive"),
-                    h(3, "h3", "symptom"),
-                ],
-                cause: named,
-                ended_by: Agent,
-                completed: true,
-                graded: Some(Medium),
-                outcome: Some((O::Blocked, R::LeadingBlocked)),
-                shown: Some(Low),
-            },
-            Case {
-                name: "T8",
-                calls: vec![
-                    h(1, "h1", "blocked"),
-                    with_metric(2, "h2", "contributing", "decisive"),
-                ],
-                cause: named,
-                ended_by: AnswerDeadline,
-                completed: true,
-                graded: Some(Medium),
-                outcome: Some((O::Blocked, R::AnswerDeadline)),
-                shown: Some(Low),
-            },
-            Case {
-                name: "T9",
-                calls: vec![with_metric(1, "h1", "root_cause", "decisive")],
-                cause: named,
-                ended_by: AnswerDeadline,
-                completed: true,
-                graded: Some(Medium),
-                outcome: Some((O::Blocked, R::AnswerDeadline)),
-                shown: Some(Low),
-            },
-            Case {
-                name: "T10",
-                calls: vec![
-                    h(1, "h1", "inconclusive"),
-                    h(2, "h2", "inconclusive"),
-                    h(3, "h3", "symptom"),
-                    ruled_out_verified(4, "h4"),
-                ],
-                cause: named,
-                ended_by: Agent,
-                completed: true,
-                graded: Some(Low),
-                outcome: Some((O::Inconclusive, R::NoConfirmedCause)),
-                shown: Some(Low),
-            },
-            Case {
-                name: "T11",
-                calls: vec![],
-                cause: Some("cause unknown"),
-                ended_by: Agent,
-                completed: true,
-                graded: Some(Low),
-                outcome: Some((O::Inconclusive, R::NoHypothesis)),
-                shown: Some(Low),
-            },
-            Case {
-                name: "T12",
-                calls: vec![with_metric(1, "h1", "root_cause", "decisive")],
-                cause: Some("Cause unknown"),
-                ended_by: Agent,
-                completed: true,
-                graded: Some(Low),
-                outcome: Some((O::Inconclusive, R::NoConfirmedCause)),
-                shown: Some(Low),
-            },
-            Case {
-                name: "T13",
-                calls: vec![
-                    hyp_input(
-                        1,
-                        json!({"id": "h1", "statement": "s", "status": "likely", "reason": "r", "lead_ids": ["stg_arao"]}),
-                    ),
-                    ruled_out_verified(2, "h2"),
-                ],
-                cause: named,
-                ended_by: Agent,
-                completed: true,
-                graded: Some(Low),
-                outcome: Some((O::Inconclusive, R::NoConfirmedCause)),
-                shown: Some(Low),
-            },
-            Case {
-                name: "T14",
-                calls: vec![with_metric(1, "h1", "testing", "decisive")],
-                cause: named,
-                ended_by: Agent,
-                completed: true,
-                graded: Some(Low),
-                outcome: Some((O::Inconclusive, R::NoConfirmedCause)),
-                shown: Some(Low),
-            },
-            Case {
-                name: "T15",
-                calls: vec![
-                    h(1, "h1", "testing"),
-                    h(2, "h2", "untested"),
-                    h(3, "h3", "symptom"),
-                ],
-                cause: None,
-                ended_by: Agent,
-                completed: false,
-                graded: None,
-                outcome: None,
-                shown: None,
-            },
-            Case {
-                name: "T16",
-                calls: vec![h(1, "h1", "blocked")],
-                cause: None,
-                ended_by: AnswerDeadline,
-                completed: true,
-                graded: None,
-                outcome: Some((O::Blocked, R::AnswerDeadline)),
-                shown: None,
-            },
-        ];
-        for case in cases {
-            let submit = case.cause.map(|c| submit(submitted(c, High), vec![]));
-            let r = run(&case.calls, submit.as_ref(), case.ended_by, case.completed);
-            let name = case.name;
+                Some(&named),
+                EndedBy::Agent,
+                true,
+            );
+            assert!(
+                t2.record
+                    .grade
+                    .unwrap()
+                    .reasons
+                    .contains(&GradeReason::HumanLead)
+            );
+
+            let t14 = run(&[h(1, "h1", "testing")], Some(&named), EndedBy::Agent, true);
+            assert_eq!(
+                t14.record.ledger.hypotheses[0].status,
+                HypothesisStatus::Untested
+            );
+            assert_eq!(t14.counts.left_testing, 1);
+
+            let unknown = submit(submitted("cause unknown", Confidence::High), vec![]);
+            let t11 = run(&[], Some(&unknown), EndedBy::Agent, true);
+            assert!(!t11.record.has_ledger);
+            assert!(
+                t11.record
+                    .grade
+                    .unwrap()
+                    .reasons
+                    .contains(&GradeReason::NoLedger)
+            );
+        }
+
+        #[test]
+        fn a_cancelled_run_keeps_partial_results() {
+            let calls = [
+                with_metric(1, "h1", "testing", "decisive"),
+                h(2, "h2", "untested"),
+            ];
+            let report = submit(submitted("x", Confidence::High), vec![]);
+            let r = run(&calls, Some(&report), EndedBy::Agent, false);
             let rec = &r.record;
             assert_eq!(
-                rec.grade.as_ref().map(|g| min_band(g.claimed, g.graded)),
-                case.graded,
-                "{name}: graded before VE15"
+                (rec.outcome, rec.grade.as_ref(), rec.verdict.as_ref()),
+                (None, None, None)
             );
+            assert_eq!((rec.claims, rec.claimed_outcome), (None, None));
+            assert_eq!(rec.ledger.hypotheses.len(), 2);
+            assert_eq!(rec.evidence.len(), 1);
+            assert_eq!(r.summary_detail, None);
             assert_eq!(
-                rec.outcome.zip(rec.outcome_reason),
-                case.outcome,
-                "{name}: outcome"
+                rec.blind_spots,
+                vec![BlindSpot {
+                    id: "run_end".into(),
+                    axis: BlindSpotAxis::Other,
+                    title: "3 stages did not run".into(),
+                    why: "Log patterns, Metrics, Converge".into(),
+                    fix: BlindSpotFix::ResumeRun,
+                }]
             );
-            assert_eq!(
-                rec.grade.as_ref().map(|g| g.band),
-                case.shown,
-                "{name}: band shown"
-            );
-            assert_eq!(
-                r.verdict.as_ref().map(|v| v.confidence),
-                case.shown,
-                "{name}: verdict band"
-            );
-            assert_eq!(rec.verdict, r.verdict, "{name}");
+            let json = serde_json::to_value(rec).unwrap();
+            assert_eq!(json["schema_version"], json!(1));
+            assert!(json.get("outcome").is_none() && json.get("grade").is_none());
+
+            let log = tool_log();
+            let one = vec![
+                "context".to_string(),
+                "topology".into(),
+                "changes".into(),
+                "traces".into(),
+                "log_patterns".into(),
+                "metrics".into(),
+            ];
+            let r = record_run_end(&RunEndInput {
+                submit: None,
+                calls: &calls,
+                tool_log: &log,
+                stages_run: &one,
+                ended_by: EndedBy::Agent,
+                completed: false,
+                steer_authors: &BTreeMap::new(),
+            });
+            assert_eq!(r.record.blind_spots[0].title, "1 stage did not run");
+            // All seven stages ran: no run_end blind spot; a completed run never gets one.
+            let r = record_run_end(&RunEndInput {
+                submit: None,
+                calls: &calls,
+                tool_log: &log,
+                stages_run: &stages(7),
+                ended_by: EndedBy::Agent,
+                completed: false,
+                steer_authors: &BTreeMap::new(),
+            });
+            assert!(r.record.blind_spots.is_empty());
+            let r = record_run_end(&RunEndInput {
+                submit: Some(&report),
+                calls: &calls,
+                tool_log: &log,
+                stages_run: &[],
+                ended_by: EndedBy::Agent,
+                completed: true,
+                steer_authors: &BTreeMap::new(),
+            });
+            assert!(r.record.blind_spots.iter().all(|b| b.id != "run_end"));
         }
-    }
 
-    /// §6.4 specifics: the human lead reason (T2), the testing rewrite (T14, T15), no ledger (T11).
-    #[test]
-    fn outcome_table_details() {
-        let named = submit(submitted("orders pool exhausted", Confidence::High), vec![]);
-        let t2 = run(
-            &[
-                root_with_two_classes(1, "h1", &["stg_arao"]),
-                ruled_out_verified(2, "h4"),
-            ],
-            Some(&named),
-            EndedBy::Agent,
-            true,
-        );
-        assert!(
-            t2.record
-                .grade
-                .unwrap()
-                .reasons
-                .contains(&GradeReason::HumanLead)
-        );
+        /// VE19: the claimed outcome never changes the outcome or the band; it is stored.
+        #[test]
+        fn the_claimed_outcome_never_changes_the_outcome() {
+            let calls = [h(1, "h1", "inconclusive"), h(2, "h2", "symptom")];
+            for claimed in [
+                RcaOutcome::RootCauseIdentified,
+                RcaOutcome::ContributingFactor,
+                RcaOutcome::Inconclusive,
+                RcaOutcome::Blocked,
+            ] {
+                let mut v = submitted("orders pool", Confidence::High);
+                v.claimed_outcome = claimed;
+                let r = run(&calls, Some(&submit(v, vec![])), EndedBy::Agent, true);
+                assert_eq!(
+                    r.record.outcome,
+                    Some(RcaOutcome::Inconclusive),
+                    "{claimed}"
+                );
+                assert_eq!(
+                    r.record.outcome_reason,
+                    Some(OutcomeReason::NoConfirmedCause)
+                );
+                assert_eq!(r.record.grade.as_ref().unwrap().band, Confidence::Low);
+                assert_eq!(r.record.claimed_outcome, Some(claimed));
+                assert_eq!(r.record.claims.unwrap().outcome, claimed);
+            }
+        }
 
-        let t14 = run(&[h(1, "h1", "testing")], Some(&named), EndedBy::Agent, true);
-        assert_eq!(
-            t14.record.ledger.hypotheses[0].status,
-            HypothesisStatus::Untested
-        );
-        assert_eq!(t14.counts.left_testing, 1);
-
-        let unknown = submit(submitted("cause unknown", Confidence::High), vec![]);
-        let t11 = run(&[], Some(&unknown), EndedBy::Agent, true);
-        assert!(!t11.record.has_ledger);
-        assert!(
-            t11.record
-                .grade
-                .unwrap()
-                .reasons
-                .contains(&GradeReason::NoLedger)
-        );
-    }
-
-    /// VE16/VE34: a cancelled run with two hypotheses has no outcome or band, keeps the
-    /// partial ledger, and names the 3 stages that did not run.
-    #[test]
-    fn a_cancelled_run_keeps_partial_results() {
-        let calls = [
-            with_metric(1, "h1", "testing", "decisive"),
-            h(2, "h2", "untested"),
-        ];
-        let report = submit(submitted("x", Confidence::High), vec![]);
-        let r = run(&calls, Some(&report), EndedBy::Agent, false);
-        let rec = &r.record;
-        assert_eq!(
-            (rec.outcome, rec.grade.as_ref(), rec.verdict.as_ref()),
-            (None, None, None)
-        );
-        assert_eq!((rec.claims, rec.claimed_outcome), (None, None));
-        assert_eq!(rec.ledger.hypotheses.len(), 2);
-        assert_eq!(rec.evidence.len(), 1);
-        assert_eq!(r.summary_detail, None);
-        assert_eq!(
-            rec.blind_spots,
-            vec![BlindSpot {
-                id: "run_end".into(),
-                axis: BlindSpotAxis::Other,
-                title: "3 stages did not run".into(),
-                why: "Log patterns, Metrics, Converge".into(),
-                fix: BlindSpotFix::ResumeRun,
-            }]
-        );
-        let json = serde_json::to_value(rec).unwrap();
-        assert_eq!(json["schema_version"], json!(1));
-        assert!(json.get("outcome").is_none() && json.get("grade").is_none());
-
-        let log = tool_log();
-        let one = vec![
-            "context".to_string(),
-            "topology".into(),
-            "changes".into(),
-            "traces".into(),
-            "log_patterns".into(),
-            "metrics".into(),
-        ];
-        let r = record_run_end(&RunEndInput {
-            submit: None,
-            calls: &calls,
-            tool_log: &log,
-            stages_run: &one,
-            ended_by: EndedBy::Agent,
-            completed: false,
-            steer_authors: &BTreeMap::new(),
-        });
-        assert_eq!(r.record.blind_spots[0].title, "1 stage did not run");
-        // All seven stages ran: no run_end blind spot; a completed run never gets one.
-        let r = record_run_end(&RunEndInput {
-            submit: None,
-            calls: &calls,
-            tool_log: &log,
-            stages_run: &stages(7),
-            ended_by: EndedBy::Agent,
-            completed: false,
-            steer_authors: &BTreeMap::new(),
-        });
-        assert!(r.record.blind_spots.is_empty());
-        let r = record_run_end(&RunEndInput {
-            submit: Some(&report),
-            calls: &calls,
-            tool_log: &log,
-            stages_run: &[],
-            ended_by: EndedBy::Agent,
-            completed: true,
-            steer_authors: &BTreeMap::new(),
-        });
-        assert!(r.record.blind_spots.iter().all(|b| b.id != "run_end"));
-    }
-
-    /// VE19: the claimed outcome never changes the outcome or the band; it is stored.
-    #[test]
-    fn the_claimed_outcome_never_changes_the_outcome() {
-        let calls = [h(1, "h1", "inconclusive"), h(2, "h2", "symptom")];
-        for claimed in [
-            RcaOutcome::RootCauseIdentified,
-            RcaOutcome::ContributingFactor,
-            RcaOutcome::Inconclusive,
-            RcaOutcome::Blocked,
-        ] {
-            let mut v = submitted("orders pool", Confidence::High);
-            v.claimed_outcome = claimed;
+        /// VE38: the verdict carries the graded band, and the gate refuses a suppress at medium.
+        #[test]
+        fn the_graded_band_reaches_the_gate() {
+            let mut v = submitted("orders pool exhausted", Confidence::High);
+            v.page_recommendation.action = PageAction::Suppress;
+            let calls = [with_metric(1, "h1", "root_cause", "decisive")];
             let r = run(&calls, Some(&submit(v, vec![])), EndedBy::Agent, true);
-            assert_eq!(
-                r.record.outcome,
-                Some(RcaOutcome::Inconclusive),
-                "{claimed}"
+            let verdict = r.verdict.clone().unwrap();
+            assert_eq!(r.record.claims.unwrap().confidence, Confidence::High);
+            assert_eq!(verdict.confidence, Confidence::Medium);
+            assert_eq!(r.record.grade.as_ref().unwrap().band, Confidence::Medium);
+
+            let policy = L0Policy {
+                mode: L0Modes {
+                    p1: L0Mode::Parallel,
+                    p2: L0Mode::Gate,
+                    p3: L0Mode::Gate,
+                    p4: L0Mode::Only,
+                },
+                triage_budget_seconds: 90,
+                allow_promotion: true,
+                max_promotion_steps: 2,
+                allow_downgrade: true,
+                allow_suppress: true,
+            };
+            let state = |verdict| AnalysisState {
+                status: AnalysisStatus::Complete,
+                verdict: Some(verdict),
+                grade: r.record.grade.clone(),
+                requested_at: Some(0),
+                completed_at: Some(1),
+            };
+            let outcome = apply_verdict(&policy, &state(verdict.clone()), AlertPriority::P3, 1);
+            assert!(
+                matches!(outcome, VerdictOutcome::Page { .. }),
+                "{outcome:?}"
             );
+            // The same verdict with the claimed band would have suppressed.
+            let mut claimed = verdict;
+            claimed.confidence = Confidence::High;
             assert_eq!(
-                r.record.outcome_reason,
-                Some(OutcomeReason::NoConfirmedCause)
+                apply_verdict(&policy, &state(claimed), AlertPriority::P3, 1),
+                VerdictOutcome::Suppress
             );
-            assert_eq!(r.record.grade.as_ref().unwrap().band, Confidence::Low);
-            assert_eq!(r.record.claimed_outcome, Some(claimed));
-            assert_eq!(r.record.claims.unwrap().outcome, claimed);
         }
-    }
 
-    /// VE38: the verdict carries the graded band, and the gate refuses a suppress at medium.
-    #[test]
-    fn the_graded_band_reaches_the_gate() {
-        let mut v = submitted("orders pool exhausted", Confidence::High);
-        v.page_recommendation.action = PageAction::Suppress;
-        let calls = [with_metric(1, "h1", "root_cause", "decisive")];
-        let r = run(&calls, Some(&submit(v, vec![])), EndedBy::Agent, true);
-        let verdict = r.verdict.clone().unwrap();
-        assert_eq!(r.record.claims.unwrap().confidence, Confidence::High);
-        assert_eq!(verdict.confidence, Confidence::Medium);
-        assert_eq!(r.record.grade.as_ref().unwrap().band, Confidence::Medium);
-
-        let policy = L0Policy {
-            mode: L0Modes {
-                p1: L0Mode::Parallel,
-                p2: L0Mode::Gate,
-                p3: L0Mode::Gate,
-                p4: L0Mode::Only,
-            },
-            triage_budget_seconds: 90,
-            allow_promotion: true,
-            max_promotion_steps: 2,
-            allow_downgrade: true,
-            allow_suppress: true,
-        };
-        let state = |verdict| AnalysisState {
-            status: AnalysisStatus::Complete,
-            verdict: Some(verdict),
-            grade: r.record.grade.clone(),
-            requested_at: Some(0),
-            completed_at: Some(1),
-        };
-        let outcome = apply_verdict(&policy, &state(verdict.clone()), AlertPriority::P3, 1);
-        assert!(
-            matches!(outcome, VerdictOutcome::Page { .. }),
-            "{outcome:?}"
-        );
-        // The same verdict with the claimed band would have suppressed.
-        let mut claimed = verdict;
-        claimed.confidence = Confidence::High;
-        assert_eq!(
-            apply_verdict(&policy, &state(claimed), AlertPriority::P3, 1),
-            VerdictOutcome::Suppress
-        );
-    }
-
-    /// VE38/VE39: up to five decisive entries in number order, labelled by code, no URL.
-    #[test]
-    fn the_verdict_carries_labelled_decisive_entries() {
-        let obs = "o".repeat(200);
-        let mut evidence: Vec<Value> = (1..=6)
-            .map(|n| decisive(&format!("e{n}"), PROM, &format!("q{n}")))
-            .collect();
-        evidence.insert(
-            0,
-            item(
-                "e9",
+        /// VE38/VE39: up to five decisive entries in number order, labelled by code, no URL.
+        #[test]
+        fn the_verdict_carries_labelled_decisive_entries() {
+            let obs = "o".repeat(200);
+            let mut evidence: Vec<Value> = (1..=6)
+                .map(|n| decisive(&format!("e{n}"), PROM, &format!("q{n}")))
+                .collect();
+            evidence.insert(
+                0,
+                item(
+                    "e9",
+                    SQL,
+                    "SELECT * FROM \"checkout_api\"",
+                    "supports",
+                    "supporting",
+                ),
+            );
+            evidence.push(item(
+                "e8",
                 SQL,
-                "SELECT * FROM \"checkout_api\"",
+                "SELECT * FROM \"orders\"",
                 "supports",
-                "supporting",
-            ),
-        );
-        evidence.push(item(
-            "e8",
-            SQL,
-            "SELECT * FROM \"orders\"",
-            "supports",
-            "decisive",
-        ));
-        evidence[1]["observation"] = json!(obs);
-        let calls = [hyp(1, "h1", "root_cause", evidence)];
-        let mut log: Vec<ToolCallRecord> = (1..=6)
-            .map(|n| prom(&format!("c{n}"), &format!("q{n}"), n))
-            .collect();
-        log.push(logs("c9", "SELECT * FROM \"checkout_api\"", 0));
-        log.push(logs("c8", "SELECT * FROM \"orders\"", 9));
-        let (ledger, ..) = build_ledger(&calls, true);
-        let (entries, _) = build_evidence(ledger.as_ref(), &log);
-        let grade = crate::meta::oncall::confidence::grade_confidence(
-            &submitted("x", Confidence::High),
-            ledger.as_ref(),
-            &[],
-            &log,
-            &BTreeMap::new(),
-        );
-        let verdict = to_analysis_verdict(&submitted("x", Confidence::High), &grade, &entries);
-        let numbers: Vec<u32> = verdict.evidence.iter().map(|e| e.number).collect();
-        assert_eq!(numbers, [2, 3, 4, 5, 6], "entry 1 is supporting only");
-        assert_eq!(
-            verdict.evidence[0].label,
-            format!("PromQL · metrics · {}", "o".repeat(120))
-        );
-        assert_eq!(verdict.evidence[1].label, "PromQL · metrics · e2 obs");
-        assert_eq!(entries[7].kind, "SQL");
-        let sql_entry =
-            to_analysis_verdict(&submitted("x", Confidence::High), &grade, &entries[7..]);
-        assert_eq!(sql_entry.evidence[0].label, "SQL · orders · e8 obs");
-        assert!(!serde_json::to_string(&verdict).unwrap().contains("http"));
-    }
+                "decisive",
+            ));
+            evidence[1]["observation"] = json!(obs);
+            let calls = [hyp(1, "h1", "root_cause", evidence)];
+            let mut log: Vec<ToolCallRecord> = (1..=6)
+                .map(|n| prom(&format!("c{n}"), &format!("q{n}"), n))
+                .collect();
+            log.push(logs("c9", "SELECT * FROM \"checkout_api\"", 0));
+            log.push(logs("c8", "SELECT * FROM \"orders\"", 9));
+            let (ledger, ..) = build_ledger(&calls, true);
+            let (entries, _) = build_evidence(ledger.as_ref(), &log);
+            let grade = crate::meta::oncall::confidence::grade_confidence(
+                &submitted("x", Confidence::High),
+                ledger.as_ref(),
+                &[],
+                &log,
+                &BTreeMap::new(),
+            );
+            let verdict = to_analysis_verdict(&submitted("x", Confidence::High), &grade, &entries);
+            let numbers: Vec<u32> = verdict.evidence.iter().map(|e| e.number).collect();
+            assert_eq!(numbers, [2, 3, 4, 5, 6], "entry 1 is supporting only");
+            assert_eq!(
+                verdict.evidence[0].label,
+                format!("PromQL · metrics · {}", "o".repeat(120))
+            );
+            assert_eq!(verdict.evidence[1].label, "PromQL · metrics · e2 obs");
+            assert_eq!(entries[7].kind, "SQL");
+            let sql_entry =
+                to_analysis_verdict(&submitted("x", Confidence::High), &grade, &entries[7..]);
+            assert_eq!(sql_entry.evidence[0].label, "SQL · orders · e8 obs");
+            assert!(!serde_json::to_string(&verdict).unwrap().contains("http"));
+        }
 
-    /// VE31: a confirmed entry whose ids did not verify shows Unverified, and is counted.
-    #[test]
-    fn unverified_timeline_entries_are_counted() {
-        let calls = [hyp(
-            1,
-            "h1",
-            "root_cause",
-            vec![
-                decisive("e1", PROM, "pool_active"),
-                decisive("e9", PROM, "never"),
-            ],
-        )];
-        let timeline = vec![
-            TimelineEntry {
-                at_us: 30,
-                text: "c".into(),
-                status: TimelineStatus::Confirmed,
-                evidence_ids: vec!["e9".into()],
-            },
-            TimelineEntry {
-                at_us: 10,
-                text: "a".into(),
-                status: TimelineStatus::Confirmed,
-                evidence_ids: vec!["e9".into(), "e1".into()],
-            },
-            TimelineEntry {
-                at_us: 20,
-                text: "b".into(),
-                status: TimelineStatus::Refuted,
-                evidence_ids: vec![],
-            },
-            TimelineEntry {
-                at_us: 40,
-                text: "d".into(),
-                status: TimelineStatus::Likely,
-                evidence_ids: vec![],
-            },
-        ];
-        let r = run(
-            &calls,
-            Some(&submit(submitted("x", Confidence::High), timeline)),
-            EndedBy::Agent,
-            true,
-        );
-        assert_eq!(r.timeline_unverified, 2);
-        let view = summary_from_record(
-            "r1",
-            crate::meta::alerts::rca_runs::RunState::Completed,
-            "v".into(),
-            &r.record,
-        );
-        let shown: Vec<(&str, TimelineView, Vec<u32>)> = view
-            .timeline
-            .iter()
-            .map(|t| (t.text.as_str(), t.status, t.evidence_numbers.clone()))
-            .collect();
-        assert_eq!(
-            shown,
-            vec![
-                ("a", TimelineView::Confirmed, vec![1]),
-                ("b", TimelineView::Unverified, vec![]),
-                ("c", TimelineView::Unverified, vec![]),
-                ("d", TimelineView::Likely, vec![]),
-            ]
-        );
-    }
-
-    /// VE44: the list detail of a blocked run; none otherwise.
-    #[test]
-    fn blocked_runs_carry_a_detail() {
-        let named = submit(submitted("x", Confidence::High), vec![]);
-        let blocked = |spots: Vec<LedgerCall>| {
-            let mut calls = vec![h(1, "h1", "blocked")];
-            calls.extend(spots);
-            run(&calls, Some(&named), EndedBy::Agent, true).summary_detail
-        };
-        assert_eq!(
-            blocked(vec![
-                spot(2, "b1", "logs", "none", "No fix"),
-                spot(3, "b2", "change", "connect_toolset", "Change history")
-            ]),
-            Some("Needs: Change history".to_string())
-        );
-        assert_eq!(
-            blocked(vec![spot(2, "b1", "logs", "none", "No fix")]),
-            Some("Needs input".to_string())
-        );
-        assert_eq!(
-            run(
-                &[h(1, "h1", "blocked")],
-                None,
-                EndedBy::AnswerDeadline,
-                true
-            )
-            .summary_detail,
-            Some("Needs input".to_string())
-        );
-        // Frame B (root cause identified): no detail.
-        let b = run(
-            &[
-                root_with_two_classes(1, "h1", &[]),
-                ruled_out_verified(2, "h2"),
-            ],
-            Some(&named),
-            EndedBy::Agent,
-            true,
-        );
-        assert_eq!(b.record.outcome, Some(RcaOutcome::RootCauseIdentified));
-        assert_eq!(b.summary_detail, None);
-    }
-
-    /// §11: the record round-trips and lists only cited calls.
-    #[test]
-    fn the_record_round_trips_with_cited_calls_only() {
-        let calls = [with_metric(1, "h1", "root_cause", "decisive")];
-        let r = run(
-            &calls,
-            Some(&submit(submitted("x", Confidence::High), vec![])),
-            EndedBy::Agent,
-            true,
-        );
-        assert_eq!(
-            r.record
-                .cited_calls
+        /// VE31: a confirmed entry whose ids did not verify shows Unverified, and is counted.
+        #[test]
+        fn unverified_timeline_entries_are_counted() {
+            let calls = [hyp(
+                1,
+                "h1",
+                "root_cause",
+                vec![
+                    decisive("e1", PROM, "pool_active"),
+                    decisive("e9", PROM, "never"),
+                ],
+            )];
+            let timeline = vec![
+                TimelineEntry {
+                    at_us: 30,
+                    text: "c".into(),
+                    status: TimelineStatus::Confirmed,
+                    evidence_ids: vec!["e9".into()],
+                },
+                TimelineEntry {
+                    at_us: 10,
+                    text: "a".into(),
+                    status: TimelineStatus::Confirmed,
+                    evidence_ids: vec!["e9".into(), "e1".into()],
+                },
+                TimelineEntry {
+                    at_us: 20,
+                    text: "b".into(),
+                    status: TimelineStatus::Refuted,
+                    evidence_ids: vec![],
+                },
+                TimelineEntry {
+                    at_us: 40,
+                    text: "d".into(),
+                    status: TimelineStatus::Likely,
+                    evidence_ids: vec![],
+                },
+            ];
+            let r = run(
+                &calls,
+                Some(&submit(submitted("x", Confidence::High), timeline)),
+                EndedBy::Agent,
+                true,
+            );
+            assert_eq!(r.timeline_unverified, 2);
+            let view = summary_from_record(
+                "r1",
+                crate::meta::alerts::rca_runs::RunState::Completed,
+                "v".into(),
+                &r.record,
+            );
+            let shown: Vec<(&str, TimelineView, Vec<u32>)> = view
+                .timeline
                 .iter()
-                .map(|c| c.call_id.as_str())
-                .collect::<Vec<_>>(),
-            ["m1"]
-        );
-        assert_eq!(r.record.cited_calls[0].signal, SignalClass::Metrics);
-        let back: RcaRunRecord =
-            serde_json::from_str(&serde_json::to_string(&r.record).unwrap()).unwrap();
-        assert_eq!(back, r.record);
+                .map(|t| (t.text.as_str(), t.status, t.evidence_numbers.clone()))
+                .collect();
+            assert_eq!(
+                shown,
+                vec![
+                    ("a", TimelineView::Confirmed, vec![1]),
+                    ("b", TimelineView::Unverified, vec![]),
+                    ("c", TimelineView::Unverified, vec![]),
+                    ("d", TimelineView::Likely, vec![]),
+                ]
+            );
+        }
+
+        /// VE44: the list detail of a blocked run; none otherwise.
+        #[test]
+        fn blocked_runs_carry_a_detail() {
+            let named = submit(submitted("x", Confidence::High), vec![]);
+            let blocked = |spots: Vec<LedgerCall>| {
+                let mut calls = vec![h(1, "h1", "blocked")];
+                calls.extend(spots);
+                run(&calls, Some(&named), EndedBy::Agent, true).summary_detail
+            };
+            assert_eq!(
+                blocked(vec![
+                    spot(2, "b1", "logs", "none", "No fix"),
+                    spot(3, "b2", "change", "connect_toolset", "Change history")
+                ]),
+                Some("Needs: Change history".to_string())
+            );
+            assert_eq!(
+                blocked(vec![spot(2, "b1", "logs", "none", "No fix")]),
+                Some("Needs input".to_string())
+            );
+            assert_eq!(
+                run(
+                    &[h(1, "h1", "blocked")],
+                    None,
+                    EndedBy::AnswerDeadline,
+                    true
+                )
+                .summary_detail,
+                Some("Needs input".to_string())
+            );
+            // Frame B (root cause identified): no detail.
+            let b = run(
+                &[
+                    root_with_two_classes(1, "h1", &[]),
+                    ruled_out_verified(2, "h2"),
+                ],
+                Some(&named),
+                EndedBy::Agent,
+                true,
+            );
+            assert_eq!(b.record.outcome, Some(RcaOutcome::RootCauseIdentified));
+            assert_eq!(b.summary_detail, None);
+        }
+
+        /// §11: the record round-trips and lists only cited calls.
+        #[test]
+        fn the_record_round_trips_with_cited_calls_only() {
+            let calls = [with_metric(1, "h1", "root_cause", "decisive")];
+            let r = run(
+                &calls,
+                Some(&submit(submitted("x", Confidence::High), vec![])),
+                EndedBy::Agent,
+                true,
+            );
+            assert_eq!(
+                r.record
+                    .cited_calls
+                    .iter()
+                    .map(|c| c.call_id.as_str())
+                    .collect::<Vec<_>>(),
+                ["m1"]
+            );
+            assert_eq!(r.record.cited_calls[0].signal, SignalClass::Metrics);
+            let back: RcaRunRecord =
+                serde_json::from_str(&serde_json::to_string(&r.record).unwrap()).unwrap();
+            assert_eq!(back, r.record);
+        }
     }
 }

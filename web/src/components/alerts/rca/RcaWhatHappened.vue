@@ -14,9 +14,6 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!-- "What happened" (03 VE31, VE36, VE-D4): the causal timeline of the report,
-     in time order. A number chip opens its evidence entry under the row. While
-     the run is live the timeline is not known yet. -->
 <template>
   <section data-test="rca-what-happened" :aria-labelledby="headingId" class="flex flex-col">
     <div class="mb-3 flex flex-wrap items-baseline gap-2">
@@ -148,11 +145,6 @@ const { t } = useI18nTyped();
 const headingId = useId();
 const baseId = useId();
 
-/**
- * Markers (VE31, redesign): Confirmed is a filled dot; Inferred (`likely`) and
- * Unverified are dashed rings with a tag; Refuted keeps its place in time with a
- * hollow ring and struck-through text.
- */
 const MARKER: Record<RcaTimelineStatus, { dot: string; tag: string }> = {
   confirmed: { dot: "bg-accent", tag: "" },
   likely: { dot: "border-2 border-dashed border-border-strong", tag: "text-status-warning-text" },
@@ -168,7 +160,7 @@ const markerLabel = (status: RcaTimelineStatus): I18nText => {
     case "confirmed":
       return t("alerts.incidents.rcaSummary.marker.confirmed");
     case "likely":
-      return t("alerts.incidents.rcaSummary.marker.inferred");
+      return t("alerts.incidents.rcaSummary.marker.likely");
     case "unverified":
       return t("alerts.incidents.rcaSummary.marker.unverified");
     case "refuted":

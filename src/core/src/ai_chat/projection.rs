@@ -17,10 +17,11 @@
 
 use std::collections::HashMap;
 
-use config::utils::json::{Map, Value, json};
+use config::utils::{
+    json::{Map, Value, json},
+    redact::redact_internal_details,
+};
 use o2_enterprise::enterprise::ai::chat::batcher::DurableEvent;
-
-use crate::redact::redact_internal_details;
 
 const PLACEHOLDER_TITLE_PREFIXES: [&str; 2] = ["New session - ", "Child session - "];
 const INJECTED_KEY: &str = "o2_injected";

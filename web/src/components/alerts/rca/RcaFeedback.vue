@@ -14,41 +14,24 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!-- "Is this the cause?" (README §9, J4): Yes / No / Correct the cause on a
-     finished graded run. Only the caller's own row is read and shown; other
-     authors' feedback stays private. Undo deletes the caller's row.
-     The root is `display: contents` inside the card's wrapping facts row: the
-     segmented control ends that row, and the panels and the saved message take
-     a full-width line under it (template layout). -->
 <template>
   <div data-test="rca-feedback" class="contents">
     <div class="ms-auto flex flex-wrap items-center gap-2">
       <span :id="questionId" class="text-text-muted text-xs">
         {{ t("alerts.incidents.rcaFeedback.question") }}
       </span>
-      <div
-        role="group"
-        :aria-labelledby="questionId"
-        class="border-border-control rounded-default inline-flex overflow-hidden border"
-      >
-        <button
+      <OToggleGroup :model-value="pressed ?? ''" :disabled="busy" :aria-labelledby="questionId">
+        <OToggleGroupItem
           v-for="option in options"
           :key="option.verdict"
-          type="button"
+          :value="option.verdict"
           :data-test="`rca-feedback-${option.verdict}`"
-          :aria-pressed="pressed === option.verdict"
-          :disabled="busy"
-          class="border-border-control h-7 cursor-pointer px-2.5 text-xs font-semibold not-first:border-s disabled:cursor-not-allowed disabled:opacity-60"
-          :class="
-            pressed === option.verdict
-              ? 'bg-surface-accent text-text-heading'
-              : 'bg-surface-base text-text-body hover:bg-surface-subtle-hover'
-          "
+          size="sm"
           @click="choose(option.verdict)"
         >
           {{ option.label }}
-        </button>
-      </div>
+        </OToggleGroupItem>
+      </OToggleGroup>
     </div>
 
     <!-- No: reasons, an optional note, Send feedback. -->
@@ -170,6 +153,8 @@ import { isAxiosError } from "axios";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTextarea from "@/lib/forms/Input/OTextarea.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OnCallResolveCauseForm from "@/components/oncall/OnCallResolveCauseForm.vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import incidentsService, {

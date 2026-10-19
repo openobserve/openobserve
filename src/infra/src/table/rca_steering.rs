@@ -14,10 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 //! Steering rows of RCA runs (`rca_steering`, 04 §8).
-//!
-//! A row is inserted once and never deleted one by one (SG1, SG2). Only its status and the
-//! delivery fields change, each through a guarded update that moves along the status chart
-//! of §8.2 only, so a late writer cannot move a row back (SG3).
 
 use std::str::FromStr;
 
@@ -33,9 +29,7 @@ pub use super::entity::rca_steering::Model;
 use super::entity::rca_steering::{ActiveModel, Column, Entity};
 use crate::db::{get_orm_client_ro, get_orm_client_rw};
 
-/// The fields a [set_status] write may fill besides the status. `None` keeps the stored
-/// value. `kind` and `question_id` are written only to a `queued` row (the SG18 answer
-/// conversion).
+/// The fields a [set_status] write may fill besides the status.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct SteerPatch {
     pub status_reason: Option<SteerStatusReason>,
@@ -150,8 +144,6 @@ pub async fn list_for_run_with<C: ConnectionTrait>(
         .collect())
 }
 
-/// Fills `opencode_message_id` and `delivered_at` from the transcript (SG23), each only
-/// where it is still NULL, without a status change; neither column is immutable (SG2).
 pub async fn fill_transcript_fields(
     org_id: &str,
     steer_id: &str,
@@ -168,8 +160,7 @@ pub async fn fill_transcript_fields(
     .await
 }
 
-/// [fill_transcript_fields] on a given connection. One guarded UPDATE per column, so a set
-/// column never keeps the other from being filled.
+/// [fill_transcript_fields] on a given connection.
 pub async fn fill_transcript_fields_with<C: ConnectionTrait>(
     conn: &C,
     org_id: &str,
@@ -198,8 +189,6 @@ pub async fn fill_transcript_fields_with<C: ConnectionTrait>(
     Ok(())
 }
 
-/// Moves a row to `to` from a status [SteerStatus::allowed_from] permits, with the fields
-/// of `patch` (SG3). `Ok(false)`: the row is gone or in another status; nothing was written.
 pub async fn set_status(
     org_id: &str,
     steer_id: &str,
@@ -293,8 +282,6 @@ pub async fn rate_window_with<C: ConnectionTrait>(
     })
 }
 
-/// True while the run has a pending `hypothesis_action` with this hypothesis and action:
-/// `queued`, `delivered`, or `read` with no ack yet (SG10).
 pub async fn pending_action_exists(
     org_id: &str,
     run_id: &str,
@@ -335,8 +322,7 @@ pub async fn pending_action_exists_with<C: ConnectionTrait>(
     Ok(pending > 0)
 }
 
-/// Deletes the rows of the given runs inside the caller's transaction (the RR-25 prune,
-/// 04 §8.5).
+/// Deletes the rows of the given runs inside the caller's transaction (the RR-25 prune, 04 §8.5).
 pub async fn delete_for_runs_in(
     txn: &DatabaseTransaction,
     org_id: &str,
@@ -531,8 +517,7 @@ mod tests {
         assert_eq!(ids, ["stg_a", "stg_c", "stg_b"]);
     }
 
-    /// SG2 / SG3 / §8.2: every (from, to) pair through `set_status`. An allowed move writes
-    /// the status and the patch; a refused one writes nothing. Immutable columns never change.
+    /// SG2 / SG3 / §8.2: every (from, to) pair through `set_status`.
     #[tokio::test]
     async fn sg2_sg3_set_status_follows_the_status_chart() {
         use SteerStatus::*;
@@ -729,8 +714,6 @@ mod tests {
         assert_eq!(stored(&db, "stg_r").await.kind, SteerKind::Answer);
     }
 
-    /// SG10: the rate-window counts; guidance rows count for nothing; other runs and
-    /// other authors are separate.
     #[tokio::test]
     async fn sg10_rate_window_counts() {
         let db = db().await;
@@ -786,8 +769,6 @@ mod tests {
         assert_eq!(c, RateCounts::default());
     }
 
-    /// SG10: a pending action is queued, delivered, or read with no ack; acked, not_read
-    /// and rejected rows are not pending; other hypotheses and actions do not match.
     #[tokio::test]
     async fn sg10_pending_action_exists() {
         use SteerStatus::*;
@@ -844,8 +825,6 @@ mod tests {
         );
     }
 
-    /// §8.5 / RR-26: `delete_for_runs_in` removes only the named runs' rows of the org, and
-    /// only when the transaction commits; `delete_by_org` removes only the org's rows.
     #[tokio::test]
     async fn deletes_by_runs_in_a_transaction_and_by_org() {
         let db = db().await;
@@ -898,9 +877,6 @@ mod tests {
         assert_eq!(stored(&db, "stg_g").await.kind, SteerKind::Guidance);
     }
 
-    /// SG23 / SG2: `fill_transcript_fields` writes `opencode_message_id` and `delivered_at`
-    /// only where NULL, in every status, never overwrites, never changes the status or any
-    /// other column; each column is filled independently of the other.
     #[tokio::test]
     async fn sg23_fill_transcript_fields_writes_only_null_columns() {
         use SteerStatus::*;
@@ -973,8 +949,6 @@ mod tests {
         );
     }
 
-    /// SG18: a `kind`/`question_id` patch requires `status = queued` for every target, even
-    /// where `allowed_from` would let the row move from another status.
     #[tokio::test]
     async fn sg18_a_conversion_patch_requires_queued_for_every_target() {
         use SteerStatus::*;

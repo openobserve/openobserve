@@ -83,7 +83,6 @@ pub enum ResumeRefusal {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RunFork {
     pub session_id: String,
-    pub opencode_session_id: String,
     pub last_seq: i64,
 }
 
@@ -98,11 +97,7 @@ struct StepCall<'a> {
     title: Option<&'a Value>,
 }
 
-/// Plan a Resume over a session's committed events, ascending from seq 0 (map §B2).
-///
-/// The cut falls right before the assistant message that holds the last `record_step`, so
-/// steps 1..N-1 stay whole and step N is done again. A `record_step` the tool rejected is no
-/// step; one that never started running is not either.
+/// Keep whole steps before the final step; repeat that step on resume.
 pub fn plan_resume(events: &[DurableEvent]) -> Result<ResumePlan, ResumeRefusal> {
     let mut calls: Vec<StepCall> = Vec::new();
     let mut by_call_id: HashMap<String, usize> = HashMap::new();
@@ -190,12 +185,7 @@ fn message_of(event: &DurableEvent) -> Option<&str> {
     }
 }
 
-/// The events with every `evt_`/`ses_`/`msg_`/`prt_` id replaced, in the envelope and in
-/// every string and object key of `data`, by one consistent map keyed by `key`.
-///
-/// A new id keeps its family, its 12-char time prefix and its length, so ids sort as before;
-/// its 14-char tail is base62 of `sha256(key ‖ old id)`, so each fork, a fork of a fork too,
-/// gets ids of its own. Seqs, types and every other value stay as they are.
+/// Rewrite ids consistently per fork while preserving family and sort prefix.
 pub fn rewrite_ids(events: Vec<DurableEvent>, key: &str) -> Vec<DurableEvent> {
     let mut ids = IdMap {
         key,
@@ -275,15 +265,7 @@ fn push_base62(out: &mut String, mut n: [u8; 32]) {
     }
 }
 
-/// Copy a run session's events `0..=cut` (`prefix`, unmodified) into a new session for a
-/// resumed run (map §B4.2).
-///
-/// The new session belongs to the source's owner (SysRcaAgent) as an `sre-rca` chat, keeps
-/// the source's title and is bound to a new opencode session. Its events carry fresh ids
-/// ([rewrite_ids], keyed by the new session id) and are written before the watermark moves,
-/// so a failure leaves an uncommitted session that nothing reads. The fork is read back
-/// whole before it is used. Its first turn finds the opencode session missing and restores
-/// it from the copy.
+/// Verify the copied prefix before publishing the fork watermark.
 pub async fn fork_run_session(
     org_id: &str,
     source: &ai_chat_sessions::Model,
@@ -415,7 +397,6 @@ where
     }
     Ok(RunFork {
         session_id,
-        opencode_session_id,
         last_seq,
     })
 }
@@ -588,8 +569,6 @@ pub(crate) mod tests {
 
     // ---- plan_resume ----
 
-    /// J8: the cut falls right before the message that holds the last `record_step`, so
-    /// steps 1..N-1 stay whole and step N, with the text before it, is dropped.
     #[test]
     fn the_cut_falls_before_the_message_of_the_last_step() {
         let events = three_steps();
@@ -622,8 +601,6 @@ pub(crate) mod tests {
         );
     }
 
-    /// J8: two `record_step`s in the last step's message are both dropped; the first of
-    /// them is the step the resumed run redoes.
     #[test]
     fn two_steps_in_one_message_are_dropped_together() {
         let mut s = Session::new();
@@ -672,8 +649,6 @@ pub(crate) mod tests {
         );
     }
 
-    /// VE2: a `record_step` the tool rejected, or one that never ran, is no step: it is
-    /// neither the last step nor a reused one.
     #[test]
     fn a_rejected_or_unstarted_record_step_is_no_step() {
         for last in ["error", "pending"] {
@@ -780,8 +755,6 @@ pub(crate) mod tests {
         );
     }
 
-    /// J7: a committed `submit_report` refuses the resume; one that failed or is still
-    /// running does not.
     #[test]
     fn only_a_committed_report_refuses_the_resume() {
         for (status, refused) in [("completed", true), ("error", false), ("running", false)] {
@@ -871,8 +844,6 @@ pub(crate) mod tests {
         );
     }
 
-    /// The dropped step is named as the thread names it: no title is "Step N", an unknown
-    /// stage is none.
     #[test]
     fn an_untitled_step_is_named_by_its_index() {
         let mut events = three_steps();
@@ -944,9 +915,6 @@ pub(crate) mod tests {
         }
     }
 
-    /// The id map a rewrite applied, checked to be a bijection that keeps each id's
-    /// family, time prefix and length and changes its tail, and to leave everything that
-    /// is no id as it was.
     fn id_map(old: &[DurableEvent], new: &[DurableEvent]) -> HashMap<String, String> {
         assert_eq!(old.len(), new.len());
         let mut pairs = Vec::new();
@@ -1001,8 +969,6 @@ pub(crate) mod tests {
         id
     }
 
-    /// One event with ids in every place one can sit: envelope, values, object keys, and
-    /// inside longer text; next to a `call_` id, a `stg_` steer id and a 27-char lookalike.
     fn every_place() -> (DurableEvent, [String; 4]) {
         let (ses, msg, prt, evt) = (
             oc_id("ses", 1),
@@ -1033,8 +999,6 @@ pub(crate) mod tests {
         (event, [ses, msg, prt, evt])
     }
 
-    /// Probe rules 1–3: every `evt_`/`ses_`/`msg_`/`prt_` id, wherever it sits, is
-    /// rewritten one way; nothing else changes.
     #[test]
     fn every_opencode_id_is_rewritten_one_way_and_nothing_else() {
         let (event, olds) = every_place();
@@ -1064,8 +1028,6 @@ pub(crate) mod tests {
         assert!(every_id(&new).is_disjoint(&olds.into_iter().collect()));
     }
 
-    /// Probe rules 1–3 on a recorded session: a bijection over every id, no id of the
-    /// source left, ids in the same order, and a fork of a fork gets ids of its own.
     #[test]
     fn a_recorded_session_is_rewritten_whole_and_in_order() {
         let events = load_replay();
@@ -1199,8 +1161,6 @@ pub(crate) mod tests {
     }
 
     impl Store {
-        /// The committed events of `row`, as the chat reader verifies them from the rows
-        /// written: only the bound opencode session's, contiguous, hash-checked.
         async fn read(
             &self,
             row: &ai_chat_sessions::Model,
@@ -1259,9 +1219,6 @@ pub(crate) mod tests {
             .unwrap()
     }
 
-    /// J8: the fork is a new `sre-rca` chat of the source's owner, bound to a new opencode
-    /// session, titled like the source, whose committed history is the prefix under new
-    /// ids, written before the watermark moved.
     #[tokio::test]
     async fn a_fork_commits_the_prefix_under_new_ids_in_a_new_session() {
         let _db = db().await;
@@ -1286,11 +1243,6 @@ pub(crate) mod tests {
 
         assert_eq!(fork.last_seq, cut as i64);
         assert_ne!(fork.session_id, source.session_id);
-        assert_ne!(
-            Some(fork.opencode_session_id.as_str()),
-            source.opencode_session_id.as_deref(),
-            "probe rule 5: never the source's opencode session"
-        );
         let row = ai_chat_sessions::get(&org, &fork.session_id)
             .await
             .unwrap()
@@ -1299,10 +1251,6 @@ pub(crate) mod tests {
         assert_eq!(
             (row.user_id.as_str(), row.user_email.as_str()),
             (source.user_id.as_str(), source.user_email.as_str())
-        );
-        assert_eq!(
-            row.opencode_session_id.as_deref(),
-            Some(fork.opencode_session_id.as_str())
         );
         assert_eq!(row.title, source.title);
         assert_eq!(row.status, STATUS_ACTIVE);
@@ -1319,7 +1267,7 @@ pub(crate) mod tests {
         assert!(every_id(&read).is_disjoint(&every_id(&prefix)));
         assert!(
             read.iter()
-                .all(|e| e.aggregate_id == fork.opencode_session_id)
+                .all(|e| Some(e.aggregate_id.as_str()) == row.opencode_session_id.as_deref())
         );
         assert!(
             store
@@ -1359,11 +1307,8 @@ pub(crate) mod tests {
         id_map(&prefix, &read2);
         let ids2 = every_id(&read2);
         assert!(ids2.is_disjoint(&every_id(&read)) && ids2.is_disjoint(&every_id(&prefix)));
-        assert_ne!(again.opencode_session_id, fork.opencode_session_id);
     }
 
-    /// J8: a copy whose write fails commits nothing: the new session has no history a
-    /// reader would return, and the fork is an error. So is a copy that reads back short.
     #[tokio::test]
     async fn a_failed_copy_leaves_no_readable_session() {
         let _db = db().await;
@@ -1414,8 +1359,6 @@ pub(crate) mod tests {
         );
     }
 
-    /// J8: the copy is the committed prefix from seq 0 without a hole; anything else is
-    /// refused before a session is made.
     #[tokio::test]
     async fn a_prefix_that_is_not_contiguous_from_seq_0_is_refused() {
         let _db = db().await;

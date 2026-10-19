@@ -777,6 +777,7 @@ describe("IncidentList.vue", () => {
       updated_at: 1700000000000000,
       outcome: null,
       confidence: null,
+      report_format: "v2",
       summary: {
         stage: null,
         stage_index: null,
@@ -845,7 +846,7 @@ describe("IncidentList.vue", () => {
       expect(incidentsService.triggerRca).toHaveBeenCalledWith(
         "default",
         "1",
-        { reanalysis: true },
+        {},
         { signal: undefined },
       );
       expect(pushSpy).not.toHaveBeenCalled();

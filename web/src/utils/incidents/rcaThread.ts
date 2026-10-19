@@ -89,10 +89,7 @@ export function rcaStageLabel(stage: string): I18nText {
   }
 }
 
-/**
- * Duration with seconds kept: "0.3s", "12s", "4m12s", "2m03s", "1h05m".
- * The run stats and tool rows use it (02 TH37: "4m12s").
- */
+/** Duration with seconds kept: "0.3s", "12s", "4m12s", "2m03s", "1h05m". */
 export function formatRcaDuration(ms: number): string {
   const safe = Math.max(0, ms);
   if (safe < 10_000) return `${(safe / 1000).toFixed(1)}s`;
@@ -109,13 +106,9 @@ export const formatRcaElapsed = (ms: number): string =>
   ms < 10_000 ? `${Math.max(0, Math.floor(ms / 1000))}s` : formatRcaDuration(ms);
 
 /** "14:07:04" in UTC from microseconds; the thread and its banners use UTC. */
-export const formatRcaClock = (us: number): string =>
-  formatTimestampInTimezone(us, "HH:mm:ss", "UTC");
+export const formatRcaClock = (us: number | null): string =>
+  us === null ? "" : formatTimestampInTimezone(us, "HH:mm:ss", "UTC");
 
-/**
- * A piece of a step note: text with the inline marks the agent writes, or an
- * `[eN]` citation. Marks are set only when true.
- */
 export type RcaNoteSegment =
   | { kind: "text"; text: string; bold?: true; italic?: true; code?: true }
   | { kind: "cite"; id: string };
@@ -153,11 +146,6 @@ function splitNoteInto(segments: RcaNoteSegment[], note: string, marks: RcaNoteM
   pushText(segments, note.slice(last), marks);
 }
 
-/**
- * Splits a step note into text and `[eN]` citation chips (02 TH29), with a safe
- * inline-markdown subset: bold, italics and inline code. Links show as text; no
- * HTML is ever produced.
- */
 export function splitRcaNote(note: string): RcaNoteSegment[] {
   const segments: RcaNoteSegment[] = [];
   splitNoteInto(segments, note, {});
@@ -168,17 +156,11 @@ export function splitRcaNote(note: string): RcaNoteSegment[] {
 export const toolCallsDurationMs = (calls: RcaToolCall[]): number =>
   calls.reduce((total, call) => total + (call.duration_ms ?? 0), 0);
 
-/** The error the thread projection gives a tool call the run's end cut off (`rca_thread.rs`). */
-export const RCA_UNFINISHED_TOOL_ERROR = "The run ended before this tool call finished";
-
 /** A step the end of the run cut off: one of its tool calls never finished. */
 export const isInterruptedStep = (step: RcaStep): boolean =>
-  step.tool_calls.some((call) => call.error === RCA_UNFINISHED_TOOL_ERROR);
+  step.tool_calls.some((call) => call.interrupted === true);
 
-/**
- * Steps that really finished (02 TH40 E). The projection closes the last step of
- * an ended run, so that step only counts when the run submitted its report.
- */
+/** Count only finished steps; run-end interruptions never count. */
 export function finishedStepCount(thread: RcaThread): number {
   const last = thread.steps.length - 1;
   return thread.steps.filter(
@@ -212,7 +194,7 @@ export function rcaThreadEntries(thread: RcaThread, items: RcaSteerRecord[]): Rc
   const list = thread.steps.map((step): RcaThreadEntry => ({
     kind: "step",
     key: `step-${step.index}`,
-    at: step.started_at,
+    at: step.started_at ?? Number.MAX_SAFE_INTEGER,
     step,
   }));
   for (const question of thread.questions ?? []) {
@@ -231,12 +213,7 @@ export function rcaThreadEntries(thread: RcaThread, items: RcaSteerRecord[]): Rc
   return list.sort((a, b) => a.at - b.at);
 }
 
-/**
- * Plain-text transcript for "Copy thread" (02 TH38): the start, then in the
- * column's order each step (title, note, tool names with their key arguments),
- * each question ("Needs input: …") and each responder message (author, time,
- * status, text; 04 SG38).
- */
+/** Copy the visible transcript in its displayed order, omitting absent values. */
 export function rcaThreadPlainText(
   thread: RcaThread,
   title: string,
@@ -246,7 +223,7 @@ export function rcaThreadPlainText(
   if (thread.started) {
     lines.push(
       "",
-      `${gt("alerts.incidents.rcaThread.analysisStarted")} · ${formatRcaClock(thread.started.at)} UTC`,
+      `${gt("alerts.incidents.rcaThread.analysisStarted")}${thread.started.at === null ? "" : ` · ${formatRcaClock(thread.started.at)} UTC`}`,
     );
     if (thread.started.prompt) lines.push(thread.started.prompt);
   }
@@ -270,13 +247,18 @@ export function rcaThreadPlainText(
       continue;
     }
     const { step } = entry;
-    lines.push("", `${step.index}. ${step.title} · ${formatRcaClock(step.started_at)} UTC`);
+    lines.push(
+      "",
+      `${step.index}. ${step.title}${step.started_at === null ? "" : ` · ${formatRcaClock(step.started_at)} UTC`}`,
+    );
     if (step.note) lines.push(step.note);
     for (const call of step.tool_calls) {
       const parts = [rcaToolStatusLabel(call) as string];
       if (call.result_summary) parts.push(call.result_summary);
       if (call.duration_ms !== null) parts.push(formatRcaDuration(call.duration_ms));
-      lines.push(`  - ${call.tool}: ${call.key_arg} [${parts.join(" · ")}]`);
+      lines.push(
+        `  - ${call.tool}${call.key_arg === null ? "" : `: ${call.key_arg}`} [${parts.join(" · ")}]`,
+      );
       if (call.error) lines.push(`    ${call.error}`);
     }
   }

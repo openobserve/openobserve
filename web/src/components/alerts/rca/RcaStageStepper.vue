@@ -14,8 +14,6 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!-- The seven-stage stepper of a live run (02 TH37): "Stage n/7 · <stage>" and
-     one bar per stage, done / current / to do. -->
 <template>
   <div data-test="rca-stage-stepper" class="flex max-w-215 flex-col gap-1.5">
     <p

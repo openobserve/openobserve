@@ -29,7 +29,6 @@ import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 
 /** Query flags of `POST …/rca`; `guidance` is sent as the JSON body (04 SG33). */
 export type RcaTriggerParams = {
-  reanalysis?: boolean;
   build_on_previous?: boolean;
   guidance?: string;
 };
@@ -53,14 +52,7 @@ export type RcaResumeResult =
   | { status: "declined" }
   | { status: "unavailable"; message: I18nText };
 
-/**
- * Starts an RCA run and handles the paid-usage consent flow (RR-33).
- *
- * Cloud mounts the consent dialog: a 412 consent error prompts once and retries
- * once on accept. Other builds do not mount the dialog: a 412 returns
- * `unavailable` with the server's message and never waits for a prompt. Every
- * other error is rethrown to the caller.
- */
+/** Starts an RCA run and handles the paid-usage consent flow (RR-33). */
 export function useRcaTrigger() {
   const { t } = useI18nTyped();
   const { promptForConsent } = usePaidOverageConsent();
