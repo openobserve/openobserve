@@ -84,6 +84,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="rum-analytics-named-events-preview"
                   >{{ previewText }}</span
                 >
+                <span
+                  v-if="noParamMatch"
+                  class="text-text-secondary flex flex-wrap items-center gap-1 text-xs"
+                  data-test="rum-analytics-named-events-preview-no-param"
+                  >{{ t("rum.analytics.events.previewNoParam") }}
+                  <OButton
+                    as="a"
+                    variant="ghost-primary"
+                    size="xs"
+                    :href="logsHref"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    data-test="rum-analytics-named-events-preview-logs-link"
+                    >{{ t("rum.analytics.events.openInLogs") }}</OButton
+                  ></span
+                >
               </div>
             </OFormSection>
           </div>
@@ -150,14 +166,16 @@ import useNamedEvents, { readNamedEventHandoff } from "@/composables/rum/useName
 import useProductAnalytics from "@/composables/rum/useProductAnalytics";
 import useAnalyticsSearch from "@/composables/rum/useAnalyticsSearch";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import { addCommasToNumber } from "@/utils/formatters";
+import { addCommasToNumber, b64EncodeUnicode } from "@/utils/formatters";
+import { sqlEquals } from "@/utils/query/sqlFilterBuilder";
 import {
   MAX_RULES,
   parseNamedEventDraft,
   type NamedEvent,
+  type NamedRule,
 } from "@/utils/rum/productAnalyticsModel";
 import { rumPaError } from "@/utils/rum/rumPaApiError";
-import { featuresSql } from "@/utils/rum/productAnalyticsQueries";
+import { stepPredicateRaw } from "@/utils/rum/productAnalyticsQueries";
 import { PA_ROUTES, SUBTAB_ROUTES } from "@/utils/rum/productAnalyticsRoutes";
 import {
   emptyRule,
@@ -165,12 +183,15 @@ import {
   namedEventDefaults,
   toRules,
   type NamedEventForm,
+  type RuleOp,
 } from "./NamedEventEditor.schema";
 
 defineOptions({ name: "NamedEventEditor" });
 
 const NEW = "new";
 const PREVIEW_DEBOUNCE_MS = 400;
+const PREVIEW_DAYS = 7;
+const DAY_US = 86_400_000_000;
 
 const props = defineProps<{ id?: string }>();
 
@@ -242,6 +263,60 @@ const previewText = computed<I18nText>(() => {
   const n = Number(p.rows[0]?.e0_sessions ?? 0);
   return t("rum.analytics.events.preview", { count: addCommasToNumber(n) }, n);
 });
+
+const draftEvent = (rules: NamedRule[]): NamedEvent | null => {
+  const parsed = parseNamedEventDraft(
+    { app: app.value, name: values.value.name || "preview", rules },
+    app.value,
+  );
+  return parsed
+    ? {
+        ...parsed,
+        id: "preview",
+        version: 1,
+        createdBy: "",
+        createdAt: 0,
+        updatedBy: "",
+        updatedAt: 0,
+      }
+    : null;
+};
+
+const paramRules = computed(() =>
+  toRules(values.value.rules ?? []).filter((r) => r.t === "view" && r.op === "param"),
+);
+
+const noParamMatch = computed(() => {
+  const p = previewPanel.value;
+  return p.status === "ok" && !Number(p.rows[0]?.e0_sessions ?? 0) && paramRules.value.length > 0;
+});
+
+// Logs gets the same predicate the preview counted, so the analyst can read the raw URLs.
+const logsHref = computed(() => {
+  const ev = draftEvent(paramRules.value);
+  if (!ev) return "";
+  const where = `${sqlEquals("application_id", app.value)} AND ${stepPredicateRaw({ kind: "e", key: ev.id }, pa.scope.value, [ev])}`;
+  return router.resolve({
+    name: "logs",
+    query: {
+      org_identifier: org(),
+      stream_type: "logs",
+      stream: "_rumdata",
+      period: `${PREVIEW_DAYS}d`,
+      sql_mode: "false",
+      // Standard padding: Logs decodes either form, and plain base64 readers need it.
+      query: (b64EncodeUnicode(where) ?? "").replace(/\./g, "="),
+    },
+  }).href;
+});
+
+// Ref and error rules read columns a stream may not have, and a query naming one would fail.
+const previewable = (rules: NamedRule[]): boolean =>
+  rules.every((r) =>
+    r.t === "error"
+      ? pa.scope.value.schema.error_message
+      : r.t !== "view" || r.op !== "ref" || pa.scope.value.schema.view_referrer,
+  );
 
 const loadOptions = async () => {
   const options = await pa.pickerOptions();
@@ -340,29 +415,24 @@ const schedulePreview = () => {
   if (previewTimer) clearTimeout(previewTimer);
   previewTimer = setTimeout(() => {
     previewTimer = null;
-    const parsed = parseNamedEventDraft(
-      {
-        app: app.value,
-        name: values.value.name || "preview",
-        rules: toRules(values.value.rules ?? []),
-      },
-      app.value,
-    );
-    if (!parsed || !formReady.value) return;
-    const draft: NamedEvent = {
-      ...parsed,
-      id: "preview",
-      version: 1,
-      createdBy: "",
-      createdAt: 0,
-      updatedBy: "",
-      updatedAt: 0,
-    };
-    const r = pa.resolveRange();
-    const prev = { startUs: r.startUs - (r.endUs - r.startUs), endUs: r.endUs };
+    const draft = draftEvent(toRules(values.value.rules ?? []));
+    if (!draft || !formReady.value) return;
+    // Counting before the app's rules are known would ignore its exclusions.
+    if (!pa.rulesReady.value) {
+      runner.hold("preview", "loading");
+      return;
+    }
+    if (!previewable(draft.rules)) {
+      runner.hold("preview", "idle");
+      return;
+    }
+    const endUs = Date.now() * 1000;
+    const startUs = endUs - PREVIEW_DAYS * DAY_US;
+    const sql = pa.eventPreviewSql(draft.rules);
+    if (!sql) return;
     void runner.run(
       "preview",
-      { sql: featuresSql(pa.scope.value, r.startUs, null, [draft]), ...prev, limit: 1, sampled: 1 },
+      { sql, startUs, endUs, limit: 1, sampled: 1 },
       JSON.stringify(draft.rules),
     );
   }, PREVIEW_DEBOUNCE_MS);
@@ -387,6 +457,8 @@ const guardLeave: NavigationGuardWithThis<undefined> = (to, _from, next) => {
 
 watch(values, schedulePreview, { deep: true });
 watch(formReady, (ready) => ready && schedulePreview());
+// The preview waits for the app's rules, so it runs once they arrive.
+watch(pa.rulesReady, (ready) => ready && schedulePreview());
 watch(
   () => values.value.name,
   () => setServerFieldErrors(form, {}),
@@ -403,6 +475,6 @@ onBeforeUnmount(() => {
 });
 
 defineExpose({
-  setRuleOp: (i: number, op: "eq" | "prefix" | "regex") => form.setFieldValue(`rules[${i}].op`, op),
+  setRuleOp: (i: number, op: RuleOp) => form.setFieldValue(`rules[${i}].op`, op),
 });
 </script>

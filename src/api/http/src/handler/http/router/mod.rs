@@ -1362,7 +1362,8 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/rum/analytics/named_events/{id}", get(rum_analytics::get_named_event).put(rum_analytics::update_named_event).delete(rum_analytics::delete_named_event))
         .route("/{org_id}/rum/analytics/named_events/{id}/funnels", get(rum_analytics::named_event_funnels))
         .route("/{org_id}/rum/analytics/funnels", get(rum_analytics::list_funnels).post(rum_analytics::create_funnel))
-        .route("/{org_id}/rum/analytics/funnels/{id}", get(rum_analytics::get_funnel).put(rum_analytics::update_funnel).delete(rum_analytics::delete_funnel));
+        .route("/{org_id}/rum/analytics/funnels/{id}", get(rum_analytics::get_funnel).put(rum_analytics::update_funnel).delete(rum_analytics::delete_funnel))
+        .route("/{org_id}/rum/analytics/settings", get(rum_analytics::get_app_settings).put(rum_analytics::put_app_settings));
 
     #[cfg(feature = "enterprise")]
     {

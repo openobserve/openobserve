@@ -90,4 +90,16 @@ describe("main.ts RUM beforeSend", () => {
     expect(beforeSend(event)).toBe(true);
     expect(event.view.url).toBe("https://cloud.openobserve.ai/web/cb#id_token=redacted");
   });
+
+  it("drops a JWT from a click's target name", async () => {
+    const beforeSend = rumBeforeSend();
+    const jwt = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.c2ln";
+    const event = {
+      type: "action",
+      view: { url: "https://cloud.openobserve.ai/web/logs", referrer: "" },
+      action: { target: { name: `Copy ${jwt}` } },
+    };
+    expect(beforeSend(event)).toBe(true);
+    expect(event.action.target.name).toBe("Copy ");
+  });
 });

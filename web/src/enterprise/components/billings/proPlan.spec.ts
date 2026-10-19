@@ -398,3 +398,19 @@ describe("proPlan.vue", () => {
     });
   });
 });
+
+describe("pa gap fixes: plan button test ids (P8)", () => {
+  const mountPlan = (planType: string) =>
+    mount(proPlan, {
+      props: { planType, billingProvider: "stripe", features: mockProFeatures },
+      global: { plugins: [i18n], provide: { store }, stubs: { OIcon: true } },
+    });
+
+  it("P8-R3: Subscribe and Cancel each carry their own data-test", () => {
+    const subscribe = mountPlan("free").find("button");
+    const cancel = mountPlan("pay-as-you-go").find("button");
+    expect(subscribe.attributes("data-test")).toBeTruthy();
+    expect(cancel.attributes("data-test")).toBeTruthy();
+    expect(subscribe.attributes("data-test")).not.toBe(cancel.attributes("data-test"));
+  });
+});

@@ -69,11 +69,11 @@ export class IamFormValidationPage {
         this.userPasswordError     = '[data-test="user-password-field-error"]';
         // OSelect data-test="user-role-field" → error span: data-test="user-role-field-error"
         this.userRoleError         = '[data-test="user-role-field-error"]';
-        this.addUserSubmitBtn      = '[data-test="add-user-dialog"] [data-test="o-dialog-primary-btn"]';
+        this.addUserSubmitBtn      = '[data-test="add-user-submit-btn"]';
         this.addUserCancelBtn      = '[data-test="add-user-dialog"] [data-test="o-dialog-secondary-btn"]';
 
         // ── UpdateRole (edit user) dialog ─────────────────────────────────────
-        // Trigger: row action button data-test="edit-basic-user-${email}" which,
+        // Trigger: row action button data-test="edit-basic-user-${index}" which,
         // in OSS / enterprise (non-cloud) mode, opens the AddUser dialog in update
         // mode (data-test="add-user-dialog"). The legacy UpdateRole.vue dialog is
         // not reachable from this edit button in the current build.
@@ -82,7 +82,7 @@ export class IamFormValidationPage {
         // OSelect data-test="user-role-field" → -trigger to open, -error span on validation
         this.updateRoleSelect      = '[data-test="user-role-field-trigger"]';
         this.updateRoleError       = '[data-test="user-role-field-error"]';
-        this.updateRoleSaveBtn     = '[data-test="add-user-dialog"] [data-test="o-dialog-primary-btn"]';
+        this.updateRoleSaveBtn     = '[data-test="add-user-submit-btn"]';
         this.updateRoleCancelBtn   = '[data-test="add-user-dialog"] [data-test="o-dialog-secondary-btn"]';
 
         // ── Add Role "Start from" preset (new) ────────────────────────────────

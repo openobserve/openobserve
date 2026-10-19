@@ -1354,4 +1354,36 @@ describe("User Component", () => {
       ).toBe(true);
     });
   });
+
+  describe("pa gap fixes: user list test ids (P8)", () => {
+    it("P8-R4: the edit actions' test ids carry a row index, never the email", async () => {
+      const OTableRows = {
+        props: ["data"],
+        template: `<div><div v-for="(row, i) in data" :key="i"><slot name="cell-actions" :row="row" :index="i" /></div></div>`,
+      };
+      const w = mount(User, {
+        global: {
+          provide: { store },
+          plugins: [i18n, router, store],
+          stubs: {
+            ODialog: ODialogStub,
+            AddUser: AddUserStub,
+            OTable: OTableRows,
+            OIcon: { template: "<i />" },
+          },
+        },
+      });
+      await flushPromises();
+      const ids = w
+        .findAll("[data-test]")
+        .map((el) => el.attributes("data-test") ?? "")
+        .filter((id) => id.startsWith("edit-basic-user-"));
+      expect(ids.length).toBeGreaterThan(0);
+      for (const id of ids) {
+        expect(id).not.toContain("test@example.com");
+        expect(id).toMatch(/^edit-basic-user-\d+(-menu)?$/);
+      }
+      w.unmount();
+    });
+  });
 });
