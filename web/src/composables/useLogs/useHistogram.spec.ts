@@ -649,6 +649,27 @@ describe("useHistogram Composable", () => {
       expect(hist.yData).toEqual([3, 5]);
     });
 
+    it("stays stacked when an empty-only partition is followed by populated rows", () => {
+      setAggs([{ zo_sql_key: ts1, zo_sql_num: 4 }]);
+      wrapper.vm.generateHistogramData();
+      const first = mockState.searchObj.data.histogram;
+      expect(first.breakdownField).toBe("severity");
+      expect([...(first.breakdownSeries as unknown as Map<string, number[]>).keys()]).toEqual([""]);
+
+      setAggs([
+        { zo_sql_key: ts1, zo_sql_num: 4 },
+        { zo_sql_key: ts2, zo_sql_breakdown: "error", zo_sql_num: 2 },
+      ]);
+      wrapper.vm.generateHistogramData();
+      const second = mockState.searchObj.data.histogram;
+      const series = second.breakdownSeries as unknown as Map<string, number[]>;
+
+      expect(second.breakdownField).toBe("severity");
+      expect(series.get("")).toEqual([4, 0]);
+      expect(series.get("error")).toEqual([0, 2]);
+      expect(mockState.searchObj.data.queryResults.total).toBe(6);
+    });
+
     it("stacks an untagged row under (empty) beside a tagged row in the same bucket", () => {
       setAggs([
         { zo_sql_key: ts1, zo_sql_num: 10 },

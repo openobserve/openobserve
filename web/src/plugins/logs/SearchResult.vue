@@ -1510,6 +1510,7 @@ export default defineComponent({
 
     // Watch for theme color changes in localStorage
     const handleThemeColorChange = () => {
+      closeStalePinnedTooltip();
       const currentMode = isDark.value ? "dark" : "light";
       const appliedThemeName = localStorage.getItem(THEME_STORAGE_KEYS[currentMode].appliedName);
 
@@ -1527,7 +1528,10 @@ export default defineComponent({
     // Re-render stacked chart with correct palette when dark/light mode switches
     watch(
       () => isDark.value,
-      () => reDrawChart(),
+      () => {
+        closeStalePinnedTooltip();
+        reDrawChart();
+      },
     );
 
     // Pinned tooltip — frozen on bar click so user can explore and select
@@ -1579,6 +1583,11 @@ export default defineComponent({
       pinnedTooltip.value.visible = false;
       // Restore tooltip mouse tracking
       histogramChart.value?.chart?.setOption({ tooltip: { triggerOn: "mousemove|click" } }, false);
+    };
+
+    // Pinned row dots copy series colors at click time, so a theme change would leave them stale.
+    const closeStalePinnedTooltip = () => {
+      if (pinnedTooltip.value.visible) closePinnedTooltip();
     };
 
     const onHistogramAreaClick = (event: MouseEvent) => {
