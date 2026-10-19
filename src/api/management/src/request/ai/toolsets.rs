@@ -22,13 +22,14 @@ use axum::{
 use config::utils::time::now_micros;
 use infra::table::org_ai_toolsets::OrgToolset;
 use o2_enterprise::enterprise::ai::toolsets::{
-    ToolsetCreateRequest, ToolsetKind, ToolsetListResponse, ToolsetResponse, ToolsetUpdateRequest,
-    validate_data,
+    DestinationChanged, ToolsetCreateRequest, ToolsetKind, ToolsetListResponse, ToolsetResponse,
+    ToolsetUpdateRequest, merge_redacted, validate_data,
 };
 use openobserve_api_common::extractors::Headers;
 use openobserve_core::auth::UserEmail;
 use serde::Deserialize;
 
+use super::error::{AiErrorCode, AiErrorEnvelope};
 use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 
 // ---------------------------------------------------------------------------
@@ -203,7 +204,15 @@ pub async fn list(Path(org_id): Path<String>, Query(params): Query<ListQuery>) -
     operation_id = "UpdateAiToolset",
     summary = "Update an AI toolset",
     description = "Updates the description and/or data of an existing AI toolset. \
-                   When `data` is provided it fully replaces the existing config. \
+                   When `data` is provided it replaces the existing config, except that a \
+                   secret (MCP `headers`, CLI `env` and `credential_files` values) sent as \
+                   `***` keeps its stored value; a secret key left out is removed. Keeping \
+                   any `***` requires every destination field (MCP `url`; CLI `command`, \
+                   `allowed_subcommands`, `blocked_subcommands`, `requires_confirmation`) and \
+                   every entry of `headers`, `env` and `credential_files` to stay unchanged, \
+                   except removals; otherwise the save is refused with 400 \
+                   `invalid_request` naming the changed `fields`, and nothing is saved. \
+                   Rotating one secret therefore means re-entering all of them. \
                    Only available in enterprise deployments.",
     params(
         ("org_id" = String, Path, description = "Organization name"),
@@ -216,7 +225,7 @@ pub async fn list(Path(org_id): Path<String>, Query(params): Query<ListQuery>) -
     ),
     responses(
         (status = 200, description = "Toolset updated", content_type = "application/json"),
-        (status = 400, description = "Invalid request", content_type = "application/json"),
+        (status = 400, description = "Invalid request, or a `***` secret kept while a destination field or another secret entry changed (`invalid_request`, `error_code: destination_changed`, `fields`)", content_type = "application/json"),
         (status = 404, description = "Toolset not found", content_type = "application/json"),
     ),
     extensions(("x-o2-mcp" = json!({"enabled": false})))
@@ -233,16 +242,24 @@ pub async fn update(
         Err(e) => return MetaHttpResponse::internal_error(e),
     };
 
-    // Validate incoming data against the existing kind.
-    if body.data.is_some()
-        && let Ok(kind) = ToolsetKind::try_from(existing.kind.as_str())
-        && let Err(e) = validate_data(kind, &body.data)
+    let kind = ToolsetKind::try_from(existing.kind.as_str()).ok();
+    // The GET redacts secrets to `***`, so they are restored before validation and encryption.
+    let merged = body
+        .data
+        .map(|incoming| merge_secrets(&org_id, &id, kind, existing.data.as_deref(), incoming))
+        .transpose();
+    let data = match merged {
+        Ok(data) => data,
+        Err(changed) => return destination_changed(&changed),
+    };
+    if data.is_some()
+        && let Some(kind) = kind
+        && let Err(e) = validate_data(kind, &data)
     {
         return MetaHttpResponse::bad_request(e);
     }
 
-    let data_str = body
-        .data
+    let data_str = data
         .as_ref()
         .map(|v| serde_json::to_string(v).unwrap())
         .or_else(|| existing.data.clone());
@@ -311,4 +328,176 @@ pub async fn delete(Path(path): Path<(String, String)>) -> Response {
         )),
     )
         .into_response()
+}
+
+/// `incoming` with every secret sent as `***` given back its stored value; logs key names only.
+fn merge_secrets(
+    org_id: &str,
+    id: &str,
+    kind: Option<ToolsetKind>,
+    stored: Option<&str>,
+    incoming: serde_json::Value,
+) -> Result<serde_json::Value, DestinationChanged> {
+    let Some(kind) = kind else {
+        return Ok(incoming);
+    };
+    let stored = stored.and_then(|raw| serde_json::from_str::<serde_json::Value>(raw).ok());
+    let merge = merge_redacted(kind, stored.as_ref(), incoming).inspect_err(|changed| {
+        log::warn!(
+            "[org_id:{org_id}] toolset {id} update refused: secrets kept while {:?} changed",
+            changed.fields
+        );
+    })?;
+    if !(merge.kept.is_empty() && merge.replaced.is_empty() && merge.unmatched.is_empty()) {
+        log::info!(
+            "[org_id:{org_id}] toolset {id} secrets kept={:?} replaced={:?} dropped={:?}",
+            merge.kept,
+            merge.replaced,
+            merge.unmatched
+        );
+    }
+    Ok(merge.data)
+}
+
+/// A kept secret would follow the toolset to a new destination, so nothing is saved.
+fn destination_changed(changed: &DestinationChanged) -> Response {
+    AiErrorEnvelope::new(AiErrorCode::InvalidRequest, changed.to_string())
+        .legacy_code("destination_changed")
+        .with("fields", changed.fields.clone())
+        .into_response()
+}
+
+#[cfg(test)]
+mod tests {
+    use o2_enterprise::enterprise::ai::toolsets::{McpData, redact_response_data};
+    use serde_json::json;
+
+    use super::*;
+
+    const STORED: &str =
+        r#"{"url":"https://mcp.example.com/","headers":{"Authorization":"Bearer real-token"}}"#;
+
+    /// What the edit form sends back after a GET: the redacted data, unchanged.
+    fn redacted_round_trip() -> serde_json::Value {
+        let stored: serde_json::Value = serde_json::from_str(STORED).unwrap();
+        redact_response_data(ToolsetKind::Mcp, Some(stored)).unwrap()
+    }
+
+    #[test]
+    fn a_save_that_sends_the_redacted_header_keeps_the_stored_one() {
+        let incoming = redacted_round_trip();
+        assert_eq!(incoming["headers"]["Authorization"], "***");
+        let merged =
+            merge_secrets("o", "t1", Some(ToolsetKind::Mcp), Some(STORED), incoming).unwrap();
+        assert_eq!(merged["headers"]["Authorization"], "Bearer real-token");
+
+        // The agent push parses the stored data as `McpData`, so it carries the real header.
+        let pushed: McpData = serde_json::from_value(merged).unwrap();
+        assert_eq!(pushed.headers["Authorization"], "Bearer real-token");
+    }
+
+    #[test]
+    fn a_new_secret_replaces_the_stored_one_and_a_missing_key_removes_it() {
+        let mut incoming = redacted_round_trip();
+        incoming["headers"]["Authorization"] = json!("Bearer rotated");
+        let merged =
+            merge_secrets("o", "t1", Some(ToolsetKind::Mcp), Some(STORED), incoming).unwrap();
+        assert_eq!(merged["headers"]["Authorization"], "Bearer rotated");
+
+        let cleared = json!({"url": "https://mcp.example.com/", "headers": {}});
+        let merged =
+            merge_secrets("o", "t1", Some(ToolsetKind::Mcp), Some(STORED), cleared).unwrap();
+        assert_eq!(merged["headers"], json!({}));
+    }
+
+    #[test]
+    fn a_placeholder_with_nothing_stored_is_refused_and_an_unknown_kind_is_not_merged() {
+        let refused = merge_secrets(
+            "o",
+            "t1",
+            Some(ToolsetKind::Mcp),
+            None,
+            redacted_round_trip(),
+        );
+        assert!(refused.is_err());
+        let untouched =
+            merge_secrets("o", "t1", None, Some(STORED), redacted_round_trip()).unwrap();
+        assert_eq!(untouched, redacted_round_trip());
+    }
+
+    #[test]
+    fn a_kept_header_is_never_sent_to_a_changed_url() {
+        let mut incoming = redacted_round_trip();
+        incoming["url"] = json!("https://attacker.example/mcp");
+        let changed =
+            merge_secrets("o", "t1", Some(ToolsetKind::Mcp), Some(STORED), incoming).unwrap_err();
+        assert_eq!(changed.fields, ["url"]);
+
+        // Re-entering the secret makes the new URL acceptable.
+        let incoming = json!({
+            "url": "https://attacker.example/mcp",
+            "headers": {"Authorization": "Bearer typed-again"}
+        });
+        let merged =
+            merge_secrets("o", "t1", Some(ToolsetKind::Mcp), Some(STORED), incoming).unwrap();
+        assert_eq!(merged["headers"]["Authorization"], "Bearer typed-again");
+    }
+
+    #[test]
+    fn kept_cli_credentials_never_run_under_a_changed_command() {
+        let stored =
+            r#"{"command":"kubectl","blocked_subcommands":["delete"],"env":{"TOKEN":"real"}}"#;
+        let incoming =
+            json!({"command": "sh", "blocked_subcommands": ["delete"], "env": {"TOKEN": "***"}});
+        let changed =
+            merge_secrets("o", "t1", Some(ToolsetKind::Cli), Some(stored), incoming).unwrap_err();
+        assert_eq!(changed.fields, ["command"]);
+    }
+
+    #[tokio::test]
+    async fn a_kept_cli_token_next_to_a_changed_env_endpoint_is_a_400_and_nothing_merges() {
+        let stored = r#"{"command":"vault","env":{"VAULT_ADDR":"https://vault.corp","VAULT_TOKEN":"s.real"}}"#;
+        let incoming = json!({
+            "command": "vault",
+            "env": {"VAULT_ADDR": "https://attacker.example", "VAULT_TOKEN": "***"}
+        });
+        let changed =
+            merge_secrets("o", "t1", Some(ToolsetKind::Cli), Some(stored), incoming).unwrap_err();
+        assert_eq!(changed.fields, ["env"]);
+        let response = destination_changed(&changed);
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let text = String::from_utf8(body.to_vec()).unwrap();
+        assert!(text.contains(r#""fields":["env"]"#), "{text}");
+        assert!(
+            !text.contains("s.real") && !text.contains("attacker"),
+            "{text}"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_refused_save_is_a_typed_400_that_names_fields_never_values() {
+        let mut incoming = redacted_round_trip();
+        incoming["url"] = json!("https://attacker.example/mcp");
+        let changed =
+            merge_secrets("o", "t1", Some(ToolsetKind::Mcp), Some(STORED), incoming).unwrap_err();
+        let response = destination_changed(&changed);
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let body: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(body["code"], "invalid_request");
+        assert_eq!(body["error_code"], "destination_changed");
+        assert_eq!(body["fields"], json!(["url"]));
+        assert_eq!(body["message"], changed.to_string());
+        assert!(changed.to_string().starts_with("Re-enter every secret"));
+        let text = body.to_string();
+        assert!(
+            !text.contains("real-token") && !text.contains("attacker"),
+            "{text}"
+        );
+    }
 }

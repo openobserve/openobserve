@@ -895,6 +895,9 @@ fn upstream_error(error: &anyhow::Error) -> AiErrorEnvelope {
     let owner_unavailable = is_session_owner_unavailable(error)
         || error.to_string().contains(SESSION_OWNER_UNAVAILABLE);
     let unreachable = is_agent_unreachable(error);
+    if unreachable {
+        super::capabilities::mark_unreachable();
+    }
     let status = if unreachable {
         None
     } else {
@@ -2583,7 +2586,8 @@ async fn persisted_turn(turn: StreamTurn) -> Response {
     );
     let frames = futures::stream::unfold(rx, |mut rx| async move {
         rx.recv().await.map(|chunk| (chunk, rx))
-    });
+    })
+    .inspect(|chunk| super::capabilities::note_turn_frame(chunk));
     let (body, _metering) = meter_persisted_turn(frames, meter, stop);
     sse_response(Body::from_stream(body))
 }
