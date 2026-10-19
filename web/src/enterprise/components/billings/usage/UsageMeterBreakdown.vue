@@ -116,6 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, onActivated, onDeactivated, ref, watch } from "vue";
+import { useStore } from "vuex";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -197,6 +198,7 @@ const emit = defineEmits<{
 
 const { t } = useI18nTyped();
 const orgId = useOrgId();
+const store = useStore();
 /** The org whose usage this breakdown counts. */
 const usageOrgId = computed(() => props.scopeOrgId ?? orgId.value);
 const { isMobile } = useBreakpoint();
@@ -391,6 +393,17 @@ type Labeler = (raws: RawRow[]) => RawRow[];
 
 const keepNames: Labeler = (raws) => raws;
 
+/**
+ * Pipeline and check names live in the org's own lists. A super org admin need not belong to a
+ * member org, and a 401 from one signs the session out in cloud, so a member org the user does
+ * not belong to shows ids instead of asking.
+ */
+const canReadNames = computed(
+  () =>
+    usageOrgId.value === orgId.value ||
+    (store.state.organizations ?? []).some((org: any) => org.identifier === usageOrgId.value),
+);
+
 /** Pipeline and synthetics usage is recorded by id; a deleted entity keeps its id with a suffix. */
 const nameLabeler = async (force: boolean): Promise<Labeler> => {
   const source =
@@ -407,7 +420,7 @@ const nameLabeler = async (force: boolean): Promise<Labeler> => {
             missingKey: "billing.usageV2.unknownCheck" as I18nKey,
           }
         : null;
-  if (!source) return keepNames;
+  if (!source || !canReadNames.value) return keepNames;
   try {
     const list = await cachedRead<any[]>(source.options, force);
     const names = new Map<string, string>(

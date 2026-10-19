@@ -24,7 +24,7 @@ let releaseSchema!: (value: unknown) => void;
 vi.mock("@/composables/query/queryClient", () => ({
   queryClient: {
     invalidateQueries: vi.fn(),
-    fetchQuery: () => new Promise((resolve) => (releaseSchema = resolve)),
+    fetchQuery: vi.fn(() => new Promise((resolve) => (releaseSchema = resolve))),
   },
 }));
 vi.mock("./useUsageSearch", () => ({
@@ -32,6 +32,7 @@ vi.mock("./useUsageSearch", () => ({
 }));
 
 const { default: UsageMeterBreakdown } = await import("./UsageMeterBreakdown.vue");
+const { queryClient } = await import("@/composables/query/queryClient");
 
 enableAutoUnmount(afterEach);
 
@@ -120,5 +121,41 @@ describe("UsageMeterBreakdown for an org with no bill", () => {
 
     const columns = wrapper.findComponent({ name: "OTable" }).props("columns") as { id: string }[];
     expect(columns.map((column) => column.id)).toEqual(["name", "volume", "share"]);
+  });
+});
+
+describe("UsageMeterBreakdown inside a member org", () => {
+  // In cloud a 401 signs the session out, and a super org admin need not belong to its members.
+  const listKeys = () =>
+    (queryClient.fetchQuery as ReturnType<typeof vi.fn>).mock.calls.map((call) =>
+      JSON.stringify((call[0] as { queryKey: unknown }).queryKey),
+    );
+
+  const openPipelines = async (memberIsMine: boolean) => {
+    (queryClient.fetchQuery as ReturnType<typeof vi.fn>).mockClear();
+    store.state.organizations = memberIsMine
+      ? [{ identifier: "member-org", name: "Member" }]
+      : [{ identifier: store.state.selectedOrganization.identifier, name: "Payer" }];
+    mount(UsageMeterBreakdown, {
+      props: {
+        meterKey: "pipeline",
+        details: mockMeteringResponse().upcoming!,
+        refreshToken: 0,
+        scopeOrgId: "member-org",
+      },
+      global: { plugins: [i18n, store], stubs: { OTable: true } },
+    });
+    releaseSchema({ schema: ["stream_name", "event", "size"].map((name) => ({ name })) });
+    await flushPromises();
+  };
+
+  it("does not ask a member org the admin does not belong to for its pipeline names", async () => {
+    await openPipelines(false);
+    expect(listKeys().some((key) => key.includes("member-org"))).toBe(false);
+  });
+
+  it("still names the pipelines of a member org the admin belongs to", async () => {
+    await openPipelines(true);
+    expect(listKeys().some((key) => key.includes("member-org"))).toBe(true);
   });
 });
