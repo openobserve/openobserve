@@ -120,15 +120,7 @@ pub async fn list(
             .then_with(|| a.name.cmp(&b.name))
     });
 
-    // Build a parent-children hierarchy that mirrors the runtime resolver.
-    //
-    // For each item (processed in priority order) we derive a representative model name from its
-    // match_pattern (by stripping flags, anchors and an optional prefix group, then taking the
-    // literal part). An already-placed parent shadows the item when the resolver would pick the
-    // parent for that name: the parent matches it at least as exactly as the item itself does
-    // (an exact match beats an approximate one; equal kinds fall back to priority order, which
-    // the parent already wins). So an org `(?i)claude-3` no longer shadows a built-in
-    // `claude-3-haiku` that matches its own name exactly.
+    // An item nests under the first parent the resolver would pick for the item's own name.
     let never_matches = regex::Regex::new("$^").unwrap();
     let mut parents: Vec<(ModelPricingDefinition, regex::Regex)> = Vec::new();
 

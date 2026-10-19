@@ -90,26 +90,6 @@ pub fn resolve_pricing(
     }
 }
 
-/// Best match for `model_name` in a compiled-in table: the first exact match, else the first
-/// approximate one. The table is ordered most specific first, so among approximate matches that
-/// order decides (e.g. `claude-sonnet-4-5` before `claude-sonnet-4` for a dated snapshot name).
-fn find_compiled<'a>(
-    table: &'a [ModelPricing],
-    model_name: &str,
-) -> Option<(&'a ModelPricing, MatchKind)> {
-    let mut approximate = None;
-    for pricing in table {
-        match pricing.match_kind(model_name) {
-            Some(MatchKind::Exact) => return Some((pricing, MatchKind::Exact)),
-            Some(MatchKind::Approximate) if approximate.is_none() => {
-                approximate = Some((pricing, MatchKind::Approximate));
-            }
-            _ => {}
-        }
-    }
-    approximate
-}
-
 /// Canonicalize a raw model name string to a stable identifier.
 ///
 /// Different vendors/instrumentation frameworks report the same model under
@@ -129,6 +109,26 @@ pub fn canonical_model_pattern(model_name: &str) -> Option<&'static str> {
 /// pattern rather than matching a single Rust string.
 pub fn model_patterns() -> impl Iterator<Item = &'static str> {
     MODEL_PRICING.iter().map(|p| p.pattern.as_str())
+}
+
+/// Best match for `model_name` in a compiled-in table: the first exact match, else the first
+/// approximate one. The table is ordered most specific first, so among approximate matches that
+/// order decides (e.g. `claude-sonnet-4-5` before `claude-sonnet-4` for a dated snapshot name).
+fn find_compiled<'a>(
+    table: &'a [ModelPricing],
+    model_name: &str,
+) -> Option<(&'a ModelPricing, MatchKind)> {
+    let mut approximate = None;
+    for pricing in table {
+        match pricing.match_kind(model_name) {
+            Some(MatchKind::Exact) => return Some((pricing, MatchKind::Exact)),
+            Some(MatchKind::Approximate) if approximate.is_none() => {
+                approximate = Some((pricing, MatchKind::Approximate));
+            }
+            _ => {}
+        }
+    }
+    approximate
 }
 
 /// Pricing tier based on token count or other conditions

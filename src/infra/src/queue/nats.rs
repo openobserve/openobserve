@@ -348,9 +348,7 @@ fn max_age_update(
     })
 }
 
-// get_or_create_consumer returns an existing durable consumer unchanged, so a
-// deployment that predates the limit is updated in place; failure only warns:
-// the consumer still works, it just keeps redelivering without a limit
+// updates a durable consumer created before the limit; failure only warns, as in reconcile_max_age
 async fn reconcile_max_deliver(
     stream: &jetstream::stream::Stream,
     current: &jetstream::consumer::Config,

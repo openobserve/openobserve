@@ -442,8 +442,7 @@ mod tests {
         assert_eq!(active.is_baseline, Set(false));
         assert_eq!(active.lifecycle_version, Set(4));
 
-        // A head the peer already demoted for a newer promotion still takes
-        // its own demotion message.
+        // A head already demoted for a newer promotion still takes its own demotion message.
         current.is_baseline = false;
         assert!(revision(current, &clear).unwrap().is_some());
     }
