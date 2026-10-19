@@ -203,7 +203,6 @@ pub async fn search(
 
     // Result caching check ends, start search
     let cache_took = start.elapsed().as_millis() as usize;
-    let mut results = Vec::new();
     let mut work_group_set = Vec::new();
     let mut search_results_have_hits = false;
     let mut res = if !should_exec_query {
@@ -319,7 +318,7 @@ pub async fn search(
         let drain = in_req.search_type == Some(search::SearchEventType::PublicDashboard);
         // Deltas run as `{trace_id}-{n}`; the failing parent goes with them.
         let family = trace_id.to_string();
-        results = join_deltas(tasks, drain, move || async move {
+        let mut results = join_deltas(tasks, drain, move || async move {
             crate::abort_trace_family(&family).await
         })
         .await?;

@@ -788,7 +788,7 @@ pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
     Ok(search::QueryStatusResponse { status })
 }
 
-/// Aborts this node's `trace_id` search and its `{trace_id}-` children in every org; a no-op in OSS.
+/// Aborts this node's `trace_id` search and its `{trace_id}-` children in every org; OSS no-op.
 pub async fn abort_trace_family(trace_id: &str) {
     #[cfg(feature = "enterprise")]
     if let Some(cancelled) = SEARCH_SERVER.cancel(None, trace_id).await {
