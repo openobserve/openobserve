@@ -30,16 +30,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <BetaBadge />
       </span>
     </template>
+    <template #subtitle>
+      <span class="flex min-w-0 items-center gap-1">
+        <OTruncatedText class="leading-normal">{{ t("rum.analytics.subtitle") }}</OTruncatedText>
+        <span
+          tabindex="0"
+          role="img"
+          class="text-text-secondary flex shrink-0 items-center"
+          :aria-label="t('rum.analytics.sdkSampled')"
+          data-test="rum-analytics-sdk-sampling"
+        >
+          <OIcon name="info-outline" size="xs" />
+          <OTooltip
+            :content="t('rum.analytics.sdkSampledTip', { field: raw('sessionSampleRate') })"
+          />
+        </span>
+      </span>
+    </template>
     <template #actions>
       <OSelect
         v-if="appOptions.length > 1"
-        :model-value="state.app"
+        :model-value="[state.app, ...(pa.scope.value.apps ?? [])]"
         :options="appOptions"
         size="sm"
         searchable
+        multiple
+        row-click-single-select
         class="w-48 max-md:w-36"
         data-test="rum-analytics-app-select"
-        @update:model-value="onAppChange"
+        @update:model-value="onAppsChange"
       />
       <OTag
         v-else-if="state.app"
@@ -70,6 +89,75 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="rum-analytics-version-select"
         @update:model-value="onVersionChange"
       />
+      <OPopover
+        v-if="identityNote"
+        v-model:open="identityOpen"
+        side="bottom"
+        align="end"
+        content-class="p-3 w-80"
+      >
+        <template #trigger>
+          <OTag
+            :label="
+              state.includeAllIdentities
+                ? t('rum.analytics.identityIncluded')
+                : t(
+                    'rum.analytics.identityExcluded',
+                    { count: identityNote.count, pct: sharePct },
+                    identityNote.count,
+                  )
+            "
+            variant="warning-soft"
+            size="md"
+            clickable
+            data-test="rum-analytics-identity-note"
+          />
+        </template>
+        <div class="flex flex-col gap-2 text-sm">
+          <p class="text-text-body" data-test="rum-analytics-identity-help">
+            {{ identityHelp }}
+          </p>
+          <OButton
+            variant="outline"
+            size="sm"
+            data-test="rum-analytics-identity-include-btn"
+            @click="toggleIncludeAll"
+            >{{
+              state.includeAllIdentities
+                ? t("rum.analytics.excludeAgain")
+                : t("rum.analytics.includeIt")
+            }}</OButton
+          >
+        </div>
+      </OPopover>
+      <OButton
+        v-if="exclusionCount !== null"
+        variant="outline"
+        size="sm"
+        :icon-left="likelyBot ? 'warning' : 'filter-alt'"
+        data-test="rum-analytics-exclusions-chip"
+        @click="exclusionsOpen = true"
+        >{{
+          likelyBot
+            ? t("rum.analytics.exclusions.chipLikelyBot", { count: exclusionCount })
+            : t("rum.analytics.exclusions.chip", { count: exclusionCount })
+        }}</OButton
+      >
+      <OButton
+        v-if="showNewUsers"
+        variant="outline"
+        size="sm"
+        :active="state.newUsers"
+        :aria-pressed="state.newUsers"
+        :disabled="newUsersDisabled"
+        focusable-unavailable
+        data-test="rum-analytics-new-users-chip"
+        @click="toggleNewUsers"
+        >{{ t("rum.analytics.exclusions.newUsersOnly")
+        }}<OTooltip
+          v-if="newUsersDisabled"
+          :content="t('rum.analytics.exclusions.newUsersSessionsTip')"
+      /></OButton>
       <DateTimePickerDashboard
         ref="dateTimePickerRef"
         :model-value="state.datetime"
@@ -85,7 +173,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="rum-analytics-refresh-btn"
         @click="refresh"
       >
-        <OTooltip :content="t('rum.analytics.refresh')" />
+        <OTooltip
+          :content="
+            dataThrough
+              ? t('rum.analytics.refreshDataThrough', { time: dataThrough })
+              : t('rum.analytics.refresh')
+          "
+        />
       </OButton>
       <ShareButton
         data-test="rum-analytics-share-btn"
@@ -119,75 +213,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <RumNoDataState />
     </div>
     <div v-else class="flex h-full min-h-0 flex-col">
-      <div
-        class="px-page-edge text-text-secondary border-border-default flex shrink-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 border-b py-1 text-xs"
-        data-test="rum-analytics-trust-caption"
-      >
-        <span v-if="dataThrough" data-test="rum-analytics-data-through">{{
-          t("rum.analytics.dataThrough", { time: dataThrough })
-        }}</span>
-        <span v-if="dataThrough" aria-hidden="true">{{ separator }}</span>
-        <OTooltip :content="t('rum.analytics.sdkSampledTip', { field: raw('sessionSampleRate') })">
-          <span
-            tabindex="0"
-            class="underline decoration-dotted underline-offset-2"
-            data-test="rum-analytics-sdk-sampling"
-            >{{ t("rum.analytics.sdkSampled") }}</span
-          >
-        </OTooltip>
-        <template v-if="syntheticCount > 0">
-          <span aria-hidden="true">{{ separator }}</span>
-          <span data-test="rum-analytics-synthetic-excluded">{{
-            t(
-              "rum.analytics.syntheticExcluded",
-              { count: addCommasToNumber(syntheticCount) },
-              syntheticCount,
-            )
-          }}</span>
-        </template>
-        <OPopover
-          v-if="identityNote"
-          v-model:open="identityOpen"
-          side="bottom"
-          align="start"
-          content-class="p-3 w-80"
-        >
-          <template #trigger>
-            <OTag
-              :label="
-                state.includeAllIdentities
-                  ? t('rum.analytics.identityIncluded')
-                  : t(
-                      'rum.analytics.identityExcluded',
-                      { count: identityNote.count, pct: sharePct },
-                      identityNote.count,
-                    )
-              "
-              variant="warning-soft"
-              size="sm"
-              clickable
-              data-test="rum-analytics-identity-note"
-            />
-          </template>
-          <div class="flex flex-col gap-2 text-sm">
-            <p class="text-text-body" data-test="rum-analytics-identity-help">
-              {{ identityHelp }}
-            </p>
-            <OButton
-              variant="outline"
-              size="sm"
-              data-test="rum-analytics-identity-include-btn"
-              @click="toggleIncludeAll"
-              >{{
-                state.includeAllIdentities
-                  ? t("rum.analytics.excludeAgain")
-                  : t("rum.analytics.includeIt")
-              }}</OButton
-            >
-          </div>
-        </OPopover>
-      </div>
-
       <OBanner
         v-if="invalidParams.length && !invalidDismissed"
         variant="warning"
@@ -215,6 +240,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :content="t('rum.analytics.events.deletedNotice')"
         data-test="rum-analytics-deleted-event-link"
       />
+
+      <OBanner
+        v-if="state.includeExcluded"
+        variant="warning"
+        dense
+        class="mx-page-edge mt-2"
+        :content="includedBanner"
+        data-test="rum-analytics-included-banner"
+      >
+        <template #actions>
+          <OButton
+            v-if="appFilters.hiddenFailed.value"
+            variant="ghost"
+            size="sm"
+            data-test="rum-analytics-hidden-count-retry-btn"
+            @click="appFilters.retryHidden()"
+            >{{ t("common.retry") }}</OButton
+          >
+          <OButton
+            variant="ghost"
+            size="sm"
+            data-test="rum-analytics-hide-hidden-btn"
+            @click="appFilters.setIncludeHidden(router, false)"
+            >{{ t("rum.analytics.appFilters.hideHidden") }}</OButton
+          >
+        </template>
+      </OBanner>
 
       <div class="border-border-default pe-page-edge flex shrink-0 items-center gap-2 border-b">
         <OTabs
@@ -256,11 +308,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div v-else class="min-h-0 flex-1 overflow-auto">
         <router-view v-slot="{ Component }">
           <keep-alive :include="SUBTAB_VIEWS">
-            <component :is="Component" />
+            <component
+              :is="Component"
+              @open-exclusions="exclusionsOpen = true"
+              @likely-bot="(v: boolean) => (likelyBot = v)"
+            />
           </keep-alive>
         </router-view>
       </div>
     </div>
+    <ExclusionsDrawer v-model:open="exclusionsOpen" />
   </OPageLayout>
 </template>
 
@@ -278,6 +335,8 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
@@ -290,16 +349,19 @@ import BetaBadge from "@/components/common/BetaBadge.vue";
 import SampledTag from "@/components/rum/productAnalytics/SampledTag.vue";
 import AnalyticsPanelState from "@/components/rum/productAnalytics/AnalyticsPanelState.vue";
 import RumNoDataState from "@/components/rum/RumNoDataState.vue";
+import ExclusionsDrawer from "@/components/rum/productAnalytics/ExclusionsDrawer.vue";
 import useNamedEvents from "@/composables/rum/useNamedEvents";
 import useSavedFunnels from "@/composables/rum/useSavedFunnels";
 import useFunnelDraft from "@/composables/rum/useFunnelDraft";
 import useRum from "@/composables/rum/useRum";
+import useAppFilterCounts from "@/composables/rum/useAppFilterCounts";
 import useProductAnalytics, { querySignature } from "@/composables/rum/useProductAnalytics";
 import type { PanelState } from "@/composables/rum/useAnalyticsSearch";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { addCommasToNumber } from "@/utils/formatters";
 import {
   EXACT_ROW_LIMIT,
+  MAX_COMPARED_APPS,
   MAX_EVENTS_PER_APP,
   type AnalyticsDateTime,
 } from "@/utils/rum/productAnalyticsModel";
@@ -331,6 +393,7 @@ const pa = useProductAnalytics();
 const namedEvents = useNamedEvents();
 const savedFunnels = useSavedFunnels();
 const funnelDraft = useFunnelDraft();
+const appFilters = useAppFilterCounts();
 const {
   state,
   apps,
@@ -346,12 +409,13 @@ const {
   deletedEventLink,
 } = pa;
 
-const separator = raw("·");
 let active = false;
 let activatedOnce = false;
 const invalidDismissed = ref(false);
 const identityOpen = ref(false);
 const dateTimePickerRef = ref<any>(null);
+const exclusionsOpen = ref(false);
+const likelyBot = ref(false);
 
 const org = computed(() => store.state.selectedOrganization?.identifier ?? "");
 
@@ -372,6 +436,26 @@ const appOptions = computed(() => {
   if (state.app && !listed.includes(state.app)) listed.unshift(state.app);
   return listed.map((a) => ({ label: raw(a), value: a }));
 });
+// Ignored pages are not counted: they never change which sessions are kept.
+const exclusionCount = computed(() => {
+  const ex = pa.scope.value.exclusions;
+  return ex ? (ex.bots ? 1 : 0) + ex.sessions.length : null;
+});
+
+const includedBanner = computed<I18nText>(() => {
+  const n = appFilters.hiddenTotal.value;
+  return n === null
+    ? t("rum.analytics.appFilters.includedBannerPending")
+    : t("rum.analytics.appFilters.includedBanner", { count: addCommasToNumber(n) }, n);
+});
+
+const NEW_USERS_ROUTES: string[] = [PA_ROUTES.funnelBuilder, PA_ROUTES.paths, PA_ROUTES.retention];
+const showNewUsers = computed(() => NEW_USERS_ROUTES.includes(String(route.name)));
+// New users are counted per user, so a Sessions funnel has nothing to filter.
+const newUsersDisabled = computed(
+  () => route.name === PA_ROUTES.funnelBuilder && pa.funnel.value.unit === "sessions",
+);
+
 const envSelectOptions = computed(() =>
   envOptions.value.map((o) => ({ label: raw(o.value), value: o.value })),
 );
@@ -384,10 +468,6 @@ const dataThrough = computed(() => {
   if (!us) return "";
   return formatInTimeZone(new Date(us / 1000), store.state.timezone || "UTC", "yyyy-MM-dd HH:mm");
 });
-
-const syntheticCount = computed(() =>
-  pa.schema.value.session_type ? (summary.value?.syntheticSessions ?? 0) : 0,
-);
 
 const sharePct = computed(() => Math.round((identityNote.value?.share ?? 0) * 100));
 const identityHelp = computed(() => {
@@ -452,6 +532,22 @@ const reload = async (force = false) => {
 const onAppChange = (value: unknown) => {
   if (typeof value !== "string" || value === state.app) return;
   pa.setScope({ app: value, env: [], version: [] }, true);
+  void reload();
+};
+
+// A row click picks one app and a checkbox adds a compared app, so the primary stays while it is still picked.
+const onAppsChange = (value: unknown) => {
+  const picked = Array.isArray(value) ? value.map(String) : [];
+  if (!picked.length) return;
+  const primary = picked.includes(state.app) ? state.app : picked[0];
+  const apps = picked.filter((a) => a !== primary).slice(0, MAX_COMPARED_APPS);
+  if (primary !== state.app) pa.setScope({ app: primary, env: [], version: [], apps }, true);
+  else pa.setScope({ apps });
+  void reload();
+};
+
+const toggleNewUsers = () => {
+  pa.setScope({ newUsers: !state.newUsers });
   void reload();
 };
 

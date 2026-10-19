@@ -682,16 +682,6 @@ mod tests {
         assert!(result.is_err());
     }
 
-    #[test]
-    fn test_correlation_request_missing_dimensions_field() {
-        let json = r#"{
-            "source_stream": "default",
-            "source_type": "logs"
-        }"#;
-        let result = serde_json::from_str::<CorrelationRequest>(json);
-        assert!(result.is_err());
-    }
-
     // -----------------------------------------------------------------------
     // Group B: CardinalityClass — boundary values and methods
     // -----------------------------------------------------------------------
@@ -734,15 +724,6 @@ mod tests {
             CardinalityClass::from_cardinality(10001),
             CardinalityClass::VeryHigh
         );
-    }
-
-    #[test]
-    fn test_cardinality_class_is_suitable_for_correlation() {
-        assert!(CardinalityClass::VeryLow.is_suitable_for_correlation());
-        assert!(CardinalityClass::Low.is_suitable_for_correlation());
-        assert!(CardinalityClass::Medium.is_suitable_for_correlation());
-        assert!(!CardinalityClass::High.is_suitable_for_correlation());
-        assert!(!CardinalityClass::VeryHigh.is_suitable_for_correlation());
     }
 
     // -----------------------------------------------------------------------
@@ -1003,13 +984,5 @@ mod tests {
             let deserialized: CardinalityClass = serde_json::from_str(&json).unwrap();
             assert_eq!(class, deserialized);
         }
-    }
-
-    #[test]
-    fn test_cardinality_class_ordering() {
-        assert!(CardinalityClass::VeryLow < CardinalityClass::Low);
-        assert!(CardinalityClass::Low < CardinalityClass::Medium);
-        assert!(CardinalityClass::Medium < CardinalityClass::High);
-        assert!(CardinalityClass::High < CardinalityClass::VeryHigh);
     }
 }

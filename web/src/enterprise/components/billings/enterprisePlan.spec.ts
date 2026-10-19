@@ -284,3 +284,13 @@ describe("enterprisePlan.vue", () => {
     ]);
   });
 });
+
+describe("pa gap fixes: plan button test ids (P8)", () => {
+  it("P8-R3: Contact sales carries a data-test", () => {
+    const w = mount(enterprisePlan, {
+      props: { features: mockEnterpriseFeatures },
+      global: { plugins: [i18n], provide: { store }, stubs: { OIcon: true } },
+    });
+    expect(w.find("button").attributes("data-test")).toBeTruthy();
+  });
+});

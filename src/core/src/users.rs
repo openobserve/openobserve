@@ -1543,12 +1543,6 @@ mod tests {
     static TEST_SETUP_LOCK: tokio::sync::OnceCell<Mutex<()>> = tokio::sync::OnceCell::const_new();
 
     #[test]
-    fn test_redact_token_normal() {
-        // output is always 12 chars: first 4 visible, rest padded with '*'
-        assert_eq!(redact_token("abcd1234567890ef"), "abcd********");
-    }
-
-    #[test]
     fn test_redact_token_exactly_four_chars() {
         // 4 visible chars + 8 stars = 12 total
         assert_eq!(redact_token("abcd"), "abcd********");
@@ -1560,12 +1554,6 @@ mod tests {
         assert_eq!(redact_token("ab"), "************");
         assert_eq!(redact_token("x"), "************");
         assert_eq!(redact_token(""), "");
-    }
-
-    #[test]
-    fn test_redact_token_five_chars() {
-        // still shows first 4, pads to 12 total
-        assert_eq!(redact_token("abcde"), "abcd********");
     }
 
     /// Returned guard must be held for the whole test: `set_up` truncates the

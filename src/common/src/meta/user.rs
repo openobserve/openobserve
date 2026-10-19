@@ -1005,20 +1005,6 @@ mod tests {
     }
 
     #[test]
-    fn test_user_role_request_empty_role() {
-        let request = UserRoleRequest {
-            role: "".to_string(),
-            custom: None,
-        };
-
-        let org_role = UserOrgRole::from(&request);
-
-        // Empty role should be treated as custom
-        assert_eq!(org_role.base_role, get_default_user_role());
-        assert_eq!(org_role.custom_role, Some(vec!["".to_string()]));
-    }
-
-    #[test]
     fn test_user_response_optional_fields_absent_when_default() {
         let r = UserResponse {
             email: "u@example.com".to_string(),

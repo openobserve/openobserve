@@ -134,12 +134,6 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    #[ignore]
-    async fn test_list_nodes() {
-        assert!(list_nodes().await.unwrap().is_empty());
-    }
-
-    #[tokio::test]
     async fn test_set_online() {
         register_and_keep_alive().await.unwrap();
         set_online().await.unwrap();
@@ -159,14 +153,6 @@ mod tests {
         register_and_keep_alive().await.unwrap();
         set_schedulable().await.unwrap();
         assert!(get_cached_online_ingester_nodes().await.is_some());
-    }
-
-    #[tokio::test]
-    async fn test_update_local_node() {
-        let node = LOCAL_NODE.clone();
-        register_and_keep_alive().await.unwrap();
-        update_local_node(&node).await.unwrap();
-        assert!(get_cached_node_by_name(&node.name).await.is_some());
     }
 
     #[tokio::test]

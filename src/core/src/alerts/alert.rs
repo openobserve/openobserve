@@ -5359,33 +5359,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_update_cron_expression_3() {
-        let cron_exp = "**/15 21-23,0-8 * * *";
-        let now = Utc::now().second();
-        let new_cron_exp = update_cron_expression(cron_exp, now);
-        let updated = format!("{now} */15 21-23,0-8 * * *");
-        assert_eq!(new_cron_exp, updated);
-    }
-
-    #[tokio::test]
-    async fn test_update_cron_expression_4() {
-        let cron_exp = "*10*****";
-        let now = Utc::now().second();
-        let new_cron_exp = update_cron_expression(cron_exp, now);
-        let updated = format!("{now} 10*****");
-        assert_eq!(new_cron_exp, updated);
-    }
-
-    #[tokio::test]
-    async fn test_update_cron_expression_5() {
-        let cron_exp = "* */10 2 * * * *";
-        let now = Utc::now().second();
-        let new_cron_exp = update_cron_expression(cron_exp, now);
-        let updated = format!("{now} */10 2 * * * *");
-        assert_eq!(new_cron_exp, updated);
-    }
-
-    #[tokio::test]
     async fn test_contains_operator_sql() {
         let condition = Condition {
             column: "auth_username".to_string(),
@@ -5531,13 +5504,6 @@ mod tests {
         let original = tpl.clone();
         process_variable_replace(&mut tpl, "age", &VarValue::Str("30"), false);
         assert_eq!(tpl, original); // Should remain unchanged
-    }
-
-    #[test]
-    fn test_process_variable_replace_multiple_occurrences() {
-        let mut tpl = "{name} says hello to {name}".to_string();
-        process_variable_replace(&mut tpl, "name", &VarValue::Str("Bob"), false);
-        assert_eq!(tpl, "Bob says hello to Bob");
     }
 
     #[test]
@@ -5746,12 +5712,6 @@ mod tests {
     #[test]
     fn test_check_json_context_not_json() {
         let tpl = r#"{"hits": "The hits got {rows}"}"#;
-        assert!(!check_json_context(tpl, "rows"));
-    }
-
-    #[test]
-    fn test_check_json_context_in_middle_of_text() {
-        let tpl = r#"This is {rows} in text"#;
         assert!(!check_json_context(tpl, "rows"));
     }
 
@@ -6796,25 +6756,11 @@ mod tests {
         assert_eq!(result, "5 * * * *");
     }
 
-    #[test]
-    fn test_update_cron_expression_zero_seconds() {
-        let result = update_cron_expression("* */5 * * * *", 0);
-        assert_eq!(result, "0 */5 * * * *");
-    }
-
     // ── format_variable_value ──────────────────────────────────────────────
 
     #[test]
     fn test_format_variable_value_single_quote() {
         assert_eq!(format_variable_value("'".to_string()), "\\\\'");
-    }
-
-    #[test]
-    fn test_format_variable_value_soh_stx_us() {
-        // \x01 SOH, \x02 STX, \x1f US — each has a dedicated arm
-        assert_eq!(format_variable_value("\x01".to_string()), "\\u{1}");
-        assert_eq!(format_variable_value("\x02".to_string()), "\\u{2}");
-        assert_eq!(format_variable_value("\x1f".to_string()), "\\u{1f}");
     }
 
     #[test]

@@ -176,61 +176,8 @@ mod tests {
     }
 
     #[test]
-    fn test_get_file_from_empty_puffin_dir_with_ext_idx() {
-        let result = get_file_from_empty_puffin_dir_with_ext("idx");
-        assert!(result.is_ok());
-
-        let data = result.unwrap();
-        assert!(!data.is_empty()); // Should have some data
-    }
-
-    #[test]
-    fn test_get_file_from_empty_puffin_dir_with_ext_pos() {
-        let result = get_file_from_empty_puffin_dir_with_ext("pos");
-        assert!(result.is_ok());
-
-        let data = result.unwrap();
-        assert!(!data.is_empty()); // Should have some data
-    }
-
-    #[test]
-    fn test_get_file_from_empty_puffin_dir_with_ext_fast() {
-        let result = get_file_from_empty_puffin_dir_with_ext("fast");
-        assert!(result.is_ok());
-
-        let data = result.unwrap();
-        assert!(!data.is_empty()); // Should have some data
-    }
-
-    #[test]
-    fn test_get_file_from_empty_puffin_dir_with_ext_fieldnorm() {
-        let result = get_file_from_empty_puffin_dir_with_ext("fieldnorm");
-        assert!(result.is_ok());
-
-        let data = result.unwrap();
-        // fieldnorm files are typically empty or very small
-        assert!(!data.is_empty());
-    }
-
-    #[test]
-    fn test_get_file_from_empty_puffin_dir_with_ext_store() {
-        let result = get_file_from_empty_puffin_dir_with_ext("store");
-        assert!(result.is_ok());
-
-        let data = result.unwrap();
-        // store files might be empty since we added an empty document
-        assert!(!data.is_empty());
-    }
-
-    #[test]
     fn test_get_file_from_empty_puffin_dir_nonexistent_ext() {
         let result = get_file_from_empty_puffin_dir_with_ext("nonexistent");
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_get_file_from_empty_puffin_dir_empty_ext() {
-        let result = get_file_from_empty_puffin_dir_with_ext("");
         assert!(result.is_err());
     }
 

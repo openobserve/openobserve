@@ -50,6 +50,7 @@ import {
   isEntityId,
   MAX_SQL_BYTES,
   parsePathsDef,
+  cohortParam,
   parseRetentionDef,
   parseScope,
   parseStepRef,
@@ -59,6 +60,7 @@ import {
   identityLabels,
   resolveIdentity,
   samplingRatio,
+  funnelParam,
 } from "@/utils/rum/productAnalyticsModel";
 import { funnelSql, type AnalyticsScope } from "@/utils/rum/productAnalyticsQueries";
 
@@ -548,6 +550,7 @@ describe("parseSavedFunnel (AC-67, AC-69)", () => {
         unit: "sessions",
         window: "session",
         breakdown: null,
+        x: [],
       },
     });
     expect(parseSavedFunnel({ ...row, description: null }, "web")?.description).toBeUndefined();
@@ -783,6 +786,7 @@ describe("URL codec and validators (D-45, AC-14, AC-20)", () => {
       unit: "users",
       window: "1d",
       breakdown: "browser",
+      x: [],
     });
   });
 
@@ -845,6 +849,34 @@ describe("URL codec and validators (D-45, AC-14, AC-20)", () => {
     expect(parsePathsDef({ anchor: encodeDef(["p", "/"]), depth: "500" })).toBeNull();
     expect(parsePathsDef({ anchor: encodeDef(["p", "/"]), dir: "up" })).toBeNull();
     expect(parsePathsDef({ anchor: encodeDef(["p", "/"]), inc: "all", depth: "3" })?.depth).toBe(3);
+  });
+
+  it("a cohort link carries its funnel's name, and an older link without one still parses", () => {
+    const funnel = {
+      steps: [
+        { kind: "p" as const, key: "/a" },
+        { kind: "p" as const, key: "/b" },
+      ],
+      unit: "sessions" as const,
+      window: "session" as const,
+      breakdown: null,
+    };
+    const named = {
+      funnel,
+      stepIndex: 1,
+      side: "dropped" as const,
+      name: "Signup",
+      funnelId: "Checkout0000000000000000001",
+    };
+    const back = parsePathsDef({ cohort: cohortParam(named) })?.cohort;
+    expect(back?.name).toBe("Signup");
+    expect(back?.funnelId).toBe("Checkout0000000000000000001");
+    const forged = { ...named, funnelId: "../../etc" };
+    expect(parsePathsDef({ cohort: cohortParam(forged) })?.cohort?.funnelId).toBeUndefined();
+    const unnamed = { funnel, stepIndex: 1, side: "dropped" as const };
+    const parsed = parsePathsDef({ cohort: cohortParam(unnamed) })?.cohort;
+    expect(parsed?.stepIndex).toBe(1);
+    expect(parsed?.name).toBeUndefined();
     const cohort = encodeDef({
       s: [
         ["p", "/a"],
@@ -1589,5 +1621,164 @@ describe("feature rows (AC-45)", () => {
       delta: { kind: "pct", value: 1 },
     });
     expect(rows[2].users).toBeNull();
+  });
+});
+
+describe("pa gap fixes: model parsers (P6)", () => {
+  const steps = [
+    ["p", "/web"],
+    ["p", "/web/logs"],
+    ["p", "/web/billings"],
+  ];
+  const app = "web";
+  const draft = (rule: Record<string, unknown>) =>
+    parseNamedEventDraft({ app, name: "Ev", rules: [rule] }, app);
+
+  it("P6-R1: parseStepRef accepts a third element mapping min, fr and er to step filters", () => {
+    expect(parseStepRef(["p", "/web/logs", { min: 1000 }])).toEqual({
+      kind: "p",
+      key: "/web/logs",
+      f: { minMs: 1000 },
+    });
+    expect(parseStepRef(["p", "/web/logs", { fr: 1, er: 1 }])).toEqual({
+      kind: "p",
+      key: "/web/logs",
+      f: { frustrated: true, errored: true },
+    });
+    expect(parseStepRef(["p", "/web/logs"])).toEqual({ kind: "p", key: "/web/logs" });
+  });
+
+  it("P6-R1: parseFunnelDef reads a between-steps and a within-N exclusion, and absent x as []", () => {
+    const between = parseFunnelDef({ s: steps, x: [{ s: ["p", "/web/ingestion"], a: 2, b: 3 }] });
+    expect(between?.x).toEqual([{ step: { kind: "p", key: "/web/ingestion" }, a: 2, b: 3 }]);
+    const within = parseFunnelDef({ s: steps, x: [{ s: ["p", "/web/ingestion"], a: 2, w: 1000 }] });
+    expect(within?.x).toEqual([
+      { step: { kind: "p", key: "/web/ingestion" }, a: 2, withinMs: 1000 },
+    ]);
+    expect(parseFunnelDef({ s: steps })?.x).toEqual([]);
+  });
+
+  it("P6-R1: an exclusion must carry exactly one of b and w", () => {
+    expect(
+      parseFunnelDef({ s: steps, x: [{ s: ["p", "/web/ingestion"], a: 2, b: 3, w: 1000 }] }),
+    ).toBeNull();
+    expect(parseFunnelDef({ s: steps, x: [{ s: ["p", "/web/ingestion"], a: 2 }] })).toBeNull();
+  });
+
+  it("P6-R1: funnelParam writes exclusions and step options back in the URL form", () => {
+    const raw = {
+      s: [
+        ["p", "/web"],
+        ["p", "/web/logs", { min: 1000 }],
+        ["p", "/web/billings"],
+      ],
+      x: [{ s: ["p", "/web/ingestion"], a: 2, b: 3 }],
+    };
+    const def = parseFunnelDef(raw);
+    expect(def).not.toBeNull();
+    expect(parseFunnelDef(funnelParam(def!))).toEqual(def);
+    expect(funnelParam(def!)).toMatchObject({ s: raw.s, x: raw.x });
+  });
+
+  it("P6-R2: an unknown key in an exclusion is unreadable, not silently dropped", () => {
+    const def = parseFunnelDef({
+      s: steps,
+      x: [{ s: ["p", "/web/ingestion"], a: 2, b: 3, future: 1 }],
+    });
+    expect(def?.steps).toBeUndefined();
+  });
+
+  it("P6-R2: an unknown key in a step's options is unreadable", () => {
+    expect(parseStepRef(["p", "/web/logs", { min: 1000, future: 1 }])).toBeNull();
+    const def = parseFunnelDef({
+      s: [
+        ["p", "/web"],
+        ["p", "/web/logs", { future: 1 }],
+      ],
+    });
+    expect(def?.steps).toBeUndefined();
+  });
+
+  it("P6-R3: a view rule carries a URL parameter with name, optional value and onPage", () => {
+    const rule = {
+      t: "view",
+      op: "param",
+      name: "new_user_login",
+      value: "true",
+      onPage: "/web/cb",
+    };
+    expect(draft(rule)?.rules).toEqual([rule]);
+    const bare = { t: "view", op: "param", name: "new_user_login" };
+    expect(draft(bare)?.rules).toEqual([bare]);
+  });
+
+  it("P6-R3: a view rule carries a referrer host with onPage", () => {
+    const rule = { t: "view", op: "ref", value: "checkout.stripe.com", onPage: "/web/billings" };
+    expect(draft(rule)?.rules).toEqual([rule]);
+  });
+
+  it("P6-R3: a click rule carries op and value; a stored rule without op still parses as in", () => {
+    for (const op of ["prefix", "contains", "regex"]) {
+      const rule = { t: "action", op, value: "o2-table-expand-" };
+      expect(draft(rule)?.rules).toEqual([rule]);
+    }
+    expect(draft({ t: "action", targets: ["save-btn"] })?.rules).toEqual([
+      { t: "action", targets: ["save-btn"] },
+    ]);
+  });
+
+  it("P6-R3: an error rule on the message parses", () => {
+    for (const op of ["eq", "prefix", "contains", "regex"]) {
+      const rule = {
+        t: "error",
+        op,
+        value: "Failed to fetch billing info",
+        onPage: "/web/billings",
+      };
+      expect(draft(rule)?.rules).toEqual([rule]);
+    }
+  });
+
+  it("P6-R3: a URL parameter rule can never select on a credential name", () => {
+    for (const name of ["id_token", "access_token", "code", "token"])
+      expect(draft({ t: "view", op: "param", name })).toBeNull();
+  });
+
+  it("P6-R4: parseScope reads xall and new as flags and rejects other values", () => {
+    for (const key of ["xall", "new"]) {
+      const on = parseScope({ [key]: "1" });
+      expect(on.invalid).toEqual([]);
+      expect(Object.values(on.scope)).toContain(true);
+      expect(parseScope({ [key]: "yes" }).invalid).toEqual([key]);
+    }
+  });
+
+  it("P6-R4: xall and new land in separate scope fields", () => {
+    const xallKeys = Object.keys(parseScope({ xall: "1" }).scope);
+    const newKeys = Object.keys(parseScope({ new: "1" }).scope);
+    expect(xallKeys).toHaveLength(1);
+    expect(newKeys).toHaveLength(1);
+    expect(xallKeys[0]).not.toBe(newKeys[0]);
+    const both = parseScope({ xall: "1", new: "0" }).scope as Record<string, unknown>;
+    expect(both[xallKeys[0]]).toBe(true);
+    expect(both[newKeys[0]]).toBe(false);
+  });
+
+  it("P6-R4: parseScope reads apps and refuses more than 10", () => {
+    const ok = parseScope({ apps: ["o2-prod", "o2-prod-eu1"] });
+    expect(ok.invalid).toEqual([]);
+    expect(Object.values(ok.scope)).toContainEqual(["o2-prod", "o2-prod-eu1"]);
+    const many = Array.from({ length: 11 }, (_, i) => `app-${i}`);
+    expect(parseScope({ apps: many }).invalid).toEqual(["apps"]);
+  });
+});
+
+describe("P5 gap fixes: error path keys (§4.6)", () => {
+  it("P5-R27: pathKeyLabel strips the r: prefix of an error key", () => {
+    expect(
+      pathKeyLabel({ kind: "r", key: "r:Failed to fetch billing info" } as unknown as Parameters<
+        typeof pathKeyLabel
+      >[0]),
+    ).toBe("Failed to fetch billing info");
   });
 });

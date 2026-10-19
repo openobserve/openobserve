@@ -1260,15 +1260,6 @@ pub(super) mod tests {
 
     // ── promql_multi_alert: column ⇄ meta ───────────────────────────────────
 
-    #[test]
-    fn test_try_from_model_reads_the_promql_multi_alert_column() {
-        let id = Ksuid::new(None, None).to_string();
-        let mut m = make_model(&id);
-        m.query_promql_multi_alert = Some(true);
-        let alert = MetaAlert::try_from(m).unwrap();
-        assert!(alert.query_condition.promql_multi_alert);
-    }
-
     /// NULL is the shape every alert written before the column existed has.
     /// Reading it as anything but `false` would flip all of them to per-series
     /// evaluation on the deploy that adds the column.

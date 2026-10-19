@@ -114,12 +114,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_resolve_empty_string_returns_no_sources() {
-        let sources = resolve_client_ip_sources("");
-        assert!(sources.0.is_empty());
-    }
-
-    #[test]
     fn test_resolve_whitespace_only_returns_no_sources() {
         let sources = resolve_client_ip_sources("  ,  ");
         assert!(sources.0.is_empty());

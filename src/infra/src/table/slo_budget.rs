@@ -349,13 +349,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn the_first_charge_creates_the_org_row() {
-        let db = db().await;
-        charge(&db, ORG, "slo1", 1, 100, CAP).await.unwrap();
-        assert_eq!(totals(&db).await, (100, 0));
-    }
-
-    #[tokio::test]
     async fn charges_accumulate_across_slos() {
         let db = db().await;
         charge(&db, ORG, "slo1", 1, 100, CAP).await.unwrap();

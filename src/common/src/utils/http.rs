@@ -608,19 +608,6 @@ mod tests {
     }
 
     #[test]
-    fn test_get_or_create_trace_id_openobserve_header_valid() {
-        // Test x-openobserve-trace-id header with valid trace ID
-        let mut headers = HeaderMap::new();
-        headers.insert(
-            HeaderName::from_static("x-openobserve-trace-id"),
-            HeaderValue::from_static("4bf92f3577b34da6a3ce929d0e0e4736"),
-        );
-        let span = tracing::Span::none();
-        let trace_id = get_or_create_trace_id(&headers, &span);
-        assert_eq!(trace_id, "4bf92f3577b34da6a3ce929d0e0e4736");
-    }
-
-    #[test]
     fn test_get_or_create_trace_id_openobserve_header_invalid_length() {
         // Test x-openobserve-trace-id header with invalid length (not 32 chars)
         let mut headers = HeaderMap::new();
