@@ -32,6 +32,7 @@ use datafusion::{
     arrow::datatypes::{DataType, Schema},
     error::{DataFusionError, Result},
     execution::{SendableRecordBatchStream, TaskContext},
+    physical_expr::PhysicalSortExpr,
     physical_plan::{
         ExecutionPlan, execute_stream_partitioned,
         expressions::Column,
@@ -396,19 +397,22 @@ fn plan_contains_sort(plan: &Arc<dyn ExecutionPlan>) -> bool {
 }
 
 fn hash_ordered(plan: &Arc<dyn ExecutionPlan>) -> bool {
-    plan.properties().output_ordering().is_some_and(|ordering| {
-        let sort = ordering.first();
-        !sort.options.descending
-            && sort
-                .expr
-                .downcast_ref::<Column>()
-                .is_some_and(|column| column.name() == HASH_LABEL)
-    })
+    let Ok(column) = Column::new_with_schema(HASH_LABEL, &plan.schema()) else {
+        return false;
+    };
+    let ordering = PhysicalSortExpr::new_default(Arc::new(column))
+        .asc()
+        .nulls_last();
+    plan.properties()
+        .eq_properties
+        .ordering_satisfy([ordering])
+        .unwrap_or(false)
 }
 
 #[cfg(test)]
 mod tests {
     use std::{
+        fs::File,
         sync::atomic::{AtomicUsize, Ordering},
         time::Duration,
     };
@@ -420,9 +424,10 @@ mod tests {
         },
         common::tree_node::TreeNodeRecursion,
         datasource::MemTable,
+        parquet::arrow::ArrowWriter,
         physical_expr::{LexOrdering, PhysicalExpr, PhysicalSortExpr},
         physical_plan::{DisplayAs, DisplayFormatType, PlanProperties, empty::EmptyExec},
-        prelude::SessionConfig,
+        prelude::{ParquetReadOptions, SessionConfig},
     };
     use futures::{
         FutureExt, TryStreamExt,
@@ -575,6 +580,90 @@ mod tests {
             for pair in partitions.windows(2) {
                 assert_eq!(pair[0].1.wrapping_add(1), pair[1].0);
             }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_single_hash_parquet_streams_after_ordering_is_normalized() {
+        for rows in [1, 4] {
+            let dir = tempfile::tempdir().unwrap();
+            let path = dir.path().join("single_hash.parquet");
+            let schema = Arc::new(Schema::new(vec![
+                Field::new(HASH_LABEL, DataType::UInt64, false),
+                Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+                Field::new(VALUE_LABEL, DataType::Float64, false),
+            ]));
+            let batch = RecordBatch::try_new(
+                schema.clone(),
+                vec![
+                    Arc::new(UInt64Array::from(vec![1u64 << 63; rows])),
+                    Arc::new(Int64Array::from_iter_values(0..rows as i64)),
+                    Arc::new(Float64Array::from(vec![1.0; rows])),
+                ],
+            )
+            .unwrap();
+            let mut writer =
+                ArrowWriter::try_new(File::create(&path).unwrap(), schema, None).unwrap();
+            writer.write(&batch).unwrap();
+            writer.close().unwrap();
+
+            let ctx = SessionContext::new_with_config(
+                SessionConfig::new()
+                    .with_target_partitions(1)
+                    .with_collect_statistics(true),
+            );
+            let df = ctx
+                .read_parquet(
+                    path.to_str().unwrap(),
+                    ParquetReadOptions::default().file_sort_order(vec![vec![
+                        col(HASH_LABEL).sort(true, false),
+                        col(TIMESTAMP_COL_NAME).sort(true, false),
+                    ]]),
+                )
+                .await
+                .unwrap()
+                .filter(
+                    col(TIMESTAMP_COL_NAME)
+                        .gt_eq(lit(0i64))
+                        .and(col(TIMESTAMP_COL_NAME).lt_eq(lit(60i64)))
+                        .and(col(HASH_LABEL).gt_eq(lit(1u64 << 63)))
+                        .and(col(HASH_LABEL).lt_eq(lit(u64::MAX))),
+                )
+                .unwrap()
+                .select_columns(&[TIMESTAMP_COL_NAME, HASH_LABEL, VALUE_LABEL])
+                .unwrap()
+                .sort(vec![col(HASH_LABEL).sort(true, false)])
+                .unwrap();
+            let plan = df.create_physical_plan().await.unwrap();
+            assert!(!plan_contains_sort(&plan));
+            assert!(plan.properties().output_ordering().is_none_or(|ordering| {
+                ordering
+                    .first()
+                    .expr
+                    .downcast_ref::<Column>()
+                    .is_some_and(|column| column.name() == TIMESTAMP_COL_NAME)
+            }));
+
+            let mut inputs = execute_planned_partitions(
+                vec![PlannedPartition {
+                    plan,
+                    task_ctx: Arc::new(df.task_ctx()),
+                }],
+                "single_hash_parquet",
+            )
+            .expect("a constant hash satisfies the streaming ordering requirement");
+            let batches = inputs
+                .pop()
+                .unwrap()
+                .pop()
+                .unwrap()
+                .try_collect::<Vec<_>>()
+                .await
+                .unwrap();
+            assert_eq!(
+                batches.iter().map(RecordBatch::num_rows).sum::<usize>(),
+                rows
+            );
         }
     }
 
