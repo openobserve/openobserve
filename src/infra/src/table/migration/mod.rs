@@ -223,10 +223,10 @@ mod m20261009_000005_create_downtime_notifications;
 mod m20261012_000001_create_alert_calibration_configs;
 mod m20261013_000001_create_oncall_phone_verifications;
 mod m20261013_000002_create_org_telephony;
-mod m20261015_000001_reports_add_last_run_columns;
-mod m20261016_000001_create_rum_pa_app_settings;
 mod m20261015_000001_create_public_dashboards;
+mod m20261015_000001_reports_add_last_run_columns;
 mod m20261015_000002_add_search_type_to_search_queue;
+mod m20261016_000001_create_rum_pa_app_settings;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
 
