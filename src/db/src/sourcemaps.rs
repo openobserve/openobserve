@@ -16,7 +16,7 @@
 use std::sync::{Arc, LazyLock as Lazy};
 
 use config::SOURCEMAP_MEM_CACHE_SIZE;
-use hashbrown::HashMap;
+use hashbrown::{HashMap, HashSet};
 use hashlink::lru_cache::LruCache;
 use infra::{
     coordinator::get_coordinator,
@@ -193,27 +193,24 @@ pub async fn delete_group(
     let deleted =
         infra::table::source_maps::delete_group(org, service.clone(), env.clone(), version.clone())
             .await?;
-    release_group(org, service, env, version, &deleted).await
+    if let Err(e) = delete_stored_files(&deleted).await {
+        log::error!("error deleting sourcemap files from storage for org_id {org} : {e}");
+    }
+    release_group(org, service, env, version).await
 }
 
-/// Org teardown: one delete, then each group's files, caches and events, as [`delete_group`] does.
+/// Org teardown: listed rows retry until their files go; rows the listing missed get one try.
 pub async fn delete_by_org(org: &str) -> Result<(), errors::Error> {
-    let mut groups: HashMap<GroupKey, Vec<SourceMap>> = HashMap::new();
-    for row in infra::table::source_maps::delete_by_org(org).await? {
-        let key = (row.service.clone(), row.env.clone(), row.version.clone());
-        groups.entry(key).or_default().push(row);
-    }
-    for ((service, env, version), deleted) in groups {
-        release_group(org, service, env, version, &deleted).await?;
-    }
-    Ok(())
+    let listed = infra::table::source_maps::list_files(org, None, None, None).await?;
+    release_org_rows(org, &listed).await?;
+    let mut missed = infra::table::source_maps::delete_by_org(org).await?;
+    // A replica-read listing can miss a fresh row; the delete still returns it.
+    missed.retain(|row| listed.iter().all(|seen| seen.id != row.id));
+    release_org_rows(org, &missed).await
 }
 
 pub async fn delete_stored_files(files: &[SourceMap]) -> Result<(), errors::Error> {
-    let paths: Vec<String> = files
-        .iter()
-        .map(|f| get_file_path(&f.org, &f.file_store_id))
-        .collect();
+    let paths = stored_paths(files);
     storage::del(paths.iter().map(|p| ("", p.as_str())).collect())
         .await
         .map_err(Into::into)
@@ -345,18 +342,34 @@ pub async fn watch() -> Result<(), anyhow::Error> {
     }
 }
 
-/// Releases a deleted group's stored files, caches and cluster copies.
+fn stored_paths(files: &[SourceMap]) -> Vec<String> {
+    files
+        .iter()
+        .map(|f| get_file_path(&f.org, &f.file_store_id))
+        .collect()
+}
+
+/// Strictly deletes the rows' stored files, then releases each of their groups.
+async fn release_org_rows(org: &str, rows: &[SourceMap]) -> Result<(), errors::Error> {
+    let paths = stored_paths(rows);
+    storage::del_strict(paths.iter().map(|p| ("", p.as_str())).collect()).await?;
+    let groups: HashSet<GroupKey> = rows
+        .iter()
+        .map(|row| (row.service.clone(), row.env.clone(), row.version.clone()))
+        .collect();
+    for (service, env, version) in groups {
+        release_group(org, service, env, version).await?;
+    }
+    Ok(())
+}
+
+/// Releases a group's caches and cluster copies.
 async fn release_group(
     org: &str,
     service: Option<String>,
     env: Option<String>,
     version: Option<String>,
-    deleted: &[SourceMap],
 ) -> Result<(), errors::Error> {
-    if let Err(e) = delete_stored_files(deleted).await {
-        log::error!("error deleting sourcemap files from storage for org_id {org} : {e}");
-    }
-
     {
         let mut cache = CACHE.write().await;
         let mut keys = Vec::new();

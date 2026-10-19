@@ -1682,8 +1682,7 @@ async fn probe_token_id(headers: &axum::http::HeaderMap) -> Option<String> {
 async fn authorize_probe(headers: &axum::http::HeaderMap, org_id: &str) -> Result<(), Response> {
     match probe_token_org(headers).await {
         Some(token_org) if token_org == org_id => {
-            let active = db::org_status::read_active(&token_org).await;
-            match crate::request::alerts::external_events::org_status_refusal(&token_org, active) {
+            match crate::request::alerts::external_events::inactive_org_response(&token_org).await {
                 Some(refusal) => Err(refusal),
                 None => Ok(()),
             }

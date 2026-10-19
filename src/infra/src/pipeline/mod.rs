@@ -120,7 +120,7 @@ pub async fn list_by_org(org: &str) -> Result<Vec<Pipeline>> {
     CLIENT.list_by_org(org).await
 }
 
-/// Lists all pipelines within an organization from the primary
+/// Deletes every pipeline of the organization and returns the removed ids
 #[inline]
 pub async fn delete_by_org(org: &str) -> Result<Vec<String>> {
     CLIENT.delete_by_org(org).await

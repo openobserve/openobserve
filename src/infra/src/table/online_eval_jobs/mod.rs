@@ -553,7 +553,7 @@ pub async fn get_by_status(
 pub async fn get_active_trace_session() -> Result<Vec<OnlineEvalJob>, errors::Error> {
     use sea_orm::sea_query::{Expr, Query};
 
-    use crate::table::entity::organizations;
+    use crate::{coordinator::org_status::STATUS_ACTIVE, table::entity::organizations};
 
     let client = get_orm_client_ro().await;
 
@@ -565,7 +565,7 @@ pub async fn get_active_trace_session() -> Result<Vec<OnlineEvalJob>, errors::Er
                 Query::select()
                     .column(organizations::Column::Identifier)
                     .from(organizations::Entity)
-                    .and_where(Expr::col(organizations::Column::Status).eq("active"))
+                    .and_where(Expr::col(organizations::Column::Status).eq(STATUS_ACTIVE))
                     .to_owned(),
             ),
         )

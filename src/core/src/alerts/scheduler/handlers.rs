@@ -733,11 +733,7 @@ pub async fn handle_triggers(
     trace_id: &str,
     trigger: db::scheduler::Trigger,
 ) -> Result<(), anyhow::Error> {
-    // Do not execute scheduled work for an org that is soft-deleted (pending_deletion)
-    // or actively deleting: the org is hidden and blocked everywhere, so firing its
-    // scheduled alerts/pipelines/reports would send notifications for an org the user
-    // believes is gone. Keep the trigger alive (reschedule ~1h out) so it resumes if
-    // the org is resurrected; on hard-delete the scheduler rows are purged by cleanup.
+    // Parked, not fired: a blocked org sends nothing, and a resurrect still finds the trigger.
     if crate::db::org_status::is_blocked(&trigger.org)
         && park_while_blocked(trace_id, &trigger).await?
     {
@@ -819,7 +815,7 @@ async fn park_while_blocked(
         trigger,
         now_micros(),
         async {
-            organizations::get_from_db(org)
+            organizations::get_on_writer(org)
                 .await
                 .map(|row| (row.status, row.deleted_at))
         },

@@ -137,7 +137,7 @@ pub async fn rotate_token(org_id: &str, name: &str) -> Result<String, anyhow::Er
 
     // Notify about old token removal
     let old_key = event_key(org_id, &existing.token);
-    delete_from_db_coordinator(&old_key, false, true, None).await?;
+    let _ = delete_from_db_coordinator(&old_key, false, true, None).await;
 
     // Notify about new token
     let new_key = event_key(org_id, &new_token);
@@ -173,7 +173,7 @@ pub async fn set_enabled(org_id: &str, name: &str, enabled: bool) -> Result<(), 
     if enabled {
         let _ = put_into_db_coordinator(&key, Bytes::new(), true, None).await;
     } else {
-        delete_from_db_coordinator(&key, false, true, None).await?;
+        let _ = delete_from_db_coordinator(&key, false, true, None).await;
     }
     // Always replicate the token with its new `enabled` state; the receiving
     // cluster fires the matching coordinator event based on the flag.

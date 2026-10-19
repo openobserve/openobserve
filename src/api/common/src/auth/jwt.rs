@@ -368,6 +368,7 @@ pub async fn process_token(
             Ok(None)
         } else {
             log::info!("User does not exist in the database");
+            let maps_any_org = !source_orgs.is_empty();
             source_orgs.retain(|org| !db::org_status::is_blocked(&org.name));
 
             if openfga_cfg.enabled {
@@ -396,6 +397,12 @@ pub async fn process_token(
                     }
 
                     tuples_to_add.insert(org.name.to_owned(), tuples);
+                }
+                // Index 0 carries it otherwise, and the existing-user path never writes it later.
+                if maps_any_org && source_orgs.is_empty() {
+                    let mut tuples = vec![];
+                    get_new_user_creation_tuple(&user_email, &mut tuples);
+                    tuples_to_add.insert(user_email.to_owned(), tuples);
                 }
             }
             let (first_name, last_name) = split_name(&name);
@@ -886,16 +893,7 @@ pub async fn process_domain_org_mapping(
             .into_iter()
             .find(|m| m.domain.to_lowercase() == domain)
         {
-            if org_status::is_blocked(&mapped.org_id) {
-                log::info!(
-                    "user {user_email} supposed to be mapped to org {} but org status is blocked, so skipping",
-                    mapped.org_id
-                );
-                return Ok(false);
-            }
-
-            log::info!("found domain org mapping for user {user_email}, processing");
-            match db::org_status::read_active(&mapped.org_id).await {
+            match org_status::read_active(&mapped.org_id).await {
                 Ok(true) => {}
                 Ok(false) => {
                     log::warn!(
@@ -912,6 +910,8 @@ pub async fn process_domain_org_mapping(
                     return Ok(false);
                 }
             }
+
+            log::info!("found domain org mapping for user {user_email}, processing");
             let base_role = UserRole::from_str(&mapped.base_role).map_err(|e| {
                 anyhow::anyhow!(
                     "error parsing domain org role {} to user role : {e:?}",

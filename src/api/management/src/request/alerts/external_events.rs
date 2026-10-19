@@ -48,7 +48,7 @@ pub(crate) fn extract_token(auth_header: Option<&str>, path_token: Option<&str>)
         .map(|t| t.to_string())
 }
 
-/// 403 when the org is blocked or gone (a leaked token dies with it, D-11), 500 when unreadable.
+/// 403 when the org is blocked or gone (a leaked token dies with it), 500 when unreadable.
 pub async fn inactive_org_response(org_id: &str) -> Option<Response> {
     org_status_refusal(org_id, db::org_status::read_active(org_id).await)
 }

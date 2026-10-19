@@ -382,20 +382,19 @@ pub async fn set(
 /// Removes this node's cached metrics results of an org: the disk files, then their index entries.
 pub async fn remove_org_results(org_id: &str) -> Result<()> {
     let dirs = infra::cache::file_data::disk::get_dirs().await;
-    let files = org_result_files(&dirs, org_id)?;
+    let org = org_id.to_string();
+    let files = blocking(move || org_result_files(&dirs, &org)).await?;
     let mut keys = Vec::with_capacity(files.len());
+    let mut paths = Vec::with_capacity(files.len());
     for (path, key) in files {
         infra::cache::file_data::disk::remove(&key)
             .await
             .map_err(|e| Error::Message(format!("remove {key}: {e}")))?;
-        // The index removes only files it holds, so an unindexed one goes by path.
-        if let Err(e) = std::fs::remove_file(&path)
-            && e.kind() != std::io::ErrorKind::NotFound
-        {
-            return Err(Error::Message(format!("remove {path}: {e}")));
-        }
+        paths.push(path);
         keys.push(key);
     }
+    // The index removes only files it holds, so an unindexed one goes by path.
+    blocking(move || remove_result_paths(&paths)).await?;
     remove_evicted_files(keys).await;
     Ok(())
 }
@@ -709,6 +708,25 @@ fn org_result_files(dirs: &[String], org_id: &str) -> Result<Vec<(String, String
         }
     }
     Ok(files)
+}
+
+fn remove_result_paths(paths: &[String]) -> Result<()> {
+    for path in paths {
+        if let Err(e) = std::fs::remove_file(path)
+            && e.kind() != std::io::ErrorKind::NotFound
+        {
+            return Err(Error::Message(format!("remove {path}: {e}")));
+        }
+    }
+    Ok(())
+}
+
+async fn blocking<T: Send + 'static>(
+    work: impl FnOnce() -> Result<T> + Send + 'static,
+) -> Result<T> {
+    tokio::task::spawn_blocking(work)
+        .await
+        .map_err(|e| Error::Message(format!("cache file task: {e}")))?
 }
 
 #[cfg(test)]

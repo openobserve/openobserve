@@ -731,8 +731,19 @@ pub async fn add_user_to_org(
             }
         };
         // Checked after the root branch above may have created a missing org.
-        if !db::org_status::is_active(org_id).await {
-            return Err(Error::other("organization is not active"));
+        match db::org_status::read_active(org_id).await {
+            Ok(true) => {}
+            Ok(false) => {
+                return Err(Error::new(
+                    std::io::ErrorKind::PermissionDenied,
+                    "organization is not active",
+                ));
+            }
+            Err(e) => {
+                return Err(Error::other(format!(
+                    "cannot read the status of organization {org_id}: {e}"
+                )));
+            }
         }
         let base_role = get_role(&role);
         let is_allowed =
@@ -2596,7 +2607,11 @@ mod tests {
         ORG_STATUS_CACHE.insert(org.to_string(), OrgStatus::Deleting);
         let blocked = add_user_to_org(org, "joiner@example.com", role(), "admin@zo.dev").await;
         ORG_STATUS_CACHE.remove(org);
-        assert!(blocked.is_err(), "a deleting org must refuse new members");
+        assert_eq!(
+            blocked.map(|r| r.status()).unwrap_err().kind(),
+            std::io::ErrorKind::PermissionDenied,
+            "a deleting org must refuse new members as a client error"
+        );
         let active = add_user_to_org(org, "joiner@example.com", role(), "admin@zo.dev")
             .await
             .unwrap();

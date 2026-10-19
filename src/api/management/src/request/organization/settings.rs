@@ -78,7 +78,7 @@ pub async fn create(
     #[cfg(feature = "cloud")]
     let settings = match check_domain_org_mappings(&org_id, settings).await {
         Ok(settings) => settings,
-        Err(msg) => return MetaHttpResponse::bad_request(msg),
+        Err(refusal) => return refusal,
     };
     #[cfg(feature = "cloud")]
     if let Err(response) = check_budget_config(&org_id, &settings).await {
@@ -262,7 +262,7 @@ fn validate_settings_payload(settings: &OrganizationSettingPayload) -> Result<()
 async fn check_domain_org_mappings(
     org_id: &str,
     mut settings: OrganizationSettingPayload,
-) -> Result<OrganizationSettingPayload, String> {
+) -> Result<OrganizationSettingPayload, Response> {
     let Some(mut mappings) = settings.domain_org_mappings.take() else {
         return Ok(settings);
     };
@@ -273,34 +273,36 @@ async fn check_domain_org_mappings(
         // A deleted org keeps its row as a tombstone, so the row alone does not make it a target.
         match db::org_status::read_active(&mapping.org_id).await {
             Ok(true) => {}
-            Ok(false) => return Err(format!("No org with org id {} found", mapping.org_id)),
+            Ok(false) => return Err(inactive_mapping_target(&mapping.org_id).await),
             Err(e) => {
-                return Err(format!(
+                return Err(MetaHttpResponse::internal_error(format!(
                     "cannot read the status of org {}: {e}",
                     mapping.org_id
-                ));
+                )));
             }
         }
 
         if mapping.domain.is_empty() || mapping.domain.contains(' ') {
-            return Err(format!(
+            return Err(MetaHttpResponse::bad_request(format!(
                 "domain cannot have space or be empty, bad domain '{}'",
                 mapping.domain
-            ));
+            )));
         }
 
         if !matches!(
             mapping.base_role.as_str(),
             "admin" | "editor" | "viewer" | "allowed_user"
         ) {
-            return Err(format!(
+            return Err(MetaHttpResponse::bad_request(format!(
                 "base role {} for org {} is not a valid base role - only admin, editor, viewer, allowed_user are supported",
                 mapping.base_role, mapping.org_id
-            ));
+            )));
         }
         if let Some(claim) = mapping.role_claim_name.as_mut() {
             if claim.trim().is_empty() {
-                return Err("role claim name must not be empty".to_string());
+                return Err(MetaHttpResponse::bad_request(
+                    "role claim name must not be empty",
+                ));
             }
             *claim = claim.trim().to_string();
         }
@@ -309,6 +311,16 @@ async fn check_domain_org_mappings(
     }
     settings.domain_org_mappings = Some(mappings);
     Ok(settings)
+}
+
+/// The refusal for a mapping whose target org is not active: missing, blocked, or unreadable.
+#[cfg(feature = "cloud")]
+async fn inactive_mapping_target(org_id: &str) -> Response {
+    match infra::table::organizations::find(org_id).await {
+        Ok(None) => MetaHttpResponse::bad_request(format!("No org with org id {org_id} found")),
+        Ok(Some(_)) => MetaHttpResponse::bad_request(format!("org {org_id} is not active")),
+        Err(e) => MetaHttpResponse::internal_error(format!("cannot read org {org_id}: {e}")),
+    }
 }
 
 // Budgets are for Stripe-billed orgs only, and only for this org, its group members and the

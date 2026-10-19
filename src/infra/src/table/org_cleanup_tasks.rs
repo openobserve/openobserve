@@ -218,6 +218,14 @@ pub async fn requeue_running() -> Result<u64, errors::Error> {
     .await
 }
 
+/// `requeue_running` at startup; a single process holds no claim yet, so it frees every one.
+pub async fn requeue_running_on_startup() -> Result<u64, errors::Error> {
+    if !config::get_config().common.local_mode {
+        return requeue_running().await;
+    }
+    requeue_all_running_in(get_orm_client_rw().await, config::utils::time::now_micros()).await
+}
+
 pub async fn list_by_org_status(
     org_id: &str,
     status: Option<&str>,
@@ -599,17 +607,33 @@ async fn requeue_running_in<C: ConnectionTrait>(
             .add(Column::LeaseUntil.is_null())
             .add(Column::LeaseUntil.lt(now));
     }
-    let result = Entity::update_many()
-        .col_expr(Column::Status, Expr::value("pending"))
-        .col_expr(Column::UpdatedAt, Expr::value(now))
-        .col_expr(Column::RunningBy, Expr::value(Option::<String>::None))
-        .col_expr(Column::LeaseUntil, Expr::value(Option::<i64>::None))
-        .filter(Column::Status.eq("running"))
+    let result = requeue_update(now)
         .filter(freed)
         .exec(conn)
         .await
         .map_err(|e| errors::Error::Message(e.to_string()))?;
     Ok(result.rows_affected)
+}
+
+async fn requeue_all_running_in<C: ConnectionTrait>(
+    conn: &C,
+    now: i64,
+) -> Result<u64, errors::Error> {
+    let result = requeue_update(now)
+        .exec(conn)
+        .await
+        .map_err(|e| errors::Error::Message(e.to_string()))?;
+    Ok(result.rows_affected)
+}
+
+/// Puts `running` rows back to pending without a lease; the caller narrows which ones.
+fn requeue_update(now: i64) -> UpdateMany<Entity> {
+    Entity::update_many()
+        .col_expr(Column::Status, Expr::value("pending"))
+        .col_expr(Column::UpdatedAt, Expr::value(now))
+        .col_expr(Column::RunningBy, Expr::value(Option::<String>::None))
+        .col_expr(Column::LeaseUntil, Expr::value(Option::<i64>::None))
+        .filter(Column::Status.eq("running"))
 }
 
 #[cfg(test)]
@@ -753,6 +777,25 @@ mod tests {
         assert_eq!(expired.lease_until, None);
         assert_eq!(row(&db, "pre_lease").await.status, "running");
         assert_eq!(row(&db, "done").await.status, "done");
+    }
+
+    #[tokio::test]
+    async fn test_requeue_all_frees_every_running_row_and_only_those() {
+        let db = db().await;
+        seed(&db, "live", "running", Some(T0 + LEASE)).await;
+        seed(&db, "pre_lease", "running", None).await;
+        seed(&db, "pending", "pending", None).await;
+        seed(&db, "done", "done", None).await;
+
+        assert_eq!(requeue_all_running_in(&db, T0).await.unwrap(), 2);
+        for id in ["live", "pre_lease"] {
+            let freed = row(&db, id).await;
+            assert_eq!(freed.status, "pending", "{id}");
+            assert_eq!(freed.running_by, None, "{id}");
+            assert_eq!(freed.lease_until, None, "{id}");
+        }
+        assert_eq!(row(&db, "done").await.status, "done");
+        assert!(claim(&db, "live", "b", T0 + 1).await.is_some());
     }
 
     #[tokio::test]

@@ -424,19 +424,7 @@ pub async fn delete_folder(
     }
 
     table::folders::delete(org_id, folder_id, folder_type).await?;
-    let folder_type_ofga = folder_type_ofga_name(folder_type);
-    remove_ownership(org_id, folder_type_ofga, Authz::new(folder_id)).await;
-
-    #[cfg(feature = "enterprise")]
-    if publishes(folder_type) {
-        let _ = o2_enterprise::enterprise::super_cluster::queue::folders_delete(
-            org_id,
-            folder_id,
-            folder_type,
-        )
-        .await;
-    }
-
+    forget_folder(org_id, folder_id, folder_type).await;
     Ok(())
 }
 

@@ -34,6 +34,7 @@ use hashbrown::{HashMap, HashSet};
 use sqlx::{Executor, PgConnection, Postgres, QueryBuilder, Row};
 
 use crate::{
+    coordinator::org_status::{STATUS_DELETED, STATUS_DELETING},
     db::{
         IndexStatement,
         postgres::{CLIENT_DDL, CLIENT_RO, CLIENT_RW, add_column, create_index, delete_index},
@@ -1026,7 +1027,7 @@ SELECT date
                 .bind(org_id)
                 .fetch_optional(&mut *tx)
                 .await?;
-        if matches!(status.as_deref(), Some("deleting" | "deleted")) {
+        if matches!(status.as_deref(), Some(STATUS_DELETING | STATUS_DELETED)) {
             tx.rollback().await?;
             return Ok(false);
         }

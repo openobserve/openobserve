@@ -30,6 +30,7 @@ use hashbrown::HashMap;
 use sqlx::{Executor, QueryBuilder, Row, Sqlite};
 
 use crate::{
+    coordinator::org_status::{STATUS_DELETED, STATUS_DELETING},
     db::{
         IndexStatement,
         sqlite::{CLIENT_RO, CLIENT_RW, add_column, create_index, delete_index, drop_column},
@@ -781,7 +782,7 @@ SELECT date
                 .bind(org_id)
                 .fetch_optional(&mut *tx)
                 .await?;
-        if matches!(status.as_deref(), Some("deleting" | "deleted")) {
+        if matches!(status.as_deref(), Some(STATUS_DELETING | STATUS_DELETED)) {
             tx.rollback().await?;
             return Ok(false);
         }

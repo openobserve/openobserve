@@ -1634,12 +1634,6 @@ pub async fn acknowledge(
     Path(org_id): Path<String>,
     axum::Form(form): axum::Form<AckQuery>,
 ) -> Response {
-    // The route sits outside the blocked-org gate, so a leaked link must die with its org here.
-    if let Some(refusal) =
-        crate::request::alerts::external_events::inactive_org_response(&org_id).await
-    {
-        return refusal;
-    }
     #[cfg(feature = "enterprise")]
     {
         use o2_enterprise::enterprise::oncall::{escalation, service, token};
@@ -1659,6 +1653,12 @@ pub async fn acknowledge(
                     .into_response();
             }
         };
+        // After the signature, so an unsigned caller cannot probe whether the org exists.
+        if let Some(refusal) =
+            crate::request::alerts::external_events::inactive_org_response(&org_id).await
+        {
+            return refusal;
+        }
         // Spent before the ack: expiry does not stop a replay, and a losing token must not act.
         if !token::spend(
             &form.token,
@@ -1712,11 +1712,6 @@ fn ack_redirect(org_id: &str, response_id: &str) -> Response {
 )]
 /// GET must only look: mail gateways fetch URLs, so a scanner would take the page first.
 pub async fn ack_page(Path(org_id): Path<String>, Query(q): Query<AckQuery>) -> Response {
-    if let Some(refusal) =
-        crate::request::alerts::external_events::inactive_org_response(&org_id).await
-    {
-        return refusal;
-    }
     #[cfg(feature = "enterprise")]
     {
         use o2_enterprise::enterprise::oncall::{service, token::TokenPurpose};
@@ -1736,6 +1731,11 @@ pub async fn ack_page(Path(org_id): Path<String>, Query(q): Query<AckQuery>) -> 
                     .into_response();
             }
         };
+        if let Some(refusal) =
+            crate::request::alerts::external_events::inactive_org_response(&org_id).await
+        {
+            return refusal;
+        }
         let title = infra::table::oncall_responses::get(&claims.org_id, &claims.response_id)
             .await
             .ok()
@@ -1771,7 +1771,12 @@ pub async fn voice_ack(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        let active = db::org_status::read_active(&org_id).await;
+        // An unsigned token skips the status read and is refused by the ack path itself.
+        let active = if voice_token_is_signed_for(&org_id, &token).await {
+            db::org_status::read_active(&org_id).await
+        } else {
+            Ok(true)
+        };
         voice_ack_if_active(&org_id, &token, form, active).await
     }
     #[cfg(not(feature = "enterprise"))]
@@ -1779,6 +1784,19 @@ pub async fn voice_ack(
         let _ = (org_id, token, form);
         MetaHttpResponse::forbidden("Not Supported")
     }
+}
+
+/// Signature and org only; membership is left to the ack path, which reads it anyway.
+#[cfg(feature = "enterprise")]
+async fn voice_token_is_signed_for(org_id: &str, token: &str) -> bool {
+    use o2_enterprise::enterprise::oncall::token::{TokenPurpose, verify};
+    verify(
+        token,
+        TokenPurpose::Voice,
+        config::utils::time::now_micros(),
+    )
+    .await
+    .is_ok_and(|claims| claims.org_id == org_id)
 }
 
 /// The route sits outside the blocked-org gate, so a page call out before the block must not ack.
@@ -4782,24 +4800,35 @@ pub async fn delete_telephony(
 mod tests {
     use super::*;
 
-    #[tokio::test]
-    async fn test_ack_routes_refuse_a_blocked_org() {
-        let org = "oncall-ack-blocked-org";
-        common::infra::config::ORG_STATUS_CACHE
-            .insert(org.into(), common::meta::organization::OrgStatus::Deleting);
+    async fn ack_replies(org: &str) -> Vec<(axum::http::StatusCode, Vec<u8>)> {
         let token = || AckQuery {
             token: "leaked".to_string(),
         };
         let posted = acknowledge(Path(org.to_string()), axum::Form(token())).await;
         let fetched = ack_page(Path(org.to_string()), Query(token())).await;
-        common::infra::config::ORG_STATUS_CACHE.remove(org);
+        let mut replies = Vec::new();
         for resp in [posted, fetched] {
-            assert_eq!(resp.status(), axum::http::StatusCode::FORBIDDEN);
+            let status = resp.status();
             let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
                 .await
                 .unwrap();
+            replies.push((status, body.to_vec()));
+        }
+        replies
+    }
+
+    #[tokio::test]
+    async fn test_ack_routes_do_not_reveal_a_blocked_org_to_an_unsigned_token() {
+        let org = "oncall-ack-blocked-org";
+        common::infra::config::ORG_STATUS_CACHE
+            .insert(org.into(), common::meta::organization::OrgStatus::Deleting);
+        let blocked = ack_replies(org).await;
+        common::infra::config::ORG_STATUS_CACHE.remove(org);
+        let unknown = ack_replies("oncall-ack-unknown-org").await;
+        assert_eq!(blocked, unknown);
+        for (_, body) in &blocked {
             assert!(
-                String::from_utf8_lossy(&body).contains("organization is not active"),
+                !String::from_utf8_lossy(body).contains("organization is not active"),
                 "{body:?}"
             );
         }
@@ -4821,20 +4850,34 @@ mod tests {
 
     #[cfg(feature = "enterprise")]
     #[tokio::test]
-    async fn test_voice_ack_refuses_a_blocked_org_with_twiml() {
+    async fn test_voice_ack_does_not_reveal_a_blocked_org_to_an_unsigned_token() {
+        let press = |org: &str| {
+            voice_ack(
+                Path((org.to_string(), "leaked".to_string())),
+                axum::Form(VoiceAckForm {
+                    digits: Some("1".to_string()),
+                }),
+            )
+        };
         let org = "oncall-voice-ack-blocked-org";
         common::infra::config::ORG_STATUS_CACHE.insert(
             org.into(),
             common::meta::organization::OrgStatus::PendingDeletion,
         );
-        let resp = voice_ack(
-            Path((org.to_string(), "leaked".to_string())),
-            axum::Form(VoiceAckForm {
-                digits: Some("1".to_string()),
-            }),
-        )
-        .await;
+        let blocked = voice_reply(press(org).await).await;
         common::infra::config::ORG_STATUS_CACHE.remove(org);
+        let unknown = voice_reply(press("oncall-voice-ack-unknown-org").await).await;
+        assert_eq!(blocked, unknown);
+        assert_ne!(blocked, VOICE_ORG_INACTIVE);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_voice_ack_of_a_blocked_org_is_refused_with_twiml() {
+        let form = VoiceAckForm {
+            digits: Some("1".to_string()),
+        };
+        let resp = voice_ack_if_active("voice-org", "tok", form, Ok::<_, String>(false)).await;
         assert_eq!(voice_reply(resp).await, VOICE_ORG_INACTIVE);
     }
 

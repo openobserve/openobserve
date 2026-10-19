@@ -279,6 +279,13 @@ pub async fn get_from_db(org_id: &str) -> Result<OrganizationRecord, errors::Err
         .ok_or_else(|| Error::DbError(DbError::SeaORMError("Organization not found".to_string())))
 }
 
+/// `get_from_db` on the writer, for a check that must not lag a status flip on a replica.
+pub async fn get_on_writer(org_id: &str) -> Result<OrganizationRecord, errors::Error> {
+    find_in_db(get_orm_client_rw().await, org_id)
+        .await?
+        .ok_or_else(|| Error::DbError(DbError::SeaORMError("Organization not found".to_string())))
+}
+
 pub async fn list(filter: ListFilter) -> Result<Vec<OrganizationRecord>, errors::Error> {
     let client = get_orm_client_ro().await;
     let mut res = Entity::find().order_by(Column::CreatedAt, Order::Desc);
@@ -533,7 +540,7 @@ pub async fn promote_due_in<C: ConnectionTrait>(
 
 /// Flips a pending org to active; returns the `deleted_at` it cleared, or None when not pending.
 pub async fn restore_pending(org_id: &str) -> Result<Option<Option<i64>>, errors::Error> {
-    use crate::coordinator::org_status::STATUS_PENDING_DELETION;
+    use crate::coordinator::org_status::{STATUS_ACTIVE, STATUS_PENDING_DELETION};
 
     let db_err = |e: sea_orm::DbErr| Error::DbError(DbError::SeaORMError(e.to_string()));
     let txn = get_orm_client_rw().await.begin().await.map_err(db_err)?;
@@ -550,8 +557,8 @@ pub async fn restore_pending(org_id: &str) -> Result<Option<Option<i64>>, errors
         txn.rollback().await.map_err(db_err)?;
         return Ok(None);
     };
-    Entity::update_many()
-        .col_expr(Column::Status, Expr::value("active"))
+    let restored = Entity::update_many()
+        .col_expr(Column::Status, Expr::value(STATUS_ACTIVE))
         .col_expr(Column::DeletedAt, Expr::value(Option::<i64>::None))
         .col_expr(
             Column::UpdatedAt,
@@ -562,6 +569,10 @@ pub async fn restore_pending(org_id: &str) -> Result<Option<Option<i64>>, errors
         .exec(&txn)
         .await
         .map_err(db_err)?;
+    if restored.rows_affected == 0 {
+        txn.rollback().await.map_err(db_err)?;
+        return Ok(None);
+    }
     txn.commit().await.map_err(db_err)?;
     invalidate_cache(Some(org_id)).await;
     Ok(Some(deleted_at))

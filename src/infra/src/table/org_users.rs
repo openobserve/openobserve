@@ -26,7 +26,7 @@ use sea_orm::{
     ColumnTrait, EntityTrait, FromQueryResult, Order, PaginatorTrait, QueryFilter, QueryOrder,
     QuerySelect, Schema, Set, TransactionTrait,
     entity::prelude::*,
-    sea_query::{Func, Query},
+    sea_query::{Func, LockType, Query},
 };
 use serde::{Deserialize, Serialize};
 
@@ -665,6 +665,19 @@ async fn remove_orphaned_users<C: ConnectionTrait>(
             users::Column::Email,
         ))))
     };
+    let lowered: Vec<String> = emails.iter().map(|e| e.to_lowercase()).collect();
+    // Waits out an add's foreign-key share lock, so the check below sees its membership.
+    if txn.get_database_backend() != sea_orm::DatabaseBackend::Sqlite {
+        users::Entity::find()
+            .select_only()
+            .column(users::Column::Email)
+            .filter(user_email().is_in(lowered.clone()))
+            .order_by(user_email(), Order::Asc)
+            .lock(LockType::Update)
+            .into_tuple::<String>()
+            .all(txn)
+            .await?;
+    }
     let membership = Query::select()
         .expr(Expr::val(1))
         .from(Entity)
@@ -675,7 +688,7 @@ async fn remove_orphaned_users<C: ConnectionTrait>(
         )
         .to_owned();
     let delete = users::Entity::delete_many()
-        .filter(user_email().is_in(emails.iter().map(|e| e.to_lowercase())))
+        .filter(user_email().is_in(lowered))
         .filter(Expr::exists(membership).not());
     let removed: Vec<String> =
         super::delete_returning(txn, delete, &[users::Column::Email]).await?;

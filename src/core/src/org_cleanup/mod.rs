@@ -13,7 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pub mod coverage;
+#[cfg(test)]
+mod coverage;
 
 use std::{
     collections::{HashMap, HashSet},
@@ -23,7 +24,7 @@ use std::{
 use async_trait::async_trait;
 use config::{meta::stream::StreamType, spawn_pausable_job};
 use infra::{
-    coordinator::org_status::{STATUS_DELETING, STATUS_PENDING_DELETION},
+    coordinator::org_status::{STATUS_DELETED, STATUS_DELETING, STATUS_PENDING_DELETION},
     db::{get_orm_client_ro, get_orm_client_rw},
     dist_lock,
     org_lifecycle::OrgLifecycleGuard,
@@ -291,8 +292,8 @@ pub fn is_exhausted(task: &org_cleanup_tasks::CleanupTask) -> bool {
 }
 
 pub async fn run(stream_data_cleanup: Arc<dyn StreamDataCleanup>) -> Result<(), anyhow::Error> {
-    // Frees tasks of crashed workers once their lease expires, and pre-lease claims of gone nodes.
-    match org_cleanup_tasks::requeue_running().await {
+    // Local mode frees every crashed run's rows; a cluster only expired or orphaned ones.
+    match org_cleanup_tasks::requeue_running_on_startup().await {
         Ok(n) if n > 0 => {
             log::warn!("[org_cleanup] requeued {n} stale 'running' task(s) on startup")
         }
@@ -854,9 +855,10 @@ async fn remove_stream_rows(
     batch: i64,
     to_deleted: bool,
 ) -> Result<(), anyhow::Error> {
-    while infra::file_list::remove_stream_batch(table, org_id, stream, batch, to_deleted).await?
-        >= batch.unsigned_abs()
-    {}
+    // Until an empty batch: a concurrent delete can shorten a batch while rows remain.
+    while infra::file_list::remove_stream_batch(table, org_id, stream, batch, to_deleted).await? > 0
+    {
+    }
     Ok(())
 }
 
@@ -1353,10 +1355,7 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     trial_quota_usage::delete_by_org(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/trial_quota_usage: {e}"))?;
-    // Through the db layer, not the table layer: it also evicts the token caches
-    // cluster-wide. Runs here, in delete_db_resources, so the eviction lands before
-    // the later delete_org_record step tears down the org status row and its cache
-    // (after which `is_blocked` falls back to false).
+    // Through the db layer, not the table layer: it also evicts the token caches cluster-wide.
     crate::db::org_ingestion_tokens::delete_by_org(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/org_ingestion_tokens: {e}"))?;
@@ -1598,11 +1597,7 @@ pub async fn initiate_deletion(org_id: &str, initiated_by: &str) -> Result<(), a
         return Err(anyhow::anyhow!(SUPER_CLUSTER_REFUSAL));
     }
 
-    // The `default` and `_meta` orgs are system orgs and must never be deleted.
-    // Guard here, at the single entry point, BEFORE any status mutation — otherwise
-    // the org would be flipped to deleting/pending, blocked+hidden, and then the
-    // terminal `remove_org` step would permanently fail on its own `default` guard,
-    // leaving the org stuck in `deleting` forever.
+    // Before any status change, or step 900's own system-org guard would strand it in `deleting`.
     if org_id == config::DEFAULT_ORG || org_id == config::META_ORG_ID {
         return Err(anyhow::anyhow!("Cannot delete this organization"));
     }
@@ -1614,77 +1609,18 @@ pub async fn initiate_deletion(org_id: &str, initiated_by: &str) -> Result<(), a
     result
 }
 
-/// Moves an active org into deletion and broadcasts the block; the caller holds its lifecycle lock.
-async fn start_deletion(org_id: &str, initiated_by: &str) -> Result<(), anyhow::Error> {
-    // Look up org — also gives us org_name for the cleanup tasks.
-    let org = infra::table::organizations::get(org_id)
-        .await
-        .map_err(|e| anyhow::anyhow!("org not found: {e}"))?;
-
-    // Refuse deletion while billing is still active. The user must unsubscribe
-    // first (and have that reflected in O2) — we do NOT self-cancel, because AWS
-    // and Azure marketplace subscriptions can only be cancelled by the customer,
-    // and super-org payer relationships must be unwound by the user. This makes
-    // "org is billing-free" a visible precondition instead of a silent side effect.
-    #[cfg(feature = "cloud")]
-    {
-        if o2_enterprise::enterprise::cloud::billings::org_has_active_billing(org_id)
-            .await
-            .map_err(|e| anyhow::anyhow!("failed to check billing status: {e}"))?
-        {
-            return Err(anyhow::anyhow!(
-                "Organization has an active subscription. Please cancel your subscription before deleting this organization."
-            ));
-        }
-    }
-
-    let grace_days = grace_period_days();
-
-    if grace_days <= 0 {
-        // No grace period: immediate hard delete (legacy path).
-        // The status CAS is the single guard against concurrent requests on any node.
-        let won_race = enqueue_deletion(org_id, &org.org_name, "active", None)
-            .await
-            .map_err(|e| anyhow::anyhow!("failed to start deletion: {e}"))?;
-        if !won_race {
-            return Err(anyhow::anyhow!("Organization is already being deleted"));
-        }
-        broadcast_status(org_id, STATUS_DELETING).await;
-        emit_status_audit(org_id, initiated_by, "active", "deleting").await;
-
-        log::info!("[org_cleanup] initiated immediate deletion for org={org_id}");
-        return Ok(());
-    }
-
-    // Grace period: soft delete. Record deleted_at; do NOT enqueue cleanup yet.
-    let now = config::utils::time::now_micros();
-    let won = infra::table::organizations::set_status_if_with_deleted_at(
-        org_id,
-        "active",
-        "pending_deletion",
-        Some(now),
-    )
-    .await
-    .map_err(|e| anyhow::anyhow!("failed to set org status: {e}"))?;
-    if !won {
-        return Err(anyhow::anyhow!("Organization is already being deleted"));
-    }
-    broadcast_status(org_id, STATUS_PENDING_DELETION).await;
-    emit_status_audit(org_id, initiated_by, "active", "pending_deletion").await;
-    log::info!("[org_cleanup] soft-deleted org={org_id} (grace {grace_days}d)");
-    Ok(())
-}
-
 /// Step 900, safe to repeat; returns true only for the run that tombstoned the org.
 pub async fn step_delete_org_record(org_id: &str) -> Result<bool, anyhow::Error> {
     // Under the lock, so a status re-send that read `deleting` cannot land after `deleted`.
     let guard = OrgLifecycleGuard::acquire(org_id).await?;
     let tombstoned = tombstone_and_broadcast(org_id).await;
     guard.release().await;
-    let flipped = tombstoned?;
+    let (flipped, broadcast) = tombstoned?;
+    // A retry finds the row already `deleted`, so only this run can audit the flip.
     if flipped {
         emit_status_audit(org_id, "system", "deleting", "deleted").await;
     }
+    broadcast?;
     #[cfg(feature = "cloud")]
     crate::trial_quota::evict_org(org_id);
     // Last, so a failure above leaves the step row to be retried.
@@ -1694,7 +1630,7 @@ pub async fn step_delete_org_record(org_id: &str) -> Result<bool, anyhow::Error>
     Ok(flipped)
 }
 
-/// Re-enqueues every `deleting` org without task rows, such as one enqueued before this release.
+/// Re-enqueues every `deleting` org that has no task rows, so its deletion runs again.
 pub async fn reconcile() -> Result<usize, anyhow::Error> {
     let deleting = organizations::list_ids_by_status("deleting").await?;
     if deleting.is_empty() {
@@ -1719,7 +1655,7 @@ pub async fn reconcile() -> Result<usize, anyhow::Error> {
 }
 
 pub async fn retry(org_id: &str) -> Result<(), anyhow::Error> {
-    if !requeue(org_id).await? {
+    if !requeue(org_id).await? && !unfinished_tombstone(org_id).await? {
         return Err(anyhow::anyhow!(
             "Organization {org_id} is not being deleted"
         ));
@@ -1881,6 +1817,61 @@ pub async fn resend_blocked_statuses() -> Result<Vec<String>, anyhow::Error> {
     Ok(sent)
 }
 
+/// Moves an active org into deletion and broadcasts the block; the caller holds its lifecycle lock.
+async fn start_deletion(org_id: &str, initiated_by: &str) -> Result<(), anyhow::Error> {
+    let org = infra::table::organizations::get(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("org not found: {e}"))?;
+
+    // Marketplace subscriptions and payer links only the customer can end, so deletion waits.
+    #[cfg(feature = "cloud")]
+    {
+        if o2_enterprise::enterprise::cloud::billings::org_has_active_billing(org_id)
+            .await
+            .map_err(|e| anyhow::anyhow!("failed to check billing status: {e}"))?
+        {
+            return Err(anyhow::anyhow!(
+                "Organization has an active subscription. Please cancel your subscription before deleting this organization."
+            ));
+        }
+    }
+
+    let grace_days = grace_period_days();
+
+    if grace_days <= 0 {
+        // The status CAS is the single guard against concurrent requests on any node.
+        let won_race = enqueue_deletion(org_id, &org.org_name, "active", None)
+            .await
+            .map_err(|e| anyhow::anyhow!("failed to start deletion: {e}"))?;
+        if !won_race {
+            return Err(anyhow::anyhow!("Organization is already being deleted"));
+        }
+        broadcast_status(org_id, STATUS_DELETING).await;
+        emit_status_audit(org_id, initiated_by, "active", "deleting").await;
+
+        log::info!("[org_cleanup] initiated immediate deletion for org={org_id}");
+        return Ok(());
+    }
+
+    // Clean-up waits for the grace period to expire, so the org stays restorable until then.
+    let now = config::utils::time::now_micros();
+    let won = infra::table::organizations::set_status_if_with_deleted_at(
+        org_id,
+        "active",
+        "pending_deletion",
+        Some(now),
+    )
+    .await
+    .map_err(|e| anyhow::anyhow!("failed to set org status: {e}"))?;
+    if !won {
+        return Err(anyhow::anyhow!("Organization is already being deleted"));
+    }
+    broadcast_status(org_id, STATUS_PENDING_DELETION).await;
+    emit_status_audit(org_id, initiated_by, "active", "pending_deletion").await;
+    log::info!("[org_cleanup] soft-deleted org={org_id} (grace {grace_days}d)");
+    Ok(())
+}
+
 /// Flips one expired pending org to `deleting`; the caller holds its lifecycle lock.
 async fn promote_pending(org_id: &str, now: i64, window_micros: i64) -> bool {
     // A screen only: the promotion statement re-checks the status and the window on the primary.
@@ -2017,11 +2008,15 @@ async fn resend_status(org_id: &str) -> Result<Option<String>, anyhow::Error> {
     Ok(Some(status))
 }
 
-/// Flips the row to `deleted` and broadcasts it; the caller holds the org's lifecycle lock.
-async fn tombstone_and_broadcast(org_id: &str) -> Result<bool, anyhow::Error> {
+/// Tombstones, then broadcasts, keeping the flip if the broadcast fails; caller holds the lock.
+async fn tombstone_and_broadcast(
+    org_id: &str,
+) -> Result<(bool, Result<(), anyhow::Error>), anyhow::Error> {
     let flipped = crate::organization::tombstone_org(org_id).await?;
-    crate::db::org_status::broadcast_deleted(org_id).await?;
-    Ok(flipped)
+    let broadcast = crate::db::org_status::broadcast_deleted(org_id)
+        .await
+        .map_err(anyhow::Error::from);
+    Ok((flipped, broadcast))
 }
 
 /// Flips a pending org back to active, unblocks it and returns its old `deleted_at`; under lock.
@@ -2049,6 +2044,17 @@ async fn requeue(org_id: &str) -> Result<bool, anyhow::Error> {
     }
     let org_name = organizations::get(org_id).await?.org_name;
     enqueue_deletion(org_id, &org_name, "deleting", None).await
+}
+
+/// A `deleted` org that still has task rows: step 900 flipped it but failed after, and may rerun.
+async fn unfinished_tombstone(org_id: &str) -> Result<bool, anyhow::Error> {
+    let status = organizations::get_status_uncached(org_id).await?;
+    if status.as_deref() != Some(STATUS_DELETED) {
+        return Ok(false);
+    }
+    Ok(!org_cleanup_tasks::list_by_org_status(org_id, None)
+        .await?
+        .is_empty())
 }
 
 /// Purges marked tombstones first, so an eviction that failed on an earlier sweep is retried.
@@ -2786,9 +2792,7 @@ mod tests {
 
     #[test]
     fn test_fixed_steps_excludes_billing_and_standalone_ofga() {
-        // Billing is a pre-deletion precondition (initiate_deletion refuses if
-        // billing is active), NOT a cleanup step. OFGA tuple removal is folded into
-        // the final delete_org_record step (via remove_org), not a separate step.
+        // Active billing blocks initiate_deletion, and step 900's tombstone_org removes the tuples.
         let steps = fixed_steps("org", "Org");
         let names: Vec<&str> = steps.iter().map(|s| s.step.as_str()).collect();
         assert!(!names.contains(&"delete_cloud_billing"));
@@ -3970,6 +3974,41 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_retry_resets_the_leftover_steps_of_a_deleted_org_without_adding_any() {
+        use sea_orm::ConnectionTrait;
+        if !meta_store().await {
+            return;
+        }
+        let org_id = org_row_with_status("t_retry_tombstone", STATUS_DELETED).await;
+        let finished = retry(&org_id).await;
+        let last = fixed_steps(&org_id, &org_id)
+            .into_iter()
+            .filter(|t| t.step_order == ORDER_DELETE_ORG_RECORD)
+            .collect::<Vec<_>>();
+        org_cleanup_tasks::add_batch(&last).await.unwrap();
+        get_orm_client_rw()
+            .await
+            .execute_unprepared(&format!(
+                "UPDATE org_cleanup_tasks SET status = 'failed', attempts = {MAX_ATTEMPTS} \
+                 WHERE org_id = '{org_id}'"
+            ))
+            .await
+            .unwrap();
+        let retried = retry(&org_id).await;
+        let tasks = org_cleanup_tasks::list_by_org_status(&org_id, None)
+            .await
+            .unwrap();
+        let status = organizations::get_status_uncached(&org_id).await.unwrap();
+        drop_org_row(&org_id).await;
+
+        assert!(finished.is_err(), "a finished org was retried");
+        retried.unwrap();
+        assert_eq!(tasks.len(), 1, "a deleted org got new steps");
+        assert!(!is_exhausted(&tasks[0]), "step 900 kept its spent budget");
+        assert_eq!(status.as_deref(), Some(STATUS_DELETED));
+    }
+
+    #[tokio::test]
     async fn test_retried_eviction_unblocks_recreated_active_org() {
         let store = FakeTombstoneStore::with_tombstone("t1", 1, 0);
         assert_eq!(sweep_tombstones_in(&store, 100).await.unwrap(), 0);
@@ -3993,8 +4032,7 @@ mod tests {
     #[test]
     fn test_user_fga_role_mapping() {
         use config::meta::user::UserRole;
-        // `User` and `ServiceAccount` are granted access via the `allowed_user`
-        // relation, not a relation named after the role.
+        // These two roles hold the `allowed_user` relation, not one named after the role.
         assert_eq!(user_fga_role(&UserRole::User), "allowed_user");
         assert_eq!(user_fga_role(&UserRole::ServiceAccount), "allowed_user");
         // Every other role maps to its own name.
@@ -4009,8 +4047,7 @@ mod tests {
     #[test]
     fn test_user_fga_role_matches_relation_names() {
         use config::meta::user::UserRole;
-        // The mapped relation must be one OpenFGA recognizes on `org:` objects.
-        // These mirror the read_targets in o2_openfga delete_user_tuples.
+        // Mirrors the read_targets of o2_openfga delete_user_tuples on `org:` objects.
         let valid_org_relations = ["admin", "allowed_user", "editor", "viewer", "sre_agent"];
         for role in [
             UserRole::Admin,
@@ -4030,17 +4067,12 @@ mod tests {
 
     #[tokio::test]
     async fn test_emit_status_audit_does_not_panic() {
-        // Fire-and-forget helper: must complete without panicking regardless of
-        // build type (enterprise emits an audit message; OSS is a no-op).
         emit_status_audit("test_org", "system", "active", "pending_deletion").await;
     }
 
     #[tokio::test]
     async fn test_promote_expired_noop_without_db() {
-        // With grace <= 0 (OSS default, or enterprise default when unset) promote_expired
-        // short-circuits to Ok(0) without touching the DB. When a test DB has configured
-        // a positive grace period, this exercises the real `list` path instead — skip in
-        // that environment since no TEST_DB_URL means the DB call itself would fail.
+        // A positive grace period reads the DB, which only a TEST_DB_URL run has.
         if grace_period_days() > 0 && std::env::var("TEST_DB_URL").is_err() {
             return;
         }
@@ -4269,8 +4301,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_initiate_deletion_refuses_system_orgs() {
-        // `default` and `_meta` must never be deletable — the guard rejects before
-        // any status mutation, so this holds even without a DB.
+        // The guard runs before any status change, so this holds without a DB.
         for sys_org in [config::DEFAULT_ORG, config::META_ORG_ID] {
             let r = initiate_deletion(sys_org, "test@example.com").await;
             assert!(r.is_err(), "{sys_org} must not be deletable");
@@ -4308,19 +4339,7 @@ mod tests {
         );
     }
 
-    // ===================== SLO teardown ===================================
-    //
-    // `step_delete_db_resources` is a flat sequence of calls against global
-    // clients with no injection point, so the order it runs them in cannot be
-    // observed without a live database. The order is nonetheless a correctness
-    // requirement, so it is pinned against the source of the step itself.
-    //
-    // The limit of that technique, stated plainly: it reads the file, so it
-    // sees calls that are WRITTEN, not calls that RUN. Removing a call fails
-    // these tests by name, and each call's org argument is pinned too, so a
-    // sweep aimed at the wrong org is caught — but a call commented out, or
-    // made unreachable, still reads as present.
-
+    // The step has no injection point, so its call order is pinned against its source text.
     const SOURCE: &str = include_str!("mod.rs");
 
     /// A body with any of these writes, or opens a transaction, on the connection it takes.
@@ -4376,8 +4395,7 @@ mod tests {
         "list_folders",
     ];
 
-    /// The body of `step_delete_db_resources`, so a match cannot come from a
-    /// neighbouring function (or from these tests).
+    /// The body of `step_delete_db_resources`, so a match cannot come from another fn or a test.
     fn db_resources_step() -> &'static str {
         let start = SOURCE
             .find("async fn step_delete_db_resources")
@@ -4447,8 +4465,7 @@ mod tests {
             .unwrap_or_else(|| panic!("step_delete_db_resources never calls {call}"))
     }
 
-    /// Every SLO table, or org deletion orphans the rows it misses — each
-    /// swept for the org being torn down, not some other one.
+    /// Every SLO table, each swept for the org being torn down, or deletion orphans its rows.
     const SLO_DELETES: [&str; 4] = [
         "slo::delete_by_org(slo_conn, org_id)",
         "slo_backfill_jobs::delete_by_org(slo_conn, org_id)",
@@ -4483,9 +4500,7 @@ mod tests {
 
     #[test]
     fn test_slos_are_deleted_before_alerts() {
-        // An SLO reads from a source alert, and a later PR refuses to delete an
-        // alert that a live SLO still depends on. Org teardown must never trip
-        // that guard, so the SLOs are gone before the alerts are touched.
+        // An alert a live SLO reads from refuses deletion, so the SLOs go first.
         let alerts = position_of("delete_org_alerts(org_id)");
         for call in SLO_DELETES {
             assert!(
@@ -4777,9 +4792,7 @@ mod tests {
 
     #[test]
     fn test_slo_children_are_deleted_before_their_definitions() {
-        // `slo_status` and `slo_backfill_jobs` carry no org column, so both
-        // resolve the org through `slos`. Wiping `slos` first would leave them
-        // with nothing to resolve — and nothing deleted.
+        // Both children find their org only through `slos`, so wiping `slos` first strands them.
         let slos = position_of("slos::delete_by_org(slo_conn, org_id)");
         assert!(
             position_of("slo::delete_by_org(slo_conn, org_id)") < slos,
@@ -4791,13 +4804,7 @@ mod tests {
         );
     }
 
-    /// The other half of the same requirement (S-16 PR 4). Ordering alone is
-    /// not enough: `delete_by_id_user` refuses to delete an alert a live SLO
-    /// measures from, and one straggler — a row a failed earlier attempt left
-    /// behind, or an SLO created in the grace period — would stall the whole
-    /// teardown on a retry loop that can never succeed. Teardown therefore
-    /// goes through the UNGUARDED primitive, and the guard stays where it
-    /// belongs: on the user's delete.
+    /// Teardown uses the unguarded delete, or one straggling SLO would stall it on endless retries.
     #[test]
     fn test_org_teardown_bypasses_the_slo_source_guard() {
         let start = SOURCE

@@ -23,6 +23,7 @@ use common::{
 };
 use config::utils::json;
 use infra::{
+    coordinator::org_status::{STATUS_DELETED, STATUS_DELETING, STATUS_PENDING_DELETION},
     db::{delete_from_db_coordinator, put_into_db_coordinator},
     errors::{self, Error},
     table::organizations,
@@ -406,7 +407,7 @@ pub async fn delete_org(org_id: &str) -> Result<(), anyhow::Error> {
 
 /// Turns a `deleting` org row into a `deleted` tombstone; true only for the call that flipped it.
 pub async fn tombstone_org(org_id: &str) -> Result<bool, anyhow::Error> {
-    let won = organizations::set_status_if(org_id, "deleting", "deleted")
+    let won = organizations::set_status_if(org_id, STATUS_DELETING, STATUS_DELETED)
         .await
         .map_err(|e| anyhow::anyhow!("Error tombstoning org: {e}"))?;
     if !won {
@@ -416,7 +417,7 @@ pub async fn tombstone_org(org_id: &str) -> Result<bool, anyhow::Error> {
             .await
             .map_err(|e| anyhow::anyhow!("Error tombstoning org: {e}"))?
             .status;
-        if status != "deleted" {
+        if status != STATUS_DELETED {
             return Err(anyhow::anyhow!(
                 "Cannot tombstone org {org_id} in status {status}"
             ));
@@ -450,10 +451,6 @@ pub async fn list(limit: Option<i64>) -> Result<Vec<Organization>, anyhow::Error
 
 /// Orgs whose row and this node's status cache are both clear of pending, deleting and deleted.
 pub async fn list_unblocked() -> Result<Vec<Organization>, anyhow::Error> {
-    use infra::coordinator::org_status::{
-        STATUS_DELETED, STATUS_DELETING, STATUS_PENDING_DELETION,
-    };
-
     let filter = organizations::ListFilter {
         exclude_deleted: true,
         ..organizations::ListFilter::default()

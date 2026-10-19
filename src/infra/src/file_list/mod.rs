@@ -629,7 +629,7 @@ pub async fn has_deleted_by_org(org_id: &str) -> Result<bool> {
     CLIENT.has_deleted_by_org(org_id).await
 }
 
-/// Reads the org's status in the transaction that removes the rows, so it cannot predate a flip.
+/// Removes the rows unless the org is deleting; the caller's `OrgLifecycleGuard` keeps a flip out.
 #[inline]
 pub async fn remove_deleted_unless_org_deleting(org_id: &str, ids: &[i64]) -> Result<bool> {
     CLIENT.remove_deleted_unless_org_deleting(org_id, ids).await
