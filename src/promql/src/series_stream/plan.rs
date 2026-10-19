@@ -426,7 +426,10 @@ mod tests {
         datasource::MemTable,
         parquet::arrow::ArrowWriter,
         physical_expr::{LexOrdering, PhysicalExpr, PhysicalSortExpr},
-        physical_plan::{DisplayAs, DisplayFormatType, PlanProperties, empty::EmptyExec},
+        physical_plan::{
+            DisplayAs, DisplayFormatType, PlanProperties,
+            coalesce_partitions::CoalescePartitionsExec, empty::EmptyExec,
+        },
         prelude::{ParquetReadOptions, SessionConfig},
     };
     use futures::{
@@ -664,6 +667,101 @@ mod tests {
                 batches.iter().map(RecordBatch::num_rows).sum::<usize>(),
                 rows
             );
+        }
+    }
+
+    #[tokio::test]
+    async fn test_single_hash_parquet_across_multiple_partitions() {
+        for partitions in [2, 4] {
+            for rows in [1, 4] {
+                let dir = tempfile::tempdir().unwrap();
+                for index in 0..partitions {
+                    write_hash_parquet(
+                        &dir.path().join(format!("{index}.parquet")),
+                        &vec![1u64 << 63; rows],
+                    );
+                }
+                let ctx = parquet_ordering_context(partitions);
+                let df = ctx
+                    .read_parquet(
+                        dir.path().to_str().unwrap(),
+                        ParquetReadOptions::default().file_sort_order(vec![vec![
+                            col(HASH_LABEL).sort(true, false),
+                            col(TIMESTAMP_COL_NAME).sort(true, false),
+                        ]]),
+                    )
+                    .await
+                    .unwrap()
+                    .filter(
+                        col(TIMESTAMP_COL_NAME)
+                            .gt_eq(lit(0i64))
+                            .and(col(TIMESTAMP_COL_NAME).lt_eq(lit(60i64)))
+                            .and(col(HASH_LABEL).gt_eq(lit(1u64 << 63)))
+                            .and(col(HASH_LABEL).lt_eq(lit(u64::MAX))),
+                    )
+                    .unwrap()
+                    .select_columns(&[TIMESTAMP_COL_NAME, HASH_LABEL, VALUE_LABEL])
+                    .unwrap();
+                let scan = df.create_physical_plan().await.unwrap();
+                assert_eq!(
+                    scan.properties().output_partitioning().partition_count(),
+                    partitions
+                );
+                assert!(hash_ordered(&scan));
+                let stats = datafusion::physical_plan::statistics::StatisticsContext::new()
+                    .compute(
+                        scan.as_ref(),
+                        &datafusion::physical_plan::statistics::StatisticsArgs::new(),
+                    )
+                    .unwrap();
+                let hash_index = scan.schema().index_of(HASH_LABEL).unwrap();
+                assert!(stats.column_statistics[hash_index].is_singleton());
+                eprintln!(
+                    "constant-hash scan: partitions={partitions}, rows_per_file={rows}, output_ordering={:?}, hash_stats={:?}",
+                    scan.properties().output_ordering(),
+                    stats.column_statistics[hash_index]
+                );
+                let df = df.sort(vec![col(HASH_LABEL).sort(true, false)]).unwrap();
+                let plan = df.create_physical_plan().await.unwrap();
+                eprintln!(
+                    "constant-hash final: partitions={}, has_sort={}, root_merge={}, output_ordering={:?}\n{}",
+                    plan.properties().output_partitioning().partition_count(),
+                    plan_contains_sort(&plan),
+                    plan.downcast_ref::<SortPreservingMergeExec>().is_some(),
+                    plan.properties().output_ordering(),
+                    datafusion::physical_plan::displayable(plan.as_ref()).indent(false)
+                );
+                assert!(!plan_contains_sort(&plan));
+                assert!(plan.downcast_ref::<CoalescePartitionsExec>().is_some());
+                assert_eq!(plan.properties().output_partitioning().partition_count(), 1);
+                assert!(plan.properties().output_ordering().is_none());
+                assert!(hash_ordered(&plan));
+                let mut inputs = execute_planned_partitions(
+                    vec![PlannedPartition {
+                        plan,
+                        task_ctx: Arc::new(df.task_ctx()),
+                    }],
+                    "constant_hash_multi_partition",
+                )
+                .expect("coalesced constant-hash partitions must stream without sorting");
+                let streams = inputs.pop().unwrap();
+                assert_eq!(streams.len(), 1);
+                let mut actual = 0;
+                for stream in streams {
+                    for batch in stream.try_collect::<Vec<_>>().await.unwrap() {
+                        assert!(
+                            batch[HASH_LABEL]
+                                .as_primitive::<UInt64Type>()
+                                .values()
+                                .iter()
+                                .all(|hash| *hash == 1u64 << 63)
+                        );
+                        actual += batch.num_rows();
+                    }
+                }
+                assert_eq!(actual, partitions * rows);
+                eprintln!("constant-hash execution: returned_rows={actual}");
+            }
         }
     }
 
