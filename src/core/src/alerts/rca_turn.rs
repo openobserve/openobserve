@@ -455,6 +455,7 @@ async fn start_turn(
         Some(&session_id),
         None,
         &email,
+        None,
         RCA_AGENT_TYPE,
         &prompt,
         &trace_id,

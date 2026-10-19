@@ -23,7 +23,7 @@ pub mod rca_ledger;
 pub mod rca_thread;
 
 use std::{
-    collections::{BTreeMap, HashSet},
+    collections::{BTreeMap, HashMap, HashSet},
     sync::{Arc, LazyLock as Lazy},
     time::Duration,
 };
@@ -368,6 +368,61 @@ pub async fn read_committed_prefix(
     })
 }
 
+/// Chats whose newest turn (given with its start time) stored a delete awaiting confirmation.
+pub async fn pending_confirmations(
+    org_id: &str,
+    chats: &[(&ai_chat_sessions::Model, &str, i64)],
+) -> std::result::Result<HashMap<String, String>, ReadError> {
+    let newest: Vec<(&ai_chat_sessions::Model, &str, i64)> = chats
+        .iter()
+        .filter(|(c, ..)| c.last_committed_seq > NO_SEQ && c.last_event_at.is_some())
+        .copied()
+        .collect();
+    let Some(start) = newest.iter().map(|(.., at)| *at).min() else {
+        return Ok(HashMap::new());
+    };
+    let end = newest
+        .iter()
+        .filter_map(|(c, ..)| c.last_event_at)
+        .max()
+        .unwrap_or(start)
+        .max(start);
+    let quoted = |ids: Vec<&str>| {
+        ids.iter()
+            .map(|id| format!("'{}'", id.replace('\'', "''")))
+            .collect::<Vec<_>>()
+            .join(", ")
+    };
+    let sql = format!(
+        "SELECT * FROM \"{AI_CHAT_EVENTS_STREAM}\" WHERE session_id IN ({}) AND turn_id IN ({}) \
+         AND str_match(payload, 'delete_confirmation') ORDER BY seq ASC",
+        quoted(newest.iter().map(|(c, ..)| c.session_id.as_str()).collect()),
+        quoted(newest.iter().map(|(_, turn, _)| *turn).collect()),
+    );
+    let rows = search_rows(org_id, sql, start, end).await?;
+    let mut pending = HashMap::new();
+    for row in rows {
+        let Some((chat, ..)) = newest
+            .iter()
+            .find(|(c, turn, _)| c.session_id == row.session_id && *turn == row.turn_id)
+        else {
+            continue;
+        };
+        if row.seq > chat.last_committed_seq {
+            continue;
+        }
+        // A split event cannot be parsed from one row; it still marks the chat as waiting.
+        let call = match row.to_verified_event() {
+            Ok(event) => projection::delete_confirmation_call(&event.event_type, &event.data),
+            Err(_) => Some(String::new()),
+        };
+        if let Some(call) = call {
+            pending.insert(row.session_id, call);
+        }
+    }
+    Ok(pending)
+}
+
 /// Rewrites committed rows with fresh timestamps (caller holds the lease); returns how many.
 pub async fn refresh_chat_history(
     org_id: &str,
@@ -605,6 +660,16 @@ async fn search_window(
         "SELECT * FROM \"{AI_CHAT_EVENTS_STREAM}\" WHERE session_id = '{session}' \
          AND seq > {lo} AND seq <= {hi} ORDER BY seq ASC"
     );
+    search_rows(&row.org_id, sql, first_at, last_at).await
+}
+
+/// Every stored row `sql` selects between the two write times (micros, both inclusive).
+async fn search_rows(
+    org_id: &str,
+    sql: String,
+    first_at: i64,
+    last_at: i64,
+) -> std::result::Result<Vec<AiChatEventRecord>, ReadError> {
     let req = SearchRequest {
         query: Query {
             sql,
@@ -642,7 +707,7 @@ async fn search_window(
     let trace_id = config::ider::generate_trace_id();
     let resp = as_chat_history_reader(crate::search::search(
         &trace_id,
-        &row.org_id,
+        org_id,
         StreamType::Logs,
         None,
         &req,

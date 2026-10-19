@@ -779,6 +779,7 @@ pub async fn authentication(
         let tokens = json::to_string(&AuthTokens {
             access_token,
             refresh_token: "".to_string(),
+            login_id: None,
         })
         .unwrap();
 
@@ -1048,6 +1049,7 @@ pub async fn get_auth(
                 let tokens = AuthTokens {
                     access_token,
                     refresh_token: "".to_string(),
+                    login_id: None,
                 };
 
                 log::debug!("Setting cookie for user: {name} - {cookie_name}");

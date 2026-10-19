@@ -131,6 +131,7 @@ pub async fn admit_turn(
     session_id: Option<&str>,
     turn_id: Option<&str>,
     user_email: &str,
+    auth_session_id: Option<&str>,
     agent_type: &str,
     prompt: &str,
     trace_id: &str,
@@ -160,7 +161,14 @@ pub async fn admit_turn(
         check_turn_owner(&row, &owner, user_email, trace_id)?;
     }
     let lease = acquire_lease(org_id, session_id, trace_id).await?;
-    let registration = match registry::register_capped(org_id, session_id, &turn_id, &owner, caps) {
+    let registration = match registry::register_capped(
+        org_id,
+        session_id,
+        &turn_id,
+        &owner,
+        auth_session_id,
+        caps,
+    ) {
         Ok(registration) => registration,
         Err(scope) => {
             lease.release().await;

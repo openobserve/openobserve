@@ -1035,6 +1035,10 @@ fn ai_chat_routes(router: Router) -> Router {
             post(ai::chat::cancel),
         )
         .route(
+            "/{org_id}/ai/chats/{session_id}/turns/{turn_id}/stream",
+            get(ai::chats::stream_turn),
+        )
+        .route(
             "/{org_id}/ai/chats/{session_id}/shares",
             get(ai::shares::list_for_chat).post(ai::shares::create),
         )
