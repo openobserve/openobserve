@@ -165,10 +165,10 @@ fn is_system_field(field: &str) -> bool {
 /// event (`Done` / `Error` / `Cancelled`) has been produced; otherwise its
 /// `Drop` assumes the stream was torn down early and cancels the query.
 ///
-/// Cancellation is keyed by the parent `trace_id`; the query manager removes
-/// every internal sub-query sharing that prefix, so multi-stream searches are
-/// covered too. Cancellation requires the enterprise build — on the open-source
-/// build the guard only logs the disconnect.
+/// Cancellation is keyed by the request's own query id (not the shared
+/// `trace_id`); the query manager removes every internal sub-query sharing that
+/// prefix, so multi-stream searches are covered too. Cancellation requires the enterprise build —
+/// on the open-source build the guard only logs the disconnect.
 pub struct SearchStreamGuard {
     org_id: String,
     trace_id: String,

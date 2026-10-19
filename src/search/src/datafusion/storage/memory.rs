@@ -92,11 +92,16 @@ impl ObjectStore for FS {
                 return futures::stream::empty().boxed();
             }
         };
+        // every listing table registers its list, even an empty one, so a miss means lost state
         let objects = match super::file_list::get(&key) {
             Ok(objects) => objects,
             Err(e) => {
                 log::error!("Error getting file list for memory storage: {e}");
-                vec![]
+                let err = Error::Generic {
+                    store: Self::name(),
+                    source: e.into(),
+                };
+                return futures::stream::once(async move { Err(err) }).boxed();
             }
         };
         let values = objects
@@ -281,11 +286,15 @@ mod tests {
     async fn test_list_operations() {
         let fs = FS::new();
 
-        // Test list with valid prefix
-        let prefix = Some(Path::from("test/"));
+        // Test list with a registered, empty file list
+        super::super::file_list::set("test-list-operations", "schema", "parquet", vec![]).await;
+        let prefix = Some(Path::from(
+            "test-list-operations/schema=schema/format=parquet",
+        ));
         let stream = fs.list(prefix.as_ref());
         let results: Vec<Result<ObjectMeta>> = stream.collect().await;
         assert!(results.is_empty());
+        super::super::file_list::clear("test-list-operations");
 
         // Test list with None prefix
         let prefix_none: Option<&Path> = None;
@@ -293,11 +302,12 @@ mod tests {
         let results_none: Vec<Result<ObjectMeta>> = stream_none.collect().await;
         assert!(results_none.is_empty());
 
-        // Test list with invalid prefix (error handling)
+        // An unregistered list is lost state, not an empty table
         let prefix_invalid = Some(Path::from("invalid_prefix_that_will_cause_error"));
         let stream_invalid = fs.list(prefix_invalid.as_ref());
         let results_invalid: Vec<Result<ObjectMeta>> = stream_invalid.collect().await;
-        assert!(results_invalid.is_empty());
+        assert_eq!(results_invalid.len(), 1);
+        assert!(matches!(results_invalid[0], Err(Error::Generic { .. })));
 
         // Test list_with_delimiter
         let delimiter_result = fs.list_with_delimiter(prefix.as_ref()).await;

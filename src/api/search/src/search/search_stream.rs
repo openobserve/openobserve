@@ -570,9 +570,11 @@ pub async fn search_http2_stream(
     #[cfg(not(feature = "enterprise"))]
     let audit_ctx = None;
     let search_type = req.search_type;
+    // the disconnect guard cancels by prefix, so requests sharing a trace_id must not share it
+    let query_id = config::ider::generate_query_id(&trace_id);
     // Spawn the search task in a separate task
     tokio::spawn(process_search_stream_request(
-        trace_id.clone(),
+        query_id.clone(),
         org_id.clone(),
         user_id,
         req,
@@ -590,7 +592,7 @@ pub async fn search_http2_stream(
 
     // Cancel the running query if the client disconnects before the search
     // produces a terminal event (e.g. the browser tab is closed).
-    let mut guard = SearchStreamGuard::new(org_id.clone(), trace_id.clone());
+    let mut guard = SearchStreamGuard::new(org_id.clone(), query_id);
 
     // Return streaming response
     let stream = tokio_stream::wrappers::ReceiverStream::new(rx).flat_map(move |result| {
@@ -953,9 +955,11 @@ pub async fn values_http2_stream(
 
     // Pattern extraction is not supported for values endpoint
     let extract_patterns = false;
+    // the disconnect guard cancels by prefix, so requests sharing a trace_id must not share it
+    let query_id = config::ider::generate_query_id(&trace_id);
     // Spawn the search task to process the request
     tokio::spawn(process_search_stream_request(
-        trace_id.clone(),
+        query_id.clone(),
         org_id.clone(),
         user_id,
         req,
@@ -973,7 +977,7 @@ pub async fn values_http2_stream(
 
     // Cancel the running query if the client disconnects before the search
     // produces a terminal event (e.g. the browser tab is closed).
-    let mut guard = SearchStreamGuard::new(org_id.clone(), trace_id.clone());
+    let mut guard = SearchStreamGuard::new(org_id.clone(), query_id);
 
     // Return streaming response
     let stream = tokio_stream::wrappers::ReceiverStream::new(rx).flat_map(move |result| {

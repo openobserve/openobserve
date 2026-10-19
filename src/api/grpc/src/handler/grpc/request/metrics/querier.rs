@@ -57,15 +57,11 @@ impl Metrics for MetricsQuerier {
         let org_id = &req.org_id;
         let stream_type = StreamType::Metrics.as_str();
         #[cfg(feature = "enterprise")]
-        if !SEARCH_SERVER.contain_key(&trace_id).await {
-            SEARCH_SERVER
-                .insert(
-                    trace_id.to_string(),
-                    TaskStatus::new_follower(vec![], false),
-                )
-                .await;
-        }
-        let result = SearchService::grpc::search(req).await.map_err(|err| {
+        let registration = FollowerRegistration::register(&trace_id).await;
+        let result = SearchService::grpc::search(req).await;
+        #[cfg(feature = "enterprise")]
+        registration.finish().await;
+        let result = result.map_err(|err| {
             let time = start.elapsed().as_secs_f64();
             metrics::GRPC_RESPONSE_TIME
                 .with_label_values(&["/metrics/query", "500", org_id, stream_type, "", ""])
@@ -88,12 +84,6 @@ impl Metrics for MetricsQuerier {
         metrics::GRPC_INCOMING_REQUESTS
             .with_label_values(&["/metrics/query", "200", org_id, stream_type, "", ""])
             .inc();
-
-        // Clean up task record before returning
-        #[cfg(feature = "enterprise")]
-        if !SEARCH_SERVER.is_leader(&trace_id).await {
-            SEARCH_SERVER.remove(&trace_id, false).await;
-        }
 
         Ok(Response::new(result))
     }
@@ -125,11 +115,7 @@ impl Metrics for MetricsQuerier {
         // insert_sender — without this the engine returns SearchCancelQuery
         // immediately (same registration the `query` handler performs).
         #[cfg(feature = "enterprise")]
-        if !SEARCH_SERVER.contain_key(&trace_id).await {
-            SEARCH_SERVER
-                .insert(trace_id.clone(), TaskStatus::new_follower(vec![], false))
-                .await;
-        }
+        let registration = FollowerRegistration::register(&trace_id).await;
 
         // spawn a task to push streaming responses
         tokio::task::spawn(async move {
@@ -137,13 +123,49 @@ impl Metrics for MetricsQuerier {
                 log::error!("[gRPC:metrics:data] get data error: req:{req:?}, error:{e:?}")
             }
             #[cfg(feature = "enterprise")]
-            if !SEARCH_SERVER.is_leader(&trace_id).await {
-                SEARCH_SERVER.remove(&trace_id, false).await;
-            }
+            registration.finish().await;
         });
 
         let out_stream = ReceiverStream::new(rx);
         Ok(Response::new(Box::pin(out_stream) as Self::DataStream))
+    }
+}
+
+/// Follower entry this request created; removed when the request ends, also if it is dropped.
+#[cfg(feature = "enterprise")]
+struct FollowerRegistration(Option<String>);
+
+#[cfg(feature = "enterprise")]
+impl FollowerRegistration {
+    // on a single node the leader entry already exists and must outlive this request
+    async fn register(trace_id: &str) -> Self {
+        if SEARCH_SERVER.contain_key(trace_id).await {
+            return Self(None);
+        }
+        SEARCH_SERVER
+            .insert(
+                trace_id.to_string(),
+                TaskStatus::new_follower(vec![], false),
+            )
+            .await;
+        Self(Some(trace_id.to_string()))
+    }
+
+    async fn finish(mut self) {
+        if let Some(trace_id) = self.0.take() {
+            SEARCH_SERVER.remove(&trace_id, false).await;
+        }
+    }
+}
+
+#[cfg(feature = "enterprise")]
+impl Drop for FollowerRegistration {
+    fn drop(&mut self) {
+        if let Some(trace_id) = self.0.take() {
+            tokio::spawn(async move {
+                SEARCH_SERVER.remove(&trace_id, false).await;
+            });
+        }
     }
 }
 
