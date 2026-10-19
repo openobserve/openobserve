@@ -9285,6 +9285,7 @@
     "selectStreamTypeFirst": "Select a stream type first",
     "previewEmptyState": "Select a stream type and stream name to see a preview",
     "queryConfig": {
+      "aggregationFunction": "Aggregation function",
       "sectionTitle": "Conditions",
       "openFullEditor": "Open Full Editor",
       "groupByTooltip": "Group results by these fields — alert triggers per unique combination",
