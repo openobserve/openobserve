@@ -25,7 +25,10 @@ use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 #[cfg(feature = "enterprise")]
-use {o2_enterprise::enterprise::search::TaskStatus, search_service::SEARCH_SERVER};
+use {
+    o2_enterprise::enterprise::search::{TaskStatus, query_manager::Registration},
+    search_service::SEARCH_SERVER,
+};
 
 use crate::handler::grpc::{
     MetadataMap,
@@ -57,7 +60,7 @@ impl Metrics for MetricsQuerier {
         let org_id = &req.org_id;
         let stream_type = StreamType::Metrics.as_str();
         #[cfg(feature = "enterprise")]
-        let registration = FollowerRegistration::register(&trace_id).await;
+        let registration = FollowerRegistration::register(org_id, &trace_id).await;
         let result = SearchService::grpc::search(req).await;
         #[cfg(feature = "enterprise")]
         registration.finish().await;
@@ -115,7 +118,7 @@ impl Metrics for MetricsQuerier {
         // insert_sender — without this the engine returns SearchCancelQuery
         // immediately (same registration the `query` handler performs).
         #[cfg(feature = "enterprise")]
-        let registration = FollowerRegistration::register(&trace_id).await;
+        let registration = FollowerRegistration::register(&req.org_id, &trace_id).await;
 
         // spawn a task to push streaming responses
         tokio::task::spawn(async move {
@@ -133,27 +136,28 @@ impl Metrics for MetricsQuerier {
 
 /// Follower entry this request created; removed when the request ends, also if it is dropped.
 #[cfg(feature = "enterprise")]
-struct FollowerRegistration(Option<String>);
+struct FollowerRegistration(Option<(String, String)>);
 
 #[cfg(feature = "enterprise")]
 impl FollowerRegistration {
     // on a single node the leader entry already exists and must outlive this request
-    async fn register(trace_id: &str) -> Self {
-        if SEARCH_SERVER.contain_key(trace_id).await {
-            return Self(None);
-        }
-        SEARCH_SERVER
-            .insert(
+    async fn register(org_id: &str, trace_id: &str) -> Self {
+        let registration = SEARCH_SERVER
+            .insert_or_join(
+                org_id,
                 trace_id.to_string(),
                 TaskStatus::new_follower(vec![], false),
             )
             .await;
-        Self(Some(trace_id.to_string()))
+        Self(
+            matches!(registration, Registration::Inserted)
+                .then(|| (org_id.to_string(), trace_id.to_string())),
+        )
     }
 
     async fn finish(mut self) {
-        if let Some(trace_id) = self.0.take() {
-            SEARCH_SERVER.remove(&trace_id, false).await;
+        if let Some((org_id, trace_id)) = self.0.take() {
+            SEARCH_SERVER.remove(&org_id, &trace_id).await;
         }
     }
 }
@@ -161,9 +165,9 @@ impl FollowerRegistration {
 #[cfg(feature = "enterprise")]
 impl Drop for FollowerRegistration {
     fn drop(&mut self) {
-        if let Some(trace_id) = self.0.take() {
+        if let Some((org_id, trace_id)) = self.0.take() {
             tokio::spawn(async move {
-                SEARCH_SERVER.remove(&trace_id, false).await;
+                SEARCH_SERVER.remove(&org_id, &trace_id).await;
             });
         }
     }

@@ -37,8 +37,9 @@ impl QueryGuard {
         self.finished = true;
         #[cfg(feature = "enterprise")]
         {
-            let status = crate::SEARCH_SERVER.remove(&self.query_id, false).await?;
-            let (_, stat) = status.first()?;
+            let (_, stat) = crate::SEARCH_SERVER
+                .remove(&self.org_id, &self.query_id)
+                .await?;
             stat.work_group.as_ref().map(|wg| wg.to_string())
         }
         #[cfg(not(feature = "enterprise"))]
@@ -71,11 +72,12 @@ impl Drop for AbortOnDrop {
 async fn cancel_query(org_id: &str, query_id: &str) {
     if get_o2_config().super_cluster.enabled {
         if let Err(e) =
-            o2_enterprise::enterprise::super_cluster::search::cancel_query(org_id, query_id).await
+            o2_enterprise::enterprise::super_cluster::search::cancel_query(Some(org_id), query_id)
+                .await
         {
             log::error!("[trace_id {query_id}] failed to cancel dropped query: {e}");
         }
-    } else if let Err(e) = crate::cancel_query(org_id, query_id).await {
+    } else if let Err(e) = crate::cancel_query(Some(org_id), query_id).await {
         log::error!("[trace_id {query_id}] failed to cancel dropped query: {e}");
     }
 }

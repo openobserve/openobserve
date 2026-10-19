@@ -93,8 +93,9 @@ pub async fn search(
     timeout: i64,
     is_super_cluster: bool,
 ) -> Result<SearchResponse> {
+    let trace_id = search_service::leader_trace_id(trace_id);
     // callers such as Grafana share one trace_id across concurrent requests
-    let query_id = config::ider::generate_query_id(trace_id);
+    let query_id = config::ider::generate_query_id(&trace_id);
     #[cfg(feature = "enterprise")]
     {
         let query = Some(req.query.clone());
@@ -103,6 +104,7 @@ pub async fn search(
 
         SEARCH_SERVER
             .insert(
+                org_id,
                 query_id.clone(),
                 TaskStatus::new_leader(
                     vec![],
@@ -251,7 +253,7 @@ async fn search_registered(
     let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
     #[cfg(feature = "enterprise")]
     if SEARCH_SERVER
-        .insert_sender(trace_id, abort_sender, true)
+        .insert_sender(org_id, trace_id, abort_sender, true)
         .await
         .is_err()
     {
