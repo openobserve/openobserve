@@ -726,6 +726,7 @@ pub struct ApiDoc;
     openobserve_api_management::request::alert_calibration::digests::list_runs_for_alert,
     openobserve_api_management::request::alert_calibration::digests::get_run_records,
     openobserve_api_management::request::alert_calibration::digests::count_findings_by_rule,
+    openobserve_api_management::request::ai::chats::stream_turn,
 ))]
 #[openapi(components(schemas(
     openobserve_api_management::models::experiments::ExperimentResultRowSortBody,

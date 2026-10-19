@@ -38,7 +38,7 @@ use {
     o2_enterprise::enterprise::{
         ai::{
             agent::meta::Role,
-            chat::{PersistSettings, TurnIdentity, TurnSpec, spawn_turn},
+            chat::{OwnerCancel, PersistSettings, TurnIdentity, TurnSpec, spawn_turn},
             client::{
                 DEFAULT_AGENT_TYPE, ImageAttachment, QueryRequest, RCA_AGENT_TYPE,
                 SESSION_OWNER_UNAVAILABLE, get_agent_client, is_agent_unreachable,
@@ -271,6 +271,30 @@ enum SseLine {
     },
 }
 
+/// Which turn a Stop goes to, decided by [`stop_target`] and [`direct_stop_target`].
+#[cfg(feature = "enterprise")]
+#[derive(Debug, PartialEq, Eq)]
+enum StopTarget {
+    Turn(String),
+    /// Not known here; o2-ai routes it to the stream and checks the caller owns it.
+    Elsewhere,
+    /// Nothing the caller named runs.
+    Nothing,
+}
+
+/// What a Stop answers, decided by [`cancel_reply`].
+#[cfg(feature = "enterprise")]
+#[derive(Debug, PartialEq, Eq)]
+enum CancelReply {
+    Body {
+        cancelled: bool,
+        owner_reached: bool,
+    },
+    /// o2-ai's refusal, kept typed.
+    Relay,
+    Failed,
+}
+
 /// One turn's credit: who pays, under which id it is refunded, and what it cost.
 #[cfg(feature = "enterprise")]
 struct TurnCharge {
@@ -495,6 +519,8 @@ struct StreamTurn {
     agent_type: &'static str,
     query: QueryRequest,
     auth: String,
+    /// The browser login that sent the turn, so signing it out stops the turn.
+    auth_session_id: Option<String>,
     forward_headers: Option<std::collections::HashMap<String, String>>,
     client: Arc<o2_enterprise::enterprise::ai::client::AiAgentClient>,
     span: Option<opentelemetry::Context>,
@@ -1008,84 +1034,264 @@ async fn check_chat_owner(
     }
 }
 
-/// Asks o2-ai to abort first so the partial reply is still stored, else stops the turn here.
+/// Asks o2-ai to abort first so the partial reply is still stored, else stops the turn on its node.
 #[cfg(feature = "enterprise")]
-async fn cancel_turn(org_id: String, session_id: String, auth: String) -> Response {
-    use o2_enterprise::enterprise::ai::chat::registry::{self, CancelReason};
+async fn cancel_turn(
+    org_id: String,
+    session_id: String,
+    turn_id: Option<String>,
+    auth: String,
+    caller: String,
+) -> Response {
+    use o2_enterprise::enterprise::ai::chat::{CancelReason, lease};
 
     let persisted = o2_enterprise::enterprise::ai::chat::is_enabled();
-    let upstream = match get_agent_client() {
-        Some(client) => {
-            let (org_id, session_id) = (org_id.clone(), session_id.clone());
-            let task =
-                tokio::spawn(
-                    async move { client.cancel_session(&session_id, &org_id, &auth).await },
-                );
-            Some(tokio::time::timeout(UPSTREAM_CANCEL_WAIT, task).await)
+    // o2-ai's Stop is chat-wide, so which turn it may stop is settled here first.
+    let mut chat_turns: Option<Vec<String>> = None;
+    let target = if persisted {
+        let running = super::chats::running_turn_id(&org_id, &session_id).await;
+        match stop_target(turn_id.as_deref(), running.as_deref()) {
+            Some(turn) => StopTarget::Turn(turn),
+            None => StopTarget::Nothing,
         }
-        None => None,
+    } else {
+        let turns = o2_enterprise::enterprise::ai::chat::registry::turns(&org_id, &session_id);
+        let running: Vec<(&str, &str)> = turns
+            .iter()
+            .map(|t| (t.turn_id.as_str(), t.user_id.as_str()))
+            .collect();
+        let target = match direct_stop_target(turn_id.as_deref(), &running, &caller) {
+            Ok(target) => target,
+            Err(refusal) => return refusal.into_response(),
+        };
+        chat_turns = Some(own_turns(&running, &caller));
+        target
     };
-    let answered = match upstream {
-        Some(Ok(Ok(Ok(resp)))) => Some(resp),
-        Some(Ok(Ok(Err(e)))) => {
-            log::warn!("[AI-CHAT] failed to forward cancel for {session_id}: {e}");
-            None
-        }
-        Some(Ok(Err(e))) => {
-            log::error!("[AI-CHAT] cancel task for {session_id} failed: {e}");
-            None
-        }
-        Some(Err(_)) => {
-            log::warn!("[AI-CHAT] o2-ai did not answer the cancel for {session_id} in time");
-            None
-        }
-        None => None,
+    let target = match target {
+        StopTarget::Turn(turn) => Some(turn),
+        StopTarget::Elsewhere => None,
+        StopTarget::Nothing => return cancel_body(false, false, turn_id, None),
     };
-    match answered {
-        Some(resp) if resp.status().is_success() => {
-            let body = resp.json::<serde_json::Value>().await.unwrap_or_default();
-            let upstream_active = body.get("active").and_then(|v| v.as_bool()) == Some(true)
-                || body.get("cancelled").and_then(|v| v.as_bool()) == Some(true);
-            let mut stopped = upstream_active;
-            if persisted && upstream_active {
-                schedule_cancel_fallback(org_id, session_id);
-            } else if persisted {
-                // o2-ai runs nothing for it, but this node may hold the turn (owner wait, restore).
-                stopped = registry::cancel(&org_id, &session_id, CancelReason::User);
-            }
-            MetaHttpResponse::json(serde_json::json!({"cancelled": stopped, "active": stopped}))
+    let (accepted, refusal) = upstream_cancel(&org_id, &session_id, auth).await;
+    if accepted == Some(true)
+        && persisted
+        && let Some(target) = target.clone()
+    {
+        schedule_cancel_fallback(org_id.clone(), session_id.clone(), target);
+    }
+    let owner = if persisted && accepted != Some(true) {
+        let owner = lease::cancel_on_owner(
+            &org_id,
+            &session_id,
+            target.as_deref(),
+            CancelReason::User,
+            UPSTREAM_CANCEL_WAIT,
+        )
+        .await;
+        Some(owner)
+    } else {
+        None
+    };
+    let turn_id = owner
+        .as_ref()
+        .and_then(|o| o.turn_id.clone())
+        .or(target)
+        .or(turn_id);
+    match cancel_reply(accepted, refusal.is_some(), owner.as_ref()) {
+        CancelReply::Body {
+            cancelled,
+            owner_reached,
+        } => {
+            // Without persistence o2-ai stops the whole chat; only the caller's own turns are
+            // named.
+            let stopped = chat_turns.map(|turns| if cancelled { turns } else { Vec::new() });
+            cancel_body(cancelled, owner_reached, turn_id, stopped)
         }
-        answered => {
-            if persisted && registry::cancel(&org_id, &session_id, CancelReason::User) {
-                return MetaHttpResponse::json(
-                    serde_json::json!({"cancelled": true, "active": true}),
-                );
-            }
-            match answered {
-                Some(resp) => relay_response(resp).await,
-                None => AiErrorEnvelope::new(
-                    AiErrorCode::Internal,
-                    "Failed to cancel the response; please retry",
-                )
-                .retryable(true)
-                .into_response(),
-            }
-        }
+        CancelReply::Relay => match refusal {
+            Some(resp) => relay_response(resp).await,
+            None => cancel_failed(),
+        },
+        CancelReply::Failed => cancel_failed(),
     }
 }
 
-/// Stops the turn here if it is still running once o2-ai has had time to settle the abort.
+/// o2-ai's answer to a user Stop: `Some(active)` when it answered 2xx, else its refusal, if any.
 #[cfg(feature = "enterprise")]
-fn schedule_cancel_fallback(org_id: String, session_id: String) {
-    use o2_enterprise::enterprise::ai::chat::registry::{self, CancelReason};
-
-    let Some(turn) = registry::get(&org_id, &session_id) else {
-        return;
+async fn upstream_cancel(
+    org_id: &str,
+    session_id: &str,
+    auth: String,
+) -> (Option<bool>, Option<reqwest::Response>) {
+    let Some(client) = get_agent_client() else {
+        return (None, None);
     };
+    let (org, sid) = (org_id.to_string(), session_id.to_string());
+    // The caller's own credential only, so o2-ai checks that it started the streaming turn.
+    let task =
+        tokio::spawn(async move { client.cancel_session_as_caller(&sid, &org, &auth).await });
+    let resp = match tokio::time::timeout(UPSTREAM_CANCEL_WAIT, task).await {
+        Ok(Ok(Ok(resp))) => resp,
+        Ok(Ok(Err(e))) => {
+            log::warn!("[AI-CHAT] failed to forward cancel for {session_id}: {e}");
+            return (None, None);
+        }
+        Ok(Err(e)) => {
+            log::error!("[AI-CHAT] cancel task for {session_id} failed: {e}");
+            return (None, None);
+        }
+        Err(_) => {
+            log::warn!("[AI-CHAT] o2-ai did not answer the cancel for {session_id} in time");
+            return (None, None);
+        }
+    };
+    if !resp.status().is_success() {
+        return (None, Some(resp));
+    }
+    let body = resp.json::<serde_json::Value>().await.unwrap_or_default();
+    let active = body.get("active").and_then(|v| v.as_bool()) == Some(true)
+        || body.get("cancelled").and_then(|v| v.as_bool()) == Some(true);
+    (Some(active), None)
+}
+
+/// The persisted turn to stop: the running one, and only if it is the one the caller named.
+#[cfg(feature = "enterprise")]
+fn stop_target(named: Option<&str>, running: Option<&str>) -> Option<String> {
+    let running = running?;
+    named
+        .is_none_or(|named| named == running)
+        .then(|| running.to_string())
+}
+
+/// The turn without persistence a Stop goes to, from the turns `(turn, user)` running here.
+#[cfg(feature = "enterprise")]
+fn direct_stop_target(
+    named: Option<&str>,
+    running: &[(&str, &str)],
+    caller: &str,
+) -> Result<StopTarget, AiErrorEnvelope> {
+    // Only a node that streams none of the chat's turns forwards a Stop it cannot vouch for.
+    if running.is_empty() {
+        return Ok(StopTarget::Elsewhere);
+    }
+    let refused = || {
+        AiErrorEnvelope::new(
+            AiErrorCode::PermissionDenied,
+            "Only the user who started this answer can stop it",
+        )
+    };
+    let Some((newest_mine, _)) = running.iter().rev().find(|(_, user)| *user == caller) else {
+        return Err(refused());
+    };
+    match named.map(|named| running.iter().find(|(turn, _)| *turn == named)) {
+        None => Ok(StopTarget::Turn(newest_mine.to_string())),
+        Some(Some((_, user))) if *user != caller => Err(refused()),
+        Some(Some((turn, _))) => Ok(StopTarget::Turn(turn.to_string())),
+        // Another turn of the caller runs here, so the named one already ended.
+        Some(None) => Ok(StopTarget::Nothing),
+    }
+}
+
+/// The caller's turns among the chat's `(turn, user)` here; other users' ids are never echoed.
+#[cfg(feature = "enterprise")]
+fn own_turns(running: &[(&str, &str)], caller: &str) -> Vec<String> {
+    running
+        .iter()
+        .filter(|(_, user)| *user == caller)
+        .map(|(turn, _)| turn.to_string())
+        .collect()
+}
+
+/// How a Stop ends from o2-ai's answer and, for a persisted chat, what the turn's node said.
+#[cfg(feature = "enterprise")]
+fn cancel_reply(accepted: Option<bool>, refused: bool, owner: Option<&OwnerCancel>) -> CancelReply {
+    match (accepted, owner) {
+        (Some(true), _) => CancelReply::Body {
+            cancelled: true,
+            owner_reached: true,
+        },
+        // A refusal stays typed unless the turn was stopped anyway.
+        (_, Some(owner)) if owner.reached || !refused => CancelReply::Body {
+            cancelled: owner.reached,
+            owner_reached: owner.reached,
+        },
+        (Some(false), None) => CancelReply::Body {
+            cancelled: false,
+            owner_reached: true,
+        },
+        (..) if refused => CancelReply::Relay,
+        _ => CancelReply::Failed,
+    }
+}
+
+#[cfg(feature = "enterprise")]
+fn cancel_failed() -> Response {
+    AiErrorEnvelope::new(
+        AiErrorCode::Internal,
+        "Failed to cancel the response; please retry",
+    )
+    .retryable(true)
+    .into_response()
+}
+
+/// `owner_reached`: whoever runs the turn got the stop; `active` is kept for older clients.
+#[cfg(feature = "enterprise")]
+fn cancel_body(
+    cancelled: bool,
+    owner_reached: bool,
+    turn_id: Option<String>,
+    chat_wide: Option<Vec<String>>,
+) -> Response {
+    let mut body = serde_json::json!({
+        "cancelled": cancelled,
+        "active": cancelled,
+        "owner_reached": owner_reached,
+        "turn_id": turn_id,
+    });
+    if let (Some(stopped), Some(obj)) = (chat_wide, body.as_object_mut()) {
+        obj.insert("chat_wide".into(), true.into());
+        obj.insert("stopped_turns".into(), stopped.into());
+    }
+    MetaHttpResponse::json(body)
+}
+
+/// Stops the turn on its node if it is still running once o2-ai has had time to settle the abort.
+#[cfg(feature = "enterprise")]
+fn schedule_cancel_fallback(org_id: String, session_id: String, turn_id: String) {
+    use o2_enterprise::enterprise::ai::chat::{CancelReason, lease};
+
     tokio::spawn(async move {
         tokio::time::sleep(CANCEL_GRACE).await;
-        registry::cancel_if(&org_id, &session_id, &turn.turn_id, CancelReason::User);
+        lease::cancel_on_owner(
+            &org_id,
+            &session_id,
+            Some(&turn_id),
+            CancelReason::User,
+            UPSTREAM_CANCEL_WAIT,
+        )
+        .await;
     });
+}
+
+/// The optional `turn_id` of a cancel body; an empty body or `{}` names none.
+#[cfg(feature = "enterprise")]
+async fn cancel_turn_id(body: Body) -> Result<Option<String>, Response> {
+    let Ok(bytes) = axum::body::to_bytes(body, 4 << 10).await else {
+        return Err(error::invalid_request("Request body too large"));
+    };
+    if bytes.iter().all(u8::is_ascii_whitespace) {
+        return Ok(None);
+    }
+    let Ok(body) = serde_json::from_slice::<serde_json::Value>(&bytes) else {
+        return Err(error::invalid_request("Expected {\"turn_id\"?: string}"));
+    };
+    match body.get("turn_id") {
+        None | Some(serde_json::Value::Null) => Ok(None),
+        Some(id) => id
+            .as_str()
+            .and_then(super::chats::normalize_uuid)
+            .map(Some)
+            .ok_or_else(|| error::invalid_request("Invalid turn id")),
+    }
 }
 
 /// o2-ai's answer to a cancel; a refusal is reported by its status, its text only logged.
@@ -1141,6 +1347,20 @@ fn extract_passthrough_headers(
     }
 
     result
+}
+
+#[cfg(feature = "enterprise")]
+pub(super) fn sse_response(body: Body) -> Response {
+    axum::http::Response::builder()
+        .status(StatusCode::OK)
+        .header(
+            axum::http::header::CONTENT_TYPE,
+            mime::TEXT_EVENT_STREAM.as_ref(),
+        )
+        .header(axum::http::header::CACHE_CONTROL, "no-cache")
+        .header("X-Accel-Buffering", "no")
+        .body(body)
+        .unwrap_or_else(|_| Response::new(Body::empty()))
 }
 
 /// CreateChat
@@ -1602,8 +1822,16 @@ pub async fn confirm_action(
     summary = "Stop the AI turn running in a conversation",
     description = "Stops generation for a chat session. With server-side chat persistence \
                    enabled the browser no longer holds the connection to the agent, so \
-                   disconnecting does not stop the turn — this does, and what was generated \
-                   up to that point stays saved.",
+                   disconnecting does not stop the turn — this does, on whichever node runs it, \
+                   and what was generated up to that point stays saved. The JSON body may name \
+                   the turn (`{\"turn_id\": \"…\"}`); a turn that is not the one running is not \
+                   stopped. The answer is `{cancelled, owner_reached, turn_id}`: `owner_reached` \
+                   is false when nothing runs, or when neither the agent nor the node running \
+                   the turn answered in time. Without chat persistence only the user who started \
+                   the answer may stop it (403 `permission_denied`): a node streaming turns of \
+                   the chat refuses unless one is the caller's, and a node streaming none sends \
+                   it to the agent as the caller. Such a Stop ends the whole chat, so the answer \
+                   adds `chat_wide: true` and `stopped_turns`, the caller's own turns of it.",
     security(
         ("Authorization" = [])
     ),
@@ -1612,7 +1840,8 @@ pub async fn confirm_action(
         ("session_id" = String, Path, description = "Chat session ID")
     ),
     responses(
-        (status = StatusCode::OK, description = "Cancellation forwarded", body = Object),
+        (status = StatusCode::OK, description = "Cancellation forwarded", body = Object,
+            example = json!({"cancelled": true, "owner_reached": true, "turn_id": "0199e7b2-6f0c-7a3e-a1b2-c3d4e5f60718"})),
         (status = StatusCode::BAD_REQUEST, description = "Invalid session ID or AI agent not configured", body = Object),
         (status = StatusCode::FORBIDDEN, description = "The conversation belongs to another user", body = Object),
         (status = StatusCode::NOT_FOUND, description = "Unknown conversation", body = Object),
@@ -1627,7 +1856,7 @@ pub async fn cancel(
     Path((org_id, session_id)): Path<(String, String)>,
     in_req: axum::extract::Request,
 ) -> Response {
-    let (parts, _body) = in_req.into_parts();
+    let (parts, body) = in_req.into_parts();
     if let Err(resp) = require_json(&parts.headers) {
         return resp;
     }
@@ -1642,16 +1871,26 @@ pub async fn cancel(
             return error::invalid_request("Invalid session id");
         }
         let session_id = session_id.to_ascii_lowercase();
+        let turn_id = match cancel_turn_id(body).await {
+            Ok(turn_id) => turn_id,
+            Err(resp) => return resp,
+        };
         if let Err(resp) = check_chat_owner(&parts.headers, &org_id, &session_id).await {
             return resp;
         }
         let auth_str = openobserve_core::auth::extract_auth_str_from_headers(&parts.headers).await;
-        cancel_turn(org_id, session_id, auth_str).await
+        let caller = parts
+            .headers
+            .get("user_id")
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or_default()
+            .to_string();
+        cancel_turn(org_id, session_id, turn_id, auth_str, caller).await
     }
 
     #[cfg(not(feature = "enterprise"))]
     {
-        drop((org_id, session_id, parts));
+        drop((org_id, session_id, parts, body));
         error::not_enabled("AI chat is only available in enterprise version")
     }
 }
@@ -2173,6 +2412,7 @@ async fn stream_turn(
             agent_type,
             query: query_req,
             auth: auth_str,
+            auth_session_id: super::chats::login_key(&parts.headers),
             forward_headers: if forward_headers.is_empty() {
                 None
             } else {
@@ -2214,6 +2454,7 @@ async fn persisted_turn(turn: StreamTurn) -> Response {
         agent_type,
         query: mut query_req,
         auth,
+        auth_session_id,
         forward_headers,
         client,
         span,
@@ -2236,6 +2477,7 @@ async fn persisted_turn(turn: StreamTurn) -> Response {
         session_id.as_deref(),
         turn_id.as_deref(),
         &user_id,
+        auth_session_id.as_deref(),
         agent_type,
         &query_req.query,
         &trace_id,
@@ -2295,8 +2537,15 @@ async fn persisted_turn(turn: StreamTurn) -> Response {
         Some((session_id.clone(), turn_id.clone())),
     );
     let (stop_org, stop_session, stop_auth) = (org_id.clone(), session_id.clone(), auth.clone());
+    let (stop_turn, stop_user) = (Some(turn_id.clone()), user_id.clone());
     let stop = move || {
-        tokio::spawn(cancel_turn(stop_org, stop_session, stop_auth));
+        tokio::spawn(cancel_turn(
+            stop_org,
+            stop_session,
+            stop_turn,
+            stop_auth,
+            stop_user,
+        ));
     };
     let settings = PersistSettings::from_config();
     let store = std::sync::Arc::new(openobserve_core::ai_chat::StreamChatStore::new(
@@ -2354,6 +2603,7 @@ async fn direct_turn(turn: StreamTurn) -> Response {
         client,
         span,
         audit,
+        ..
     } = turn;
     let end_span = |span: &Option<opentelemetry::Context>| {
         if let Some(span_cx) = span.as_ref() {
@@ -2407,10 +2657,23 @@ async fn direct_turn(turn: StreamTurn) -> Response {
         return refusal.into_response();
     }
     audit.report(StatusCode::OK, None).await;
+    // A Stop of this turn is only forwarded for its own user (`direct_stop_target`).
+    let registration = session_id
+        .filter(|sid| is_valid_session_id(sid))
+        .map(|sid| {
+            o2_enterprise::enterprise::ai::chat::registry::register(
+                &org_id,
+                &sid.to_ascii_lowercase(),
+                &charge_key,
+                &user_id,
+                None,
+            )
+        });
 
     let mut meter = TurnMeter::new(TurnPhase::charged(), charge, None);
     // Keep the OTel span alive for the full stream.
     let s = async_stream::stream! {
+        let _registration = registration;
         let mut agent_stream = response.bytes_stream();
         while let Some(chunk_result) = agent_stream.next().await {
             let out = match chunk_result {
@@ -2445,20 +2708,6 @@ async fn direct_turn(turn: StreamTurn) -> Response {
         end_span(&span);
     };
     sse_response(Body::from_stream(s))
-}
-
-#[cfg(feature = "enterprise")]
-fn sse_response(body: Body) -> Response {
-    axum::http::Response::builder()
-        .status(StatusCode::OK)
-        .header(
-            axum::http::header::CONTENT_TYPE,
-            mime::TEXT_EVENT_STREAM.as_ref(),
-        )
-        .header(axum::http::header::CACHE_CONTROL, "no-cache")
-        .header("X-Accel-Buffering", "no")
-        .body(body)
-        .unwrap_or_else(|_| Response::new(Body::empty()))
 }
 
 /// Meters a persisted turn and reads on after the browser leaves, so a background turn still pays.
@@ -2933,6 +3182,19 @@ mod tests {
             Bytes::from("data: {\"type\":\"message_delta\",\"text\":\"hi\"}\n"),
             "content passes byte for byte"
         );
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn the_seq_ids_of_a_persisted_stream_pass_through_the_meter() {
+        let mut meter = test_meter(1);
+        let stream = b"id: 3\ndata: {\"type\":\"message_delta\",\"text\":\"hi\"}\n\nid: 4\ndata: {\"type\":\"complete\"}\n\n";
+        let out = meter.feed(stream).await;
+        assert_eq!(out[0], Bytes::from_static(b"id: 3\n"));
+        assert_eq!(out[3], Bytes::from_static(b"id: 4\n"));
+        let frames = frames_of(&out);
+        assert_eq!(frames.len(), 2, "an id line is not a frame");
+        assert_eq!(frames[1]["usage"]["credits"], 1);
     }
 
     #[cfg(feature = "enterprise")]
@@ -3541,5 +3803,156 @@ mod tests {
                 "client": {"container": "incident", "entry_kind": "door"},
             })
         );
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn a_stop_reaches_only_the_running_turn_it_names() {
+        assert_eq!(stop_target(None, Some("t2")).as_deref(), Some("t2"));
+        assert_eq!(stop_target(Some("t2"), Some("t2")).as_deref(), Some("t2"));
+        // A stale Stop for t1 must not cut t2, which now runs in the same chat.
+        assert_eq!(stop_target(Some("t1"), Some("t2")), None);
+        assert_eq!(stop_target(Some("t1"), None), None);
+        assert_eq!(stop_target(None, None), None);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn without_persistence_only_the_turns_user_may_stop_it() {
+        let alice = [("t1", "alice@x")];
+        assert_eq!(
+            direct_stop_target(None, &alice, "alice@x").unwrap(),
+            StopTarget::Turn("t1".into())
+        );
+        assert_eq!(
+            direct_stop_target(Some("t0"), &alice, "alice@x").unwrap(),
+            StopTarget::Nothing
+        );
+        // A node streaming only someone else's turns refuses, named or not, and forwards nothing.
+        for named in [Some("t1"), None, Some("t9")] {
+            let refused = direct_stop_target(named, &alice, "mallory@x").unwrap_err();
+            assert_eq!(refused.code(), AiErrorCode::PermissionDenied, "{named:?}");
+            assert_eq!(refused.http_status(), StatusCode::FORBIDDEN);
+        }
+        // A node streaming none of the chat's turns forwards as the caller.
+        assert_eq!(
+            direct_stop_target(None, &[], "alice@x").unwrap(),
+            StopTarget::Elsewhere
+        );
+        assert_eq!(
+            direct_stop_target(Some("t1"), &[], "mallory@x").unwrap(),
+            StopTarget::Elsewhere
+        );
+        // Another user's turn under the same chat id never takes the caller's Stop away.
+        let shared = [("t1", "alice@x"), ("t2", "mallory@x")];
+        assert_eq!(
+            direct_stop_target(None, &shared, "alice@x").unwrap(),
+            StopTarget::Turn("t1".into())
+        );
+        assert!(direct_stop_target(Some("t2"), &shared, "alice@x").is_err());
+        // Two tabs of one user: the Stop is decided for the named one (o2-ai then stops the chat).
+        let tabs = [("t1", "alice@x"), ("t2", "alice@x")];
+        assert_eq!(
+            direct_stop_target(Some("t1"), &tabs, "alice@x").unwrap(),
+            StopTarget::Turn("t1".into())
+        );
+        assert_eq!(
+            direct_stop_target(None, &tabs, "alice@x").unwrap(),
+            StopTarget::Turn("t2".into())
+        );
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn a_stop_without_persistence_says_it_stopped_the_whole_chat() {
+        let body = |resp: Response| async move {
+            let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX)
+                .await
+                .unwrap();
+            serde_json::from_slice::<serde_json::Value>(&bytes).unwrap()
+        };
+        let wide = body(cancel_body(
+            true,
+            true,
+            Some("t1".into()),
+            Some(vec!["t1".into(), "t2".into()]),
+        ))
+        .await;
+        assert_eq!(wide["chat_wide"], true);
+        assert_eq!(wide["stopped_turns"], serde_json::json!(["t1", "t2"]));
+        let persisted = body(cancel_body(true, true, Some("t1".into()), None)).await;
+        assert!(persisted.get("chat_wide").is_none() && persisted.get("stopped_turns").is_none());
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn a_stop_answers_by_what_o2_ai_and_the_turns_node_said() {
+        let owner = |reached| OwnerCancel {
+            reached,
+            turn_id: Some("t1".into()),
+        };
+        let body = |cancelled, owner_reached| CancelReply::Body {
+            cancelled,
+            owner_reached,
+        };
+        // o2-ai took it.
+        assert_eq!(cancel_reply(Some(true), false, None), body(true, true));
+        // Persisted: the node running the turn decides, a refusal stays typed only if it was not.
+        assert_eq!(
+            cancel_reply(Some(false), false, Some(&owner(true))),
+            body(true, true)
+        );
+        assert_eq!(
+            cancel_reply(None, false, Some(&owner(false))),
+            body(false, false)
+        );
+        assert_eq!(
+            cancel_reply(None, true, Some(&owner(true))),
+            body(true, true)
+        );
+        assert_eq!(
+            cancel_reply(None, true, Some(&owner(false))),
+            CancelReply::Relay
+        );
+        // Without persistence o2-ai is the only owner.
+        assert_eq!(cancel_reply(Some(false), false, None), body(false, true));
+        assert_eq!(cancel_reply(None, true, None), CancelReply::Relay);
+        assert_eq!(cancel_reply(None, false, None), CancelReply::Failed);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn a_cancel_body_names_a_turn_or_none() {
+        let id = "0195A1B2-C3D4-7E5F-8A9B-0C1D2E3F4A5B";
+        let parse = |body: String| cancel_turn_id(Body::from(body));
+        assert_eq!(parse(String::new()).await.unwrap(), None);
+        assert_eq!(parse(" \n".into()).await.unwrap(), None);
+        assert_eq!(parse("{}".into()).await.unwrap(), None);
+        assert_eq!(parse(r#"{"turn_id": null}"#.into()).await.unwrap(), None);
+        assert_eq!(
+            parse(format!(r#"{{"turn_id": "{id}"}}"#))
+                .await
+                .unwrap()
+                .as_deref(),
+            Some("0195a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b")
+        );
+        for bad in [
+            r#"{"turn_id": "nope"}"#.to_string(),
+            r#"{"turn_id": 7}"#.into(),
+            "not json".into(),
+            format!("{{\"pad\": \"{}\"}}", "x".repeat(8 << 10)),
+        ] {
+            let refused = parse(bad).await.unwrap_err();
+            assert_eq!(refused.status(), StatusCode::BAD_REQUEST);
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn a_chat_wide_stop_names_only_the_callers_own_turns() {
+        let shared = [("t1", "alice@x"), ("t2", "mallory@x"), ("t3", "alice@x")];
+        assert_eq!(own_turns(&shared, "alice@x"), vec!["t1", "t3"]);
+        assert_eq!(own_turns(&shared, "mallory@x"), vec!["t2"]);
+        assert!(own_turns(&shared, "bob@x").is_empty());
     }
 }
