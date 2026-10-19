@@ -108,6 +108,11 @@ pub async fn extract_patterns(
                 return MetaHttpResponse::bad_request(format!("Invalid request body: {e}"));
             }
         };
+        if let Err(msg) =
+            config::utils::time::validate_time_range(req.query.start_time, req.query.end_time)
+        {
+            return MetaHttpResponse::bad_request(msg);
+        }
 
         // Create audit context
         let audit_ctx = Some(search::AuditContext {
