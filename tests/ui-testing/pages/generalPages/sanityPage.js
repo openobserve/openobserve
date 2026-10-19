@@ -595,6 +595,8 @@ export class SanityPage {
         await this.folderAddNameField.waitFor({ state: 'visible', timeout: 10000 });
         await this.folderAddNameField.fill(folderName);
         await this.folderAddSave.click();
+        // The dialog closes only once the folder is created; its overlay would otherwise swallow the tab click below.
+        await expect(this.page.locator('[data-test="dashboard-folder-dialog"]')).toBeHidden({ timeout: 30000 });
 
         // Confirm the folder tab appears with the given name.
         const folderTabName = this.getDashboardFolderTabByName(folderName);
