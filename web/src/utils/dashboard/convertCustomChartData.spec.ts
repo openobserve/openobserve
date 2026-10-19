@@ -179,8 +179,8 @@ describe("convertCustomChartData", () => {
       // Verify script content is set
       expect(mockIframe.srcdoc).toContain('<meta http-equiv="Content-Security-Policy"');
       expect(mockIframe.srcdoc).toContain("script-src 'self' 'nonce-");
-      expect(mockIframe.srcdoc).toContain("/src/assets/dashboard/echarts.min.js");
-      expect(mockIframe.srcdoc).toContain("/src/assets/dashboard/purify.min.js");
+      expect(mockIframe.srcdoc).toContain("echarts.min.js");
+      expect(mockIframe.srcdoc).toContain("purify.min.js");
 
       // Simulate iframe onload and message handling
       expect(mockIframe.onload).toBeDefined();
@@ -221,10 +221,7 @@ describe("convertCustomChartData", () => {
       expect(result).toEqual({ title: { text: "Test" } });
     });
 
-    it("should use /web/ prefix for assets when pathname contains 'web'", async () => {
-      // Set pathname to contain 'web'
-      window.location.pathname = "/web/dashboard";
-
+    it("should load echarts and dompurify from npm packages, not the deleted static assets", async () => {
       const acorn = await import("acorn");
       const walk = await import("acorn-walk");
 
@@ -248,9 +245,11 @@ describe("convertCustomChartData", () => {
 
       runJavaScriptCode(panelSchema, []);
 
-      // Verify the script uses /web/ prefix for assets
-      expect(mockIframe.srcdoc).toContain("/web/src/assets/dashboard/echarts.min.js");
-      expect(mockIframe.srcdoc).toContain("/web/src/assets/dashboard/purify.min.js");
+      // Verify the srcdoc loads scripts from the npm packages (Vite ?url imports),
+      // not from the deleted static files under /src/assets/dashboard/.
+      expect(mockIframe.srcdoc).toMatch(/<script src="[^"]*echarts/);
+      expect(mockIframe.srcdoc).toMatch(/<script src="[^"]*purify/);
+      expect(mockIframe.srcdoc).not.toContain("/src/assets/dashboard/");
     });
 
     it("should handle execution errors from iframe", async () => {

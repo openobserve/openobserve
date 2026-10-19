@@ -48,6 +48,8 @@ vi.mock("@/services/stream", async (importOriginal) => {
 vi.mock("@/composables/fieldValueStore", () => ({
   getFieldValuesForSuggestion: vi.fn().mockResolvedValue([]),
   requestFieldValues: vi.fn().mockResolvedValue([]),
+  pendingFieldValues: vi.fn(() => null),
+  fieldValuesUnavailable: vi.fn(() => false),
 }));
 // A SINGLE mutable store, so a test can switch organisation the way the app
 // does — in place, without a page reload.
@@ -61,7 +63,16 @@ vi.mock("vuex", async (importOriginal) => {
 
 import searchService from "@/services/search";
 import streamService from "@/services/stream";
-import { getFieldValuesForSuggestion, requestFieldValues } from "@/composables/fieldValueStore";
+import {
+  fieldValuesUnavailable,
+  getFieldValuesForSuggestion,
+  requestFieldValues,
+} from "@/composables/fieldValueStore";
+import {
+  buildPromqlValueEntries,
+  parsePromqlValueContext,
+  resolvePromqlLabelValues,
+} from "./usePromqlSuggestions";
 
 /**
  * A fresh copy of the composable module per test.
@@ -111,6 +122,7 @@ beforeEach(() => {
   vi.mocked(streamService.schema).mockResolvedValue(METRIC_SCHEMA as any);
   vi.mocked(getFieldValuesForSuggestion).mockResolvedValue([]);
   vi.mocked(requestFieldValues).mockResolvedValue([]);
+  vi.mocked(fieldValuesUnavailable).mockReturnValue(false);
 });
 
 describe("PromQL no longer asks for every series", () => {
@@ -242,118 +254,111 @@ describe("label NAMES come from the stream schema", () => {
   });
 });
 
-describe("label VALUES come from the same place SQL gets them", () => {
-  it("reads the cache under the metric's stream key", async () => {
-    vi.mocked(getFieldValuesForSuggestion).mockResolvedValue(["api-gateway", "chat-service"]);
+describe("label VALUES belong to the completion provider", () => {
+  it("leaves a value position alone: no list change and no programmatic popup", async () => {
+    // A popup.open is never an automatic menu, so it opens highlighted and Enter would insert a value.
     const c = await freshComposable();
+    const open = vi.fn();
+    c.autoCompleteData.value.popup.open = open;
+    const before = offered(c);
     atLabelValue(c, 'cpu_utilization_percent{service="');
     await c.getSuggestions();
     await flushPromises();
+    expect(open).not.toHaveBeenCalled();
+    expect(offered(c)).toBe(before);
+    expect(getFieldValuesForSuggestion).not.toHaveBeenCalled();
+  });
+
+  it("parses the metric, the label and what was typed", () => {
+    expect(parsePromqlValueContext('cpu_utilization_percent{service="api')).toEqual({
+      metric: "cpu_utilization_percent",
+      label: "service",
+      hasOpenQuote: true,
+      typed: "api",
+    });
+    expect(parsePromqlValueContext("rate(http_total{code!=")).toMatchObject({
+      metric: "http_total",
+      label: "code",
+      hasOpenQuote: false,
+    });
+    expect(parsePromqlValueContext('up{job=~"')).toMatchObject({ label: "job" });
+  });
+
+  it("is not a value position after a closed value, outside braces or without a metric", () => {
+    expect(parsePromqlValueContext('up{job="a"')).toBeNull();
+    expect(parsePromqlValueContext('up{job="a"} + ')).toBeNull();
+    expect(parsePromqlValueContext('{job="')).toBeNull();
+    expect(parsePromqlValueContext("up{")).toBeNull();
+  });
+
+  it("reads the cache under the metric's stream key", async () => {
+    vi.mocked(getFieldValuesForSuggestion).mockResolvedValue(["api-gateway", "chat-service"]);
+    await expect(
+      resolvePromqlLabelValues("myorg", "cpu_utilization_percent", "service"),
+    ).resolves.toEqual(["api-gateway", "chat-service"]);
     expect(getFieldValuesForSuggestion).toHaveBeenCalledWith(
       { org: "myorg", streamType: "metrics", streamName: "cpu_utilization_percent" },
       "service",
     );
-  });
-
-  it("offers the cached values", async () => {
-    vi.mocked(getFieldValuesForSuggestion).mockResolvedValue(["api-gateway", "chat-service"]);
-    const c = await freshComposable();
-    atLabelValue(c, 'cpu_utilization_percent{service="');
-    await c.getSuggestions();
-    await flushPromises();
-    expect(offered(c).map((k) => k.label)).toEqual(["api-gateway", "chat-service"]);
-  });
-
-  // ── Quoting, against the model monaco actually holds ───────────────────────
-  // Typing `"` auto-closes, so the model is `service=""` with the cursor
-  // BETWEEN the quotes — not the unterminated `service="` a naive spec assumes.
-  // Inserting a fully quoted value there produces
-  //   cpu_utilization_percent{service=""analytics-service""}
-  // which is what this build does today; reproduced in a dashboard panel before
-  // these tests were written. An earlier draft asserted insertText was
-  // '"api-gateway"' and would have blessed it.
-  describe("inserting a value leaves exactly one pair of quotes", () => {
-    const valuesFor = async (query: string, cursorIndex: number) => {
-      vi.mocked(getFieldValuesForSuggestion).mockResolvedValue(["api-gateway"]);
-      const c = await freshComposable();
-      c.autoCompleteData.value.query = query;
-      c.autoCompleteData.value.position.cursorIndex = cursorIndex;
-      await c.getSuggestions();
-      await flushPromises();
-      return offered(c);
-    };
-
-    it("inserts the bare value when both quotes are already there", async () => {
-      // `{service=""}` with the cursor between the quotes — the auto-closed
-      // shape, and the one a user is actually in.
-      const query = 'cpu_utilization_percent{service=""}';
-      const items = await valuesFor(query, query.indexOf('""'));
-      expect(items[0]?.insertText).toBe("api-gateway");
-    });
-
-    it("closes the quote when the user typed only the opening one", async () => {
-      // Auto-closing off, or the closer deleted: the value has to terminate
-      // itself or the query will not parse.
-      const query = 'cpu_utilization_percent{service="';
-      const items = await valuesFor(query, query.length - 1);
-      expect(items[0]?.insertText).toBe('api-gateway"');
-    });
-
-    it("supplies both quotes when none were typed", async () => {
-      const query = "cpu_utilization_percent{service=";
-      const items = await valuesFor(query, query.length - 1);
-      expect(items[0]?.insertText).toBe('"api-gateway"');
-    });
-  });
-
-  it("asks the server when the cache is cold", async () => {
-    const c = await freshComposable();
-    atLabelValue(c, 'cpu_utilization_percent{service="');
-    await c.getSuggestions();
-    await flushPromises();
-    expect(requestFieldValues).toHaveBeenCalledWith(
-      { org: "myorg", streamType: "metrics", streamName: "cpu_utilization_percent" },
-      "service",
-    );
-  });
-
-  it("does not ask the server when the cache answered", async () => {
-    vi.mocked(getFieldValuesForSuggestion).mockResolvedValue(["api-gateway"]);
-    const c = await freshComposable();
-    atLabelValue(c, 'cpu_utilization_percent{service="');
-    await c.getSuggestions();
-    await flushPromises();
     expect(requestFieldValues).not.toHaveBeenCalled();
   });
 
-  it("keeps an empty result empty rather than showing the language", async () => {
-    // Same rule as the SQL side: a lookup that matched nothing is not an
-    // invitation to offer 113 functions inside a label filter.
-    const c = await freshComposable();
-    atLabelValue(c, 'cpu_utilization_percent{service="');
-    await c.getSuggestions();
-    await flushPromises();
-    // Asserted as EMPTY, not merely "no functions": the loading row satisfies
-    // "no functions" too, so the weaker form passes while the position still
-    // shows something that is not a value.
-    expect(offered(c)).toEqual([]);
+  it("asks the server when the cache is cold, and waits for it", async () => {
+    vi.mocked(requestFieldValues).mockResolvedValue(["us-east-1"]);
+    await expect(
+      resolvePromqlLabelValues("myorg", "cpu_utilization_percent", "region"),
+    ).resolves.toEqual(["us-east-1"]);
+    expect(requestFieldValues).toHaveBeenCalledWith(
+      { org: "myorg", streamType: "metrics", streamName: "cpu_utilization_percent" },
+      "region",
+      expect.anything(),
+    );
+  });
+
+  it("rejects when the server lookup failed, so the editor can say so", async () => {
+    vi.mocked(fieldValuesUnavailable).mockReturnValue(true);
+    await expect(
+      resolvePromqlLabelValues("myorg", "cpu_utilization_percent", "region"),
+    ).rejects.toThrow();
+  });
+
+  describe("inserting a value leaves exactly one pair of quotes", () => {
+    const RANGE = { startLineNumber: 1, endLineNumber: 1, startColumn: 34, endColumn: 34 };
+
+    it("swallows the auto-closed quote so the caret ends outside the string", () => {
+      const [entry] = buildPromqlValueEntries(["api-gateway"], {
+        hasOpenQuote: true,
+        closingQuoteAhead: true,
+        range: RANGE,
+      });
+      expect(entry.insertText).toBe('api-gateway"');
+      expect(entry.range).toEqual({ ...RANGE, endColumn: 35 });
+    });
+
+    it("closes the quote when the user typed only the opening one", () => {
+      const [entry] = buildPromqlValueEntries(["api-gateway"], { hasOpenQuote: true });
+      expect(entry.insertText).toBe('api-gateway"');
+      expect(entry.range).toBeUndefined();
+    });
+
+    it("supplies both quotes when none were typed", () => {
+      const [entry] = buildPromqlValueEntries(["api-gateway"], { hasOpenQuote: false });
+      expect(entry.insertText).toBe('"api-gateway"');
+    });
+
+    it("escapes a quote or backslash inside the value", () => {
+      const [entry] = buildPromqlValueEntries(['a"b\\c'], { hasOpenQuote: false });
+      expect(entry.insertText).toBe('"a\\"b\\\\c"');
+    });
   });
 });
 
-describe("while a lookup is in flight", () => {
+describe("while a label lookup is in flight", () => {
   it("shows one loading row, not one per keystroke", async () => {
-    // Moved here from the main spec, which used to hold the SERIES call open to
-    // observe this. The row is set before either lookup starts, and it is
-    // ASSIGNED rather than pushed — appending it to the catalog once per
-    // keystroke is a bug this project has already shipped once.
-    // The lookup is held open, and getSuggestions is NOT awaited: this path
-    // awaits its lookups, so awaiting the call would wait for the very thing
-    // being kept pending. The loading row is observed while it is still true.
-    vi.mocked(getFieldValuesForSuggestion).mockReturnValue(new Promise(() => {}) as any);
+    // getSuggestions is not awaited: it awaits the very lookup being held open.
+    vi.mocked(streamService.schema).mockReturnValue(new Promise(() => {}) as any);
     const c = await freshComposable();
-    const query = 'cpu_utilization_percent{service="';
-    c.autoCompleteData.value.query = query;
-    c.autoCompleteData.value.position.cursorIndex = query.length - 1;
+    atLabelName(c, "cpu_utilization_percent{");
     for (let i = 0; i < 3; i++) void c.getSuggestions();
     await flushPromises();
     const rows = offered(c);
@@ -395,36 +400,29 @@ describe("caches and races", () => {
   });
 
   it("ignores a slow lookup that lands after a newer one", async () => {
-    // Values are a network call with a ten-second ceiling. Type `{service="`,
-    // change your mind to `{region="`, and the first answer can arrive last and
-    // overwrite the second — offering service names for a region filter.
+    // Change metric mid-lookup and the first answer can land last, offering the wrong metric's labels.
     const c = await freshComposable();
-    let resolveSlow: (v: string[]) => void = () => {};
-    vi.mocked(getFieldValuesForSuggestion)
+    let resolveSlow: (v: any) => void = () => {};
+    vi.mocked(streamService.schema)
       .mockImplementationOnce(() => new Promise((resolve) => (resolveSlow = resolve)) as any)
-      .mockResolvedValue(["us-east-1"]);
+      .mockResolvedValue({ data: { schema: [{ name: "region", type: "Utf8" }] } } as any);
 
-    const first = 'cpu_utilization_percent{service="';
-    c.autoCompleteData.value.query = first;
-    c.autoCompleteData.value.position.cursorIndex = first.length - 1;
+    atLabelName(c, "cpu_utilization_percent{");
     void c.getSuggestions();
     await flushPromises();
 
-    const second = 'cpu_utilization_percent{region="';
-    c.autoCompleteData.value.query = second;
-    c.autoCompleteData.value.position.cursorIndex = second.length - 1;
+    atLabelName(c, "cache_hit_ratio{");
     await c.getSuggestions();
     await flushPromises();
-    expect(offered(c).map((k: any) => k.label)).toEqual(["us-east-1"]);
+    expect(offered(c).map((k: any) => k.label)).toEqual(["region"]);
 
-    // The abandoned request finally answers.
-    resolveSlow(["api-gateway", "chat-service"]);
+    resolveSlow({ data: { schema: [{ name: "service", type: "Utf8" }] } });
     await flushPromises();
 
     expect(
       offered(c).map((k: any) => k.label),
       "a stale lookup overwrote the current one",
-    ).toEqual(["us-east-1"]);
+    ).toEqual(["region"]);
   });
 });
 

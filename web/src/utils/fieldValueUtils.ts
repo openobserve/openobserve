@@ -33,7 +33,7 @@ export const EXCLUDED_FIELDS = new Set([
   "msg",
 ]);
 
-const MAX_VALUE_LENGTH = 150; // chars — skip values too long to be useful filter candidates
+export const MAX_VALUE_LENGTH = 150; // chars — skip values too long to be useful filter candidates
 
 /**
  * Extract deduplicated field→values from an array of search hits.

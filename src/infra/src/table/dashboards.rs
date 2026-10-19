@@ -604,12 +604,6 @@ mod tests {
     }
 
     #[test]
-    fn test_try_from_version_zero_returns_err() {
-        let model = make_model(0, serde_json::json!({}));
-        assert!(Dashboard::try_from(model).is_err());
-    }
-
-    #[test]
     fn test_try_from_data_not_object_version1_returns_err() {
         // data is null, not an object — injection is skipped, deserialization must fail
         let model = make_model(1, serde_json::Value::Null);

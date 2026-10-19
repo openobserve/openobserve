@@ -90,6 +90,8 @@ pub async fn search(
     timeout: i64,
     is_super_cluster: bool,
 ) -> Result<SearchResponse> {
+    let trace_id = search_service::leader_trace_id(trace_id);
+    let trace_id = trace_id.as_str();
     #[cfg(feature = "enterprise")]
     {
         let query = Some(req.query.clone());
@@ -98,6 +100,7 @@ pub async fn search(
 
         SEARCH_SERVER
             .insert(
+                org_id,
                 trace_id.to_string(),
                 TaskStatus::new_leader(
                     vec![],
@@ -225,7 +228,7 @@ pub async fn search(
     let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
     #[cfg(feature = "enterprise")]
     if SEARCH_SERVER
-        .insert_sender(trace_id, abort_sender, true)
+        .insert_sender(org_id, trace_id, abort_sender, true)
         .await
         .is_err()
     {
@@ -277,7 +280,7 @@ pub async fn search(
 
     // Clean up task record before returning
     #[cfg(feature = "enterprise")]
-    SEARCH_SERVER.remove(trace_id, false).await;
+    SEARCH_SERVER.remove(org_id, trace_id).await;
 
     match task {
         Ok(Ok(ret)) => Ok(ret),
@@ -649,6 +652,8 @@ async fn merge_matrix_query(
     }
     let mut merged_data = merged_data
         .into_iter()
+        // Prometheus never answers a range query with a series that has no samples
+        .filter(|(_, samples)| !samples.is_empty())
         .map(|(sig, samples)| {
             let mut samples = samples
                 .into_iter()
@@ -895,6 +900,37 @@ mod tests {
                 vec![(1_000_000, 1.0), (2_000_000, 2.0), (3_000_000, 3.0)]
             );
         }
+    }
+
+    #[tokio::test]
+    async fn test_merge_matrix_drops_series_without_samples() {
+        let mut response = cluster_rpc::MetricsQueryResponse::default();
+        grpc::add_value(
+            &mut response,
+            Value::Range(RangeValue::new(
+                vec![Arc::new(Label::new("pod", "recovered"))],
+                Vec::<Sample>::new(),
+            )),
+        );
+        grpc::add_value(
+            &mut response,
+            Value::Range(RangeValue::new(
+                vec![Arc::new(Label::new("pod", "waiting"))],
+                vec![Sample::new(1_000_000, 1.0)],
+            )),
+        );
+
+        let value = merge_matrix_query(&response.series, "test_merge_empty_series", &mut vec![])
+            .await
+            .unwrap();
+        let Value::Matrix(matrix) = value else {
+            panic!("expected matrix result");
+        };
+        assert_eq!(matrix.len(), 1);
+        assert_eq!(
+            matrix[0].labels,
+            vec![Arc::new(Label::new("pod", "waiting"))]
+        );
     }
 
     #[tokio::test]

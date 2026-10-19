@@ -102,8 +102,7 @@ test.describe("Logs Page testcases", () => {
   }, async ({ page }) => {
     testLogger.info('Testing VRL query execution with valid text');
     await pm.logsPage.clickDateTimeButton();
-    await pm.logsPage.waitForRelative6WeeksButtonVisible();
-    await pm.logsPage.clickRelative6WeeksButton();
+    await pm.logsPage.clickRelative15MinButton();
     await applyQueryButton(pm);
 
     await pm.logsPage.toggleVrlEditor();
@@ -125,7 +124,7 @@ test.describe("Logs Page testcases", () => {
   }, async ({ page }) => {
     testLogger.info('Testing field list collapse/expand functionality');
     await pm.logsPage.clickDateTimeButton();
-    await pm.logsPage.clickRelative6WeeksButton();
+    await pm.logsPage.clickRelative15MinButton();
     await pm.logsPage.clickShowQueryToggle();
     await pm.logsPage.clickFieldListCollapseButton();
     await page.waitForLoadState('domcontentloaded'); // Replace hard wait
@@ -140,7 +139,7 @@ test.describe("Logs Page testcases", () => {
   }, async ({ page }) => {
     testLogger.info('Testing saved views name validation with special characters');
     await pm.logsPage.clickDateTimeButton();
-    await pm.logsPage.clickRelative6WeeksButton();
+    await pm.logsPage.clickRelative15MinButton();
     await pm.logsPage.clickShowQueryToggle();
     await pm.logsPage.clickSavedViewsButton();
     // Allowed: alphanumeric, spaces, underscores, hyphens (/^[A-Za-z0-9 _-]+$/)
@@ -172,8 +171,7 @@ test.describe("Logs Page testcases", () => {
   }, async ({ page }) => {
     testLogger.info('Testing logs results display on graph');
     await pm.logsPage.clickDateTimeButton();
-    await pm.logsPage.waitForRelative6WeeksButtonVisible();
-    await pm.logsPage.clickRelative6WeeksButton();
+    await pm.logsPage.clickRelative15MinButton();
     await applyQueryButton(pm);
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {}); // Replace long hard wait
     await pm.logsPage.expectSearchListVisible();
@@ -192,7 +190,7 @@ test.describe("Logs Page testcases", () => {
     testLogger.info('Testing live mode functionality with 5 second interval');
     await page.route("**/logData.ValueQuery", (route) => route.continue());
     await pm.logsPage.clickDateTimeButton();
-    await pm.logsPage.clickRelative6WeeksButton();
+    await pm.logsPage.clickRelative15MinButton();
     await pm.logsPage.clickLiveModeButton();
     // Wait for the 5-sec live-mode option to be enabled in the dropdown
     await pm.logsPage.waitForLiveMode5SecReady();

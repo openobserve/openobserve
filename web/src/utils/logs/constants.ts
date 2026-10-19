@@ -176,7 +176,6 @@ export const DEFAULT_LOGS_CONFIG = {
     runPending: false,
     runOutcome: {} as any,
     editorDirty: false,
-    nlDetected: false,
     freeTextScan: {} as any,
   },
   data: {

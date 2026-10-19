@@ -12,12 +12,15 @@ vi.mock("vuex", async (importOriginal) => {
 });
 
 // ─── Mock IDB so no real storage is touched ───────────────────────────────────
-vi.mock("@/composables/fieldValueStore", () => ({
+vi.mock("@/composables/fieldValueStore", async (importOriginal) => ({
+  noValueLookup: (await importOriginal<typeof import("@/composables/fieldValueStore")>())
+    .noValueLookup,
   getFieldValuesForSuggestion: vi.fn().mockResolvedValue([]),
-  // Phase 5 (D9): the resolver asks the server when the cache is cold. Stubbed
-  // to a promise that NEVER settles by default, so any test that accidentally
-  // awaits it hangs visibly instead of passing by luck.
-  requestFieldValues: vi.fn(() => new Promise(() => {})),
+  requestFieldValues: vi.fn().mockResolvedValue([]),
+  requestFieldValuesMatching: vi.fn().mockResolvedValue([]),
+  pendingFieldValues: vi.fn(() => null),
+  fieldValuesUnavailable: vi.fn(() => false),
+  fieldValuesTruncated: vi.fn(() => false),
 }));
 
 // getSuggestions now lazily loads the server function catalog. Stub it to an
@@ -30,7 +33,14 @@ vi.mock("@/services/query_functions", async (importOriginal) => {
   });
 });
 
-import { getFieldValuesForSuggestion, requestFieldValues } from "@/composables/fieldValueStore";
+import {
+  fieldValuesTruncated,
+  fieldValuesUnavailable,
+  getFieldValuesForSuggestion,
+  requestFieldValues,
+  requestFieldValuesMatching,
+  pendingFieldValues,
+} from "@/composables/fieldValueStore";
 import useSqlSuggestions from "./useSuggestions";
 
 // ─── helper: build composable with common defaults ────────────────────────────
@@ -90,7 +100,7 @@ describe("resolveFieldValues — in-session and stored value merge", () => {
     const c = useSqlSuggestions();
     // org/streamType/streamName left as empty strings
     c.autoCompleteData.value.fieldValues = {};
-    await c.resolveFieldValues("status");
+    await expect(c.resolveFieldValues("status")).rejects.toMatchObject({ name: "NoValueLookup" });
     expect(getFieldValuesForSuggestion).not.toHaveBeenCalled();
   });
 
@@ -204,7 +214,7 @@ describe("catalog wiring — suggestions come from the shared sqlCompletion modu
     c.updateFieldKeywords([{ name: "host" }, { name: "level" }]);
     await run(c, "SELECT * FROM stream WHERE ");
     const host = c.effectiveKeywords.value.find((k: any) => k.label === "host");
-    const and = c.effectiveKeywords.value.find((k: any) => k.label === "and");
+    const and = c.effectiveKeywords.value.find((k: any) => k.label === "AND");
     expect(host.sortText < and.sortText).toBe(true);
   });
 });
@@ -287,7 +297,7 @@ describe("Phase 2 — SQL clause keywords are offered (B1)", () => {
     const c = makeComposable({ storedValues: [] });
     await run(c, "SELECT * FROM stream WHERE ");
     const labels = c.effectiveKeywords.value.map((k: any) => k.label);
-    expect(labels).toContain("and");
+    expect(labels).toContain("AND");
     expect(labels).toContain("=");
   });
 
@@ -476,33 +486,85 @@ describe("Phase 3 — resolveFieldValues is exposed for the editor to await", ()
     expect(values).toContain("stored_only");
   });
 
+  it("answers for the stream selected when the lookup returns, not the one it started on", async () => {
+    const c = makeComposable();
+    let finishOld!: (values: string[]) => void;
+    vi.mocked(getFieldValuesForSuggestion).mockImplementation((ctx: any) =>
+      ctx.streamName === "http_logs"
+        ? new Promise<string[]>((resolve) => (finishOld = resolve))
+        : Promise.resolve(["new-stream-value"]),
+    );
+    const pending = (c as any).resolveFieldValues("level");
+    c.autoCompleteData.value.streamName = "other_logs";
+    finishOld(["old-stream-value"]);
+    await expect(pending).resolves.toEqual(["new-stream-value"]);
+  });
+
+  it("drops null in-session values and passes numbers and booleans on as text", async () => {
+    const c = makeComposable({ storedValues: [] });
+    c.autoCompleteData.value.fieldValues = { level: new Set(["error", null, undefined, 5, true]) };
+    await expect((c as any).resolveFieldValues("level")).resolves.toEqual(["error", "5", "true"]);
+  });
+
+  it("treats a page that has not handed over its values yet as having none", async () => {
+    const c = makeComposable({ storedValues: ["error"] });
+    (c.autoCompleteData.value as any).fieldValues = undefined;
+    await expect((c as any).resolveFieldValues("level")).resolves.toEqual(["error"]);
+  });
+
+  it("leaves out session values too long to be a filter, rather than cutting them short", async () => {
+    const c = makeComposable({ storedValues: [] });
+    const longest = "x".repeat(150);
+    c.autoCompleteData.value.fieldValues = {
+      body: new Set(["short", longest, "y".repeat(151), "z".repeat(4000)]),
+    };
+    await expect((c as any).resolveFieldValues("body")).resolves.toEqual(["short", longest]);
+  });
+
   it("resolves to an empty list rather than throwing when the lookup fails", async () => {
     const c = makeComposable({ storedValues: [] });
     vi.mocked(getFieldValuesForSuggestion).mockRejectedValueOnce(new Error("idb down"));
     await expect((c as any).resolveFieldValues("level")).resolves.toEqual([]);
   });
 
-  it("resolves to an empty list when no stream context is set", async () => {
+  it("says no lookup ran, rather than no values, when no stream context ever arrives", async () => {
     const c = makeComposable({ storedValues: ["error"] });
     c.autoCompleteData.value.streamName = "";
-    await expect((c as any).resolveFieldValues("level")).resolves.toEqual([]);
+    await expect((c as any).resolveFieldValues("level")).rejects.toMatchObject({
+      name: "NoValueLookup",
+    });
+  });
+
+  it("never waits for a stream context: without one, no lookup runs", async () => {
+    const c = makeComposable({ storedValues: ["error"] });
+    c.autoCompleteData.value.streamName = "";
+    const started = Date.now();
+    await expect((c as any).resolveFieldValues("level")).rejects.toMatchObject({
+      name: "NoValueLookup",
+    });
+    expect(Date.now() - started).toBeLessThan(100);
+  });
+
+  it("still answers from in-session values without a stream context", async () => {
+    const c = makeComposable({ inSessionValues: { level: ["warn"] } });
+    c.autoCompleteData.value.streamName = "";
+    await expect((c as any).resolveFieldValues("level")).resolves.toEqual(["warn"]);
   });
 });
 
-// ─── Phase 5 (tmp/code.md D9) — values for a stream nobody has searched ──────
-// The resolver may now ask the server, and the one rule that matters is that it
-// must NOT make the dropdown wait for the answer: the completion provider
-// awaits this function, so a blocking fetch puts a network round trip between
-// the user and their list on every value position.
+// ─── P0-4: a cold cache is awaited; the provider owns the wait budget ────────
 
 describe("resolveFieldValues — asking the server when the cache is cold", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(requestFieldValues).mockResolvedValue([]);
+    vi.mocked(fieldValuesUnavailable).mockReturnValue(false);
+  });
 
-  it("returns without waiting for the network", async () => {
-    // requestFieldValues is stubbed to never settle. If the resolver awaits it,
-    // this test times out — which is the failure worth having.
+  it("waits for the server's answer instead of returning an empty list", async () => {
+    vi.mocked(requestFieldValues).mockResolvedValue(["warn", "error"]);
     const c = makeComposable({ storedValues: [] });
-    await expect(c.resolveFieldValues("level")).resolves.toEqual([]);
+    await expect(c.resolveFieldValues("level")).resolves.toEqual(["warn", "error"]);
   });
 
   it("still returns the local values immediately when there are some", async () => {
@@ -516,43 +578,297 @@ describe("resolveFieldValues — asking the server when the cache is cold", () =
     expect(requestFieldValues).toHaveBeenCalledWith(
       { org: "myorg", streamType: "logs", streamName: "http_logs" },
       "level",
+      expect.anything(),
     );
   });
 
-  it("does NOT ask when the cache already has values", async () => {
-    // The cache is the whole point; a hit must cost nothing.
+  it("still asks when the cache has values, and lists the cached ones first", async () => {
+    vi.mocked(requestFieldValues).mockResolvedValue(["warn", "fatal"]);
     const c = makeComposable({ storedValues: ["error", "warn"] });
-    await c.resolveFieldValues("level");
-    expect(requestFieldValues).not.toHaveBeenCalled();
+    await expect(c.resolveFieldValues("level")).resolves.toEqual(["error", "warn", "fatal"]);
+    expect(requestFieldValues).toHaveBeenCalledTimes(1);
   });
 
-  it("does not ask when in-session values alone answer the question", async () => {
-    const c = makeComposable({ storedValues: [], inSessionValues: { level: ["error"] } });
-    await c.resolveFieldValues("level");
-    expect(requestFieldValues).not.toHaveBeenCalled();
+  it("adds the server's values after the in-session ones, which alone are a thin list", async () => {
+    vi.mocked(requestFieldValues).mockResolvedValue(["openobserve", "querier", "alertmanager"]);
+    const c = makeComposable({
+      storedValues: [],
+      inSessionValues: { service_name: ["alertmanager", "querier"] },
+    });
+    await expect(c.resolveFieldValues("service_name")).resolves.toEqual([
+      "alertmanager",
+      "querier",
+      "openobserve",
+    ]);
+  });
+
+  it("shows the local values without waiting out a slow server", async () => {
+    vi.useFakeTimers();
+    try {
+      vi.mocked(requestFieldValues).mockReturnValue(new Promise<string[]>(() => {}));
+      const c = makeComposable({ inSessionValues: { level: ["warn"] } });
+      let answer: string[] | undefined;
+      void c.resolveFieldValues("level").then((v) => (answer = v));
+      await vi.advanceTimersByTimeAsync(799);
+      expect(answer).toBeUndefined();
+      await vi.advanceTimersByTimeAsync(1);
+      expect(answer).toEqual(["warn"]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("keeps the local values when the server lookup fails", async () => {
+    vi.mocked(fieldValuesUnavailable).mockReturnValue(true);
+    const c = makeComposable({ storedValues: ["error"] });
+    await expect(c.resolveFieldValues("level")).resolves.toEqual(["error"]);
   });
 
   it("does not ask without a stream to ask about", async () => {
     const c = useSqlSuggestions();
     c.autoCompleteData.value.fieldValues = {};
-    await c.resolveFieldValues("level");
+    await c.resolveFieldValues("level").catch(() => {});
     expect(requestFieldValues).not.toHaveBeenCalled();
   });
 
-  it("picks up the values on the NEXT call, once the fetch has landed", async () => {
-    // This is how they reach the user: the fetch writes to the cache, the
-    // provider is invoked again on the next keystroke, and the local read now
-    // answers. Nothing forces the popup open.
+  it("an empty answer is an empty list, so the editor can say there are none", async () => {
     const c = makeComposable({ storedValues: [] });
-    await c.resolveFieldValues("level");
-
-    vi.mocked(getFieldValuesForSuggestion).mockResolvedValue(["error", "warn"]);
-    await expect(c.resolveFieldValues("level")).resolves.toEqual(["error", "warn"]);
+    await expect(c.resolveFieldValues("level")).resolves.toEqual([]);
   });
 
-  it("survives a rejected request without taking completion down", async () => {
-    vi.mocked(requestFieldValues).mockRejectedValueOnce(new Error("500"));
+  it("a failed lookup rejects, so the editor can say it could not load", async () => {
+    vi.mocked(fieldValuesUnavailable).mockReturnValue(true);
     const c = makeComposable({ storedValues: [] });
+    await expect(c.resolveFieldValues("level")).rejects.toThrow();
+  });
+});
+
+// ─── values follow an explicit time range (dashboard panels) ───────────────────
+
+describe("setValuesTimeRange — values follow the caller's time range", () => {
+  const range = { startTime: 1_700_000_000_000_000, endTime: 1_700_086_400_000_000 };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(requestFieldValues).mockResolvedValue([]);
+    vi.mocked(fieldValuesUnavailable).mockReturnValue(false);
+  });
+
+  it("asks the server for that range", async () => {
+    const c = makeComposable();
+    c.setValuesTimeRange(range);
+    await c.resolveFieldValues("level");
+    expect(vi.mocked(requestFieldValues).mock.calls[0][2]).toMatchObject({ timeRange: range });
+  });
+
+  it("does not offer persisted values, which come from other windows", async () => {
+    vi.mocked(requestFieldValues).mockResolvedValue(["in-range"]);
+    const c = makeComposable({ storedValues: ["from-another-window"] });
+    c.setValuesTimeRange(range);
+    await expect(c.resolveFieldValues("level")).resolves.toEqual(["in-range"]);
+    expect(getFieldValuesForSuggestion).not.toHaveBeenCalled();
+  });
+
+  it("goes back to the default lookback on null", async () => {
+    const c = makeComposable();
+    c.setValuesTimeRange(range);
+    c.setValuesTimeRange(null);
+    await c.resolveFieldValues("level");
+    expect(vi.mocked(requestFieldValues).mock.calls[0][2]?.timeRange).toBeUndefined();
+    expect(getFieldValuesForSuggestion).toHaveBeenCalled();
+  });
+
+  it("is per instance, so a dashboard's range never reaches Logs or Traces", async () => {
+    const dashboard = makeComposable();
+    const logs = makeComposable();
+    dashboard.setValuesTimeRange(range);
+    await logs.resolveFieldValues("level");
+    expect(vi.mocked(requestFieldValues).mock.calls[0][2]?.timeRange).toBeUndefined();
+  });
+
+  it("asks whether the lookup failed for the same range", async () => {
+    vi.mocked(fieldValuesUnavailable).mockReturnValue(true);
+    const c = makeComposable();
+    c.setValuesTimeRange(range);
+    await expect(c.resolveFieldValues("level")).rejects.toThrow();
+    expect(fieldValuesUnavailable).toHaveBeenCalledWith(expect.anything(), "level", range);
+  });
+
+  it("answers for the range set when the lookup returns, not the one it started with", async () => {
+    const later = { startTime: range.startTime - 1, endTime: range.endTime };
+    let finishOld!: (values: string[]) => void;
+    vi.mocked(requestFieldValues).mockImplementation((_ctx, _field, options: any) =>
+      options?.timeRange?.startTime === range.startTime
+        ? new Promise<string[]>((resolve) => (finishOld = resolve))
+        : Promise.resolve(["later-window"]),
+    );
+    const c = makeComposable();
+    c.setValuesTimeRange(range);
+    const pending = c.resolveFieldValues("level");
+    await Promise.resolve();
+    c.setValuesTimeRange(later);
+    finishOld(["old-window"]);
+    await expect(pending).resolves.toEqual(["later-window"]);
+  });
+
+  it("treats an equal range set again as the same range, not a change", async () => {
+    let finish!: (values: string[]) => void;
+    vi.mocked(requestFieldValues).mockImplementation(
+      () => new Promise<string[]>((resolve) => (finish = resolve)),
+    );
+    const c = makeComposable();
+    c.setValuesTimeRange(range);
+    const pending = c.resolveFieldValues("level");
+    await Promise.resolve();
+    await Promise.resolve();
+    c.setValuesTimeRange({ ...range });
+    finish(["in-range"]);
+    await expect(pending).resolves.toEqual(["in-range"]);
+    expect(requestFieldValues).toHaveBeenCalledTimes(1);
+  });
+
+  it("ignores a range that is not a range", async () => {
+    const c = makeComposable();
+    c.setValuesTimeRange({ startTime: 5, endTime: 5 });
+    await c.resolveFieldValues("level");
+    expect(vi.mocked(requestFieldValues).mock.calls[0][2]?.timeRange).toBeUndefined();
+  });
+});
+
+// ─── a typed prefix reaches past the top ten ──────────────────────────────────
+
+describe("resolveFieldValues — a typed prefix asks the server for matches", () => {
+  const topTen = [
+    "accounting",
+    "ad",
+    "alertmanager",
+    "cart",
+    "checkout",
+    "compactor",
+    "email",
+    "frontend",
+    "ingester",
+    "o2-agent",
+  ];
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(requestFieldValues).mockResolvedValue(topTen);
+    vi.mocked(requestFieldValuesMatching).mockResolvedValue(["openobserve"]);
+    vi.mocked(fieldValuesUnavailable).mockReturnValue(false);
+    vi.mocked(fieldValuesTruncated).mockReturnValue(true);
+  });
+
+  it("adds the server's matches when the top ten was truncated and has none", async () => {
+    const c = makeComposable();
+    const values = await c.resolveFieldValues("service_name", { prefix: "openobs" });
+    expect(values).toContain("openobserve");
+    expect(requestFieldValuesMatching).toHaveBeenCalledWith(
+      expect.objectContaining({ streamName: "http_logs" }),
+      "service_name",
+      "openobs",
+      expect.not.objectContaining({ timeRange: expect.anything() }),
+    );
+  });
+
+  it("does not ask when the unfiltered answer was complete", async () => {
+    vi.mocked(requestFieldValues).mockResolvedValue(topTen.slice(0, 9));
+    vi.mocked(fieldValuesTruncated).mockReturnValue(false);
+    const c = makeComposable();
+    await c.resolveFieldValues("service_name", { prefix: "openobs" });
+    expect(requestFieldValuesMatching).not.toHaveBeenCalled();
+  });
+
+  it("asks when the store calls nine values truncated, as when a blank filled the tenth slot", async () => {
+    vi.mocked(requestFieldValues).mockResolvedValue(topTen.slice(0, 9));
+    const c = makeComposable();
+    const values = await c.resolveFieldValues("service_name", { prefix: "openobs" });
+    expect(values).toContain("openobserve");
+    expect(fieldValuesTruncated).toHaveBeenCalledWith(
+      expect.objectContaining({ streamName: "http_logs" }),
+      "service_name",
+      expect.anything(),
+    );
+  });
+
+  it("does not ask when three values already start with the prefix", async () => {
+    const c = makeComposable({ inSessionValues: { service_name: ["Open-a", "open-b"] } });
+    vi.mocked(requestFieldValues).mockResolvedValue([...topTen.slice(0, 9), "open-c"]);
+    await c.resolveFieldValues("service_name", { prefix: "open" });
+    expect(requestFieldValuesMatching).not.toHaveBeenCalled();
+  });
+
+  it("does not ask without a prefix", async () => {
+    const c = makeComposable();
+    await c.resolveFieldValues("service_name", { prefix: "  " });
+    await c.resolveFieldValues("service_name");
+    expect(requestFieldValuesMatching).not.toHaveBeenCalled();
+  });
+
+  it("asks within the range a dashboard set", async () => {
+    const range = { startTime: 1_000_000, endTime: 2_000_000 };
+    const c = makeComposable();
+    c.setValuesTimeRange(range);
+    await c.resolveFieldValues("service_name", { prefix: "openobs" });
+    expect(vi.mocked(requestFieldValuesMatching).mock.calls[0][3]).toMatchObject({
+      timeRange: range,
+    });
+  });
+
+  it("keeps the local values when the match lookup is slow", async () => {
+    vi.useFakeTimers();
+    try {
+      vi.mocked(requestFieldValuesMatching).mockReturnValue(new Promise<string[]>(() => {}));
+      const c = makeComposable({ inSessionValues: { service_name: ["querier"] } });
+      let answer: string[] | undefined;
+      void c.resolveFieldValues("service_name", { prefix: "openobs" }).then((v) => (answer = v));
+      await vi.advanceTimersByTimeAsync(800);
+      expect(answer).toEqual(expect.arrayContaining(["querier", ...topTen]));
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+// ─── a slow lookup is still loading, never "no values" ────────────────────────
+
+describe("resolveFieldValues — a lookup that outlived its timeout", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(requestFieldValues).mockResolvedValue([]);
+    vi.mocked(fieldValuesUnavailable).mockReturnValue(false);
+    vi.mocked(pendingFieldValues).mockReturnValue(null);
+  });
+
+  it("stays pending while the server is still answering, so the editor shows its loading row", async () => {
+    let finish!: (values: string[]) => void;
+    vi.mocked(pendingFieldValues).mockReturnValue(
+      new Promise<string[]>((resolve) => (finish = resolve)),
+    );
+    const c = makeComposable();
+    let answer: string[] | undefined;
+    void c.resolveFieldValues("level").then((v) => (answer = v));
+    await new Promise((r) => setTimeout(r, 0));
+    expect(answer).toBeUndefined();
+    finish(["late"]);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(answer).toEqual(["late"]);
+  });
+
+  it("asks about the same range it looked up", async () => {
+    const range = { startTime: 1_000_000, endTime: 2_000_000 };
+    const c = makeComposable();
+    c.setValuesTimeRange(range);
+    await c.resolveFieldValues("level");
+    expect(pendingFieldValues).toHaveBeenCalledWith(
+      expect.objectContaining({ streamName: "http_logs" }),
+      "level",
+      expect.objectContaining({ timeRange: range }),
+    );
+  });
+
+  it("still says there are none when the server really answered with nothing", async () => {
+    const c = makeComposable();
     await expect(c.resolveFieldValues("level")).resolves.toEqual([]);
   });
 });

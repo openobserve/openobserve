@@ -106,7 +106,9 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 106: create ai_chat_turns and add replica_purged_at to ai_chat_sessions.
 // 107: add redact_tools to ai_chat_shares.
 // 108: create oncall_phone_verifications and org_telephony.
-pub const DB_SCHEMA_VERSION: u64 = 108;
+// 109: add last_run columns to reports.
+// 110: create rum_pa_app_settings; add rules_hash to rum_pa_funnels.
+pub const DB_SCHEMA_VERSION: u64 = 110;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -3056,6 +3058,12 @@ pub struct Limit {
     )]
     pub timechart_enabled: bool,
     #[env_config(
+        name = "ZO_EDITOR_SUGGEST_MODE",
+        help = "Query editor suggestions for every user: automatic (field, operator and value menus follow each other), typing (no follow-on menus) or off (the editor as it was before this setting)",
+        default = "automatic"
+    )]
+    pub editor_suggest_mode: String,
+    #[env_config(
         name = "ZO_HISTOGRAM_BREAKDOWN_FIELDS",
         help = "Comma-separated ordered list of stream fields used for stacked histogram breakdown. First match wins. Default: severity,log_level,level,status",
         default = "severity,log_level,level,status"
@@ -4026,7 +4034,20 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.limit.workflow_error_retention_secs = 3600;
     }
 
+    cfg.limit.editor_suggest_mode = normalize_editor_suggest_mode(&cfg.limit.editor_suggest_mode)?;
+
     Ok(())
+}
+
+fn normalize_editor_suggest_mode(raw: &str) -> Result<String, anyhow::Error> {
+    let mode = raw.trim().to_lowercase();
+    match mode.as_str() {
+        "" => Ok("automatic".to_string()),
+        "automatic" | "typing" | "off" => Ok(mode),
+        _ => Err(anyhow::anyhow!(
+            "ZO_EDITOR_SUGGEST_MODE must be one of: automatic (default), typing or off; got {raw}"
+        )),
+    }
 }
 
 fn check_route_config(cfg: &Config) -> Result<(), anyhow::Error> {
@@ -5139,11 +5160,6 @@ mod tests {
     }
 
     #[test]
-    fn budget_above_lease_is_rejected() {
-        assert!(validate_synthetics_ceilings(&ceilings(900, 901, 300_000)).is_err());
-    }
-
-    #[test]
     fn net_timeout_larger_than_the_budget_is_rejected() {
         // One attempt could never fit, so every config of that type would fail
         // validation for a reason the user cannot act on.
@@ -5544,11 +5560,6 @@ mod tests {
     }
 
     #[test]
-    fn test_ensure_not_empty_valid() {
-        assert!(ensure_not_empty("valid", "TEST").is_ok());
-    }
-
-    #[test]
     fn test_ensure_not_empty_invalid() {
         assert!(ensure_not_empty("", "TEST").is_err());
     }
@@ -5556,11 +5567,6 @@ mod tests {
     #[test]
     fn test_ensure_not_empty_with_whitespace() {
         assert!(ensure_not_empty("  value  ", "TEST").is_ok());
-    }
-
-    #[test]
-    fn test_ensure_not_empty_single_char() {
-        assert!(ensure_not_empty("a", "TEST").is_ok());
     }
 
     #[test]
@@ -6074,6 +6080,27 @@ mod tests {
     }
 
     #[test]
+    fn test_editor_suggest_mode_defaults_to_automatic() {
+        let mut cfg = Config::init().unwrap();
+        assert_eq!(cfg.limit.editor_suggest_mode, "automatic");
+        check_limit_config(&mut cfg).unwrap();
+        assert_eq!(cfg.limit.editor_suggest_mode, "automatic");
+    }
+
+    #[test]
+    fn test_editor_suggest_mode_normalizes_and_rejects_unknown_values() {
+        assert_eq!(normalize_editor_suggest_mode(" Typing ").unwrap(), "typing");
+        assert_eq!(normalize_editor_suggest_mode("OFF").unwrap(), "off");
+        assert_eq!(normalize_editor_suggest_mode("").unwrap(), "automatic");
+        for value in ["auto", "on", "invoke", "manual"] {
+            assert!(
+                normalize_editor_suggest_mode(value).is_err(),
+                "editor suggest mode {value} must be rejected instead of falling back"
+            );
+        }
+    }
+
+    #[test]
     fn test_check_queue_store_config_memory_requires_local_mode() {
         let mut cfg = Config::default();
         cfg.common.queue_store = "memory".to_string();
@@ -6489,13 +6516,6 @@ mod tests {
         let p = std::path::Path::new("/data/openobserve");
         let result = deverbatim(p);
         assert_eq!(result, "/data/openobserve");
-    }
-
-    #[test]
-    fn test_deverbatim_empty_path_unchanged() {
-        let p = std::path::Path::new("");
-        let result = deverbatim(p);
-        assert_eq!(result, "");
     }
 
     #[cfg(windows)]

@@ -34,11 +34,38 @@ type Method =
   | "getFunnel"
   | "createFunnel"
   | "updateFunnel"
-  | "deleteFunnel";
+  | "deleteFunnel"
+  | "getAppSettings"
+  | "putAppSettings";
 type Impl = (...args: never[]) => Promise<unknown>;
 
 const CAP = 50;
 const ID_CHARS = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+
+/** The hash the mock reports for an app's day-one settings (built-in rule on, no rules). */
+export const DEFAULT_RULES_HASH = "0f0f0f0f0f0f0f0f";
+
+/** The settings GET for an app with no stored row: the built-in bot rule on, nothing else. */
+export function defaultAppSettings(app: string): Record<string, unknown> {
+  return {
+    id: null,
+    app,
+    bots: true,
+    builtinBots: {
+      version: 1,
+      families: ["HeadlessChrome", "PhantomJS", "Spider"],
+      devices: ["Spider"],
+    },
+    sessions: [],
+    pages: [],
+    version: 0,
+    rulesHash: DEFAULT_RULES_HASH,
+    createdBy: null,
+    createdAt: null,
+    updatedBy: null,
+    updatedAt: null,
+  };
+}
 
 const events = new Map<string, Row>();
 const funnels = new Map<string, Row>();
@@ -178,6 +205,10 @@ const impls: Record<Method, Impl> = {
     funnels.delete(id);
     return { status: 204, data: "" };
   },
+  getAppSettings: async (_org: string, app: string) => ({ data: defaultAppSettings(app) }),
+  putAppSettings: async (_org: string, app: string, body: Record<string, unknown>) => ({
+    data: { ...defaultAppSettings(app), ...body, version: Number(body.version ?? 0) + 1 },
+  }),
 };
 
 const service = Object.fromEntries(
@@ -211,6 +242,8 @@ export const rumPaApiMock = {
     state.seq = 0;
     state.actor = "me@x.com";
     for (const m of Object.keys(impls) as Method[]) {
+      // Specs replace or delete the settings methods per block, so reset puts the default back.
+      if (!vi.isMockFunction(service[m])) service[m] = vi.fn(impls[m]) as Mock<Impl>;
       service[m].mockReset();
       service[m].mockImplementation(impls[m]);
     }

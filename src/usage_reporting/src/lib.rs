@@ -669,6 +669,12 @@ mod tests {
             synthetics_location: None,
             downtime_id: None,
             delivery_attempted: None,
+            trigger_source: None,
+            triggered_by: None,
+            recipient_count: None,
+            attachment_type: None,
+            dashboard_count: None,
+            scheduled_for: None,
         }
     }
 

@@ -275,6 +275,8 @@ export default defineConfig(({ mode }) => {
               leaflet: ["leaflet"],
               gridstack: ["gridstack"],
               "highlight.js": ["highlight.js"],
+              // The entry needs these; left ungrouped they land in the monaco chunk and drag all of it onto every page.
+              "o2cs-node-polyfills": ["buffer", "process", "base64-js", "ieee754"],
             };
 
             return (id: string) => {
@@ -297,9 +299,6 @@ export default defineConfig(({ mode }) => {
               // getContribution("editor.contrib.suggestController") is simply
               // null and Ctrl+Space does nothing. Keeping every monaco module in
               // one chunk keeps its own import order intact.
-              //
-              // Still lazily loaded: nothing in the entry graph imports monaco,
-              // so the chunk is fetched when an editor first mounts.
               if (id.includes("node_modules/monaco-editor/")) return "monaco-editor";
 
               for (const [chunk, packages] of Object.entries(byPackage)) {

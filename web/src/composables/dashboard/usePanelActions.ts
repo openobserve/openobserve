@@ -17,10 +17,17 @@ import {
   buildPrefillFromPanel,
   dateToMicros,
   executedPanelQuery,
+  alertableQueryIndexes,
   panelQueryChoices,
+  type PanelQueryShape,
 } from "@/utils/alerts/prefill/fromPanel";
 import { requestAlertCreation, useAlertCreation } from "@/composables/alerts/useAlertCreation";
-import { needsConfirmation, normalizePrefill } from "@/utils/alerts/alertPrefill";
+import {
+  firstAggregateAlias,
+  needsConfirmation,
+  normalizePrefill,
+  warn,
+} from "@/utils/alerts/alertPrefill";
 import type { AlertBuildOptions, AlertPrefill } from "@/ts/interfaces/alertPrefill";
 import {
   FORECAST_FREQUENCY_MINUTES,
@@ -30,6 +37,7 @@ import {
 } from "@/utils/alerts/forecastAlert";
 import { ref } from "vue";
 import { downloadFile } from "@/utils/dom";
+import { getNumberLocale } from "@/locales/numberFormat";
 import type { TranslateFn } from "@/types/i18n";
 
 const PERIOD_WARNINGS = ["absoluteToRolling", "periodClamped"];
@@ -70,6 +78,7 @@ const sqlYAxisColumnOf = (
   query: any,
   executedQuery: string | undefined,
   clickedSeriesName: string | undefined,
+  yFieldIndex = 0,
 ): string | null => {
   let yAxisColumn = null;
   const sqlQuery = executedQuery || query.query;
@@ -77,7 +86,7 @@ const sqlYAxisColumnOf = (
   // First, try to get from query.fields.y if available (most reliable for query builder)
   if (query.fields?.y && query.fields.y.length > 0) {
     // For query builder queries, use the Y-axis field
-    const yField = query.fields.y[0];
+    const yField = query.fields.y[yFieldIndex];
     const aliasOrColumn = yField.alias || yField.column;
 
     // Extract from SQL to get the exact case (without quotes)
@@ -107,19 +116,20 @@ const sqlYAxisColumnOf = (
       yAxisColumn = match[1];
     } else {
       // Last resort: extract any aggregation column from SQL (first one found)
-      // Pattern: count(...) as alias, avg(...) as alias, etc.
-      const aggRegex =
-        /(?:count|sum|avg|min|max|median)\s*\([^)]+\)\s+as\s+["']?([^"',\s)]+)["']?/i;
-      const aggMatch = sqlQuery.match(aggRegex);
-      if (aggMatch && aggMatch[1]) {
-        yAxisColumn = aggMatch[1];
-      } else {
-        yAxisColumn = clickedSeriesName;
-      }
+      yAxisColumn = firstAggregateAlias(sqlQuery) ?? clickedSeriesName;
     }
   }
   return yAxisColumn;
 };
+
+/** A query's own y-axis column, for a query the user picked rather than clicked. */
+const ownYAxisColumnOf = (
+  query: PanelQueryShape | undefined,
+  executedQuery: string | undefined,
+): string | null =>
+  query?.fields?.y?.length
+    ? sqlYAxisColumnOf(query, executedQuery, undefined)
+    : firstAggregateAlias(executedQuery || query?.query || "");
 
 export function usePanelAlertCreation({
   panelSchema,
@@ -211,10 +221,20 @@ export function usePanelAlertCreation({
     hideContextMenu();
 
     const queries: any[] = panelSchema.value.queries ?? [];
-    const visible = visibleQueryIndexes?.value ?? queries.map((_, index) => index);
-    // A click on empty chart area hit no series, so only a lone visible query is certain.
-    const queryIndex = selection.panelQueryIndex ?? (visible.length === 1 ? visible[0] : undefined);
-    const query = queries[queryIndex ?? visible[0]];
+    const visible = alertableQueryIndexes(
+      queries,
+      visibleQueryIndexes?.value ?? queries.map((_, index) => index),
+    );
+    const point = contextMenuData.value?.forecastPoint;
+    const isForecast = selection.condition === "forecast" && !!point;
+    // A forecast is fitted to the clicked series, so it cannot move to another query.
+    const offerChoice = visible.length > 1 && !isForecast;
+    const named = selection.panelQueryIndex;
+    // A hidden query draws nothing, so a series naming one was mislabelled and counts as no series; a forecast keeps its query.
+    const clicked =
+      named !== undefined && (isForecast || visible.includes(named)) ? named : undefined;
+    const queryIndex = clicked ?? visible[0];
+    const query = queries[queryIndex];
     if (!query) {
       return;
     }
@@ -228,23 +248,57 @@ export function usePanelAlertCreation({
 
     const executedQueryOf = (index: number) =>
       executedPanelQuery(metadata.value?.queries, index) || queries[index]?.query;
+    const clickedYField = contextMenuData.value?.yField;
+    // Single-query series carry no query index, so the lone query owns the click.
+    const clickOwner = clicked ?? (offerChoice ? undefined : queryIndex);
+    // The y field the clicked series drew; with several and none named, the first is only a guess.
+    const yFieldOf = (index: number): { field: number; guessed: boolean } => {
+      const count = queries[index]?.fields?.y?.length ?? 0;
+      return index === clickOwner && typeof clickedYField === "number" && clickedYField < count
+        ? { field: clickedYField, guessed: false }
+        : { field: 0, guessed: count > 1 };
+    };
     // Only a SQL threshold needs the y-axis column; PromQL compares the series value.
-    const yAxisColumnOf = (index: number) =>
-      queryType === "sql"
-        ? sqlYAxisColumnOf(
-            queries[index],
-            executedQueryOf(index),
-            contextMenuData.value?.seriesName,
-          )
-        : null;
+    const yAxisColumnOf = (index: number) => {
+      if (queryType !== "sql") return null;
+      // Right-click events carry no series name, so a query falls back to its own SQL alias.
+      return (
+        (index === clickOwner
+          ? sqlYAxisColumnOf(
+              queries[index],
+              executedQueryOf(index),
+              contextMenuData.value?.seriesName,
+              yFieldOf(index).field,
+            )
+          : null) ?? ownYAxisColumnOf(queries[index], executedQueryOf(index))
+      );
+    };
+    // The clicked value is on that series' scale, so a query the user switched to gets the form's default.
+    const carriesThreshold = (index: number) => clicked === undefined || index === clicked;
+    const thresholdFor = (index: number) =>
+      carriesThreshold(index)
+        ? { threshold: selection.threshold, condition: selection.condition as "above" | "below" }
+        : {};
+    const shownThreshold = selection.threshold.toLocaleString(getNumberLocale(), {
+      maximumFractionDigits: 2,
+    });
+    // Both cases change what the chart click asked for, so the form's banner has to say so.
+    const thresholdWarnings = (prefill: AlertPrefill, index: number) => {
+      if (!carriesThreshold(index)) {
+        return [warn("thresholdNotCarried", "warning", { value: shownThreshold })];
+      }
+      const having = prefill.meta?.sqlHaving as { column?: string } | undefined;
+      return queryType === "sql" && yFieldOf(index).guessed && having?.column
+        ? [warn("thresholdColumnGuessed", "warning", { column: having.column })]
+        : [];
+    };
 
     // The menu already chose the threshold, so the dialog is only for which query, which stream, or why not.
-    const queryChoices =
-      queryIndex === undefined
-        ? panelQueryChoices(queries, metadata.value?.queries, visible)
-        : undefined;
+    const queryChoices = offerChoice
+      ? panelQueryChoices(queries, metadata.value?.queries, visible)
+      : undefined;
     const build = (options: AlertBuildOptions = {}) => {
-      const index = options.queryIndex ?? queryIndex ?? visible[0] ?? 0;
+      const index = options.queryIndex ?? queryIndex;
       const prefill = buildPrefillFromPanel({
         panelTitle: panelSchema.value.title || "Unnamed Panel",
         panelId: panelSchema.value.id,
@@ -253,20 +307,17 @@ export function usePanelAlertCreation({
         queryIndex: index,
         queryChoices,
         timeRange: selectedTimeObj.value,
-        threshold: selection.threshold,
-        condition: selection.condition as "above" | "below",
+        ...thresholdFor(index),
         yAxisColumn: yAxisColumnOf(index),
         executedQuery: executedQueryOf(index),
         metadataQueries: metadata.value?.queries,
       });
+      prefill.warnings.push(...thresholdWarnings(prefill, index));
       return alertSource?.value ? { ...prefill, source: alertSource.value } : prefill;
     };
 
-    const point = contextMenuData.value?.forecastPoint;
     const prefill = normalizePrefill(
-      selection.condition === "forecast" && point
-        ? forecastPrefill(build(), selection.threshold, point)
-        : build(),
+      isForecast ? forecastPrefill(build(), selection.threshold, point) : build(),
     );
     if (needsConfirmation(prefill)) {
       requestAlertCreation(prefill, {}, build);

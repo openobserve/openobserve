@@ -77,7 +77,7 @@ jobs:
 
       - uses: ./.github/actions/github-auth
       - name: Setup Rust Toolchain
-        uses: dtolnay/rust-toolchain@7e38f4b43b4db5c8dd498af069a4f6196df1d067 # master
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
         with:
           toolchain: nightly-2026-05-20
           targets: x86_64-unknown-linux-gnu
@@ -133,12 +133,12 @@ jobs:
 
       - uses: ./.github/actions/github-auth
       - name: Setup Rust Toolchain
-        uses: dtolnay/rust-toolchain@7e38f4b43b4db5c8dd498af069a4f6196df1d067 # master
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
         with:
           toolchain: nightly-2026-05-20
           targets: x86_64-unknown-linux-gnu
 
-      - uses: taiki-e/install-action@83ac0ad63c0167e6f06796fab0fce28db1bf3db0 # v2.87.22
+      - uses: taiki-e/install-action@1168f6810a3cb30a3514bf5756a3b7f0422c6df8 # v2.87.28
         env:
           GITHUB_TOKEN: ${{ github.token }}
         with:
@@ -197,12 +197,12 @@ jobs:
 
       - uses: ./.github/actions/github-auth
       - name: Setup Rust Toolchain
-        uses: dtolnay/rust-toolchain@7e38f4b43b4db5c8dd498af069a4f6196df1d067 # master
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
         with:
           toolchain: nightly-2026-05-20
           targets: x86_64-unknown-linux-gnu
 
-      - uses: taiki-e/install-action@83ac0ad63c0167e6f06796fab0fce28db1bf3db0 # v2.87.22
+      - uses: taiki-e/install-action@1168f6810a3cb30a3514bf5756a3b7f0422c6df8 # v2.87.28
         env:
           GITHUB_TOKEN: ${{ github.token }}
         with:

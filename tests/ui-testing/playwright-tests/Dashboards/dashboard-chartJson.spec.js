@@ -113,7 +113,7 @@ test.describe("dashboard UI testcases", () => {
     // we toggle JSON rendering on the field — mirrors test 4's pattern,
     // which avoids the race between the v-model toggle on
     // `fields.showFieldAsJson` and the first panel-schema build.
-    await pm.dateTimeHelper.setRelativeTimeRange("6-w");
+    await pm.dateTimeHelper.setRelativeTimeRange("1-h");
     await pm.dashboardPanelActions.applyDashboardBtn();
     await pm.dashboardPanelActions.waitForChartToRender();
 
@@ -181,7 +181,7 @@ test.describe("dashboard custom query mode field options testcases", () => {
     await page.waitForTimeout(1000);
 
     // Set date-time range
-    await pm.dateTimeHelper.setRelativeTimeRange("6-w");
+    await pm.dateTimeHelper.setRelativeTimeRange("1-h");
     await pm.dashboardPanelActions.applyDashboardBtn();
     await pm.dashboardPanelActions.waitForChartToRender();
 
@@ -238,7 +238,7 @@ test.describe("dashboard custom query mode field options testcases", () => {
     await page.waitForTimeout(1000);
 
     // Set date-time range
-    await pm.dateTimeHelper.setRelativeTimeRange("6-w");
+    await pm.dateTimeHelper.setRelativeTimeRange("1-h");
     await pm.dashboardPanelActions.applyDashboardBtn();
     await pm.dashboardPanelActions.waitForChartToRender();
 
@@ -295,7 +295,7 @@ test.describe("dashboard custom query mode field options testcases", () => {
     await page.waitForTimeout(1000);
 
     // Set date-time range
-    await pm.dateTimeHelper.setRelativeTimeRange("6-w");
+    await pm.dateTimeHelper.setRelativeTimeRange("1-h");
     await pm.dashboardPanelActions.applyDashboardBtn();
     await pm.dashboardPanelActions.waitForChartToRender();
 
@@ -354,7 +354,7 @@ test.describe("dashboard custom query mode field options testcases", () => {
     await page.waitForTimeout(1000);
 
     // Set date-time range
-    await pm.dateTimeHelper.setRelativeTimeRange("6-w");
+    await pm.dateTimeHelper.setRelativeTimeRange("1-h");
     await pm.dashboardPanelActions.applyDashboardBtn();
     await pm.dashboardPanelActions.waitForChartToRender();
 
@@ -409,7 +409,7 @@ test.describe("dashboard custom query mode field options testcases", () => {
     await page.waitForTimeout(1000);
 
     // Set date-time range
-    await pm.dateTimeHelper.setRelativeTimeRange("6-w");
+    await pm.dateTimeHelper.setRelativeTimeRange("1-h");
     await pm.dashboardPanelActions.applyDashboardBtn();
     await pm.dashboardPanelActions.waitForChartToRender();
 
