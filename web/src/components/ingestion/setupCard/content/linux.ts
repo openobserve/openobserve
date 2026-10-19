@@ -140,6 +140,6 @@ sudo journalctl -u openobserve-agent -n 50 --no-pager`,
     },
     docUrl: "https://github.com/openobserve/agents",
     // Step notes can't link externally, so the tracing guide is a footer link.
-    docLinks: [{ label: t("ingestion.setupCard.linuxTracingGuideLink"), url: TRACING_DOC_URL }],
+    docLinks: [{ label: t("ingestion.setupCard.ebpfTracingGuideLink"), url: TRACING_DOC_URL }],
   };
 }

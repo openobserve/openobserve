@@ -703,3 +703,130 @@ describe("SetupCardRenderer — Linux install step tracing toggle", () => {
     expect(installBlock().props("code")).not.toContain("cluster1");
   });
 });
+
+describe("SetupCardRenderer — Kubernetes instrument step (nested toggle)", () => {
+  let wrapper: VueWrapper<any>;
+
+  afterEach(() => {
+    if (wrapper) wrapper.unmount();
+  });
+
+  const BASE = `helm repo update openobserve
+helm --namespace openobserve-collector upgrade o2c openobserve/openobserve-collector \\
+  --version '>=0.6.0' --reset-then-reuse-values \\
+  --set ebpf.enabled=true`;
+  const codes = () => wrapper.findAllComponents(OCodeBlock).map((b) => b.props("code") as string);
+  const instrumentCode = () =>
+    codes().find((c) => c.includes("kubectl annotate") || c.includes("upgrade o2c"));
+  const field = (id: string) => wrapper.find(`[data-test="ai-input-${id}"]`);
+  const type = (id: string, v: string) => field(id).find("input").setValue(v);
+  const warning = () => wrapper.find('[data-test="ai-variant-require-instrument"]');
+  const subTabs = () => wrapper.find('[data-test="ai-subvariant-tabs-instrument"]');
+  const pickTop = async (id: string) => {
+    const tabs = wrapper
+      .findAll('[data-test="ai-variant-tabs"]')
+      .find((t) => t.find('[data-test="ai-variant-ebpf"]').exists())!;
+    tabs.findComponent(OToggleGroup).vm.$emit("update:modelValue", id);
+    await flushPromises();
+  };
+  const pickSub = async (id: string) => {
+    subTabs().findComponent(OToggleGroup).vm.$emit("update:modelValue", id);
+    await flushPromises();
+  };
+  const mountK8s = () =>
+    mount(SetupCardRenderer, {
+      props: { content: kubernetesCard(SUBS, gt), subs: SUBS },
+      global: { plugins: [store, router], stubs: { FirstEventStatus: FirstEventStatusStub } },
+      attachTo: document.body,
+    });
+
+  it("renders the nested language toggle under language libraries and switches code", async () => {
+    wrapper = mountK8s();
+    expect(subTabs().exists()).toBe(true);
+    for (const id of ["java", "dotnet", "nodejs", "python"]) {
+      expect(subTabs().find(`[data-test="ai-variant-${id}"]`).exists()).toBe(true);
+    }
+    expect(instrumentCode()).toContain("inject-java=");
+    await pickSub("python");
+    expect(instrumentCode()).toContain("inject-python=");
+    expect(instrumentCode()).not.toContain("inject-java=");
+
+    await pickTop("ebpf");
+    expect(subTabs().exists()).toBe(false);
+    await pickTop("libraries");
+    // Each top-level choice remembers its own nested selection.
+    expect(instrumentCode()).toContain("inject-python=");
+  });
+
+  it("shows the eBPF fields only under eBPF, opening with nothing selected", async () => {
+    wrapper = mountK8s();
+    for (const id of ["ebpfPorts", "ebpfExe", "ebpfCmd"]) expect(field(id).exists()).toBe(false);
+    await pickTop("ebpf");
+    for (const id of ["ebpfPorts", "ebpfExe", "ebpfCmd"]) expect(field(id).exists()).toBe(true);
+    expect(warning().exists()).toBe(true);
+    expect(codes().some((c) => c.includes("upgrade o2c"))).toBe(false);
+
+    await type("ebpfPorts", "8080");
+    expect(warning().exists()).toBe(false);
+    expect(instrumentCode()).toBe(
+      `${BASE} \\\n  --set-string 'ebpf.trace.ports={8080}'` +
+        ` \\\n  --set ebpf.trace.exePaths=null \\\n  --set ebpf.trace.cmdLines=null`,
+    );
+  });
+
+  it("emits one --set-string per filled field, in order, with comma-split quoted lists", async () => {
+    wrapper = mountK8s();
+    await pickTop("ebpf");
+    await type("ebpfPorts", " 8080, 9000-9100 ,,");
+    await type("ebpfExe", "/app/it's*");
+    await type("ebpfCmd", "*reports.py*, *worker*");
+    expect(instrumentCode()).toBe(
+      `${BASE} \\\n  --set-string 'ebpf.trace.ports={8080,9000-9100}'` +
+        ` \\\n  --set-string 'ebpf.trace.exePaths={/app/it'\\''s*}'` +
+        ` \\\n  --set-string 'ebpf.trace.cmdLines={*reports.py*,*worker*}'`,
+    );
+  });
+
+  it("sets blank fields to null so a selector from an earlier run is cleared", async () => {
+    wrapper = mountK8s();
+    await pickTop("ebpf");
+    await type("ebpfPorts", "  ");
+    await type("ebpfCmd", "*reports.py*");
+    expect(instrumentCode()).toBe(
+      `${BASE} \\\n  --set ebpf.trace.ports=null \\\n  --set ebpf.trace.exePaths=null` +
+        ` \\\n  --set-string 'ebpf.trace.cmdLines={*reports.py*}'`,
+    );
+  });
+
+  it("warns and hides the command when every selector is blank", async () => {
+    wrapper = mountK8s();
+    await pickTop("ebpf");
+    expect(warning().exists()).toBe(true);
+    expect(warning().text()).toContain("Fill in at least one");
+    expect(codes().some((c) => c.includes("upgrade o2c"))).toBe(false);
+  });
+
+  it("escapes backslashes and braces so a value cannot close the Helm list", async () => {
+    wrapper = mountK8s();
+    await pickTop("ebpf");
+    await type(
+      "ebpfCmd",
+      "*x*},exporters.otlphttp/openobserve.endpoint=https://evil.example,ebpf.trace.cmdLines={*y*",
+    );
+    await type("ebpfExe", String.raw`*a\b*`);
+    expect(instrumentCode()).toBe(
+      `${BASE} \\\n  --set ebpf.trace.ports=null` +
+        ` \\\n  --set-string 'ebpf.trace.exePaths={*a\\\\b*}'` +
+        ` \\\n  --set-string 'ebpf.trace.cmdLines={*x*\\},exporters.otlphttp/openobserve.endpoint=https://evil.example,ebpf.trace.cmdLines=\\{*y*}'`,
+    );
+  });
+
+  it("treats a field holding only commas and spaces as blank", async () => {
+    wrapper = mountK8s();
+    await pickTop("ebpf");
+    await type("ebpfPorts", " ,,, ");
+    await type("ebpfExe", ",");
+    expect(warning().exists()).toBe(true);
+    expect(codes().some((c) => c.includes("upgrade o2c"))).toBe(false);
+  });
+});

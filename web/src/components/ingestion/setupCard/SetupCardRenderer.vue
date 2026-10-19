@@ -55,6 +55,7 @@ import type {
   RichCardInput,
   RichCardStep,
   RichCardStepVariant,
+  RichCardStepVariantGroup,
   RichCardStreamInput,
   StepChipKind,
 } from "./types";
@@ -135,7 +136,9 @@ const watchedStream = computed(() =>
 const allInputs = computed(() =>
   props.content.steps.flatMap((s) => [
     ...(s.inputs ?? []),
-    ...(s.variants ?? []).flatMap((v) => v.inputs ?? []),
+    ...(s.variants ?? [])
+      .flatMap((v) => ("variants" in v ? v.variants : [v]))
+      .flatMap((v) => v.inputs ?? []),
   ]),
 );
 const inputValues = ref<Record<string, string>>(
@@ -150,7 +153,7 @@ const subStream = (text?: string, variant?: RichCardStepVariant): string | undef
   const flags = variantFlags(variant);
   let out = text.replaceAll("{stream}", watchedStream.value).replaceAll("{flags}", () => flags);
   for (const inp of allInputs.value) {
-    if (inp.flag) continue;
+    if (inp.flag || inp.helmSet) continue;
     const value = inputValues.value[inp.id] ?? inp.default;
     // A function replacement keeps typed `$&`, `$$` etc. literal.
     out = out.replaceAll(`{${inp.id}}`, () => value);
@@ -160,13 +163,29 @@ const subStream = (text?: string, variant?: RichCardStepVariant): string | undef
 
 const inputValue = (id: string) => inputValues.value[id]?.trim() ?? "";
 const missingRequired = (variant?: RichCardStepVariant) =>
-  !!variant?.requireOneOf && variant.requireOneOf.ids.every((id) => !inputValue(id));
+  !!variant?.requireOneOf &&
+  variant.requireOneOf.ids.every((id) => !inputValue(id).replace(/[\s,]/g, ""));
 // Single-quoted for POSIX shells, so globs like *app* reach the installer unexpanded.
 const shellQuote = (v: string) => `'${v.replaceAll("'", "'\\''")}'`;
+// Helm list items end at an unescaped `,` or `}`; escaping stops a value from closing the list.
+const helmList = (v: string) =>
+  v
+    .split(",")
+    .map((item) => item.trim().replace(/[\\{}]/g, "\\$&"))
+    .filter(Boolean)
+    .join(",");
 const variantFlags = (variant?: RichCardStepVariant): string =>
   (variant?.inputs ?? [])
-    .filter((inp) => inp.flag && inputValue(inp.id))
-    .map((inp) => ` ${inp.flag} ${shellQuote(inputValue(inp.id))}`)
+    .map((inp) => {
+      // A blank list is set to null, not omitted: --reset-then-reuse-values would keep the old one.
+      if (inp.helmSet) {
+        const list = helmList(inputValue(inp.id));
+        return list
+          ? ` \\\n  --set-string ${shellQuote(`${inp.helmSet}={${list}}`)}`
+          : ` \\\n  --set ${inp.helmSet}=null`;
+      }
+      return inp.flag && inputValue(inp.id) ? ` ${inp.flag} ${shellQuote(inputValue(inp.id))}` : "";
+    })
     .join("");
 
 const detect = useStreamDetect({
@@ -252,8 +271,22 @@ const variantSel = ref<Record<string, string>>({});
 const variantKey = (step: RichCardStep): string => step.variantGroup ?? step.id;
 const currentVariantId = (step: RichCardStep): string | undefined =>
   step.variants?.length ? (variantSel.value[variantKey(step)] ?? step.variants[0].id) : undefined;
-const activeVariant = (step: RichCardStep) =>
+const topVariant = (step: RichCardStep) =>
   step.variants?.find((v) => v.id === currentVariantId(step));
+// A nested selection is keyed under its parent, so each top-level choice remembers its own.
+const subVariantKey = (step: RichCardStep) => `${variantKey(step)}/${topVariant(step)?.id}`;
+const subVariants = (step: RichCardStep) => {
+  const top = topVariant(step);
+  return top && "variants" in top ? top.variants : undefined;
+};
+const currentSubVariantId = (step: RichCardStep): string | undefined =>
+  variantSel.value[subVariantKey(step)] ?? subVariants(step)?.[0]?.id;
+const activeVariant = (step: RichCardStep): RichCardStepVariant | undefined => {
+  const top = topVariant(step);
+  return top && "variants" in top
+    ? top.variants.find((v) => v.id === currentSubVariantId(step))
+    : top;
+};
 const selectVariant = (key: string, variantId: unknown) => {
   variantSel.value = { ...variantSel.value, [key]: String(variantId) };
 };
@@ -268,7 +301,7 @@ const stepTitle = (step: RichCardStep): I18nText =>
   step.titleKey ? t(step.titleKey) : (step.title ?? raw(""));
 const stepDescription = (step: RichCardStep): I18nText =>
   step.descriptionKey ? t(step.descriptionKey) : (step.description ?? raw(""));
-const variantLabel = (variant: RichCardStepVariant): I18nText =>
+const variantLabel = (variant: RichCardStepVariant | RichCardStepVariantGroup): I18nText =>
   variant.labelKey ? t(variant.labelKey) : (variant.label ?? raw(""));
 const streamInputHelp = (input: RichCardStreamInput): I18nText | undefined =>
   input.helpKey ? t(input.helpKey) : input.help;
@@ -607,6 +640,36 @@ function fireConfetti() {
               >
                 <OToggleGroupItem
                   v-for="v in step.variants"
+                  :key="v.id"
+                  :value="v.id"
+                  size="sm"
+                  :data-test="`ai-variant-${v.id}`"
+                >
+                  <template v-if="v.icon" #icon-left>
+                    <img
+                      :src="v.icon"
+                      alt=""
+                      aria-hidden="true"
+                      class="variant-icon"
+                      :class="{ 'variant-icon-invert': v.iconInvertDark }"
+                    />
+                  </template>
+                  {{ variantLabel(v) }}
+                </OToggleGroupItem>
+              </OToggleGroup>
+            </div>
+
+            <div
+              v-if="subVariants(step)?.length && step.variantToggle !== false"
+              class="variant-tabs"
+              :data-test="`ai-subvariant-tabs-${step.id}`"
+            >
+              <OToggleGroup
+                :model-value="currentSubVariantId(step)"
+                @update:model-value="(v) => selectVariant(subVariantKey(step), v)"
+              >
+                <OToggleGroupItem
+                  v-for="v in subVariants(step)"
                   :key="v.id"
                   :value="v.id"
                   size="sm"

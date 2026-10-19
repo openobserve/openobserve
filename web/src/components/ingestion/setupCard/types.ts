@@ -110,6 +110,16 @@ export interface RichCardStepVariant {
   note?: I18nText;
 }
 
+/** A toggle entry with its own nested toggle (one level only); the chosen sub-variant supplies code, note and inputs. */
+export interface RichCardStepVariantGroup extends Pick<
+  RichCardStepVariant,
+  "id" | "label" | "labelKey" | "icon" | "iconInvertDark"
+> {
+  variants: RichCardStepVariant[];
+  // Declared so `step.variants[i].code` still type-checks across the union.
+  code?: never;
+}
+
 /**
  * A button that performs the step instead of handing over a command — e.g.
  * "Launch CloudFormation Stack", which opens the AWS console. The renderer is
@@ -147,7 +157,7 @@ export interface RichCardStep {
    * Selectable code alternatives (e.g. per OS/arch). When present, the card
    * renders a toggle and shows the chosen variant's code; `code` is ignored.
    */
-  variants?: RichCardStepVariant[];
+  variants?: (RichCardStepVariant | RichCardStepVariantGroup)[];
   /**
    * Shares the variant selection across steps: steps with the same `variantGroup`
    * read/write one selected id (e.g. "os" so the install OS choice drives the
@@ -328,6 +338,8 @@ export interface RichCardInput {
   width?: FieldWidth;
   /** CLI flag: the value goes into the variant's `{flags}` as `<flag> '<value>'`, omitted when blank. */
   flag?: string;
+  /** Helm list value: goes into `{flags}` as `--set-string '<key>={a,b}'`, or `--set <key>=null` when blank. */
+  helmSet?: string;
 }
 
 export interface RichCardContent {
