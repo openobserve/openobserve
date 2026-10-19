@@ -13,9 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! The numbered evidence list: one entry per tool call that ran and that the
-//! ledger cites (03 VE23–VE30).
-
 use std::{borrow::Cow, collections::HashMap};
 
 use serde::{Deserialize, Serialize};
@@ -52,8 +49,7 @@ fn is_shell_tool(tool: &str) -> bool {
     matches!(tool, "bash" | "shell") || tool.starts_with("cli_")
 }
 
-/// What the web app needs to open the same query (VE26, VE29). Every value
-/// comes from the persisted tool input, never from the ledger or the model.
+/// What the web app needs to open the same query (VE26, VE29).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct EvidenceTarget {
     pub signal: SignalClass,
@@ -71,8 +67,7 @@ pub struct EvidenceTarget {
     /// Microseconds.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub end_us: Option<i64>,
-    /// The command of a shell or `cli_*` call, for "Copy query" only; no link is
-    /// built from it.
+    /// The command of a shell or `cli_*` call, for "Copy query" only; no link is built from it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub command: Option<String>,
 }
@@ -111,7 +106,6 @@ fn prometheus_time_us(v: Option<&Value>) -> Option<i64> {
 }
 
 /// Stream, time range and query of one call, from its unwrapped input (VE26).
-/// A value that is absent or does not parse stays empty.
 pub fn evidence_target(tool: &str, input: &Value) -> EvidenceTarget {
     let mut target = EvidenceTarget {
         signal: signal_class(tool, input),
@@ -158,8 +152,6 @@ pub fn evidence_target(tool: &str, input: &Value) -> EvidenceTarget {
     target
 }
 
-/// The response body: a JSON string is parsed, and a `{"output": "<json>"}`
-/// wrapper around a JSON value is unwrapped. Plain text stays as it is.
 fn decode_output(output: &Value) -> Cow<'_, Value> {
     match output {
         Value::String(s) => match serde_json::from_str::<Value>(s) {
@@ -193,8 +185,7 @@ fn byte_size(bytes: usize) -> String {
     }
 }
 
-/// Rows of a markdown table: table lines minus the header row and the
-/// `|---|` separator.
+/// Rows of a markdown table: table lines minus the header row and the `|---|` separator.
 fn md_table_rows(data: &str) -> u64 {
     let is_separator = |line: &str| {
         line.contains('-')
@@ -216,8 +207,6 @@ fn csv_rows(data: &str) -> u64 {
     lines.saturating_sub(1)
 }
 
-/// Rows returned in a text `data` field (`agent_options.output_format`
-/// `md_table` or `csv`); the `format` field decides when present.
 fn data_rows(body: &Value) -> Option<u64> {
     let data = body
         .get("data")
@@ -240,8 +229,6 @@ fn sql_summary(body: &Value) -> Option<(String, Option<u64>)> {
         .is_some_and(|s| !s.trim().is_empty());
     let rows = match hits {
         Some(h) if !h.is_empty() => h.len() as u64,
-        // Rows returned as text: count them, or (unknown format) leave the size
-        // fallback; empty `hits` beside text `data` are not "0 rows".
         _ if has_text_data => data_rows(body)?,
         _ => hits?.len() as u64,
     };
@@ -309,9 +296,6 @@ fn shell_summary(body: &Value) -> (String, Option<u64>) {
     )
 }
 
-/// A one-line summary of a call's result, built from its persisted output, and
-/// the result count when the output has one (VE27). `output` is the response
-/// body (a JSON value), or the raw output string.
 pub fn summarize_result(tool: &str, output: &Value) -> (String, Option<u64>) {
     if is_shell_tool(tool) {
         return shell_summary(output);
@@ -402,9 +386,6 @@ pub struct EvidenceEntry {
     pub citations: Vec<Citation>,
 }
 
-/// Matches each ledger item to the tool call that ran it (CG §5.3.1) and merges
-/// the items of one call into one numbered entry (VE23, VE24, VE28). Items with
-/// no successful call go to the unverified list (VE30).
 pub fn build_evidence(
     ledger: Option<&EvidenceLedger>,
     tool_log: &[ToolCallRecord],
@@ -850,10 +831,7 @@ mod tests {
         );
     }
 
-    /// D2: SQL outputs with `agent_options.output_format` carry rows in a text
-    /// `data` field. Fixtures are the real outputs of the Phase 3 E2E runs
-    /// (`artifacts/phase-3/e2e/S1-call01-output.txt`, md_table, cut to its first
-    /// three complete rows; `R-S4-call00-output.txt`, csv, whole).
+    /// D2: SQL outputs with `agent_options.output_format` carry rows in a text `data` field.
     #[test]
     fn text_table_outputs_count_their_rows() {
         let s1_table = "| _timestamp | service_name | level | message | http_status | latency_ms | upstream | k8s_namespace_name |\n| --- | --- | --- | --- | --- | --- | --- | --- |\n| 1792125252548309 | checkout_p3s1 | error | payment gateway timeout after 5000ms calling POST /v1/charges | 504 | 5283 | payments-gateway | shop |\n| 1792125246548309 | checkout_p3s1 | info | checkout completed | 200 | 120 |  | shop |\n| 1792125240548309 | checkout_p3s1 | info | checkout completed | 200 | 50 |  | shop |\n";
@@ -933,8 +911,6 @@ mod tests {
         );
     }
 
-    /// D2: the real search body always has `hits: []` next to a text `data`; an
-    /// unknown format still reads "OK · <size>", not "0 rows".
     #[test]
     fn an_unknown_format_with_empty_hits_is_ok_with_size() {
         let unknown =
@@ -1024,8 +1000,6 @@ mod tests {
         );
     }
 
-    /// VE5/VE24: a reused id with a different query is a different item; each
-    /// entry numbers by its own item's first citation.
     #[test]
     fn a_reused_id_with_another_query_numbers_by_its_own_first_citation() {
         let ledger = ledger_of(&[
@@ -1094,8 +1068,6 @@ mod tests {
         );
     }
 
-    /// VE5/VE24: the same id, tool and query on a later call keeps the first seq;
-    /// an `o2_` prefix and whitespace do not make it a new item.
     #[test]
     fn the_same_item_reused_keeps_one_first_seq() {
         let ledger = ledger_of(&[

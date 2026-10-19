@@ -90,25 +90,11 @@ describe("useRcaTrigger (RR-33)", () => {
     awsConfig.isCloud = "false";
   });
 
-  it("sends one POST with the given params and returns the run id", async () => {
-    triggerRca.mockResolvedValue({ data: { message: "started", run_id: "run-1" } } as never);
-
-    const result = await useRcaTrigger().requestRca("org", "inc-1", { reanalysis: true });
-
-    expect(triggerRca).toHaveBeenCalledTimes(1);
-    expect(triggerRca).toHaveBeenCalledWith(
-      "org",
-      "inc-1",
-      { reanalysis: true },
-      { signal: undefined },
-    );
-    expect(result).toMatchObject({ status: "started", runId: "run-1" });
-  });
 
   it("non-Cloud 412 returns the server message and never prompts", async () => {
     triggerRca.mockRejectedValue(httpError(412, { message: "AI SRE is not configured" }));
 
-    const result = await useRcaTrigger().requestRca("org", "inc-1", { reanalysis: true });
+    const result = await useRcaTrigger().requestRca("org", "inc-1", {});
 
     expect(result).toEqual({ status: "unavailable", message: "AI SRE is not configured" });
     expect(promptForConsent).not.toHaveBeenCalled();
@@ -144,7 +130,7 @@ describe("useRcaTrigger (RR-33)", () => {
     const result = await useRcaTrigger().requestRca(
       "org",
       "inc-1",
-      { reanalysis: true },
+      {},
       { onConsentRequired },
     );
 
@@ -165,7 +151,7 @@ describe("useRcaTrigger (RR-33)", () => {
       .mockRejectedValueOnce(httpError(412, CONSENT_BODY))
       .mockResolvedValueOnce({ data: { run_id: "run-2" } } as never);
     promptForConsent.mockResolvedValue(true);
-    const params = { reanalysis: true, build_on_previous: false, guidance: "Check the pool" };
+    const params = { build_on_previous: false, guidance: "Check the pool" };
 
     await useRcaTrigger().requestRca("org", "inc-1", params);
 

@@ -249,29 +249,10 @@ pub async fn update_incident(
             .await
             {
                 Ok(incident) => {
-                    // A live run blocks a new one (RR-9, RR-10); read from the run summary.
-                    let in_flight =
-                        match infra::table::alert_incidents::get(&org_id, &incident_id).await {
-                            Ok(Some(row)) => row
-                                .rca_state
-                                .as_deref()
-                                .and_then(|s| {
-                                    s.parse::<config::meta::alerts::rca_runs::RunState>().ok()
-                                })
-                                .is_some_and(|state| {
-                                    config::meta::alerts::rca_runs::is_live_blocking(
-                                        state,
-                                        row.rca_updated_at
-                                            .or(row.rca_started_at)
-                                            .unwrap_or_default(),
-                                        config::utils::time::now_micros(),
-                                        o2_enterprise::enterprise::common::config::get_config()
-                                            .incidents
-                                            .rca_timeout_secs,
-                                    )
-                                }),
-                            _ => false,
-                        };
+                    let in_flight = incident
+                        .rca
+                        .as_ref()
+                        .is_some_and(|rca| rca.state.is_live() && !rca.stale);
                     MetaHttpResponse::json(UpdateSeverityResponse {
                         incident,
                         analysis_in_flight: in_flight,
@@ -460,11 +441,7 @@ pub struct RcaThreadQuery {
 /// Query parameters for RCA trigger
 #[derive(Debug, Deserialize, IntoParams, ToSchema)]
 pub struct TriggerRcaQuery {
-    /// Accepted for compatibility; every run starts in the background and answers 202.
-    #[serde(default)]
-    pub reanalysis: bool,
-    /// Feed the previous report to the agent so it builds on it instead of starting
-    /// from scratch (default: false — each run is a fresh, independent analysis).
+    /// Include the previous report; default false keeps the new investigation fresh.
     #[serde(default)]
     pub build_on_previous: bool,
 }
@@ -498,7 +475,7 @@ pub struct TriggerRcaQuery {
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"})),
-        ("x-o2-mcp" = json!({"description": "Manually trigger incident RCA", "category": "alerts"}))
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 pub async fn trigger_incident_rca(
@@ -508,8 +485,6 @@ pub async fn trigger_incident_rca(
     body: axum::body::Bytes,
 ) -> Response {
     use config::meta::alerts::rca_runs::{RunMode, RunTrigger};
-    #[cfg(feature = "cloud")]
-    use o2_enterprise::enterprise::alerts::rca_service;
     use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
     use openobserve_core::alerts::rca_runs;
 
@@ -554,17 +529,14 @@ pub async fn trigger_incident_rca(
             .unwrap();
     }
 
-    // Validate the incident before consuming quota or starting a run. Existence check
-    // only: the builder below re-derives the context, so read the one row rather than hydrating
-    // every alert on the incident.
+    // Validate existence before quota; the context builder hydrates the incident later.
     match infra::table::alert_incidents::get(&org_id, &incident_id).await {
         Ok(Some(_)) => {}
         Ok(None) => return MetaHttpResponse::not_found("Incident not found"),
         Err(e) => return MetaHttpResponse::internal_error(e),
     }
 
-    // A first analysis is `manual`; once a run has completed, any further one is a
-    // `reanalyze` (RR-7). The Cloud usage feature follows the same predicate.
+    // RR-7: completed history determines both trigger type and Cloud usage feature.
     let has_completed_run =
         match infra::table::rca_runs::newest_completed_for_incident(&org_id, &incident_id).await {
             Ok(run) => run.is_some(),
@@ -576,9 +548,7 @@ pub async fn trigger_incident_rca(
         RunTrigger::Manual
     };
 
-    // Cloud: refuse a request that cannot be paid for, without metering it. Usage is
-    // metered only right before the agent is called, so a refused start or an earlier
-    // failure never costs a credit (precheck → start → authorize, as `chat_stream` does).
+    // Precheck → start CAS → authorize avoids charging a rejected duplicate start.
     #[cfg(feature = "cloud")]
     let (usage_feature, usage_context) = {
         let feature = if has_completed_run {
@@ -600,8 +570,7 @@ pub async fn trigger_incident_rca(
         (feature, usage_context)
     };
 
-    // Start the run. The start transaction is the in-flight guard (RR-5, RR-9) and
-    // appends the Begin event; user-started runs skip the cooldown (RR-8).
+    // User starts skip cooldown; the transaction owns the in-flight guard and Begin event.
     let run_id = match rca_runs::start_run(rca_runs::StartRun {
         org_id: org_id.clone(),
         subject: rca_runs::RunSubject::Incident(incident_id.clone()),
@@ -628,42 +597,22 @@ pub async fn trigger_incident_rca(
         }
     };
 
-    // The run is started, so the rest runs in its own task: a client that disconnects
-    // drops only this wait, and the task still ends the run (RR-13). The task returns once
-    // the investigation turn is spawned; the turn's finalizer ends the run (TH12, TH13).
+    // RR-13: detached launch must terminate the persisted run even if the request disconnects.
     let task = tokio::spawn(async move {
         // Meter usage only now, after the start: a refused start never costs a credit.
         #[cfg(feature = "cloud")]
-        let usage_permit = match openobserve_core::trial_quota::authorize_ai_usage(
+        let usage_permit = match authorize_started_rca(
             &org_id,
+            &incident_id,
+            &run_id,
+            trigger,
             usage_feature,
             &usage_context,
         )
         .await
         {
             Ok(permit) => Some(permit),
-            Err(error) => {
-                match rca_runs::fail_run(
-                    &org_id,
-                    &run_id,
-                    trigger,
-                    rca_runs::ERROR_USAGE_DENIED,
-                    rca_runs::USAGE_DENIED_REASON,
-                    Some(error.to_string()),
-                )
-                .await
-                {
-                    // A run that ended delivers no verdict, so it frees the page it held.
-                    Ok(true) => {
-                        rca_service::skip_analysis_for_incident(&org_id, &incident_id).await
-                    }
-                    Ok(false) => {}
-                    Err(e) => {
-                        log::error!("[INCIDENTS::RCA] Failed to end run {run_id} as failed: {e}")
-                    }
-                }
-                return crate::request::ai::chat::ai_authorization_error_response(error);
-            }
+            Err(response) => return response,
         };
         #[cfg(not(feature = "cloud"))]
         let usage_permit = None;
@@ -694,6 +643,48 @@ pub async fn trigger_incident_rca(
     }
 }
 
+#[cfg(feature = "cloud")]
+async fn authorize_started_rca(
+    org_id: &str,
+    incident_id: &str,
+    run_id: &str,
+    trigger: config::meta::alerts::rca_runs::RunTrigger,
+    feature: openobserve_core::trial_quota::TrialQuotaFeature,
+    context: &openobserve_core::trial_quota::AiUsageContext,
+) -> Result<openobserve_core::trial_quota::AiUsagePermit, Response> {
+    use openobserve_core::alerts::rca_runs;
+    match openobserve_core::trial_quota::authorize_ai_usage(org_id, feature, context).await {
+        Ok(permit) => Ok(permit),
+        Err(error) => {
+            match rca_runs::fail_run(
+                org_id,
+                run_id,
+                trigger,
+                rca_runs::ERROR_USAGE_DENIED,
+                rca_runs::USAGE_DENIED_REASON,
+                Some(error.to_string()),
+            )
+            .await
+            {
+                Ok(true) => {
+                    o2_enterprise::enterprise::alerts::rca_service::skip_analysis_for_incident(
+                        org_id,
+                        incident_id,
+                    )
+                    .await
+                }
+                Ok(false) => {}
+                Err(error) => {
+                    log::error!("[INCIDENTS::RCA] cannot end unauthorized run {run_id}: {error}")
+                }
+            }
+            Err(crate::request::ai::chat::ai_authorization_error_response(
+                error,
+            ))
+        }
+    }
+}
+
 /// `202 {message, run_id}`: the run is started and its turn spawned (TH13).
 #[cfg(feature = "enterprise")]
 fn rca_started_response(run_id: String) -> Response {
@@ -707,9 +698,7 @@ fn rca_started_response(run_id: String) -> Response {
     )
 }
 
-/// The answer for a run whose turn could not start; the run is already failed with the code.
-/// The body carries fixed messages only: the details (agent URL, upstream errors) go to the
-/// log.
+/// Return fixed start-error messages; keep redacted diagnostic details on the run.
 #[cfg(feature = "enterprise")]
 fn rca_turn_error_response(error: &openobserve_core::alerts::rca_turn::RcaTurnError) -> Response {
     use axum::http::StatusCode;
@@ -775,15 +764,14 @@ fn json_status_response(status: axum::http::StatusCode, body: serde_json::Value)
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"})),
-        ("x-o2-mcp" = json!({"description": "Cancel a running incident RCA", "category": "alerts"}))
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 pub async fn cancel_incident_rca(
     Path((org_id, incident_id)): Path<(String, String)>,
     Headers(user_email): Headers<UserEmail>,
 ) -> Response {
-    // The live-run check lives inside cancel_rca_run, in the same compare-and-set that ends
-    // the run, so a run started meanwhile is never cancelled in its place (RR-19, TH41).
+    // Cancel's atomic guard prevents cancelling a replacement run.
     match openobserve_core::alerts::rca_turn::cancel_rca_run(
         &org_id,
         &incident_id,
@@ -810,7 +798,7 @@ pub async fn cancel_incident_rca(
     tag = "Incidents",
     operation_id = "ListIncidentRcaRuns",
     summary = "List the analysis runs of an incident",
-    description = "Returns the incident's analysis runs, newest first, without report text. Page with `before` set to the last run id of the previous page.",
+    description = "Returns the incident's analysis runs, newest first, without report text. Page with `before` set to the last run id of the previous page. Reports from before analysis runs existed follow on the last page with `report_format: v1`.",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
@@ -824,38 +812,55 @@ pub async fn cancel_incident_rca(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"})),
-        ("x-o2-mcp" = json!({"description": "List past incident RCA runs", "category": "alerts"}))
+        ("x-o2-mcp" = json!({"enabled": true, "description": "List past incident RCA runs", "category": "alerts"}))
     )
 )]
 pub async fn list_incident_rca_runs(
     Path((org_id, incident_id)): Path<(String, String)>,
     Query(query): Query<ListRcaRunsQuery>,
 ) -> Response {
-    match infra::table::alert_incidents::get(&org_id, &incident_id).await {
-        Ok(Some(_)) => {}
+    let incident = match infra::table::alert_incidents::get(&org_id, &incident_id).await {
+        Ok(Some(incident)) => incident,
         Ok(None) => return MetaHttpResponse::not_found("Incident not found"),
         Err(e) => return MetaHttpResponse::internal_error(e),
-    }
+    };
     let limit = query
         .limit
         .unwrap_or(RCA_RUNS_DEFAULT_LIMIT)
         .clamp(1, RCA_RUNS_MAX_LIMIT);
-    match infra::table::rca_runs::list_for_incident(
-        &org_id,
-        &incident_id,
-        limit,
-        query.before.as_deref(),
-    )
-    .await
-    {
-        Ok((runs, has_more)) => {
-            MetaHttpResponse::json(config::meta::alerts::rca_runs::ListRcaRunsResponse {
-                runs: runs.iter().map(infra::table::rca_runs::to_item).collect(),
+    let before = query.before.as_deref();
+    let v1_cursor = before.filter(|id| config::meta::alerts::rca_runs::is_v1_run_id(id));
+    let (mut runs, mut has_more) = if v1_cursor.is_some() {
+        (Vec::new(), false)
+    } else {
+        match infra::table::rca_runs::list_for_incident(&org_id, &incident_id, limit, before).await
+        {
+            Ok((runs, has_more)) => (
+                runs.iter()
+                    .map(infra::table::rca_runs::to_item)
+                    .collect::<Vec<_>>(),
                 has_more,
-            })
+            ),
+            Err(e) => return MetaHttpResponse::internal_error(e),
         }
-        Err(e) => MetaHttpResponse::internal_error(e),
+    };
+    if !has_more {
+        let v1 = match openobserve_core::alerts::rca_runs::v1_reports_of(&org_id, &incident).await {
+            Ok(v1) => v1,
+            Err(e) => return MetaHttpResponse::internal_error(e),
+        };
+        // A v1 cursor continues among the v1 reports, which are already newest first.
+        let mut rest = v1
+            .iter()
+            .skip_while(|report| v1_cursor.is_some_and(|id| report.run_id != id))
+            .skip(usize::from(v1_cursor.is_some()));
+        let room = usize::try_from(limit)
+            .unwrap_or(usize::MAX)
+            .saturating_sub(runs.len());
+        runs.extend(rest.by_ref().take(room).map(|report| report.item()));
+        has_more = rest.next().is_some();
     }
+    MetaHttpResponse::json(config::meta::alerts::rca_runs::ListRcaRunsResponse { runs, has_more })
 }
 
 #[cfg(feature = "enterprise")]
@@ -881,11 +886,21 @@ pub async fn list_incident_rca_runs(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": false})),
     )
 )]
 pub async fn get_incident_rca_run(
     Path((org_id, incident_id, run_id)): Path<(String, String, String)>,
 ) -> Response {
+    if config::meta::alerts::rca_runs::is_v1_run_id(&run_id) {
+        return match openobserve_core::alerts::rca_runs::v1_run(&org_id, &incident_id, &run_id)
+            .await
+        {
+            Ok(Some(run)) => MetaHttpResponse::json(run),
+            Ok(None) => MetaHttpResponse::not_found("Run not found"),
+            Err(e) => MetaHttpResponse::internal_error(e),
+        };
+    }
     match infra::table::rca_runs::get(&org_id, &run_id).await {
         Ok(Some(run)) if run.incident_id.as_deref() == Some(incident_id.as_str()) => {
             MetaHttpResponse::json(infra::table::rca_runs::to_run(run))
@@ -921,6 +936,7 @@ pub async fn get_incident_rca_run(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": false})),
     )
 )]
 pub async fn get_incident_rca_thread(
@@ -1030,8 +1046,7 @@ pub struct TriggerRcaBody {
     pub guidance: Option<String>,
 }
 
-/// Body of `POST …/rca/runs/{run_id}/steer` (§9.1). The author is the authenticated user,
-/// so the body has no author field and any unknown field is refused (SG11).
+/// SG11: derive author from authentication and reject unknown body fields.
 #[derive(Debug, Deserialize, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct SteerRequestBody {
@@ -1076,8 +1091,7 @@ fn rca_error_response(
 }
 
 #[cfg(feature = "enterprise")]
-/// A steering error as a response; a server error answers `server_message` and logs the
-/// cause.
+/// Expose the fixed message and log the internal cause.
 fn steer_error_response(
     error: &openobserve_core::alerts::rca_steering::SteerError,
     server_message: &str,
@@ -1124,6 +1138,7 @@ fn steer_error_response(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false})),
     )
 )]
 pub async fn steer_incident_rca_run(
@@ -1134,8 +1149,7 @@ pub async fn steer_incident_rca_run(
     use axum::http::StatusCode;
     use openobserve_core::alerts::rca_steering;
 
-    // Parsed here, not by the `Json` extractor, so an unknown field (an author) is a 400
-    // like every other invalid body (SG11).
+    // SG11: use 400 for malformed bodies, including forged author fields.
     let body: SteerRequestBody = match serde_json::from_slice(&body) {
         Ok(body) => body,
         Err(e) => {
@@ -1148,8 +1162,7 @@ pub async fn steer_incident_rca_run(
         }
     };
 
-    // The permission of starting an analysis (SG7). The route middleware checks the
-    // OpenFGA part; this also covers the RCA flags.
+    // SG7: OpenFGA middleware and RCA feature flags both gate writes.
     if !crate::request::ai::chat::can_run_incident_rca(&org_id, &user_email.user_id, &incident_id)
         .await
     {
@@ -1210,6 +1223,7 @@ pub async fn steer_incident_rca_run(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": false})),
     )
 )]
 pub async fn get_incident_rca_steering(
@@ -1227,8 +1241,7 @@ pub async fn get_incident_rca_steering(
     }
 }
 
-/// The incident's run for a feedback route: 404 for an unknown run or a run of another
-/// incident.
+/// Unknown runs and runs owned by another incident both return 404.
 #[cfg(feature = "enterprise")]
 async fn incident_run(
     org_id: &str,
@@ -1247,8 +1260,7 @@ async fn incident_run(
     }
 }
 
-/// The write permission of the feedback routes: that of starting an analysis (J2). 404 for
-/// an unknown incident, 403 otherwise.
+/// J2: feedback writes require RCA permission; unknown incidents return 404.
 #[cfg(feature = "enterprise")]
 async fn require_rca_permission(
     org_id: &str,
@@ -1312,6 +1324,7 @@ fn is_rateable(run: &infra::table::rca_runs::Model) -> bool {
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false})),
     )
 )]
 pub async fn put_incident_rca_feedback(
@@ -1323,8 +1336,7 @@ pub async fn put_incident_rca_feedback(
     use config::meta::alerts::rca_feedback::{PutRcaFeedbackRequest, bare_subject_id};
     use infra::table::rca_feedback;
 
-    // Parsed here, not by the `Json` extractor, so an unknown field is a 400 like every
-    // other invalid body.
+    // Keep unknown-field errors consistent with other invalid bodies.
     let request: PutRcaFeedbackRequest = match serde_json::from_slice(&body) {
         Ok(request) => request,
         Err(e) => {
@@ -1436,6 +1448,7 @@ pub async fn put_incident_rca_feedback(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": false})),
     )
 )]
 pub async fn get_incident_rca_feedback(
@@ -1488,6 +1501,7 @@ pub async fn get_incident_rca_feedback(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false})),
     )
 )]
 pub async fn delete_incident_rca_feedback(
@@ -1545,6 +1559,7 @@ pub async fn delete_incident_rca_feedback(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false})),
     )
 )]
 pub async fn resume_incident_rca_run(
@@ -1568,8 +1583,7 @@ pub async fn resume_incident_rca_run(
     response
 }
 
-/// [resume_incident_rca_run] without the metric: the steps of `trigger_incident_rca` with
-/// the J7 checks and the fork seed (precheck → prepare → start → authorize → launch).
+/// J7: precheck → prepare → start → authorize → launch; the caller owns metrics.
 #[cfg(feature = "enterprise")]
 async fn resume_run(
     org_id: String,
@@ -1592,9 +1606,6 @@ async fn resume_run(
         );
     }
 
-    // Cloud: a resume is a new run, metered as `IncidentReAnalysis` (the feature
-    // `trigger_rca_for_incident` checks the permit against for `RunTrigger::Resume`); refuse
-    // what cannot be paid for before any work, meter only right before the agent is called.
     #[cfg(feature = "cloud")]
     if let Err(error) = openobserve_core::trial_quota::precheck_ai_usage(
         &org_id,
@@ -1672,8 +1683,6 @@ async fn start_resumed_run(
 ) -> Response {
     use axum::http::StatusCode;
     use config::meta::alerts::rca_runs::RunTrigger;
-    #[cfg(feature = "cloud")]
-    use o2_enterprise::enterprise::alerts::rca_service;
     use openobserve_core::alerts::rca_runs;
 
     #[cfg(feature = "cloud")]
@@ -1686,9 +1695,7 @@ async fn start_resumed_run(
         },
     );
 
-    // The start transaction is the in-flight guard and appends the Begin event. The
-    // lineage is stored with the row, so a resume that fails at any later point leaves
-    // its source resumable (M1).
+    // The start transaction is the in-flight guard and appends the Begin event.
     let new_run_id = match rca_runs::start_run(rca_runs::StartRun {
         org_id: org_id.clone(),
         subject: rca_runs::RunSubject::Incident(incident_id.clone()),
@@ -1724,39 +1731,20 @@ async fn start_resumed_run(
         from_step: seed.from_step.clone(),
     };
 
-    // The run is started, so the rest runs in its own task: a client that disconnects drops
-    // only this wait, and the task still ends the run.
     let task = tokio::spawn(async move {
         #[cfg(feature = "cloud")]
-        let usage_permit = match openobserve_core::trial_quota::authorize_ai_usage(
+        let usage_permit = match authorize_started_rca(
             &org_id,
+            &incident_id,
+            &new_run_id,
+            RunTrigger::Resume,
             usage_feature,
             &usage_context,
         )
         .await
         {
             Ok(permit) => Some(permit),
-            Err(error) => {
-                match rca_runs::fail_run(
-                    &org_id,
-                    &new_run_id,
-                    RunTrigger::Resume,
-                    rca_runs::ERROR_USAGE_DENIED,
-                    rca_runs::USAGE_DENIED_REASON,
-                    Some(error.to_string()),
-                )
-                .await
-                {
-                    Ok(true) => {
-                        rca_service::skip_analysis_for_incident(&org_id, &incident_id).await
-                    }
-                    Ok(false) => {}
-                    Err(e) => log::error!(
-                        "[INCIDENTS::RCA] Failed to end run {new_run_id} as failed: {e}"
-                    ),
-                }
-                return crate::request::ai::chat::ai_authorization_error_response(error);
-            }
+            Err(response) => return response,
         };
         #[cfg(not(feature = "cloud"))]
         let usage_permit = None;
@@ -1790,10 +1778,7 @@ async fn start_resumed_run(
     }
 }
 
-/// The answer for a thread whose committed events could not be read. A partial thread is
-/// never presented as whole. An ended run's history never grows again, so a missing or
-/// bad event there is final (410 `transcript_incomplete`), not worth a retry; anything
-/// else, or a live run, is 503 `history_unavailable`.
+/// The answer for a thread whose committed events could not be read.
 #[cfg(feature = "enterprise")]
 fn read_error_response(
     run_id: &str,
@@ -1861,6 +1846,7 @@ fn read_error_response(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": false})),
     )
 )]
 pub async fn get_incident_rca_summary(
@@ -2088,6 +2074,7 @@ fn partial_summary(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false})),
     )
 )]
 pub async fn run_incident_rca_backtest(
@@ -2213,7 +2200,7 @@ pub struct CommentRequest {
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"})),
-        ("x-o2-mcp" = json!({"description": "Manually trigger incident RCA", "category": "alerts"}))
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 pub async fn trigger_incident_rca(_path: Path<(String, String)>) -> Response {
@@ -2381,7 +2368,7 @@ pub async fn update_incident(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"})),
-        ("x-o2-mcp" = json!({"description": "Cancel a running incident RCA", "category": "alerts"}))
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 pub async fn cancel_incident_rca(
@@ -2411,7 +2398,7 @@ pub async fn cancel_incident_rca(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"})),
-        ("x-o2-mcp" = json!({"description": "List past incident RCA runs", "category": "alerts"}))
+        ("x-o2-mcp" = json!({"enabled": true, "description": "List past incident RCA runs", "category": "alerts"}))
     )
 )]
 pub async fn list_incident_rca_runs(
@@ -2441,6 +2428,7 @@ pub async fn list_incident_rca_runs(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": false})),
     )
 )]
 pub async fn get_incident_rca_run(_path: Path<(String, String, String)>) -> Response {
@@ -2468,6 +2456,7 @@ pub async fn get_incident_rca_run(_path: Path<(String, String, String)>) -> Resp
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": false})),
     )
 )]
 pub async fn get_incident_rca_thread(
@@ -2498,6 +2487,7 @@ pub async fn get_incident_rca_thread(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": false})),
     )
 )]
 pub async fn get_incident_rca_summary(
@@ -2528,6 +2518,7 @@ pub async fn get_incident_rca_summary(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false})),
     )
 )]
 pub async fn steer_incident_rca_run(
@@ -2557,6 +2548,7 @@ pub async fn steer_incident_rca_run(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": false})),
     )
 )]
 pub async fn get_incident_rca_steering(
@@ -2587,6 +2579,7 @@ pub async fn get_incident_rca_steering(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false})),
     )
 )]
 pub async fn put_incident_rca_feedback(
@@ -2617,6 +2610,7 @@ pub async fn put_incident_rca_feedback(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": false})),
     )
 )]
 pub async fn get_incident_rca_feedback(
@@ -2646,6 +2640,7 @@ pub async fn get_incident_rca_feedback(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false})),
     )
 )]
 pub async fn delete_incident_rca_feedback(
@@ -2675,6 +2670,7 @@ pub async fn delete_incident_rca_feedback(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false})),
     )
 )]
 pub async fn resume_incident_rca_run(
@@ -2703,6 +2699,7 @@ pub async fn resume_incident_rca_run(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false})),
     )
 )]
 pub async fn run_incident_rca_backtest(
@@ -2964,7 +2961,8 @@ mod tests {
     #[test]
     fn test_list_rca_runs_query_and_response_shape() {
         use config::meta::alerts::rca_runs::{
-            ListRcaRunsResponse, RcaRunItem, RunMode, RunState, RunSubjectType, RunTrigger,
+            ListRcaRunsResponse, RcaRunItem, ReportFormat, RunMode, RunState, RunSubjectType,
+            RunTrigger,
         };
 
         let empty: ListRcaRunsQuery = serde_json::from_str("{}").unwrap();
@@ -2980,6 +2978,7 @@ mod tests {
         let json = serde_json::to_value(ListRcaRunsResponse {
             runs: vec![RcaRunItem {
                 run_id: "2abc".to_string(),
+                report_format: ReportFormat::V2,
                 subject_type: RunSubjectType::Incident,
                 trigger: RunTrigger::Reanalyze,
                 mode: RunMode::BuildOnPrevious,
@@ -3058,8 +3057,6 @@ mod tests {
         );
     }
 
-    /// TH10, TH13, D3: a turn that could not start answers with its code and a fixed
-    /// message; the error's details (internal hosts, upstream text) never reach the body.
     #[cfg(feature = "enterprise")]
     #[tokio::test]
     async fn test_a_turn_that_could_not_start_answers_with_its_code() {
@@ -3113,8 +3110,7 @@ mod tests {
         }
     }
 
-    /// The global SQLite meta store with the run and chat tables. Refuses any other store,
-    /// so a developer `.env` can never point the test at a real database.
+    /// The global SQLite meta store with the run and chat tables.
     #[cfg(feature = "enterprise")]
     async fn thread_tables() -> &'static sea_orm::DatabaseConnection {
         use infra::table::entity::{ai_chat_sessions, rca_runs};
@@ -3182,9 +3178,6 @@ mod tests {
         }
     }
 
-    /// TH30, TH31: the thread route answers 404 for a run of another incident, `transcript:
-    /// none` for a run without a session, 410 for an expired session, and `not_modified`
-    /// when the caller's version is current.
     #[cfg(feature = "enterprise")]
     #[tokio::test]
     async fn test_the_thread_route_answers_by_run_and_session() {
@@ -3327,9 +3320,6 @@ mod tests {
         );
     }
 
-    /// A record as the finalizer stores it: `h1` recorded twice (the second after a.rao's
-    /// steer `stg_1`) with one verified decisive logs item and one citation that never ran,
-    /// one blind spot, and a report with one confirmed timeline entry.
     #[cfg(feature = "enterprise")]
     fn stored_record() -> serde_json::Value {
         use config::meta::oncall::{
@@ -3411,11 +3401,6 @@ mod tests {
         serde_json::to_value(end.record).unwrap()
     }
 
-    /// 03 §12, VE42: the summary route answers 404 for a run of another incident or an
-    /// unknown run; a finished run with a record from the record, with the contract keys;
-    /// a finished run with no result or an unreadable one as legacy; `not_modified` for a
-    /// current `known_version`; a live run without a session with an empty live summary; a
-    /// live run whose session is gone with 410, unless its turn never started.
     #[cfg(feature = "enterprise")]
     #[tokio::test]
     async fn test_the_summary_route_answers_by_run_record_and_session() {
@@ -3496,8 +3481,6 @@ mod tests {
         let (status, _) = status_and_body(read("inc_1", "run_unknown", None).await).await;
         assert_eq!(status, StatusCode::NOT_FOUND, "an unknown run");
 
-        // A finished run with a record: the summary comes from the record, whatever
-        // happened to its transcript.
         let (status, body) = status_and_body(read("inc_1", "run_recorded", None).await).await;
         assert_eq!(status, StatusCode::OK);
         assert_eq!(body["run_id"], "run_recorded");
@@ -3608,9 +3591,6 @@ mod tests {
         );
     }
 
-    /// VE34, 03 §12: a failed or cancelled run whose partial record is not stored yet is
-    /// read from its session, versioned like a live run; with no session row or no session
-    /// id it is legacy. A completed run without a result is legacy even with a session.
     #[cfg(feature = "enterprise")]
     #[tokio::test]
     async fn test_an_ended_run_without_its_record_reads_its_session() {
@@ -3717,9 +3697,6 @@ mod tests {
         }
     }
 
-    /// VE34, VE16: the summary of an ended run built from its transcript is the partial
-    /// record: the hypotheses (testing left as untested), the evidence and the `run_end`
-    /// blind spot, with no outcome or band; not legacy.
     #[cfg(feature = "enterprise")]
     #[test]
     fn test_the_partial_summary_is_the_partial_record_of_the_transcript() {
@@ -3812,9 +3789,6 @@ mod tests {
         assert_eq!(run_end["fix"], "resume_run");
     }
 
-    /// TH30, D5: an ended run whose committed history has a gap, a divergence or a corrupt
-    /// event answers 410 `transcript_incomplete`; any other read error, or a live run,
-    /// answers 503 `history_unavailable`.
     #[cfg(feature = "enterprise")]
     #[tokio::test]
     async fn test_a_failed_thread_read_maps_by_run_state_and_error() {
@@ -3863,18 +3837,12 @@ mod tests {
         }
     }
 
-    /// Passes the steer route's permission: the RCA flags are on and a root user passes
-    /// `check_permissions` (SG7).
     #[cfg(feature = "enterprise")]
     const STEER_ROOT: &str = "root@steering.incidents.test";
     /// Fails it while the incident exists: `check_permissions` finds no user record (SG7).
     #[cfg(feature = "enterprise")]
     const STEER_READER: &str = "reader@steering.incidents.test";
 
-    /// The SQLite meta store with the incident, run, steering and chat tables, incident
-    /// analysis switched on with an agent URL that refuses connections, and [STEER_ROOT] as a
-    /// root user. No agent client is initialized, so every relay ends `rejected` with
-    /// `agent_unreachable`, the answer of a node that cannot reach the agent (SG17).
     #[cfg(feature = "enterprise")]
     async fn steering_tables() -> &'static sea_orm::DatabaseConnection {
         use infra::table::entity::{
@@ -3886,8 +3854,6 @@ mod tests {
         static TABLES: tokio::sync::OnceCell<()> = tokio::sync::OnceCell::const_new();
         TABLES
             .get_or_init(|| async {
-                // SAFETY: set once, inside the `OnceCell` initializer, before the refresh
-                // reads them.
                 unsafe {
                     std::env::set_var("O2_INCIDENTS_ENABLED", "true");
                     std::env::set_var("O2_INCIDENTS_RCA_ENABLED", "true");
@@ -3935,6 +3901,129 @@ mod tests {
         infra::db::get_orm_client_rw().await
     }
 
+    #[cfg(feature = "cloud")]
+    #[tokio::test]
+    async fn cloud_manual_and_resume_refusal_after_start_releases_the_page_without_usage() {
+        use config::meta::{
+            alerts::rca_runs::{RunMode, RunTrigger},
+            oncall::{AnalysisStatus, ResponderRole, SubjectRef, SubjectType},
+            triggers::{Trigger, TriggerModule, TriggerStatus},
+        };
+        use infra::table::entity::{oncall_responses, trial_quota_usage};
+        use o2_enterprise::enterprise::oncall::escalation::EscalationTriggerData;
+        use openobserve_core::{alerts::rca_runs, trial_quota};
+        use sea_orm::{ConnectionTrait, Schema};
+        let db = steering_tables().await;
+        db.execute_unprepared(
+            "CREATE TABLE IF NOT EXISTS customer_billings (
+                id TEXT PRIMARY KEY, email TEXT NOT NULL, org_id TEXT NOT NULL,
+                customer_id TEXT, subscription_id TEXT, subscription_type SMALLINT NOT NULL,
+                session_id TEXT, metering_offset BIGINT NOT NULL, provider TEXT NOT NULL,
+                end_date BIGINT, expiry_notified_stage SMALLINT
+            )",
+        )
+        .await
+        .unwrap();
+        let backend = db.get_database_backend();
+        let schema = Schema::new(backend);
+        for mut table in [
+            schema.create_table_from_entity(oncall_responses::Entity),
+            schema.create_table_from_entity(trial_quota_usage::Entity),
+        ] {
+            db.execute(backend.build(table.if_not_exists()))
+                .await
+                .unwrap();
+        }
+        for trigger in [RunTrigger::Manual, RunTrigger::Resume] {
+            let org = steering_org("cloud-refusal");
+            let incident = sid(&org, "incident");
+            steering_incident(db, &org, "incident", None).await;
+            let feature = if trigger == RunTrigger::Manual {
+                trial_quota::TrialQuotaFeature::NewIncident
+            } else {
+                trial_quota::TrialQuotaFeature::IncidentReAnalysis
+            };
+            trial_quota::set_limit(&org, 100).await.unwrap();
+            trial_quota::precheck_ai_usage(&org, feature, STEER_ROOT)
+                .await
+                .unwrap();
+            let started = rca_runs::start_run(rca_runs::StartRun {
+                org_id: org.clone(),
+                subject: rca_runs::RunSubject::Incident(incident.clone()),
+                trigger,
+                mode: RunMode::Fresh,
+                started_by: STEER_ROOT.to_string(),
+                guidance: None,
+                skip_cooldown: true,
+                oncall_subjects: None,
+                context_used: None,
+            })
+            .await
+            .unwrap();
+            let rca_runs::StartOutcome::Started { run_id } = started else {
+                panic!("{started:?}")
+            };
+            let subject = SubjectRef::new(SubjectType::Incident, &incident, 1);
+            let record = infra::table::oncall_responses::open(
+                &org,
+                &subject,
+                None,
+                2,
+                None,
+                ResponderRole::Owner,
+                None,
+            )
+            .await
+            .unwrap();
+            let mut hold = EscalationTriggerData::none();
+            hold.analysis.status = AnalysisStatus::Pending;
+            infra::scheduler::push(Trigger {
+                org: org.clone(),
+                module: TriggerModule::OncallEscalation,
+                module_key: record.id.clone(),
+                next_run_at: config::utils::time::now_micros() + 3_600_000_000,
+                status: TriggerStatus::Waiting,
+                data: hold.write(),
+                ..Default::default()
+            })
+            .await
+            .unwrap();
+            trial_quota::set_limit(&org, 0).await.unwrap();
+            let response = authorize_started_rca(
+                &org,
+                &incident,
+                &run_id,
+                trigger,
+                feature,
+                &trial_quota::AiUsageContext {
+                    user_email: STEER_ROOT.to_string(),
+                    incident_id: Some(incident.clone()),
+                    ..Default::default()
+                },
+            )
+            .await
+            .err()
+            .expect("billing refuses after the successful precheck");
+            assert_eq!(response.status(), axum::http::StatusCode::PAYMENT_REQUIRED);
+            let run = infra::table::rca_runs::get_rw(&org, &run_id)
+                .await
+                .unwrap()
+                .unwrap();
+            assert_eq!(run.state, "failed");
+            assert_eq!(run.error.as_ref().unwrap()["code"], "usage_denied");
+            assert!(run.ended_at.is_some());
+            assert_eq!(trial_quota::get_used(&org), 0);
+            let scheduled =
+                infra::scheduler::get(&org, TriggerModule::OncallEscalation, &record.id)
+                    .await
+                    .unwrap();
+            assert_eq!(
+                EscalationTriggerData::read(&scheduled.data).analysis.status,
+                AnalysisStatus::Skipped
+            );
+        }
+    }
+
     /// A fresh org name for one test.
     #[cfg(feature = "enterprise")]
     fn steering_org(prefix: &str) -> String {
@@ -3944,8 +4033,7 @@ mod tests {
         )
     }
 
-    /// Incident and run ids are primary keys across orgs: each test's names are scoped to its
-    /// org.
+    /// Incident and run ids are primary keys across orgs: each test's names are scoped to its org.
     #[cfg(feature = "enterprise")]
     fn sid(org_id: &str, name: &str) -> String {
         format!("{name}.{org_id}")
@@ -4081,9 +4169,6 @@ mod tests {
             .unwrap()
     }
 
-    /// §9.1: a message to the incident's live run is saved and answered 201 `{steer,
-    /// run_state}`; the author is the caller and the text is trimmed. Without a reachable
-    /// agent the row is `rejected` (`agent_unreachable`) and still a 201.
     #[cfg(feature = "enterprise")]
     #[tokio::test]
     async fn test_a_steer_to_a_live_run_answers_201_with_the_row_and_run_state() {
@@ -4145,13 +4230,6 @@ mod tests {
         );
     }
 
-    /// SG8, SG11, SG31: an author field, an unknown field or a body that does not parse is
-    /// 400 `invalid_body`; a blank text or 2,001 characters `invalid_text` (counted in
-    /// Unicode scalar values: 2,000 two-byte characters pass); `kind` other than `message` or
-    /// `hypothesis_action` (the server's own `answer` and `guidance` too) `invalid_kind`; a
-    /// message with an action, or a hypothesis action without a valid action or hypothesis,
-    /// `invalid_action`; a hypothesis the run's ledger lacks `unknown_hypothesis`. A refused
-    /// body inserts no row.
     #[cfg(feature = "enterprise")]
     #[tokio::test]
     async fn test_an_invalid_steer_body_is_400_with_its_code() {
@@ -4225,9 +4303,6 @@ mod tests {
         );
     }
 
-    /// SG7: a user who can read the incident but cannot start its analysis gets 403 and no
-    /// row; an unknown incident is 404 for anyone, and an unknown run (or another incident's
-    /// run) 404 for a user who may steer.
     #[cfg(feature = "enterprise")]
     #[tokio::test]
     async fn test_steering_needs_the_rca_permission_and_a_known_run() {
@@ -4259,10 +4334,6 @@ mod tests {
         assert!(steer_rows(&org, "run_live").await.is_empty());
     }
 
-    /// SG9: only the incident's latest run, `running` or `waiting_input`, with no closed
-    /// answer deadline takes messages. A completed run and an older live run are 409
-    /// `run_not_steerable`, a run past its answer deadline 409 `run_closing`, and none of them
-    /// gets a row.
     #[cfg(feature = "enterprise")]
     #[tokio::test]
     async fn test_a_run_that_takes_no_messages_is_409_and_gets_no_row() {
@@ -4308,9 +4379,6 @@ mod tests {
         }
     }
 
-    /// SG10: one author sends one message each 5 seconds; a second message 1 second later is
-    /// 429 `rate_limited` with `retry_after_secs` of 4 or 5, the same `Retry-After` header,
-    /// and no row.
     #[cfg(feature = "enterprise")]
     #[tokio::test]
     async fn test_a_second_message_within_5_seconds_is_429_with_retry_after() {
@@ -4341,10 +4409,6 @@ mod tests {
         assert_eq!(steer_rows(&org, "run_live").await.len(), 1);
     }
 
-    /// SG22, SG37, §9.2: the steering view lists the run's rows in send order with their
-    /// stored state (no transcript here, so nothing to merge), `open_question: null` without
-    /// one, and `can_steer` only for a user with the RCA permission on a steerable run. A
-    /// reader without it sees the same rows and `can_steer: false`. The route writes nothing.
     #[cfg(feature = "enterprise")]
     #[tokio::test]
     async fn test_the_steering_view_lists_rows_and_who_can_steer() {
@@ -4457,10 +4521,6 @@ mod tests {
         );
     }
 
-    /// SG33: `POST …/rca` refuses blank guidance or guidance over 2,000 characters with 400
-    /// `invalid_guidance` (and a body that does not parse with `invalid_body`) before starting
-    /// a run. Valid guidance is trimmed into the new run's `guidance` and a `guidance` row of
-    /// the caller; no body starts a run with neither.
     #[cfg(feature = "enterprise")]
     #[tokio::test]
     async fn test_guidance_on_a_reanalysis_reaches_the_run_and_its_row() {
@@ -4480,7 +4540,6 @@ mod tests {
                     user_id: STEER_ROOT.to_string(),
                 }),
                 Query(TriggerRcaQuery {
-                    reanalysis: false,
                     build_on_previous: false,
                 }),
                 axum::body::Bytes::from(body),
@@ -4694,13 +4753,6 @@ mod tests {
             .get()
     }
 
-    /// J2: a body that does not parse, names an unknown field (an author too), or carries an
-    /// unknown verdict, reason or cause is 400 `invalid_body`; `change` without a cause or
-    /// with `still_unknown`, a cause or reasons on the wrong verdict, a repeated reason, more
-    /// than four reasons, or a note over 1,000 characters is 400 `invalid_feedback`. A refused
-    /// body stores nothing and counts nothing. The boundaries pass: a 1,000-character note
-    /// (Unicode scalar values, after trimming) with all four reasons, a blank note (stored
-    /// as none), `no` without reasons, `change` without a note.
     #[cfg(feature = "enterprise")]
     #[tokio::test]
     async fn test_an_invalid_feedback_body_is_400_with_its_code() {
@@ -4832,11 +4884,6 @@ mod tests {
         assert_eq!(feedback_rows(&org, "run_done").await.len(), 1);
     }
 
-    /// J2: feedback is for a run of the incident (404 for an unknown run, a run of another
-    /// incident or an unknown incident, on all three methods) that completed with a stored
-    /// record that has an outcome: a failed, cancelled, live or waiting run, a completed
-    /// run without a record (legacy), with a record whose outcome is null, or with an
-    /// unreadable record is 409 `not_rateable` and gets no row.
     #[cfg(feature = "enterprise")]
     #[tokio::test]
     async fn test_feedback_needs_a_run_of_the_incident_that_completed_with_an_outcome() {
@@ -4921,12 +4968,6 @@ mod tests {
         assert_eq!(status, StatusCode::OK, "{body}");
     }
 
-    /// J1, J2, J11: one row per run and author; a second answer replaces the first (same
-    /// `created_at`, newer `updated_at`) and the answer is the stored row. GET lists every
-    /// author's row oldest first, with the caller's own as `mine` (null for a caller without
-    /// one). DELETE answers 204 with no body, removes only the caller's row, and answers 204
-    /// again when there is nothing left to remove. Each saved answer counts once under its
-    /// verdict; deletes count nothing.
     #[cfg(feature = "enterprise")]
     #[tokio::test]
     async fn test_feedback_is_one_row_per_author_and_delete_removes_only_the_callers() {
@@ -5048,10 +5089,6 @@ mod tests {
         }
     }
 
-    /// J2: writing or removing feedback needs the RCA trigger permission: a user who can
-    /// read the incident but not start its analysis gets 403 on PUT and DELETE, and neither
-    /// writes nor removes a row (nor counts). Reading the run's feedback is the route's read
-    /// permission, so the same user gets 200.
     #[cfg(feature = "enterprise")]
     #[tokio::test]
     async fn test_feedback_writes_need_the_rca_permission() {
@@ -5103,8 +5140,6 @@ mod tests {
         assert!(view["mine"].is_null());
     }
 
-    /// J1, J3a: feedback on an alert run is keyed by the bare alert id, so a `change` is a
-    /// past-cause correction for every firing of the alert.
     #[cfg(feature = "enterprise")]
     #[tokio::test]
     async fn test_feedback_on_an_alert_run_is_keyed_by_the_bare_alert_id() {
@@ -5143,8 +5178,6 @@ mod tests {
         assert_eq!(corrections[0].cause.as_deref(), Some("dependency_failure"));
     }
 
-    /// A run of `incident_id` in `state`, with session `session` (scoped to the org) and
-    /// `error.code`.
     #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
     async fn resume_source(
         conn: &sea_orm::DatabaseConnection,
@@ -5177,8 +5210,6 @@ mod tests {
             .unwrap();
     }
 
-    /// An `sre-rca` session row (scoped to the org) with `status` and `last_committed_seq`,
-    /// and no event time range.
     #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
     fn resume_session_row(
         org_id: &str,
@@ -5263,14 +5294,6 @@ mod tests {
             .unwrap()
     }
 
-    /// J7, J11: only the incident's latest run, failed or cancelled, with a session and an
-    /// error that leaves something to reuse, is resumable. Each refusal answers its status
-    /// and code, starts no run, and counts `refused`; a 503 counts nothing. Unknown run,
-    /// another incident's run, unknown incident: 404. Completed, live, not the latest, a
-    /// `transcript_deleted` or turn-start error, no session: 409 `not_resumable`. A missing
-    /// or deleted session: 410 `transcript_expired`. No committed event: 409
-    /// `nothing_to_resume`. Committed events the reader cannot locate: 503
-    /// `history_unavailable`. Cloud prechecks billing first, so this runs without `cloud`.
     #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
     #[tokio::test]
     async fn test_a_run_that_cannot_be_resumed_answers_by_reason() {
@@ -5481,8 +5504,6 @@ mod tests {
         assert_eq!(runs_after, runs_before, "a refused resume starts no run");
     }
 
-    /// J7: each reason a run cannot be resumed answers its status and code; the 409
-    /// `not_resumable` message is the reason's, and a 503 or 500 never shows its details.
     #[cfg(feature = "enterprise")]
     #[tokio::test]
     async fn test_each_resume_refusal_maps_to_its_status_and_code() {
@@ -5539,9 +5560,6 @@ mod tests {
         }
     }
 
-    /// A seed of `source_run_id` as `prepare_resume` returns it, with no events to copy: the
-    /// launch's copy refuses an empty prefix, so the resumed run ends `resume_failed` before
-    /// any agent call.
     #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
     fn resume_seed(
         org_id: &str,
@@ -5569,12 +5587,6 @@ mod tests {
         }
     }
 
-    /// J7, J8, M1: a resume starts a new `resume` run of the incident in the source's mode,
-    /// started by the caller, that names its source in `context_used.resumed_from` before
-    /// the launch, and answers 202 `{message, run_id, resumed_from, reused_steps, from_step}`.
-    /// Its copy failing here ends it `resume_failed` and leaves the source resumable: the
-    /// next resume of the source is judged on the source's own transcript (here
-    /// `nothing_to_resume`), not refused as no longer the latest run.
     #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
     #[tokio::test]
     async fn test_a_resume_starts_a_run_that_names_its_source() {
@@ -5677,8 +5689,6 @@ mod tests {
         assert_eq!(body["error_code"], "nothing_to_resume", "{body}");
     }
 
-    /// J7: a resume while the incident has a live run answers 409 `run_in_flight` like a
-    /// second start, and starts no run.
     #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
     #[tokio::test]
     async fn test_a_resume_while_a_run_is_live_is_409_and_starts_nothing() {
@@ -5729,12 +5739,6 @@ mod tests {
         assert_eq!(incident_runs(conn, &org, "inc_1").await.len(), 2);
     }
 
-    /// J7, M1: a resumed run that fails at launch (here its copy: `resume_failed`, no
-    /// session) carries `context_used.resumed_from` from its insert: a SQLite trigger scoped
-    /// to this test's org refuses every update that changes `context_used`, so no later write
-    /// can have put it there. Its source stays resumable: the next resume of the source passes
-    /// the latest-run check and is judged on the source's own transcript, whose committed
-    /// events this test has no stream for (503 `history_unavailable`, not 409).
     #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
     #[tokio::test]
     async fn test_a_resume_that_fails_at_launch_keeps_its_lineage_and_its_source() {
@@ -5819,12 +5823,6 @@ mod tests {
         assert_eq!(body["error_code"], "history_unavailable", "{body}");
     }
 
-    /// M1 through the route: a later run hides its source only when it is something else
-    /// than a Resume of that source that failed before its first turn. A failed Resume of
-    /// the source with a turn-start error and no session leaves the source resumable (judged
-    /// on its own transcript, here `nothing_to_resume`); the same failure on a Resume of
-    /// another run, or a failed manual run, makes the source no longer the latest
-    /// (`not_resumable`).
     #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
     #[tokio::test]
     async fn test_only_a_failed_resume_of_the_source_leaves_it_resumable() {

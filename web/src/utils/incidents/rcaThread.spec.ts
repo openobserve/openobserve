@@ -21,7 +21,6 @@ import {
   formatRcaElapsed,
   isInterruptedStep,
   RCA_STAGES,
-  RCA_UNFINISHED_TOOL_ERROR,
   rcaStageLabel,
   rcaThreadEntries,
   rcaThreadPlainText,
@@ -147,7 +146,7 @@ describe("rcaThread utils", () => {
   });
 
   describe("finishedStepCount (TH40 E, m1)", () => {
-    const cut = rcaToolCall({ status: "error", error: RCA_UNFINISHED_TOOL_ERROR });
+    const cut = rcaToolCall({ status: "error", error: "Interrupted upstream", interrupted: true });
 
     it("does not count a step whose tool call the run's end cut off", () => {
       const steps = [
@@ -179,10 +178,6 @@ describe("rcaThread utils", () => {
         ),
       ).toBe(1);
     });
-
-    it("matches the projection's error text", () => {
-      expect(RCA_UNFINISHED_TOOL_ERROR).toBe("The run ended before this tool call finished");
-    });
   });
 
   it("Copy thread text has the start, step titles, notes, tool names and key args (TH38)", () => {
@@ -203,6 +198,30 @@ describe("rcaThread utils", () => {
       "2. Map the checkout dependencies · 08:53:41 UTC",
       "  - get_service_graph: checkout [Running]",
     ]);
+  });
+
+  it("keeps missing timestamps last and omits absent time and key arguments from Copy thread", () => {
+    const missing = rcaStep({
+      index: 1,
+      started_at: null,
+      title: "No timestamp",
+      tool_calls: [rcaToolCall({ key_arg: null })],
+    });
+    const dated = rcaStep({ index: 2, started_at: RCA_T0, title: "Dated step", tool_calls: [] });
+    const thread = rcaThread({
+      started: { at: null, prompt: "Missing start" },
+      steps: [missing, dated],
+    });
+    expect(
+      rcaThreadEntries(thread, [])
+        .filter((entry) => entry.kind === "step")
+        .map((entry) => entry.step.index),
+    ).toEqual([2, 1]);
+    const text = rcaThreadPlainText(thread, "Thread");
+    expect(text).toContain("1. No timestamp\n");
+    expect(text).toContain("\nAnalysis started\n");
+    expect(text).not.toContain("null");
+    expect(formatRcaClock(null)).toBe("");
   });
 
   describe("04 §10.6: one time order for steps, questions and messages", () => {

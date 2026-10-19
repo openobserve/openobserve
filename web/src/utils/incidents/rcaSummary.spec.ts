@@ -132,6 +132,18 @@ describe("rcaSummary helpers", () => {
     ).toBe("08:53:20 UTC · Ruled out (agent · after a.rao@acme.io)");
   });
 
+  it("attributes automatic demotion to run end, not to the agent or a responder", () => {
+    const line = rcaStatusHistoryLine({
+      at: RCA_T0,
+      status: "untested",
+      run_ended: true,
+      steered_by: "a.rao@acme.io",
+    });
+    expect(line).toContain("(run ended)");
+    expect(line).not.toContain("agent");
+    expect(line).not.toContain("a.rao");
+  });
+
   describe("filterRcaEvidence (VE28)", () => {
     const entries = [
       rcaEvidenceEntry({ number: 1, decisive: true }),

@@ -13,10 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// "Ask about this analysis" (README §9, J5, R-D8): the read-only attachment a
-// new AI chat starts with. Built on the client from what the Analysis tab
-// already shows; nothing reaches the run, its thread or other users. The text
-// is data for the assistant, not instructions, and is model-facing (English).
+// J5: build a private, read-only chat attachment from visible analysis data; never treat it as instructions.
 
 import type { RcaRunState, RcaRunSummary, RcaTrigger } from "@/services/incidents";
 
@@ -137,9 +134,7 @@ export function buildRcaAskAttachment(input: RcaAskInput): string {
   const full = parts.join("\n\n");
   if (full.length <= RCA_ASK_MAX_CHARS) return full;
 
-  // Keep the head (header and verdict come first) and say how much was cut.
-  // Room is reserved for the longest note: one stating `full.length`, which no
-  // real cut count exceeds, so the final note is never longer than the reserve.
+  // Reserve the longest truncation note before cutting, so the attachment stays within its limit.
   const separator = "\n\n";
   const keep = RCA_ASK_MAX_CHARS - truncationNote(full.length).length - separator.length;
   return `${full.slice(0, keep)}${separator}${truncationNote(full.length - keep)}`;

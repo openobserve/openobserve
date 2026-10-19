@@ -13,10 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Resume of a stopped RCA run (README §9, J7): which run may be resumed, and the seed
-//! a resumed run starts from. [prepare_resume] only reads; the route starts the new run
-//! with `context_used.resumed_from` ([ResumeSeed::resumed_from]) in its row, and the
-//! launch (`incidents::trigger_rca_for_incident` with a seed) forks the session.
+//! J7: validate a stopped run and prepare its immutable transcript prefix for a new fork.
 
 use config::meta::alerts::rca_runs::{RunMode, RunState, RunSubjectType, RunTrigger};
 use infra::table::{
@@ -42,8 +39,7 @@ use crate::ai_chat::{
     read_committed_events,
 };
 
-/// Run `error.code`s after which nothing can be reused, besides the turn start codes: the
-/// transcript is gone or was never written, or no turn ever ran.
+/// Error codes that leave no reusable transcript.
 const NOT_RESUMABLE_CODES: [&str; 6] = [
     ERROR_TRANSCRIPT_DELETED,
     ERROR_PERSISTENCE_FAILED,
@@ -107,11 +103,7 @@ pub enum ResumeError {
     Internal(String),
 }
 
-/// The seed of a Resume of `run_id` (J7): the incident's latest run (or the run a failed
-/// Resume that never ran a turn tried to resume), an incident run that failed or was
-/// cancelled with a session, an error that leaves something to reuse, a readable
-/// transcript with at least one finished step and no committed report. Reads the runs
-/// and one bounded copy of the committed events; writes nothing.
+/// J7: validate eligibility and read one bounded immutable transcript prefix; do not write.
 pub async fn prepare_resume(
     org_id: &str,
     incident_id: &str,
@@ -124,6 +116,38 @@ pub async fn prepare_resume(
         async |source: &ai_chat_sessions::Model| read_committed_events(source, NO_SEQ).await,
     )
     .await
+}
+
+pub async fn resumable_run_id(org_id: &str, incident_id: &str, latest_id: &str) -> Option<String> {
+    let latest = runs_table::get_rw(org_id, latest_id).await.ok().flatten()?;
+    if !matches!(
+        runs_table::to_item(&latest).state,
+        RunState::Failed | RunState::Cancelled
+    ) {
+        return None;
+    }
+    let source_id = latest
+        .context_used
+        .as_ref()
+        .and_then(|context| context["resumed_from"]["run_id"].as_str());
+    let candidate = match source_id {
+        Some(source)
+            if is_transparent_resume_of(org_id, latest_id, source)
+                .await
+                .ok()? =>
+        {
+            source
+        }
+        _ => latest_id,
+    };
+    match prepare_resume(org_id, incident_id, candidate).await {
+        Ok(_) => Some(candidate.to_string()),
+        Err(ResumeError::Unavailable(error) | ResumeError::Internal(error)) => {
+            log::warn!("[RCA_RESUME] cannot read eligibility of {candidate}: {error}");
+            None
+        }
+        Err(_) => None,
+    }
 }
 
 /// [prepare_resume] reading the source's committed events with `read_events`.
@@ -194,11 +218,7 @@ where
     })
 }
 
-/// Whether the incident's latest run `latest_id` is a Resume of `run_id` that ended
-/// (`failed` or `cancelled`) without running a turn on its fork: a failed one whose launch
-/// failed (`resume_failed` or a start code), or either state with no session or a session
-/// that holds nothing past the copied events. Such a run hides nothing of the source, so
-/// the source stays resumable.
+/// A resume that never ran a turn must not hide its still-reusable source.
 async fn is_transparent_resume_of(
     org_id: &str,
     latest_id: &str,
@@ -250,7 +270,6 @@ async fn is_transparent_resume_of(
 }
 
 /// J7 on the run row alone: the session id and mode of a run that may be resumed.
-/// `latest`: the run is the incident's latest, or only a transparent Resume follows it.
 fn check_resumable(latest: bool, run: &RunRow) -> Result<(&str, RunMode), ResumeError> {
     let item = runs_table::to_item(run);
     if item.subject_type != RunSubjectType::Incident || !latest {
@@ -311,7 +330,7 @@ pub(crate) mod tests {
         },
         alerts::rca_runs::{
             self, ERROR_AGENT_ERROR, ERROR_AGENT_UNAVAILABLE, ERROR_CREDENTIALS, ERROR_INTERRUPTED,
-            ERROR_NO_REPORT, ERROR_TIMEOUT, RESUME_FAILED_REASON, RunPatch, StartOutcome, StartRun,
+            ERROR_NO_REPORT, ERROR_TIMEOUT, RESUME_FAILED_REASON, StartOutcome, StartRun,
             complete_run, fail_run, start_run,
             tests::{add_incident, cancel_write, db, incident_start, new_incident, stored},
         },
@@ -392,8 +411,9 @@ pub(crate) mod tests {
         }
     }
 
+    use infra::table::rca_runs::RunUpdate;
     async fn with_session(org_id: &str, run_id: &str, session_id: &str) {
-        let patch = RunPatch {
+        let patch = RunUpdate {
             session_id: Some(session_id.to_string()),
             ..Default::default()
         };
@@ -412,8 +432,6 @@ pub(crate) mod tests {
         }
     }
 
-    /// A "Build on previous" run of the incident that committed [three_steps] and stopped
-    /// with `code` (`None`: cancelled).
     async fn stopped(org_id: &str, incident_id: &str, code: Option<&str>) -> String {
         let run_id = start_with(
             org_id,
@@ -461,9 +479,6 @@ pub(crate) mod tests {
         matches!(result, Err(ResumeError::NotResumable(_)))
     }
 
-    /// J7: only the incident's latest run, failed or cancelled with a code that leaves
-    /// something to reuse and with a session, is resumed; the run is checked before the
-    /// transcript is read.
     #[tokio::test]
     async fn only_the_latest_stopped_run_with_a_session_is_resumable() {
         let _db = db().await;
@@ -520,7 +535,7 @@ pub(crate) mod tests {
         add_session(session_row(&org, "ses-running", 17, STATUS_ACTIVE)).await;
         assert!(not_resumable(&prepare_three(&org, &inc, &running).await));
         assert!(
-            complete_run(&org, &running, "## Root cause", RunPatch::default())
+            complete_run(&org, &running, "## Root cause", RunUpdate::default())
                 .await
                 .unwrap()
         );
@@ -542,8 +557,6 @@ pub(crate) mod tests {
         assert!(not_resumable(&prepare_three(&org, &inc, &bare).await));
     }
 
-    /// J7: a transcript that is gone or broken is expired (410); one that cannot be read now
-    /// is unavailable (503); a session that committed nothing has nothing to resume.
     #[tokio::test]
     async fn a_missing_or_unreadable_transcript_is_expired_or_unavailable() {
         let _db = db().await;
@@ -598,9 +611,6 @@ pub(crate) mod tests {
         }
     }
 
-    /// J7, J8: the seed is the source's events up to the last step's message, its finished
-    /// steps, the step to redo and the source's mode; a committed report or a single step
-    /// is refused.
     #[tokio::test]
     async fn the_seed_keeps_the_events_before_the_last_steps_message() {
         let _db = db().await;
@@ -655,8 +665,6 @@ pub(crate) mod tests {
         assert_eq!(result.unwrap_err(), ResumeError::NothingToResume);
     }
 
-    /// Review M1: a Resume that failed before its fork ran a turn hides nothing; the
-    /// source it names stays resumable, and the failed Resume keeps its lineage.
     #[tokio::test]
     async fn a_resume_that_failed_to_launch_leaves_its_source_resumable() {
         let _db = db().await;
@@ -727,14 +735,10 @@ pub(crate) mod tests {
         Committed,
     }
 
-    /// Review M1: the source stays resumable only while the latest run is a failed or
-    /// cancelled Resume of it whose fork never committed a turn of its own.
     #[tokio::test]
     async fn only_a_resume_that_ran_no_turn_is_transparent() {
         let _db = db().await;
         let cut = THREE_STEPS_CUT;
-        // (case, trigger, names the source, fork, end: None running / Some(None) cancelled /
-        // Some(Some(code)) failed, transparent)
         let resume = RunTrigger::Resume;
         type Case<'a> = (
             &'a str,
@@ -853,7 +857,7 @@ pub(crate) mod tests {
                 json!({"resumed_from": {"run_id": "another-run", "steps": 2}})
             };
             let fork = format!("fork-{resumed}");
-            let patch = RunPatch {
+            let patch = RunUpdate {
                 context_used: Some(lineage),
                 session_id: (!matches!(fork_state, Fork::NoSession)).then(|| fork.clone()),
                 ..Default::default()

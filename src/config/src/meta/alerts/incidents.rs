@@ -2074,9 +2074,8 @@ mod tests {
     }
 
     #[test]
-    fn test_topology_with_legacy_report_keys_deserializes_and_drops_them() {
-        // Rows written before `rca_runs` (or by an old node during a rolling upgrade) can
-        // still carry the report keys (RR-24); they must decode and not be written back.
+    fn test_topology_with_pre_run_report_keys_decodes_without_owning_them() {
+        // `update_topology` carries the pre-run report keys over; the struct never writes them.
         let json = r#"{"nodes":[],"edges":[],"related_incident_ids":[],
             "suggested_root_cause":"legacy report",
             "previous_analyses":[{"content":"older","archived_at":1}]}"#;

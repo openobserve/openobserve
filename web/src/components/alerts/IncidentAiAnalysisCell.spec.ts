@@ -59,12 +59,7 @@ describe("IncidentAiAnalysisCell (RR-33)", () => {
     await flushPromises();
 
     expect(triggerRca).toHaveBeenCalledTimes(1);
-    expect(triggerRca).toHaveBeenCalledWith(
-      "default",
-      "inc-1",
-      { reanalysis: true },
-      { signal: undefined },
-    );
+    expect(triggerRca).toHaveBeenCalledWith("default", "inc-1", {}, { signal: undefined });
     expect(wrapper.emitted("started")).toEqual([["run-1"]]);
     expect(wrapper.emitted("open")).toBeUndefined();
   });

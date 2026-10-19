@@ -13,20 +13,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Incident analysis runs (`rca_runs`) and the run summary columns of `alert_incidents`.
-//!
-//! [start_run] and [update_run] are the only writers of both (RR-3). Each is one
-//! transaction that holds the run change, the incident's run summary and the timeline
-//! event, so a failed part leaves nothing written (RR-4). Both lock the incident row before
-//! any run row, so concurrent starts, updates and sweeps never wait on each other in a cycle.
+//! Transactional run storage and incident summary updates; lock incident before run.
 
 use std::str::FromStr;
 
 use config::meta::alerts::{
     incidents::IncidentEvent,
     rca_runs::{
-        RcaRun, RcaRunItem, RcaSummary, RunError, RunMode, RunState, RunStats, RunSubjectType,
-        RunSummaryFields, RunTrigger, is_live_blocking, is_stale, next_previous,
+        RcaRun, RcaRunItem, RcaSummary, ReportFormat, RunError, RunMode, RunState, RunStats,
+        RunSubjectType, RunSummaryFields, RunTrigger, is_live_blocking, is_stale, next_previous,
     },
     rca_steering::SteerRecord,
 };
@@ -72,8 +67,6 @@ pub struct NewRun {
     pub guidance: Option<String>,
     /// Serialized `Vec<SubjectRef>`: the pending on-call records of an alert run.
     pub oncall_subjects: Option<serde_json::Value>,
-    /// Written with the row: a resumed run's `{resumed_from}`, so its source is named even
-    /// if nothing else is ever written to it (J8, M1).
     pub context_used: Option<serde_json::Value>,
 }
 
@@ -92,8 +85,6 @@ pub struct StartGuards {
 pub enum StartResult {
     Started {
         run_id: String,
-        /// The trigger of a stale run this start ended `failed`/`stale` (RR-6), so the
-        /// caller counts that end (TH44).
         replaced_stale: Option<RunTrigger>,
         /// The id of that stale run, so the caller closes its steering rows (SG23).
         replaced_run_id: Option<String>,
@@ -108,6 +99,8 @@ pub enum StartResult {
 #[derive(Debug, Clone, Default)]
 pub struct RunUpdate {
     pub state: Option<RunState>,
+    /// Additional source-state precondition, intersected with the legal transition.
+    pub expected_state: Option<RunState>,
     pub report: Option<String>,
     pub outcome: Option<String>,
     pub confidence: Option<String>,
@@ -127,9 +120,7 @@ pub struct RunUpdate {
     pub context_used: Option<serde_json::Value>,
     /// Adds one to `continuations` in SQL.
     pub continuations_inc: bool,
-    /// The final stats of a run in any state: writes only `stats`, `result` while the run
-    /// has none and is not `completed` (VE34), and, while the incident still names the run,
-    /// `rca_summary.steps`/`tool_calls`/`unblocked_by`. Every other field is ignored.
+    /// Final stats cannot change lifecycle state; partial result is filled only if absent.
     pub final_stats_only: bool,
     /// Appended to the incident's timeline in the same transaction (incident subjects).
     pub event: Option<IncidentEvent>,
@@ -144,12 +135,9 @@ pub struct RunUpdate {
     pub now_us: i64,
 }
 
-/// Changes to the incident's `rca_summary`. `None` keeps the stored value; `previous`
-/// never changes after the start (RR-41).
+/// Changes to the incident's `rca_summary`.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct RunSummaryPatch {
-    pub stage: Option<String>,
-    pub stage_index: Option<u8>,
     pub steps: Option<u32>,
     pub tool_calls: Option<u32>,
     pub detail: Option<Option<String>>,
@@ -187,13 +175,7 @@ fn encode<T: serde::Serialize>(value: &T, what: &str) -> Result<serde_json::Valu
     serde_json::to_value(value).map_err(|e| DbErr::Custom(format!("serialize {what}: {e}")))
 }
 
-/// Starts a run (RR-5 to RR-8, RR-25, RR-41) in one transaction.
-///
-/// Incident subject: lock the incident's run summary, return `InFlight` while the latest run
-/// blocks (RR-9) and `CoolingDown` when the newest completed run ended within the cooldown,
-/// compare-and-set the summary on the `rca_run_id` and `rca_state` that were read, fail the
-/// replaced run when it was stale, insert the run and its `guidance_row` (SG33), append
-/// `begin_event`, prune. Alert subject: insert and prune only.
+/// Atomically admit one run per incident and append its Begin event before pruning history.
 pub async fn start_run(
     new: NewRun,
     guards: StartGuards,
@@ -403,8 +385,7 @@ pub async fn start_run_with<C: TransactionTrait>(
     })
 }
 
-/// Ends a `running` run as `failed`/`stale` (RR-6). No timeline event (D9). Returns the
-/// run's trigger when this write ended it.
+/// Ends a `running` run as `failed`/`stale` (RR-6).
 async fn fail_stale_with(
     txn: &DatabaseTransaction,
     org_id: &str,
@@ -455,8 +436,6 @@ async fn fail_stale_with(
         .then(|| parse_or(&run.trigger, RunTrigger::Legacy, &run.run_id, "trigger")))
 }
 
-/// RR-25: keep the subject's newest `history_limit + 1` runs and its newest `completed` run;
-/// delete only terminal runs.
 async fn prune_with(
     txn: &DatabaseTransaction,
     org_id: &str,
@@ -511,9 +490,7 @@ async fn prune_with(
     Ok(())
 }
 
-/// The states a run may move from to reach `target` (01 §7). `None` is a progress write,
-/// allowed only while the run is `running`. `waiting_input → running` goes only through
-/// [resume_waiting] and [close_deadline].
+/// The states a run may move from to reach `target` (01 §7).
 fn allowed_from(target: Option<RunState>) -> &'static [RunState] {
     match target {
         None | Some(RunState::Completed) | Some(RunState::Failed) => &[RunState::Running],
@@ -564,22 +541,11 @@ fn merge_stats(
     stats
 }
 
-/// The incident's `rca_summary` after `upd`. `previous` is never touched (RR-41).
-/// The stage a write sets: the run fields, else the summary patch.
 fn run_stage(upd: &RunUpdate) -> (Option<String>, Option<i16>) {
-    let patch = upd.summary.as_ref();
-    (
-        upd.stage
-            .clone()
-            .or_else(|| patch.and_then(|p| p.stage.clone())),
-        upd.stage_index
-            .or_else(|| patch.and_then(|p| p.stage_index).map(i16::from)),
-    )
+    (upd.stage.clone(), upd.stage_index)
 }
 
 fn merge_summary(mut summary: RunSummaryFields, upd: &RunUpdate) -> RunSummaryFields {
-    // The summary mirrors the run: a cancel names its user and a failure its reason,
-    // unless the patch says otherwise (D7).
     if let Some(user) = upd.cancelled_by.as_ref() {
         summary.cancelled_by = Some(user.clone());
     }
@@ -595,12 +561,6 @@ fn merge_summary(mut summary: RunSummaryFields, upd: &RunUpdate) -> RunSummaryFi
         summary.stage_index = Some(index);
     }
     if let Some(p) = upd.summary.as_ref() {
-        if p.stage.is_some() {
-            summary.stage = p.stage.clone();
-        }
-        if p.stage_index.is_some() {
-            summary.stage_index = p.stage_index;
-        }
         if let Some(steps) = p.steps {
             summary.steps = steps;
         }
@@ -628,19 +588,11 @@ fn merge_summary(mut summary: RunSummaryFields, upd: &RunUpdate) -> RunSummaryFi
     summary
 }
 
-/// Changes a run from an allowed state (01 §7, RR-11) and, for an incident subject, its run
-/// summary while the incident still names this run, plus the event, in one transaction.
-/// `Ok(false)`: the run is gone, not in an allowed state, or no longer the incident's latest
-/// run; nothing was written.
 pub async fn update_run(org_id: &str, run_id: &str, upd: RunUpdate) -> Result<bool, DbErr> {
     update_run_with(get_orm_client_rw().await, org_id, run_id, upd).await
 }
 
-/// [update_run] on a given connection.
-///
-/// Locks the incident row before the run row, as [start_run_with] does: the run's subject
-/// never changes, so it is read without a lock first; an incident subject then locks the
-/// incident while it names this run; last the run row is locked and its state checked again.
+/// Lock incident before run; recheck state guards inside the transaction.
 pub async fn update_run_with<C: TransactionTrait>(
     db: &C,
     org_id: &str,
@@ -652,7 +604,11 @@ pub async fn update_run_with<C: TransactionTrait>(
     }
     let txn = db.begin().await?;
     let now = upd.now_us;
-    let from = allowed_from(upd.state);
+    let from: Vec<_> = allowed_from(upd.state)
+        .iter()
+        .copied()
+        .filter(|state| upd.expected_state.is_none_or(|expected| expected == *state))
+        .collect();
     let allowed = |state: &str| RunState::from_str(state).is_ok_and(|s| from.contains(&s));
 
     let Some((subject_type, subject_id, _)) = rca_runs::Entity::find_by_id(run_id)
@@ -847,10 +803,7 @@ pub async fn update_run_with<C: TransactionTrait>(
     Ok(true)
 }
 
-/// The `final_stats_only` write of [update_run_with], on any run state. Locks the incident
-/// before the run, as every other write does; never changes the state, report or timeline.
-/// `result` is written only to a run that has none and did not complete: the partial record
-/// of a run another write ended (VE34).
+/// Stats-only writes preserve terminal state and never overwrite a stored result.
 async fn final_stats_with<C: TransactionTrait>(
     db: &C,
     org_id: &str,
@@ -968,9 +921,6 @@ async fn get_with<C: ConnectionTrait>(
         .await
 }
 
-/// Runs whose `incident_id` is the incident (its own runs and the page runs linked to it),
-/// newest first, `limit` at most, strictly older than the run `before` when given. The flag
-/// says whether older runs remain.
 pub async fn list_for_incident(
     org_id: &str,
     incident_id: &str,
@@ -1025,6 +975,22 @@ pub async fn newest_completed_for_incident(
     .await
 }
 
+/// `started_at` of the incident's oldest run; pre-run reports are older than it.
+pub async fn first_started_at_for_incident(
+    org_id: &str,
+    incident_id: &str,
+) -> Result<Option<i64>, DbErr> {
+    rca_runs::Entity::find()
+        .select_only()
+        .column(rca_runs::Column::StartedAt)
+        .filter(rca_runs::Column::OrgId.eq(org_id))
+        .filter(rca_runs::Column::IncidentId.eq(incident_id))
+        .order_by_asc(rca_runs::Column::StartedAt)
+        .into_tuple::<i64>()
+        .one(get_orm_client_ro().await)
+        .await
+}
+
 async fn newest_completed_with<C: ConnectionTrait>(
     conn: &C,
     org_id: &str,
@@ -1040,8 +1006,6 @@ async fn newest_completed_with<C: ConnectionTrait>(
         .await
 }
 
-/// `completed` runs of the org that ended in `[from_us, to_us)` and carry a `result`, newest
-/// first, `limit` at most (CG §7 backtest).
 pub async fn list_completed_between(
     org_id: &str,
     from_us: i64,
@@ -1071,8 +1035,6 @@ pub async fn list_running(limit: u64) -> Result<Vec<Model>, DbErr> {
         .await
 }
 
-/// `waiting_input` runs whose answer deadline is before `now_us`, oldest deadline first,
-/// `limit` at most (SG27).
 pub async fn list_waiting_past_deadline(now_us: i64, limit: u64) -> Result<Vec<Model>, DbErr> {
     list_waiting_past_deadline_with(get_orm_client_rw().await, now_us, limit).await
 }
@@ -1094,9 +1056,6 @@ pub async fn list_waiting_past_deadline_with<C: ConnectionTrait>(
 }
 
 /// SG18: a steering message reopens a `waiting_input` run whose deadline is still open.
-/// Compare-and-set to `running`, clearing the deadline and the open question; the
-/// incident's run summary follows while it names the run. `Ok(false)`: another writer won,
-/// or the run is not waiting.
 pub async fn resume_waiting(org_id: &str, run_id: &str) -> Result<bool, DbErr> {
     reopen_waiting_with(
         get_orm_client_rw().await,
@@ -1108,9 +1067,7 @@ pub async fn resume_waiting(org_id: &str, run_id: &str) -> Result<bool, DbErr> {
     .await
 }
 
-/// SG27: the sweeper closes the answer deadline the run was listed with. Compare-and-set to
-/// `running` with `deadline_closed_at = now`, so exactly one sweeper starts the finalize
-/// turn and the steer route refuses from then on. `Ok(false)`: another writer won.
+/// SG27: the sweeper closes the answer deadline the run was listed with.
 pub async fn close_deadline(
     org_id: &str,
     run_id: &str,
@@ -1262,6 +1219,7 @@ pub fn to_run(m: Model) -> RcaRun {
         .as_ref()
         .and_then(|v| serde_json::from_value(v.clone()).ok());
     RcaRun {
+        report_format: ReportFormat::V2,
         subject_type: parse_or(
             &m.subject_type,
             RunSubjectType::Incident,
@@ -1303,6 +1261,7 @@ pub fn to_run(m: Model) -> RcaRun {
 pub fn to_item(m: &Model) -> RcaRunItem {
     RcaRunItem {
         run_id: m.run_id.clone(),
+        report_format: ReportFormat::V2,
         subject_type: parse_or(
             &m.subject_type,
             RunSubjectType::Incident,
@@ -1322,8 +1281,6 @@ pub fn to_item(m: &Model) -> RcaRunItem {
     }
 }
 
-/// The incident's run summary (01 §11.1) with `stale` computed (RR-9); `None` when the
-/// incident was never analyzed. Detail fields stay empty.
 pub fn summary_from_incident(
     inc: &alert_incidents::Model,
     now_us: i64,
@@ -1340,6 +1297,7 @@ pub fn summary_from_incident(
     let updated_at = inc.rca_updated_at.unwrap_or(started_at);
     Some(RcaSummary {
         run_id,
+        report_format: ReportFormat::V2,
         state,
         stale: is_stale(state, updated_at, now_us, rca_timeout_secs),
         started_at,
@@ -1586,8 +1544,6 @@ mod tests {
         run
     }
 
-    /// RR-1, RR-2: a started run has one row; after each lifecycle write the summary
-    /// columns equal the run row.
     #[tokio::test]
     async fn rr1_rr2_each_lifecycle_write_keeps_the_summary_equal_to_the_run() {
         let db = db().await;
@@ -1605,9 +1561,9 @@ mod tests {
 
         // Progress write.
         let mut progress = update(None, T0 + SEC);
+        progress.stage = Some("context".to_string());
+        progress.stage_index = Some(2);
         progress.summary = Some(RunSummaryPatch {
-            stage: Some("gather".to_string()),
-            stage_index: Some(2),
             steps: Some(4),
             tool_calls: Some(9),
             ..Default::default()
@@ -1616,7 +1572,7 @@ mod tests {
         let row = assert_summary_mirrors_run(&db, "inc-1").await;
         assert_eq!(row.updated_at, T0 + SEC);
         let summary = summary_of(&inc(&db, "inc-1").await);
-        assert_eq!(summary.stage.as_deref(), Some("gather"));
+        assert_eq!(summary.stage.as_deref(), Some("context"));
         assert_eq!((summary.steps, summary.tool_calls), (4, 9));
 
         finish(&db, &r1, RunState::Completed, T0 + 90 * SEC).await;
@@ -1656,8 +1612,6 @@ mod tests {
         );
     }
 
-    /// RR-5 (sequential form): a second start while the latest run is live returns
-    /// `InFlight` and writes no row and no event; `waiting_input` blocks too.
     #[tokio::test]
     async fn rr5_a_start_while_a_run_is_live_is_in_flight_and_writes_nothing() {
         let db = db().await;
@@ -1737,8 +1691,6 @@ mod tests {
         assert_eq!(event_types(&db, "inc-1").await.len(), 1);
     }
 
-    /// RR-6 / RR-9: a `running` run past the stale threshold is ended `failed`/`stale` by
-    /// the next start, which becomes the latest run; before the threshold it still blocks.
     #[tokio::test]
     async fn rr6_a_start_replaces_a_stale_run_and_fails_it() {
         let db = db().await;
@@ -1791,8 +1743,6 @@ mod tests {
         assert_eq!(event_types(&db, "inc-1").await.len(), 2);
     }
 
-    /// RR-8: a run completed 10 minutes ago blocks an automatic start under a 30-minute
-    /// cooldown and does not block a start that skips the cooldown.
     #[tokio::test]
     async fn rr8_cooldown_blocks_automatic_starts_only() {
         let db = db().await;
@@ -1863,8 +1813,7 @@ mod tests {
         run_id
     }
 
-    /// RR-11 / 01 §7: every (from, to) pair; a refused write changes no run, summary or
-    /// event. `waiting_input → running` is only for `resume_waiting`/`close_deadline` (04).
+    /// RR-11 / 01 §7: every (from, to) pair; a refused write changes no run, summary or event.
     #[tokio::test]
     async fn rr11_update_run_follows_the_transition_table() {
         use RunState::*;
@@ -1942,8 +1891,6 @@ mod tests {
         assert_eq!(events(&db, "inc-1").await, timeline);
     }
 
-    /// RR-11: a run that is no longer the incident's latest is refused, and its own row
-    /// change rolls back with the refused summary write.
     #[tokio::test]
     async fn rr11_a_run_that_lost_the_incident_writes_nothing() {
         let db = db().await;
@@ -1965,8 +1912,6 @@ mod tests {
         assert_eq!(event_types(&db, "inc-1").await.len(), 1);
     }
 
-    /// RR-4: a failing `incident_events` append rolls back the run and summary writes of
-    /// both `start_run` and `update_run`.
     #[tokio::test]
     async fn rr4_a_failed_event_append_writes_nothing() {
         let db = db().await;
@@ -2000,8 +1945,6 @@ mod tests {
         assert_eq!(inc(&db, "inc-2").await, inc2_before);
     }
 
-    /// RR-41: R1 completed, R2 failed, R3 running gives R3 `previous = R1`, ended at R1's
-    /// end; a first run has none and a later write never changes it.
     #[tokio::test]
     async fn rr41_previous_is_the_newest_completed_run() {
         let db = db().await;
@@ -2024,10 +1967,7 @@ mod tests {
         let r3 = start(&db, "inc-1", T0 + 200 * SEC).await;
         assert_eq!(summary_of(&inc(&db, "inc-1").await).previous, r1_previous);
         let mut progress = update(None, T0 + 201 * SEC);
-        progress.summary = Some(RunSummaryPatch {
-            stage: Some("verify".to_string()),
-            ..Default::default()
-        });
+        progress.stage = Some("converge".to_string());
         progress.steered_by_add = Some("b.lee".to_string());
         assert!(update_run_with(&db, ORG, &r3, progress).await.unwrap());
         let summary = summary_of(&inc(&db, "inc-1").await);
@@ -2035,8 +1975,7 @@ mod tests {
         assert_eq!(summary.steered_by, vec!["b.lee".to_string()]);
     }
 
-    /// Starts and ends one incident run per state, one second apart; returns ids oldest
-    /// first.
+    /// Starts and ends one incident run per state, one second apart; returns ids oldest first.
     async fn history(
         db: &DatabaseConnection,
         incident_id: &str,
@@ -2081,8 +2020,6 @@ mod tests {
         }
     }
 
-    /// RR-25: limit 3 keeps the newest 4 runs plus the newest completed run when it is
-    /// older; limit 0 keeps the newest run and the newest completed run.
     #[tokio::test]
     async fn rr25_prune_keeps_limit_plus_one_and_the_newest_completed_run() {
         use RunState::*;
@@ -2126,8 +2063,7 @@ mod tests {
         assert_eq!(ids_of(&db, "inc-c").await, expected);
     }
 
-    /// RR-25 / RR-1: live runs are never pruned. Alert runs take no compare-and-set, so a
-    /// subject can hold several live runs.
+    /// RR-25 / RR-1: live runs are never pruned.
     #[tokio::test]
     async fn rr25_prune_never_deletes_a_live_run() {
         let db = db().await;
@@ -2186,8 +2122,6 @@ mod tests {
         );
     }
 
-    /// `get_rw` reads through `get_with` on the write connection: a run written by the same
-    /// connection is returned at once, scoped to its org.
     #[tokio::test]
     async fn get_rw_reads_a_run_written_on_the_same_connection() {
         let db = db().await;
@@ -2210,8 +2144,6 @@ mod tests {
         serde_json::from_value(m.stats.clone().unwrap_or_default()).unwrap_or_default()
     }
 
-    /// TH22, TH42: a stats-only write works on every state, writes `stats` and the summary
-    /// counts, and ignores every other field: no state, report, error or event.
     #[tokio::test]
     async fn a_stats_only_write_changes_only_the_counts_in_any_state() {
         use RunState::*;
@@ -2270,8 +2202,6 @@ mod tests {
         }
     }
 
-    /// TH22: a stats-only write for a run the incident no longer names writes the run's
-    /// stats and leaves the newer run's summary alone; an unknown run writes nothing.
     #[tokio::test]
     async fn a_stats_only_write_for_a_replaced_run_leaves_the_summary() {
         let db = db().await;
@@ -2299,8 +2229,6 @@ mod tests {
         assert!(!update_run_with(&db, ORG, "missing", upd).await.unwrap());
     }
 
-    /// VE34: a stats-only write sets `result` only on a run that has none and did not
-    /// complete (the partial record of a run a cancel ended), and never replaces one.
     #[tokio::test]
     async fn a_stats_only_write_sets_the_result_only_when_null_and_not_completed() {
         use RunState::*;
@@ -2342,8 +2270,6 @@ mod tests {
         }
     }
 
-    /// TH1 (7.1), TH25, TH27: a progress write stores the session, stage, context and
-    /// continuation columns, and the stage reaches the summary.
     #[tokio::test]
     async fn a_progress_write_stores_the_run_progress_columns() {
         let db = db().await;
@@ -2389,8 +2315,6 @@ mod tests {
         );
     }
 
-    /// The PostgreSQL lane (`ZO_META_POSTGRES_DSN` set) runs this against a throwaway
-    /// database; the SQLite lane skips it.
     async fn throwaway_postgres() -> Option<(DatabaseConnection, String, String)> {
         let dsn = std::env::var("ZO_META_POSTGRES_DSN").ok()?;
         if dsn.trim().is_empty() {
@@ -2421,8 +2345,6 @@ mod tests {
             .unwrap();
     }
 
-    /// RR-5 and RR-22 on PostgreSQL: two concurrent starts give one run, one Begin event
-    /// and one `InFlight`; 20 concurrent appends leave 20 events.
     #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
     async fn rr5_rr22_postgres_concurrent_starts_and_appends() {
         let Some((db, dsn, name)) = throwaway_postgres().await else {
@@ -2537,9 +2459,6 @@ mod tests {
         run_id
     }
 
-    /// SG26 / SG42: `running → waiting_input` writes the question columns, the summary and
-    /// the `ai_analysis_needs_input` event in one transaction; the event is present iff the
-    /// write wins.
     #[tokio::test]
     async fn sg26_sg42_waiting_input_write_carries_its_event_iff_it_wins() {
         let db = db().await;
@@ -2613,8 +2532,6 @@ mod tests {
         assert_eq!(run(&db, &r3).await, run_before);
     }
 
-    /// SG18: `resume_waiting` is a compare-and-set; the second caller loses; the summary
-    /// follows; it is refused after the deadline closed.
     #[tokio::test]
     async fn sg18_resume_waiting_is_a_compare_and_set() {
         let db = db().await;
@@ -2665,8 +2582,6 @@ mod tests {
         assert_eq!([a.unwrap(), b.unwrap()].iter().filter(|w| **w).count(), 1);
     }
 
-    /// SG27: `close_deadline` is a compare-and-set on the listed deadline; it sets
-    /// `deadline_closed_at`; the second sweeper loses; an answer after it is refused.
     #[tokio::test]
     async fn sg27_close_deadline_is_a_compare_and_set() {
         let db = db().await;
@@ -2742,8 +2657,6 @@ mod tests {
         assert_eq!([a.unwrap(), b.unwrap()].iter().filter(|w| **w).count(), 1);
     }
 
-    /// SG27: the sweeper lists waiting runs past their open deadline, oldest deadline
-    /// first, `limit` at most.
     #[tokio::test]
     async fn sg27_list_waiting_past_deadline() {
         let db = db().await;
@@ -2817,8 +2730,6 @@ mod tests {
         }
     }
 
-    /// 04 §8.5: the prune deletes the steering rows of the pruned runs, and only those, in
-    /// the start transaction.
     #[tokio::test]
     async fn prune_deletes_the_steering_rows_of_pruned_runs() {
         use RunState::*;
@@ -2897,8 +2808,6 @@ mod tests {
         );
     }
 
-    /// SG23: `replaced_run_id` names the stale run a start ended, and is `None` for every
-    /// other start (first run, after a terminal run, alert subjects).
     #[tokio::test]
     async fn sg23_replaced_run_id_is_set_only_on_stale_replacement() {
         use RunState::*;

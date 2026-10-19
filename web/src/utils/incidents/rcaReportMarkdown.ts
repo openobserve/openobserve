@@ -13,9 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// Markdown rendering for agent-written RCA reports. One module-scoped Marked
-// instance owns the renderers, so rendering never touches the global `marked`
-// defaults and renderers cannot stack across renders.
+// A private Marked instance prevents report rendering from mutating global markdown behavior.
 
 import DOMPurify from "dompurify";
 import { Marked, type Tokens } from "marked";
@@ -28,16 +26,7 @@ const escapeHtml = (text: string): string =>
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
 
-const headingId = (text: string): string =>
-  "section-" +
-  text
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)/g, "");
-
-// A fence closes only on a bare run of its own character at least as long as the
-// opener, so ``` inside ~~~ (or inside ````) stays code. Indentation is not limited
-// to three spaces: treating a line as code only ever skips a rewrite.
+// Only a bare fence of the same character and sufficient length can close a code block.
 const createCodeFenceTracker = () => {
   let open: { char: string; length: number } | null = null;
   return (line: string): boolean => {
@@ -113,9 +102,7 @@ const convertKeyValueListsToTables = (content: string): string => {
       }
     }
 
-    // GFM splits table cells on every unescaped `|`, code spans included, and turns
-    // `\|` back into `|`, so each `|` is escaped. Text that already holds `\|` cannot
-    // survive that round trip; such a list stays a list.
+    // Escape GFM pipes; leave lists with pre-escaped pipes unchanged to avoid corrupting their content.
     if (cells.length >= 3 && !cells.flat().some((text) => text.includes("\\|"))) {
       result.push("", "| Field | Value |", "|-------|-------|");
       cells.forEach((row) =>
@@ -131,10 +118,7 @@ const convertKeyValueListsToTables = (content: string): string => {
   return result.join("\n");
 };
 
-// Colours/backgrounds for these rca-* classes come from the `:deep(.rca-report-content)`
-// rules in components/alerts/rca/RcaReportContent.vue. Those rules are unlayered, so they beat any layered
-// colour utility named here; only structural utilities (spacing, size, weight,
-// border-width) are live.
+// RcaReportContent owns colors; renderer classes supply structure only.
 const HEADING_CLASSES = [
   "rca-h1 font-bold text-lg text-center mb-4 pb-2 border-b-2",
   "rca-h2 font-bold text-lg mt-5 mb-3 rca-section-bg px-4 py-3 rounded-default border-s-4",
@@ -146,9 +130,9 @@ const rcaMarked = new Marked({
   gfm: true,
   breaks: false,
   renderer: {
-    heading({ tokens, depth, text }: Tokens.Heading) {
+    heading({ tokens, depth }: Tokens.Heading) {
       const body = this.parser.parseInline(tokens);
-      return `<div id="${headingId(text)}" class="${HEADING_CLASSES[depth - 1] || ""}">${body}</div>`;
+      return `<div class="${HEADING_CLASSES[depth - 1] || ""}">${body}</div>`;
     },
     code({ text }: Tokens.Code) {
       return `<div class="rca-code-block border rounded-default p-3 my-3 overflow-x-auto"><pre class="text-sm font-mono whitespace-pre m-0"><code>${escapeHtml(text)}</code></pre></div>`;
@@ -156,8 +140,7 @@ const rcaMarked = new Marked({
     codespan({ text }: Tokens.Codespan) {
       return `<code class="rca-inline-code px-1.5 py-0.5 rounded-default text-sm font-mono">${escapeHtml(text)}</code>`;
     },
-    // Model-written links are a prompt-injection path: show where they point, never
-    // make them clickable.
+    // Model-written links are untrusted: show their destination without making them clickable.
     link({ href, text, tokens }: Tokens.Link) {
       if (text === href) return escapeHtml(href);
       return `${this.parser.parseInline(tokens)} (${escapeHtml(href)})`;
@@ -208,32 +191,21 @@ const rcaMarked = new Marked({
     hr() {
       return `<hr class="my-4 border-t" />`;
     },
-    // Model-written HTML, block or inline, is shown as the text it is; it never
-    // becomes markup, so it cannot carry styles or classes into the page.
+    // Escape model-written HTML so it cannot inject markup, styles or classes.
     html({ text }: Tokens.HTML | Tokens.Tag) {
       return escapeHtml(text);
     },
   },
 });
 
-// Exactly the tags and attributes the renderers above emit; raw HTML never reaches
-// here as markup because the `html` renderer escapes it.
+// Allow only renderer-owned tags and attributes after raw HTML has been escaped.
 const ALLOWED_TAGS =
   "div p ul ol li strong em code pre table thead tbody tr th td blockquote hr".split(" ");
-const ALLOWED_ATTR = ["class", "id"];
+const ALLOWED_ATTR = ["class"];
 
 const VERDICT_FENCE = "```";
 
-/**
- * Kept only for reports stored before Phase 2, which ended in a ```json verdict
- * block; newer reports come from `submit_report` and carry none.
- *
- * Removes every ```json verdict block: machine input, not report prose. The line
- * rules mirror the server's `last_verdict_block`: a block opens on a line that,
- * trimmed, is ``` followed by exactly the words `json verdict`, and closes on the
- * next line that starts with ``` after leading whitespace, so backticks inside a
- * JSON string never close it. An unterminated block runs to the end of the input.
- */
+/** Strip only legacy fenced verdict tails, not current report content. */
 export const stripVerdictFence = (md: string): string => {
   let inVerdict = false;
   return md

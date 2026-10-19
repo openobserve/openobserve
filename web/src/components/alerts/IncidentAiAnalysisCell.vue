@@ -148,7 +148,7 @@ const analyze = async () => {
     const result = await requestRca(
       org,
       props.incident.id,
-      { reanalysis: true },
+      {},
       { isStillActive: () => store.state.selectedOrganization.identifier === org },
     );
     if (result.status === "unavailable") {

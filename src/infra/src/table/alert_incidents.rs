@@ -17,6 +17,7 @@
 //!
 //! Provides CRUD operations for incidents and incident-alert associations.
 
+use config::meta::alerts::rca_runs::{V1_PREVIOUS_REPORTS_KEY, V1_REPORT_KEY};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, PaginatorTrait, QueryFilter,
     QueryOrder, QuerySelect, RelationTrait, Set, TransactionTrait,
@@ -872,17 +873,27 @@ pub async fn update_topology(
     let client = get_orm_client_rw().await;
     let now = chrono::Utc::now().timestamp_micros();
 
-    let incident = get(org_id, id)
+    let mut incident = get(org_id, id)
         .await?
         .ok_or_else(|| Error::DbError(DbError::SeaORMError("Incident not found".to_string())))?;
 
     // Serialize topology to JSON - ONLY place this happens
-    let topology_json = serde_json::to_value(topology).map_err(|e| {
+    let mut topology_json = serde_json::to_value(topology).map_err(|e| {
         Error::DbError(DbError::SeaORMError(format!(
             "Failed to serialize topology: {}",
             e
         )))
     })?;
+    // The pre-run reports are not part of the struct but are still read as v1 reports.
+    if let (serde_json::Value::Object(new), Some(serde_json::Value::Object(mut old))) =
+        (&mut topology_json, incident.topology_context.take())
+    {
+        for key in [V1_REPORT_KEY, V1_PREVIOUS_REPORTS_KEY] {
+            if let Some(value) = old.remove(key) {
+                new.insert(key.to_string(), value);
+            }
+        }
+    }
 
     let mut active: alert_incidents::ActiveModel = incident.into();
     active.topology_context = Set(Some(topology_json));
@@ -1436,7 +1447,7 @@ mod tests {
                 }
             ],
             "related_incident_ids": [],
-            "suggested_root_cause": "# Root Cause\n\nlegacy key read before the backfill removed it"
+            "suggested_root_cause": "# Root Cause\n\na pre-run report the struct does not own"
         });
 
         // Deserialize

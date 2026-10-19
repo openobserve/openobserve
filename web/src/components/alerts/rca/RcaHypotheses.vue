@@ -14,11 +14,6 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!-- "Hypotheses" (03 VE11, VE12, VE18, VE36; contract F8): grouped as the
-     redesign draws them, ranked inside each group, each with its status, reason,
-     evidence numbers and status history. While the run takes messages each row
-     offers its actions (Disprove, Reopen, Test first) and shows "Pending ·
-     <author>" until the agent reads the action (04 SG31, H16). -->
 <template>
   <section data-test="rca-hypotheses" :aria-labelledby="headingId" class="flex flex-col">
     <div class="mb-1 flex items-baseline gap-2">

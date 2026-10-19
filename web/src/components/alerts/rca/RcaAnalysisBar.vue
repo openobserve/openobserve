@@ -14,10 +14,6 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!-- Analysis bar (contract E5): run version selector from the history, the
-     trigger + age line, "Ask about this analysis" (J5; not live), Re-analyze ▾
-     (not live; Fresh, Build on previous, With guidance… (04 frame I)) or Cancel
-     run (live), and the ⋯ menu with Copy report / Download as Markdown / Copy thread. -->
 <template>
   <div data-test="rca-analysis-bar" class="flex flex-wrap items-center gap-2.5">
     <ODropdown align="start" content-class="w-80">

@@ -2343,9 +2343,7 @@ async fn dependency_edge_type_v1(org_id: &str, from: &str, to: &str) -> EdgeType
     }
 }
 
-/// Whether the deployment can run an analysis at all. Callers check this before
-/// authorizing AI usage so a run that cannot happen is never charged. When it
-/// returns false no verdict is coming, so any triage hold is released here.
+/// Whether the deployment can run an analysis at all.
 #[cfg(feature = "enterprise")]
 pub async fn rca_will_run(org_id: &str, incident_id: &str) -> bool {
     use o2_enterprise::enterprise::{alerts::rca_service, common::config::get_config};
@@ -2363,10 +2361,6 @@ pub async fn rca_will_run(org_id: &str, incident_id: &str) -> bool {
 const SYSTEM_USER_EMAIL: &str = "system@openobserve.ai";
 
 /// The one start path of automatic runs (RR-7, RR-39, RR-45).
-///
-/// Deployment checks, the incident's `rca_off_reason`, the Cloud precheck, then
-/// `start_run`; only a started run starts its investigation turn, which meters
-/// usage right before the turn starts.
 #[cfg(feature = "enterprise")]
 async fn start_automatic_rca(
     org_id: &str,
@@ -2488,10 +2482,6 @@ async fn start_automatic_rca(
 }
 
 /// A new incident's first analysis, decided after on-call routing (RR-45).
-///
-/// When the routed record's team has L0 off at its priority the incident stores
-/// `rca_off_reason = "l0_off"` and no automatic run ever starts; otherwise (no
-/// record, on-call off, routing skipped or failed) the run starts.
 #[cfg(feature = "enterprise")]
 async fn start_new_incident_rca(
     org_id: &str,
@@ -2499,7 +2489,7 @@ async fn start_new_incident_rca(
     routed: Option<&config::meta::oncall::Response>,
 ) {
     if let Some(record) = routed
-        && l0_off_for_record(org_id, record).await
+        && o2_enterprise::enterprise::alerts::rca_service::l0_off_for_record(org_id, record).await
     {
         if let Err(e) =
             infra::table::alert_incidents::set_rca_off_reason(org_id, incident_id, Some("l0_off"))
@@ -2526,10 +2516,6 @@ async fn start_new_incident_rca(
 }
 
 /// An un-muted incident's analysis (RR-45).
-///
-/// An incident muted since creation has never been routed, so its first routing
-/// decides L0 exactly as a creation does. One that already has a run or a stored
-/// `rca_off_reason` keeps that decision.
 #[cfg(feature = "enterprise")]
 async fn start_unmuted_incident_rca(
     org_id: &str,
@@ -2554,25 +2540,6 @@ async fn start_unmuted_incident_rca(
             config::meta::alerts::rca_runs::RunTrigger::AutoNewIncident,
         )
         .await;
-    }
-}
-
-/// Whether the record's team has switched L0 off at the record's priority.
-#[cfg(feature = "enterprise")]
-async fn l0_off_for_record(org_id: &str, record: &config::meta::oncall::Response) -> bool {
-    let Some(team_id) = record.team_id.as_deref() else {
-        return false;
-    };
-    let Some(priority) = config::meta::alerts::priority::AlertPriority::from_i32(record.priority)
-    else {
-        return false;
-    };
-    match infra::table::oncall_policies::get_or_create_cached(org_id, team_id).await {
-        Ok(policy) => policy.l0.mode_for(priority) == config::meta::oncall::L0Mode::Off,
-        Err(e) => {
-            log::warn!("[INCIDENTS::RCA] Could not read the L0 policy of team {team_id}: {e}");
-            false
-        }
     }
 }
 
@@ -2606,28 +2573,17 @@ const TURN_BUSY_REASON: &str = "The analysis session is busy";
 pub struct RcaLaunch {
     pub trigger: config::meta::alerts::rca_runs::RunTrigger,
     /// Email of the user who triggered the analysis, used for AI usage tracking.
-    /// For automated/system-initiated calls, use "system@openobserve.ai".
     pub user_email: String,
     /// When true, the newest completed report is sent so the agent extends it (RR-27).
     pub build_on_previous: bool,
-    /// A permit the caller already holds; `None` meters right before the turn
-    /// starts, after every guard, so the spawned task cannot meter twice.
+    /// None authorizes immediately before first-turn launch.
     pub usage_permit: Option<crate::AiUsagePermit>,
-    /// SG33: the run was started with this guidance; its queued `guidance` row, written
-    /// with the start, rides on the first turn's prompt.
     pub guidance: Option<String>,
-    /// J8: the run resumes a stopped run from this seed: it skips "Build on previous",
-    /// continues on a copy of the source's session and takes the source's mode.
+    /// A resume uses its copied steps instead of a previous report.
     pub resume: Option<super::rca_resume::ResumeSeed>,
 }
 
-/// Start a started run's investigation turn (TH12, TH16).
-///
-/// Returns once the turn is spawned: the turn's finalizer ends the run. A guard
-/// that no longer holds, or a resumed run whose source session cannot be copied
-/// (`resume_failed`), fails the run with its code and returns `Ok`; a turn
-/// that cannot start fails the run with the turn's code, releases the triage
-/// hold, and returns the error so a manual caller can answer with it.
+/// Return after spawning; every launch error must terminate the admitted run.
 #[cfg(feature = "enterprise")]
 pub async fn trigger_rca_for_incident(
     org_id: String,
@@ -2707,8 +2663,7 @@ pub async fn trigger_rca_for_incident(
         return Ok(());
     }
 
-    // I20: the run must be refused before the billable turn. User-started
-    // runs never consult L0 (D2, RR-45).
+    // I20: the run must be refused before the billable turn.
     if !trigger.is_user_started() && rca_service::l0_off_for_incident(&org_id, &incident_id).await {
         log::debug!("[INCIDENTS::RCA] L0 is off for {incident_id}'s priority, ending run {run_id}");
         end_failed(ERROR_L0_OFF, L0_OFF_REASON, None).await;
@@ -2732,8 +2687,6 @@ pub async fn trigger_rca_for_incident(
         trigger.as_str()
     );
 
-    // RR-27: "Build on previous" extends the newest completed report; a resumed run has
-    // its source's steps instead.
     let previous_analysis = if build_on_previous && resume.is_none() {
         newest_completed_report(&org_id, &incident_id)
             .await
@@ -2746,14 +2699,10 @@ pub async fn trigger_rca_for_incident(
     } else {
         None
     };
-    // §7/C1: the single builder, so every trigger tells the agent the same
-    // things about the same incident.
     let context =
         rca_service::build_incident_context(&org_id, &incident_id, previous_analysis).await;
     let context = rca_service::rca_context_json(&context);
 
-    // Metered only now that every guard has held and the turn is about to
-    // start (RR-39): a run that ends on a guard never charges.
     #[cfg(feature = "cloud")]
     {
         use config::meta::alerts::rca_runs::RunTrigger;
@@ -2793,8 +2742,6 @@ pub async fn trigger_rca_for_incident(
         debug_assert_eq!(usage_permit.feature(), feature);
     }
 
-    // J8: a resumed run goes on from a copy of its source's session, cut at the last
-    // finished step; a copy that fails ends the run like a guard.
     let (mode, fork) = match resume {
         Some(seed) => {
             let source_run_id = seed.source_run_id.clone();
@@ -2883,8 +2830,6 @@ pub async fn trigger_rca_for_incident(
     }
 }
 
-/// J8: copy `seed`'s session for the resumed run `run_id` with `fork`; the session it
-/// continues on and the source's mode.
 #[cfg(feature = "enterprise")]
 async fn fork_for_resume<F>(
     org_id: &str,
@@ -3901,7 +3846,6 @@ mod tests {
                 assert_eq!(from_run, source_run);
                 Ok(RunFork {
                     session_id: fork_session.clone(),
-                    opencode_session_id: "ses_0817c5614ffea1NfBrR9UndbIb".to_string(),
                     last_seq: seed.cut_seq,
                 })
             },
@@ -4089,10 +4033,11 @@ mod tests {
     #[tokio::test]
     async fn a_cancel_of_an_ended_or_absent_run_returns_none() {
         use config::meta::alerts::rca_runs::{RunState, RunTrigger};
+        use infra::table::rca_runs::RunUpdate;
 
         use crate::alerts::{
             rca_runs::{
-                RunPatch, complete_run,
+                complete_run,
                 tests::{db, new_incident, start, stored},
             },
             rca_turn::cancel_rca_run,
@@ -4106,7 +4051,7 @@ mod tests {
         );
         let run_id = start(&org, &inc, RunTrigger::Manual).await;
         assert!(
-            complete_run(&org, &run_id, "report", RunPatch::default())
+            complete_run(&org, &run_id, "report", RunUpdate::default())
                 .await
                 .unwrap()
         );

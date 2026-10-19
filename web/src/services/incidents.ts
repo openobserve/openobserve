@@ -70,6 +70,9 @@ export type RcaTrigger =
 
 export type RcaRunMode = "fresh" | "build_on_previous";
 
+/** `v1`: a pre-upgrade report served as markdown only; `v2`: an `rca_runs` row. */
+export type RcaReportFormat = "v1" | "v2";
+
 /** Outcome of a completed run (03 VE14). */
 export type RcaOutcome =
   "root_cause_identified" | "contributing_factor" | "inconclusive" | "blocked";
@@ -122,6 +125,8 @@ export interface RcaSummary {
   report_run?: RcaRunItem | null;
   /** Detail endpoint only: runs newest first. */
   history?: RcaRunItem[];
+  resume_run_id?: string | null;
+  report_format: RcaReportFormat;
 }
 
 export interface RcaRunItem {
@@ -137,6 +142,7 @@ export interface RcaRunItem {
   confidence: RcaBand | null;
   cancelled_by: string | null;
   error_reason: string | null;
+  report_format: RcaReportFormat;
 }
 
 export interface RcaRunError {
@@ -184,6 +190,7 @@ export interface RcaRun {
   context_used?: RcaContextUsed | null;
   /** Continuation turns the run used. */
   continuations?: number;
+  report_format: RcaReportFormat;
 }
 
 /** `rca_runs.context_used`: the leads the run started with, not evidence. */
@@ -208,9 +215,10 @@ export type RcaToolCallStatus = "ok" | "error" | "running";
 export interface RcaToolCall {
   call_id: string;
   tool: string;
-  key_arg: string;
+  key_arg: string | null;
   status: RcaToolCallStatus;
-  started_at: number;
+  started_at: number | null;
+  interrupted?: boolean;
   duration_ms: number | null;
   result_summary: string | null;
   error: string | null;
@@ -225,7 +233,7 @@ export interface RcaStep {
   index: number;
   stage: string | null;
   title: string;
-  started_at: number;
+  started_at: number | null;
   /** Null while the step runs. */
   ended_at: number | null;
   note: string | null;
@@ -276,7 +284,7 @@ export interface RcaThread {
   not_modified: false;
   active: boolean;
   transcript: RcaTranscriptState;
-  started: { at: number; prompt: string } | null;
+  started: { at: number | null; prompt: string } | null;
   steps: RcaStep[];
   user_messages: RcaThreadUserMessage[];
   questions: RcaThreadQuestion[];
@@ -458,6 +466,7 @@ export interface RcaSummaryStatusChange {
   /** Microseconds since epoch. */
   at: number;
   status: RcaHypothesisStatus;
+  run_ended?: boolean;
   /** Author of the steering message that caused the change, if any. */
   steered_by?: string;
 }
@@ -793,7 +802,7 @@ const incidents = {
   triggerRca: (
     org_identifier: string,
     incident_id: string,
-    params: { reanalysis?: boolean; build_on_previous?: boolean; guidance?: string } = {},
+    params: { build_on_previous?: boolean; guidance?: string } = {},
     config: { signal?: AbortSignal } = {},
   ) => {
     const { guidance, ...query } = params;

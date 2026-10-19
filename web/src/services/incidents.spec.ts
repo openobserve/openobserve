@@ -181,29 +181,11 @@ describe("incidents service", () => {
       expect(res.data).toEqual({ message: "Analysis started", run_id: "run-7" });
     });
 
-    it("should pass reanalysis params and the abort signal", () => {
-      mockHttp.post.mockResolvedValue({ data: { run_id: "run-1" } });
-      const controller = new AbortController();
-
-      incidents.triggerRca(
-        "test-org",
-        "incident-123",
-        { reanalysis: true },
-        { signal: controller.signal },
-      );
-
-      expect(mockHttp.post).toHaveBeenCalledWith(
-        "/api/v2/test-org/alerts/incidents/incident-123/rca",
-        null,
-        { params: { reanalysis: true }, signal: controller.signal },
-      );
-    });
 
     it("SG33: sends the guidance as the JSON body and keeps the query flags", () => {
       mockHttp.post.mockResolvedValue({ data: { run_id: "run-1" } });
 
       incidents.triggerRca("test-org", "incident-123", {
-        reanalysis: true,
         build_on_previous: true,
         guidance: "Check the orders pool",
       });
@@ -211,7 +193,7 @@ describe("incidents service", () => {
       expect(mockHttp.post).toHaveBeenCalledWith(
         "/api/v2/test-org/alerts/incidents/incident-123/rca",
         { guidance: "Check the orders pool" },
-        { params: { reanalysis: true, build_on_previous: true }, signal: undefined },
+        { params: { build_on_previous: true }, signal: undefined },
       );
     });
   });

@@ -107,7 +107,14 @@ import { nextTick } from "vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
-import { rcaRunSummaryLive } from "@/test/unit/fixtures/rcaThread";
+import {
+  rcaRunSummaryLive,
+  rcaSummary,
+  rcaRun,
+  rcaRunItem,
+  rcaV1RunItem,
+  rcaV1Summary,
+} from "@/test/unit/fixtures/rcaThread";
 import awsConfig from "@/aws-exports";
 
 // Test data factory
@@ -565,7 +572,7 @@ describe("IncidentDetailDrawer.vue", () => {
       expect(incidentsService.triggerRca).toHaveBeenCalledWith(
         "default",
         "1",
-        { reanalysis: true, build_on_previous: false },
+        { build_on_previous: false },
         expect.objectContaining({ signal: expect.anything() }),
       );
     });
@@ -675,6 +682,7 @@ describe("IncidentDetailDrawer.vue", () => {
             updated_at: 1700000000000000,
             outcome: null,
             confidence: null,
+            report_format: "v2",
             summary: {
               stage: null,
               stage_index: null,
@@ -700,6 +708,7 @@ describe("IncidentDetailDrawer.vue", () => {
               confidence: null,
               cancelled_by: null,
               error_reason: null,
+              report_format: "v2",
             },
             history: [],
           },
@@ -1023,7 +1032,7 @@ describe("IncidentDetailDrawer.vue", () => {
       expect(incidentsService.triggerRca).toHaveBeenCalledWith(
         "org-456",
         expect.any(String),
-        { reanalysis: true, build_on_previous: false },
+        { build_on_previous: false },
         expect.objectContaining({ signal: expect.anything() }),
       );
     });
@@ -1410,6 +1419,7 @@ describe("IncidentDetailDrawer.vue", () => {
       updated_at: 1700000000000000,
       outcome: null,
       confidence: null,
+      report_format: "v2" as const,
       summary: {
         stage: null,
         stage_index: null,
@@ -1436,6 +1446,7 @@ describe("IncidentDetailDrawer.vue", () => {
             confidence: null,
             cancelled_by: null,
             error_reason: null,
+            report_format: "v2" as const,
           }
         : null,
       history: [],
@@ -1526,6 +1537,61 @@ describe("IncidentDetailDrawer.vue", () => {
       expect(incidentsService.getRcaThread).not.toHaveBeenCalled();
       expect(incidentsService.getRcaSummary).not.toHaveBeenCalled();
     });
+
+    it("v1: an incident with only a pre-upgrade report shows its report and reads no run record", async () => {
+      vi.mocked(incidentsService.get).mockResolvedValue({
+        data: createIncidentWithAlerts({
+          id: "1",
+          rca: rcaV1Summary([rcaV1RunItem(), rcaV1RunItem({ run_id: "v1-1" })]),
+        }),
+      } as never);
+      wrapper = await createWrapper({}, {}, "1");
+      await flushPromises();
+
+      wrapper.vm.activeTab = "incidentAnalysis";
+      await flushPromises();
+
+      expect(incidentsService.getRcaRun).toHaveBeenCalledWith("default", "1", "v1-0");
+      expect(wrapper.find('[data-test="rca-verdict-state"]').text()).toBe("Analyzed");
+      expect(wrapper.find('[data-test="rca-existing-container"]').text()).toContain(
+        "Report of v1-0",
+      );
+      expect(incidentsService.getRcaThread).not.toHaveBeenCalled();
+      expect(incidentsService.getRcaSummary).not.toHaveBeenCalled();
+      expect(incidentsService.getRcaSteering).not.toHaveBeenCalled();
+      expect(incidentsService.getRcaFeedback).not.toHaveBeenCalled();
+    });
+
+    it("v1: picking a pre-upgrade report shows it and reads no thread or summary for it", async () => {
+      const latest = rcaRunItem({ run_id: "run-2" });
+      vi.mocked(incidentsService.get).mockResolvedValue({
+        data: createIncidentWithAlerts({
+          id: "1",
+          rca: rcaSummary({
+            state: "completed",
+            current_run: rcaRun({ state: "completed" }),
+            report_run: latest,
+            history: [latest, rcaV1RunItem()],
+          }),
+        }),
+      } as never);
+      wrapper = await createWrapper({}, {}, "1");
+      await flushPromises();
+      wrapper.vm.activeTab = "incidentAnalysis";
+      await flushPromises();
+
+      wrapper.findComponent({ name: "IncidentRCAAnalysis" }).vm.$emit("view-run", "v1-0");
+      await flushPromises();
+
+      expect(incidentsService.getRcaRun).toHaveBeenCalledWith("default", "1", "v1-0");
+      expect(wrapper.find('[data-test="rca-existing-container"]').text()).toContain(
+        "Report of v1-0",
+      );
+      for (const read of [incidentsService.getRcaThread, incidentsService.getRcaSummary]) {
+        expect(read).not.toHaveBeenCalledWith("default", "1", "v1-0", undefined);
+      }
+      expect(incidentsService.getRcaSteering).not.toHaveBeenCalledWith("default", "1", "v1-0");
+    });
   });
 
   describe("Phase 5: Ask hand-off and Resume", () => {
@@ -1542,6 +1608,7 @@ describe("IncidentDetailDrawer.vue", () => {
       confidence: null,
       cancelled_by: null,
       error_reason: null,
+      report_format: "v2" as const,
     };
     const completed = {
       run_id: "run-2",
@@ -1551,6 +1618,7 @@ describe("IncidentDetailDrawer.vue", () => {
       updated_at: 1700000060000000,
       outcome: null,
       confidence: null,
+      report_format: "v2" as const,
       summary: {
         stage: null,
         stage_index: null,
@@ -1779,10 +1847,42 @@ describe("IncidentDetailDrawer.vue", () => {
 
       expect(mockConfirm).toHaveBeenCalled();
       expect(incidentsService.triggerRca).toHaveBeenCalledTimes(1);
-      expect(vi.mocked(incidentsService.triggerRca).mock.calls[0]?.[2]).toEqual({
-        reanalysis: true,
-      });
       expect(incidentsService.get).toHaveBeenCalledWith("default", "1");
+    });
+
+    it("shows a severity rerun that committed failure before returning 503, without a duplicate error toast", async () => {
+      vi.mocked(incidentsService.updateIncident).mockResolvedValueOnce({
+        data: { severity: "P2", analysis_in_flight: false },
+      } as never);
+      const failure = { code: "agent_unavailable", reason: "Agent unavailable", details: null };
+      const failedDetail = {
+        data: createIncidentWithAlerts({
+          id: "1",
+          rca: rcaSummary({
+            run_id: "severity-failed",
+            state: "failed",
+            current_run: rcaRun({
+              run_id: "severity-failed",
+              state: "failed",
+              error: failure,
+            }),
+          }),
+        }),
+      };
+      vi.mocked(incidentsService.triggerRca).mockImplementationOnce(async () => {
+        vi.mocked(incidentsService.get).mockResolvedValue(failedDetail as never);
+        throw {
+          isAxiosError: true,
+          response: { status: 503, data: { message: "Agent unavailable" } },
+        };
+      });
+      mockToast.mockClear();
+      wrapper.vm.activeTab = "incidentAnalysis";
+      await wrapper.vm.updateSeverity("P2");
+      await flushPromises();
+      expect(wrapper.find('[data-test="rca-error-banner"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="rca-error-reason"]').text()).toBe("Agent unavailable");
+      expect(mockToast.mock.calls.some(([message]) => message.variant === "error")).toBe(false);
     });
     it("does not call updateIncident when no incidentDetails", async () => {
       wrapper.vm.incidentDetails = null;

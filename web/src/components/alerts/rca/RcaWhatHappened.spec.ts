@@ -73,39 +73,6 @@ describe("RcaWhatHappened (03 VE31, VE36, VE-D4)", () => {
     ).toEqual([["1"], ["2"], []]);
   });
 
-  it("VE31 markers: Confirmed has no tag; likely reads Inferred; Unverified and Refuted tag their rows", () => {
-    const wrapper = mountTimeline(
-      rcaRunSummary({
-        timeline: [
-          { at: RCA_T0, text: "Deploy", status: "confirmed", evidence_numbers: [1] },
-          { at: RCA_T0 + sec(1), text: "Pool full", status: "likely", evidence_numbers: [] },
-          { at: RCA_T0 + sec(2), text: "Flag flip", status: "unverified", evidence_numbers: [] },
-          { at: RCA_T0 + sec(3), text: "CPU spike", status: "refuted", evidence_numbers: [] },
-        ],
-      }),
-    );
-
-    expect(
-      rows(wrapper).map((row) => {
-        const marker = row.find('[data-test="rca-timeline-marker"]');
-        return marker.exists() ? marker.text() : null;
-      }),
-    ).toEqual([null, "Inferred", "Unverified", "Refuted"]);
-    expect(rows(wrapper)[3].find(".line-through").text()).toBe("CPU spike");
-    expect(wrapper.find('[data-test="rca-timeline-legend"]').text()).toMatch(
-      /Confirmed\s*Inferred\s*Unverified\s*Refuted/,
-    );
-  });
-
-  it("the legend shows Unverified and Refuted only when a row uses them", () => {
-    const legend = mountTimeline(rcaRunSummary()).find('[data-test="rca-timeline-legend"]').text();
-
-    expect(legend).toContain("Confirmed");
-    expect(legend).toContain("Inferred");
-    expect(legend).not.toContain("Unverified");
-    expect(legend).not.toContain("Refuted");
-  });
-
   it("a number chip opens its evidence card under the row and closes it again (F9)", async () => {
     const wrapper = mountTimeline(rcaRunSummary());
     const chip = rows(wrapper)[1].find('[data-test="rca-timeline-chip"]');

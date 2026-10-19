@@ -13,8 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// Display helpers for the summary view of an RCA run (03 §9, §12): verdict
-// pill, band, hypothesis groups, timeline markers and evidence numbers.
+// Display structured RCA verdicts, timeline, hypotheses and evidence metadata.
 
 import { gt, raw, type I18nKey, type I18nText } from "@/types/i18n";
 import type {
@@ -31,10 +30,6 @@ import type {
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import { formatRcaClock } from "@/utils/incidents/rcaThread";
 
-/**
- * The one pill style of the Analysis tab (redesign): outcome, hypothesis status
- * and evidence weight share it. `dash` and `warn-dash` are the open statuses.
- */
 export type RcaPillTone = "ok" | "warn" | "err" | "neutral" | "strong" | "dash" | "warn-dash";
 
 export const RCA_PILL_TONE_CLASS: Record<RcaPillTone, string> = {
@@ -124,11 +119,6 @@ const compareHypotheses = (a: RcaSummaryHypothesis, b: RcaSummaryHypothesis): nu
   return ra !== rb ? ra - rb : a.first_seen_seq - b.first_seen_seq;
 };
 
-/**
- * Hypotheses in their groups (F8): "Explains the incident" first when the outcome
- * names a cause or a factor, else the open group first; "Ruled out" last. Empty
- * groups are dropped.
- */
 export function groupRcaHypotheses(
   hypotheses: RcaSummaryHypothesis[],
   outcome: RcaOutcome | undefined,
@@ -175,10 +165,7 @@ const STATUS_LABEL: Record<RcaHypothesisStatus, I18nKey> = {
 export const rcaHypothesisStatusWord = (status: RcaHypothesisStatus): I18nText =>
   gt(STATUS_LABEL[status]);
 
-/**
- * Status pill text of a hypothesis. A `root_cause` hypothesis of a run whose
- * outcome is not `root_cause_identified` reads "Root cause · not confirmed" (VE18).
- */
+/** Status pill text of a hypothesis. */
 export function rcaHypothesisStatusLabel(
   status: RcaHypothesisStatus,
   outcome: RcaOutcome | undefined,
@@ -204,9 +191,11 @@ export const RCA_HYPOTHESIS_TONE: Record<RcaHypothesisStatus, RcaPillTone> = {
 
 /** "14:07:04 UTC · Testing (agent · after a.rao)" for one status change (VE11). */
 export function rcaStatusHistoryLine(change: RcaSummaryStatusChange): I18nText {
-  const actor = change.steered_by
-    ? gt("alerts.incidents.rcaSummary.historyActorSteered", { author: change.steered_by })
-    : gt("alerts.incidents.rcaSummary.historyActorAgent");
+  const actor = change.run_ended
+    ? gt("alerts.incidents.rcaSummary.historyActorRunEnded")
+    : change.steered_by
+      ? gt("alerts.incidents.rcaSummary.historyActorSteered", { author: change.steered_by })
+      : gt("alerts.incidents.rcaSummary.historyActorAgent");
   return gt("alerts.incidents.rcaSummary.historyLine", {
     time: formatRcaClock(change.at),
     status: rcaHypothesisStatusWord(change.status),

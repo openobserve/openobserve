@@ -1493,7 +1493,6 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
 import { useRouter, useRoute } from "vue-router";
-import { isAxiosError } from "axios";
 import { formatToReadable } from "@/utils/date";
 import incidentsService, {
   Incident,
@@ -1534,7 +1533,6 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard as copyToClipboardUtil } from "@/utils/clipboard";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
-import { useRcaTrigger } from "@/composables/useRcaTrigger";
 import { useIncidentRca } from "@/composables/useIncidentRca";
 import type { RcaAskPayload } from "@/utils/incidents/rcaAskAttachment";
 
@@ -1569,7 +1567,6 @@ export default defineComponent({
     const router = useRouter();
     const route = useRoute();
     const { confirm } = useConfirmDialog();
-    const { requestRca } = useRcaTrigger();
 
     const incidentOrgId = useOrgId();
     const updateIncidentStatus = useMutation(() =>
@@ -2846,7 +2843,6 @@ export default defineComponent({
 
       updating.value = true;
       try {
-        const org = store.state.selectedOrganization.identifier;
         const incidentId = incidentDetails.value.id;
         const response = await updateIncident.mutateAsync({
           id: incidentId,
@@ -2883,38 +2879,7 @@ export default defineComponent({
               persistent: false,
             });
             if (ok) {
-              try {
-                const result = await requestRca(
-                  org,
-                  incidentId,
-                  { reanalysis: true },
-                  {
-                    isStillActive: () =>
-                      store.state.selectedOrganization.identifier === org &&
-                      incidentDetails.value?.id === incidentId,
-                  },
-                );
-                if (result.status === "declined") return;
-                if (result.status === "unavailable") {
-                  toast({ variant: "error", message: result.message });
-                  return;
-                }
-                toast({
-                  variant: "success",
-                  message: t("toastMessages.alerts.aiReanalysisStarted"),
-                });
-                await reloadRca();
-              } catch (error: unknown) {
-                const responseData: unknown = isAxiosError(error) ? error.response?.data : null;
-                const message =
-                  responseData &&
-                  typeof responseData === "object" &&
-                  "message" in responseData &&
-                  typeof responseData.message === "string"
-                    ? raw(responseData.message)
-                    : t("alerts.incidents.reanalysisStartFailed");
-                toast({ variant: "error", message });
-              }
+              await triggerRca();
             }
           }
         }

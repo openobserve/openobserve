@@ -13,9 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Creates `rca_feedback`: one row per RCA run and author with the responder's answer to
-//! "Is this the cause?". Rows are keyed by subject so they outlive the run prune.
-
 use sea_orm_migration::prelude::*;
 
 #[derive(DeriveMigrationName)]

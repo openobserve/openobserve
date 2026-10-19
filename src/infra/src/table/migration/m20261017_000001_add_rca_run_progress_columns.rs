@@ -13,9 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Adds the live progress columns of an RCA run to `rca_runs`: the current stage,
-//! the context the agent was given, the number of continuation turns, and the pending
-//! on-call records of an alert run.
+//! Add persisted RCA protocol stage, context and continuation progress.
 
 use sea_orm_migration::prelude::*;
 
@@ -121,8 +119,6 @@ mod tests {
         );
     }
 
-    /// TH1 (7.1), TH10: up adds the columns once (a rerun is a no-op), an existing run reads
-    /// `continuations = 0`, and down removes them, also twice.
     #[tokio::test]
     async fn up_twice_is_idempotent_and_down_removes_the_columns_on_sqlite() {
         let db = Database::connect("sqlite::memory:").await.unwrap();

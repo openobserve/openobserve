@@ -14,9 +14,6 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!-- One verified evidence entry (03 VE23–VE29): the query that ran, what it
-     returned, the agent's reading of it for each hypothesis, and the link that
-     runs it again. Shown inline under a claim and inside the Evidence index. -->
 <template>
   <div
     data-test="rca-evidence-card"

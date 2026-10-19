@@ -14,11 +14,6 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!-- Verdict card (03 VE21, VE22, VE32, VE33, VE35; contract F2): pill, headline,
-     band and reason, suspect change and impact for a graded run; the live label
-     and leading hypothesis while live; the stage stepper (02 TH37) and the banners
-     of TH40 (M, L, N, E); the paused banner (04 frame D) and "Unblocked by …"
-     (frame G, SG39). A legacy run keeps the Phase 2 card (VE42). No credits. -->
 <template>
   <section
     data-test="rca-verdict-card"
@@ -134,9 +129,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :stage="stage"
     />
 
-    <!-- Facts of a graded run (VE35); never while live (VE-D2). The row wraps:
-         "Is this the cause?" (README §9) ends it, and its panels and saved
-         message take a full-width line below (template layout). -->
     <div v-if="graded" class="mt-0.5 flex flex-wrap items-end gap-x-8 gap-y-3">
       <dl data-test="rca-verdict-facts" class="m-0 flex min-w-0 flex-wrap items-end gap-8">
         <div class="max-w-105 min-w-0">
@@ -453,10 +445,6 @@ const props = withDefaults(
     runId: string;
     /** The shown run is live and waits for an answer (VE22). */
     waitingInput?: boolean;
-    /**
-     * Summary view of the shown run (03 §12); null while loading, on a read
-     * error, and for a legacy run (VE42): the card then keeps its Phase 2 form.
-     */
     summary?: RcaRunSummary | null;
     stale?: boolean;
     /** "HH:MM:SS" of the stale run's last update. */
@@ -609,8 +597,7 @@ const pill = computed<{
         label: t("alerts.incidents.rcaRun.state.failed"),
       };
     default:
-      // A cancelled run with a partial record reads "Failed" (VE32 frame E); the
-      // recordless Phase 2 card keeps "Cancelled".
+      // A cancelled run with a partial record reads "Failed" (VE32 frame E); the recordless Phase 2 card keeps "Cancelled".
       return {
         tone: "err",
         icon: "cancel",

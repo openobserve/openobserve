@@ -14,9 +14,6 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!-- "Evidence" index (03 VE23–VE30): one row per verified tool call with the
-     All / Decisive / Supporting filter, then the citations that matched no call
-     ("Cited but not verified"). Rows toggle their card. -->
 <template>
   <section data-test="rca-evidence-list" :aria-labelledby="headingId" class="flex flex-col">
     <div class="mb-2.5 flex flex-wrap items-center gap-2">
@@ -32,30 +29,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }}
       </span>
       <span class="flex-1" />
-      <div
+      <OToggleGroup
         v-if="evidence.length > 0"
+        :model-value="filter"
         data-test="rca-evidence-filter"
-        role="group"
         :aria-label="t('alerts.incidents.rcaSummary.evidenceFilter')"
-        class="rounded-default border-border-control inline-flex overflow-hidden border"
+        @update:model-value="
+          (value) => {
+            if (value === 'all' || value === 'decisive' || value === 'supporting') filter = value;
+          }
+        "
       >
-        <button
+        <OToggleGroupItem
           v-for="option in filterOptions"
           :key="option.value"
-          type="button"
+          :value="option.value"
           :data-test="`rca-evidence-filter-${option.value}`"
-          class="border-border-control h-7 cursor-pointer px-2.5 text-xs font-semibold not-first:border-s"
-          :class="
-            filter === option.value
-              ? 'bg-surface-accent text-text-heading'
-              : 'bg-surface-base text-text-secondary hover:bg-surface-subtle-hover'
-          "
-          :aria-pressed="filter === option.value"
-          @click="filter = option.value"
+          size="sm"
         >
           {{ option.label }}
-        </button>
-      </div>
+        </OToggleGroupItem>
+      </OToggleGroup>
     </div>
 
     <p
@@ -163,6 +157,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, nextTick, ref, useId, type ComponentPublicInstance } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import { useI18nTyped } from "@/types/i18n";
 import type {
   RcaEvidenceEntry,

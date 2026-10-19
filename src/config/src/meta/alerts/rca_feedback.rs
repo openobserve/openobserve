@@ -13,8 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Responder feedback on a finished RCA run ("Is this the cause?", README §9): one
-//! `rca_feedback` row per run and author, the latest write wins.
+//! Per-author responder feedback on completed RCA runs.
 
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -93,8 +92,6 @@ pub struct ValidFeedback {
 }
 
 impl PutRcaFeedbackRequest {
-    /// `change` needs a cause other than `still_unknown`; `no` takes 0–4 distinct reasons;
-    /// `yes` takes neither; the note is optional, at most [MAX_FEEDBACK_NOTE_CHARS].
     pub fn validate(self) -> Result<ValidFeedback, String> {
         let note = self
             .note
@@ -166,8 +163,6 @@ pub struct ListRcaFeedbackResponse {
     pub mine: Option<RcaFeedback>,
 }
 
-/// The subject id feedback is keyed by: an alert's `<alert_id>:group:<team>` is stored as
-/// the bare alert id, so every firing of the alert finds it.
 pub fn bare_subject_id(subject_id: &str) -> &str {
     subject_id
         .split_once(":group:")
@@ -202,8 +197,6 @@ mod tests {
         }
     }
 
-    /// J2: the body is `deny_unknown_fields`; unknown verdicts, causes and reasons are
-    /// rejected at parse time.
     #[test]
     fn unknown_fields_and_values_are_rejected_when_parsing() {
         assert!(parse(serde_json::json!({"verdict": "yes", "author_email": "x"})).is_err());
@@ -323,8 +316,6 @@ mod tests {
         }
     }
 
-    /// The note is trimmed, a blank note is dropped, and the 1,000 limit counts chars
-    /// (not bytes) after trimming.
     #[test]
     fn note_is_trimmed_blank_is_none_and_limit_counts_chars() {
         let note = |n: &str| {

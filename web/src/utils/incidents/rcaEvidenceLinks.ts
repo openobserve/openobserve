@@ -13,9 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// Routes for the evidence entries and blind spots of an RCA run (03 VE29, VE37).
-// Every link is built here from the entry's stored target; no URL comes from the
-// server or the model (VE-D5).
+// VE-D5: build evidence links from stored query targets, never server- or model-provided URLs.
 
 import type { RouteLocationRaw } from "vue-router";
 import { buildNavigationRoute } from "@/components/O2AIChat.navigation";
@@ -44,15 +42,10 @@ const SQL_STREAM_TYPE: Partial<Record<RcaEvidenceTarget["signal"], true>> = {
 const hasRange = (link: RcaEvidenceTarget): boolean =>
   typeof link.start_us === "number" && typeof link.end_us === "number";
 
-/**
- * The route that runs an entry's query again (VE29), or null for entries with no
- * query to run (change, infra, context, unclassified).
- */
 export function rcaEvidenceLink(link: RcaEvidenceTarget, org: string): RcaEvidenceLink | null {
   const ranged = hasRange(link);
 
-  // SQL: the logs page with the AI chat's load_query handoff; `stream_type` keeps
-  // the signal, so metrics and traces SQL open on the logs page too.
+  // Logs handles SQL for all three signals; preserve the source stream type.
   if (link.sql && SQL_STREAM_TYPE[link.signal]) {
     const route = buildNavigationRoute(
       {
@@ -115,10 +108,7 @@ export function rcaEvidenceLink(link: RcaEvidenceTarget, org: string): RcaEviden
   return null;
 }
 
-/**
- * The query text "Copy query" copies, or null when the entry stored none. A
- * command (change, infra) is copied too, though it has no explorer link.
- */
+/** The query text "Copy query" copies, or null when the entry stored none. */
 export const rcaEvidenceQuery = (link: RcaEvidenceTarget): string | null =>
   link.sql || link.promql || link.filter || link.command || null;
 

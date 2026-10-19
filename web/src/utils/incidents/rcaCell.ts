@@ -13,9 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// The "AI analysis" cell of the incidents list (01 §12.1, RR-42, 03 VE14). The
-// model reads only `incident.rca`, `incident.rca_off_reason` and the severity;
-// `stale` comes from the server and is never computed here (RR-9).
+// List display reads only incident metadata; stale state is computed by the server.
 
 import { gt, raw, type I18nKey, type I18nText } from "@/types/i18n";
 import type { Incident, RcaBand, RcaOutcome, RcaSummary } from "@/services/incidents";
@@ -160,7 +158,12 @@ export function rcaCellModel(
           }),
         );
       }
-      const elapsed = sinceMicros(rca.started_at, now);
+      const elapsed = rca.summary.stage_index
+        ? gt("alerts.incidents.aiAnalysis.stageProgress", {
+            index: rca.summary.stage_index,
+            count: rca.summary.stage_count,
+          })
+        : sinceMicros(rca.started_at, now);
       return state(
         investigating,
         "muted",
@@ -227,14 +230,16 @@ export function rcaCellModel(
           rerunNote,
         });
       }
-      // A cancelled run reads "Failed"; the detail tells it apart from a broken run.
-      // A run the server stopped names why ("Stopped: incident resolved", 04 SG41).
+      // Preserve the server's special cancellation reason, including incident resolution.
       const detail =
         rca.state === "failed" || rca.summary.detail
           ? raw(rca.summary.detail)
           : cancelledBy
-            ? gt("alerts.incidents.aiAnalysis.cancelledBy", { user: cancelledBy })
-            : gt("alerts.incidents.aiAnalysis.cancelled");
+            ? gt("alerts.incidents.aiAnalysis.cancelledByAfterChecks", {
+                user: cancelledBy,
+                count: rca.summary.steps,
+              })
+            : gt("alerts.incidents.aiAnalysis.cancelledAfterChecks", { count: rca.summary.steps });
       return state(gt("alerts.incidents.aiAnalysis.failed"), "err", detail);
     }
   }

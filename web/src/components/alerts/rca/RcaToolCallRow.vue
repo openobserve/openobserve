@@ -14,9 +14,6 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!-- One tool call of a thread step (02 TH33/TH38): tool, key argument, result
-     summary, OK/Error and duration. The full input/output only shows when the
-     org setting sends them (TH34). -->
 <template>
   <li data-test="rca-tool-call" class="flex min-w-0 flex-col gap-0.5 px-2.5 py-1.5">
     <div class="flex min-w-0 items-center gap-2">

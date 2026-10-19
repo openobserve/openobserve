@@ -13,9 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! The evidence ledger: what `record_hypothesis` and `record_blind_spot` left in
-//! the run (03 VE4–VE13, VE20).
-
 use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
@@ -33,8 +30,6 @@ pub const MAX_BLIND_SPOTS: usize = 10;
 pub const MAX_TEXT_CHARS: usize = 500;
 /// Most characters kept for a blind spot title (VE8).
 pub const MAX_TITLE_CHARS: usize = 100;
-/// Most bytes kept for an evidence query: the key-argument limit of the tool log,
-/// so a long query the agent copied still matches its call (CG §5.2).
 pub const MAX_QUERY_BYTES: usize = crate::meta::oncall::confidence::KEY_ARG_MAX_BYTES;
 
 /// The `tool` label of `rca_ledger_invalid_call_total` for each ledger tool.
@@ -96,8 +91,6 @@ pub struct EvidenceItem {
     pub polarity: Polarity,
     pub strength: Strength,
     pub observation: String,
-    /// `seq` of the first ledger call, on any hypothesis, that held this item: the
-    /// same id, bare tool and matched query (VE5, VE24).
     pub first_cited_seq: i64,
 }
 
@@ -107,6 +100,8 @@ pub struct StatusChange {
     /// Microseconds.
     pub at_us: i64,
     pub status: HypothesisStatus,
+    #[serde(default)]
+    pub run_ended: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub trigger_steer_id: Option<String>,
 }
@@ -190,8 +185,6 @@ pub struct LedgerCall {
 /// What `build_ledger` cut, dropped and rewrote, for the ledger metrics (§14).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct LedgerCounts {
-    /// `(field, count)` with a non-zero count; field is one of
-    /// `hypotheses|evidence|statement|reason|observation|query|title|why|blind_spots`.
     pub truncated: Vec<(&'static str, u32)>,
     /// `(tool, count)` of dropped calls; tool is `record_hypothesis` or `record_blind_spot`.
     pub invalid_calls: Vec<(String, u32)>,
@@ -316,9 +309,6 @@ fn parse_blind_spot(input: &serde_json::Value) -> Option<BlindSpotInput> {
     numbered_id(&b.id, 'b', MAX_BLIND_SPOTS as u32).then_some(b)
 }
 
-/// The identity of one cited item (VE5): its evidence id, its bare tool and its
-/// query in the form a citation is matched in. A reused id with another tool or
-/// query is another item, verified and numbered by its own first citation.
 #[derive(Debug, Clone, PartialEq)]
 struct CitedItem {
     id: String,
@@ -336,8 +326,7 @@ impl CitedItem {
     }
 }
 
-/// The fold of ledger calls in sequence order, shared by [build_ledger] and
-/// [leading_history].
+/// The fold of ledger calls in sequence order, shared by [build_ledger] and [leading_history].
 #[derive(Default)]
 struct Builder {
     hypotheses: Vec<Hypothesis>,
@@ -431,6 +420,7 @@ impl Builder {
         let change = StatusChange {
             at_us: call.at_us,
             status: input.status,
+            run_ended: false,
             trigger_steer_id,
         };
 
@@ -507,13 +497,7 @@ impl Builder {
     }
 }
 
-/// Builds the ledger and the blind spots from the ledger calls, in sequence order
-/// (VE10): the last valid call for an id sets its fields, `first_seen_seq` is the
-/// seq of its first valid call, and invalid calls are dropped and counted. Limits
-/// of VE6 cut and drop, and each cut is counted. A status history entry is added
-/// only when the status changes (VE11). When `run_ended`, each `testing`
-/// hypothesis becomes `untested` with one more history entry at the last call's
-/// time (VE7). `None` when the run has no `record_hypothesis` call.
+/// Fold ledger calls; run end demotes testing to untested with explicit server provenance.
 pub fn build_ledger(
     calls: &[LedgerCall],
     run_ended: bool,
@@ -535,14 +519,13 @@ pub fn build_ledger(
             h.history.push(StatusChange {
                 at_us,
                 status: HypothesisStatus::Untested,
+                run_ended: true,
                 trigger_steer_id: None,
             });
             left_testing += 1;
         }
     }
 
-    // A later call may cite an item first defined earlier; every item carries the
-    // run-wide first seq of its identity.
     for item in b.hypotheses.iter_mut().flat_map(|h| h.evidence.iter_mut()) {
         let key = CitedItem::of(&item.id, &item.tool, &item.query);
         if let Some((_, seq)) = b.first_cited.iter().find(|(k, _)| *k == key) {
@@ -611,8 +594,6 @@ pub fn leading(ledger: &EvidenceLedger) -> Option<&Hypothesis> {
     leading_in(&ledger.hypotheses)
 }
 
-/// The hypothesis the grade judges (VE13): the earliest `root_cause`, else the
-/// earliest `contributing`, else the leading one.
 pub fn subject(ledger: &EvidenceLedger) -> Option<&Hypothesis> {
     let earliest = |status: HypothesisStatus| {
         ledger
@@ -633,9 +614,6 @@ pub struct LeadingEntry {
     pub statement: String,
 }
 
-/// The leading hypothesis after each hypothesis call, in sequence order, with
-/// consecutive duplicates removed (VE20). A new id or a new statement for the
-/// same id is a new entry; a moment with no leading hypothesis adds nothing.
 pub fn leading_history(calls: &[LedgerCall]) -> Vec<LeadingEntry> {
     let mut b = Builder::default();
     let mut history: Vec<LeadingEntry> = Vec::new();
@@ -819,11 +797,13 @@ mod tests {
                 StatusChange {
                     at_us: 1_000_000,
                     status: HypothesisStatus::Testing,
+                    run_ended: false,
                     trigger_steer_id: None
                 },
                 StatusChange {
                     at_us: 5_000_000,
                     status: HypothesisStatus::Untested,
+                    run_ended: true,
                     trigger_steer_id: None
                 },
             ]
@@ -906,11 +886,13 @@ mod tests {
                 StatusChange {
                     at_us: at(14, 7),
                     status: HypothesisStatus::Testing,
+                    run_ended: false,
                     trigger_steer_id: None
                 },
                 StatusChange {
                     at_us: at(14, 14),
                     status: HypothesisStatus::RootCause,
+                    run_ended: false,
                     trigger_steer_id: Some("stg_arao".into()),
                 },
             ]

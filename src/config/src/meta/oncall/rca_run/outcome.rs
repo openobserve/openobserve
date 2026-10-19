@@ -66,8 +66,7 @@ pub(super) fn is_cause_unknown(probable_cause: &str) -> bool {
     probable_cause.trim().eq_ignore_ascii_case("cause unknown")
 }
 
-/// The VE14 table; the first rule that matches wins. `grade.band` is the band
-/// before VE15. A `probable_cause` of "cause unknown" empties the `root_cause` set.
+/// The VE14 table; the first rule that matches wins.
 pub fn derive_outcome(
     ledger: Option<&EvidenceLedger>,
     grade: &ConfidenceGrade,

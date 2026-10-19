@@ -23,7 +23,10 @@ use config::{
             rca_run::summarize_result,
         },
     },
-    utils::json::{Map, Value},
+    utils::{
+        json::{Map, Value},
+        redact::redact_internal_details,
+    },
 };
 use infra::table::ai_chat_turns;
 use o2_enterprise::enterprise::ai::chat::batcher::DurableEvent;
@@ -37,32 +40,20 @@ use super::{
     },
     rca_ledger::{ASK_RESPONDERS, question_of, split_steers},
 };
-use crate::redact::redact_internal_details;
 
 pub(crate) const RECORD_STEP: &str = "record_step";
 pub(crate) const SUBMIT_REPORT: &str = "submit_report";
 /// The durable event type of a part change; stored types carry a `.N` version suffix.
 const PART_UPDATED: &str = "message.part.updated";
 const IMPLICIT_STEP_TITLE: &str = "Investigation";
-/// The seven stages of the RCA protocol, in order; `stage_index` is the 1-based position (TH18).
-pub(crate) const RCA_STAGES: [&str; 7] = [
-    "context",
-    "topology",
-    "changes",
-    "traces",
-    "log_patterns",
-    "metrics",
-    "converge",
-];
 
 /// One of the seven stage names, else `None`.
 pub(crate) fn rca_stage(stage: Option<&Value>) -> Option<&'static str> {
     let stage = stage?.as_str()?;
-    RCA_STAGES.iter().copied().find(|s| *s == stage)
+    config::meta::oncall::rca_run::protocol_stage(stage)
 }
 
-/// How one tool part counts in the thread (TH20, TH29). The projection and the live
-/// observer (TH27) both count through this, so the live counts are the final ones.
+/// How one tool part counts in the thread (TH20, TH29).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ThreadPart {
     /// A `record_step` that opens a step with this stage.
@@ -87,8 +78,6 @@ impl ThreadPart {
         }
     }
 
-    /// Whether this part, coming after `steps` steps, opens a step: a `record_step`, or the
-    /// first row before any step (the implicit "Investigation" step).
     pub(crate) fn opens_step(self, steps: usize) -> bool {
         match self {
             Self::Step(_) => true,
@@ -98,9 +87,6 @@ impl ThreadPart {
     }
 }
 
-/// A tool part as the thread reads it (TH29, TH33): the bare tool name (MCP prefix
-/// stripped, `tools_call` unwrapped), its arguments and its state. The thread, the live
-/// observer and the run decoder (`rca_ledger`) all read tool parts through this.
 pub(crate) struct ToolPart<'a> {
     part: &'a Map<String, Value>,
     /// Empty when a `tools_call` names no tool.
@@ -205,8 +191,6 @@ pub(crate) fn updated_part(event: &DurableEvent) -> Option<&Map<String, Value>> 
     event.data.get("part").and_then(Value::as_object)
 }
 
-/// The title the thread gives the `index`-th (1-based) step: its trimmed `title` argument
-/// cut to [STEP_TITLE_MAX_CHARS], else "Step <index>".
 pub(crate) fn step_title(title: Option<&Value>, index: usize) -> String {
     title
         .and_then(Value::as_str)
@@ -287,6 +271,7 @@ pub struct ThreadToolCall {
     pub tool: String,
     pub key_arg: Option<String>,
     pub status: ToolCallStatus,
+    pub interrupted: bool,
     pub started_at: Option<i64>,
     pub duration_ms: Option<i64>,
     pub result_summary: Option<String>,
@@ -300,8 +285,6 @@ pub struct ThreadToolCall {
     pub output: Option<String>,
 }
 
-/// A user message after the first prompt: a turn prompt, or a steering message (SG19)
-/// with its header fields and the responder's text without the header lines.
 #[derive(Debug, Clone, PartialEq, Serialize, ToSchema)]
 pub struct ThreadUserMessage {
     pub at: Option<i64>,
@@ -380,9 +363,7 @@ impl RcaThread {
     }
 }
 
-/// TH31: `"{last_committed_seq}.{session.updated_at}.{run.updated_at}"`, plus `.io` while
-/// the org shows tool input and output, so turning that setting off or on invalidates a
-/// version a client holds.
+/// TH31: version committed seq, session/run writes, and tool-IO visibility together.
 pub fn state_version(
     last_committed_seq: i64,
     session_updated_at: i64,
@@ -393,8 +374,7 @@ pub fn state_version(
     format!("{last_committed_seq}.{session_updated_at}.{run_updated_at}{io}")
 }
 
-/// The thread of an RCA session (TH29). `run_id` and `state_version` are left empty for the
-/// caller; `show_tool_io` adds raw tool `input`/`output` (TH34).
+/// The thread of an RCA session (TH29).
 pub fn project_rca_thread(
     events: &[DurableEvent],
     turns: &[ai_chat_turns::Model],
@@ -466,8 +446,6 @@ impl Builder {
         self.last_ms = Some(self.last_ms.map_or(ms, |l| l.max(ms)));
     }
 
-    /// The first user message is the run's prompt; a later one is a turn prompt or one or
-    /// more steering messages (SG19).
     fn user_message(&mut self, at: Option<i64>, parts: &Map<String, Value>) {
         let (preamble, blocks) = split_steers(&user_text(parts));
         if self.started.is_none() {
@@ -625,6 +603,7 @@ impl Builder {
             key_arg: key_arg(&tool, &input),
             tool,
             status,
+            interrupted: !self.active && !matches!(call.status, "completed" | "error"),
             started_at,
             duration_ms: started_at.zip(ended_at).map(|(s, e)| (e - s) / 1000),
             result_summary,
@@ -718,8 +697,7 @@ impl Builder {
                 question.answered_at = answer.at;
             }
         }
-        // J10: a resumed run's session starts with copied events that no turn row covers;
-        // its duration counts from its first turn, not from the first copied event.
+        // J10: copied events precede this run; duration starts at its own first turn.
         let first_ms = match turns.first() {
             Some(turn) if turn.start_seq.is_some_and(|seq| seq > 0) => Some(turn.started_at / 1000),
             _ => self.first_ms,
@@ -823,8 +801,6 @@ pub(crate) fn key_arg(tool: &str, input: &Map<String, Value>) -> Option<String> 
     Some(cut_bytes(&text, KEY_ARG_MAX_BYTES).to_string())
 }
 
-/// A tool call's response body: the payload inside an MCP content wrapper, else the output
-/// as an object (JSON output parsed; text output as `{"output": text, "metadata": ..}`).
 pub(crate) fn tool_body(state: &Map<String, Value>) -> Value {
     let metadata = state
         .get("metadata")
@@ -866,8 +842,6 @@ pub(crate) mod tests {
     pub(crate) const T: i64 = 1_784_600_000_000;
     pub(crate) const FIRST_REPORT: &str = "## Draft\nThe pool may be exhausted.";
     pub(crate) const SECOND_REPORT: &str = "## Root cause\nThe DB pool ran dry.";
-    /// The visible tool rows of [rca_session]: GetIncident, SearchSQL, PrometheusRangeQuery,
-    /// and a failed SearchSQL. `bash`, `read` and the sentinels are not rows.
     pub(crate) const VISIBLE_TOOL_CALLS: u32 = 4;
 
     /// Builds the committed events of one chat session.
@@ -968,8 +942,6 @@ pub(crate) mod tests {
         json!({"output": json!({"took": 3, "hits": vec![json!({}); n], "total": n}).to_string()})
     }
 
-    /// A recorded-shape RCA session: a tool call before the first step, hidden tools, two
-    /// `record_step`s with notes and citations, a failed call, and two `submit_report`s.
     pub(crate) fn rca_session() -> Vec<DurableEvent> {
         let mut s = Session::new();
         s.message("msg_u1", "user", json!({"created": T}));
@@ -1147,8 +1119,6 @@ pub(crate) mod tests {
             .collect()
     }
 
-    /// TH29, TH33: steps, stage and title, notes, citations, durations and summaries of the
-    /// recorded RCA session.
     #[test]
     fn the_rca_session_projects_to_its_steps_notes_and_tool_rows() {
         let thread = project_rca_thread(&rca_session(), &[], false, false);
@@ -1177,8 +1147,6 @@ pub(crate) mod tests {
             ]
         );
 
-        // Tool calls before the first record_step: the "Investigation" step; the text before
-        // them is no note.
         let first = &thread.steps[0];
         assert_eq!(first.note, None);
         assert_eq!(first.started_at, us(200));
@@ -1316,9 +1284,6 @@ pub(crate) mod tests {
         }
     }
 
-    /// TH33, VE27: a SearchSQL row whose rows came back as a markdown table
-    /// (`agent_options.output_format = md_table`, `hits` emptied) counts the table rows,
-    /// as the evidence summary does; it never reads "0 rows".
     #[test]
     fn an_md_table_search_row_counts_the_table_rows() {
         let mut table = String::from("| level | n |\n| --- | --- |");
@@ -1434,6 +1399,7 @@ pub(crate) mod tests {
             ended.steps[0].tool_calls[0].error.as_deref(),
             Some(UNFINISHED_TOOL_ERROR)
         );
+        assert!(ended.steps[0].tool_calls[0].interrupted);
     }
 
     /// TH31: the version names the session watermark, the session write and the run write.
@@ -1448,8 +1414,6 @@ pub(crate) mod tests {
         assert_ne!(v, state_version(12, 1_700, 1_800, true));
     }
 
-    /// TH31: turning the org's tool-output setting on or off changes the version, so a
-    /// client's copy with the other visibility is never answered `not_modified`.
     #[test]
     fn the_state_version_names_the_tool_io_setting() {
         assert_eq!(state_version(12, 1_700, 1_800, true), "12.1700.1800.io");
@@ -1462,21 +1426,9 @@ pub(crate) mod tests {
     /// TH18: the seven stage names map to themselves; anything else is no stage.
     #[test]
     fn rca_stage_maps_the_seven_names_only() {
-        for stage in RCA_STAGES {
+        for (stage, _) in config::meta::oncall::rca_run::RCA_STAGES {
             assert_eq!(rca_stage(Some(&json!(stage))), Some(stage));
         }
-        assert_eq!(
-            RCA_STAGES,
-            [
-                "context",
-                "topology",
-                "changes",
-                "traces",
-                "log_patterns",
-                "metrics",
-                "converge"
-            ]
-        );
         for other in [
             json!("gather"),
             json!("Context"),
@@ -1543,8 +1495,6 @@ pub(crate) mod tests {
             100,
             101,
         );
-        // [e1] at the start, [e2] ends exactly at char 1,000, [e3] starts after the cut,
-        // [e4] straddles it.
         let head = format!("[e1] {}", "a".repeat(990));
         assert_eq!(head.chars().count(), 995);
         let text = format!("{head} [e2] [e3] {} [e4]", "b".repeat(50));
@@ -1594,10 +1544,6 @@ pub(crate) mod tests {
         assert_eq!(json["stats"]["tool_calls"], 0);
     }
 
-    /// SG19, SG20, SG25, §10.6: a steering message is a user message with its header fields
-    /// and the responder's text without the header lines, read at the next assistant
-    /// message; the first step after that read is `from_steering`; an answer names its
-    /// question's responder.
     #[test]
     fn steering_messages_project_with_their_header_read_time_and_question() {
         use config::meta::alerts::rca_steering::SteerKind;
@@ -1725,9 +1671,6 @@ pub(crate) mod tests {
         }
     }
 
-    /// J10: a resumed run's session starts with copied events no turn row covers; its
-    /// duration counts from its first turn row, not from the source's first event. A
-    /// session whose first turn starts at seq 0 counts from its first event.
     #[test]
     fn a_resumed_sessions_duration_counts_from_its_first_turn() {
         use crate::ai_chat::fork::tests::{THREE_STEPS_CUT, three_steps};

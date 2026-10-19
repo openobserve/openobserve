@@ -176,15 +176,6 @@ const cases: [string, Row, boolean, Expected][] = [
     { kind: "state", label: "Failed", tone: "err", detail: "Agent unavailable", rerunNote: "" },
   ],
   [
-    "Failed · Cancelled by a.rao",
-    {
-      rca: rca({ state: "cancelled", summary: { cancelled_by: "a.rao@acme.io" } }),
-      severity: "P2",
-    },
-    true,
-    { kind: "state", label: "Failed", tone: "err", detail: "Cancelled by a.rao", rerunNote: "" },
-  ],
-  [
     "RR-42: previous + re-run failed",
     {
       rca: rca({ state: "failed", summary: { detail: "Agent unavailable", previous: PREVIOUS } }),
@@ -397,6 +388,24 @@ describe("rcaCellModel (01 §12.1, RR-42, 03 VE14/VE44)", () => {
   it.each(cases)("%s", (_name, row, rcaEnabled, expected) => {
     const model = rcaCellModel(row, { rcaEnabled, now: NOW });
     expect(model).toMatchObject(expected);
+  });
+
+  it("shows persisted progress instead of elapsed time once the stage is known", () => {
+    const row = {
+      rca: rca({ summary: { stage: "log_patterns", stage_index: 5, stage_count: 7 } }),
+      severity: "P2",
+    } as Row;
+    expect(rcaCellModel(row, { rcaEnabled: true, now: NOW }).detail).toContain("Stage 5/7");
+  });
+
+  it("includes completed checks on cancellation but keeps the resolved-incident reason", () => {
+    const row = {
+      rca: rca({ state: "cancelled", summary: { steps: 3, cancelled_by: "a.rao@acme.io" } }),
+      severity: "P2",
+    } as Row;
+    expect(rcaCellModel(row, { rcaEnabled: true, now: NOW }).detail).toContain("after 3 checks");
+    row.rca!.summary.detail = "Incident resolved";
+    expect(rcaCellModel(row, { rcaEnabled: true, now: NOW }).detail).toBe("Incident resolved");
   });
 
   it("SG26: the until time is in the viewer's zone", () => {
