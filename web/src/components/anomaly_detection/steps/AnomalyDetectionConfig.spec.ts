@@ -697,16 +697,35 @@ describe("AnomalyDetectionConfig", () => {
       },
     );
 
-    it.each([1, 10, 3.25])("accepts %s", async (ok) => {
-      wrapper = mountConfig({ band_width: ok });
-      await flushPromises();
-      const form = getForm(wrapper);
+    it.each([1, 10, 3.25, 4.234])(
+      "validates typed %s and preserves its numeric payload",
+      async (ok) => {
+        const { wrapper: w, config } = mountReturning({ band_width: 4 });
+        wrapper = w;
+        await flushPromises();
+        await levelInput(wrapper).setValue(String(ok));
+        await flushPromises();
 
-      await form.handleSubmit();
-      await flushPromises();
+        await expect((wrapper.vm as any).validate()).resolves.toBe(true);
+        expect(anomalyBandPayload(config, false).band_width).toBe(ok);
+        expect(typeof anomalyBandPayload(config, false).band_width).toBe("number");
+      },
+    );
 
-      expect(form.state.isValid).toBe(true);
-    });
+    it.each(["0.5", "10.5", ""])(
+      "blocks a typed %j draft through app validation and keeps manual mode",
+      async (draft) => {
+        wrapper = mountConfig({ band_width: 4 });
+        await flushPromises();
+        await levelInput(wrapper).setValue(draft);
+        await flushPromises();
+
+        await expect((wrapper.vm as any).validate()).resolves.toBe(false);
+        expect(tierStates(wrapper)).toEqual(["off", "off", "off", "off"]);
+        expect(wrapper.find('[data-test="anomaly-sensitivity-auto-level"]').exists()).toBe(false);
+        expect(wrapper.find('[data-test="anomaly-sensitivity-error"]').text()).toBe(RANGE_MESSAGE);
+      },
+    );
 
     // Saving must never pin k: both an Auto create and an untouched Auto edit send null.
     it.each([
@@ -807,15 +826,6 @@ describe("AnomalyDetectionConfig", () => {
 
       expect(form.state.values.budget_count).toBe(1);
       expect(form.state.values.budget_period).toBe("week");
-    });
-
-    it("preserves fractional budget validity after numeric props reach the native input", async () => {
-      wrapper = mountConfig({ alert_budget_per_day: 0.05 });
-      await flushPromises();
-      const input = wrapper.find('[data-test="anomaly-budget-count"] input');
-      expect((input.element as HTMLInputElement).value).toBe("0.35");
-      expect((input.element as HTMLInputElement).checkValidity()).toBe(true);
-      await expect((wrapper.vm as any).validate()).resolves.toBe(true);
     });
 
     it("the budget tiers map to 1/week, 1/day and 4/day", async () => {

@@ -28,22 +28,18 @@ describe("OFormInput", () => {
     expect(wrapper.find("input").exists()).toBe(true);
   });
 
-  it("accepts fractional levels and enforces numeric bounds in the native input", async () => {
+  it("preserves legacy numeric constraint forwarding", () => {
     wrapper = mount(OForm, {
-      props: { defaultValues: { level: 3.5 } },
+      props: { defaultValues: { count: 0 } },
       slots: {
-        default: () =>
-          h(OFormInput, { name: "level", type: "number", min: 1, max: 10, step: "any" }),
+        default: () => h(OFormInput, { name: "count", type: "number", min: 1, max: 10, step: 2 }),
       },
     });
     const input = wrapper.find("input");
+    expect(input.attributes("min")).toBeUndefined();
+    expect(input.attributes("max")).toBeUndefined();
+    expect(input.attributes("step")).toBeUndefined();
     expect(input.element.checkValidity()).toBe(true);
-    await input.setValue("4.234");
-    expect(input.element.validity.stepMismatch).toBe(false);
-    await input.setValue("0.5");
-    expect(input.element.validity.rangeUnderflow).toBe(true);
-    await input.setValue("10.5");
-    expect(input.element.validity.rangeOverflow).toBe(true);
   });
 
   it("renders a label when provided", () => {
