@@ -267,6 +267,7 @@ import {
   formatRate,
   METERS,
   monthlyPace,
+  type BillingOrg,
   type EstimateInputs,
   type EstimateLine,
   type MeteringDetails,
@@ -305,7 +306,14 @@ const SECONDS_PER_MINUTE = 60;
 /** Below a cent a line is noise, so it renders quietly rather than as a real cost. */
 const CENT = 0.005;
 
-const props = defineProps<{ details: MeteringDetails | null }>();
+const props = withDefaults(
+  defineProps<{
+    details: MeteringDetails | null;
+    /** A super org's orgs, itself first; empty for any other org. */
+    billingOrgs?: BillingOrg[];
+  }>(),
+  { billingOrgs: () => [] },
+);
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -607,10 +615,12 @@ const loadingHistory = ref(false);
 const loadDefaults = async () => {
   if (!props.details) return;
   loadingHistory.value = true;
+  // A super org's bill covers its whole group, so the assumptions that turn it into counts do too.
+  const orgId = props.billingOrgs.length ? null : store.state.selectedOrganization.identifier;
   try {
     const [streams, scan] = await Promise.all([
-      runScalarQuery(averageStreamSizeSql(store.state.selectedOrganization.identifier), "streams"),
-      runScalarQuery(searchScanRateSql(store.state.selectedOrganization.identifier), "scan"),
+      runScalarQuery(averageStreamSizeSql(orgId), "streams"),
+      runScalarQuery(searchScanRateSql(orgId), "scan"),
     ]);
     const streamCount = Number(streams.streams) || 0;
     if (!edited.has("avgStreamMb")) {

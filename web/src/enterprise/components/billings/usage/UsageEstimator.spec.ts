@@ -117,6 +117,23 @@ describe("UsageEstimator My Current Usage", () => {
     expect(current).toBe(2);
   });
 
+  it("reads a super org's history across the whole group, the same orgs its bill covers", async () => {
+    mount(UsageEstimator, {
+      props: {
+        details,
+        billingOrgs: [
+          { id: "payer", name: "Payer", isSelf: true },
+          { id: "child", name: "Child", isSelf: false },
+        ],
+      },
+      global: { plugins: [i18n, store] },
+    });
+    await flushPromises();
+
+    expect(search).toHaveBeenCalledTimes(2);
+    for (const [sql] of search.mock.calls) expect(sql).not.toContain("org_id =");
+  });
+
   it("leaves a value typed before the history lands as typed", async () => {
     const wrapper = mountEstimator();
     await flushPromises();

@@ -308,19 +308,24 @@ export function meterTotalSql(orgId: string, events: string[]): string {
   );
 }
 
-/** Estimator default: mean ingested megabytes per stream. */
-export function averageStreamSizeSql(orgId: string): string {
+/** `null` reads every org in the stream: a super org's whole group, as its bill covers. */
+const orgWhere = (orgId: string | null) =>
+  orgId === null ? "where " : `where org_id = '${escapeLiteral(orgId)}' and `;
+
+/** Estimator default: mean ingested megabytes per stream. Across a group, two orgs' `default` are two streams. */
+export function averageStreamSizeSql(orgId: string | null): string {
+  const stream = orgId === null ? "concat(org_id, '/', stream_name)" : "stream_name";
   return (
-    `select sum(size) as total, count(distinct stream_name) as streams ` +
-    `from "${USAGE_STREAM_NAME}" where org_id = '${escapeLiteral(orgId)}' and event = 'Ingestion'`
+    `select sum(size) as total, count(distinct ${stream}) as streams ` +
+    `from "${USAGE_STREAM_NAME}" ${orgWhere(orgId)}event = 'Ingestion'`
   );
 }
 
 /** Estimator default: megabytes scanned per minute of search. `response_time` is seconds. */
-export function searchScanRateSql(orgId: string): string {
+export function searchScanRateSql(orgId: string | null): string {
   return (
     `select sum(size) as total, sum(response_time) as seconds ` +
-    `from "${USAGE_STREAM_NAME}" where org_id = '${escapeLiteral(orgId)}' and event = 'Search'`
+    `from "${USAGE_STREAM_NAME}" ${orgWhere(orgId)}event = 'Search'`
   );
 }
 

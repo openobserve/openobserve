@@ -118,6 +118,13 @@ describe("usageQueries", () => {
     expect(searchScanRateSql("default")).toContain("sum(response_time)");
   });
 
+  it("reads a super org's estimator history across the group, counting each org's streams apart", () => {
+    const streams = averageStreamSizeSql(null);
+    expect(streams).not.toContain("org_id =");
+    expect(streams).toContain("count(distinct concat(org_id, '/', stream_name))");
+    expect(searchScanRateSql(null)).toMatch(/where event = 'Search'$/);
+  });
+
   it("reads the cycles out of the new body and still accepts the old flat one", () => {
     const parsed = parseMeteringResponse({ upcoming: details, past: [details], oldest_ts: 1 });
     expect(parsed?.past).toHaveLength(1);

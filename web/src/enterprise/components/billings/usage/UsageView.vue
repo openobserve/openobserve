@@ -157,7 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :org-costs="orgCosts"
         />
         <UsageBudget v-else-if="activeTab === 'budget'" :details="details" :projected="projected" />
-        <UsageEstimator v-else :details="details" />
+        <UsageEstimator v-else :details="details" :billing-orgs="billingOrgs" />
       </KeepAlive>
     </div>
   </div>
