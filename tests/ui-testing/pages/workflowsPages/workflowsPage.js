@@ -13,10 +13,8 @@
 //   K9 — the editor Save button has a tooltip overlay that intercepts pointer events; we click it
 //        via evaluate() to bypass the interception.
 //   K10 — the workflows list GET is slow (~16-20s); readiness/list helpers use generous timeouts.
-//   K11 — node-drawer dropdowns (column/operator selects) can take longer than 15s to open under
-//         CI parallel load, even though their options (e.g. condition columns) are static, synchronous
-//         data — it's render/animation contention from several canvases+drawers opening at once, not
-//         a slow fetch. Seen timing out on COND-02's column pick (meta_alert_name) on retry too.
+//   K11 — under CI parallel load a node-drawer dropdown click can land without the list opening,
+//         and waiting longer never recovers it; openSelect() re-clicks a trigger that is still closed.
 
 const { expect } = require('@playwright/test');
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
@@ -837,18 +835,27 @@ class WorkflowsPage {
     await this.page.locator(this.destHeaderValueField(key)).fill(value, { timeout: DRAWER_TIMEOUT_MS });
   }
 
+  /** Open an OSelect until `option` shows (K11); an open list with no such option still fails. */
+  async openSelect(triggerSel, option) {
+    const trigger = this.page.locator(triggerSel);
+    await expect(async () => {
+      if ((await trigger.getAttribute('data-state')) !== 'open') {
+        await trigger.click({ timeout: 5000 });
+      }
+      await expect(option).toBeVisible({ timeout: 3000 });
+    }).toPass({ timeout: DRAWER_TIMEOUT_MS });
+  }
+
   /** Pick an OSelect option by its VALUE (options stamp data-test-value). */
   async pickSelectOption(triggerSel, optionSel, value) {
-    await this.page.locator(triggerSel).click({ timeout: DRAWER_TIMEOUT_MS });
     const option = this.page.locator(`${optionSel}[data-test-value="${value}"]`).first();
-    await option.waitFor({ state: 'visible', timeout: DRAWER_TIMEOUT_MS });
+    await this.openSelect(triggerSel, option);
     await option.click({ timeout: DRAWER_TIMEOUT_MS });
   }
 
   /** Values of every option an OSelect currently offers. */
   async selectOptionValues(triggerSel, optionSel) {
-    await this.page.locator(triggerSel).click({ timeout: DRAWER_TIMEOUT_MS });
-    await this.page.locator(optionSel).first().waitFor({ state: 'visible', timeout: DRAWER_TIMEOUT_MS });
+    await this.openSelect(triggerSel, this.page.locator(optionSel).first());
     const values = await this.page.locator(optionSel).evaluateAll((els) =>
       els.map((e) => e.getAttribute('data-test-value'))
     );
