@@ -462,7 +462,11 @@ const isSuperOrg = computed(() => props.billingOrgs.length > 0);
 /** An org keeps its palette slot by its place in the group; the retention row keeps its meter colour. */
 const orgColor = (key: string) => {
   const index = props.billingOrgs.findIndex((org) => org.id === key);
-  return index >= 0 ? paletteColor(index) : meterColorFor(key as MeterKey);
+  if (index >= 0) return paletteColor(index);
+  const former = formerOrgIds.value.indexOf(key);
+  return former >= 0
+    ? paletteColor(props.billingOrgs.length + former)
+    : meterColorFor(key as MeterKey);
 };
 
 const selectedOrg = computed<BillingOrg | null>(() =>
@@ -478,28 +482,51 @@ const orgCostsFailed = computed(() => props.orgCosts.failed);
 const hasOrgCosts = computed(() => Object.keys(orgCosts.value).length > 0);
 
 /** Every org with its cost, plus retention, which writes no usage events to split by org. */
+/** Orgs still on this bill that are no longer members: one that left the group mid-cycle. */
+const formerOrgIds = computed(() => {
+  const members = new Set(props.billingOrgs.map((org) => org.id));
+  return Object.entries(orgCosts.value)
+    .filter(([id, cost]) => id && !members.has(id) && (cost.gross > 0 || cost.billed > 0))
+    .map(([id]) => id);
+});
+
+const orgRow = (id: string, label: I18nText, member: boolean): BillRow => {
+  const cost = orgCosts.value[id] ?? { gross: 0, billed: 0, ingested: 0, byMeter: {} };
+  const discount = Math.max(cost.gross - cost.billed, 0);
+  const volume = raw(formatSizeFromMB(cost.ingested));
+  return {
+    key: id,
+    label,
+    volume: EM_DASH,
+    rate: EM_DASH,
+    subline: member
+      ? t("billing.usageV2.ingestedVolume", { volume })
+      : t("billing.usageV2.formerMemberIngested", { volume }),
+    cost: cost.billed,
+    gross: cost.gross,
+    discount,
+    missing: false,
+    discountPercent: cost.gross > 0 ? Math.round((discount / cost.gross) * 1000) / 10 : 0,
+    drillable: member,
+    hasBreakdown: member,
+  };
+};
+
 const orgRows = computed<BillRow[]>(() => {
   if (orgCostsFailed.value) return [];
-  const orgs = props.billingOrgs.map((org): BillRow => {
-    const cost = orgCosts.value[org.id] ?? { gross: 0, billed: 0, ingested: 0, byMeter: {} };
-    const discount = Math.max(cost.gross - cost.billed, 0);
-    return {
-      key: org.id,
-      label: org.isSelf ? t("billing.usageV2.thisOrg", { org: org.name }) : raw(org.name),
-      volume: EM_DASH,
-      rate: EM_DASH,
-      subline: t("billing.usageV2.ingestedVolume", {
-        volume: raw(formatSizeFromMB(cost.ingested)),
-      }),
-      cost: cost.billed,
-      gross: cost.gross,
-      discount,
-      missing: false,
-      discountPercent: cost.gross > 0 ? Math.round((discount / cost.gross) * 1000) / 10 : 0,
-      drillable: true,
-      hasBreakdown: true,
-    };
-  });
+  const orgs = props.billingOrgs.map((org) =>
+    orgRow(
+      org.id,
+      org.isSelf ? t("billing.usageV2.thisOrg", { org: org.name }) : raw(org.name),
+      true,
+    ),
+  );
+  // An org that left mid-cycle stays on the payer's bill, so its row keeps the rows equal to the bill.
+  for (const id of formerOrgIds.value) {
+    const name =
+      (store.state.organizations ?? []).find((org: any) => org.identifier === id)?.name ?? id;
+    orgs.push(orgRow(id, raw(name), false));
+  }
   const retention = props.details?.retention;
   const retentionRow = rows.value.find((row) => row.key === "retention");
   if (retention && retentionRow && retentionRow.cost > 0) {

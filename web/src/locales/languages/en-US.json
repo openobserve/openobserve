@@ -8481,6 +8481,7 @@
       "colOrganization": "Organization",
       "shareOfOrg": "Share of {org}",
       "thisOrg": "{org} (this org)",
+      "formerMemberIngested": "Former member · {volume} ingested",
       "ingestedVolume": "{volume} ingested",
       "notSplitByOrg": "Billed to the whole group, not split by org",
       "orgSummary": "{cost} billed · {share} of the bill",

@@ -114,6 +114,59 @@ describe("UsageOverview org drilldown", () => {
   });
 });
 
+describe("UsageOverview Cost by Org", () => {
+  beforeEach(() => {
+    route.query = {};
+    search.mockReset().mockResolvedValue([]);
+  });
+
+  it("keeps an org that left the group mid-cycle, so the rows still add up to the bill", async () => {
+    // "gone" was a member earlier this cycle; its usage stays on the payer's bill.
+    const costs = {
+      payer: { gross: 8, billed: 8, ingested: 10, byMeter: {} },
+      child: { gross: 28, billed: 28, ingested: 30, byMeter: {} },
+      gone: { gross: 14, billed: 14, ingested: 20, byMeter: {} },
+    };
+    const wrapper = mount(UsageOverview, {
+      props: {
+        details: mockMeteringResponse().upcoming,
+        billingOrgs,
+        lastLoadedAt: 1,
+        projected: null,
+        refreshing: false,
+        orgCosts: { costs: costs as any, loading: false, failed: false },
+      },
+      global: {
+        plugins: [i18n, store],
+        stubs: { UsageCachedChart: true, UsageMeterBreakdown: true, UsageBillStrip: true },
+      },
+    });
+    await flushPromises();
+
+    const table = wrapper.findComponent('[data-test="billings-usageoverview-org-table"]');
+    const rows = table.props("rows") as {
+      key: string;
+      label: unknown;
+      cost: number;
+      drillable: boolean;
+    }[];
+    const gone = rows.find((row) => row.key === "gone")! as {
+      label: unknown;
+      subline: unknown;
+      drillable: boolean;
+    };
+    // The name stays whole; the line under it says why the org is listed, so a cut name never hides it.
+    expect(String(gone.label)).toBe("gone");
+    expect(String(gone.subline)).toBe("Former member · 20.00 MB ingested");
+    // Not a member any more, so there is no org view to open.
+    expect(gone.drillable).toBe(false);
+    expect(table.props("total")).toBe(50);
+    // Its own colour, not the payer's: the bar and the dots must tell them apart.
+    const colorFor = table.props("colorFor") as (key: string) => string;
+    expect(new Set(["payer", "child", "gone"].map(colorFor)).size).toBe(3);
+  });
+});
+
 describe("UsageOverview meter drilldown chart", () => {
   beforeEach(() => {
     route.query = { meter: "ingestion" };

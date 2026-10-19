@@ -45,9 +45,11 @@ export function meterColorFor(key: MeterKey): string {
   return chartColor(`--color-chart-series-${slot}`);
 }
 
-/** A palette slot by position, for series that are not meters, such as a super org's orgs. */
+/** A palette slot by position for a super org's orgs, skipping Data Retention's slot: both rows share Cost by Org. */
 export function paletteColor(index: number): string {
-  return chartColor(`--color-chart-series-${(Math.max(index, 0) % 12) + 1}`);
+  const retention = METERS.findIndex((def) => def.key === "retention") % 12;
+  const slots = Array.from({ length: 12 }, (_, slot) => slot).filter((slot) => slot !== retention);
+  return chartColor(`--color-chart-series-${slots[Math.max(index, 0) % slots.length] + 1}`);
 }
 
 const HEX = /^#([0-9a-f]{6})$/i;

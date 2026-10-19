@@ -14,9 +14,23 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it } from "vitest";
-import { buildTrendsChartOption, entitySeriesColors, shadeOf } from "./usageCharts";
+import {
+  buildTrendsChartOption,
+  entitySeriesColors,
+  meterColorFor,
+  paletteColor,
+  shadeOf,
+} from "./usageCharts";
 
 describe("usageCharts", () => {
+  it("never gives an org Data Retention's colour, since both sit in Cost by Org", () => {
+    const retention = meterColorFor("retention");
+    const orgs = Array.from({ length: 11 }, (_, index) => paletteColor(index));
+    expect(orgs).not.toContain(retention);
+    // Eleven orgs still get eleven different colours before the palette repeats.
+    expect(new Set(orgs).size).toBe(11);
+  });
+
   it("keeps the base colour for the top entity and lightens the ones below it", () => {
     expect(shadeOf("#000000", 0, "#ffffff")).toBe("#000000");
     expect(shadeOf("#000000", 1, "#ffffff")).toBe("#2b2b2b");
