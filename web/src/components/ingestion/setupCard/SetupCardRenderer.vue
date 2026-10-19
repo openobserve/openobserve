@@ -131,7 +131,13 @@ const watchedStream = computed(() =>
 // reactively, like `{stream}` above. We aggregate every step's inputs so a value
 // can fill code anywhere, and seed from defaults so all keys exist (keeps
 // mutations reactive) and code shows sensible values before the user edits.
-const allInputs = computed(() => props.content.steps.flatMap((s) => s.inputs ?? []));
+// Variant inputs are included whether selected or not, so ids must be unique card-wide.
+const allInputs = computed(() =>
+  props.content.steps.flatMap((s) => [
+    ...(s.inputs ?? []),
+    ...(s.variants ?? []).flatMap((v) => v.inputs ?? []),
+  ]),
+);
 const inputValues = ref<Record<string, string>>(
   Object.fromEntries(allInputs.value.map((i) => [i.id, i.default])),
 );
@@ -143,7 +149,7 @@ const subStream = (text?: string): string | undefined => {
   if (text == null) return text;
   let out = text.replaceAll("{stream}", watchedStream.value);
   for (const inp of allInputs.value) {
-    out = out.replaceAll(`{${inp.id}}`, inputValues.value[inp.id] ?? inp.default);
+    out = out.replaceAll(`{${inp.id}}`, inputValues.value[inp.id]?.trim() || inp.default);
   }
   return out;
 };
@@ -600,6 +606,24 @@ function fireConfetti() {
                   {{ variantLabel(v) }}
                 </OToggleGroupItem>
               </OToggleGroup>
+            </div>
+
+            <div
+              v-if="activeVariant(step)?.inputs?.length"
+              class="step-inputs"
+              :data-test="`ai-variant-inputs-${step.id}`"
+            >
+              <OInput
+                v-for="inp in activeVariant(step)?.inputs"
+                :key="inp.id"
+                v-model="inputValues[inp.id]"
+                :label="inputLabel(inp)"
+                :placeholder="raw(inp.placeholder || inp.default)"
+                :help-text="inp.helpKey ? t(inp.helpKey) : undefined"
+                size="sm"
+                :width="inp.width || 'md'"
+                :data-test="`ai-input-${inp.id}`"
+              />
             </div>
 
             <!-- Page-supplied controls that CHOOSE this step's code (a client

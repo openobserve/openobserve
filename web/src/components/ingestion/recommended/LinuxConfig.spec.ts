@@ -66,7 +66,7 @@ describe("linuxCard builder", () => {
   it("builds the Linux card metadata and step flow", () => {
     const card = linuxCard(SUBS, gt);
     expect(card.provider.name).toBe("Linux");
-    expect(card.provider.metaBadges).toEqual(["Logs", "Metrics"]);
+    expect(card.provider.metaBadges).toEqual(["Logs", "Metrics", "Traces"]);
     expect(card.steps.map((s) => s.id)).toEqual(["install", "verify", "dashboard"]);
     // Host metrics fan out per metric, so detection is existence-based.
     expect(card.detect).toMatchObject({
@@ -75,13 +75,51 @@ describe("linuxCard builder", () => {
     });
   });
 
-  it("offers a single install command with no environment toggle", () => {
+  // The exact pre-traces command: the default variant must not drift from it.
+  const BASE_INSTALL = `curl -O https://raw.githubusercontent.com/openobserve/agents/main/linux/install.sh \\
+  && chmod +x install.sh \\
+  && sudo ./install.sh ${SUBS.url}/api/${SUBS.org}/ ${SUBS.token}`;
+
+  const installVariants = () => linuxCard(SUBS, gt).steps[0].variants!;
+
+  it("toggles the install command between logs & metrics and logs, metrics & traces", () => {
     // The standard script also collects EC2 instance metadata — no AWS EC2 variant.
     const install = linuxCard(SUBS, gt).steps[0];
     expect(install.required).toBe(true);
-    expect(install.variants).toBeUndefined();
-    expect(install.code?.raw).toContain("/linux/install.sh");
-    expect(install.code?.raw).not.toContain("/ec2/");
+    expect(install.variants?.map((v) => v.id)).toEqual(["logs-metrics", "traces"]);
+    for (const v of install.variants!) expect(v.code.raw).not.toContain("/ec2/");
+  });
+
+  it("keeps the default logs & metrics command unchanged", () => {
+    const [base] = installVariants();
+    expect(base.code.raw).toBe(BASE_INSTALL);
+    expect(base.code.raw).not.toContain("--trace");
+  });
+
+  it("appends --trace-ports with the ports input on the traces variant", () => {
+    const traces = installVariants()[1];
+    expect(traces.code.raw).toBe(`${BASE_INSTALL} --trace-ports "{ports}"`);
+    // The ports field belongs to the traces variant alone, not the whole step.
+    expect(linuxCard(SUBS, gt).steps[0].inputs).toBeUndefined();
+    expect(installVariants()[0].inputs).toBeUndefined();
+    expect(traces.inputs).toEqual([expect.objectContaining({ id: "ports", default: "8080" })]);
+  });
+
+  it("shows the tracing note on the traces variant only", () => {
+    const [base, traces] = installVariants();
+    expect(base.note).toBeUndefined();
+    expect(traces.note).toContain("BTF");
+    expect(traces.note).toContain("--trace-exe");
+  });
+
+  it("links the eBPF tracing guide and tells the verify step when traces arrive", () => {
+    const card = linuxCard(SUBS, gt);
+    expect(card.docLinks?.map((l) => l.url)).toEqual([
+      "https://github.com/openobserve/agents/blob/main/obi.md",
+    ]);
+    expect(card.steps[1].note).toContain("traced app handles a request");
+    // Detection stays on host metrics, tracing or not.
+    expect(card.detect?.streamName).toBe("system_");
   });
 
   it("offers the uninstall command", () => {
@@ -91,14 +129,17 @@ describe("linuxCard builder", () => {
     expect(uninstall?.code.raw).not.toContain("/ec2/");
   });
 
-  it("substitutes url/org and masks the ingestion token", () => {
-    const code = linuxCard(SUBS, gt).steps[0].code!;
-    expect(code.raw).toContain(`${SUBS.url}/api/${SUBS.org}/`);
-    expect(code.raw).toContain(SUBS.token);
-    // The old page rendered a literal [BASIC_PASSCODE] placeholder instead.
-    expect(code.raw).not.toContain("[BASIC_PASSCODE]");
-    expect(code.masked).not.toContain(SUBS.token);
-  });
+  it.each(["logs-metrics", "traces"])(
+    "substitutes url/org and masks the ingestion token (%s)",
+    (id) => {
+      const code = installVariants().find((v) => v.id === id)!.code;
+      expect(code.raw).toContain(`${SUBS.url}/api/${SUBS.org}/`);
+      expect(code.raw).toContain(SUBS.token);
+      // The old page rendered a literal [BASIC_PASSCODE] placeholder instead.
+      expect(code.raw).not.toContain("[BASIC_PASSCODE]");
+      expect(code.masked).not.toContain(SUBS.token);
+    },
+  );
 });
 
 describe("LinuxConfig.vue", () => {

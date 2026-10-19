@@ -102,6 +102,8 @@ export interface RichCardStepVariant {
    */
   iconInvertDark?: boolean;
   code: RichCardCode;
+  /** Inputs shown only while this variant is selected; ids must be unique card-wide. */
+  inputs?: RichCardInput[];
   /** Optional note rendered under the code for this variant only. */
   note?: I18nText;
 }

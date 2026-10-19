@@ -27,6 +27,11 @@ import SetupCardRenderer from "./SetupCardRenderer.vue";
 import { iconRegistry } from "@/lib/core/Icon/OIcon.icons";
 import type { RichCardContent } from "./types";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OStep from "@/lib/navigation/Stepper/OStep.vue";
+import linuxCard from "./content/linux";
+import kubernetesCard from "./content/kubernetes";
+import { gt } from "@/types/i18n";
 import analytics from "@/services/product_analytics";
 
 vi.mock("@/composables/useStreams", () => ({
@@ -557,5 +562,95 @@ describe("SetupCardRenderer — product analytics", () => {
     });
     const block = wrapper.findComponent(OCodeBlock);
     expect(block.props("tokenName")).toBe("default");
+  });
+});
+
+describe("SetupCardRenderer — Linux install step tracing toggle", () => {
+  let wrapper: VueWrapper<any>;
+
+  afterEach(() => {
+    if (wrapper) wrapper.unmount();
+  });
+
+  const LINUX_SUBS = { ...SUBS, token: "dGVzdEB0b2tlbg==" };
+  const installBlock = () => wrapper.findAllComponents(OCodeBlock)[0];
+  const installNotes = () =>
+    wrapper.find('[data-test="ai-variant-tabs"]').element.parentElement!.textContent ?? "";
+  const portsField = () => wrapper.find('[data-test="ai-input-ports"]');
+  const pick = async (id: string) => {
+    wrapper.findAllComponents(OToggleGroup)[0].vm.$emit("update:modelValue", id);
+    await flushPromises();
+  };
+
+  it("defaults to logs & metrics, then substitutes the typed ports into the traces command", async () => {
+    wrapper = mount(SetupCardRenderer, {
+      props: { content: linuxCard(LINUX_SUBS, gt), subs: LINUX_SUBS },
+      global: { plugins: [store, router], stubs: { FirstEventStatus: FirstEventStatusStub } },
+      attachTo: document.body,
+    });
+    expect(installBlock().props("code")).not.toContain("--trace");
+    expect(installNotes()).not.toContain("BTF");
+    // The ports field is the traces variant's own, so logs & metrics has none.
+    expect(portsField().exists()).toBe(false);
+    expect(wrapper.find('[data-test="ai-step-inputs-install"]').exists()).toBe(false);
+
+    await pick("traces");
+    expect(installBlock().props("code")).toMatch(/ --trace-ports "8080"$/);
+    expect(installNotes()).toContain("BTF");
+    expect(portsField().exists()).toBe(true);
+
+    await portsField().find("input").setValue("80,443,8000-8999");
+    expect(installBlock().props("code")).toMatch(/ --trace-ports "80,443,8000-8999"$/);
+    // The token stays masked until revealed, on the traces command too.
+    expect(installBlock().props("codeMasked")).toContain('--trace-ports "80,443,8000-8999"');
+    expect(installBlock().props("codeMasked")).not.toContain(LINUX_SUBS.token);
+
+    // Switching away and back keeps the typed ports.
+    await pick("logs-metrics");
+    expect(portsField().exists()).toBe(false);
+    expect(installBlock().props("code")).not.toContain("--trace");
+    await pick("traces");
+    expect(installBlock().props("code")).toMatch(/ --trace-ports "80,443,8000-8999"$/);
+  });
+
+  const mountLinux = () =>
+    mount(SetupCardRenderer, {
+      props: { content: linuxCard(LINUX_SUBS, gt), subs: LINUX_SUBS },
+      global: { plugins: [store, router], stubs: { FirstEventStatus: FirstEventStatusStub } },
+      attachTo: document.body,
+    });
+
+  it.each(["", "   "])(
+    "falls back to the default ports when the field is blank (%j)",
+    async (v) => {
+      wrapper = mountLinux();
+      await pick("traces");
+      await portsField().find("input").setValue(v);
+      expect(installBlock().props("code")).toMatch(/ --trace-ports "8080"$/);
+    },
+  );
+
+  it("marks the install step done when the traces command is copied", async () => {
+    wrapper = mountLinux();
+    await pick("traces");
+    const step = () => wrapper.findAllComponents(OStep)[0];
+    expect(step().props("done")).toBe(false);
+    installBlock().vm.$emit("copy", { partial: false });
+    await flushPromises();
+    expect(step().props("done")).toBe(true);
+  });
+
+  it("leaves step-level inputs where they were (Kubernetes cluster name)", async () => {
+    wrapper = mount(SetupCardRenderer, {
+      props: { content: kubernetesCard(LINUX_SUBS, gt), subs: LINUX_SUBS },
+      global: { plugins: [store, router], stubs: { FirstEventStatus: FirstEventStatusStub } },
+      attachTo: document.body,
+    });
+    expect(
+      wrapper.find('[data-test="ai-step-inputs-install"] [data-test="ai-input-cluster"]').exists(),
+    ).toBe(true);
+    expect(wrapper.find('[data-test="ai-variant-inputs-install"]').exists()).toBe(false);
+    await wrapper.find('[data-test="ai-input-cluster"] input').setValue("prod-eu");
+    expect(installBlock().props("code")).toContain("--cluster-name=prod-eu");
   });
 });
