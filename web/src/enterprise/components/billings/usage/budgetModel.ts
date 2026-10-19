@@ -43,7 +43,8 @@ export function withBudget(
   entry: BudgetConfig,
 ): BudgetConfig[] {
   const others = (configs ?? []).filter((config) => config.org_id !== entry.org_id);
-  return [...others, entry];
+  // A cleared budget leaves the list: stored as $0 it would be a $0 warn line, crossed every hour.
+  return entry.total_budget_amount > 0 ? [...others, entry] : others;
 }
 
 const cents = (value: number) => Math.round(value * 100) / 100;

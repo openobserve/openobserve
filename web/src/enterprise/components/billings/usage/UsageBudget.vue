@@ -364,7 +364,8 @@ const dirty = computed(() => {
   );
 });
 
-const canSave = computed(() => loaded.value && hasBudget.value && dirty.value && !saving.value);
+/** A cleared amount is a change too: saving it removes this org's budget. */
+const canSave = computed(() => loaded.value && dirty.value && !saving.value);
 
 /** Sends only `budget_config`; the backend leaves every setting it is not sent untouched. */
 const save = async () => {
@@ -378,7 +379,13 @@ const save = async () => {
       ...(store.state?.organizationData?.organizationSettings ?? {}),
       budget_config: next,
     });
-    toast({ variant: "success", message: t("billing.usageV2.budgetSaved"), timeout: 4000 });
+    toast({
+      variant: "success",
+      message: hasBudget.value
+        ? t("billing.usageV2.budgetSaved")
+        : t("billing.usageV2.budgetRemoved"),
+      timeout: 4000,
+    });
   } catch (e: any) {
     toast({
       variant: "error",

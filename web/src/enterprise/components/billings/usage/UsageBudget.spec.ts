@@ -249,3 +249,32 @@ describe("Budget Save after a one-cent change", () => {
     expect(save().props("disabled")).toBe(false);
   });
 });
+
+describe("Budget removal on the single-org tab", () => {
+  beforeEach(() => {
+    getSettings.mockReset().mockResolvedValue(stored);
+    post.mockReset().mockResolvedValue({ data: {} });
+  });
+
+  it("saves a cleared amount as a removal, leaving every other org's budget", async () => {
+    const wrapper = mount(UsageBudget, {
+      props: { details, projected: null },
+      global: { plugins: [i18n, store] },
+    });
+    await flushPromises();
+
+    byTestId(wrapper, "OInput", "billings-usagebudget-total").vm.$emit("update:modelValue", "");
+    await flushPromises();
+    const save = byTestId(wrapper, "OButton", "billings-usagebudget-save");
+    expect(save.props("disabled")).toBe(false);
+    save.vm.$emit("click");
+    await flushPromises();
+
+    const sent = post.mock.calls[0][1].budget_config as { org_id: string }[];
+    // Gone, not stored as $0, which the hourly budget job would treat as always crossed.
+    expect(sent.map((entry) => entry.org_id)).not.toContain(
+      store.state.selectedOrganization.identifier,
+    );
+    expect(sent.map((entry) => entry.org_id)).toEqual(["total", "member-a"]);
+  });
+});

@@ -8283,6 +8283,7 @@
       "alertsPausedHint": "No emails until you turn this back on.",
       "saveBudget": "Save Settings",
       "budgetSaved": "Budget saved",
+      "budgetRemoved": "Budget removed",
       "budgetSaveFailed": "Could not save the budget",
       "budgetLoadFailedTitle": "Your budgets could not be loaded",
       "budgetLoadFailed": "Editing waits until they load, so saving cannot overwrite budgets that are already set. Try again in a moment."

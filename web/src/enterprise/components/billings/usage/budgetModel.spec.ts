@@ -129,3 +129,14 @@ describe("budgetModel cents", () => {
     expect(sameBudget(saved, { ...saved, warnPercent: 36.01 })).toBe(false);
   });
 });
+
+describe("budgetModel removing a budget", () => {
+  it("drops this org's entry for a cleared budget and keeps every other org's", () => {
+    const stored = [
+      { org_id: "a", total_budget_amount: 100, warn_at_amount: 80, paused: false },
+      { org_id: "b", total_budget_amount: 50, warn_at_amount: 40, paused: false },
+    ];
+    const cleared = { org_id: "a", total_budget_amount: 0, warn_at_amount: 0, paused: false };
+    expect(withBudget(stored, cleared)).toEqual([stored[1]]);
+  });
+});
