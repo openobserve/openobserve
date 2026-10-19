@@ -126,7 +126,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="billings-usagesuperbudget-table"
         >
           <template #cell-name="{ row }">
-            <span class="truncate font-medium">{{ row.label }}</span>
+            <!-- Marked for the table's cut-off tooltip, so a cut name shows in full on hover. -->
+            <span class="truncate font-medium" data-o2-cell-clip>{{ row.label }}</span>
           </template>
           <template #cell-spend="{ row }">
             <!-- Hovering the spend shows what makes it up, meter by meter. -->
@@ -188,7 +189,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OTooltip>
           </template>
           <template #cell-budget="{ row }">
-            <div class="w-28">
+            <!-- Fills the cell, so a narrow column never clips the input's border. -->
+            <div class="w-full">
               <OInput
                 :model-value="row.draft.budget || undefined"
                 type="number"
@@ -203,7 +205,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template #cell-warn="{ row }">
             <div class="flex items-center gap-2">
-              <div class="w-20">
+              <div class="w-16">
                 <OInput
                   :model-value="row.draft.budget > 0 ? percentLabel(row.draft) : undefined"
                   type="number"
@@ -513,9 +515,10 @@ const columns = computed<OTableColumnDef<OrgRow>[]>(() => [
     minSize: 160,
   },
   { id: "spend", header: t("billing.usageV2.colSpendThisCycle"), accessorKey: "spend", size: 220 },
-  { id: "budget", header: t("billing.usageV2.colBudget"), accessorKey: "id", size: 132 },
-  { id: "warn", header: t("billing.usageV2.warnAt"), accessorKey: "id", size: 170 },
-  { id: "alerts", header: t("billing.usageV2.colAlerts"), accessorKey: "id", size: 76 },
+  // Narrow fixed columns leave the org names room at laptop widths; Spend keeps its badge on one line.
+  { id: "budget", header: t("billing.usageV2.colBudget"), accessorKey: "id", size: 112 },
+  { id: "warn", header: t("billing.usageV2.warnAt"), accessorKey: "id", size: 160 },
+  { id: "alerts", header: t("billing.usageV2.colAlerts"), accessorKey: "id", size: 56 },
 ]);
 
 const totalWarnAt = computed(() => warnAmountFor(totalDraft.warnPercent, totalDraft.budget));
