@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="relative flex h-full w-full flex-col" dir="ltr" v-bind="$attrs">
     <div
       data-test="query-editor"
-      class="logs-query-editor bg-card-glass-bg min-h-0 flex-1"
+      class="logs-query-editor bg-card-glass-bg focus-within:ring-focus-ring-accent min-h-0 flex-1 focus-within:ring-2 focus-within:ring-inset"
       :class="{
         'promql-mode': language === 'promql',
         [queryEditorClass]: language === 'sql' || language === 'promql',
@@ -2195,11 +2195,6 @@ export default defineComponent({
    decorations API). These nodes are created by the library at runtime and never
    carry the scoped data-v attribute, so they are unreachable from utilities and
    must stay as :deep() CSS. */
-
-.logs-query-editor:focus-within {
-  outline: 2px solid var(--color-focus-ring-accent) !important;
-  outline-offset: -2px;
-}
 
 .logs-query-editor :deep(.monaco-editor),
 .logs-query-editor :deep(.monaco-editor .monaco-editor) {
