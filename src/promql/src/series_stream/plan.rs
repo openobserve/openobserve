@@ -668,6 +668,191 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_multi_hash_parquet_preserves_ordered_partition_chains() {
+        for partitions in [1, 2, 4] {
+            let dir = tempfile::tempdir().unwrap();
+            let hashes = vec![10, 10, 20, 20, 30, 30];
+            for index in 0..partitions {
+                write_hash_parquet(&dir.path().join(format!("{index}.parquet")), &hashes);
+            }
+            let ctx = parquet_ordering_context(partitions);
+            let df = ctx
+                .read_parquet(
+                    dir.path().to_str().unwrap(),
+                    ParquetReadOptions::default().file_sort_order(vec![vec![
+                        col(HASH_LABEL).sort(true, false),
+                        col(TIMESTAMP_COL_NAME).sort(true, false),
+                    ]]),
+                )
+                .await
+                .unwrap()
+                .filter(col(TIMESTAMP_COL_NAME).gt_eq(lit(0i64)))
+                .unwrap()
+                .select_columns(&[TIMESTAMP_COL_NAME, HASH_LABEL, VALUE_LABEL])
+                .unwrap();
+            let scan = df.create_physical_plan().await.unwrap();
+            assert_eq!(
+                scan.properties().output_partitioning().partition_count(),
+                partitions
+            );
+            assert!(hash_ordered(&scan));
+            assert_eq!(ordered_partition_input(&scan).is_some(), partitions == 1);
+
+            let df = df.sort(vec![col(HASH_LABEL).sort(true, false)]).unwrap();
+            let plan = df.create_physical_plan().await.unwrap();
+            assert!(!plan_contains_sort(&plan));
+            assert_eq!(
+                plan.downcast_ref::<SortPreservingMergeExec>().is_some(),
+                partitions > 1
+            );
+            let input = ordered_partition_input(&plan).unwrap();
+            assert_eq!(
+                input.properties().output_partitioning().partition_count(),
+                partitions
+            );
+            let mut inputs = execute_planned_partitions(
+                vec![PlannedPartition {
+                    plan,
+                    task_ctx: Arc::new(df.task_ctx()),
+                }],
+                "multi_hash_parquet",
+            )
+            .unwrap();
+            let streams = inputs.pop().unwrap();
+            assert_eq!(streams.len(), partitions);
+            let mut actual = Vec::new();
+            for stream in streams {
+                let batches = stream.try_collect::<Vec<_>>().await.unwrap();
+                let mut previous = None;
+                for batch in batches {
+                    for hash in batch[HASH_LABEL].as_primitive::<UInt64Type>().values() {
+                        assert!(previous.is_none_or(|previous| previous <= *hash));
+                        previous = Some(*hash);
+                        actual.push(*hash);
+                    }
+                }
+            }
+            actual.sort_unstable();
+            let mut expected = hashes.repeat(partitions);
+            expected.sort_unstable();
+            assert_eq!(actual, expected);
+            eprintln!(
+                "ordered multi-hash parquet: partitions={partitions}, rows={}, accepted",
+                actual.len()
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn test_unordered_multi_hash_parquet_is_rejected() {
+        for partitions in [1, 2, 4] {
+            for ordering in ["none", "timestamp", "descending_hash", "timestamp_hash"] {
+                let dir = tempfile::tempdir().unwrap();
+                let hashes = if ordering == "descending_hash" {
+                    vec![30, 30, 20, 20, 10, 10]
+                } else {
+                    vec![30, 10, 20, 10, 30, 20]
+                };
+                for index in 0..partitions {
+                    write_hash_parquet(&dir.path().join(format!("{index}.parquet")), &hashes);
+                }
+                let options = match ordering {
+                    "timestamp" => ParquetReadOptions::default()
+                        .file_sort_order(vec![vec![col(TIMESTAMP_COL_NAME).sort(true, false)]]),
+                    "descending_hash" => ParquetReadOptions::default()
+                        .file_sort_order(vec![vec![col(HASH_LABEL).sort(false, false)]]),
+                    "timestamp_hash" => ParquetReadOptions::default().file_sort_order(vec![vec![
+                        col(TIMESTAMP_COL_NAME).sort(true, false),
+                        col(HASH_LABEL).sort(true, false),
+                    ]]),
+                    _ => ParquetReadOptions::default(),
+                };
+                let ctx = parquet_ordering_context(partitions);
+                let df = ctx
+                    .read_parquet(dir.path().to_str().unwrap(), options)
+                    .await
+                    .unwrap()
+                    .filter(col(TIMESTAMP_COL_NAME).gt_eq(lit(0i64)))
+                    .unwrap()
+                    .select_columns(&[TIMESTAMP_COL_NAME, HASH_LABEL, VALUE_LABEL])
+                    .unwrap();
+                let scan = df.create_physical_plan().await.unwrap();
+                assert_eq!(
+                    scan.properties().output_partitioning().partition_count(),
+                    partitions
+                );
+                assert!(!plan_contains_sort(&scan));
+                assert!(!hash_ordered(&scan));
+                assert!(ordered_partition_input(&scan).is_none());
+                let error = execute_planned_partitions(
+                    vec![PlannedPartition {
+                        plan: scan,
+                        task_ctx: Arc::new(df.task_ctx()),
+                    }],
+                    "unordered_multi_hash_scan",
+                )
+                .err()
+                .expect("an unordered scan must fail validation");
+                assert!(error.to_string().contains("plan cannot stream in order"));
+
+                let df = df.sort(vec![col(HASH_LABEL).sort(true, false)]).unwrap();
+                let plan = df.create_physical_plan().await.unwrap();
+                assert!(plan_contains_sort(&plan));
+                assert!(ordered_partition_input(&plan).is_none());
+                let error = execute_planned_partitions(
+                    vec![PlannedPartition {
+                        plan,
+                        task_ctx: Arc::new(df.task_ctx()),
+                    }],
+                    "unordered_multi_hash_sort",
+                )
+                .err()
+                .expect("a scan needing a real sort must fail validation");
+                assert!(error.to_string().contains("plan cannot stream in order"));
+                eprintln!(
+                    "unordered multi-hash parquet: partitions={partitions}, ordering={ordering}, scan and SortExec rejected"
+                );
+            }
+        }
+    }
+
+    fn parquet_ordering_context(partitions: usize) -> SessionContext {
+        let mut config = SessionConfig::new()
+            .with_target_partitions(partitions)
+            .with_collect_statistics(true)
+            .with_repartition_file_scans(false);
+        config
+            .options_mut()
+            .optimizer
+            .enable_round_robin_repartition = false;
+        config
+            .options_mut()
+            .execution
+            .split_file_groups_by_statistics = true;
+        SessionContext::new_with_config(config)
+    }
+
+    fn write_hash_parquet(path: &std::path::Path, hashes: &[u64]) {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new(HASH_LABEL, DataType::UInt64, false),
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+            Field::new(VALUE_LABEL, DataType::Float64, false),
+        ]));
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(UInt64Array::from(hashes.to_vec())),
+                Arc::new(Int64Array::from_iter_values(0..hashes.len() as i64)),
+                Arc::new(Float64Array::from(vec![1.0; hashes.len()])),
+            ],
+        )
+        .unwrap();
+        let mut writer = ArrowWriter::try_new(File::create(path).unwrap(), schema, None).unwrap();
+        writer.write(&batch).unwrap();
+        writer.close().unwrap();
+    }
+
+    #[tokio::test]
     async fn test_hash_shards_preserve_scan_chains_and_session_config() {
         let partitions = 8;
         let rows_per_batch = 64;
