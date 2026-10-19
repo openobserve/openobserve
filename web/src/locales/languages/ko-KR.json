@@ -582,6 +582,7 @@
   },
   "common": {
     "copiedToClipboard": "클립보드에 복사됨",
+    "queryEditorAriaLabel": "쿼리 편집기입니다. 다음 컨트롤로 이동하려면 Escape를 누르세요.",
     "inlineEdit": {
       "autoHint": "클릭하여 이름을 변경하세요. 변경하기 전까지 이 이름은 구성에서 생성되며 변경 사항에 따라 계속 업데이트됩니다."
     },
@@ -9284,6 +9285,7 @@
     "selectStreamTypeFirst": "먼저 스트림 유형을 선택합니다.",
     "previewEmptyState": "미리 보기를 보려면 스트림 유형과 스트림 이름을 선택하세요.",
     "queryConfig": {
+      "aggregationFunction": "집계 함수",
       "sectionTitle": "조건",
       "openFullEditor": "전체 편집기 열기",
       "groupByTooltip": "이러한 필드별 결과 그룹화 — 고유한 조합별 경고 트리거",

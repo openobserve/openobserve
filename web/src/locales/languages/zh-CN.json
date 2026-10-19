@@ -582,6 +582,7 @@
   },
   "common": {
     "copiedToClipboard": "已复制到剪贴板",
+    "queryEditorAriaLabel": "查询编辑器。按 Escape 移动到下一个控件。",
     "inlineEdit": {
       "autoHint": "点击重命名。在您重命名之前，此名称会根据您的配置自动生成，并在您更改配置时随之更新。"
     },
@@ -9284,6 +9285,7 @@
     "selectStreamTypeFirst": "请先选择数据流类型",
     "previewEmptyState": "选择数据流类型和数据流名称以查看预览",
     "queryConfig": {
+      "aggregationFunction": "聚合函数",
       "sectionTitle": "条件",
       "openFullEditor": "打开完整版编辑器",
       "groupByTooltip": "按这些字段对结果分组 — 告警按每个唯一组合触发",

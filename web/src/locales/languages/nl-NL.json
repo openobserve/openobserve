@@ -582,6 +582,7 @@
   },
   "common": {
     "copiedToClipboard": "Gekopieerd naar klembord",
+    "queryEditorAriaLabel": "Query-editor. Druk op Escape om naar het volgende besturingselement te gaan.",
     "inlineEdit": {
       "autoHint": "Klik om te hernoemen. Tot je dat doet, wordt deze naam gegenereerd uit je configuratie en volgt deze je wijzigingen."
     },
@@ -9284,6 +9285,7 @@
     "selectStreamTypeFirst": "Selecteer eerst een streamtype",
     "previewEmptyState": "Selecteer een streamtype en streamnaam om een voorbeeld te zien",
     "queryConfig": {
+      "aggregationFunction": "Aggregatiefunctie",
       "sectionTitle": "Voorwaarden",
       "openFullEditor": "Volledige editor openen",
       "groupByTooltip": "Groepeer resultaten op basis van deze velden — waarschuwingstriggers per unieke combinatie",

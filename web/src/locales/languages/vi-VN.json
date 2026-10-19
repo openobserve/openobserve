@@ -582,6 +582,7 @@
   },
   "common": {
     "copiedToClipboard": "Đã sao chép vào bộ nhớ tạm",
+    "queryEditorAriaLabel": "Trình soạn truy vấn. Nhấn Escape để chuyển sang điều khiển tiếp theo.",
     "inlineEdit": {
       "autoHint": "Nhấp để đổi tên. Cho đến khi bạn đổi tên, tên này được tạo từ cấu hình của bạn và sẽ cập nhật theo khi bạn thay đổi."
     },
@@ -9284,6 +9285,7 @@
     "selectStreamTypeFirst": "Chọn loại luồng trước",
     "previewEmptyState": "Chọn loại luồng và tên luồng để xem trước",
     "queryConfig": {
+      "aggregationFunction": "Hàm tổng hợp",
       "sectionTitle": "Điều kiện",
       "openFullEditor": "Mở toàn bộ trình soạn thảo",
       "groupByTooltip": "Nhóm kết quả theo các trường này — cảnh báo kích hoạt cho mỗi tổ hợp duy nhất",

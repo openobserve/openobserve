@@ -582,6 +582,7 @@
   },
   "common": {
     "copiedToClipboard": "Panoya kopyalandı",
+    "queryEditorAriaLabel": "Sorgu düzenleyici. Sonraki denetime geçmek için Escape tuşuna basın.",
     "inlineEdit": {
       "autoHint": "Yeniden adlandırmak için tıklayın. Siz yapana kadar bu ad, yapılandırmanızdan oluşturulur ve siz değiştirdikçe güncel kalır."
     },
@@ -9284,6 +9285,7 @@
     "selectStreamTypeFirst": "Önce bir akış türü seçin",
     "previewEmptyState": "Önizlemeyi görmek için bir akış türü ve akış adı seçin",
     "queryConfig": {
+      "aggregationFunction": "Toplama işlevi",
       "sectionTitle": "Koşullar",
       "openFullEditor": "Tam Düzenleyiciyi Aç",
       "groupByTooltip": "Sonuçları bu alanlara göre gruplayın - benzersiz kombinasyon başına uyarı tetikleyicileri",

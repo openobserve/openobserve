@@ -582,6 +582,7 @@
   },
   "common": {
     "copiedToClipboard": "تم نسخها إلى الحافظة",
+    "queryEditorAriaLabel": "محرر الاستعلام. اضغط على Escape للانتقال إلى عنصر التحكم التالي.",
     "inlineEdit": {
       "autoHint": "انقر لإعادة الاسم. حتى تفعل ذلك، يتم توليد هذا الاسم من إعدادك ويستمر مع تغييره."
     },
@@ -9284,6 +9285,7 @@
     "selectStreamTypeFirst": "اختر نوع التدفق أولا",
     "previewEmptyState": "اختر نوع البث واسم البث لرؤية معاينة",
     "queryConfig": {
+      "aggregationFunction": "دالة التجميع",
       "sectionTitle": "الظروف",
       "openFullEditor": "المحرر الكامل المفتوح",
       "groupByTooltip": "اجمع النتائج حسب هذه الحقول — محفزات التنبيه لكل تركيبة فريدة",

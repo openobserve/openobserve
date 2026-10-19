@@ -582,6 +582,7 @@
   },
   "common": {
     "copiedToClipboard": "已複製到剪貼簿",
+    "queryEditorAriaLabel": "查詢編輯器。按 Escape 移至下一個控制項。",
     "inlineEdit": {
       "autoHint": "按一下以重新命名。在您重新命名前，此名稱會根據您的組態產生，並在您變更時更新。"
     },
@@ -9279,6 +9280,7 @@
     "selectStreamTypeFirst": "請先選擇串流類型",
     "previewEmptyState": "選擇串流類型和串流名稱以檢視預覽",
     "queryConfig": {
+      "aggregationFunction": "聚合函數",
       "sectionTitle": "條件",
       "openFullEditor": "開啟完整編輯器",
       "groupByTooltip": "依這些欄位分組結果 — 每個唯一組合觸發警示",

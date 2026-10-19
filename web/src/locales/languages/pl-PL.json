@@ -582,6 +582,7 @@
   },
   "common": {
     "copiedToClipboard": "Skopiowano do schowka",
+    "queryEditorAriaLabel": "Edytor zapytań. Naciśnij Escape, aby przejść do następnego elementu sterującego.",
     "inlineEdit": {
       "autoHint": "Kliknij, aby zmienić nazwę. Dopóki tego nie zrobisz, nazwa ta jest generowana z Twojej konfiguracji i aktualizuje się w miarę jej zmian."
     },
@@ -9284,6 +9285,7 @@
     "selectStreamTypeFirst": "Najpierw wybierz typ strumienia",
     "previewEmptyState": "Wybierz typ strumienia i nazwę strumienia, aby zobaczyć podgląd",
     "queryConfig": {
+      "aggregationFunction": "Funkcja agregacji",
       "sectionTitle": "Warunki",
       "openFullEditor": "Otwórz pełny edytor",
       "groupByTooltip": "Grupuj wyniki według tych pól — powiadomienie jest wywoływane dla każdej unikalnej kombinacji",

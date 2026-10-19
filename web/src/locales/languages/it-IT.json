@@ -582,6 +582,7 @@
   },
   "common": {
     "copiedToClipboard": "Copiato negli appunti",
+    "queryEditorAriaLabel": "Editor di query. Premi Escape per passare al controllo successivo.",
     "inlineEdit": {
       "autoHint": "Fai clic per rinominare. Finché non lo fai, questo nome viene generato dalla tua configurazione e si aggiorna man mano che la modifichi."
     },
@@ -9284,6 +9285,7 @@
     "selectStreamTypeFirst": "Seleziona prima un tipo di stream",
     "previewEmptyState": "Seleziona il tipo e il nome dello stream per visualizzarne l'anteprima",
     "queryConfig": {
+      "aggregationFunction": "Funzione di aggregazione",
       "sectionTitle": "Condizioni",
       "openFullEditor": "Apri l'editor completo",
       "groupByTooltip": "Raggruppa i risultati in base a questi campi: trigger di avviso per combinazione univoca",

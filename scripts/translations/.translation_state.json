@@ -4815,6 +4815,7 @@
     "queryBuilder": "090940e7325896cc",
     "queryConfig": {
       "addGroupByField": "ba98467f659fa044",
+      "aggregationFunction": "ad4c82396840c89c",
       "alertIfValueIsTooltip": "0f7214217a666a65",
       "checkEvery": "a0b9aa23865d3a8f",
       "clearMultiWindowsMessage": "15ad2c80c5e6d142",
@@ -6986,6 +6987,7 @@
     "previous": "a57b08a480b822a0",
     "providerLogo": "f555df26a5ece7cf",
     "query": "b80a37564fbb3c07",
+    "queryEditorAriaLabel": "d296e0ba957295e7",
     "queryNumber": "b7ec3384f5adfc62",
     "rangeFallbackLabel": "5de74a81b192304c",
     "rangeMaximum": "9ac5e1c3125dacac",

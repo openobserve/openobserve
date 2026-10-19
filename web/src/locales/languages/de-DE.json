@@ -582,6 +582,7 @@
   },
   "common": {
     "copiedToClipboard": "In die Zwischenablage kopiert",
+    "queryEditorAriaLabel": "Abfrage-Editor. Drücken Sie Escape, um zum nächsten Steuerelement zu wechseln.",
     "inlineEdit": {
       "autoHint": "Zum Umbenennen klicken. Bis du das tust, wird dieser Name aus deiner Konfiguration generiert und passt sich bei Änderungen an."
     },
@@ -9284,6 +9285,7 @@
     "selectStreamTypeFirst": "Wählen Sie zuerst einen Stream-Typ",
     "previewEmptyState": "Wählen Sie einen Streamtyp und einen Streamnamen aus, um eine Vorschau zu sehen",
     "queryConfig": {
+      "aggregationFunction": "Aggregationsfunktion",
       "sectionTitle": "Bedingungen",
       "openFullEditor": "Vollständigen Editor öffnen",
       "groupByTooltip": "Ergebnisse nach diesen Feldern gruppieren — Warnauslöser pro eindeutiger Kombination",

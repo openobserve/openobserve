@@ -582,6 +582,7 @@
   },
   "common": {
     "copiedToClipboard": "クリップボードにコピーしました",
+    "queryEditorAriaLabel": "クエリエディタ。Escape キーを押すと次のコントロールに移動します。",
     "inlineEdit": {
       "autoHint": "クリックして名前を変更します。変更しない限り、この名前は設定から生成され、変更に応じて更新されます。"
     },
@@ -9284,6 +9285,7 @@
     "selectStreamTypeFirst": "最初にストリームタイプを選択してください",
     "previewEmptyState": "プレビューを表示するには、ストリームタイプとストリーム名を選択してください",
     "queryConfig": {
+      "aggregationFunction": "集計関数",
       "sectionTitle": "条件",
       "openFullEditor": "フルエディターを開く",
       "groupByTooltip": "これらのフィールドで結果をグループ化 — 固有の組み合わせごとにアラートがトリガーされる",

@@ -582,6 +582,7 @@
   },
   "common": {
     "copiedToClipboard": "Copiado al portapapeles",
+    "queryEditorAriaLabel": "Editor de consultas. Pulse Escape para pasar al siguiente control.",
     "inlineEdit": {
       "autoHint": "Haz clic para renombrar. Hasta que lo hagas, este nombre se genera a partir de tu configuración y se actualiza a medida que la cambias."
     },
@@ -9284,6 +9285,7 @@
     "selectStreamTypeFirst": "Selecciona primero un tipo de transmisión",
     "previewEmptyState": "Selecciona un tipo de transmisión y un nombre de transmisión para ver una vista previa",
     "queryConfig": {
+      "aggregationFunction": "Función de agregación",
       "sectionTitle": "Condiciones",
       "openFullEditor": "Abrir el editor completo",
       "groupByTooltip": "Agrupe los resultados por estos campos: activadores de alertas por combinación única",
