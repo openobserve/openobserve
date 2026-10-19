@@ -88,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="max-w-full min-w-0"
                       :remove-label="t('rum.analytics.pathsView.clearScope')"
                       data-test="rum-analytics-paths-session-filter"
-                      @click="cohortOpen = !cohortOpen"
+                      @click="onCohortChipClick"
                       @remove="clearCohort"
                     >
                       <span class="text-text-secondary shrink-0">{{
@@ -559,6 +559,11 @@ const cohortCount = computed(() => {
 
 const update = (patch: Partial<PathsDef>) => {
   pa.paths.value = { ...def.value, ...patch };
+};
+
+// A mouse click also reaches the popover trigger, so only a keyboard click toggles here.
+const onCohortChipClick = (e: Event) => {
+  if (e instanceof KeyboardEvent) cohortOpen.value = !cohortOpen.value;
 };
 
 const clearCohort = () => {
