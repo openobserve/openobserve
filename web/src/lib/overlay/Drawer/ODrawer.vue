@@ -48,6 +48,7 @@ const props = withDefaults(defineProps<DrawerProps>(), {
   showClose: true,
   width: undefined,
   seamless: false,
+  primaryButtonDataTest: "o-drawer-primary-btn",
   primaryButtonVariant: "primary",
   secondaryButtonVariant: "outline",
   neutralButtonVariant: "ghost",
@@ -629,7 +630,7 @@ watch(shown, (open) => {
               <OButton
                 v-if="primaryButtonLabel"
                 ref="primaryBtnRef"
-                data-test="o-drawer-primary-btn"
+                :data-test="primaryButtonDataTest"
                 :variant="primaryButtonVariant"
                 size="sm-action"
                 :type="formId ? 'submit' : 'button'"

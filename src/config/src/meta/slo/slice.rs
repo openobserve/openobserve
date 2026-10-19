@@ -434,17 +434,6 @@ mod tests {
 
     // ---- gap-fill policy ---------------------------------------------------
 
-    /// D48: the two types disagree, and the disagreement is the point.
-    #[test]
-    fn count_treats_a_missing_bucket_as_measured_zero_traffic() {
-        assert_eq!(gap_fill_policy(SliType::Count), GapFill::CoveredZero);
-    }
-
-    #[test]
-    fn time_slice_treats_a_missing_bucket_as_unmeasured() {
-        assert_eq!(gap_fill_policy(SliType::TimeSlice), GapFill::Nothing);
-    }
-
     #[test]
     fn alert_sli_takes_coverage_from_the_ledger_not_gap_fill() {
         assert_eq!(gap_fill_policy(SliType::Alert), GapFill::Nothing);

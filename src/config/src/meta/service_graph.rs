@@ -18,61 +18,6 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-/// Service Graph topology snapshot record
-/// Stored in ServiceGraph stream for historical queries
-#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
-pub struct ServiceGraphSnapshot {
-    /// Snapshot timestamp (microseconds since epoch)
-    #[serde(rename = "_timestamp")]
-    pub timestamp: i64,
-
-    /// Organization identifier
-    pub org_id: String,
-
-    /// Source trace stream name
-    pub trace_stream_name: String,
-
-    /// Client service name (initiator); None for entry-point services
-    pub client_service: Option<String>,
-
-    /// Server service name (receiver)
-    pub server_service: String,
-
-    /// Total requests (cumulative counter)
-    pub total_requests: u64,
-
-    /// Failed requests (cumulative counter)
-    pub failed_requests: u64,
-
-    /// Error rate percentage (0-100)
-    pub error_rate: f64,
-
-    /// P50 latency in nanoseconds
-    pub p50_latency_ns: u64,
-
-    /// P95 latency in nanoseconds
-    pub p95_latency_ns: u64,
-
-    /// P99 latency in nanoseconds
-    pub p99_latency_ns: u64,
-
-    /// First time this edge was seen (microseconds)
-    pub first_seen: i64,
-
-    /// Last time this edge was seen (microseconds)
-    pub last_seen: i64,
-
-    /// Snapshot version (monotonic counter for deduplication)
-    pub snapshot_version: u64,
-}
-
-impl ServiceGraphSnapshot {
-    /// Convert to JSON value for stream ingestion
-    pub fn to_json(&self) -> serde_json::Value {
-        serde_json::to_value(self).expect("Failed to serialize ServiceGraphSnapshot")
-    }
-}
-
 /// Graph format for frontend visualization
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct ServiceGraphData {
@@ -245,54 +190,6 @@ pub struct EdgeTrendResponse {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    fn make_snapshot() -> ServiceGraphSnapshot {
-        ServiceGraphSnapshot {
-            timestamp: 1_000_000,
-            org_id: "default".to_string(),
-            trace_stream_name: "traces".to_string(),
-            client_service: Some("frontend".to_string()),
-            server_service: "backend".to_string(),
-            total_requests: 100,
-            failed_requests: 5,
-            error_rate: 5.0,
-            p50_latency_ns: 1_000_000,
-            p95_latency_ns: 5_000_000,
-            p99_latency_ns: 10_000_000,
-            first_seen: 900_000,
-            last_seen: 1_100_000,
-            snapshot_version: 1,
-        }
-    }
-
-    #[test]
-    fn test_to_json_includes_all_fields() {
-        let snap = make_snapshot();
-        let val = snap.to_json();
-        assert_eq!(val["_timestamp"], 1_000_000_i64);
-        assert_eq!(val["org_id"], "default");
-        assert_eq!(val["server_service"], "backend");
-        assert_eq!(val["total_requests"], 100_u64);
-        assert_eq!(val["failed_requests"], 5_u64);
-    }
-
-    #[test]
-    fn test_to_json_client_service_none_is_null() {
-        let mut snap = make_snapshot();
-        snap.client_service = None;
-        let val = snap.to_json();
-        assert!(val["client_service"].is_null());
-    }
-
-    #[test]
-    fn test_to_json_roundtrip() {
-        let snap = make_snapshot();
-        let val = snap.to_json();
-        let back: ServiceGraphSnapshot = serde_json::from_value(val).unwrap();
-        assert_eq!(back.org_id, "default");
-        assert_eq!(back.total_requests, 100);
-        assert_eq!(back.snapshot_version, 1);
-    }
 
     #[test]
     fn test_service_edge_baseline_none_fields_omitted_from_json() {

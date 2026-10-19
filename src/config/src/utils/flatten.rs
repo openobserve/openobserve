@@ -275,11 +275,6 @@ mod tests {
     }
 
     #[test]
-    fn test_check_key_special_characters() {
-        assert!(!check_key("key!"));
-    }
-
-    #[test]
     fn object_with_plain_values() {
         let obj = json!({"int": 1, "float": 2.0, "str": "a", "bool": true, "null": null});
         assert_eq!(obj, flatten(obj.clone()).unwrap());

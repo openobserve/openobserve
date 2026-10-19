@@ -75,9 +75,6 @@ impl Transform {
             && RESULT_ARRAY.is_match(&self.function)
             && !RESULT_ARRAY_SKIP_VRL.is_match(&self.function)
     }
-    pub fn is_result_array_skip_vrl(&self) -> bool {
-        self.is_vrl() && RESULT_ARRAY_SKIP_VRL.is_match(&self.function)
-    }
     pub fn is_result_array_js(&self) -> bool {
         self.is_js() && RESULT_ARRAY.is_match(&self.function)
     }
@@ -282,29 +279,6 @@ mod tests {
             streams: None,
         };
         assert!(!normal_vrl.is_result_array_vrl());
-    }
-
-    #[test]
-    fn test_transform_is_result_array_skip_vrl() {
-        let skip_vrl_trans = Transform {
-            function: "#ResultArray#SkipVRL#\n. = {}".to_string(),
-            name: "test".to_string(),
-            params: "row".to_string(),
-            num_args: 1,
-            trans_type: Some(0),
-            streams: None,
-        };
-        assert!(skip_vrl_trans.is_result_array_skip_vrl());
-
-        let result_array_trans = Transform {
-            function: "#ResultArray#\n. = {}".to_string(),
-            name: "test".to_string(),
-            params: "row".to_string(),
-            num_args: 1,
-            trans_type: Some(0),
-            streams: None,
-        };
-        assert!(!result_array_trans.is_result_array_skip_vrl());
     }
 
     #[test]

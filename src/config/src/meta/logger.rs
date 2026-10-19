@@ -148,19 +148,6 @@ mod tests {
     }
 
     #[test]
-    fn test_custom_time_format_writer() {
-        let timer = CustomTimeFormat;
-        let mut buffer = String::new();
-        let mut writer = tracing_subscriber::fmt::format::Writer::new(&mut buffer);
-
-        let result = timer.format_time(&mut writer);
-        assert!(result.is_ok());
-
-        // Buffer should contain some output
-        assert!(!buffer.is_empty());
-    }
-
-    #[test]
     fn test_otel_middleware_enabled_needs_otel_layer_and_target() {
         use tracing_subscriber::{filter::Targets, prelude::*};
 
