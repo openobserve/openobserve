@@ -1911,7 +1911,7 @@ mod tests {
             .unwrap();
         assert_eq!(created, links::CreateOutcome::Created);
 
-        let resp = remove_user_from_org("dummy", email, "admin@zo.dev")
+        let resp = remove_user_from_org("dummy", email, "admin@zo.dev", RemovalTarget::User)
             .await
             .unwrap();
         assert_eq!(resp.status(), http::StatusCode::OK);

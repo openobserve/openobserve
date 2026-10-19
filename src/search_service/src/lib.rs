@@ -788,10 +788,10 @@ pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
     Ok(search::QueryStatusResponse { status })
 }
 
-/// Aborts this node's searches whose trace id starts with `prefix`; a no-op in OSS (no channel).
-pub async fn abort_trace_family(prefix: &str) {
+/// Aborts this node's `trace_id` search and its `{trace_id}-` children in every org; a no-op in OSS.
+pub async fn abort_trace_family(trace_id: &str) {
     #[cfg(feature = "enterprise")]
-    if let Some(cancelled) = SEARCH_SERVER.remove(prefix, true).await {
+    if let Some(cancelled) = SEARCH_SERVER.cancel(None, trace_id).await {
         for (_, status) in cancelled {
             for sender in status.abort_senders.into_iter().rev() {
                 let _ = sender.send(());
@@ -799,7 +799,7 @@ pub async fn abort_trace_family(prefix: &str) {
         }
     }
     #[cfg(not(feature = "enterprise"))]
-    let _ = prefix;
+    let _ = trace_id;
 }
 
 /// Cancels `trace_id` on every querier; `Some(org)` limits each node to that org's queries.
