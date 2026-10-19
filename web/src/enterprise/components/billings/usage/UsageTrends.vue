@@ -380,8 +380,29 @@ const clamp = (span: Window): Window => {
   return { start, end: span.end > start ? span.end : start + length };
 };
 
-const preset = ref<Preset>("current");
-const customWindow = ref<Window | null>(null);
+/**
+ * The range lives in the URL, `from`/`to` in microseconds as logs keeps them, so a reload shows the same days.
+ * Read as numbers first: a change to any other query key then leaves the window, and the chart, alone.
+ */
+const fromSeconds = computed(() => Math.floor(Number(route.query.from) / 1_000_000));
+const toSeconds = computed(() => Math.floor(Number(route.query.to) / 1_000_000));
+const customWindow = computed<Window | null>(() => {
+  const start = fromSeconds.value;
+  const end = toSeconds.value;
+  return Number.isFinite(start) && Number.isFinite(end) && end > start ? { start, end } : null;
+});
+
+/** `?range=` names a preset; no value is the current cycle, and a picked window wins over both. */
+const preset = computed<Preset>(() => {
+  if (customWindow.value) return "custom";
+  if (route.query.range === "last" && lastCycle.value) return "last";
+  return route.query.range === "last90" ? "last90" : "current";
+});
+
+const setRange = (query: { range?: Preset; from?: string; to?: string }) =>
+  router.replace({
+    query: { ...route.query, range: undefined, from: undefined, to: undefined, ...query },
+  });
 
 const presetOptions = computed(() => {
   const options: { value: Preset; labelKey: I18nKey }[] = [
@@ -407,8 +428,7 @@ const range = computed<Window>(() => {
 
 const onPresetChange = (value: unknown) => {
   if (typeof value !== "string" || !value) return;
-  preset.value = value as Preset;
-  customWindow.value = null;
+  setRange({ range: value === "current" ? undefined : (value as Preset) });
 };
 
 /**
@@ -445,8 +465,10 @@ const onPickerChange = (value: {
   const start = Math.floor(Number(value.startTime) / 1_000_000);
   const end = Math.floor(Number(value.endTime) / 1_000_000);
   if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return;
-  customWindow.value = { start, end: Math.min(end, nowSeconds()) };
-  preset.value = "custom";
+  setRange({
+    from: String(start * 1_000_000),
+    to: String(Math.min(end, nowSeconds()) * 1_000_000),
+  });
 };
 
 /** Usage exists only up to now, so an open cycle's KPIs and labels stop at today, not the cycle end. */

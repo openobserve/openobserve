@@ -23,10 +23,16 @@ const post = vi.fn();
 vi.mock("@/services/organizations", () => ({
   default: { post_organization_settings: (...args: unknown[]) => post(...args) },
 }));
-vi.mock("vue-router", () => ({
-  useRoute: () => ({ query: {} }),
-  useRouter: () => ({ replace: vi.fn() }),
-}));
+// A live route, so a query the page writes is what it reads back, as after a reload.
+const nav = vi.hoisted(() => ({ route: null as unknown as { query: Record<string, unknown> } }));
+const replace = vi.fn(({ query }: { query: Record<string, unknown> }) => {
+  nav.route.query = Object.fromEntries(Object.entries(query).filter(([, v]) => v !== undefined));
+});
+vi.mock("vue-router", async () => {
+  const { reactive } = await import("vue");
+  nav.route = reactive({ query: {} });
+  return { useRoute: () => nav.route, useRouter: () => ({ replace }) };
+});
 const search = vi.fn().mockResolvedValue([]);
 vi.mock("./useUsageSearch", () => ({ useUsageSearch: () => ({ search }) }));
 
@@ -95,6 +101,73 @@ describe("UsageTrends cost and volume", () => {
     // The forecast is money, so it has no place on a volume chart.
     expect(wrapper.find('[data-test="billings-usagetrends-forecast-toggle"]').exists()).toBe(false);
     // Volume came back with the cost rows, so switching sends nothing.
+    expect(search).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("UsageTrends range in the URL", () => {
+  const upcoming = mockMeteringResponse().upcoming!;
+  const DAY = 86_400;
+  const from = (upcoming.cycle_start + DAY) * 1_000_000;
+  const to = (upcoming.cycle_start + 3 * DAY) * 1_000_000;
+
+  const mountTrends = () =>
+    mount(UsageTrends, {
+      props: { details: upcoming, cycles: [upcoming], billingOrgs: [] },
+      global: { plugins: [i18n, store], stubs: { DateTime: true, AsyncComponentWrapper: true } },
+    });
+
+  const rangeToggle = (wrapper: ReturnType<typeof mountTrends>) =>
+    wrapper
+      .findAllComponents({ name: "OToggleGroup" })
+      .find((group) => group.vm.$attrs["data-test"] === "billings-usagetrends-range")!;
+
+  beforeEach(() => {
+    store.state.organizationData.organizationSettings = {
+      ...store.state.organizationData.organizationSettings,
+      usage_stream_enabled: true,
+    };
+    search.mockReset().mockResolvedValue([]);
+    nav.route.query = { tab: "trends" };
+  });
+
+  it("opens on the window a reloaded link carries", async () => {
+    nav.route.query = { tab: "trends", from: String(from), to: String(to) };
+    const wrapper = mountTrends();
+    await flushPromises();
+
+    expect(search.mock.calls[0][1]).toMatchObject({ start: from, end: to });
+    expect(rangeToggle(wrapper).props("modelValue")).toBe("custom");
+  });
+
+  it("writes a picked window and a preset to the URL, keeping the rest of the query", async () => {
+    const wrapper = mountTrends();
+    await flushPromises();
+
+    wrapper
+      .findComponent({ name: "DateTime" })
+      .vm.$emit("on:date-change", { startTime: from, endTime: to, userChangedValue: true });
+    await flushPromises();
+    expect(nav.route.query).toEqual({ tab: "trends", from: String(from), to: String(to) });
+    expect(search.mock.lastCall![1]).toMatchObject({ start: from, end: to });
+
+    rangeToggle(wrapper).vm.$emit("update:modelValue", "last90");
+    await flushPromises();
+    expect(nav.route.query).toEqual({ tab: "trends", range: "last90" });
+
+    rangeToggle(wrapper).vm.$emit("update:modelValue", "current");
+    await flushPromises();
+    expect(nav.route.query).toEqual({ tab: "trends" });
+  });
+
+  it("leaves the chart alone when another part of the URL changes", async () => {
+    nav.route.query = { tab: "trends", from: String(from), to: String(to) };
+    mountTrends();
+    await flushPromises();
+    expect(search).toHaveBeenCalledTimes(1);
+
+    nav.route.query = { ...nav.route.query, tab: "overview" };
+    await flushPromises();
     expect(search).toHaveBeenCalledTimes(1);
   });
 });
