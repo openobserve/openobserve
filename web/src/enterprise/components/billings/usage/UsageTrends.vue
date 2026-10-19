@@ -232,6 +232,7 @@ import UsageChartSkeleton from "./UsageChartSkeleton.vue";
 import {
   formatCost,
   METERS,
+  projectCycleCost,
   type BillingOrg,
   type MeterKey,
   type MeteringDetails,
@@ -289,6 +290,8 @@ const props = withDefaults(
     oldestTs?: number | null;
     /** A super org's orgs, itself first; empty for any other org. */
     billingOrgs?: BillingOrg[];
+    /** The cycle's projected total, worked out once by the page so every tab shows the same figure. */
+    projected: number | null;
   }>(),
   { billingOrgs: () => [] },
 );
@@ -582,6 +585,16 @@ const canForecast = computed(() => {
   return preset.value === "current" && !!cycle && cycle.cycle_end > nowSeconds();
 });
 
+/**
+ * The bill's projection, the figure every tab shows. One org of a group is projected from its own
+ * cost the same way, because the bill is not split by org.
+ */
+const projectedTotal = computed(() => {
+  const cycle = upcoming.value;
+  if (!cycle || !(props.billingOrgs.length && selectedOrg.value)) return props.projected;
+  return projectCycleCost({ ...cycle, total_cost: summary.value.total });
+});
+
 const forecast = computed(() => {
   const cycle = upcoming.value;
   if (!cycle || !canForecast.value || !showForecast.value) return null;
@@ -646,11 +659,11 @@ const kpiCards = computed(() => {
             key: "projected",
             label: t("billing.usageV2.projectedTotal"),
             icon: "trending-up",
-            value: cost(f.projected),
-            hint: t("billing.usageV2.projectedRange", {
-              low: cost(f.low),
-              high: cost(f.high),
-              date: date(cycle.cycle_end),
+            value: projectedTotal.value === null ? raw("—") : cost(projectedTotal.value),
+            // The recent pace is a second view, so it is named as one and not as the projection.
+            hint: t("billing.usageV2.atPaceProjected", {
+              cost: cost(f.projected),
+              days: f.paceDays,
             }),
           }
         : {
@@ -724,7 +737,7 @@ const chartOption = computed(() => {
       spendToDate: String(t("billing.usageV2.spendToDate")),
       forecast: String(t("billing.usageV2.forecast")),
       dayTotal: String(t("billing.usageV2.dayTotal")),
-      projected: String(t("billing.usageV2.projectedTotal")),
+      projected: String(t("billing.usageV2.atPace", { days: forecast.value?.paceDays ?? 0 })),
     },
   });
 });

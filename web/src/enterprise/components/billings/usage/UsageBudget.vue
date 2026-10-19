@@ -237,7 +237,6 @@ import {
   cycleProgress,
   formatCost,
   formatCycle,
-  projectCycleCost,
   splitByUse,
   type MeteringDetails,
 } from "./meteringModel";
@@ -253,7 +252,11 @@ import {
   type BudgetConfig,
 } from "./budgetModel";
 
-const props = defineProps<{ details: MeteringDetails | null }>();
+const props = defineProps<{
+  details: MeteringDetails | null;
+  /** The cycle's projected total, worked out once by the page so every tab shows the same figure. */
+  projected: number | null;
+}>();
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -267,7 +270,7 @@ const progress = computed(() =>
   props.details ? cycleProgress(props.details) : { day: 1, totalDays: 1, elapsed: 0 },
 );
 const day = computed(() => progress.value.day);
-const projected = computed(() => projectCycleCost(props.details));
+const projected = computed(() => props.projected);
 
 const cycleLabel = computed(() => (props.details ? formatCycle(props.details, t) : raw("")));
 const cycleHint = computed(() =>

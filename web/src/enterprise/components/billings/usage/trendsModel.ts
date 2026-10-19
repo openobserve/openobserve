@@ -173,7 +173,10 @@ export function summarizeTrend(rows: CostRow[], only: MeterKey | null = null): T
   return { total, days, meters };
 }
 
-/** Trailing-week run rate; a day with no usage has no row, so the window is zero-filled first. */
+/**
+ * Trailing-week run rate over complete days: today is still filling in and would pull it down.
+ * A day with no usage has no row, so the window is zero-filled first.
+ */
 export function forecastCycle(
   summary: TrendSummary,
   cycleStart: number,
@@ -186,9 +189,14 @@ export function forecastCycle(
   const window: number[] = [];
   const today = Math.floor(now / SECONDS_PER_DAY) * SECONDS_PER_DAY;
   const first = Math.floor(cycleStart / SECONDS_PER_DAY) * SECONDS_PER_DAY;
-  for (let day = today; day >= first && window.length < TRAILING_DAYS; day -= SECONDS_PER_DAY) {
+  for (
+    let day = today - SECONDS_PER_DAY;
+    day >= first && window.length < TRAILING_DAYS;
+    day -= SECONDS_PER_DAY
+  ) {
     window.push(costOn.get(day) ?? 0);
   }
+  if (!window.length) return null;
   const pace = window.reduce((sum, cost) => sum + cost, 0) / window.length;
   return {
     pace,

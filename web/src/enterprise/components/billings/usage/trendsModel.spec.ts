@@ -91,12 +91,28 @@ describe("trendsModel", () => {
   it("forecasts from the trailing week, counting days with no usage as zero", () => {
     const start = 1_700_000_000 - (1_700_000_000 % DAY);
     const now = start + 10 * DAY + 3600;
-    const summary = { total: 7, days: [{ ts: start + 10 * DAY, cost: 7 }], meters: [] };
+    const summary = { total: 7, days: [{ ts: start + 9 * DAY, cost: 7 }], meters: [] };
     const forecast = forecastCycle(summary, start, start + 30 * DAY, now);
     expect(forecast?.paceDays).toBe(7);
     expect(forecast?.pace).toBeCloseTo(1, 6);
     expect(forecast?.low).toBeCloseTo(7, 6);
     expect(forecastCycle(summary, start, now - 1, now)).toBeNull();
+    // On a cycle's first day there is no complete day to average yet.
+    expect(forecastCycle(summary, start, start + 30 * DAY, start + 3600)).toBeNull();
+  });
+
+  it("leaves today's unfinished day out of the run rate", () => {
+    // A flat $10 a day, one hour into day 11 of 30: the pace is $10, so the cycle ends at $300.
+    const start = 1_700_000_000 - (1_700_000_000 % DAY);
+    const now = start + 10 * DAY + 3600;
+    const days = Array.from({ length: 11 }, (_, i) => ({
+      ts: start + i * DAY,
+      cost: i < 10 ? 10 : 10 / 24,
+    }));
+    const total = days.reduce((sum, day) => sum + day.cost, 0);
+    const forecast = forecastCycle({ total, days, meters: [] }, start, start + 30 * DAY, now);
+    expect(forecast?.pace).toBeCloseTo(10, 6);
+    expect(forecast?.projected).toBeCloseTo(300, 6);
   });
 
   it("reads the backend's mixed timestamp units and picks a bucket per window", () => {

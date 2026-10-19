@@ -116,6 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :details="details"
           :billing-orgs="billingOrgs"
           :last-loaded-at="lastLoadedAt"
+          :projected="projected"
           :refreshing="loading"
           @refresh="loadDetails"
         />
@@ -125,14 +126,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :cycles="cycles"
           :oldest-ts="response?.oldest_ts"
           :billing-orgs="billingOrgs"
+          :projected="projected"
           @refresh="loadDetails"
         />
         <UsageSuperBudget
           v-else-if="activeTab === 'budget' && billingOrgs.length"
           :details="details"
           :billing-orgs="billingOrgs"
+          :projected="projected"
         />
-        <UsageBudget v-else-if="activeTab === 'budget'" :details="details" />
+        <UsageBudget v-else-if="activeTab === 'budget'" :details="details" :projected="projected" />
         <UsageEstimator v-else :details="details" />
       </KeepAlive>
     </div>
@@ -163,6 +166,7 @@ import {
   billingGroupOrgs,
   cyclesNewestFirst,
   parseMeteringResponse,
+  projectCycleCost,
   type BillingOrg,
   type MeteringDetails,
   type MeteringResponse,
@@ -210,6 +214,9 @@ const loadFailure = ref<"network" | "server" | null>(null);
 /** A Refresh failed while the page still holds an earlier bill. */
 const refreshFailed = ref(false);
 const lastLoadedAt = ref<number | null>(null);
+
+/** One projection for every tab, from the bill as it was loaded, so tabs opened at different times agree. */
+const projected = computed(() => projectCycleCost(details.value, lastLoadedAt.value ?? undefined));
 
 /** A super org's orgs, itself first; empty for any other org. */
 const billingOrgs = ref<BillingOrg[]>([]);

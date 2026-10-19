@@ -65,12 +65,17 @@ const byTestId = (wrapper: VueWrapper, name: string, id: string) =>
 
 // Save sends the whole list, so a list built without the stored one would erase it.
 describe.each([
-  { view: "UsageBudget", component: UsageBudget, prefix: "usagebudget", props: { details } },
+  {
+    view: "UsageBudget",
+    component: UsageBudget,
+    prefix: "usagebudget",
+    props: { details, projected: null },
+  },
   {
     view: "UsageSuperBudget",
     component: UsageSuperBudget,
     prefix: "usagesuperbudget",
-    props: { details, billingOrgs },
+    props: { details, billingOrgs, projected: null },
   },
 ])("$view when the stored budgets are not loaded", ({ component, prefix, props }) => {
   const mountView = () => mount(component as any, { props, global: { plugins: [i18n, store] } });
@@ -120,7 +125,10 @@ describe("an emptied Warn % field", () => {
   });
 
   it("keeps the org's warn line at its share when the budget is saved", async () => {
-    const wrapper = mount(UsageBudget, { props: { details }, global: { plugins: [i18n, store] } });
+    const wrapper = mount(UsageBudget, {
+      props: { details, projected: null },
+      global: { plugins: [i18n, store] },
+    });
     await flushPromises();
 
     byTestId(wrapper, "OInput", "billings-usagebudget-warn-percent").vm.$emit(
@@ -140,7 +148,7 @@ describe("an emptied Warn % field", () => {
 
   it("keeps a member's warn line in the super org table", async () => {
     const wrapper = mount(UsageSuperBudget, {
-      props: { details, billingOrgs },
+      props: { details, billingOrgs, projected: null },
       global: { plugins: [i18n, store] },
     });
     await flushPromises();

@@ -55,7 +55,7 @@ describe("UsageTrends usage reporting", () => {
   it("turns reporting on without writing back the page's older copy of the other settings", async () => {
     const upcoming = mockMeteringResponse().upcoming!;
     const wrapper = mount(UsageTrends, {
-      props: { details: upcoming, cycles: [upcoming], billingOrgs: [] },
+      props: { details: upcoming, cycles: [upcoming], billingOrgs: [], projected: null },
       global: { plugins: [i18n, store] },
     });
     await flushPromises();
@@ -84,7 +84,7 @@ describe("UsageTrends cost and volume", () => {
       { x_axis_1: day, breakdown_1: "AiCredits", y_axis_1: 5, volume: 7 },
     ]);
     const wrapper = mount(UsageTrends, {
-      props: { details: upcoming, cycles: [upcoming], billingOrgs: [] },
+      props: { details: upcoming, cycles: [upcoming], billingOrgs: [], projected: null },
       global: { plugins: [i18n, store], stubs: { DateTime: true, AsyncComponentWrapper: true } },
     });
     await flushPromises();
@@ -113,7 +113,7 @@ describe("UsageTrends range in the URL", () => {
 
   const mountTrends = () =>
     mount(UsageTrends, {
-      props: { details: upcoming, cycles: [upcoming], billingOrgs: [] },
+      props: { details: upcoming, cycles: [upcoming], billingOrgs: [], projected: null },
       global: { plugins: [i18n, store], stubs: { DateTime: true, AsyncComponentWrapper: true } },
     });
 
@@ -169,5 +169,32 @@ describe("UsageTrends range in the URL", () => {
     nav.route.query = { ...nav.route.query, tab: "overview" };
     await flushPromises();
     expect(search).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("UsageTrends projected total", () => {
+  it("shows the page's projection, with the recent pace named as such", async () => {
+    store.state.organizationData.organizationSettings = {
+      ...store.state.organizationData.organizationSettings,
+      usage_stream_enabled: true,
+    };
+    const upcoming = mockMeteringResponse().upcoming!;
+    const yesterday = new Date((Math.floor(Date.now() / 86_400_000) - 1) * 86_400_000);
+    search
+      .mockReset()
+      .mockResolvedValue([
+        { x_axis_1: yesterday.toISOString().slice(0, 19), breakdown_1: "Ingestion", y_axis_1: 70 },
+      ]);
+    nav.route.query = {};
+    const wrapper = mount(UsageTrends, {
+      props: { details: upcoming, cycles: [upcoming], billingOrgs: [], projected: 5000 },
+      global: { plugins: [i18n, store], stubs: { DateTime: true, AsyncComponentWrapper: true } },
+    });
+    await flushPromises();
+
+    const card = wrapper.find('[data-test="billings-usagetrends-kpi-projected"]').text();
+    // The same figure Overview and Budget show, not a second projection.
+    expect(card).toContain("$5,000.00");
+    expect(card).toContain("at the last 7 days' pace");
   });
 });

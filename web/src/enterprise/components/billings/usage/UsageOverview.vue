@@ -295,7 +295,6 @@ import {
   formatVolume,
   formatCycle,
   netCost,
-  projectCycleCost,
   scopedMeterRows,
   splitByUse,
   subtotalCost,
@@ -337,6 +336,8 @@ const props = withDefaults(
     /** A super org's orgs, itself first; empty for any other org. */
     billingOrgs?: BillingOrg[];
     lastLoadedAt: number | null;
+    /** The cycle's projected total, worked out once by the page so every tab shows the same figure. */
+    projected: number | null;
     refreshing: boolean;
   }>(),
   { billingOrgs: () => [] },
@@ -396,7 +397,7 @@ const progress = computed(() =>
   props.details ? cycleProgress(props.details) : { day: 0, totalDays: 0, elapsed: 0 },
 );
 
-const projected = computed(() => projectCycleCost(props.details));
+const projected = computed(() => props.projected);
 
 const cycleEndText = computed(() =>
   raw(

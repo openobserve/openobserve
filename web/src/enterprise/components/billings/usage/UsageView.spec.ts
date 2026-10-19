@@ -23,7 +23,7 @@ const mounts: Record<string, number> = {};
 const stub = (name: string) =>
   defineComponent({
     name,
-    props: ["details", "billingOrgs", "cycles"],
+    props: ["details", "billingOrgs", "cycles", "projected"],
     setup: () => {
       mounts[name] = (mounts[name] ?? 0) + 1;
     },
@@ -108,6 +108,25 @@ describe("UsageView", () => {
     expect(mounts.UsageOverview - before.UsageOverview).toBe(0);
     expect(mounts.UsageTrends - (before.UsageTrends ?? 0)).toBe(1);
     route.query = {};
+  });
+
+  it("gives every tab the same projected total, from the bill as it was loaded", async () => {
+    // $1 by day 10 of a 30-day cycle projects to $3.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime((1_700_000_000 + 10 * 86_400) * 1000);
+    metering.mockResolvedValue(bill);
+    members.mockResolvedValue({ data: [] });
+    const wrapper = mount(UsageView, { global: { plugins: [i18n, store] } });
+    await flushPromises();
+    expect(wrapper.findComponent({ name: "UsageOverview" }).props("projected")).toBeCloseTo(3, 6);
+
+    // Budget opened five days later still shows the loaded bill's figure, not a new one.
+    vi.setSystemTime((1_700_000_000 + 15 * 86_400) * 1000);
+    route.query = { tab: "budget" };
+    await flushPromises();
+    expect(wrapper.findComponent({ name: "UsageBudget" }).props("projected")).toBeCloseTo(3, 6);
+    route.query = {};
+    vi.useRealTimers();
   });
 
   it("still shows the bill when the org list fails, as a plain org", async () => {

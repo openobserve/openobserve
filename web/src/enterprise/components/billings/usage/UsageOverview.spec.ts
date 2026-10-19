@@ -80,6 +80,7 @@ describe("UsageOverview org drilldown", () => {
         details: mockMeteringResponse().upcoming,
         billingOrgs,
         lastLoadedAt: 1,
+        projected: null,
         refreshing: false,
       },
       global: {
@@ -118,7 +119,12 @@ describe("UsageOverview meter drilldown chart", () => {
 
   const mountMeter = () =>
     mount(UsageOverview, {
-      props: { details: mockMeteringResponse().upcoming, lastLoadedAt: 1, refreshing: false },
+      props: {
+        details: mockMeteringResponse().upcoming,
+        lastLoadedAt: 1,
+        projected: null,
+        refreshing: false,
+      },
       global: {
         plugins: [i18n, store],
         stubs: { UsageCachedChart: true, UsageMeterBreakdown: true, UsageBillStrip: true },

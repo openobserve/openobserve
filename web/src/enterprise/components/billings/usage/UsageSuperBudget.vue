@@ -343,7 +343,6 @@ import {
   cycleProgress,
   formatCost,
   METERS,
-  projectCycleCost,
   type BillingOrg,
   type MeterKey,
   type MeteringDetails,
@@ -368,6 +367,8 @@ const props = defineProps<{
   details: MeteringDetails | null;
   /** The super org first, then its members. */
   billingOrgs: BillingOrg[];
+  /** The cycle's projected total, worked out once by the page so every tab shows the same figure. */
+  projected: number | null;
 }>();
 
 const { t } = useI18nTyped();
@@ -407,7 +408,7 @@ const spent = computed(() => Number(props.details?.total_cost) || 0);
 const progress = computed(() =>
   props.details ? cycleProgress(props.details) : { day: 1, totalDays: 1, elapsed: 0 },
 );
-const projected = computed(() => projectCycleCost(props.details));
+const projected = computed(() => props.projected);
 
 // ── Saved and draft budgets ──────────────────────────────────────
 
