@@ -15,20 +15,23 @@
 
 use std::{ops::ControlFlow, sync::Arc};
 
+use config::utils::sql::is_complex_query_stmt;
 use datafusion::common::TableReference;
 use hashbrown::HashMap;
 use infra::schema::SchemaCache;
-use sqlparser::ast::{BinaryOperator, Expr, Query, VisitorMut};
+use sqlparser::ast::{
+    BinaryOperator, Expr, Query, SetExpr, Statement, TableFactor, Value, VisitorMut,
+};
 
 use crate::{
     sql::visitor::utils::generate_table_reference,
-    utils::{is_field, is_value, split_conjunction, trim_quotes},
+    utils::{is_field, is_value, split_conjunction},
 };
 
-/// get all equal items from where clause
 pub struct PartitionColumnVisitor<'a> {
-    pub equal_items: HashMap<TableReference, Vec<(String, String)>>, // filed = value
+    pub equal_items: HashMap<TableReference, Vec<(String, String)>>,
     schemas: &'a HashMap<TableReference, Arc<SchemaCache>>,
+    query_visited: bool,
 }
 
 impl<'a> PartitionColumnVisitor<'a> {
@@ -36,6 +39,7 @@ impl<'a> PartitionColumnVisitor<'a> {
         Self {
             equal_items: HashMap::new(),
             schemas,
+            query_visited: false,
         }
     }
 }
@@ -43,7 +47,19 @@ impl<'a> PartitionColumnVisitor<'a> {
 impl VisitorMut for PartitionColumnVisitor<'_> {
     type Break = ();
 
+    fn pre_visit_statement(&mut self, statement: &mut Statement) -> ControlFlow<Self::Break> {
+        if !can_prune_partitions(statement) {
+            return ControlFlow::Break(());
+        }
+        ControlFlow::Continue(())
+    }
+
     fn pre_visit_query(&mut self, query: &mut Query) -> ControlFlow<Self::Break> {
+        if self.query_visited {
+            self.equal_items.clear();
+            return ControlFlow::Break(());
+        }
+        self.query_visited = true;
         if let sqlparser::ast::SetExpr::Select(select) = query.body.as_ref()
             && let Some(expr) = select.selection.as_ref()
         {
@@ -62,6 +78,9 @@ impl VisitorMut for PartitionColumnVisitor<'_> {
                         } else {
                             continue;
                         };
+                        let Some(value) = partition_value(right) else {
+                            continue;
+                        };
                         match left.as_ref() {
                             Expr::Identifier(ident) => {
                                 let mut count = 0;
@@ -77,21 +96,16 @@ impl VisitorMut for PartitionColumnVisitor<'_> {
                                     self.equal_items
                                         .entry(TableReference::from(table_name))
                                         .or_default()
-                                        .push((
-                                            field_name,
-                                            trim_quotes(right.to_string().as_str()),
-                                        ));
+                                        .push((field_name, value));
                                 }
                             }
                             Expr::CompoundIdentifier(idents) => {
                                 let (table_name, field_name) = generate_table_reference(idents);
-                                // check if table_name is in schemas, otherwise the table_name
-                                // maybe is a alias
                                 if self.schemas.contains_key(&table_name) {
-                                    self.equal_items.entry(table_name).or_default().push((
-                                        field_name,
-                                        trim_quotes(right.to_string().as_str()),
-                                    ));
+                                    self.equal_items
+                                        .entry(table_name)
+                                        .or_default()
+                                        .push((field_name, value));
                                 }
                             }
                             _ => {}
@@ -102,6 +116,11 @@ impl VisitorMut for PartitionColumnVisitor<'_> {
                         list,
                         negated: false,
                     } => {
+                        let Some(values) =
+                            list.iter().map(partition_value).collect::<Option<Vec<_>>>()
+                        else {
+                            continue;
+                        };
                         match expr.as_ref() {
                             Expr::Identifier(ident) => {
                                 let mut count = 0;
@@ -118,25 +137,17 @@ impl VisitorMut for PartitionColumnVisitor<'_> {
                                         .equal_items
                                         .entry(TableReference::from(table_name))
                                         .or_default();
-                                    for val in list.iter() {
-                                        entry.push((
-                                            field_name.clone(),
-                                            trim_quotes(val.to_string().as_str()),
-                                        ));
+                                    for value in values {
+                                        entry.push((field_name.clone(), value));
                                     }
                                 }
                             }
                             Expr::CompoundIdentifier(idents) => {
                                 let (table_name, field_name) = generate_table_reference(idents);
-                                // check if table_name is in schemas, otherwise the table_name
-                                // maybe is a alias
                                 if self.schemas.contains_key(&table_name) {
                                     let entry = self.equal_items.entry(table_name).or_default();
-                                    for val in list.iter() {
-                                        entry.push((
-                                            field_name.clone(),
-                                            trim_quotes(val.to_string().as_str()),
-                                        ));
+                                    for value in values {
+                                        entry.push((field_name.clone(), value));
                                     }
                                 }
                             }
@@ -148,6 +159,37 @@ impl VisitorMut for PartitionColumnVisitor<'_> {
             }
         }
         ControlFlow::Continue(())
+    }
+}
+
+fn can_prune_partitions(statement: &Statement) -> bool {
+    let Statement::Query(query) = statement else {
+        return false;
+    };
+    let SetExpr::Select(select) = query.body.as_ref() else {
+        return false;
+    };
+    select.from.len() == 1
+        && select.from[0].joins.is_empty()
+        && matches!(
+            select.from[0].relation,
+            TableFactor::Table {
+                alias: None,
+                args: None,
+                ..
+            }
+        )
+        && !is_complex_query_stmt(statement)
+}
+
+fn partition_value(expr: &Expr) -> Option<String> {
+    let Expr::Value(value) = expr else {
+        return None;
+    };
+    match &value.value {
+        Value::SingleQuotedString(value) | Value::Number(value, _) => Some(value.clone()),
+        Value::Boolean(value) => Some(value.to_string()),
+        _ => None,
     }
 }
 
@@ -180,7 +222,6 @@ mod tests {
         let mut partition_visitor = PartitionColumnVisitor::new(&schemas);
         let _ = statement.visit(&mut partition_visitor);
 
-        // Should extract equal conditions and IN list values
         let users_table = TableReference::from("users");
         assert!(partition_visitor.equal_items.contains_key(&users_table));
         let items = &partition_visitor.equal_items[&users_table];
@@ -206,7 +247,6 @@ mod tests {
 
     #[test]
     fn test_partition_visitor_value_on_left_side() {
-        // value = field (value on left) — should be swapped to field = value
         let sql = "SELECT * FROM users WHERE 'john' = name";
         let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
@@ -249,7 +289,6 @@ mod tests {
         let mut visitor = PartitionColumnVisitor::new(&schemas);
         let _ = statement.visit(&mut visitor);
 
-        // unknown_col not in schema → should not be added
         let users_table = TableReference::from("users");
         let items = visitor.equal_items.get(&users_table);
         assert!(items.is_none_or(|v| v.is_empty()));
@@ -257,7 +296,6 @@ mod tests {
 
     #[test]
     fn test_partition_visitor_negated_in_list_ignored() {
-        // NOT IN should NOT be captured
         let sql = "SELECT * FROM users WHERE city NOT IN ('NYC', 'LA')";
         let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
@@ -268,13 +306,11 @@ mod tests {
         let mut visitor = PartitionColumnVisitor::new(&schemas);
         let _ = statement.visit(&mut visitor);
 
-        // NOT IN → negated=true branch → not captured
         assert!(visitor.equal_items.is_empty());
     }
 
     #[test]
     fn test_partition_visitor_compound_identifier_eq() {
-        // table.field = 'value' → CompoundIdentifier branch on the left side
         let sql = "SELECT * FROM users WHERE users.name = 'alice'";
         let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
@@ -292,7 +328,6 @@ mod tests {
 
     #[test]
     fn test_partition_visitor_compound_identifier_eq_unknown_table_ignored() {
-        // unknown.field = 'value' → CompoundIdentifier, table not in schemas → ignored
         let sql = "SELECT * FROM users WHERE other.name = 'alice'";
         let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
@@ -303,13 +338,11 @@ mod tests {
         let mut visitor = PartitionColumnVisitor::new(&schemas);
         let _ = statement.visit(&mut visitor);
 
-        // 'other' table not in schemas → nothing captured
         assert!(visitor.equal_items.is_empty());
     }
 
     #[test]
     fn test_partition_visitor_compound_identifier_in_list() {
-        // table.field IN (...) → CompoundIdentifier branch in InList
         let sql = "SELECT * FROM users WHERE users.city IN ('NYC', 'LA')";
         let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
@@ -328,7 +361,6 @@ mod tests {
 
     #[test]
     fn test_partition_visitor_ambiguous_field_in_multiple_tables_ignored() {
-        // field exists in 2 tables → count > 1 → ignored (no partition capture)
         let sql = "SELECT * FROM users WHERE name = 'alice'";
         let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
@@ -350,7 +382,113 @@ mod tests {
         let mut visitor = PartitionColumnVisitor::new(&schemas);
         let _ = statement.visit(&mut visitor);
 
-        // count == 2 (both tables have 'name') → not captured
         assert!(visitor.equal_items.is_empty());
+    }
+
+    #[test]
+    fn test_partition_visitor_disables_complex_queries() {
+        for sql in [
+            "SELECT name FROM users WHERE name = 'john' AND city IN (SELECT city FROM users)",
+            "SELECT name, (SELECT city FROM users LIMIT 1) FROM users WHERE name = 'john'",
+            "WITH u AS (SELECT * FROM users WHERE name = 'john') SELECT * FROM u",
+            "SELECT * FROM (SELECT * FROM users WHERE name = 'john') u",
+            "SELECT * FROM users JOIN users AS u ON users.name = u.name WHERE users.name = 'john'",
+            "SELECT * FROM users, users AS u WHERE users.name = 'john'",
+            "SELECT name FROM users WHERE name = 'john' UNION ALL SELECT name FROM users",
+            "SELECT name FROM users WHERE name = 'john' EXCEPT SELECT name FROM users",
+            "SELECT name FROM users WHERE name = 'john' INTERSECT SELECT name FROM users",
+            "SELECT count(*) FROM users WHERE name = 'john'",
+            "SELECT city FROM users WHERE name = 'john' GROUP BY city",
+            "SELECT DISTINCT city FROM users WHERE name = 'john'",
+            "SELECT row_number() OVER () FROM users WHERE name = 'john'",
+            "SELECT name FROM users WHERE name = 'john' ORDER BY (SELECT max(age) FROM users)",
+            "SELECT ARRAY(SELECT city FROM users) FROM users WHERE name = 'john'",
+        ] {
+            assert!(partition_items(sql).is_empty(), "{sql}");
+        }
+    }
+
+    #[test]
+    fn test_partition_visitor_disables_aliased_and_non_table_reads() {
+        for sql in [
+            "SELECT * FROM users AS u WHERE name = 'john'",
+            "SELECT * FROM users AS u WHERE u.name = 'john'",
+            "SELECT * FROM users AS users WHERE users.name = 'john'",
+            "SELECT * FROM users() WHERE name = 'john'",
+            "(SELECT * FROM users WHERE name = 'john')",
+        ] {
+            assert!(partition_items(sql).is_empty(), "{sql}");
+        }
+    }
+
+    #[test]
+    fn test_partition_visitor_rejects_entire_nonliteral_in_lists() {
+        for sql in [
+            "SELECT * FROM users WHERE city IN (city)",
+            "SELECT * FROM users WHERE city IN ('NYC', city)",
+            "SELECT * FROM users WHERE users.city IN ('NYC', users.city)",
+            "SELECT * FROM users WHERE city IN (upper('nyc'))",
+            "SELECT * FROM users WHERE city IN ('NYC', upper('la'))",
+            "SELECT * FROM users WHERE city IN ($1)",
+            "SELECT * FROM users WHERE city IN ('NYC', NULL)",
+            "SELECT * FROM users WHERE name = $1",
+        ] {
+            assert!(partition_items(sql).is_empty(), "{sql}");
+        }
+    }
+
+    #[test]
+    fn test_partition_visitor_keeps_independent_literal_predicates() {
+        assert_eq!(
+            partition_items("SELECT * FROM users WHERE name = 'john' AND city IN ('NYC', city)"),
+            vec![("name".to_string(), "john".to_string())]
+        );
+    }
+
+    #[test]
+    fn test_partition_visitor_decodes_string_literals() {
+        assert_eq!(
+            partition_items(
+                "SELECT * FROM users WHERE name = 'O''Reilly' AND city IN ('N''Y', 'LA')"
+            ),
+            vec![
+                ("city".to_string(), "LA".to_string()),
+                ("city".to_string(), "N'Y".to_string()),
+                ("name".to_string(), "O'Reilly".to_string()),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_partition_visitor_ignores_or_and_negated_predicates() {
+        for sql in [
+            "SELECT * FROM users WHERE name = 'john' OR city = 'NYC'",
+            "SELECT * FROM users WHERE NOT (name = 'john')",
+        ] {
+            assert!(partition_items(sql).is_empty(), "{sql}");
+        }
+        assert_eq!(
+            partition_items(
+                "SELECT * FROM users WHERE name = 'john' AND (age = 25 OR city = 'NYC')"
+            ),
+            vec![("name".to_string(), "john".to_string())]
+        );
+    }
+
+    fn partition_items(sql: &str) -> Vec<(String, String)> {
+        let mut statement =
+            sqlparser::parser::Parser::parse_sql(&sqlparser::dialect::PostgreSqlDialect {}, sql)
+                .unwrap()
+                .pop()
+                .unwrap();
+        let schemas = make_schemas();
+        let mut visitor = PartitionColumnVisitor::new(&schemas);
+        let _ = statement.visit(&mut visitor);
+        let mut items = visitor
+            .equal_items
+            .remove(&TableReference::from("users"))
+            .unwrap_or_default();
+        items.sort();
+        items
     }
 }
