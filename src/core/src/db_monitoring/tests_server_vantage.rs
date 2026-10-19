@@ -4099,8 +4099,7 @@ fn delta_semantics_are_recorded_not_accumulated() {
 ///
 /// * gRPC/protobuf — `get_val_with_type_retained` (`ingestion/grpc.rs:130-135`) emits
 ///   `IntValue`/`DoubleValue` as JSON **numbers**.
-/// * HTTP/JSON — `get_val_for_attr` (`ingestion/mod.rs:386-389`) emits both as `.to_string()`, i.e.
-///   JSON **strings**.
+/// * HTTP/JSON — emits both as `.to_string()`, i.e. JSON **strings**.
 ///
 /// So a collector pointed at the HTTP endpoint delivers `"19687"` where the gRPC
 /// one delivers `19687`. A canonicalizer reading `as_i64()` directly parses the
@@ -4110,8 +4109,7 @@ fn delta_semantics_are_recorded_not_accumulated() {
 fn numeric_attributes_parse_from_both_the_grpc_and_json_wire_shapes() {
     let numeric = server_vantage::canonicalize_top_query(&pg_top_query()).expect("grpc shape");
 
-    // The HTTP/JSON shape: every number stringified, exactly as
-    // `get_val_for_attr` renders it.
+    // The HTTP/JSON shape: every number stringified.
     let mut stringly = pg_top_query();
     for key in [
         "postgresql_calls",

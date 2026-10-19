@@ -13,10 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{
-    io::Error,
-    net::{AddrParseError, IpAddr, SocketAddr},
-};
+use std::io::Error;
 
 use axum::http::header::{HeaderMap, HeaderName};
 use config::meta::{
@@ -211,25 +208,6 @@ pub fn get_or_create_trace_id(headers: &HeaderMap, span: &tracing::Span) -> Stri
     }
 }
 
-/// This function can handle IPv4 and IPv6 addresses which may have port numbers appended
-pub fn parse_ip_addr(ip_address: &str) -> Result<(IpAddr, Option<u16>), AddrParseError> {
-    let mut port: Option<u16> = None;
-    let ip = ip_address.parse::<IpAddr>().or_else(|_| {
-        ip_address
-            .parse::<SocketAddr>()
-            .map(|sock_addr| {
-                port = Some(sock_addr.port());
-                sock_addr.ip()
-            })
-            .map_err(|e| {
-                log::error!("Error parsing IP address: {}, {}", ip_address, e);
-                e
-            })
-    })?;
-
-    Ok((ip, port))
-}
-
 // Extractor for request headers
 pub struct RequestHeaderExtractor<'a> {
     headers: &'a HeaderMap,
@@ -411,39 +389,6 @@ mod tests {
 
         let query = Query::<HashMap<String, String>>(Default::default());
         assert_eq!(get_folder(&query), config::meta::folder::DEFAULT_FOLDER);
-    }
-
-    #[test]
-    fn test_parse_ip_addr() {
-        let ip_port_exp_map = [
-            (
-                "192.168.1.1",
-                "192.168.1.1".parse::<IpAddr>().unwrap(),
-                None,
-            ),
-            (
-                "192.168.1.1:8080",
-                "192.168.1.1".parse::<IpAddr>().unwrap(),
-                Some(8080),
-            ),
-            (
-                "2001:db8::1",
-                "2001:db8::1".parse::<IpAddr>().unwrap(),
-                None,
-            ),
-            (
-                "[2001:db8::1]:8080",
-                "2001:db8::1".parse::<IpAddr>().unwrap(),
-                Some(8080),
-            ),
-        ];
-
-        for (ip, exp_ip, exp_port) in ip_port_exp_map {
-            assert_eq!(parse_ip_addr(ip).unwrap(), (exp_ip, exp_port));
-        }
-
-        // Test invalid IP
-        assert!(parse_ip_addr("invalid").is_err());
     }
 
     #[test]

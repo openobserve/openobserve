@@ -106,15 +106,6 @@ pub async fn update_local_node(node: &Node) -> Result<()> {
     }
 }
 
-pub async fn set_unschedulable() -> Result<()> {
-    let node_id = LOCAL_NODE.uuid.clone();
-    if let Some(mut node) = get_node_by_uuid(&node_id).await {
-        node.scheduled = false;
-        update_local_node(&node).await?;
-    };
-    Ok(())
-}
-
 pub async fn set_schedulable() -> Result<()> {
     let node_id = LOCAL_NODE.uuid.clone();
     if let Some(mut node) = get_node_by_uuid(&node_id).await {
@@ -161,14 +152,6 @@ mod tests {
         set_offline().await.unwrap();
         // doesn't work for local mode
         assert!(get_cached_online_nodes().await.is_some());
-    }
-
-    #[tokio::test]
-    async fn test_set_unschedulable() {
-        register_and_keep_alive().await.unwrap();
-        set_unschedulable().await.unwrap();
-        // doesn't work for local mode
-        assert!(get_cached_online_ingester_nodes().await.is_some());
     }
 
     #[tokio::test]

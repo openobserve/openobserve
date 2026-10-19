@@ -1273,12 +1273,6 @@ impl MultiSearchPartitionRequest {
     }
 }
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
-pub struct MultiSearchPartitionResponse {
-    pub success: hashbrown::HashMap<String, SearchPartitionResponse>,
-    pub error: hashbrown::HashMap<String, String>,
-}
-
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct SqlQuery {
     pub sql: String,
@@ -1545,10 +1539,6 @@ pub enum Interval {
 impl Interval {
     pub fn get_duration_minutes(&self) -> i64 {
         *self as i64
-    }
-
-    pub fn get_interval_seconds(&self) -> i64 {
-        self.get_duration_minutes() * 60
     }
 
     pub fn get_interval_microseconds(&self) -> i64 {
@@ -3059,40 +3049,6 @@ mod tests {
     }
 
     #[test]
-    fn test_multi_search_partition_response() {
-        let mut response = MultiSearchPartitionResponse::default();
-        let partition_response = SearchPartitionResponse {
-            trace_id: "trace123".to_string(),
-            file_num: 10,
-            records: 100,
-            original_size: 1024,
-            compressed_size: 512,
-            histogram_interval: Some(3600),
-            max_query_range: 24,
-            partitions: vec![[100, 200]],
-            order_by: OrderBy::Asc,
-            limit: 1000,
-            streaming_output: true,
-            streaming_aggs: false,
-            streaming_id: Some("stream123".to_string()),
-            is_histogram_eligible: false,
-            non_ts_order_by_cols: vec![],
-        };
-
-        response
-            .success
-            .insert("query1".to_string(), partition_response);
-        response
-            .error
-            .insert("query2".to_string(), "Error message".to_string());
-
-        assert_eq!(response.success.len(), 1);
-        assert_eq!(response.error.len(), 1);
-        assert!(response.success.contains_key("query1"));
-        assert!(response.error.contains_key("query2"));
-    }
-
-    #[test]
     fn test_query_status_response() {
         let response = QueryStatusResponse {
             status: vec![QueryStatus {
@@ -3147,11 +3103,6 @@ mod tests {
         assert_eq!(Interval::FiveMinutes.get_duration_minutes(), 5);
         assert_eq!(Interval::OneHour.get_duration_minutes(), 60);
         assert_eq!(Interval::OneDay.get_duration_minutes(), 1440);
-
-        // Test duration in seconds
-        assert_eq!(Interval::FiveMinutes.get_interval_seconds(), 300);
-        assert_eq!(Interval::OneHour.get_interval_seconds(), 3600);
-        assert_eq!(Interval::OneDay.get_interval_seconds(), 86400);
 
         // Test duration in microseconds
         assert_eq!(
@@ -3643,10 +3594,7 @@ mod tests {
     #[test]
     fn test_interval_seconds_and_microseconds() {
         let h = Interval::OneHour;
-        assert_eq!(h.get_interval_seconds(), 3600);
         assert_eq!(h.get_interval_microseconds(), 3_600_000_000);
-        let five = Interval::FiveMinutes;
-        assert_eq!(five.get_interval_seconds(), 300);
     }
 
     #[test]

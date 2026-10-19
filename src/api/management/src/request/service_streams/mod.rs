@@ -745,29 +745,6 @@ mod tests {
         assert!(!CardinalityClass::VeryHigh.is_suitable_for_correlation());
     }
 
-    #[test]
-    fn test_cardinality_class_priority_score_ordering() {
-        assert!(
-            CardinalityClass::VeryLow.priority_score() < CardinalityClass::Low.priority_score()
-        );
-        assert!(CardinalityClass::Low.priority_score() < CardinalityClass::Medium.priority_score());
-        assert!(
-            CardinalityClass::Medium.priority_score() < CardinalityClass::High.priority_score()
-        );
-        assert!(
-            CardinalityClass::High.priority_score() < CardinalityClass::VeryHigh.priority_score()
-        );
-    }
-
-    #[test]
-    fn test_cardinality_class_priority_score_values() {
-        assert_eq!(CardinalityClass::VeryLow.priority_score(), 1);
-        assert_eq!(CardinalityClass::Low.priority_score(), 2);
-        assert_eq!(CardinalityClass::Medium.priority_score(), 3);
-        assert_eq!(CardinalityClass::High.priority_score(), 4);
-        assert_eq!(CardinalityClass::VeryHigh.priority_score(), 5);
-    }
-
     // -----------------------------------------------------------------------
     // Group C: DimensionAnalytics
     // -----------------------------------------------------------------------
@@ -935,12 +912,6 @@ mod tests {
         let stream = StreamInfo::new("my_stream".to_string());
         assert_eq!(stream.stream_type, StreamType::Logs);
         assert!(stream.filters.is_empty());
-    }
-
-    #[test]
-    fn test_stream_info_set_stream_type_builder() {
-        let stream = StreamInfo::new("my_stream".to_string()).set_stream_type(StreamType::Metrics);
-        assert_eq!(stream.stream_type, StreamType::Metrics);
     }
 
     #[test]
