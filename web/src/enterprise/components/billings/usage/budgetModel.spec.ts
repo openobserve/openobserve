@@ -21,6 +21,7 @@ import {
   draftOf,
   nextWarnPercent,
   sameBudget,
+  sameCents,
   superBudgetConfigs,
   TOTAL_BUDGET_ID,
   budgetReachedDay,
@@ -115,5 +116,16 @@ describe("budgetModel", () => {
     expect(nextWarnPercent("abc", 80)).toBe(80);
     expect(nextWarnPercent("50", 80)).toBe(50);
     expect(nextWarnPercent(150, 80)).toBe(100);
+  });
+});
+
+describe("budgetModel cents", () => {
+  // In floating point 36.01 - 36 is 0.00999…, which a "< 0.01" test reads as no change.
+  it("tells a one-cent change apart, and treats sub-cent noise as the same amount", () => {
+    expect(sameCents(36.01, 36)).toBe(false);
+    expect(sameCents(400.01, 400)).toBe(false);
+    expect(sameCents(36, 36.004)).toBe(true);
+    const saved = { budget: 100, warnPercent: 36, alertsOn: true };
+    expect(sameBudget(saved, { ...saved, warnPercent: 36.01 })).toBe(false);
   });
 });

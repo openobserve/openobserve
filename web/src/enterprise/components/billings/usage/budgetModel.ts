@@ -48,6 +48,14 @@ export function withBudget(
 
 const cents = (value: number) => Math.round(value * 100) / 100;
 
+/**
+ * Two amounts are the same to the cent. Whole cents, not `< 0.01`: in floating point 36.01 - 36
+ * is 0.00999…, so a one-cent change would read as no change and Save would stay off.
+ */
+export function sameCents(a: number, b: number): boolean {
+  return Math.round(a * 100) === Math.round(b * 100);
+}
+
 /** The two warn fields stay linked through the percent, so a new budget keeps the same share. */
 export function warnAmountFor(percent: number, total: number): number {
   return total > 0 ? cents((total * clampPercent(percent)) / 100) : 0;
@@ -130,7 +138,7 @@ export function sameBudget(a: BudgetDraft, b: BudgetDraft): boolean {
   const y = configOf("", b);
   return (
     x.total_budget_amount === y.total_budget_amount &&
-    Math.abs(x.warn_at_amount - y.warn_at_amount) < 0.01 &&
+    sameCents(x.warn_at_amount, y.warn_at_amount) &&
     x.paused === y.paused
   );
 }

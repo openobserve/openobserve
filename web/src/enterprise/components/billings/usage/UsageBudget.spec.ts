@@ -225,3 +225,27 @@ describe("super org Budget saving", () => {
     expect(bar).toContain("All changes saved");
   });
 });
+
+describe("Budget Save after a one-cent change", () => {
+  beforeEach(() => {
+    getSettings.mockReset().mockResolvedValue(stored);
+  });
+
+  it("turns Save on when the warn amount moves by one cent", async () => {
+    const wrapper = mount(UsageBudget, {
+      props: { details, projected: null },
+      global: { plugins: [i18n, store] },
+    });
+    await flushPromises();
+    const save = () => byTestId(wrapper, "OButton", "billings-usagebudget-save");
+    expect(save().props("disabled")).toBe(true);
+
+    // Saved at $400.00; 400.01 - 400 is 0.00999… in floating point.
+    byTestId(wrapper, "OInput", "billings-usagebudget-warn-amount").vm.$emit(
+      "update:modelValue",
+      "400.01",
+    );
+    await flushPromises();
+    expect(save().props("disabled")).toBe(false);
+  });
+});

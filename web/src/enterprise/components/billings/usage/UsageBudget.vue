@@ -249,6 +249,7 @@ import {
   warnAmountFor,
   warnPercentFor,
   withBudget,
+  sameCents,
   type BudgetConfig,
 } from "./budgetModel";
 
@@ -358,7 +359,7 @@ const dirty = computed(() => {
   if (!config) return draft.total_budget_amount > 0;
   return (
     config.total_budget_amount !== draft.total_budget_amount ||
-    Math.abs(config.warn_at_amount - draft.warn_at_amount) >= 0.01 ||
+    !sameCents(config.warn_at_amount, draft.warn_at_amount) ||
     config.paused !== draft.paused
   );
 });
