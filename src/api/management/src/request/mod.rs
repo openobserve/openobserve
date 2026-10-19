@@ -66,9 +66,9 @@ pub mod prompts;
 pub mod providers;
 pub mod public_dashboards;
 pub mod public_rate_limit;
-pub mod query_history;
 #[cfg(feature = "enterprise")]
 pub mod quality;
+pub mod query_history;
 #[cfg(feature = "enterprise")]
 pub mod remote_tasks;
 pub mod rum_analytics;

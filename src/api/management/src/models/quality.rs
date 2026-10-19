@@ -70,8 +70,7 @@ pub struct ListQualityScoresQuery {
     pub unhealthy_only: Option<bool>,
     /// Numeric configs: first distribution bucket index to include.
     pub bucket_from: Option<i64>,
-    /// Numeric configs: last distribution bucket index to include. Defaults to
-    /// `bucket_from`.
+    /// Numeric configs: last distribution bucket index to include, `bucket_from` when omitted.
     pub bucket_to: Option<i64>,
     /// Boolean and categorical configs: exact value to include.
     pub value: Option<String>,

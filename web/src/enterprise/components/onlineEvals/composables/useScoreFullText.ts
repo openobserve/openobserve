@@ -120,8 +120,11 @@ export function useScoreFullText(score: () => QualityScore | null, orgId: Ref<st
     const first = firstSpans.data.value;
     const last = lastSpans.data.value;
     if (!target || !traceIds.value || !first || !last) return null;
-    const input = asText(extractLLMData(contentSpan(target, first))?.input);
-    const output = asText(extractLLMData(contentSpan(target, last))?.output);
+    const inputSpan = contentSpan(target, first);
+    // A trace target reads both texts from the same span list.
+    const outputSpan = first === last ? inputSpan : contentSpan(target, last);
+    const input = asText(extractLLMData(inputSpan)?.input);
+    const output = asText(extractLLMData(outputSpan)?.output);
     return input || output ? { input, output } : null;
   });
 
