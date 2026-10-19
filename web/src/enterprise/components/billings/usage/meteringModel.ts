@@ -170,7 +170,8 @@ export const METERS: MeterDef[] = [
   {
     key: "retention",
     labelKey: "billing.dataRetention",
-    rateUnitKey: "billing.usageV2.unitGb",
+    // Metered in MB-hours; Stripe divides by 1024, so the price is per GB-hour.
+    rateUnitKey: "billing.usageV2.unitGbHour",
     events: [],
     billedAsKey: "billing.usageV2.billedRetention",
   },
@@ -213,6 +214,13 @@ const USD_RATE = new Intl.NumberFormat("en-US", {
   currency: "USD",
   minimumFractionDigits: 2,
   maximumFractionDigits: 4,
+});
+
+/** Under a cent a rate keeps three significant digits, so a real price never reads $0.00. */
+const USD_TINY_RATE = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+  maximumSignificantDigits: 3,
 });
 
 const USD_PRECISE = new Intl.NumberFormat("en-US", {
@@ -270,7 +278,7 @@ export function formatRate(
   const base = Number(meter?.base_cost);
   if (!Number.isFinite(base)) return raw("—");
   return t("billing.usageV2.ratePerUnit", {
-    rate: USD_RATE.format(base),
+    rate: (base > 0 && base < 0.01 ? USD_TINY_RATE : USD_RATE).format(base),
     unit: t(def.rateUnitKey),
   });
 }

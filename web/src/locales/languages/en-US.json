@@ -8018,6 +8018,7 @@
     "usageReportingFailingForHours": "Usage reporting has been failing for {count} hour, some features will get disabled soon | Usage reporting has been failing for {count} hours, some features will get disabled soon",
     "usageV2": {
       "unitGb": "GB",
+      "unitGbHour": "GB-hour",
       "unitCredit": "Credit",
       "unitRun": "Run",
       "ratePerUnit": "{rate} per {unit}",

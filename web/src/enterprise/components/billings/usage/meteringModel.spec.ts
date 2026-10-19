@@ -135,9 +135,25 @@ describe("meteringModel", () => {
     expect(formatCost(0)).toBe("$0.00");
   });
 
-  it("keeps four decimals on a sub-cent rate", () => {
+  it("keeps three significant digits on a sub-cent rate", () => {
     const synthetics = METERS.find((def) => def.key === "synthetics_browser")!;
-    expect(formatRate(details.synthetics_browser, synthetics, t)).toContain("$0.0003");
+    // $0.0002574: four fixed decimals rounded it to $0.0003, 16% high.
+    expect(formatRate(details.synthetics_browser, synthetics, t)).toContain("$0.000257");
+  });
+
+  it("never shows a real but tiny rate as $0.00, and prices retention per GB-hour", () => {
+    const meter = (key: string) => METERS.find((def) => def.key === key)!;
+    const protocol = { ...details.synthetics_protocol, base_cost: 0.00000494 };
+    expect(formatRate(protocol, meter("synthetics_protocol"), t)).toContain('"rate":"$0.00000494"');
+    // Retention is metered in MB-hours and Stripe divides by 1024, so its unit is the GB-hour.
+    const retention = { ...details.retention, base_cost: 1.3563368e-7, unit_divisor: 1024 };
+    const retentionRate = formatRate(retention, meter("retention"), t);
+    expect(retentionRate).toContain('"rate":"$0.000000136"');
+    expect(retentionRate).toContain('"unit":"billing.usageV2.unitGbHour"');
+    // A rate of a cent or more reads as before.
+    expect(formatRate({ ...details.ingestion, base_cost: 0.5 }, meter("ingestion"), t)).toContain(
+      '"rate":"$0.50"',
+    );
   });
 
   it("derives the per stored unit rate", () => {
