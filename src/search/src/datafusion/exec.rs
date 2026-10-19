@@ -286,8 +286,8 @@ impl<'a> DataFusionContextBuilder<'a> {
         if !self.optimizer_rules.is_empty() {
             builder = builder.with_optimizer_rules(self.optimizer_rules)
         }
-        for rule in self.physical_optimizer_rules {
-            builder = builder.with_physical_optimizer_rule(rule);
+        if !self.physical_optimizer_rules.is_empty() {
+            builder = builder.with_physical_optimizer_rules(self.physical_optimizer_rules)
         }
         if cfg.search.feature_join_match_one_enabled || cfg.search.feature_shared_cte_enabled {
             builder = builder.with_query_planner(Arc::new(OpenobserveQueryPlanner::new()));
