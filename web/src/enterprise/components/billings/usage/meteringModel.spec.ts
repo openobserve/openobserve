@@ -23,6 +23,7 @@ import {
   apiCheckRuns,
   browserStepRuns,
   estimateCost,
+  fitWholeCount,
   runsPerMonth,
   effectiveRate,
   projectCycleCost,
@@ -412,5 +413,16 @@ describe("meteringModel usage without a bill", () => {
     expect(usage.ai).toMatchObject({ metered_amount: 7, unit_divisor: 1, metered_cost: 0 });
     expect(usage.query.metered_amount).toBe(0);
     expect(usage).toMatchObject({ total_cost: 0, cycle_start: 10, cycle_end: 20 });
+  });
+});
+
+describe("meteringModel whole counts for the estimator", () => {
+  it("rounds to a whole count, at least one once there is usage, with the size scaled to fit", () => {
+    expect(fitWholeCount(1 / 3)).toEqual({ count: 1, scale: 1 / 3 });
+    const three = fitWholeCount(3.4);
+    expect(three.count).toBe(3);
+    expect(three.count * three.scale).toBeCloseTo(3.4, 9);
+    expect(fitWholeCount(0)).toEqual({ count: 0, scale: 1 });
+    expect(fitWholeCount(Number.NaN)).toEqual({ count: 0, scale: 1 });
   });
 });

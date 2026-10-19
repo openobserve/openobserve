@@ -256,6 +256,7 @@ import {
   browserStepRuns,
   estimateCost,
   formatCost,
+  fitWholeCount,
   formatRate,
   METERS,
   monthlyPace,
@@ -436,9 +437,13 @@ const scenario = ref<ScenarioKey>("current");
 
 const round = (value: number) => Number(value.toFixed(2));
 
+/** Fields the user typed in; history that lands later must not overwrite them. */
+const edited = new Set<FieldKey>();
+
 const setField = (key: FieldKey, value: unknown) => {
   const next = Number(value);
   inputs[key] = Number.isFinite(next) && next > 0 ? next : 0;
+  edited.add(key);
 };
 
 /**
@@ -457,33 +462,40 @@ const currentScenario = computed<EstimateInputs>(() => {
   const scannedMb = perMonth(details.query?.metered_amount);
   const scanPerSearch = DEFAULTS.searchMinutes * assumptions.scanRateMbPerMin;
   const pipelineMb = perMonth(details.pipeline?.metered_amount);
+  // Whole searches and checks; the duration or interval absorbs the rest, so the total matches the bill.
+  const searches = fitWholeCount(scanPerSearch > 0 ? scannedMb / scanPerSearch : 0);
+  const browser = fitWholeCount(
+    perMonth(details.synthetics_browser?.metered_amount) / BROWSER_RUNS_PER_CHECK,
+  );
+  const api = fitWholeCount(
+    perMonth(details.synthetics_protocol?.metered_amount) / API_RUNS_PER_CHECK,
+  );
   return {
     ...assumptions,
     ingestGb: round(perMonth(details.ingestion?.metered_amount) / MB_PER_GB),
-    searchCount: scanPerSearch > 0 ? Math.round(scannedMb / scanPerSearch) : DEFAULTS.searchCount,
-    searchMinutes: DEFAULTS.searchMinutes,
+    searchCount: scanPerSearch > 0 ? searches.count : DEFAULTS.searchCount,
+    // The slider starts at one minute; below it the cost is a fraction of a cent.
+    searchMinutes: Math.max(round(DEFAULTS.searchMinutes * searches.scale), 1),
     pipelineCount:
       assumptions.avgStreamMb > 0
         ? Math.round(pipelineMb / assumptions.avgStreamMb)
         : DEFAULTS.pipelineCount,
     retentionDays: DEFAULTS.retentionDays,
     aiCredits: Math.round(perMonth(details.ai?.metered_amount)),
-    browserChecks: Math.round(
-      perMonth(details.synthetics_browser?.metered_amount) / BROWSER_RUNS_PER_CHECK,
-    ),
+    browserChecks: browser.count,
     browserSteps: DEFAULTS.browserSteps,
     browserRegions: DEFAULTS.browserRegions,
     browserDevices: DEFAULTS.browserDevices,
-    browserIntervalSec: DEFAULTS.browserIntervalSec,
-    apiChecks: Math.round(
-      perMonth(details.synthetics_protocol?.metered_amount) / API_RUNS_PER_CHECK,
-    ),
+    browserIntervalSec: Math.round(DEFAULTS.browserIntervalSec / browser.scale),
+    apiChecks: api.count,
     apiRegions: DEFAULTS.apiRegions,
-    apiIntervalSec: DEFAULTS.apiIntervalSec,
+    apiIntervalSec: Math.round(DEFAULTS.apiIntervalSec / api.scale),
   };
 });
 
 const applyScenario = (key: ScenarioKey) => {
+  // A preset fills every field on purpose, so nothing typed before it is protected any more.
+  edited.clear();
   scenario.value = key;
   const base = currentScenario.value;
   const factor = key === "twice" ? 2 : key === "fiveTimes" ? 5 : 1;
@@ -591,15 +603,20 @@ const loadDefaults = async () => {
       runScalarQuery(searchScanRateSql(store.state.selectedOrganization.identifier), "scan"),
     ]);
     const streamCount = Number(streams.streams) || 0;
-    inputs.avgStreamMb = streamCount > 0 ? round(Number(streams.total) / streamCount) : 0;
+    if (!edited.has("avgStreamMb")) {
+      inputs.avgStreamMb = streamCount > 0 ? round(Number(streams.total) / streamCount) : 0;
+    }
     const seconds = Number(scan.seconds) || 0;
-    inputs.scanRateMbPerMin =
-      seconds > 0 ? round((Number(scan.total) / seconds) * SECONDS_PER_MINUTE) : 0;
+    if (!edited.has("scanRateMbPerMin")) {
+      inputs.scanRateMbPerMin =
+        seconds > 0 ? round((Number(scan.total) / seconds) * SECONDS_PER_MINUTE) : 0;
+    }
   } catch {
     inputs.avgStreamMb = inputs.avgStreamMb || 0;
     inputs.scanRateMbPerMin = inputs.scanRateMbPerMin || 0;
   }
-  applyScenario("current");
+  // The answers land a moment after the tab opens; anything typed by then stays as typed.
+  if (!edited.size) applyScenario("current");
 };
 
 onMounted(loadDefaults);

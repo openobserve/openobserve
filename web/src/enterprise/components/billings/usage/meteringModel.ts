@@ -449,6 +449,17 @@ export function monthlyPace(
   return ((Number(amount) || 0) / daysPassed) * DAYS_PER_MONTH;
 }
 
+/**
+ * A whole count for a form field, with the factor its size field must scale by so the total stays
+ * exact: 0.33 of a 60-minute search is 1 search of 20 minutes, not 0 searches. At least one once
+ * there is any usage, so a small but billed meter never estimates to $0.
+ */
+export function fitWholeCount(exact: number): { count: number; scale: number } {
+  if (!(exact > 0)) return { count: 0, scale: 1 };
+  const count = Math.max(1, Math.round(exact));
+  return { count, scale: exact / count };
+}
+
 /** Scheduled runs in a 30 day month; a check with no interval never runs. */
 export function runsPerMonth(intervalSec: number): number {
   const interval = finite(intervalSec);
