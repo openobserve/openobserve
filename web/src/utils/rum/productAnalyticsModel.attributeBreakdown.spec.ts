@@ -129,7 +129,7 @@ describe("step property conditions (pc) in the link", () => {
     const x = (step: unknown[]) => ({ s: S, x: [{ s: step, a: 1, b: 3 }] });
     expect(parseFunnelDef(x(["c", "Buy", { pc: [UPI] }]))).toBeNull();
     expect(parseFunnelDef(x(["p", "/z", { min: 1, pc: [UPI] }]))).toBeNull();
-    expect(parseFunnelDef(x(["p", "/z", { min: 1 }]))?.x).toHaveLength(1);
+    expect(parseFunnelDef(x(["p", "/z"]))?.x).toHaveLength(1);
   });
 
   it("maps a pinned step through a step change", () => {

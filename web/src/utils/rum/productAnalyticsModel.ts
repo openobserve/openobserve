@@ -1002,8 +1002,6 @@ const parseExclusion = (raw: unknown, steps: StepRef[]): ExclusionStep | null =>
   // The queries match an exclusion by its step alone, so options on it would be ignored.
   if (step?.f) return null;
   if (!step || typeof a !== "number" || !Number.isInteger(a) || a < 1) return null;
-  // Mirrors the server: the exclusion SQL matches its step without options, so a condition would be ignored.
-  if (step.f?.pc) return null;
   if ((b === undefined) === (w === undefined)) return null;
   let x: ExclusionStep | null = null;
   if (b !== undefined)
