@@ -54,7 +54,8 @@ export function useUsageReporting() {
     } catch (e: any) {
       toast({
         variant: "error",
-        message: raw(e?.message) || t("billing.failedToEnableUsageReporting"),
+        // The server's reason when it gives one, not the request library's "status code" text.
+        message: raw(e?.response?.data?.message) || t("billing.failedToEnableUsageReporting"),
         timeout: 5000,
       });
     } finally {

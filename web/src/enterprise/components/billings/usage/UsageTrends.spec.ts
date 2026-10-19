@@ -21,6 +21,8 @@ import store from "@/test/unit/helpers/store";
 import { mockMeteringResponse } from "./meteringMock";
 
 const post = vi.fn();
+const toast = vi.fn();
+vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: (...args: unknown[]) => toast(...args) }));
 vi.mock("@/services/organizations", () => ({
   default: { post_organization_settings: (...args: unknown[]) => post(...args) },
 }));
@@ -81,6 +83,49 @@ describe("UsageTrends usage reporting", () => {
     // The page still learns the new value straight away.
     expect(store.state.organizationData.organizationSettings.usage_stream_enabled).toBe(true);
     expect(store.state.organizationData.organizationSettings.scrape_interval).toBe(15);
+  });
+});
+
+describe("UsageTrends usage reporting failure", () => {
+  beforeEach(() => {
+    toast.mockReset();
+    store.state.organizationData.organizationSettings = {
+      ...store.state.organizationData.organizationSettings,
+      usage_stream_enabled: false,
+    };
+  });
+
+  const turnOn = async () => {
+    const upcoming = mockMeteringResponse().upcoming!;
+    const wrapper = mount(UsageTrends, {
+      props: { details: upcoming, cycles: [upcoming], billingOrgs: [], projected: null },
+      global: { plugins: [i18n, store] },
+    });
+    await flushPromises();
+    wrapper.findComponent({ name: "ConfirmDialog" }).vm.$emit("update:ok");
+    await flushPromises();
+  };
+
+  it("shows the server's reason, not the request library's status text", async () => {
+    post.mockReset().mockRejectedValue({
+      message: "Request failed with status code 400",
+      response: { data: { message: "usage reporting is not available on this plan" } },
+    });
+    await turnOn();
+    expect(toast).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        variant: "error",
+        message: "usage reporting is not available on this plan",
+      }),
+    );
+  });
+
+  it("falls back to its own words when the server gives no reason", async () => {
+    post.mockReset().mockRejectedValue({ message: "Network Error" });
+    await turnOn();
+    expect(toast).toHaveBeenLastCalledWith(
+      expect.objectContaining({ variant: "error", message: "Failed to enable usage reporting" }),
+    );
   });
 });
 
