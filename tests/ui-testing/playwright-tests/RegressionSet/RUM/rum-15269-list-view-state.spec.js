@@ -3,17 +3,11 @@ const path = require('path');
 const { test, expect } = require('../../utils/enhanced-baseFixtures.js');
 const testLogger = require('../../utils/test-logger.js');
 const PageManager = require('../../../pages/page-manager.js');
-const { apiContext } = require('../../utils/rum-analytics-ingestion.js');
 const { buildZip } = require('../../utils/zip-builder.js');
 
 const TAGS = ['@bug-15269', '@P2', '@regression', '@rumRegression'];
 const FIXTURE_DIR = path.resolve(__dirname, '../../../fixtures/sourcemaps');
 const manifest = require(path.join(FIXTURE_DIR, 'manifest.json'));
-
-const sourceMapsUrl = (query = '') => {
-  const { orgId, baseUrl } = apiContext();
-  return `${baseUrl}/api/${orgId}/sourcemaps${query}`;
-};
 
 test.describe('RUM Source Maps list keeps its view state (#15269)', () => {
   test.describe.configure({ mode: 'parallel' });
@@ -34,15 +28,8 @@ test.describe('RUM Source Maps list keeps its view state (#15269)', () => {
       { name: manifest.bundle, content: fs.readFileSync(path.join(FIXTURE_DIR, 'dist', manifest.bundle)) },
       { name: `${manifest.bundle}.map`, content: fs.readFileSync(path.join(FIXTURE_DIR, 'dist', `${manifest.bundle}.map`)) },
     ]);
-    const { Authorization } = apiContext().headers;
     try {
-      for (const version of versions) {
-        const res = await page.request.post(sourceMapsUrl(), {
-          headers: { Authorization },
-          multipart: { service, version, env: 'e2e', file: { name: manifest.zip, mimeType: 'application/zip', buffer: zip } },
-        });
-        expect(res.ok(), `upload ${service}@${version}: ${res.status()} ${await res.text()}`).toBe(true);
-      }
+      for (const version of versions) await maps.uploadGroupViaApi(service, version, 'e2e', { name: manifest.zip, buffer: zip });
       await maps.gotoSourceMapsList();
       await maps.expectOnListPage();
       await maps.filterByService(service);
@@ -61,12 +48,7 @@ test.describe('RUM Source Maps list keeps its view state (#15269)', () => {
       await maps.returnViaRumMenu();
       await maps.expectListState(state);
     } finally {
-      for (const version of versions) {
-        const res = await page.request
-          .delete(sourceMapsUrl(`?service=${service}&version=${version}&env=e2e`), { headers: { Authorization } })
-          .catch(() => {});
-        if (!res?.ok()) testLogger.warn('Cleanup delete failed', { service, version, status: res?.status() });
-      }
+      for (const version of versions) await maps.deleteGroupViaApi(service, version, 'e2e');
     }
   });
 });

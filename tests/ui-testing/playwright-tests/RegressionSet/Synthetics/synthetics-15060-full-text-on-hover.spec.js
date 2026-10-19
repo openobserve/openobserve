@@ -11,7 +11,7 @@ test.describe('Synthetics cut-off text shows in full on hover (#15060)', () => {
     testLogger.testStart(testInfo.title, testInfo.file);
     await navigateToBase(page);
     synthetics = new SyntheticsRegressionPage(page);
-    tag = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+    tag = synthetics.newRunTag();
   });
 
   test.afterEach(async ({}, testInfo) => {
@@ -23,8 +23,7 @@ test.describe('Synthetics cut-off text shows in full on hover (#15060)', () => {
     tag: ['@bug-15060', '@P2', '@regression', '@syntheticsRegression'],
   }, async () => {
     const label = `SynReg ${tag} probe location with a name far too long for its column`;
-    const locationId = `synreg-${tag}`;
-    await synthetics.createPublicLocations([{ id: locationId, label }]);
+    const locationId = await synthetics.createProbeLocation(tag, label);
     const check = await synthetics.createCheck(`synreg${tag}_hover`, 'http', locationId);
     await synthetics.seedRuns(check, locationId, [{ status: 'passed', durationMs: 240, ageSec: 60 }]);
 

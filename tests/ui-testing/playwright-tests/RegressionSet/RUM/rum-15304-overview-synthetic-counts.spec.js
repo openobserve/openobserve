@@ -52,7 +52,9 @@ test.describe('Product Analytics Overview counts exclude synthetic sessions (#15
     testLogger.testStart(testInfo.title, testInfo.file);
     const pa = new PageManager(page).rumProductAnalyticsPage;
     await pa.goto('overview', { app: seed.appId, period: '7d' });
-    await expect(pa.syntheticExcluded).toHaveText(`${seed.botSessions} synthetic sessions excluded`, { timeout: 30000 });
+    await pa.openExclusions();
+    await expect(pa.syntheticExcluded).toHaveText(`Synthetic tests ${seed.botSessions} · always excluded`, { timeout: 30000 });
+    await pa.closePopovers();
   });
 
   test('Pages per session divides real page views by real sessions only', {

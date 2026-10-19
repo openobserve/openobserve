@@ -2,6 +2,8 @@
 // The UPLOAD FORM has its own page object (generalPages/rumFormValidationPage.js,
 // registered as pm.rumFormValidation) — reuse that for form interactions.
 import { expect } from '@playwright/test';
+const testLogger = require('../../playwright-tests/utils/test-logger.js');
+const { rumTestContext, basicAuthHeader } = require('../../playwright-tests/utils/rum-env.js');
 
 export class RumSourcemapsPage {
     constructor(page) {
@@ -167,6 +169,29 @@ export class RumSourcemapsPage {
         expect((await deleteResponse).status(), 'sourcemaps DELETE should succeed').toBe(200);
 
         await expect(this.groupRow(service)).toHaveCount(0, { timeout: 15000 });
+    }
+
+    /** Calls the org's source-maps API as the RUM test user. */
+    async sourceMapsApi(method, query, options = {}) {
+        const { orgId, baseUrl, email, password } = rumTestContext();
+        return this.page.request[method](`${baseUrl}/api/${orgId}/sourcemaps${query}`, {
+            ...options,
+            headers: { Authorization: basicAuthHeader(email, password) },
+        });
+    }
+
+    /** Uploads a zip as one service@version source-map group through the API. */
+    async uploadGroupViaApi(service, version, env, { name, buffer }) {
+        const res = await this.sourceMapsApi('post', '', {
+            multipart: { service, version, env, file: { name, mimeType: 'application/zip', buffer } },
+        });
+        expect(res.ok(), `upload ${service}@${version}: ${res.status()} ${await res.text()}`).toBe(true);
+    }
+
+    // Cleanup only: a failed delete is logged, never thrown, so it cannot replace the test's own result.
+    async deleteGroupViaApi(service, version, env) {
+        const res = await this.sourceMapsApi('delete', `?${new URLSearchParams({ service, version, env })}`).catch(() => null);
+        if (!res?.ok()) testLogger.warn('Cleanup delete failed', { service, version, status: res?.status() });
     }
 
     /** Toast / inline message shown by the upload page (error or success). */

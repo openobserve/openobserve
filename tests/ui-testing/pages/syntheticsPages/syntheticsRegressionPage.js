@@ -82,6 +82,16 @@ export class SyntheticsRegressionPage {
     return getOrgIdentifier() || process.env.ORGNAME || 'default';
   }
 
+  /** A short id unique to one test, so parallel tests never share checks or locations. */
+  newRunTag() {
+    return `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+  }
+
+  // Zero-padded so that sorting by name matches creation order.
+  numberedNames(base, count) {
+    return Array.from({ length: count }, (_, i) => `${base}${String(i).padStart(2, '0')}`);
+  }
+
   // The single-node meta store is SQLite; parallel check writers can hit "database is locked".
   async apiRequest(method, path, data) {
     let last = null;
@@ -111,6 +121,18 @@ export class SyntheticsRegressionPage {
     expect(status, `public locations must be created: ${JSON.stringify(body)}`).toBe(200);
     expect(body.results.every((r) => r.ok), `every location must be created: ${JSON.stringify(body)}`).toBe(true);
     testLogger.info('Synthetics public locations created', { count: locations.length });
+  }
+
+  /** Creates one public location for this test's checks and returns its id. */
+  async createProbeLocation(tag, label = `SynReg ${tag}`) {
+    const id = `synreg-${tag}`;
+    await this.createPublicLocations([{ id, label }]);
+    return id;
+  }
+
+  numberedProbeLocations(tag, count) {
+    const labels = this.numberedNames(`SynReg ${tag} `, count);
+    return this.numberedNames(`synreg-${tag}-`, count).map((id, i) => ({ id, label: labels[i] }));
   }
 
   async deleteLocation(id) {
@@ -327,8 +349,14 @@ export class SyntheticsRegressionPage {
     expect(cut, 'the location text must be cut off in its column').toBe(true);
   }
 
+  // Late-loading panels shift the runs table and re-render its rows, which can leave one hover's pointer where no mouseenter fired.
   async hoverRunLocation(rowIndex) {
-    await this.runLocationCell(rowIndex).hover();
+    const bubble = this.page.locator(this.locators.tooltipBubble).first();
+    for (let attempt = 0; attempt < 4; attempt++) {
+      await this.table(RUNS_TABLE).locator(this.locators.paginationInfo).hover();
+      await this.runLocationCell(rowIndex).hover();
+      if (await bubble.waitFor({ state: 'visible', timeout: 3000 }).then(() => true).catch(() => false)) break;
+    }
   }
 
   async expectTooltipText(text) {
@@ -404,6 +432,17 @@ export class SyntheticsRegressionPage {
     expect(url.searchParams.get('run'), 'the run id travels back').toBe(run.runId);
     expect(url.searchParams.get('exec'), 'the execution id travels back').toBe(run.executionId);
     expect(url.searchParams.get('period'), 'the time range travels back').toBe(period);
+  }
+
+  /** Opens one seeded run's full page with a 6h range, clicks its back button and expects the results page to reopen that run. */
+  async expectBackFromRunPageReopensRun(tag, type) {
+    const locationId = await this.createProbeLocation(tag);
+    const check = await this.createCheck(`synreg${tag}_${type}_detail`, type, locationId);
+    const [run] = await this.seedRuns(check, locationId, [{ status: 'passed', durationMs: 240, ageSec: 60 }]);
+
+    await this.gotoRunDetail(check, run, { period: '6h' });
+    await this.clickRunDetailBack(type);
+    await this.expectResultsReopenedOnRun(check.id, run, '6h');
   }
 
   async gotoLocations(metaOrg) {

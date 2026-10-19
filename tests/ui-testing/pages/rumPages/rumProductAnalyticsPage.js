@@ -399,6 +399,12 @@ export class RumProductAnalyticsPage {
         await expect(this.exclusionsDrawer).toBeVisible();
     }
 
+    /** Opens the Paths cohort chip's popover, which holds the drop-off condition and its session count. */
+    async openPathsCohort() {
+        await this.pathsSessionFilter.click();
+        await expect(this.pathsCohortPopover).toBeVisible();
+    }
+
     async openDropoff(i) {
         await expect(this.dropoffBtn(i)).toHaveAttribute('aria-haspopup', 'dialog');
         await this.dropoffBtn(i).click();

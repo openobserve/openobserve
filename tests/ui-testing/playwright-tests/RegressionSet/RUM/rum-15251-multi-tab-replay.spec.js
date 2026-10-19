@@ -18,7 +18,6 @@ const RUN_ID = `${Date.now()}-${process.pid}`;
 const HOUR_US = 3600 * 1000 * 1000;
 const RECORDING_TIMEOUT_MS = 8 * 60 * 1000;
 
-let sdkReachable = false;
 let session = null;
 let timeline = null;
 
@@ -40,8 +39,10 @@ async function recordSession(browser) {
   });
   const context = await browser.newContext();
   try {
-    sdkReachable = await server.sdkReachable();
-    if (!sdkReachable) return null;
+    expect(
+      await server.sdkDownloadError(),
+      `The RUM browser SDK could not be downloaded from ${server.sdkUrl} (CDN down or version missing), so no two-tab session can be recorded`,
+    ).toBe('');
     return await recordTwoTabSession(context, server, org);
   } finally {
     await context.close();
@@ -86,10 +87,6 @@ test.describe('RUM session replay across two browser tabs (#15251)', () => {
     // Every recording step has its own wait, and together their worst case reaches the 5-minute CI test timeout.
     test.setTimeout(RECORDING_TIMEOUT_MS);
     session = await recordSession(browser);
-    if (!session) {
-      testLogger.warn('RUM SDK CDN unreachable, so no session could be recorded');
-      return;
-    }
     expect(session.sameSession, 'Precondition: both tabs must share one RUM session').toBe(true);
 
     const probe = await browser.newPage();
@@ -110,7 +107,6 @@ test.describe('RUM session replay across two browser tabs (#15251)', () => {
 
   test.beforeEach(async ({ page }, testInfo) => {
     testLogger.testStart(testInfo.title, testInfo.file);
-    test.skip(!sdkReachable, 'Skipped: the RUM browser SDK CDN (browsersdk.openobserve.ai) was unreachable, so no two-tab session could be recorded');
     await navigateToBase(page);
   });
 

@@ -95,7 +95,8 @@ function startMultiTabReplayServer(opts) {
         origin,
         ordersUrl: `${origin}/orders.html`,
         catalogueUrl: `${origin}/catalogue.html`,
-        sdkReachable: () => fetchSdkFile(opts.sdkVersion, 'openobserve-rum.js', cache).then(() => true, () => false),
+        sdkUrl: `${CDN}/${opts.sdkVersion}/openobserve-rum.js`,
+        sdkDownloadError: () => fetchSdkFile(opts.sdkVersion, 'openobserve-rum.js', cache).then(() => '', (err) => String(err?.message || err)),
         close: () => new Promise((done) => server.close(() => done())),
       });
     });

@@ -1,43 +1,28 @@
-const { test, expect, navigateToBase } = require('../../utils/enhanced-baseFixtures.js');
+const { test, navigateToBase } = require('../../utils/enhanced-baseFixtures.js');
 const testLogger = require('../../utils/test-logger.js');
 const PageManager = require('../../../pages/page-manager.js');
 const { generateHexId } = require('../../utils/trace-ingestion.js');
-const { getAuthHeaders, getOrgIdentifier } = require('../../utils/cloud-auth.js');
+const { createSavedView, deleteSavedView } = require('../../utils/traces-api.js');
 
 const STREAM = 'default';
 const PIN_TITLE = 'Pin to toolbar';
 const UNPIN_TITLE = 'Unpin from toolbar';
 
-const org = () => getOrgIdentifier() || process.env.ORGNAME || 'default';
-const baseUrl = () => (process.env.ZO_BASE_URL || '').replace(/\/+$/, '');
-
-async function createTracesView(page, name, editorValue) {
-  const response = await page.request.post(`${baseUrl()}/api/${org()}/savedviews`, {
-    headers: getAuthHeaders(),
+function tracesView(name, editorValue) {
+  return {
+    view_name: name,
+    view_type: 'traces',
     data: {
-      view_name: name,
-      view_type: 'traces',
-      data: {
-        version: 1,
-        stream: { label: STREAM, value: STREAM },
-        editorValue,
-        datetime: { type: 'relative', relativeTimePeriod: '15m', startTime: 0, endTime: 0 },
-        searchMode: 'spans',
-        sortBy: 'start_time',
-        sortOrder: 'desc',
-        selectedFields: [],
-      },
+      version: 1,
+      stream: { label: STREAM, value: STREAM },
+      editorValue,
+      datetime: { type: 'relative', relativeTimePeriod: '15m', startTime: 0, endTime: 0 },
+      searchMode: 'spans',
+      sortBy: 'start_time',
+      sortOrder: 'desc',
+      selectedFields: [],
     },
-  });
-  expect(response.status(), 'Precondition: saved view must be created').toBe(200);
-  return (await response.json()).view_id;
-}
-
-async function deleteView(page, viewId) {
-  if (!viewId) return;
-  await page.request
-    .delete(`${baseUrl()}/api/${org()}/savedviews/${viewId}`, { headers: getAuthHeaders() })
-    .catch(() => {});
+  };
 }
 
 test.describe('Traces saved views in the More menu with a pin (#15189)', () => {
@@ -54,13 +39,15 @@ test.describe('Traces saved views in the More menu with a pin (#15189)', () => {
     const runId = generateHexId(4);
     viewName = `e2e-15189-${runId}`;
     viewFilter = `service_name = 'e2e-15189-${runId}'`;
-    viewId = await createTracesView(page, viewName, viewFilter);
+    viewId = await createSavedView(page.request, tracesView(viewName, viewFilter), {
+      message: 'Precondition: saved view must be created',
+    });
     await pm.tracesPage.navigateToTracesUrlWithStream(STREAM);
     await pm.tracesPage.switchToSpansMode();
   });
 
   test.afterEach(async ({ page }, testInfo) => {
-    await deleteView(page, viewId);
+    await deleteSavedView(page.request, viewId);
     testLogger.testEnd(testInfo.title, testInfo.status);
   });
 

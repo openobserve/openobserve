@@ -104,6 +104,14 @@ const analyticsUrl = (kind, app, id = '', extra = '') => {
   return `${baseUrl}/api/${orgId}/rum/analytics/${path}${id ? `/${id}` : ''}?app=${encodeURIComponent(app)}${extra}`;
 };
 
+/** The app's current exclusion-rules hash; a funnel saved without it reads as stale, which keeps its Save enabled. */
+async function appRulesHash(page, app) {
+  const { orgId, baseUrl, headers } = apiContext();
+  const res = await page.request.get(`${baseUrl}/api/${orgId}/rum/analytics/settings?app=${encodeURIComponent(app)}`, { headers });
+  expect(res.status(), await res.text()).toBe(200);
+  return (await res.json()).rulesHash;
+}
+
 /** Deletes what a test created and checks each row is gone; soft, so it never hides the test's own error. */
 async function cleanupAnalytics(page, app, created) {
   const { headers } = apiContext();
@@ -1431,6 +1439,7 @@ test.describe('RUM Product Analytics', () => {
         name: `Uses gone ${suffix}`,
         def: { s: [['e', ev.id], ['c', facts.funnel.b]], u: 'sessions', w: 'session' },
         sql: 'SELECT 1 AS x_axis_1 FROM "_rumdata"',
+        rules_hash: await appRulesHash(page, facts.appId),
       });
       const { headers } = apiContext();
       const del = await page.request.delete(analyticsUrl('events', facts.appId, ev.id, '&force=true'), { headers });

@@ -3,8 +3,6 @@ const testLogger = require('../../utils/test-logger.js');
 const { SyntheticsRegressionPage } = require('../../../pages/syntheticsPages/syntheticsRegressionPage.js');
 
 const TAGS = ['@bug-15269', '@P1', '@regression', '@syntheticsRegression'];
-const pad = (n) => String(n).padStart(2, '0');
-const runTag = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 
 test.describe('Synthetics lists keep their view state on return (#15269)', () => {
   test.describe.configure({ mode: 'parallel' });
@@ -15,7 +13,7 @@ test.describe('Synthetics lists keep their view state on return (#15269)', () =>
     testLogger.testStart(testInfo.title, testInfo.file);
     await navigateToBase(page);
     synthetics = new SyntheticsRegressionPage(page);
-    tag = runTag();
+    tag = synthetics.newRunTag();
   });
 
   test.afterEach(async ({}, testInfo) => {
@@ -23,18 +21,12 @@ test.describe('Synthetics lists keep their view state on return (#15269)', () =>
     testLogger.testEnd(testInfo.title, testInfo.status);
   });
 
-  async function createProbeLocation() {
-    const id = `synreg-${tag}`;
-    await synthetics.createPublicLocations([{ id, label: `SynReg ${tag}` }]);
-    return id;
-  }
-
   test('the checks list keeps its search, type tab, status, sort, page size and page after opening a check and coming back', {
     tag: TAGS,
   }, async () => {
-    const locationId = await createProbeLocation();
+    const locationId = await synthetics.createProbeLocation(tag);
     const prefix = `synreg${tag}`;
-    const httpNames = Array.from({ length: 12 }, (_, i) => `${prefix}_http_${pad(i)}`);
+    const httpNames = synthetics.numberedNames(`${prefix}_http_`, 12);
     for (const name of httpNames) await synthetics.createCheck(name, 'http', locationId);
     const tcpName = `${prefix}_tcp_00`;
     await synthetics.createCheck(tcpName, 'tcp', locationId);
@@ -77,7 +69,7 @@ test.describe('Synthetics lists keep their view state on return (#15269)', () =>
   test("a check's runs list keeps its status filter, sort, page size and page after leaving the results page and coming back", {
     tag: TAGS,
   }, async () => {
-    const locationId = await createProbeLocation();
+    const locationId = await synthetics.createProbeLocation(tag);
     const check = await synthetics.createCheck(`synreg${tag}_runs`, 'http', locationId);
     const passed = Array.from({ length: 25 }, (_, i) => ({ status: 'passed', durationMs: 100 + i * 10, ageSec: 20 + i * 8 }));
     const failed = Array.from({ length: 3 }, (_, i) => ({ status: 'failed', durationMs: 6000 + i * 10, ageSec: 24 + i * 8 }));
@@ -115,34 +107,24 @@ test.describe('Synthetics lists keep their view state on return (#15269)', () =>
     testLogger.info('Runs list state restored after going back to the checks list and reopening the check');
   });
 
-  async function expectBackFromRunPageReopensRun(type) {
-    const locationId = await createProbeLocation();
-    const check = await synthetics.createCheck(`synreg${tag}_${type}_detail`, type, locationId);
-    const [run] = await synthetics.seedRuns(check, locationId, [{ status: 'passed', durationMs: 240, ageSec: 60 }]);
-
-    await synthetics.gotoRunDetail(check, run, { period: '6h' });
-    await synthetics.clickRunDetailBack(type);
-    await synthetics.expectResultsReopenedOnRun(check.id, run, '6h');
-  }
-
   test("back from a browser run's full page reopens that run on the results page with the same time range", {
     tag: TAGS,
   }, async () => {
-    await expectBackFromRunPageReopensRun('browser');
+    await synthetics.expectBackFromRunPageReopensRun(tag, 'browser');
   });
 
   test.fixme("back from an HTTP run's full page reopens that run on the results page with the same time range", {
     tag: TAGS,
     annotation: { type: 'issue', description: 'Still broken on main: the http/tcp/tls/ssh run page (ProtocolRunSummary) back drops the run and time range; #15269 only changed RunDetail' },
   }, async () => {
-    await expectBackFromRunPageReopensRun('http');
+    await synthetics.expectBackFromRunPageReopensRun(tag, 'http');
   });
 
   test('the synthetics locations list keeps its search, sort, page size and page after leaving it and coming back', {
     tag: TAGS,
   }, async () => {
     const metaOrg = await synthetics.getMetaOrg();
-    const locations = Array.from({ length: 12 }, (_, i) => ({ id: `synreg-${tag}-${pad(i)}`, label: `SynReg ${tag} ${pad(i)}` }));
+    const locations = synthetics.numberedProbeLocations(tag, 12);
     await synthetics.createPublicLocations(locations);
 
     await synthetics.gotoLocations(metaOrg);

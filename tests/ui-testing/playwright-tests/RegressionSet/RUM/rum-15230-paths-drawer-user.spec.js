@@ -64,10 +64,11 @@ test.describe('Product Analytics Paths sessions drawer shows the user (#15230)',
     await pa.expectFunnelCounts([seed.sessions, 0]);
     await pa.openDropoff(0);
     await pa.openDroppedSessionsPaths();
-    await expect(pa.pathsSessionFilter).toHaveText(
-      `Dropped after step 1 (/web/a): ${seed.sessions} sessions of ${seed.sessions} sessions`,
-      { timeout: 30000 },
-    );
+    await expect(pa.pathsSessionFilter).toHaveText(/^\s*step 1\s*\/web\/a\s*$/, { timeout: 30000 });
+    await pa.openPathsCohort();
+    await expect(pa.pathsCohortPopover).toContainText('Reached /web/a, then did not reach /web/c.');
+    await expect(pa.pathsCohortPopover).toContainText(`${seed.sessions} sessions`, { timeout: 30000 });
+    await pa.closePopovers();
     await pa.expectFlowRendered();
     await pa.clickPathsBand('/web/a', '/web/b', 1, MAX_DEPTH);
     await expect(pa.branchDrawer).toBeVisible({ timeout: 30000 });

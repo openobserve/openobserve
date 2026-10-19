@@ -2,7 +2,7 @@ const { test, expect, navigateToBase } = require('../../utils/enhanced-baseFixtu
 const testLogger = require('../../utils/test-logger.js');
 const PageManager = require('../../../pages/page-manager.js');
 const { generateHexId } = require('../../utils/trace-ingestion.js');
-const { getAuthHeaders } = require('../../utils/cloud-auth.js');
+const { stringAttr, ingestOtlpTraces, ingestRumData, waitForSearch, deleteStream } = require('../../utils/traces-api.js');
 
 const MINUTE_MS = 60 * 1000;
 const NS_PER_MS = 1000000;
@@ -12,9 +12,6 @@ const VIEW_OPENED_BEFORE_REQUEST_MS = 10 * MINUTE_MS;
 const VIEW_TIME_SPENT_MS = 25 * MINUTE_MS;
 // A dedicated org keeps _rumdata narrow: past ZO_QUICK_MODE_NUM_FIELDS, SELECT * drops view_id and the bridge finds no page view.
 const RUM_ORG = 'e2e15041rum';
-
-const baseUrl = () => (process.env.INGESTION_URL || process.env.ZO_BASE_URL || '').replace(/\/+$/, '');
-const stringAttr = (key, value) => ({ key, value: { stringValue: value } });
 
 function buildFixture() {
   return {
@@ -27,19 +24,8 @@ function buildFixture() {
   };
 }
 
-async function waitForHits(page, type, sql, expected, message) {
-  await expect.poll(async () => {
-    const endUs = Date.now() * 1000 + 60_000_000;
-    const response = await page.request.post(`${baseUrl()}/api/${RUM_ORG}/_search?type=${type}`, {
-      headers: getAuthHeaders(),
-      data: { query: { sql, start_time: endUs - 60 * MINUTE_MS * 1000, end_time: endUs, from: 0, size: 10 } },
-    });
-    return response.ok() ? ((await response.json()).hits || []).length : 0;
-  }, { timeout: 60000, intervals: [2000], message }).toBe(expected);
-}
-
 // The backend root's parent is the browser request, which only the RUM row owns, so the trace bridges to its page view.
-async function ingestBackendTrace(page, stream, f) {
+async function ingestBackendTrace(request, stream, f) {
   const startNs = BigInt(f.requestAtMs + 40) * BigInt(NS_PER_MS);
   const span = (spanId, parentSpanId, name, offsetMs, durationMs) => ({
     traceId: f.traceId,
@@ -52,27 +38,27 @@ async function ingestBackendTrace(page, stream, f) {
     attributes: [],
     status: { code: 1 },
   });
-  const response = await page.request.post(`${baseUrl()}/api/${RUM_ORG}/v1/traces`, {
-    headers: { ...getAuthHeaders(), 'stream-name': stream },
-    data: {
-      resourceSpans: [{
-        resource: { attributes: [stringAttr('service.name', 'e2e-15041-checkout')] },
-        scopeSpans: [{
-          scope: { name: 'e2e-15041' },
-          spans: [
-            span(f.backendSpanId, f.browserSpanId, 'POST /api/checkout', 0, BACKEND_MS),
-            span(generateHexId(8), f.backendSpanId, 'SELECT orders', 50, 120),
-          ],
-        }],
+  await ingestOtlpTraces(request, stream, {
+    resourceSpans: [{
+      resource: { attributes: [stringAttr('service.name', 'e2e-15041-checkout')] },
+      scopeSpans: [{
+        scope: { name: 'e2e-15041' },
+        spans: [
+          span(f.backendSpanId, f.browserSpanId, 'POST /api/checkout', 0, BACKEND_MS),
+          span(generateHexId(8), f.backendSpanId, 'SELECT orders', 50, 120),
+        ],
       }],
-    },
+    }],
+  }, { org: RUM_ORG, message: 'Precondition: backend trace must ingest' });
+  await waitForSearch(request, `SELECT span_id FROM "${stream}" WHERE trace_id = '${f.traceId}'`, {
+    org: RUM_ORG,
+    size: 10,
+    expected: 2,
+    message: 'the backend spans must become searchable',
   });
-  expect(response.status(), 'Precondition: backend trace must ingest').toBe(200);
-  await waitForHits(page, 'traces', `SELECT span_id FROM "${stream}" WHERE trace_id = '${f.traceId}'`, 2,
-    'the backend spans must become searchable');
 }
 
-async function ingestPageVisit(page, f) {
+async function ingestPageVisit(request, f) {
   const shared = { session_id: f.sessionId, view_id: f.viewId, service: 'e2e-15041-web', source: 'browser' };
   const rows = [
     {
@@ -96,19 +82,14 @@ async function ingestPageVisit(page, f) {
       _o2_span_id: f.browserSpanId,
     },
   ];
-  const response = await page.request.post(`${baseUrl()}/api/${RUM_ORG}/_rumdata/_json`, {
-    headers: getAuthHeaders(),
-    data: rows,
+  await ingestRumData(request, rows, { org: RUM_ORG, message: 'Precondition: the page visit must ingest' });
+  await waitForSearch(request, `SELECT view_id FROM "_rumdata" WHERE session_id = '${f.sessionId}'`, {
+    org: RUM_ORG,
+    type: 'logs',
+    size: 10,
+    expected: rows.length,
+    message: 'the page visit must become searchable',
   });
-  expect(response.status(), 'Precondition: the page visit must ingest').toBe(200);
-  await waitForHits(page, 'logs', `SELECT view_id FROM "_rumdata" WHERE session_id = '${f.sessionId}'`, rows.length,
-    'the page visit must become searchable');
-}
-
-async function deleteStream(page, stream) {
-  await page.request
-    .delete(`${baseUrl()}/api/${RUM_ORG}/streams/${stream}?type=traces`, { headers: getAuthHeaders() })
-    .catch(() => {});
 }
 
 test.describe('Trace waterfall axis for a trace started from a browser page (#15041)', () => {
@@ -124,7 +105,7 @@ test.describe('Trace waterfall axis for a trace started from a browser page (#15
   });
 
   test.afterEach(async ({ page }, testInfo) => {
-    await deleteStream(page, stream);
+    await deleteStream(page.request, stream, { org: RUM_ORG });
     testLogger.testEnd(testInfo.title, testInfo.status);
   });
 
@@ -132,8 +113,8 @@ test.describe('Trace waterfall axis for a trace started from a browser page (#15
     tag: ['@bug-15041', '@P1', '@regression', '@tracesRegression'],
   }, async ({ page }) => {
     const f = buildFixture();
-    await ingestBackendTrace(page, stream, f);
-    await ingestPageVisit(page, f);
+    await ingestBackendTrace(page.request, stream, f);
+    await ingestPageVisit(page.request, f);
 
     await pm.tracesPage.navigateToTraceDetailsUrl({
       traceId: f.traceId,
