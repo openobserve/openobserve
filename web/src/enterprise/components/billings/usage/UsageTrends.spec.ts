@@ -257,6 +257,23 @@ describe("UsageTrends range in the URL", () => {
     await flushPromises();
     expect(search).toHaveBeenCalledTimes(1);
   });
+
+  it("asks the server once on Refresh, and the reloaded bill does not replace that read with a cached one", async () => {
+    const wrapper = mountTrends();
+    await flushPromises();
+    search.mockClear();
+
+    wrapper.findComponent('[data-test="billings-usagetrends-refresh"]').vm.$emit("click");
+    // The page reloads the bill: new objects, same cycle and prices.
+    await wrapper.setProps({
+      details: structuredClone(upcoming),
+      cycles: [structuredClone(upcoming)],
+    });
+    await flushPromises();
+
+    expect(search).toHaveBeenCalledTimes(1);
+    expect(search.mock.calls[0][1].refresh).toBe(true);
+  });
 });
 
 describe("UsageTrends projected total", () => {

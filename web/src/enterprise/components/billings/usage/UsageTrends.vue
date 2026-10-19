@@ -489,6 +489,11 @@ const { search } = useUsageSearch();
 /** Days stream oldest first, so the run rate and projection are only right once all have landed; the KPIs wait for that and only the list streams. */
 const waitingForFirstChunk = computed(() => loading.value && !rows.value.length);
 
+/** As text, so a reloaded bill with the same prices is the same query. */
+const costSql = computed(() =>
+  trendsCostSql(usageOrg.value, prices.value, bucket.value, undefined, true),
+);
+
 const loadCosts = async (refresh = false) => {
   if (!usageStreamEnabled.value) return;
   const loadId = ++latestLoad;
@@ -497,19 +502,16 @@ const loadCosts = async (refresh = false) => {
   // Cleared, so streamed days never mix with the previous range's.
   rows.value = [];
   try {
-    const hits = await search(
-      trendsCostSql(usageOrg.value, prices.value, bucket.value, undefined, true),
-      {
-        start: range.value.start * 1_000_000,
-        end: range.value.end * 1_000_000,
-        size: 10_000,
-        key: "trends",
-        refresh,
-        onRows: (partial) => {
-          if (loadId === latestLoad) rows.value = toCostRows(partial);
-        },
+    const hits = await search(costSql.value, {
+      start: range.value.start * 1_000_000,
+      end: range.value.end * 1_000_000,
+      size: 10_000,
+      key: "trends",
+      refresh,
+      onRows: (partial) => {
+        if (loadId === latestLoad) rows.value = toCostRows(partial);
       },
-    );
+    });
     if (loadId !== latestLoad) return;
     rows.value = toCostRows(hits);
     streamMissing.value = false;
@@ -526,7 +528,12 @@ const loadCosts = async (refresh = false) => {
   }
 };
 
-watch([range, prices, usageStreamEnabled, usageOrg], () => loadCosts(), { immediate: true });
+// Values, not objects: Refresh reloads the bill, and that new copy must not replace the uncached read.
+watch(
+  [costSql, () => range.value.start, () => range.value.end, usageStreamEnabled],
+  () => loadCosts(),
+  { immediate: true },
+);
 
 const emit = defineEmits<{ refresh: [] }>();
 
