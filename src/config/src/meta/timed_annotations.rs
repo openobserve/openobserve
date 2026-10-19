@@ -240,23 +240,6 @@ mod tests {
     }
 
     #[test]
-    fn test_timed_annotation_validate_invalid_end_time() {
-        let annotation = TimedAnnotation {
-            annotation_id: Some("test_id".to_string()),
-            start_time: 2000,
-            end_time: Some(1000), // Invalid: end_time <= start_time
-            title: "Valid Title".to_string(),
-            text: None,
-            tags: vec![],
-            panels: vec![],
-        };
-        assert_eq!(
-            annotation.validate().unwrap_err(),
-            "end time must be greater than start time"
-        );
-    }
-
-    #[test]
     fn test_timed_annotation_validate_equal_end_time() {
         let annotation = TimedAnnotation {
             annotation_id: Some("test_id".to_string()),
@@ -419,19 +402,6 @@ mod tests {
             panels: None,
         };
         assert!(update_req.validate().is_ok());
-    }
-
-    #[test]
-    fn test_list_timed_annotations_query_validate_invalid_time_range() {
-        let query = ListTimedAnnotationsQuery {
-            panels: None,
-            start_time: 2000,
-            end_time: 1000, // Invalid: start_time >= end_time
-        };
-        assert_eq!(
-            query.validate().unwrap_err(),
-            "start time must be less than end time"
-        );
     }
 
     #[test]

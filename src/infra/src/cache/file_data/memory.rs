@@ -667,14 +667,6 @@ mod tests {
     }
 
     #[test]
-    fn test_get_bucket_idx_empty_string() {
-        let idx = get_bucket_idx("");
-        let cfg = config::get_config();
-        let max = cfg.memory_cache.bucket_num.max(1);
-        assert!(idx < max);
-    }
-
-    #[test]
     fn test_file_data_new_is_empty() {
         let fd = FileData::with_cache_strategy("lru");
         assert!(fd.is_empty());

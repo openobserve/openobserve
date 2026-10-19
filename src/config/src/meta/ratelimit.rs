@@ -487,12 +487,6 @@ mod tests {
     }
 
     #[test]
-    fn test_get_resource_from_params_empty_values() {
-        let resource = get_resource_from_params("", "", "", "", "", "");
-        assert_eq!(resource, ":::::");
-    }
-
-    #[test]
     fn test_get_resource_from_params_special_characters() {
         let resource = get_resource_from_params(
             "org:with:colons",

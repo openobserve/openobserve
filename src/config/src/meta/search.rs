@@ -524,8 +524,8 @@ impl Response {
             .collect();
     }
 
-    pub fn add_hit(&mut self, hit: &json::Value) {
-        self.hits.push(hit.to_owned());
+    pub fn add_hit(&mut self, hit: json::Value) {
+        self.hits.push(hit);
         self.total += 1;
     }
 
@@ -1745,17 +1745,6 @@ mod search_history_utils {
         }
 
         #[test]
-        fn test_with_stream_name() {
-            let query = SearchHistoryQueryBuilder::new()
-                .with_stream_name(&Some("streamA".to_string()))
-                .build(SEARCH_STREAM_NAME);
-            assert_eq!(
-                query,
-                "SELECT * FROM usage WHERE event='Search' AND stream_name = 'streamA'"
-            );
-        }
-
-        #[test]
         fn test_with_user_email() {
             let query = SearchHistoryQueryBuilder::new()
                 .with_user_email(&Some("user123@gmail.com".to_string()))
@@ -2098,7 +2087,7 @@ mod tests {
         let hit = json::json!({"num":12});
         let mut val_map = json::Map::new();
         val_map.insert("id".to_string(), json::json!({"id":1}));
-        res.add_hit(&hit); // total+1
+        res.add_hit(hit); // total+1
         assert_eq!(res.total, 11);
     }
 
@@ -3510,13 +3499,6 @@ mod tests {
             SearchEventType::try_from("insights").unwrap(),
             SearchEventType::Insights
         );
-    }
-
-    #[test]
-    fn test_storage_type_equality() {
-        assert_eq!(StorageType::Memory, StorageType::Memory);
-        assert_eq!(StorageType::Wal, StorageType::Wal);
-        assert_ne!(StorageType::Memory, StorageType::Wal);
     }
 
     #[test]

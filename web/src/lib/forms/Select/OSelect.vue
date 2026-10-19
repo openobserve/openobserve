@@ -906,6 +906,7 @@ function getPaletteGradient(colors: string[]): string {
 
 // Aligned with OInput and OButton sm: h-[2.125rem] ≈ 30px at the 14px html base.
 const heightClasses: Record<NonNullable<SelectProps["size"]>, string> = {
+  xs: "h-7 text-xs",
   sm: "h-[2.125rem] text-sm",
   md: "h-[2.125rem] text-sm",
 };

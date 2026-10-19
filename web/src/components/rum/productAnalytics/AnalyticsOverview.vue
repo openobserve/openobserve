@@ -16,6 +16,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="px-page-edge flex flex-col gap-3 py-3" data-test="rum-analytics-overview">
+    <OBanner
+      v-if="suggest.banner.value"
+      :variant="suggest.banner.value"
+      dense
+      :content="bannerText"
+      data-test="rum-analytics-exclusions-banner"
+    >
+      <template #actions>
+        <OButton
+          v-for="s in canExclude ? suggest.ua.value : []"
+          :key="s.value"
+          variant="ghost"
+          size="sm"
+          :disabled="excluding"
+          :data-test="`rum-analytics-exclusions-banner-exclude-${s.value}`"
+          @click="excludeNow(s.rule)"
+          >{{ t("rum.analytics.exclusions.exclude", { value: raw(s.value) }) }}</OButton
+        >
+        <OButton
+          variant="ghost"
+          size="sm"
+          data-test="rum-analytics-exclusions-banner-review"
+          @click="emit('open-exclusions')"
+          >{{ t("rum.analytics.exclusions.review") }}</OButton
+        >
+      </template>
+    </OBanner>
     <OEmptyState
       v-if="isEmpty"
       preset="no-search-results"
@@ -37,11 +64,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div data-test="rum-analytics-kpi-strip">
         <OStatStrip :items="kpis" :loading="!summary" />
       </div>
+      <div
+        v-if="kpiFootnote"
+        class="text-text-secondary flex flex-wrap items-center gap-1.5 text-xs"
+        data-test="rum-analytics-kpi-excluded"
+      >
+        <span>{{ kpiFootnote }}</span>
+        <span aria-hidden="true">{{ separator }}</span>
+        <OButton
+          variant="ghost-primary"
+          size="xs"
+          data-test="rum-analytics-kpi-include-them"
+          @click="includeExcluded"
+          >{{ t("rum.analytics.exclusions.includeThem") }}</OButton
+        >
+      </div>
       <ActiveUsersStrip
         v-if="identitySql"
         :state="activePanel"
         :field="identitySql.field"
         :unit="pa.usersUnit.value"
+        :identity-rule-note="identityRuleNote"
         @retry="runner.retry('active-users')"
       />
       <TrendsPanel
@@ -155,6 +198,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @trend="toggleTrend"
           @retry="view === 'all' ? runner.retry('pages') : loadEntryExit(true)"
         />
+        <div
+          v-if="ignoredPages.length"
+          class="border-border-default text-text-secondary flex flex-wrap items-center gap-1.5 border-t px-4 py-2 text-xs"
+          data-test="rum-analytics-overview-pages-hidden"
+        >
+          <span>{{
+            t(
+              "rum.analytics.exclusions.hiddenPages",
+              { count: ignoredPages.length, pages: raw(ignoredPages.join(", ")) },
+              ignoredPages.length,
+            )
+          }}</span>
+          <span aria-hidden="true">{{ separator }}</span>
+          <OButton
+            variant="ghost-primary"
+            size="xs"
+            data-test="rum-analytics-overview-pages-hidden-edit"
+            @click="emit('open-exclusions')"
+            >{{ t("rum.analytics.exclusions.edit") }}</OButton
+          >
+        </div>
       </OCard>
 
       <OCard
@@ -169,6 +233,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span class="text-text-secondary min-w-0 flex-1 truncate text-xs">{{
             t("rum.analytics.overview.clicksCaption")
           }}</span>
+          <span
+            v-if="identityRuleNote"
+            class="text-text-secondary w-full text-xs"
+            data-test="rum-analytics-overview-clicks-identity-note"
+            >{{ t("rum.analytics.exclusions.identityRowForm") }}</span
+          >
         </div>
         <OBanner
           v-if="showNameHint"
@@ -239,6 +309,54 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </OCard>
 
+      <OCard
+        v-if="unnamedPanel.status !== 'ok' || unnamedRows.length"
+        variant="outlined"
+        class="rounded-surface overflow-hidden"
+        data-test="rum-analytics-overview-unnamed-clicks"
+      >
+        <div class="border-border-default flex flex-wrap items-center gap-2 border-b px-4 py-2">
+          <span class="text-text-heading text-sm font-semibold">{{
+            t("rum.analytics.unnamedClicks.title")
+          }}</span>
+          <span
+            tabindex="0"
+            role="img"
+            :aria-label="unnamedCaption"
+            class="text-text-secondary flex items-center"
+            data-test="rum-analytics-overview-unnamed-clicks-info"
+          >
+            <OIcon name="info-outline" size="xs" />
+            <OTooltip :content="unnamedCaption" />
+          </span>
+        </div>
+        <AnalyticsPanelState
+          :state="unnamedPanel"
+          data-test="rum-analytics-overview-unnamed-clicks-panel"
+          @retry="runner.retry('unnamed-clicks')"
+        >
+          <OTable
+            :data="unnamedRows"
+            :columns="unnamedColumns"
+            :default-columns="false"
+            row-key="pg"
+            pagination="none"
+            sorting="none"
+            :show-global-filter="false"
+            :frame="false"
+            data-test="rum-analytics-overview-unnamed-clicks-table"
+          >
+            <template #cell-share="{ row }">
+              <ODataBarCell
+                :value="row.share * 100"
+                :max="100"
+                :display="`${(row.share * 100).toFixed(0)}%`"
+              />
+            </template>
+          </OTable>
+        </AnalyticsPanelState>
+      </OCard>
+
       <FeaturesTable
         :rows="featureRows"
         :events="events"
@@ -278,6 +396,8 @@ import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
@@ -286,6 +406,13 @@ import RankedKeysTable from "@/components/rum/productAnalytics/RankedKeysTable.v
 import ActiveUsersStrip from "@/components/rum/productAnalytics/ActiveUsersStrip.vue";
 import TrendsPanel from "@/components/rum/productAnalytics/TrendsPanel.vue";
 import FeaturesTable from "@/components/rum/productAnalytics/FeaturesTable.vue";
+import AnalyticsPanelState from "@/components/rum/productAnalytics/AnalyticsPanelState.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import ODataBarCell from "@/lib/core/Table/cells/ODataBarCell.vue";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import useExclusionSuggestions from "@/composables/rum/useExclusionSuggestions";
+import { rumPaError } from "@/utils/rum/rumPaApiError";
 import useNamedEvents, {
   namedEventHandoffState,
   type NamedEventHandoff,
@@ -305,20 +432,26 @@ import {
   sortForChip,
   toFeatureRows,
   toRankedRows,
+  type AppSettings,
   type ChipFilter,
   type RankedRow,
   type RankedView,
+  type SessionRule,
 } from "@/utils/rum/productAnalyticsModel";
 import {
   activeUsersSql,
   clickPagesSql,
   clicksSql,
   featuresSql,
+  IDENTITY_FIELDS,
   pagesSql,
+  unnamedClicksSql,
   type StepRef,
 } from "@/utils/rum/productAnalyticsQueries";
 
 defineOptions({ name: "AnalyticsOverview" });
+
+const emit = defineEmits<{ "open-exclusions": []; "likely-bot": [boolean] }>();
 
 const MAX_TREND_SERIES = 5;
 const FEATURE_CHUNK = 5;
@@ -340,6 +473,11 @@ const pagesPanel = runner.panel<Record<string, unknown>>("pages");
 const clicksPanel = runner.panel<Record<string, unknown>>("clicks");
 const clickPagesPanel = runner.panel<{ k: string; pg: string; sessions: number }>("click-pages");
 const activePanel = runner.panel<{ dau: number; wau: number; mau: number }>("active-users");
+const unnamedPanel = runner.panel<{ pg: string; clicks: number; unnamed: number }>(
+  "unnamed-clicks",
+);
+const suggest = useExclusionSuggestions();
+const separator = raw("·");
 const entryPanel = ref<PanelState<unknown>>({
   status: "idle",
   rows: [],
@@ -512,6 +650,8 @@ const kpis = computed<StatItem[]>(() => {
       key: "pages",
       label: t("rum.analytics.kpi.pagesPerSession"),
       value: sessions > 0 ? ((s?.views ?? 0) / sessions).toFixed(1) : "0.0",
+      sub: t("rum.analytics.exclusions.pagesPerSessionTip"),
+      subIcon: "info-outline",
       tone: "purple",
       icon: "article",
       dataTest: "rum-analytics-kpi-pages-per-session",
@@ -526,6 +666,119 @@ const kpis = computed<StatItem[]>(() => {
     },
   ];
 });
+
+const exclusions = computed(() => pa.scope.value.exclusions);
+
+const kpiFootnote = computed(() => {
+  const s = summary.value;
+  const ex = exclusions.value;
+  if (!s || !ex) return null;
+  const count = s.totalSessions - s.sessions;
+  if (count <= 0) return null;
+  const k = ex.sessions.length;
+  const rules = t("rum.analytics.exclusions.rules", { count: k }, k);
+  const n = addCommasToNumber(count);
+  if (!ex.bots) return t("rum.analytics.exclusions.excludedRules", { count: n, rules }, count);
+  return k
+    ? t("rum.analytics.exclusions.excludedBoth", { count: n, rules }, count)
+    : t("rum.analytics.exclusions.excludedBuiltin", { count: n }, count);
+});
+
+const ignoredPages = computed(() => (exclusions.value?.pages ?? []).map((p) => p.value));
+
+// Row-form builders filter only rows that carry the identity, so their cards say so.
+const identityRuleNote = computed(
+  () =>
+    !pa.state.includeExcluded &&
+    !!exclusions.value?.sessions.some((r) =>
+      (IDENTITY_FIELDS as readonly string[]).includes(r.field),
+    ),
+);
+
+const bannerText = computed(() =>
+  suggest.ua.value.length
+    ? t("rum.analytics.exclusions.botBanner", { family: raw(suggest.ua.value[0].value) })
+    : t("rum.analytics.exclusions.identityBanner"),
+);
+
+const unnamedRows = computed(() =>
+  unnamedPanel.value.rows
+    .map((r) => ({
+      pg: String(r.pg ?? ""),
+      clicks: Number(r.clicks) || 0,
+      unnamed: Number(r.unnamed) || 0,
+    }))
+    .filter((r) => r.unnamed > 0)
+    .map((r) => ({ ...r, share: r.clicks > 0 ? r.unnamed / r.clicks : 0 })),
+);
+
+const unnamedColumns = computed<OTableColumnDef<(typeof unnamedRows.value)[number]>[]>(() => [
+  {
+    id: "pg",
+    header: t("rum.analytics.unnamedClicks.page"),
+    accessorKey: "pg",
+    size: 320,
+    meta: { fillRemaining: true },
+  },
+  {
+    id: "clicks",
+    header: t("rum.analytics.unnamedClicks.clicks"),
+    accessorKey: "clicks",
+    size: 120,
+    meta: { align: "right" },
+  },
+  {
+    id: "unnamed",
+    header: t("rum.analytics.unnamedClicks.unnamed"),
+    accessorKey: "unnamed",
+    size: 120,
+    meta: { align: "right" },
+  },
+  {
+    id: "share",
+    header: t("rum.analytics.unnamedClicks.share"),
+    accessorKey: "share",
+    size: 150,
+    meta: { align: "right" },
+  },
+]);
+
+const includeExcluded = async () => {
+  pa.setScope({ includeExcluded: true });
+  await pa.loadScope();
+  await pa.syncUrl(router);
+};
+
+// The banner's chip saves at once; the drawer is the place to review before saving.
+// Named events and app filters share the rum_analytics PUT permission.
+const canExclude = computed(() => namedEvents.permission.value !== "read");
+const excluding = ref(false);
+const unnamedCaption = computed(() =>
+  t("rum.analytics.unnamedClicks.caption", { attribute: raw("data-test") }),
+);
+
+const excludeNow = async (rule: SessionRule) => {
+  const ex = exclusions.value as AppSettings | undefined;
+  if (!ex || excluding.value) return;
+  excluding.value = true;
+  try {
+    await pa.saveAppSettings({
+      bots: ex.bots,
+      sessions: [...ex.sessions, rule],
+      pages: ex.pages,
+      version: ex.version,
+    });
+  } catch (e) {
+    const err = rumPaError(e);
+    let message = t("rum.analytics.exclusions.saveFailed");
+    if (err.status === 403) message = t("rum.analytics.exclusions.readOnly");
+    else if (err.code === "version_conflict") message = t("rum.analytics.exclusions.conflict");
+    toast({ variant: "error", message });
+    if (err.code === "version_conflict") void pa.refresh();
+  } finally {
+    excluding.value = false;
+  }
+};
 
 const windows = () => {
   const r = pa.resolveRange();
@@ -588,6 +841,7 @@ const run = async (force = false) => {
   const { cur, prev } = windows();
   const scope = pa.scope.value;
   const jobs: Promise<unknown>[] = [
+    suggest.loadUa(),
     runner.run(
       "pages",
       { sql: pagesSql(scope, cur.startUs, id), ...prev, limit: 500, sampled: 1 },
@@ -619,6 +873,13 @@ const run = async (force = false) => {
   // Features is the heaviest search, so it never starts for a tab the user has already left.
   if (!active || key !== lastRunKey) return;
   await loadFeatures(force);
+  // A diagnostic card, so it waits for every ranking the user reads first.
+  if (!active || key !== lastRunKey) return;
+  await runner.run(
+    "unnamed-clicks",
+    { sql: unnamedClicksSql(scope), ...cur, limit: 20, sampled: 1 },
+    key,
+  );
 };
 
 const chipLabel = (label: I18nText, count: number) =>
@@ -763,6 +1024,12 @@ watch(
     const kept = pa.trendSeries.value.filter((s) => s.kind !== "e" || known.has(s.key));
     if (kept.length !== pa.trendSeries.value.length) pa.trendSeries.value = kept;
   },
+  { immediate: true },
+);
+
+watch(
+  () => suggest.banner.value === "warning",
+  (warn) => emit("likely-bot", warn),
   { immediate: true },
 );
 

@@ -48,7 +48,10 @@ import usePerformance from "@/composables/rum/usePerformance";
 import useProductAnalytics, { resetProductAnalytics } from "@/composables/rum/useProductAnalytics";
 import useSavedFunnels, { resetSavedFunnels } from "@/composables/rum/useSavedFunnels";
 import { resetNamedEvents } from "@/composables/rum/useNamedEvents";
-import { rumPaApiMock as api } from "@/utils/rum/__fixtures__/namedEventsApiMock";
+import {
+  DEFAULT_RULES_HASH,
+  rumPaApiMock as api,
+} from "@/utils/rum/__fixtures__/namedEventsApiMock";
 import { PA_ROUTES } from "@/utils/rum/productAnalyticsRoutes";
 import type { FunnelDef } from "@/utils/rum/productAnalyticsQueries";
 
@@ -112,6 +115,7 @@ const def = (...keys: string[]): FunnelDef => ({
   unit: "sessions",
   window: "session",
   breakdown: null,
+  x: [],
 });
 
 const searchRoutes: [RegExp, Record<string, unknown>[]][] = [
@@ -431,7 +435,7 @@ describe("SavedFunnelsPage (AC-67, AC-68, AC-69)", () => {
       expectOpenUntouched(before);
     });
 
-    it("Duplicate names the copy Copy of, saves the row as stored and stays on the list", async () => {
+    it("P7-R1: Duplicate names the copy Copy of, recompiles sql from def with the current rules_hash and stays on the list", async () => {
       const { before } = await openAWithEdits();
       await action(1, "duplicate").trigger("click");
       await settle();
@@ -440,11 +444,35 @@ describe("SavedFunnelsPage (AC-67, AC-68, AC-69)", () => {
       );
       expect(nameInput().element.value).toBe("Copy of Beta");
       await fillAndSubmit();
-      expect(api.bodies("createFunnel")).toEqual([
-        { name: "Copy of Beta", def: OTHER, sql: 'SELECT 1 FROM "_rumdata"' },
-      ]);
+      const bodies = api.bodies("createFunnel");
+      expect(bodies).toHaveLength(1);
+      expect(bodies[0]).toMatchObject({
+        name: "Copy of Beta",
+        def: OTHER,
+        rules_hash: DEFAULT_RULES_HASH,
+      });
+      expect(bodies[0].sql).not.toBe('SELECT 1 FROM "_rumdata"');
+      expect(bodies[0].sql).toContain('FROM "_rumdata"');
       expect(names()).toEqual(["Alpha", "Beta", "Copy of Beta"]);
       expectOpenUntouched(before);
+    });
+
+    it("Duplicate compiles its sql without the page's env, so the copy matches what the funnel remembers (D4)", async () => {
+      usePerformance().performanceState.data.streams._rumdata = {
+        name: "_rumdata",
+        schema: { usr_email: { name: "usr_email" }, env: { name: "env" } },
+      };
+      api.seedFunnel("web", "Alpha", PARAM);
+      await mountPage();
+      useProductAnalytics().setScope({ env: ["prod"] });
+      await settle();
+      await action(0, "duplicate").trigger("click");
+      await settle();
+      await fillAndSubmit();
+      const [body] = api.bodies("createFunnel");
+      expect(body.sql).toContain('FROM "_rumdata"');
+      expect(body.sql).not.toContain("env IN");
+      expect(useProductAnalytics().scope.value.env).toEqual(["prod"]);
     });
 
     it("Duplicate is off while a step's event is deleted, saying why (CR-11)", async () => {

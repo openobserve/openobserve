@@ -171,7 +171,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
           </template>
 
-          <template #cell-actions="{ row }">
+          <template #cell-actions="{ row, index }">
             <OButton
               v-if="row.enableDelete && row.status != 'pending'"
               :title="t('user.delete')"
@@ -202,7 +202,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="ghost"
               size="icon-sm"
               class="max-md:hidden"
-              :data-test="`edit-basic-user-${row.email}`"
+              :data-test="`edit-basic-user-${index}`"
               data-row-action="edit"
               @click="addRoutePush(row)"
             >
@@ -251,7 +251,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="row.enableEdit && row.status != 'pending'"
                 icon-left="edit"
                 class="md:hidden"
-                :data-test="`edit-basic-user-${row.email}-menu`"
+                :data-test="`edit-basic-user-${index}-menu`"
                 @select="addRoutePush(row)"
               >
                 <span>{{ t("user.update") }}</span>

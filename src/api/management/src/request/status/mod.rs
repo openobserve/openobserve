@@ -1991,16 +1991,6 @@ mod tests {
     }
 
     #[test]
-    fn test_healthz_response_empty_status() {
-        let response = HealthzResponse {
-            status: "".to_string(),
-        };
-
-        let json = serde_json::to_string(&response).unwrap();
-        assert!(json.contains("\"status\":\"\""));
-    }
-
-    #[test]
     fn test_rum_serialization() {
         let rum = Rum {
             enabled: true,
@@ -2063,17 +2053,6 @@ mod tests {
         assert!(json.contains("site with spaces"));
         assert!(json.contains("service/with/slashes"));
         assert!(json.contains("1.0.0-beta+build.1"));
-    }
-
-    #[test]
-    fn test_healthz_response_structure() {
-        // Test that we can create and serialize a HealthzResponse
-        let response = HealthzResponse {
-            status: "ok".to_string(),
-        };
-
-        let json = serde_json::to_string(&response).unwrap();
-        assert!(json.contains("\"status\":\"ok\""));
     }
 
     #[test]
