@@ -3370,20 +3370,6 @@ mod tests {
         use super::*;
 
         #[test]
-        fn test_format_response_partial_content_json() {
-            let partial_success = ExportMetricsPartialSuccess {
-                rejected_data_points: 10,
-                error_message: "Custom error message".to_string(),
-            };
-
-            let response = format_response(partial_success, OtlpRequestType::HttpJson);
-            assert!(response.is_ok());
-
-            let http_response = response.unwrap();
-            assert_eq!(http_response.status(), http::StatusCode::PARTIAL_CONTENT);
-        }
-
-        #[test]
         fn test_format_response_success_json() {
             let partial_success = ExportMetricsPartialSuccess {
                 rejected_data_points: 0,

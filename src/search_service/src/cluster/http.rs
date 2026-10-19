@@ -207,15 +207,15 @@ pub async fn search(
             for source in sources {
                 if source.is_object() {
                     result.add_hit(
-                        &flatten::flatten(source).map_err(|e| Error::Message(e.to_string()))?,
+                        flatten::flatten(source).map_err(|e| Error::Message(e.to_string()))?,
                     );
                 } else {
-                    result.add_hit(&source);
+                    result.add_hit(source);
                 }
             }
         } else {
             for source in sources {
-                result.add_hit(&source);
+                result.add_hit(source);
             }
         }
     }

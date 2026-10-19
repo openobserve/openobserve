@@ -19,19 +19,31 @@ use config::{ALL_VALUES_COL_NAME, ORIGINAL_DATA_COL_NAME, datafusion::request::R
 use datafusion::{
     common::{Result, TableReference},
     optimizer::{
-        AnalyzerRule, OptimizerRule, common_subexpr_eliminate::CommonSubexprEliminate,
+        AnalyzerRule, OptimizerRule,
+        common_subexpr_eliminate::CommonSubexprEliminate,
+        decorrelate_lateral_join::DecorrelateLateralJoin,
         decorrelate_predicate_subquery::DecorrelatePredicateSubquery,
         eliminate_cross_join::EliminateCrossJoin,
-        eliminate_duplicated_expr::EliminateDuplicatedExpr, eliminate_filter::EliminateFilter,
-        eliminate_group_by_constant::EliminateGroupByConstant, eliminate_join::EliminateJoin,
-        eliminate_limit::EliminateLimit, eliminate_outer_join::EliminateOuterJoin,
+        eliminate_duplicated_expr::EliminateDuplicatedExpr,
+        eliminate_filter::EliminateFilter,
+        eliminate_group_by_constant::EliminateGroupByConstant,
+        eliminate_join::EliminateJoin,
+        eliminate_limit::EliminateLimit,
+        eliminate_outer_join::EliminateOuterJoin,
         extract_equijoin_predicate::ExtractEquijoinPredicate,
-        filter_null_join_keys::FilterNullJoinKeys, optimize_projections::OptimizeProjections,
-        optimize_unions::OptimizeUnions, propagate_empty_relation::PropagateEmptyRelation,
-        push_down_filter::PushDownFilter, push_down_limit::PushDownLimit,
+        extract_leaf_expressions::{ExtractLeafExpressions, PushDownLeafProjections},
+        filter_null_join_keys::FilterNullJoinKeys,
+        optimize_projections::OptimizeProjections,
+        optimize_unions::OptimizeUnions,
+        propagate_empty_relation::PropagateEmptyRelation,
+        push_down_filter::PushDownFilter,
+        push_down_limit::PushDownLimit,
         replace_distinct_aggregate::ReplaceDistinctWithAggregate,
-        scalar_subquery_to_join::ScalarSubqueryToJoin, simplify_expressions::SimplifyExpressions,
+        rewrite_set_comparison::RewriteSetComparison,
+        scalar_subquery_to_join::ScalarSubqueryToJoin,
+        simplify_expressions::SimplifyExpressions,
         single_distinct_to_groupby::SingleDistinctToGroupBy,
+        unions_to_filter::UnionsToFilter,
     },
     physical_optimizer::{
         PhysicalOptimizerRule, aggregate_statistics::AggregateStatistics,
@@ -116,12 +128,15 @@ pub fn generate_optimizer_rules(sql: &Sql) -> Vec<Arc<dyn OptimizerRule + Send +
 
     let mut rules: Vec<Arc<dyn OptimizerRule + Send + Sync>> = Vec::with_capacity(64);
 
+    rules.push(Arc::new(RewriteSetComparison::new()));
     rules.push(Arc::new(OptimizeUnions::new()));
+    rules.push(Arc::new(UnionsToFilter::new()));
     rules.push(Arc::new(SimplifyExpressions::new()));
     rules.push(Arc::new(ReplaceDistinctWithAggregate::new()));
     rules.push(Arc::new(EliminateJoin::new()));
     rules.push(Arc::new(DecorrelatePredicateSubquery::new()));
     rules.push(Arc::new(ScalarSubqueryToJoin::new()));
+    rules.push(Arc::new(DecorrelateLateralJoin::new()));
     rules.push(Arc::new(ExtractEquijoinPredicate::new()));
     // simplify expressions does not simplify expressions in subqueries, so we
     // run it again after running the optimizations that potentially converted
@@ -168,6 +183,8 @@ pub fn generate_optimizer_rules(sql: &Sql) -> Vec<Arc<dyn OptimizerRule + Send +
     rules.push(Arc::new(SimplifyExpressions::new()));
     rules.push(Arc::new(CommonSubexprEliminate::new()));
     rules.push(Arc::new(EliminateGroupByConstant::new()));
+    rules.push(Arc::new(ExtractLeafExpressions::new()));
+    rules.push(Arc::new(PushDownLeafProjections::new()));
     rules.push(Arc::new(OptimizeProjections::new()));
 
     // *********** custom rules ***********
@@ -287,11 +304,35 @@ pub async fn create_physical_plan(
 
 #[cfg(test)]
 mod tests {
+    use arrow::{
+        array::{ArrayRef, Int64Array, RecordBatch, StringArray, StructArray},
+        util::pretty::pretty_format_batches,
+    };
+    use arrow_schema::{DataType, Field, Fields, Schema};
     use config::meta::stream::StreamType;
-    use datafusion::{optimizer::Optimizer, physical_optimizer::optimizer::PhysicalOptimizer};
+    use datafusion::{
+        common::tree_node::{TreeNode, TreeNodeRecursion},
+        datasource::MemTable,
+        execution::{SessionStateBuilder, runtime_env::RuntimeEnvBuilder},
+        optimizer::Optimizer,
+        physical_optimizer::optimizer::PhysicalOptimizer,
+        prelude::SessionConfig,
+    };
+    use datafusion_proto::bytes::physical_plan_from_bytes_with_extension_codec;
 
     use super::*;
-    use crate::datafusion::{context::SearchContextBuilder, optimizer::context::RemoteScanContext};
+    use crate::datafusion::{
+        context::SearchContextBuilder,
+        distributed_plan::{codec::get_physical_extension_codec, remote_scan_exec::RemoteScanExec},
+        optimizer::{
+            context::RemoteScanContext, logical_optimizer::rewrite_histogram::RewriteHistogram,
+            physical_optimizer::remote_scan::RemoteScanRule,
+        },
+        table_provider::empty_table::NewEmptyTable,
+        udf::histogram_udf,
+    };
+
+    const MINUTE_MICROS: i64 = 60_000_000;
 
     // DataFusion 55.1 Optimizer::new() order, as last reviewed against generate_optimizer_rules.
     const DATAFUSION_LOGICAL_RULES: &[&str] = &[
@@ -323,17 +364,7 @@ mod tests {
     ];
 
     // Upstream defaults generate_optimizer_rules does not install yet, in upstream order.
-    const SKIPPED_DATAFUSION_LOGICAL_RULES: &[&str] = &[
-        // Without it `x > ANY (subquery)` / `= ALL` fail with "does not support SetComparison".
-        "rewrite_set_comparison",
-        // No-op unless datafusion.optimizer.enable_unions_to_filter is set (off by default).
-        "unions_to_filter",
-        // Without it LATERAL joins fail with "does not support OuterReferenceColumn".
-        "decorrelate_lateral_join",
-        // Pushes struct field access (`s['f']`) towards the scan; optimization only.
-        "extract_leaf_expressions",
-        "push_down_leaf_projections",
-    ];
+    const SKIPPED_DATAFUSION_LOGICAL_RULES: &[&str] = &[];
 
     fn test_sql() -> Sql {
         Sql {
@@ -357,6 +388,97 @@ mod tests {
             sorted_by_time: false,
             sampling_config: None,
         }
+    }
+
+    fn struct_fields() -> Fields {
+        Fields::from(vec![
+            Field::new("f", DataType::Int64, false),
+            Field::new("g", DataType::Utf8, false),
+        ])
+    }
+
+    fn t_schema() -> Arc<Schema> {
+        Arc::new(Schema::new(vec![
+            Field::new("_timestamp", DataType::Int64, false),
+            Field::new("a", DataType::Int64, false),
+            Field::new("s", DataType::Struct(struct_fields()), false),
+        ]))
+    }
+
+    fn register_tables(ctx: &SessionContext) {
+        let a = Int64Array::from(vec![1, 2, 3, 4, 5]);
+        let ts = Int64Array::from_iter_values(a.values().iter().map(|a| a * MINUTE_MICROS));
+        let s = StructArray::new(
+            struct_fields(),
+            vec![
+                Arc::new(Int64Array::from_iter_values(
+                    a.values().iter().map(|a| a * 10),
+                )) as ArrayRef,
+                Arc::new(StringArray::from_iter_values(
+                    a.values().iter().map(|a| format!("x{a}")),
+                )),
+            ],
+            None,
+        );
+        let t =
+            RecordBatch::try_new(t_schema(), vec![Arc::new(ts), Arc::new(a), Arc::new(s)]).unwrap();
+        let t2_schema = Arc::new(Schema::new(vec![Field::new("b", DataType::Int64, false)]));
+        let t2 = RecordBatch::try_new(
+            t2_schema.clone(),
+            vec![Arc::new(Int64Array::from(vec![2, 3, 3, 9]))],
+        )
+        .unwrap();
+        let t = MemTable::try_new(t_schema(), vec![vec![t]]).unwrap();
+        let t2 = MemTable::try_new(t2_schema, vec![vec![t2]]).unwrap();
+        ctx.register_table("t", Arc::new(t)).unwrap();
+        ctx.register_table("t2", Arc::new(t2)).unwrap();
+        ctx.register_udf(histogram_udf::HISTOGRAM_UDF.clone());
+    }
+
+    fn histogram_rule(sql: &Sql) -> Arc<RewriteHistogram> {
+        Arc::new(RewriteHistogram::new(
+            sql.time_range.0,
+            sql.time_range.1,
+            sql.histogram_interval.unwrap_or_default(),
+            sql.timezone.clone(),
+        ))
+    }
+
+    async fn run(ctx: &SessionContext, query: &str) -> String {
+        let batches = ctx.sql(query).await.unwrap().collect().await.expect(query);
+        pretty_format_batches(&batches).unwrap().to_string()
+    }
+
+    // Each case is (query run with OO rules, query run with DataFusion defaults).
+    async fn assert_same_rows_as_datafusion(sql: &Sql, cases: &[(&str, &str)]) {
+        let state = SessionStateBuilder::new()
+            .with_default_features()
+            .with_optimizer_rules(generate_optimizer_rules(sql))
+            .build();
+        let oo = SessionContext::new_with_state(state);
+        register_tables(&oo);
+        let reference = SessionContext::new();
+        reference.add_optimizer_rule(histogram_rule(sql));
+        register_tables(&reference);
+        for (oo_query, reference_query) in cases {
+            let expected = run(&reference, reference_query).await;
+            assert_eq!(run(&oo, oo_query).await, expected, "{oo_query}");
+        }
+    }
+
+    async fn optimized_plan(sql: &Sql, query: &str) -> String {
+        let state = SessionStateBuilder::new()
+            .with_default_features()
+            .with_optimizer_rules(generate_optimizer_rules(sql))
+            .build();
+        let ctx = SessionContext::new_with_state(state);
+        register_tables(&ctx);
+        let plan = ctx.state().create_logical_plan(query).await.unwrap();
+        ctx.state()
+            .optimize(&plan)
+            .unwrap()
+            .display_indent()
+            .to_string()
     }
 
     #[test]
@@ -384,6 +506,116 @@ mod tests {
             missing, SKIPPED_DATAFUSION_LOGICAL_RULES,
             "generate_optimizer_rules is missing DataFusion default logical rules"
         );
+    }
+
+    #[tokio::test]
+    async fn test_set_comparison_and_lateral_join_match_datafusion() {
+        let mut sql = test_sql();
+        sql.limit = config::QUERY_WITH_NO_LIMIT;
+        let queries = [
+            "SELECT a FROM t WHERE a > ANY (SELECT b FROM t2) ORDER BY a",
+            "SELECT a FROM t WHERE a = ALL (SELECT b FROM t2 WHERE b = 3) ORDER BY a",
+            "SELECT a FROM t WHERE a < ALL (SELECT b FROM t2) ORDER BY a",
+            "SELECT a FROM t WHERE a <> ANY (SELECT b FROM t2 WHERE b > 2) ORDER BY a",
+            "SELECT t.a, x.b FROM t, LATERAL (SELECT t2.b FROM t2 WHERE t2.b = t.a) x ORDER BY t.a, x.b",
+            "SELECT t.a, x.c FROM t, LATERAL (SELECT count(*) AS c FROM t2 WHERE t2.b = t.a) x ORDER BY t.a",
+            "SELECT t.a, x.b FROM t LEFT JOIN LATERAL (SELECT t2.b FROM t2 WHERE t2.b = t.a) x ON true ORDER BY t.a, x.b",
+        ];
+        let cases = queries.map(|query| (query, query));
+        assert_same_rows_as_datafusion(&sql, &cases).await;
+    }
+
+    #[tokio::test]
+    async fn test_struct_field_access_matches_datafusion() {
+        let mut sql = test_sql();
+        sql.limit = config::QUERY_WITH_NO_LIMIT;
+        let queries = [
+            "SELECT a, s['g'] AS g FROM t WHERE s['f'] > 20 ORDER BY s['f'] DESC",
+            "SELECT s['g'] AS g, count(*) AS c FROM t WHERE s['f'] > 10 GROUP BY s['g'] ORDER BY g",
+            "SELECT item['v'] AS v FROM (SELECT named_struct('v', a, 'c', a % 2) AS item FROM t) WHERE item['c'] = 1 ORDER BY v",
+            "SELECT item['f'] AS f FROM (SELECT unnest(make_array(s)) AS item FROM t) WHERE item['g'] <> 'x1' ORDER BY f",
+            "SELECT t.a, t2.b FROM t JOIN t2 ON t.s['f'] = t2.b * 10 ORDER BY t.a, t2.b",
+        ];
+        let cases = queries.map(|query| (query, query));
+        assert_same_rows_as_datafusion(&sql, &cases).await;
+
+        let plan = optimized_plan(&sql, queries[0]).await;
+        assert!(plan.contains("__datafusion_extracted"), "{plan}");
+    }
+
+    #[tokio::test]
+    async fn test_search_rules_with_struct_field_access_match_datafusion() {
+        let mut sql = test_sql();
+        sql.time_range = (0, 10 * MINUTE_MICROS);
+        sql.histogram_interval = Some(60);
+        let cases = [
+            (
+                "SELECT _timestamp, s['f'] AS f FROM t WHERE s['f'] > 10",
+                "SELECT _timestamp, s['f'] AS f FROM t WHERE s['f'] > 10 ORDER BY _timestamp DESC LIMIT 100",
+            ),
+            (
+                "SELECT histogram(_timestamp) AS h, count(*) AS c FROM t WHERE s['f'] > 10 GROUP BY h ORDER BY h",
+                "SELECT histogram(_timestamp) AS h, count(*) AS c FROM t WHERE s['f'] > 10 GROUP BY h ORDER BY h LIMIT 100",
+            ),
+            (
+                "SELECT a FROM t WHERE a > ANY (SELECT b FROM t2) AND s['g'] <> 'x5' ORDER BY a",
+                "SELECT a FROM t WHERE a > ANY (SELECT b FROM t2) AND s['g'] <> 'x5' ORDER BY a LIMIT 100",
+            ),
+        ];
+        assert_same_rows_as_datafusion(&sql, &cases).await;
+
+        let plan = optimized_plan(&sql, cases[0].0).await;
+        assert!(plan.contains("__datafusion_extracted"), "{plan}");
+        assert!(plan.contains("fetch=100"), "{plan}");
+    }
+
+    #[tokio::test]
+    async fn test_remote_scan_plan_with_extracted_struct_fields_decodes() {
+        let sql = test_sql();
+        let mut file_id_lists = hashbrown::HashMap::new();
+        file_id_lists.insert(TableReference::from("t"), vec![]);
+        let state = SessionStateBuilder::new()
+            .with_config(SessionConfig::new().with_target_partitions(4))
+            .with_runtime_env(Arc::new(RuntimeEnvBuilder::new().build().unwrap()))
+            .with_optimizer_rules(generate_optimizer_rules(&sql))
+            .with_physical_optimizer_rule(Arc::new(RemoteScanRule::new_test(file_id_lists, false)))
+            .with_default_features()
+            .build();
+        let ctx = SessionContext::new_with_state(state);
+        let table = NewEmptyTable::new("t", t_schema()).with_partitions(4);
+        ctx.register_table("t", Arc::new(table)).unwrap();
+
+        let codec = get_physical_extension_codec();
+        for query in [
+            "SELECT _timestamp, s['f'] AS f FROM t WHERE s['f'] > 10",
+            "SELECT s['g'] AS g, count(*) AS c FROM t WHERE s['f'] > 10 GROUP BY s['g'] ORDER BY c DESC",
+        ] {
+            let logical = ctx.state().create_logical_plan(query).await.unwrap();
+            let optimized = ctx.state().optimize(&logical).unwrap();
+            assert!(
+                optimized
+                    .display_indent()
+                    .to_string()
+                    .contains("__datafusion_extracted"),
+                "{query}"
+            );
+            let plan = ctx.state().create_physical_plan(&logical).await.unwrap();
+            let mut sent = vec![];
+            plan.apply(|node| {
+                if let Some(scan) = node.downcast_ref::<RemoteScanExec>() {
+                    sent.push((scan.schema(), scan.encoded_plan().to_vec()));
+                }
+                Ok(TreeNodeRecursion::Continue)
+            })
+            .unwrap();
+            assert!(!sent.is_empty(), "{query}");
+            for (schema, bytes) in &sent {
+                let follower =
+                    physical_plan_from_bytes_with_extension_codec(bytes, &ctx.task_ctx(), &codec)
+                        .unwrap();
+                assert_eq!(follower.schema().fields(), schema.fields(), "{query}");
+            }
+        }
     }
 
     #[test]

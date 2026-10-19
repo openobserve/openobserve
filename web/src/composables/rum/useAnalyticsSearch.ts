@@ -70,8 +70,6 @@ const emptyPanel = <T>(): PanelState<T> => ({
 const isAbort = (e: SearchError): boolean =>
   e?.code === "ERR_CANCELED" || e?.name === "CanceledError" || e?.name === "AbortError";
 
-const guardEnabled = (): boolean => import.meta.env.DEV || import.meta.env.MODE === "test";
-
 export interface AnalyticsStoreState {
   selectedOrganization?: { identifier?: string };
   zoConfig?: { sql_base64_enabled?: boolean };
@@ -178,7 +176,7 @@ export default function useAnalyticsSearch(
   };
 
   const run = async <T>(id: string, spec: SearchSpec, key: string): Promise<PanelState<T>> => {
-    if (guardEnabled()) assertJoinFree(spec.sql);
+    assertJoinFree(spec.sql);
     entries.get(id)?.controller?.abort();
     // Bound at enqueue: a search queued behind the cap must not run against an org switched to meanwhile.
     const org = appStore()?.state.selectedOrganization?.identifier ?? "";

@@ -63,11 +63,19 @@
           <div
             v-else
             class="o-field-list__row group px-page-edge rounded-default relative mt-1 flex min-h-6 w-full cursor-pointer items-center text-xs leading-[0.8rem]"
-            :class="{ 'o-field-list__row--draggable': draggable }"
+            :class="{
+              'o-field-list__row--draggable': draggable,
+              'focus-visible:ring-focus-ring-accent outline-none focus-visible:ring-2 focus-visible:ring-inset':
+                keyboard,
+            }"
+            :tabindex="keyboard ? 0 : undefined"
+            :role="keyboard ? 'button' : undefined"
             :data-test="`o-field-list-row-${row.name}`"
             :draggable="draggable && isDragEnabled(row, row._index ?? 0) && isDragArmed()"
             @click="(e: MouseEvent) => onRowClick(row, e)"
             @dblclick="(e: MouseEvent) => onRowDblClick(row, e)"
+            @keydown.enter.space="(e: KeyboardEvent) => onRowKey(row, e)"
+            @keydown.up.down="onRowArrow"
             @dragstart="(e: DragEvent) => onDragStart(row, e)"
             @dragend="(e: DragEvent) => onDragEnd(row, e)"
             @dragover.prevent
@@ -153,6 +161,8 @@ const props = withDefaults(
     draggable?: boolean;
     dragEnabledFn?: (row: FieldItem, index: number) => boolean;
     sortFn?: (a: FieldItem, b: FieldItem) => number;
+    /** Rows take focus and Enter or Space picks them, for a list that is a picker. */
+    keyboard?: boolean;
   }>(),
   {
     search: "",
@@ -170,6 +180,7 @@ const props = withDefaults(
     draggable: false,
     dragEnabledFn: undefined,
     sortFn: undefined,
+    keyboard: false,
   },
 );
 
@@ -177,7 +188,7 @@ const emit = defineEmits<{
   "update:search": [value: string];
   "update:currentPage": [page: number];
   "update:expandedIds": [ids: string[]];
-  "row-click": [row: FieldItem, event: MouseEvent];
+  "row-click": [row: FieldItem, event: MouseEvent | KeyboardEvent];
   "row-dblclick": [row: FieldItem, event: MouseEvent];
   "scroll-end": [scrollInfo: any];
   "drag-start": [row: FieldItem, event: DragEvent];
@@ -357,6 +368,24 @@ function onDragEnd(row: FieldItem, event: DragEvent) {
 function onRowClick(row: FieldItem, event: MouseEvent) {
   if (row.isGroup) return;
   emit("row-click", row, event);
+}
+
+function onRowKey(row: FieldItem, event: KeyboardEvent) {
+  if (!props.keyboard || row.isGroup || event.target !== event.currentTarget) return;
+  event.preventDefault();
+  emit("row-click", row, event);
+}
+
+function onRowArrow(event: KeyboardEvent) {
+  if (!props.keyboard) return;
+  const rows = [
+    ...(scrollContainerRef.value?.querySelectorAll<HTMLElement>(".o-field-list__row") ?? []),
+  ];
+  const next =
+    rows[rows.indexOf(event.currentTarget as HTMLElement) + (event.key === "ArrowDown" ? 1 : -1)];
+  if (!next) return;
+  event.preventDefault();
+  next.focus();
 }
 
 function onRowDblClick(row: FieldItem, event: MouseEvent) {

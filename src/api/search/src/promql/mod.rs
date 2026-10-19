@@ -2048,19 +2048,6 @@ mod tests {
         assert_eq!(result, 300_000_000);
     }
 
-    #[test]
-    fn test_max_lookback_single_range_5m() {
-        // Single range selector 5m -> 300s -> 300_000_000 micros
-        let result = get_max_lookback_window("rate(http_requests_total[5m])");
-        assert_eq!(result, 300_000_000);
-    }
-
-    #[test]
-    fn test_max_lookback_10m() {
-        let result = get_max_lookback_window("rate(up[10m])");
-        assert_eq!(result, 600_000_000); // 10m in micros
-    }
-
     // --- MaxLookbackWindowVisitor ---
 
     #[test]

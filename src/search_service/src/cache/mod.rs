@@ -205,17 +205,18 @@ pub async fn search(
     let cache_took = start.elapsed().as_millis() as usize;
     let mut results = Vec::new();
     let mut work_group_set = Vec::new();
+    let mut search_results_have_hits = false;
     let mut res = if !should_exec_query {
         // no need to search, just merge the cached response
         // TODO: which case we don't need to search?
         merge_response(
             trace_id,
-            &mut c_resp
+            c_resp
                 .cached_response
-                .iter()
-                .map(|r| r.cached_response.clone())
+                .into_iter()
+                .map(|r| r.cached_response)
                 .collect(),
-            &mut vec![],
+            vec![],
             &c_resp.ts_column,
             c_resp.limit,
             c_resp.is_descending,
@@ -320,16 +321,18 @@ pub async fn search(
         for res in &results {
             work_group_set.push(res.work_group.clone());
         }
+        search_results_have_hits = results.first().is_some_and(|res| !res.hits.is_empty())
+            || results.last().is_some_and(|res| !res.hits.is_empty());
         // merge the cached response and the search response
         if c_resp.has_cached_data {
             merge_response(
                 trace_id,
-                &mut c_resp
+                c_resp
                     .cached_response
-                    .iter()
-                    .map(|r| r.cached_response.clone())
+                    .into_iter()
+                    .map(|r| r.cached_response)
                     .collect(),
-                &mut results,
+                results,
                 &c_resp.ts_column,
                 c_resp.limit,
                 c_resp.is_descending,
@@ -337,7 +340,7 @@ pub async fn search(
                 c_resp.order_by,
             )
         } else {
-            let mut reps = results[0].clone();
+            let mut reps = results.swap_remove(0);
             sort_response(
                 c_resp.is_descending,
                 &mut reps,
@@ -496,10 +499,7 @@ pub async fn search(
         "[trace_id {trace_id}] should_cache_results: {should_cache_results}, is_http2_streaming: {is_http2_streaming}, hits: {}",
         res.hits.len()
     );
-    if should_cache_results
-        && (results.first().is_some_and(|res| !res.hits.is_empty())
-            || results.last().is_some_and(|res| !res.hits.is_empty()))
-    {
+    if should_cache_results && search_results_have_hits {
         // Determine if this is a non-timestamp histogram query
         // Note: write_res.order_by_metadata contains the same ORDER BY info
         let is_histogram_non_ts_order = c_resp.histogram_interval > 0
@@ -711,8 +711,8 @@ pub async fn prepare_cache_response(
 #[allow(clippy::too_many_arguments)]
 pub fn merge_response(
     trace_id: &str,
-    cached_responses: &mut Vec<config::meta::search::Response>,
-    search_responses: &mut Vec<config::meta::search::Response>,
+    mut cached_responses: Vec<config::meta::search::Response>,
+    mut search_responses: Vec<config::meta::search::Response>,
     ts_column: &str,
     limit: i64,
     is_descending: bool,
@@ -738,11 +738,9 @@ pub fn merge_response(
             if res.hits.is_empty() {
                 continue;
             }
-            resp.hits.extend(res.hits.clone());
+            resp.hits.extend(res.hits);
             resp.histogram_interval = res.histogram_interval;
-            if !res.function_error.is_empty() {
-                fn_error.extend(res.function_error.clone());
-            }
+            fn_error.extend(res.function_error);
         }
         resp.took = cache_took;
         resp
@@ -762,9 +760,7 @@ pub fn merge_response(
             cache_response.scan_size += res.scan_size;
             cache_response.took += res.took;
             cache_response.histogram_interval = res.histogram_interval;
-            if !res.function_error.is_empty() {
-                fn_error.extend(res.function_error.clone());
-            }
+            fn_error.extend(res.function_error);
         }
         cache_response.function_error = fn_error;
         return cache_response;
@@ -778,7 +774,18 @@ pub fn merge_response(
 
     let mut res_took = ResponseTook::default();
 
-    for res in search_responses.clone() {
+    let search_responses_len = search_responses.len();
+    let (first_order_by, first_order_by_metadata, first_is_histogram_eligible) = search_responses
+        .first()
+        .map(|res| {
+            (
+                res.order_by,
+                res.order_by_metadata.clone(),
+                res.is_histogram_eligible,
+            )
+        })
+        .unwrap_or_default();
+    for res in search_responses {
         cache_response.total += res.total;
         cache_response.scan_size += res.scan_size;
         cache_response.took += res.took;
@@ -797,9 +804,7 @@ pub fn merge_response(
         res_took.search_took = std::cmp::max(res_took.search_took, res.took_detail.search_took);
         res_took.file_list_took =
             std::cmp::max(res_took.file_list_took, res.took_detail.file_list_took);
-        if !res.function_error.is_empty() {
-            fn_error.extend(res.function_error.clone());
-        }
+        fn_error.extend(res.function_error);
 
         cache_response.peak_memory_usage = Some(
             cache_response
@@ -808,7 +813,7 @@ pub fn merge_response(
                 .max(res.peak_memory_usage.unwrap_or(0.0)),
         );
 
-        cache_response.hits.extend(res.hits.clone());
+        cache_response.hits.extend(res.hits);
     }
     sort_response(is_descending, &mut cache_response, ts_column, &order_by);
 
@@ -819,8 +824,8 @@ pub fn merge_response(
         cache_response.total = cache_response.hits.len();
     }
 
-    if !search_responses.is_empty() {
-        cache_response.cached_ratio = files_cache_ratio / search_responses.len();
+    if let Some(ratio) = files_cache_ratio.checked_div(search_responses_len) {
+        cache_response.cached_ratio = ratio;
     }
     cache_response.size = cache_response.hits.len() as i64;
     let total = cache_response.size;
@@ -850,14 +855,8 @@ pub fn merge_response(
     );
 
     cache_response.took_detail = res_took;
-    cache_response.order_by = search_responses
-        .first()
-        .map(|res| res.order_by)
-        .unwrap_or_default();
-    cache_response.order_by_metadata = search_responses
-        .first()
-        .map(|res| res.order_by_metadata.clone())
-        .unwrap_or_default();
+    cache_response.order_by = first_order_by;
+    cache_response.order_by_metadata = first_order_by_metadata;
     cache_response.result_cache_ratio = (((cached_hits_len as f64) * 100_f64)
         / ((search_hits_len + cached_hits_len) as f64))
         as usize;
@@ -865,10 +864,7 @@ pub fn merge_response(
         cache_response.function_error.extend(fn_error);
         cache_response.is_partial = true;
     }
-    cache_response.is_histogram_eligible = search_responses
-        .first()
-        .map(|res| res.is_histogram_eligible)
-        .unwrap_or_default();
+    cache_response.is_histogram_eligible = first_is_histogram_eligible;
     cache_response
 }
 
@@ -891,7 +887,7 @@ fn sort_response(
         in_order_by
     };
 
-    cache_response.hits.sort_by(|a, b| {
+    let compare = |a: &serde_json::Value, b: &serde_json::Value| {
         for (field, order) in order_by {
             let cmp = if ts_column == field {
                 let a_ts = get_ts_value(ts_column, a);
@@ -940,7 +936,15 @@ fn sort_response(
 
         // If all fields are equal, maintain stable sort
         std::cmp::Ordering::Equal
-    });
+    };
+    // a single fresh result already arrives in query order; sorting it again is pure cost
+    if cache_response
+        .hits
+        .is_sorted_by(|a, b| compare(a, b) != std::cmp::Ordering::Greater)
+    {
+        return;
+    }
+    cache_response.hits.sort_by(compare);
 }
 
 /// Caches search results to disk after applying filtering and validation strategies.
@@ -1662,5 +1666,101 @@ mod tests {
             .unwrap();
         assert!(!is_range_already_cached(&query_key, file_path, &inner).await);
         assert!(!QUERY_RESULT_CACHE.read().await.contains_key(&query_key));
+    }
+
+    fn response_with_ts(ts: &[i64]) -> search::Response {
+        let hits = ts
+            .iter()
+            .map(|t| json::json!({"_timestamp": t, "name": format!("r{t}")}))
+            .collect::<Vec<_>>();
+        search::Response {
+            total: hits.len(),
+            scan_size: 1,
+            cached_ratio: 50,
+            hits,
+            ..Default::default()
+        }
+    }
+
+    fn ts_of(resp: &search::Response) -> Vec<i64> {
+        resp.hits
+            .iter()
+            .map(|h| get_ts_value("_timestamp", h))
+            .collect()
+    }
+
+    #[test]
+    fn test_merge_response_moves_cached_and_search_hits_in_order() {
+        let cached = vec![response_with_ts(&[10, 20])];
+        let searched = vec![response_with_ts(&[40, 30]), response_with_ts(&[50])];
+        let asc = merge_response(
+            "t",
+            cached.clone(),
+            searched.clone(),
+            "_timestamp",
+            10,
+            false,
+            7,
+            vec![],
+        );
+        assert_eq!(ts_of(&asc), vec![10, 20, 30, 40, 50]);
+        assert_eq!(asc.total, 5);
+        assert_eq!(asc.size, 5);
+        assert_eq!(asc.scan_size, 2);
+        assert_eq!(asc.cached_ratio, 50);
+        assert_eq!(asc.result_cache_ratio, 40);
+
+        let desc = merge_response("t", cached, searched, "_timestamp", 10, true, 7, vec![]);
+        assert_eq!(ts_of(&desc), vec![50, 40, 30, 20, 10]);
+    }
+
+    #[test]
+    fn test_merge_response_truncates_to_limit_after_sorting() {
+        let merged = merge_response(
+            "t",
+            vec![response_with_ts(&[10, 20])],
+            vec![response_with_ts(&[30, 40])],
+            "_timestamp",
+            3,
+            true,
+            0,
+            vec![],
+        );
+        assert_eq!(ts_of(&merged), vec![40, 30, 20]);
+        assert_eq!(merged.total, 3);
+    }
+
+    #[test]
+    fn test_merge_response_without_any_hits_returns_empty_response() {
+        let mut empty = response_with_ts(&[]);
+        empty.total = 3;
+        let merged = merge_response("t", vec![], vec![empty], "_timestamp", 10, true, 0, vec![]);
+        assert!(merged.hits.is_empty());
+        assert_eq!(merged.total, 0);
+    }
+
+    #[test]
+    fn test_sort_response_reorders_unsorted_hits() {
+        let mut resp = response_with_ts(&[30, 10, 20]);
+        sort_response(true, &mut resp, "_timestamp", &vec![]);
+        assert_eq!(ts_of(&resp), vec![30, 20, 10]);
+        sort_response(false, &mut resp, "_timestamp", &vec![]);
+        assert_eq!(ts_of(&resp), vec![10, 20, 30]);
+    }
+
+    #[test]
+    fn test_sort_response_keeps_already_sorted_hits_untouched() {
+        let mut resp = response_with_ts(&[30, 20, 20, 10]);
+        let before = resp.hits.clone();
+        sort_response(true, &mut resp, "_timestamp", &vec![]);
+        assert_eq!(resp.hits, before);
+    }
+
+    #[test]
+    fn test_sort_response_honours_explicit_order_by_field() {
+        let mut resp = response_with_ts(&[10, 30, 20]);
+        let order_by = vec![("name".to_string(), OrderBy::Desc)];
+        sort_response(false, &mut resp, "_timestamp", &order_by);
+        assert_eq!(ts_of(&resp), vec![30, 20, 10]);
     }
 }
