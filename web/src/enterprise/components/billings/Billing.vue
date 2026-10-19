@@ -110,14 +110,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template v-slot:after>
         <div class="flex h-full w-full flex-col pt-2">
           <div class="flex min-h-0 flex-1 gap-2.5 pe-2.5 pb-2.5">
-            <div class="h-full min-w-0 flex-1 overflow-y-auto">
+            <!-- On Usage the trial strip and the page share the height, so the page fits below the strip instead of scrolling. -->
+            <div
+              class="h-full min-w-0 flex-1 overflow-y-auto"
+              :class="{ 'flex flex-col': isUsageRoute }"
+            >
               <TrialPeriod
                 v-if="isUsageRoute && billingInfoLoaded"
                 current-page="usage"
                 :provider="billingProvider"
-                class="ms-2 me-3 mb-3"
+                class="ms-2 me-3 mb-3 shrink-0"
               />
-              <router-view title=""> </router-view>
+              <router-view title="" :class="{ 'min-h-0 flex-1': isUsageRoute }"> </router-view>
             </div>
           </div>
         </div>
