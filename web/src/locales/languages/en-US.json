@@ -582,6 +582,7 @@
   },
   "common": {
     "copiedToClipboard": "Copied to clipboard",
+    "customLogoAlt": "Organization logo",
     "queryEditorAriaLabel": "Query editor. Press Escape to move to the next control.",
     "inlineEdit": {
       "autoHint": "Click to rename. Until you do, this name is generated from your configuration and keeps up as you change it."

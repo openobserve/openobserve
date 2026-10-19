@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ t("billing.aiCredits") }}
               </div>
               <div class="opacity-80">
-                <img :src="aiIcon" />
+                <img alt="" :src="aiIcon" />
               </div>
             </div>
             <OTag type="aiMode" :value="aiUsage.mode" class="mt-2" style="width: fit-content" />

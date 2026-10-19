@@ -163,6 +163,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @mouseleave="isJsonEditorAiHovered = false"
       >
         <img
+          alt=""
           :src="jsonEditorAiBtnLogo"
           class="header-icon size-5 [transition:transform_0.6s_ease] group-hover:rotate-180 group-hover:brightness-0 group-hover:invert group-hover:[transition:filter_0.3s_ease]"
         />

@@ -35,6 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :class="store.state.isAiChatEnabled ? 'ai-btn-active bg-gradient-ai-subtle!' : ''"
       >
         <img
+          alt=""
           :src="scheduledPipelineRef?.getBtnLogo"
           class="header-icon ai-icon opacity-70 transition-[transform] duration-[0.6s] ease-[ease]"
           :class="store.state.isAiChatEnabled ? 'opacity-100!' : ''"
