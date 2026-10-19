@@ -176,6 +176,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :key="`${selectedOrg?.id ?? 'self'}-${selectedMeter}`"
                 :meter-key="selectedMeter"
                 :scope-org-id="selectedOrg?.id"
+                :rate="meterRate(selectedMeter)"
                 :details="details"
                 :group="selectedGroup"
                 :refresh-token="refreshToken"
@@ -211,8 +212,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :gross="scopedTotals.gross"
                 :discount="scopedTotals.discount"
                 :share-header="t('billing.usageV2.shareOfOrg', { org: selectedOrg.name })"
-                :loading="orgVolumesLoading && !hasOrgVolumes"
-                :streaming="orgVolumesLoading && hasOrgVolumes"
+                :loading="orgCostsLoading && !hasOrgCosts"
+                :streaming="orgCostsLoading && hasOrgCosts"
                 data-test="billings-usageoverview-org-meters"
                 @select="(key) => selectMeter(key as MeterKey)"
               />
@@ -243,6 +244,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :key="chartKey"
                   :panel-schema="chartSchema"
                   :selected-time-obj="elapsedTimeObj"
+                  :refresh-without-cache="refreshedOnce"
                   data-test="billings-usageoverview-daily-chart"
                 />
               </KeepAlive>
@@ -264,7 +266,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, ref, toRef, watch } from "vue";
+import { computed, nextTick, ref, toRef } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
@@ -276,7 +278,6 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import KpiCardRow from "@/components/common/KpiCardRow.vue";
-import { useUsageSearch } from "./useUsageSearch";
 import { formatSizeFromMB } from "@/utils/formatters";
 import useBreakpoint from "@/composables/useBreakpoint";
 import UsageKpiCard from "./UsageKpiCard.vue";
@@ -313,12 +314,7 @@ import {
   meterColorFor,
   paletteColor,
 } from "./usageCharts";
-import {
-  dailyOrgCostSql,
-  dailyEntitySql,
-  orgEventVolumeSql,
-  type DrilldownSection,
-} from "./usageQueries";
+import { dailyOrgCostSql, dailyEntitySql, type DrilldownSection } from "./usageQueries";
 import { cyclePrices } from "./trendsModel";
 import { useOrgCosts } from "./useOrgCosts";
 
@@ -354,6 +350,8 @@ const router = useRouter();
 const { isMobile } = useBreakpoint();
 
 const refreshToken = ref(0);
+/** Set by the first Refresh: from then on charts skip the server's result cache, as the dashboard refresh does. */
+const refreshedOnce = ref(false);
 const breakdownAnchor = ref<HTMLElement | null>(null);
 const groupSections = ref<DrilldownSection[]>([]);
 /** The view the breakdown's groupings came from; another meter's must not shape this chart. */
@@ -430,23 +428,10 @@ const {
   costs: orgCosts,
   loading: orgCostsLoading,
   failed: orgCostsFailed,
-  window: cycleWindow,
 } = useOrgCosts(toRef(props, "details"), toRef(props, "billingOrgs"), refreshToken);
 
 /** Partial costs stream in, so the skeleton only covers the wait for the first chunk. */
 const hasOrgCosts = computed(() => Object.keys(orgCosts.value).length > 0);
-
-const { search, cancel } = useUsageSearch();
-
-/** Keyed, so picking another org stops the previous org's query instead of racing it. */
-const searchUsage = (sql: string, onRows?: (rows: Record<string, unknown>[]) => void) =>
-  search(sql, {
-    start: cycleWindow.value.start,
-    end: cycleWindow.value.end,
-    size: 1000,
-    key: "orgVolumes",
-    onRows,
-  });
 
 /** Every org with its cost, plus retention, which writes no usage events to split by org. */
 const orgRows = computed<BillRow[]>(() => {
@@ -492,55 +477,22 @@ const sumRows = (list: BillRow[]) => ({
 
 const orgTotals = computed(() => sumRows(orgRows.value));
 
-const orgVolumes = ref<Record<string, number>>({});
-const orgVolumesLoading = ref(false);
-const hasOrgVolumes = computed(() => Object.keys(orgVolumes.value).length > 0);
-
-/** Each org's volumes for the bill on screen, so going back into an org shows its table without querying again. */
-const orgVolumeCache = new Map<string, Record<string, number>>();
-
-const loadOrgVolumes = async () => {
-  const org = selectedOrg.value;
-  if (!org || !props.details) return;
-  const cached = orgVolumeCache.get(org.id);
-  if (cached) {
-    // Stops another org's query still streaming, or its rows would land on this org's table.
-    cancel("orgVolumes");
-    orgVolumes.value = cached;
-    orgVolumesLoading.value = false;
-    return;
-  }
-  orgVolumesLoading.value = true;
-  orgVolumes.value = {};
-  const toVolumes = (hits: Record<string, unknown>[]) =>
-    Object.fromEntries(hits.map((hit) => [String(hit.name ?? ""), Number(hit.volume) || 0]));
-  try {
-    const hits = await searchUsage(orgEventVolumeSql(org.id), (partial) => {
-      orgVolumes.value = toVolumes(partial);
-    });
-    orgVolumes.value = toVolumes(hits);
-    orgVolumeCache.set(org.id, orgVolumes.value);
-  } catch {
-    orgVolumes.value = {};
-  } finally {
-    orgVolumesLoading.value = false;
-  }
-};
-
-watch(
-  [() => selectedOrg.value?.id, () => props.details, refreshToken],
-  (_, previous) => {
-    // A new bill or a Refresh makes every kept org stale; only picking an org may reuse one.
-    if (previous[1] !== props.details || previous[2] !== refreshToken.value) orgVolumeCache.clear();
-    loadOrgVolumes();
-  },
-  { immediate: true },
+/** The selected org's part of each meter, from the same split as its row, so the two always agree. */
+const selectedShares = computed(() =>
+  selectedOrg.value ? (orgCosts.value[selectedOrg.value.id]?.byMeter ?? {}) : {},
 );
 
 /** The selected org's meters, priciest first. */
 const scopedRows = computed<MeterRow[]>(() =>
-  scopedMeterRows(props.details, orgVolumes.value, t).sort((a, b) => b.cost - a.cost),
+  scopedMeterRows(props.details, selectedShares.value, t).sort((a, b) => b.cost - a.cost),
 );
+
+/** Inside an org, a meter is priced at that org's share of it, so its breakdown adds up to the org's row. */
+const meterRate = (key: MeterKey) => {
+  const share = selectedShares.value[key];
+  if (!selectedOrg.value || !share) return effectiveRate(props.details?.[key]);
+  return share.volume > 0 ? share.billed / share.volume : 0;
+};
 
 const scopedTotals = computed(() => sumRows(scopedRows.value));
 
@@ -760,7 +712,7 @@ const chartSchema = computed(() => {
   const ranked = chartNamesFor.value === `${viewKey.value}-${spec.id}` ? chartNames.value : [];
   return buildStackedCostPanelSchema({
     id: `usage-overview-${meterKey}-${spec.id}`,
-    sql: dailyEntitySql(usageOrgId.value, spec, effectiveRate(props.details[meterKey])),
+    sql: dailyEntitySql(usageOrgId.value, spec, meterRate(meterKey)),
     seriesColors: entitySeriesColors(meterKey, ranked, OTHERS_SERIES),
     topResults: CHART_TOP,
     fixedColor: meterColorFor(meterKey),
@@ -817,6 +769,7 @@ const selectGroup = (group: string) => {
 };
 
 const refresh = () => {
+  refreshedOnce.value = true;
   refreshToken.value += 1;
   emit("refresh");
 };

@@ -460,8 +460,12 @@ const orgRows = computed<OrgRow[]>(() =>
       id: org.id,
       label: org.isSelf ? t("billing.usageV2.thisOrg", { org: org.name }) : raw(org.name),
       spend,
-      meters: METERS.filter((def) => (byMeter[def.key] ?? 0) > 0)
-        .map((def) => ({ key: def.key, label: t(def.labelKey), cost: byMeter[def.key] ?? 0 }))
+      meters: METERS.filter((def) => (byMeter[def.key]?.billed ?? 0) > 0)
+        .map((def) => ({
+          key: def.key,
+          label: t(def.labelKey),
+          cost: byMeter[def.key]?.billed ?? 0,
+        }))
         .sort((x, y) => y.cost - x.cost),
       draft,
       status: budgetStatus(spend, draft.budget, warnAmountFor(draft.warnPercent, draft.budget)),

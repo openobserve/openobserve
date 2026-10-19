@@ -16,12 +16,13 @@
 import { computed, ref, watch, type Ref } from "vue";
 import {
   meterForEvent,
+  netCost,
   type BillingOrg,
   type MeterKey,
+  type MeterShare,
   type MeteringDetails,
 } from "./meteringModel";
 import { orgVolumeSql } from "./usageQueries";
-import { cyclePrices } from "./trendsModel";
 import { useUsageSearch } from "./useUsageSearch";
 
 export interface OrgCost {
@@ -29,17 +30,23 @@ export interface OrgCost {
   billed: number;
   /** Megabytes ingested this cycle. */
   ingested: number;
-  /** Billed cost per meter; retention writes no usage events, so it is never here. */
-  byMeter: Partial<Record<MeterKey, number>>;
+  /** The org's part of each meter; retention writes no usage events, so it is never here. */
+  byMeter: Partial<Record<MeterKey, MeterShare>>;
 }
 
-/** Prices each org's per-event volume at this cycle's list and discounted rates. */
+/**
+ * Splits each meter's billed amount across orgs by their share of its volume. The orgs then
+ * add up to the bill, discounts and rounding included, even when the volumes are off.
+ */
 export function priceOrgVolumes(
   hits: Record<string, unknown>[],
   cycle: MeteringDetails,
 ): Record<string, OrgCost> {
-  const billedRates = cyclePrices([cycle])[0]?.rates ?? {};
-  const grossRates = cyclePrices([cycle], true)[0]?.rates ?? {};
+  const totals: Partial<Record<MeterKey, number>> = {};
+  for (const hit of hits) {
+    const meter = meterForEvent(String(hit.event ?? ""))?.key;
+    if (meter) totals[meter] = (totals[meter] ?? 0) + (Number(hit.volume) || 0);
+  }
   const byOrg: Record<string, OrgCost> = {};
   for (const hit of hits) {
     const event = String(hit.event ?? "");
@@ -50,12 +57,19 @@ export function priceOrgVolumes(
       ingested: 0,
       byMeter: {},
     });
-    const billed = volume * (billedRates[event] ?? 0);
-    org.gross += volume * (grossRates[event] ?? 0);
-    org.billed += billed;
     if (event === "Ingestion") org.ingested += volume;
     const meter = meterForEvent(event)?.key;
-    if (meter) org.byMeter[meter] = (org.byMeter[meter] ?? 0) + billed;
+    const total = meter ? (totals[meter] ?? 0) : 0;
+    if (!meter || total <= 0) continue;
+    const share = volume / total;
+    const gross = (Number(cycle[meter]?.metered_cost) || 0) * share;
+    const billed = netCost(cycle[meter]) * share;
+    const part = (org.byMeter[meter] ??= { volume: 0, gross: 0, billed: 0 });
+    part.volume += volume;
+    part.gross += gross;
+    part.billed += billed;
+    org.gross += gross;
+    org.billed += billed;
   }
   return byOrg;
 }
@@ -65,7 +79,7 @@ export function priceOrgVolumes(
  *
  * Stripe itemises a super org's bill for the super org only, but every member's usage
  * also lands in the super org's `usage` stream with its own org_id. So each org's cost
- * is its usage priced at this bill's rates and discounts: an estimate that tracks the bill.
+ * is its share of the bill, by its usage.
  */
 export function useOrgCosts(
   details: Ref<MeteringDetails | null>,
@@ -86,10 +100,14 @@ export function useOrgCosts(
   });
 
   let latest = 0;
+  /** The Refresh this cost was last read for; a newer one bypasses the server's result cache. */
+  let readFor = refreshToken.value;
 
   const load = async () => {
     const cycle = details.value;
     if (!billingOrgs.value.length || !cycle) return;
+    const refresh = readFor !== refreshToken.value;
+    readFor = refreshToken.value;
     const id = ++latest;
     loading.value = true;
     failed.value = false;
@@ -101,6 +119,7 @@ export function useOrgCosts(
         end: window.value.end,
         size: 1000,
         key: "orgCosts",
+        refresh,
         onRows: (rows) => {
           if (id === latest) costs.value = priceOrgVolumes(rows, cycle);
         },
@@ -116,7 +135,8 @@ export function useOrgCosts(
     }
   };
 
-  watch([() => billingOrgs.value.length, details, refreshToken], load, { immediate: true });
+  // Not on the Refresh token itself: Refresh always brings a new bill, and two reads would cancel the uncached one.
+  watch([() => billingOrgs.value.length, details], load, { immediate: true });
 
   return { costs, loading, failed, window };
 }

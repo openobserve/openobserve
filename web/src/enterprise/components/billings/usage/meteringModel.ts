@@ -482,34 +482,39 @@ export function estimateCost(
   return { lines, total: lines.reduce((sum, line) => sum + line.cost, 0) };
 }
 
+/** One org's part of one meter on a super org's bill. */
+export interface MeterShare {
+  /** The org's volume of this meter in the `usage` stream: megabytes, or a count. */
+  volume: number;
+  gross: number;
+  billed: number;
+}
+
 /**
- * One org's meters inside a super org's bill: volumes from the `usage` stream, priced at
- * the bill's own rates and discounts, since Stripe itemises the bill for the super org only.
+ * One org's meters inside a super org's bill, from its share of each meter's billed amount.
  * Retention writes no usage events, so it cannot be split by org and is left out.
  */
 export function scopedMeterRows(
   details: MeteringDetails | null | undefined,
-  volumeByEvent: Record<string, number>,
+  shares: Partial<Record<MeterKey, MeterShare>>,
   t: TranslateFn,
 ): MeterRow[] {
   if (!details) return [];
   return METERS.filter((def) => def.events.length).map((def) => {
     const meter = details[def.key];
-    const amount = def.events.reduce((sum, event) => sum + (volumeByEvent[event] ?? 0), 0);
-    const percent = Math.min(Math.max(Number(meter?.percent_discount) || 0, 0), 100);
-    const gross = amount * unitRate(meter);
-    const discount = (gross * percent) / 100;
+    const share = shares[def.key] ?? { volume: 0, gross: 0, billed: 0 };
+    const discount = Math.max(share.gross - share.billed, 0);
     return {
       key: def.key,
       label: t(def.labelKey),
-      volume: formatVolume(meter ? { ...meter, metered_amount: amount } : null),
+      volume: formatVolume(meter ? { ...meter, metered_amount: share.volume } : null),
       rate: formatRate(meter, def, t),
-      cost: gross - discount,
-      gross,
+      cost: share.billed,
+      gross: share.gross,
       discount,
       missing: false,
-      discountPercent: percent,
-      drillable: amount > 0,
+      discountPercent: share.gross > 0 ? Math.round((discount / share.gross) * 1000) / 10 : 0,
+      drillable: share.volume > 0,
       hasBreakdown: true,
     };
   });

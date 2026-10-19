@@ -172,6 +172,8 @@ const props = defineProps<{
    * stream holds every member's usage; only the `org_id` filter and name lookups change.
    */
   scopeOrgId?: string;
+  /** Price per unit to use instead of the bill's, so a member's rows add up to its share. */
+  rate?: number;
 }>();
 /** Every grouping the meter offers; `unavailable` lists those this org has never recorded. */
 type SectionsPayload = {
@@ -260,7 +262,7 @@ const columnVisibility = computed(() => ({ volume: !isMobile.value }));
 
 const restShare = computed(() => (total.value > 0 ? (rest.value / total.value) * 100 : 0));
 
-const rate = computed(() => effectiveRate(meter.value));
+const rate = computed(() => props.rate ?? effectiveRate(meter.value));
 
 const EM_DASH = raw("—");
 
@@ -313,7 +315,6 @@ const gridTemplate = computed(() =>
 );
 
 const toRows = (raws: RawRow[], sum: number): BreakdownRow[] => {
-  const rate = effectiveRate(meter.value);
   const shown = raws.reduce((acc, entry) => acc + entry.volume, 0);
   const remainder = Math.max(sum - shown, 0);
   rest.value = sum > 0 && remainder / sum > 0.0005 ? remainder : 0;
@@ -321,7 +322,7 @@ const toRows = (raws: RawRow[], sum: number): BreakdownRow[] => {
     name: entry.name,
     volume: entry.volume,
     retentionDays: entry.retentionDays,
-    cost: entry.volume * rate,
+    cost: entry.volume * rate.value,
     share: sum > 0 ? Math.min((entry.volume / sum) * 100, 100) : 0,
   }));
 };

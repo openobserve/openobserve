@@ -344,14 +344,22 @@ describe("estimateCost", () => {
       expect(billingGroupOrgs(null, "sup")).toEqual([]);
     });
 
-    it("prices one org's usage at the bill's rates and discounts, without retention", () => {
-      const rows = scopedMeterRows(details, { Ingestion: 2048, Search: 1024 }, t);
+    it("shows one org's share of each meter, without retention", () => {
+      const rows = scopedMeterRows(
+        details,
+        {
+          ingestion: { volume: 2048, gross: 1, billed: 0.9 },
+          query: { volume: 0, gross: 0, billed: 0 },
+        },
+        t,
+      );
       const ingestion = rows.find((row) => row.key === "ingestion")!;
-      // 2 GB at $0.50/GB is $1.00 gross; the bill's 10% ingestion coupon applies to this org too.
       expect(ingestion.gross).toBeCloseTo(1);
       expect(ingestion.discount).toBeCloseTo(0.1);
+      expect(ingestion.discountPercent).toBe(10);
       expect(ingestion.cost).toBeCloseTo(0.9);
       expect(ingestion.drillable).toBe(true);
+      expect(rows.find((row) => row.key === "query")!.drillable).toBe(false);
       expect(rows.find((row) => row.key === "pipeline")!.drillable).toBe(false);
       expect(rows.some((row) => row.key === "retention")).toBe(false);
       expect(scopedMeterRows(null, {}, t)).toEqual([]);

@@ -35,15 +35,19 @@ const search = vi.fn();
 const cancel = vi.fn();
 vi.mock("./useUsageSearch", () => ({ useUsageSearch: () => ({ search, cancel }) }));
 
+// The org costs every test sees; the member view must read its numbers from here.
+const orgCosts: { value: Record<string, unknown> } = { value: {} };
 vi.mock("./useOrgCosts", async () => {
   const { ref: vueRef } = await import("vue");
+  const costs = vueRef({});
+  Object.defineProperty(orgCosts, "value", {
+    get: () => costs.value,
+    set: (v) => {
+      costs.value = v;
+    },
+  });
   return {
-    useOrgCosts: () => ({
-      costs: vueRef({}),
-      loading: vueRef(false),
-      failed: vueRef(false),
-      window: vueRef({ start: 1, end: 2 }),
-    }),
+    useOrgCosts: () => ({ costs, loading: vueRef(false), failed: vueRef(false) }),
   };
 });
 
@@ -57,14 +61,20 @@ const billingOrgs = [
 enableAutoUnmount(afterEach);
 
 describe("UsageOverview org drilldown", () => {
+  // The child's part of the bill: 100 MB of a $90-billed Ingestion meter came to $22.50.
+  const childShare = { volume: 100, gross: 25, billed: 22.5 };
+
   beforeEach(() => {
     route.query = {};
-    search.mockReset().mockResolvedValue([{ name: "Ingestion", volume: 10 }]);
+    search.mockReset().mockResolvedValue([]);
     cancel.mockReset();
+    orgCosts.value = {
+      child: { gross: 25, billed: 22.5, ingested: 100, byMeter: { ingestion: childShare } },
+    };
   });
 
-  const mountAt = (org: string) => {
-    route.query = { org };
+  const mountAt = (query: Record<string, string>) => {
+    route.query = query;
     return mount(UsageOverview, {
       props: {
         details: mockMeteringResponse().upcoming,
@@ -79,33 +89,24 @@ describe("UsageOverview org drilldown", () => {
     });
   };
 
-  it("queries an org once and serves it from memory when the user comes back to it", async () => {
-    mountAt("child");
-    await flushPromises();
-    expect(search).toHaveBeenCalledTimes(1);
-
-    route.query = {};
-    await flushPromises();
-    route.query = { org: "child" };
+  it("builds a member's meters from its share of the bill, with no query of its own", async () => {
+    const wrapper = mountAt({ org: "child" });
     await flushPromises();
 
-    expect(search).toHaveBeenCalledTimes(1);
-    // A cache hit stops any other org's stream, so its rows cannot land on this table.
-    expect(cancel).toHaveBeenCalledWith("orgVolumes");
+    const table = wrapper.findComponent('[data-test="billings-usageoverview-org-meters"]');
+    const rows = table.props("rows") as { key: string; cost: number }[];
+    expect(rows.find((row) => row.key === "ingestion")?.cost).toBe(22.5);
+    // The member's meters add up to its row in Cost by Org.
+    expect(table.props("total")).toBe(22.5);
+    expect(search).not.toHaveBeenCalled();
   });
 
-  it("queries the org again once a new bill arrives", async () => {
-    const wrapper = mountAt("child");
+  it("prices a member's drilldown at its share, so the breakdown adds up to its row", async () => {
+    const wrapper = mountAt({ org: "child", meter: "ingestion" });
     await flushPromises();
 
-    await wrapper.setProps({ details: { ...mockMeteringResponse().upcoming } });
-    await flushPromises();
-    route.query = {};
-    await flushPromises();
-    route.query = { org: "child" };
-    await flushPromises();
-
-    expect(search).toHaveBeenCalledTimes(2);
+    const breakdown = wrapper.findComponent({ name: "UsageMeterBreakdown" });
+    expect(breakdown.props("rate")).toBeCloseTo(22.5 / 100, 12);
   });
 });
 

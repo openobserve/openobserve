@@ -22,7 +22,6 @@ import {
   dailyEntitySql,
   meterTotalSql,
   orgVolumeSql,
-  orgEventVolumeSql,
   searchScanRateSql,
   trendsCostSql,
 } from "./usageQueries";
@@ -181,12 +180,6 @@ describe("usageQueries", () => {
       expect(sql).toContain("group by org_id, event");
       expect(sql).not.toContain("org_id =");
       expect(sql).not.toContain("case");
-    });
-
-    it("reads one org's volume per event", () => {
-      const sql = orgEventVolumeSql("m'1");
-      expect(sql).toContain("org_id = 'm''1'");
-      expect(sql).toContain("group by event");
     });
 
     it("labels the daily series by org name and folds unknown orgs into Other", () => {

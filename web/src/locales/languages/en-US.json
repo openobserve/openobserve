@@ -8253,7 +8253,7 @@
       "ingestedVolume": "{volume} ingested",
       "notSplitByOrg": "Billed to the whole group, not split by org",
       "orgSummary": "{cost} billed · {share} of the bill",
-      "orgCostEstimated": "Estimated from each org's usage at this bill's rates",
+      "orgCostEstimated": "This bill split by each org's share of usage",
       "byOrg": "By org",
       "historyStartsOn": "Usage history starts on {date}, the start of your oldest billing cycle we have usage for. Earlier days have no usage to show.",
       "budgetTab": "Budget",

@@ -234,15 +234,6 @@ export function orgVolumeSql(events: string[] = PRICED_EVENTS): string {
   );
 }
 
-/** One org's volume per event, which `scopedMeterRows` prices into meter rows. */
-export function orgEventVolumeSql(orgId: string, events: string[] = PRICED_EVENTS): string {
-  const inList = events.map((event) => `'${escapeLiteral(event)}'`).join(", ");
-  return (
-    `select event as name, sum(size) as volume from "${USAGE_STREAM_NAME}" ` +
-    `where org_id = '${escapeLiteral(orgId)}' and event in (${inList}) group by event`
-  );
-}
-
 /** Daily cost per org, labelled by org name; an org missing from `orgs` folds into `otherLabel`. */
 export function dailyOrgCostSql(
   prices: CyclePrice[],
