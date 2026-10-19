@@ -16,6 +16,7 @@
 import { afterEach, describe, it, expect, vi, beforeEach } from "vitest";
 import { createMemoryHistory, createRouter } from "vue-router";
 import useRoutes from "./router";
+import Login from "@/views/Login.vue";
 import store from "@/stores";
 import { routeGuard } from "@/utils/zincutils";
 import { isPaywalledDestination, shouldPaywallRoute } from "@/utils/auth";
@@ -162,15 +163,21 @@ vi.mock("@/components/pipelines/BackfillJobsList.vue", () => ({
 // Sub-composable mocks — return empty arrays so counts are deterministic
 // ---------------------------------------------------------------------------
 vi.mock("./useIngestionRoutes", () => ({
-  default: vi.fn(() => [{ path: "ingestion", name: "ingestion", component: {} }]),
+  default: vi.fn(() => [
+    { path: "ingestion", name: "ingestion", component: () => Promise.resolve({}) },
+  ]),
 }));
 
 vi.mock("./useEnterpriseRoutes", () => ({
-  default: vi.fn(() => [{ path: "iam", name: "iam", component: {}, children: [] }]),
+  default: vi.fn(() => [
+    { path: "iam", name: "iam", component: () => Promise.resolve({}), children: [] },
+  ]),
 }));
 
 vi.mock("./useManagementRoutes", () => ({
-  default: vi.fn(() => [{ path: "settings", name: "settings", component: {}, children: [] }]),
+  default: vi.fn(() => [
+    { path: "settings", name: "settings", component: () => Promise.resolve({}), children: [] },
+  ]),
 }));
 
 // ---------------------------------------------------------------------------
@@ -2491,5 +2498,20 @@ describe("useRoutes (router.ts)", () => {
         expect(findRoute(homeChildRoutes, name).meta?.allowOnEmptyData).toBeUndefined();
       },
     );
+  });
+});
+
+describe("useRoutes lazy loading", () => {
+  // An eager route component lands in the entry bundle the login page downloads.
+  it("lazy-loads every route component except Login", () => {
+    const { parentRoutes, homeChildRoutes } = useRoutes();
+    const walk = (routes: any[]): void =>
+      routes.forEach((route) => {
+        if (route.component && route.component !== Login) {
+          expect(typeof route.component, route.path).toBe("function");
+        }
+        if (route.children) walk(route.children);
+      });
+    walk([...parentRoutes, ...homeChildRoutes]);
   });
 });

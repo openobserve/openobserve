@@ -689,7 +689,7 @@ async fn cancel_job_inner(org_id: &str, job_id: &str, user_id: &str) -> Response
     }
 
     // 4. use cancel query function to cancel the query
-    cancel_query_inner(org_id, &[&job.trace_id]).await
+    cancel_query_inner(Some(org_id), &[&job.trace_id]).await
 }
 
 #[cfg(feature = "enterprise")]
