@@ -288,10 +288,52 @@ pub async fn create_physical_plan(
 #[cfg(test)]
 mod tests {
     use config::meta::stream::StreamType;
-    use datafusion::physical_optimizer::optimizer::PhysicalOptimizer;
+    use datafusion::{optimizer::Optimizer, physical_optimizer::optimizer::PhysicalOptimizer};
 
     use super::*;
     use crate::datafusion::{context::SearchContextBuilder, optimizer::context::RemoteScanContext};
+
+    // DataFusion 55.1 Optimizer::new() order, as last reviewed against generate_optimizer_rules.
+    const DATAFUSION_LOGICAL_RULES: &[&str] = &[
+        "rewrite_set_comparison",
+        "optimize_unions",
+        "unions_to_filter",
+        "simplify_expressions",
+        "replace_distinct_aggregate",
+        "eliminate_join",
+        "decorrelate_predicate_subquery",
+        "scalar_subquery_to_join",
+        "decorrelate_lateral_join",
+        "extract_equijoin_predicate",
+        "eliminate_duplicated_expr",
+        "eliminate_filter",
+        "eliminate_cross_join",
+        "eliminate_limit",
+        "propagate_empty_relation",
+        "filter_null_join_keys",
+        "eliminate_outer_join",
+        "push_down_limit",
+        "push_down_filter",
+        "single_distinct_aggregation_to_group_by",
+        "eliminate_group_by_constant",
+        "common_sub_expression_eliminate",
+        "extract_leaf_expressions",
+        "push_down_leaf_projections",
+        "optimize_projections",
+    ];
+
+    // Upstream defaults generate_optimizer_rules does not install yet, in upstream order.
+    const SKIPPED_DATAFUSION_LOGICAL_RULES: &[&str] = &[
+        // Without it `x > ANY (subquery)` / `= ALL` fail with "does not support SetComparison".
+        "rewrite_set_comparison",
+        // No-op unless datafusion.optimizer.enable_unions_to_filter is set (off by default).
+        "unions_to_filter",
+        // Without it LATERAL joins fail with "does not support OuterReferenceColumn".
+        "decorrelate_lateral_join",
+        // Pushes struct field access (`s['f']`) towards the scan; optimization only.
+        "extract_leaf_expressions",
+        "push_down_leaf_projections",
+    ];
 
     fn test_sql() -> Sql {
         Sql {
@@ -315,6 +357,33 @@ mod tests {
             sorted_by_time: false,
             sampling_config: None,
         }
+    }
+
+    #[test]
+    fn test_datafusion_logical_rules_reviewed() {
+        let upstream = Optimizer::new()
+            .rules
+            .iter()
+            .map(|rule| rule.name().to_string())
+            .collect::<Vec<_>>();
+        assert_eq!(
+            upstream, DATAFUSION_LOGICAL_RULES,
+            "DataFusion's default logical rules changed; review generate_optimizer_rules, then update this list"
+        );
+
+        let ours = generate_optimizer_rules(&test_sql())
+            .iter()
+            .map(|rule| rule.name().to_string())
+            .collect::<std::collections::HashSet<_>>();
+        let missing = upstream
+            .iter()
+            .filter(|name| !ours.contains(name.as_str()))
+            .map(String::as_str)
+            .collect::<Vec<_>>();
+        assert_eq!(
+            missing, SKIPPED_DATAFUSION_LOGICAL_RULES,
+            "generate_optimizer_rules is missing DataFusion default logical rules"
+        );
     }
 
     #[test]
