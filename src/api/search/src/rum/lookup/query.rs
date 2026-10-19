@@ -317,7 +317,8 @@ impl LookupContext {
         {
             let org_id = self.org_id.clone();
             tokio::spawn(async move {
-                if let Err(e) = SearchService::cancel_query(&org_id, &trace_id).await {
+                if let Err(e) = SearchService::cancel_query(Some(org_id.as_str()), &trace_id).await
+                {
                     log::warn!(
                         "[trace_id {trace_id}] rum lookup could not cancel a timed-out query: {e}"
                     );

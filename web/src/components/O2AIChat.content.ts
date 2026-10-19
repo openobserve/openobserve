@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import DOMPurify from "dompurify";
-import hljs from "highlight.js";
+import hljs from "@/lib/core/Code/highlighter";
 import { marked } from "marked";
 
 import type { ChatMessage } from "@/ts/interfaces/chat";

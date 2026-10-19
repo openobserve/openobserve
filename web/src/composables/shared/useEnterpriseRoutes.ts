@@ -14,7 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import config from "@/aws-exports";
-import ServiceAccountsList from "@/components/iam/serviceAccounts/ServiceAccountsList.vue";
 import { routeGuard } from "@/utils/zincutils";
 import store from "@/stores";
 import {
@@ -96,9 +95,12 @@ const Quota = () => import("@/components/iam/quota/Quota.vue");
 
 const Organizations = () => import("@/components/iam/organizations/AppOrganizations.vue");
 
+const ServiceAccountsList = () =>
+  import("@/components/iam/serviceAccounts/ServiceAccountsList.vue");
+
 const Invitations = () => import("@/views/Invitations.vue");
 
-import Users from "@/views/User.vue";
+const Users = () => import("@/views/User.vue");
 
 const IncidentList = () => import("@/components/alerts/IncidentList.vue");
 

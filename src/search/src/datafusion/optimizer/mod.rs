@@ -33,7 +33,18 @@ use datafusion::{
         scalar_subquery_to_join::ScalarSubqueryToJoin, simplify_expressions::SimplifyExpressions,
         single_distinct_to_groupby::SingleDistinctToGroupBy,
     },
-    physical_optimizer::{PhysicalOptimizerRule, limit_pushdown::LimitPushdown},
+    physical_optimizer::{
+        PhysicalOptimizerRule, aggregate_statistics::AggregateStatistics,
+        combine_partial_final_agg::CombinePartialFinalAggregate, ensure_coop::EnsureCooperative,
+        ensure_requirements::EnsureRequirements, filter_pushdown::FilterPushdown,
+        hash_join_buffering::HashJoinBuffering, join_selection::JoinSelection,
+        limit_pushdown::LimitPushdown, limit_pushdown_past_window::LimitPushPastWindows,
+        limited_distinct_aggregation::LimitedDistinctAggregation,
+        output_requirements::OutputRequirements, projection_pushdown::ProjectionPushdown,
+        pushdown_sort::PushdownSort, sanity_checker::SanityCheckPlan,
+        topk_aggregation::TopKAggregation, topk_repartition::TopKRepartition,
+        update_aggr_exprs::OptimizeAggregateOrder, window_topn::WindowTopN,
+    },
     physical_plan::ExecutionPlan,
     prelude::SessionContext,
 };
@@ -183,7 +194,37 @@ pub fn generate_physical_optimizer_rules(
     sql: &Sql,
     contexts: Vec<PhysicalOptimizerContext>,
 ) -> Vec<Arc<dyn PhysicalOptimizerRule + Send + Sync>> {
-    let mut rules = vec![Arc::new(JoinReorderRule::new()) as _];
+    let mut rules: Vec<Arc<dyn PhysicalOptimizerRule + Send + Sync>> = Vec::with_capacity(32);
+
+    // DataFusion 55.1 defaults in PhysicalOptimizer::new() order; a test guards drift on upgrade.
+    rules.push(Arc::new(OutputRequirements::new_add_mode()));
+    rules.push(Arc::new(AggregateStatistics::new()));
+    // Must be before EnsureRequirements: the chosen join mode decides the required distribution
+    rules.push(Arc::new(JoinSelection::new()));
+    rules.push(Arc::new(LimitedDistinctAggregation::new()));
+    rules.push(Arc::new(FilterPushdown::new()));
+    rules.push(Arc::new(WindowTopN::new()));
+    rules.push(Arc::new(EnsureRequirements::new()));
+    rules.push(Arc::new(CombinePartialFinalAggregate::new()));
+    rules.push(Arc::new(OptimizeAggregateOrder::new()));
+    rules.push(Arc::new(ProjectionPushdown::new()));
+    rules.push(Arc::new(OutputRequirements::new_remove_mode()));
+    rules.push(Arc::new(TopKAggregation::new()));
+    rules.push(Arc::new(LimitPushPastWindows::new()));
+    rules.push(Arc::new(HashJoinBuffering::new()));
+    rules.push(Arc::new(LimitPushdown::new()));
+    // Must be after LimitPushdown, which creates the TopK it pushes below the repartition
+    rules.push(Arc::new(TopKRepartition::new()));
+    rules.push(Arc::new(ProjectionPushdown::new()));
+    rules.push(Arc::new(PushdownSort::new()));
+    rules.push(Arc::new(EnsureCooperative::new()));
+    // Must be near the end: later plan changes break the dynamic filters' source references
+    rules.push(Arc::new(FilterPushdown::new_post_optimization()));
+    // Only validates the plan as left by the rules above it, not the custom rules below
+    rules.push(Arc::new(SanityCheckPlan::new()));
+
+    // *********** custom rules ***********
+    rules.push(Arc::new(JoinReorderRule::new()));
 
     for context in contexts.into_iter() {
         match context {
@@ -196,7 +237,7 @@ pub fn generate_physical_optimizer_rules(
             PhysicalOptimizerContext::StreamingAggregation(context) => {
                 if let Some(context) = context {
                     rules.push(generate_streaming_agg_rules(context));
-                    rules.push(Arc::new(EliminateAggregateRule::new()) as _);
+                    rules.push(Arc::new(EliminateAggregateRule::new()));
                 }
             }
         }
@@ -219,14 +260,15 @@ pub fn generate_physical_optimizer_rules(
             .collect::<HashSet<_>>();
         index_fields.insert(stream_name.clone(), idx_fields);
     }
-    rules.push(Arc::new(LeaderIndexOptimizerRule::new(index_fields)) as _);
+    rules.push(Arc::new(LeaderIndexOptimizerRule::new(index_fields)));
 
-    rules.push(Arc::new(LimitPushdown::new()) as _);
+    rules.push(Arc::new(LimitPushdown::new()));
 
     // Must be last: the shared markers are merged only after every copy is fully rewritten.
     if config::get_config().search.feature_shared_cte_enabled {
-        rules.push(Arc::new(SharedSubplanRule::new()) as _);
+        rules.push(Arc::new(SharedSubplanRule::new()));
     }
+    // ************************************
 
     rules
 }
@@ -241,4 +283,184 @@ pub async fn create_physical_plan(
     let plan = ctx.state().create_logical_plan(sql).await?;
     let physical_plan = ctx.state().create_physical_plan(&plan).await?;
     optimize_distribute_analyze(physical_plan)
+}
+
+#[cfg(test)]
+mod tests {
+    use config::meta::stream::StreamType;
+    use datafusion::{optimizer::Optimizer, physical_optimizer::optimizer::PhysicalOptimizer};
+
+    use super::*;
+    use crate::datafusion::{context::SearchContextBuilder, optimizer::context::RemoteScanContext};
+
+    // DataFusion 55.1 Optimizer::new() order, as last reviewed against generate_optimizer_rules.
+    const DATAFUSION_LOGICAL_RULES: &[&str] = &[
+        "rewrite_set_comparison",
+        "optimize_unions",
+        "unions_to_filter",
+        "simplify_expressions",
+        "replace_distinct_aggregate",
+        "eliminate_join",
+        "decorrelate_predicate_subquery",
+        "scalar_subquery_to_join",
+        "decorrelate_lateral_join",
+        "extract_equijoin_predicate",
+        "eliminate_duplicated_expr",
+        "eliminate_filter",
+        "eliminate_cross_join",
+        "eliminate_limit",
+        "propagate_empty_relation",
+        "filter_null_join_keys",
+        "eliminate_outer_join",
+        "push_down_limit",
+        "push_down_filter",
+        "single_distinct_aggregation_to_group_by",
+        "eliminate_group_by_constant",
+        "common_sub_expression_eliminate",
+        "extract_leaf_expressions",
+        "push_down_leaf_projections",
+        "optimize_projections",
+    ];
+
+    // Upstream defaults generate_optimizer_rules does not install yet, in upstream order.
+    const SKIPPED_DATAFUSION_LOGICAL_RULES: &[&str] = &[
+        // Without it `x > ANY (subquery)` / `= ALL` fail with "does not support SetComparison".
+        "rewrite_set_comparison",
+        // No-op unless datafusion.optimizer.enable_unions_to_filter is set (off by default).
+        "unions_to_filter",
+        // Without it LATERAL joins fail with "does not support OuterReferenceColumn".
+        "decorrelate_lateral_join",
+        // Pushes struct field access (`s['f']`) towards the scan; optimization only.
+        "extract_leaf_expressions",
+        "push_down_leaf_projections",
+    ];
+
+    fn test_sql() -> Sql {
+        Sql {
+            sql: "SELECT * FROM t".to_string(),
+            is_complex: false,
+            org_id: "default".to_string(),
+            stream_type: StreamType::Logs,
+            stream_names: vec![],
+            has_match_all: false,
+            equal_items: Default::default(),
+            columns: Default::default(),
+            aliases: vec![],
+            schemas: Default::default(),
+            limit: 100,
+            offset: 0,
+            time_range: (0, 0),
+            group_by: vec![],
+            order_by: vec![],
+            histogram_interval: None,
+            timezone: None,
+            sorted_by_time: false,
+            sampling_config: None,
+        }
+    }
+
+    #[test]
+    fn test_datafusion_logical_rules_reviewed() {
+        let upstream = Optimizer::new()
+            .rules
+            .iter()
+            .map(|rule| rule.name().to_string())
+            .collect::<Vec<_>>();
+        assert_eq!(
+            upstream, DATAFUSION_LOGICAL_RULES,
+            "DataFusion's default logical rules changed; review generate_optimizer_rules, then update this list"
+        );
+
+        let ours = generate_optimizer_rules(&test_sql())
+            .iter()
+            .map(|rule| rule.name().to_string())
+            .collect::<std::collections::HashSet<_>>();
+        let missing = upstream
+            .iter()
+            .filter(|name| !ours.contains(name.as_str()))
+            .map(String::as_str)
+            .collect::<Vec<_>>();
+        assert_eq!(
+            missing, SKIPPED_DATAFUSION_LOGICAL_RULES,
+            "generate_optimizer_rules is missing DataFusion default logical rules"
+        );
+    }
+
+    #[test]
+    fn test_datafusion_physical_rules_match_upstream_defaults() {
+        let upstream = PhysicalOptimizer::new()
+            .rules
+            .iter()
+            .map(|rule| format!("{rule:?}"))
+            .collect::<Vec<_>>();
+        let rules = generate_physical_optimizer_rules(&Request::default(), &test_sql(), vec![]);
+        // Debug, not name(): both OutputRequirements modes share one name.
+        let ours = rules[..upstream.len()]
+            .iter()
+            .map(|rule| format!("{rule:?}"))
+            .collect::<Vec<_>>();
+        assert_eq!(
+            ours, upstream,
+            "DataFusion's default physical rules changed; review the order in generate_physical_optimizer_rules"
+        );
+        assert_eq!(rules[upstream.len()].name(), "JoinReorderRule");
+    }
+
+    #[tokio::test]
+    async fn test_effective_physical_rule_order() {
+        let req = Request::default();
+        let sql = Arc::new(test_sql());
+        let ctx = SearchContextBuilder::new()
+            .target_partitions(2)
+            .add_context(PhysicalOptimizerContext::RemoteScan(RemoteScanContext {
+                nodes: vec![],
+                partitioned_file_lists: Default::default(),
+                context: opentelemetry::Context::new(),
+                is_leader: false,
+            }))
+            .add_context(PhysicalOptimizerContext::StreamingAggregation(None))
+            .add_context(PhysicalOptimizerContext::AggregateTopk)
+            .build(&req, &sql)
+            .await
+            .unwrap();
+
+        let mut expected = vec![
+            "OutputRequirements",
+            "aggregate_statistics",
+            "join_selection",
+            "LimitedDistinctAggregation",
+            "FilterPushdown",
+            "WindowTopN",
+            "EnsureRequirements",
+            "CombinePartialFinalAggregate",
+            "OptimizeAggregateOrder",
+            "ProjectionPushdown",
+            "OutputRequirements",
+            "LimitAggregation",
+            "LimitPushPastWindows",
+            "HashJoinBuffering",
+            "LimitPushdown",
+            "TopKRepartition",
+            "ProjectionPushdown",
+            "PushdownSort",
+            "EnsureCooperative",
+            "FilterPushdown(Post)",
+            "SanityCheckPlan",
+            "JoinReorderRule",
+            "RemoteScanRule",
+            "AggregateTopkRule",
+            "LeaderIndexOptimizerRule",
+            "LimitPushdown",
+        ];
+        if config::get_config().search.feature_shared_cte_enabled {
+            expected.push("SharedSubplanRule");
+        }
+        let actual = ctx
+            .state()
+            .physical_optimizers()
+            .iter()
+            .map(|rule| rule.name().to_string())
+            .collect::<Vec<_>>();
+        assert_eq!(actual, expected);
+    }
 }
