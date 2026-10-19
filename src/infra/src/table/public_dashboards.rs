@@ -387,7 +387,7 @@ pub async fn upsert_settings<C: ConnectionTrait>(
     upsert_settings_columns(db, org_id, enabled, max_links, &columns, updated_by, now).await
 }
 
-/// Writes only the org's switch, keeping its link limit; a new row has no limit.
+/// Writes only the org's switch, keeping its link limit and its owner; a new row has no limit.
 pub async fn set_settings_enabled<C: ConnectionTrait>(
     db: &C,
     org_id: &str,
@@ -411,7 +411,7 @@ pub async fn set_settings_max_links<C: ConnectionTrait>(
     upsert_settings_columns(db, org_id, true, max_links, &columns, updated_by, now).await
 }
 
-/// Inserts the row, or on an existing one updates `columns` and the rev and audit fields only.
+/// Upserts `columns` with the rev and audit fields; writing `max_links` also records who set it.
 async fn upsert_settings_columns<C: ConnectionTrait>(
     db: &C,
     org_id: &str,
@@ -421,14 +421,19 @@ async fn upsert_settings_columns<C: ConnectionTrait>(
     updated_by: &str,
     now: i64,
 ) -> Result<settings::Model, errors::Error> {
+    let writes_limit = columns
+        .iter()
+        .any(|c| matches!(c, settings::Column::MaxLinks));
     let row = settings::ActiveModel {
         org_id: Set(org_id.to_string()),
         rev: Set(now),
         enabled: Set(enabled),
         max_links: Set(max_links),
+        max_links_set_by: Set(writes_limit.then(|| updated_by.to_string())),
         updated_at: Set(now),
         updated_by: Set(updated_by.to_string()),
     };
+    let set_by = writes_limit.then_some(settings::Column::MaxLinksSetBy);
     settings::Entity::insert(row)
         .on_conflict(
             OnConflict::column(settings::Column::OrgId)
@@ -443,6 +448,7 @@ async fn upsert_settings_columns<C: ConnectionTrait>(
                     columns
                         .iter()
                         .copied()
+                        .chain(set_by)
                         .chain([settings::Column::UpdatedAt, settings::Column::UpdatedBy]),
                 )
                 .to_owned(),
@@ -760,6 +766,41 @@ mod tests {
             .unwrap();
         assert_eq!((row.enabled, row.max_links, row.rev), (false, Some(3), 20));
         assert_eq!(row.updated_by, "admin");
+    }
+
+    #[tokio::test]
+    async fn only_a_limit_write_records_who_set_the_limit() {
+        let db = db().await;
+        let row = set_settings_enabled(&db, "new", false, "admin", 10)
+            .await
+            .unwrap();
+        assert_eq!(row.max_links_set_by, None);
+
+        let row = set_settings_max_links(&db, "o", Some(50), "plan_sync", 10)
+            .await
+            .unwrap();
+        assert_eq!(row.max_links_set_by.as_deref(), Some("plan_sync"));
+        // The switch write is audited, but the limit still belongs to the plan sync.
+        let row = set_settings_enabled(&db, "o", false, "admin", 20)
+            .await
+            .unwrap();
+        assert_eq!(
+            (row.max_links, row.updated_by.as_str()),
+            (Some(50), "admin")
+        );
+        assert_eq!(row.max_links_set_by.as_deref(), Some("plan_sync"));
+
+        let row = upsert_settings(&db, "o", false, Some(20), "root", 30)
+            .await
+            .unwrap();
+        assert_eq!(row.max_links_set_by.as_deref(), Some("root"));
+        let row = set_settings_enabled(&db, "o", true, "admin", 40)
+            .await
+            .unwrap();
+        assert_eq!(
+            (row.max_links, row.max_links_set_by.as_deref()),
+            (Some(20), Some("root"))
+        );
     }
 
     #[tokio::test]

@@ -714,6 +714,7 @@ mod tests {
             rev: 9,
             enabled,
             max_links: None,
+            max_links_set_by: None,
             updated_at: 1,
             updated_by: "a".into(),
         };

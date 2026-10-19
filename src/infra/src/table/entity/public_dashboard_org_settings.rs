@@ -25,6 +25,8 @@ pub struct Model {
     pub rev: i64,
     pub enabled: bool,
     pub max_links: Option<i32>,
+    /// Who wrote `max_links`: `plan_sync` or the admin; a switch-only write leaves it.
+    pub max_links_set_by: Option<String>,
     pub updated_at: i64,
     pub updated_by: String,
 }

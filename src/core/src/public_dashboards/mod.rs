@@ -748,10 +748,10 @@ pub async fn set_org_settings(
         };
         let stored = pd_table::get_settings(db, org).await?;
         check_plan_owned_max_links(stored.as_ref().and_then(|s| s.max_links), body.max_links)?;
-        // The switch write takes over the row, so a plan-owned limit is synced first.
+        // A plan-owned or missing row is synced first so the switch write keeps the plan's limit.
         if stored
             .as_ref()
-            .is_none_or(|s| plan_owns_limit(&s.updated_by, s.max_links))
+            .is_none_or(|s| plan_owns_limit(s.max_links_set_by.as_deref(), s.max_links))
         {
             sync_public_dashboard_links(org).await;
         }
@@ -2590,6 +2590,7 @@ mod tests {
         );
         let info = ctx.dashboard_info(
             &dash.v8.as_ref().unwrap().tabs[0],
+            max_links_set_by: None,
             &dash.v8.as_ref().unwrap().tabs[0].panels[0],
         );
         assert_eq!((info.panel_id.as_str(), info.tab_id.as_str()), ("a", "t0"));
@@ -2959,6 +2960,7 @@ mod tests {
     fn gate04_a_variable_edit_checks_only_the_panels_that_read_the_changed_value() {
         let (mut link, ..) = ctx_parts();
         link.frozen_variables = Some(json!({ "src.p.c": "safe", "env": "prod" }).to_string());
+            max_links_set_by: None,
         let dash = templated_dashboard();
         let frozen = |v: serde_json::Value| -> BTreeMap<String, serde_json::Value> {
             serde_json::from_value(v).unwrap()

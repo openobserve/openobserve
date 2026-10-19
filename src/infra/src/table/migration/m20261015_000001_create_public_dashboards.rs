@@ -292,6 +292,11 @@ fn create_org_settings_stmt() -> TableCreateStatement {
                 .null(),
         )
         .col(
+            ColumnDef::new(PublicDashboardOrgSettings::MaxLinksSetBy)
+                .string_len(256)
+                .null(),
+        )
+        .col(
             ColumnDef::new(PublicDashboardOrgSettings::UpdatedAt)
                 .big_integer()
                 .not_null(),
@@ -373,6 +378,7 @@ enum PublicDashboardOrgSettings {
     Rev,
     Enabled,
     MaxLinks,
+    MaxLinksSetBy,
     UpdatedAt,
     UpdatedBy,
 }
@@ -456,6 +462,12 @@ mod tests {
                 .has_table("public_dashboard_org_settings")
                 .await
                 .unwrap()
+        );
+        assert!(
+            columns(&db, "public_dashboard_org_settings")
+                .await
+                .iter()
+                .any(|c| c == "max_links_set_by")
         );
         assert!(manager.has_table("public_dashboard_outbox").await.unwrap());
         assert!(!manager.has_table(SNAPSHOTS).await.unwrap());
