@@ -318,7 +318,6 @@ const fetchMetering = async () => {
   const apiResponse = await BillingService.get_data_usage(
     store.state.selectedOrganization.identifier,
     "30days",
-    "gb",
   );
   return parseMeteringResponse(apiResponse?.data?.price_details);
 };
