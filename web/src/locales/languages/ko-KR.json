@@ -20102,7 +20102,25 @@
       "maxDoc": "필드의 가장 큰 값입니다. 집계 — GROUP BY와 함께 사용하세요.",
       "minDoc": "필드의 가장 작은 값입니다. 집계 — GROUP BY와 함께 사용하세요.",
       "arrayExtractDoc": "1부터 시작하는 인덱스로 배열에서 단일 요소를 추출합니다. 예: `array_extract(regexp_match(log, '...'), 1)`.",
-      "approxTopkDoc": "필드의 가장 빈번한 k개 값을 근사합니다. 고유 값 수가 많은 필드에서 정확한 GROUP BY ... ORDER BY count DESC보다 훨씬 저렴합니다."
+      "approxTopkDoc": "필드의 가장 빈번한 k개 값을 근사합니다. 고유 값 수가 많은 필드에서 정확한 GROUP BY ... ORDER BY count DESC보다 훨씬 저렴합니다.",
+      "valuesLoading": "{field}의 값을 아직 불러오는 중",
+      "valuesLoadingRow": "값을 아직 불러오는 중",
+      "valuesLoadingHint": "계속 입력하거나 Esc를 누른 후 Ctrl+Space를 누르세요",
+      "valuesEmpty": "최근 {minutes}분 동안 {field}의 값이 없습니다",
+      "valuesEmptyInRange": "선택한 시간 범위에 {field} 값이 없습니다",
+      "closeValueQuote": "값 따옴표 닫기",
+      "valuesFailed": "{field}의 값을 불러오지 못했습니다",
+      "chainedMenuAnnouncement": "{count}개 추천, Tab으로 수락 | {count}개 추천, Tab으로 수락",
+      "valuesCap": "{count}개 값 표시 · 입력하여 필터링 | {count}개 값 표시 · 입력하여 필터링",
+      "groupValues": "값 · 최근",
+      "groupValuesName": "값",
+      "groupFields": "필드",
+      "groupOperators": "연산자",
+      "groupFunctionsAndFields": "함수 및 필드",
+      "groupFunctions": "함수",
+      "wrapStrMatch": "부분 문자열",
+      "wrapReMatch": "정규식",
+      "wrapReNotMatch": "정규식, 부정"
     },
     "diagnostics": {
       "incompleteAnd": "불완전한 조건 — AND 뒤에 표현식이 필요합니다",
@@ -20158,6 +20176,8 @@
       "duplicateColumn": "열 '{col}'이 두 번 이상 정의되었습니다 — 중복 항목을 제거하거나 별칭을 지정하세요.",
       "tableNotFound": "알 수 없는 테이블 '{tbl}' — 이 테이블 또는 CTE는 존재하지 않습니다.",
       "functionSignature": "함수 '{fn}'이 잘못된 인수 타입으로 호출되었습니다 — 명시적 형변환을 추가하세요.",
+      "notACondition": "`{field}`은 텍스트이며 조건이 아닙니다. 다음과 같이 비교하세요: `{field} = '…'` 또는 `str_match({field}, '…')`",
+      "notAConditionValue": "`{field}`은 조건이 아닙니다. 예를 들어 `{field} = …`처럼 비교하세요",
       "syntaxError": "SQL 구문 오류"
     },
     "hover": {

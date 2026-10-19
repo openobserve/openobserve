@@ -20102,7 +20102,25 @@
       "maxDoc": "Grootste waarde in het veld. Aggregaat — combineer met GROUP BY.",
       "minDoc": "Kleinste waarde in het veld. Aggregaat — combineer met GROUP BY.",
       "arrayExtractDoc": "Haal een enkel element uit een array op basis van een 1-gebaseerde index, bijv. `array_extract(regexp_match(log, '...'), 1)`.",
-      "approxTopkDoc": "Benader de k meest voorkomende waarden van een veld. Veel goedkoper dan een exacte GROUP BY ... ORDER BY count DESC op velden met hoge kardinaliteit."
+      "approxTopkDoc": "Benader de k meest voorkomende waarden van een veld. Veel goedkoper dan een exacte GROUP BY ... ORDER BY count DESC op velden met hoge kardinaliteit.",
+      "valuesLoading": "Waarden voor {field} worden nog geladen",
+      "valuesLoadingRow": "Waarden worden nog geladen",
+      "valuesLoadingHint": "Blijf typen, of druk op Esc en dan Ctrl+Space",
+      "valuesEmpty": "Geen waarden voor {field} in de afgelopen {minutes} minuten",
+      "valuesEmptyInRange": "Geen waarden voor {field} in het geselecteerde tijdsbereik",
+      "closeValueQuote": "Sluit het aanhalingsteken van de waarde",
+      "valuesFailed": "Waarden voor {field} konden niet worden geladen",
+      "chainedMenuAnnouncement": "{count} suggestie, Tab om te accepteren | {count} suggesties, Tab om te accepteren",
+      "valuesCap": "{count} waarde getoond · typ om te filteren | {count} waarden getoond · typ om te filteren",
+      "groupValues": "Waarden · recent",
+      "groupValuesName": "Waarden",
+      "groupFields": "Velden",
+      "groupOperators": "Operatoren",
+      "groupFunctionsAndFields": "Functies en velden",
+      "groupFunctions": "Functies",
+      "wrapStrMatch": "substring",
+      "wrapReMatch": "regex",
+      "wrapReNotMatch": "regex, ontkend"
     },
     "diagnostics": {
       "incompleteAnd": "Onvolledige voorwaarde — expressie verwacht na AND",
@@ -20158,6 +20176,8 @@
       "duplicateColumn": "Kolom '{col}' is meer dan eens gedefinieerd — verwijder het duplicaat of geef een alias",
       "tableNotFound": "Onbekende tabel '{tbl}' — deze tabel of CTE bestaat niet",
       "functionSignature": "Functie '{fn}' is aangeroepen met onjuiste argumenttype(s) — voeg een expliciete cast toe",
+      "notACondition": "`{field}` is tekst, geen voorwaarde. Vergelijk het: `{field} = '…'` of `str_match({field}, '…')`",
+      "notAConditionValue": "`{field}` is geen voorwaarde. Vergelijk het, bijv. `{field} = …`",
       "syntaxError": "SQL-syntaxfout"
     },
     "hover": {
