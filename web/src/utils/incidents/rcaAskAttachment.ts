@@ -64,7 +64,13 @@ function structuredSections(summary: RcaRunSummary): string[] {
   if (card.outcome) verdict.push(`Outcome: ${card.outcome}`);
   if (card.outcome_reason) verdict.push(`Outcome reason: ${card.outcome_reason}`);
   if (card.band) verdict.push(`Confidence band: ${card.band}`);
-  if (card.band_reason) verdict.push(`Band reason: ${card.band_reason}`);
+  if (card.confidence) {
+    const c = card.confidence;
+    verdict.push(`Agent-claimed confidence: ${c.claimed}`);
+    verdict.push(`Evidence allows: ${c.evidence} (${c.evidence_reason})`);
+    if (c.next_level) verdict.push(`To raise: ${c.next_level}`);
+    if (c.caps.length) verdict.push(`Capped to medium: ${c.caps.join(", ")}`);
+  }
   if (card.headline) verdict.push(`Probable cause: ${card.headline}`);
   if (card.suspect_change) {
     const change = card.suspect_change;

@@ -29,7 +29,7 @@ use crate::meta::{
     alerts::{rca_runs::RunState, rca_steering::STEER_ID_PREFIX},
     oncall::{
         agent::{ChangeKind, Confidence},
-        confidence::{SignalClass, ToolCallRecord, UnverifiedCitation},
+        confidence::{ConfidenceBreakdown, SignalClass, ToolCallRecord, UnverifiedCitation},
     },
 };
 
@@ -73,9 +73,9 @@ pub struct SummaryCard {
     /// Graded runs only (VE33).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub band: Option<Confidence>,
-    /// The CG §5.3.4 reason line; graded runs only.
+    /// Why the band is what it is (CG §5.3.4); graded runs only.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub band_reason: Option<String>,
+    pub confidence: Option<ConfidenceBreakdown>,
     /// Completed runs only (VE35).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub suspect_change: Option<SummarySuspectChange>,
@@ -363,7 +363,7 @@ pub fn summary_from_record(
         leading: None,
         verdict_so_far: None,
         band: record.grade.as_ref().map(|g| g.band),
-        band_reason: record.grade.as_ref().map(|g| g.reason_line()),
+        confidence: record.grade.as_ref().map(|g| g.breakdown()),
         suspect_change,
         impact: record.impact.clone().filter(|_| completed),
         needs: (record.outcome == Some(RcaOutcome::Blocked))
@@ -531,7 +531,7 @@ mod tests {
         assert_eq!(r.outcome, Some(RcaOutcome::Inconclusive));
         let s = summary_from_record("r", RunState::Completed, "v".into(), &r);
         assert_eq!(s.card.headline.as_deref(), Some("h1 statement"));
-        assert!(s.card.band.is_some() && s.card.band_reason.is_some());
+        assert!(s.card.band.is_some() && s.card.confidence.is_some());
 
         let r = record(
             &[],
@@ -540,9 +540,11 @@ mod tests {
         );
         let s = summary_from_record("r", RunState::Completed, "v".into(), &r);
         assert_eq!(s.card.headline, None);
+        // The agent claimed high; the floor holds the evidence at low.
+        let c = s.card.confidence.expect("graded");
         assert_eq!(
-            s.card.band_reason.as_deref(),
-            Some("low · claimed high · no confirmed cause")
+            (c.claimed, c.evidence, c.evidence_reason.as_str()),
+            (Confidence::High, Confidence::Low, "no confirmed cause")
         );
     }
 
@@ -628,7 +630,7 @@ mod tests {
             &BTreeMap::new(),
         );
         assert_eq!(s.card.band, None);
-        assert_eq!(s.card.band_reason, None);
+        assert_eq!(s.card.confidence, None);
         assert_eq!((s.card.outcome, s.card.headline.as_ref()), (None, None));
         assert_eq!(
             (s.card.suspect_change.as_ref(), s.card.impact.as_ref()),

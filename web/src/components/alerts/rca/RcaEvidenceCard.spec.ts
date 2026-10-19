@@ -22,15 +22,25 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: toastMock }));
 
 import i18n from "@/locales";
 import RcaEvidenceCard from "./RcaEvidenceCard.vue";
-import type { RcaEvidenceEntry } from "@/services/incidents";
+import type { RcaEvidenceEntry, RcaSummaryHypothesis } from "@/services/incidents";
 import { rcaEvidenceLink } from "@/utils/incidents/rcaEvidenceLinks";
 import { rcaEvidenceEntry, rcaRunSummary } from "@/test/unit/fixtures/rcaThread";
 
 const HYPOTHESES = rcaRunSummary().hypotheses;
 
-const mountCard = (entry: RcaEvidenceEntry, withHeader = false) =>
+const mountCard = (
+  entry: RcaEvidenceEntry,
+  withHeader = false,
+  extra: { hypothesisId?: string; hypotheses?: RcaSummaryHypothesis[] } = {},
+) =>
   mount(RcaEvidenceCard, {
-    props: { entry, hypotheses: HYPOTHESES, org: "default", withHeader },
+    props: {
+      entry,
+      hypotheses: extra.hypotheses ?? HYPOTHESES,
+      hypothesisId: extra.hypothesisId ?? null,
+      org: "default",
+      withHeader,
+    },
     global: { plugins: [i18n] },
   });
 
@@ -47,7 +57,7 @@ describe("RcaEvidenceCard (03 VE23–VE29)", () => {
 
   afterEach(() => vi.restoreAllMocks());
 
-  it("shows the query, each citation with its hypothesis, polarity, strength and the agent's reading, and the result line", () => {
+  it("shows the query, each citation's weight and polarity with its hypothesis as a link, the agent's reading, and the result line", () => {
     const wrapper = mountCard(
       rcaEvidenceEntry({
         citations: [
@@ -68,14 +78,47 @@ describe("RcaEvidenceCard (03 VE23–VE29)", () => {
     );
     const citations = wrapper.findAll('[data-test="rca-evidence-citation"]').map((c) => c.text());
     expect(citations[0]).toMatch(
-      /^Deploy 4f2c1e opens one orders-db connection per line item\s*· supports\s*· Decisive\s*Agent's reading:\s*Errors begin 116 s after the rollout\.$/,
+      /^Decisive · supports\s*the root cause\s*Agent's reading:\s*Errors begin 116 s after the rollout\.$/,
     );
-    expect(citations[1]).toContain("Node CPU saturation");
-    expect(citations[1]).toContain("· rules out");
-    expect(citations[1]).toContain("· Supporting");
+    // A ruled-out hypothesis has no role name: the link is its statement.
+    expect(citations[1]).toMatch(/^Supporting · rules out\s*Node CPU saturation/);
     expect(byTest(wrapper, "rca-evidence-result").text()).toMatch(
       /^2 rows · took 41 ms\s*· checkout_api · 08:23:20–09:23:20 UTC · 0\.0s$/,
     );
+  });
+
+  it("a role two hypotheses share names the statement instead", () => {
+    const wrapper = mountCard(rcaEvidenceEntry(), false, {
+      hypotheses: HYPOTHESES.map((h) => (h.id === "h2" ? { ...h, status: "root_cause" } : h)),
+    });
+
+    expect(byTest(wrapper, "rca-evidence-citation-hypothesis").text()).toBe(
+      "Deploy 4f2c1e opens one orders-db connection per line item",
+    );
+  });
+
+  it("a hypothesis link emits open-hypothesis; under its own hypothesis the citation has no link", async () => {
+    const entry = rcaEvidenceEntry({
+      citations: [
+        ...rcaEvidenceEntry().citations,
+        {
+          hypothesis_id: "h4",
+          evidence_id: "e1",
+          polarity: "rules_out",
+          strength: "supporting",
+          observation: "No CPU spike in the window.",
+        },
+      ],
+    });
+    const wrapper = mountCard(entry, true, { hypothesisId: "h1" });
+
+    const citations = wrapper.findAll('[data-test="rca-evidence-citation"]');
+    expect(citations[0].find('[data-test="rca-evidence-citation-hypothesis"]').exists()).toBe(
+      false,
+    );
+    expect(citations[0].text()).toMatch(/^Decisive · supports\s*Agent's reading/);
+    await citations[1].find('[data-test="rca-evidence-citation-hypothesis"]').trigger("click");
+    expect(wrapper.emitted("open-hypothesis")).toEqual([["h4"]]);
   });
 
   it("the header carries the number, kind, title and the Decisive pill", () => {
