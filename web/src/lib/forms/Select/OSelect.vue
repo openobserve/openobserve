@@ -42,6 +42,7 @@ import {
   inject,
   nextTick,
   onBeforeUnmount,
+  onMounted,
   provide,
   ref,
   useAttrs,
@@ -51,6 +52,7 @@ import {
   watchEffect,
 } from "vue";
 import useBreakpoint from "@/composables/useBreakpoint";
+import { splitControlAttrs, warnIfUnlabelled } from "@/lib/forms/controlAttrs";
 import {
   O_DROPDOWN_NESTED_KEY,
   setActiveOverlay,
@@ -133,11 +135,19 @@ const parentDataTest = computed(() => $attrs["data-test"] as string | undefined)
 
 // Forward tabindex to the real trigger; keep it off the wrapper (avoids a double tab-stop).
 const inputTabindex = computed(() => $attrs["tabindex"] as number | string | undefined);
-const wrapperAttrs = computed(() => {
-  const { tabindex, ...rest } = $attrs;
-  void tabindex;
-  return rest;
-});
+const split = computed(() => splitControlAttrs($attrs));
+const wrapperAttrs = computed(() => split.value.wrapperAttrs);
+const controlAttrs = computed(() => split.value.controlAttrs);
+
+const insideLabelName = computed(() =>
+  props.labelPosition === "inside" && props.label ? props.label : undefined,
+);
+onMounted(() =>
+  warnIfUnlabelled(
+    "OSelect",
+    Boolean(props.label || $attrs["aria-label"] || $attrs["aria-labelledby"]),
+  ),
+);
 
 const emit = defineEmits<SelectEmits>();
 const slots = useSlots();
@@ -146,6 +156,7 @@ defineSlots<SelectSlots>();
 
 const _fallbackId = useId();
 const inputId = computed(() => props.id ?? _fallbackId);
+const errorId = computed(() => `${inputId.value}-error`);
 
 // Dev-time warning: slot-based options with multiple/searchable require listbox
 // mode, but listboxModeEnabled requires options prop. Guide the developer early.
@@ -506,6 +517,7 @@ const effectiveError = computed(() => {
   return props.errorMessage || " ";
 });
 const hasError = computed(() => !!effectiveError.value);
+const errorDescribedBy = computed(() => (effectiveError.value?.trim() ? errorId.value : undefined));
 
 const stringValue = computed(() =>
   !Array.isArray(props.modelValue) && props.modelValue !== undefined
@@ -1238,6 +1250,9 @@ const fieldWidthClass = computed(() => {
             role="combobox"
             :aria-expanded="popoverOpen"
             :aria-invalid="hasError || undefined"
+            :aria-describedby="errorDescribedBy"
+            :aria-label="insideLabelName"
+            v-bind="controlAttrs"
             @keydown="handleTriggerKeydown"
             :data-test="parentDataTest ? `${parentDataTest}-trigger` : undefined"
             :data-test-selected-value="
@@ -1475,7 +1490,7 @@ const fieldWidthClass = computed(() => {
               -->
                 <div
                   v-if="selectAll && multiple && selectableOptions.length > 0"
-                  role="button"
+                  role="checkbox"
                   tabindex="0"
                   :aria-label="t('components.select.toggleAllOptions')"
                   :aria-checked="allSelected ? 'true' : partiallySelected ? 'mixed' : 'false'"
@@ -1885,6 +1900,10 @@ const fieldWidthClass = computed(() => {
         <SelectTrigger
           :id="inputId"
           :tabindex="inputTabindex"
+          :aria-invalid="hasError || undefined"
+          :aria-describedby="errorDescribedBy"
+          :aria-label="insideLabelName"
+          v-bind="controlAttrs"
           :data-test="parentDataTest ? `${parentDataTest}-trigger` : undefined"
           :class="
             isInlineAppearance
@@ -2090,6 +2109,7 @@ const fieldWidthClass = computed(() => {
     <!-- Error message -->
     <span
       v-if="effectiveError && effectiveError.trim()"
+      :id="errorId"
       :data-test="parentDataTest ? `${parentDataTest}-error` : undefined"
       class="text-select-error-text text-xs leading-none"
       role="alert"
