@@ -21,7 +21,10 @@ use config::{
     DEFAULT_ORG,
     meta::{folder::DEFAULT_FOLDER, user::UserRole},
 };
-use db;
+use db::{
+    self,
+    ofga::{ModelSetup, save_version_after_write},
+};
 use hashbrown::HashSet;
 use infra::dist_lock;
 #[cfg(feature = "cloud")]
@@ -79,6 +82,7 @@ struct PendingMigrations {
     ai_chat_shares: bool,
 }
 
+/// Upgrades the OpenFGA model. [weak: tuples may land unrecorded; a retry rewrites, dupes ignored]
 pub async fn init() -> Result<(), anyhow::Error> {
     use o2_openfga::get_all_init_tuples;
 
@@ -195,34 +199,23 @@ pub async fn init() -> Result<(), anyhow::Error> {
         .map(|existing_meta_model| existing_meta_model.version.clone());
 
     match db::ofga::set_ofga_model(existing_meta).await {
-        Ok((store_id, latest_model_version, matched)) => {
-            if store_id.is_empty() {
+        Ok(setup) => {
+            if setup.record.store_id.is_empty() {
                 log::error!("[OFGA:Local] OFGA store id is empty");
             }
-            o2_openfga::config::OFGA_STORE_ID.insert("store_id".to_owned(), store_id.clone());
+            o2_openfga::config::OFGA_STORE_ID
+                .insert("store_id".to_owned(), setup.record.store_id.clone());
 
-            if get_o2_config().super_cluster.enabled {
-                // Set the model version in the super cluster, only version and store_id is
-                // important
-                if let Err(e) = set_model(Some(OFGAModel {
-                    version: latest_model_version.clone(),
-                    store_id,
-                    model_id: "".to_string(),
-                    model: None,
-                }))
-                .await
-                {
-                    log::error!(
-                        "[OFGA:SuperCluster] Error setting OFGA model to super cluster: {e}"
-                    );
-                    dist_lock::unlock(&locker)
-                        .await
-                        .expect("Failed to release lock");
-                    return Err(e.into());
-                }
+            if (setup.matched || setup.new_store)
+                && let Err(e) = publish_model_version(&setup).await
+            {
+                dist_lock::unlock(&locker)
+                    .await
+                    .expect("Failed to release lock");
+                return Err(e);
             }
 
-            if matched {
+            if setup.matched {
                 // No further openfga init required, as the meta table version was already updated
                 // by some other node. Hence simply unlock and return from here.
                 dist_lock::unlock(&locker)
@@ -244,9 +237,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
             let pending = match &existing_model_version {
                 Some(existing) => {
                     log::info!(
-                        "[OFGA:Local] model version changed: {existing} -> {latest_model_version}"
+                        "[OFGA:Local] model version changed: {existing} -> {}",
+                        setup.record.version
                     );
-                    pending_migrations(&latest_model_version, existing)
+                    pending_migrations(&setup.record.version, existing)
                 }
                 None => PendingMigrations::default(),
             };
@@ -349,18 +343,37 @@ pub async fn init() -> Result<(), anyhow::Error> {
                 tuples.push(tuple);
             }
 
-            if tuples.is_empty() {
+            let tuples_written = if tuples.is_empty() {
                 log::info!("[OFGA:Local] No orgs to update to the openfga");
+                true
             } else {
                 log::debug!("[OFGA:Local] tuples not empty: {tuples:#?}");
                 match update_tuples(tuples, vec![]).await {
                     Ok(_) => {
                         log::info!("[OFGA:Local] Data migrated to openfga");
+                        true
                     }
                     Err(e) => {
                         log::error!(
                             "Error updating orgs & users to the openfga during migration: {e}"
                         );
+                        false
+                    }
+                }
+            };
+
+            if save_version_after_write(setup.new_store, tuples_written) {
+                match db::ofga::set_ofga_model_to_db(setup.record.clone()).await {
+                    Ok(_) => {
+                        if let Err(e) = publish_model_version(&setup).await {
+                            dist_lock::unlock(&locker)
+                                .await
+                                .expect("Failed to release lock");
+                            return Err(e);
+                        }
+                    }
+                    Err(e) => {
+                        log::error!("Error setting OFGA model: {e}");
                     }
                 }
             }
@@ -375,6 +388,24 @@ pub async fn init() -> Result<(), anyhow::Error> {
         .expect("Failed to release lock");
 
     Ok(())
+}
+
+/// Publishes the model version and store id to the super cluster when it is enabled.
+async fn publish_model_version(setup: &ModelSetup) -> Result<(), anyhow::Error> {
+    if !get_o2_config().super_cluster.enabled {
+        return Ok(());
+    }
+    set_model(Some(OFGAModel {
+        version: setup.record.version.clone(),
+        store_id: setup.record.store_id.clone(),
+        model_id: "".to_string(),
+        model: None,
+    }))
+    .await
+    .map_err(|e| {
+        log::error!("[OFGA:SuperCluster] Error setting OFGA model to super cluster: {e}");
+        e.into()
+    })
 }
 
 /// Database sweeps a pending back-fill needs beyond its ownership tuples.

@@ -27,53 +27,60 @@ use o2_openfga::{
 use crate as db;
 pub const OFGA_KEY_PREFIX: &str = "/ofga/model";
 
-// Sets the ofga model using the ofga model.json, Returns a tuple (store id, boolean representing
-// whether existing meta version matched)
-pub async fn set_ofga_model(
-    existing_meta: Option<OFGAModel>,
-) -> Result<(String, String, bool), anyhow::Error> {
+/// Outcome of writing the shipped model to OpenFGA.
+pub struct ModelSetup {
+    pub record: OFGAModel,
+    pub matched: bool,
+    pub new_store: bool,
+}
+
+/// Whether to save the model version once the back-fill tuple write is done. [pure]
+pub fn save_version_after_write(new_store: bool, tuples_written: bool) -> bool {
+    !new_store && tuples_written
+}
+
+/// Writes the shipped model to OpenFGA. [weak: the model may land unrecorded; a retry rewrites it]
+pub async fn set_ofga_model(existing_meta: Option<OFGAModel>) -> Result<ModelSetup, anyhow::Error> {
     let meta = read_ofga_model().await;
-    if let Some(existing_model) = existing_meta {
-        if meta.version == existing_model.version {
+    let reusable_store_id = match existing_meta {
+        Some(existing_model) if existing_model.version == meta.version => {
             log::info!("OFGA model already exists & no changes required");
-            Ok((existing_model.store_id, meta.version, true))
-        } else {
+            return Ok(ModelSetup {
+                record: existing_model,
+                matched: true,
+                new_store: false,
+            });
+        }
+        Some(existing_model) => {
             #[cfg(not(feature = "cloud"))]
             let force_create_new_store = false;
             #[cfg(feature = "cloud")]
             let force_create_new_store = !is_ofga_migrations_done().await.unwrap();
-
-            let store_id = if existing_model.store_id.is_empty() || force_create_new_store {
-                create_open_fga_store().await.unwrap()
-            } else {
-                existing_model.store_id
-            };
-            match write_auth_models(&meta, &store_id).await {
-                Ok(_) => {
-                    let mut loc_meta = meta.clone();
-                    loc_meta.store_id = store_id;
-                    loc_meta.model = None;
-                    set_ofga_model_to_db(loc_meta)
-                        .await
-                        .map(|store_id| (store_id, meta.version, false))
-                }
-                Err(e) => Err(anyhow::anyhow!(e)),
-            }
+            (!existing_model.store_id.is_empty() && !force_create_new_store)
+                .then_some(existing_model.store_id)
         }
-    } else {
-        let store_id = create_open_fga_store().await.unwrap();
-        match write_auth_models(&meta, &store_id).await {
-            Ok(_) => {
-                let mut loc_meta = meta.clone();
-                loc_meta.store_id = store_id;
-                loc_meta.model = None;
-                set_ofga_model_to_db(loc_meta)
-                    .await
-                    .map(|store_id| (store_id, meta.version, false))
-            }
-            Err(e) => Err(anyhow::anyhow!(e)),
-        }
+        None => None,
+    };
+    let new_store = reusable_store_id.is_none();
+    let store_id = match reusable_store_id {
+        Some(store_id) => store_id,
+        None => create_open_fga_store().await.unwrap(),
+    };
+    write_auth_models(&meta, &store_id)
+        .await
+        .map_err(|e| anyhow::anyhow!(e))?;
+    let mut record = meta;
+    record.store_id = store_id;
+    record.model = None;
+    // Reused store: save the version only after the back-fill, so a failed write is retried.
+    if new_store {
+        set_ofga_model_to_db(record.clone()).await?;
     }
+    Ok(ModelSetup {
+        record,
+        matched: false,
+        new_store,
+    })
 }
 
 pub async fn set_ofga_model_to_db(mut meta: OFGAModel) -> Result<String, anyhow::Error> {
@@ -165,5 +172,22 @@ mod tests {
     #[test]
     fn test_ofga_key_prefix_starts_with_slash() {
         assert!(OFGA_KEY_PREFIX.starts_with('/'));
+    }
+
+    #[test]
+    fn test_save_version_after_write() {
+        let cases = [
+            (true, true, false),
+            (true, false, false),
+            (false, true, true),
+            (false, false, false),
+        ];
+        for (new_store, tuples_written, expected) in cases {
+            assert_eq!(
+                save_version_after_write(new_store, tuples_written),
+                expected,
+                "new_store={new_store} tuples_written={tuples_written}"
+            );
+        }
     }
 }
