@@ -107,6 +107,74 @@ export class IngestionConfigPage {
         return await this.page.locator(`[data-test="ai-step-${stepId}"] [data-test="ingestion-setup-code-block"]`).first().textContent();
     }
 
+    // ==================== eBPF Tracing Setup Card Variants ====================
+    // The Linux/Kubernetes rich cards gain an eBPF traces variant whose inputs
+    // (OInput) put the -field suffix on the native <input>. The warning and code
+    // block are gated by requireOneOf, so assertions target their absence too.
+
+    async expectStepVisible(stepId) {
+        await expect(this.page.locator(`[data-test="ai-step-${stepId}"]`)).toBeVisible({ timeout: 10000 });
+    }
+
+    async getStepCodeText(stepId) {
+        return await this.page
+            .locator(`[data-test="ai-step-${stepId}"] [data-test="ingestion-setup-code-block-pre"]`)
+            .first()
+            .textContent();
+    }
+
+    async fillVariantInput(inputId, value) {
+        await this.page.locator(`[data-test="ai-input-${inputId}-field"]`).fill(value);
+    }
+
+    async getVariantInputValue(inputId) {
+        return await this.page.locator(`[data-test="ai-input-${inputId}-field"]`).inputValue();
+    }
+
+    async expectVariantInputAbsent(inputId) {
+        await expect(this.page.locator(`[data-test="ai-input-${inputId}-field"]`)).toHaveCount(0, {
+            timeout: 10000,
+        });
+    }
+
+    async expectVariantWarning(stepId, visible = true) {
+        const locator = this.page.locator(`[data-test="ai-variant-require-${stepId}"]`);
+        if (visible) {
+            await expect(locator).toBeVisible({ timeout: 10000 });
+        } else {
+            await expect(locator).toHaveCount(0, { timeout: 10000 });
+        }
+    }
+
+    async expectStepCodePresent(stepId, present = true) {
+        const locator = this.page.locator(
+            `[data-test="ai-step-${stepId}"] [data-test="ingestion-setup-code-block"]`,
+        );
+        if (present) {
+            await expect(locator).toBeVisible({ timeout: 10000 });
+        } else {
+            await expect(locator).toHaveCount(0, { timeout: 10000 });
+        }
+    }
+
+    async expectVariantTabsAbsent(stepId) {
+        await expect(
+            this.page.locator(`[data-test="ai-step-${stepId}"] [data-test="ai-variant-tabs"]`),
+        ).toHaveCount(0, { timeout: 10000 });
+    }
+
+    async expectSubvariantTabsVisible(stepId) {
+        await expect(this.page.locator(`[data-test="ai-subvariant-tabs-${stepId}"]`)).toBeVisible({
+            timeout: 10000,
+        });
+    }
+
+    async expectSubvariantTabsHidden(stepId) {
+        await expect(this.page.locator(`[data-test="ai-subvariant-tabs-${stepId}"]`)).toHaveCount(0, {
+            timeout: 10000,
+        });
+    }
+
     // ==================== Tab Interactions ====================
 
     async clickMetricsTab() {

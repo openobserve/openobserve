@@ -1,0 +1,8 @@
+[
+  { "title": "should reveal trace inputs and append ordered single-quoted --trace flags on the Linux install step", "action": "new", "verifies": "the Linux 'eBPF traces' variant reveals four inputs and appends single-quoted --trace-* flags in order" },
+  { "title": "should swap nested language tabs for eBPF inputs and emit Helm --set-string flags", "action": "new", "verifies": "the Kubernetes eBPF variant swaps the language toggle for three inputs and emits Helm --set-string ebpf.trace.* flags" },
+  { "title": "should gate the Linux trace command on requireOneOf and restore it once a selector is filled", "action": "new", "verifies": "the Linux requireOneOf guard hides the command until a selector is filled (serviceName alone does not satisfy it)" },
+  { "title": "should gate the eBPF command on requireOneOf and emit one --set-string per filled selector", "action": "new", "verifies": "the Kubernetes eBPF guard clears on the first selector and emits ordered --set-string flags with --set ...=null for blanks" },
+  { "title": "should render no eBPF traces toggle or trace inputs on Windows and macOS host agents", "action": "new", "verifies": "Windows and macOS host agents render a single install code block with no tracing toggle or trace inputs" },
+  { "title": "should expose the eBPF tracing guide link on Linux and Kubernetes cards", "action": "new", "verifies": "the card footer exposes an eBPF tracing guide link on both Linux and Kubernetes" }
+]
