@@ -33,7 +33,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- An org with no bill shows usage from its own stream, which only exists once reporting is on. -->
     <OEmptyState
       v-if="!details && volumeOnly"
-      size="block"
+      size="hero"
+      illustration="wave-bars"
       :title="
         usageStreamEnabled
           ? t('billing.usageTrends.waitingTitle')

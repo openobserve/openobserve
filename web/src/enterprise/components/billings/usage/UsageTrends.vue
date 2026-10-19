@@ -19,7 +19,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="flex flex-col gap-2.5" data-test="billings-usagetrends-root">
     <OEmptyState
       v-if="!usageStreamEnabled"
-      size="block"
+      size="hero"
+      illustration="wave-bars"
       :title="t('billing.usageTrends.enableTitle')"
       :description="t('billing.usageTrends.enableSubtitle')"
       :action-label="t('billing.usageTrends.enableButton')"
