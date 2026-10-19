@@ -108,9 +108,7 @@ export class IngestionConfigPage {
     }
 
     // ==================== eBPF Tracing Setup Card Variants ====================
-    // The Linux/Kubernetes rich cards gain an eBPF traces variant whose inputs
-    // (OInput) put the -field suffix on the native <input>. The warning and code
-    // block are gated by requireOneOf, so assertions target their absence too.
+    // eBPF inputs use the -field suffix; requireOneOf gates the warning and code block, so assert their absence.
 
     async expectStepVisible(stepId) {
         await expect(this.page.locator(`[data-test="ai-step-${stepId}"]`)).toBeVisible({ timeout: 10000 });
