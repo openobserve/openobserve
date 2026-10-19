@@ -8161,6 +8161,7 @@
       "expectedUsageHint": "根据本周期迄今用量预填",
       "yourEstimate": "您的预估",
       "assumptionsFrom": "基于您过去 30 天",
+      "scanNote": "每月扫描约 {volume}。",
       "qtyScanned": "已扫描 {volume}",
       "qtyProcessed": "已处理 {volume}",
       "qtyKeptFor": "{volume}，保留 {days} 天",

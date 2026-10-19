@@ -8161,6 +8161,7 @@
       "expectedUsageHint": "이번 주기 현재까지 기준으로 미리 입력됨",
       "yourEstimate": "내 예상치",
       "assumptionsFrom": "최근 30일 기준",
+      "scanNote": "월간 스캔량은 약 {volume}입니다.",
       "qtyScanned": "{volume} 스캔됨",
       "qtyProcessed": "{volume} 처리됨",
       "qtyKeptFor": "{volume} · {days}일",

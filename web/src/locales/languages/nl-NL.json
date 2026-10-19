@@ -8161,6 +8161,7 @@
       "expectedUsageHint": "Vooraf ingevuld op basis van deze cyclus tot nu toe",
       "yourEstimate": "Je schatting",
       "assumptionsFrom": "Op basis van je laatste 30 dagen",
+      "scanNote": "Scant ongeveer {volume} per maand.",
       "qtyScanned": "{volume} gescand",
       "qtyProcessed": "{volume} verwerkt",
       "qtyKeptFor": "{volume} voor {days} dagen",

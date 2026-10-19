@@ -8161,6 +8161,7 @@
       "expectedUsageHint": "Wstępnie wypełnione na podstawie dotychczasowego cyklu",
       "yourEstimate": "Twoje szacunki",
       "assumptionsFrom": "Z ostatnich 30 dni",
+      "scanNote": "Skanuje około {volume} miesięcznie.",
       "qtyScanned": "{volume} przeskanowano",
       "qtyProcessed": "{volume} przetworzono",
       "qtyKeptFor": "{volume} przez {days} dni",

@@ -8156,6 +8156,7 @@
       "expectedUsageHint": "依本期迄今資料預先填入",
       "yourEstimate": "您的預估",
       "assumptionsFrom": "依您最近 30 天",
+      "scanNote": "每月掃描約 {volume}。",
       "qtyScanned": "已掃描 {volume}",
       "qtyProcessed": "已處理 {volume}",
       "qtyKeptFor": "{volume}，保留 {days} 天",

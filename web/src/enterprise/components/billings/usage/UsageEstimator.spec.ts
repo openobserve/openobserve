@@ -156,6 +156,19 @@ describe("UsageEstimator My Current Usage", () => {
     for (const [sql] of search.mock.calls) expect(sql).not.toContain("org_id =");
   });
 
+  it("starts the two synthetics blocks on one row, so neither leaves a hole beside a short field", async () => {
+    const wrapper = mountEstimator();
+    await flushPromises();
+    const order = wrapper
+      .findAll('[data-test^="billings-usageestimator-field-"]')
+      .map((block) => block.attributes("data-test")!.replace("billings-usageestimator-field-", ""));
+    // Two columns: the tall browser block must open a row and the API block sit beside it.
+    const browser = order.indexOf("browserChecks");
+    expect(browser % 2).toBe(0);
+    expect(order[browser + 1]).toBe("apiChecks");
+    expect(order).toHaveLength(browser + 2);
+  });
+
   it("puts each count slider's thumb where its box says, including the defaults", async () => {
     const wrapper = mountEstimator();
     await flushPromises();
@@ -178,7 +191,8 @@ describe("UsageEstimator My Current Usage", () => {
           /^billings-usageestimator-|-slider$/g,
           "",
         );
-        return key === "ingestGb" || onGrid(key);
+        // Sizes keep decimals, where the step is only how far a drag moves; counts must sit exactly.
+        return key === "ingestGb" || key === "scanPerSearchMb" || onGrid(key);
       }),
     ).toBe(true);
 

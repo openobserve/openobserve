@@ -8161,6 +8161,7 @@
       "expectedUsageHint": "Заполнено по текущему циклу",
       "yourEstimate": "Ваша оценка",
       "assumptionsFrom": "По вашим последним 30 дням",
+      "scanNote": "Сканирует около {volume} в месяц.",
       "qtyScanned": "{volume} просканировано",
       "qtyProcessed": "{volume} обработано",
       "qtyKeptFor": "{volume} за {days} дней",

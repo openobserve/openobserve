@@ -8161,6 +8161,7 @@
       "expectedUsageHint": "Bu dönemin şu ana kadarki verileriyle önceden dolduruldu",
       "yourEstimate": "Tahmininiz",
       "assumptionsFrom": "Son 30 gününüze göre",
+      "scanNote": "Ayda yaklaşık {volume} tarar.",
       "qtyScanned": "{volume} tarandı",
       "qtyProcessed": "{volume} işlendi",
       "qtyKeptFor": "{volume}, {days} gün için",

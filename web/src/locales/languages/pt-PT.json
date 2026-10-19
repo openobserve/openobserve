@@ -8161,6 +8161,7 @@
       "expectedUsageHint": "Pré-preenchido com base neste ciclo até agora",
       "yourEstimate": "Sua estimativa",
       "assumptionsFrom": "Com base nos seus últimos 30 dias",
+      "scanNote": "Verifica cerca de {volume} por mês.",
       "qtyScanned": "{volume} verificados",
       "qtyProcessed": "{volume} processados",
       "qtyKeptFor": "{volume} por {days} dias",

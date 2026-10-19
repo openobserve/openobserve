@@ -22,9 +22,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   without leaving the field. The estimate is broken down by meter, because one
   total hides which meter a change moved.
 
-  Nobody knows how many gigabytes a search will scan, so the two assumption
-  fields convert planning units into billing units using this org's own history,
-  and stay editable because a plan is not the past.
+  Nobody knows how many gigabytes a search will scan or a pipeline will process,
+  so the data per search and per stream start from this org's own history, and
+  stay editable because a plan is not the past.
 
   Retention is priced from the org's own metered cost per stored megabyte per
   day rather than from `base_cost`, because that meter's unit is not a plain
@@ -123,15 +123,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="billings-usageestimator-avg-stream"
                     @update:model-value="setField('avgStreamMb', $event)"
                   />
-                  <OInput
-                    :model-value="inputs.scanPerSearchMb"
-                    type="number"
-                    size="md"
-                    :label="t('billing.usageV2.avgScanPerSearch')"
-                    :suffix="rawMb"
-                    data-test="billings-usageestimator-scan-per-search"
-                    @update:model-value="setField('scanPerSearchMb', $event)"
-                  />
                 </div>
               </OPopover>
             </template>
@@ -154,7 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="md"
                 :label="t(field.labelKey)"
                 :suffix="field.suffix"
-                :help-text="field.rate"
+                :help-text="field.key === 'scanPerSearchMb' ? scanNote : field.rate"
                 :data-test="`billings-usageestimator-${field.key}`"
                 @update:model-value="setField(field.key, $event)"
               >
@@ -359,6 +350,14 @@ const FIELDS: FieldDef[] = [
     step: 1,
   },
   {
+    key: "scanPerSearchMb",
+    labelKey: "billing.usageV2.scanPerSearch",
+    suffix: "MB",
+    min: 0,
+    max: 10240,
+    step: 1,
+  },
+  {
     key: "pipelineCount",
     labelKey: "billing.usageV2.pipelineCount",
     meter: "pipeline",
@@ -529,6 +528,13 @@ const meterLabel = (key: MeterKey) => {
   const def = METERS.find((entry) => entry.key === key);
   return def ? t(def.labelKey) : raw(key);
 };
+
+const scannedMb = computed(() => Number(inputs.searchCount) * Number(inputs.scanPerSearchMb));
+
+const scannedText = computed(() => raw(formatSizeFromMB(scannedMb.value)));
+
+/** Search is billed on the data it scans, so the size field states the month's total. */
+const scanNote = computed(() => t("billing.usageV2.scanNote", { volume: scannedText.value }));
 
 const runCount = (runs: number) => raw(addCommasToNumber(Math.round(runs)));
 

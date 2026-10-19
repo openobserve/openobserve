@@ -8161,6 +8161,7 @@
       "expectedUsageHint": "Được điền sẵn từ chu kỳ này đến nay",
       "yourEstimate": "Ước tính của bạn",
       "assumptionsFrom": "Từ 30 ngày qua của bạn",
+      "scanNote": "Quét khoảng {volume} mỗi tháng.",
       "qtyScanned": "{volume} đã quét",
       "qtyProcessed": "{volume} đã xử lý",
       "qtyKeptFor": "{volume} trong {days} ngày",

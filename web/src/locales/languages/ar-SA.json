@@ -8161,6 +8161,7 @@
       "expectedUsageHint": "تمت التعبئة مسبقًا من هذه الدورة حتى الآن",
       "yourEstimate": "تقديرك",
       "assumptionsFrom": "من آخر 30 يومًا لديك",
+      "scanNote": "يفحص نحو {volume} شهريًا.",
       "qtyScanned": "{volume} تم فحصه",
       "qtyProcessed": "{volume} تمت معالجته",
       "qtyKeptFor": "{volume} لمدة {days} أيام",

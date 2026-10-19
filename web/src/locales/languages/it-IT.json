@@ -8161,6 +8161,7 @@
       "expectedUsageHint": "Precompilato in base al ciclo finora",
       "yourEstimate": "La tua stima",
       "assumptionsFrom": "In base agli ultimi 30 giorni",
+      "scanNote": "Analizza circa {volume} al mese.",
       "qtyScanned": "{volume} analizzati",
       "qtyProcessed": "{volume} elaborati",
       "qtyKeptFor": "{volume} per {days} giorni",
