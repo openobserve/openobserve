@@ -95,8 +95,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="billings-usageoverview-breakdown"
       >
         <!-- No bill, no strip: a share across meters means nothing when GB and run counts mix. -->
+        <div
+          v-if="isSuperOrg && !volumeOnly && orgCostsPending"
+          class="border-border-default border-b px-4 py-2.5"
+          data-test="billings-usageoverview-strip-loading"
+        >
+          <OSkeleton class="h-7 w-full" />
+        </div>
         <UsageBillStrip
-          v-if="isSuperOrg && !volumeOnly"
+          v-else-if="isSuperOrg && !volumeOnly"
           :rows="orgRows"
           :total="orgTotals.total"
           :selected="selectedOrg?.id ?? null"
@@ -223,7 +230,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :discount="orgTotals.discount"
                 :color-for="orgColor"
                 :name-header="t('billing.usageV2.colOrganization')"
-                :loading="orgCostsLoading && !hasOrgCosts"
+                :loading="orgCostsPending"
                 :streaming="orgCostsLoading && hasOrgCosts"
                 data-test="billings-usageoverview-org-table"
                 @select="selectOrg"
@@ -235,7 +242,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :gross="scopedTotals.gross"
                 :discount="scopedTotals.discount"
                 :share-header="t('billing.usageV2.shareOfOrg', { org: selectedOrg.name })"
-                :loading="orgCostsLoading && !hasOrgCosts"
+                :loading="orgCostsPending"
                 :streaming="orgCostsLoading && hasOrgCosts"
                 data-test="billings-usageoverview-org-meters"
                 @select="(key) => selectMeter(key as MeterKey)"
@@ -311,6 +318,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import KpiCardRow from "@/components/common/KpiCardRow.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
@@ -480,6 +488,8 @@ const orgCostsFailed = computed(() => props.orgCosts.failed);
 
 /** Partial costs stream in, so the skeleton only covers the wait for the first chunk. */
 const hasOrgCosts = computed(() => Object.keys(orgCosts.value).length > 0);
+/** Until the first org costs land, the bill's retention row would read as the whole bill. */
+const orgCostsPending = computed(() => orgCostsLoading.value && !hasOrgCosts.value);
 
 /** Every org with its cost, plus retention, which writes no usage events to split by org. */
 /** Orgs still on this bill that are no longer members: one that left the group mid-cycle. */
@@ -513,7 +523,7 @@ const orgRow = (id: string, label: I18nText, member: boolean): BillRow => {
 };
 
 const orgRows = computed<BillRow[]>(() => {
-  if (orgCostsFailed.value) return [];
+  if (orgCostsFailed.value || orgCostsPending.value) return [];
   const orgs = props.billingOrgs.map((org) =>
     orgRow(
       org.id,

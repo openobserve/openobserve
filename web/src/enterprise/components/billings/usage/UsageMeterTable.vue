@@ -95,11 +95,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <span />
           <span class="px-2">{{ t("billing.usageV2.colTotal") }}</span>
-          <span class="px-2">{{ formatCost(gross) }}</span>
-          <span v-if="discount > 0" class="text-status-success-text px-2">
+          <span class="px-2">{{ formatCost(loading ? null : gross) }}</span>
+          <span v-if="discount > 0 && !loading" class="text-status-success-text px-2">
             {{ formatCost(-discount) }}
           </span>
-          <span class="px-2">{{ formatCost(total) }}</span>
+          <span class="px-2">{{ formatCost(loading ? null : total) }}</span>
           <span />
           <span />
         </div>

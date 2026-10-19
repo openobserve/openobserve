@@ -167,6 +167,40 @@ describe("UsageOverview Cost by Org", () => {
   });
 });
 
+describe("UsageOverview Cost by Org while costs load", () => {
+  beforeEach(() => {
+    route.query = {};
+    search.mockReset().mockResolvedValue([]);
+  });
+
+  it("shows placeholders, not the retention row as the whole bill", async () => {
+    const wrapper = mount(UsageOverview, {
+      props: {
+        details: mockMeteringResponse().upcoming,
+        billingOrgs,
+        lastLoadedAt: 1,
+        projected: null,
+        refreshing: false,
+        orgCosts: { costs: {}, loading: true, failed: false },
+      },
+      global: {
+        plugins: [i18n, store],
+        stubs: { UsageCachedChart: true, UsageMeterBreakdown: true, UsageBillStrip: true },
+      },
+    });
+    await flushPromises();
+
+    // No org has a cost yet, so the bar would read "Data Retention 100%" and the total its $0.58.
+    expect(wrapper.findComponent({ name: "UsageBillStrip" }).exists()).toBe(false);
+    expect(wrapper.find('[data-test="billings-usageoverview-strip-loading"]').exists()).toBe(true);
+    const table = wrapper.findComponent('[data-test="billings-usageoverview-org-table"]');
+    expect(table.props("rows")).toEqual([]);
+    const footer = wrapper.find('[data-test="billings-usagemetertable-total"]');
+    expect(footer.text()).not.toContain("$");
+    expect(footer.text()).toContain("—");
+  });
+});
+
 describe("UsageOverview meter drilldown chart", () => {
   beforeEach(() => {
     route.query = { meter: "ingestion" };
