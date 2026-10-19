@@ -380,14 +380,31 @@ const rowCount = (data: unknown[] | undefined): number =>
 const asPartitions = (meta: unknown[] | undefined): unknown[][] =>
   (meta ?? []).map((m) => (Array.isArray(m) ? m : m === null || m === undefined ? [] : [m]));
 
-// A truncated panel says how many rows it kept; a retained one shows its own build time, dimmed.
+// A PromQL query's entry is `{ resultType, result }`, so its size is its series count.
+const seriesCount = (data: unknown[] | undefined): number =>
+  Math.max(
+    0,
+    ...(data ?? []).map((entry) => {
+      const series = (entry as { result?: unknown } | null)?.result;
+      return Array.isArray(series) ? series.length : 0;
+    }),
+  );
+
+// A truncated panel says how many rows or series it kept; a retained one shows its build time, dimmed.
 const panelBadge = (result: PanelResult): I18nText | undefined => {
   if (result.state?.retained && result.built_at) {
     return t("dashboard.publicDashboard.panelFrom", { time: raw(clockTime(result.built_at)) });
   }
+  if (!result.state?.truncated) return undefined;
   const rows = rowCount(result.data);
-  if (result.state?.truncated && rows > 0) {
+  if (rows > 0) {
     return t("dashboard.publicDashboard.panelTruncated", { count: rows.toLocaleString() }, rows);
+  }
+  const series = seriesCount(result.data);
+  if (series > 0) {
+    return t("dashboard.publicDashboard.panelTruncatedSeries", {
+      count: series.toLocaleString(),
+    });
   }
   return undefined;
 };

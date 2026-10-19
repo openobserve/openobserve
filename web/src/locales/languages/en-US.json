@@ -6186,6 +6186,7 @@
       "refreshFailedNoRetry": "Some panels could not be refreshed at {time}. They show older data.",
       "panelFrom": "from {time}",
       "panelTruncated": "Showing the first {count} row | Showing the first {count} rows",
+      "panelTruncatedSeries": "Showing the first {count} series",
       "pastMinutes": "Past {n} minute | Past {n} minutes",
       "pastHours": "Past {n} hour | Past {n} hours",
       "pastDays": "Past {n} day | Past {n} days",

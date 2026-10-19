@@ -928,6 +928,35 @@ describe("PublicDashboard viewer", () => {
     expect(injected.big.errorDetail.message).toBe("This panel isn't available on the public view.");
   });
 
+  it("counts series, not rows, on a truncated PromQL panel", async () => {
+    vi.mocked(service.getConfig).mockResolvedValue({
+      data: panelsConfig([{ id: "prom", type: "line" }]),
+      status: 200,
+    } as never);
+    const series = Array.from({ length: 100 }, (_, i) => ({
+      metric: { pod: `p${i}` },
+      values: [],
+    }));
+    vi.mocked(service.getData).mockResolvedValue({
+      status: 200,
+      data: {
+        ...okBody("a"),
+        panels: {
+          prom: {
+            state: { state: "ok", truncated: true },
+            data: [
+              { resultType: "matrix", result: [] },
+              { resultType: "matrix", result: series },
+            ],
+          },
+        },
+      },
+    } as never);
+    const w = buildWrapper();
+    await flushPromises();
+    expect(grid(w).props("injectedPanelData").prom.notice).toBe("Showing the first 100 series");
+  });
+
   it("says when a refresh failed and when it is tried next, keeping the data", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(1_800_000_020_000);
