@@ -148,6 +148,19 @@ pub async fn clean_empty_dirs(
     Ok(())
 }
 
+/// Removes `dir` and then each ancestor below `root`, stopping at the first non-empty one.
+pub async fn remove_empty_parents(root: &Path, dir: &Path) {
+    // remove_dir fails atomically on a non-empty dir, so no emptiness check is needed
+    for cur in dir
+        .ancestors()
+        .take_while(|p| *p != root && p.starts_with(root))
+    {
+        if remove_dir(cur).await.is_err() {
+            break;
+        }
+    }
+}
+
 /// Creates a closure that filters file paths based on a datetime range extracted
 /// from the directory structure.
 ///
@@ -383,6 +396,27 @@ mod tests {
                 content.len() as u64
             );
         }
+    }
+
+    #[tokio::test]
+    async fn test_remove_empty_parents_stops_at_non_empty_and_root() {
+        let root = tempfile::tempdir().unwrap();
+        let root = root.path();
+        let leaf = root.join("a/b/c");
+        std::fs::create_dir_all(&leaf).unwrap();
+        std::fs::write(root.join("a/keep.txt"), b"x").unwrap();
+
+        remove_empty_parents(root, &leaf).await;
+        assert!(!root.join("a/b").exists());
+        assert!(root.join("a/keep.txt").exists());
+
+        std::fs::remove_file(root.join("a/keep.txt")).unwrap();
+        remove_empty_parents(root, &root.join("a")).await;
+        assert!(!root.join("a").exists());
+        assert!(root.exists());
+
+        remove_empty_parents(root, &root.join("missing/x")).await;
+        assert!(root.exists());
     }
 
     #[tokio::test]

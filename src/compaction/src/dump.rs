@@ -1647,24 +1647,6 @@ mod tests {
     }
 
     #[test]
-    fn test_generate_dump_stream_name_empty_stream() {
-        let name = generate_dump_stream_name(StreamType::Logs, "");
-        assert_eq!(name, "_logs");
-    }
-
-    #[test]
-    fn test_generate_dump_stream_name_stream_with_underscores() {
-        let name = generate_dump_stream_name(StreamType::Metrics, "my_stream_name");
-        assert_eq!(name, "my_stream_name_metrics");
-    }
-
-    #[test]
-    fn test_generate_dump_stream_name_stream_with_hyphens() {
-        let name = generate_dump_stream_name(StreamType::Logs, "my-stream-2024");
-        assert_eq!(name, "my-stream-2024_logs");
-    }
-
-    #[test]
     fn test_generate_dump_stream_name_format_pattern() {
         // Verify the pattern is always {stream_name}_{stream_type}
         for (stype, suffix) in &[

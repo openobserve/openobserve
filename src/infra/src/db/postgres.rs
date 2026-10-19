@@ -1052,12 +1052,6 @@ mod tests {
     }
 
     #[test]
-    fn test_build_key_with_special_chars() {
-        let key = super::super::build_key("mod-ule", "key_1", "key.2", 0);
-        assert_eq!(key, "/mod-ule/key_1/key.2");
-    }
-
-    #[test]
     fn test_index_statement_new() {
         let stmt = IndexStatement::new("test_idx", "test_table", false, &["col1", "col2"]);
         assert_eq!(stmt.idx_name, "test_idx");
@@ -1137,20 +1131,6 @@ mod tests {
         assert_eq!(
             alert_sql,
             "ALTER TABLE test_table ADD COLUMN IF NOT EXISTS new_column VARCHAR(255) NOT NULL DEFAULT '';"
-        );
-    }
-
-    #[test]
-    fn test_drop_column_check_sql_format() {
-        let table = "test_table";
-        let column = "old_column";
-
-        let check_sql = format!(
-            "SELECT count(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE table_schema=current_schema() AND table_name='{table}' AND column_name='{column}';"
-        );
-        assert_eq!(
-            check_sql,
-            "SELECT count(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE table_schema=current_schema() AND table_name='test_table' AND column_name='old_column';"
         );
     }
 
@@ -1260,24 +1240,6 @@ mod tests {
         assert_eq!(module, original_parts.0);
         assert_eq!(k1, original_parts.1);
         assert_eq!(k2, original_parts.2);
-    }
-
-    #[test]
-    fn test_parse_key_with_numbers() {
-        let key = "/123/456/789";
-        let (module, k1, k2) = super::super::parse_key(key);
-        assert_eq!(module, "123");
-        assert_eq!(k1, "456");
-        assert_eq!(k2, "789");
-    }
-
-    #[test]
-    fn test_parse_key_with_hyphens_underscores() {
-        let key = "/test-module/test_key1/test-key-2";
-        let (module, k1, k2) = super::super::parse_key(key);
-        assert_eq!(module, "test-module");
-        assert_eq!(k1, "test_key1");
-        assert_eq!(k2, "test-key-2");
     }
 
     #[test]

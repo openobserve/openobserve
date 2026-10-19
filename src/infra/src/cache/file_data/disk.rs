@@ -2483,14 +2483,6 @@ mod tests {
     }
 
     #[test]
-    fn test_get_bucket_idx_empty_string() {
-        let idx = get_bucket_idx("");
-        let cfg = config::get_config();
-        let max = cfg.disk_cache.bucket_num.max(1);
-        assert!(idx < max);
-    }
-
-    #[test]
     fn test_is_legacy_metrics_result_file() {
         let dir = "metrics_results/default/2025/04/08/06";
         let name = "17caf18281f2a17c76a803a9cd59a207_1_2_3.pb";

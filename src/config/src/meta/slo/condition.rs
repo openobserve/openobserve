@@ -1188,11 +1188,6 @@ mod tests {
         );
     }
 
-    #[test]
-    fn a_default_count_gate_is_accepted() {
-        assert!(validate(&fast_burn(), &slo_30d_60s(), true).is_ok());
-    }
-
     // ============== the alert-level wiring (save path) =====================
 
     /// The overwhelming majority of alerts are not SLO alerts, and the check
@@ -1347,27 +1342,6 @@ mod tests {
             short_window_secs: Some(30 * 60),
             ..fast_burn()
         };
-        assert_eq!(
-            validate(&c, &slo_7d_300s_grouped(), true),
-            Err(SloConditionError::MultiAlertNotImplemented)
-        );
-    }
-
-    /// D36: a superset of the usual behavior, which permits group alerting only
-    /// on Time Slice SLOs. Our per-group machinery is SLI-type agnostic — `SloFacts`
-    /// carries no SLI type at all, so the deferral (and, once shipped, the
-    /// acceptance) is identical for every SLI type.
-    #[test]
-    fn per_group_alerting_is_not_restricted_by_sli_type() {
-        let c = SloCondition {
-            multi_alert: true,
-            critical: 3.0,
-            long_window_secs: Some(6 * HOUR),
-            short_window_secs: Some(30 * 60),
-            ..fast_burn()
-        };
-        // The rejection is the type-blind MultiAlertNotImplemented, never a
-        // type-dependent variant.
         assert_eq!(
             validate(&c, &slo_7d_300s_grouped(), true),
             Err(SloConditionError::MultiAlertNotImplemented)

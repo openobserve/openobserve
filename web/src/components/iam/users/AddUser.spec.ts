@@ -837,3 +837,31 @@ describe("AddUser", () => {
     });
   });
 });
+
+describe("pa gap fixes: Add user submit test id (P8)", () => {
+  it("P8-R3: the Add user submit carries its own data-test, not the dialog's generic one", async () => {
+    store.state.userInfo = { ...store.state.userInfo, email: ADMIN_EMAIL };
+    store.state.organizations = store.state.organizations ?? [];
+    const w = mount(AddUser, {
+      attachTo: document.body,
+      global: { plugins: [store, i18n] },
+      props: {
+        open: true,
+        modelValue: {},
+        isUpdated: false,
+        userRole: "admin",
+        roles: [{ label: "Admin", value: "admin" }],
+        customRoles: [],
+        isCloud: false,
+      },
+    });
+    await flushPromises();
+    const submit = document.querySelector<HTMLButtonElement>(
+      '[data-test="add-user-dialog"] button[type="submit"]',
+    );
+    expect(submit).not.toBeNull();
+    expect(submit!.getAttribute("data-test")).toBeTruthy();
+    expect(submit!.getAttribute("data-test")).not.toMatch(/^o-dialog-/);
+    w.unmount();
+  });
+});

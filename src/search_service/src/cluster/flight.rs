@@ -271,13 +271,15 @@ pub async fn search(trace_id: &str, sql: Arc<Sql>, mut req: Request) -> Result<S
     );
 
     #[cfg(feature = "enterprise")]
-    SEARCH_SERVER.add_file_stats(trace_id, &scan_stats).await;
+    SEARCH_SERVER
+        .add_file_stats(&sql.org_id, trace_id, &scan_stats)
+        .await;
 
     #[cfg(feature = "enterprise")]
     let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
     #[cfg(feature = "enterprise")]
     if SEARCH_SERVER
-        .insert_sender(trace_id, abort_sender, true)
+        .insert_sender(&sql.org_id, trace_id, abort_sender, true)
         .await
         .is_err()
     {

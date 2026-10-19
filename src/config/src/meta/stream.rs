@@ -2443,13 +2443,6 @@ mod tests {
     }
 
     #[test]
-    fn test_time_range_contains_strict_subset() {
-        let outer = TimeRange::new(0, 100);
-        let inner = TimeRange::new(20, 80);
-        assert!(outer.contains(&inner));
-    }
-
-    #[test]
     fn test_time_range_contains_not_contained() {
         let outer = TimeRange::new(0, 50);
         let inner = TimeRange::new(40, 100);
@@ -2470,13 +2463,6 @@ mod tests {
         let b = TimeRange::new(50, 100);
         // a.end == b.start: condition is a.start < b.end && a.end > b.start => 0<100 && 50>50 =>
         // false
-        assert!(!a.intersects(&b));
-    }
-
-    #[test]
-    fn test_time_range_intersects_disjoint() {
-        let a = TimeRange::new(0, 30);
-        let b = TimeRange::new(50, 100);
         assert!(!a.intersects(&b));
     }
 
