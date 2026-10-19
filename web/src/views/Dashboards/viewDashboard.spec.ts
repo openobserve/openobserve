@@ -1843,7 +1843,7 @@ describe("ViewDashboard", () => {
     });
   });
 
-  it("shows a visible Beta chip beside the publish button while public links are on", async () => {
+  it("names beta in the publish button's label instead of a chip while public links are on", async () => {
     const zoConfig = global.mockStoreState.zoConfig;
     global.mockStoreState.zoConfig = { ...zoConfig, public_dashboards_enabled: true };
     onTestFinished(() => {
@@ -1857,8 +1857,12 @@ describe("ViewDashboard", () => {
     });
     await flushPromises();
     const publish = wrapper.find('[data-test="dashboard-publish-public"]');
-    expect(publish.find('[data-test="dashboard-publish-public-btn"]').exists()).toBe(true);
-    expect(publish.findComponent({ name: "BetaBadge" }).exists()).toBe(true);
+    const button = publish.find('[data-test="dashboard-publish-public-btn"]');
+    expect(button.exists()).toBe(true);
+    expect(publish.findComponent({ name: "BetaBadge" }).exists()).toBe(false);
+    // This spec's t() returns the key, so the rendered label is checked against the real message.
+    expect(button.attributes("aria-label")).toBe("dashboard.publicDashboard.shareTooltip");
+    expect(i18n.global.t("dashboard.publicDashboard.shareTooltip")).toBe("Publish publicly (beta)");
   });
 
   it("hands the live variables manager to the template, so public links seed from it", async () => {

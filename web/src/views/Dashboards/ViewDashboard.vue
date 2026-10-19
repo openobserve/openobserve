@@ -300,7 +300,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span
               v-if="!isFullscreen && store.state.zoConfig?.public_dashboards_enabled"
               v-show="store.state.printMode !== true"
-              class="inline-flex items-center gap-1"
+              class="inline-flex items-center"
               data-test="dashboard-publish-public"
             >
               <OButton
@@ -313,7 +313,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <OTooltip :content="t('dashboard.publicDashboard.shareTooltip')" />
               </OButton>
-              <BetaBadge size="xs" class="max-md:hidden" />
             </span>
             <PublicLinksPanel
               v-if="
@@ -635,7 +634,6 @@ import {
 import PanelLayoutSettings from "./PanelLayoutSettings.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
-import BetaBadge from "@/components/common/BetaBadge.vue";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
@@ -690,7 +688,6 @@ export default defineComponent({
   emits: ["onDeletePanel", "sendToAiChat"],
   components: {
     OBanner,
-    BetaBadge,
     OPageLayout,
     DateTimePickerDashboard,
     ShareButton,
