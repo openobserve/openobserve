@@ -221,14 +221,17 @@ const projected = computed(() => projectCycleCost(details.value, lastLoadedAt.va
 /** A super org's orgs, itself first; empty for any other org. */
 const billingOrgs = ref<BillingOrg[]>([]);
 
-/** A failure reads as "not a super org", so the page still shows the bill by meter. */
+/**
+ * A failure keeps the list already shown for this org, so a Refresh does not drop a super org's
+ * org view; with none shown yet it reads as "not a super org", and the page shows the bill by meter.
+ */
 const fetchBillingOrgs = async (): Promise<BillingOrg[]> => {
   const orgId = store.state.selectedOrganization.identifier;
   try {
     const res = await BillingService.list_billing_group_members(orgId);
     return billingGroupOrgs(res?.data, orgId);
   } catch {
-    return [];
+    return billingOrgs.value[0]?.id === orgId ? billingOrgs.value : [];
   }
 };
 

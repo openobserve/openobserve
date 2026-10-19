@@ -129,6 +129,25 @@ describe("UsageView", () => {
     vi.useRealTimers();
   });
 
+  it("keeps a super org's orgs when the org list fails on Refresh", async () => {
+    metering.mockResolvedValue(bill);
+    members.mockResolvedValue({
+      data: [{ payer_org_name: "Payer", member_org_id: "child", member_org_name: "Child" }],
+    });
+    const wrapper = mount(UsageView, { global: { plugins: [i18n, store] } });
+    await flushPromises();
+
+    members.mockRejectedValue(new Error("Network Error"));
+    wrapper.findComponent({ name: "UsageOverview" }).vm.$emit("refresh");
+    await flushPromises();
+
+    const orgs = wrapper.findComponent({ name: "UsageOverview" }).props("billingOrgs");
+    expect(orgs.map((org: { id: string }) => org.id)).toEqual([
+      store.state.selectedOrganization.identifier,
+      "child",
+    ]);
+  });
+
   it("still shows the bill when the org list fails, as a plain org", async () => {
     metering.mockResolvedValue(bill);
     members.mockRejectedValue(new Error("boom"));
