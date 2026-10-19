@@ -150,6 +150,10 @@ describe("UsageTrends cost and volume", () => {
     });
     await flushPromises();
     expect(search.mock.calls[0][0]).toContain('sum(size) as "volume"');
+    // Retention is billed from a separate record Trends cannot read, so its totals say they leave it out.
+    expect(wrapper.find('[data-test="billings-usagetrends-chart-pane"]').text()).toContain(
+      "Excludes Data Retention",
+    );
 
     const measure = wrapper
       .findAllComponents({ name: "OToggleGroup" })

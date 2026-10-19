@@ -8438,7 +8438,7 @@
       "enableVolumeSubtitle": "Turn on usage reporting to see how much each meter uses, day by day.",
       "measureCost": "Cost",
       "measureVolume": "Volume",
-      "estimatedAtCyclePrice": "Estimated from usage, at each cycle's price",
+      "estimatedAtCyclePrice": "Estimated from usage, at each cycle's price. Excludes Data Retention.",
       "showOnlyMeter": "Show only {meter}",
       "showAllMeters": "Show all meters",
       "noUsageInRange": "No usage in this range",
