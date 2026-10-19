@@ -62,6 +62,7 @@ const props = withDefaults(defineProps<DialogProps>(), {
   showClose: true,
   width: undefined,
   maxHeight: undefined,
+  primaryButtonDataTest: "o-dialog-primary-btn",
   primaryButtonVariant: "primary",
   secondaryButtonVariant: "outline",
   neutralButtonVariant: "ghost",
@@ -625,7 +626,7 @@ watch(shown, (open) => {
               <OButton
                 v-if="primaryButtonLabel"
                 ref="primaryBtnRef"
-                data-test="o-dialog-primary-btn"
+                :data-test="primaryButtonDataTest"
                 :variant="primaryButtonVariant"
                 size="sm-action"
                 :type="formId ? 'submit' : 'button'"

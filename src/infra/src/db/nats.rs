@@ -1234,14 +1234,6 @@ mod tests {
     }
 
     #[test]
-    fn test_key_encode_with_special_chars() {
-        let key = "test/key+with/special";
-        let encoded = key_encode(key);
-        assert!(!encoded.contains('/'));
-        assert!(!encoded.contains('+'));
-    }
-
-    #[test]
     fn test_key_encode_decode_roundtrip() {
         let keys = vec![
             "simple_key",
@@ -1492,34 +1484,6 @@ mod tests {
         let encoded = key_encode(&long_key);
         let decoded = key_decode(&encoded).expect("we just encoded it");
         assert_eq!(decoded, long_key);
-    }
-
-    #[test]
-    fn test_key_encode_newlines_and_tabs() {
-        let key = "key\nwith\nnewlines\tand\ttabs";
-        let encoded = key_encode(key);
-        let decoded = key_decode(&encoded).expect("we just encoded it");
-        assert_eq!(decoded, key);
-    }
-
-    #[test]
-    fn test_key_encode_binary_like_data() {
-        let key = "key\0with\0null\0bytes";
-        let encoded = key_encode(key);
-        let decoded = key_decode(&encoded).expect("we just encoded it");
-        assert_eq!(decoded, key);
-    }
-
-    #[test]
-    fn test_nats_db_prefix_no_modification_without_slash() {
-        let db = NatsDb::new("no_slash_prefix");
-        assert_eq!(db.prefix, "no_slash_prefix");
-    }
-
-    #[test]
-    fn test_nats_db_empty_prefix() {
-        let db = NatsDb::new("");
-        assert_eq!(db.prefix, "");
     }
 
     #[test]

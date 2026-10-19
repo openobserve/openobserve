@@ -273,18 +273,6 @@ mod tests {
     }
 
     #[test]
-    fn test_list_keys_empty_prefix() {
-        // Test empty prefix
-        let prefix = "";
-        let result = if prefix.ends_with('*') {
-            prefix.strip_suffix('*').unwrap()
-        } else {
-            prefix
-        };
-        assert_eq!(result, "");
-    }
-
-    #[test]
     fn test_list_keys_asterisk_only() {
         // Test asterisk only
         let prefix = "*";

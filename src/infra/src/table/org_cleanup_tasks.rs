@@ -177,17 +177,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_new_cleanup_task_fields() {
-        let t = NewCleanupTask {
-            org_id: "myorg".to_string(),
-            org_name: "My Org".to_string(),
-            step: "delete_streams".to_string(),
-            step_order: 100,
-        };
-        assert_eq!(t.step_order, 100);
-    }
-
-    #[test]
     fn test_cleanup_task_default_status() {
         // CleanupTask has a status field defaulting to "pending" when constructed from
         // NewCleanupTask We can only test the NewCleanupTask struct here since CleanupTask

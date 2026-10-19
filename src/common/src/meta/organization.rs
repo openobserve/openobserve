@@ -692,13 +692,6 @@ impl NodeListResponse {
 
         cluster_entry.push(node);
     }
-
-    /// Adds multiple nodes to the response structure
-    pub fn add_nodes(&mut self, nodes: Vec<(Node, String, String)>) {
-        for (node, region, cluster) in nodes {
-            self.add_node(node, region, cluster);
-        }
-    }
 }
 
 #[derive(Serialize, Deserialize, Default, Clone, Debug, ToSchema)]
@@ -769,33 +762,6 @@ mod tests {
             .unwrap();
         assert_eq!(nodes.len(), 1);
         assert_eq!(nodes[0].name, "node-1");
-    }
-
-    #[test]
-    fn test_node_list_response_add_nodes() {
-        let node1 = Node {
-            name: "node-1".into(),
-            ..Default::default()
-        };
-        let node2 = Node {
-            name: "node-2".into(),
-            ..Default::default()
-        };
-
-        let mut response = NodeListResponse::new();
-        response.add_nodes(vec![
-            (node1.clone(), "us-west".into(), "cluster-x".into()),
-            (node2.clone(), "us-west".into(), "cluster-x".into()),
-        ]);
-
-        let nodes = &response
-            .regions
-            .get("us-west")
-            .unwrap()
-            .clusters
-            .get("cluster-x")
-            .unwrap();
-        assert_eq!(nodes.len(), 2);
     }
 
     #[test]

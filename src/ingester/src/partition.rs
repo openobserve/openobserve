@@ -13,7 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::BTreeMap, fs::create_dir_all, path::PathBuf, sync::Arc};
+use std::{
+    collections::BTreeMap,
+    fs::create_dir_all,
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 
 use arrow_schema::Schema;
 use config::{
@@ -29,7 +34,10 @@ use config::{
 };
 use hashbrown::HashSet;
 use snafu::ResultExt;
-use tokio::{fs::OpenOptions, io::AsyncWriteExt};
+use tokio::{
+    fs::{File, OpenOptions},
+    io::AsyncWriteExt,
+};
 
 use crate::{
     ReadRecordBatchEntry,
@@ -253,15 +261,7 @@ impl Partition {
                 path.push(hour.to_string());
                 path.push(file_name);
                 path.set_extension("par");
-                create_dir_all(path.parent().unwrap())
-                    .context(CreateFileSnafu { path: path.clone() })?;
-                let mut f = OpenOptions::new()
-                    .create(true)
-                    .write(true)
-                    .truncate(true)
-                    .open(&path)
-                    .await
-                    .context(CreateFileSnafu { path: path.clone() })?;
+                let mut f = create_file(&path).await?;
                 f.write_all(&buf_parquet)
                     .await
                     .context(WriteFileSnafu { path: path.clone() })?;
@@ -344,6 +344,27 @@ impl MemorySize for PartitionFile {
     fn mem_size(&self) -> usize {
         std::mem::size_of::<PartitionFile>() + self.data.mem_size()
     }
+}
+
+/// Retries once on NotFound: the upload job may drop a just-emptied dir between mkdir and open.
+async fn create_file(path: &Path) -> Result<File> {
+    let parent = path.parent().unwrap();
+    let open = || async {
+        create_dir_all(parent)?;
+        OpenOptions::new()
+            .create(true)
+            .write(true)
+            .truncate(true)
+            .open(path)
+            .await
+    };
+    let ret = match open().await {
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => open().await,
+        ret => ret,
+    };
+    ret.context(CreateFileSnafu {
+        path: path.to_path_buf(),
+    })
 }
 
 #[cfg(test)]

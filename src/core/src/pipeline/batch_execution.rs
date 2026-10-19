@@ -309,13 +309,6 @@ impl MemorySize for ExecutableNode {
     }
 }
 
-#[derive(Debug)]
-pub struct ExecutablePipelineBulkInputs {
-    records: Vec<Value>,
-    doc_ids: Vec<Option<String>>,
-    originals: Vec<Option<String>>,
-}
-
 impl ExecutablePipeline {
     pub fn contains_llm_evaluation_node(&self) -> bool {
         self.node_map
@@ -1215,37 +1208,6 @@ impl std::fmt::Display for ExecutableNode {
             NodeData::Branch(_) => write!(f, "branch"),
             NodeData::Unsupported => write!(f, "unsupported"),
         }
-    }
-}
-
-impl ExecutablePipelineBulkInputs {
-    pub fn new() -> Self {
-        Self {
-            records: Vec::new(),
-            doc_ids: Vec::new(),
-            originals: Vec::new(),
-        }
-    }
-
-    pub fn add_input(
-        &mut self,
-        record: Value,
-        doc_id: Option<String>,
-        original_data: Option<String>,
-    ) {
-        self.records.push(record);
-        self.doc_ids.push(doc_id);
-        self.originals.push(original_data);
-    }
-
-    pub fn into_parts(self) -> (Vec<Value>, Vec<Option<String>>, Vec<Option<String>>) {
-        (self.records, self.doc_ids, self.originals)
-    }
-}
-
-impl Default for ExecutablePipelineBulkInputs {
-    fn default() -> Self {
-        Self::new()
     }
 }
 
@@ -3325,15 +3287,6 @@ mod tests {
         assert!(err1.is_err());
     }
 
-    // Test ExecutablePipelineBulkInputs
-    #[test]
-    fn test_executable_pipeline_bulk_inputs_new() {
-        let inputs = ExecutablePipelineBulkInputs::new();
-        assert!(inputs.records.is_empty());
-        assert!(inputs.doc_ids.is_empty());
-        assert!(inputs.originals.is_empty());
-    }
-
     #[test]
     fn test_contains_llm_evaluation_node_detects_misclassified_eval_pipeline() {
         let mut node_map = HashMap::new();
@@ -3480,74 +3433,6 @@ mod tests {
         assert_eq!(eval_sampling_key(&first_span, 0), "span-a");
         assert_eq!(eval_sampling_key(&second_span, 0), "span-b");
         assert_eq!(eval_sampling_key(&trace_only, 99), "same-trace");
-    }
-
-    #[test]
-    fn test_executable_pipeline_bulk_inputs_default() {
-        let inputs = ExecutablePipelineBulkInputs::default();
-        assert!(inputs.records.is_empty());
-        assert!(inputs.doc_ids.is_empty());
-        assert!(inputs.originals.is_empty());
-    }
-
-    #[test]
-    fn test_executable_pipeline_bulk_inputs_add_input() {
-        let mut inputs = ExecutablePipelineBulkInputs::new();
-        let record = json::json!({"key": "value"});
-        let doc_id = Some("doc123".to_string());
-        let original = Some("original_data".to_string());
-
-        inputs.add_input(record.clone(), doc_id.clone(), original.clone());
-
-        assert_eq!(inputs.records.len(), 1);
-        assert_eq!(inputs.doc_ids.len(), 1);
-        assert_eq!(inputs.originals.len(), 1);
-        assert_eq!(inputs.records[0], record);
-        assert_eq!(inputs.doc_ids[0], doc_id);
-        assert_eq!(inputs.originals[0], original);
-    }
-
-    #[test]
-    fn test_executable_pipeline_bulk_inputs_add_multiple() {
-        let mut inputs = ExecutablePipelineBulkInputs::new();
-
-        // Add first input
-        let record1 = json::json!({"key1": "value1"});
-        inputs.add_input(record1.clone(), Some("doc1".to_string()), None);
-
-        // Add second input
-        let record2 = json::json!({"key2": "value2"});
-        inputs.add_input(record2.clone(), None, Some("original2".to_string()));
-
-        assert_eq!(inputs.records.len(), 2);
-        assert_eq!(inputs.doc_ids.len(), 2);
-        assert_eq!(inputs.originals.len(), 2);
-
-        assert_eq!(inputs.records[0], record1);
-        assert_eq!(inputs.records[1], record2);
-        assert_eq!(inputs.doc_ids[0], Some("doc1".to_string()));
-        assert_eq!(inputs.doc_ids[1], None);
-        assert_eq!(inputs.originals[0], None);
-        assert_eq!(inputs.originals[1], Some("original2".to_string()));
-    }
-
-    #[test]
-    fn test_executable_pipeline_bulk_inputs_into_parts() {
-        let mut inputs = ExecutablePipelineBulkInputs::new();
-        let record = json::json!({"test": "data"});
-        let doc_id = Some("test_doc".to_string());
-        let original = Some("test_original".to_string());
-
-        inputs.add_input(record.clone(), doc_id.clone(), original.clone());
-
-        let (records, doc_ids, originals) = inputs.into_parts();
-
-        assert_eq!(records.len(), 1);
-        assert_eq!(doc_ids.len(), 1);
-        assert_eq!(originals.len(), 1);
-        assert_eq!(records[0], record);
-        assert_eq!(doc_ids[0], doc_id);
-        assert_eq!(originals[0], original);
     }
 
     // Test ExecutableNode

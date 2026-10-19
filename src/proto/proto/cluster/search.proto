@@ -36,6 +36,8 @@ message QueryStatusResponse {
 
 message CancelQueryRequest {
     string trace_id = 1;
+    // Unset cancels in every org; nodes that predate the field ignore it.
+    optional string org_id = 2;
 }
 
 message CancelQueryResponse {

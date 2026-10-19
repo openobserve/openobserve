@@ -777,17 +777,6 @@ pub fn calculate_max_ts_upper_bound(time_end: i64, level: PartitionTimeLevel) ->
     time_end + second_micros(level.duration())
 }
 
-pub fn parse_stream_key(key: &str) -> Option<(String, StreamType, String)> {
-    let parts = key.split('/').collect::<Vec<_>>();
-    if parts.len() != 3 {
-        return None;
-    }
-    let org_id = parts[0].to_string();
-    let stream_type = parts[1].into();
-    let stream_name = parts[2].to_string();
-    Some((org_id, stream_type, stream_name))
-}
-
 #[derive(Debug, Clone, PartialEq, sqlx::FromRow)]
 pub struct FileRecord {
     #[sqlx(default)]
@@ -955,54 +944,9 @@ pub struct FileIdWithFile {
 
 #[cfg(test)]
 mod tests {
-    use config::meta::stream::{StreamStats, StreamType};
+    use config::meta::stream::StreamStats;
 
     use super::*;
-
-    // ── parse_stream_key ──────────────────────────────────────────────────────
-
-    #[test]
-    fn test_parse_stream_key_valid_logs() {
-        let result = parse_stream_key("myorg/logs/mystream");
-        assert!(result.is_some());
-        let (org, stype, stream) = result.unwrap();
-        assert_eq!(org, "myorg");
-        assert_eq!(stype, StreamType::Logs);
-        assert_eq!(stream, "mystream");
-    }
-
-    #[test]
-    fn test_parse_stream_key_valid_metrics() {
-        let result = parse_stream_key("default/metrics/cpu_usage");
-        assert!(result.is_some());
-        let (org, stype, stream) = result.unwrap();
-        assert_eq!(org, "default");
-        assert_eq!(stype, StreamType::Metrics);
-        assert_eq!(stream, "cpu_usage");
-    }
-
-    #[test]
-    fn test_parse_stream_key_valid_traces() {
-        let result = parse_stream_key("acme/traces/http_spans");
-        assert!(result.is_some());
-        let (org, stype, stream) = result.unwrap();
-        assert_eq!(org, "acme");
-        assert_eq!(stype, StreamType::Traces);
-        assert_eq!(stream, "http_spans");
-    }
-
-    #[test]
-    fn test_parse_stream_key_too_few_parts() {
-        assert!(parse_stream_key("myorg/logs").is_none());
-        assert!(parse_stream_key("myorg").is_none());
-        assert!(parse_stream_key("").is_none());
-    }
-
-    #[test]
-    fn test_parse_stream_key_too_many_parts() {
-        // More than 3 segments → None
-        assert!(parse_stream_key("org/logs/stream/extra").is_none());
-    }
 
     // ── FileListJobStatus::from(i32) ──────────────────────────────────────────
 

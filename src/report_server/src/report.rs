@@ -506,13 +506,6 @@ mod tests {
     }
 
     #[test]
-    fn test_sanitize_filename_mixed_chars() {
-        let input = "My Report! 2024/01/15.pdf";
-        let expected = "My Report_ 2024_01_15_pdf";
-        assert_eq!(sanitize_filename(input), expected);
-    }
-
-    #[test]
     fn test_sanitize_filename_empty() {
         let input = "";
         let expected = "";

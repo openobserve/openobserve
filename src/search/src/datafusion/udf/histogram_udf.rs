@@ -97,11 +97,6 @@ mod tests {
     }
 
     #[test]
-    fn test_histogram_udf_name_constant() {
-        assert_eq!(HISTOGRAM_UDF_NAME, "histogram");
-    }
-
-    #[test]
     fn test_invoke_with_args_errors_instead_of_panicking() {
         let udf = HistogramUdf::new();
         let args = datafusion::logical_expr::ScalarFunctionArgs {

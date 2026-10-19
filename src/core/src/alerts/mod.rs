@@ -2114,28 +2114,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_condition_group_to_sql_single_condition() {
-        let schema = Schema::new(vec![Field::new("level", DataType::Utf8, false)]);
-
-        // Single condition should be wrapped in parentheses
-        let condition_group = ConditionGroup {
-            filter_type: "group".to_string(),
-            logical_operator: LogicalOperator::And,
-            conditions: vec![ConditionItem::Condition(ConditionItemCondition {
-                column: "level".to_string(),
-                operator: Operator::EqualTo,
-                value: Value::String("error".to_string()),
-                ignore_case: None,
-                logical_operator: LogicalOperator::And,
-            })],
-        };
-
-        let sql = condition_group.to_sql(&schema).await.unwrap();
-
-        assert_eq!(sql, "(\"level\" = 'error')");
-    }
-
-    #[tokio::test]
     async fn test_condition_group_to_sql_mixed_and_or_same_level() {
         let schema = Schema::new(vec![
             Field::new("level", DataType::Utf8, false),

@@ -115,3 +115,29 @@ describe("buildPrefillFromRumFunnel", () => {
     expect(prefill.warnings.map((w) => w.key)).toContain("periodClamped");
   });
 });
+
+describe("P5 gap fixes: frozen exclusions in the alert SQL", () => {
+  it("P5-R9: the prefilled SQL carries the app's current exclusion rules", () => {
+    const ruled = {
+      ...scope,
+      schema: { ...scope.schema, user_agent_user_agent_family: true, geo_info_country: true },
+      exclusions: {
+        bots: true,
+        builtinBots: { version: 1, families: ["HeadlessChrome"], devices: [] },
+        sessions: [{ field: "geo_info_country", op: "eq", values: ["XX"] }],
+        pages: [],
+      },
+    };
+    const prefill = buildPrefillFromRumFunnel({
+      scope: ruled,
+      id: null,
+      def,
+      events: [],
+      belowPct: 40,
+    });
+    expect(prefill.sql).toContain(
+      "(user_agent_user_agent_family IS NULL OR user_agent_user_agent_family NOT IN ('HeadlessChrome'))",
+    );
+    expect(prefill.sql).toContain("(geo_info_country IS NULL OR geo_info_country <> 'XX')");
+  });
+});

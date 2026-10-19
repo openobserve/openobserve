@@ -27,6 +27,14 @@ import {
   useAIObservabilityExtraRoutes,
 } from "@/composables/shared/useAIObservabilityRoutes";
 
+const Billing = () => import("@/enterprise/components/billings/Billing.vue");
+const Plans = () => import("@/enterprise/components/billings/plans.vue");
+const InvoiceHistory = () => import("@/enterprise/components/billings/invoiceHistory.vue");
+const Usage = () => import("@/enterprise/components/billings/usage.vue");
+const BillingGroup = () => import("@/enterprise/components/billings/BillingGroup.vue");
+const AzureMarketplaceSetup = () => import("@/views/AzureMarketplaceSetup.vue");
+const AwsMarketplaceSetup = () => import("@/views/AwsMarketplaceSetup.vue");
+
 const useEnvRoutes = () => {
   // Note: AWS Marketplace registration is handled by backend at POST /api/aws-marketplace/register
   // The backend sets a cookie and redirects to Dex login

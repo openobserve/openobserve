@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { createRouter, createWebHistory, type Router } from "vue-router";
 import { createStore } from "vuex";
@@ -35,6 +35,7 @@ import searchService from "@/services/search";
 import usePerformance from "@/composables/rum/usePerformance";
 import useProductAnalytics, { resetProductAnalytics } from "@/composables/rum/useProductAnalytics";
 import AnalyticsOverview from "./AnalyticsOverview.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import useNamedEvents, {
   readNamedEventHandoff,
   resetNamedEvents,
@@ -836,5 +837,299 @@ describe("AnalyticsOverview", () => {
       pageHints: [],
       from: "overview",
     });
+  });
+});
+
+describe("pa gap fixes (Overview exclusions)", () => {
+  let router: Router;
+  let wrapper: VueWrapper | null = null;
+  const settingsApi = api.service as unknown as Record<string, Mock>;
+  const appSettings = (over: Record<string, unknown> = {}) => ({
+    id: "web-settings-id",
+    app: "web",
+    bots: true,
+    builtinBots: {
+      version: 1,
+      families: ["HeadlessChrome", "PhantomJS", "Spider"],
+      devices: ["Spider"],
+    },
+    sessions: [],
+    pages: [],
+    version: 1,
+    rulesHash: "0123456789abcdef",
+    createdBy: "admin@x.com",
+    createdAt: 1,
+    updatedBy: "admin@x.com",
+    updatedAt: 1,
+    ...over,
+  });
+  const EXCLUDED_SUMMARY: Hit = {
+    ...SUMMARY,
+    sessions: 1673,
+    total_sessions: 14008,
+    builtin_kept_sessions: 1752,
+  };
+  const UA_RE = /AS dev/;
+  const STAFF_RULE = { field: "usr_email", op: "suffix", values: ["@openobserve.ai"] };
+
+  const withRoutes = (extra: Route[], summary: Hit = EXCLUDED_SUMMARY) => {
+    routes = [
+      ...extra,
+      ...baseRoutes().map(([re, v]): Route =>
+        String(re) === String(/va_rows/) ? [re, [summary]] : [re, v],
+      ),
+    ];
+    respond();
+  };
+
+  const mountOverview = async () => {
+    router = createRouter({
+      history: createWebHistory(),
+      routes: [
+        { path: "/o", name: "productAnalyticsOverview", component: { template: "<div />" } },
+        { path: "/f", name: "productAnalyticsFunnels", component: { template: "<div />" } },
+        { path: "/fb", name: "productAnalyticsFunnelBuilder", component: { template: "<div />" } },
+        { path: "/p", name: "productAnalyticsPaths", component: { template: "<div />" } },
+        { path: "/i", name: "frontendMonitoring", component: { template: "<div />" } },
+        { path: "/en", name: "productAnalyticsEventNew", component: { template: "<div />" } },
+      ],
+    });
+    await router.push("/o?app=web&period=7d");
+    useProductAnalytics().initFromRoute({ app: "web", period: "7d" });
+    wrapper = mount(AnalyticsOverview, {
+      global: { plugins: [router, store], stubs: { TrendsPanel: TrendsStub } },
+      attachTo: document.body,
+    });
+    await settle();
+  };
+
+  const text = () => wrapper!.text();
+  const button = (label: string) =>
+    wrapper!.findAll("button, a, [role='button']").find((b) => b.text().trim() === label);
+  const textsIn = (dataTest: string) => {
+    const el = wrapper!.find(`[data-test="${dataTest}"]`);
+    const tips = el.findAllComponents(OTooltip).map((c) => String(c.props("content") ?? ""));
+    return [el.html(), ...tips].join("\n");
+  };
+  const uaSqls = () => sqls().filter((s) => UA_RE.test(s));
+
+  beforeEach(() => {
+    api.reset();
+    resetNamedEvents();
+    resetProductAnalytics();
+    vi.mocked(searchService.search).mockReset();
+    usePerformance().performanceState.data.streams._rumdata = {
+      name: "_rumdata",
+      schema: {
+        usr_email: { name: "usr_email" },
+        user_agent_user_agent_family: { name: "user_agent_user_agent_family" },
+        user_agent_device_family: { name: "user_agent_device_family" },
+      },
+    };
+    settingsApi.getAppSettings.mockImplementation(async () => ({ data: appSettings() }));
+    settingsApi.putAppSettings.mockImplementation(async (_o: string, _a: string, body: object) => ({
+      data: appSettings({ ...body, version: 2 }),
+    }));
+    withRoutes([]);
+  });
+
+  afterEach(() => {
+    wrapper?.unmount();
+    wrapper = null;
+    document.body.innerHTML = "";
+  });
+
+  it("P7-R7: KPI footnote names the sessions excluded by the built-in rule and the saved rules, with Include them", async () => {
+    settingsApi.getAppSettings.mockImplementation(async () => ({
+      data: appSettings({ sessions: [STAFF_RULE] }),
+    }));
+    await mountOverview();
+    expect(text()).toMatch(/12,335 sessions hidden by the built-in bot rule and 1 rule/);
+    expect(button("Include them")).toBeDefined();
+  });
+
+  it("P7-R7: Include them sets xall=1", async () => {
+    await mountOverview();
+    await button("Include them")!.trigger("click");
+    await settle();
+    expect(useProductAnalytics().toQuery().xall).toBe("1");
+  });
+
+  it("P6-R7: Include them re-runs the summary without re-probing apps", async () => {
+    await mountOverview();
+    const count = (re: RegExp) => sqls().filter((s) => re.test(s)).length;
+    const probes = count(/AS app, COUNT/);
+    const summaries = count(/va_rows/);
+    await button("Include them")!.trigger("click");
+    await settle();
+    expect(count(/va_rows/)).toBeGreaterThan(summaries);
+    expect(count(/AS app, COUNT/)).toBe(probes);
+  });
+
+  it("P7-R7: no KPI footnote when nothing is excluded", async () => {
+    withRoutes([], { ...SUMMARY, total_sessions: 200, builtin_kept_sessions: 200 });
+    await mountOverview();
+    expect(wrapper!.find('[data-test="rum-analytics-kpi-sessions"]').text()).toContain("200");
+    expect(text()).not.toMatch(/sessions? hidden by/);
+    expect(button("Include them")).toBeUndefined();
+  });
+
+  it("P7-R7: the Pages per session tooltip says it counts every page view, including hidden pages", async () => {
+    await mountOverview();
+    expect(textsIn("rum-analytics-kpi-pages-per-session")).toContain(
+      "Counts every page view, including hidden pages",
+    );
+  });
+
+  it("P7-R8: a bot-like user agent over 20% of sessions shows the banner with Hide <family> and Review app filters", async () => {
+    withRoutes([[UA_RE, [{ ua: "PingdomBot", dev: "Other", sessions: 500 }]]]);
+    await mountOverview();
+    expect(uaSqls()).toHaveLength(1);
+    expect(uaSqls()[0]).toMatch(/LIMIT 15/);
+    expect(button("Hide PingdomBot")).toBeDefined();
+    expect(button("Review app filters")).toBeDefined();
+  });
+
+  it("P6-R11: a real browser family is never suggested, however many sessions it holds", async () => {
+    withRoutes([[UA_RE, [{ ua: "Chrome", dev: "Other", sessions: 1500 }]]]);
+    await mountOverview();
+    expect(uaSqls()).toHaveLength(1);
+    expect(text()).not.toContain("Hide Chrome");
+    expect(button("Review app filters")).toBeUndefined();
+  });
+
+  it("P6-R11: the bot-like family match is case-insensitive", async () => {
+    withRoutes([[UA_RE, [{ ua: "SiteCHECKer", dev: "Other", sessions: 500 }]]]);
+    await mountOverview();
+    expect(button("Hide SiteCHECKer")).toBeDefined();
+  });
+
+  it.each([
+    ["eq", "user_agent_user_agent_family", "PingdomBot"],
+    ["in", "user_agent_user_agent_family", "PingdomBot"],
+    ["prefix", "user_agent_user_agent_family", "Pingdom"],
+    ["suffix", "user_agent_user_agent_family", "Bot"],
+    ["contains", "user_agent_user_agent_family", "dom"],
+    ["eq", "user_agent_device_family", "BotDevice"],
+    ["in", "user_agent_device_family", "BotDevice"],
+    ["prefix", "user_agent_device_family", "Bot"],
+    ["suffix", "user_agent_device_family", "Device"],
+    ["contains", "user_agent_device_family", "tDev"],
+  ])("P6-R11: a family covered by a %s rule on %s is not suggested", async (op, field, value) => {
+    settingsApi.getAppSettings.mockImplementation(async () => ({
+      data: appSettings({ sessions: [{ field, op, values: [value] }] }),
+    }));
+    withRoutes([[UA_RE, [{ ua: "PingdomBot", dev: "BotDevice", sessions: 500 }]]]);
+    await mountOverview();
+    expect(uaSqls()).toHaveLength(1);
+    expect(text()).not.toContain("Hide PingdomBot");
+  });
+
+  it("P6-R11: a regex rule does not count as covering, so the family is still suggested", async () => {
+    settingsApi.getAppSettings.mockImplementation(async () => ({
+      data: appSettings({
+        sessions: [{ field: "user_agent_user_agent_family", op: "regex", values: ["^Pingdom"] }],
+      }),
+    }));
+    withRoutes([[UA_RE, [{ ua: "PingdomBot", dev: "Other", sessions: 500 }]]]);
+    await mountOverview();
+    expect(button("Hide PingdomBot")).toBeDefined();
+  });
+
+  it("P6-R11: while the built-in rule is off, its labels are never suggested", async () => {
+    settingsApi.getAppSettings.mockImplementation(async () => ({
+      data: appSettings({ bots: false }),
+    }));
+    withRoutes([
+      [
+        UA_RE,
+        [
+          { ua: "HeadlessChrome", dev: "Other", sessions: 600 },
+          { ua: "Spider", dev: "Spider", sessions: 500 },
+        ],
+      ],
+    ]);
+    await mountOverview();
+    expect(uaSqls()).toHaveLength(1);
+    expect(text()).not.toContain("Hide HeadlessChrome");
+    expect(text()).not.toContain("Hide Spider");
+    expect(button("Review app filters")).toBeUndefined();
+  });
+
+  it("P6-R11: a bot-like family at or under 20% of the remaining sessions fires no banner", async () => {
+    withRoutes([[UA_RE, [{ ua: "PingdomBot", dev: "Other", sessions: 300 }]]]);
+    await mountOverview();
+    expect(uaSqls()).toHaveLength(1);
+    expect(button("Review app filters")).toBeUndefined();
+  });
+
+  it("P6-R11: an identity value over 20% of identified sessions fires the banner", async () => {
+    withRoutes([
+      [UA_RE, []],
+      [/total_s/, [{ u: "staff@x.com", s: 40, total_s: 150, n_values: 50 }]],
+    ]);
+    await mountOverview();
+    expect(button("Review app filters")).toBeDefined();
+  });
+
+  it("P6-R11: an identity value at or under 20% of identified sessions fires no banner", async () => {
+    withRoutes([
+      [UA_RE, []],
+      [/total_s/, [{ u: "staff@x.com", s: 25, total_s: 150, n_values: 50 }]],
+    ]);
+    await mountOverview();
+    expect(button("Review app filters")).toBeUndefined();
+  });
+
+  it("P7-R9: shows the Unnamed clicks by page card from the unnamed clicks query", async () => {
+    withRoutes([[/AS unnamed/, [{ pg: "/web/unnamed-host", clicks: 41, unnamed: 37 }]]]);
+    await mountOverview();
+    expect(text()).toContain("Unnamed clicks by page");
+    expect(sqls().some((s) => /AS unnamed/.test(s))).toBe(true);
+    const card = wrapper!
+      .findAll("*")
+      .filter(
+        (e) =>
+          e.text().includes("Unnamed clicks by page") && e.text().includes("/web/unnamed-host"),
+      )
+      .at(-1);
+    expect(card).toBeDefined();
+    expect(card!.text()).toContain("37");
+  });
+
+  it("P7-R10: the Pages card footnote names the hidden pages", async () => {
+    settingsApi.getAppSettings.mockImplementation(async () => ({
+      data: appSettings({
+        pages: [
+          { op: "eq", value: "/web/login" },
+          { op: "prefix", value: "/web/cb" },
+        ],
+      }),
+    }));
+    await mountOverview();
+    const card = wrapper!.find('[data-test="rum-analytics-overview-pages"]').text();
+    expect(card).toContain("/web/login");
+    expect(card).toContain("/web/cb");
+  });
+
+  it("P7-R16: a card built on a row-form query says identity rules apply from the first identified event", async () => {
+    settingsApi.getAppSettings.mockImplementation(async () => ({
+      data: appSettings({ sessions: [STAFF_RULE] }),
+    }));
+    await mountOverview();
+    expect(textsIn("rum-analytics-overview-clicks")).toContain(
+      "identity rules apply from the first identified event",
+    );
+  });
+
+  it("P7-R16: the active users strip, built on a row-form query, says identity rules apply from the first identified event", async () => {
+    settingsApi.getAppSettings.mockImplementation(async () => ({
+      data: appSettings({ sessions: [STAFF_RULE] }),
+    }));
+    await mountOverview();
+    expect(wrapper!.find('[data-test="rum-analytics-active-users"]').exists()).toBe(true);
+    expect(textsIn("rum-analytics-active-users")).toContain(
+      "identity rules apply from the first identified event",
+    );
   });
 });
