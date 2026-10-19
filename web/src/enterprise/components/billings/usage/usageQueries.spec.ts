@@ -175,6 +175,13 @@ describe("usageQueries", () => {
     expect(sql).toContain("event = 'Ingestion'");
   });
 
+  it("asks for every day x entity row, past the server's 1,000-row default for a query with no LIMIT", () => {
+    // 1,300 streams over a month is far more than 1,000 rows; cut short, 'others' misses most of them.
+    const sql = dailyEntitySql("default", DRILLDOWNS.ingestion![0], 0.001, 5);
+    expect(sql).toMatch(/ LIMIT (\d+)$/);
+    expect(Number(sql.match(/ LIMIT (\d+)$/)![1])).toBeGreaterThanOrEqual(31 * 1_300);
+  });
+
   describe("super org", () => {
     it("reads every org's volume per event, with no per-row price expressions", () => {
       const sql = orgVolumeSql();

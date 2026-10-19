@@ -202,6 +202,14 @@ export const DRILLDOWNS: Partial<Record<MeterKey, DrilldownSection[]>> = {
   synthetics_protocol: [byCheck("SyntheticsProtocolSteps")],
 };
 
+/**
+ * Without a LIMIT the server returns at most 1,000 rows, and a month of 1,300 streams is about
+ * 6,700, so the chart's 'others' band lost most of them. An explicit LIMIT is honoured instead.
+ * ponytail: rows still cap here (about 3,200 entities a day for a 31-day cycle); rank the top
+ * entities in SQL if an org outgrows it.
+ */
+const DAILY_ENTITY_ROWS = 100_000;
+
 /** Daily cost per entity; the chart keeps the top few itself, so it need not wait for the table's ranking. */
 export function dailyEntitySql(
   orgId: string,
@@ -213,7 +221,7 @@ export function dailyEntitySql(
     `SELECT histogram(_timestamp, '1 day') as "x_axis_1", ` +
     `sum(size) * ${rate} as "y_axis_1", ${spec.expression} as "breakdown_1" ` +
     `FROM "${USAGE_STREAM_NAME}" WHERE ${sectionWhere(orgId, spec)}${sinceClause(since)} ` +
-    `GROUP BY x_axis_1, breakdown_1 ORDER BY x_axis_1 ASC`
+    `GROUP BY x_axis_1, breakdown_1 ORDER BY x_axis_1 ASC LIMIT ${DAILY_ENTITY_ROWS}`
   );
 }
 
