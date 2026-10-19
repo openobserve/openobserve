@@ -699,7 +699,7 @@ describe("SetupCardRenderer — Linux install step tracing toggle", () => {
     expect(wrapper.find('[data-test="ai-variant-inputs-install"]').exists()).toBe(false);
     await wrapper.find('[data-test="ai-input-cluster"] input').setValue("prod-eu");
     expect(installBlock().props("code")).toContain("--cluster-name=prod-eu");
-    await wrapper.find('[data-test="ai-input-cluster"] input').setValue("  ");
-    expect(installBlock().props("code")).toContain("--cluster-name=cluster1");
+    await wrapper.find('[data-test="ai-input-cluster"] input').setValue("");
+    expect(installBlock().props("code")).not.toContain("cluster1");
   });
 });

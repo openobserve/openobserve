@@ -113,6 +113,7 @@ describe("linuxCard builder", () => {
   it("shows the tracing note on the traces variant only", () => {
     const [base, traces] = installVariants();
     expect(base.note).toBeUndefined();
+    expect(traces.note).toMatch(/^Traces are captured with eBPF/);
     expect(traces.note).toContain("BTF");
     // Recovery points at the plain command: --service-name alone would be rejected.
     expect(traces.note).toContain("re-run the **Logs & metrics** command");

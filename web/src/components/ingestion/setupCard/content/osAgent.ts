@@ -64,8 +64,6 @@ export function dashboardReadyStep(t: TranslateFn): RichCardStep {
   };
 }
 
-// The agents repo ships a single uninstall script per OS — there is no EC2-specific
-// one — so an EC2 install is removed by the same command as a generic one.
 const unixUninstall = (dir: "linux" | "mac") =>
   `curl -O ${AGENTS_REPO}/${dir}/uninstall.sh \\
   && chmod +x uninstall.sh \\

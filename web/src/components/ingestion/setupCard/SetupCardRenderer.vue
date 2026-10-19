@@ -151,7 +151,7 @@ const subStream = (text?: string, variant?: RichCardStepVariant): string | undef
   let out = text.replaceAll("{stream}", watchedStream.value).replaceAll("{flags}", () => flags);
   for (const inp of allInputs.value) {
     if (inp.flag) continue;
-    const value = inputValues.value[inp.id]?.trim() || inp.default;
+    const value = inputValues.value[inp.id] ?? inp.default;
     // A function replacement keeps typed `$&`, `$$` etc. literal.
     out = out.replaceAll(`{${inp.id}}`, () => value);
   }
