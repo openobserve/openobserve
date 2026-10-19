@@ -582,6 +582,7 @@
   },
   "common": {
     "copiedToClipboard": "تم نسخها إلى الحافظة",
+    "customLogoAlt": "شعار المؤسسة",
     "queryEditorAriaLabel": "محرر الاستعلام. اضغط على Escape للانتقال إلى عنصر التحكم التالي.",
     "inlineEdit": {
       "autoHint": "انقر لإعادة الاسم. حتى تفعل ذلك، يتم توليد هذا الاسم من إعدادك ويستمر مع تغييره."
@@ -18960,6 +18961,8 @@
         "resetToDefault": "إعادة التعيين إلى الوضع الافتراضي",
         "resetColumnWidths": "إعادة ضبط عرض الأعمدة"
       },
+      "selectAllRows": "تحديد كل الصفوف",
+      "selectRow": "تحديد الصف {name}",
       "removeColumnAria": "إزالة العمود",
       "formatColumnAria": "عمود التنسيق",
       "selectedOfTotal": "تم تحديد {selected} من {total}",

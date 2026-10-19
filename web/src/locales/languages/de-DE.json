@@ -582,6 +582,7 @@
   },
   "common": {
     "copiedToClipboard": "In die Zwischenablage kopiert",
+    "customLogoAlt": "Organisationslogo",
     "queryEditorAriaLabel": "Abfrage-Editor. Drücken Sie Escape, um zum nächsten Steuerelement zu wechseln.",
     "inlineEdit": {
       "autoHint": "Zum Umbenennen klicken. Bis du das tust, wird dieser Name aus deiner Konfiguration generiert und passt sich bei Änderungen an."
@@ -18960,6 +18961,8 @@
         "resetToDefault": "Auf Standard zurücksetzen",
         "resetColumnWidths": "Spaltenbreiten zurücksetzen"
       },
+      "selectAllRows": "Alle Zeilen auswählen",
+      "selectRow": "Zeile {name} auswählen",
       "removeColumnAria": "Spalte entfernen",
       "formatColumnAria": "Spalte formatieren",
       "selectedOfTotal": "{selected} von {total} ausgewählt",

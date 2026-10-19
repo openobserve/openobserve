@@ -582,6 +582,7 @@
   },
   "common": {
     "copiedToClipboard": "Copiado al portapapeles",
+    "customLogoAlt": "Logotipo de la organización",
     "queryEditorAriaLabel": "Editor de consultas. Pulse Escape para pasar al siguiente control.",
     "inlineEdit": {
       "autoHint": "Haz clic para renombrar. Hasta que lo hagas, este nombre se genera a partir de tu configuración y se actualiza a medida que la cambias."
@@ -18960,6 +18961,8 @@
         "resetToDefault": "Restablecer a los valores predeterminados",
         "resetColumnWidths": "Restablecer anchos de columna"
       },
+      "selectAllRows": "Seleccionar todas las filas",
+      "selectRow": "Seleccionar fila {name}",
       "removeColumnAria": "Eliminar columna",
       "formatColumnAria": "Formatear columna",
       "selectedOfTotal": "{selected} de {total} seleccionados",

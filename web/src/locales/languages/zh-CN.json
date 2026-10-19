@@ -582,6 +582,7 @@
   },
   "common": {
     "copiedToClipboard": "已复制到剪贴板",
+    "customLogoAlt": "组织 Logo",
     "queryEditorAriaLabel": "查询编辑器。按 Escape 移动到下一个控件。",
     "inlineEdit": {
       "autoHint": "点击重命名。在您重命名之前，此名称会根据您的配置自动生成，并在您更改配置时随之更新。"
@@ -18960,6 +18961,8 @@
         "resetToDefault": "重置为默认",
         "resetColumnWidths": "重置列宽"
       },
+      "selectAllRows": "选择所有行",
+      "selectRow": "选择行 {name}",
       "removeColumnAria": "移除列",
       "formatColumnAria": "格式化列",
       "selectedOfTotal": "已选择 {selected}/{total}",
