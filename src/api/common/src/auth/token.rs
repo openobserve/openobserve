@@ -54,6 +54,12 @@ fn may_skip_permission_check(
     is_list_invite_call || is_reject_invite_call || is_member_subscription || is_org_list_call
 }
 
+/// Only the top-level org list filters by the caller's email; an org-scoped list does not.
+#[cfg(any(feature = "enterprise", test))]
+fn is_top_level_org_list(path_columns: &[&str], method: &str) -> bool {
+    matches!(path_columns, ["organizations"]) && method == "LIST"
+}
+
 /// Foreign-`aud` MCP tokens pass only on /{org}/mcp or our own loopback calls.
 #[cfg(any(feature = "enterprise", test))]
 fn relaxes_audience_check(path_columns: &[&str], mcp_marker: Option<&[u8]>) -> bool {
@@ -69,19 +75,14 @@ pub async fn token_validator(
     req_data: &RequestData,
     auth_info: &AuthExtractor,
 ) -> Result<AuthValidationResult, AuthError> {
-    use openobserve_core::{auth::V2_API_PREFIX, authz::check_permissions};
+    use openobserve_core::{
+        auth::{org_from_path, routed_path},
+        authz::check_permissions,
+    };
 
     let user;
     let keys = get_dex_jwks().await;
-    let path = match req_data
-        .uri
-        .path()
-        .strip_prefix(format!("{}/api/", config::get_config().common.base_uri).as_str())
-    {
-        Some(path) => path,
-        None => req_data.uri.path(),
-    };
-    let path = path.strip_prefix("/").unwrap_or(path);
+    let path = routed_path(req_data.uri.path());
     let path_columns = path.split('/').collect::<Vec<&str>>();
 
     let mcp_marker = req_data.headers.get("x-o2-mcp").map(|v| v.as_bytes());
@@ -162,14 +163,8 @@ pub async fn token_validator(
                     }
                 } else {
                     user = match path.find('/') {
-                        Some(index) => {
-                            let org_id =
-                                if path_columns.len() > 1 && path_columns[0].eq(V2_API_PREFIX) {
-                                    path_columns[1]
-                                } else {
-                                    &path[0..index]
-                                };
-                            users::get_user(Some(org_id), user_id).await
+                        Some(_) => {
+                            users::get_user(Some(org_from_path(&path_columns)), user_id).await
                         }
                         None => {
                             if path_columns.len() == 1 && path_columns[0] == "license" {
@@ -217,7 +212,7 @@ pub async fn token_validator(
                         is_list_invite_call,
                         is_reject_invite_call,
                         is_member_subscription,
-                        path_suffix.eq(&"organizations") && auth_info.method.eq("LIST"),
+                        is_top_level_org_list(&path_columns, &auth_info.method),
                     ) =>
                     {
                         // Allow these special cases without requiring user in DB
@@ -329,6 +324,15 @@ mod tests {
              (allow_nonexistent_user) was a cross-org authorization bypass and \
              must not return."
         );
+    }
+
+    #[test]
+    fn only_the_top_level_org_list_is_exempt() {
+        assert!(is_top_level_org_list(&["organizations"], "LIST"));
+        assert!(!is_top_level_org_list(&["_meta", "organizations"], "LIST"));
+        assert!(!is_top_level_org_list(&["acme", "organizations"], "LIST"));
+        assert!(!is_top_level_org_list(&["organizations"], "POST"));
+        assert!(!is_top_level_org_list(&["organizations"], "GET"));
     }
 
     #[test]

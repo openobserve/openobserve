@@ -34,7 +34,8 @@ pub use openobserve_core::auth::get_user_email_from_auth_str;
 pub use openobserve_core::authz::{check_permissions, list_objects_for_user};
 use openobserve_core::{
     auth::{
-        AuthExtractor, SESSION_AUTH_MARKER, V2_API_PREFIX, get_hash, get_user_details, try_get_hash,
+        AuthExtractor, SESSION_AUTH_MARKER, get_hash, get_user_details, org_from_path, routed_path,
+        try_get_hash,
     },
     users,
 };
@@ -55,18 +56,6 @@ pub const PKCE_STATE_ORG: &str = "o2_pkce_state";
 pub const ACCESS_TOKEN: &str = "access_token";
 pub const REFRESH_TOKEN: &str = "refresh_token";
 pub const ID_TOKEN_HEADER: &str = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9";
-/// Modules routed as `/v2/{org_id}/{module}`; any other path names its org in the first segment.
-const V2_ORG_MODULES: [&str; 8] = [
-    "alerts",
-    "folders",
-    "reports",
-    "synthetics",
-    "incidents",
-    "downtimes",
-    "workflows",
-    "alert_calibration",
-];
-
 /// Extracted request data that can be safely passed across await points
 /// This is Send + Sync because all fields are Send + Sync
 #[derive(Clone)]
@@ -206,13 +195,8 @@ pub async fn validator(
     path_prefix: &str,
     from_session: bool,
 ) -> Result<AuthValidationResult, AuthError> {
-    let cfg = get_config();
     let uri_path = req_data.uri.path();
-    let path = uri_path
-        .strip_prefix(format!("{}{}", cfg.common.base_uri, path_prefix).as_str())
-        .or_else(|| uri_path.strip_prefix("/api/"))
-        .unwrap_or(uri_path);
-    let path = path.strip_prefix("/").unwrap_or(path);
+    let path = routed_path(uri_path.strip_prefix(path_prefix).unwrap_or(uri_path));
     match if auth_info.auth.starts_with("{\"auth_ext\":") {
         let auth_token: AuthTokensExt =
             config::utils::json::from_str(&auth_info.auth).unwrap_or_default();
@@ -328,19 +312,7 @@ fn is_org_agnostic_read(path: &str) -> bool {
         return true;
     }
     let segments: Vec<&str> = path.split('/').filter(|s| !s.is_empty()).collect();
-    matches!(
-        segments.as_slice(),
-        [_org, "password_complexity"] | ["api", _org, "password_complexity"]
-    )
-}
-
-/// The org a request path names, which a `/v2/{org_id}/{module}` route carries second.
-fn org_from_path<'a>(path_columns: &[&'a str]) -> &'a str {
-    match *path_columns {
-        ["v2", org, module, ..] if V2_ORG_MODULES.contains(&module) => org,
-        [org, ..] => org,
-        [] => "",
-    }
+    matches!(segments.as_slice(), [_org, "password_complexity"])
 }
 
 /// Compare a password under the lockout policy, recording the attempt.
@@ -482,11 +454,7 @@ pub async fn validate_credentials(
     // if the password starts with this prefix, check the dedicated
     // org_ingestion_tokens cache/table instead of the user tables.
     if user_password.starts_with(infra::table::org_ingestion_tokens::ORG_INGESTION_TOKEN_PREFIX) {
-        let org_id = if path_columns.len() > 1 && path_columns[0].eq(V2_API_PREFIX) {
-            path_columns.get(1).copied()
-        } else {
-            path_columns.first().copied()
-        };
+        let org_id = (!path_columns.is_empty()).then(|| org_from_path(&path_columns));
 
         if let Some(org_id) = org_id {
             let cache_key = format!("{}/{}", org_id, user_password);
@@ -582,12 +550,8 @@ pub async fn validate_credentials(
         }
     } else {
         match path.find('/') {
-            Some(index) => {
-                let org_id = if path_columns.len() > 1 && path_columns[0].eq(V2_API_PREFIX) {
-                    path_columns[1]
-                } else {
-                    &path[0..index]
-                };
+            Some(_) => {
+                let org_id = org_from_path(&path_columns);
 
                 if is_root_user(user_id) {
                     users::get_user(Some(DEFAULT_ORG), user_id).await
@@ -816,12 +780,8 @@ pub async fn validate_credentials_ext(
         }
     } else {
         match path.find('/') {
-            Some(index) => {
-                let org_id = if path_columns.len() > 1 && path_columns[0].eq(V2_API_PREFIX) {
-                    path_columns[1]
-                } else {
-                    &path[0..index]
-                };
+            Some(_) => {
+                let org_id = org_from_path(&path_columns);
                 if is_root_user(user_id) {
                     users::get_user(Some(DEFAULT_ORG), user_id).await
                 } else {
@@ -1085,12 +1045,7 @@ pub async fn validate_user_for_query_params(
 
 /// Validates AWS Firehose requests
 pub async fn validator_aws(req_data: &RequestData) -> Result<AuthValidationResult, AuthError> {
-    let cfg = get_config();
-    let path = req_data
-        .uri
-        .path()
-        .strip_prefix(format!("{}/aws/", cfg.common.base_uri).as_str())
-        .unwrap_or(req_data.uri.path());
+    let path = routed_path(req_data.uri.path());
 
     match req_data.headers.get("X-Amz-Firehose-Access-Key") {
         Some(val) => match val.to_str() {
@@ -1130,12 +1085,7 @@ pub async fn validator_aws(req_data: &RequestData) -> Result<AuthValidationResul
 
 /// Validates GCP requests
 pub async fn validator_gcp(req_data: &RequestData) -> Result<AuthValidationResult, AuthError> {
-    let cfg = get_config();
-    let path = req_data
-        .uri
-        .path()
-        .strip_prefix(format!("{}/gcp/", cfg.common.base_uri).as_str())
-        .unwrap_or(req_data.uri.path());
+    let path = routed_path(req_data.uri.path());
 
     // Parse query string
     let query_string = req_data.uri.query().unwrap_or("");
@@ -1370,9 +1320,8 @@ pub async fn oo_validator(
     req_data: &RequestData,
     auth_info: &AuthExtractor,
 ) -> Result<AuthValidationResult, AuthError> {
-    let path_prefix = "/api/";
-    let _path = extract_relative_path(req_data.uri.path(), path_prefix);
-
+    // The `/api` nest has already stripped its prefix; only the unnested proxy routes keep theirs.
+    let path_prefix = "";
     oo_validator_internal(req_data, auth_info, path_prefix).await
 }
 
@@ -1387,16 +1336,6 @@ pub async fn validator_proxy_url(
 ) -> Result<AuthValidationResult, AuthError> {
     let path_prefix = "/proxy/";
     oo_validator_internal(req_data, auth_info, path_prefix).await
-}
-
-/// Helper function to extract the relative path after the base URI and path prefix
-fn extract_relative_path(full_path: &str, path_prefix: &str) -> String {
-    let base_uri = config::get_config().common.base_uri.clone();
-    let full_prefix = format!("{base_uri}{path_prefix}");
-    full_path
-        .strip_prefix(&full_prefix)
-        .unwrap_or(full_path)
-        .to_string()
 }
 
 /// Helper function to check if the path corresponds to a short URL
@@ -1450,7 +1389,7 @@ mod tests {
     };
     #[cfg(feature = "enterprise")]
     use o2_enterprise::enterprise::password_policy::meta::{LockoutPolicy, PasswordPolicy};
-    use openobserve_core::{organization, users};
+    use openobserve_core::{auth::V2_ORG_MODULES, organization, users};
 
     use super::*;
     use crate::common::{
@@ -1458,13 +1397,46 @@ mod tests {
         meta::user::UserRequest,
     };
 
+    // The fixed test keypair from `common::utils::jwt` tests; its public half is `TEST_DEX_JWKS`.
+    #[cfg(feature = "enterprise")]
+    const TEST_DEX_KEY_PEM: &str = "-----BEGIN PRIVATE KEY-----
+MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQDGTBNl8SrAdlAU
+fsXuDA7mAVAOd9et3zx5zxaPCxGbHCUyMfBxPTUiBgJVfZw82PEGZW/nIBg0Jh9y
+oVxfPZI8IjBTWyhv+pjewe2a8sIquEeeK1ke6INUhTP98P2xeabw+LeTtuBOVVxy
+84+wIrSOMpytyiW+PPRpfUZ6odTBnV1lPVesI/z3eodmVBrGApEK1mRo+zCRboh7
+N6ZgWJLNcp94ChHN0EkKktyBLaFQFd/6n3ZZGO9BrlaUNTIMa2cw4W6TZgQ44Pg2
+XEudkr9nIPIQSkiW1BapnB2bWufFO7Qa5XQv1i1jA7FjOMiFLM04hJtVNKsEqdTD
+zNTAvgIVAgMBAAECggEAevmE8iyM6cy1vvAbyZP6zVM1FbPmsrKFq7js8YrYwUvE
+GYv05BUkVVRKsD/025tiZigULM6vk++sgwdk5L+nZ9mABMG8oy1TDppPw08XcSzV
+ZVbWrx9dCtaMtsh0XFLoX/quxlGca5fufG9lxcLQHHtwxSpfG8prfNwvEDA6ZFMe
+Rsovk/4UCLWDSA6TDzjl/rgMiiqHPUe2bZn4Dmz6dB75JGqDUlRrHzYf0EpbirXN
+sHqVmCTN5coQ9YEbVxO5YvvCA2VIzaOV/vtjsxVo6AW0Su6Q1zG95e6B+dHT8gq3
+23zdDDyhvuLZZDuJxMjTzYrdKa6Cbj5cxRMARY1HhQKBgQDugLVcmrmD+a+CyROb
+QLJkFpLks6u9mIR88i1GofCdswcic77DFm9dJ08Qf38+liWL8hCr1WJdJgPLXxNp
+h3gseKn6RL1p2dwFAkSRMO88vxVc4PYMFds7PfJC/tuN2Sc1/03o05mwBkeEX9On
+dhhFqJWcCRmPI9nf4L5OL98LfwKBgQDU2EVZqvTTDvqXr7oh7DJ7YD/GUNuEop2K
+1L4fnrq+HVCKZ8wzTh8yjKfO6fpZf4wWZGETBWbg87nexpap8BDzQxwBIJzmEE7H
+qbgoyb1kWbXN7r4Zz9KMK/lrmaH9Uzr/W1ZJNdDhyuJBna7s3Y5BZFEdXTPoB0ez
+tgdHqCXMawKBgQCF9n9oC3RGX9moYV8E5jsNIuzRTuYZMXDBaZnqwY0QVv2b6V1t
+4M0eirTLNIH5Woaua4HXspx0a6TX94hEzxW+DOyUqUWnDfqaSaLP1qeZ/E54g9dQ
+BHrGdM39uX8C1sVCfCt7qlb52x0Simys9BVAEygto6Lalq2LJYZfDl5+6wKBgFao
+k1vVwgZos9isgHEtVMRsxKp+41GWT+Rlh98h5lBfaRpg9n/xD7yqDeyt0PM9fhDj
+36455dAzC3tLia45Av24Vh+TYq4894ZNcKCSutyvtdjZmmax+bx+bvfDPnQAviWX
+z4LROXGlBAfJJp5j+nZfXLNC7k5LIINn2oDvUixvAoGBAMhtnO1d8ufI9swV2i3T
+f65K5EUUYygLm1AXgFCenb6L9golR0XCtibdEI8lCBK7mGjrLAbV0z9gNVoc7uZ7
+plzPFc/u57aR2ej7TOIVdtH4o5dfd55UJFwocNvfSBAAoGHaUlQ19/JZpu1g+LVk
+CN5lTowpVXP2OIiiNTGa75Fj
+-----END PRIVATE KEY-----";
+    #[cfg(feature = "enterprise")]
+    const TEST_DEX_JWKS: &str = r#"{"keys":[{"kty":"RSA","kid":"test-key","alg":"RS256","use":"sig","n":"xkwTZfEqwHZQFH7F7gwO5gFQDnfXrd88ec8WjwsRmxwlMjHwcT01IgYCVX2cPNjxBmVv5yAYNCYfcqFcXz2SPCIwU1sob_qY3sHtmvLCKrhHnitZHuiDVIUz_fD9sXmm8Pi3k7bgTlVccvOPsCK0jjKcrcolvjz0aX1GeqHUwZ1dZT1XrCP893qHZlQaxgKRCtZkaPswkW6IezemYFiSzXKfeAoRzdBJCpLcgS2hUBXf-p92WRjvQa5WlDUyDGtnMOFuk2YEOOD4NlxLnZK_ZyDyEEpIltQWqZwdm1rnxTu0GuV0L9YtYwOxYzjIhSzNOISbVTSrBKnUw8zUwL4CFQ","e":"AQAB"}]}"#;
+
     #[tokio::test]
     async fn splunk_scheme_is_rejected_on_the_api_tree() {
         // §12.1: a Splunk collector GUID must never authenticate an /api route.
         // This holds structurally — `Splunk` matches no branch in
         // oo_validator_internal and falls through to Unauthorized.
         let req_data = RequestData {
-            uri: "/api/orgb/_bulk".parse::<Uri>().unwrap(),
+            uri: "/orgb/_bulk".parse::<Uri>().unwrap(),
             method: Method::POST,
             headers: HeaderMap::new(),
         };
@@ -1488,7 +1460,7 @@ mod tests {
     async fn auth_ext_token_without_its_prefix_is_rejected() {
         let now = Utc::now().timestamp();
         let req_data = RequestData {
-            uri: "/api/default/streams".parse::<Uri>().unwrap(),
+            uri: "/default/streams".parse::<Uri>().unwrap(),
             method: Method::GET,
             headers: HeaderMap::new(),
         };
@@ -1517,7 +1489,7 @@ mod tests {
         let mut headers = HeaderMap::new();
         headers.insert("X-Amz-Firehose-Access-Key", encoded.parse().unwrap());
         let aws = RequestData {
-            uri: "/aws/default/mystream/_kinesis_firehose"
+            uri: "/default/mystream/_kinesis_firehose"
                 .parse::<Uri>()
                 .unwrap(),
             method: Method::POST,
@@ -1532,7 +1504,7 @@ mod tests {
             .append_pair("API-Key", &encoded)
             .finish();
         let gcp = RequestData {
-            uri: format!("/gcp/default/mystream/_sub?{query}")
+            uri: format!("/default/mystream/_sub?{query}")
                 .parse::<Uri>()
                 .unwrap(),
             method: Method::POST,
@@ -1549,7 +1521,7 @@ mod tests {
         // A GUID is not an `o2oi_` token and is not a user password, so Basic
         // with it must fail too.
         let req_data = RequestData {
-            uri: "/api/orgb/_bulk".parse::<Uri>().unwrap(),
+            uri: "/orgb/_bulk".parse::<Uri>().unwrap(),
             method: Method::POST,
             headers: HeaderMap::new(),
         };
@@ -1942,13 +1914,13 @@ mod tests {
         // token must still be rejected: bypass_check must not double as
         // from_session and skip the allow_static_token policy.
         let req_data = RequestData {
-            uri: "/api/default/config".parse().unwrap(),
+            uri: "/default/config".parse().unwrap(),
             method: Method::GET,
             headers: HeaderMap::new(),
         };
         let auth_info = AuthExtractor::bypass(String::new(), String::new());
         assert!(
-            validator(&req_data, sa_email, token, &auth_info, "/api/", false)
+            validator(&req_data, sa_email, token, &auth_info, "", false)
                 .await
                 .is_err(),
             "static token with allow_static_token=false must be rejected on bypass routes"
@@ -1992,7 +1964,7 @@ mod tests {
 
         let credentials = base64::encode(&format!("{sa_email}:{token}"));
         let req_data = RequestData {
-            uri: "/api/default/users".parse().unwrap(),
+            uri: "/default/users".parse().unwrap(),
             method: Method::GET,
             headers: HeaderMap::new(),
         };
@@ -2136,6 +2108,7 @@ mod tests {
 
         exercise_empty_password_rejected(org_id).await;
         exercise_saltless_sso_user_refused(org_id).await;
+        exercise_path_org_is_the_routed_org().await;
 
         #[cfg(feature = "enterprise")]
         exercise_lockout(org_id, init_user, pwd).await;
@@ -2171,6 +2144,147 @@ mod tests {
         db::org_users::add_with_flags(org_id, email, role, token, None, true)
             .await
             .unwrap();
+    }
+
+    // Each URI is what the auth layer sees once axum has stripped its mount.
+    async fn exercise_path_org_is_the_routed_org() {
+        let pwd = "Complexpass#123";
+        let member = "kv-member@example.com";
+        for org in ["kv", "api", "v2", "aws", "gcp"] {
+            let _ = organization::check_and_create_org_without_ofga(org).await;
+        }
+        seed_user_without_password_ext("kv", member, UserRole::Admin, pwd, "kv-member-tok").await;
+        let credentials = base64::encode(&format!("{member}:{pwd}"));
+        let basic = AuthExtractor::bypass(format!("Basic {credentials}"), String::new());
+
+        let mut failures = routed_org_failures(&basic, "Basic").await;
+        let mut firehose = HeaderMap::new();
+        firehose.insert("X-Amz-Firehose-Access-Key", credentials.parse().unwrap());
+        if validator_aws(&post_request("/aws/kv/_kinesis_firehose", firehose))
+            .await
+            .is_ok()
+        {
+            failures.push("POST /aws/aws/kv/_kinesis_firehose: accepted for org aws".to_string());
+        }
+        let query: String = url::form_urlencoded::Serializer::new(String::new())
+            .append_pair("API-Key", &credentials)
+            .finish();
+        if validator_gcp(&post_request(
+            &format!("/gcp/kv/_sub?{query}"),
+            HeaderMap::new(),
+        ))
+        .await
+        .is_ok()
+        {
+            failures.push("POST /gcp/gcp/kv/_sub: accepted for org gcp".to_string());
+        }
+        #[cfg(feature = "enterprise")]
+        {
+            failures.extend(routed_org_failures(&auth_ext_for_kv_member().await, "auth_ext").await);
+            failures.extend(routed_org_failures(&dex_bearer_for(member).await, "Bearer").await);
+        }
+        assert!(failures.is_empty(), "{failures:#?}");
+    }
+
+    fn post_request(uri: &str, headers: HeaderMap) -> RequestData {
+        RequestData {
+            uri: uri.parse().unwrap(),
+            method: Method::POST,
+            headers,
+        }
+    }
+
+    // A member of `kv` is served in `kv` and refused by the orgs named like route segments.
+    async fn routed_org_failures(auth: &AuthExtractor, scheme: &str) -> Vec<String> {
+        let mut failures = vec![];
+        if oo_validator(&post_request("/kv/kv/note", HeaderMap::new()), auth)
+            .await
+            .is_err()
+        {
+            failures.push(format!(
+                "{scheme} POST /api/kv/kv/note: a member of kv was refused in kv"
+            ));
+        }
+        for (served, uri) in [("api", "/api/kv/note"), ("v2", "/v2/kv/note")] {
+            if oo_validator(&post_request(uri, HeaderMap::new()), auth)
+                .await
+                .is_ok()
+            {
+                failures.push(format!(
+                    "{scheme} POST /api{uri}: a member of kv was accepted for org {served}"
+                ));
+            }
+        }
+        failures
+    }
+
+    #[cfg(feature = "enterprise")]
+    async fn auth_ext_for_kv_member() -> AuthExtractor {
+        let email = "kv-ext-member@example.com";
+        let salt = config::get_ext_auth_salt();
+        let password_ext = get_hash("kv-ext-secret", &salt);
+        infra::table::users::add(infra::table::users::UserRecord {
+            email: email.to_string(),
+            first_name: "Ext".to_string(),
+            last_name: "Member".to_string(),
+            password: get_hash("Complexpass#123", "ext-member-salt"),
+            salt: "ext-member-salt".to_string(),
+            is_root: false,
+            password_ext: Some(password_ext.clone()),
+            user_type: UserType::Internal,
+            created_at: 0,
+            updated_at: 0,
+            must_reset_password: false,
+            password_reset_reason: None,
+            flagged_at: None,
+            password_updated_at: None,
+        })
+        .await
+        .unwrap();
+        db::org_users::add_with_flags("kv", email, UserRole::Admin, "kv-ext-tok", None, true)
+            .await
+            .unwrap();
+        let now = Utc::now().timestamp();
+        let credential = password_ext_credential(&password_ext, &now.to_string(), 300, &salt);
+        let encoded = base64::encode(&format!("{email}:{credential}"));
+        AuthExtractor::bypass(
+            format!(
+                r#"{{"auth_ext":"auth_ext{encoded}","refresh_token":"","request_time":{now},"expires_in":300}}"#
+            ),
+            String::new(),
+        )
+    }
+
+    // Serves the fixed test key below as the Dex JWKS, so a bearer token minted here verifies.
+    #[cfg(feature = "enterprise")]
+    async fn dex_bearer_for(email: &str) -> AuthExtractor {
+        use jsonwebtoken::{EncodingKey, Header, encode};
+        use o2_dex::{
+            config::{JWKS, get_config as get_dex_config},
+            meta::auth::CachedJwks,
+        };
+
+        let dex = get_dex_config();
+        JWKS.write().await.insert(
+            format!("{}{}", dex.dex_url, dex.dex_keys_ep_suffix),
+            CachedJwks {
+                content: TEST_DEX_JWKS.to_string(),
+                fetched_at: Utc::now(),
+                max_age: std::time::Duration::from_secs(3600),
+            },
+        );
+        let now = Utc::now().timestamp();
+        let mut header = Header::new(jsonwebtoken::Algorithm::RS256);
+        header.kid = Some("test-key".to_string());
+        let claims = serde_json::json!({
+            "aud": dex.client_id,
+            "email": email,
+            "iat": now,
+            "exp": now + 3600,
+        });
+        let key = EncodingKey::from_rsa_pem(TEST_DEX_KEY_PEM.as_bytes()).unwrap();
+        let token = encode(&header, &claims, &key).unwrap();
+        AuthExtractor::bypass(format!("Bearer {token}"), String::new())
     }
 
     // Stored the way the SSO/Dex callback creates external users: no password, no salt.
@@ -2212,7 +2326,7 @@ mod tests {
         }
         let credentials = base64::encode(&format!("{sso_user}:anything"));
         let req_data = RequestData {
-            uri: "/api/default/streams".parse().unwrap(),
+            uri: "/default/streams".parse().unwrap(),
             method: Method::GET,
             headers: HeaderMap::new(),
         };
@@ -2254,7 +2368,7 @@ mod tests {
         for email in [sre_agent, plain_user] {
             let credentials = base64::encode(&format!("{email}:"));
             let req_data = RequestData {
-                uri: "/api/default/streams".parse().unwrap(),
+                uri: "/default/streams".parse().unwrap(),
                 method: Method::GET,
                 headers: HeaderMap::new(),
             };
@@ -2495,24 +2609,6 @@ mod tests {
     }
 
     #[test]
-    fn test_extract_relative_path() {
-        // Test normal path extraction
-        let full_path = "/api/v1/logs";
-        let result = extract_relative_path(full_path, "/api/");
-        assert_eq!(result, "v1/logs");
-
-        // Test path with base URI
-        let full_path_with_base = "/openobserve/api/v1/logs";
-        let result = extract_relative_path(full_path_with_base, "/api/");
-        assert_eq!(result, "/openobserve/api/v1/logs");
-
-        // Test path that doesn't match prefix
-        let unmatched_path = "/other/path";
-        let result = extract_relative_path(unmatched_path, "/api/");
-        assert_eq!(result, "/other/path");
-    }
-
-    #[test]
     fn test_is_short_url_path() {
         // Test short URL path
         let short_url_path = ["api", "short", "abc123"];
@@ -2617,9 +2713,7 @@ mod tests {
     #[test]
     fn org_agnostic_reads_cover_license_and_password_complexity() {
         assert!(is_org_agnostic_read("license"));
-        // The path reaching here is relative and nest-stripped, but accept both shapes.
         assert!(is_org_agnostic_read("acme/password_complexity"));
-        assert!(is_org_agnostic_read("api/acme/password_complexity"));
         assert!(is_org_agnostic_read("_meta/password_complexity"));
         // An org literally named "api" still resolves as an org.
         assert!(is_org_agnostic_read("api/password_complexity"));
@@ -2632,6 +2726,8 @@ mod tests {
         assert!(!is_org_agnostic_read("_meta/settings/password_policy"));
         // Neither do neighbouring or deeper paths.
         assert!(!is_org_agnostic_read("acme/password_complexity/detail"));
+        // The path arrives nest-stripped, so a leading `api` is an org name, not the mount.
+        assert!(!is_org_agnostic_read("api/kv/password_complexity"));
         assert!(!is_org_agnostic_read("acme/streams"));
         assert!(!is_org_agnostic_read("password_complexity"));
         assert!(!is_org_agnostic_read("license/keys"));

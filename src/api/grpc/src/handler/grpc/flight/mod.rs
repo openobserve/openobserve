@@ -38,7 +38,10 @@ use tonic::{Request, Response, Status, Streaming};
 use tracing::Instrument;
 #[cfg(feature = "enterprise")]
 use {
-    o2_enterprise::enterprise::{common::config::get_config as get_o2_config, search::TaskStatus},
+    o2_enterprise::enterprise::{
+        common::config::get_config as get_o2_config,
+        search::{TaskStatus, query_manager::Registration},
+    },
     search::utils::AsyncDefer,
     search_service::SEARCH_SERVER,
 };
@@ -117,8 +120,12 @@ impl FlightService for FlightServiceImpl {
         let trace_id_move = trace_id.clone();
         let result = async move {
             #[cfg(feature = "enterprise")]
-            let _task_status =
-                register_follower_task_status(is_super_cluster, &trace_id_move).await;
+            let _task_status = register_follower_task_status(
+                is_super_cluster,
+                &req_move.query_identifier.org_id,
+                &trace_id_move,
+            )
+            .await;
             get_ctx_and_physical_plan(&trace_id_move, &req_move).await
         }
         .instrument(span.clone())
@@ -368,20 +375,26 @@ async fn get_ctx_and_physical_plan(
 #[cfg(feature = "enterprise")]
 async fn register_follower_task_status(
     is_super_cluster: bool,
+    org_id: &str,
     trace_id: &str,
 ) -> Option<AsyncDefer> {
-    if !is_super_cluster || SEARCH_SERVER.contain_key(trace_id).await {
+    if !is_super_cluster {
         return None;
     }
-    SEARCH_SERVER
-        .insert(
+    let registration = SEARCH_SERVER
+        .insert_or_join(
+            org_id,
             trace_id.to_string(),
             TaskStatus::new_follower(vec![], false),
         )
         .await;
+    if registration == Registration::Joined {
+        return None;
+    }
+    let org_id = org_id.to_string();
     let trace_id = trace_id.to_string();
     Some(AsyncDefer::new(async move {
-        SEARCH_SERVER.remove(&trace_id, false).await;
+        SEARCH_SERVER.remove_follower(&org_id, &trace_id).await;
     }))
 }
 

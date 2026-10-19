@@ -279,6 +279,7 @@ pub async fn process_token(
                     &org.name,
                     &user_email,
                     &get_config().auth.root_user_email,
+                    users::RemovalTarget::Any,
                 )
                 .await
                 {
@@ -683,6 +684,7 @@ async fn map_group_to_custom_role(
                         &existing_org.name,
                         user_email,
                         &config::get_config().auth.root_user_email,
+                        users::RemovalTarget::Any,
                     )
                     .await
                     {

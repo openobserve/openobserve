@@ -311,6 +311,13 @@ router.onError(async (error) => {
   }
 });
 
+// router.onError only sees route chunks; lazy components (e.g. the alert dialog) fail through Vite's preload hook.
+window.addEventListener("vite:preloadError", async (event) => {
+  if (await buildVersionChecker.isStaleChunkError(event.payload)) {
+    showNewVersionNotification();
+  }
+});
+
 // Ensure the active locale's messages are loaded (en-us is bundled; any other
 // language is fetched as a code-split chunk) before the first render.
 loadLocaleMessages(activeLocale)

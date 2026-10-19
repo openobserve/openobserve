@@ -85,6 +85,7 @@ snap.workspace = true
 time.workspace = true
 tokio.workspace = true
 url.workspace = true
+urlencoding.workspace = true
 utoipa.workspace = true
 utoipa-swagger-ui.workspace = true
 config.workspace = true
