@@ -20,7 +20,7 @@ const parentDataTest = computed(() => $attrs["data-test"] as string | undefined)
 // Forward tabindex to the real control; keep it off the wrapper (avoids a double tab-stop).
 const inputTabindex = computed(() => $attrs["tabindex"] as number | string | undefined);
 const wrapperAttrs = computed(() => {
-  const { tabindex: _tabindex, ...rest } = $attrs;
+  const { tabindex: _tabindex, "aria-describedby": _describedBy, ...rest } = $attrs;
   return rest;
 });
 
@@ -70,15 +70,15 @@ const effectiveError = computed(() => {
 });
 const hasError = computed(() => !!effectiveError.value);
 
-// `aria-invalid` alone tells a screen reader THAT the field is wrong but never
-// WHAT is wrong. Point the control at the message element so the reason is
-// announced with the field. Only set when a message is actually rendered —
-// `effectiveError` is " " when the text lives in OFormInput's #error slot, and
-// a dangling `aria-describedby` would reference a node that does not exist.
 const errorId = computed(() => `${inputId.value}-error`);
-const describedBy = computed(() =>
-  effectiveError.value && effectiveError.value.trim() ? errorId.value : undefined,
-);
+const describedBy = computed(() => {
+  const ids = String($attrs["aria-describedby"] ?? "")
+    .split(/\s+/)
+    .filter(Boolean);
+  // An external error slot has no built-in message node to reference.
+  if (effectiveError.value?.trim()) ids.push(errorId.value);
+  return [...new Set(ids)].join(" ") || undefined;
+});
 
 const isTextarea = computed(() => props.type === "textarea");
 

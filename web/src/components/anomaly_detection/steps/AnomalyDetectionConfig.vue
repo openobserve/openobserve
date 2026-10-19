@@ -503,7 +503,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Sensitivity -->
         <div class="mb-4! flex flex-row flex-wrap items-start gap-2 pb-0!">
-          <div class="min-h-8 w-42.5 min-w-42.5 text-[length:inherit] leading-[1.4] font-semibold">
+          <div
+            class="min-h-8 w-42.5 min-w-42.5 text-[length:inherit] leading-[1.4] font-semibold"
+            :class="{ 'flex items-center': !budgetMode }"
+          >
             {{ t("alerts.sensitivity") }}
             <span class="text-status-error-text ms-1">*</span>
             <OIcon name="info" size="sm" class="text-icon-color ms-1 cursor-pointer">
@@ -515,7 +518,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </OIcon>
           </div>
-          <div class="flex min-w-0 flex-1 basis-60 flex-col gap-1">
+          <div
+            class="flex min-w-0 flex-1 basis-60 flex-col"
+            :class="budgetMode ? 'gap-1' : 'gap-2'"
+          >
             <!-- In budget mode the budget IS the contract, so the control is the delivered-alert cap. -->
             <div v-if="budgetMode" class="flex flex-wrap items-start gap-3">
               <OToggleGroup
@@ -558,7 +564,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </div>
             </div>
-            <div v-else class="flex flex-col items-start gap-3">
+            <div v-else class="flex flex-col items-start gap-2">
               <OToggleGroup
                 :model-value="bandTier"
                 :aria-label="t('alerts.sensitivity')"
@@ -578,40 +584,57 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OToggleGroup>
               <div
                 v-if="autoSensitivity"
-                class="flex flex-wrap items-center gap-2"
+                class="flex min-h-8.5 flex-wrap items-center gap-x-2 gap-y-1"
                 role="status"
                 aria-live="polite"
                 data-test="anomaly-sensitivity-auto-level"
               >
-                <span class="text-text-secondary text-xs">{{ autoLevelLabel }}</span>
+                <span class="text-input-label-text text-xs font-medium">{{ autoLevelLabel }}</span>
                 <output class="text-sm font-medium tabular-nums">{{ autoLevelValue }}</output>
               </div>
-              <div v-else class="flex flex-wrap items-start gap-2">
+              <div
+                v-else
+                class="grid w-full grid-cols-[auto_minmax(0,1fr)] items-start gap-x-2 gap-y-1"
+              >
                 <label
                   for="anomaly-manual-level"
-                  class="text-input-label-text pt-2 text-xs font-medium whitespace-nowrap"
+                  class="text-input-label-text flex min-h-8.5 items-center text-xs font-medium"
                 >
                   {{ t("alerts.anomaly.level") }}
                 </label>
-                <OFormInput
-                  id="anomaly-manual-level"
-                  name="band_width"
-                  type="number"
-                  min="1"
-                  max="10"
-                  step="any"
-                  suffix="σ"
-                  :model-modifiers="{ number: true }"
-                  :aria-label="t('alerts.anomaly.level')"
-                  class="max-w-21.75 min-w-21.75"
-                  data-test="anomaly-sensitivity-level"
-                />
-                <span
-                  v-if="customSensitivity"
-                  class="text-text-secondary pt-2 text-xs"
-                  data-test="anomaly-sensitivity-custom"
-                  >{{ t("alerts.anomaly.customSensitivity") }}</span
+                <div class="flex min-w-0 flex-wrap items-start gap-x-2 gap-y-1">
+                  <OFormInput
+                    id="anomaly-manual-level"
+                    name="band_width"
+                    type="number"
+                    min="1"
+                    max="10"
+                    step="any"
+                    suffix="σ"
+                    :model-modifiers="{ number: true }"
+                    :aria-label="t('alerts.anomaly.level')"
+                    :aria-describedby="sensitivityError ? 'anomaly-manual-level-error' : undefined"
+                    class="max-w-21.75 min-w-21.75"
+                    data-test="anomaly-sensitivity-level"
+                  >
+                    <template #error />
+                  </OFormInput>
+                  <span
+                    v-if="customSensitivity"
+                    class="text-text-secondary flex min-h-8.5 items-center text-xs"
+                    data-test="anomaly-sensitivity-custom"
+                    >{{ t("alerts.anomaly.customSensitivity") }}</span
+                  >
+                </div>
+                <div
+                  v-if="sensitivityError"
+                  id="anomaly-manual-level-error"
+                  class="text-input-error-text col-start-2 text-xs"
+                  data-test="anomaly-sensitivity-error"
+                  role="alert"
                 >
+                  {{ sensitivityError }}
+                </div>
               </div>
             </div>
             <div

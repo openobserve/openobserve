@@ -686,9 +686,9 @@ describe("AnomalyDetectionConfig", () => {
         expect(fieldError(wrapper, "band_width")).toBe(RANGE_MESSAGE);
         // Two OForm* wrappers on one field, but only the step's own message renders.
         expect(wrapper.text().split(RANGE_MESSAGE).length - 1).toBe(1);
-        expect(
-          wrapper.find('[data-test="anomaly-sensitivity-level"] [role="alert"]').attributes("role"),
-        ).toBe("alert");
+        expect(wrapper.find('[data-test="anomaly-sensitivity-error"]').attributes("role")).toBe(
+          "alert",
+        );
         expect(wrapper.find('[data-test="anomaly-sensitivity-hint"]').exists()).toBe(false);
       },
     );
