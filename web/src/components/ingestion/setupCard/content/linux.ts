@@ -33,9 +33,6 @@ const install = `curl -O ${AGENTS_REPO}/linux/install.sh \\
   && chmod +x install.sh \\
   && sudo ./install.sh {url}/api/{org}/ {token}`;
 
-// Quoted so "80, 443" reaches the installer's port check as one value.
-const installWithTraces = `${install} --trace-ports "{ports}"`;
-
 const TRACING_DOC_URL = "https://github.com/openobserve/agents/blob/main/obi.md";
 
 export default function linuxCard(subs: CardSubstitutions, t: TranslateFn): RichCardContent {
@@ -67,16 +64,45 @@ export default function linuxCard(subs: CardSubstitutions, t: TranslateFn): Rich
           {
             id: "traces",
             labelKey: "ingestion.setupCard.logsMetricsTracesVariant",
-            code: agentCode(installWithTraces, subs, "bash"),
+            code: agentCode(`${install}{flags}`, subs, "bash"),
             inputs: [
               {
                 id: "ports",
+                flag: "--trace-ports",
                 labelKey: "ingestion.setupCard.tracePortsLabel",
                 default: "8080",
                 placeholder: raw("80,443,8000-8999"),
                 helpKey: "ingestion.setupCard.tracePortsHelp",
               },
+              {
+                id: "exe",
+                flag: "--trace-exe",
+                labelKey: "ingestion.setupCard.traceExeLabel",
+                default: "",
+                placeholder: raw("/opt/myapp/*"),
+              },
+              {
+                id: "cmd",
+                flag: "--trace-cmd",
+                labelKey: "ingestion.setupCard.traceCmdLabel",
+                default: "",
+                placeholder: raw("*reports.py*"),
+                helpKey: "ingestion.setupCard.traceCmdHelp",
+              },
+              {
+                id: "serviceName",
+                flag: "--service-name",
+                labelKey: "ingestion.setupCard.traceServiceNameLabel",
+                default: "",
+                placeholder: raw("checkout"),
+                helpKey: "ingestion.setupCard.traceServiceNameHelp",
+              },
             ],
+            // The installer rejects --service-name without a selector.
+            requireOneOf: {
+              ids: ["ports", "exe", "cmd"],
+              messageKey: "ingestion.setupCard.traceSelectorRequired",
+            },
             note: t("ingestion.setupCard.linuxTracesNote"),
           },
         ],

@@ -96,20 +96,26 @@ describe("linuxCard builder", () => {
     expect(base.code.raw).not.toContain("--trace");
   });
 
-  it("appends --trace-ports with the ports input on the traces variant", () => {
+  it("appends the tracing flags to the traces variant", () => {
     const traces = installVariants()[1];
-    expect(traces.code.raw).toBe(`${BASE_INSTALL} --trace-ports "{ports}"`);
-    // The ports field belongs to the traces variant alone, not the whole step.
+    expect(traces.code.raw).toBe(`${BASE_INSTALL}{flags}`);
     expect(linuxCard(SUBS, gt).steps[0].inputs).toBeUndefined();
     expect(installVariants()[0].inputs).toBeUndefined();
-    expect(traces.inputs).toEqual([expect.objectContaining({ id: "ports", default: "8080" })]);
+    expect(traces.inputs?.map((i) => [i.flag, i.default])).toEqual([
+      ["--trace-ports", "8080"],
+      ["--trace-exe", ""],
+      ["--trace-cmd", ""],
+      ["--service-name", ""],
+    ]);
+    expect(traces.requireOneOf?.ids).toEqual(["ports", "exe", "cmd"]);
   });
 
   it("shows the tracing note on the traces variant only", () => {
     const [base, traces] = installVariants();
     expect(base.note).toBeUndefined();
     expect(traces.note).toContain("BTF");
-    expect(traces.note).toContain("--trace-exe");
+    // Recovery points at the plain command: --service-name alone would be rejected.
+    expect(traces.note).toContain("re-run the **Logs & metrics** command");
   });
 
   it("links the eBPF tracing guide and tells the verify step when traces arrive", () => {

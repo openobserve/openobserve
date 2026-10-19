@@ -145,14 +145,29 @@ const inputValues = ref<Record<string, string>>(
 // Substitute live values (stream + free-form inputs) into authored code at
 // display/copy time (kept out of build-time subs because they change as the user
 // types). Build-time {url}/{org}/{token} are already resolved.
-const subStream = (text?: string): string | undefined => {
+const subStream = (text?: string, variant?: RichCardStepVariant): string | undefined => {
   if (text == null) return text;
-  let out = text.replaceAll("{stream}", watchedStream.value);
+  const flags = variantFlags(variant);
+  let out = text.replaceAll("{stream}", watchedStream.value).replaceAll("{flags}", () => flags);
   for (const inp of allInputs.value) {
-    out = out.replaceAll(`{${inp.id}}`, inputValues.value[inp.id]?.trim() || inp.default);
+    if (inp.flag) continue;
+    const value = inputValues.value[inp.id]?.trim() || inp.default;
+    // A function replacement keeps typed `$&`, `$$` etc. literal.
+    out = out.replaceAll(`{${inp.id}}`, () => value);
   }
   return out;
 };
+
+const inputValue = (id: string) => inputValues.value[id]?.trim() ?? "";
+const missingRequired = (variant?: RichCardStepVariant) =>
+  !!variant?.requireOneOf && variant.requireOneOf.ids.every((id) => !inputValue(id));
+// Single-quoted for POSIX shells, so globs like *app* reach the installer unexpanded.
+const shellQuote = (v: string) => `'${v.replaceAll("'", "'\\''")}'`;
+const variantFlags = (variant?: RichCardStepVariant): string =>
+  (variant?.inputs ?? [])
+    .filter((inp) => inp.flag && inputValue(inp.id))
+    .map((inp) => ` ${inp.flag} ${shellQuote(inputValue(inp.id))}`)
+    .join("");
 
 const detect = useStreamDetect({
   config: () => ({
@@ -194,8 +209,11 @@ const onBarDetected = (result: { count: number }) => detect.markConnected(result
 
 // Re-copies through the first step's own block, so the clipboard and the toast match a click on it.
 const copyFirstSnippet = () => {
-  const step = props.content.steps.find((st) => displayCode(st));
+  const index = props.content.steps.findIndex((st) => displayCode(st));
+  const step = props.content.steps[index];
   if (!step) return;
+  // A hidden command can't be copied; show the step and its warning instead.
+  if (missingRequired(activeVariant(step))) return scrollToStep(index);
   const prefix = displayCode(step)?.dataTest ?? SETUP_CODE_BLOCK;
   cardRoot.value?.querySelector<HTMLElement>(`[data-test="${prefix}-copy-btn"]`)?.click();
 };
@@ -625,6 +643,14 @@ function fireConfetti() {
                 :data-test="`ai-input-${inp.id}`"
               />
             </div>
+            <p
+              v-if="missingRequired(activeVariant(step))"
+              class="step-note"
+              :data-test="`ai-variant-require-${step.id}`"
+            >
+              <OIcon name="warning-amber" size="sm" />
+              <span>{{ t(activeVariant(step)!.requireOneOf!.messageKey) }}</span>
+            </p>
 
             <!-- Page-supplied controls that CHOOSE this step's code (a client
                  picker, an install shortcut) — above the block they drive. -->
@@ -637,12 +663,12 @@ function fireConfetti() {
             </div>
 
             <OCodeBlock
-              v-if="displayCode(step)"
+              v-if="displayCode(step) && !missingRequired(activeVariant(step))"
               :lang="displayCode(step)?.lang"
               :chrome="codeChrome(step)"
               :filename="displayCode(step)?.filename"
-              :code="subStream(displayCode(step)?.raw) || ''"
-              :code-masked="subStream(displayCode(step)?.masked)"
+              :code="subStream(displayCode(step)?.raw, activeVariant(step)) || ''"
+              :code-masked="subStream(displayCode(step)?.masked, activeVariant(step))"
               :data-test="displayCode(step)?.dataTest ?? SETUP_CODE_BLOCK"
               :reveal-tooltip="t('ingestion.setupCard.revealToken')"
               :hide-tooltip="t('ingestion.setupCard.hideToken')"

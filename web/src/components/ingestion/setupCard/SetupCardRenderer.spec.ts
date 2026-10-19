@@ -573,46 +573,17 @@ describe("SetupCardRenderer — Linux install step tracing toggle", () => {
   });
 
   const LINUX_SUBS = { ...SUBS, token: "dGVzdEB0b2tlbg==" };
+  const BASE_TAIL = `./install.sh ${LINUX_SUBS.url}/api/${LINUX_SUBS.org}/ ${LINUX_SUBS.token}`;
   const installBlock = () => wrapper.findAllComponents(OCodeBlock)[0];
   const installNotes = () =>
     wrapper.find('[data-test="ai-variant-tabs"]').element.parentElement!.textContent ?? "";
-  const portsField = () => wrapper.find('[data-test="ai-input-ports"]');
+  const field = (id: string) => wrapper.find(`[data-test="ai-input-${id}"]`);
+  const type = (id: string, v: string) => field(id).find("input").setValue(v);
+  const warning = () => wrapper.find('[data-test="ai-variant-require-install"]');
   const pick = async (id: string) => {
     wrapper.findAllComponents(OToggleGroup)[0].vm.$emit("update:modelValue", id);
     await flushPromises();
   };
-
-  it("defaults to logs & metrics, then substitutes the typed ports into the traces command", async () => {
-    wrapper = mount(SetupCardRenderer, {
-      props: { content: linuxCard(LINUX_SUBS, gt), subs: LINUX_SUBS },
-      global: { plugins: [store, router], stubs: { FirstEventStatus: FirstEventStatusStub } },
-      attachTo: document.body,
-    });
-    expect(installBlock().props("code")).not.toContain("--trace");
-    expect(installNotes()).not.toContain("BTF");
-    // The ports field is the traces variant's own, so logs & metrics has none.
-    expect(portsField().exists()).toBe(false);
-    expect(wrapper.find('[data-test="ai-step-inputs-install"]').exists()).toBe(false);
-
-    await pick("traces");
-    expect(installBlock().props("code")).toMatch(/ --trace-ports "8080"$/);
-    expect(installNotes()).toContain("BTF");
-    expect(portsField().exists()).toBe(true);
-
-    await portsField().find("input").setValue("80,443,8000-8999");
-    expect(installBlock().props("code")).toMatch(/ --trace-ports "80,443,8000-8999"$/);
-    // The token stays masked until revealed, on the traces command too.
-    expect(installBlock().props("codeMasked")).toContain('--trace-ports "80,443,8000-8999"');
-    expect(installBlock().props("codeMasked")).not.toContain(LINUX_SUBS.token);
-
-    // Switching away and back keeps the typed ports.
-    await pick("logs-metrics");
-    expect(portsField().exists()).toBe(false);
-    expect(installBlock().props("code")).not.toContain("--trace");
-    await pick("traces");
-    expect(installBlock().props("code")).toMatch(/ --trace-ports "80,443,8000-8999"$/);
-  });
-
   const mountLinux = () =>
     mount(SetupCardRenderer, {
       props: { content: linuxCard(LINUX_SUBS, gt), subs: LINUX_SUBS },
@@ -620,15 +591,91 @@ describe("SetupCardRenderer — Linux install step tracing toggle", () => {
       attachTo: document.body,
     });
 
-  it.each(["", "   "])(
-    "falls back to the default ports when the field is blank (%j)",
-    async (v) => {
-      wrapper = mountLinux();
-      await pick("traces");
-      await portsField().find("input").setValue(v);
-      expect(installBlock().props("code")).toMatch(/ --trace-ports "8080"$/);
-    },
-  );
+  it("shows the tracing fields only under traces, and leaves the default command unchanged", async () => {
+    wrapper = mountLinux();
+    expect(installBlock().props("code").endsWith(BASE_TAIL)).toBe(true);
+    expect(installNotes()).not.toContain("BTF");
+    for (const id of ["ports", "exe", "cmd", "serviceName"]) expect(field(id).exists()).toBe(false);
+    expect(wrapper.find('[data-test="ai-step-inputs-install"]').exists()).toBe(false);
+
+    await pick("traces");
+    for (const id of ["ports", "exe", "cmd", "serviceName"]) expect(field(id).exists()).toBe(true);
+    expect(installNotes()).toContain("BTF");
+    expect(warning().exists()).toBe(false);
+    expect(installBlock().props("code").endsWith(`${BASE_TAIL} --trace-ports '8080'`)).toBe(true);
+
+    await pick("logs-metrics");
+    expect(field("ports").exists()).toBe(false);
+    expect(installBlock().props("code").endsWith(BASE_TAIL)).toBe(true);
+  });
+
+  it("emits all four flags in order, single-quoted, with the token still masked", async () => {
+    wrapper = mountLinux();
+    await pick("traces");
+    await type("ports", "80,443,8000-8999");
+    await type("exe", "/opt/my app/*");
+    await type("cmd", "*it's.py*");
+    await type("serviceName", "checkout");
+    const flags =
+      " --trace-ports '80,443,8000-8999' --trace-exe '/opt/my app/*'" +
+      " --trace-cmd '*it'\\''s.py*' --service-name 'checkout'";
+    expect(installBlock().props("code").endsWith(`${BASE_TAIL}${flags}`)).toBe(true);
+    expect(installBlock().props("codeMasked").endsWith(flags)).toBe(true);
+    expect(installBlock().props("codeMasked")).not.toContain(LINUX_SUBS.token);
+  });
+
+  it("keeps a typed $ literal inside the quotes", async () => {
+    wrapper = mountLinux();
+    await pick("traces");
+    await type("exe", "/opt/$$x/*a$&$");
+    expect(installBlock().props("code").endsWith(` --trace-exe '/opt/$$x/*a$&$'`)).toBe(true);
+  });
+
+  it("omits blank (or whitespace-only) fields instead of falling back to a default", async () => {
+    wrapper = mountLinux();
+    await pick("traces");
+    await type("ports", "   ");
+    await type("cmd", "*reports.py*");
+    expect(installBlock().props("code").endsWith(`${BASE_TAIL} --trace-cmd '*reports.py*'`)).toBe(
+      true,
+    );
+  });
+
+  it("warns and hides the command when no selector is filled", async () => {
+    wrapper = mountLinux();
+    await pick("traces");
+    await type("serviceName", "checkout");
+    await type("ports", "");
+    expect(warning().exists()).toBe(true);
+    expect(warning().text()).toContain("Fill in at least one");
+    const codes = wrapper.findAllComponents(OCodeBlock).map((b) => b.props("code"));
+    expect(codes.some((c) => c.includes("install.sh"))).toBe(false);
+
+    await type("exe", "/opt/myapp/*");
+    expect(warning().exists()).toBe(false);
+    expect(
+      installBlock()
+        .props("code")
+        .endsWith(" --trace-exe '/opt/myapp/*' --service-name 'checkout'"),
+    ).toBe(true);
+  });
+
+  it("scrolls to the install step when the bar asks for a command that is hidden", async () => {
+    wrapper = mountLinux();
+    await pick("traces");
+    await type("ports", "");
+    expect(warning().exists()).toBe(true);
+    const original = (Element.prototype as any).scrollIntoView;
+    const scrollSpy = vi.fn();
+    (Element.prototype as any).scrollIntoView = scrollSpy;
+    try {
+      bar(wrapper).vm.$emit("copy-command");
+      expect(scrollSpy).toHaveBeenCalledTimes(1);
+      expect((scrollSpy.mock.contexts[0] as Element).contains(warning().element)).toBe(true);
+    } finally {
+      (Element.prototype as any).scrollIntoView = original;
+    }
+  });
 
   it("marks the install step done when the traces command is copied", async () => {
     wrapper = mountLinux();
@@ -652,5 +699,7 @@ describe("SetupCardRenderer — Linux install step tracing toggle", () => {
     expect(wrapper.find('[data-test="ai-variant-inputs-install"]').exists()).toBe(false);
     await wrapper.find('[data-test="ai-input-cluster"] input').setValue("prod-eu");
     expect(installBlock().props("code")).toContain("--cluster-name=prod-eu");
+    await wrapper.find('[data-test="ai-input-cluster"] input').setValue("  ");
+    expect(installBlock().props("code")).toContain("--cluster-name=cluster1");
   });
 });

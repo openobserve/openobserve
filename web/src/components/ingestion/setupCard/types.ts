@@ -104,6 +104,8 @@ export interface RichCardStepVariant {
   code: RichCardCode;
   /** Inputs shown only while this variant is selected; ids must be unique card-wide. */
   inputs?: RichCardInput[];
+  /** While none of these inputs has a value, show the message instead of the code. */
+  requireOneOf?: { ids: string[]; messageKey: I18nKey };
   /** Optional note rendered under the code for this variant only. */
   note?: I18nText;
 }
@@ -324,6 +326,8 @@ export interface RichCardInput {
   helpKey?: I18nKey;
   /** Width hint passed to OInput (e.g. "sm" | "md"). Defaults to "md". */
   width?: FieldWidth;
+  /** CLI flag: the value goes into the variant's `{flags}` as `<flag> '<value>'`, omitted when blank. */
+  flag?: string;
 }
 
 export interface RichCardContent {
