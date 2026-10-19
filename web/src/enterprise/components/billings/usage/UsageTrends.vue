@@ -481,7 +481,7 @@ const costSql = computed(() =>
   trendsCostSql(usageOrg.value, prices.value, bucket.value, undefined, true),
 );
 
-const loadCosts = async (refresh = false) => {
+const loadCosts = async () => {
   if (!usageStreamEnabled.value) return;
   const loadId = ++latestLoad;
   loading.value = true;
@@ -494,7 +494,6 @@ const loadCosts = async (refresh = false) => {
       end: range.value.end * 1_000_000,
       size: 10_000,
       key: "trends",
-      refresh,
       onRows: (partial) => {
         if (loadId === latestLoad) rows.value = toCostRows(partial);
       },
@@ -515,7 +514,7 @@ const loadCosts = async (refresh = false) => {
   }
 };
 
-// Values, not objects: Refresh reloads the bill, and that new copy must not replace the uncached read.
+// Values, not objects: Refresh reloads the bill, and that new copy must not re-run the read.
 watch(
   [costSql, () => range.value.start, () => range.value.end, usageStreamEnabled],
   () => loadCosts(),
@@ -527,7 +526,7 @@ const emit = defineEmits<{ refresh: [] }>();
 /** Reloads the metering response too, so new cycles and rates come with the new usage. */
 const refresh = () => {
   emit("refresh");
-  loadCosts(true);
+  loadCosts();
 };
 
 /** KPIs and the forecast count days, whatever bucket the chart uses. */
@@ -603,11 +602,13 @@ const kpiCards = computed(() => {
     [
       {
         key: "total",
-        // An estimate from usage records, so it does not share Overview's name for the bill.
-        label: f ? t("billing.usageV2.estimatedCostSoFar") : t("billing.usageV2.totalCost"),
+        // A usage-record estimate for the whole open cycle, even before the forecast has a complete day.
+        label: canForecast.value
+          ? t("billing.usageV2.estimatedCostSoFar")
+          : t("billing.usageV2.totalCost"),
         icon: "attach-money",
         value: cost(s.total),
-        hint: f
+        hint: canForecast.value
           ? t("billing.usageV2.cycleDay", { day: cycleDay, total: cycleDays })
           : rangeLabel.value,
       },

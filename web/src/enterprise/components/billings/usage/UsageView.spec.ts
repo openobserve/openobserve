@@ -177,7 +177,6 @@ describe("UsageView org costs", () => {
     await flushPromises();
     const orgCostReads = () => search.mock.calls.filter((call) => call[1]?.key === "orgCosts");
     expect(orgCostReads()).toHaveLength(1);
-    expect(orgCostReads()[0][1].refresh).toBe(false);
     const shown = wrapper.findComponent({ name: "UsageOverview" }).props("orgCosts");
 
     // Budget judges spend on the same read, so opening it sends no second query.
@@ -191,7 +190,6 @@ describe("UsageView org costs", () => {
     wrapper.findComponent({ name: "UsageOverview" }).vm.$emit("refresh");
     await flushPromises();
     expect(orgCostReads()).toHaveLength(2);
-    expect(orgCostReads()[1][1].refresh).toBe(true);
   });
 });
 

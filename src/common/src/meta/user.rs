@@ -150,16 +150,6 @@ impl UserUpdateMode {
     }
 }
 
-pub fn get_default_user_org() -> UserOrg {
-    UserOrg {
-        name: "".to_string(),
-        org_name: "".to_string(),
-        token: "".to_string(),
-        rum_token: None,
-        role: get_default_user_role(),
-    }
-}
-
 #[cfg(feature = "enterprise")]
 pub fn get_default_user_role() -> UserRole {
     let mut role = UserRole::Admin;
@@ -848,16 +838,6 @@ mod tests {
     }
 
     #[test]
-    fn test_get_default_user_org() {
-        let org = get_default_user_org();
-
-        assert_eq!(org.name, "");
-        assert_eq!(org.token, "");
-        assert!(org.rum_token.is_none());
-        assert_eq!(org.role, get_default_user_role());
-    }
-
-    #[test]
     fn test_get_default_user_role() {
         let role = get_default_user_role();
 
@@ -1022,20 +1002,6 @@ mod tests {
             org_role.custom_role,
             Some(vec!["perm1".to_string(), "perm2".to_string()])
         );
-    }
-
-    #[test]
-    fn test_user_role_request_empty_role() {
-        let request = UserRoleRequest {
-            role: "".to_string(),
-            custom: None,
-        };
-
-        let org_role = UserOrgRole::from(&request);
-
-        // Empty role should be treated as custom
-        assert_eq!(org_role.base_role, get_default_user_role());
-        assert_eq!(org_role.custom_role, Some(vec!["".to_string()]));
     }
 
     #[test]

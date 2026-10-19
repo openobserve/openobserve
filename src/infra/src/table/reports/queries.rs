@@ -669,11 +669,13 @@ mod tests {
         const DASHBOARD_SNOWFLAKE_ID: &str = "TEST_DASHBOARD_SNOWFLAKE_ID";
         const PAGE_SIZE: u64 = 10;
         const PAGE_IDX: u64 = 3;
-        let params = ListReportsParams::new(ORG_ID)
-            .in_folder(REPORT_FOLDER_SNOWFLAKE_ID)
-            .for_dashboard(DASHBOARD_SNOWFLAKE_ID)
-            .has_destinations(true)
-            .paginate(PAGE_SIZE, PAGE_IDX);
+        let params = ListReportsParams {
+            dashboard_snowflake_id: Some(DASHBOARD_SNOWFLAKE_ID.to_string()),
+            ..ListReportsParams::new(ORG_ID)
+                .in_folder(REPORT_FOLDER_SNOWFLAKE_ID)
+                .has_destinations(true)
+                .paginate(PAGE_SIZE, PAGE_IDX)
+        };
 
         let postgres_statement = ListReportsQueryResult::select(&params)
             .into_statement(sea_orm::DatabaseBackend::Postgres)

@@ -171,7 +171,8 @@ export const METERS: MeterDef[] = [
     key: "ai",
     labelKey: "billing.aiCredits",
     rateUnitKey: "billing.usageV2.unitCredit",
-    events: ["AiCredits", "NewIncident"],
+    // NewIncident is a size-1 activity record beside the incident's AiCredits; the backend never bills it.
+    events: ["AiCredits"],
     billedAsKey: "billing.usageV2.billedAi",
   },
   {
@@ -222,6 +223,11 @@ const USD_PRECISE = new Intl.NumberFormat("en-US", {
   maximumFractionDigits: 4,
 });
 
+const GB_HOURS = new Intl.NumberFormat("en-US", {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+
 const CYCLE_DATE = new Intl.DateTimeFormat("en-US", {
   year: "numeric",
   month: "short",
@@ -247,15 +253,21 @@ export function formatCost(amount: number | null | undefined, precise = false): 
   return raw((precise ? USD_PRECISE : USD).format(Number(amount)));
 }
 
-/** A `unit_divisor` of 1024 means `metered_amount` is megabytes. A 1 means it is a count. */
-export function formatVolume(meter: PricingDetails | null | undefined): I18nText {
+/** A `unit_divisor` of 1024 means `metered_amount` is megabytes, MB-hours for retention. A 1 means it is a count. */
+export function formatVolume(
+  meter: PricingDetails | null | undefined,
+  key?: MeterKey | null,
+): I18nText {
   const amount = meter?.metered_amount;
   if (amount === null || amount === undefined || !Number.isFinite(Number(amount))) return raw("—");
-  return raw(
-    Number(meter?.unit_divisor) === 1
-      ? addCommasToNumber(Math.round(amount))
-      : formatSizeFromMB(amount),
-  );
+  if (Number(meter?.unit_divisor) === 1) return raw(addCommasToNumber(Math.round(amount)));
+  if (key === "retention") return raw(formatGbHours(amount));
+  return raw(formatSizeFromMB(amount));
+}
+
+/** Always GB-hours, the unit retention is priced in, so the amount reads against its rate. */
+export function formatGbHours(mbHours: number): string {
+  return `${GB_HOURS.format(mbHours / 1024)} GB-hours`;
 }
 
 export function formatRate(
@@ -303,7 +315,7 @@ function billedAs(
   const billed = cost / base;
   if (billed <= ((Number(meter?.metered_amount) || 0) / divisor) * 1.01) return undefined;
   return t("billing.usageV2.volumeAtRateBilled", {
-    volume: formatVolume(meter),
+    volume: formatVolume(meter, def.key),
     rate: formatRate(meter, def, t),
     amount: raw(addCommasToNumber(Math.round(billed * 100) / 100)),
     unit: t(def.rateUnitKey),
@@ -322,7 +334,7 @@ export function buildMeterRows(
     return {
       key: def.key,
       label: t(def.labelKey),
-      volume: formatVolume(meter),
+      volume: formatVolume(meter, def.key),
       rate: formatRate(meter, def, t),
       subline: billedAs(meter, def, t),
       cost: netCost(meter),
@@ -446,6 +458,7 @@ export interface Estimate {
 const MB_PER_GB = 1024;
 
 const SECONDS_PER_DAY = 86400;
+const HOURS_PER_DAY = 24;
 
 const DAYS_PER_MONTH = 30;
 
@@ -489,12 +502,15 @@ export function apiCheckRuns(input: EstimateInputs): number {
   return finite(input.apiChecks) * finite(input.apiRegions) * runsPerMonth(input.apiIntervalSec);
 }
 
+/** Cost per stored megabyte per day: the org's own billed rate once it has retention usage, else list price. */
 export function retentionDailyRate(details: MeteringDetails | null | undefined): number {
   const meter = details?.retention;
-  const cycleDays = ((details?.cycle_end ?? 0) - (details?.cycle_start ?? 0)) / SECONDS_PER_DAY;
-  const amount = Number(meter?.metered_amount) || 0;
-  if (!meter || amount <= 0 || cycleDays <= 0) return 0;
-  return (Number(meter.metered_cost) || 0) / (amount * cycleDays);
+  if (!meter) return 0;
+  const amount = Number(meter.metered_amount) || 0;
+  const cost = Number(meter.metered_cost) || 0;
+  // `metered_amount` is MB-hours, not stored MB, so cost / amount is already per MB-hour and must not be divided by the cycle's days.
+  const perMbHour = amount > 0 && cost > 0 ? cost / amount : unitRate(meter);
+  return perMbHour * HOURS_PER_DAY;
 }
 
 /** What a month of the given usage would cost at list price, one line per meter. */

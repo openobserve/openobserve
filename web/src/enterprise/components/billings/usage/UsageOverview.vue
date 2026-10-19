@@ -268,7 +268,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :key="chartKey"
                   :panel-schema="chartSchema"
                   :selected-time-obj="elapsedTimeObj"
-                  :refresh-without-cache="refreshedOnce"
                   data-test="billings-usageoverview-daily-chart"
                 />
               </KeepAlive>
@@ -405,8 +404,6 @@ const router = useRouter();
 const { isMobile } = useBreakpoint();
 
 const refreshToken = ref(0);
-/** Set by the first Refresh: from then on charts skip the server's result cache, as the dashboard refresh does. */
-const refreshedOnce = ref(false);
 const breakdownAnchor = ref<HTMLElement | null>(null);
 const groupSections = ref<DrilldownSection[]>([]);
 /** The view the breakdown's groupings came from; another meter's must not shape this chart. */
@@ -592,7 +589,7 @@ const meterTitle = computed(() =>
 const meterSummary = computed(() => {
   if (props.volumeOnly) {
     const meter = selectedMeter.value ? props.details?.[selectedMeter.value] : null;
-    return meter ? formatVolume(meter) : undefined;
+    return meter ? formatVolume(meter, selectedMeter.value) : undefined;
   }
   const scoped = selectedOrg.value
     ? scopedRows.value.find((row) => row.key === selectedMeter.value)
@@ -610,7 +607,7 @@ const meterSummary = computed(() => {
   const billed = netCost(meter);
   return t("billing.usageV2.breakdownSummary", {
     cost: formatCost(billed),
-    volume: formatVolume(meter),
+    volume: formatVolume(meter, selectedMeter.value),
     share: total.value > 0 ? raw(`${((billed / total.value) * 100).toFixed(1)}%`) : EM_DASH,
   });
 });
@@ -647,7 +644,7 @@ const volumeCards = computed<KpiCard[]>(() =>
     key: def.key,
     label: t(def.labelKey),
     icon: "bar-chart",
-    value: formatVolume(props.details?.[def.key]),
+    value: formatVolume(props.details?.[def.key], def.key),
     hint: t(def.billedAsKey),
   })),
 );
@@ -891,7 +888,6 @@ const selectGroup = (group: string) => {
 };
 
 const refresh = () => {
-  refreshedOnce.value = true;
   refreshToken.value += 1;
   emit("refresh");
 };

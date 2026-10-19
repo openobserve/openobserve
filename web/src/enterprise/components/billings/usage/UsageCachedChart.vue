@@ -26,7 +26,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :panel-schema="panelSchema"
       :selected-time-obj="selectedTimeObj"
       :variables-data="{}"
-      :should-refresh-without-cache="refreshWithoutCache"
       @loading-state-change="busy = $event"
       @error="onError"
     />
@@ -56,8 +55,6 @@ import { USAGE_STREAM_NAME } from "./usageQueries";
 defineProps<{
   panelSchema: Record<string, unknown>;
   selectedTimeObj: { start_time: Date; end_time: Date };
-  /** Make the next query skip the server's result cache, as after a Refresh. */
-  refreshWithoutCache?: boolean;
 }>();
 
 const { t } = useI18nTyped();

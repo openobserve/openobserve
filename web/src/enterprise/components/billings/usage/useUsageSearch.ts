@@ -27,8 +27,6 @@ export interface UsageSearchOptions {
   size: number;
   /** A new call with the same key cancels the previous one on the server. */
   key?: string;
-  /** Bypasses the result cache, for an explicit Refresh. */
-  refresh?: boolean;
   /** The rows so far after each streamed chunk, for a caller that renders progressively. */
   onRows?: (rows: Row[]) => void;
 }
@@ -86,7 +84,6 @@ export function useUsageSearch() {
           searchType: "ui",
           traceId,
           org_id: store.state.selectedOrganization.identifier,
-          clear_cache: options.refresh ?? false,
         },
         {
           data: (_payload: unknown, response: any) => {

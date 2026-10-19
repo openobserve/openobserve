@@ -57,14 +57,13 @@ impl Metrics for MetricsQuerier {
         let org_id = &req.org_id;
         let stream_type = StreamType::Metrics.as_str();
         #[cfg(feature = "enterprise")]
-        if !SEARCH_SERVER.contain_key(&trace_id).await {
-            SEARCH_SERVER
-                .insert(
-                    trace_id.to_string(),
-                    TaskStatus::new_follower(vec![], false),
-                )
-                .await;
-        }
+        SEARCH_SERVER
+            .insert_or_join(
+                org_id,
+                trace_id.to_string(),
+                TaskStatus::new_follower(vec![], false),
+            )
+            .await;
         let result = SearchService::grpc::search(req).await.map_err(|err| {
             let time = start.elapsed().as_secs_f64();
             metrics::GRPC_RESPONSE_TIME
@@ -91,9 +90,7 @@ impl Metrics for MetricsQuerier {
 
         // Clean up task record before returning
         #[cfg(feature = "enterprise")]
-        if !SEARCH_SERVER.is_leader(&trace_id).await {
-            SEARCH_SERVER.remove(&trace_id, false).await;
-        }
+        SEARCH_SERVER.remove_follower(org_id, &trace_id).await;
 
         Ok(Response::new(result))
     }
@@ -125,11 +122,13 @@ impl Metrics for MetricsQuerier {
         // insert_sender — without this the engine returns SearchCancelQuery
         // immediately (same registration the `query` handler performs).
         #[cfg(feature = "enterprise")]
-        if !SEARCH_SERVER.contain_key(&trace_id).await {
-            SEARCH_SERVER
-                .insert(trace_id.clone(), TaskStatus::new_follower(vec![], false))
-                .await;
-        }
+        SEARCH_SERVER
+            .insert_or_join(
+                &req.org_id,
+                trace_id.clone(),
+                TaskStatus::new_follower(vec![], false),
+            )
+            .await;
 
         // spawn a task to push streaming responses
         tokio::task::spawn(async move {
@@ -137,9 +136,7 @@ impl Metrics for MetricsQuerier {
                 log::error!("[gRPC:metrics:data] get data error: req:{req:?}, error:{e:?}")
             }
             #[cfg(feature = "enterprise")]
-            if !SEARCH_SERVER.is_leader(&trace_id).await {
-                SEARCH_SERVER.remove(&trace_id, false).await;
-            }
+            SEARCH_SERVER.remove_follower(&req.org_id, &trace_id).await;
         });
 
         let out_stream = ReceiverStream::new(rx);

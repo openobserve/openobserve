@@ -345,7 +345,6 @@ const runSearch = (
   sql: string,
   size: number,
   key: string,
-  refresh: boolean,
   onRows?: (rows: Record<string, unknown>[]) => void,
 ) =>
   search(sql, {
@@ -353,7 +352,6 @@ const runSearch = (
     end: props.details.cycle_end * 1_000_000,
     size,
     key,
-    refresh,
     onRows,
   });
 
@@ -420,17 +418,16 @@ const toRaws = (hits: Record<string, unknown>[]): RawRow[] =>
 /** Both queries stream running aggregates; `onPartial` gets the latest of each as they land. */
 const loadSection = async (
   spec: DrilldownSection,
-  force: boolean,
   onPartial: (raws: RawRow[], sum: number) => void,
 ) => {
   let partialRaws: RawRow[] = [];
   let partialSum = 0;
   const [hits, totals] = await Promise.all([
-    runSearch(spec.sql(usageOrgId.value), DRILLDOWN_LIMIT, "rows", force, (rows) => {
+    runSearch(spec.sql(usageOrgId.value), DRILLDOWN_LIMIT, "rows", (rows) => {
       partialRaws = toRaws(rows);
       onPartial(partialRaws, partialSum);
     }),
-    runSearch(meterTotalSql(usageOrgId.value, [spec.event]), 1, "total", force, (rows) => {
+    runSearch(meterTotalSql(usageOrgId.value, [spec.event]), 1, "total", (rows) => {
       partialSum = Number(rows[0]?.total) || 0;
       onPartial(partialRaws, partialSum);
     }),
@@ -486,7 +483,7 @@ const load = async (force = false) => {
     const result = isRetention.value
       ? await loadRetention(force)
       : activeSection.value
-        ? await loadSection(activeSection.value, force, showPartial)
+        ? await loadSection(activeSection.value, showPartial)
         : { raws: [], sum: 0 };
     if (loadId !== latestLoad) return;
     // Final only: the chart colours its bands by this ranking, and a partial one would reshuffle them.

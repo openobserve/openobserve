@@ -119,6 +119,7 @@ impl OtelIngestionProcessor {
     /// it is used to select the most-recently-applicable pricing definition via `valid_from`
     /// and the time-of-day tier via `utc_windows`. Zero means unknown: no time restriction.
     /// In production always call `get_org_pricing_entries` to populate this slice.
+    #[cfg(test)]
     pub fn process_span_with_pricing(
         &self,
         span_attributes: &mut HashMap<String, json::Value>,

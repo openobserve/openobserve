@@ -87,20 +87,13 @@ describe("priceOrgVolumes", () => {
 });
 
 describe("useOrgCosts", () => {
-  it("reads once after a Refresh, past the server's result cache", async () => {
+  it("re-reads when a Refresh brings a new bill", async () => {
     const details = ref<MeteringDetails | null>(cycle);
-    const token = ref(0);
-    useOrgCosts(details, ref([{ id: "payer", name: "Payer", isSelf: true }]), token);
-    await flushPromises();
-    expect(search.mock.calls[0][1].refresh).toBe(false);
-
-    // Refresh bumps the token at once; the new bill lands later, after its request.
-    token.value += 1;
+    useOrgCosts(details, ref([{ id: "payer", name: "Payer", isSelf: true }]));
     await flushPromises();
     details.value = { ...cycle };
     await flushPromises();
 
     expect(search).toHaveBeenCalledTimes(2);
-    expect(search.mock.calls[1][1].refresh).toBe(true);
   });
 });

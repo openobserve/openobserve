@@ -66,12 +66,6 @@ pub struct StreamCreate {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct StreamQueryParams {
-    #[serde(rename = "type")]
-    pub stream_type: Option<StreamType>,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct StreamSchema {
     pub stream_name: String,
     pub stream_type: StreamType,
@@ -141,15 +135,6 @@ mod tests {
 
         assert_eq!(field.name, "test_field");
         assert_eq!(field.r#type, "string");
-    }
-
-    #[test]
-    fn test_stream_query_params() {
-        let params = StreamQueryParams {
-            stream_type: Some(StreamType::Logs),
-        };
-
-        assert_eq!(params.stream_type, Some(StreamType::Logs));
     }
 
     #[test]

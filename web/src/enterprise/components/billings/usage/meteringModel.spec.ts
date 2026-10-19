@@ -23,6 +23,7 @@ import {
   apiCheckRuns,
   browserStepRuns,
   estimateCost,
+  retentionDailyRate,
   fitWholeCount,
   runsPerMonth,
   effectiveRate,
@@ -34,6 +35,7 @@ import {
   formatCycle,
   formatRate,
   formatVolume,
+  formatGbHours,
   METERS,
   meterForEvent,
   monthlyPace,
@@ -122,6 +124,10 @@ describe("meteringModel", () => {
     expect(formatVolume(details.ingestion)).toBe("1016.00 MB");
     expect(formatVolume(details.query)).toBe("6.48 GB");
     expect(formatVolume(details.ai)).toBe("1,036");
+    expect(formatVolume({ ...details.query, metered_amount: 1361.92 }, "retention")).toBe(
+      "1.33 GB-hours",
+    );
+    expect(formatGbHours(2_560_000)).toBe("2,500.00 GB-hours");
   });
 
   it("renders a dash when a meter is absent", () => {
@@ -165,7 +171,8 @@ describe("meteringModel", () => {
 
   it("maps a usage stream event back to its meter", () => {
     expect(meterForEvent("Search")?.key).toBe("query");
-    expect(meterForEvent("NewIncident")?.key).toBe("ai");
+    expect(meterForEvent("AiCredits")?.key).toBe("ai");
+    expect(meterForEvent("NewIncident")).toBeUndefined();
     expect(meterForEvent("Functions")).toBeUndefined();
   });
 
@@ -380,8 +387,22 @@ describe("estimateCost", () => {
   it("prices retention from the org's own cost per stored megabyte per day", () => {
     const { lines } = estimateCost(priced, input);
     const retention = lines.find((line) => line.key === "retention");
-    // 30 dollars over 1000 MB across the 30 day cycle is 0.001 per MB per day.
-    expect(retention?.cost).toBeCloseTo(100 * 1024 * 30 * 0.001, 5);
+    // 30 dollars over 1000 MB-hours is 0.03 per MB-hour, so 0.72 per MB per day.
+    expect(retention?.cost).toBeCloseTo(100 * 1024 * 30 * 0.72, 5);
+  });
+
+  it("converts billed MB-hours to a daily rate, falling back to list price before any usage", () => {
+    const at = (retention: Record<string, number>) =>
+      retentionDailyRate({ ...priced, retention } as unknown as MeteringDetails);
+    // 72 dollars over 72,000 MB-hours is 0.001 per MB-hour, 0.024 per MB-day.
+    expect(
+      at({ base_cost: 0, unit_divisor: 1024, metered_amount: 72_000, metered_cost: 72 }),
+    ).toBeCloseTo(0.024, 10);
+    // 1.024 dollars per GB-hour is 0.001 per MB-hour.
+    expect(
+      at({ base_cost: 1.024, unit_divisor: 1024, metered_amount: 0, metered_cost: 0 }),
+    ).toBeCloseTo(0.024, 10);
+    expect(retentionDailyRate(null)).toBe(0);
   });
 
   it("returns nothing to price without a cycle", () => {
@@ -465,7 +486,7 @@ describe("meteringModel usage without a bill", () => {
       unit_divisor: 1024,
       metered_cost: 0,
     });
-    expect(usage.ai).toMatchObject({ metered_amount: 7, unit_divisor: 1, metered_cost: 0 });
+    expect(usage.ai).toMatchObject({ metered_amount: 5, unit_divisor: 1, metered_cost: 0 });
     expect(usage.query.metered_amount).toBe(0);
     expect(usage).toMatchObject({ total_cost: 0, cycle_start: 10, cycle_end: 20 });
   });

@@ -284,19 +284,6 @@ mod tests {
     }
 
     #[test]
-    fn test_try_into_unknown_module_treated_as_pipeline() {
-        let id = svix_ksuid::Ksuid::new(None, None).to_string();
-        let type_json = serde_json::json!({"url": "https://example.com"});
-        let model = make_model(&id, "UNKNOWN_MODULE", type_json);
-        let result = model.try_into(None);
-        assert!(result.is_ok());
-        assert!(matches!(
-            result.unwrap().module,
-            destinations::Module::Pipeline { .. }
-        ));
-    }
-
-    #[test]
     fn test_try_into_invalid_ksuid_fails() {
         let type_json = serde_json::json!({"type": "http", "url": "https://example.com"});
         let model = make_model("not-a-ksuid", "alert", type_json);

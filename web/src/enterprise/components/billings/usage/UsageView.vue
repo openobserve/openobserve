@@ -279,7 +279,7 @@ const SECONDS_PER_DAY = 86_400;
 const { search } = useUsageSearch();
 
 /** The stream appears only once the org reports usage, so until then every meter reads zero. */
-const fetchVolumes = async (refresh: boolean): Promise<MeteringDetails> => {
+const fetchVolumes = async (): Promise<MeteringDetails> => {
   const end = Math.floor(Date.now() / 1000);
   const start = (Math.floor(end / SECONDS_PER_DAY) - (VOLUME_DAYS - 1)) * SECONDS_PER_DAY;
   try {
@@ -288,7 +288,6 @@ const fetchVolumes = async (refresh: boolean): Promise<MeteringDetails> => {
       end: end * 1_000_000,
       size: 100,
       key: "volumes",
-      refresh,
     });
     const volumes = Object.fromEntries(
       hits.map((hit) => [String(hit.event ?? ""), Number(hit.volume) || 0]),
@@ -381,10 +380,7 @@ const loadDetails = async () => {
       fetchPayer(),
     ]);
     const usageOnly = !metering?.upcoming || payerName !== null;
-    const volumes =
-      usageOnly && usageStreamEnabled.value
-        ? await fetchVolumes(lastLoadedAt.value !== null)
-        : null;
+    const volumes = usageOnly && usageStreamEnabled.value ? await fetchVolumes() : null;
     response.value = metering;
     billingOrgs.value = orgs;
     payer.value = payerName;
@@ -400,18 +396,13 @@ const loadDetails = async () => {
   }
 };
 
-/** Bumped by a Refresh on any tab, so the shared org-cost read skips the server's cache once. */
-const refreshToken = ref(0);
-
 const refresh = () => {
-  refreshToken.value += 1;
   void loadDetails();
 };
 
 const orgCostRead = useOrgCosts(
   computed(() => (billed.value ? details.value : null)),
   computed(() => (billed.value ? billingOrgs.value : [])),
-  refreshToken,
 );
 const orgCosts = computed<OrgCostsState>(() => ({
   costs: orgCostRead.costs.value,

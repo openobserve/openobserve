@@ -50,11 +50,10 @@ import {
   stepPredicateRaw,
   urlPrefilter,
   type AnalyticsScope,
-  type BuildOpts,
-  type PathsDef,
   type RegexPass,
 } from "@/utils/rum/productAnalyticsQueries";
 import type { NamedEvent } from "@/utils/rum/productAnalyticsModel";
+import * as MODEL from "@/utils/rum/productAnalyticsModel";
 import * as PROVEN from "@/utils/rum/__fixtures__/productAnalyticsProvenSql";
 import * as PATHS from "@/utils/rum/__fixtures__/productAnalyticsPathsSql";
 import * as QUERIES from "@/utils/rum/productAnalyticsQueries";
@@ -135,15 +134,6 @@ const norm = (sql: string, s: AnalyticsScope, sample: 1 | 2 | 4 | 8 | 16 = 1): s
   return out.split(String(CS)).join("{cs}");
 };
 
-// Strips the drawer's NULL user_label wherever it sits, so the rest can be compared with the pre-#2851 SQL.
-const dropColumn = (sql: string, col: string): string =>
-  sql.replace(new RegExp(`,\\s*${col}`, "g"), "").replace(new RegExp(`${col},\\s*`, "g"), "");
-const withoutNullLabel = (sql: string): string =>
-  dropColumn(
-    dropColumn(sql, String.raw`CAST\(NULL AS VARCHAR\) AS user_label\b`),
-    String.raw`\buser_label\b`,
-  );
-
 const scope = (patch: Partial<AnalyticsScope> = {}): AnalyticsScope => ({
   app: "web",
   env: [],
@@ -152,15 +142,14 @@ const scope = (patch: Partial<AnalyticsScope> = {}): AnalyticsScope => ({
   ...patch,
 });
 
-const summaryColumns = (sql: string): Record<string, string> => {
-  const select = sql.slice("SELECT ".length, sql.indexOf(' FROM "_rumdata"'));
-  return Object.fromEntries(
-    select.split(/, (?=COUNT\(|MAX\(|0 AS )/).map((c) => {
-      const at = c.lastIndexOf(" AS ");
-      return [c.slice(at + 4), c.slice(0, at)];
-    }),
+// Strips the drawer's NULL user_label wherever it sits, so the rest can be compared with the pre-#2851 SQL.
+const dropColumn = (sql: string, col: string): string =>
+  sql.replace(new RegExp(`,\\s*${col}`, "g"), "").replace(new RegExp(`${col},\\s*`, "g"), "");
+const withoutNullLabel = (sql: string): string =>
+  dropColumn(
+    dropColumn(sql, String.raw`CAST\(NULL AS VARCHAR\) AS user_label\b`),
+    String.raw`\buser_label\b`,
   );
-};
 
 describe("page key (AC-4, AC-7)", () => {
   it.each(KEY_TABLE)("%s -> %s", (url, viewName, schema, expected) => {
@@ -389,67 +378,39 @@ describe("scope-load builders (G2)", () => {
     );
   });
 
-  it("Q3 summary equals the proven shape, counts synthetic sessions and excludes them from sessions (P1-M2)", () => {
+  it("P5-R8: Q3 summary flags synthetic sessions per session, drops them from sessions and counts them apart (P1-M2)", () => {
     const sql = summarySql(s, CS);
-    const unscoped = "application_id = 'web' AND session_id IS NOT NULL";
-    expect(sql.split(unscoped).join("{scope}").split(String(CS)).join("{cs}")).toBe(
-      PROVEN.Q3_SUMMARY,
+    const g = sql.slice(sql.indexOf("g AS (SELECT ") + "g AS (SELECT ".length);
+    const final = sql.slice(sql.lastIndexOf("\n") + 1);
+    expect(g).toContain("MAX(CASE WHEN session_type = 'synthetics' THEN 1 ELSE 0 END) AS syn");
+    expect(final).toMatch(/SUM\(CASE WHEN [^)]*cur = 1 AND syn = 0[^)]*\) AS sessions/);
+    expect(final).toMatch(/SUM\(CASE WHEN [^)]*prv = 1 AND syn = 0[^)]*\) AS prev_sessions/);
+    expect(final).toMatch(/SUM\(CASE WHEN [^)]*cur = 1 AND syn = 1[^)]*\) AS synthetic_sessions/);
+  });
+
+  it("Q3 drops synthetic sessions from views, rows and identity counts too", () => {
+    const final = summarySql(s, CS).split("\n").pop()!;
+    expect(final).toMatch(/SUM\(CASE WHEN [^)]*syn = 0[^)]*THEN views ELSE 0 END\) AS views/);
+    expect(final).toMatch(/SUM\(CASE WHEN [^)]*syn = 0[^)]*THEN va ELSE 0 END\) AS va_rows/);
+    expect(final).toMatch(
+      /CASE WHEN [^)]*syn = 0 AND starts_with\(v, [^)]*\) THEN v END\) AS usr_email__values/,
     );
-    // `sessions`/`prev_sessions` must drop synthetics so the KPI matches the "N synthetic sessions
-    // excluded" caption, while `synthetic_sessions` still counts them via its own, unfiltered CASE.
-    expect(sql).toContain(
-      "CASE WHEN _timestamp >= {cs} AND (session_type IS NULL OR session_type <> 'synthetics') THEN session_id END) AS sessions".replace(
-        "{cs}",
-        String(CS),
-      ),
-    );
-    expect(sql).toContain(
-      "CASE WHEN _timestamp < {cs} AND (session_type IS NULL OR session_type <> 'synthetics') THEN session_id END) AS prev_sessions".replace(
-        "{cs}",
-        String(CS),
-      ),
-    );
-    expect(sql).toContain(
-      `CASE WHEN _timestamp >= ${CS} AND session_type = 'synthetics' THEN session_id END) AS synthetic_sessions`,
+    expect(final).toMatch(
+      /CASE WHEN [^)]*syn = 0 AND usr_email__has = 1 THEN sid END\) AS usr_email__sessions/,
     );
   });
 
-  it("Q3 drops synthetics from every count except synthetic_sessions and data_through_us", () => {
-    const cols = summaryColumns(summarySql(s, CS));
-    const bot = "(session_type IS NULL OR session_type <> 'synthetics')";
-    for (const alias of [
-      "sessions",
-      "prev_sessions",
-      "views",
-      "va_rows",
-      "usr_email__values",
-      "usr_email__sessions",
-    ])
-      expect(cols[alias], alias).toContain(bot);
-    expect(cols.synthetic_sessions).not.toContain(bot);
-    expect(cols.data_through_us).not.toContain(bot);
-    expect(summarySql(s, CS)).toMatch(
-      /WHERE application_id = 'web' AND session_id IS NOT NULL LIMIT 1$/,
-    );
-  });
-
-  it("Q3 without session_type adds no synthetics clause to any column", () => {
-    const cols = summaryColumns(summarySql(scope({ schema: { usr_email: true } }), CS));
-    expect(Object.keys(cols)).toContain("usr_email__sessions");
-    for (const [alias, expr] of Object.entries(cols))
-      expect(expr, alias).not.toContain("session_type");
-  });
-
-  it("Q3 without session_type or candidates reports zero synthetics and no identity pairs", () => {
+  it("P5-R8: Q3 without session_type or candidates never reads session_type and has no identity pairs", () => {
     const sql = summarySql(scope(), CS);
-    expect(sql).toContain("0 AS synthetic_sessions");
+    expect(sql).toContain("AS synthetic_sessions");
+    expect(sql).not.toContain("session_type");
     expect(sql).not.toContain("__values");
   });
 
-  it("Q3 keeps env and version filters", () => {
+  it("P5-R8: Q3 keeps env and version filters in its per-session pass", () => {
     const sql = summarySql({ ...s, env: ["prod"] }, CS);
     expect(sql).toContain(
-      "WHERE application_id = 'web' AND session_id IS NOT NULL AND env IN ('prod') LIMIT 1",
+      "WHERE application_id = 'web' AND session_id IS NOT NULL AND env IN ('prod') GROUP BY session_id",
     );
   });
 
@@ -475,30 +436,11 @@ describe("entry/exit and step picker builders (G3, G4)", () => {
   const s = scope({ schema: { usr_email: true, action_target_name: true } });
   const id = { field: "usr_email" as const, excluded: [] };
 
-  it("Q6 entryExit equals the proven shape plus the key tie-break, one row per session", () => {
-    // One session is one entry, in its first view's window, and one exit, in its last view's window.
-    const expected = amendPk(PROVEN.Q6_ENTRY_EXIT_IDENTITY)
-      .replace(
-        "CASE WHEN _timestamp >= {cs} THEN 1 ELSE 0 END AS cur,",
-        "CASE WHEN MIN(CASE WHEN type = 'view' THEN _timestamp END) >= {cs} THEN 1 ELSE 0 END AS ce, CASE WHEN MAX(CASE WHEN type = 'view' THEN _timestamp END) >= {cs} THEN 1 ELSE 0 END AS cx,",
-      )
-      .replace(
-        "s1 AS (SELECT sid, cur, u, unnest(",
-        "s1 AS (SELECT sid, u, unnest(make_array(ce, cx)) AS cur, unnest(",
-      )
-      .replace(
-        "GROUP BY session_id, CASE WHEN _timestamp >= {cs} THEN 1 ELSE 0 END)",
-        "GROUP BY session_id)",
-      )
-      .replace("ORDER BY rank_key DESC LIMIT 1000", "ORDER BY rank_key DESC, k LIMIT 1000");
-    expect(norm(entryExitSql(s, CS, id), s)).toBe(norm(expected, s));
-  });
-
-  it("Q6 without identity drops the users columns", () => {
+  it("P5-R14: Q6 without identity drops the users columns and groups per view", () => {
     const sql = entryExitSql(s, CS, null);
     expect(sql).not.toContain("users");
     expect(sql).not.toContain("usr_email");
-    expect(sql).toContain(`WHERE ${scopeClause(s)} AND (type = 'view') GROUP BY session_id`);
+    expect(sql).toContain(`WHERE ${scopeClause(s)} AND type = 'view' GROUP BY session_id, view_id`);
   });
 
   it("Q9 stepPicker equals the proven shape with the design tie-break and term limit", () => {
@@ -1123,6 +1065,1733 @@ describe("paths builders (G6, AC-23, AC-24, AC-25, AC-26)", () => {
   });
 });
 
+describe("retention builders (G7, AC-31, AC-34, AC-35, AC-51)", () => {
+  const s = scope({ schema: { usr_email: true } });
+  const id = { field: "usr_email" as const, excluded: [] };
+  const any = { start: null, ret: null, per: "week" as const, mode: "on" as const };
+  const opts = { events: [], sample: 1 as const };
+
+  it("Q16 equals the proven shape with period boundaries as literals", () => {
+    expect(norm(retentionSql(s, id, any, [1000, 2000, 3000], opts), s)).toBe(
+      norm(PROVEN.Q16_RETENTION, s),
+    );
+  });
+
+  it("Q17 On mode equals the proven shape", () => {
+    expect(norm(retentionCellUsersSql(s, id, any, [1000, 2000, 3000], 0, 1, opts), s)).toBe(
+      norm(PROVEN.Q17_CELL, s),
+    );
+  });
+
+  it("Q17 On or after counts a user retained by their last return period", () => {
+    const sql = retentionCellUsersSql(
+      s,
+      id,
+      { ...any, mode: "after" },
+      [1000, 2000, 3000],
+      0,
+      1,
+      opts,
+    );
+    expect(sql).toContain("CASE WHEN MAX(last_ret) >= 1 THEN 1 ELSE 0 END AS retained");
+  });
+
+  it("narrows start and return to a page or click (AC-34)", () => {
+    const withClicks = scope({ schema: { usr_email: true, action_target_name: true } });
+    const sql = retentionSql(
+      withClicks,
+      id,
+      { ...any, start: { kind: "p", key: "/signup" }, ret: { kind: "c", key: "save" } },
+      [1, 2],
+      opts,
+    );
+    expect(sql).toContain(
+      `MAX(CASE WHEN (type = 'view' AND (strpos(view_url, '/signup') > 0) AND ${pageKeyExpr("view_url", withClicks.schema)} = '/signup') THEN 1 ELSE 0 END) AS s`,
+    );
+    expect(sql).toContain(
+      `MAX(CASE WHEN (type = 'action' AND action_target_name <> '' AND ${clickKeyExpr("action_target_name")} = 'save') THEN 1 ELSE 0 END) AS r`,
+    );
+    expect(sql).toMatch(/LIMIT 3$/);
+  });
+
+  it("a click return matches nothing, instead of referencing action_target_name, when the org has no click events (o2-enterprise#2800)", () => {
+    const sql = retentionSql(
+      s,
+      id,
+      { ...any, start: { kind: "p", key: "/signup" }, ret: { kind: "c", key: "save" } },
+      [1, 2],
+      opts,
+    );
+    expect(sql).not.toContain("action_target_name");
+    expect(sql).toContain("MAX(CASE WHEN (1 = 0) THEN 1 ELSE 0 END) AS r");
+  });
+
+  it("samples users by a hash of the identity (AC-52)", () => {
+    const sql = retentionSql(s, id, any, [1, 2, 3], { events: [], sample: 2 });
+    expect(sql).toContain(
+      "AND substr(md5(NULLIF(usr_email, '')), 1, 1) IN ('0', '1', '2', '3', '4', '5', '6', '7')",
+    );
+    expect(sql).not.toContain("md5(session_id)");
+  });
+
+  it("uses the dominant-value exclusion as the identity (AC-50)", () => {
+    const sql = retentionSql(s, { field: "usr_email", excluded: ["bot"] }, any, [1, 2], opts);
+    expect(sql).toContain(
+      "CASE WHEN NULLIF(usr_email, '') IN ('bot') THEN NULL ELSE NULLIF(usr_email, '') END AS u",
+    );
+  });
+});
+
+describe("features builder (G8, AC-45)", () => {
+  const s = scope({ schema: { action_id: true, usr_email: true, action_target_name: true } });
+  const id = { field: "usr_email" as const, excluded: [] };
+  const ev = (i: number, rules: NamedEvent["rules"]): NamedEvent => ({
+    id: `e${i}`,
+    app: "web",
+    name: `E${i}`,
+    rules,
+    version: 1,
+    createdBy: "",
+    createdAt: 0,
+    updatedBy: "",
+    updatedAt: 0,
+  });
+  const events = [
+    ev(0, [{ t: "view", op: "eq", value: "/web/logs" }]),
+    ev(1, [{ t: "action", targets: ["menu-link-/logs-item"], onPage: "/web" }]),
+  ];
+
+  it("Q23 equals the proven shape", () => {
+    expect(norm(featuresSql(s, CS, id, events), s)).toBe(norm(PROVEN.Q23_FEATURES, s));
+  });
+
+  it("drops the identity columns without an identity and refuses more than 5 events", () => {
+    const sql = featuresSql(s, CS, null, events);
+    expect(sql).not.toMatch(/users|u0|usr_email/);
+    const many = Array.from({ length: 6 }, (_, i) =>
+      ev(i, [{ t: "view", op: "prefix", value: "/a" }]),
+    );
+    expect(() => featuresSql(s, CS, null, many)).toThrow();
+  });
+
+  it("uses prefix and regex rules over the page template", () => {
+    const sql = featuresSql(s, CS, null, [
+      ev(0, [
+        { t: "view", op: "prefix", value: "/web/" },
+        { t: "view", op: "regex", value: "^/a$" },
+      ]),
+    ]);
+    expect(sql).toContain(
+      "((ty = 'view' AND starts_with(pg, '/web/')) OR (ty = 'view' AND regexp_like(pg, '^/a$')))",
+    );
+  });
+
+  it("never references action_target_name when the org has no click events (o2-enterprise#2800)", () => {
+    const noClicks = scope({ schema: { action_id: true, usr_email: true } });
+    const sql = featuresSql(noClicks, CS, id, events);
+    expect(sql).not.toContain("action_target_name");
+    expect(sql).toContain("(type = 'view' OR FALSE OR");
+    expect(() => assertJoinFree(sql)).not.toThrow();
+  });
+});
+
+describe("dashboard panel builder (G9, AC-53)", () => {
+  const steps = [
+    { kind: "p" as const, key: "/web" },
+    { kind: "c" as const, key: "menu-link-/logs-item" },
+    { kind: "p" as const, key: "/web/logs" },
+  ];
+  const s = scope({ schema: { action_id: true, action_target_name: true } });
+
+  it("pivots the unbroken Sessions funnel into one row per step", () => {
+    const sql = funnelPanelSql(
+      s,
+      { steps, unit: "users", window: "7d", breakdown: "browser" },
+      { events: [], sample: 4 },
+    );
+    expect(norm(sql, s)).toBe(norm(SEQ.Q7_PANEL, s));
+    expect(sql).not.toMatch(/_timestamp >= \d|md5/);
+  });
+});
+
+describe("alert-bound builders (no SELECT *)", () => {
+  // The same pattern as RE_ONLY_SELECT in src/search/src/sql/mod.rs, which the alert service applies to the whole text.
+  const RE_ONLY_SELECT = /select[ ]+\*/i;
+  const steps = [
+    { kind: "p" as const, key: "/web" },
+    { kind: "c" as const, key: "menu-link-/logs-item" },
+    { kind: "e" as const, key: "ev1" },
+  ];
+  const events: NamedEvent[] = [
+    {
+      id: "ev1",
+      app: "web",
+      name: "Save",
+      rules: [{ t: "action", targets: ["save"], onPage: "/web" }],
+      version: 1,
+      createdBy: "",
+      createdAt: 0,
+      updatedBy: "",
+      updatedAt: 0,
+    },
+  ];
+  const s = scope({
+    schema: { action_id: true, usr_email: true, user_agent_user_agent_family: true },
+  });
+  const id = { field: "usr_email" as const, excluded: [] };
+  const opts = { events, sample: 1 as const };
+  const defs = [
+    { unit: "sessions" as const, window: "session" as const },
+    { unit: "users" as const, window: "session" as const },
+    { unit: "users" as const, window: "1h" as const },
+    { unit: "users" as const, window: "7d" as const },
+  ].flatMap((u) =>
+    [2, 3, 10, 20].map((n) => ({
+      ...u,
+      steps: Array.from({ length: n }, (_, i) => steps[i % steps.length]),
+      breakdown: "browser" as const,
+    })),
+  );
+
+  it.each(defs)("funnelAlertSql never writes SELECT * ($unit, $window)", (def) => {
+    const sql = funnelAlertSql(s, id, def, 50, opts);
+    expect(sql).not.toMatch(RE_ONLY_SELECT);
+    expect(() => assertJoinFree(sql)).not.toThrow();
+  });
+
+  it.each(defs)(
+    "funnelPanelSql, which dashboards can turn into alerts, never writes SELECT * ($unit, $window)",
+    (def) => {
+      expect(funnelPanelSql(s, def, opts)).not.toMatch(RE_ONLY_SELECT);
+    },
+  );
+
+  it("ends in the conversion row filter over the funnel's own counts", () => {
+    const def = {
+      steps: steps.slice(0, 2),
+      unit: "sessions" as const,
+      window: "session" as const,
+      breakdown: null,
+    };
+    const sql = funnelAlertSql(s, id, def, 42.5, opts);
+    expect(sql).toContain("fin AS (SELECT SUM(r1) AS entered, SUM(r2) AS converted FROM ps)");
+    expect(sql).toMatch(
+      /\nSELECT entered, converted, 100\.0 \* converted \/ entered AS conv_pct FROM fin WHERE entered > 0 AND 100\.0 \* converted \/ entered < 42\.5$/,
+    );
+    const users = funnelAlertSql(s, id, { ...def, unit: "users", window: "1d" }, 42.5, opts);
+    expect(users).toContain("SUM(r2) AS converted FROM pu WHERE anon = 0)");
+  });
+
+  it("drops the breakdown and clamps the threshold to 0-100", () => {
+    const def = {
+      steps: steps.slice(0, 2),
+      unit: "sessions" as const,
+      window: "session" as const,
+      breakdown: "browser" as const,
+    };
+    expect(funnelAlertSql(s, id, def, 250, opts)).toMatch(/ < 100$/);
+    expect(funnelAlertSql(s, id, def, Number.NaN, opts)).toMatch(/ < 0$/);
+    expect(funnelAlertSql(s, id, def, 10, opts)).not.toContain("dim");
+  });
+});
+
+// P5 builders (§4.1, §4.6, §4.7) that are not exported yet.
+const P5_NEW = QUERIES as unknown as Record<string, (...args: unknown[]) => string>;
+
+describe("assertJoinFree over every builder (AC-55)", () => {
+  const s = scope({
+    schema: {
+      action_id: true,
+      usr_email: true,
+      session_type: true,
+      user_agent_user_agent_family: true,
+      action_frustration_type: true,
+    },
+  });
+  const id = { field: "usr_email" as const, excluded: ["bot@x.com"] };
+  const ev: NamedEvent = {
+    id: "ev1aaaaaaaaa",
+    app: "web",
+    name: "Save",
+    rules: [
+      { t: "view", op: "regex", value: "^/web/.*$" },
+      { t: "action", targets: ["save"], onPage: "/web" },
+    ],
+    version: 1,
+    createdBy: "",
+    createdAt: 0,
+    updatedBy: "",
+    updatedAt: 0,
+  };
+  const opts = { events: [ev], sample: 4 as const };
+  const pick = [
+    { kind: "p" as const, key: "/web" },
+    { kind: "c" as const, key: "save" },
+    { kind: "e" as const, key: "ev1aaaaaaaaa" },
+  ];
+  const steps = (n: number) => Array.from({ length: n }, (_, i) => pick[i % pick.length]);
+  const defs = [2, 20].flatMap((n) =>
+    (
+      [
+        ["sessions", "session"],
+        ["users", "session"],
+        ["users", "1d"],
+      ] as const
+    ).map(([unit, window]) => ({ steps: steps(n), unit, window, breakdown: "browser" as const })),
+  );
+  const retention = { start: pick[2], ret: pick[1], per: "week" as const, mode: "after" as const };
+  const bounds = [1000, 2000, 3000, 4000];
+  const builders: Record<string, () => string[]> = {
+    appProbeSql: () => [QUERIES.appProbeSql()],
+    facetOptionsSql: () => [
+      QUERIES.facetOptionsSql(s, "env"),
+      QUERIES.facetOptionsSql(s, "version"),
+    ],
+    summarySql: () => [QUERIES.summarySql(s, CS)],
+    identityTopSql: () => [QUERIES.identityTopSql(s, "usr_email")],
+    entryExitSql: () => [QUERIES.entryExitSql(s, CS, id), QUERIES.entryExitSql(s, CS, null)],
+    stepPickerSql: () => [QUERIES.stepPickerSql(s), QUERIES.stepPickerSql(s, "we")],
+    pagesSql: () => [QUERIES.pagesSql(s, CS, id), QUERIES.pagesSql(s, CS, null)],
+    clicksSql: () => [QUERIES.clicksSql(s, CS, id), QUERIES.clicksSql(s, CS, null)],
+    clickPagesSql: () => [QUERIES.clickPagesSql(s, CS, ["save", "o'k"])],
+    trendSql: () => [QUERIES.trendSql(s, id, "1 day", "UTC", pick, [ev])],
+    activeUsersSql: () => [QUERIES.activeUsersSql(s, id, CS)],
+    funnelSql: () =>
+      defs.flatMap((d) => [
+        QUERIES.funnelSql(s, id, d, opts),
+        QUERIES.funnelSql(s, id, { ...d, breakdown: null }, opts),
+      ]),
+    funnelPanelSql: () => defs.map((d) => QUERIES.funnelPanelSql(s, d, opts)),
+    funnelAlertSql: () => defs.map((d) => QUERIES.funnelAlertSql(s, id, d, 50, opts)),
+    nextStepsSql: () => defs.map((d) => QUERIES.nextStepsSql(s, id, d, opts)),
+    dropoffNextSql: () =>
+      defs.map((d) =>
+        QUERIES.dropoffNextSql(
+          s,
+          id,
+          { funnel: d, stepIndex: d.steps.length - 1, side: "dropped" },
+          opts,
+        ),
+      ),
+    dropoffHealthSql: () => defs.map((d) => QUERIES.dropoffHealthSql(s, id, d, 1, opts)),
+    cohortSessionsSql: () =>
+      defs.map((d) =>
+        QUERIES.cohortSessionsSql(s, id, { funnel: d, stepIndex: 1, side: "dropped" }, 1, opts),
+      ),
+    sessionEventsProbeSql: () => [QUERIES.sessionEventsProbeSql("s'1", s.schema)],
+    pathsSql: () => [
+      ...pick.map((anchor) =>
+        QUERIES.pathsSql(
+          s,
+          id,
+          { anchor, direction: "prev", depth: 5, include: "all", cohort: null },
+          opts,
+        ),
+      ),
+      ...defs.map((d) =>
+        QUERIES.pathsSql(
+          s,
+          id,
+          {
+            anchor: null,
+            direction: "next",
+            depth: 5,
+            include: "pages",
+            cohort: { funnel: d, stepIndex: d.steps.length - 1, side: "dropped" },
+          },
+          opts,
+        ),
+      ),
+    ],
+    branchSessionsSql: () =>
+      defs.map((d) =>
+        QUERIES.branchSessionsSql(
+          s,
+          id,
+          {
+            anchor: null,
+            direction: "next",
+            depth: 3,
+            include: "all",
+            cohort: { funnel: d, stepIndex: 1, side: "dropped" },
+          },
+          "s1 = 'p:/web'",
+          2,
+          0,
+          opts,
+        ),
+      ),
+    retentionSql: () => [QUERIES.retentionSql(s, id, retention, bounds, opts)],
+    retentionCellUsersSql: () => [
+      QUERIES.retentionCellUsersSql(s, id, retention, bounds, 0, 2, opts),
+    ],
+    featuresSql: () => [
+      QUERIES.featuresSql(s, CS, id, [ev]),
+      QUERIES.featuresSql(s, CS, null, [ev]),
+    ],
+    errorPickerSql: () => [P5_NEW.errorPickerSql(s), P5_NEW.errorPickerSql(s, "fa'il")],
+    unnamedClicksSql: () => [P5_NEW.unnamedClicksSql(s)],
+    userAgentSuggestionSql: () => [P5_NEW.userAgentSuggestionSql(s)],
+    namedEventPreviewSql: () => [P5_NEW.namedEventPreviewSql(s, ev)],
+    filterValuesSql: () => [QUERIES.filterValuesSql(s, "usr_email")],
+    whyEnteredSql: () =>
+      defs.map((d) =>
+        QUERIES.whyEnteredSql(
+          s,
+          { ...d, f: [{ field: "usr_email", op: "in", values: ["a@x.io"] }] },
+          opts,
+        ),
+      ),
+  };
+
+  it("covers every exported *Sql builder", () => {
+    const exported = Object.entries(QUERIES)
+      .filter(([name, v]) => name.endsWith("Sql") && typeof v === "function")
+      .map(([name]) => name)
+      .sort();
+    expect(Object.keys(builders).sort()).toEqual(exported);
+  });
+
+  it.each(Object.keys(builders))(
+    "%s reads _rumdata once with no JOIN, IN (SELECT, EXISTS or UNION",
+    (name) => {
+      const sqls = builders[name]();
+      expect(sqls.length).toBeGreaterThan(0);
+      for (const sql of sqls) expect(() => assertJoinFree(sql)).not.toThrow();
+    },
+  );
+});
+
+describe("saved funnel sql cap (G8, CR-24)", () => {
+  const s = scope({
+    schema: {
+      action_id: true,
+      usr_email: true,
+      user_agent_user_agent_family: true,
+      action_target_name: true,
+    },
+  });
+  const id = { field: "usr_email" as const, excluded: ["a'b@x.com"] };
+  const key = (i: number, c: string) => `/${c.repeat(1023 - String(i).length)}${i}`;
+  const sizes = (page: string, click: string) => {
+    const steps = Array.from({ length: 10 }, (_, i) =>
+      i % 2
+        ? { kind: "c" as const, key: key(i, click) }
+        : { kind: "p" as const, key: key(i, page) },
+    );
+    return (["sessions", "users"] as const).flatMap((unit) =>
+      [null, "browser" as const].map((breakdown) => {
+        const window = unit === "users" ? ("7d" as const) : ("session" as const);
+        const sql = funnelSql(
+          s,
+          unit === "users" ? id : null,
+          { steps, unit, window, breakdown },
+          {
+            events: [],
+            sample: 1,
+          },
+        );
+        return new TextEncoder().encode(sql).length;
+      }),
+    );
+  };
+
+  it("a 10-step funnel of 1,024-character ASCII keys compiles under the server's 65,536-byte cap", () => {
+    expect(Math.max(...sizes("b", "a"))).toBeLessThan(65536);
+  });
+
+  it("quote-heavy or multibyte 1,024-character keys can exceed it, which is why Save checks bytes first", () => {
+    expect(Math.max(...sizes("'", "é"))).toBeGreaterThan(65536);
+  });
+});
+
+// pageKeyExpr's mobile fallback read view_name directly, but CTE call sites only ever select url/fu/lu.
+describe("mobile view_name fallback reaches a column the CTE actually selects (o2-enterprise#2798)", () => {
+  const s = scope({
+    schema: { view_name: true, usr_email: true, action_id: true, action_target_name: true },
+  });
+  const id = { field: "usr_email" as const, excluded: [] };
+  const opts = { events: [], sample: 1 as const };
+
+  it("pageKeyExpr lets a caller name the real backing column instead of the raw 'view_name'", () => {
+    expect(pageKeyExpr("url", { view_name: true }, "vn")).toContain("THEN NULLIF(vn, '') ELSE");
+    expect(pageKeyExpr("url", { view_name: true })).toContain("THEN NULLIF(view_name, '') ELSE");
+  });
+
+  it("Q4 pages (Overview -> Pages) carries vn through v0/v1 and reads it, not the raw column", () => {
+    const sql = pagesSql(s, CS, id);
+    expect(sql).toContain("MIN(CASE WHEN type = 'view' THEN view_name END) AS vn");
+    expect(sql).toContain("v1 AS (SELECT sid, ty, cur, vid, url, vn,");
+    expect(sql).toContain("NULLIF(vn, '')");
+    expect(sql).not.toContain("NULLIF(view_name, '')");
+  });
+
+  it("P5-R14: Q6 entryExit carries view_name per view for the page key, not the raw column", () => {
+    const sql = entryExitSql(s, CS, id);
+    const v0 = sql.slice(0, sql.indexOf("\n"));
+    expect(v0).toContain("view_name");
+    expect(sql).not.toContain("AS fvn");
+    expect(sql).not.toContain("NULLIF(view_name, '')");
+  });
+
+  it("Q9 stepPicker carries vn", () => {
+    const sql = stepPickerSql(s);
+    expect(sql).toContain("MIN(view_name) AS vn");
+    expect(sql).toContain("NULLIF(vn, '')");
+    expect(sql).not.toContain("NULLIF(view_name, '')");
+  });
+
+  it("Q7 funnel (Funnels panel) carries vn through x00/x0 for the page key", () => {
+    const steps = [
+      { kind: "p" as const, key: "/web" },
+      { kind: "p" as const, key: "/web/logs" },
+    ];
+    const sql = funnelSql(
+      s,
+      id,
+      { steps, unit: "sessions", window: "session", breakdown: null },
+      opts,
+    );
+    expect(sql).toContain("MIN(view_name) AS vn");
+    expect(sql).toContain("NULLIF(vn, '')");
+    expect(sql).not.toContain("NULLIF(view_name, '')");
+  });
+
+  it("an on-page action rule forwards vn alongside url so the step flag resolves it inside x1", () => {
+    const events = [
+      {
+        id: "ev1",
+        app: "web",
+        name: "Save",
+        rules: [{ t: "action" as const, targets: ["save"], onPage: "/web" }],
+        version: 1,
+        createdBy: "",
+        createdAt: 0,
+        updatedBy: "",
+        updatedAt: 0,
+      },
+    ];
+    const sql = funnelSql(
+      s,
+      null,
+      {
+        steps: [{ kind: "e" as const, key: "ev1" }],
+        unit: "sessions",
+        window: "session",
+        breakdown: null,
+      },
+      { events, sample: 1 },
+    );
+    expect(sql).toMatch(/ AS k, url, vn FROM x00/);
+    expect(sql).toContain(`k IN ('save') AND ${pageKeyExpr("url", s.schema, "vn")} = '/web'`);
+    expect(sql).toContain("NULLIF(view_name, '')"); // the raw-level onPage scan filter in x00, unaffected
+  });
+
+  it("Q12 dropoffHealth and Q13 cohortSessions carry vn through fullChainCtes", () => {
+    const sessions = {
+      steps: [
+        { kind: "p" as const, key: "/web" },
+        { kind: "c" as const, key: "menu-link-/logs-item" },
+      ],
+      unit: "sessions" as const,
+      window: "session" as const,
+      breakdown: null,
+    };
+    const health = dropoffHealthSql(s, null, sessions, 1, opts);
+    expect(health).toContain("MIN(view_name) AS vn");
+    expect(health).toContain("NULLIF(vn, '')");
+    expect(health).not.toContain("NULLIF(view_name, '')");
+    const cohort = cohortSessionsSql(
+      s,
+      id,
+      { funnel: sessions, stepIndex: 1, side: "dropped" },
+      0,
+      opts,
+    );
+    expect(cohort).toContain("NULLIF(vn, '')");
+    expect(cohort).not.toContain("NULLIF(view_name, '')");
+  });
+
+  it("Q14 paths carries vn", () => {
+    const def = {
+      anchor: { kind: "p" as const, key: "/web/logs" },
+      direction: "next" as const,
+      depth: 3,
+      include: "all" as const,
+      cohort: null,
+    };
+    const sql = pathsSql(s, null, def, opts);
+    expect(sql).toContain("MIN(view_name) AS vn");
+    expect(sql).toContain("NULLIF(vn, '')");
+    expect(sql).not.toContain("NULLIF(view_name, '')");
+  });
+
+  it("Q23 features carries vn", () => {
+    const events = [
+      {
+        id: "e0",
+        app: "web",
+        name: "E0",
+        rules: [{ t: "view" as const, op: "eq" as const, value: "/web/logs" }],
+        version: 1,
+        createdBy: "",
+        createdAt: 0,
+        updatedBy: "",
+        updatedAt: 0,
+      },
+    ];
+    const sql = featuresSql(s, CS, id, events);
+    expect(sql).toContain("MIN(view_name) AS vn");
+    expect(sql).toContain("NULLIF(vn, '')");
+    expect(sql).not.toContain("NULLIF(view_name, '')");
+  });
+
+  it("every builder still runs join-free with view_name in the schema", () => {
+    const steps = [
+      { kind: "p" as const, key: "/web" },
+      { kind: "c" as const, key: "menu-link-/logs-item" },
+      { kind: "p" as const, key: "/web/logs" },
+    ];
+    const def = { steps, unit: "sessions" as const, window: "session" as const, breakdown: null };
+    for (const sql of [
+      pagesSql(s, CS, id),
+      entryExitSql(s, CS, id),
+      stepPickerSql(s),
+      funnelSql(s, id, def, opts),
+      funnelPanelSql(s, def, opts),
+      pathsSql(
+        s,
+        id,
+        {
+          anchor: { kind: "p", key: "/web" },
+          direction: "next",
+          depth: 3,
+          include: "all",
+          cohort: null,
+        },
+        opts,
+      ),
+      featuresSql(s, CS, id, [
+        {
+          id: "e0",
+          app: "web",
+          name: "E0",
+          rules: [{ t: "view", op: "eq", value: "/web" }],
+          version: 1,
+          createdBy: "",
+          createdAt: 0,
+          updatedBy: "",
+          updatedAt: 0,
+        },
+      ]),
+    ]) {
+      expect(() => assertJoinFree(sql)).not.toThrow();
+    }
+  });
+});
+
+// P5 (gap fixes, web SQL builders). Assumed scope fields: `exclusions` (§4.0), `xall`, `apps: string[]`,
+// `appExclusions` (each compared app's settings by app id), `newSince` (new-users range start, ms).
+describe("P5 gap fixes: SQL builders", () => {
+  const FIELDS =
+    "action_error_count action_id action_target_name action_type application_id date env error_id error_message error_type geo_info_city geo_info_country session_has_replay session_id session_type type user_agent_device_family user_agent_os_family user_agent_user_agent_family usr_email usr_name version view_error_count view_frustration_count view_id view_referrer view_time_spent view_url".split(
+      " ",
+    );
+  const FULL: Record<string, boolean> = Object.fromEntries(FIELDS.map((f) => [f, true]));
+  const BUILTIN = {
+    version: 1,
+    families: ["HeadlessChrome", "PhantomJS", "Spider"],
+    devices: ["Spider"],
+  };
+  const FAMILY_HALF =
+    "(user_agent_user_agent_family IS NULL OR user_agent_user_agent_family NOT IN ('HeadlessChrome', 'PhantomJS', 'Spider'))";
+  const DEVICE_HALF =
+    "(user_agent_device_family IS NULL OR user_agent_device_family NOT IN ('Spider'))";
+  const BUILTIN_PRED = `${FAMILY_HALF} AND ${DEVICE_HALF}`;
+  const STAFF = { field: "usr_email", op: "suffix", values: ["@openobserve.ai"] };
+  const STAFF_XI =
+    "MAX(CASE WHEN usr_email IS NOT NULL AND ends_with(usr_email, '@openobserve.ai') THEN 1 ELSE 0 END) AS xi";
+  const STAFF_ROW = "(usr_email IS NULL OR NOT ends_with(usr_email, '@openobserve.ai'))";
+  const COUNTRY = { field: "geo_info_country", op: "eq", values: ["XX"] };
+  const COUNTRY_PRED = "(geo_info_country IS NULL OR geo_info_country <> 'XX')";
+  const IGNORED = [
+    { op: "eq", value: "/web/login" },
+    { op: "eq", value: "/web/cb" },
+  ];
+  const IGN_K = "NOT (k IN ('/web/login', '/web/cb'))";
+  type Rules = {
+    bots?: boolean;
+    builtinBots?: typeof BUILTIN;
+    sessions?: unknown[];
+    pages?: unknown[];
+  };
+  const rules = (r: Rules = {}) => ({
+    bots: true,
+    builtinBots: BUILTIN,
+    sessions: [],
+    pages: [],
+    ...r,
+  });
+  const ruled = (
+    r: Rules = {},
+    patch: Record<string, unknown> = {},
+    schema: Record<string, boolean> = FULL,
+  ): AnalyticsScope =>
+    ({
+      app: "web",
+      env: [],
+      version: [],
+      schema,
+      exclusions: rules(r),
+      ...patch,
+    }) as AnalyticsScope;
+  const noRules = (schema: Record<string, boolean> = FULL) => ruled({ bots: false }, {}, schema);
+  const NEW = QUERIES as unknown as Record<string, (...args: unknown[]) => string>;
+  const opts = { events: [] as NamedEvent[], sample: 1 as const };
+  const id = { field: "usr_email" as const, excluded: [] };
+  const p = (key: string, f?: Record<string, unknown>) =>
+    ({ kind: "p", key, ...(f ? { f } : {}) }) as StepRefP5;
+  type StepRefP5 = { kind: "p" | "c" | "e" | "r"; key: string; f?: Record<string, unknown> };
+  type DefP5 = {
+    steps: StepRefP5[];
+    unit: "sessions" | "users";
+    window: "session" | "1h" | "1d" | "7d";
+    breakdown: string | null;
+    x?: unknown[];
+  };
+  const fdef = (patch: Partial<DefP5> = {}) =>
+    ({
+      steps: [p("/web"), p("/web/logs"), p("/web/billings"), p("/web/settings")],
+      unit: "sessions",
+      window: "session",
+      breakdown: null,
+      ...patch,
+    }) as unknown as Parameters<typeof funnelSql>[2];
+  const BETWEEN = { step: p("/web/ingestion"), a: 2, b: 3 };
+  const WITHIN = { step: p("/web/ingestion"), a: 2, withinMs: 1000 };
+  const named = (rulesList: unknown[], eid = "ev1aaaaaaaaa"): NamedEvent =>
+    ({
+      id: eid,
+      app: "web",
+      name: "Ev",
+      rules: rulesList,
+      version: 1,
+      createdBy: "",
+      createdAt: 0,
+      updatedBy: "",
+      updatedAt: 0,
+    }) as NamedEvent;
+  const evStep = { kind: "e" as const, key: "ev1aaaaaaaaa" };
+
+  // Returns one CTE's body by balanced parentheses, skipping quoted literals.
+  const cte = (sql: string, name: string): string => {
+    const m = new RegExp(`(?:^|WITH |\\n)${name} +AS \\(`).exec(sql);
+    if (!m) return "";
+    const start = m.index + m[0].length;
+    let depth = 1;
+    let quoted = false;
+    for (let i = start; i < sql.length; i++) {
+      const ch = sql[i];
+      if (ch === "'") quoted = !quoted;
+      else if (!quoted && ch === "(") depth++;
+      else if (!quoted && ch === ")" && --depth === 0) return sql.slice(start, i);
+    }
+    return sql.slice(start);
+  };
+  // Returns the select item aliased `alias`, walking back to its top-level comma.
+  const item = (text: string, alias: string): string => {
+    const m = new RegExp(` AS ${alias}(?=,| FROM|$)`).exec(text);
+    if (!m) return "";
+    let depth = 0;
+    let quoted = false;
+    for (let i = m.index - 1; i >= 0; i--) {
+      const ch = text[i];
+      if (ch === "'") quoted = !quoted;
+      else if (!quoted && ch === ")") depth++;
+      else if (!quoted && ch === "(") {
+        if (depth === 0) return text.slice(i + 1, m.index).trim();
+        depth--;
+      } else if (!quoted && depth === 0 && ch === ",") return text.slice(i + 1, m.index).trim();
+      if (!quoted && depth === 0 && text.slice(i, i + 7) === "SELECT ")
+        return text.slice(i + 7, m.index).trim();
+    }
+    return text.slice(0, m.index).trim();
+  };
+  const scans = (sql: string) => sql.split('FROM "_rumdata"').length - 1;
+  const tail = (sql: string) => sql.slice(sql.lastIndexOf("\n") + 1);
+
+  describe("session exclusions (§4.1)", () => {
+    it.each([
+      ["eq", ["o'k"], "(geo_info_country IS NULL OR geo_info_country <> 'o''k')"],
+      ["in", ["a", "b"], "(geo_info_country IS NULL OR geo_info_country NOT IN ('a', 'b'))"],
+      ["prefix", ["v"], "(geo_info_country IS NULL OR NOT starts_with(geo_info_country, 'v'))"],
+      ["suffix", ["v"], "(geo_info_country IS NULL OR NOT ends_with(geo_info_country, 'v'))"],
+      ["contains", ["v"], "(geo_info_country IS NULL OR strpos(geo_info_country, 'v') = 0)"],
+      ["regex", ["^v$"], "(geo_info_country IS NULL OR NOT regexp_like(geo_info_country, '^v$'))"],
+    ])("P5-R2: a %s rule emits its NULL-safe predicate in scopeClause", (op, values, pred) => {
+      const s = ruled({ bots: false, sessions: [{ field: "geo_info_country", op, values }] });
+      expect(scopeClause(s)).toContain(pred);
+    });
+
+    it("P5-R2: every scopeClause caller carries the rule predicate", () => {
+      const s = ruled({ bots: false, sessions: [COUNTRY] });
+      const sqls = [
+        pagesSql(s, CS, null),
+        clicksSql(s, CS, null),
+        entryExitSql(s, CS, null),
+        stepPickerSql(s),
+        trendSql(s, null, "1 day", "UTC", [], []),
+        funnelSql(s, null, fdef(), opts),
+        identityTopSql(s, "usr_email"),
+        activeUsersSql(s, id, CS),
+        featuresSql(s, CS, null, [named([{ t: "view", op: "eq", value: "/web" }])]),
+        clickPagesSql(s, CS, ["save"]),
+        nextStepsSql(s, null, fdef(), opts),
+        pathsSql(
+          s,
+          null,
+          { anchor: p("/web") as never, direction: "next", depth: 2, include: "all", cohort: null },
+          opts,
+        ),
+        retentionSql(s, id, { start: null, ret: null, per: "week", mode: "on" }, [1, 2, 3], opts),
+      ];
+      for (const sql of sqls) expect(sql).toContain(COUNTRY_PRED);
+    });
+
+    it("P5-R3: bots on emits the §4.0 canonical built-in predicate verbatim; bots off emits none", () => {
+      expect(scopeClause(ruled())).toBe(
+        `application_id = 'web' AND session_id IS NOT NULL AND (session_type IS NULL OR session_type <> 'synthetics') AND ${BUILTIN_PRED}`,
+      );
+      expect(scopeClause(ruled({ bots: false }))).not.toContain("user_agent_");
+    });
+
+    it("P5-R3: the built-in predicate is built from the server's builtinBots list", () => {
+      const s = ruled({ builtinBots: { version: 2, families: ["Foo", "Bar"], devices: ["Baz"] } });
+      expect(scopeClause(s)).toContain(
+        "(user_agent_user_agent_family IS NULL OR user_agent_user_agent_family NOT IN ('Foo', 'Bar')) AND (user_agent_device_family IS NULL OR user_agent_device_family NOT IN ('Baz'))",
+      );
+      expect(scopeClause(s)).not.toContain("HeadlessChrome");
+    });
+
+    it("P5-R4: each built-in half and each rule is gated on its field being in the schema", () => {
+      const noDevice = { ...FULL, user_agent_device_family: false };
+      const s = ruled(
+        { sessions: [{ field: "geo_info_city", op: "eq", values: ["x"] }] },
+        {},
+        {
+          ...noDevice,
+          geo_info_city: false,
+        },
+      );
+      const sql = scopeClause(s);
+      expect(sql).toContain(FAMILY_HALF);
+      expect(sql).not.toContain("user_agent_device_family");
+      expect(sql).not.toContain("geo_info_city");
+      const noFamily = { ...FULL, user_agent_user_agent_family: false };
+      expect(scopeClause(ruled({}, {}, noFamily))).toContain(DEVICE_HALF);
+      expect(scopeClause(ruled({}, {}, noFamily))).not.toContain("user_agent_user_agent_family");
+    });
+
+    it("P5-R5: xall reproduces the no-rules SQL byte-for-byte across builders", () => {
+      const r = { sessions: [STAFF, COUNTRY] };
+      const xall = ruled(r, { xall: true });
+      const base = noRules();
+      const builds: ((s: AnalyticsScope) => string)[] = [
+        (s) => scopeClause(s),
+        (s) => funnelSql(s, null, fdef(), opts),
+        (s) => trendSql(s, null, "1 day", "UTC", [], []),
+        (s) => clicksSql(s, CS, null),
+        (s) =>
+          retentionSql(s, id, { start: null, ret: null, per: "week", mode: "on" }, [1, 2, 3], opts),
+      ];
+      for (const b of builds) {
+        expect(b(ruled(r))).not.toBe(b(base));
+        expect(b(xall)).toBe(b(base));
+      }
+    });
+
+    it("P5-R5: ignored pages still apply under xall", () => {
+      const sql = pagesSql(
+        ruled({ sessions: [COUNTRY], pages: IGNORED }, { xall: true }),
+        CS,
+        null,
+      );
+      expect(sql).toContain(IGN_K);
+      expect(sql).not.toContain(COUNTRY_PRED);
+      expect(sql).not.toContain("user_agent_");
+    });
+
+    it.each<[string, (s: AnalyticsScope) => string]>([
+      ["funnelCtes", (s) => funnelSql(s, null, fdef(), opts)],
+      ["fullChainCtes", (s) => nextStepsSql(s, null, fdef(), opts)],
+      [
+        "pathCtes",
+        (s) =>
+          pathsSql(
+            s,
+            null,
+            {
+              anchor: p("/web") as never,
+              direction: "next",
+              depth: 3,
+              include: "all",
+              cohort: null,
+            },
+            opts,
+          ),
+      ],
+      ["pagesSql", (s) => pagesSql(s, CS, null)],
+      ["entryExitSql", (s) => entryExitSql(s, CS, null)],
+      [
+        "featuresSql",
+        (s) => featuresSql(s, CS, null, [named([{ t: "view", op: "eq", value: "/web" }])]),
+      ],
+      ["stepPickerSql", (s) => stepPickerSql(s)],
+    ])(
+      "P5-R6: %s runs the identity session pass in its first grouped CTE with a widened row filter",
+      (_name, build) => {
+        const sql = build(ruled({ bots: false, sessions: [STAFF] }));
+        const first = sql.slice(0, sql.indexOf("\n"));
+        expect(first).toContain(STAFF_XI);
+        expect(first).toContain("OR usr_email IS NOT NULL");
+        expect(sql).toContain("MAX(xi) OVER (PARTITION BY sid) AS xs");
+        expect(sql).toContain("xs = 0");
+        expect(sql).not.toContain(STAFF_ROW);
+      },
+    );
+
+    it("P5-R6: both trendSql forms add a per-session group and filter xs = 0", () => {
+      const s = ruled({ bots: false, sessions: [STAFF] });
+      for (const sql of [
+        trendSql(s, null, "1 day", "UTC", [], []),
+        trendSql(s, null, "1 day", "UTC", [p("/web") as never], []),
+      ]) {
+        expect(sql).toContain(STAFF_XI);
+        expect(sql).toContain("MAX(xi) OVER (PARTITION BY");
+        expect(sql).toContain("xs = 0");
+        expect(sql).not.toContain(STAFF_ROW);
+      }
+    });
+
+    it("P5-R6: retentionCtes adds session_id to its first group for the session pass", () => {
+      const s = ruled({ bots: false, sessions: [STAFF] });
+      const sql = retentionSql(
+        s,
+        id,
+        { start: null, ret: null, per: "week", mode: "on" },
+        [1000, 2000, 3000],
+        opts,
+      );
+      const a = cte(sql, "a");
+      expect(a).toContain(STAFF_XI);
+      expect(a.slice(a.lastIndexOf("GROUP BY"))).toContain("session_id");
+      expect(sql).toContain("xs = 0");
+    });
+
+    it("P5-R7: identity rules use the row form only in clicks, click pages, active users and identity top", () => {
+      const s = ruled({ bots: false, sessions: [STAFF] });
+      for (const sql of [
+        clicksSql(s, CS, null),
+        clickPagesSql(s, CS, ["save"]),
+        activeUsersSql(s, id, CS),
+        identityTopSql(s, "usr_email"),
+      ]) {
+        expect(sql).toContain(STAFF_ROW);
+        expect(sql).not.toContain(" AS xi");
+      }
+    });
+
+    describe("P5-R8: summarySql flags", () => {
+      const schema = { ...FULL, usr_id: true };
+      const sql = summarySql(ruled({ sessions: [STAFF, COUNTRY] }, {}, schema), CS);
+      const g = cte(sql, "g");
+      const final = tail(sql);
+
+      it("P5-R8: keeps every session in g and carries the rules as xb and xr flags", () => {
+        const where = g.slice(g.indexOf("WHERE"));
+        expect(where).not.toContain("user_agent_");
+        expect(where).not.toContain(COUNTRY_PRED);
+        expect(item(g, "xb")).toContain(BUILTIN_PRED);
+        expect(item(g, "xr")).toContain(COUNTRY_PRED);
+        expect(item(g, "xr")).toContain("ends_with(usr_email, '@openobserve.ai')");
+      });
+
+      it("P5-R8: returns sessions, prev_sessions, total_sessions and builtin_kept_sessions from the flags", () => {
+        expect(item(final, "sessions")).toContain("xb = 0 AND xr = 0");
+        expect(item(final, "prev_sessions")).toContain("xb = 0 AND xr = 0");
+        expect(item(final, "total_sessions")).not.toMatch(/\bx[br] = 0/);
+        expect(item(final, "builtin_kept_sessions")).toContain("xb = 0");
+        expect(item(final, "builtin_kept_sessions")).not.toContain("xr = 0");
+      });
+
+      it("P5-R8: views is rule-filtered; synthetics, va_rows and data_through_us are not", () => {
+        expect(item(final, "views")).toContain("xb = 0 AND xr = 0");
+        for (const alias of ["synthetic_sessions", "va_rows", "data_through_us"])
+          expect(item(final, alias)).not.toMatch(/\bx[br]\b/);
+      });
+
+      it("P5-R8: emits __values/__sessions for every present identity field from the gv CTE", () => {
+        expect(cte(sql, "gv")).not.toBe("");
+        for (const f of ["usr_id", "usr_email"]) {
+          expect(item(final, `${f}__values`)).toContain("xb = 0 AND xr = 0");
+          expect(item(final, `${f}__sessions`)).toContain("xb = 0 AND xr = 0");
+        }
+        expect(final).not.toContain("usr_anonymous_id__values");
+        expect(scans(sql)).toBe(1);
+        expect(() => assertJoinFree(sql)).not.toThrow();
+      });
+
+      it("a session counts as removed only when the views would drop every row of it", () => {
+        expect(item(g, "xb")).toMatch(/^MIN\(CASE WHEN /);
+        const country = item(cte(summarySql(ruled({ sessions: [COUNTRY] }), CS), "g"), "xr");
+        expect(country).toMatch(/^MIN\(CASE WHEN /);
+      });
+
+      it("an identity rule still removes the whole session on any matching row, as sessionPass does", () => {
+        const staff = item(
+          cte(summarySql(ruled({ bots: false, sessions: [STAFF] }), CS), "g"),
+          "xr",
+        );
+        expect(staff).toMatch(/^MAX\(CASE WHEN /);
+        const both = item(g, "xr");
+        expect(both).toContain("MIN(CASE WHEN ");
+        expect(both).toContain("MAX(CASE WHEN ");
+        expect(both).toMatch(/^CASE WHEN MIN\(.* = 1 OR MAX\(.* = 1 THEN 1 ELSE 0 END$/);
+      });
+
+      it("P5-R8: xb is constant 0 with bots off, and both flags are 0 under xall", () => {
+        const off = cte(summarySql(ruled({ bots: false, sessions: [COUNTRY] }), CS), "g");
+        expect(item(off, "xb")).toBe("0");
+        expect(item(off, "xr")).toContain(COUNTRY_PRED);
+        const all = cte(summarySql(ruled({ sessions: [STAFF, COUNTRY] }, { xall: true }), CS), "g");
+        expect(item(all, "xb")).toBe("0");
+        expect(item(all, "xr")).toBe("0");
+      });
+    });
+
+    it("P5-R9: funnelAlertSql and funnelPanelSql emit the current rules' predicate", () => {
+      const s = ruled({ sessions: [COUNTRY] });
+      for (const sql of [
+        funnelAlertSql(s, null, fdef(), 50, opts),
+        funnelPanelSql(s, fdef(), opts),
+      ]) {
+        expect(sql).toContain(BUILTIN_PRED);
+        expect(sql).toContain(COUNTRY_PRED);
+      }
+    });
+
+    it("P5-R10: Q7_FUNNEL_EXCLUDED, with the version-1 device form and the widened row filter", () => {
+      const s = ruled(
+        {
+          builtinBots: {
+            version: 0,
+            families: ["HeadlessChrome", "PhantomJS"],
+            devices: ["Spider"],
+          },
+          sessions: [STAFF],
+        },
+        { app: "o2-prod-eu1" },
+      );
+      const def = fdef({ steps: [p("/web"), p("/web/billings/plans")] });
+      const expected = (PROVEN as Record<string, string>).Q7_FUNNEL_EXCLUDED.replace(
+        "user_agent_device_family <> 'Spider'",
+        "user_agent_device_family NOT IN ('Spider')",
+      ).replace(
+        "AND (type = 'view') GROUP BY",
+        "AND (type = 'view' OR usr_email IS NOT NULL) GROUP BY",
+      );
+      expect(funnelSql(s, null, def, opts)).toBe(expected);
+    });
+
+    it("P5-R11: userAgentSuggestionSql ranks top 15 family/device pairs over the scope without exclusions", () => {
+      const s = ruled({ sessions: [COUNTRY, STAFF] });
+      const sql = NEW.userAgentSuggestionSql(s);
+      expect(sql).toContain("GROUP BY user_agent_user_agent_family, user_agent_device_family");
+      expect(sql).toContain("COUNT(DISTINCT session_id) AS sessions");
+      expect(sql).toContain("ORDER BY sessions DESC LIMIT 15");
+      expect(sql).toContain(scopeClause(noRules()));
+      expect(sql).not.toContain(FAMILY_HALF);
+      expect(sql).not.toContain(COUNTRY_PRED);
+      expect(sql).not.toContain("ends_with(usr_email");
+    });
+  });
+
+  describe("ignored pages (§4.2)", () => {
+    const pagesFull = [
+      ...IGNORED,
+      { op: "prefix", value: "/web/org/" },
+      { op: "regex", value: "^/web/cb" },
+    ];
+
+    it("P5-R12: ignoredPagePredicate emits NOT (IN OR starts_with OR regexp_like) on the key", () => {
+      const sql = pagesSql(ruled({ bots: false, pages: pagesFull }), CS, null);
+      expect(sql).toContain(
+        "NOT (k IN ('/web/login', '/web/cb') OR starts_with(k, '/web/org/') OR regexp_like(k, '^/web/cb'))",
+      );
+    });
+
+    it("P5-R13: pagesSql filters ignored keys after computing the key and before the aggregate", () => {
+      const sql = pagesSql(ruled({ bots: false, pages: IGNORED }), CS, null);
+      expect(cte(sql, "g")).toContain(`FROM v WHERE k IS NOT NULL AND ${IGN_K} GROUP BY k`);
+    });
+
+    it("P5-R13: stepPickerSql filters ignored keys for page rows only", () => {
+      const sql = stepPickerSql(ruled({ bots: false, pages: IGNORED }));
+      expect(tail(sql)).toContain(
+        "WHERE k IS NOT NULL AND k <> '' AND NOT (kind = 'p' AND (k IN ('/web/login', '/web/cb')))",
+      );
+    });
+
+    it("P5-R13: pathTail drops ignored p: keys before the LAG dedup, NULL-safe in the attrs form", () => {
+      const s = ruled({ bots: false, pages: IGNORED });
+      const def = {
+        anchor: p("/web") as never,
+        direction: "next" as const,
+        depth: 3,
+        include: "all" as const,
+        cohort: null,
+      };
+      const flow = pathsSql(s, null, def, opts);
+      expect(flow).toContain(
+        "d AS (SELECT *, LAG(key) OVER (PARTITION BY sid ORDER BY t, key) AS pk FROM e WHERE NOT (key IN ('p:/web/login', 'p:/web/cb')))",
+      );
+      const branch = branchSessionsSql(s, null, def, "s1 = 'p:/web'", 1, 0, opts);
+      expect(cte(branch, "d")).toContain(
+        "FROM e WHERE key IS NULL OR NOT (key IN ('p:/web/login', 'p:/web/cb'))",
+      );
+      const pre = pathsSql(
+        ruled({ bots: false, pages: [{ op: "prefix", value: "/web/org/" }] }),
+        null,
+        def,
+        opts,
+      );
+      expect(cte(pre, "d")).toContain("substr(key, 3)");
+    });
+
+    it("P5-R13: pathTail prefix and regex rules match the page text of p: keys only", () => {
+      const def = {
+        anchor: p("/web") as never,
+        direction: "next" as const,
+        depth: 3,
+        include: "all" as const,
+        cohort: null,
+      };
+      for (const rule of [
+        { op: "prefix", value: "/web/org/" },
+        { op: "regex", value: "^/web/cb" },
+      ]) {
+        const d = cte(pathsSql(ruled({ bots: false, pages: [rule] }), null, def, opts), "d");
+        const where = d.includes(" WHERE ") ? d.slice(d.lastIndexOf(" WHERE ")) : "";
+        expect(where).toContain("substr(key, 3)");
+        expect(where).toContain(`'${rule.value}'`);
+        expect(where).toContain("'p:'");
+      }
+    });
+
+    it("P5-R13: A -> ignored -> A collapses to one A under the pathTail filter and LAG dedup", () => {
+      const sql = pathsSql(
+        ruled({ bots: false, pages: IGNORED }),
+        null,
+        { anchor: p("/web") as never, direction: "next", depth: 3, include: "all", cohort: null },
+        opts,
+      );
+      const where = /FROM e WHERE NOT \(key IN \(([^)]*)\)\)/.exec(cte(sql, "d"));
+      expect(where).not.toBeNull();
+      const ignored = [...(where?.[1] ?? "").matchAll(/'([^']*)'/g)].map((m) => m[1]);
+      const kept = ["p:/a", "p:/web/login", "p:/a"].filter((k) => !ignored.includes(k));
+      const deduped = kept.filter((k, i) => i === 0 || kept[i - 1] !== k);
+      expect(deduped).toEqual(["p:/a"]);
+    });
+
+    it("P5-R14: entryExitSql without identity is the per-view shape of the spike fixture", () => {
+      const fixture = (PROVEN as Record<string, string>).Q6_ENTRY_EXIT_PER_VIEW;
+      const cs = Number(/>= (\d+) THEN/.exec(fixture)?.[1]);
+      const s = ruled({ bots: false }, { app: "o2-prod-eu1" });
+      expect(entryExitSql(s, cs, null)).toBe(fixture);
+      expect(
+        entryExitSql(
+          { ...s, exclusions: rules({ bots: false, pages: IGNORED }) } as AnalyticsScope,
+          cs,
+          null,
+        ),
+      ).toBe(
+        fixture.replace(
+          "v AS (SELECT * FROM v1 WHERE k IS NOT NULL)",
+          `v AS (SELECT * FROM v1 WHERE k IS NOT NULL AND ${IGN_K})`,
+        ),
+      );
+    });
+
+    it("P5-R14: with identity, entryExitSql combines view and identity rows in v0 and filters xs = 0 AND vid IS NOT NULL", () => {
+      const sql = entryExitSql(ruled({ bots: false, sessions: [STAFF], pages: IGNORED }), CS, id);
+      const v0 = cte(sql, "v0");
+      expect(v0).toContain("OR NULLIF(usr_email, '') IS NOT NULL");
+      expect(v0).toContain(STAFF_XI);
+      expect(v0).toContain(" AS u0");
+      expect(cte(sql, "v")).toBe(
+        `SELECT * FROM v1 WHERE xs = 0 AND vid IS NOT NULL AND k IS NOT NULL AND ${IGN_K}`,
+      );
+    });
+
+    it("P5-R15: funnels never apply ignored pages", () => {
+      const def = fdef({ steps: [p("/web/login"), p("/web")] });
+      expect(funnelSql(ruled({ pages: IGNORED }), null, def, opts)).toBe(
+        funnelSql(ruled(), null, def, opts),
+      );
+    });
+  });
+
+  describe("exclusion steps and step filters (§4.3)", () => {
+    const s = ruled({ bots: false });
+
+    it("P5-R16: a between-steps exclusion in the sid partition gates steps b and later on ex1 = 0", () => {
+      const sql = funnelSql(s, null, fdef({ x: [BETWEEN] }), opts);
+      const conds = "t, m1 = 1, m2 = 1, m3 = 1, m4 = 1";
+      for (const frag of [
+        "CASE WHEN ty = 'view' AND k = '/web/ingestion' THEN 1 ELSE 0 END AS mx1",
+        `sequence_step_match(0, 2, ${conds}) OVER (PARTITION BY sid) AS va1`,
+        `sequence_step_match(0, 3, ${conds}) OVER (PARTITION BY sid) AS vb1`,
+        "MIN(CASE WHEN va1 THEN t END) OVER (PARTITION BY sid) AS ta1",
+        "MIN(CASE WHEN vb1 THEN t END) OVER (PARTITION BY sid) AS tb1",
+        "MAX(CASE WHEN mx1 = 1 AND t > ta1 AND t < tb1 THEN 1 ELSE 0 END) AS ex1",
+        "CASE WHEN f[2] IS NOT NULL THEN 1 ELSE 0 END AS r2",
+        "CASE WHEN f[3] IS NOT NULL AND ex1 = 0 THEN 1 ELSE 0 END AS r3",
+        "CASE WHEN f[4] IS NOT NULL AND ex1 = 0 THEN 1 ELSE 0 END AS r4",
+        "f[2] AS d2",
+        "CASE WHEN ex1 = 0 THEN f[3] END AS d3",
+        "CASE WHEN ex1 = 0 THEN f[4] END AS d4",
+        "CASE WHEN f[3] IS NOT NULL AND ex1 = 1 THEN 1 ELSE 0 END AS xr1",
+      ])
+        expect(sql).toContain(frag);
+      expect(sql).not.toContain("CASE WHEN ex1 = 0 THEN f[2] END");
+    });
+
+    it("P5-R17: Users pu counts xr1 only for users with no clean reach of step b", () => {
+      const sql = funnelSql(s, id, fdef({ unit: "users", x: [BETWEEN] }), opts);
+      expect(cte(sql, "pu")).toContain("CASE WHEN MAX(r3) = 0 THEN MAX(xr1) ELSE 0 END AS xr1");
+    });
+
+    it("P5-R17: the breakdown sums xr1 per dim", () => {
+      const sql = funnelSql(s, null, fdef({ breakdown: "browser", x: [BETWEEN] }), opts);
+      expect(tail(sql)).toContain("SUM(xr1)");
+      expect(tail(sql)).toContain("GROUP BY dim");
+    });
+
+    it("P5-R17, P5-R18: the windowed Users path bounds the span and computes ex1/xr1 in su", () => {
+      const sql = funnelSql(s, id, fdef({ unit: "users", window: "7d", x: [BETWEEN] }), opts);
+      const part = "COALESCE(uid, 's:' || sid)";
+      const conds = "t, m1 = 1, m2 = 1, m3 = 1, m4 = 1";
+      expect(sql).toContain(
+        `sequence_step_match(604800000, 2, ${conds}) OVER (PARTITION BY ${part}) AS va1`,
+      );
+      expect(sql).toContain(
+        `sequence_step_match(604800000, 3, ${conds}) OVER (PARTITION BY ${part}) AS vb1`,
+      );
+      expect(sql).toContain(`MIN(CASE WHEN vb1 THEN t END) OVER (PARTITION BY ${part}) AS tb1`);
+      expect(sql).toContain(
+        `MAX(CASE WHEN va1 AND t < tb1 AND t >= tb1 - 604800000 THEN t END) OVER (PARTITION BY ${part}) AS ta1`,
+      );
+      expect(cte(sql, "su")).toContain(" AS ex1");
+      expect(cte(sql, "su")).toContain("xr1");
+      expect(cte(sql, "pu")).toContain("xr1");
+    });
+
+    it.each(["session", "7d"] as const)(
+      "P5-R18: Users x2 (window %s) keeps exclusion rows and gains only the mx flags",
+      (window) => {
+        const steps = [p("/web"), p("/web/logs", { minMs: 1000 }), p("/web/billings")];
+        const sql = funnelSql(s, id, fdef({ unit: "users", window, steps, x: [BETWEEN] }), opts);
+        const x2 = cte(sql, "x2");
+        expect(x2).toContain("OR mx1 = 1");
+        const cols = x2.slice(0, x2.indexOf(" FROM "));
+        expect(cols).toMatch(/\bmx1\b/);
+        expect(cols).not.toContain("vts");
+      },
+    );
+
+    it("two within exclusions on one step each lift only their own gate when counting removals", () => {
+      const other = { step: p("/web/settings"), a: 2, withinMs: 2000 };
+      const sql = funnelSql(s, null, fdef({ x: [WITHIN, other] }), opts);
+      expect(sql).toContain(
+        "CASE WHEN ty = 'view' AND k = '/web/logs' AND (nx2 IS NULL OR nx2 - t > 2000) THEN 1 ELSE 0 END AS ma1",
+      );
+      expect(sql).toContain(
+        "CASE WHEN ty = 'view' AND k = '/web/logs' AND (nx1 IS NULL OR nx1 - t > 1000) THEN 1 ELSE 0 END AS ma2",
+      );
+    });
+
+    it("P5-R19: a within-N exclusion gates step a with a NULL-safe flag over a RANGE frame and adds a count column", () => {
+      const sql = funnelSql(s, null, fdef({ x: [WITHIN] }), opts);
+      expect(sql).toContain(
+        "x0f AS (SELECT *, CASE WHEN ty = 'view' AND k = '/web/ingestion' THEN 1 ELSE 0 END AS mx1 FROM x0)",
+      );
+      expect(sql).toContain(
+        "MIN(CASE WHEN mx1 = 1 THEN t END) OVER (PARTITION BY sid ORDER BY t RANGE BETWEEN CURRENT ROW AND UNBOUNDED FOLLOWING) AS nx1",
+      );
+      expect(sql).toContain(
+        "CASE WHEN ty = 'view' AND k = '/web/logs' AND (nx1 IS NULL OR nx1 - t > 1000) THEN 1 ELSE 0 END AS m2",
+      );
+      const aliases = (q: string) => new Set([...tail(q).matchAll(/ AS (\w+)/g)].map((m) => m[1]));
+      const plain = aliases(funnelSql(s, null, fdef(), opts));
+      expect([...aliases(sql)].filter((a) => !plain.has(a)).length).toBeGreaterThan(0);
+    });
+
+    it("P5-R20: minMs adds vts to x00 and gates the page flag on nanoseconds", () => {
+      const steps = [p("/web"), p("/web/logs", { minMs: 1000 })];
+      const sql = funnelSql(s, null, fdef({ steps }), opts);
+      expect(cte(sql, "x00")).toContain("MAX(view_time_spent) AS vts");
+      expect(sql).toContain(
+        "CASE WHEN ty = 'view' AND k = '/web/logs' AND vts >= 1000000000 THEN 1 ELSE 0 END AS m2",
+      );
+    });
+
+    it("P5-R20: frustrated and errored filters read the per-view maxima; a funnel without filters gets none", () => {
+      const fr = funnelSql(
+        s,
+        null,
+        fdef({ steps: [p("/web"), p("/web/logs", { frustrated: true })] }),
+        opts,
+      );
+      expect(fr).toContain("MAX(view_frustration_count) > 0");
+      const er = funnelSql(
+        s,
+        null,
+        fdef({ steps: [p("/web"), p("/web/logs", { errored: true })] }),
+        opts,
+      );
+      expect(er).toContain("MAX(view_error_count) > 0");
+      const none = funnelSql(s, null, fdef(), opts);
+      for (const col of ["view_time_spent", "view_frustration_count", "view_error_count"])
+        expect(none).not.toContain(col);
+    });
+
+    it("P5-R21: exclusion pages and clicks enter the scan, never the sequence conditions", () => {
+      const page = funnelSql(s, null, fdef({ x: [BETWEEN] }), opts);
+      expect(cte(page, "x0")).toContain("= '/web/ingestion'");
+      const click = funnelSql(
+        s,
+        null,
+        fdef({ x: [{ step: { kind: "c", key: "cancel-btn" }, a: 1, b: 2 }] }),
+        opts,
+      );
+      expect(cte(click, "x00")).toContain("= 'cancel-btn'");
+      for (const sql of [page, click]) {
+        const calls = [...sql.matchAll(/sequence_step_(?:times|match)\(([^)]*)\)/g)];
+        expect(calls.length).toBeGreaterThan(0);
+        for (const c of calls) expect(c[1]).not.toContain("mx");
+      }
+      expect(page).toContain("sequence_step_times(0, t, m1 = 1, m2 = 1, m3 = 1, m4 = 1) AS f");
+    });
+
+    it.each<[string, (d: Parameters<typeof funnelSql>[2]) => string]>([
+      ["nextStepsSql", (d) => nextStepsSql(s, null, d, opts)],
+      [
+        "dropoffNextSql",
+        (d) => dropoffNextSql(s, null, { funnel: d, stepIndex: 3, side: "dropped" }, opts),
+      ],
+      ["dropoffHealthSql", (d) => dropoffHealthSql(s, null, d, 3, opts)],
+      [
+        "cohortSessionsSql",
+        (d) => cohortSessionsSql(s, null, { funnel: d, stepIndex: 3, side: "dropped" }, 0, opts),
+      ],
+      [
+        "cohort paths",
+        (d) =>
+          pathsSql(
+            s,
+            null,
+            {
+              anchor: null,
+              direction: "next",
+              depth: 2,
+              include: "all",
+              cohort: { funnel: d, stepIndex: 3, side: "dropped" },
+            },
+            opts,
+          ),
+      ],
+    ])(
+      "P5-R22: %s carries the exclusion flags, the ex1 gate, the step filters and error rows",
+      (_n, build) => {
+        const steps = [
+          p("/web"),
+          p("/web/logs", { minMs: 1000 }),
+          p("/web/billings"),
+          { kind: "r", key: "Failed to fetch billing info" } as StepRefP5,
+        ];
+        const sql = build(fdef({ steps, x: [BETWEEN] }));
+        expect(sql).toContain(" AS mx1");
+        expect(sql).toContain("ex1 = 0");
+        expect(cte(sql, "xw")).not.toBe("");
+        expect(cte(sql, "xrr")).not.toBe("");
+        expect(sql).toContain("vts >= 1000000000");
+        expect(sql.slice(0, sql.indexOf("\n"))).toContain(
+          "starts_with(error_message, 'Failed to fetch billing info')",
+        );
+        expect(scans(sql)).toBe(1);
+        expect(() => assertJoinFree(sql)).not.toThrow();
+      },
+    );
+
+    it("P5-R23: funnelPanelSql carries the exclusion", () => {
+      const sql = funnelPanelSql(s, fdef({ x: [BETWEEN] }), opts);
+      expect(sql).toContain(" AS ex1");
+      expect(sql).toContain("CASE WHEN f[3] IS NOT NULL AND ex1 = 0 THEN 1 ELSE 0 END AS r3");
+    });
+
+    it("P5-R23: funnelAlertSql carries the exclusion", () => {
+      const sql = funnelAlertSql(s, null, fdef({ x: [BETWEEN] }), 50, opts);
+      expect(sql).toContain(" AS ex1");
+      expect(sql).toContain("CASE WHEN f[3] IS NOT NULL AND ex1 = 0 THEN 1 ELSE 0 END AS r3");
+    });
+  });
+
+  describe("rule ops, error steps, compare apps, new users (§4.4-§4.10)", () => {
+    const s = ruled({ bots: false });
+    const PKV = pageKeyExpr("view_url", FULL);
+    const PKU = pageKeyExpr("url", FULL);
+    const CKA = clickKeyExpr("action_target_name");
+    const PARAM = {
+      t: "view",
+      op: "param",
+      name: "new_user_login",
+      value: "true",
+      onPage: "/web/cb",
+    };
+    const REF = { t: "view", op: "ref", value: "checkout.stripe.com" };
+    const REF_RE = String.raw`'^https?://([^/]*\.)?checkout\.stripe\.com(/|:|$)'`;
+
+    it("P5-R24: param and ref rules emit the §4.4 raw and grouped predicates", () => {
+      const ev = [named([PARAM, REF])];
+      const raw = stepPredicateRaw(evStep, s, ev);
+      expect(raw).toContain(
+        `(type = 'view' AND strpos(view_url, 'new_user_login=') > 0 AND regexp_like(view_url, '[?#&]new_user_login=true(&|#|$)') AND ${PKV} = '/web/cb')`,
+      );
+      expect(raw).toContain(
+        `(type = 'view' AND strpos(view_referrer, 'checkout.stripe.com') > 0 AND regexp_like(view_referrer, ${REF_RE}))`,
+      );
+      const grouped = stepPredicateGrouped(evStep, s, ev);
+      expect(grouped).toContain(
+        `(ty = 'view' AND regexp_like(url, '[?#&]new_user_login=true(&|#|$)') AND ${PKU} = '/web/cb')`,
+      );
+      expect(grouped).toContain(`(ty = 'view' AND regexp_like(ref, ${REF_RE}))`);
+    });
+
+    it("P5-R24: values are regex-escaped then quote-escaped; a param without a value matches its name alone", () => {
+      expect(NEW.escapeRegex("a.b?c")).toBe(String.raw`a\.b\?c`);
+      const esc = stepPredicateRaw(evStep, s, [
+        named([{ t: "view", op: "param", name: "q.x", value: "it's?" }]),
+      ]);
+      expect(esc).toContain(String.raw`regexp_like(view_url, '[?#&]q\.x=it''s\?(&|#|$)')`);
+      const bare = stepPredicateGrouped(evStep, s, [
+        named([{ t: "view", op: "param", name: "new_user_login" }]),
+      ]);
+      expect(bare).toContain("regexp_like(url, '[?#&]new_user_login(=|&|#|$)')");
+    });
+
+    it("P5-R25: param rules carry url and ref rules carry view_referrer through funnel, chain, features and trend", () => {
+      const def = fdef({ steps: [p("/web"), evStep] });
+      const paramEv = [named([{ ...PARAM, onPage: undefined }])];
+      const pf = funnelSql(s, null, def, { events: paramEv, sample: 1 });
+      expect(cte(pf, "x0").slice(0, cte(pf, "x0").indexOf(" FROM "))).toMatch(/, url\b/);
+      const refEv = [named([REF])];
+      for (const sql of [
+        funnelSql(s, null, def, { events: refEv, sample: 1 }),
+        nextStepsSql(s, null, def, { events: refEv, sample: 1 }),
+        featuresSql(s, CS, null, refEv),
+      ]) {
+        expect(sql).toContain("MIN(view_referrer) AS ref");
+        expect(sql).toContain(`regexp_like(ref, ${REF_RE})`);
+      }
+      expect(trendSql(s, null, "1 day", "UTC", [evStep], refEv)).toContain(
+        `regexp_like(view_referrer, ${REF_RE})`,
+      );
+    });
+
+    it("P5-R26: click prefix, contains and regex ops emit the §4.5 predicates", () => {
+      const ev = [
+        named([
+          { t: "action", op: "prefix", value: "o2-table-expand-" },
+          { t: "action", op: "contains", value: "copy-btn" },
+          { t: "action", op: "regex", value: "-copy-btn$" },
+        ]),
+      ];
+      const raw = stepPredicateRaw(evStep, s, ev);
+      expect(raw).toContain(
+        `(type = 'action' AND action_target_name <> '' AND strpos(action_target_name, 'o2-table-expand-') > 0 AND starts_with(${CKA}, 'o2-table-expand-'))`,
+      );
+      expect(raw).toContain(`strpos(${CKA}, 'copy-btn') > 0`);
+      expect(raw).toContain(`regexp_like(${CKA}, '-copy-btn$')`);
+      expect(stepPredicateGrouped(evStep, s, ev)).toContain(
+        "(ty = 'action' AND starts_with(k, 'o2-table-expand-'))",
+      );
+    });
+
+    it("P5-R26: the strpos prefilter is dropped when the value holds a mask token", () => {
+      const raw = stepPredicateRaw(evStep, s, [
+        named([{ t: "action", op: "prefix", value: "row-:num-" }]),
+      ]);
+      expect(raw).toContain(`starts_with(${CKA}, 'row-:num-')`);
+      expect(raw).not.toContain("strpos(action_target_name,");
+    });
+
+    const ERR = "Failed to fetch billing info";
+    const errStep = { kind: "r", key: ERR } as never;
+
+    it("P5-R27: an error step brings error rows into x00 and x0 and flags them on em", () => {
+      const sql = funnelSql(s, null, fdef({ steps: [p("/web"), errStep] }), opts);
+      const x00 = cte(sql, "x00");
+      expect(x00).toContain(`(type = 'error' AND starts_with(error_message, '${ERR}'))`);
+      expect(x00).toContain("MIN(error_message) AS em");
+      expect(x00).toContain("WHEN type = 'error' THEN CAST(date AS VARCHAR)");
+      const x0 = cte(sql, "x0");
+      expect(x0.slice(0, x0.indexOf(" FROM "))).toMatch(/\bem\b/);
+      expect(x0.slice(x0.indexOf(" WHERE "))).toContain("ty = 'error'");
+      expect(sql).toContain(
+        `CASE WHEN ty = 'error' AND starts_with(em, '${ERR}') THEN 1 ELSE 0 END AS m2`,
+      );
+      expect(funnelSql(s, null, fdef(), opts)).not.toContain(" AS em");
+    });
+
+    it("P5-R27: the r step predicates, Paths and Retention anchors match on the message prefix", () => {
+      expect(stepPredicateRaw(errStep, s, [])).toContain(
+        `type = 'error' AND starts_with(error_message, '${ERR}')`,
+      );
+      expect(stepPredicateGrouped(errStep, s, [])).toContain(
+        `ty = 'error' AND starts_with(em, '${ERR}')`,
+      );
+      const paths = pathsSql(
+        s,
+        null,
+        { anchor: errStep, direction: "next", depth: 2, include: "all", cohort: null },
+        opts,
+      );
+      expect(paths).toContain(`starts_with(error_message, '${ERR}')`);
+      const ret = retentionSql(
+        s,
+        id,
+        { start: errStep, ret: null, per: "week", mode: "on" },
+        [1000, 2000, 3000],
+        opts,
+      );
+      expect(ret).toContain(`starts_with(error_message, '${ERR}')`);
+    });
+
+    it("P5-R27: an error rule on a named event brings error rows into the scan", () => {
+      const ev = [named([{ t: "error", op: "prefix", value: "Failed" }])];
+      const x00 = cte(
+        funnelSql(s, null, fdef({ steps: [p("/web"), evStep] }), { events: ev, sample: 1 }),
+        "x00",
+      );
+      expect(x00).toContain("type = 'error'");
+      expect(x00).toContain("error_message");
+    });
+
+    it("P5-R28: errorPickerSql lists the top 50 message prefixes by sessions, with an escaped search term", () => {
+      expect(NEW.errorPickerSql(s)).toBe(
+        `SELECT substr(error_message, 1, 120) AS k, COUNT(DISTINCT session_id) AS sessions FROM "_rumdata" WHERE ${scopeClause(s)} AND type = 'error' GROUP BY 1 ORDER BY sessions DESC LIMIT 50`,
+      );
+      expect(NEW.errorPickerSql(s, "Fe'tch")).toContain(
+        "AND strpos(lower(error_message), 'fe''tch') > 0",
+      );
+    });
+
+    it("P5-R29: stepPickerSql reads MIN(action_type) AS at", () => {
+      expect(stepPickerSql(s)).toContain("MIN(action_type) AS at");
+    });
+
+    describe("P5-R30: compare apps", () => {
+      const b = rules({
+        bots: false,
+        sessions: [{ field: "usr_email", op: "suffix", values: ["@b.io"] }],
+      });
+      const sa = ruled(
+        { sessions: [STAFF], pages: IGNORED },
+        { apps: ["b"], appExclusions: { b } },
+      );
+
+      it("P5-R30: scopeClause lists every app and ORs each app's row rules, an empty branch as the app alone", () => {
+        const sql = scopeClause(sa);
+        expect(sql).toMatch(/application_id IN \(('web', 'b'|'b', 'web')\)/);
+        expect(sql).toContain(
+          `((application_id = 'web' AND ${BUILTIN_PRED}) OR application_id = 'b')`,
+        );
+      });
+
+      it("P5-R30: identity rules become one flag per app in a single MAX(CASE)", () => {
+        expect(funnelSql(sa, null, fdef(), opts)).toContain(
+          "MAX(CASE WHEN application_id = 'web' AND usr_email IS NOT NULL AND ends_with(usr_email, '@openobserve.ai') THEN 1 WHEN application_id = 'b' AND usr_email IS NOT NULL AND ends_with(usr_email, '@b.io') THEN 1 ELSE 0 END) AS xi",
+        );
+      });
+
+      it("P5-R30: the first grouped CTE carries the app and applies each app's ignored pages", () => {
+        const sql = pagesSql(sa, CS, null);
+        expect(cte(sql, "v0")).toContain("MIN(application_id) AS app");
+        expect(sql).toContain(`((app = 'web' AND ${IGN_K}) OR app = 'b')`);
+      });
+    });
+
+    it("P5-R31: a named-event step under compared apps uses the primary app's definition once", () => {
+      const ev = [named([{ t: "view", op: "eq", value: "/web/only-primary" }])];
+      const def = fdef({ steps: [p("/web"), evStep] });
+      const o = { events: ev, sample: 1 as const };
+      const single = funnelSql(s, null, def, o);
+      const compared = funnelSql(
+        ruled({ bots: false }, { apps: ["b"], appExclusions: { b: rules({ bots: false }) } }),
+        null,
+        def,
+        o,
+      );
+      const count = (q: string) => q.split("'/web/only-primary'").length - 1;
+      expect(compared).toMatch(/application_id IN \(/);
+      expect(count(compared)).toBe(count(single));
+      const flag = item(cte(compared, "x1"), "m2");
+      expect(flag).toContain("'/web/only-primary'");
+      expect(flag).not.toContain("app");
+    });
+
+    it("P5-R31: DIMENSIONS gains app, so a funnel breaks down by application_id", () => {
+      expect((QUERIES.DIMENSIONS as Record<string, string>).app).toBe("application_id");
+      const sql = funnelSql(s, null, fdef({ breakdown: "app" }), opts);
+      expect(cte(sql, "x00")).toContain("MIN(application_id) AS dim");
+    });
+
+    it("P5-R32: new users keep only units first seen on or after the range start", () => {
+      const RS = 1788000000000;
+      const sn = ruled({ bots: false }, { newSince: RS });
+      const sql = funnelSql(sn, id, fdef({ unit: "users", window: "7d" }), opts);
+      expect(cte(sql, "x00")).toContain("MIN(date) AS t0");
+      expect(sql).toContain(
+        "fs AS (SELECT *, MIN(t0) OVER (PARTITION BY COALESCE(uid, 's:' || sid)) AS first_t FROM x1)",
+      );
+      expect(cte(sql, "x2")).toContain(`first_t >= ${RS}`);
+      const paths = pathsSql(
+        sn,
+        id,
+        { anchor: p("/web") as never, direction: "next", depth: 2, include: "all", cohort: null },
+        opts,
+      );
+      expect(paths).toContain(`>= ${RS}`);
+      const WEEK_US = 7 * 86400000000;
+      const weeks = [0, 1, 2].map((i) => RS * 1000 + i * WEEK_US);
+      const ret = retentionSql(
+        sn,
+        id,
+        { start: null, ret: null, per: "week", mode: "on" },
+        weeks,
+        opts,
+      );
+      expect(ret).toContain(`>= ${RS}`);
+      expect(ret).toContain(`WHEN _timestamp < ${weeks[0]} THEN -1`);
+      expect(ret).toContain("p >= 0");
+      // A first column opening before the range start judges newness from that column.
+      const early = [RS * 1000 - WEEK_US / 2, RS * 1000 + WEEK_US / 2];
+      const retEarly = retentionSql(
+        sn,
+        id,
+        { start: null, ret: null, per: "week", mode: "on" },
+        early,
+        opts,
+      );
+      expect(retEarly).toContain(`first_t >= ${early[0] / 1000}`);
+    });
+
+    it("retention without new users keeps every row's period", () => {
+      const ret = retentionSql(
+        ruled({ bots: false }),
+        id,
+        { start: null, ret: null, per: "week", mode: "on" },
+        [1000, 2000, 3000],
+        opts,
+      );
+      expect(ret).not.toContain("THEN -1");
+      expect(ret).not.toContain("p >= 0");
+    });
+
+    it("P5-R34: namedEventPreviewSql applies the scope's exclusions", () => {
+      const sql = NEW.namedEventPreviewSql(
+        ruled({ sessions: [COUNTRY] }),
+        named([{ t: "view", op: "eq", value: "/web" }]),
+      );
+      expect(sql).toContain(BUILTIN_PRED);
+      expect(sql).toContain(COUNTRY_PRED);
+    });
+
+    it("P5-R32: the new-users search range starts 30 days before the selected start", () => {
+      const DAY = 86400000000;
+      const range = { startUs: 1790000000000000, endUs: 1790600000000000 };
+      const widened = (
+        MODEL as unknown as Record<string, (r: typeof range) => typeof range>
+      ).newUsersSearchRange(range);
+      expect(widened).toEqual({ startUs: range.startUs - 30 * DAY, endUs: range.endUs });
+    });
+
+    it("P5-R33: unnamedClicksSql counts container-named clicks per page, top 20", () => {
+      expect(NEW.unnamedClicksSql(s)).toBe(
+        `SELECT ${PKV} AS pg, COUNT(*) AS clicks, COUNT(CASE WHEN regexp_like(action_target_name, '-(page|content|dialog|layout|container|panel|wrapper|section)$') THEN 1 END) AS unnamed FROM "_rumdata" WHERE ${scopeClause(s)} AND type = 'action' AND action_target_name <> '' GROUP BY 1 ORDER BY unnamed DESC LIMIT 20`,
+      );
+    });
+  });
+
+  it("P5-R10: every builder with rules reads _rumdata once and passes assertJoinFree", () => {
+    const s = ruled({ sessions: [STAFF, COUNTRY], pages: IGNORED });
+    const ev = [
+      named([
+        { t: "view", op: "param", name: "q", value: "1" },
+        { t: "view", op: "ref", value: "x.com" },
+        { t: "action", op: "prefix", value: "btn-" },
+        { t: "error", op: "contains", value: "boom" },
+      ]),
+    ];
+    const o = { events: ev, sample: 1 as const };
+    const steps = [p("/web"), p("/web/logs", { minMs: 1000 }), evStep, { kind: "r", key: "boom" }];
+    const defs = (["session", "7d"] as const).flatMap((window) =>
+      (["sessions", "users"] as const).map((unit) =>
+        fdef({ steps: steps as never, unit, window, x: [BETWEEN, WITHIN] }),
+      ),
+    );
+    const path = {
+      anchor: p("/web") as never,
+      direction: "next" as const,
+      depth: 3,
+      include: "all" as const,
+      cohort: null,
+    };
+    const ret = { start: p("/web") as never, ret: null, per: "week" as const, mode: "on" as const };
+    const sqls = [
+      summarySql(s, CS),
+      identityTopSql(s, "usr_email"),
+      entryExitSql(s, CS, id),
+      stepPickerSql(s),
+      pagesSql(s, CS, id),
+      clicksSql(s, CS, id),
+      clickPagesSql(s, CS, ["a"]),
+      trendSql(s, id, "1 day", "UTC", [], []),
+      trendSql(s, id, "1 day", "UTC", [p("/web") as never], o.events),
+      activeUsersSql(s, id, CS),
+      featuresSql(s, CS, id, ev),
+      pathsSql(s, id, path, o),
+      branchSessionsSql(s, id, path, "s1 = 'p:/web'", 1, 0, o),
+      retentionSql(s, id, ret, [1, 2, 3], o),
+      retentionCellUsersSql(s, id, ret, [1, 2, 3], 0, 1, o),
+      NEW.errorPickerSql(s),
+      NEW.unnamedClicksSql(s),
+      ...defs.flatMap((d) => [
+        funnelSql(s, id, d, o),
+        funnelPanelSql(s, d, o),
+        funnelAlertSql(s, id, d, 50, o),
+        nextStepsSql(s, id, d, o),
+        dropoffHealthSql(s, id, d, 2, o),
+        cohortSessionsSql(s, id, { funnel: d, stepIndex: 2, side: "dropped" }, 0, o),
+      ]),
+    ];
+    for (const sql of sqls) {
+      expect(scans(sql)).toBe(1);
+      expect(() => assertJoinFree(sql)).not.toThrow();
+    }
+  });
+});
+
 describe("paths drawer user label (o2-enterprise#2851)", () => {
   const s = scope({
     schema: {
@@ -1402,619 +3071,5 @@ describe("paths drawer user label (o2-enterprise#2851)", () => {
       w.replace("ty IN ('view', 'action')", "(ty IN ('view', 'action') OR ty = 'error')"),
     );
     expect(pathWhereClauses(branch(id, cohorts.users))).toEqual(flow);
-  });
-});
-
-describe("retention builders (G7, AC-31, AC-34, AC-35, AC-51)", () => {
-  const s = scope({ schema: { usr_email: true } });
-  const id = { field: "usr_email" as const, excluded: [] };
-  const any = { start: null, ret: null, per: "week" as const, mode: "on" as const };
-  const opts = { events: [], sample: 1 as const };
-
-  it("Q16 equals the proven shape with period boundaries as literals", () => {
-    expect(norm(retentionSql(s, id, any, [1000, 2000, 3000], opts), s)).toBe(
-      norm(PROVEN.Q16_RETENTION, s),
-    );
-  });
-
-  it("Q17 On mode equals the proven shape", () => {
-    expect(norm(retentionCellUsersSql(s, id, any, [1000, 2000, 3000], 0, 1, opts), s)).toBe(
-      norm(PROVEN.Q17_CELL, s),
-    );
-  });
-
-  it("Q17 On or after counts a user retained by their last return period", () => {
-    const sql = retentionCellUsersSql(
-      s,
-      id,
-      { ...any, mode: "after" },
-      [1000, 2000, 3000],
-      0,
-      1,
-      opts,
-    );
-    expect(sql).toContain("CASE WHEN MAX(last_ret) >= 1 THEN 1 ELSE 0 END AS retained");
-  });
-
-  it("narrows start and return to a page or click (AC-34)", () => {
-    const withClicks = scope({ schema: { usr_email: true, action_target_name: true } });
-    const sql = retentionSql(
-      withClicks,
-      id,
-      { ...any, start: { kind: "p", key: "/signup" }, ret: { kind: "c", key: "save" } },
-      [1, 2],
-      opts,
-    );
-    expect(sql).toContain(
-      `MAX(CASE WHEN (type = 'view' AND (strpos(view_url, '/signup') > 0) AND ${pageKeyExpr("view_url", withClicks.schema)} = '/signup') THEN 1 ELSE 0 END) AS s`,
-    );
-    expect(sql).toContain(
-      `MAX(CASE WHEN (type = 'action' AND action_target_name <> '' AND ${clickKeyExpr("action_target_name")} = 'save') THEN 1 ELSE 0 END) AS r`,
-    );
-    expect(sql).toMatch(/LIMIT 3$/);
-  });
-
-  it("a click return matches nothing, instead of referencing action_target_name, when the org has no click events (o2-enterprise#2800)", () => {
-    const sql = retentionSql(
-      s,
-      id,
-      { ...any, start: { kind: "p", key: "/signup" }, ret: { kind: "c", key: "save" } },
-      [1, 2],
-      opts,
-    );
-    expect(sql).not.toContain("action_target_name");
-    expect(sql).toContain("MAX(CASE WHEN (1 = 0) THEN 1 ELSE 0 END) AS r");
-  });
-
-  it("samples users by a hash of the identity (AC-52)", () => {
-    const sql = retentionSql(s, id, any, [1, 2, 3], { events: [], sample: 2 });
-    expect(sql).toContain(
-      "AND substr(md5(NULLIF(usr_email, '')), 1, 1) IN ('0', '1', '2', '3', '4', '5', '6', '7')",
-    );
-    expect(sql).not.toContain("md5(session_id)");
-  });
-
-  it("uses the dominant-value exclusion as the identity (AC-50)", () => {
-    const sql = retentionSql(s, { field: "usr_email", excluded: ["bot"] }, any, [1, 2], opts);
-    expect(sql).toContain(
-      "CASE WHEN NULLIF(usr_email, '') IN ('bot') THEN NULL ELSE NULLIF(usr_email, '') END AS u",
-    );
-  });
-});
-
-describe("features builder (G8, AC-45)", () => {
-  const s = scope({ schema: { action_id: true, usr_email: true, action_target_name: true } });
-  const id = { field: "usr_email" as const, excluded: [] };
-  const ev = (i: number, rules: NamedEvent["rules"]): NamedEvent => ({
-    id: `e${i}`,
-    app: "web",
-    name: `E${i}`,
-    rules,
-    version: 1,
-    createdBy: "",
-    createdAt: 0,
-    updatedBy: "",
-    updatedAt: 0,
-  });
-  const events = [
-    ev(0, [{ t: "view", op: "eq", value: "/web/logs" }]),
-    ev(1, [{ t: "action", targets: ["menu-link-/logs-item"], onPage: "/web" }]),
-  ];
-
-  it("Q23 equals the proven shape", () => {
-    expect(norm(featuresSql(s, CS, id, events), s)).toBe(norm(PROVEN.Q23_FEATURES, s));
-  });
-
-  it("drops the identity columns without an identity and refuses more than 5 events", () => {
-    const sql = featuresSql(s, CS, null, events);
-    expect(sql).not.toMatch(/users|u0|usr_email/);
-    const many = Array.from({ length: 6 }, (_, i) =>
-      ev(i, [{ t: "view", op: "prefix", value: "/a" }]),
-    );
-    expect(() => featuresSql(s, CS, null, many)).toThrow();
-  });
-
-  it("uses prefix and regex rules over the page template", () => {
-    const sql = featuresSql(s, CS, null, [
-      ev(0, [
-        { t: "view", op: "prefix", value: "/web/" },
-        { t: "view", op: "regex", value: "^/a$" },
-      ]),
-    ]);
-    expect(sql).toContain(
-      "((ty = 'view' AND starts_with(pg, '/web/')) OR (ty = 'view' AND regexp_like(pg, '^/a$')))",
-    );
-  });
-
-  it("never references action_target_name when the org has no click events (o2-enterprise#2800)", () => {
-    const noClicks = scope({ schema: { action_id: true, usr_email: true } });
-    const sql = featuresSql(noClicks, CS, id, events);
-    expect(sql).not.toContain("action_target_name");
-    expect(sql).toContain("(type = 'view' OR FALSE OR");
-    expect(() => assertJoinFree(sql)).not.toThrow();
-  });
-});
-
-describe("dashboard panel builder (G9, AC-53)", () => {
-  const steps = [
-    { kind: "p" as const, key: "/web" },
-    { kind: "c" as const, key: "menu-link-/logs-item" },
-    { kind: "p" as const, key: "/web/logs" },
-  ];
-  const s = scope({ schema: { action_id: true, action_target_name: true } });
-
-  it("pivots the unbroken Sessions funnel into one row per step", () => {
-    const sql = funnelPanelSql(
-      s,
-      { steps, unit: "users", window: "7d", breakdown: "browser" },
-      { events: [], sample: 4 },
-    );
-    expect(norm(sql, s)).toBe(norm(SEQ.Q7_PANEL, s));
-    expect(sql).not.toMatch(/_timestamp >= \d|md5/);
-  });
-});
-
-describe("alert-bound builders (no SELECT *)", () => {
-  // The same pattern as RE_ONLY_SELECT in src/search/src/sql/mod.rs, which the alert service applies to the whole text.
-  const RE_ONLY_SELECT = /select[ ]+\*/i;
-  const steps = [
-    { kind: "p" as const, key: "/web" },
-    { kind: "c" as const, key: "menu-link-/logs-item" },
-    { kind: "e" as const, key: "ev1" },
-  ];
-  const events: NamedEvent[] = [
-    {
-      id: "ev1",
-      app: "web",
-      name: "Save",
-      rules: [{ t: "action", targets: ["save"], onPage: "/web" }],
-      version: 1,
-      createdBy: "",
-      createdAt: 0,
-      updatedBy: "",
-      updatedAt: 0,
-    },
-  ];
-  const s = scope({
-    schema: { action_id: true, usr_email: true, user_agent_user_agent_family: true },
-  });
-  const id = { field: "usr_email" as const, excluded: [] };
-  const opts = { events, sample: 1 as const };
-  const defs = [
-    { unit: "sessions" as const, window: "session" as const },
-    { unit: "users" as const, window: "session" as const },
-    { unit: "users" as const, window: "1h" as const },
-    { unit: "users" as const, window: "7d" as const },
-  ].flatMap((u) =>
-    [2, 3, 10, 20].map((n) => ({
-      ...u,
-      steps: Array.from({ length: n }, (_, i) => steps[i % steps.length]),
-      breakdown: "browser" as const,
-    })),
-  );
-
-  it.each(defs)("funnelAlertSql never writes SELECT * ($unit, $window)", (def) => {
-    const sql = funnelAlertSql(s, id, def, 50, opts);
-    expect(sql).not.toMatch(RE_ONLY_SELECT);
-    expect(() => assertJoinFree(sql)).not.toThrow();
-  });
-
-  it.each(defs)(
-    "funnelPanelSql, which dashboards can turn into alerts, never writes SELECT * ($unit, $window)",
-    (def) => {
-      expect(funnelPanelSql(s, def, opts)).not.toMatch(RE_ONLY_SELECT);
-    },
-  );
-
-  it("ends in the conversion row filter over the funnel's own counts", () => {
-    const def = {
-      steps: steps.slice(0, 2),
-      unit: "sessions" as const,
-      window: "session" as const,
-      breakdown: null,
-    };
-    const sql = funnelAlertSql(s, id, def, 42.5, opts);
-    expect(sql).toContain("fin AS (SELECT SUM(r1) AS entered, SUM(r2) AS converted FROM ps)");
-    expect(sql).toMatch(
-      /\nSELECT entered, converted, 100\.0 \* converted \/ entered AS conv_pct FROM fin WHERE entered > 0 AND 100\.0 \* converted \/ entered < 42\.5$/,
-    );
-    const users = funnelAlertSql(s, id, { ...def, unit: "users", window: "1d" }, 42.5, opts);
-    expect(users).toContain("SUM(r2) AS converted FROM pu WHERE anon = 0)");
-  });
-
-  it("drops the breakdown and clamps the threshold to 0-100", () => {
-    const def = {
-      steps: steps.slice(0, 2),
-      unit: "sessions" as const,
-      window: "session" as const,
-      breakdown: "browser" as const,
-    };
-    expect(funnelAlertSql(s, id, def, 250, opts)).toMatch(/ < 100$/);
-    expect(funnelAlertSql(s, id, def, Number.NaN, opts)).toMatch(/ < 0$/);
-    expect(funnelAlertSql(s, id, def, 10, opts)).not.toContain("dim");
-  });
-});
-
-describe("assertJoinFree over every builder (AC-55)", () => {
-  const s = scope({
-    schema: {
-      action_id: true,
-      usr_email: true,
-      session_type: true,
-      user_agent_user_agent_family: true,
-      action_frustration_type: true,
-    },
-  });
-  const id = { field: "usr_email" as const, excluded: ["bot@x.com"] };
-  const ev: NamedEvent = {
-    id: "ev1aaaaaaaaa",
-    app: "web",
-    name: "Save",
-    rules: [
-      { t: "view", op: "regex", value: "^/web/.*$" },
-      { t: "action", targets: ["save"], onPage: "/web" },
-    ],
-    version: 1,
-    createdBy: "",
-    createdAt: 0,
-    updatedBy: "",
-    updatedAt: 0,
-  };
-  const opts = { events: [ev], sample: 4 as const };
-  const pick = [
-    { kind: "p" as const, key: "/web" },
-    { kind: "c" as const, key: "save" },
-    { kind: "e" as const, key: "ev1aaaaaaaaa" },
-  ];
-  const steps = (n: number) => Array.from({ length: n }, (_, i) => pick[i % pick.length]);
-  const defs = [2, 20].flatMap((n) =>
-    (
-      [
-        ["sessions", "session"],
-        ["users", "session"],
-        ["users", "1d"],
-      ] as const
-    ).map(([unit, window]) => ({ steps: steps(n), unit, window, breakdown: "browser" as const })),
-  );
-  const retention = { start: pick[2], ret: pick[1], per: "week" as const, mode: "after" as const };
-  const bounds = [1000, 2000, 3000, 4000];
-  const builders: Record<string, () => string[]> = {
-    appProbeSql: () => [QUERIES.appProbeSql()],
-    facetOptionsSql: () => [
-      QUERIES.facetOptionsSql(s, "env"),
-      QUERIES.facetOptionsSql(s, "version"),
-    ],
-    summarySql: () => [QUERIES.summarySql(s, CS)],
-    identityTopSql: () => [QUERIES.identityTopSql(s, "usr_email")],
-    entryExitSql: () => [QUERIES.entryExitSql(s, CS, id), QUERIES.entryExitSql(s, CS, null)],
-    stepPickerSql: () => [QUERIES.stepPickerSql(s), QUERIES.stepPickerSql(s, "we")],
-    pagesSql: () => [QUERIES.pagesSql(s, CS, id), QUERIES.pagesSql(s, CS, null)],
-    clicksSql: () => [QUERIES.clicksSql(s, CS, id), QUERIES.clicksSql(s, CS, null)],
-    clickPagesSql: () => [QUERIES.clickPagesSql(s, CS, ["save", "o'k"])],
-    trendSql: () => [QUERIES.trendSql(s, id, "1 day", "UTC", pick, [ev])],
-    activeUsersSql: () => [QUERIES.activeUsersSql(s, id, CS)],
-    funnelSql: () =>
-      defs.flatMap((d) => [
-        QUERIES.funnelSql(s, id, d, opts),
-        QUERIES.funnelSql(s, id, { ...d, breakdown: null }, opts),
-      ]),
-    funnelPanelSql: () => defs.map((d) => QUERIES.funnelPanelSql(s, d, opts)),
-    funnelAlertSql: () => defs.map((d) => QUERIES.funnelAlertSql(s, id, d, 50, opts)),
-    nextStepsSql: () => defs.map((d) => QUERIES.nextStepsSql(s, id, d, opts)),
-    dropoffNextSql: () =>
-      defs.map((d) =>
-        QUERIES.dropoffNextSql(
-          s,
-          id,
-          { funnel: d, stepIndex: d.steps.length - 1, side: "dropped" },
-          opts,
-        ),
-      ),
-    dropoffHealthSql: () => defs.map((d) => QUERIES.dropoffHealthSql(s, id, d, 1, opts)),
-    cohortSessionsSql: () =>
-      defs.map((d) =>
-        QUERIES.cohortSessionsSql(s, id, { funnel: d, stepIndex: 1, side: "dropped" }, 1, opts),
-      ),
-    sessionEventsProbeSql: () => [QUERIES.sessionEventsProbeSql("s'1", s.schema)],
-    pathsSql: () => [
-      ...pick.map((anchor) =>
-        QUERIES.pathsSql(
-          s,
-          id,
-          { anchor, direction: "prev", depth: 5, include: "all", cohort: null },
-          opts,
-        ),
-      ),
-      ...defs.map((d) =>
-        QUERIES.pathsSql(
-          s,
-          id,
-          {
-            anchor: null,
-            direction: "next",
-            depth: 5,
-            include: "pages",
-            cohort: { funnel: d, stepIndex: d.steps.length - 1, side: "dropped" },
-          },
-          opts,
-        ),
-      ),
-    ],
-    branchSessionsSql: () =>
-      defs.map((d) =>
-        QUERIES.branchSessionsSql(
-          s,
-          id,
-          {
-            anchor: null,
-            direction: "next",
-            depth: 3,
-            include: "all",
-            cohort: { funnel: d, stepIndex: 1, side: "dropped" },
-          },
-          "s1 = 'p:/web'",
-          2,
-          0,
-          opts,
-        ),
-      ),
-    retentionSql: () => [QUERIES.retentionSql(s, id, retention, bounds, opts)],
-    retentionCellUsersSql: () => [
-      QUERIES.retentionCellUsersSql(s, id, retention, bounds, 0, 2, opts),
-    ],
-    featuresSql: () => [
-      QUERIES.featuresSql(s, CS, id, [ev]),
-      QUERIES.featuresSql(s, CS, null, [ev]),
-    ],
-  };
-
-  it("covers every exported *Sql builder", () => {
-    const exported = Object.entries(QUERIES)
-      .filter(([name, v]) => name.endsWith("Sql") && typeof v === "function")
-      .map(([name]) => name)
-      .sort();
-    expect(Object.keys(builders).sort()).toEqual(exported);
-  });
-
-  it.each(Object.keys(builders))(
-    "%s reads _rumdata once with no JOIN, IN (SELECT, EXISTS or UNION",
-    (name) => {
-      const sqls = builders[name]();
-      expect(sqls.length).toBeGreaterThan(0);
-      for (const sql of sqls) expect(() => assertJoinFree(sql)).not.toThrow();
-    },
-  );
-});
-
-describe("saved funnel sql cap (G8, CR-24)", () => {
-  const s = scope({
-    schema: {
-      action_id: true,
-      usr_email: true,
-      user_agent_user_agent_family: true,
-      action_target_name: true,
-    },
-  });
-  const id = { field: "usr_email" as const, excluded: ["a'b@x.com"] };
-  const key = (i: number, c: string) => `/${c.repeat(1023 - String(i).length)}${i}`;
-  const sizes = (page: string, click: string) => {
-    const steps = Array.from({ length: 10 }, (_, i) =>
-      i % 2
-        ? { kind: "c" as const, key: key(i, click) }
-        : { kind: "p" as const, key: key(i, page) },
-    );
-    return (["sessions", "users"] as const).flatMap((unit) =>
-      [null, "browser" as const].map((breakdown) => {
-        const window = unit === "users" ? ("7d" as const) : ("session" as const);
-        const sql = funnelSql(
-          s,
-          unit === "users" ? id : null,
-          { steps, unit, window, breakdown },
-          {
-            events: [],
-            sample: 1,
-          },
-        );
-        return new TextEncoder().encode(sql).length;
-      }),
-    );
-  };
-
-  it("a 10-step funnel of 1,024-character ASCII keys compiles under the server's 65,536-byte cap", () => {
-    expect(Math.max(...sizes("b", "a"))).toBeLessThan(65536);
-  });
-
-  it("quote-heavy or multibyte 1,024-character keys can exceed it, which is why Save checks bytes first", () => {
-    expect(Math.max(...sizes("'", "é"))).toBeGreaterThan(65536);
-  });
-});
-
-// pageKeyExpr's mobile fallback read view_name directly, but CTE call sites only ever select url/fu/lu.
-describe("mobile view_name fallback reaches a column the CTE actually selects (o2-enterprise#2798)", () => {
-  const s = scope({
-    schema: { view_name: true, usr_email: true, action_id: true, action_target_name: true },
-  });
-  const id = { field: "usr_email" as const, excluded: [] };
-  const opts = { events: [], sample: 1 as const };
-
-  it("pageKeyExpr lets a caller name the real backing column instead of the raw 'view_name'", () => {
-    expect(pageKeyExpr("url", { view_name: true }, "vn")).toContain("THEN NULLIF(vn, '') ELSE");
-    expect(pageKeyExpr("url", { view_name: true })).toContain("THEN NULLIF(view_name, '') ELSE");
-  });
-
-  it("Q4 pages (Overview -> Pages) carries vn through v0/v1 and reads it, not the raw column", () => {
-    const sql = pagesSql(s, CS, id);
-    expect(sql).toContain("MIN(CASE WHEN type = 'view' THEN view_name END) AS vn");
-    expect(sql).toContain("v1 AS (SELECT sid, ty, cur, vid, url, vn,");
-    expect(sql).toContain("NULLIF(vn, '')");
-    expect(sql).not.toContain("NULLIF(view_name, '')");
-  });
-
-  it("Q6 entryExit carries fvn/lvn for the first and last view", () => {
-    const sql = entryExitSql(s, CS, id);
-    expect(sql).toContain(
-      "substr(MIN(CASE WHEN type = 'view' THEN CAST(date AS VARCHAR) || view_name END), 14) AS fvn",
-    );
-    expect(sql).toContain(
-      "substr(MAX(CASE WHEN type = 'view' THEN CAST(date AS VARCHAR) || view_name END), 14) AS lvn",
-    );
-    expect(sql).toContain("NULLIF(fvn, '')");
-    expect(sql).toContain("NULLIF(lvn, '')");
-    expect(sql).not.toContain("NULLIF(view_name, '')");
-  });
-
-  it("Q9 stepPicker carries vn", () => {
-    const sql = stepPickerSql(s);
-    expect(sql).toContain("MIN(view_name) AS vn");
-    expect(sql).toContain("NULLIF(vn, '')");
-    expect(sql).not.toContain("NULLIF(view_name, '')");
-  });
-
-  it("Q7 funnel (Funnels panel) carries vn through x00/x0 for the page key", () => {
-    const steps = [
-      { kind: "p" as const, key: "/web" },
-      { kind: "p" as const, key: "/web/logs" },
-    ];
-    const sql = funnelSql(
-      s,
-      id,
-      { steps, unit: "sessions", window: "session", breakdown: null },
-      opts,
-    );
-    expect(sql).toContain("MIN(view_name) AS vn");
-    expect(sql).toContain("NULLIF(vn, '')");
-    expect(sql).not.toContain("NULLIF(view_name, '')");
-  });
-
-  it("an on-page action rule forwards vn alongside url so the step flag resolves it inside x1", () => {
-    const events = [
-      {
-        id: "ev1",
-        app: "web",
-        name: "Save",
-        rules: [{ t: "action" as const, targets: ["save"], onPage: "/web" }],
-        version: 1,
-        createdBy: "",
-        createdAt: 0,
-        updatedBy: "",
-        updatedAt: 0,
-      },
-    ];
-    const sql = funnelSql(
-      s,
-      null,
-      {
-        steps: [{ kind: "e" as const, key: "ev1" }],
-        unit: "sessions",
-        window: "session",
-        breakdown: null,
-      },
-      { events, sample: 1 },
-    );
-    expect(sql).toMatch(/ AS k, url, vn FROM x00/);
-    expect(sql).toContain(`k IN ('save') AND ${pageKeyExpr("url", s.schema, "vn")} = '/web'`);
-    expect(sql).toContain("NULLIF(view_name, '')"); // the raw-level onPage scan filter in x00, unaffected
-  });
-
-  it("Q12 dropoffHealth and Q13 cohortSessions carry vn through fullChainCtes", () => {
-    const sessions = {
-      steps: [
-        { kind: "p" as const, key: "/web" },
-        { kind: "c" as const, key: "menu-link-/logs-item" },
-      ],
-      unit: "sessions" as const,
-      window: "session" as const,
-      breakdown: null,
-    };
-    const health = dropoffHealthSql(s, null, sessions, 1, opts);
-    expect(health).toContain("MIN(view_name) AS vn");
-    expect(health).toContain("NULLIF(vn, '')");
-    expect(health).not.toContain("NULLIF(view_name, '')");
-    const cohort = cohortSessionsSql(
-      s,
-      id,
-      { funnel: sessions, stepIndex: 1, side: "dropped" },
-      0,
-      opts,
-    );
-    expect(cohort).toContain("NULLIF(vn, '')");
-    expect(cohort).not.toContain("NULLIF(view_name, '')");
-  });
-
-  it("Q14 paths carries vn", () => {
-    const def = {
-      anchor: { kind: "p" as const, key: "/web/logs" },
-      direction: "next" as const,
-      depth: 3,
-      include: "all" as const,
-      cohort: null,
-    };
-    const sql = pathsSql(s, null, def, opts);
-    expect(sql).toContain("MIN(view_name) AS vn");
-    expect(sql).toContain("NULLIF(vn, '')");
-    expect(sql).not.toContain("NULLIF(view_name, '')");
-  });
-
-  it("Q23 features carries vn", () => {
-    const events = [
-      {
-        id: "e0",
-        app: "web",
-        name: "E0",
-        rules: [{ t: "view" as const, op: "eq" as const, value: "/web/logs" }],
-        version: 1,
-        createdBy: "",
-        createdAt: 0,
-        updatedBy: "",
-        updatedAt: 0,
-      },
-    ];
-    const sql = featuresSql(s, CS, id, events);
-    expect(sql).toContain("MIN(view_name) AS vn");
-    expect(sql).toContain("NULLIF(vn, '')");
-    expect(sql).not.toContain("NULLIF(view_name, '')");
-  });
-
-  it("every builder still runs join-free with view_name in the schema", () => {
-    const steps = [
-      { kind: "p" as const, key: "/web" },
-      { kind: "c" as const, key: "menu-link-/logs-item" },
-      { kind: "p" as const, key: "/web/logs" },
-    ];
-    const def = { steps, unit: "sessions" as const, window: "session" as const, breakdown: null };
-    for (const sql of [
-      pagesSql(s, CS, id),
-      entryExitSql(s, CS, id),
-      stepPickerSql(s),
-      funnelSql(s, id, def, opts),
-      funnelPanelSql(s, def, opts),
-      pathsSql(
-        s,
-        id,
-        {
-          anchor: { kind: "p", key: "/web" },
-          direction: "next",
-          depth: 3,
-          include: "all",
-          cohort: null,
-        },
-        opts,
-      ),
-      featuresSql(s, CS, id, [
-        {
-          id: "e0",
-          app: "web",
-          name: "E0",
-          rules: [{ t: "view", op: "eq", value: "/web" }],
-          version: 1,
-          createdBy: "",
-          createdAt: 0,
-          updatedBy: "",
-          updatedAt: 0,
-        },
-      ]),
-    ]) {
-      expect(() => assertJoinFree(sql)).not.toThrow();
-    }
   });
 });

@@ -24,12 +24,6 @@ import type { LocationQuery, LocationQueryRaw, RouteLocationRaw } from "vue-rout
 import config from "@/aws-exports";
 import { resolveTraceSearchMode, type TraceSearchMode } from "@/ts/interfaces/traces/trace.types";
 import store from "@/stores";
-import Home from "@/views/HomeView.vue";
-import ImportDashboard from "@/views/Dashboards/ImportDashboard.vue";
-import About from "@/views/About.vue";
-import MemberSubscription from "@/views/MemberSubscription.vue";
-import Error404 from "@/views/Error404.vue";
-import ShortUrl from "@/views/ShortUrl.vue";
 import { hasMetricsEditorParams } from "@/utils/metrics/metricsEditorParams";
 import { PA_ROUTES } from "@/utils/rum/productAnalyticsRoutes";
 
@@ -65,11 +59,7 @@ const redirectToTraceTab =
     query: canonicalTraceQuery(to.query, supportedTraceTab(tab)),
   });
 
-// Eager, not lazy: the shell hosts the keep-alive that every DBM tab lives in,
-// so it is on the critical path for the first DBM route either way, and it is a
-// single `<router-view>`.
-import DbmShell from "@/views/DatabaseMonitoring/DbmShell.vue";
-
+const DbmShell = () => import("@/views/DatabaseMonitoring/DbmShell.vue");
 const DbmDatabasesPage = () => import("@/views/DatabaseMonitoring/DatabasesPage.vue");
 const DbmQueriesPage = () => import("@/views/DatabaseMonitoring/QueriesPage.vue");
 const DbmMetricsPage = () => import("@/views/DatabaseMonitoring/MetricsPage.vue");
@@ -220,6 +210,13 @@ import useIngestionRoutes from "./useIngestionRoutes";
 import useEnterpriseRoutes from "./useEnterpriseRoutes";
 import useManagementRoutes from "./useManagementRoutes";
 import Login from "@/views/Login.vue";
+
+const Home = () => import("@/views/HomeView.vue");
+const ImportDashboard = () => import("@/views/Dashboards/ImportDashboard.vue");
+const About = () => import("@/views/About.vue");
+const MemberSubscription = () => import("@/views/MemberSubscription.vue");
+const Error404 = () => import("@/views/Error404.vue");
+const ShortUrl = () => import("@/views/ShortUrl.vue");
 
 const useRoutes = () => {
   const parentRoutes: any = [
