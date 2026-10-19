@@ -285,8 +285,7 @@ fn sanitize_trace_ids<'a>(ids: impl Iterator<Item = &'a str>) -> Vec<String> {
     .collect()
 }
 
-/// Traces to re-aggregate and the range covering their spans; without `all` only crossers are
-/// redone.
+/// Traces to re-aggregate and the range covering their spans; only crossers unless `all`.
 fn summary_scope(
     ids: &[String],
     indexed: &HashMap<String, TraceTimeRange>,

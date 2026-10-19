@@ -336,6 +336,25 @@ enum WindowResult {
     TimedOut,
 }
 
+struct StripScan {
+    outcomes: Vec<Option<ScanOutcome>>,
+    windows: u64,
+    timed_out: bool,
+}
+
+impl StripScan {
+    fn found(self, keys: &[String]) -> Vec<(String, TraceTimeRange)> {
+        self.outcomes
+            .into_iter()
+            .enumerate()
+            .filter_map(|(index, outcome)| match outcome {
+                Some(ScanOutcome::Found { range, .. }) => Some((keys[index].clone(), range)),
+                _ => None,
+            })
+            .collect()
+    }
+}
+
 fn locate_batch_sizes() -> impl Iterator<Item = i64> {
     [1, 2, 7, 14, 28]
         .into_iter()
@@ -686,7 +705,7 @@ pub async fn query_session(
     .await
 }
 
-/// Index ranges of traces with spans inside `around`; None when the index cannot answer.
+/// Ranges of traces with rows within LIST_MARGIN of an edge of `around`; None if the index is mute.
 pub(crate) async fn lookup_trace_ranges(
     org_id: &str,
     stream_name: &str,
@@ -709,17 +728,8 @@ pub(crate) async fn lookup_trace_ranges(
     else {
         return Ok(None);
     };
-    let bounds = ScanBounds {
-        scan_start: padded
-            .scan_start
-            .max(around.start_time.saturating_sub(LIST_MARGIN)),
-        scan_end: padded
-            .scan_end
-            .min(around.end_time.saturating_add(LIST_MARGIN)),
-        hard_start: padded.scan_start,
-        hard_end: padded.scan_end,
-    };
-    if bounds.scan_start >= bounds.scan_end {
+    let strips = list_scan_bounds(padded, around);
+    if strips.is_empty() {
         return Ok(None);
     }
     let streams = [stream_name.to_string()];
@@ -737,44 +747,50 @@ pub(crate) async fn lookup_trace_ranges(
         stream_index: 0,
     };
     let index_stream = get_trace_time_index_stream_name(stream_name);
-    let mut scanner = BatchScanner::with_margin(LIST_MARGIN, trace_ids.len(), bounds, None, &[]);
+    let edges: Vec<_> = strips
+        .iter()
+        .map(|bounds| (bounds.scan_start, bounds.scan_end))
+        .collect();
+    let scans = futures::future::join_all(
+        strips
+            .into_iter()
+            .map(|bounds| scan_strip(&params, &index_stream, bounds)),
+    )
+    .await;
+    let mut ranges = HashMap::new();
     let mut windows = 0u64;
     let mut timed_out = false;
-    loop {
-        if deadline.saturating_duration_since(Instant::now()).is_zero() {
-            timed_out = true;
-            break;
-        }
-        let Some((start, end)) = scanner.next_window() else {
-            break;
-        };
-        windows += 1;
-        let active = scanner.active_keys();
-        let Some(rows) = query_batch_window(&params, &index_stream, &active, start, end).await?
-        else {
-            timed_out = true;
-            break;
-        };
-        scanner.ingest(rows);
-    }
-    let mut ranges = HashMap::new();
-    for (index, outcome) in scanner.finish().into_iter().enumerate() {
-        if let Some(ScanOutcome::Found { range, .. }) = outcome {
-            ranges.insert(trace_ids[index].clone(), range);
+    let mut failed = false;
+    // One strip failing must not throw away what the other one found.
+    for (scan, edges) in scans.into_iter().zip(&edges) {
+        match scan {
+            Ok(scan) => {
+                windows += scan.windows;
+                timed_out |= scan.timed_out;
+                collect_traces(&mut ranges, scan.found(trace_ids));
+            }
+            Err(error) => {
+                failed = true;
+                log::warn!(
+                    "[trace_time_index] lookup_ranges strip {edges:?} failed for {org_id}/{stream_name}: {error}"
+                );
+            }
         }
     }
-    let status = match (timed_out, ranges.is_empty()) {
-        (true, _) => "timeout",
-        (false, false) => "hit",
-        (false, true) => "miss",
+    let status = match (failed, timed_out, ranges.is_empty()) {
+        (true, ..) => "error",
+        (false, true, _) => "timeout",
+        (false, false, false) => "hit",
+        (false, false, true) => "miss",
     };
     config::metrics::TRACE_TIME_INDEX_OPERATIONS
         .with_label_values(&[org_id, "lookup_ranges", status])
         .inc();
     log::debug!(
-        "[trace_time_index] lookup_ranges org_id={org_id:?} stream={stream_name:?} keys={} found={} windows={windows} timed_out={timed_out} took={} ms",
+        "[trace_time_index] lookup_ranges org_id={org_id:?} stream={stream_name:?} keys={} found={} strips={} windows={windows} status={status} took={} ms",
         trace_ids.len(),
         ranges.len(),
+        edges.len(),
         started.elapsed().as_millis(),
     );
     Ok(Some(ranges))
@@ -1040,6 +1056,41 @@ async fn scan_stream_inner(params: &ScanParams<'_>) -> Result<Option<Vec<LookupO
     Ok(Some(outcomes))
 }
 
+/// One list strip: keys absent from its first window end NotFound, found keys grow by LIST_MARGIN.
+async fn scan_strip(
+    params: &ScanParams<'_>,
+    index_stream: &str,
+    bounds: ScanBounds,
+) -> Result<StripScan> {
+    let deadline = params.run.deadline;
+    let mut scanner =
+        BatchScanner::with_margin(LIST_MARGIN, params.run.keys.len(), bounds, None, &[]);
+    let mut windows = 0u64;
+    let mut timed_out = false;
+    loop {
+        if deadline.saturating_duration_since(Instant::now()).is_zero() {
+            timed_out = true;
+            break;
+        }
+        let Some((start, end)) = scanner.next_window() else {
+            break;
+        };
+        windows += 1;
+        let active = scanner.active_keys();
+        let Some(rows) = query_batch_window(params, index_stream, &active, start, end).await?
+        else {
+            timed_out = true;
+            break;
+        };
+        scanner.ingest(rows);
+    }
+    Ok(StripScan {
+        outcomes: scanner.finish(),
+        windows,
+        timed_out,
+    })
+}
+
 /// The stream's scan bounds, shared by the per-key and batch paths, or None
 /// when there is no consultable coverage (feature disabled, caller bounds
 /// outside coverage, or no index stream). `hard_start_floor` carries the
@@ -1080,6 +1131,42 @@ async fn resolve_scan_bounds(
         hard_start,
         hard_end,
     }))
+}
+
+/// One margin around each edge of `around`, within `padded`: where a crosser's rows are expected.
+fn list_scan_bounds(padded: ScanBounds, around: TraceTimeRange) -> Vec<ScanBounds> {
+    // Rows sit at a span's start and end hour, so a span longer than two margins can cross unseen.
+    let clip = |start: i64, end: i64| {
+        let bounds = ScanBounds {
+            scan_start: padded.scan_start.max(start),
+            scan_end: padded.scan_end.min(end),
+            hard_start: padded.scan_start,
+            hard_end: padded.scan_end,
+        };
+        (bounds.scan_start < bounds.scan_end).then_some(bounds)
+    };
+    let (start, end) = (around.start_time, around.end_time);
+    let strips = if end.saturating_sub(start) <= 2 * LIST_MARGIN {
+        [
+            clip(
+                start.saturating_sub(LIST_MARGIN),
+                end.saturating_add(LIST_MARGIN),
+            ),
+            None,
+        ]
+    } else {
+        [
+            clip(
+                start.saturating_sub(LIST_MARGIN),
+                start.saturating_add(LIST_MARGIN),
+            ),
+            clip(
+                end.saturating_sub(LIST_MARGIN),
+                end.saturating_add(LIST_MARGIN),
+            ),
+        ]
+    };
+    strips.into_iter().flatten().collect()
 }
 
 fn collect_scan_outcomes(
@@ -1570,6 +1657,104 @@ mod tests {
             "SELECT \"trace_id\", MIN(min_ts) AS min_ts, MAX(max_ts) AS max_ts \
              FROM \"trace_time_index_default\" WHERE \"trace_id\" IN ('a', 'b') GROUP BY \"trace_id\""
         );
+    }
+
+    #[test]
+    fn list_scan_bounds_cover_both_edges_and_clip_to_coverage() {
+        let hour = LIST_MARGIN;
+        let padded = ScanBounds {
+            scan_start: 0,
+            scan_end: 100 * hour,
+            hard_start: 0,
+            hard_end: 100 * hour,
+        };
+        let around = |start_time: i64, end_time: i64| TraceTimeRange {
+            start_time,
+            end_time,
+        };
+        let edges = |bounds: &ScanBounds| (bounds.scan_start, bounds.scan_end);
+        // A partition no wider than two margins is one strip.
+        let narrow = list_scan_bounds(padded, around(10 * hour, 12 * hour));
+        assert_eq!(
+            narrow.iter().map(edges).collect::<Vec<_>>(),
+            [(9 * hour, 13 * hour)]
+        );
+        assert_eq!((narrow[0].hard_start, narrow[0].hard_end), (0, 100 * hour));
+        // A wider range only scans one margin around each edge.
+        let wide = list_scan_bounds(padded, around(10 * hour, 50 * hour));
+        assert_eq!(
+            wide.iter().map(edges).collect::<Vec<_>>(),
+            [(9 * hour, 11 * hour), (49 * hour, 51 * hour)]
+        );
+        // Coverage clips a strip and drops the one it leaves empty.
+        let clipped = ScanBounds {
+            scan_start: 20 * hour,
+            scan_end: 50 * hour + 30,
+            hard_start: 20 * hour,
+            hard_end: 50 * hour + 30,
+        };
+        let partial = list_scan_bounds(clipped, around(10 * hour, 50 * hour));
+        assert_eq!(
+            partial.iter().map(edges).collect::<Vec<_>>(),
+            [(49 * hour, 50 * hour + 30)]
+        );
+        assert_eq!(
+            (partial[0].hard_start, partial[0].hard_end),
+            (20 * hour, 50 * hour + 30)
+        );
+        assert!(list_scan_bounds(clipped, around(0, 5 * hour)).is_empty());
+    }
+
+    #[test]
+    fn edge_strips_see_a_crosser_only_through_a_row_within_the_margin() {
+        let hour = LIST_MARGIN;
+        let range = |start_time: i64, end_time: i64| TraceTimeRange {
+            start_time,
+            end_time,
+        };
+        let padded = ScanBounds {
+            scan_start: 0,
+            scan_end: 100 * hour,
+            hard_start: 0,
+            hard_end: 100 * hour,
+        };
+        let keys = ["short", "long"].map(String::from);
+        // Rows as the writer lays them out: one at the span's start, one at its end hour.
+        let rows = [
+            (
+                0usize,
+                9 * hour + hour / 2,
+                range(9 * hour + hour / 2, 11 * hour),
+            ),
+            (0, 10 * hour, range(9 * hour + hour / 2, 11 * hour)),
+            (1, 8 * hour, range(8 * hour, 30 * hour)),
+            (1, 29 * hour, range(8 * hour, 30 * hour)),
+        ];
+        let mut found = HashMap::new();
+        for bounds in list_scan_bounds(padded, range(10 * hour, 50 * hour)) {
+            let mut scanner = BatchScanner::with_margin(LIST_MARGIN, keys.len(), bounds, None, &[]);
+            while let Some((start, end)) = scanner.next_window() {
+                let active = scanner.active_keys();
+                let hits = rows
+                    .iter()
+                    .filter(|(key, ts, _)| active.contains(key) && (start..=end).contains(ts))
+                    .map(|&(key, _, range)| (key, range))
+                    .collect();
+                scanner.ingest(hits);
+            }
+            let scan = StripScan {
+                outcomes: scanner.finish(),
+                windows: 0,
+                timed_out: false,
+            };
+            collect_traces(&mut found, scan.found(&keys));
+        }
+        assert_eq!(
+            found.get("short"),
+            Some(&range(9 * hour + hour / 2, 11 * hour))
+        );
+        // The long root crosses the start edge, but both of its rows lie outside the strips.
+        assert!(!found.contains_key("long"));
     }
 
     #[test]
