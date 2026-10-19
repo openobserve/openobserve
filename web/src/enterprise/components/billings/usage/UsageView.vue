@@ -56,17 +56,49 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
     </OBanner>
 
+    <!-- A failed Refresh keeps the last good numbers on screen and says so, rather than wiping them. -->
+    <OBanner
+      v-if="refreshFailed"
+      variant="warning"
+      icon="warning"
+      inline-actions
+      dense
+      data-test="billings-usageview-refresh-failed"
+    >
+      {{ t("billing.usageV2.refreshFailed") }}
+      <template #actions>
+        <OButton
+          variant="warning"
+          size="xs"
+          data-test="billings-usageview-refresh-retry"
+          @click="loadDetails"
+          >{{ t("common.retry") }}</OButton
+        >
+      </template>
+    </OBanner>
+
     <!-- The page's own shape, not a spinner: nothing moves once the data lands. -->
     <div v-if="loading && lastLoadedAt === null" class="min-h-0 flex-1 overflow-hidden">
       <UsageOverviewSkeleton data-test="billings-usageview-loading" />
     </div>
 
-    <OBanner
-      v-else-if="loadError"
-      variant="error"
-      :content="loadError"
-      data-test="billings-usageview-error"
-    />
+    <!-- Nothing loaded yet: a load failure replaces the tabs, in plain words with a way to try again. -->
+    <div v-else-if="loadFailure" class="min-h-0 flex-1" data-test="billings-usageview-error">
+      <OEmptyState
+        size="hero"
+        variant="error"
+        illustration="broken-panel"
+        :title="t('billing.usageV2.loadFailedTitle')"
+        :description="
+          loadFailure === 'network'
+            ? t('billing.usageV2.loadFailedNetwork')
+            : t('billing.usageV2.loadFailedServer')
+        "
+        :action-label="t('common.retry')"
+        action-icon="refresh"
+        @action="loadDetails"
+      />
+    </div>
 
     <div
       v-else
@@ -111,12 +143,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, onMounted, ref } from "vue";
 import { useRoute, useRouter, type LocationQueryRaw } from "vue-router";
 import { useStore } from "vuex";
-import { raw, useI18nTyped } from "@/types/i18n";
-import type { I18nText } from "@/types/i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import config from "@/aws-exports";
 import { siteURL } from "@/constants/config";
 import BillingService, { type AiUsage } from "@/services/billings";
@@ -173,7 +205,10 @@ const details = computed<MeteringDetails | null>(() => response.value?.upcoming 
 /** Current cycle first, then closed cycles, which is what a trend range counts back through. */
 const cycles = computed(() => cyclesNewestFirst(response.value));
 const loading = ref(false);
-const loadError = ref<I18nText | null>(null);
+/** Why the first load failed: no answer at all, or an error from the server. */
+const loadFailure = ref<"network" | "server" | null>(null);
+/** A Refresh failed while the page still holds an earlier bill. */
+const refreshFailed = ref(false);
 const lastLoadedAt = ref<number | null>(null);
 
 /** A super org's orgs, itself first; empty for any other org. */
@@ -249,16 +284,18 @@ const aiCreditsAction = computed(() => {
 const loadDetails = async () => {
   void loadAiUsage();
   loading.value = true;
-  loadError.value = null;
+  refreshFailed.value = false;
   try {
     // Published together: the bill alone renders the plain meter view, which then flips to the org view.
     const [metering, orgs] = await Promise.all([fetchMetering(), fetchBillingOrgs()]);
     response.value = metering;
     billingOrgs.value = orgs;
     lastLoadedAt.value = Date.now();
+    loadFailure.value = null;
   } catch (e: any) {
-    response.value = null;
-    loadError.value = raw(e?.message) || t("billing.usageV2.loadFailed");
+    // The raw text ("Network Error") is not shown; the kind of failure picks the advice.
+    if (response.value) refreshFailed.value = true;
+    else loadFailure.value = e?.response ? "server" : "network";
   } finally {
     loading.value = false;
   }

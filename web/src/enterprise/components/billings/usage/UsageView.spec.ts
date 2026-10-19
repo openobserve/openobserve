@@ -168,3 +168,52 @@ describe("UsageView AI credits warning", () => {
     );
   });
 });
+
+describe("UsageView load failures", () => {
+  const retryButton = (wrapper: ReturnType<typeof mount>) =>
+    wrapper.findAll("button").find((button) => button.text() === "Retry");
+
+  it("shows a retryable error in plain words, not the raw message, when the bill cannot load", async () => {
+    metering.mockRejectedValueOnce(new Error("Network Error")).mockResolvedValue(bill);
+    members.mockResolvedValue({ data: [] });
+    const wrapper = mount(UsageView, { global: { plugins: [i18n, store] } });
+    await flushPromises();
+
+    const error = wrapper.find('[data-test="billings-usageview-error"]');
+    expect(error.exists()).toBe(true);
+    expect(error.text()).not.toContain("Network Error");
+    expect(error.text()).toContain("network connection");
+
+    await retryButton(wrapper)!.trigger("click");
+    await flushPromises();
+    expect(wrapper.findComponent({ name: "UsageOverview" }).exists()).toBe(true);
+  });
+
+  it("says the billing service failed when the server answers with an error", async () => {
+    metering.mockRejectedValue(
+      Object.assign(new Error("Request failed"), { response: { status: 500 } }),
+    );
+    members.mockResolvedValue({ data: [] });
+    const wrapper = mount(UsageView, { global: { plugins: [i18n, store] } });
+    await flushPromises();
+    expect(wrapper.find('[data-test="billings-usageview-error"]').text()).toContain(
+      "billing service returned an error",
+    );
+  });
+
+  it("keeps the last bill on screen when a Refresh fails, and offers Retry", async () => {
+    metering.mockResolvedValueOnce(bill).mockRejectedValueOnce(new Error("Network Error"));
+    members.mockResolvedValue({ data: [] });
+    const wrapper = mount(UsageView, { global: { plugins: [i18n, store] } });
+    await flushPromises();
+
+    wrapper.findComponent({ name: "UsageOverview" }).vm.$emit("refresh");
+    await flushPromises();
+
+    const overview = wrapper.findComponent({ name: "UsageOverview" });
+    expect(overview.exists()).toBe(true);
+    expect(overview.props("details")).toMatchObject({ total_cost: 1 });
+    expect(wrapper.find('[data-test="billings-usageview-refresh-failed"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="billings-usageview-error"]').exists()).toBe(false);
+  });
+});
