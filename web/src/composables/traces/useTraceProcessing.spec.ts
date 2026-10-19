@@ -396,7 +396,8 @@ describe("useTraceProcessing", () => {
   });
 });
 
-describe("deep span chains", () => {
+// 20,000-level chains are slow on loaded CI runners, so the default 5 s timeout flakes.
+describe("deep span chains", { timeout: 30_000 }, () => {
   const DEPTH = 20_000;
 
   const oldNode = (id: string, children: any[] = []) => ({

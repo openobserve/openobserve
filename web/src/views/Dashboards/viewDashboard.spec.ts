@@ -15,6 +15,8 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { shallowMount, flushPromises } from "@vue/test-utils";
+import { inject } from "vue";
+import { DASHBOARD_FRESH_ON_OPEN } from "@/composables/dashboard/dashboardFreshOnOpen";
 // Comprehensive service mocks - these prevent real API calls
 vi.mock("@/services/dashboards", async (importOriginal) => {
   const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
@@ -251,9 +253,11 @@ vi.mock("moment-timezone", () => ({
 
 import ViewDashboard from "@/views/Dashboards/ViewDashboard.vue";
 import i18n from "@/locales";
+import enUS from "@/locales/languages/en-US.json";
 import store from "@/test/unit/helpers/store";
 import analytics from "@/services/product_analytics";
 import ShareButton from "@/components/common/ShareButton.vue";
+import { dashboardSaveConflictState } from "@/composables/dashboard/dashboardSaveConflictState";
 import { getDashboard } from "@/utils/commons.ts";
 import { getManager } from "@/lib/vue-shortcut-manager";
 import { DASHBOARD_FRESH_PANEL_TIME } from "@/composables/dashboard/dashboardFreshPanelTime";
@@ -495,6 +499,197 @@ describe("ViewDashboard", () => {
       wrapper.vm.toggleAutoRun();
       expect(localStorage.getItem("oo_toggle_auto_run")).toBe("false");
       expect(wrapper.vm.isAutoRunOn).toBe(false);
+    });
+
+    describe("on open", () => {
+      let freshOnOpen: any;
+      const mountWithToolbar = () =>
+        createWrapper({
+          global: {
+            plugins: [i18n, store],
+            renderStubDefaultSlot: true,
+            stubs: {
+              OPageLayout: {
+                setup() {
+                  freshOnOpen = inject(DASHBOARD_FRESH_ON_OPEN, null);
+                },
+                template: '<div><slot name="actions" /></div>',
+              },
+              ODropdown: { template: '<div><slot name="trigger" /><slot /></div>' },
+            },
+          },
+        });
+      const relativePanel = {
+        id: "P1",
+        config: {
+          panel_time_enabled: true,
+          panel_time_range: { type: "relative", relativeTimePeriod: "1h" },
+        },
+      };
+
+      beforeEach(() => {
+        freshOnOpen = null;
+      });
+
+      it("keeps the refresh options reachable while panels load", async () => {
+        setAutoQuery(true);
+        wrapper = mountWithToolbar();
+        await flushPromises();
+
+        wrapper.vm.handleEmittedData(false);
+        await flushPromises();
+
+        const option = (dataTest: string) => wrapper.findComponent(`[data-test="${dataTest}"]`);
+        expect(wrapper.vm.arePanelsLoading).toBe(true);
+        expect(option("dashboard-refresh-options-btn").props("disabled")).toBe(false);
+        expect(option("dashboard-refresh-without-cache-btn").props("disabled")).toBe(true);
+        expect(option("dashboard-auto-run-toggle-btn").props("disabled")).toBe(false);
+      });
+
+      it("enables Refresh cache & reload again once panels finish", async () => {
+        setAutoQuery(true);
+        wrapper = mountWithToolbar();
+        await flushPromises();
+
+        wrapper.vm.handleEmittedData(false);
+        wrapper.vm.handleEmittedData(true);
+        await flushPromises();
+
+        expect(
+          wrapper
+            .findComponent('[data-test="dashboard-refresh-without-cache-btn"]')
+            .props("disabled"),
+        ).toBe(false);
+      });
+
+      it("describes Auto Run on dashboards with the dashboard-only copy", async () => {
+        setAutoQuery(true);
+        wrapper = mountWithToolbar();
+        await flushPromises();
+
+        const toggle = wrapper.find('[data-test="dashboard-auto-run-toggle-btn"]');
+        expect(toggle.text()).toContain("dashboard.viewDashboard.autoRunDescription");
+        expect(toggle.text()).not.toContain("search.liveModeTooltip");
+        const tooltips = wrapper
+          .findAllComponents({ name: "OTooltip" })
+          .map((tooltip: any) => tooltip.props("content"));
+        expect(tooltips).toContain("dashboard.viewDashboard.autoRunDescription");
+        expect(tooltips).not.toContain("dashboard.viewDashboard.autoRunScope");
+        expect(tooltips).not.toContain("search.autoRunEnabled");
+      });
+
+      it("says below the description that Auto Run applies beyond this dashboard", async () => {
+        setAutoQuery(true);
+        wrapper = mountWithToolbar();
+        await flushPromises();
+
+        const toggle = wrapper.find('[data-test="dashboard-auto-run-toggle-btn"]');
+        const lines = toggle.findAll("div").map((line: any) => line.text());
+        expect(lines).toEqual([
+          "search.turnOffLiveMode",
+          "dashboard.viewDashboard.autoRunDescription",
+          "dashboard.viewDashboard.autoRunScope",
+        ]);
+        expect(toggle.find('[data-test="dashboard-auto-run-scope"]').classes()).toEqual(
+          expect.arrayContaining(["text-text-secondary", "text-xs"]),
+        );
+      });
+
+      it("keeps the scope line whether Auto Run is on or off", async () => {
+        setAutoQuery(true);
+        wrapper = mountWithToolbar();
+        await flushPromises();
+        const toggle = () => wrapper.find('[data-test="dashboard-auto-run-toggle-btn"]');
+        const scope = () => toggle().find('[data-test="dashboard-auto-run-scope"]');
+
+        expect(toggle().text()).toContain("search.turnOffLiveMode");
+        expect(scope().text()).toBe("dashboard.viewDashboard.autoRunScope");
+
+        wrapper.vm.toggleAutoRun();
+        await flushPromises();
+
+        expect(toggle().text()).toContain("search.turnOnLiveMode");
+        expect(scope().text()).toBe("dashboard.viewDashboard.autoRunScope");
+      });
+
+      it("ships the approved English copy for both lines", () => {
+        expect(enUS.dashboard.viewDashboard.autoRunDescription).toBe(
+          "Runs queries on open and on filter/time changes",
+        );
+        expect(enUS.dashboard.viewDashboard.autoRunScope).toBe(
+          "Applies to all dashboards, Logs and Traces",
+        );
+      });
+
+      it("provides a gate that needs Auto Run and a relative effective range", async () => {
+        setAutoQuery(true);
+        wrapper = mountWithToolbar();
+        await flushPromises();
+        const globalPanel = { id: "P2", config: {} };
+
+        wrapper.vm.selectedDate = { valueType: "relative", relativeTimePeriod: "15m" };
+        expect(freshOnOpen.appliesTo(globalPanel)).toBe(true);
+
+        wrapper.vm.selectedDate = { valueType: "absolute", startTime: 1, endTime: 2 };
+        expect(freshOnOpen.appliesTo(globalPanel)).toBe(false);
+        expect(freshOnOpen.appliesTo(relativePanel)).toBe(true);
+
+        wrapper.vm.toggleAutoRun();
+        expect(freshOnOpen.appliesTo(relativePanel)).toBe(false);
+      });
+
+      it("reports each panel's effective range whether or not Auto Run is on", async () => {
+        setAutoQuery(false);
+        wrapper = mountWithToolbar();
+        await flushPromises();
+        const globalPanel = { id: "P2", config: {} };
+
+        wrapper.vm.selectedDate = { valueType: "absolute", startTime: 1, endTime: 2 };
+        expect(freshOnOpen.isRelativeRange(globalPanel)).toBe(false);
+        expect(freshOnOpen.isRelativeRange(relativePanel)).toBe(true);
+
+        wrapper.vm.selectedDate = { valueType: "relative", relativeTimePeriod: "15m" };
+        expect(freshOnOpen.isRelativeRange(globalPanel)).toBe(true);
+      });
+
+      it("never applies while the server flag is off", async () => {
+        setAutoQuery(false);
+        wrapper = mountWithToolbar();
+        await flushPromises();
+
+        expect(freshOnOpen.appliesTo(relativePanel)).toBe(false);
+      });
+    });
+  });
+
+  describe("save conflict resolution", () => {
+    it("marks the page not saved while this dashboard's conflict is unresolved", async () => {
+      wrapper = shallowMount(ViewDashboard, {
+        global: {
+          plugins: [i18n, store],
+          config: { globalProperties: { store } },
+          stubs: {
+            OPageLayout: { template: "<div><slot /></div>" },
+            OBanner: { template: "<div><slot /><slot name='actions' /></div>" },
+          },
+        },
+      });
+      await flushPromises();
+      const banner = () => wrapper.find('[data-test="dashboard-unsaved-conflict-banner"]');
+      expect(banner().exists()).toBe(false);
+
+      dashboardSaveConflictState.myChange = 'Deleted panel "CPU"';
+      dashboardSaveConflictState.unresolvedDashboardId = "test-dashboard-1";
+      await flushPromises();
+      expect(banner().exists()).toBe(true);
+      // This spec's i18n has no messages, so the banner carries its key.
+      expect(banner().text()).toContain("dashboard.saveConflict.notSavedChange");
+      expect(wrapper.find('[data-test="dashboard-unsaved-conflict-resolve"]').exists()).toBe(true);
+
+      dashboardSaveConflictState.unresolvedDashboardId = "other-dashboard";
+      await flushPromises();
+      expect(banner().exists()).toBe(false);
+      dashboardSaveConflictState.unresolvedDashboardId = "";
     });
   });
 
@@ -1688,6 +1883,10 @@ describe("ViewDashboard", () => {
                 '<div><slot name="title" /><slot name="actions" /><slot name="actions-overflow" /><slot /></div>',
             },
             RenderDashboardCharts: RenderDashboardChartsStub,
+            OBanner: {
+              props: ["dataTest"],
+              template: '<div :data-test="dataTest"><slot /><slot name="actions" /></div>',
+            },
           },
         },
       });
@@ -1944,6 +2143,20 @@ describe("ViewDashboard", () => {
       );
     });
 
+    it("keeps my JSON on screen when its save hits a conflict, naming it in the dialog", async () => {
+      await mountDashboard();
+      const edited = JSON.parse(JSON.stringify(wrapper.vm.currentDashboardData.data));
+      edited.tabs[0].panels[0].layout.w = 48;
+      const loadsBefore = vi.mocked(getDashboard).mock.calls.length;
+      mockSaveExecute.mockResolvedValueOnce(false);
+
+      await wrapper.vm.saveJsonDashboard.execute(edited);
+
+      expect(mockSaveExecute).toHaveBeenCalledWith("dashboard.saveConflict.change.editedJson");
+      expect(vi.mocked(getDashboard).mock.calls.length).toBe(loadsBefore);
+      expect(panelLayout().w).toBe(48);
+    });
+
     it("warns on page unload only while the draft has changes", async () => {
       await mountDashboard();
       wrapper.vm.enterLayoutEdit();
@@ -2015,6 +2228,101 @@ describe("ViewDashboard", () => {
       } finally {
         manager.unregisterById(chatId);
       }
+    });
+
+    describe("save conflict on Save", () => {
+      const conflictLost = async () => {
+        await mountDashboard();
+        wrapper.vm.enterLayoutEdit();
+        await dragPanelTo(10);
+        // What saveDashboardData does on a 409: open the dialog (which marks the dashboard unresolved) and report failure.
+        mockSaveExecute.mockImplementationOnce(async () => {
+          dashboardSaveConflictState.unresolvedDashboardId = "test-dashboard-1";
+          return false;
+        });
+        await wrapper.vm.saveLayout();
+        await flushPromises();
+      };
+
+      const resolve = async (outcome: "reloaded" | "overwritten") => {
+        dashboardSaveConflictState.unresolvedDashboardId = "";
+        dashboardSaveConflictState.resolvedDashboardId = "test-dashboard-1";
+        dashboardSaveConflictState.resolvedOutcome = outcome;
+        dashboardSaveConflictState.resolvedSeq += 1;
+        await flushPromises();
+      };
+
+      afterEach(() => {
+        dashboardSaveConflictState.unresolvedDashboardId = "";
+      });
+
+      it("keeps edit mode, the draft and its undo history while the dialog is open or closed", async () => {
+        await conflictLost();
+
+        expect(wrapper.vm.isEditingLayout).toBe(true);
+        expect(wrapper.vm.layoutChangeCount).toBe(1);
+        expect(wrapper.vm.canUndoLayout).toBe(true);
+        expect(panelLayout().x).toBe(10);
+        expect(has("dashboard-unsaved-conflict-banner")).toBe(true);
+        expect(has("dashboard-edit-badge")).toBe(true);
+      });
+
+      it("a time-range change applies without saving and leaves the not-saved banner up", async () => {
+        await conflictLost();
+        const loadsBefore = vi.mocked(getDashboard).mock.calls.length;
+
+        wrapper.vm.timeGate.onShow();
+        wrapper.vm.timeGate.onPick({ valueType: "relative", relativeTimePeriod: "1h" });
+        wrapper.vm.onTimePickerHide();
+        wrapper.vm.timeGate.apply();
+        await flushPromises();
+
+        expect(wrapper.vm.selectedDate).toMatchObject({ relativeTimePeriod: "1h" });
+        expect(mockSaveExecute).toHaveBeenCalledTimes(1);
+        expect(vi.mocked(getDashboard).mock.calls.length).toBe(loadsBefore);
+        expect(dashboardSaveConflictState.unresolvedDashboardId).toBe("test-dashboard-1");
+        expect(has("dashboard-unsaved-conflict-banner")).toBe(true);
+        expect(wrapper.vm.isEditingLayout).toBe(true);
+        expect(wrapper.vm.layoutChangeCount).toBe(1);
+      });
+
+      it("Reload leaves edit mode, drops the draft and shows the latest version", async () => {
+        await conflictLost();
+        const drafted = wrapper.vm.currentDashboardData.data;
+        const callsBefore = vi.mocked(getDashboard).mock.calls.length;
+
+        await resolve("reloaded");
+
+        expect(wrapper.vm.isEditingLayout).toBe(false);
+        expect(wrapper.vm.layoutChangeCount).toBe(0);
+        expect(wrapper.vm.canUndoLayout).toBe(false);
+        expect(drafted.tabs[0].panels[0].layout.x).toBe(0);
+        expect(vi.mocked(getDashboard).mock.calls.length).toBe(callsBefore + 1);
+        expect(has("dashboard-unsaved-conflict-banner")).toBe(false);
+      });
+
+      it("Overwrite ends edit mode like a normal save, keeping my layout", async () => {
+        await conflictLost();
+        const drafted = wrapper.vm.currentDashboardData.data;
+
+        await resolve("overwritten");
+
+        expect(wrapper.vm.isEditingLayout).toBe(false);
+        expect(wrapper.vm.layoutChangeCount).toBe(0);
+        expect(drafted.tabs[0].panels[0].layout.x).toBe(10);
+      });
+
+      it("the banner's Resolve reopens the dialog without saving again, and edit mode stays", async () => {
+        await conflictLost();
+        await dragPanelTo(20);
+
+        await wrapper.find('[data-test="dashboard-unsaved-conflict-resolve"]').trigger("click");
+        await flushPromises();
+
+        expect(mockSaveExecute).toHaveBeenCalledTimes(1);
+        expect(wrapper.vm.isEditingLayout).toBe(true);
+        expect(panelLayout().x).toBe(20);
+      });
     });
   });
 });

@@ -641,8 +641,33 @@ describe("searchState composable", () => {
   // fieldValues and notificationMsg
   // ---------------------------------------------------------------------------
   describe("fieldValues", () => {
-    it("should expose fieldValues as undefined by default", () => {
-      expect(wrapper.vm.fieldValues).toBeUndefined();
+    // useStreamFields fills it and logs/Index.vue hands it to the SearchBar, so both must hold the same one.
+    it("is one value list shared by every caller, like searchObj", () => {
+      const other = mountTestComponent();
+      (wrapper.vm as any).fieldValues = { level: new Set(["error"]) };
+      expect([...(other.vm as any).fieldValues.level]).toEqual(["error"]);
+      other.unmount();
+    });
+
+    it("is cleared with the search object, on org switch", () => {
+      (wrapper.vm as any).fieldValues = { level: new Set(["error"]) };
+      wrapper.vm.resetSearchObj();
+      expect(wrapper.vm.fieldValues).toEqual({});
+    });
+
+    it("is emptied in place, so the editor's copy sees the next search's values", () => {
+      (wrapper.vm as any).fieldValues = { level: new Set(["error"]) };
+      const held = wrapper.vm.fieldValues;
+      wrapper.vm.resetSearchObj();
+      (wrapper.vm as any).clearFieldValues();
+      expect(wrapper.vm.fieldValues).toBe(held);
+      expect(held).toEqual({});
+    });
+
+    it("is cleared with the stream data, on stream change", () => {
+      (wrapper.vm as any).fieldValues = { level: new Set(["error"]) };
+      wrapper.vm.resetStreamData();
+      expect(wrapper.vm.fieldValues).toEqual({});
     });
   });
 

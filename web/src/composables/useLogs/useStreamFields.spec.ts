@@ -23,6 +23,8 @@ import { searchState } from "./searchState";
 import { restoreLogsSelectedStreams, saveLogsSelectedStreams } from "@/utils/streamPersist";
 import { useLocalLogFilterField } from "@/utils/zincutils";
 import { columnsFromUrl } from "./useLogPermalink";
+import { CancelledError } from "@tanstack/vue-query";
+import { queryClient } from "@/composables/query/queryClient";
 
 // Create i18n instance
 const i18n = createI18n({
@@ -81,6 +83,21 @@ describe("useStreamFields Composable", () => {
       expect(typeof wrapper.vm.getStreamList).toBe("function");
     });
 
+    it("should not log a superseded stream-list fetch that was cancelled", async () => {
+      queryClient.clear();
+      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      const fetchQuery = vi
+        .spyOn(queryClient, "fetchQuery")
+        .mockRejectedValueOnce(new CancelledError());
+
+      await wrapper.vm.getStreamList(false);
+
+      expect(fetchQuery).toHaveBeenCalled();
+      expect(consoleError).not.toHaveBeenCalled();
+      fetchQuery.mockRestore();
+      consoleError.mockRestore();
+    });
+
     it("should have loadStreamFields function", () => {
       expect(typeof wrapper.vm.loadStreamFields).toBe("function");
     });
@@ -127,6 +144,39 @@ describe("useStreamFields Composable", () => {
       const { loadStreamLists } = wrapper.vm;
       await loadStreamLists(false);
       expect(loadStreamLists).toHaveBeenCalled;
+    });
+  });
+
+  describe("updateFieldValues — in-session values for autocomplete", () => {
+    const { searchObj, fieldValues } = searchState();
+
+    beforeEach(() => {
+      fieldValues.value = {};
+      searchObj.data.stream.selectedStreamFields = [];
+      searchObj.data.queryResults = {
+        hits: [
+          { _timestamp: 2, level: "error", service_name: "querier" },
+          { _timestamp: 1, msg: "x", level: "warn", service_name: "ingester" },
+        ],
+      } as any;
+    });
+
+    it("skips an excluded key and keeps reading the rest of the hits", () => {
+      wrapper.vm.updateFieldValues();
+
+      expect([...fieldValues.value.level]).toEqual(["error", "warn"]);
+      expect([...fieldValues.value.service_name]).toEqual(["querier", "ingester"]);
+      expect(fieldValues.value._timestamp).toBeUndefined();
+      expect(fieldValues.value.msg).toBeUndefined();
+    });
+
+    it("empties the list in place on a new search, so the editor's copy stays live", () => {
+      wrapper.vm.updateFieldValues();
+      const held = fieldValues.value;
+      wrapper.vm.resetFieldValues();
+      wrapper.vm.updateFieldValues();
+      expect(fieldValues.value).toBe(held);
+      expect([...held.level]).toEqual(["error", "warn"]);
     });
   });
 

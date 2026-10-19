@@ -97,6 +97,8 @@ pub async fn process_zip(
 
     // first filter out the js and .map files from teh archive
     for name in archive.file_names() {
+        let name = name.context("invalid file name in zip")?;
+        let name = name.as_ref();
         if name.ends_with(".js") {
             let (_, file_name) = name.rsplit_once("/").unwrap_or(("", name));
             minified.insert(file_name.to_string());
@@ -1025,7 +1027,7 @@ mod tests {
         let err = process_zip(org, None, None, None, zip).await.unwrap_err();
         assert!(
             err.to_string()
-                .contains("exceeds maximum allowed file size"),
+                .contains("larger than its declared uncompressed size"),
             "{err}"
         );
         assert!(stored_files(org).await.is_empty());

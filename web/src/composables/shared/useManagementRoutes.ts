@@ -1,7 +1,7 @@
-import { useStore } from "vuex";
 import config from "@/aws-exports";
 import { routeGuard } from "@/utils/zincutils";
 import { withFeatureGate } from "@/utils/enterpriseFeatures";
+import { oncallRouteGuard } from "./oncallRouteGuard";
 
 const Settings = () => import("@/components/settings/index.vue");
 
@@ -209,6 +209,16 @@ const useManagementRoutes = () => {
           component: () => import("@/components/alerts/PipelinesDestinationList.vue"),
           beforeEnter: withFeatureGate("pipelineDestinations", routeGuard),
         },
+        // Its API is mounted with on-call's, so the page exists only where on-call is on.
+        {
+          path: "telephony",
+          name: "telephonySettings",
+          meta: {
+            titleKey: "telephony.title",
+          },
+          component: () => import("@/components/settings/TelephonySettings.vue"),
+          beforeEnter: withFeatureGate("oncall", oncallRouteGuard),
+        },
         {
           path: "storage_settings",
           name: "storageSettings",
@@ -306,23 +316,6 @@ const useManagementRoutes = () => {
         },
       ],
     );
-  }
-  if (config.isEnterprise == "true" || config.isCloud == "true") {
-    routes[0].children.push({
-      path: "alert_calibration",
-      name: "alertCalibrationSettings",
-      component: () => import("@/components/settings/AlertCalibrationSettings.vue"),
-      meta: { titleKey: "settings.alertCalibration" },
-      // Synchronous: `useStore` and `routeGuard` read the injection context, which an await loses.
-      beforeEnter(to: any, from: any, next: any) {
-        // `=== false`, not falsy: a cold load with `/config` still in flight must not bounce.
-        if (useStore().state.zoConfig?.alert_calibration_enabled === false) {
-          next({ name: "general", query: to.query });
-          return;
-        }
-        routeGuard(to, from, next);
-      },
-    });
   }
   if (config.isCloud == "true") {
     routes[0].children.push(

@@ -1225,6 +1225,12 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
     why: "a field-type tag is a filled chip in the field list",
   },
   {
+    fg: "--color-flame-frame-text",
+    bg: "--color-chart-series-1",
+    category: "text",
+    why: "a flame graph frame label is painted on the frame fill (FlameGraphView.vue: chart series 1, 5, 7, 9), never on the page; series 1 is the darkest of the four, so it is the pair that must clear 4.5:1",
+  },
+  {
     fg: "--color-icon-chip-error-text",
     bg: "--color-icon-chip-error-bg",
     under: ["--color-surface-base"],

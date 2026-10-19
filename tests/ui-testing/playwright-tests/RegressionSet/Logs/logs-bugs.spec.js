@@ -1167,7 +1167,7 @@ test.describe("Logs Regression Bug Fixes", () => {
     // Set wide time range to get more records
     await pm.logsPage.clickDateTimeButton();
     await page.waitForTimeout(500);
-    await pm.logsPage.clickRelative6WeeksButton();
+    await pm.logsPage.clickRelative15MinButton();
     await page.waitForTimeout(500);
 
     // Run query

@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { CancelledError } from "@tanstack/vue-query";
 import { effectScope, getCurrentScope, nextTick, onScopeDispose, ref, type EffectScope } from "vue";
 import { byString } from "@/utils/json";
 import { useI18nTyped, raw } from "@/types/i18n";
@@ -117,6 +118,7 @@ export const useStreamFields = () => {
     searchObj,
     searchObjDebug,
     fieldValues,
+    clearFieldValues,
     notificationMsg,
     streamSchemaFieldsIndexMapping,
     schemaRequestToken,
@@ -168,7 +170,7 @@ export const useStreamFields = () => {
         // Object.keys(item).forEach((key) => {
         for (const key of Object.keys(item)) {
           if (excludedFields.includes(key)) {
-            return;
+            continue;
           }
 
           if (fieldValues.value === undefined) {
@@ -985,6 +987,7 @@ export const useStreamFields = () => {
       await loadStreamLists(selectStream, options);
       return;
     } catch (e: any) {
+      if (e instanceof CancelledError) return;
       console.error("Error while getting stream list", e);
     }
   };
@@ -1048,7 +1051,7 @@ export const useStreamFields = () => {
   };
 
   const resetFieldValues = () => {
-    fieldValues.value = {};
+    clearFieldValues();
   };
 
   const hasInterestingFieldsInLocal = (streamName: string) => {

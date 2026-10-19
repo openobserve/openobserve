@@ -51,3 +51,30 @@ describe("enterprise routes: allowOnEmptyData", () => {
     },
   );
 });
+
+describe("enterprise routes: removed Paid Usage page", () => {
+  it("sends old /billings/paid_usage links to Plans with their query", async () => {
+    const { homeChildRoutes } = useEnvRoutes();
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: "/", component: { template: "<div />" }, children: homeChildRoutes }],
+    });
+
+    await router.push("/billings/paid_usage?org_identifier=acme");
+
+    expect(router.currentRoute.value.name).toBe("plans");
+    expect(router.currentRoute.value.query).toEqual({ org_identifier: "acme" });
+  });
+});
+
+describe("enterprise routes: lazy loading", () => {
+  it("lazy-loads every route component", () => {
+    const { parentRoutes, homeChildRoutes } = useEnvRoutes();
+    const walk = (routes: any[]): void =>
+      routes.forEach((route) => {
+        if (route.component) expect(typeof route.component, route.path).toBe("function");
+        if (route.children) walk(route.children);
+      });
+    walk([...parentRoutes, ...homeChildRoutes]);
+  });
+});

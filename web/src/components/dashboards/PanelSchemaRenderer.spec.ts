@@ -233,7 +233,11 @@ describe("PanelSchemaRenderer", () => {
           $t: (key: string) => key,
         },
         stubs: {
-          ChartRenderer: { template: '<div data-test="chart-renderer"></div>' },
+          ChartRenderer: {
+            name: "ChartRenderer",
+            props: ["findLineOnContextMenu"],
+            template: '<div data-test="chart-renderer"></div>',
+          },
           TableRenderer: { template: '<div data-test="table-renderer"></div>' },
           GeoMapRenderer: { template: '<div data-test="geomap-renderer"></div>' },
           MapsRenderer: { template: '<div data-test="maps-renderer"></div>' },
@@ -246,6 +250,28 @@ describe("PanelSchemaRenderer", () => {
       },
     });
   };
+
+  /** Whether the panel asks the chart to name the line under a right-click. */
+  const findsLine = async () => {
+    await nextTick();
+    return wrapper.findComponent({ name: "ChartRenderer" }).props("findLineOnContextMenu");
+  };
+
+  /** The loader's state for the next mount: data and metadata as the executors store them. */
+  const mockLoadedData = (data: unknown[], metadataQueries: Record<string, unknown>[]) =>
+    vi.mocked(usePanelDataLoader).mockReturnValueOnce({
+      data: ref(data),
+      loading: ref(false),
+      errorDetail: ref({ message: "", code: "" }),
+      metadata: ref({ queries: metadataQueries }),
+      resultMetaData: ref({}),
+      annotations: ref([]),
+      lastTriggeredAt: ref(null),
+      isCachedDataDifferWithCurrentTimeRange: ref(false),
+      searchRequestTraceIds: ref([]),
+      loadingProgressPercentage: ref(0),
+      isPartialData: ref(false),
+    } as unknown as ReturnType<typeof usePanelDataLoader>);
 
   describe("Component Initialization", () => {
     it("should render component with default props", () => {
@@ -1258,6 +1284,136 @@ describe("PanelSchemaRenderer", () => {
     });
   });
 
+  describe("Cache restore and the first load", () => {
+    describe("before the first load settles", () => {
+      const loaderWith = (overrides: Record<string, any>) => ({
+        data: ref([]),
+        loading: ref(false),
+        errorDetail: ref({ message: "", code: "" }),
+        metadata: ref({ queries: [] }),
+        resultMetaData: ref([]),
+        annotations: ref([]),
+        lastTriggeredAt: ref(null),
+        isCachedDataDifferWithCurrentTimeRange: ref(false),
+        searchRequestTraceIds: ref([]),
+        loadingProgressPercentage: ref(0),
+        isPartialData: ref(false),
+        isFirstLoadSettled: ref(false),
+        ...overrides,
+      });
+
+      it("shows neither the chart nor No Data", async () => {
+        vi.mocked(usePanelDataLoader).mockReturnValueOnce(loaderWith({}) as any);
+        wrapper = createWrapper();
+        await flushPromises();
+
+        expect(wrapper.find('[data-test="no-data"]').exists()).toBe(false);
+        expect(wrapper.find('[data-test="chart-renderer"]').exists()).toBe(false);
+      });
+
+      it("keeps a table's empty footer hidden too", async () => {
+        vi.mocked(usePanelDataLoader).mockReturnValueOnce(loaderWith({}) as any);
+        wrapper = createWrapper({ panelSchema: { ...defaultProps.panelSchema, type: "table" } });
+        await flushPromises();
+
+        expect(wrapper.find('[data-test="table-renderer"]').exists()).toBe(false);
+      });
+
+      it("shows No Data once an empty first load settles", async () => {
+        const isFirstLoadSettled = ref(false);
+        vi.mocked(usePanelDataLoader).mockReturnValueOnce(
+          loaderWith({ isFirstLoadSettled }) as any,
+        );
+        wrapper = createWrapper();
+        await flushPromises();
+
+        isFirstLoadSettled.value = true;
+        await flushPromises();
+
+        expect(wrapper.find('[data-test="no-data"]').exists()).toBe(true);
+      });
+
+      it("renders the chart once the restored result settles", async () => {
+        const isFirstLoadSettled = ref(false);
+        const data = ref<any[]>([]);
+        vi.mocked(usePanelDataLoader).mockReturnValueOnce(
+          loaderWith({ isFirstLoadSettled, data }) as any,
+        );
+        wrapper = createWrapper({
+          panelSchema: {
+            ...defaultProps.panelSchema,
+            queryType: "promql",
+            queries: [{ query: "up", fields: {}, config: {} }],
+          },
+        });
+        await flushPromises();
+        expect(convertPanelData).not.toHaveBeenCalled();
+
+        data.value = [{ resultType: "matrix", result: [{ metric: {}, values: [[1, "4"]] }] }];
+        isFirstLoadSettled.value = true;
+        await flushPromises();
+
+        expect(convertPanelData).toHaveBeenCalled();
+        expect(wrapper.find('[data-test="chart-renderer"]').exists()).toBe(true);
+        expect(wrapper.find('[data-test="no-data"]').exists()).toBe(false);
+      });
+
+      it("shows the error when the first load fails", async () => {
+        vi.mocked(usePanelDataLoader).mockReturnValueOnce(
+          loaderWith({
+            isFirstLoadSettled: ref(true),
+            errorDetail: ref({ message: "Query failed", code: 400 }),
+          }) as any,
+        );
+        wrapper = createWrapper();
+        await flushPromises();
+
+        expect(wrapper.find('[data-test="panel-schema-renderer-error-message"]').text()).toContain(
+          "Query failed",
+        );
+      });
+
+      it("never holds back a markdown panel", async () => {
+        vi.mocked(usePanelDataLoader).mockReturnValueOnce(loaderWith({}) as any);
+        wrapper = createWrapper({
+          panelSchema: { ...defaultProps.panelSchema, type: "markdown", queries: [] },
+        });
+        await flushPromises();
+
+        expect(wrapper.find('[data-test="markdown-renderer"]').exists()).toBe(true);
+      });
+    });
+
+    it("keeps the line loader on, over the restored chart, while a refresh loads", async () => {
+      vi.mocked(usePanelDataLoader).mockReturnValueOnce({
+        data: ref([{ resultType: "matrix", result: [{ metric: {}, values: [[1, "4"]] }] }]),
+        loading: ref(true),
+        errorDetail: ref({ message: "", code: "" }),
+        metadata: ref({ queries: [] }),
+        resultMetaData: ref([]),
+        annotations: ref([]),
+        lastTriggeredAt: ref(null),
+        isCachedDataDifferWithCurrentTimeRange: ref(false),
+        searchRequestTraceIds: ref([]),
+        loadingProgressPercentage: ref(0),
+        isPartialData: ref(false),
+        isFirstLoadSettled: ref(true),
+      } as any);
+      wrapper = createWrapper({
+        panelSchema: {
+          ...defaultProps.panelSchema,
+          queryType: "promql",
+          queries: [{ query: "up", fields: {}, config: {} }],
+        },
+      });
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="loading-progress"]').attributes("loading")).toBe("true");
+      expect(wrapper.find('[data-test="chart-renderer"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="no-data"]').exists()).toBe(false);
+    });
+  });
+
   describe("Advanced Event Emissions", () => {
     it("should emit series-data-update when panel data changes", async () => {
       wrapper = createWrapper();
@@ -2124,6 +2280,152 @@ describe("PanelSchemaRenderer", () => {
 
       wrapper.vm.onChartDomContextMenu({ x: 1, y: 2, value: 4 });
       expect(wrapper.vm.contextMenuData.panelQueryIndex).toBeUndefined();
+    });
+
+    it("maps a SQL series past a hidden query to its own panel query", () => {
+      mockLoadedData(
+        [[], [], []],
+        [{ panelQueryIndex: 0 }, { panelQueryIndex: 1 }, { panelQueryIndex: 2 }],
+      );
+      const query = defaultProps.panelSchema.queries[0];
+      wrapper = createWrapper({
+        allowAlertCreation: true,
+        panelSchema: {
+          ...defaultProps.panelSchema,
+          queries: [query, { ...query, config: { hide: true } }, query],
+        },
+      });
+      // convertSQLData read the unfiltered metadata, so the second kept series claims query 1.
+      wrapper.vm.panelData = {
+        options: {
+          series: [
+            { name: "a", _queryIndex: 0, _panelQueryIndex: 0 },
+            { name: "c", _queryIndex: 1, _panelQueryIndex: 1, yAxisGroup: 1 },
+          ],
+        },
+      };
+
+      wrapper.vm.onChartDomContextMenu({ x: 1, y: 2, value: 3, seriesIndex: 1 });
+      expect(wrapper.vm.contextMenuData.panelQueryIndex).toBe(2);
+      expect(wrapper.vm.contextMenuData.yField).toBe(1);
+
+      wrapper.vm.onChartDomContextMenu({ x: 1, y: 2, value: 3, seriesIndex: 0 });
+      expect(wrapper.vm.contextMenuData.panelQueryIndex).toBe(0);
+    });
+
+    describe("a multi-query SQL panel's series mapped back to their query", () => {
+      const clickedQuery = (position: number) => {
+        wrapper.vm.onChartDomContextMenu({ x: 1, y: 2, value: 3, seriesIndex: position });
+        return wrapper.vm.contextMenuData.panelQueryIndex;
+      };
+      const query = defaultProps.panelSchema.queries[0];
+      const series = (count: number) =>
+        Array.from({ length: count }, (_, position) => ({
+          name: `s${position}`,
+          _queryIndex: position,
+        }));
+
+      it("sends a time-shifted series to its parent query", () => {
+        mockLoadedData(
+          [[], [], []],
+          [
+            { panelQueryIndex: 0, timeRangeGap: { seconds: 0 } },
+            { panelQueryIndex: 0, timeRangeGap: { seconds: 86400 } },
+            { panelQueryIndex: 1, timeRangeGap: { seconds: 0 } },
+          ],
+        );
+        wrapper = createWrapper({
+          allowAlertCreation: true,
+          panelSchema: { ...defaultProps.panelSchema, queries: [query, query] },
+        });
+        wrapper.vm.panelData = { options: { series: series(3) } };
+
+        expect(clickedQuery(1)).toBe(0);
+        expect(clickedQuery(2)).toBe(1);
+      });
+
+      it("maps past an empty query slot the executor never ran, which leaves a hole in its data", async () => {
+        const holey = <T>(first: T, third: T): T[] => {
+          const entries: T[] = [];
+          entries[0] = first;
+          entries[2] = third;
+          return entries;
+        };
+        mockLoadedData(holey([], []), holey({ panelQueryIndex: 0 }, { panelQueryIndex: 2 }));
+        wrapper = createWrapper({
+          allowAlertCreation: true,
+          panelSchema: {
+            ...defaultProps.panelSchema,
+            queries: [query, { ...query, query: "" }, query],
+          },
+        });
+        wrapper.vm.panelData = {
+          options: {
+            series: [
+              { name: "a", _queryIndex: 0, _panelQueryIndex: 0 },
+              { name: "c", _queryIndex: 2, _panelQueryIndex: 2, yAxisGroup: 0 },
+            ],
+          },
+        };
+
+        expect(await findsLine()).toBe(true);
+        expect(clickedQuery(0)).toBe(0);
+        expect(clickedQuery(1)).toBe(2);
+        expect(wrapper.vm.contextMenuData.yField).toBe(0);
+      });
+    });
+
+    it("maps the one visible, time-shifted SQL query's series past a hidden one", async () => {
+      mockLoadedData(
+        [[], [], []],
+        [
+          { panelQueryIndex: 0, timeRangeGap: { seconds: 0 } },
+          { panelQueryIndex: 1, timeRangeGap: { seconds: 0 } },
+          { panelQueryIndex: 1, timeRangeGap: { seconds: 86400 } },
+        ],
+      );
+      const query = defaultProps.panelSchema.queries[0];
+      wrapper = createWrapper({
+        allowAlertCreation: true,
+        panelSchema: {
+          ...defaultProps.panelSchema,
+          queries: [{ ...query, config: { hide: true } }, query],
+        },
+      });
+      // convertSQLData labels these from the unfiltered metadata, so they claim the hidden query.
+      wrapper.vm.panelData = {
+        options: {
+          series: [
+            { name: "b", _queryIndex: 0, _panelQueryIndex: 0, yAxisGroup: 1 },
+            { name: "b (1 day ago)", _queryIndex: 1, _panelQueryIndex: 0 },
+          ],
+        },
+      };
+
+      expect(await findsLine()).toBe(false);
+      wrapper.vm.onChartDomContextMenu({ x: 1, y: 2, value: 3, seriesIndex: 0 });
+      expect(wrapper.vm.contextMenuData.panelQueryIndex).toBe(1);
+      expect(wrapper.vm.contextMenuData.yField).toBe(1);
+      wrapper.vm.onChartDomContextMenu({ x: 1, y: 2, value: 3, seriesIndex: 1 });
+      expect(wrapper.vm.contextMenuData.panelQueryIndex).toBe(1);
+    });
+
+    it("looks for the clicked line on a single query plotting two y fields", async () => {
+      const query = defaultProps.panelSchema.queries[0];
+      wrapper = createWrapper({
+        allowAlertCreation: true,
+        panelSchema: {
+          ...defaultProps.panelSchema,
+          queries: [
+            {
+              ...query,
+              fields: { ...query.fields, y: [...query.fields.y, { alias: "avg", label: "Avg" }] },
+            },
+          ],
+        },
+      });
+
+      expect(await findsLine()).toBe(true);
     });
 
     it("reads a forecast line's start and the clicked point's time, for the forecast alert", () => {

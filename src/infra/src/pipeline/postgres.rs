@@ -349,8 +349,8 @@ SELECT * FROM pipeline
         {
             Ok(pipelines) => Ok(pipelines),
             Err(e) => {
-                log::debug!("[POSTGRES] list pipelines by org error: {e}");
-                Ok(vec![])
+                log::error!("[POSTGRES] list pipelines by org error: {e}");
+                Err(e.into())
             }
         }
     }

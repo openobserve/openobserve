@@ -456,9 +456,10 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     use infra::table::{
         alert_calibration, alert_incidents, backfill_jobs, compactor_manual_jobs, dashboards,
         destinations, distinct_values, enrichment_table_urls, enrichment_tables, folders,
-        incident_events, kv_store, llm_prompts, org_storage_providers, query_history, re_pattern,
-        re_pattern_stream_map, reports, rum_pa, search_queue, short_urls, slo, slo_backfill_jobs,
-        slo_budget, slos, system_settings, templates, timed_annotations,
+        incident_events, kv_store, llm_prompts, org_storage_providers, org_telephony,
+        query_history, re_pattern, re_pattern_stream_map, reports, rum_pa, search_queue,
+        short_urls, slo, slo_backfill_jobs, slo_budget, slos, system_settings, templates,
+        timed_annotations,
     };
 
     // FK-constrained children must be deleted before their parents.
@@ -571,6 +572,9 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     org_storage_providers::delete_by_org(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/org_storage_providers: {e}"))?;
+    org_telephony::delete(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/org_telephony: {e}"))?;
     #[cfg(feature = "cloud")]
     trial_quota_usage::delete_by_org(org_id)
         .await

@@ -14,7 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import type { I18nKey, I18nText, TranslateFn } from "@/types/i18n";
-import { errorCode } from "@/services/alert_calibration";
 
 export const DIGEST_STREAM = "_o2_alert_calibration_digests";
 /** Every digest search asks for this many rows, and a full page means more may exist. */
@@ -22,10 +21,9 @@ export const SEARCH_SIZE = 100;
 export const RUNS_LOOKBACK_DAYS = 14;
 
 const MICROS_PER_DAY = 86_400_000_000;
-/** A search for a stream or a column no record has written yet fails with one of these. */
-const NOT_YET_WRITTEN_CODES = [20002, 20004];
 
-export type RuleId = "failure" | "no_destination" | "noise" | "notify_failed" | "silent";
+export type RuleId =
+  "failure" | "no_destination" | "noise" | "notify_failed" | "scheduler_health" | "silent";
 export type Severity = "Info" | "Low" | "Medium" | "High";
 export type Confidence = "Low" | "Medium" | "High";
 
@@ -38,7 +36,6 @@ export interface Coverage {
   coverage_error_clusters_truncated: boolean;
   coverage_error_clusters_unattributed: number;
   coverage_stream_substrate_empty: boolean;
-  coverage_meta_fallback_used: boolean;
 }
 
 /** One run as the timeline lists it; a run is identified by its window, not by an id. */
@@ -73,6 +70,14 @@ export type FindingRecord = DigestRecord &
 
 export type CoverageVerdict = "none" | "gap" | "full";
 
+/** One org or hour a cluster finding lists; the digest stores each list as one JSON column. */
+export interface LagRow {
+  key: string | number;
+  skipped_windows: number;
+  late_evaluations: number;
+  evaluations: number;
+}
+
 const COVERAGE_COLUMNS: (keyof Coverage)[] = [
   "coverage_unreadable_definitions",
   "coverage_facts_without_definition",
@@ -82,7 +87,6 @@ const COVERAGE_COLUMNS: (keyof Coverage)[] = [
   "coverage_error_clusters_truncated",
   "coverage_error_clusters_unattributed",
   "coverage_stream_substrate_empty",
-  "coverage_meta_fallback_used",
 ];
 
 const SEVERITY_RANK: Record<Severity, number> = { High: 3, Medium: 2, Low: 1, Info: 0 };
@@ -97,14 +101,9 @@ const RUN_COLUMNS = [
   ...COVERAGE_COLUMNS,
 ];
 
-const quote = (value: string) => `'${value.replaceAll("'", "''")}'`;
-
 /** One row per emission: a run pulled again writes a second emission with its own `_timestamp`. */
 export const runsSql = () =>
   `SELECT DISTINCT ${RUN_COLUMNS.join(", ")}, _timestamp AS emitted_at\nFROM "${DIGEST_STREAM}"\nORDER BY emitted_at DESC`;
-
-export const runsWithAlertSql = (name: string) =>
-  `SELECT DISTINCT window_start, window_end\nFROM "${DIGEST_STREAM}"\nWHERE rule_id IS NOT NULL\n  AND str_match_ignore_case(alert_name, ${quote(name)})`;
 
 export const runRecordsSql = (windowStart: number, windowEnd: number) =>
   `SELECT *\nFROM "${DIGEST_STREAM}"\nWHERE window_start = ${Math.trunc(windowStart)} AND window_end = ${Math.trunc(windowEnd)}\nORDER BY _timestamp DESC`;
@@ -112,16 +111,10 @@ export const runRecordsSql = (windowStart: number, windowEnd: number) =>
 export const flaggedByRuleSql = () =>
   `SELECT rule_id, COUNT(DISTINCT alert_id) AS alerts_flagged, COUNT(DISTINCT window_end) AS runs_flagging\nFROM "${DIGEST_STREAM}"\nWHERE rule_id IS NOT NULL\nGROUP BY rule_id`;
 
-/** The range the timeline and the dashboard search; a run emitted before it is not listed. */
+/** The range the timeline and the dashboard read; a run emitted before it is not listed. */
 export const lookbackRange = (nowMicros: number) => ({
-  startTime: nowMicros - RUNS_LOOKBACK_DAYS * MICROS_PER_DAY,
-  endTime: nowMicros,
-});
-
-/** A record is stamped when its run finishes, at or after `window_end`, so this range holds the whole run. */
-export const runRange = (windowEnd: number, nowMicros: number) => ({
-  startTime: windowEnd,
-  endTime: nowMicros,
+  start_time: nowMicros - RUNS_LOOKBACK_DAYS * MICROS_PER_DAY,
+  end_time: nowMicros,
 });
 
 export const runKey = (row: Pick<RunRow, "window_start" | "window_end">) =>
@@ -154,7 +147,6 @@ export function runIdentity(record: DigestRecord): RunRow {
     coverage_error_clusters_truncated: record.coverage_error_clusters_truncated,
     coverage_error_clusters_unattributed: record.coverage_error_clusters_unattributed,
     coverage_stream_substrate_empty: record.coverage_stream_substrate_empty,
-    coverage_meta_fallback_used: record.coverage_meta_fallback_used,
   };
 }
 
@@ -178,6 +170,30 @@ const findingOrder = (a: FindingRecord, b: FindingRecord) =>
   a.rule_id.localeCompare(b.rule_id) ||
   (a.alert_name ?? "").localeCompare(b.alert_name ?? "");
 
+export interface RuleGroup {
+  rule_id: RuleId;
+  /** In severity order, as `latestEmission` sorts them. */
+  findings: FindingRecord[];
+  severity: Severity | null;
+}
+
+/** Every rule, worst first, so a rule that flagged nothing still shows as clear rather than missing. */
+export function findingsByRule(rules: RuleId[], findings: FindingRecord[]): RuleGroup[] {
+  const rank = (s: Severity | null) => (s ? SEVERITY_RANK[s] + 1 : 0);
+  return rules
+    .map((rule_id) => {
+      const mine = findings.filter((f) => f.rule_id === rule_id);
+      return { rule_id, findings: mine, severity: mine[0]?.severity ?? null };
+    })
+    .sort((a, b) => rank(b.severity) - rank(a.severity) || b.findings.length - a.findings.length);
+}
+
+/** A title restates the alert's name, which a row that already shows the name can drop. */
+export const titleAfterName = (f: FindingRecord): string =>
+  f.alert_name && f.title.startsWith(f.alert_name)
+    ? f.title.slice(f.alert_name.length).trimStart()
+    : f.title;
+
 export const latestRun = (rows: RunRow[]): RunRow | null =>
   rows.reduce<RunRow | null>((a, b) => (!a || b.window_end > a.window_end ? b : a), null);
 
@@ -185,12 +201,37 @@ export const latestRun = (rows: RunRow[]): RunRow | null =>
 export const isClean = (row: RunRow) =>
   row.finding_count === 0 && !row.coverage_gap && row.skip_count === 0;
 
+/** A missing or malformed column lists nothing, and a row without a usable key is dropped. */
+export function parseLagRows(value: unknown, keyField: "org_id" | "hour_start_micros"): LagRow[] {
+  if (typeof value !== "string" || value === "") return [];
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(parsed)) return [];
+  return parsed
+    .filter((item): item is Record<string, unknown> => typeof item === "object" && item !== null)
+    .filter((item) =>
+      keyField === "org_id"
+        ? typeof item.org_id === "string" && item.org_id.trim() !== ""
+        : Number.isFinite(item.hour_start_micros),
+    )
+    .map((item) => ({
+      key: item[keyField] as string | number,
+      skipped_windows: Number(item.skipped_windows) || 0,
+      late_evaluations: Number(item.late_evaluations) || 0,
+      evaluations: Number(item.evaluations) || 0,
+    }));
+}
+
 export function coverageVerdict(row: RunRow): CoverageVerdict {
   if (row.coverage_stream_substrate_empty) return "none";
   return row.coverage_gap ? "gap" : "full";
 }
 
-/** Every coverage column off its default, including the two `coverage_gap` does not count. */
+/** Every coverage column off its default, including the ones `coverage_gap` does not count. */
 export function coverageNotes(t: TranslateFn, row: RunRow): I18nText[] {
   const notes: I18nText[] = [];
   if (row.coverage_stream_substrate_empty)
@@ -205,7 +246,6 @@ export function coverageNotes(t: TranslateFn, row: RunRow): I18nText[] {
     ["coverage_transitions_truncated", "alertCalibration.coverage.transitionsTruncated"],
     ["coverage_counters_truncated", "alertCalibration.coverage.countersTruncated"],
     ["coverage_error_clusters_truncated", "alertCalibration.coverage.errorClustersTruncated"],
-    ["coverage_meta_fallback_used", "alertCalibration.coverage.metaFallbackUsed"],
   ];
   for (const [column, key] of counts) {
     const count = Number(row[column]);
@@ -215,10 +255,4 @@ export function coverageNotes(t: TranslateFn, row: RunRow): I18nText[] {
     if (row[column]) notes.push(t(key));
   }
   return notes;
-}
-
-/** A digest stream with no record yet, or no finding yet, reads as empty rather than as a failure. */
-export function isNotYetWritten(error: unknown): boolean {
-  const code = errorCode(error);
-  return code !== undefined && NOT_YET_WRITTEN_CODES.includes(code);
 }

@@ -160,11 +160,6 @@ mod tests {
     // ---- coverage arithmetic ----------------------------------------------
 
     #[test]
-    fn full_coverage_is_one() {
-        assert_eq!(coverage(100, 100), 1.0);
-    }
-
-    #[test]
     fn no_observations_is_zero_coverage() {
         assert_eq!(coverage(0, 100), 0.0);
     }

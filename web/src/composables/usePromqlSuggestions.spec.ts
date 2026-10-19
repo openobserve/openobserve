@@ -604,20 +604,19 @@ describe("PromQL catalog reaches the editor", () => {
     expect(fresh.autoCompletePromqlKeywords.value).toEqual(labelList);
   });
 
-  it("keeps an empty label result empty instead of showing every function", async () => {
-    // A label lookup that matched nothing is not the same as "no context" — but
-    // both arrived as `[]`, so the catalog took over and offered 97 functions
-    // inside `up{instance="`, where none of them can be typed.
-    vi.mocked(searchService.get_promql_series).mockResolvedValue({ data: { data: [] } } as any);
+  it("leaves a label value position to the completion provider", async () => {
+    // The provider answers values with no functions; a popup opened from here would be highlighted.
     const fresh = usePromqlSuggestions();
+    const open = vi.fn();
+    fresh.autoCompleteData.value.popup.open = open;
     fresh.autoCompleteData.value.query = 'up{instance="';
     fresh.autoCompleteData.value.position.cursorIndex = 12;
 
     await fresh.getSuggestions();
     await flushPromises();
 
-    const rows = fresh.autoCompletePromqlKeywords.value as any[];
-    expect(rows.filter((k: any) => k.kind === "Function")).toEqual([]);
+    expect(open).not.toHaveBeenCalled();
+    expect(searchService.get_promql_series).not.toHaveBeenCalled();
   });
   it("has the catalog ready before the first keystroke", async () => {
     // getSuggestions is what fills this list today, and getSuggestions only

@@ -18,4 +18,5 @@ import { orgKey } from "@/composables/query/keys";
 export const alertCalibrationKeys = {
   all: (org: string) => orgKey(org, "alertCalibration"),
   config: (org: string) => orgKey(org, "alertCalibration", "config"),
+  status: (org: string) => orgKey(org, "alertCalibration", "status"),
 };

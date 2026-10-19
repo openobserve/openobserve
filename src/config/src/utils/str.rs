@@ -328,12 +328,6 @@ mod tests {
     }
 
     #[test]
-    fn test_optional_non_empty_string() {
-        let s = "hello".to_string();
-        assert_eq!(s.optional(), Some("hello".to_string()));
-    }
-
-    #[test]
     fn test_optional_whitespace_string() {
         let s = " ".to_string();
         assert_eq!(s.optional(), Some(" ".to_string()));

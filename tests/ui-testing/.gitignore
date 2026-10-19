@@ -8,6 +8,8 @@
 # https://www.npmjs.org/doc/misc/npm-faq.html#should-i-check-my-node_modules-folder-into-git
 node_modules
 /test-results/
+# Zero-setup autocomplete tokens kept across the three ZO_EDITOR_SUGGEST_MODE runs
+/zero-setup-results/
 /playwright-report/
 /blob-report/
 /setup-debug/

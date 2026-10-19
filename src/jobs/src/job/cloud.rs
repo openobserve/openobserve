@@ -127,6 +127,7 @@ async fn report_org_no_ingestion(start_hour: i64, duration: &str) {
         created_after: Some(now - h_end_micro),
         created_before: Some(now - h_start_micro),
         limit: None,
+        exclude_deleted: true,
     };
 
     let orgs = match infra::table::organizations::list(filter).await {
@@ -161,6 +162,7 @@ async fn run_trial_quota_flush() {
         openobserve_core::trial_quota::flush_to_db().await;
         openobserve_core::trial_quota::refresh_limits_from_db().await;
         openobserve_core::trial_quota::refresh_paid_overage_from_db().await;
+        openobserve_core::trial_quota::refresh_usage_from_db().await;
     }
 }
 

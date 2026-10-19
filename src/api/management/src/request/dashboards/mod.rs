@@ -37,6 +37,7 @@ use crate::{
 };
 
 pub mod reports;
+pub mod reports_history;
 pub mod timed_annotations;
 
 async fn ensure_dashboard_in_org(org_id: &str, dashboard_id: &str) -> bool {

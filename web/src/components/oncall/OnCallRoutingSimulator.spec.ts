@@ -268,4 +268,12 @@ describe("OnCallRoutingSimulator", () => {
     await wrapper.find('[data-test="oncall-simulator-send-test"]').trigger("click");
     expect(wrapper.emitted("send-test")?.[0][0]).toEqual({ team_id: "team_1", priority: "P1" });
   });
+
+  it("renders Send test page disabled once the org is latched read-only", async () => {
+    const wrapper = render({ preview: preview(), canConfigure: false });
+    await pickPriority(wrapper);
+    expect(
+      wrapper.find('[data-test="oncall-simulator-send-test"]').attributes("disabled"),
+    ).toBeDefined();
+  });
 });

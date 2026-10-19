@@ -18,9 +18,10 @@
 use chrono::Duration;
 use config::{
     cluster::LOCAL_NODE,
+    get_config,
     meta::{
         self_reporting::usage::{RunOutcome, TriggerData, TriggerDataType},
-        triggers::{Trigger, TriggerStatus},
+        triggers::{Trigger, TriggerModule, TriggerStatus},
     },
     utils::{
         json,
@@ -29,7 +30,7 @@ use config::{
 };
 use infra::{
     db::get_orm_client_ro,
-    errors::Error as InfraError,
+    errors::{DbError, Error as InfraError},
     scheduler::get_scheduler_max_retries,
     table::{
         alert_calibration::{self, DEFAULT_FREQUENCY_MINUTES},
@@ -41,6 +42,7 @@ use usage_reporting::publish_triggers_usage;
 
 const CONFIG_RETRY_SECS: i64 = 60;
 const MAX_CONFIG_RETRY_SECS: i64 = 86_400;
+const WRITE_ALLOWANCE_SECS: i64 = 60;
 
 type ConfigRead = Result<Option<CalibrationConfig>, InfraError>;
 
@@ -48,6 +50,17 @@ type ConfigRead = Result<Option<CalibrationConfig>, InfraError>;
 #[derive(Default, Deserialize, Serialize)]
 struct JobData {
     config_misses: u32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    last_run: Option<LastRun>,
+}
+
+/// How the latest attempted pass ended; a failed pass writes no digest, so only the row can say
+/// why.
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+pub struct LastRun {
+    pub status: RunOutcome,
+    pub error: Option<String>,
+    pub finished_at: i64,
 }
 
 /// What a pass decided before any analysis.
@@ -130,6 +143,13 @@ impl<'a> Pass<'a> {
             },
         };
         data.config_misses = 0;
+        if !matches!(self, Self::Disabled(_)) {
+            data.last_run = Some(LastRun {
+                status: status.clone(),
+                error: error.clone(),
+                finished_at: now,
+            });
+        }
         Outcome {
             status,
             error,
@@ -166,17 +186,20 @@ pub(super) async fn handle_triggers(
 ) -> Result<(), anyhow::Error> {
     let started_at = now_micros();
     let read = read_config(&trigger).await;
-    let (_, max_retries) = get_scheduler_max_retries();
+    let max_retries = get_scheduler_max_retries();
     let pass = Pass::decide(read.as_ref(), trigger.retries, max_retries);
     let analysis = match &pass {
-        Pass::Due(config) => Some(analyse(&trigger, config).await.map_err(|e| {
-            log::error!(
-                "[alert_calibration] pass failed for config {} org={}: {e}",
-                trigger.module_key,
-                trigger.org
-            );
-            e.to_string()
-        })),
+        Pass::Due(config) => {
+            let time_left = time_left(trigger.start_time, started_at, analysis_budget_secs());
+            Some(analyse(&trigger, config, time_left).await.map_err(|e| {
+                log::error!(
+                    "[alert_calibration] pass failed for config {} org={}: {e}",
+                    trigger.module_key,
+                    trigger.org
+                );
+                e.to_string()
+            }))
+        }
         _ => None,
     };
     let mut data: JobData = json::from_str(&trigger.data).unwrap_or_default();
@@ -198,6 +221,23 @@ pub(super) async fn handle_triggers(
     }
     publish_triggers_usage(row);
     Ok(())
+}
+
+/// How long the scheduler keeps a pass's claim alive: its analysis budget plus room to write.
+pub(super) fn claim_lifetime_secs() -> i64 {
+    analysis_budget_secs() + WRITE_ALLOWANCE_SECS
+}
+
+/// How the latest attempted pass of the org's config `key` ended, if one has.
+pub async fn last_run(org: &str, key: &str) -> Result<Option<LastRun>, anyhow::Error> {
+    let trigger = match infra::scheduler::get(org, TriggerModule::AlertCalibration, key).await {
+        Ok(trigger) => trigger,
+        Err(InfraError::DbError(DbError::KeyNotExists(_))) => return Ok(None),
+        Err(e) => return Err(e.into()),
+    };
+    Ok(json::from_str::<JobData>(&trigger.data)
+        .unwrap_or_default()
+        .last_run)
 }
 
 async fn read_config(trigger: &Trigger) -> Option<ConfigRead> {
@@ -231,19 +271,40 @@ fn deployment_enabled() -> bool {
 async fn analyse(
     trigger: &Trigger,
     config: &CalibrationConfig,
+    time_left: std::time::Duration,
 ) -> Result<(i64, i64), anyhow::Error> {
     use o2_enterprise::enterprise::alert_calibration_service::run_pass;
 
     use crate::alerts::alert_calibration::{SearchAdapter, sink::write_digest_records};
 
-    let pass = run_pass(
-        &SearchAdapter,
-        &trigger.org,
-        &trigger.module_key,
-        trigger.next_run_at,
-        config.window_minutes,
+    let pass = tokio::time::timeout(
+        time_left,
+        run_pass(
+            &SearchAdapter,
+            &trigger.org,
+            &trigger.module_key,
+            trigger.next_run_at,
+            config.window_minutes,
+        ),
+    )
+    .await
+    .map_err(|_| {
+        anyhow::anyhow!(
+            "the analysis ran past its {}s budget",
+            analysis_budget_secs()
+        )
+    })??;
+    let cfg = get_config();
+    // Only the claim's holder writes, or a pass that was claimed again lands its digest twice.
+    let held = infra::scheduler::keep_alive_claim(
+        trigger,
+        cfg.limit.alert_schedule_timeout,
+        cfg.limit.report_schedule_timeout,
     )
     .await?;
+    if !held {
+        anyhow::bail!("lost the claim before writing the digest");
+    }
     write_digest_records(&trigger.org, pass.records).await?;
     Ok((pass.window.start_micros, pass.window.end_micros))
 }
@@ -252,8 +313,22 @@ async fn analyse(
 async fn analyse(
     _trigger: &Trigger,
     _config: &CalibrationConfig,
+    _time_left: std::time::Duration,
 ) -> Result<(i64, i64), anyhow::Error> {
     anyhow::bail!("alert calibration is an enterprise feature")
+}
+
+fn analysis_budget_secs() -> i64 {
+    // The collector's longest chain is three searches in a row, each capped by the query timeout.
+    3 * get_config().limit.query_timeout as i64
+}
+
+/// Counted from the claim, since time spent queued for a worker uses up the same keep-alive.
+fn time_left(claimed_at: Option<i64>, now: i64, budget_secs: i64) -> std::time::Duration {
+    let deadline = claimed_at
+        .unwrap_or(now)
+        .saturating_add(second_micros(budget_secs));
+    std::time::Duration::from_micros(u64::try_from(deadline.saturating_sub(now)).unwrap_or(0))
 }
 
 /// Doubling from a minute to a day, so a deleted config stops costing a pull a minute.
@@ -309,8 +384,6 @@ fn trigger_data(
 
 #[cfg(test)]
 mod tests {
-    use infra::errors::DbError;
-
     use super::*;
 
     const NOW: i64 = 1_700_000_000_000_000;
@@ -359,7 +432,10 @@ mod tests {
 
     #[test]
     fn a_switched_off_deployment_looks_again_in_a_day_and_keeps_the_backoff() {
-        let mut data = JobData { config_misses: 3 };
+        let mut data = JobData {
+            config_misses: 3,
+            ..Default::default()
+        };
         let outcome = Pass::SwitchedOff.settle(&mut data, 0, NOW, None);
         assert_eq!(outcome.status, RunOutcome::Skipped);
         assert_eq!(outcome.next_run_at, NOW + 1440 * MINUTE);
@@ -388,7 +464,10 @@ mod tests {
 
     #[test]
     fn a_due_pass_reports_its_analysis_and_re_arms_on_its_cadence() {
-        let mut data = JobData { config_misses: 5 };
+        let mut data = JobData {
+            config_misses: 5,
+            ..Default::default()
+        };
         let enabled = config(true, 30);
         let done = Pass::Due(&enabled).settle(&mut data, 0, NOW, Some(Ok((NOW - MINUTE, NOW))));
         assert_eq!(data.config_misses, 0);
@@ -409,6 +488,21 @@ mod tests {
     }
 
     #[test]
+    fn the_row_keeps_the_latest_attempted_pass_and_not_a_disabled_one() {
+        let mut data = JobData::default();
+        Pass::Due(&config(true, 30)).settle(&mut data, 0, NOW, Some(Err("querier down".into())));
+        Pass::Disabled(&config(false, 30)).settle(&mut data, 0, NOW + MINUTE, None);
+        assert_eq!(
+            data.last_run,
+            Some(LastRun {
+                status: RunOutcome::Error,
+                error: Some("querier down".to_string()),
+                finished_at: NOW,
+            })
+        );
+    }
+
+    #[test]
     fn a_non_positive_cadence_falls_back_to_daily() {
         for frequency in [0, -1, i32::MIN] {
             let broken = config(false, frequency);
@@ -424,6 +518,14 @@ mod tests {
         assert_eq!(outcome.status, RunOutcome::Error);
         assert_eq!(outcome.next_run_at, NOW + 60 * MINUTE);
         assert!(outcome.error.unwrap().starts_with("3 earlier attempts"));
+    }
+
+    #[test]
+    fn the_analysis_budget_runs_from_the_claim() {
+        let left = |claimed_at| time_left(claimed_at, NOW, 1800).as_secs();
+        assert_eq!(left(Some(NOW - 10 * MINUTE)), 1200);
+        assert_eq!(left(Some(NOW - 40 * MINUTE)), 0);
+        assert_eq!(left(None), 1800);
     }
 
     #[test]

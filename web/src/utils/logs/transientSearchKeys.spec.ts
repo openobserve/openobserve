@@ -59,7 +59,6 @@ function liveSearchObj(liveMode: boolean): PlainObject {
       runPending: true,
       runOutcome: { logs: "complete" },
       editorDirty: true,
-      nlDetected: true,
       resultGrid: { sortOrder: "asc" },
     },
     data: {
@@ -102,7 +101,6 @@ describe("registry", () => {
       "meta.autoRunBlocked",
       "meta.consentedScope",
       "meta.editorDirty",
-      "meta.nlDetected",
     ]) {
       expect(modes[path]).toBe("reset");
     }
@@ -242,7 +240,6 @@ describe("apply hook (both mergeDeep sites)", () => {
         executed: { generation: 99, signature: { query: "other" }, req: {}, complete: true },
         autoRunBlocked: { reason: "url" },
         editorDirty: true,
-        nlDetected: true,
       },
       data: { query: "status=500" },
     };
@@ -251,7 +248,6 @@ describe("apply hook (both mergeDeep sites)", () => {
     expect(getPath(target, "meta.autoRunBlocked")).toBeNull();
     expect(getPath(target, "meta.consentedScope")).toBeNull();
     expect(getPath(target, "meta.editorDirty")).toBe(false);
-    expect(getPath(target, "meta.nlDetected")).toBe(false);
     expect(getPath(target, "meta.runPending")).toBe(false);
     expect(getPath(target, "meta.runOutcome")).toEqual({});
     expect(getPath(target, "data.query")).toBe("status=500");
@@ -363,7 +359,6 @@ describe("an old view leaves stale state and Auto Run unchanged", () => {
     const live = liveSearchObj(false);
     setPath(live, "meta.executed", null);
     setPath(live, "meta.editorDirty", false);
-    setPath(live, "meta.nlDetected", false);
     const engine = engineOver(live);
     engine.requestRun("run");
     const gen = engine.currentGeneration();
@@ -395,7 +390,6 @@ describe("an old view leaves stale state and Auto Run unchanged", () => {
     const live = liveSearchObj(false);
     setPath(live, "meta.executed", null);
     setPath(live, "meta.editorDirty", false);
-    setPath(live, "meta.nlDetected", false);
     const engine = engineOver(live);
     const savedFrom = liveSearchObj(true);
     setPath(savedFrom, "meta.executed", {
@@ -405,7 +399,6 @@ describe("an old view leaves stale state and Auto Run unchanged", () => {
       complete: true,
     });
     setPath(savedFrom, "meta.editorDirty", false);
-    setPath(savedFrom, "meta.nlDetected", false);
     mergeDeep(live, JSON.parse(JSON.stringify(savedFrom)));
     expect(engine.isAutoRunActive()).toBe(true);
     expect(engine.isResultsStale()).toBe(true);

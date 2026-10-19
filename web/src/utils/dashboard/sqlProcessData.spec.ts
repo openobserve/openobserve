@@ -228,6 +228,83 @@ describe("sqlProcessData - processData", () => {
       expect(extras.limitNumberOfSeriesWarningMessage).toBeDefined();
     });
 
+    it("reports the real shown and total series counts in extras and the message", () => {
+      const bigData = Array.from({ length: 12 }, (_, i) => ({
+        category: `cat${i}`,
+        time: "2024-01",
+        value: 100 - i,
+      }));
+      const extras: any = {};
+      processData(
+        [bigData],
+        makeSchema(null, false),
+        makeStore(5),
+        ["value"],
+        ["category"],
+        ["time"],
+        extras,
+      );
+      expect(extras.seriesLimit).toEqual({ shown: 5, total: 12, cap: 5 });
+      expect(extras.limitNumberOfSeriesWarningMessage).toBe(
+        "Showing 5 of 12 series to keep the chart fast",
+      );
+    });
+
+    it("formats large counts in the message with thousands separators", () => {
+      const bigData = Array.from({ length: 1200 }, (_, i) => ({
+        category: `cat${i}`,
+        time: "2024-01",
+        value: 2000 - i,
+      }));
+      const extras: any = {};
+      processData(
+        [bigData],
+        makeSchema(null, false),
+        makeStore(100),
+        ["value"],
+        ["category"],
+        ["time"],
+        extras,
+      );
+      expect(extras.limitNumberOfSeriesWarningMessage).toBe(
+        "Showing 100 of 1,200 series to keep the chart fast",
+      );
+    });
+
+    it("counts per-axis series against the per-axis cap on multi y-axis charts", () => {
+      const bigData = Array.from({ length: 9 }, (_, i) => ({
+        category: `cat${i}`,
+        time: "2024-01",
+        value1: 100 - i,
+        value2: i,
+      }));
+      const extras: any = {};
+      processData(
+        [bigData],
+        makeSchema(null, false),
+        makeStore(8),
+        ["value1", "value2"],
+        ["category"],
+        ["time"],
+        extras,
+      );
+      expect(extras.seriesLimit).toEqual({ shown: 4, total: 9, cap: 4 });
+    });
+
+    it("leaves seriesLimit unset when nothing was dropped", () => {
+      const extras: any = {};
+      processData(
+        [[{ category: "A", time: "2024-01", value: 1 }]],
+        makeSchema(null, false),
+        makeStore(5),
+        ["value"],
+        ["category"],
+        ["time"],
+        extras,
+      );
+      expect(extras.seriesLimit).toBeUndefined();
+    });
+
     it("does not set warning when within limits", () => {
       const smallData = [
         { category: "A", time: "2024-01", value: 10 },

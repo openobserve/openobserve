@@ -344,6 +344,22 @@ pub struct TriggerData {
     /// Whether a firing tried a destination, workflow or incident notification; None on old rows.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub delivery_attempted: Option<bool>,
+    /// "scheduled" or "manual"; None on older rows, which read as scheduled.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub trigger_source: Option<String>,
+    /// Email of the user who ran a manual report run.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub triggered_by: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub recipient_count: Option<i32>,
+    /// Report type of the first dashboard: "pdf", "png" or "csv".
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub attachment_type: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dashboard_count: Option<i32>,
+    /// The run's own due time; `next_run_at` on the row is already the following run.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scheduled_for: Option<i64>,
 }
 
 impl Default for TriggerData {
@@ -386,6 +402,12 @@ impl Default for TriggerData {
             synthetics_location: None,
             downtime_id: None,
             delivery_attempted: None,
+            trigger_source: None,
+            triggered_by: None,
+            recipient_count: None,
+            attachment_type: None,
+            dashboard_count: None,
+            scheduled_for: None,
         }
     }
 }
@@ -439,6 +461,12 @@ impl TriggerData {
             synthetics_location: Some(String::new()),
             downtime_id: Some(String::new()),
             delivery_attempted: Some(true),
+            trigger_source: Some(String::new()),
+            triggered_by: Some(String::new()),
+            recipient_count: Some(0),
+            attachment_type: Some(String::new()),
+            dashboard_count: Some(0),
+            scheduled_for: Some(0),
         }
     }
 
@@ -1840,6 +1868,12 @@ mod tests {
             synthetics_location: None,
             downtime_id: None,
             delivery_attempted: None,
+            trigger_source: None,
+            triggered_by: None,
+            recipient_count: None,
+            attachment_type: None,
+            dashboard_count: None,
+            scheduled_for: None,
         };
 
         let json = serde_json::to_string(&trigger_data).unwrap();

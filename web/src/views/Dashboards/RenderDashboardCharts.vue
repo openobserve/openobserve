@@ -205,6 +205,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   "
                   :variablesData="getMergedVariablesForPanel(item.id)"
                   :currentVariablesData="getLiveVariablesForPanel(item.id)"
+                  :isTimeRangeWaiting="isPanelTimeWaiting(item)"
                   :width="getPanelLayout(item, 'w')"
                   :height="getPanelLayout(item, 'h')"
                   :forceLoad="forceLoad"
@@ -242,17 +243,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :data-test="`dashboard-panel-${item.id}-time-picker`"
                       >
                         <DateTimePickerDashboard
-                          :modelValue="panelTimeValues[item.id]"
-                          :auto-apply-dashboard="false"
+                          :modelValue="getPanelPickedTime(item.id) ?? panelTimeValues[item.id]"
+                          :auto-apply-dashboard="true"
                           size="sm"
                           class="panel-time-picker-widget"
-                          @update:modelValue="(val) => onPanelTimeApply(item.id, val)"
+                          @update:modelValue="(val) => getPanelTimeGate(item.id).onPick(val)"
+                          @show="getPanelTimeGate(item.id).onShow()"
+                          @hide="getPanelTimeGate(item.id).onHide()"
+                          @timezone-change="getPanelTimeGate(item.id).flush()"
                           :data-test="`panel-time-picker-${item.id}`"
-                          :ref="
-                            (el) => {
-                              if (el) panelDateTimePickerRefs.set(item.id, el);
-                            }
-                          "
+                          :ref="(picker) => setPanelTimePicker(item.id, picker)"
                         />
                       </div>
 
@@ -299,6 +299,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :selectedDateForViewPanel="viewPanelSelectedDate"
             :initialVariableValues="getMergedVariablesForPanel(viewPanelId)"
             :searchType="searchType"
+            :viewOnly="!!viewOnly"
             @close-panel="() => (showViewPanel = false)"
             @update:initial-variable-values="updateInitialVariableValues"
           />
@@ -321,6 +322,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import {
   computed,
   defineComponent,
+  effectScope,
   onActivated,
   onMounted,
   onUnmounted,
@@ -335,7 +337,7 @@ import {
   type Ref,
 } from "vue";
 import { useStore } from "vuex";
-import { useI18nTyped } from "@/types/i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import PanelContainer from "../../components/dashboards/PanelContainer.vue";
 import DateTimePickerDashboard from "../../components/DateTimePickerDashboard.vue";
@@ -346,12 +348,19 @@ import NoPanel from "../../components/shared/grid/NoPanel.vue";
 import VariablesValueSelector from "../../components/dashboards/VariablesValueSelector.vue";
 import TabList from "@/components/dashboards/tabs/TabList.vue";
 import useNotifications from "@/composables/useNotifications";
+import { useDashboardSaveConflict } from "@/composables/dashboard/useDashboardSaveConflict";
 import { getVariableKey, useVariablesManager } from "@/composables/dashboard/useVariablesManager";
+import {
+  useDashboardTimeGate,
+  type DashboardTimeGate,
+} from "@/composables/dashboard/useDashboardTimeGate";
 import { useLoading } from "@/composables/useLoading";
 import { GridStack } from "gridstack";
 import {
+  arePickerValuesEqual,
   convertTimeObjToPickerFormat,
   resolvePanelTimeValue,
+  toPickerSavedDate,
 } from "@/utils/dashboard/panelTimeUtils";
 import "gridstack/dist/gridstack.min.css";
 import { panelDownloadRegistry, panelCsvRegistry } from "@/utils/panelDownloadRegistry";
@@ -676,11 +685,8 @@ export default defineComponent({
       }
     });
 
-    const {
-      showPositiveNotification,
-      showErrorNotification,
-      showConfictErrorNotificationWithRefreshBtn,
-    } = useNotifications();
+    const { showPositiveNotification, showErrorNotification } = useNotifications();
+    const saveConflict = useDashboardSaveConflict();
     const refreshDashboard = (onlyIfRequired = false) => {
       emit("refresh", onlyIfRequired);
     };
@@ -842,7 +848,8 @@ export default defineComponent({
     provide("hoveredSeriesState", hoveredSeriesState);
 
     // save the dashboard value
-    const saveDashboardData = useLoading(async () => {
+    // `change` names the edit in the conflict dialog when the caller is not a layout move.
+    const saveDashboardData = useLoading(async (change?: I18nText) => {
       try {
         await updateDashboard(
           store,
@@ -855,21 +862,22 @@ export default defineComponent({
         showPositiveNotification(t("dashboard.renderDashboardCharts.dashboardUpdatedSuccessfully"));
         return true;
       } catch (error: any) {
-        if (error?.response?.status === 409) {
-          showConfictErrorNotificationWithRefreshBtn(
-            error?.response?.data?.message ??
-              error?.message ??
-              t("dashboard.renderDashboardCharts.dashboardUpdateFailed"),
-            t,
-          );
-        } else {
-          showErrorNotification(
-            error?.message ?? t("dashboard.renderDashboardCharts.dashboardUpdateFailed"),
-            {
-              timeout: 2000,
-            },
-          );
+        if (saveConflict.isConflict(error)) {
+          // No refresh, in any layout mode: the layout I just made stays on screen (and edit mode keeps its draft) while the dialog is open.
+          void saveConflict.openConflict({
+            dashboardId: props.dashboardData.dashboardId,
+            folderId: (route.query.folder as string) ?? "default",
+            mine: props.dashboardData,
+            change: change ?? t("dashboard.saveConflict.change.movedPanels"),
+          });
+          return false;
         }
+        showErrorNotification(
+          error?.message ?? t("dashboard.renderDashboardCharts.dashboardUpdateFailed"),
+          {
+            timeout: 2000,
+          },
+        );
 
         // A reload swaps the dashboard object and ends the edit session, so edit mode keeps the draft for a retry.
         if (props.layoutMode !== "edit") refreshDashboard();
@@ -1515,37 +1523,16 @@ export default defineComponent({
       }
     };
 
-    // Track which panels are currently being synced to prevent infinite loops
-    const panelsSyncingDateTime = ref(new Set<string>());
-
+    // A panel's waiting range is applied here: by its own refresh, the dashboard Refresh, or Auto Run.
     const syncPanelDateTimePickerState = (panelId: string) => {
-      const pickerRef = panelDateTimePickerRefs.get(panelId);
+      const gate = panelTimeGates.get(panelId);
+      if (!gate) return;
 
-      if (!pickerRef?.dateTimePicker) {
-        return;
-      }
+      gate.apply();
 
-      // Mark this panel as currently syncing
-      panelsSyncingDateTime.value.add(panelId);
-
-      try {
-        // Call refresh() to commit uncommitted changes
-        pickerRef.refresh();
-
-        // Get the committed value
-        const innerDateTimePicker = pickerRef.dateTimePicker;
-        const currentDateTime = innerDateTimePicker.getConsumableDateTime();
-
-        if (currentDateTime) {
-          if (!arePickerValuesEqual(panelTimeValues.value[panelId], currentDateTime)) {
-            panelTimeValues.value[panelId] = currentDateTime;
-          }
-        }
-      } finally {
-        // Unmark after a short delay to allow events to settle
-        setTimeout(() => {
-          panelsSyncingDateTime.value.delete(panelId);
-        }, 100);
+      const appliedTime = gate.applied.value;
+      if (appliedTime && !arePickerValuesEqual(panelTimeValues.value[panelId], appliedTime)) {
+        panelTimeValues.value[panelId] = appliedTime;
       }
     };
 
@@ -1623,22 +1610,50 @@ export default defineComponent({
     };
 
     // ===== Panel Time Configuration (NEW FEATURE) =====
-    // Panel time values for all panels (map: panelId -> time value)
+    // The applied time of every panel that has its own picker (map: panelId -> time value)
     const panelTimeValues = ref<Record<string, any>>({});
 
-    // Store refs to panel datetime picker components using a Map (not reactive)
-    const panelDateTimePickerRefs = new Map<string, any>();
+    // Gates outlive a picker remount, so a range still waiting survives a tab switch.
+    const panelTimeGates = new Map<string, DashboardTimeGate>();
+    const panelTimeGateScope = effectScope(true);
+    onBeforeUnmount(() => panelTimeGateScope.stop());
+
+    const panelTimePickers = new Map<string, any>();
+    const setPanelTimePicker = (panelId: string, picker: any) => {
+      if (picker) panelTimePickers.set(panelId, picker);
+      else panelTimePickers.delete(panelId);
+    };
+
+    const getPanelTimeGate = (panelId: string) => {
+      let gate = panelTimeGates.get(panelId);
+      if (!gate) {
+        gate = panelTimeGateScope.run(() =>
+          useDashboardTimeGate({
+            isAutoRunOn: () => dashboardAutoRun.value === true,
+            onAutoApply: () => refreshPanelRequest(panelId, false),
+            showInPicker: (value) =>
+              panelTimePickers
+                .get(panelId)
+                ?.setSavedDate(toPickerSavedDate(value, store.state.timezone)),
+          }),
+        );
+        panelTimeGates.set(panelId, gate);
+      }
+      return gate;
+    };
+
+    const getPanelPickedTime = (panelId: string) => getPanelTimeGate(panelId).picked.value;
 
     // panelDownloadRegistry is a module-level singleton (see utils/panelDownloadRegistry.ts).
     // PanelContainer instances register themselves on mount; no provide/inject needed.
-
-    // Track panels that are initializing (to prevent spurious change events)
-    const panelsInitializing = ref<Set<string>>(new Set());
 
     // Check if a specific panel has time enabled
     const hasPanelTime = (panel: any) => {
       return !!panel?.config?.panel_time_enabled;
     };
+
+    const isPanelTimeWaiting = (panel: any) =>
+      hasPanelTime(panel) && getPanelTimeGate(panel.id).needsRefresh.value;
 
     // Computed property to get the correct time for view panel
     // Returns panel-specific time if available, otherwise returns global time
@@ -1658,25 +1673,6 @@ export default defineComponent({
       return props.selectedDateForViewPanel;
     });
 
-    // Semantic equality for picker values — used in both initializePanelTimes and onPanelTimeApply.
-    // DateTimePickerDashboard normalizes values (adds startTime/endTime, may drop "type"),
-    // so we compare semantically: for relative, only compare the period string.
-    const arePickerValuesEqual = (v1: any, v2: any) => {
-      if (!v1 || !v2) return v1 === v2;
-
-      const type1 = v1.valueType || v1.type;
-      const type2 = v2.valueType || v2.type;
-      if (type1 !== type2) return false;
-
-      // For relative: only the period matters (startTime/endTime are computed & change over time)
-      if (type1 === "relative") {
-        return v1.relativeTimePeriod === v2.relativeTimePeriod;
-      }
-
-      // For absolute: compare start and end times
-      return v1.startTime === v2.startTime && v1.endTime === v2.endTime;
-    };
-
     // Initialize panel time values for panels with panel-level time enabled
     const initializePanelTimes = () => {
       panels.value?.forEach((panel: any) => {
@@ -1684,8 +1680,7 @@ export default defineComponent({
         if (hasPanelTime(panel)) {
           const panelId = panel.id;
 
-          // Mark this panel as initializing to prevent change events
-          panelsInitializing.value.add(panelId);
+          getPanelTimeGate(panelId);
 
           // When panel has no custom time (panel_time_range is null) and no URL panel params,
           // use local convertGlobalTimeToPickerFormat which preserves relative/absolute type
@@ -1708,9 +1703,6 @@ export default defineComponent({
           if (pickerValue && !arePickerValuesEqual(panelTimeValues.value[panelId], pickerValue)) {
             panelTimeValues.value[panelId] = pickerValue;
           }
-
-          // Cleanup initialization flag
-          setTimeout(() => panelsInitializing.value.delete(panelId), 500);
         }
       });
     };
@@ -1747,34 +1739,6 @@ export default defineComponent({
         valueType: "relative",
         relativeTimePeriod: "15m",
       };
-    };
-
-    // Handle Apply button click on panel time picker
-    const onPanelTimeApply = async (panelId: string, newValue?: any) => {
-      // Guard against infinite recursion during state synchronization
-      if (panelsSyncingDateTime.value.has(panelId)) {
-        return;
-      }
-
-      // Guard against firing during initialization (when initializePanelTimes sets values)
-      // This prevents null-config panels from creating spurious URL params
-      if (panelsInitializing.value.has(panelId)) {
-        return;
-      }
-
-      // Skip when DateTime.vue emits its current value on mount (open-picker cascade).
-      // We use :modelValue (not v-model) so panelTimeValues is NOT auto-written before
-      // this handler runs — enabling a true before/after equality check here.
-      if (newValue && arePickerValuesEqual(panelTimeValues.value[panelId], newValue)) {
-        return;
-      }
-
-      if (newValue) {
-        panelTimeValues.value[panelId] = newValue;
-      }
-
-      // Use the local helper which handles state syncing, URL update and variable freeze for this panel
-      await refreshPanelRequest(panelId, false);
     };
 
     // Update URL with panel time params
@@ -1913,8 +1877,10 @@ export default defineComponent({
       // Panel time configuration (NEW)
       panelTimeValues,
       hasPanelTime,
-      onPanelTimeApply,
-      panelDateTimePickerRefs,
+      getPanelTimeGate,
+      getPanelPickedTime,
+      isPanelTimeWaiting,
+      setPanelTimePicker,
       viewPanelSelectedDate,
     };
   },

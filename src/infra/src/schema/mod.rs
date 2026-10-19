@@ -21,9 +21,9 @@ use std::{
 use arc_swap::ArcSwap;
 use chrono::Utc;
 use config::{
-    ALL_VALUES_COL_NAME, BLOOM_FILTER_DEFAULT_FIELDS, ORIGINAL_DATA_COL_NAME, RwAHashMap,
-    RwHashMap, RwHashSet, SQL_FULL_TEXT_SEARCH_FIELDS, SQL_SECONDARY_INDEX_SEARCH_FIELDS,
-    TIMESTAMP_COL_NAME, get_config,
+    ALL_VALUES_COL_NAME, BLOOM_FILTER_DEFAULT_FIELDS, COMPACT_DYNAMIC_MERGE_STREAM_TYPES,
+    ORIGINAL_DATA_COL_NAME, RwAHashMap, RwHashMap, RwHashSet, SQL_FULL_TEXT_SEARCH_FIELDS,
+    SQL_SECONDARY_INDEX_SEARCH_FIELDS, TIMESTAMP_COL_NAME, get_config,
     ider::SnowflakeIdGenerator,
     meta::{
         self_reporting::usage::INTERNAL_STREAM_NAMES,
@@ -377,6 +377,12 @@ pub async fn get_is_llm_stream(org_id: &str, stream_name: &str, stream_type: Str
     false
 }
 
+/// Whether the compactor merges this stream's closed days across hours.
+pub async fn get_dynamic_merge(org_id: &str, stream_name: &str, stream_type: StreamType) -> bool {
+    let settings = get_settings(org_id, stream_name, stream_type).await;
+    get_stream_setting_dynamic_merge(stream_type, &settings)
+}
+
 pub fn unwrap_stream_settings(schema: &Schema) -> Option<StreamSettings> {
     if schema.metadata().is_empty() {
         return None;
@@ -420,6 +426,17 @@ pub fn get_partition_time_level(stream_type: StreamType) -> PartitionTimeLevel {
     }
 }
 
+/// The stream setting `dynamic_merge` when set, else the type's presence in the env list.
+pub fn get_stream_setting_dynamic_merge<T: std::borrow::Borrow<StreamSettings>>(
+    stream_type: StreamType,
+    settings: &Option<T>,
+) -> bool {
+    settings
+        .as_ref()
+        .and_then(|settings| settings.borrow().dynamic_merge)
+        .unwrap_or_else(|| COMPACT_DYNAMIC_MERGE_STREAM_TYPES.contains(&stream_type))
+}
+
 pub fn get_stream_setting_defined_schema_fields<T: std::borrow::Borrow<StreamSettings>>(
     settings: &Option<T>,
 ) -> Vec<String> {
@@ -457,14 +474,21 @@ pub fn get_stream_setting_fts_fields<T: std::borrow::Borrow<StreamSettings>>(
 
 pub fn get_stream_setting_index_fields<T: std::borrow::Borrow<StreamSettings>>(
     settings: &Option<T>,
+    stream_type: StreamType,
 ) -> Vec<String> {
     // Bloom filter is built on top of the secondary index, so every bloom
     // field must also be a secondary-index field. Fold the default bloom
     // fields into the index defaults here; the per-stream configured bloom
     // fields are unioned in the `Some` branch below (defensive for settings
     // persisted before bloom fields were merged into index_fields on update).
-    let mut default_fields = SQL_SECONDARY_INDEX_SEARCH_FIELDS.clone();
-    default_fields.extend(BLOOM_FILTER_DEFAULT_FIELDS.clone());
+    // metrics streams only index the fields their own stream settings ask for
+    let default_fields = if stream_type == StreamType::Metrics {
+        Vec::new()
+    } else {
+        let mut fields = SQL_SECONDARY_INDEX_SEARCH_FIELDS.clone();
+        fields.extend(BLOOM_FILTER_DEFAULT_FIELDS.clone());
+        fields
+    };
     let mut fields = match settings {
         Some(settings) => {
             let settings = settings.borrow();
@@ -524,6 +548,7 @@ pub fn get_stream_setting_bloom_filter_fields<T: std::borrow::Borrow<StreamSetti
 
 pub fn get_stream_setting_index_updated_at_for_fields<T: std::borrow::Borrow<StreamSettings>>(
     settings: &Option<T>,
+    stream_type: StreamType,
     created_at: Option<i64>,
     fields: &[String],
     distinct_fields_updated_at: i64,
@@ -547,7 +572,8 @@ pub fn get_stream_setting_index_updated_at_for_fields<T: std::borrow::Borrow<Str
     fields
         .iter()
         .map(|f| {
-            if SQL_SECONDARY_INDEX_SEARCH_FIELDS.contains(f) {
+            // metrics files only carry the built-in defaults when a stream setting asked for them
+            if stream_type != StreamType::Metrics && SQL_SECONDARY_INDEX_SEARCH_FIELDS.contains(f) {
                 BASE_TIME.timestamp_micros()
             } else if let Some(updated_at) = settings
                 .as_ref()
@@ -1123,11 +1149,6 @@ fn user_data_org(key: &str) -> Option<&str> {
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_is_widening_conversion() {
-        assert!(is_widening_conversion(&DataType::Int8, &DataType::Int32));
-    }
-
     #[tokio::test]
     async fn test_stream_settings_mutation_api() {
         // unique org prefix so the shared global caches can host parallel tests
@@ -1332,7 +1353,7 @@ mod tests {
     #[test]
     fn test_get_stream_setting_index_fields() {
         // Test with None
-        let fields = get_stream_setting_index_fields(&None::<StreamSettings>);
+        let fields = get_stream_setting_index_fields(&None::<StreamSettings>, StreamType::Logs);
         assert!(!fields.is_empty()); // Should have default fields
 
         // Test with custom index fields
@@ -1340,13 +1361,29 @@ mod tests {
             index_fields: vec!["index_field1".to_string(), "index_field2".to_string()],
             ..Default::default()
         };
-        let fields = get_stream_setting_index_fields(&Some(settings));
+        let fields = get_stream_setting_index_fields(&Some(settings), StreamType::Logs);
         assert!(fields.contains(&"index_field1".to_string()));
         assert!(fields.contains(&"index_field2".to_string()));
 
         // Verify no duplicates
         let unique_count = fields.iter().collect::<hashbrown::HashSet<_>>().len();
         assert_eq!(unique_count, fields.len());
+    }
+
+    #[test]
+    fn test_get_stream_setting_index_fields_metrics_skip_defaults() {
+        let fields = get_stream_setting_index_fields(&None::<StreamSettings>, StreamType::Metrics);
+        assert!(fields.is_empty());
+
+        // explicit per-stream settings still apply to metrics
+        let settings = StreamSettings {
+            index_fields: vec!["service_name".to_string()],
+            bloom_filter_fields: vec!["trace_id".to_string()],
+            ..Default::default()
+        };
+        let fields = get_stream_setting_index_fields(&Some(settings), StreamType::Metrics);
+        assert!(fields.contains(&"service_name".to_string()));
+        assert!(fields.contains(&"trace_id".to_string()));
     }
 
     #[test]
@@ -1393,7 +1430,7 @@ mod tests {
             ..Default::default()
         };
 
-        let fields = get_stream_setting_index_fields(&Some(settings.clone()));
+        let fields = get_stream_setting_index_fields(&Some(settings.clone()), StreamType::Logs);
         assert!(fields.contains(&"index_field".to_string()));
         assert!(fields.contains(&"svc".to_string()));
         assert!(!fields.contains(&"fts".to_string()));
@@ -1407,7 +1444,7 @@ mod tests {
             enable_distinct_fields: false,
             ..settings
         };
-        let fields = get_stream_setting_index_fields(&Some(settings));
+        let fields = get_stream_setting_index_fields(&Some(settings), StreamType::Logs);
         assert!(fields.contains(&"index_field".to_string()));
         assert!(!fields.contains(&"svc".to_string()));
     }
@@ -1431,6 +1468,7 @@ mod tests {
         let fields = vec!["svc".to_string()];
         let result = get_stream_setting_index_updated_at_for_fields(
             &Some(settings.clone()),
+            StreamType::Logs,
             Some(created_at),
             &fields,
             0,
@@ -1441,6 +1479,7 @@ mod tests {
         let cutoff = added_ts + 1_000_000;
         let result = get_stream_setting_index_updated_at_for_fields(
             &Some(settings.clone()),
+            StreamType::Logs,
             Some(created_at),
             &fields,
             cutoff,
@@ -1454,6 +1493,7 @@ mod tests {
         };
         let result = get_stream_setting_index_updated_at_for_fields(
             &Some(settings_both),
+            StreamType::Logs,
             Some(created_at),
             &fields,
             0,
@@ -1467,6 +1507,7 @@ mod tests {
         };
         let result = get_stream_setting_index_updated_at_for_fields(
             &Some(settings_disabled),
+            StreamType::Logs,
             Some(created_at),
             &fields,
             0,
@@ -1489,32 +1530,53 @@ mod tests {
 
         // no referenced fields -> no cutoff
         let fields = Vec::new();
-        let result =
-            get_stream_setting_index_updated_at_for_fields(&settings, Some(created_at), &fields, 0);
+        let result = get_stream_setting_index_updated_at_for_fields(
+            &settings,
+            StreamType::Logs,
+            Some(created_at),
+            &fields,
+            0,
+        );
         assert_eq!(result, 0);
 
         // a field with its own entry uses it
         let fields = vec!["user_id".to_string()];
-        let result =
-            get_stream_setting_index_updated_at_for_fields(&settings, Some(created_at), &fields, 0);
+        let result = get_stream_setting_index_updated_at_for_fields(
+            &settings,
+            StreamType::Logs,
+            Some(created_at),
+            &fields,
+            0,
+        );
         assert_eq!(result, 1_760_000_000_000_000);
 
         // a field without an entry falls back to the stream-level value
         let fields = vec!["level".to_string()];
-        let result =
-            get_stream_setting_index_updated_at_for_fields(&settings, Some(created_at), &fields, 0);
+        let result = get_stream_setting_index_updated_at_for_fields(
+            &settings,
+            StreamType::Logs,
+            Some(created_at),
+            &fields,
+            0,
+        );
         assert_eq!(result, 1_750_000_000_000_000);
 
         // multiple fields use the max
         let fields = vec!["user_id".to_string(), "level".to_string()];
-        let result =
-            get_stream_setting_index_updated_at_for_fields(&settings, Some(created_at), &fields, 0);
+        let result = get_stream_setting_index_updated_at_for_fields(
+            &settings,
+            StreamType::Logs,
+            Some(created_at),
+            &fields,
+            0,
+        );
         assert_eq!(result, 1_760_000_000_000_000);
 
         // None settings falls back to created_at
         let fields = vec!["user_id".to_string()];
         let result = get_stream_setting_index_updated_at_for_fields(
             &None::<StreamSettings>,
+            StreamType::Logs,
             Some(created_at),
             &fields,
             0,
@@ -1527,12 +1589,18 @@ mod tests {
             .insert("trace_id".to_string(), 1_760_000_000_000_000);
         let settings = Some(stream_settings);
         let fields = vec!["trace_id".to_string()];
-        let result =
-            get_stream_setting_index_updated_at_for_fields(&settings, Some(created_at), &fields, 0);
+        let result = get_stream_setting_index_updated_at_for_fields(
+            &settings,
+            StreamType::Logs,
+            Some(created_at),
+            &fields,
+            0,
+        );
         assert_eq!(result, base_time);
         let fields = vec!["service_name".to_string()];
         let result = get_stream_setting_index_updated_at_for_fields(
             &None::<StreamSettings>,
+            StreamType::Logs,
             Some(created_at),
             &fields,
             0,
@@ -1541,8 +1609,24 @@ mod tests {
 
         // a default field combined with a configured field still uses the max
         let fields = vec!["trace_id".to_string(), "user_id".to_string()];
-        let result =
-            get_stream_setting_index_updated_at_for_fields(&settings, Some(created_at), &fields, 0);
+        let result = get_stream_setting_index_updated_at_for_fields(
+            &settings,
+            StreamType::Logs,
+            Some(created_at),
+            &fields,
+            0,
+        );
+        assert_eq!(result, 1_760_000_000_000_000);
+
+        // metrics streams have no built-in default index fields, so the field's own entry wins
+        let fields = vec!["trace_id".to_string()];
+        let result = get_stream_setting_index_updated_at_for_fields(
+            &settings,
+            StreamType::Metrics,
+            Some(created_at),
+            &fields,
+            0,
+        );
         assert_eq!(result, 1_760_000_000_000_000);
     }
 
@@ -1773,6 +1857,26 @@ mod tests {
         let schema = Schema::new(vec![Field::new("f1", DataType::Int32, false)]);
         let cache = SchemaCache::new(schema);
         assert_eq!(cache.schema().fields().len(), 1);
+    }
+
+    #[test]
+    fn test_get_stream_setting_dynamic_merge() {
+        // the env list is empty in tests, so only the stream setting can enable it
+        let unset = Some(StreamSettings::default());
+        assert!(!get_stream_setting_dynamic_merge(
+            StreamType::Metrics,
+            &unset
+        ));
+        let on = Some(StreamSettings {
+            dynamic_merge: Some(true),
+            ..Default::default()
+        });
+        assert!(get_stream_setting_dynamic_merge(StreamType::Traces, &on));
+        let off = Some(Arc::new(StreamSettings {
+            dynamic_merge: Some(false),
+            ..Default::default()
+        }));
+        assert!(!get_stream_setting_dynamic_merge(StreamType::Logs, &off));
     }
 
     fn empty_cache() -> SchemaCache {

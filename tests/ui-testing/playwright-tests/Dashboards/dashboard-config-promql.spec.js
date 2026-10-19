@@ -861,10 +861,13 @@ test.describe("ConfigPanel — PromQL Settings", () => {
       if (url.includes("/api/")) allCalls.push({ url, status: res.status() });
     };
     page.on("response", onResponse);
+    // The settled signal can pass before the query is even sent on a slow env, so wait for the query's response headers first.
+    const promqlResponse = page.waitForResponse((res) => isPromQLQuery(res.url()), { timeout: 30000 });
 
     // One Apply, then wait on the panel's own completion signal rather than a
     // network event — the Apply button stays disabled until every chunk lands.
     await pm.dashboardPanelActions.applyDashboardBtn();
+    await promqlResponse;
     const settled = await waitForPanelRenderSettled(page, pm);
     page.off("response", onResponse);
 

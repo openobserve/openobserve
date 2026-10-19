@@ -227,6 +227,9 @@ pub async fn get(
         }
     }
 
+    // a series whose readings all fall before the window would reach callers with no samples
+    resp.series.retain(|series| !series.samples.is_empty());
+
     // if new_start == start, it means we have no data in cache, so we need to return None
     if new_start == start {
         return Ok(None);
@@ -838,6 +841,49 @@ mod tests {
         infra::cache::file_data::disk::remove(&legacy)
             .await
             .unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_promql_cache_drops_series_trimmed_to_nothing() {
+        let Some(fixture) = IsolationFixture::new() else {
+            return;
+        };
+        let org = "trimmed_org";
+        let series = |pod: &str, steps: i64| RangeValue {
+            labels: vec![Arc::new(Label::new("pod", pod))],
+            samples: (0..steps)
+                .map(|i| Sample::new(fixture.start + i * fixture.step, 1.0))
+                .collect(),
+            exemplars: None,
+            time_window: None,
+        };
+        set(
+            "trimmed_test",
+            org,
+            &fixture.query,
+            fixture.start,
+            fixture.end,
+            fixture.step,
+            vec![series("waiting", 5), series("recovered", 1)],
+            false,
+        )
+        .await
+        .unwrap();
+
+        let start = fixture.start + 2 * fixture.step;
+        let (_, cached) = get(org, &fixture.query, start, fixture.end, fixture.step)
+            .await
+            .unwrap()
+            .expect("the waiting series still has samples in the window");
+        assert_eq!(cached.len(), 1);
+        assert_eq!(cached[0].metric[0].value, "waiting");
+        assert_eq!(cached[0].samples.len(), 3);
+
+        let key = get_hash_key(org, &fixture.query, fixture.step);
+        let file = GLOBAL_CACHE[get_bucket_id(&key)].read().await.data[&key].entries[0]
+            .key
+            .clone();
+        fixture.delete(org, &file).await;
     }
 
     #[tokio::test]
