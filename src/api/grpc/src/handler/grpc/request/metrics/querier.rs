@@ -140,7 +140,7 @@ impl FollowerRegistration {
     // on a single node the leader entry already exists and must outlive this request
     async fn register(org_id: &str, trace_id: &str) -> Self {
         let inserted = SEARCH_SERVER
-            .insert_if_absent(
+            .insert(
                 org_id,
                 trace_id.to_string(),
                 TaskStatus::new_follower(vec![], false),

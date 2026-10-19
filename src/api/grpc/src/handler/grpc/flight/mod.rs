@@ -379,7 +379,7 @@ async fn register_follower_task_status(
         return None;
     }
     let inserted = SEARCH_SERVER
-        .insert_if_absent(
+        .insert(
             org_id,
             trace_id.to_string(),
             TaskStatus::new_follower(vec![], false),

@@ -517,6 +517,23 @@ mod tests {
     use super::*;
 
     #[cfg(feature = "enterprise")]
+    async fn contains(searcher: &Searcher, org_id: &str, trace_id: &str) -> bool {
+        let guard = searcher.query_manager.query_manager.read().await;
+        guard
+            .get(org_id)
+            .is_some_and(|tasks| tasks.contains_key(trace_id))
+    }
+
+    #[cfg(feature = "enterprise")]
+    async fn is_leader(searcher: &Searcher, org_id: &str, trace_id: &str) -> bool {
+        let guard = searcher.query_manager.query_manager.read().await;
+        guard
+            .get(org_id)
+            .and_then(|tasks| tasks.get(trace_id))
+            .is_some_and(|task| task.is_leader())
+    }
+
+    #[cfg(feature = "enterprise")]
     async fn cancel_in(searcher: &Searcher, trace_id: &str, org_id: Option<&str>) -> bool {
         let req = Request::new(CancelQueryRequest {
             trace_id: trace_id.to_string(),
@@ -540,13 +557,13 @@ mod tests {
         searcher.insert("b", "t1".to_string(), leader()).await;
 
         assert!(!cancel_in(&searcher, "t1", Some("a")).await);
-        assert!(searcher.contain_key("b", "t1").await);
+        assert!(contains(&searcher, "b", "t1").await);
         assert!(cancel_in(&searcher, "t1", Some("b")).await);
-        assert!(!searcher.contain_key("b", "t1").await);
+        assert!(!contains(&searcher, "b", "t1").await);
 
         searcher.insert("b", "t2".to_string(), leader()).await;
         assert!(cancel_in(&searcher, "t2", None).await);
-        assert!(!searcher.contain_key("b", "t2").await);
+        assert!(!contains(&searcher, "b", "t2").await);
         assert!(!cancel_in(&searcher, "t2", None).await);
     }
 
@@ -561,21 +578,17 @@ mod tests {
         searcher.insert("b", "t".to_string(), status(true)).await;
         searcher.insert("b", "t-1".to_string(), status(false)).await;
 
-        assert!(
-            !searcher
-                .insert_if_absent("b", "t".to_string(), status(false))
-                .await
-        );
+        assert!(!searcher.insert("b", "t".to_string(), status(false)).await);
         assert!(cancel_in(&searcher, "t", Some("a")).await);
-        assert!(!searcher.contain_key("a", "t").await);
-        assert!(searcher.is_leader("b", "t").await);
-        assert!(searcher.contain_key("b", "t-1").await);
+        assert!(!contains(&searcher, "a", "t").await);
+        assert!(is_leader(&searcher, "b", "t").await);
+        assert!(contains(&searcher, "b", "t-1").await);
 
         searcher.insert("a", "t".to_string(), status(true)).await;
         assert!(cancel_in(&searcher, "t", None).await);
         for (org, trace_id) in [("a", "t"), ("b", "t"), ("b", "t-1")] {
             assert!(
-                !searcher.contain_key(org, trace_id).await,
+                !contains(&searcher, org, trace_id).await,
                 "{org}/{trace_id}"
             );
         }
@@ -600,7 +613,7 @@ mod tests {
                 .await
                 .is_err()
         );
-        assert!(searcher.contain_key("b", "t").await);
+        assert!(contains(&searcher, "b", "t").await);
         assert!(cancel_in(&searcher, "t", Some("b")).await);
     }
 

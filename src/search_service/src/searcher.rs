@@ -33,27 +33,10 @@ impl Searcher {
         }
     }
 
-    // check is the trace_id in the query_manager
-    pub async fn contain_key(&self, org_id: &str, trace_id: &str) -> bool {
-        self.query_manager.contain_key(org_id, trace_id).await
-    }
-
-    // insert the trace_id and task_status into the query_manager
-    pub async fn insert(&self, org_id: &str, trace_id: String, task_status: TaskStatus) {
+    /// Registers a task unless the org already runs one under the same id; true when inserted.
+    pub async fn insert(&self, org_id: &str, trace_id: String, task_status: TaskStatus) -> bool {
         self.query_manager
             .insert(org_id, trace_id, task_status)
-            .await;
-    }
-
-    /// Registers a task unless the org already runs one under the same id; true when inserted.
-    pub async fn insert_if_absent(
-        &self,
-        org_id: &str,
-        trace_id: String,
-        task_status: TaskStatus,
-    ) -> bool {
-        self.query_manager
-            .insert_if_absent(org_id, trace_id, task_status)
             .await
     }
 
@@ -69,11 +52,6 @@ impl Searcher {
         trace_id: &str,
     ) -> Option<Vec<(String, TaskStatus)>> {
         self.query_manager.cancel(org_id, trace_id).await
-    }
-
-    // check is the trace_id in the query_manager and is_leader
-    pub async fn is_leader(&self, org_id: &str, trace_id: &str) -> bool {
-        self.query_manager.is_leader(org_id, trace_id).await
     }
 
     // insert the sender into the query_manager by trace_id
