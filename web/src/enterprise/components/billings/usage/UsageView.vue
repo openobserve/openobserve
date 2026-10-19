@@ -326,14 +326,17 @@ const fetchMetering = async () => {
 const aiUsage = ref<AiUsage | null>(null);
 
 /** Cloud only, as on main; a failed read just leaves the warning out. */
-const loadAiUsage = async () => {
+/** Overlapping Refreshes can answer out of order; only the newest load may publish. */
+let latestLoad = 0;
+
+const loadAiUsage = async (loadId: number) => {
   if (config.isCloud !== "true") return;
   try {
-    aiUsage.value = (
-      await BillingService.get_ai_usage(store.state.selectedOrganization.identifier)
-    ).data;
+    const usage = (await BillingService.get_ai_usage(store.state.selectedOrganization.identifier))
+      .data;
+    if (loadId === latestLoad) aiUsage.value = usage;
   } catch {
-    aiUsage.value = null;
+    if (loadId === latestLoad) aiUsage.value = null;
   }
 };
 
@@ -369,7 +372,8 @@ const aiCreditsAction = computed(() => {
 });
 
 const loadDetails = async () => {
-  void loadAiUsage();
+  const loadId = ++latestLoad;
+  void loadAiUsage(loadId);
   loading.value = true;
   refreshFailed.value = false;
   try {
@@ -381,6 +385,7 @@ const loadDetails = async () => {
     ]);
     const usageOnly = !metering?.upcoming || payerName !== null;
     const volumes = usageOnly && usageStreamEnabled.value ? await fetchVolumes() : null;
+    if (loadId !== latestLoad) return;
     response.value = metering;
     billingOrgs.value = orgs;
     payer.value = payerName;
@@ -388,11 +393,12 @@ const loadDetails = async () => {
     lastLoadedAt.value = Date.now();
     loadFailure.value = null;
   } catch (e: any) {
+    if (loadId !== latestLoad) return;
     // The raw text ("Network Error") is not shown; the kind of failure picks the advice.
     if (response.value) refreshFailed.value = true;
     else loadFailure.value = e?.response ? "server" : "network";
   } finally {
-    loading.value = false;
+    if (loadId === latestLoad) loading.value = false;
   }
 };
 

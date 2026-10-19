@@ -23,7 +23,15 @@ const mounts: Record<string, number> = {};
 const stub = (name: string) =>
   defineComponent({
     name,
-    props: ["details", "billingOrgs", "cycles", "projected", "volumeOnly", "orgCosts"],
+    props: [
+      "details",
+      "billingOrgs",
+      "cycles",
+      "projected",
+      "volumeOnly",
+      "orgCosts",
+      "refreshing",
+    ],
     setup: () => {
       mounts[name] = (mounts[name] ?? 0) + 1;
     },
@@ -150,6 +158,62 @@ describe("UsageView", () => {
       store.state.selectedOrganization.identifier,
       "child",
     ]);
+  });
+
+  it("keeps the newest bill when an older Refresh answers last", async () => {
+    metering.mockResolvedValue(bill);
+    members.mockResolvedValue({ data: [] });
+    const wrapper = mount(UsageView, { global: { plugins: [i18n, store] } });
+    await flushPromises();
+
+    // Two Refreshes overlap; the first one's answer arrives after the second's.
+    const withCost = (total_cost: number) => ({
+      data: {
+        price_details: {
+          ...bill.data.price_details,
+          upcoming: { ...bill.data.price_details.upcoming, total_cost },
+        },
+      },
+    });
+    let releaseOld!: (value: unknown) => void;
+    metering.mockReturnValueOnce(new Promise((resolve) => (releaseOld = resolve)));
+    metering.mockResolvedValueOnce(withCost(3));
+    const overview = () => wrapper.findComponent({ name: "UsageOverview" });
+    overview().vm.$emit("refresh");
+    overview().vm.$emit("refresh");
+    await flushPromises();
+    expect(overview().props("details")).toMatchObject({ total_cost: 3 });
+
+    releaseOld(withCost(2));
+    await flushPromises();
+    expect(overview().props("details")).toMatchObject({ total_cost: 3 });
+  });
+
+  it("does not raise a stale failure over a newer good bill, and stops loading only when the newest load ends", async () => {
+    metering.mockResolvedValue(bill);
+    members.mockResolvedValue({ data: [] });
+    const wrapper = mount(UsageView, { global: { plugins: [i18n, store] } });
+    await flushPromises();
+
+    let failOld!: (error: unknown) => void;
+    let releaseNew!: (value: unknown) => void;
+    metering.mockReturnValueOnce(new Promise((_, reject) => (failOld = reject)));
+    metering.mockReturnValueOnce(new Promise((resolve) => (releaseNew = resolve)));
+    const overview = () => wrapper.findComponent({ name: "UsageOverview" });
+    overview().vm.$emit("refresh");
+    overview().vm.$emit("refresh");
+    await flushPromises();
+
+    failOld(new Error("Network Error"));
+    await flushPromises();
+    // The newer load is still running: no banner, and the page still says it is loading.
+    expect(wrapper.find('[data-test="billings-usageview-refresh-failed"]').exists()).toBe(false);
+    expect(overview().props("refreshing")).toBe(true);
+
+    releaseNew(bill);
+    await flushPromises();
+    expect(wrapper.find('[data-test="billings-usageview-refresh-failed"]').exists()).toBe(false);
+    expect(overview().props("refreshing")).toBe(false);
   });
 
   it("still shows the bill when the org list fails, as a plain org", async () => {
