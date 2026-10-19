@@ -10,6 +10,10 @@ export default class DashboardPrintPage {
     this.printModeContainer = page.locator(".print-mode-container");
     this.backBtn = page.locator('[data-test="dashboard-back-btn"]');
     this.refreshBtn = page.locator('[data-test="dashboard-refresh-btn"]');
+    // Enterprise swaps refresh for cancel (v-if/v-else) while panels load.
+    this.refreshOrCancelBtn = this.refreshBtn.or(
+      page.locator('[data-test="dashboard-cancel-btn"]')
+    );
     this.gridStack = page.locator(".grid-stack");
     this.panelContainer = page.locator('[data-test="dashboard-panel-container"]');
     this.tablePanel = page.locator(
@@ -155,7 +159,7 @@ export default class DashboardPrintPage {
   async expectPrintChromeCleared() {
     await expect(this.printModeContainer).toHaveCount(0);
     await expect(this.backBtn).toBeVisible();
-    await expect(this.refreshBtn).toBeVisible();
+    await expect(this.refreshOrCancelBtn).toBeVisible();
   }
 
   async expectPrintModeContainerVisible() {
