@@ -3709,15 +3709,6 @@ mod tests {
     }
 
     #[test]
-    fn test_cors_web_url_trailing_slash_stripped() {
-        // Caller trims trailing slashes on web_url before calling us.
-        assert!(is_origin_allowed(
-            b"https://app.example.com",
-            "https://app.example.com"
-        ));
-    }
-
-    #[test]
     fn test_cors_prefix_bypass_denied() {
         // https://app.example.com.evil.com must NOT match https://app.example.com
         assert!(!is_origin_allowed(

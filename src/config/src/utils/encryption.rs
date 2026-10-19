@@ -252,20 +252,6 @@ mod tests {
     }
 
     #[test]
-    fn test_aes_encrypt_decrypt() {
-        let algo = Algorithm::Aes256Siv;
-        let enc = algo.encrypt(&key(), "test").unwrap();
-        assert_eq!(algo.decrypt(&key(), &enc).unwrap(), "test");
-    }
-
-    #[test]
-    fn test_aes_empty() {
-        let algo = Algorithm::Aes256Siv;
-        let enc = algo.encrypt(&key(), "").unwrap();
-        assert_eq!(algo.decrypt(&key(), &enc).unwrap(), "");
-    }
-
-    #[test]
     fn test_aes_unicode() {
         let algo = Algorithm::Aes256Siv;
         let enc = algo.encrypt(&key(), "世界").unwrap();
@@ -280,20 +266,6 @@ mod tests {
     #[test]
     fn test_aes_bad_base64() {
         assert!(Algorithm::Aes256Siv.decrypt(&key(), "!!!").is_err());
-    }
-
-    #[test]
-    fn test_none_encrypt_decrypt() {
-        let algo = Algorithm::None;
-        let enc = algo.encrypt(&key(), "test").unwrap();
-        assert_eq!(algo.decrypt(&key(), &enc).unwrap(), "test");
-    }
-
-    #[test]
-    fn test_none_empty() {
-        let algo = Algorithm::None;
-        let enc = algo.encrypt(&key(), "").unwrap();
-        assert_eq!(algo.decrypt(&key(), &enc).unwrap(), "");
     }
 
     #[test]

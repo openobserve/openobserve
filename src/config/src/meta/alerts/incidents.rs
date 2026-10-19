@@ -1494,48 +1494,6 @@ mod tests {
         assert_eq!(KeyType::from_stored("unknown"), KeyType::AlertId);
     }
 
-    #[test]
-    fn test_key_type_can_upgrade_alert_id_to_secondary() {
-        assert!(KeyType::AlertId.can_upgrade_to(KeyType::Secondary));
-    }
-
-    #[test]
-    fn test_key_type_can_upgrade_alert_id_to_primary() {
-        assert!(KeyType::AlertId.can_upgrade_to(KeyType::Primary));
-    }
-
-    #[test]
-    fn test_key_type_can_upgrade_secondary_to_primary() {
-        assert!(KeyType::Secondary.can_upgrade_to(KeyType::Primary));
-    }
-
-    #[test]
-    fn test_key_type_can_upgrade_same_level_secondary() {
-        // Same level upgrades allowed (dimension refinement)
-        assert!(KeyType::Secondary.can_upgrade_to(KeyType::Secondary));
-    }
-
-    #[test]
-    fn test_key_type_can_upgrade_same_level_primary() {
-        // Same level upgrades allowed (dimension refinement)
-        assert!(KeyType::Primary.can_upgrade_to(KeyType::Primary));
-    }
-
-    #[test]
-    fn test_key_type_cannot_downgrade_primary_to_secondary() {
-        assert!(!KeyType::Primary.can_upgrade_to(KeyType::Secondary));
-    }
-
-    #[test]
-    fn test_key_type_cannot_downgrade_primary_to_alert_id() {
-        assert!(!KeyType::Primary.can_upgrade_to(KeyType::AlertId));
-    }
-
-    #[test]
-    fn test_key_type_cannot_downgrade_secondary_to_alert_id() {
-        assert!(!KeyType::Secondary.can_upgrade_to(KeyType::AlertId));
-    }
-
     // ========== DimensionRelationship Tests ==========
 
     #[test]

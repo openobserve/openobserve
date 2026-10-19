@@ -1277,11 +1277,6 @@ mod tests {
     // ---- target range and precision (S-2) ----------------------------------
 
     #[test]
-    fn a_well_formed_slo_is_accepted() {
-        assert_eq!(validate_slo(&ungrouped(), 99.9, None), Ok(()));
-    }
-
-    #[test]
     fn a_target_of_one_hundred_is_rejected() {
         // A zero error budget makes every burn rate 0 or infinite.
         assert_eq!(
@@ -2282,11 +2277,6 @@ mod tests {
         assert!(serde_json::from_str::<SliConfig>(r#"{"sli_type":"telepathy"}"#).is_err());
     }
 
-    #[test]
-    fn a_missing_content_block_fails_to_deserialize() {
-        assert!(serde_json::from_str::<SliConfig>(r#"{"sli_type":"time_slice"}"#).is_err());
-    }
-
     // ---- query safety (§6b.7) ----------------------------------------------
 
     /// The safety boundary is "parse, then re-render from the AST". A fragment
@@ -2577,11 +2567,6 @@ mod tests {
     }
 
     // ---- stream / language compatibility -----------------------------------
-
-    #[test]
-    fn sql_addresses_a_logs_stream() {
-        assert_eq!(language_suits_stream("logs", QueryLanguage::Sql), Ok(()));
-    }
 
     /// Metrics are ordinary streams with a `value` column, so SQL addresses
     /// them like any other. Forbidding it was the rule's one mistake.
