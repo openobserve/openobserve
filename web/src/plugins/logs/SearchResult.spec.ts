@@ -391,6 +391,44 @@ describe("SearchResult Component", () => {
       expect(emptyRowColor()).toBe("rgba(139, 141, 240, 1)");
     });
 
+    it("closes a pin opened during the accent debounce once the redraw runs", async () => {
+      vi.useFakeTimers();
+      localStorage.setItem("appliedLightThemeName", "__custom__");
+      pinAt();
+
+      accents.set(document.documentElement, "rgba(16, 185, 129, 1)");
+      window.dispatchEvent(new CustomEvent("themeColorChanged"));
+      await nextTick();
+      pinAt();
+      expect(wrapper.vm.pinnedTooltip.visible).toBe(true);
+
+      vi.advanceTimersByTime(300);
+      expect(wrapper.vm.pinnedTooltip.visible).toBe(false);
+      pinAt();
+      expect(emptyRowColor()).toBe("rgba(16, 185, 129, 1)");
+    });
+
+    it("gives the empty group and a literal (empty) value their own series colors", async () => {
+      wrapper.vm.searchObj.data.histogram = {
+        ...wrapper.vm.searchObj.data.histogram,
+        breakdownSeries: new Map([
+          ["", [3]],
+          ["(empty)", [1]],
+          ["error", [2]],
+        ]),
+      };
+      wrapper.vm.reDrawChart();
+      await flushPromises();
+      const seriesColors = wrapper.vm.plotChart.options.series.map((s: any) => s.itemStyle.color);
+
+      pinAt();
+      const rowColors = wrapper.vm.pinnedTooltip.rows.map((r: any) => r.color);
+
+      expect(seriesColors[0]).toBe("rgba(91, 76, 240, 1)");
+      expect(seriesColors[1]).not.toBe(seriesColors[0]);
+      expect(rowColors).toEqual(seriesColors);
+    });
+
     it("keeps the pin open across a streaming redraw", async () => {
       pinAt();
 

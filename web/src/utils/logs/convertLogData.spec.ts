@@ -697,9 +697,6 @@ describe("convertLogData.ts", () => {
     });
   });
 
-  // ---------------------------------------------------------------------------
-  // Shared theme accent: flat histogram and the (empty) breakdown series
-  // ---------------------------------------------------------------------------
   describe("theme accent for the flat histogram and the (empty) series", () => {
     const ts1 = 1640995200000;
     const ts2 = 1640998800000;
