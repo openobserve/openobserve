@@ -125,6 +125,15 @@ describe("usageQueries", () => {
     expect(searchScanRateSql(null)).toMatch(/where event = 'Search'$/);
   });
 
+  it("leaves out the zero-length invoice Stripe creates at subscription, so it is never Last Cycle", () => {
+    const signup = { ...details, cycle_start: 1_789_000_000, cycle_end: 1_789_000_000 };
+    const closed = { ...details, cycle_start: 1_786_000_000, cycle_end: 1_788_600_000 };
+    const cycles = cyclesNewestFirst({ upcoming: details, past: [signup, closed] });
+    expect(cycles).toEqual([details, closed]);
+    // A brand-new subscriber has only the signup invoice behind it: no Last Cycle at all.
+    expect(cyclesNewestFirst({ upcoming: details, past: [signup] })).toEqual([details]);
+  });
+
   it("reads the cycles out of the new body and still accepts the old flat one", () => {
     const parsed = parseMeteringResponse({ upcoming: details, past: [details], oldest_ts: 1 });
     expect(parsed?.past).toHaveLength(1);

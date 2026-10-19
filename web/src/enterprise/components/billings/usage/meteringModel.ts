@@ -72,10 +72,15 @@ export function parseMeteringResponse(body: unknown): MeteringResponse | null {
   return { upcoming: body as MeteringDetails, past: [], oldest_ts: value.cycle_start };
 }
 
-/** Every cycle the API returned, newest first, so an index is "cycles back". */
+/**
+ * Every cycle the API returned, newest first, so an index is "cycles back". Stripe opens a
+ * subscription with a $0 invoice that starts and ends at once; it covers no usage, so it is left out.
+ */
 export function cyclesNewestFirst(response: MeteringResponse | null): MeteringDetails[] {
   if (!response) return [];
-  const past = [...response.past].sort((a, b) => b.cycle_start - a.cycle_start);
+  const past = response.past
+    .filter((cycle) => cycle.cycle_end > cycle.cycle_start)
+    .sort((a, b) => b.cycle_start - a.cycle_start);
   return [response.upcoming, ...past];
 }
 
