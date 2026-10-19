@@ -21,7 +21,7 @@ use std::{
 
 use arrow_schema::Schema;
 use bytes::Bytes;
-use chrono::{Duration, Utc};
+use chrono::{Duration, TimeZone, Utc};
 use config::{
     FxIndexMap, cluster, get_config,
     meta::{
@@ -30,7 +30,7 @@ use config::{
     },
     metrics,
     utils::{
-        async_file::{get_file_meta, get_file_size},
+        async_file::{get_file_meta, get_file_size, remove_empty_parents},
         file::scan_files_with_channel,
         parquet::{read_metadata_from_file, read_schema_from_file},
         schema_ext::SchemaExt,
@@ -198,14 +198,13 @@ async fn scan_pending_delete_files() -> Result<(), anyhow::Error> {
             continue;
         }
         log::debug!("[INGESTER:JOB] the file was released, delete it: {file_key}");
-        let file = wal_dir.join(&file_key);
-        let Ok(file_size) = get_file_size(&file).await else {
+        let Ok(file_size) = get_file_size(wal_dir.join(&file_key)).await else {
             continue;
         };
         // delete metadata from cache
         WAL_PARQUET_METADATA.write().await.remove(&file_key);
         // delete file from disk
-        if let Err(e) = remove_file(&file).await {
+        if let Err(e) = remove_wal_file(&wal_dir, &file_key).await {
             log::error!("[INGESTER:JOB] Failed to remove parquet file: {file_key}, {e}");
         }
         // need release the file
@@ -249,7 +248,6 @@ async fn scan_wal_files(
             tx,
         )
         .await
-            && !e.to_string().contains("No such file or directory")
         {
             log::error!("[INGESTER:JOB] Failed to scan files: {e}");
         }
@@ -330,7 +328,7 @@ async fn prepare_files(
             // delete metadata from cache
             WAL_PARQUET_METADATA.write().await.remove(&file_key);
             // delete file from disk
-            if let Err(e) = remove_file(wal_dir.join(&file)).await {
+            if let Err(e) = remove_wal_file(&wal_dir, &file_key).await {
                 log::error!("[INGESTER:JOB] Failed to remove parquet file from disk: {file}, {e}");
             }
             continue;
@@ -379,7 +377,7 @@ async fn move_files(
             // delete metadata from cache
             WAL_PARQUET_METADATA.write().await.remove(file_key);
             // delete file from disk
-            if let Err(e) = remove_file(wal_dir.join(file_key)).await {
+            if let Err(e) = remove_wal_file(&wal_dir, file_key).await {
                 log::error!(
                     "[INGESTER:JOB:{thread_id}] Failed to remove parquet file from disk: {file_key}, {e}",
                 );
@@ -416,7 +414,7 @@ async fn move_files(
             // delete metadata from cache
             WAL_PARQUET_METADATA.write().await.remove(file_key);
             // delete file from disk
-            if let Err(e) = remove_file(wal_dir.join(file_key)).await {
+            if let Err(e) = remove_wal_file(&wal_dir, file_key).await {
                 log::error!(
                     "[INGESTER:JOB:{thread_id}] Failed to remove parquet file from disk: {file_key}, {e}",
                 );
@@ -453,7 +451,7 @@ async fn move_files(
                 // delete metadata from cache
                 WAL_PARQUET_METADATA.write().await.remove(file_key);
                 // delete file from disk
-                if let Err(e) = remove_file(wal_dir.join(file_key)).await {
+                if let Err(e) = remove_wal_file(&wal_dir, file_key).await {
                     log::error!(
                         "[INGESTER:JOB:{thread_id}] Failed to remove parquet file from disk: {file_key}, {e}",
                     );
@@ -597,7 +595,7 @@ async fn move_files(
                 // delete metadata from cache
                 WAL_PARQUET_METADATA.write().await.remove(file_key);
                 // delete file from disk
-                match remove_file(wal_dir.join(file_key)).await {
+                match remove_wal_file(&wal_dir, file_key).await {
                     Err(e) => {
                         log::warn!(
                             "[INGESTER:JOB:{thread_id}] Failed to remove parquet file from disk, set to pending delete list: {file_key}, {e}",
@@ -979,6 +977,42 @@ fn is_service_discovery_candidate(
         && !config::meta::self_reporting::usage::is_internal_stream(stream_name)
 }
 
+/// Deletes the file, then its directory chain if the hour is old enough that late data is unlikely.
+async fn remove_wal_file(wal_dir: &Path, file_key: &str) -> Result<(), std::io::Error> {
+    let path = wal_dir.join(file_key);
+    remove_file(&path).await?;
+    if wal_bucket_is_stale(file_key, Utc::now())
+        && let Some(parent) = path.parent()
+    {
+        remove_empty_parents(&wal_dir.join("files"), parent).await;
+    }
+    Ok(())
+}
+
+// eg: files/default/logs/olympics/0/2023/08/21/08/8b8a5451bbe1c44b/xxx.parquet
+fn wal_bucket_is_stale(file_key: &str, now: chrono::DateTime<Utc>) -> bool {
+    let mut parts = file_key.split('/').skip(5).map(|c| c.parse::<u32>());
+    let (Some(Ok(year)), Some(Ok(month)), Some(Ok(day)), Some(Ok(hour))) =
+        (parts.next(), parts.next(), parts.next(), parts.next())
+    else {
+        return false;
+    };
+    let Some(bucket_start) = Utc
+        .with_ymd_and_hms(year as i32, month, day, hour, 0, 0)
+        .single()
+    else {
+        return false;
+    };
+    // daily-partitioned streams write to HH=00, so an hour-00 directory is treated as a day bucket
+    let bucket = if hour == 0 {
+        Duration::days(1)
+    } else {
+        Duration::hours(1)
+    };
+    let grace = Duration::seconds(super::EMPTY_DIR_GRACE_SECS as i64);
+    bucket_start + bucket + grace <= now
+}
+
 fn split_perfix(prefix: &str) -> (String, StreamType, String, String) {
     let columns = prefix.split('/').collect::<Vec<&str>>();
     // removed thread_id from prefix, so there is no thread_id in the path
@@ -1145,6 +1179,36 @@ mod tests {
     use config::meta::stream::StreamType;
 
     use super::*;
+
+    #[test]
+    fn test_wal_bucket_is_stale_waits_for_bucket_end_plus_grace() {
+        let key = "files/default/logs/olympics/0/2023/08/21/08/8b8a5451bbe1c44b/x.parquet";
+        let start = Utc.with_ymd_and_hms(2023, 8, 21, 8, 0, 0).unwrap();
+        let grace = Duration::seconds(super::super::EMPTY_DIR_GRACE_SECS as i64);
+        let stale_at = start + Duration::hours(1) + grace;
+        assert!(!wal_bucket_is_stale(key, stale_at - Duration::seconds(1)));
+        assert!(wal_bucket_is_stale(key, stale_at));
+
+        let day_key = "files/default/logs/olympics/0/2023/08/21/00/8b8a5451bbe1c44b/x.parquet";
+        let day_start = Utc.with_ymd_and_hms(2023, 8, 21, 0, 0, 0).unwrap();
+        assert!(!wal_bucket_is_stale(
+            day_key,
+            day_start + Duration::hours(12)
+        ));
+        assert!(wal_bucket_is_stale(
+            day_key,
+            day_start + Duration::days(1) + grace
+        ));
+
+        assert!(!wal_bucket_is_stale(
+            "files/default/logs/olympics",
+            stale_at
+        ));
+        assert!(!wal_bucket_is_stale(
+            "files/default/logs/olympics/0/2023/13/21/08/h/x.parquet",
+            stale_at + Duration::days(365)
+        ));
+    }
 
     #[test]
     fn test_service_discovery_skips_internal_streams() {

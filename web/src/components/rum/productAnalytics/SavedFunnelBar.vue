@@ -46,19 +46,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="rum-analytics-funnel-saved-read-only"
       >{{ t("rum.analytics.saved.readOnly") }}</span
     >
-    <span class="ms-auto flex shrink-0 items-center gap-1">
+    <span class="ms-auto flex shrink-0 flex-wrap items-center justify-end gap-1 max-md:shrink">
+      <slot name="actions" />
       <span v-if="canWrite">
         <OButton
           variant="primary"
           size="sm"
-          :disabled="!!saveBlocked"
+          :disabled="!!saveDisabled"
           data-test="rum-analytics-funnel-save-btn"
           @click="dialogs?.save()"
           >{{ t("rum.analytics.saved.save") }}</OButton
         >
-        <OTooltip v-if="saveBlocked" :content="saveBlocked" />
+        <OTooltip v-if="saveDisabled" :content="saveDisabled" />
       </span>
-      <ODropdown v-if="canWrite || opened" side="bottom" align="end">
+      <ODropdown v-if="canWrite || opened || $slots.menu" side="bottom" align="end">
         <template #trigger>
           <OButton
             variant="ghost"
@@ -69,10 +70,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ><OTooltip :content="t('rum.analytics.saved.more')"
           /></OButton>
         </template>
+        <slot name="menu" />
         <ODropdownItem
           v-if="canWrite"
           icon-left="bookmark-add"
-          :disabled="!!copyBlocked"
+          :disabled="!!copyDisabled"
           data-test="rum-analytics-funnel-saved-menu-save-as"
           @select="dialogs?.saveAs()"
           >{{ t("rum.analytics.saved.saveAsNew") }}</ODropdownItem
@@ -87,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
             <ODropdownItem
               icon-left="content-copy"
-              :disabled="!!copyBlocked"
+              :disabled="!!copyDisabled"
               data-test="rum-analytics-funnel-saved-menu-duplicate"
               @select="dialogs?.duplicate(opened, false)"
               >{{ t("rum.analytics.saved.duplicate") }}</ODropdownItem
@@ -134,7 +136,7 @@ import useFunnelDraft, {
   useFunnelLeaveGuard,
   useFunnelSaveBlockers,
 } from "@/composables/rum/useFunnelDraft";
-import { useI18nTyped } from "@/types/i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 import { copyToClipboard } from "@/utils/clipboard";
 import type { NamedEvent } from "@/utils/rum/productAnalyticsModel";
 import type { FunnelDef } from "@/utils/rum/productAnalyticsQueries";
@@ -157,6 +159,14 @@ const org = () => pa.toQuery().org_identifier as string;
 const app = () => pa.state.app;
 const opened = pa.openedFunnel;
 const canWrite = computed(() => permission.value === "write");
+// Without the app's rules the sql would be compiled without its exclusions, so nothing is saved.
+const rulesFailed = computed<I18nText | null>(() =>
+  !pa.rulesReady.value && (pa.scopeStatus.value === "error" || pa.scopeStatus.value === "forbidden")
+    ? t("rum.analytics.saved.rulesUnavailable")
+    : null,
+);
+const saveDisabled = computed(() => rulesFailed.value ?? saveBlocked.value);
+const copyDisabled = computed(() => rulesFailed.value ?? copyBlocked.value);
 
 // A deleted funnel is not left on screen as a draft, so the list it returns to starts clean.
 const removeOpened = async () => {

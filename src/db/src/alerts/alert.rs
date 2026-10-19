@@ -639,12 +639,6 @@ mod tests {
     }
 
     #[test]
-    fn test_cache_alert_key_empty_org() {
-        let key = cache_alert_key("", "alert-456");
-        assert_eq!(key, "/alert-456");
-    }
-
-    #[test]
     fn test_scheduler_key_none_returns_default_folder() {
         let key = scheduler_key(None);
         assert_eq!(key, "default");

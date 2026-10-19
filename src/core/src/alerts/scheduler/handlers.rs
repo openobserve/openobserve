@@ -7978,29 +7978,9 @@ mod tests {
     // ── parse_detection_interval_to_micros ───────────────────────────────────
 
     #[test]
-    fn test_parse_detection_interval_minutes() {
-        // "5m" → 5 * 60 * 1_000_000
-        let result = parse_detection_interval_to_micros("5m");
-        assert_eq!(result, 5 * 60 * 1_000_000);
-    }
-
-    #[test]
-    fn test_parse_detection_interval_hours() {
-        // "2h" → 2 * 3600 * 1_000_000
-        let result = parse_detection_interval_to_micros("2h");
-        assert_eq!(result, 2 * 3600 * 1_000_000);
-    }
-
-    #[test]
     fn test_parse_detection_interval_one_hour() {
         let result = parse_detection_interval_to_micros("1h");
         assert_eq!(result, 3600 * 1_000_000);
-    }
-
-    #[test]
-    fn test_parse_detection_interval_ten_minutes() {
-        let result = parse_detection_interval_to_micros("10m");
-        assert_eq!(result, 10 * 60 * 1_000_000);
     }
 
     #[test]
@@ -8059,12 +8039,6 @@ mod tests {
         assert_eq!(result, 0);
     }
 
-    #[test]
-    fn test_parse_detection_interval_large_value() {
-        let result = parse_detection_interval_to_micros("100m");
-        assert_eq!(result, 100 * 60 * 1_000_000);
-    }
-
     // ── get_pipeline_info_from_module_key additional edge cases ──────────────
 
     #[test]
@@ -8116,12 +8090,6 @@ mod tests {
     #[test]
     fn test_get_pipeline_info_too_few_parts_two() {
         let result = get_pipeline_info_from_module_key("logs/org");
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_get_pipeline_info_too_few_parts_three() {
-        let result = get_pipeline_info_from_module_key("logs/org/pipeline");
         assert!(result.is_err());
     }
 

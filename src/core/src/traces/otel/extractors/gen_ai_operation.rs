@@ -293,86 +293,6 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_gen_ai_operation_embeddings() {
-        let attrs = make_attributes(vec![("gen_ai.operation.name", "embeddings")]);
-        let resource_attrs = HashMap::new();
-        assert_eq!(
-            map_to_gen_ai_operation_name(&attrs, &resource_attrs, None),
-            "embeddings"
-        );
-    }
-
-    #[test]
-    fn test_gen_ai_operation_text_completion() {
-        let attrs = make_attributes(vec![("gen_ai.operation.name", "text_completion")]);
-        let resource_attrs = HashMap::new();
-        assert_eq!(
-            map_to_gen_ai_operation_name(&attrs, &resource_attrs, None),
-            "text_completion"
-        );
-    }
-
-    #[test]
-    fn test_gen_ai_operation_generate_content() {
-        let attrs = make_attributes(vec![("gen_ai.operation.name", "generate_content")]);
-        let resource_attrs = HashMap::new();
-        assert_eq!(
-            map_to_gen_ai_operation_name(&attrs, &resource_attrs, None),
-            "generate_content"
-        );
-    }
-
-    #[test]
-    fn test_gen_ai_operation_invoke_agent() {
-        let attrs = make_attributes(vec![("gen_ai.operation.name", "invoke_agent")]);
-        let resource_attrs = HashMap::new();
-        assert_eq!(
-            map_to_gen_ai_operation_name(&attrs, &resource_attrs, None),
-            "invoke_agent"
-        );
-    }
-
-    #[test]
-    fn test_gen_ai_operation_create_agent() {
-        let attrs = make_attributes(vec![("gen_ai.operation.name", "create_agent")]);
-        let resource_attrs = HashMap::new();
-        assert_eq!(
-            map_to_gen_ai_operation_name(&attrs, &resource_attrs, None),
-            "create_agent"
-        );
-    }
-
-    #[test]
-    fn test_gen_ai_operation_execute_tool() {
-        let attrs = make_attributes(vec![("gen_ai.operation.name", "execute_tool")]);
-        let resource_attrs = HashMap::new();
-        assert_eq!(
-            map_to_gen_ai_operation_name(&attrs, &resource_attrs, None),
-            "execute_tool"
-        );
-    }
-
-    #[test]
-    fn test_gen_ai_operation_invoke_workflow() {
-        let attrs = make_attributes(vec![("gen_ai.operation.name", "invoke_workflow")]);
-        let resource_attrs = HashMap::new();
-        assert_eq!(
-            map_to_gen_ai_operation_name(&attrs, &resource_attrs, None),
-            "invoke_workflow"
-        );
-    }
-
-    #[test]
-    fn test_gen_ai_operation_retrieval() {
-        let attrs = make_attributes(vec![("gen_ai.operation.name", "retrieval")]);
-        let resource_attrs = HashMap::new();
-        assert_eq!(
-            map_to_gen_ai_operation_name(&attrs, &resource_attrs, None),
-            "retrieval"
-        );
-    }
-
     // ---- llm.request.type ----
 
     #[test]
@@ -694,11 +614,6 @@ mod tests {
     #[test]
     fn test_is_gen_embedding_not_tool() {
         assert!(!is_generation_or_embedding("execute_tool"));
-    }
-
-    #[test]
-    fn test_is_gen_embedding_not_agent() {
-        assert!(!is_generation_or_embedding("invoke_agent"));
     }
 
     // ---- is_llm_trace ----

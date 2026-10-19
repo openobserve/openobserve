@@ -365,6 +365,8 @@ use crate::{
         rum_analytics::get_funnel,
         rum_analytics::update_funnel,
         rum_analytics::delete_funnel,
+        rum_analytics::get_app_settings,
+        rum_analytics::put_app_settings,
     ),
     components(
         schemas(
@@ -629,6 +631,16 @@ use crate::{
             openobserve_core::rum_pa::NamedEventRefList,
             openobserve_core::rum_pa::Current,
             openobserve_core::rum_pa::RumPaErrorBody,
+            openobserve_core::rum_pa::MatchOp,
+            openobserve_core::rum_pa::SessionField,
+            openobserve_core::rum_pa::SessionRule,
+            openobserve_core::rum_pa::FunnelFilter,
+            openobserve_core::rum_pa::FilterField,
+            openobserve_core::rum_pa::PageOp,
+            openobserve_core::rum_pa::PageRule,
+            openobserve_core::rum_pa::PutAppSettings,
+            openobserve_core::rum_pa::BuiltinBots,
+            openobserve_core::rum_pa::AppSettings,
          ),
     ),
     modifiers(&SecurityAddon),
@@ -1639,5 +1651,22 @@ mod tests {
         assert!(under_gated_prefix("/{org_id}/workflows"));
         assert!(under_gated_prefix("/{org_id}/workflows/{id}"));
         assert!(!under_gated_prefix("/{org_id}/workflows_v3"));
+    }
+
+    #[test]
+    fn p4_r4_rum_analytics_settings_routes_and_schemas_are_registered() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let settings = &spec["paths"]["/api/{org_id}/rum/analytics/settings"];
+        for (method, statuses) in [("get", &["200"][..]), ("put", &["200", "400", "409"][..])] {
+            let op = &settings[method];
+            assert!(op.is_object(), "{method} settings missing");
+            for status in statuses {
+                assert!(op["responses"].get(*status).is_some(), "{method} {status}");
+            }
+        }
+        let schemas = spec["components"]["schemas"].as_object().unwrap();
+        for name in ["AppSettings", "PutAppSettings"] {
+            assert!(schemas.contains_key(name), "schema {name} missing");
+        }
     }
 }

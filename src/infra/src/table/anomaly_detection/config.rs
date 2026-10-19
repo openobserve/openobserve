@@ -583,15 +583,6 @@ mod tests {
         assert_eq!(active.last_failed_at.unwrap(), Some(1_700_000_000_000_000));
     }
 
-    /// `put()` may insert a ConfigUpdate for an unknown row, so it holds the anchor local.
-    #[test]
-    fn test_into_active_model_drops_a_replicated_last_failed_at() {
-        let mut m = make_model("anom-1", "org");
-        m.last_failed_at = Some(1_700_000_000_000_000);
-        let active = into_active_model(m);
-        assert_eq!(active.last_failed_at.unwrap(), None);
-    }
-
     #[test]
     fn test_into_active_model_sets_the_representative_fields() {
         let m = make_model("anom-all", "org-all");

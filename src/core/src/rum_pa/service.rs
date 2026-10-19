@@ -17,20 +17,24 @@
 
 use std::future::Future;
 
-use infra::table::rum_pa::{self, FunnelRow, Funnels, MAX_PER_APP, NamedEventRow, NamedEvents};
+use infra::table::rum_pa::{
+    self, AppSettingsRow, FunnelRow, Funnels, MAX_PER_APP, NamedEventRow, NamedEvents,
+};
 use sea_orm::{ConnectionTrait, TransactionTrait};
 use serde::Serialize;
 
 use super::{
-    CreateFunnel, CreateNamedEvent, Current, FunnelDef, FunnelRef, NamedEvent, NamedEventRef,
-    RumPaError, SavedFunnel, UpdateFunnel, UpdateNamedEvent, validate_def, validate_description,
-    validate_name, validate_rules, validate_sql,
+    AppSettings, CreateFunnel, CreateNamedEvent, Current, FunnelDef, FunnelRef, NamedEvent,
+    NamedEventRef, PutAppSettings, RumPaError, SavedFunnel, UpdateFunnel, UpdateNamedEvent,
+    settings_id, validate_def, validate_description, validate_name, validate_rules,
+    validate_rules_hash, validate_settings, validate_sql,
 };
 
 /// The super-cluster meta-topic module; keys are `/rum_analytics/{org}/{table}/{id}`.
 pub const REPLICATION_MODULE: &str = "rum_analytics";
 pub const EVENTS_TABLE: &str = "named_events";
 pub const FUNNELS_TABLE: &str = "funnels";
+pub const APP_SETTINGS_TABLE: &str = "app_settings";
 
 /// The org and app every query is filtered by; never taken from a body.
 #[derive(Debug, Clone, Copy)]
@@ -52,6 +56,7 @@ struct FunnelDraft {
     definition: serde_json::Value,
     event_ids: Vec<String>,
     sql: String,
+    rules_hash: Option<String>,
 }
 
 pub fn row_key(org: &str, table: &str, id: &str) -> String {
@@ -156,10 +161,11 @@ pub async fn list_funnels<C: ConnectionTrait>(
     db: &C,
     scope: Scope<'_>,
 ) -> Result<Vec<SavedFunnel>, RumPaError> {
+    let current = current_rules_hash(db, scope).await?;
     Ok(rum_pa::list::<Funnels, _>(db, scope.org, scope.app)
         .await?
         .into_iter()
-        .map(SavedFunnel::from)
+        .map(|row| SavedFunnel::new(row, current.clone()))
         .collect())
 }
 
@@ -168,10 +174,10 @@ pub async fn get_funnel<C: ConnectionTrait>(
     scope: Scope<'_>,
     id: &str,
 ) -> Result<SavedFunnel, RumPaError> {
-    rum_pa::get::<Funnels, _>(db, scope.org, scope.app, id)
+    let row = rum_pa::get::<Funnels, _>(db, scope.org, scope.app, id)
         .await?
-        .map(SavedFunnel::from)
-        .ok_or(RumPaError::NotFound)
+        .ok_or(RumPaError::NotFound)?;
+    Ok(SavedFunnel::new(row, current_rules_hash(db, scope).await?))
 }
 
 pub async fn create_funnel<C: ConnectionTrait + TransactionTrait>(
@@ -185,10 +191,12 @@ pub async fn create_funnel<C: ConnectionTrait + TransactionTrait>(
         body.description.as_deref(),
         &body.def,
         &body.sql,
+        body.rules_hash.as_deref(),
     )?;
+    let current = current_rules_hash(db, scope).await?;
     let row = retry_once(|| create_funnel_once(db, scope, user, &draft)).await?;
     emit_put(scope.org, FUNNELS_TABLE, &row.id, &row).await;
-    Ok(row.into())
+    Ok(SavedFunnel::new(row, current))
 }
 
 /// Ids already in the stored `event_ids` may outlive their event; new ones must exist.
@@ -204,10 +212,12 @@ pub async fn update_funnel<C: ConnectionTrait + TransactionTrait>(
         body.description.as_deref(),
         &body.def,
         &body.sql,
+        body.rules_hash.as_deref(),
     )?;
+    let current = current_rules_hash(db, scope).await?;
     let row = retry_once(|| update_funnel_once(db, scope, id, user, &draft, body.version)).await?;
     emit_put(scope.org, FUNNELS_TABLE, &row.id, &row).await;
-    Ok(row.into())
+    Ok(SavedFunnel::new(row, current))
 }
 
 pub async fn delete_funnel<C: ConnectionTrait + TransactionTrait>(
@@ -218,6 +228,29 @@ pub async fn delete_funnel<C: ConnectionTrait + TransactionTrait>(
     let row = retry_once(|| delete_funnel_once(db, scope, id)).await?;
     emit_delete(scope.org, FUNNELS_TABLE, &row.id, row.version).await;
     Ok(())
+}
+
+/// The stored settings, or the built-in default when the app has never saved any.
+pub async fn get_app_settings<C: ConnectionTrait>(
+    db: &C,
+    scope: Scope<'_>,
+) -> Result<AppSettings, RumPaError> {
+    Ok(stored_settings(db, scope)
+        .await?
+        .map_or_else(|| AppSettings::unsaved(scope.app), AppSettings::from))
+}
+
+/// Saves at the version the caller read: 0 creates, any other must equal the stored version.
+pub async fn put_app_settings<C: ConnectionTrait + TransactionTrait>(
+    db: &C,
+    scope: Scope<'_>,
+    user: &str,
+    body: &PutAppSettings,
+) -> Result<AppSettings, RumPaError> {
+    validate_settings(body)?;
+    let row = retry_once(|| put_settings_once(db, scope, user, body)).await?;
+    emit_put(scope.org, APP_SETTINGS_TABLE, &row.id, &row).await;
+    Ok(row.into())
 }
 
 /// Replicates an org's removal; org cleanup only runs in the region that started it.
@@ -254,17 +287,20 @@ fn funnel_draft(
     description: Option<&str>,
     def: &FunnelDef,
     sql: &str,
+    rules_hash: Option<&str>,
 ) -> Result<FunnelDraft, RumPaError> {
     let name = validate_name(name)?;
     let description = validate_description(description)?;
     let (definition, event_ids) = validate_def(def)?;
     validate_sql(sql)?;
+    validate_rules_hash(rules_hash)?;
     Ok(FunnelDraft {
         name,
         description,
         definition,
         event_ids,
         sql: sql.to_string(),
+        rules_hash: rules_hash.map(str::to_string),
     })
 }
 
@@ -410,6 +446,7 @@ async fn create_funnel_once<C: ConnectionTrait + TransactionTrait>(
         updated_by: user.to_string(),
         created_at: now,
         updated_at: now,
+        rules_hash: draft.rules_hash.clone(),
     };
     rum_pa::insert::<Funnels, _>(&txn, row.clone()).await?;
     txn.commit().await?;
@@ -439,6 +476,7 @@ async fn update_funnel_once<C: ConnectionTrait + TransactionTrait>(
         version: version.saturating_add(1),
         updated_by: user.to_string(),
         updated_at: now_ms(),
+        rules_hash: draft.rules_hash.clone(),
         ..stored
     };
     let changed = rum_pa::update_if_version::<Funnels, _>(
@@ -453,9 +491,9 @@ async fn update_funnel_once<C: ConnectionTrait + TransactionTrait>(
     if changed == 0 {
         return Err(
             match rum_pa::get::<Funnels, _>(&txn, scope.org, scope.app, id).await? {
-                Some(current) => {
-                    RumPaError::VersionConflict(Box::new(Current::Funnel(current.into())))
-                }
+                Some(current) => RumPaError::VersionConflict(Box::new(Current::Funnel(
+                    SavedFunnel::new(current, current_rules_hash(&txn, scope).await?),
+                ))),
                 None => RumPaError::NotFound,
             },
         );
@@ -476,6 +514,99 @@ async fn delete_funnel_once<C: ConnectionTrait + TransactionTrait>(
     rum_pa::delete::<Funnels, _>(&txn, scope.org, scope.app, id, row.version, &row.name).await?;
     txn.commit().await?;
     Ok(row)
+}
+
+/// Version 0 inserts at the derived id; any other version must equal the stored one.
+async fn put_settings_once<C: ConnectionTrait + TransactionTrait>(
+    db: &C,
+    scope: Scope<'_>,
+    user: &str,
+    body: &PutAppSettings,
+) -> Result<AppSettingsRow, RumPaError> {
+    let now = now_ms();
+    let sessions = serde_json::to_value(&body.sessions).map_err(internal)?;
+    let pages = serde_json::to_value(&body.pages).map_err(internal)?;
+    if body.version == 0 {
+        let row = AppSettingsRow {
+            id: settings_id(scope.org, scope.app),
+            org_id: scope.org.to_string(),
+            app: scope.app.to_string(),
+            bots: body.bots,
+            sessions,
+            pages,
+            version: 1,
+            created_by: user.to_string(),
+            updated_by: user.to_string(),
+            created_at: now,
+            updated_at: now,
+        };
+        return match rum_pa::insert::<rum_pa::AppSettings, _>(db, row.clone()).await {
+            Ok(()) => Ok(row),
+            Err(e)
+                if matches!(
+                    e.sql_err(),
+                    Some(sea_orm::SqlErr::UniqueConstraintViolation(_))
+                ) =>
+            {
+                // Read outside the failed statement: Postgres aborts a transaction on the error.
+                Err(settings_conflict(db, scope).await?)
+            }
+            Err(e) => Err(e.into()),
+        };
+    }
+    let txn = db.begin().await?;
+    let Some(stored) = stored_settings(&txn, scope).await? else {
+        return Err(settings_conflict(&txn, scope).await?);
+    };
+    let id = stored.id.clone();
+    let row = AppSettingsRow {
+        bots: body.bots,
+        sessions,
+        pages,
+        version: body.version.saturating_add(1),
+        updated_by: user.to_string(),
+        updated_at: now,
+        ..stored
+    };
+    let changed = rum_pa::update_if_version::<rum_pa::AppSettings, _>(
+        &txn,
+        scope.org,
+        scope.app,
+        &id,
+        body.version,
+        row.clone(),
+    )
+    .await?;
+    if changed == 0 {
+        return Err(settings_conflict(&txn, scope).await?);
+    }
+    txn.commit().await?;
+    Ok(row)
+}
+
+async fn stored_settings<C: ConnectionTrait>(
+    db: &C,
+    scope: Scope<'_>,
+) -> Result<Option<AppSettingsRow>, RumPaError> {
+    let id = settings_id(scope.org, scope.app);
+    Ok(rum_pa::get::<rum_pa::AppSettings, _>(db, scope.org, scope.app, &id).await?)
+}
+
+async fn settings_conflict<C: ConnectionTrait>(
+    db: &C,
+    scope: Scope<'_>,
+) -> Result<RumPaError, RumPaError> {
+    let current = get_app_settings(db, scope).await?;
+    Ok(RumPaError::VersionConflict(Box::new(Current::AppSettings(
+        current,
+    ))))
+}
+
+async fn current_rules_hash<C: ConnectionTrait>(
+    db: &C,
+    scope: Scope<'_>,
+) -> Result<String, RumPaError> {
+    Ok(get_app_settings(db, scope).await?.rules_hash)
 }
 
 /// Locks the referenced events `FOR SHARE`, so none is deleted before this save commits.
@@ -585,7 +716,7 @@ mod tests {
     };
 
     use super::*;
-    use crate::rum_pa::{Rule, ViewOp, replication, validate_id};
+    use crate::rum_pa::{replication, validate_id};
 
     const ORG: &str = "acme";
     const APP: &str = "web";
@@ -604,44 +735,30 @@ mod tests {
     }
 
     fn event_body(name: &str) -> CreateNamedEvent {
-        CreateNamedEvent {
-            name: name.to_string(),
-            rules: vec![Rule::View {
-                op: ViewOp::Eq,
-                value: "/signup".to_string(),
-            }],
-        }
+        serde_json::from_value(serde_json::json!({
+            "name": name, "rules": [{"t": "view", "op": "eq", "value": "/signup"}]
+        }))
+        .unwrap()
     }
 
-    fn funnel_def(steps: &[(&str, &str)]) -> FunnelDef {
-        FunnelDef {
-            s: steps
-                .iter()
-                .map(|(k, v)| (k.to_string(), v.to_string()))
-                .collect(),
-            u: None,
-            w: None,
-            b: None,
-        }
+    fn funnel_def(steps: &[(&str, &str)]) -> serde_json::Value {
+        let s: Vec<[&str; 2]> = steps.iter().map(|(k, v)| [*k, *v]).collect();
+        serde_json::json!({"s": s})
     }
 
     fn funnel_body(name: &str, steps: &[(&str, &str)]) -> CreateFunnel {
-        CreateFunnel {
-            name: name.to_string(),
-            description: None,
-            def: funnel_def(steps),
-            sql: "SELECT 1".to_string(),
-        }
+        serde_json::from_value(serde_json::json!({
+            "name": name, "def": funnel_def(steps), "sql": "SELECT 1"
+        }))
+        .unwrap()
     }
 
     fn funnel_update(created: &SavedFunnel, steps: &[(&str, &str)]) -> UpdateFunnel {
-        UpdateFunnel {
-            name: created.name.clone(),
-            description: None,
-            def: funnel_def(steps),
-            sql: "SELECT 2".to_string(),
-            version: created.version,
-        }
+        serde_json::from_value(serde_json::json!({
+            "name": created.name, "def": funnel_def(steps), "sql": "SELECT 2",
+            "version": created.version
+        }))
+        .unwrap()
     }
 
     async fn create(db: &DatabaseConnection, scope: Scope<'_>, name: &str) -> NamedEvent {
@@ -935,6 +1052,600 @@ mod tests {
         assert_eq!(calls.load(Ordering::SeqCst), 1);
     }
 
+    const HASH: &str = "0123456789abcdef";
+
+    fn builtin_bots() -> serde_json::Value {
+        serde_json::json!({"version": 1, "families": ["HeadlessChrome", "PhantomJS", "Spider"], "devices": ["Spider"]})
+    }
+
+    fn settings_id(org: &str, app: &str) -> String {
+        use sha2::{Digest, Sha256};
+        let hex: String = Sha256::digest(format!("{org}/{app}").as_bytes())
+            .iter()
+            .map(|b| format!("{b:02x}"))
+            .collect();
+        hex[..27].to_string()
+    }
+
+    fn is_rules_hash(value: &serde_json::Value) -> bool {
+        value.as_str().is_some_and(|h| {
+            h.len() == 16
+                && h.bytes()
+                    .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+        })
+    }
+
+    fn session(field: &str, op: &str, values: &[&str]) -> serde_json::Value {
+        serde_json::json!({"field": field, "op": op, "values": values})
+    }
+
+    fn page(op: &str, value: &str) -> serde_json::Value {
+        serde_json::json!({"op": op, "value": value})
+    }
+
+    fn settings_body(
+        bots: bool,
+        sessions: serde_json::Value,
+        pages: serde_json::Value,
+        version: i64,
+    ) -> PutAppSettings {
+        serde_json::from_value(
+            serde_json::json!({"bots": bots, "sessions": sessions, "pages": pages, "version": version}),
+        )
+        .unwrap()
+    }
+
+    async fn put_settings(
+        db: &DatabaseConnection,
+        scope: Scope<'_>,
+        user: &str,
+        body: &PutAppSettings,
+    ) -> Result<serde_json::Value, RumPaError> {
+        put_app_settings(db, scope, user, body)
+            .await
+            .map(|s| serde_json::to_value(s).unwrap())
+    }
+
+    async fn read_settings(db: &DatabaseConnection, scope: Scope<'_>) -> serde_json::Value {
+        serde_json::to_value(get_app_settings(db, scope).await.unwrap()).unwrap()
+    }
+
+    /// The status a first save of these rules gets on an empty store.
+    async fn first_save_status(sessions: serde_json::Value, pages: serde_json::Value) -> u16 {
+        let db = db().await;
+        match put_app_settings(
+            &db,
+            SCOPE,
+            "a@x.io",
+            &settings_body(true, sessions, pages, 0),
+        )
+        .await
+        {
+            Ok(_) => 200,
+            Err(e) => e.status(),
+        }
+    }
+
+    fn funnel_json(name: &str, def: serde_json::Value, rules_hash: Option<&str>) -> CreateFunnel {
+        let mut body = serde_json::json!({"name": name, "def": def, "sql": "SELECT 1"});
+        if let Some(hash) = rules_hash {
+            body["rules_hash"] = hash.into();
+        }
+        serde_json::from_value(body).unwrap()
+    }
+
+    fn funnel_update_json(created: &SavedFunnel, version: i32, rules_hash: &str) -> UpdateFunnel {
+        serde_json::from_value(serde_json::json!({
+            "name": created.name, "def": {"s": [["p", "/"], ["p", "/b"]]}, "sql": "SELECT 2",
+            "version": version, "rules_hash": rules_hash
+        }))
+        .unwrap()
+    }
+
+    #[tokio::test]
+    async fn p2_r6_without_a_row_a_read_returns_the_defaults() {
+        let db = db().await;
+        let s = read_settings(&db, SCOPE).await;
+        assert_eq!(s["app"], APP, "{s}");
+        assert_eq!(s.get("id"), Some(&serde_json::Value::Null), "{s}");
+        assert_eq!(s["version"], 0, "{s}");
+        assert_eq!(s["bots"], true, "{s}");
+        assert_eq!(s["sessions"], serde_json::json!([]), "{s}");
+        assert_eq!(s["pages"], serde_json::json!([]), "{s}");
+        assert_eq!(s["builtinBots"], builtin_bots(), "{s}");
+        assert!(is_rules_hash(&s["rulesHash"]), "{s}");
+        for audit in ["createdBy", "createdAt", "updatedBy", "updatedAt"] {
+            assert_eq!(
+                s.get(audit),
+                Some(&serde_json::Value::Null),
+                "{audit} in {s}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn p2_r4_every_read_carries_the_builtin_bot_list() {
+        let db = db().await;
+        let saved = put_settings(
+            &db,
+            SCOPE,
+            "a@x.io",
+            &settings_body(false, serde_json::json!([]), serde_json::json!([]), 0),
+        )
+        .await
+        .unwrap();
+        assert_eq!(saved["builtinBots"], builtin_bots(), "{saved}");
+        assert_eq!(
+            read_settings(&db, SCOPE).await["builtinBots"],
+            builtin_bots()
+        );
+    }
+
+    #[tokio::test]
+    async fn p2_r10_settings_serialise_camel_case() {
+        let db = db().await;
+        let saved = put_settings(
+            &db,
+            SCOPE,
+            "a@x.io",
+            &settings_body(true, serde_json::json!([]), serde_json::json!([]), 0),
+        )
+        .await
+        .unwrap();
+        assert_eq!(saved["app"], APP, "{saved}");
+        assert_eq!(read_settings(&db, SCOPE).await["app"], APP);
+        assert_eq!(saved["createdBy"], "a@x.io", "{saved}");
+        assert_eq!(saved["updatedBy"], "a@x.io", "{saved}");
+        assert!(
+            saved["createdAt"].is_i64() && saved["updatedAt"].is_i64(),
+            "{saved}"
+        );
+        assert!(is_rules_hash(&saved["rulesHash"]), "{saved}");
+        for snake in [
+            "builtin_bots",
+            "rules_hash",
+            "created_by",
+            "created_at",
+            "updated_by",
+            "updated_at",
+        ] {
+            assert!(saved.get(snake).is_none(), "{snake} in {saved}");
+        }
+    }
+
+    #[tokio::test]
+    async fn p2_r1_session_and_page_rules_round_trip() {
+        let db = db().await;
+        let sessions: Vec<serde_json::Value> = [
+            "user_agent_user_agent_family",
+            "user_agent_os_family",
+            "user_agent_device_family",
+            "geo_info_country",
+            "geo_info_city",
+            "usr_id",
+            "usr_email",
+            "usr_anonymous_id",
+            "env",
+            "version",
+        ]
+        .iter()
+        .zip(
+            ["eq", "in", "prefix", "suffix", "contains", "regex"]
+                .iter()
+                .cycle(),
+        )
+        .map(|(field, op)| session(field, op, &["x"]))
+        .collect();
+        let pages = serde_json::json!([
+            page("eq", "/login"),
+            page("prefix", "/auth/"),
+            page("regex", "^/cb")
+        ]);
+        let body = settings_body(true, sessions.clone().into(), pages.clone(), 0);
+        put_settings(&db, SCOPE, "a@x.io", &body).await.unwrap();
+        let s = read_settings(&db, SCOPE).await;
+        assert_eq!(s["sessions"], serde_json::Value::from(sessions));
+        assert_eq!(s["pages"], pages);
+    }
+
+    #[tokio::test]
+    async fn p2_r5_the_id_is_derived_from_org_and_app() {
+        let expected = settings_id(ORG, APP);
+        let body = settings_body(true, serde_json::json!([]), serde_json::json!([]), 0);
+        for _ in 0..2 {
+            let db = db().await;
+            let saved = put_settings(&db, SCOPE, "a@x.io", &body).await.unwrap();
+            assert_eq!(saved["id"], expected.as_str(), "{saved}");
+        }
+        let db = db().await;
+        let other = Scope {
+            org: ORG,
+            app: "ios",
+        };
+        let saved = put_settings(&db, other, "a@x.io", &body).await.unwrap();
+        assert_eq!(saved["id"], settings_id(ORG, "ios").as_str(), "{saved}");
+    }
+
+    #[tokio::test]
+    async fn p2_r7_version_zero_creates_and_the_stored_version_updates() {
+        let db = db().await;
+        let created = put_settings(
+            &db,
+            SCOPE,
+            "a@x.io",
+            &settings_body(true, serde_json::json!([]), serde_json::json!([]), 0),
+        )
+        .await
+        .unwrap();
+        let version = created["version"].as_i64().unwrap();
+        assert!(version >= 1, "{created}");
+        let rules = serde_json::json!([session("env", "eq", &["staging"])]);
+        let updated = put_settings(
+            &db,
+            SCOPE,
+            "b@x.io",
+            &settings_body(true, rules.clone(), serde_json::json!([]), version),
+        )
+        .await
+        .unwrap();
+        assert!(updated["version"].as_i64().unwrap() > version, "{updated}");
+        assert_eq!(
+            (&updated["createdBy"], &updated["updatedBy"]),
+            (&"a@x.io".into(), &"b@x.io".into())
+        );
+        assert_eq!(read_settings(&db, SCOPE).await["sessions"], rules);
+    }
+
+    #[tokio::test]
+    async fn p2_r7_a_stale_version_is_a_conflict_carrying_the_current_settings() {
+        let db = db().await;
+        let created = put_settings(
+            &db,
+            SCOPE,
+            "a@x.io",
+            &settings_body(true, serde_json::json!([]), serde_json::json!([]), 0),
+        )
+        .await
+        .unwrap();
+        let stale = created["version"].as_i64().unwrap();
+        let rules = serde_json::json!([session("env", "eq", &["staging"])]);
+        put_settings(
+            &db,
+            SCOPE,
+            "b@x.io",
+            &settings_body(true, rules, serde_json::json!([]), stale),
+        )
+        .await
+        .unwrap();
+        let err = put_app_settings(
+            &db,
+            SCOPE,
+            "c@x.io",
+            &settings_body(false, serde_json::json!([]), serde_json::json!([]), stale),
+        )
+        .await
+        .unwrap_err();
+        assert_eq!((err.code(), err.status()), ("version_conflict", 409));
+        let body = serde_json::to_value(err.body()).unwrap();
+        assert_eq!(body["current"], read_settings(&db, SCOPE).await, "{body}");
+    }
+
+    #[tokio::test]
+    async fn p2_r7_a_second_create_is_a_conflict_not_a_duplicate_name() {
+        let db = db().await;
+        let rules = serde_json::json!([session("env", "eq", &["staging"])]);
+        put_settings(
+            &db,
+            SCOPE,
+            "a@x.io",
+            &settings_body(true, rules, serde_json::json!([]), 0),
+        )
+        .await
+        .unwrap();
+        let before = read_settings(&db, SCOPE).await;
+        let err = put_app_settings(
+            &db,
+            SCOPE,
+            "b@x.io",
+            &settings_body(false, serde_json::json!([]), serde_json::json!([]), 0),
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(err.code(), "version_conflict");
+        assert_eq!(serde_json::to_value(err.body()).unwrap()["current"], before);
+        assert_eq!(read_settings(&db, SCOPE).await, before);
+    }
+
+    #[tokio::test]
+    async fn p2_r3_at_most_twenty_session_rules_and_twenty_page_rules() {
+        let sessions = |n: usize| serde_json::Value::from(vec![session("env", "eq", &["x"]); n]);
+        let pages = |n: usize| serde_json::Value::from(vec![page("eq", "/login"); n]);
+        assert_eq!(first_save_status(sessions(20), pages(20)).await, 200);
+        assert_eq!(first_save_status(sessions(21), pages(0)).await, 400);
+        assert_eq!(first_save_status(sessions(0), pages(21)).await, 400);
+    }
+
+    #[tokio::test]
+    async fn p2_r3_an_in_rule_holds_at_most_twenty_values() {
+        let values = |n: usize| -> Vec<String> { (0..n).map(|i| format!("v{i}")).collect() };
+        let in_rule =
+            |n: usize| serde_json::json!([{"field": "env", "op": "in", "values": values(n)}]);
+        assert_eq!(
+            first_save_status(in_rule(20), serde_json::json!([])).await,
+            200
+        );
+        assert_eq!(
+            first_save_status(in_rule(21), serde_json::json!([])).await,
+            400
+        );
+    }
+
+    #[tokio::test]
+    async fn p2_r3_a_session_value_is_one_to_1024_utf16_units() {
+        let with_value = |v: &str| serde_json::json!([session("usr_email", "eq", &[v])]);
+        let longest = "a".repeat(1024);
+        let too_long = format!("{}😀", "a".repeat(1023));
+        assert_eq!(
+            first_save_status(with_value(&longest), serde_json::json!([])).await,
+            200
+        );
+        assert_eq!(
+            first_save_status(with_value(""), serde_json::json!([])).await,
+            400
+        );
+        assert_eq!(
+            first_save_status(with_value(&too_long), serde_json::json!([])).await,
+            400
+        );
+    }
+
+    #[tokio::test]
+    async fn p2_r3_a_pattern_is_bounded_and_must_compile() {
+        let longest = "a".repeat(256);
+        let too_long = "a".repeat(257);
+        for (pattern, status) in [
+            (longest.as_str(), 200),
+            (too_long.as_str(), 400),
+            (r"(a)\1", 400),
+        ] {
+            let sessions = serde_json::json!([session("usr_email", "regex", &[pattern])]);
+            assert_eq!(
+                first_save_status(sessions, serde_json::json!([])).await,
+                status,
+                "{pattern}"
+            );
+            let pages = serde_json::json!([page("regex", pattern)]);
+            assert_eq!(
+                first_save_status(serde_json::json!([]), pages).await,
+                status,
+                "{pattern}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn p2_r9_ignored_pages_leave_the_rules_hash_unchanged() {
+        let db = db().await;
+        let default_hash = read_settings(&db, SCOPE).await["rulesHash"].clone();
+        let saved = put_settings(
+            &db,
+            SCOPE,
+            "a@x.io",
+            &settings_body(
+                true,
+                serde_json::json!([]),
+                serde_json::json!([page("eq", "/login")]),
+                0,
+            ),
+        )
+        .await
+        .unwrap();
+        assert_eq!(saved["rulesHash"], default_hash);
+        let version = saved["version"].as_i64().unwrap();
+        let more_pages = serde_json::json!([page("eq", "/login"), page("prefix", "/auth/")]);
+        let saved = put_settings(
+            &db,
+            SCOPE,
+            "a@x.io",
+            &settings_body(true, serde_json::json!([]), more_pages, version),
+        )
+        .await
+        .unwrap();
+        assert_eq!(saved["rulesHash"], default_hash);
+        assert_eq!(read_settings(&db, SCOPE).await["rulesHash"], default_hash);
+    }
+
+    #[tokio::test]
+    async fn p2_r9_session_rules_and_the_bot_switch_change_the_rules_hash() {
+        let db = db().await;
+        let default_hash = read_settings(&db, SCOPE).await["rulesHash"].clone();
+        let rules = serde_json::json!([session("env", "eq", &["staging"])]);
+        let with_rule = put_settings(
+            &db,
+            SCOPE,
+            "a@x.io",
+            &settings_body(true, rules.clone(), serde_json::json!([]), 0),
+        )
+        .await
+        .unwrap();
+        assert!(is_rules_hash(&with_rule["rulesHash"]), "{with_rule}");
+        assert_ne!(with_rule["rulesHash"], default_hash);
+        let version = with_rule["version"].as_i64().unwrap();
+        let bots_off = put_settings(
+            &db,
+            SCOPE,
+            "a@x.io",
+            &settings_body(false, rules, serde_json::json!([]), version),
+        )
+        .await
+        .unwrap();
+        assert_ne!(bots_off["rulesHash"], with_rule["rulesHash"]);
+        assert_ne!(bots_off["rulesHash"], default_hash);
+    }
+
+    #[tokio::test]
+    async fn p2_r9_the_rules_hash_depends_on_the_rules_not_the_app() {
+        let db = db().await;
+        let rules = serde_json::json!([session("geo_info_country", "in", &["US", "IN"])]);
+        let ios = Scope {
+            org: ORG,
+            app: "ios",
+        };
+        let web = put_settings(
+            &db,
+            SCOPE,
+            "a@x.io",
+            &settings_body(true, rules.clone(), serde_json::json!([]), 0),
+        )
+        .await
+        .unwrap();
+        let ios_saved = put_settings(
+            &db,
+            ios,
+            "b@x.io",
+            &settings_body(true, rules, serde_json::json!([page("eq", "/x")]), 0),
+        )
+        .await
+        .unwrap();
+        assert_eq!(web["rulesHash"], ios_saved["rulesHash"]);
+        assert_eq!(read_settings(&db, ios).await["rulesHash"], web["rulesHash"]);
+    }
+
+    #[tokio::test]
+    async fn p2_r12_a_rules_hash_is_sixteen_lowercase_hex_and_stored_as_sent() {
+        let db = db().await;
+        let def = serde_json::json!({"s": [["p", "/"], ["p", "/a"]]});
+        for (i, bad) in [
+            "0123456789ABCDEF",
+            "0123456789abcde",
+            "0123456789abcdeg",
+            "0123456789abcdef0",
+        ]
+        .iter()
+        .enumerate()
+        {
+            let err = create_funnel(
+                &db,
+                SCOPE,
+                "a@x.io",
+                &funnel_json(&format!("bad{i}"), def.clone(), Some(bad)),
+            )
+            .await
+            .unwrap_err();
+            assert_eq!(err.status(), 400, "{bad}");
+        }
+        let created = create_funnel(&db, SCOPE, "a@x.io", &funnel_json("F", def, Some(HASH)))
+            .await
+            .unwrap();
+        assert_eq!(serde_json::to_value(&created).unwrap()["rulesHash"], HASH);
+        let other = "fedcba9876543210";
+        let updated = update_funnel(
+            &db,
+            SCOPE,
+            &created.id,
+            "a@x.io",
+            &funnel_update_json(&created, created.version, other),
+        )
+        .await
+        .unwrap();
+        assert_eq!(serde_json::to_value(&updated).unwrap()["rulesHash"], other);
+        let err = update_funnel(
+            &db,
+            SCOPE,
+            &created.id,
+            "a@x.io",
+            &funnel_update_json(&updated, updated.version, "FEDCBA9876543210"),
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(err.status(), 400);
+    }
+
+    #[tokio::test]
+    async fn p2_r13_every_saved_funnel_carries_its_and_the_current_rules_hash() {
+        let db = db().await;
+        let rules = serde_json::json!([session("env", "eq", &["staging"])]);
+        let current = put_settings(
+            &db,
+            SCOPE,
+            "a@x.io",
+            &settings_body(true, rules, serde_json::json!([]), 0),
+        )
+        .await
+        .unwrap()["rulesHash"]
+            .clone();
+        assert!(is_rules_hash(&current), "{current}");
+        let hashes = |f: &SavedFunnel| {
+            let v = serde_json::to_value(f).unwrap();
+            (v["rulesHash"].clone(), v["currentRulesHash"].clone())
+        };
+        let expected = (serde_json::Value::from(HASH), current.clone());
+        let def = serde_json::json!({"s": [["p", "/"], ["p", "/a"]]});
+        let created = create_funnel(&db, SCOPE, "a@x.io", &funnel_json("F", def, Some(HASH)))
+            .await
+            .unwrap();
+        assert_eq!(hashes(&created), expected);
+        assert_eq!(
+            hashes(&get_funnel(&db, SCOPE, &created.id).await.unwrap()),
+            expected
+        );
+        assert_eq!(
+            hashes(&list_funnels(&db, SCOPE).await.unwrap()[0]),
+            expected
+        );
+        let updated = update_funnel(
+            &db,
+            SCOPE,
+            &created.id,
+            "a@x.io",
+            &funnel_update_json(&created, created.version, HASH),
+        )
+        .await
+        .unwrap();
+        assert_eq!(hashes(&updated), expected);
+        let err = update_funnel(
+            &db,
+            SCOPE,
+            &created.id,
+            "a@x.io",
+            &funnel_update_json(&created, created.version, HASH),
+        )
+        .await
+        .unwrap_err();
+        let body = serde_json::to_value(err.body()).unwrap();
+        assert_eq!(
+            (
+                body["current"]["rulesHash"].clone(),
+                body["current"]["currentRulesHash"].clone()
+            ),
+            expected,
+            "{body}"
+        );
+    }
+
+    #[tokio::test]
+    async fn p3_r4_an_event_used_only_by_an_exclusion_is_in_use() {
+        let db = db().await;
+        let event = create(&db, SCOPE, "Bounce").await;
+        let def = serde_json::json!({
+            "s": [["p", "/"], ["p", "/a"]],
+            "x": [{"s": ["e", event.id], "a": 1, "b": 2}]
+        });
+        let funnel = create_funnel(&db, SCOPE, "a@x.io", &funnel_json("Flow", def, None))
+            .await
+            .unwrap();
+        let err = delete_event(&db, SCOPE, &event.id, false)
+            .await
+            .unwrap_err();
+        assert_eq!(
+            err,
+            RumPaError::EventInUse(vec![FunnelRef {
+                id: funnel.id,
+                name: "Flow".into()
+            }])
+        );
+    }
+
     /// The global RW client, which CI's unit-test jobs point at an init-db'd Postgres or SQLite.
     async fn global() -> Option<&'static DatabaseConnection> {
         if std::env::var("ZO_META_STORE").is_err() {
@@ -959,6 +1670,7 @@ mod tests {
         tombstones_keep_deleted_rows_away(db).await;
         two_puts_racing_on_an_absent_row_keep_the_newer(db).await;
         a_put_racing_its_delete_never_resurrects_the_row(db).await;
+        p2_r7_two_first_settings_puts_racing_admit_one_and_conflict_the_other(db).await;
     }
 
     async fn tombstones_keep_deleted_rows_away(db: &'static DatabaseConnection) {
@@ -1162,6 +1874,46 @@ mod tests {
             tokio::time::sleep(Duration::from_millis(10)).await;
         }
         panic!("fewer than {n} sessions ever waited on a lock");
+    }
+
+    async fn p2_r7_two_first_settings_puts_racing_admit_one_and_conflict_the_other(
+        db: &'static DatabaseConnection,
+    ) {
+        let org = format!("rumpa_{}", config::ider::uuid());
+        let racer = |org: String, user: &'static str, env: &'static str| {
+            tokio::spawn(async move {
+                let scope = Scope {
+                    org: &org,
+                    app: APP,
+                };
+                let rules = serde_json::json!([session("env", "eq", &[env])]);
+                let body = settings_body(true, rules, serde_json::json!([]), 0);
+                put_app_settings(db, scope, user, &body).await
+            })
+        };
+        let (a, b) = (
+            racer(org.clone(), "a@x.io", "dev"),
+            racer(org.clone(), "b@x.io", "prod"),
+        );
+        let results = [a.await.unwrap(), b.await.unwrap()];
+        let scope = Scope {
+            org: &org,
+            app: APP,
+        };
+        let stored = read_settings(db, scope).await;
+        let winners: Vec<serde_json::Value> = results
+            .iter()
+            .filter_map(|r| r.as_ref().ok())
+            .map(|s| serde_json::to_value(s).unwrap())
+            .collect();
+        assert_eq!(winners, std::slice::from_ref(&stored), "{results:?}");
+        let loser = results.iter().find_map(|r| r.as_ref().err()).unwrap();
+        assert_eq!(loser.code(), "version_conflict", "{loser:?}");
+        assert_eq!(
+            serde_json::to_value(loser.body()).unwrap()["current"],
+            stored
+        );
+        rum_pa::apply_delete_org(db, &org).await.unwrap();
     }
 
     async fn concurrent_creates_at_49_admit_exactly_one(db: &'static DatabaseConnection) {

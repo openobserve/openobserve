@@ -21,6 +21,12 @@ describe("OSwitch", () => {
     expect(wrapper.text()).toContain("Enable notifications");
   });
 
+  it("names an unlabelled switch from aria-label on the switch itself", () => {
+    wrapper = mount(OSwitch, { attrs: { "aria-label": "Built-in bot rule" } });
+    expect(wrapper.find('[role="switch"]').attributes("aria-label")).toBe("Built-in bot rule");
+    expect(wrapper.attributes("aria-label")).toBeUndefined();
+  });
+
   it("renders label slot when provided", () => {
     wrapper = mount(OSwitch, {
       slots: { label: "<strong>Custom</strong>" },

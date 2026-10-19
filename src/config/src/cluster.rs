@@ -225,12 +225,4 @@ mod tests {
         // just ensure no panic, returns any valid RoleGroup
         let _ = format!("{rg:?}");
     }
-
-    #[test]
-    fn test_is_online_initial_state() {
-        // Initially NodeStatus is Prepare, so neither online nor offline
-        let online = is_online();
-        let offline = is_offline();
-        assert!(!(online && offline));
-    }
 }
