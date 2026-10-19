@@ -192,7 +192,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                   <div class="flex shrink-0 items-center gap-2">
                     <OButton
-                      v-if="formTiers.length > 1"
+                      v-if="idx > 0"
                       variant="outline-destructive"
                       size="icon"
                       type="button"
@@ -335,6 +335,81 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                   </div>
 
+                  <div
+                    v-if="idx > 0 && tierRules(tier).length"
+                    class="rounded-default bg-surface-panel border-card-glass-border border px-3.5 py-3"
+                    :data-test="`model-pricing-tier-rules-${idx}`"
+                  >
+                    <OText variant="section">
+                      {{ t("modelPricing.attributeRules") }}
+                    </OText>
+                    <div class="text-2xs mt-px mb-2 opacity-55">
+                      {{ t("modelPricing.attributeRulesDesc") }}
+                    </div>
+                    <!-- Index keys: form fields bind to their name once, see the price-row note below. -->
+                    <div
+                      v-for="(rule, ruleIdx) in tierRules(tier)"
+                      :key="ruleIdx"
+                      class="flex flex-nowrap items-end gap-2 py-0.5"
+                    >
+                      <div class="min-w-50 flex-1">
+                        <OFormInput
+                          :name="`tiers[${idx}].rules[${ruleIdx}].keys`"
+                          :label="t('modelPricing.ruleKeys')"
+                          :placeholder="
+                            t('modelPricing.ruleKeysPlaceholder', {
+                              example: raw(
+                                'openai.response.service_tier, openai.request.service_tier',
+                              ),
+                            })
+                          "
+                          :data-test="`model-pricing-tier-rule-keys-input-${idx}-${ruleIdx}`"
+                        />
+                      </div>
+                      <div class="w-30 shrink-0">
+                        <OFormSelect
+                          :name="`tiers[${idx}].rules[${ruleIdx}].op`"
+                          :options="ruleOperatorOptions(rule.op)"
+                          :label="t('modelPricing.ruleOperator')"
+                          label-key="label"
+                          value-key="value"
+                          :searchable="false"
+                          :data-test="`model-pricing-tier-rule-op-select-${idx}-${ruleIdx}`"
+                        />
+                      </div>
+                      <div v-if="SET_RULE_OPS.includes(rule.op)" class="w-45 shrink-0">
+                        <OFormInput
+                          :name="`tiers[${idx}].rules[${ruleIdx}].values`"
+                          :label="t('modelPricing.ruleValues')"
+                          :placeholder="
+                            t('modelPricing.ruleValuesPlaceholder', { example: raw('flex') })
+                          "
+                          :data-test="`model-pricing-tier-rule-values-input-${idx}-${ruleIdx}`"
+                        />
+                      </div>
+                      <div v-else-if="NUMERIC_RULE_OPS.includes(rule.op)" class="w-35 shrink-0">
+                        <OFormInput
+                          :name="`tiers[${idx}].rules[${ruleIdx}].value`"
+                          :label="t('modelPricing.threshold')"
+                          type="number"
+                          :data-test="`model-pricing-tier-rule-value-input-${idx}-${ruleIdx}`"
+                        />
+                      </div>
+                      <div class="flex h-8.5 items-center">
+                        <OButton
+                          variant="outline-destructive"
+                          size="icon"
+                          type="button"
+                          :data-test="`model-pricing-tier-rule-remove-btn-${idx}-${ruleIdx}`"
+                          @click="removeRule(idx, ruleIdx)"
+                        >
+                          <OIcon name="delete" size="sm" />
+                          <OTooltip :side-offset="4" :content="t('modelPricing.removeRule')" />
+                        </OButton>
+                      </div>
+                    </div>
+                  </div>
+
                   <!-- Add a restriction to a non-default tier -->
                   <div v-if="idx > 0" class="flex flex-wrap items-center gap-2">
                     <OButton
@@ -356,6 +431,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       {{ t("modelPricing.addTimeWindow") }}
                     </OButton>
+                    <OButton
+                      variant="outline"
+                      size="sm-action"
+                      type="button"
+                      :disabled="tierRules(tier).length >= MAX_RULES_PER_TIER"
+                      :data-test="`model-pricing-tier-add-rule-btn-${idx}`"
+                      @click="addRule(idx)"
+                    >
+                      {{ t("modelPricing.addRule") }}
+                    </OButton>
+                    <div class="ms-auto w-30 shrink-0">
+                      <OFormInput
+                        :name="`tiers[${idx}].priority`"
+                        :label="t('modelPricing.tierPriority')"
+                        :help-text="t('modelPricing.tierPriorityHint')"
+                        type="number"
+                        :data-test="`model-pricing-tier-priority-input-${idx}`"
+                      />
+                    </div>
                   </div>
 
                   <!-- Quick Setup -->
@@ -558,11 +652,50 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </div>
               </div>
+              <OBanner
+                v-if="ambiguousTierPairs.length"
+                variant="warning"
+                icon="warning"
+                data-test="model-pricing-tier-tie-warning"
+              >
+                <div class="text-xs font-semibold">{{ t("modelPricing.tierTieWarning") }}</div>
+                <ul class="m-0 mt-1 ps-4 text-xs">
+                  <li v-for="pair in ambiguousTierPairs" :key="pair.join('-')">
+                    {{
+                      t("modelPricing.tierTiePair", {
+                        first: formTiers[pair[0]]?.name || `#${pair[0] + 1}`,
+                        second: formTiers[pair[1]]?.name || `#${pair[1] + 1}`,
+                      })
+                    }}
+                  </li>
+                </ul>
+              </OBanner>
+              <OBanner
+                v-if="unreachableTierPairs.length"
+                variant="warning"
+                icon="warning"
+                data-test="model-pricing-tier-unreachable-warning"
+              >
+                <div class="text-xs font-semibold">
+                  {{ t("modelPricing.tierUnreachableWarning") }}
+                </div>
+                <ul class="m-0 mt-1 ps-4 text-xs">
+                  <li v-for="pair in unreachableTierPairs" :key="pair.join('-')">
+                    {{
+                      t("modelPricing.tierUnreachablePair", {
+                        first: formTiers[pair[0]]?.name || `#${pair[0] + 1}`,
+                        second: formTiers[pair[1]]?.name || `#${pair[1] + 1}`,
+                      })
+                    }}
+                  </li>
+                </ul>
+              </OBanner>
               <OButton
                 variant="outline"
                 size="sm-action"
                 type="button"
                 class="self-start"
+                :disabled="formTiers.length >= MAX_TIERS"
                 data-test="model-pricing-add-tier-btn"
                 @click="addTier"
               >
@@ -607,6 +740,7 @@ import { useI18nTyped, raw } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import modelPricingService from "@/services/model_pricing";
 import { saveModelPricingMutation } from "@/services/model_pricing.queries";
@@ -627,9 +761,18 @@ import { copyToClipboard } from "@/utils/clipboard";
 import { formatUtcWindowsInTz } from "@/utils/formatters";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import {
+  findAmbiguousTiers,
+  findUnreachableTiers,
+  KNOWN_RULE_OPS,
   makeModelPricingSchema,
+  MAX_RULES_PER_TIER,
+  MAX_TIERS,
+  NUMERIC_RULE_OPS,
+  splitList,
+  SET_RULE_OPS,
   type ModelPricingForm,
   type ModelPricingTier,
+  type ModelPricingTierRule,
   type ModelPricingTierWindow,
 } from "./ModelPricingEditor.schema";
 
@@ -694,6 +837,8 @@ const form = useOForm<ModelPricingForm>({
 // Reactive view of the form-owned `tiers` array — form.useStore tracks array
 // mutations (a plain form.state.values read in a computed would not).
 const formTiers = form.useStore((s): ModelPricingTier[] => s.values.tiers ?? []);
+const ambiguousTierPairs = computed(() => findAmbiguousTiers(formTiers.value));
+const unreachableTierPairs = computed(() => findUnreachableTiers(formTiers.value));
 
 function createEmptyModel() {
   return {
@@ -714,6 +859,7 @@ function newTier(name: string, condition: any = null) {
     condition,
     prices: {} as Record<string, number>,
     utc_windows: [] as Array<{ start_minute: number; end_minute: number }>,
+    rules: [] as Array<{ keys: string[]; op: string; values?: string[]; value?: number }>,
   };
 }
 
@@ -724,6 +870,8 @@ function newFormTier(name: string, condition: any = null) {
     name,
     condition,
     utc_windows: [] as ModelPricingTierWindow[],
+    rules: [] as ModelPricingTierRule[],
+    priority: 0,
     prices: [] as Array<{ key: string; value: number }>,
     draftKey: "",
     draftValue: 0,
@@ -787,27 +935,69 @@ function parsedTierWindows(tier: any): UtcHoursWindow[] {
     );
 }
 
+/** A tier's rules, tolerant of form state seeded before the field existed. */
+function tierRules(tier: any): ModelPricingTierRule[] {
+  return (tier?.rules ?? []) as ModelPricingTierRule[];
+}
+
+function ruleToForm(rule: any): ModelPricingTierRule {
+  const op = rule?.op ?? "in";
+  return {
+    keys: (rule?.keys ?? []).join(", "),
+    op,
+    values: (rule?.values ?? []).join(", "),
+    // An operator this build does not know keeps its threshold verbatim until the user picks one.
+    value: KNOWN_RULE_OPS.includes(op) ? Number(rule?.value ?? 0) || 0 : (rule?.value ?? ""),
+  };
+}
+
+/** Form rule → API rule; only the fields the operator reads are sent. */
+function ruleToModel(rule: any) {
+  const op = String(rule?.op ?? "in");
+  const out: { keys: string[]; op: string; values?: string[]; value?: number } = {
+    keys: splitList(rule?.keys),
+    op,
+  };
+  const values = splitList(rule?.values);
+  const value = String(rule?.value ?? "").trim();
+  if (SET_RULE_OPS.includes(op)) out.values = values;
+  else if (NUMERIC_RULE_OPS.includes(op)) out.value = Number(rule?.value);
+  else if (!KNOWN_RULE_OPS.includes(op)) {
+    if (values.length) out.values = values;
+    if (value !== "" && Number.isFinite(Number(value))) out.value = Number(value);
+  }
+  return out;
+}
+
+/** The operator list, plus a loaded operator this build does not know so the select still shows it. */
+function ruleOperatorOptions(op: string) {
+  return !op || KNOWN_RULE_OPS.includes(op)
+    ? ruleOperators
+    : [...ruleOperators, { label: raw(op), value: op }];
+}
+
+/** True when the tier has no restriction at all, i.e. the backend treats it as the default. */
+function isUnrestricted(tier: any): boolean {
+  return !tier?.condition && !(tier?.utc_windows ?? []).length && !(tier?.rules ?? []).length;
+}
+
 // API model (per-token price MAP) → FORM value (per-million ROW array).
 function modelToForm(m: any): ModelPricingForm {
-  const tiers = (m?.tiers ?? []).map((tier: any, i: number) => {
+  const apiTiers: any[] = [...(m?.tiers ?? [])];
+  // The editor treats tier 0 as the default, so the unrestricted tier must sit there or its restrictions would be dropped.
+  const defaultIdx = apiTiers.findIndex(isUnrestricted);
+  if (defaultIdx > 0) apiTiers.unshift(...apiTiers.splice(defaultIdx, 1));
+  const tiers = apiTiers.map((tier: any, i: number) => {
     const windows: ModelPricingTierWindow[] = (tier.utc_windows ?? []).map((w: any) => ({
       start: minutesToHhmm(w?.start_minute),
       end: minutesToHhmm(w?.end_minute),
     }));
     return {
       name: tier.name ?? "",
-      // Tier 0 is the unconditional default. A later tier keeps its own condition;
-      // one restricted only by time windows keeps `null` rather than being handed a
-      // usage condition it never had.
-      condition:
-        i === 0
-          ? null
-          : tier.condition
-            ? { ...tier.condition }
-            : windows.length
-              ? null
-              : { usage_key: "input", operator: "gt", value: 0 },
+      condition: i === 0 || !tier.condition ? null : { ...tier.condition },
       utc_windows: i === 0 ? [] : windows,
+      rules: i === 0 ? [] : (tier.rules ?? []).map(ruleToForm),
+      priority: Number(tier.priority) || 0,
       prices: Object.entries(tier.prices ?? {}).map(([k, v]) => ({
         key: k,
         value: toPerMillion(Number(v)),
@@ -861,7 +1051,9 @@ function formToModelTiers(tiers: any[]): any[] {
               }
             : null,
       utc_windows: utcWindows,
+      rules: i === 0 ? [] : (tier.rules ?? []).map(ruleToModel),
       prices,
+      ...(Number(tier.priority) ? { priority: Math.trunc(Number(tier.priority)) } : {}),
     };
   });
 }
@@ -883,6 +1075,17 @@ const usageTemplates = [
     color: "#d97706",
     keys: ["input", "output", "cache_read_input_tokens", "cache_creation_input_tokens"],
   },
+];
+
+const ruleOperators = [
+  { label: t("modelPricing.ruleOpIn"), value: "in" },
+  { label: t("modelPricing.ruleOpNotIn"), value: "not_in" },
+  { label: t("modelPricing.ruleOpExists"), value: "exists" },
+  { label: t("modelPricing.ruleOpNotExists"), value: "not_exists" },
+  { label: raw(">"), value: "gt" },
+  { label: raw(">="), value: "gte" },
+  { label: raw("<"), value: "lt" },
+  { label: raw("<="), value: "lte" },
 ];
 
 const operators = [
@@ -942,6 +1145,29 @@ function removeWindow(tierIdx: number, winIdx: number) {
   patchTier(tierIdx, (tier) => ({
     ...tier,
     utc_windows: (tier.utc_windows ?? []).filter((_: any, j: number) => j !== winIdx),
+  }));
+}
+
+// Seeded with OpenAI Flex so the "response key first, request key as fallback" order is visible.
+function addRule(idx: number) {
+  patchTier(idx, (tier) => ({
+    ...tier,
+    rules: [
+      ...(tier.rules ?? []),
+      {
+        keys: "openai.response.service_tier, openai.request.service_tier",
+        op: "in",
+        values: "flex",
+        value: 0,
+      },
+    ],
+  }));
+}
+
+function removeRule(tierIdx: number, ruleIdx: number) {
+  patchTier(tierIdx, (tier) => ({
+    ...tier,
+    rules: (tier.rules ?? []).filter((_: any, j: number) => j !== ruleIdx),
   }));
 }
 
@@ -1095,11 +1321,10 @@ async function save(value?: ModelPricingForm) {
     }
   }
 
-  // A non-default tier with neither a usage condition nor a time window can never
-  // be selected — the unconditional tier 0 always wins first.
+  // A second unrestricted tier is unreachable: the backend uses the first one as the fallback.
   for (let i = 1; i < tiers.length; i++) {
     const tier = tiers[i];
-    if (!tier.condition && !(tier.utc_windows ?? []).length) {
+    if (isUnrestricted(tier)) {
       notifyWarn(t("modelPricing.tierNeedsRestriction", { name: tier.name || `#${i + 1}` }));
       return;
     }
@@ -1196,18 +1421,6 @@ onBeforeMount(async () => {
           model.value.name = model.value.name + t("settings.modelPricingEditor.copySuffix");
           // Clear source so create endpoint assigns the correct one
           delete model.value.source;
-        }
-        for (let i = 1; i < model.value.tiers.length; i++) {
-          const tier = model.value.tiers[i];
-          // A tier restricted only by UTC time windows legitimately has no usage
-          // condition — leave it alone rather than fabricating one.
-          if (!tier.condition && !(tier.utc_windows ?? []).length) {
-            tier.condition = {
-              usage_key: "input",
-              operator: "gt",
-              value: 0,
-            };
-          }
         }
         // Data arrived after mount → re-seed the whole form (scalars + the
         // converted tier/price rows) once. formTiers (form.useStore) updates
