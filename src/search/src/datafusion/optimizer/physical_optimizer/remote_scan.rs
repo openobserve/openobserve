@@ -286,7 +286,8 @@ impl TreeNodeRewriter for RemoteScanRewriter {
             // add each remote scan for each child
             if !visitor.has_remote_scan {
                 let mut new_children: Vec<Arc<dyn ExecutionPlan>> = vec![];
-                for child in node.children() {
+                let maintains_order = node.maintains_input_order();
+                for (i, child) in node.children().into_iter().enumerate() {
                     let mut visitor = TableNameVisitor::new();
                     child.visit(&mut visitor)?;
                     // For sort, we should add a SortPreservingMergeExec
@@ -308,7 +309,7 @@ impl TreeNodeRewriter for RemoteScanRewriter {
                     } else {
                         let table_name = visitor.table_name.clone().unwrap();
                         let remote_scan = Arc::new(RemoteScanExec::new(
-                            child.clone(),
+                            merge_ordered_input(maintains_order[i], child.clone()),
                             self.remote_scan_nodes.get_remote_node(&table_name),
                         )?);
                         new_children.push(remote_scan);
@@ -323,15 +324,23 @@ impl TreeNodeRewriter for RemoteScanRewriter {
             }
         } else if node.name() == "HashJoinExec" {
             let mut new_children: Vec<Arc<dyn ExecutionPlan>> = vec![];
-            for child in node.children() {
+            let maintains_order = node.maintains_input_order();
+            for (i, child) in node.children().into_iter().enumerate() {
                 let mut visitor = TableNameVisitor::new();
                 child.visit(&mut visitor)?;
                 if !visitor.has_remote_scan {
                     let table_name = visitor.table_name.clone().unwrap();
+                    let input = merge_ordered_input(maintains_order[i], child.clone());
+                    let keeps_order = !Arc::ptr_eq(&input, child);
                     let remote_scan = Arc::new(RemoteScanExec::new(
-                        child.clone(),
+                        input,
                         self.remote_scan_nodes.get_remote_node(&table_name),
                     )?);
+                    // A round-robin repartition would interleave the merged streams again.
+                    if keeps_order {
+                        new_children.push(remote_scan);
+                        continue;
+                    }
                     // add repartition for better performance(imporve parallelism)
                     let output_partitioning = Partitioning::RoundRobinBatch(
                         child.output_partitioning().partition_count(),
@@ -351,6 +360,20 @@ impl TreeNodeRewriter for RemoteScanRewriter {
             return Ok(Transformed::yes(new_node));
         }
         Ok(Transformed::no(node))
+    }
+}
+
+// Followers interleave output partitions, so an input whose order the parent keeps is merged first.
+fn merge_ordered_input(
+    order_maintained: bool,
+    input: Arc<dyn ExecutionPlan>,
+) -> Arc<dyn ExecutionPlan> {
+    match input.output_ordering() {
+        Some(ordering) if order_maintained && input.output_partitioning().partition_count() > 1 => {
+            let fetch = input.fetch();
+            Arc::new(SortPreservingMergeExec::new(ordering.clone(), input).with_fetch(fetch))
+        }
+        _ => input,
     }
 }
 
@@ -1077,5 +1100,66 @@ mod tests {
             Ok(TreeNodeRecursion::Continue)
         })
         .unwrap();
+    }
+
+    fn remote_scan_inputs(plan: &Arc<dyn ExecutionPlan>) -> Vec<Arc<dyn ExecutionPlan>> {
+        let mut inputs = vec![];
+        plan.apply(|node| {
+            if node.downcast_ref::<RemoteScanExec>().is_some() {
+                inputs.push(Arc::clone(node.children()[0]));
+            }
+            Ok(TreeNodeRecursion::Continue)
+        })
+        .unwrap();
+        inputs
+    }
+
+    #[tokio::test]
+    async fn test_cluster_union_in_scan_order_merges_each_branch_before_remote_scan() {
+        let sql = "SELECT _timestamp, event_name FROM t WHERE value > 1 \
+            UNION ALL SELECT _timestamp, event_name FROM t WHERE value < 0 \
+            ORDER BY _timestamp DESC LIMIT 10";
+        let (ctx, plan) = cluster_plan(sql).await;
+        let inputs = remote_scan_inputs(&plan);
+        assert_eq!(inputs.len(), 2);
+        assert_eq!(decode_every_remote_scan(&ctx, &plan), 2);
+        for input in inputs {
+            assert_eq!(input.name(), "SortPreservingMergeExec");
+            assert_eq!(input.output_partitioning().partition_count(), 1);
+            assert_eq!(input.fetch(), Some(10));
+        }
+    }
+
+    #[tokio::test]
+    async fn test_cluster_unordered_union_keeps_branches_parallel() {
+        let sql = "SELECT event_name, count(*) AS n FROM (SELECT event_name FROM t WHERE value > 1 \
+            UNION ALL SELECT event_name FROM t WHERE value < 0) GROUP BY event_name";
+        let (_ctx, plan) = cluster_plan(sql).await;
+        let inputs = remote_scan_inputs(&plan);
+        assert!(!inputs.is_empty());
+        for input in inputs {
+            assert_ne!(input.name(), "SortPreservingMergeExec");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_cluster_join_probe_side_in_scan_order_merges_before_remote_scan() {
+        let sql = "SELECT b._timestamp FROM (SELECT event_name FROM t WHERE value > 1 LIMIT 5) a \
+            JOIN t b ON a.event_name = b.event_name ORDER BY b._timestamp DESC LIMIT 10";
+        let (ctx, plan) = cluster_plan(sql).await;
+        assert_eq!(decode_every_remote_scan(&ctx, &plan), 2);
+        let mut probe = None;
+        plan.apply(|node| {
+            if node.name() == "HashJoinExec" {
+                probe = Some(Arc::clone(node.children()[1]));
+            }
+            Ok(TreeNodeRecursion::Continue)
+        })
+        .unwrap();
+        let probe = probe.expect("a hash join");
+        assert_eq!(probe.name(), "RemoteScanExec");
+        let input = probe.children()[0];
+        assert_eq!(input.name(), "SortPreservingMergeExec");
+        assert_eq!(input.output_partitioning().partition_count(), 1);
     }
 }
