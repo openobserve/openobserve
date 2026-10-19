@@ -3037,6 +3037,16 @@ pub static RCA_RESUME_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
     )
     .expect("Metric created")
 });
+// RCA live stream (05 LU20; see core::alerts::rca_live)
+pub static RCA_LIVE_STREAMS: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new("rca_live_streams", "Open RCA live streams on this node")
+            .namespace(NAMESPACE)
+            .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
 // Deliberate: spec §14.1 says `org_id` and four `result` values; `organization` is the house label.
 pub static HEC_AUTH_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
@@ -3744,6 +3754,7 @@ pub(crate) fn register(registry: &Registry) {
         Box::new(RCA_ANSWER_WAIT_SECONDS.clone()),
         Box::new(RCA_FEEDBACK_TOTAL.clone()),
         Box::new(RCA_RESUME_TOTAL.clone()),
+        Box::new(RCA_LIVE_STREAMS.clone()),
     ] {
         registry.register(metric).expect("Metric registered");
     }

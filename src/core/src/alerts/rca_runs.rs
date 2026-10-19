@@ -328,10 +328,19 @@ pub async fn rca_detail(
     org_id: &str,
     incident: &alert_incidents::Model,
 ) -> anyhow::Result<Option<RcaSummary>> {
+    rca_detail_at(org_id, incident, now_micros()).await
+}
+
+/// [rca_detail] with `stale` judged at `now_us`.
+pub async fn rca_detail_at(
+    org_id: &str,
+    incident: &alert_incidents::Model,
+    now_us: i64,
+) -> anyhow::Result<Option<RcaSummary>> {
     let cfg = get_o2_config();
     let v1 = v1_reports_of(org_id, incident).await?;
     let stored =
-        runs_table::summary_from_incident(incident, now_micros(), cfg.incidents.rca_timeout_secs);
+        runs_table::summary_from_incident(incident, now_us, cfg.incidents.rca_timeout_secs);
     let Some(mut summary) = stored.or_else(|| v1.first().map(V1Report::summary)) else {
         return Ok(None);
     };

@@ -14,20 +14,18 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { defineComponent, ref, type Ref } from "vue";
+import { defineComponent, ref } from "vue";
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 
 vi.mock("@/services/incidents", () => ({
-  default: { getRcaSteering: vi.fn(), steerRca: vi.fn() },
+  default: { steerRca: vi.fn() },
 }));
 
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
-import incidentsService, { type RcaSteerRequest, type RcaSteering } from "@/services/incidents";
-import { rcaSteering, rcaSteeringLive } from "@/test/unit/fixtures/rcaThread";
-import { RCA_STEERING_POLL_MS, useRcaSteering, type RcaSteerSendResult } from "./useRcaSteering";
+import incidentsService, { type RcaSteerRequest } from "@/services/incidents";
+import { useRcaSteering, type RcaSteerSendResult } from "./useRcaSteering";
 
-const getRcaSteering = vi.mocked(incidentsService.getRcaSteering);
 const steerRca = vi.mocked(incidentsService.steerRca);
 
 const httpError = (status: number, data: unknown = {}) => ({
@@ -37,40 +35,34 @@ const httpError = (status: number, data: unknown = {}) => ({
 
 /** What the tests use of the composable. */
 interface Api {
-  steering: Ref<RcaSteering | null>;
   send: (request: RcaSteerRequest) => Promise<RcaSteerSendResult>;
 }
 
 interface Host {
   wrapper: VueWrapper;
   api: Api;
-  runId: Ref<string | null>;
-  live: Ref<boolean>;
 }
 
-const mountHost = (live = true, runId: string | null = "run-2"): Host => {
-  const runRef = ref<string | null>(runId);
-  const liveRef = ref(live);
+const mountHost = (): Host => {
   let api!: Api;
   const wrapper = mount(
     defineComponent({
       setup() {
-        api = useRcaSteering(ref("default"), ref<string | null>("inc-1"), runRef, liveRef);
+        api = useRcaSteering(ref("default"), ref<string | null>("inc-1"), ref("run-2"));
         return () => null;
       },
     }),
     { global: { plugins: [i18n, store] } },
   );
-  return { wrapper, api, runId: runRef, live: liveRef };
+  return { wrapper, api };
 };
 
-describe("useRcaSteering (04 §9.2, SG37)", () => {
+describe("useRcaSteering send (04 §9.1)", () => {
   let host: Host | null = null;
 
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(Date.UTC(2026, 9, 16, 12, 0, 0));
-    getRcaSteering.mockReset().mockResolvedValue({ data: rcaSteering() } as never);
     steerRca.mockReset().mockResolvedValue({ data: { run_state: "running" } } as never);
     vi.spyOn(console, "error").mockImplementation(() => {});
   });
@@ -82,126 +74,16 @@ describe("useRcaSteering (04 §9.2, SG37)", () => {
     vi.restoreAllMocks();
   });
 
-  it("reads the view of the run on mount", async () => {
-    getRcaSteering.mockResolvedValue({ data: rcaSteeringLive() } as never);
-    host = mountHost();
-    await flushPromises();
-
-    expect(getRcaSteering).toHaveBeenCalledWith("default", "inc-1", "run-2");
-    expect(host.api.steering.value?.items).toHaveLength(2);
-  });
-
-  it("polls every 4 s while live", async () => {
-    host = mountHost();
-    await flushPromises();
-    expect(getRcaSteering).toHaveBeenCalledTimes(1);
-
-    await vi.advanceTimersByTimeAsync(RCA_STEERING_POLL_MS - 1);
-    expect(getRcaSteering).toHaveBeenCalledTimes(1);
-    await vi.advanceTimersByTimeAsync(1);
-    expect(getRcaSteering).toHaveBeenCalledTimes(2);
-    await vi.advanceTimersByTimeAsync(RCA_STEERING_POLL_MS);
-    expect(getRcaSteering).toHaveBeenCalledTimes(3);
-  });
-
-  it("a run that is not live is read once and not polled", async () => {
-    host = mountHost(false);
-    await flushPromises();
-    await vi.advanceTimersByTimeAsync(RCA_STEERING_POLL_MS * 3);
-
-    expect(getRcaSteering).toHaveBeenCalledTimes(1);
-  });
-
-  it("when the run stops being live: one final read, then no more", async () => {
-    host = mountHost();
-    await flushPromises();
-    host.live.value = false;
-    await flushPromises();
-    expect(getRcaSteering).toHaveBeenCalledTimes(2);
-
-    await vi.advanceTimersByTimeAsync(RCA_STEERING_POLL_MS * 3);
-    expect(getRcaSteering).toHaveBeenCalledTimes(2);
-  });
-
-  it.each([403, 404])("a %s halts the reads and leaves no view", async (status) => {
-    getRcaSteering
-      .mockResolvedValueOnce({ data: rcaSteering() } as never)
-      .mockRejectedValueOnce(httpError(status));
-    host = mountHost();
-    await flushPromises();
-    expect(host.api.steering.value).not.toBeNull();
-
-    await vi.advanceTimersByTimeAsync(RCA_STEERING_POLL_MS);
-    expect(host.api.steering.value).toBeNull();
-    await vi.advanceTimersByTimeAsync(RCA_STEERING_POLL_MS * 3);
-    expect(getRcaSteering).toHaveBeenCalledTimes(2);
-  });
-
-  it("a 500 keeps the last view and the poll retries", async () => {
-    getRcaSteering
-      .mockResolvedValueOnce({ data: rcaSteeringLive() } as never)
-      .mockRejectedValueOnce(httpError(500));
-    host = mountHost();
-    await flushPromises();
-    await vi.advanceTimersByTimeAsync(RCA_STEERING_POLL_MS);
-
-    expect(host.api.steering.value?.items).toHaveLength(2);
-    await vi.advanceTimersByTimeAsync(RCA_STEERING_POLL_MS);
-    expect(getRcaSteering).toHaveBeenCalledTimes(3);
-  });
-
-  it("a new run id clears the view and reads the new run", async () => {
-    getRcaSteering.mockResolvedValue({ data: rcaSteeringLive() } as never);
-    host = mountHost();
-    await flushPromises();
-    getRcaSteering.mockResolvedValue({ data: rcaSteering() } as never);
-    host.runId.value = "run-3";
-    await flushPromises();
-
-    expect(getRcaSteering).toHaveBeenLastCalledWith("default", "inc-1", "run-3");
-    expect(host.api.steering.value?.items).toEqual([]);
-  });
-
-  it("unmount stops the poll", async () => {
-    host = mountHost();
-    await flushPromises();
-    host.wrapper.unmount();
-    host = null;
-    await vi.advanceTimersByTimeAsync(RCA_STEERING_POLL_MS * 3);
-
-    expect(getRcaSteering).toHaveBeenCalledTimes(1);
-  });
-
-  describe("send (§9.1)", () => {
-    it("POSTs the request, then re-reads the view at once", async () => {
+  describe("send", () => {
+    it("POSTs the request", async () => {
       host = mountHost();
       await flushPromises();
       const request = { text: "Check the orders pool", kind: "message" as const };
 
       const result = await host.api.send(request);
-      await flushPromises();
 
       expect(steerRca).toHaveBeenCalledWith("default", "inc-1", "run-2", request);
-      expect(result).toEqual({ ok: true, runState: "running" });
-      // Mount read + the refresh, before any 4 s tick.
-      expect(getRcaSteering).toHaveBeenCalledTimes(2);
-      expect(steerRca.mock.invocationCallOrder[0]).toBeLessThan(
-        getRcaSteering.mock.invocationCallOrder[1],
-      );
-    });
-
-    it("the refresh restarts the 4 s rhythm", async () => {
-      host = mountHost();
-      await flushPromises();
-      await vi.advanceTimersByTimeAsync(RCA_STEERING_POLL_MS - 1_000);
-      await host.api.send({ text: "x", kind: "message" });
-      await flushPromises();
-      expect(getRcaSteering).toHaveBeenCalledTimes(2);
-
-      await vi.advanceTimersByTimeAsync(RCA_STEERING_POLL_MS - 1);
-      expect(getRcaSteering).toHaveBeenCalledTimes(2);
-      await vi.advanceTimersByTimeAsync(1);
-      expect(getRcaSteering).toHaveBeenCalledTimes(3);
+      expect(result).toEqual({ ok: true });
     });
 
     it.each([
@@ -253,33 +135,5 @@ describe("useRcaSteering (04 §9.2, SG37)", () => {
 
       expect(result).toMatchObject({ ok: false, message: "Too many messages for this run." });
     });
-
-    it("a refused send re-reads the view at once", async () => {
-      steerRca.mockRejectedValue(httpError(409, { error_code: "duplicate_action" }));
-      host = mountHost();
-      await flushPromises();
-
-      await host.api.send({ text: "x", kind: "message" });
-      await flushPromises();
-
-      expect(getRcaSteering).toHaveBeenCalledTimes(2);
-    });
-
-    it.each(["run_closing", "run_not_steerable"])(
-      "a %s refusal is left to the 4 s poll (no read at once)",
-      async (code) => {
-        steerRca.mockRejectedValue(httpError(409, { error_code: code }));
-        host = mountHost();
-        await flushPromises();
-
-        const result = await host.api.send({ text: "x", kind: "message" });
-        await flushPromises();
-
-        expect(result).toMatchObject({ ok: false, code });
-        expect(getRcaSteering).toHaveBeenCalledTimes(1);
-        await vi.advanceTimersByTimeAsync(RCA_STEERING_POLL_MS);
-        expect(getRcaSteering).toHaveBeenCalledTimes(2);
-      },
-    );
   });
 });

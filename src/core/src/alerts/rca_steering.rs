@@ -1247,17 +1247,8 @@ pub(crate) async fn steering_view_with(
     let rows = steering_table::list_for_run(org_id, run_id)
         .await
         .map_err(internal)?;
-    let waiting = runs_table::to_item(&run).state == RunState::WaitingInput;
 
-    // The transcript only changes a row the agent may still read or ack, or names the question.
-    let needs_transcript = waiting
-        || rows.iter().any(|r| {
-            matches!(
-                r.status,
-                SteerStatus::Queued | SteerStatus::Delivered | SteerStatus::Read
-            )
-        });
-    let transcript = if needs_transcript {
+    let transcript = if steering_reads_transcript(&run, &rows) {
         deps.transcript(org_id, &run).await.unwrap_or_else(|e| {
             log::warn!("[RCA_STEERING] could not read the transcript of run {run_id}: {e:#}");
             None
@@ -1265,25 +1256,51 @@ pub(crate) async fn steering_view_with(
     } else {
         None
     };
+    Ok(build_steering_view(
+        incident.rca_run_id.as_deref(),
+        &run,
+        rows,
+        transcript.as_ref(),
+        can_steer_permission,
+    ))
+}
 
-    let steers = transcript_steers(transcript.as_ref());
-    let acks = first_acks(transcript.as_ref());
+/// The transcript only changes a row the agent may still read or ack, or names the question.
+pub fn steering_reads_transcript(run: &RunRow, rows: &[SteerRecord]) -> bool {
+    runs_table::to_item(run).state == RunState::WaitingInput
+        || rows.iter().any(|r| {
+            matches!(
+                r.status,
+                SteerStatus::Queued | SteerStatus::Delivered | SteerStatus::Read
+            )
+        })
+}
+
+/// The steering view from loaded rows; pass `transcript` only if [steering_reads_transcript].
+pub fn build_steering_view(
+    incident_run_id: Option<&str>,
+    run: &RunRow,
+    rows: Vec<SteerRecord>,
+    transcript: Option<&RunTranscript>,
+    can_steer_permission: bool,
+) -> SteeringView {
+    let steers = transcript_steers(transcript);
+    let acks = first_acks(transcript);
     let items = rows
         .into_iter()
         .map(|row| merge_row(row, &steers, &acks))
         .collect();
-    let open_question = if waiting {
-        open_question(&run, transcript.as_ref())
+    let open_question = if runs_table::to_item(run).state == RunState::WaitingInput {
+        open_question(run, transcript)
     } else {
         None
     };
-    let can_steer =
-        can_steer_permission && check_steerable(incident.rca_run_id.as_deref(), &run).is_ok();
-    Ok(SteeringView {
+    let can_steer = can_steer_permission && check_steerable(incident_run_id, run).is_ok();
+    SteeringView {
         items,
         open_question,
         can_steer,
-    })
+    }
 }
 
 fn open_question(run: &RunRow, transcript: Option<&RunTranscript>) -> Option<OpenQuestion> {

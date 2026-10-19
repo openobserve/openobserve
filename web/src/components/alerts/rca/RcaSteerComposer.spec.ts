@@ -22,10 +22,7 @@ import type { RcaSteerSendResult } from "@/composables/useRcaSteering";
 import { rcaSteeringPaused } from "@/test/unit/fixtures/rcaThread";
 
 const okSend = () =>
-  vi.fn<(text: string) => Promise<RcaSteerSendResult>>(async () => ({
-    ok: true,
-    runState: "running",
-  }));
+  vi.fn<(text: string) => Promise<RcaSteerSendResult>>(async () => ({ ok: true }));
 
 const mountComposer = (props: Record<string, unknown> = {}) =>
   mount(RcaSteerComposer, {

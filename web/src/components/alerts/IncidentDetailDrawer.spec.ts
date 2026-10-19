@@ -64,9 +64,7 @@ vi.mock("@/services/incidents", async (importOriginal) => {
       cancelRca: vi.fn(),
       getRcaFeedback: vi.fn(),
       getRcaRun: vi.fn(),
-      getRcaThread: vi.fn(),
-      getRcaSummary: vi.fn(),
-      getRcaSteering: vi.fn(),
+      openRcaLiveStream: vi.fn(),
       getCorrelatedStreams: vi.fn(),
       getEvents: vi.fn(),
       updateIncident: vi.fn(),
@@ -109,12 +107,14 @@ import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import {
   rcaRunSummaryLive,
+  rcaSteering,
   rcaSummary,
   rcaRun,
   rcaRunItem,
   rcaV1RunItem,
   rcaV1Summary,
 } from "@/test/unit/fixtures/rcaThread";
+import type { RcaLiveEvent } from "@/services/incidents";
 import awsConfig from "@/aws-exports";
 
 // Test data factory
@@ -152,6 +152,14 @@ const createAlert = (overrides: Partial<IncidentAlert> = {}): IncidentAlert => (
   correlation_reason: overrides.correlation_reason || "service_discovery",
   created_at: overrides.created_at || 1700000000000000,
 });
+
+/** One live stream the drawer opened; the test drives it. */
+interface Connection {
+  runId: string | null;
+  emit: (event: RcaLiveEvent) => void;
+}
+
+const connections: Connection[] = [];
 
 describe("IncidentDetailDrawer.vue", () => {
   let wrapper: VueWrapper<any>;
@@ -264,29 +272,14 @@ describe("IncidentDetailDrawer.vue", () => {
       } as never),
     );
 
-    vi.mocked(incidentsService.getRcaThread).mockResolvedValue({
-      data: {
-        run_id: "run-2",
-        state_version: "1.1.1",
-        not_modified: false,
-        active: true,
-        transcript: "available",
-        started: { at: 1700000000000000, prompt: "Analyze incident 1" },
-        steps: [],
-        user_messages: [],
-        questions: [],
-        report_submitted: false,
-        stats: { steps: 0, tool_calls: 0, duration_ms: 0 },
+    // The stream stays open until the test unmounts; tests push events into it.
+    connections.length = 0;
+    vi.mocked(incidentsService.openRcaLiveStream).mockImplementation(
+      (_org, _id, runId, { onEvent }) => {
+        connections.push({ runId, emit: onEvent });
+        return new Promise<{ ended: boolean }>(() => {});
       },
-    } as never);
-
-    vi.mocked(incidentsService.getRcaSummary).mockImplementation((_org, _id, runId) =>
-      Promise.resolve({ data: rcaRunSummaryLive({ run_id: runId }) } as never),
     );
-
-    vi.mocked(incidentsService.getRcaSteering).mockResolvedValue({
-      data: { items: [], open_question: null, can_steer: true },
-    } as never);
     vi.mocked(incidentsService.cancelRca).mockResolvedValue({
       data: { run_id: "run-2", cancelled: true },
     } as never);
@@ -1410,7 +1403,7 @@ describe("IncidentDetailDrawer.vue", () => {
   // Testing loading state UI presentation is better handled through visual regression tests
   // Component logic tests should focus on loading state management, not CSS/layout
 
-  describe("RR-35: run state polling", () => {
+  describe("RR-35: run state live stream", () => {
     const summaryFor = (state: "running" | "completed", reportRunId: string | null) => ({
       run_id: "run-2",
       state,
@@ -1456,41 +1449,7 @@ describe("IncidentDetailDrawer.vue", () => {
       vi.useRealTimers();
     });
 
-    it("polls the detail while live, stops after terminal + one final read, and shows the new report", async () => {
-      vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
-      const get = vi.mocked(incidentsService.get);
-      get
-        .mockResolvedValueOnce({
-          data: createIncidentWithAlerts({ id: "1", rca: summaryFor("running", "run-1") }),
-        } as never)
-        .mockResolvedValueOnce({
-          data: createIncidentWithAlerts({ id: "1", rca: summaryFor("running", "run-1") }),
-        } as never)
-        .mockResolvedValue({
-          data: createIncidentWithAlerts({ id: "1", rca: summaryFor("completed", "run-2") }),
-        } as never);
-      wrapper = await createWrapper({}, {}, "1");
-      await flushPromises();
-      const afterLoad = get.mock.calls.length;
-      expect(wrapper.vm.rcaReportText).toContain("Report of run-1");
-
-      await vi.advanceTimersByTimeAsync(10_000);
-      await flushPromises();
-      expect(get.mock.calls.length).toBe(afterLoad + 1);
-
-      await vi.advanceTimersByTimeAsync(10_000);
-      await flushPromises();
-      expect(get.mock.calls.length).toBe(afterLoad + 2);
-      expect(wrapper.vm.rcaSummary.state).toBe("completed");
-
-      await vi.advanceTimersByTimeAsync(60_000);
-      await flushPromises();
-      expect(get.mock.calls.length).toBe(afterLoad + 2);
-      expect(incidentsService.getRcaRun).toHaveBeenCalledWith("default", "1", "run-2");
-      expect(wrapper.vm.rcaReportText).toContain("Report of run-2");
-    });
-
-    it("E5 / TH32: the Analysis tab shows the analysis and thread columns and reads the live run's thread", async () => {
+    it("E5 / TH32: the Analysis tab shows the analysis and thread columns and streams the live run", async () => {
       vi.mocked(incidentsService.get).mockResolvedValue({
         data: createIncidentWithAlerts({ id: "1", rca: summaryFor("running", "run-1") }),
       } as never);
@@ -1499,6 +1458,28 @@ describe("IncidentDetailDrawer.vue", () => {
 
       wrapper.vm.activeTab = "incidentAnalysis";
       await flushPromises();
+      const stream = connections.at(-1)!;
+      expect(stream.runId).toBe("run-2");
+      stream.emit({
+        event: "thread",
+        data: {
+          run_id: "run-2",
+          state_version: "1.1.1",
+          not_modified: false,
+          active: true,
+          transcript: "available",
+          started: { at: 1700000000000000, prompt: "Analyze incident 1" },
+          steps: [],
+          user_messages: [],
+          questions: [],
+          report_submitted: false,
+          stats: { steps: 0, tool_calls: 0, duration_ms: 0 },
+        },
+      } as never);
+      // 03 §12: the summary of the same run, carried by the same stream.
+      stream.emit({ event: "summary", data: rcaRunSummaryLive({ run_id: "run-2" }) });
+      stream.emit({ event: "steering", data: rcaSteering() });
+      await flushPromises();
 
       const panel = wrapper.find('[data-test="rca-analysis-container"]');
       expect(panel.find('[data-test="rca-analysis-bar"]').exists()).toBe(true);
@@ -1506,26 +1487,14 @@ describe("IncidentDetailDrawer.vue", () => {
       expect(panel.find('[data-test="rca-thread-column"]').exists()).toBe(true);
       expect(panel.find('[data-test="rca-thread-live-pill"]').exists()).toBe(true);
       expect(panel.findAll('[role="tab"]')).toHaveLength(0);
-      expect(incidentsService.getRcaThread).toHaveBeenCalledWith(
-        "default",
-        "1",
-        "run-2",
-        undefined,
-      );
-      // 03 §12: the summary of the same run, read with the thread.
-      expect(incidentsService.getRcaSummary).toHaveBeenCalledWith(
-        "default",
-        "1",
-        "run-2",
-        undefined,
-      );
+      expect(incidentsService.get).toHaveBeenCalledTimes(1);
       expect(panel.find('[data-test="rca-verdict-headline"]').text()).toBe(
         "Leading: Deploy 4f2c1e exhausted the orders-db pool",
       );
       expect(panel.find('[data-test="rca-hypotheses"]').exists()).toBe(true);
     });
 
-    it("K: with no run the Analysis tab offers Analyze and reads no thread", async () => {
+    it("K: with no run the Analysis tab offers Analyze and streams no run", async () => {
       wrapper = await createWrapper({}, {}, "1");
       await flushPromises();
 
@@ -1534,8 +1503,7 @@ describe("IncidentDetailDrawer.vue", () => {
 
       expect(wrapper.find('[data-test="trigger-rca-btn"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="rca-thread-column"]').exists()).toBe(false);
-      expect(incidentsService.getRcaThread).not.toHaveBeenCalled();
-      expect(incidentsService.getRcaSummary).not.toHaveBeenCalled();
+      expect(connections.every((c) => c.runId === null)).toBe(true);
     });
 
     it("v1: an incident with only a pre-upgrade report shows its report and reads no run record", async () => {
@@ -1556,13 +1524,11 @@ describe("IncidentDetailDrawer.vue", () => {
       expect(wrapper.find('[data-test="rca-existing-container"]').text()).toContain(
         "Report of v1-0",
       );
-      expect(incidentsService.getRcaThread).not.toHaveBeenCalled();
-      expect(incidentsService.getRcaSummary).not.toHaveBeenCalled();
-      expect(incidentsService.getRcaSteering).not.toHaveBeenCalled();
+      expect(connections.every((c) => c.runId === null)).toBe(true);
       expect(incidentsService.getRcaFeedback).not.toHaveBeenCalled();
     });
 
-    it("v1: picking a pre-upgrade report shows it and reads no thread or summary for it", async () => {
+    it("v1: picking a pre-upgrade report shows it and streams no thread or summary for it", async () => {
       const latest = rcaRunItem({ run_id: "run-2" });
       vi.mocked(incidentsService.get).mockResolvedValue({
         data: createIncidentWithAlerts({
@@ -1587,10 +1553,8 @@ describe("IncidentDetailDrawer.vue", () => {
       expect(wrapper.find('[data-test="rca-existing-container"]').text()).toContain(
         "Report of v1-0",
       );
-      for (const read of [incidentsService.getRcaThread, incidentsService.getRcaSummary]) {
-        expect(read).not.toHaveBeenCalledWith("default", "1", "v1-0", undefined);
-      }
-      expect(incidentsService.getRcaSteering).not.toHaveBeenCalledWith("default", "1", "v1-0");
+      expect(connections.map((c) => c.runId)).not.toContain("v1-0");
+      expect(connections.at(-1)!.runId).toBeNull();
     });
   });
 

@@ -5,15 +5,20 @@
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 
-import { computed, onScopeDispose, ref, watch, type Ref } from "vue";
+import { computed, onScopeDispose, ref, shallowRef, watch, type Ref } from "vue";
 import { isAxiosError } from "axios";
 import { useQueryClient } from "@tanstack/vue-query";
 import incidentsService, {
   type IncidentWithAlerts,
+  type RcaLiveError,
+  type RcaLiveEvent,
   type RcaRunError,
   type RcaRunItem,
   type RcaRunState,
+  type RcaRunSummary,
+  type RcaSteering,
   type RcaSummary,
+  type RcaThread,
 } from "@/services/incidents";
 import { incidentKeys } from "@/services/incidents.querykeys";
 import { useRcaTrigger } from "@/composables/useRcaTrigger";
@@ -21,8 +26,21 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { isLiveRca } from "@/utils/incidents/rcaCell";
 import { raw, useI18nTyped } from "@/types/i18n";
 
-/** How often the incident detail is re-read while its latest run is live. */
-export const RCA_POLL_INTERVAL_MS = 10_000;
+/** How a part of the shown run reads: its data, or why there is none (02 TH32, 05 LU17). */
+export type RcaReadStatus =
+  | "idle"
+  | "loading"
+  | "ready"
+  | "expired"
+  | "incomplete"
+  | "unavailable"
+  | "unsupported"
+  | "missing";
+
+/** LU16: the waits before each reconnect of a dropped live stream; the last repeats. */
+export const RCA_LIVE_RECONNECT_MS = [1_000, 2_000, 4_000, 8_000, 16_000, 30_000];
+
+const isLiveState = (state: RcaRunState) => state === "running" || state === "waiting_input";
 
 /** The server message of a rejected request, if it sent one. */
 const serverMessage = (error: unknown): string | null => {
@@ -36,8 +54,12 @@ const serverMessage = (error: unknown): string | null => {
     : null;
 };
 
-/** RR-35: incident detail owns run state; report text is loaded separately. */
-export function useIncidentRca(orgRef: Ref<string>, incidentRef: Ref<IncidentWithAlerts | null>) {
+/** RR-35: run state, report text and, over one live stream (05 LU15), the shown run's parts. */
+export function useIncidentRca(
+  orgRef: Ref<string>,
+  incidentRef: Ref<IncidentWithAlerts | null>,
+  analysisOpen: Ref<boolean>,
+) {
   const { t } = useI18nTyped();
   const { requestRca, requestResume } = useRcaTrigger();
   const queryClient = useQueryClient();
@@ -90,6 +112,28 @@ export function useIncidentRca(orgRef: Ref<string>, incidentRef: Ref<IncidentWit
   const threadLive = computed(
     () => live.value && threadRunId.value !== null && threadRunId.value === summary.value?.run_id,
   );
+
+  /** A v1 run is a pre-upgrade report: markdown only, with no thread, record, steering or feedback. */
+  const threadRunIsV1 = computed(() => {
+    const id = threadRunId.value;
+    const run =
+      history.value.find((item) => item.run_id === id) ??
+      (id && id === summary.value?.run_id ? summary.value : null);
+    return run?.report_format === "v1";
+  });
+
+  // LU15: the run the stream reads while the Analysis tab is open; the run-scoped parts
+  // answer 404 for a v1 run, so it has none.
+  const liveRunId = computed(() =>
+    analysisOpen.value && !threadRunIsV1.value ? threadRunId.value : null,
+  );
+
+  const thread = shallowRef<RcaThread | null>(null);
+  const threadStatus = ref<RcaReadStatus>("idle");
+  const runSummary = shallowRef<RcaRunSummary | null>(null);
+  const runSummaryStatus = ref<RcaReadStatus>("idle");
+  const steering = shallowRef<RcaSteering | null>(null);
+  const steeringStatus = ref<RcaReadStatus>("idle");
 
   // Report text per run id. A completed run's report never changes.
   const reports = ref<Record<string, string>>({});
@@ -170,30 +214,151 @@ export function useIncidentRca(orgRef: Ref<string>, incidentRef: Ref<IncidentWit
     }
   };
 
-  let pollTimer: number | null = null;
+  /** LU17: a transcript error reaches the thread and, unless it holds a finished run's record, the summary. */
+  const applyTranscriptError = ({ status, error_code }: RcaLiveError) => {
+    if (status === 410 || status === 404) {
+      thread.value = null;
+      threadStatus.value =
+        status === 404
+          ? "missing"
+          : error_code === "transcript_incomplete"
+            ? "incomplete"
+            : "expired";
+      if (!runSummary.value || isLiveState(runSummary.value.state)) {
+        runSummary.value = null;
+        runSummaryStatus.value = status === 404 ? "missing" : "expired";
+      }
+      return;
+    }
+    if (!thread.value) threadStatus.value = "unavailable";
+    const summaryData = runSummary.value;
+    // A live summary of a run that ended is out of date: drop it (02 TH32 clearOnTerminalError).
+    if (summaryData && isLiveState(summaryData.state) && !threadLive.value) runSummary.value = null;
+    if (!runSummary.value) runSummaryStatus.value = "unavailable";
+  };
 
-  const stopPolling = () => {
-    if (pollTimer) {
-      clearInterval(pollTimer);
-      pollTimer = null;
+  const applyLiveEvent = (event: RcaLiveEvent) => {
+    switch (event.event) {
+      case "rca":
+        // The stream is newer than any detail read still in flight.
+        reloadGeneration += 1;
+        if (incidentRef.value) incidentRef.value.rca = event.data;
+        break;
+      case "thread":
+        thread.value = event.data;
+        threadStatus.value = "ready";
+        break;
+      case "summary":
+        runSummary.value = event.data;
+        runSummaryStatus.value = "ready";
+        break;
+      case "steering":
+        steering.value = event.data;
+        steeringStatus.value = "ready";
+        break;
+      case "error":
+        if (event.data.part === "transcript") applyTranscriptError(event.data);
+        else if (event.data.part === "steering") steeringStatus.value = "unavailable";
+        else console.error("RCA live stream could not read the analysis state:", event.data);
+        break;
+      case "end":
+        break;
     }
   };
 
-  const startPolling = () => {
-    if (pollTimer) return;
-    pollTimer = window.setInterval(() => void reload(), RCA_POLL_INTERVAL_MS);
+  /** LU15: hold a stream while the latest run is live or the Analysis tab is open. */
+  const liveWanted = computed(() => live.value || analysisOpen.value);
+
+  let connection: AbortController | null = null;
+  let reconnectTimer: number | undefined;
+  let reconnects = 0;
+
+  const closeLive = () => {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = undefined;
+    connection?.abort();
+    connection = null;
   };
 
+  const setPartStatus = (status: RcaReadStatus) => {
+    threadStatus.value = status;
+    runSummaryStatus.value = status;
+    steeringStatus.value = status;
+  };
+
+  const openLive = () => {
+    closeLive();
+    const incidentId = incidentRef.value?.id;
+    if (!incidentId || !liveWanted.value) return;
+    const controller = new AbortController();
+    connection = controller;
+    // LU16: reconnect after a drop, a network error or a 5xx; the wait grows until an event arrives.
+    const reconnect = () => {
+      if (connection !== controller) return;
+      const wait = RCA_LIVE_RECONNECT_MS[Math.min(reconnects, RCA_LIVE_RECONNECT_MS.length - 1)];
+      reconnects += 1;
+      reconnectTimer = window.setTimeout(openLive, wait);
+    };
+    incidentsService
+      .openRcaLiveStream(orgRef.value, incidentId, liveRunId.value, {
+        signal: controller.signal,
+        onEvent: (event) => {
+          if (connection !== controller) return;
+          reconnects = 0;
+          applyLiveEvent(event);
+        },
+      })
+      .then(({ ended }) => {
+        if (ended) {
+          if (connection === controller) connection = null;
+        } else reconnect();
+      })
+      .catch((error: unknown) => {
+        if (connection !== controller) return;
+        const status =
+          error instanceof Error && "status" in error && typeof error.status === "number"
+            ? error.status
+            : 0;
+        if (status === 403 || status === 404) {
+          connection = null;
+          thread.value = null;
+          runSummary.value = null;
+          steering.value = null;
+          setPartStatus(status === 403 ? "unsupported" : "missing");
+          return;
+        }
+        console.error("RCA live stream failed:", error);
+        reconnect();
+      });
+  };
+
+  // A new incident, run or tab state starts the parts over on a new stream.
   watch(
-    [live, () => incidentRef.value?.id] as const,
-    ([isLive, id], previous) => {
-      if (isLive) startPolling();
-      else stopPolling();
-      // The run of this incident just ended: its list row changed too.
-      if (!isLive && previous?.[0] && previous[1] === id) invalidateList(orgRef.value);
+    [orgRef, () => incidentRef.value?.id, liveRunId, liveWanted] as const,
+    () => {
+      thread.value = null;
+      runSummary.value = null;
+      steering.value = null;
+      setPartStatus(liveRunId.value && liveWanted.value ? "loading" : "idle");
+      reconnects = 0;
+      openLive();
     },
     { immediate: true },
   );
+
+  /** Reconnect at once (LU17). */
+  const retryLive = () => {
+    for (const status of [threadStatus, runSummaryStatus, steeringStatus]) {
+      if (status.value === "unavailable") status.value = "loading";
+    }
+    reconnects = 0;
+    openLive();
+  };
+
+  watch([live, () => incidentRef.value?.id] as const, ([isLive, id], previous) => {
+    // The run of this incident just ended: its list row changed too.
+    if (!isLive && previous?.[0] && previous[1] === id) invalidateList(orgRef.value);
+  });
 
   /** Show a completed run's report and thread; null (or the latest run) follows the latest run. */
   const viewRun = (runId: string | null) => {
@@ -344,7 +509,7 @@ export function useIncidentRca(orgRef: Ref<string>, incidentRef: Ref<IncidentWit
   };
 
   onScopeDispose(() => {
-    stopPolling();
+    closeLive();
     lifecycle.abort();
   });
 
@@ -361,6 +526,14 @@ export function useIncidentRca(orgRef: Ref<string>, incidentRef: Ref<IncidentWit
     displayedRunId,
     threadRunId,
     threadLive,
+    threadRunIsV1,
+    thread,
+    threadStatus,
+    runSummary,
+    runSummaryStatus,
+    steering,
+    steeringStatus,
+    retryLive,
     reportText,
     reportLoading,
     triggering,

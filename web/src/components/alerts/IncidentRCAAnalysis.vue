@@ -232,11 +232,13 @@ import type {
   RcaRunItem,
   RcaRunState,
   RcaRunStats,
+  RcaRunSummary,
   RcaSteerAction,
+  RcaSteering,
   RcaSummary,
+  RcaThread,
 } from "@/services/incidents";
-import { useRcaThread } from "@/composables/useRcaThread";
-import { useRcaSummary } from "@/composables/useRcaSummary";
+import type { RcaReadStatus } from "@/composables/useIncidentRca";
 import { useRcaSteering } from "@/composables/useRcaSteering";
 import { useViewerTimezone } from "@/composables/downtimes/useViewerTimezone";
 import { formatTimestampInTimezone } from "@/utils/date";
@@ -293,8 +295,16 @@ const props = withDefaults(
     reportLoading?: boolean;
     /** The run whose thread shows: the picked run, else the latest. */
     threadRunId?: string | null;
-    /** The thread's run is live; its thread is polled (02 TH32). */
+    /** The thread's run is the latest and live. */
     threadLive?: boolean;
+    /** The thread's run is a pre-upgrade report with no thread, record or steering. */
+    threadRunIsV1?: boolean;
+    /** The thread, summary and steering of the thread's run, from the live stream (05 LU17). */
+    thread?: RcaThread | null;
+    threadStatus?: RcaReadStatus;
+    runSummary?: RcaRunSummary | null;
+    runSummaryStatus?: RcaReadStatus;
+    steering?: RcaSteering | null;
     triggering?: boolean;
     cancelling?: boolean;
     resumeRunId?: string | null;
@@ -312,6 +322,12 @@ const props = withDefaults(
     reportLoading: false,
     threadRunId: null,
     threadLive: false,
+    threadRunIsV1: false,
+    thread: null,
+    threadStatus: "idle",
+    runSummary: null,
+    runSummaryStatus: "idle",
+    steering: null,
     triggering: false,
     cancelling: false,
     resumeRunId: null,
@@ -324,8 +340,8 @@ const emit = defineEmits<{
   "trigger-rca": [options: { buildOnPrevious: boolean; guidance?: string }];
   "cancel-rca": [];
   "view-run": [runId: string | null];
-  /** A message resumed the paused run: the run state changed (04 SG18). */
-  steered: [];
+  /** "Try again" on a thread that could not be read: reconnect the live stream. */
+  "retry-live": [];
   /** "Resume run" on L, E or the `resume_run` blind spot (J9). */
   "resume-rca": [runId: string];
   /** "Ask about this analysis" (J5): the hand-off payload for a new AI chat. */
@@ -350,34 +366,16 @@ const currentRun = computed(() => props.rca?.current_run ?? null);
 const findRun = (runId: string | null | undefined) =>
   runId ? (props.history.find((run) => run.run_id === runId) ?? null) : null;
 
-/** A v1 run is a pre-upgrade report: markdown only, with no thread, record, steering or feedback. */
-const threadRunIsV1 = computed(() => {
-  const id = props.threadRunId;
-  const run = findRun(id) ?? (id && id === props.rca?.run_id ? props.rca : null);
-  return run?.report_format === "v1";
-});
+const threadRunIsV1 = toRef(props, "threadRunIsV1");
 
-// The run-scoped routes answer 404 for a v1 run, so nothing is read for one.
+// The run-scoped routes answer 404 for a v1 run, so a v1 run takes no steering.
 const recordRunId = computed(() => (threadRunIsV1.value ? null : props.threadRunId));
 
-const {
-  thread,
-  status: threadStatus,
-  retry: retryThread,
-} = useRcaThread(
-  toRef(props, "orgId"),
-  toRef(props, "incidentId"),
-  recordRunId,
-  toRef(props, "threadLive"),
-);
-
-// The summary view of the same run, polled with the thread (03 §12).
-const { summary, status: summaryStatus } = useRcaSummary(
-  toRef(props, "orgId"),
-  toRef(props, "incidentId"),
-  recordRunId,
-  toRef(props, "threadLive"),
-);
+const thread = toRef(props, "thread");
+const threadStatus = toRef(props, "threadStatus");
+const summary = toRef(props, "runSummary");
+const summaryStatus = toRef(props, "runSummaryStatus");
+const retryThread = () => emit("retry-live");
 
 /** The summary of a run with a record (live or stored); null for legacy runs and errors. */
 const recordSummary = computed(() => {
@@ -543,16 +541,13 @@ const threadRunStats = computed<RcaRunStats | null>(() => {
 const threadColumn = ref<InstanceType<typeof RcaThreadColumn> | null>(null);
 const followThread = () => void threadColumn.value?.scrollToLatest();
 
-// Steering (04 SG37–SG40, H16): the rows, the open question and `can_steer` of the thread's run, polled with the thread.
-const {
-  steering,
-  sending: steerSending,
-  send: steer,
-} = useRcaSteering(
+// Steering (04 SG37–SG40, H16): the rows, the open question and `can_steer` of the thread's run.
+// A sent row and a resumed run arrive on the live stream (05 LU18).
+const steering = toRef(props, "steering");
+const { sending: steerSending, send: steer } = useRcaSteering(
   toRef(props, "orgId"),
   toRef(props, "incidentId"),
   recordRunId,
-  toRef(props, "threadLive"),
 );
 
 const authorEmail = computed<string>(() => store.state.userInfo?.email ?? "");
@@ -566,16 +561,7 @@ const canSteer = computed(
     steering.value?.can_steer === true,
 );
 
-const afterSend = (runState: RcaRunState) => {
-  // An answer resumes a paused run: re-read the detail so the card leaves frame D.
-  if (runState !== props.rca?.state) emit("steered");
-};
-
-const sendMessage = async (text: string) => {
-  const result = await steer({ text, kind: "message" });
-  if (result.ok) afterSend(result.runState);
-  return result;
-};
+const sendMessage = (text: string) => steer({ text, kind: "message" });
 
 const sendHypothesisAction = async (request: { hypothesisId: string; action: RcaSteerAction }) => {
   // The server writes the text of an action (SG31).
@@ -585,8 +571,7 @@ const sendHypothesisAction = async (request: { hypothesisId: string; action: Rca
     action: request.action,
     hypothesis_id: request.hypothesisId,
   });
-  if (result.ok) afterSend(result.runState);
-  else toast({ variant: "error", message: result.message });
+  if (!result.ok) toast({ variant: "error", message: result.message });
 };
 
 const pendingActions = computed(() => rcaPendingHypothesisActions(steering.value?.items ?? []));

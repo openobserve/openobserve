@@ -28,23 +28,52 @@ vi.mock("@/services/incidents", () => ({
     triggerRca: vi.fn(),
     resumeRca: vi.fn(),
     cancelRca: vi.fn(),
+    openRcaLiveStream: vi.fn(),
   },
 }));
 
 import incidentsService, {
   type IncidentWithAlerts,
+  type RcaLiveEvent,
   type RcaRun,
   type RcaRunError,
   type RcaRunItem,
   type RcaRunState,
+  type RcaRunSummary,
+  type RcaSteering,
   type RcaSummary,
+  type RcaThread,
 } from "@/services/incidents";
 import { incidentKeys } from "@/services/incidents.querykeys";
 import { queryClient } from "@/composables/query/queryClient";
-import { RCA_POLL_INTERVAL_MS, useIncidentRca } from "./useIncidentRca";
-import { rcaV1RunItem, rcaV1Summary } from "@/test/unit/fixtures/rcaThread";
+import { useIncidentRca, type RcaReadStatus } from "./useIncidentRca";
+import {
+  rcaRunSummary,
+  rcaRunSummaryLive,
+  rcaSteering,
+  rcaThread,
+  rcaV1RunItem,
+  rcaV1Summary,
+} from "@/test/unit/fixtures/rcaThread";
 
 const service = vi.mocked(incidentsService);
+
+/** One live stream the composable opened; the test drives it. */
+interface Connection {
+  org: string;
+  incidentId: string;
+  runId: string | null;
+  signal: AbortSignal;
+  emit: (event: RcaLiveEvent) => void;
+  /** The server sends `end` and closes. */
+  end: () => void;
+  /** The connection closes without `end`. */
+  drop: () => void;
+  /** The stream does not open: `status` 0 is a network error. */
+  fail: (status: number) => void;
+}
+
+const connections: Connection[] = [];
 
 const T0 = 1_760_000_000_000_000; // microseconds
 
@@ -109,15 +138,23 @@ interface IncidentRcaApi {
   triggering: Readonly<Ref<boolean>>;
   resuming: Readonly<Ref<boolean>>;
   resumeRunId: Readonly<Ref<string | null>>;
+  thread: Readonly<Ref<RcaThread | null>>;
+  threadStatus: Readonly<Ref<RcaReadStatus>>;
+  runSummary: Readonly<Ref<RcaRunSummary | null>>;
+  runSummaryStatus: Readonly<Ref<RcaReadStatus>>;
+  steering: Readonly<Ref<RcaSteering | null>>;
+  steeringStatus: Readonly<Ref<RcaReadStatus>>;
   trigger: (options?: { buildOnPrevious?: boolean }) => Promise<void>;
   resume: (runId: string) => Promise<void>;
   cancel: () => Promise<void>;
   reload: () => Promise<void>;
   viewRun: (runId: string | null) => void;
+  retryLive: () => void;
 }
 
 interface Host {
   incident: Ref<IncidentWithAlerts | null>;
+  analysisOpen: Ref<boolean>;
   api: IncidentRcaApi;
   wrapper: VueWrapper;
 }
@@ -127,16 +164,17 @@ function mountHost(initial: RcaSummary | null): Host {
     id: "inc-1",
     rca: initial,
   } as IncidentWithAlerts) as Ref<IncidentWithAlerts | null>;
+  const analysisOpen = ref(false);
   let api!: Host["api"];
   const wrapper = mount(
     defineComponent({
       setup() {
-        api = useIncidentRca(ref("default"), incident);
+        api = useIncidentRca(ref("default"), incident, analysisOpen);
         return () => null;
       },
     }),
   );
-  return { incident, api, wrapper };
+  return { incident, analysisOpen, api, wrapper };
 }
 
 describe("useIncidentRca (RR-35)", () => {
@@ -145,9 +183,32 @@ describe("useIncidentRca (RR-35)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useFakeTimers();
+    connections.length = 0;
     service.getRcaRun.mockImplementation((_org, _id, runId) =>
       Promise.resolve({ data: { run_id: runId, report: `report of ${runId}` } } as never),
     );
+    service.openRcaLiveStream.mockImplementation((org, incidentId, runId, { onEvent, signal }) => {
+      const { promise, resolve, reject } = Promise.withResolvers<{ ended: boolean }>();
+      connections.push({
+        org,
+        incidentId,
+        runId,
+        signal: signal!,
+        emit: onEvent,
+        end: () => {
+          onEvent({ event: "end", data: { state: "completed" } });
+          resolve({ ended: true });
+        },
+        drop: () => resolve({ ended: false }),
+        fail: (status) =>
+          reject(
+            status === 0
+              ? new TypeError("Failed to fetch")
+              : Object.assign(new Error("refused"), { name: "RcaLiveStreamRefused", status }),
+          ),
+      });
+      return promise;
+    });
   });
 
   afterEach(() => {
@@ -156,54 +217,203 @@ describe("useIncidentRca (RR-35)", () => {
     vi.useRealTimers();
   });
 
-  it("polls the detail while live and stops after terminal + one final read", async () => {
-    service.get
-      .mockResolvedValueOnce(detail(rca("running", "run-1", null)) as never)
-      .mockResolvedValueOnce(detail(rca("completed", "run-1", "run-1")) as never);
-    host = mountHost(rca("running", "run-1", null));
-    await flushPromises();
-    expect(service.get).not.toHaveBeenCalled();
+  describe("live stream (05 LU15–LU17, LU19)", () => {
+    it("LU15: a live run opens one stream; the Analysis tab adds its run and closing drops it", async () => {
+      host = mountHost(rca("running", "run-1", null));
+      await flushPromises();
+      expect(connections.map((c) => c.runId)).toEqual([null]);
+      expect(connections[0].org).toBe("default");
+      expect(connections[0].incidentId).toBe("inc-1");
 
-    await vi.advanceTimersByTimeAsync(RCA_POLL_INTERVAL_MS);
-    expect(service.get).toHaveBeenCalledTimes(1);
-    expect(service.get).toHaveBeenCalledWith("default", "inc-1");
-    expect(host.api.live.value).toBe(true);
+      host.analysisOpen.value = true;
+      await flushPromises();
+      expect(connections.map((c) => c.runId)).toEqual([null, "run-1"]);
+      expect(connections[0].signal.aborted).toBe(true);
+      expect(host.api.threadStatus.value).toBe("loading");
 
-    await vi.advanceTimersByTimeAsync(RCA_POLL_INTERVAL_MS);
-    expect(service.get).toHaveBeenCalledTimes(2);
-    expect(host.api.state.value).toBe("completed");
-    expect(host.api.live.value).toBe(false);
+      host.analysisOpen.value = false;
+      await flushPromises();
+      expect(connections.map((c) => c.runId)).toEqual([null, "run-1", null]);
+      expect(connections[1].signal.aborted).toBe(true);
+    });
 
-    await vi.advanceTimersByTimeAsync(RCA_POLL_INTERVAL_MS * 5);
-    expect(service.get).toHaveBeenCalledTimes(2);
-    // The run that finished elsewhere shows its report without a reload.
-    expect(service.getRcaRun).toHaveBeenCalledWith("default", "inc-1", "run-1");
-    expect(host.api.reportText.value).toBe("report of run-1");
-  });
+    it("LU15: a finished incident streams only while the tab is open, for the shown run", async () => {
+      const finished = rca("completed", "run-2", "run-2");
+      finished.history = [reportRun("run-2"), reportRun("run-1")];
+      host = mountHost(finished);
+      await flushPromises();
+      expect(connections).toHaveLength(0);
 
-  it("a finished incident does not poll", async () => {
-    host = mountHost(rca("completed", "run-1", "run-1"));
+      host.analysisOpen.value = true;
+      await flushPromises();
+      host.api.viewRun("run-1");
+      await flushPromises();
+      expect(connections.map((c) => c.runId)).toEqual(["run-2", "run-1"]);
+    });
 
-    await vi.advanceTimersByTimeAsync(RCA_POLL_INTERVAL_MS * 3);
+    it("LU15: a v1 run streams without a run", async () => {
+      host = mountHost(rcaV1Summary([rcaV1RunItem()]));
+      host.analysisOpen.value = true;
+      await flushPromises();
 
-    expect(service.get).not.toHaveBeenCalled();
-  });
+      expect(connections.map((c) => c.runId)).toEqual([null]);
+      expect(host.api.threadStatus.value).toBe("idle");
+    });
 
-  it("a report_run.run_id change loads getRcaRun and shows the new report", async () => {
-    // A re-run is live; the earlier report shows meanwhile.
-    const rerun = { ...rca("running", "run-2", "run-1") };
-    service.get.mockResolvedValueOnce(detail(rca("completed", "run-2", "run-2")) as never);
-    host = mountHost(rerun);
-    await flushPromises();
-    expect(service.getRcaRun).toHaveBeenCalledWith("default", "inc-1", "run-1");
-    expect(host.api.reportText.value).toBe("report of run-1");
+    it("LU17: events replace the parts; the run ending loads its report and refreshes the list", async () => {
+      const invalidate = vi.spyOn(queryClient, "invalidateQueries");
+      host = mountHost(rca("running", "run-2", "run-1"));
+      host.analysisOpen.value = true;
+      await flushPromises();
+      const stream = connections.at(-1)!;
 
-    await vi.advanceTimersByTimeAsync(RCA_POLL_INTERVAL_MS);
-    await flushPromises();
+      stream.emit({ event: "thread", data: rcaThread({ run_id: "run-2" }) });
+      stream.emit({ event: "summary", data: rcaRunSummaryLive({ run_id: "run-2" }) });
+      stream.emit({ event: "steering", data: rcaSteering() });
+      expect(host.api.thread.value?.run_id).toBe("run-2");
+      expect(host.api.threadStatus.value).toBe("ready");
+      expect(host.api.runSummary.value?.state).toBe("running");
+      expect(host.api.runSummaryStatus.value).toBe("ready");
+      expect(host.api.steering.value?.can_steer).toBe(true);
 
-    expect(service.getRcaRun).toHaveBeenCalledWith("default", "inc-1", "run-2");
-    expect(host.api.displayedRunId.value).toBe("run-2");
-    expect(host.api.reportText.value).toBe("report of run-2");
+      stream.emit({ event: "rca", data: rca("completed", "run-2", "run-2") });
+      stream.end();
+      await flushPromises();
+      expect(host.api.state.value).toBe("completed");
+      expect(host.api.reportText.value).toBe("report of run-2");
+      expect(invalidate).toHaveBeenCalledWith({ queryKey: incidentKeys.all("default") });
+      expect(service.get).not.toHaveBeenCalled();
+
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(connections.map((c) => c.runId)).toEqual([null, "run-2"]);
+    });
+
+    it("LU19: a live run is never re-read by polling", async () => {
+      host = mountHost(rca("running", "run-1", null));
+      host.analysisOpen.value = true;
+      await vi.advanceTimersByTimeAsync(60_000);
+
+      expect(service.get).not.toHaveBeenCalled();
+      expect(connections).toHaveLength(2);
+    });
+
+    it("LU16: a dropped stream reconnects after 1, 2, 4 s; an event resets the delay", async () => {
+      host = mountHost(rca("running", "run-1", null));
+      await flushPromises();
+
+      connections.at(-1)!.drop();
+      await vi.advanceTimersByTimeAsync(999);
+      expect(connections).toHaveLength(1);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(connections).toHaveLength(2);
+
+      connections.at(-1)!.fail(503);
+      await vi.advanceTimersByTimeAsync(1_999);
+      expect(connections).toHaveLength(2);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(connections).toHaveLength(3);
+
+      connections.at(-1)!.fail(0);
+      await vi.advanceTimersByTimeAsync(4_000);
+      expect(connections).toHaveLength(4);
+
+      connections.at(-1)!.emit({ event: "rca", data: rca("running", "run-1", null) });
+      connections.at(-1)!.drop();
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(connections).toHaveLength(5);
+    });
+
+    it.each([
+      [403, "unsupported"],
+      [404, "missing"],
+    ] as const)("LU16: a %i stops the stream and marks every part %s", async (status, expected) => {
+      host = mountHost(rca("running", "run-1", null));
+      host.analysisOpen.value = true;
+      await flushPromises();
+
+      connections.at(-1)!.fail(status);
+      await vi.advanceTimersByTimeAsync(60_000);
+
+      expect(connections).toHaveLength(2);
+      expect(host.api.threadStatus.value).toBe(expected);
+      expect(host.api.runSummaryStatus.value).toBe(expected);
+      expect(host.api.steeringStatus.value).toBe(expected);
+    });
+
+    it("LU17: transcript and steering errors map to the read states", async () => {
+      host = mountHost(rca("running", "run-1", null));
+      host.analysisOpen.value = true;
+      await flushPromises();
+      const stream = connections.at(-1)!;
+      const error = (part: string, status: number, error_code: string | null) =>
+        stream.emit({ event: "error", data: { part, status, error_code, message: "m" } } as never);
+
+      // 503 with no data yet: unavailable.
+      error("transcript", 503, "history_unavailable");
+      expect(host.api.threadStatus.value).toBe("unavailable");
+      expect(host.api.runSummaryStatus.value).toBe("unavailable");
+
+      // 503 with data while the run is live: the data stays.
+      stream.emit({ event: "thread", data: rcaThread({ run_id: "run-1" }) });
+      stream.emit({ event: "summary", data: rcaRunSummaryLive({ run_id: "run-1" }) });
+      error("transcript", 503, "history_unavailable");
+      expect(host.api.threadStatus.value).toBe("ready");
+      expect(host.api.runSummary.value).not.toBeNull();
+
+      stream.emit({ event: "steering", data: rcaSteering() });
+      error("steering", 500, null);
+      expect(host.api.steeringStatus.value).toBe("unavailable");
+      expect(host.api.steering.value).not.toBeNull();
+
+      error("transcript", 410, "transcript_incomplete");
+      expect(host.api.thread.value).toBeNull();
+      expect(host.api.threadStatus.value).toBe("incomplete");
+      expect(host.api.runSummary.value).toBeNull();
+      expect(host.api.runSummaryStatus.value).toBe("expired");
+    });
+
+    it("LU17: a stored summary survives a transcript that cannot be read", async () => {
+      host = mountHost(rca("completed", "run-1", "run-1"));
+      host.analysisOpen.value = true;
+      await flushPromises();
+      const stream = connections.at(-1)!;
+
+      stream.emit({ event: "summary", data: rcaRunSummary({ run_id: "run-1" }) });
+      stream.emit({
+        event: "error",
+        data: { part: "transcript", status: 410, error_code: "transcript_expired", message: "m" },
+      });
+      expect(host.api.threadStatus.value).toBe("expired");
+      expect(host.api.runSummary.value?.state).toBe("completed");
+      expect(host.api.runSummaryStatus.value).toBe("ready");
+    });
+
+    it("LU17: an rca event wins over a detail read still in flight", async () => {
+      const read = Promise.withResolvers<unknown>();
+      service.get.mockReturnValueOnce(read.promise as never);
+      host = mountHost(rca("running", "run-1", null));
+      await flushPromises();
+
+      const reload = host.api.reload();
+      connections.at(-1)!.emit({ event: "rca", data: rca("completed", "run-1", "run-1") });
+      read.resolve(detail(rca("running", "run-1", null)));
+      await reload;
+
+      expect(host.api.state.value).toBe("completed");
+    });
+
+    it("LU17: retry() reconnects at once", async () => {
+      host = mountHost(rca("running", "run-1", null));
+      await flushPromises();
+      connections.at(-1)!.drop();
+      await flushPromises();
+
+      host.api.retryLive();
+      await flushPromises();
+      expect(connections).toHaveLength(2);
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(connections).toHaveLength(2);
+    });
   });
 
   it("trigger sends the selected mode and reloads the committed run", async () => {
