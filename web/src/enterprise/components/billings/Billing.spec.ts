@@ -40,10 +40,7 @@ const mockRouter = {
   currentRoute: {
     value: {
       name: "billings",
-      query: {
-        data_type: "gb",
-        usage_date: "30days",
-      },
+      query: {},
     },
   },
   push: vi.fn(),
@@ -82,10 +79,7 @@ describe("Billing Component", () => {
 
     // Reset router state
     mockRouter.currentRoute.value.name = "billings";
-    mockRouter.currentRoute.value.query = {
-      data_type: "gb",
-      usage_date: "30days",
-    };
+    mockRouter.currentRoute.value.query = {};
 
     wrapper = mount(Billing, {
       global: {
@@ -151,10 +145,7 @@ describe("Billing Component", () => {
     it("should redirect to plans when route is plans", async () => {
       // Reset router state and clear mocks before mounting
       mockRouter.currentRoute.value.name = "plans";
-      mockRouter.currentRoute.value.query = {
-        data_type: "gb",
-        usage_date: "30days",
-      };
+      mockRouter.currentRoute.value.query = {};
 
       // Mock billing service response for this test
       (BillingService.list_subscription as any).mockResolvedValue({
