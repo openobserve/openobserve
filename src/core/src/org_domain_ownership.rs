@@ -87,7 +87,10 @@ pub async fn delete_linked_domain(record: Model) -> Result<(), anyhow::Error> {
     // non verified domain is not going to be in cache
     if record.verification_state == OwnershipState::Verified as i32 {
         let mut lock = CACHE.write().await;
-        lock.remove(&record.domain);
+        let cached = lock.get(&record.domain);
+        if cached.is_some_and(|v| v == &record.org_id) {
+            lock.remove(&record.domain);
+        }
         drop(lock);
         emit_sync_event(&record.org_id, &record.domain).await;
     }
@@ -247,10 +250,12 @@ pub async fn watch() -> Result<(), anyhow::Error> {
             let mut lock = CACHE.write().await;
             match record {
                 None => {
-                    log::info!(
-                        "removing org {org} domain {domain} from memory cache as record not found in db"
-                    );
-                    lock.remove(domain);
+                    if cached.is_some_and(|v| v == org) {
+                        log::info!(
+                            "removing org {org} domain {domain} from memory cache as record not found in db"
+                        );
+                        lock.remove(domain);
+                    }
                 }
                 Some(v) => {
                     if v.verification_state == OwnershipState::Verified as i32 {
