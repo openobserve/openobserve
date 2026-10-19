@@ -287,6 +287,10 @@ interface ShapeDef {
 
 type ScenarioKey = "current" | "twice" | "fiveTimes";
 
+/**
+ * A browser draws a range thumb at the nearest `min + n × step`, so a count's slider steps by one:
+ * a coarser step would show 7 searches at 5.
+ */
 interface FieldDef {
   key: FieldKey;
   labelKey: I18nKey;
@@ -352,7 +356,7 @@ const FIELDS: FieldDef[] = [
     suffix: "",
     min: 0,
     max: 1000,
-    step: 5,
+    step: 1,
   },
   {
     key: "pipelineCount",
@@ -379,7 +383,7 @@ const FIELDS: FieldDef[] = [
     suffix: "",
     min: 0,
     max: 2000,
-    step: 10,
+    step: 1,
   },
   {
     key: "browserChecks",

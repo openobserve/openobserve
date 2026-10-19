@@ -156,6 +156,43 @@ describe("UsageEstimator My Current Usage", () => {
     for (const [sql] of search.mock.calls) expect(sql).not.toContain("org_id =");
   });
 
+  it("puts each count slider's thumb where its box says, including the defaults", async () => {
+    const wrapper = mountEstimator();
+    await flushPromises();
+    releaseHistory();
+    await flushPromises();
+    // A browser draws a range input's thumb at the nearest min + n x step, so a value off that
+    // grid shows somewhere else: the old duration slider showed 61 for a box reading 60.
+    const onGrid = (key: string) => {
+      const slider = wrapper
+        .findAllComponents({ name: "OSlider" })
+        .find((item) => item.vm.$attrs["data-test"] === `billings-usageestimator-${key}-slider`)!;
+      const steps =
+        (Number(slider.props("modelValue")) - Number(slider.props("min"))) /
+        Number(slider.props("step"));
+      return Math.abs(steps - Math.round(steps)) < 1e-9;
+    };
+    expect(
+      wrapper.findAllComponents({ name: "OSlider" }).every((slider) => {
+        const key = String(slider.vm.$attrs["data-test"]).replace(
+          /^billings-usageestimator-|-slider$/g,
+          "",
+        );
+        return key === "ingestGb" || onGrid(key);
+      }),
+    ).toBe(true);
+
+    for (const [key, value] of [
+      ["searchCount", 7],
+      ["aiCredits", 13],
+      ["pipelineCount", 3],
+    ] as const) {
+      field(wrapper, key).vm.$emit("update:modelValue", value);
+      await flushPromises();
+      expect(onGrid(key)).toBe(true);
+    }
+  });
+
   it("leaves a value typed before the history lands as typed", async () => {
     const wrapper = mountEstimator();
     await flushPromises();
