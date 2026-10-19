@@ -291,9 +291,9 @@ async fn run(
             &plan,
             deliverable_q1,
             (p_start, p_end),
+            false,
             &base_req,
             &sender,
-            &format!("partition [{p_start},{p_end}]"),
         )
         .await
         else {
@@ -355,14 +355,15 @@ async fn run(
             return;
         }
 
+        // Heap rows are per-partition aggregates, so every trace needs the full re-aggregation.
         let Some(batch) = load_batch(
             &ctx,
             &plan,
             deliverable_q1,
             (start_time, end_time),
+            true,
             &base_req,
             &sender,
-            "non-ts",
         )
         .await
         else {
@@ -407,15 +408,18 @@ async fn load_batch(
     plan: &TraceListPlan,
     hits: Vec<json::Value>,
     range: (i64, i64),
+    partial: bool,
     base_request: &Request,
     sender: &mpsc::Sender<Result<StreamResponses, infra::errors::Error>>,
-    log_ctx: &str,
 ) -> Option<TraceBatch> {
-    let hits = match ctx.summarize_traces(plan, base_request, hits, range).await {
+    let hits = match ctx
+        .summarize_traces(plan, base_request, hits, range, partial)
+        .await
+    {
         Ok(hits) => hits,
         Err(error) => {
             log::error!(
-                "[TRACES_STREAM trace_id {}] Q2a error ({log_ctx}): {error}",
+                "[TRACES_STREAM trace_id {}] Q2a error ({range:?}): {error}",
                 ctx.trace_id
             );
             let _ = sender.send(Err(error)).await;
@@ -432,7 +436,7 @@ async fn load_batch(
         .await
     {
         log::error!(
-            "[TRACES_STREAM trace_id {}] Q2b error ({log_ctx}): {error}",
+            "[TRACES_STREAM trace_id {}] Q2b error ({range:?}): {error}",
             ctx.trace_id
         );
         let _ = sender.send(Err(error)).await;

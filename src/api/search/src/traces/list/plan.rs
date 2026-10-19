@@ -62,18 +62,14 @@ impl TraceListPlan {
         }
     }
 
-    /// Re-aggregates the selected traces over all their spans, or `None` when the page was
-    /// unfiltered and its aggregates already cover every span.
+    /// Re-aggregates the selected traces over all their spans in `range`, without the filter.
     pub fn summary_request(
         &self,
         stream_name: &str,
         base_request: &Request,
         trace_ids: &[String],
         range: (i64, i64),
-    ) -> Option<Request> {
-        if self.filter().is_empty() || trace_ids.is_empty() {
-            return None;
-        }
+    ) -> Request {
         let mut request = base_request.clone();
         request.query.sql = format!(
             "{} WHERE trace_id IN ({}) GROUP BY trace_id",
@@ -84,7 +80,11 @@ impl TraceListPlan {
         request.query.size = trace_ids.len() as i64;
         request.query.start_time = range.0;
         request.query.end_time = range.1;
-        Some(request)
+        request
+    }
+
+    pub fn is_filtered(&self) -> bool {
+        !self.filter().is_empty()
     }
 
     fn sql(&self, stream_name: &str) -> String {
@@ -426,27 +426,15 @@ mod tests {
                 llm_schema: None,
                 mode,
             };
-            let base = unfiltered.request("traces");
-            assert!(
-                unfiltered
-                    .summary_request("traces", &base, &ids, (1, 2))
-                    .is_none()
-            );
-
+            assert!(!unfiltered.is_filtered());
             query.insert("filter".to_string(), "service_name = 'api'".to_string());
             let filtered = TraceListPlan {
                 options: TraceListOptions::parse(&query, mode).unwrap(),
                 ..unfiltered
             };
+            assert!(filtered.is_filtered());
             let base = filtered.request("traces");
-            assert!(
-                filtered
-                    .summary_request("traces", &base, &[], (1, 2))
-                    .is_none()
-            );
-            let request = filtered
-                .summary_request("traces", &base, &ids, (1, 2))
-                .unwrap();
+            let request = filtered.summary_request("traces", &base, &ids, (1, 2));
             assert!(!request.query.sql.contains("service_name = 'api'"));
             assert!(request.query.sql.contains("count(*) AS span_count"));
             assert!(

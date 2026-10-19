@@ -63,6 +63,8 @@ const SESSION_EXPAND_WINDOW: i64 = 7 * DAY_MICROS;
 const MAX_LOOKUP_KEYS: usize = 100;
 const LOOKUP_CONCURRENCY: usize = 8;
 const AFFINITY_STREAMS: usize = 2;
+// A page's IN list multiplies bloom false positives, so list scans trade the 24h guarantee for 1h.
+const LIST_MARGIN: i64 = 60 * 60 * 1_000_000;
 
 static STREAM_AFFINITY: Lazy<RwHashMap<String, Vec<String>>> = Lazy::new(Default::default);
 
@@ -478,15 +480,10 @@ async fn query_batch_window(
         return Ok(Some(Vec::new()));
     }
     let column = params.run.kind.column();
-    let predicate = key_in_predicate(
+    let sql = ranges_sql(
+        index_stream,
         column,
         active.iter().map(|&index| params.run.keys[index].as_str()),
-    );
-    let sql = format!(
-        "SELECT {}, MIN(min_ts) AS min_ts, MAX(max_ts) AS max_ts FROM {} WHERE {predicate} GROUP BY {}",
-        quote_identifier(column),
-        quote_identifier(index_stream),
-        quote_identifier(column),
     );
     let Some(hits) = search_index_window(
         params.run.org_id,
@@ -509,6 +506,21 @@ async fn query_batch_window(
         }
     }
     Ok(Some(rows))
+}
+
+/// One row per key: the merged index range over every row in the searched window.
+fn ranges_sql<'a>(
+    index_stream: &str,
+    column: &str,
+    keys: impl IntoIterator<Item = &'a str>,
+) -> String {
+    format!(
+        "SELECT {}, MIN(min_ts) AS min_ts, MAX(max_ts) AS max_ts FROM {} WHERE {} GROUP BY {}",
+        quote_identifier(column),
+        quote_identifier(index_stream),
+        key_in_predicate(column, keys),
+        quote_identifier(column),
+    )
 }
 
 fn collect_traces(
@@ -673,6 +685,100 @@ pub async fn query_session(
         deadline: default_deadline(),
     })
     .await
+}
+
+/// Index ranges of traces with spans inside `around`; None when the index cannot answer.
+pub(crate) async fn lookup_trace_ranges(
+    org_id: &str,
+    stream_name: &str,
+    trace_ids: &[String],
+    around: TraceTimeRange,
+    deadline: Instant,
+) -> Result<Option<HashMap<String, TraceTimeRange>>> {
+    if trace_ids.is_empty() {
+        return Ok(Some(HashMap::new()));
+    }
+    let started = std::time::Instant::now();
+    let Some(padded) = resolve_scan_bounds(
+        org_id,
+        stream_name,
+        TimeIndexKind::Trace,
+        Some(around),
+        None,
+    )
+    .await?
+    else {
+        return Ok(None);
+    };
+    let bounds = ScanBounds {
+        scan_start: padded
+            .scan_start
+            .max(around.start_time.saturating_sub(LIST_MARGIN)),
+        scan_end: padded
+            .scan_end
+            .min(around.end_time.saturating_add(LIST_MARGIN)),
+        hard_start: padded.scan_start,
+        hard_end: padded.scan_end,
+    };
+    if bounds.scan_start >= bounds.scan_end {
+        return Ok(None);
+    }
+    let streams = [stream_name.to_string()];
+    let mut run = LookupRun::new(
+        org_id,
+        &streams,
+        TimeIndexKind::Trace,
+        trace_ids,
+        None,
+        Some(around),
+    );
+    run.deadline = deadline;
+    let params = ScanParams {
+        run: &run,
+        stream_index: 0,
+    };
+    let index_stream = get_trace_time_index_stream_name(stream_name);
+    let mut scanner = BatchScanner::with_margin(LIST_MARGIN, trace_ids.len(), bounds, None, &[]);
+    let mut windows = 0u64;
+    let mut timed_out = false;
+    loop {
+        if deadline.saturating_duration_since(Instant::now()).is_zero() {
+            timed_out = true;
+            break;
+        }
+        let Some((start, end)) = scanner.next_window() else {
+            break;
+        };
+        windows += 1;
+        let active = scanner.active_keys();
+        let Some(rows) = query_batch_window(&params, &index_stream, &active, start, end).await?
+        else {
+            timed_out = true;
+            break;
+        };
+        scanner.ingest(rows);
+    }
+    let mut ranges = HashMap::new();
+    for (index, outcome) in scanner.finish().into_iter().enumerate() {
+        if let Some(ScanOutcome::Found { range, .. }) = outcome {
+            ranges.insert(trace_ids[index].clone(), range);
+        }
+    }
+    let status = match (timed_out, ranges.is_empty()) {
+        (true, _) => "timeout",
+        (false, false) => "hit",
+        (false, true) => "miss",
+    };
+    config::metrics::TRACE_TIME_INDEX_OPERATIONS
+        .with_label_values(&[org_id, "lookup_ranges", status])
+        .inc();
+    log::debug!(
+        "[trace_time_index] lookup_ranges org_id={org_id:?} stream={stream_name:?} keys={} found={} windows={windows} timed_out={timed_out} took={} ms",
+        trace_ids.len(),
+        ranges.len(),
+        started.elapsed().as_millis(),
+    );
+    Ok(Some(ranges))
 }
 
 fn default_deadline() -> Instant {
@@ -1457,6 +1563,15 @@ pub async fn get_org_trace_time_range(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn ranges_sql_groups_the_keyed_rows() {
+        assert_eq!(
+            ranges_sql("trace_time_index_default", "trace_id", ["a", "b"]),
+            "SELECT \"trace_id\", MIN(min_ts) AS min_ts, MAX(max_ts) AS max_ts \
+             FROM \"trace_time_index_default\" WHERE \"trace_id\" IN ('a', 'b') GROUP BY \"trace_id\""
+        );
+    }
 
     #[test]
     fn locate_batches_are_monotonic() {
