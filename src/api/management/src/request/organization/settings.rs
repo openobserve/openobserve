@@ -348,13 +348,13 @@ async fn check_budget_config(
         )));
     }
     for config in configs {
-        if config.total_budget_amount < 0.0 {
+        if config.total_budget_amount <= 0.0 {
             return Err(MetaHttpResponse::bad_request(format!(
                 "cannot set budget amount less than 0 for org {}",
                 config.org_id
             )));
         }
-        if config.warn_at_amount < 0.0 || config.warn_at_amount > config.total_budget_amount {
+        if config.warn_at_amount <= 0.0 || config.warn_at_amount > config.total_budget_amount {
             return Err(MetaHttpResponse::bad_request(format!(
                 "invalid warning amount for org {}",
                 config.org_id

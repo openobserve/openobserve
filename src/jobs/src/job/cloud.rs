@@ -907,7 +907,7 @@ async fn send_warning_email(
     let body = format!(
         r#"Hello,
     {info_line}<br />
-    You have configured a total budget of <b>${}</b>, with warning starting at </b>${}</b> or <b>{:.2}%</b>.<br/>
+    You have configured a total budget of <b>${}</b>, with warning starting at <b>${}</b> or <b>{:.2}%</b>.<br/>
     The org has reached estimated cost of <b>${:.2}</b> or <b>{:.2}%</b> of the total budget, exceeding the warning level.<br/>
     These amounts are for current billing cycle ranging from <b>{}</b> (UTC) to <b>{}</b> (UTC).<br/>
     <br/>
