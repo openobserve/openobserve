@@ -741,6 +741,8 @@ async fn put(
     dashboard.set_title(title);
 
     dashboard.set_dashboard_id(dashboard_id.to_owned());
+    // Public links detect edits by this stamp, so every writer gets it, not only the UI.
+    dashboard.set_updated_at();
     let dash = table::dashboards::put(org_id, folder_id, new_folder_id, dashboard, false).await?;
     if let Some(id) = dash.dashboard_id() {
         if let Err(e) = infra::coordinator::dashboards::emit_put_event(org_id, id).await {
