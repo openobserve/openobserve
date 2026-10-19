@@ -857,6 +857,8 @@ pub struct ApiDoc;
     openobserve_api_management::request::workflows::get_workflow_history,
     openobserve_api_management::request::workflows::promote_draft,
     openobserve_api_management::request::ai::chats::stream_turn,
+    openobserve_api_management::request::ai::capabilities::get_capabilities,
+    openobserve_api_management::request::ai::capabilities::test_capabilities,
 ))]
 #[openapi(components(schemas(
     openobserve_api_management::models::experiments::ExperimentResultRowSortBody,

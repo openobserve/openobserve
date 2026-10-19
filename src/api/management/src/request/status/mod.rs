@@ -227,6 +227,8 @@ struct ConfigResponse<'a> {
     alert_preview_timerange_minutes: i64,
     incidents_enabled: bool,
     incidents_rca_enabled: bool,
+    /// Incident analysis can run: incidents, RCA and AI are on and o2-ai has a target.
+    rca_enabled: bool,
     downtimes_enabled: bool,
     alert_calibration_enabled: bool,
     service_streams_enabled: bool,
@@ -490,6 +492,15 @@ pub async fn zo_config(
         false,
         o2cfg.incidents.enabled && o2cfg.incidents.rca_enabled && o2cfg.ai.has_agent_target()
     );
+    let rca_enabled = enterprise_value!(
+        false,
+        rca_enabled_for(
+            o2cfg.incidents.enabled,
+            o2cfg.incidents.rca_enabled,
+            o2cfg.ai.enabled,
+            o2cfg.ai.has_agent_target()
+        )
+    );
     let downtimes_enabled = enterprise_value!(false, o2cfg.downtimes.enabled);
     let alert_calibration_enabled = enterprise_value!(false, o2cfg.alert_calibration.enabled);
     let service_streams_enabled = enterprise_value!(false, o2cfg.service_streams.enabled);
@@ -624,6 +635,7 @@ pub async fn zo_config(
         alert_preview_timerange_minutes: cfg.limit.alert_preview_timerange_minutes,
         incidents_enabled,
         incidents_rca_enabled,
+        rca_enabled,
         downtimes_enabled,
         alert_calibration_enabled,
         service_streams_enabled,
@@ -693,6 +705,17 @@ async fn search_inspector_permitted(org_id: &str, user_id: &str) -> bool {
 #[cfg(feature = "enterprise")]
 async fn rbac_enabled_for_config(openfga_enabled: bool) -> bool {
     openfga_enabled && !openobserve_core::authz::report_failure_lifts_rbac().await
+}
+
+#[cfg(any(feature = "enterprise", test))]
+// The RCA trigger takes the agent client `init_agent_client` leaves unset while AI is off.
+fn rca_enabled_for(
+    incidents_enabled: bool,
+    rca_enabled: bool,
+    ai_enabled: bool,
+    has_agent_target: bool,
+) -> bool {
+    incidents_enabled && rca_enabled && ai_enabled && has_agent_target
 }
 
 async fn org_admin(org_id: &str, user_id: &str) -> bool {
@@ -2017,6 +2040,15 @@ mod tests {
         assert_eq!(last_reported_timestamp().await, 0);
         assert!(rbac_enabled_for_config(true).await);
         assert!(!rbac_enabled_for_config(false).await);
+    }
+
+    #[test]
+    fn rca_is_enabled_only_with_incidents_rca_ai_and_an_agent_target() {
+        let on: Vec<_> = (0..16u8)
+            .map(|bits| (bits & 1 != 0, bits & 2 != 0, bits & 4 != 0, bits & 8 != 0))
+            .filter(|&(incidents, rca, ai, target)| rca_enabled_for(incidents, rca, ai, target))
+            .collect();
+        assert_eq!(on, vec![(true, true, true, true)]);
     }
 
     #[test]
