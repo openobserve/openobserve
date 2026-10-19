@@ -88,14 +88,6 @@ pub fn get_exemplar_val(attr_val: &Option<exemplar::Value>) -> json::Value {
     }
 }
 
-pub fn get_val_for_attr(attr_val: json::Value) -> json::Value {
-    let local_val = attr_val.as_object().unwrap();
-    if let Some((_key, value)) = local_val.into_iter().next() {
-        return serde_json::Value::String(super::get_string_value(value));
-    };
-    ().into()
-}
-
 pub fn get_val_with_type_retained(attr_val: &Option<&AnyValue>) -> json::Value {
     match attr_val {
         Some(local_val) => match &local_val.value {
@@ -322,37 +314,6 @@ mod tests {
         // Test None case
         let resp = get_exemplar_val(&None);
         assert!(resp.is_null());
-    }
-
-    #[test]
-    fn test_get_val_for_attr() {
-        // Test with string value
-        let attr_val = json::json!({
-            "key1": "test_value"
-        });
-        let resp = get_val_for_attr(attr_val);
-        assert_eq!(resp.as_str().unwrap(), "test_value");
-
-        // Test with numeric value
-        let attr_val = json::json!({
-            "key2": 42
-        });
-        let resp = get_val_for_attr(attr_val);
-        assert_eq!(resp.as_str().unwrap(), "42");
-
-        // Test with boolean value
-        let attr_val = json::json!({
-            "key3": true
-        });
-        let resp = get_val_for_attr(attr_val);
-        assert_eq!(resp.as_str().unwrap(), "true");
-
-        // Test with float value
-        let attr_val = json::json!({
-            "key4": std::f32::consts::PI
-        });
-        let resp = get_val_for_attr(attr_val);
-        assert_eq!(resp.as_str().unwrap(), "3.1415927");
     }
 
     #[test]

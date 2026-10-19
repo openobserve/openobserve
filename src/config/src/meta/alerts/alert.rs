@@ -505,12 +505,6 @@ impl ListAlertsParams {
         self
     }
 
-    /// Filter alerts by the given case-insensitive name substring.
-    pub fn with_name_substring(mut self, name_substring: &str) -> Self {
-        self.name_substring = Some(name_substring.to_string());
-        self
-    }
-
     /// Filter alerts by the given stream type and optional stream name.
     pub fn for_stream(mut self, stream_type: StreamType, stream_name: Option<&str>) -> Self {
         self.stream_type_and_name = Some((stream_type, stream_name.map(|n| n.to_string())));
@@ -863,14 +857,6 @@ mod tests {
     }
 
     #[test]
-    fn test_list_alerts_params_with_name_substring() {
-        let params = ListAlertsParams::new("test_org").with_name_substring("test");
-
-        assert_eq!(params.org_id, "test_org");
-        assert_eq!(params.name_substring, Some("test".to_string()));
-    }
-
-    #[test]
     fn test_list_alerts_params_for_stream() {
         let params =
             ListAlertsParams::new("test_org").for_stream(StreamType::Logs, Some("test_stream"));
@@ -905,13 +891,11 @@ mod tests {
     fn test_list_alerts_params_chaining() {
         let params = ListAlertsParams::new("test_org")
             .in_folder("test_folder")
-            .with_name_substring("test")
             .for_stream(StreamType::Logs, Some("test_stream"))
             .paginate(20, 1);
 
         assert_eq!(params.org_id, "test_org");
         assert_eq!(params.folder_id, Some("test_folder".to_string()));
-        assert_eq!(params.name_substring, Some("test".to_string()));
         assert_eq!(
             params.stream_type_and_name,
             Some((StreamType::Logs, Some("test_stream".to_string())))

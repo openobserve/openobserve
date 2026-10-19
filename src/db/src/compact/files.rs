@@ -121,24 +121,6 @@ pub async fn reset_offset(time: i64, stream: Option<&str>) -> Result<u64, anyhow
     Ok(count)
 }
 
-pub async fn list_offset() -> Result<Vec<(String, i64)>, anyhow::Error> {
-    let mut items = Vec::new();
-    let key = "/compact/files/";
-    let ret = db::list(key).await?;
-    for (item_key, item_value) in ret {
-        let item_key = item_key.strip_prefix(key).unwrap();
-        let value = String::from_utf8_lossy(&item_value).to_string();
-        let offset = if value.contains(';') {
-            let mut parts = value.split(';');
-            parts.next().unwrap().parse().unwrap()
-        } else {
-            value.parse().unwrap()
-        };
-        items.push((item_key.to_string(), offset));
-    }
-    Ok(items)
-}
-
 pub async fn sync_cache_to_db() -> Result<(), anyhow::Error> {
     let r = CACHES.read().await;
     for (key, (offset, node)) in r.iter() {
@@ -193,6 +175,5 @@ mod tests {
             get_offset_from_cache("default", "logs".into(), "compact_file").await,
             Some((OFFSET, "LOCAL".to_string()))
         );
-        assert!(!list_offset().await.unwrap().is_empty());
     }
 }
