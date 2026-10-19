@@ -83,6 +83,8 @@ describe("UsageOverview org drilldown", () => {
         lastLoadedAt: 1,
         projected: null,
         refreshing: false,
+        // The page reads org costs once and hands them down.
+        orgCosts: { costs: orgCosts.value as any, loading: false, failed: false },
       },
       global: {
         plugins: [i18n, store],

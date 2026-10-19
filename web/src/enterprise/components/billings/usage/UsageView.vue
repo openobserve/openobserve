@@ -137,7 +137,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :projected="billed ? projected : null"
           :refreshing="loading"
           :volume-only="!billed"
-          @refresh="loadDetails"
+          :org-costs="orgCosts"
+          @refresh="refresh"
         />
         <UsageTrends
           v-else-if="activeTab === 'trends'"
@@ -146,13 +147,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :oldest-ts="response?.oldest_ts"
           :billing-orgs="billingOrgs"
           :projected="projected"
-          @refresh="loadDetails"
+          @refresh="refresh"
         />
         <UsageSuperBudget
           v-else-if="activeTab === 'budget' && billingOrgs.length"
           :details="details"
           :billing-orgs="billingOrgs"
           :projected="projected"
+          :org-costs="orgCosts"
         />
         <UsageBudget v-else-if="activeTab === 'budget'" :details="details" :projected="projected" />
         <UsageEstimator v-else :details="details" />
@@ -183,6 +185,7 @@ import UsageEstimator from "./UsageEstimator.vue";
 import UsageBudget from "./UsageBudget.vue";
 import UsageSuperBudget from "./UsageSuperBudget.vue";
 import { useUsageSearch } from "./useUsageSearch";
+import { useOrgCosts, type OrgCostsState } from "./useOrgCosts";
 import { eventVolumeSql, USAGE_STREAM_NAME } from "./usageQueries";
 import {
   billingGroupOrgs,
@@ -406,6 +409,29 @@ const loadDetails = async () => {
     loading.value = false;
   }
 };
+
+/** Bumped by a Refresh on any tab, so the shared org-cost read skips the server's cache once. */
+const refreshToken = ref(0);
+
+const refresh = () => {
+  refreshToken.value += 1;
+  void loadDetails();
+};
+
+/**
+ * One org-cost read for the whole page: Overview's Cost by Org and the super org Budget judge
+ * spend on the same figures, and a Refresh on any tab reaches it.
+ */
+const orgCostRead = useOrgCosts(
+  computed(() => (billed.value ? details.value : null)),
+  computed(() => (billed.value ? billingOrgs.value : [])),
+  refreshToken,
+);
+const orgCosts = computed<OrgCostsState>(() => ({
+  costs: orgCostRead.costs.value,
+  loading: orgCostRead.loading.value,
+  failed: orgCostRead.failed.value,
+}));
 
 onMounted(loadDetails);
 

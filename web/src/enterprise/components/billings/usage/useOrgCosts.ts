@@ -81,10 +81,17 @@ export function priceOrgVolumes(
  * also lands in the super org's `usage` stream with its own org_id. So each org's cost
  * is its share of the bill, by its usage.
  */
+/** One org-cost read, as the Usage page hands it to every tab that shows per-org spend. */
+export interface OrgCostsState {
+  costs: Record<string, OrgCost>;
+  loading: boolean;
+  failed: boolean;
+}
+
 export function useOrgCosts(
-  details: Ref<MeteringDetails | null>,
-  billingOrgs: Ref<BillingOrg[]>,
-  refreshToken: Ref<number>,
+  details: Readonly<Ref<MeteringDetails | null>>,
+  billingOrgs: Readonly<Ref<BillingOrg[]>>,
+  refreshToken: Readonly<Ref<number>>,
 ) {
   const { search } = useUsageSearch();
   const costs = ref<Record<string, OrgCost>>({});

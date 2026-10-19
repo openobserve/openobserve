@@ -319,7 +319,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref, toRef, watch } from "vue";
+import { computed, reactive, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
@@ -360,16 +360,21 @@ import {
   type BudgetDraft,
   type BudgetStatus,
 } from "./budgetModel";
-import { useOrgCosts } from "./useOrgCosts";
+import type { OrgCostsState } from "./useOrgCosts";
 import { meterColorFor } from "./usageCharts";
 
-const props = defineProps<{
-  details: MeteringDetails | null;
-  /** The super org first, then its members. */
-  billingOrgs: BillingOrg[];
-  /** The cycle's projected total, worked out once by the page so every tab shows the same figure. */
-  projected: number | null;
-}>();
+const props = withDefaults(
+  defineProps<{
+    details: MeteringDetails | null;
+    /** The super org first, then its members. */
+    billingOrgs: BillingOrg[];
+    /** The cycle's projected total, worked out once by the page so every tab shows the same figure. */
+    projected: number | null;
+    /** Per-org spend, read once by the page and shared with Overview, so both judge the same figures. */
+    orgCosts?: OrgCostsState;
+  }>(),
+  { orgCosts: () => ({ costs: {}, loading: false, failed: false }) },
+);
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -397,11 +402,9 @@ const orgId = computed<string>(() => store.state.selectedOrganization.identifier
 
 // ── Spend ────────────────────────────────────────────────────────
 
-const {
-  costs,
-  loading: costsLoading,
-  failed: costsFailed,
-} = useOrgCosts(toRef(props, "details"), toRef(props, "billingOrgs"), ref(0));
+const costs = computed(() => props.orgCosts.costs);
+const costsLoading = computed(() => props.orgCosts.loading);
+const costsFailed = computed(() => props.orgCosts.failed);
 
 /** The whole group's bill, which the overall budget is measured against. */
 const spent = computed(() => Number(props.details?.total_cost) || 0);

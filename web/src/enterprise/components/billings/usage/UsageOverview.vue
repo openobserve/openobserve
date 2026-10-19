@@ -309,7 +309,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, ref, toRef } from "vue";
+import { computed, nextTick, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
@@ -368,7 +368,7 @@ import {
   type DrilldownSection,
 } from "./usageQueries";
 import { cyclePrices } from "./trendsModel";
-import { useOrgCosts } from "./useOrgCosts";
+import type { OrgCostsState } from "./useOrgCosts";
 import { useUsageReporting } from "./useUsageReporting";
 
 interface KpiCard {
@@ -398,8 +398,14 @@ const props = withDefaults(
      * screen shows volumes and hides every money figure. Off, Overview is the bill as before.
      */
     volumeOnly?: boolean;
+    /** The super org's per-org spend, read once by the page. */
+    orgCosts?: OrgCostsState;
   }>(),
-  { billingOrgs: () => [], volumeOnly: false },
+  {
+    billingOrgs: () => [],
+    volumeOnly: false,
+    orgCosts: () => ({ costs: {}, loading: false, failed: false }),
+  },
 );
 const emit = defineEmits<{ refresh: [] }>();
 
@@ -483,11 +489,10 @@ const selectedOrg = computed<BillingOrg | null>(() =>
   isSuperOrg.value ? (props.billingOrgs.find((org) => org.id === route.query.org) ?? null) : null,
 );
 
-const {
-  costs: orgCosts,
-  loading: orgCostsLoading,
-  failed: orgCostsFailed,
-} = useOrgCosts(toRef(props, "details"), toRef(props, "billingOrgs"), refreshToken);
+// The page reads org costs once for every tab, so Budget judges spend on these same figures.
+const orgCosts = computed(() => props.orgCosts.costs);
+const orgCostsLoading = computed(() => props.orgCosts.loading);
+const orgCostsFailed = computed(() => props.orgCosts.failed);
 
 /** Partial costs stream in, so the skeleton only covers the wait for the first chunk. */
 const hasOrgCosts = computed(() => Object.keys(orgCosts.value).length > 0);

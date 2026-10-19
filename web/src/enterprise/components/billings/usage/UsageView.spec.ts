@@ -23,7 +23,7 @@ const mounts: Record<string, number> = {};
 const stub = (name: string) =>
   defineComponent({
     name,
-    props: ["details", "billingOrgs", "cycles", "projected", "volumeOnly"],
+    props: ["details", "billingOrgs", "cycles", "projected", "volumeOnly", "orgCosts"],
     setup: () => {
       mounts[name] = (mounts[name] ?? 0) + 1;
     },
@@ -162,6 +162,36 @@ describe("UsageView", () => {
     const overview = wrapper.findComponent({ name: "UsageOverview" });
     expect(overview.props("details")).toMatchObject({ total_cost: 1 });
     expect(overview.props("billingOrgs")).toEqual([]);
+  });
+});
+
+describe("UsageView org costs", () => {
+  it("reads them once for Overview and Budget, and past the cache after a Refresh", async () => {
+    search.mockClear();
+    // A fresh object per response, as a real reload brings.
+    metering.mockReset().mockImplementation(async () => structuredClone(bill));
+    members.mockResolvedValue({
+      data: [{ payer_org_name: "Payer", member_org_id: "child", member_org_name: "Child" }],
+    });
+    const wrapper = mount(UsageView, { global: { plugins: [i18n, store] } });
+    await flushPromises();
+    const orgCostReads = () => search.mock.calls.filter((call) => call[1]?.key === "orgCosts");
+    expect(orgCostReads()).toHaveLength(1);
+    expect(orgCostReads()[0][1].refresh).toBe(false);
+    const shown = wrapper.findComponent({ name: "UsageOverview" }).props("orgCosts");
+
+    // Budget judges spend on the same read, so opening it sends no second query.
+    route.query = { tab: "budget" };
+    await flushPromises();
+    expect(orgCostReads()).toHaveLength(1);
+    expect(wrapper.findComponent({ name: "UsageSuperBudget" }).props("orgCosts")).toEqual(shown);
+
+    route.query = {};
+    await flushPromises();
+    wrapper.findComponent({ name: "UsageOverview" }).vm.$emit("refresh");
+    await flushPromises();
+    expect(orgCostReads()).toHaveLength(2);
+    expect(orgCostReads()[1][1].refresh).toBe(true);
   });
 });
 
