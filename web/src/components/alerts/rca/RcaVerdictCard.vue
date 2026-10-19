@@ -89,9 +89,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </span>
         {{ rcaBandLabel(card?.band) }}
       </component>
-      <span v-if="bandReason" data-test="rca-verdict-band-reason" class="text-text-secondary">
-        {{ bandReason }}
-      </span>
       <span
         v-if="unverifiedCount > 0"
         data-test="rca-verdict-unverified-count"
@@ -123,6 +120,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </button>
     </div>
 
+    <!-- CG §5.3.4: what the agent claimed, what the evidence allows and why, and any cap. -->
+    <dl
+      v-if="breakdown"
+      data-test="rca-verdict-confidence-why"
+      class="text-compact m-0 -mt-1 grid max-w-225 grid-cols-[max-content_minmax(0,1fr)] gap-x-4 gap-y-0.5"
+    >
+      <dt class="text-text-muted">{{ t("alerts.incidents.rcaSummary.confidenceClaimed") }}</dt>
+      <dd data-test="rca-confidence-claimed" class="text-text-heading m-0 font-semibold">
+        {{ bandWord(breakdown.claimed) }}
+      </dd>
+      <dt class="text-text-muted">{{ t("alerts.incidents.rcaSummary.confidenceEvidence") }}</dt>
+      <dd data-test="rca-confidence-evidence" class="text-text-secondary m-0">
+        <span class="text-text-heading font-semibold">{{ bandWord(breakdown.evidence) }}</span>
+        · {{ evidenceText }}
+      </dd>
+      <template v-if="breakdown.caps.length > 0">
+        <dt class="text-text-muted">
+          {{ t("alerts.incidents.rcaSummary.confidenceCapped", { band: bandWord("medium") }) }}
+        </dt>
+        <dd data-test="rca-confidence-caps" class="text-text-secondary m-0">
+          {{ breakdown.caps.join(", ") }}
+        </dd>
+      </template>
+    </dl>
+
     <RcaStageStepper
       v-if="cardState === 'investigating'"
       :stage-index="stageIndex"
@@ -131,7 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div v-if="graded" class="mt-0.5 flex flex-wrap items-end gap-x-8 gap-y-3">
       <dl data-test="rca-verdict-facts" class="m-0 flex min-w-0 flex-wrap items-end gap-8">
-        <div class="max-w-105 min-w-0">
+        <div v-if="suspectText" class="max-w-105 min-w-0">
           <dt class="text-text-muted text-xs">
             {{ t("alerts.incidents.rcaSummary.suspectChange") }}
           </dt>
@@ -181,13 +203,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             : t("alerts.incidents.rcaSteer.paused.waits")
         }}
       </p>
-      <p
-        v-if="earlierReportNote"
-        data-test="rca-earlier-report-note"
-        class="text-banner-warning-text m-0 mt-0.5 text-xs"
-      >
-        {{ earlierReportNote }}
-      </p>
       <template #actions>
         <OButton
           v-if="canSteer"
@@ -223,13 +238,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <p data-test="rca-stale-message" class="text-banner-warning-text m-0 text-sm">
         {{ t("alerts.incidents.rcaRun.stale", { time: staleSince }) }}
       </p>
-      <p
-        v-if="earlierReportNote"
-        data-test="rca-earlier-report-note"
-        class="text-banner-warning-text m-0 mt-0.5 text-xs"
-      >
-        {{ earlierReportNote }}
-      </p>
       <template #actions>
         <OButton
           data-test="rca-stale-cancel-btn"
@@ -243,9 +251,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
     </OBanner>
 
-    <!-- M: a re-run is live and an earlier report stays readable below. -->
+    <!-- M: a re-run of an analyzed incident is live. -->
     <OBanner
-      v-else-if="cardState === 'investigating' && earlierReportNote"
+      v-else-if="cardState === 'investigating' && hasEarlierReport"
       data-test="rca-reanalyzing-banner"
       variant="info"
       inline-actions
@@ -259,9 +267,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ? t("alerts.incidents.rcaRun.reanalyzingBuildOnPrevious")
             : t("alerts.incidents.rcaRun.reanalyzingFresh")
         }}
-      </p>
-      <p data-test="rca-earlier-report-note" class="text-banner-info-text m-0 mt-0.5 text-xs">
-        {{ earlierReportNote }}
       </p>
       <template #actions>
         <OButton
@@ -294,13 +299,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <p data-test="rca-error-reason" class="text-banner-error-soft-text m-0 text-sm font-medium">
         {{ error?.reason || t("alerts.incidents.rcaFailed") }}
-      </p>
-      <p
-        v-if="earlierReportNote"
-        data-test="rca-earlier-report-note"
-        class="text-banner-error-soft-text m-0 mt-0.5 text-xs"
-      >
-        {{ earlierReportNote }}
       </p>
       <template v-if="error?.details">
         <button
@@ -339,7 +337,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ t("alerts.incidents.rcaResume.button") }}
         </OButton>
-        <ODropdown v-if="earlierReportNote" align="end">
+        <ODropdown v-if="hasEarlierReport" align="end">
           <template #trigger>
             <OButton
               data-test="rca-retry-btn"
@@ -388,13 +386,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <p data-test="rca-cancelled-message" class="text-banner-error-soft-text m-0 text-sm">
         {{ cancelledText }}
       </p>
-      <p
-        v-if="earlierReportNote"
-        data-test="rca-earlier-report-note"
-        class="text-banner-error-soft-text m-0 mt-0.5 text-xs"
-      >
-        {{ earlierReportNote }}
-      </p>
       <template v-if="canResume" #actions>
         <OButton
           data-test="rca-resume-btn"
@@ -423,7 +414,13 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import type { RcaChangeKind, RcaRunError, RcaRunMode, RcaRunSummary } from "@/services/incidents";
+import type {
+  RcaBand,
+  RcaChangeKind,
+  RcaRunError,
+  RcaRunMode,
+  RcaRunSummary,
+} from "@/services/incidents";
 import {
   RCA_OUTCOME_PILL,
   rcaBandLabel,
@@ -455,8 +452,8 @@ const props = withDefaults(
     liveMode?: RcaRunMode | null;
     /** Mode of the failed run; Retry offers it first. */
     failedMode?: RcaRunMode | null;
-    /** "The report below is from the HH:MM run." when an earlier report shows below. */
-    earlierReportNote?: I18nText | null;
+    /** A completed run precedes the latest one: M shows, and Retry offers both modes. */
+    hasEarlierReport?: boolean;
     error?: RcaRunError | null;
     /** The full E message. */
     cancelledText?: I18nText | null;
@@ -487,7 +484,7 @@ const props = withDefaults(
     stage: null,
     liveMode: null,
     failedMode: null,
-    earlierReportNote: null,
+    hasEarlierReport: false,
     error: null,
     cancelledText: null,
     triggering: false,
@@ -666,7 +663,21 @@ const belowHeadline = computed<I18nText | null>(() => {
 });
 
 const showConfidence = computed(() => graded.value || partial.value);
-const bandReason = computed(() => (graded.value ? (card.value?.band_reason ?? null) : null));
+const breakdown = computed(() => (graded.value ? (card.value?.confidence ?? null) : null));
+const BAND_WORD: Record<RcaBand, I18nText> = {
+  high: t("alerts.incidents.aiAnalysis.band.high"),
+  medium: t("alerts.incidents.aiAnalysis.band.medium"),
+  low: t("alerts.incidents.aiAnalysis.band.low"),
+};
+const bandWord = (band: RcaBand) => BAND_WORD[band];
+/** "1 decisive source (logs) · High needs a second decisive source …" */
+const evidenceText = computed(() => {
+  const value = breakdown.value;
+  if (!value) return "";
+  return value.next_level
+    ? `${value.evidence_reason} · ${value.next_level}`
+    : value.evidence_reason;
+});
 const unverifiedCount = computed(() =>
   showConfidence.value ? (props.summary?.unverified.length ?? 0) : 0,
 );
@@ -682,10 +693,10 @@ const CHANGE_KIND: Record<RcaChangeKind, I18nText> = {
   infra: t("alerts.incidents.rcaSummary.changeKind.infra"),
 };
 
-/** "Deploy 4f2c1e · 14:02 UTC (diff not read) (from a.rao)" (VE35). */
-const suspectText = computed<I18nText>(() => {
+/** "Deploy 4f2c1e · 14:02 UTC (diff not read) (from a.rao)" (VE35); null hides the row. */
+const suspectText = computed<I18nText | null>(() => {
   const change = card.value?.suspect_change;
-  if (!change) return t("alerts.incidents.rcaSummary.noSuspectChange");
+  if (!change) return null;
   const parts = [
     t("alerts.incidents.rcaSummary.suspectRef", {
       kind: CHANGE_KIND[change.kind],

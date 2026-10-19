@@ -216,12 +216,12 @@ describe("IncidentRCAAnalysis", () => {
       expect(byTest(wrapper, "rca-existing-container").exists()).toBe(false);
     });
 
-    it("live with an earlier report shows that report under the card, not the pending line", async () => {
+    it("live with an earlier report hides that report and shows the pending line", async () => {
       wrapper = mountPanel(liveProps({ reportRun: rcaRunItem(), reportText: REPORT }));
       await flushPromises();
 
-      expect(byTest(wrapper, "rca-report-pending").exists()).toBe(false);
-      expect(byTest(wrapper, "rca-existing-container").text()).toContain("Memory leak");
+      expect(byTest(wrapper, "rca-report-pending").text()).toBe("The report shows after the run.");
+      expect(byTest(wrapper, "rca-existing-container").exists()).toBe(false);
     });
 
     it("shows the analysis loading line until the summary answers, then the report loading line (legacy)", async () => {
@@ -333,9 +333,6 @@ describe("IncidentRCAAnalysis", () => {
       expect(byTest(wrapper, "rca-reanalyzing-message").text()).toBe(
         "Building on the previous report…",
       );
-      expect(byTest(wrapper, "rca-earlier-report-note").text()).toBe(
-        "The report below is from the 08:53 UTC run.",
-      );
       await byTest(wrapper, "rca-banner-cancel-btn").trigger("click");
       expect(wrapper.emitted("cancel-rca")).toHaveLength(1);
     });
@@ -355,7 +352,7 @@ describe("IncidentRCAAnalysis", () => {
       expect(scrollTo).toHaveBeenCalledWith(expect.objectContaining({ behavior: "smooth" }));
     });
 
-    it("L: a failed run with an earlier report shows the reason, the report, and Retry modes", async () => {
+    it("L: a failed run after an earlier report shows the reason and Retry modes, not that report", async () => {
       wrapper = mountPanel({
         rca: rcaSummary({
           state: "failed",
@@ -374,7 +371,7 @@ describe("IncidentRCAAnalysis", () => {
       await flushPromises();
 
       expect(byTest(wrapper, "rca-error-reason").text()).toBe("Agent unavailable");
-      expect(byTest(wrapper, "rca-existing-container").text()).toContain("Memory leak");
+      expect(byTest(wrapper, "rca-existing-container").exists()).toBe(false);
       await byTest(wrapper, "rca-retry-fresh").trigger("click");
       expect(wrapper.emitted("trigger-rca")).toEqual([[{ buildOnPrevious: false }]]);
     });
@@ -589,41 +586,6 @@ describe("IncidentRCAAnalysis", () => {
       expect(byTest(wrapper, "rca-resume-btn").exists()).toBe(false);
       expect(byTest(wrapper, "rca-reanalyze-build").attributes("data-disabled")).toBe("false");
       expectNoRunReads();
-    });
-
-    it("a failed latest run with a v1 report shows the v1 report as the earlier report", async () => {
-      const failed = rcaRunItem({
-        run_id: "run-1",
-        state: "failed",
-        started_at: RCA_T0 + sec(600),
-        ended_at: RCA_T0 + sec(700),
-      });
-      wrapper = mountPanel({
-        rca: rcaSummary({
-          run_id: "run-1",
-          state: "failed",
-          current_run: rcaRun({ run_id: "run-1", state: "failed" }),
-          report_run: V1,
-          history: [failed, V1],
-        }),
-        error: {
-          code: "agent_unavailable",
-          reason: "Agent unavailable",
-          details: null,
-          trigger_type: null,
-        },
-        reportRun: V1,
-        history: [failed, V1],
-        reportText: REPORT,
-        threadRunId: "run-1",
-      });
-      await flushPromises();
-
-      expect(byTest(wrapper, "rca-error-reason").text()).toBe("Agent unavailable");
-      expect(byTest(wrapper, "rca-earlier-report-note").text()).toBe(
-        "The report below is from the 08:53 UTC run.",
-      );
-      expect(byTest(wrapper, "rca-existing-container").text()).toContain("Memory leak");
     });
 
     it("the selector opens a v1 report; the picked v1 run shows its report and reads no thread", async () => {
@@ -853,6 +815,30 @@ describe("IncidentRCAAnalysis", () => {
       expect(byTest(wrapper, "rca-copy-btn").attributes("data-disabled")).toBe("false");
     });
 
+    it("a graded run keeps its markdown in a Full report section that opens on click", async () => {
+      answers.runSummary = rcaRunSummary();
+      wrapper = mountPanel(completedProps());
+      await flushPromises();
+
+      const section = byTest(wrapper, "rca-full-report");
+      expect(precedes(byTest(wrapper, "rca-blind-spots").element, section.element)).toBe(true);
+      expect(byTest(wrapper, "rca-full-report-content").exists()).toBe(false);
+
+      await section.find("button").trigger("click");
+      await flushPromises();
+
+      expect(byTest(wrapper, "rca-full-report-content").text()).toContain("Memory leak");
+    });
+
+    it("a live run with a record shows no Full report of the earlier run", async () => {
+      answers.runSummary = rcaRunSummaryLive();
+      wrapper = mountPanel(liveProps({ reportRun: rcaRunItem(), reportText: REPORT }));
+      await flushPromises();
+
+      expect(byTest(wrapper, "rca-hypotheses").exists()).toBe(true);
+      expect(byTest(wrapper, "rca-full-report").exists()).toBe(false);
+    });
+
     it("legacy (VE42): the Analyzed card and the markdown report, none of the new sections", async () => {
       wrapper = mountPanel(completedProps());
       await flushPromises();
@@ -947,6 +933,21 @@ describe("IncidentRCAAnalysis", () => {
       ]);
       expect(byTest(wrapper, "rca-blind-spot").text()).toContain("3 stages did not run");
       expect(byTest(wrapper, "rca-blind-spot-action").exists()).toBe(false);
+    });
+
+    it("an evidence entry's hypothesis link scrolls to that hypothesis and focuses it", async () => {
+      const scrollIntoView = vi.fn();
+      Element.prototype.scrollIntoView = scrollIntoView;
+      answers.runSummary = rcaRunSummary();
+      wrapper = mountPanel(completedProps());
+      await flushPromises();
+
+      await byTest(byTest(wrapper, "rca-evidence-list"), "rca-evidence-row").trigger("click");
+      await byTest(wrapper, "rca-evidence-citation-hypothesis").trigger("click");
+
+      const target = wrapper.find('[data-test="rca-hypothesis"][data-hypothesis-id="h1"]');
+      expect(document.activeElement).toBe(target.element);
+      expect(scrollIntoView.mock.contexts).toContain(target.element);
     });
 
     it("F9: a thread chip shows the entry number and opens that entry in the Evidence index", async () => {

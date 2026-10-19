@@ -58,8 +58,6 @@ const buttonTexts = (wrapper: VueWrapper, bannerId: string) =>
     .findAll("button")
     .map((button) => button.text());
 
-const EARLIER = "The report below is from the 08:53 run.";
-
 describe("RcaVerdictCard", () => {
   describe("state pill and headline", () => {
     it.each([
@@ -96,16 +94,15 @@ describe("RcaVerdictCard", () => {
   });
 
   describe("TH40 banners", () => {
-    it("M (fresh): re-analyzing text, the earlier-report note, Follow in thread and Cancel", async () => {
+    it("M (fresh): re-analyzing text, Follow in thread and Cancel", async () => {
       const wrapper = mountCard({
         cardState: "investigating",
         liveMode: "fresh",
-        earlierReportNote: EARLIER,
+        hasEarlierReport: true,
       });
 
       expect(shownBanners(wrapper)).toEqual(["rca-reanalyzing-banner"]);
       expect(byTest(wrapper, "rca-reanalyzing-message").text()).toBe("Re-analyzing from scratch…");
-      expect(byTest(wrapper, "rca-earlier-report-note").text()).toBe(EARLIER);
       expect(buttonTexts(wrapper, "rca-reanalyzing-banner")).toEqual([
         "Follow in thread",
         "Cancel",
@@ -121,7 +118,7 @@ describe("RcaVerdictCard", () => {
       const wrapper = mountCard({
         cardState: "investigating",
         liveMode: "build_on_previous",
-        earlierReportNote: EARLIER,
+        hasEarlierReport: true,
       });
 
       expect(byTest(wrapper, "rca-reanalyzing-message").text()).toBe(
@@ -129,11 +126,11 @@ describe("RcaVerdictCard", () => {
       );
     });
 
-    it("L: the reason, the earlier-report note, collapsed details, and Retry with the failed mode first", async () => {
+    it("L: the reason, collapsed details, and Retry with the failed mode first", async () => {
       const wrapper = mountCard({
         cardState: "failed",
         failedMode: "build_on_previous",
-        earlierReportNote: EARLIER,
+        hasEarlierReport: true,
         error: {
           code: "agent_unavailable",
           reason: "Agent unavailable",
@@ -144,7 +141,6 @@ describe("RcaVerdictCard", () => {
 
       expect(shownBanners(wrapper)).toEqual(["rca-error-banner"]);
       expect(byTest(wrapper, "rca-error-reason").text()).toBe("Agent unavailable");
-      expect(byTest(wrapper, "rca-earlier-report-note").text()).toBe(EARLIER);
       expect(byTest(wrapper, "rca-error-details").exists()).toBe(false);
       const menu = wrapper.findAll('[role="menuitem"]');
       expect(menu.map((item) => item.attributes("data-test"))).toEqual([
@@ -172,7 +168,7 @@ describe("RcaVerdictCard", () => {
       const wrapper = mountCard({
         cardState: "failed",
         failedMode: "fresh",
-        earlierReportNote: EARLIER,
+        hasEarlierReport: true,
         error: { code: "timeout", reason: "Timed out", details: null, trigger_type: null },
       });
 
@@ -207,7 +203,7 @@ describe("RcaVerdictCard", () => {
         cardState: "investigating",
         stale: true,
         staleSince: "14:07:04",
-        earlierReportNote: EARLIER,
+        hasEarlierReport: true,
       });
 
       expect(shownBanners(wrapper)).toEqual(["rca-stale-banner"]);
@@ -265,10 +261,7 @@ describe("RcaVerdictCard", () => {
       });
 
       it.each([
-        [
-          "a live run",
-          { cardState: "investigating", liveMode: "fresh", earlierReportNote: EARLIER },
-        ],
+        ["a live run", { cardState: "investigating", liveMode: "fresh", hasEarlierReport: true }],
         ["a stale run", { cardState: "investigating", stale: true, staleSince: "14:07:04" }],
         ["an analyzed run", { cardState: "analyzed", summary: rcaRunSummary() }],
       ])("never on %s, even with canResume", (_label, props) => {
@@ -328,12 +321,12 @@ describe("RcaVerdictCard", () => {
     ])(
       "%s: every banner paragraph carries %s's text token",
       async (_frame, bannerId, token, props) => {
-        const wrapper = mountCard({ ...props, earlierReportNote: EARLIER });
+        const wrapper = mountCard({ ...props, hasEarlierReport: true });
         const details = byTest(wrapper, "rca-error-details-toggle");
         if (details.exists()) await details.trigger("click");
 
         const paragraphs = byTest(wrapper, bannerId).findAll("p");
-        expect(paragraphs.length).toBeGreaterThanOrEqual(2);
+        expect(paragraphs.length).toBeGreaterThanOrEqual(1);
         for (const p of paragraphs) expect(p.classes()).toContain(token);
       },
     );
@@ -410,7 +403,7 @@ describe("RcaVerdictCard", () => {
       expect(byTest(wrapper, "rca-verdict-band").exists()).toBe(false);
     });
 
-    it("B: 'Root cause identified', band chip High with the reason line, suspect change and impact (VE33, VE35)", async () => {
+    it("B: 'Root cause identified', band chip High with what the agent claimed and what the evidence allows, suspect change and impact (VE33, VE35)", async () => {
       const wrapper = mountCard({ cardState: "analyzed", summary: rcaRunSummary() });
 
       expect(text(wrapper, "rca-verdict-state")).toBe("Root cause identified");
@@ -420,9 +413,11 @@ describe("RcaVerdictCard", () => {
       const band = byTest(wrapper, "rca-verdict-band");
       expect(band.attributes("data-band")).toBe("high");
       expect(band.text()).toContain("High");
-      expect(text(wrapper, "rca-verdict-band-reason")).toBe(
-        "high · decisive: traces + change · ruled out: node CPU",
+      expect(text(wrapper, "rca-confidence-claimed")).toBe("High");
+      expect(text(wrapper, "rca-confidence-evidence")).toBe(
+        "High · 2 decisive sources (traces + change), 1 alternative ruled out",
       );
+      expect(byTest(wrapper, "rca-confidence-caps").exists()).toBe(false);
       expect(text(wrapper, "rca-verdict-unverified-count")).toBe("1 citation not verified");
       expect(text(wrapper, "rca-verdict-blind-link")).toBe("2 blind spots below");
       expect(text(wrapper, "rca-verdict-suspect")).toBe("Deploy 4f2c1e · 08:53 UTC");
@@ -437,6 +432,37 @@ describe("RcaVerdictCard", () => {
       await byTest(wrapper, "rca-verdict-blind-link").trigger("click");
       expect(wrapper.emitted("show-unverified")).toHaveLength(1);
       expect(wrapper.emitted("show-blind-spots")).toHaveLength(1);
+    });
+
+    it("the breakdown names the caps that lowered the band and what the next level needs (CG §5.3.4)", async () => {
+      const base = rcaRunSummary();
+      const withConfidence = (confidence: NonNullable<typeof base.card.confidence>) =>
+        mountCard({
+          cardState: "analyzed",
+          summary: rcaRunSummary({ card: { ...base.card, band: "medium", confidence } }),
+        });
+
+      const capped = withConfidence({
+        claimed: "high",
+        evidence: "high",
+        evidence_reason: "2 decisive sources (logs + traces), 1 alternative ruled out",
+        caps: ["change history not reachable"],
+      });
+      expect(capped.find('[data-test="rca-verdict-confidence-why"]').text()).toMatch(
+        /Capped to Medium\s*change history not reachable$/,
+      );
+
+      const limited = withConfidence({
+        claimed: "high",
+        evidence: "medium",
+        evidence_reason: "1 decisive source (logs)",
+        next_level: "High needs a second decisive source and a ruled-out alternative",
+        caps: [],
+      });
+      expect(text(limited, "rca-confidence-evidence")).toBe(
+        "Medium · 1 decisive source (logs) · High needs a second decisive source and a ruled-out alternative",
+      );
+      expect(byTest(limited, "rca-confidence-caps").exists()).toBe(false);
     });
 
     it("a band chip with no unverified citations is not a button", () => {
@@ -458,7 +484,6 @@ describe("RcaVerdictCard", () => {
             ...base.card,
             outcome: "contributing_factor",
             band: "medium",
-            band_reason: "medium",
           },
         }),
       });
@@ -477,7 +502,8 @@ describe("RcaVerdictCard", () => {
         "orders-db connection pool exhaustion after checkout-api deploy 4f2c1e",
       );
       expect(text(wrapper, "rca-verdict-band")).toContain("Low");
-      expect(text(wrapper, "rca-verdict-band-reason")).toBe("low · no confirmed cause");
+      expect(text(wrapper, "rca-confidence-claimed")).toBe("Medium");
+      expect(text(wrapper, "rca-confidence-evidence")).toBe("Low · no confirmed cause");
       expect(text(wrapper, "rca-verdict-suspect")).toBe(
         "Deploy 4f2c1e · 08:53 UTC (diff not read)",
       );
@@ -515,12 +541,12 @@ describe("RcaVerdictCard", () => {
       );
     });
 
-    it("D: Blocked with 'Needs: Change history' (VE32, VE44)", () => {
+    it("D: Blocked with 'Needs: Change history'; no suspect change hides its row (VE32, VE44)", () => {
       const wrapper = mountCard({ cardState: "analyzed", summary: rcaRunSummaryBlocked() });
 
       expect(text(wrapper, "rca-verdict-state")).toBe("Blocked");
       expect(text(wrapper, "rca-verdict-below")).toBe("Needs: Change history");
-      expect(text(wrapper, "rca-verdict-suspect")).toBe("None found");
+      expect(byTest(wrapper, "rca-verdict-suspect").exists()).toBe(false);
     });
 
     it("D without a need: 'Needs input' (VE32)", () => {
@@ -546,7 +572,7 @@ describe("RcaVerdictCard", () => {
       const band = byTest(wrapper, "rca-verdict-band");
       expect(band.attributes("data-band")).toBe("none");
       expect(band.text()).toBe("No confidence");
-      expect(byTest(wrapper, "rca-verdict-band-reason").exists()).toBe(false);
+      expect(byTest(wrapper, "rca-verdict-confidence-why").exists()).toBe(false);
       expect(byTest(wrapper, "rca-verdict-facts").exists()).toBe(false);
       expect(text(wrapper, "rca-verdict-blind-link")).toBe("1 blind spot below");
       expect(shownBanners(wrapper)).toEqual(["rca-cancelled-banner"]);

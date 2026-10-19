@@ -110,6 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="mt-2 max-w-215"
             :entry="openEntry"
             :hypotheses="hypotheses"
+            @open-hypothesis="$emit('open-hypothesis', $event)"
             :org="org"
             with-header
           />
@@ -139,6 +140,11 @@ const props = defineProps<{
   org: string;
   /** The run is live: the timeline comes with the report (VE36). */
   live: boolean;
+}>();
+
+defineEmits<{
+  /** A citation's hypothesis link was clicked. */
+  "open-hypothesis": [hypothesisId: string];
 }>();
 
 const { t } = useI18nTyped();

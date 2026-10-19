@@ -432,6 +432,20 @@ export interface RcaImpact {
   window?: { start: number; end: number };
 }
 
+/** Why the band is what it is (CG §5.3.4), built by the server from the grade. */
+export interface RcaConfidenceBreakdown {
+  /** The level the agent claimed for itself. */
+  claimed: RcaBand;
+  /** The level the evidence rules allow, before any cap. */
+  evidence: RcaBand;
+  /** Why the evidence allows that level, e.g. "1 decisive source (logs)". */
+  evidence_reason: string;
+  /** What the next level up needs, e.g. "High needs a ruled-out alternative". */
+  next_level?: string;
+  /** The caps that lowered the evidence level to medium. */
+  caps: string[];
+}
+
 /** The verdict card of a summary; the server omits each field it has no value for. */
 export interface RcaSummaryCard {
   outcome?: RcaOutcome;
@@ -440,8 +454,7 @@ export interface RcaSummaryCard {
   leading?: RcaLeadingEntry;
   verdict_so_far?: RcaVerdictSoFar;
   band?: RcaBand;
-  /** Server-built reason line (CG §5.3.4). */
-  band_reason?: string;
+  confidence?: RcaConfidenceBreakdown;
   suspect_change?: RcaSummarySuspectChange;
   impact?: RcaImpact;
   needs?: string;

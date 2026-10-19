@@ -308,15 +308,28 @@ pub struct ConfidenceGrade {
     pub lead_author: Option<String>,
 }
 
+/// Why a band is what it is, in the parts a reader checks (CG §5.3.4): the agent's
+/// claim, what the evidence allows and why, and the caps that lowered it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct ConfidenceBreakdown {
+    /// The level the agent claimed for itself.
+    pub claimed: Confidence,
+    /// The level the evidence rules allow, before any cap.
+    pub evidence: Confidence,
+    /// Why the evidence allows that level, e.g. "1 decisive source (logs)".
+    pub evidence_reason: String,
+    /// What the next level up needs; absent at `high` and under a floor.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub next_level: Option<String>,
+    /// The caps that lowered the evidence level to `medium`.
+    #[serde(default)]
+    pub caps: Vec<String>,
+}
+
 impl ConfidenceGrade {
-    /// The reason line (CG §5.3.4), built only from the grade.
-    pub fn reason_line(&self) -> String {
-        let mut line = self.band.as_str().to_string();
-        if min_band(self.claimed, self.band) != self.claimed {
-            line.push_str(" · claimed ");
-            line.push_str(self.claimed.as_str());
-        }
-        let floor = [
+    /// The first floor that holds the band at `low`, if any (CG §5.3.3).
+    fn floor(&self) -> Option<GradeReason> {
+        [
             GradeReason::NoConfirmedCause,
             GradeReason::AmbiguousCause,
             GradeReason::NoLedger,
@@ -324,7 +337,92 @@ impl ConfidenceGrade {
         ]
         .into_iter()
         .find(|r| self.reasons.contains(r))
-        .and_then(|r| r.floor_text());
+    }
+
+    /// The level the evidence allows before caps: the floor, else the basis rule.
+    pub fn evidence_level(&self) -> Confidence {
+        if self.floor().is_some() {
+            Confidence::Low
+        } else if self
+            .reasons
+            .contains(&GradeReason::TwoDecisiveClassesAndRuledOut)
+        {
+            Confidence::High
+        } else if self.reasons.contains(&GradeReason::DecisiveClass) {
+            Confidence::Medium
+        } else {
+            Confidence::Low
+        }
+    }
+
+    /// The caps that lowered the band. Every cap sets `medium`, so a cap on a
+    /// `medium` evidence level changed nothing and is left out.
+    fn applied_caps(&self) -> Vec<String> {
+        if self.evidence_level() != Confidence::High {
+            return Vec::new();
+        }
+        let lead_author = self.lead_author.as_deref();
+        self.reasons
+            .iter()
+            .filter_map(|r| r.cap_text(lead_author))
+            .collect()
+    }
+
+    /// The breakdown the verdict card shows (VE33).
+    pub fn breakdown(&self) -> ConfidenceBreakdown {
+        let evidence = self.evidence_level();
+        let floor = self.floor().and_then(|r| r.floor_text());
+        let classes: Vec<&str> = self.decisive_classes.iter().map(|c| c.as_str()).collect();
+        let mut evidence_reason = match (floor, classes.len()) {
+            (Some(text), _) => text.to_string(),
+            (None, 0) => "supporting evidence, none decisive".to_string(),
+            (None, 1) => format!("1 decisive source ({})", classes[0]),
+            (None, n) => format!("{n} decisive sources ({})", classes.join(" + ")),
+        };
+        if floor.is_none() && !self.ruled_out.is_empty() {
+            let n = self.ruled_out.len();
+            let noun = if n == 1 {
+                "alternative"
+            } else {
+                "alternatives"
+            };
+            evidence_reason.push_str(&format!(", {n} {noun} ruled out"));
+        }
+        let next_level = match evidence {
+            _ if floor.is_some() => None,
+            Confidence::Low => Some("Medium needs a decisive source".to_string()),
+            Confidence::Medium => {
+                let mut missing = Vec::new();
+                if classes.len() < 2 {
+                    missing.push("a second decisive source");
+                }
+                if self.ruled_out.is_empty() {
+                    missing.push("a ruled-out alternative");
+                }
+                if self.reasons.contains(&GradeReason::ContradictingEvidence) {
+                    missing.push("no contradicting evidence on the cause");
+                }
+                (!missing.is_empty()).then(|| format!("High needs {}", missing.join(" and ")))
+            }
+            Confidence::High => None,
+        };
+        ConfidenceBreakdown {
+            claimed: self.claimed,
+            evidence,
+            evidence_reason,
+            next_level,
+            caps: self.applied_caps(),
+        }
+    }
+
+    /// The reason line (CG §5.3.4), built only from the grade.
+    pub fn reason_line(&self) -> String {
+        let mut line = self.band.as_str().to_string();
+        if min_band(self.claimed, self.band) != self.claimed {
+            line.push_str(" · claimed ");
+            line.push_str(self.claimed.as_str());
+        }
+        let floor = self.floor().and_then(|r| r.floor_text());
         // A low band that only the model's own claim set reads like the band the
         // rules allowed.
         let floor_format =
@@ -349,12 +447,7 @@ impl ConfidenceGrade {
             line.push_str(" · ruled out: ");
             line.push_str(&self.ruled_out.join(", "));
         }
-        let lead_author = self.lead_author.as_deref();
-        let caps: Vec<String> = self
-            .reasons
-            .iter()
-            .filter_map(|r| r.cap_text(lead_author))
-            .collect();
+        let caps = self.applied_caps();
         if !caps.is_empty() {
             line.push_str(" · capped: ");
             line.push_str(&caps.join(", "));
@@ -1252,7 +1345,8 @@ mod tests {
                     vec![],
                     0,
                 ),
-                "medium · claimed high · decisive: metrics · capped: change history not reachable",
+                // One decisive class already means medium: the cap lowered nothing.
+                "medium · claimed high · decisive: metrics",
             ),
             (
                 g(
@@ -1294,9 +1388,62 @@ mod tests {
                 "low · one class of supporting evidence",
             ),
         ];
-        for (grade, want) in cases {
-            assert_eq!(grade.reason_line(), want);
+        for (grade, want) in &cases {
+            assert_eq!(grade.reason_line(), *want);
         }
+        // VE33: the card's breakdown of the same grades.
+        let breakdown = |i: usize| cases[i].0.breakdown();
+        let b = |claimed, evidence, reason: &str, next: Option<&str>, caps: &[&str]| {
+            ConfidenceBreakdown {
+                claimed,
+                evidence,
+                evidence_reason: reason.to_string(),
+                next_level: next.map(str::to_string),
+                caps: caps.iter().map(|c| c.to_string()).collect(),
+            }
+        };
+        assert_eq!(
+            breakdown(0),
+            b(
+                High,
+                High,
+                "2 decisive sources (traces + change), 1 alternative ruled out",
+                None,
+                &[]
+            )
+        );
+        assert_eq!(
+            breakdown(1),
+            b(
+                Medium,
+                High,
+                "1 decisive source (metrics)",
+                None,
+                &["suspect change not read"]
+            )
+        );
+        assert_eq!(
+            breakdown(2),
+            b(
+                High,
+                Medium,
+                "1 decisive source (metrics)",
+                Some("High needs a second decisive source and a ruled-out alternative"),
+                &[]
+            ),
+            "a cap on a medium evidence level is not listed"
+        );
+        assert_eq!(breakdown(4), b(Low, Low, "no verified evidence", None, &[]));
+        assert_eq!(
+            breakdown(5),
+            b(
+                Low,
+                Low,
+                "supporting evidence, none decisive",
+                Some("Medium needs a decisive source"),
+                &[]
+            )
+        );
         // The low row through grade_confidence: three citations that did not run.
         let calls = [hyp(
             1,

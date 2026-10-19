@@ -3567,7 +3567,8 @@ mod tests {
         let lines = verdict_lines(&state, &unchanged);
         assert_eq!(
             lines[0],
-            "probable cause: fd leak introduced by querier v0.14.2 (medium · claimed high · decisive: metrics · capped: suspect change not read)"
+            // One decisive class is already medium: the suspect-change cap lowered nothing.
+            "probable cause: fd leak introduced by querier v0.14.2 (medium · claimed high · decisive: metrics)"
         );
 
         // F3: the grade round-trips; `{"status":"skipped"}` stays exact (pinned above).

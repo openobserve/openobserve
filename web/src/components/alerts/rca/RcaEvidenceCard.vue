@@ -52,16 +52,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="border-border-default m-0 flex list-none flex-col gap-2 border-t px-3 py-2.5"
     >
       <li
-        v-for="citation in entry.citations"
+        v-for="{ citation, target } in citationRows"
         :key="`${citation.hypothesis_id}:${citation.evidence_id}`"
         data-test="rca-evidence-citation"
         class="flex flex-col gap-0.5 text-xs"
       >
-        <span class="text-text-secondary">
-          <span class="text-text-heading font-semibold">{{
-            statementOf(citation.hypothesis_id)
-          }}</span>
-          · {{ polarityLabel(citation.polarity) }} · {{ strengthLabel(citation.strength) }}
+        <!-- "Decisive · supports the root cause": the weight first, the hypothesis a link. -->
+        <span class="text-text-secondary flex min-w-0 items-baseline gap-1">
+          <span class="shrink-0">
+            <span class="text-text-heading font-semibold">{{
+              strengthLabel(citation.strength)
+            }}</span>
+            · {{ polarityLabel(citation.polarity) }}
+          </span>
+          <button
+            v-if="target"
+            type="button"
+            data-test="rca-evidence-citation-hypothesis"
+            class="text-accent min-w-0 cursor-pointer truncate border-none bg-transparent p-0 text-start font-semibold hover:underline"
+            :title="target.statement"
+            @click="$emit('open-hypothesis', citation.hypothesis_id)"
+          >
+            {{ target.label }}
+          </button>
         </span>
         <span class="text-text-body">
           <span class="text-text-muted font-semibold">{{
@@ -111,6 +124,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import type {
+  RcaCitation,
   RcaEvidenceEntry,
   RcaPolarity,
   RcaStrength,
@@ -125,12 +139,19 @@ const props = withDefaults(
   defineProps<{
     entry: RcaEvidenceEntry;
     hypotheses: RcaSummaryHypothesis[];
+    /** The card opens under this hypothesis: its own citation needs no name. */
+    hypothesisId?: string | null;
     org: string;
     /** Inline cards carry their own header; index rows already show it. */
     withHeader?: boolean;
   }>(),
-  { withHeader: false },
+  { hypothesisId: null, withHeader: false },
 );
+
+defineEmits<{
+  /** A citation's hypothesis link: show that hypothesis. */
+  "open-hypothesis": [hypothesisId: string];
+}>();
 
 const { t } = useI18nTyped();
 const router = useRouter();
@@ -168,8 +189,30 @@ const openLabel = computed(() => {
   }
 });
 
-const statements = computed(() => new Map(props.hypotheses.map((h) => [h.id, h.statement])));
-const statementOf = (id: string) => raw(statements.value.get(id) ?? id);
+/**
+ * Each citation's hypothesis as a link: "the root cause" or "a contributing factor" when only
+ * one hypothesis holds that role, else its statement. None under the card's own hypothesis.
+ */
+const citationRows = computed(() => {
+  const byId = new Map(props.hypotheses.map((h) => [h.id, h]));
+  const perStatus = new Map<string, number>();
+  for (const h of props.hypotheses) perStatus.set(h.status, (perStatus.get(h.status) ?? 0) + 1);
+  const roleOf = (h: RcaSummaryHypothesis): I18nText | null => {
+    if ((perStatus.get(h.status) ?? 0) > 1) return null;
+    if (h.status === "root_cause") return t("alerts.incidents.rcaSummary.citesRootCause");
+    if (h.status === "contributing") return t("alerts.incidents.rcaSummary.citesContributing");
+    return null;
+  };
+  return props.entry.citations.map((citation: RcaCitation) => {
+    if (citation.hypothesis_id === props.hypothesisId) return { citation, target: null };
+    const found = byId.get(citation.hypothesis_id);
+    if (!found) return { citation, target: null };
+    return {
+      citation,
+      target: { label: roleOf(found) ?? raw(found.statement), statement: found.statement },
+    };
+  });
+});
 
 const polarityLabel = (polarity: RcaPolarity): I18nText => {
   switch (polarity) {

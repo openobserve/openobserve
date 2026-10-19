@@ -338,7 +338,7 @@ const SKIPPED: Record<string, string> = {
   // exactly what that forbids.
   PresetId: "catalogue-driven by design; the UI must not know preset ids",
   PresetSpec: "request body built from the catalogue's own inputs schema",
-  GradeReason: "raw reasons stay in the record; the UI uses the formatted card.band_reason",
+  GradeReason: "raw reasons stay in the record; the UI reads the server-built card.confidence",
   LedgerTool: "internal transcript decoder tag; no endpoint serializes it",
   EndedBy: "internal finalization input; the endpoint exposes OutcomeReason",
   SuspectChangeState: "agent claim stored for metrics; UI reads code-derived ShownChangeState",

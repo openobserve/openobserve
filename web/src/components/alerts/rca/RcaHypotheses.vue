@@ -15,7 +15,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <section data-test="rca-hypotheses" :aria-labelledby="headingId" class="flex flex-col">
+  <section
+    ref="section"
+    data-test="rca-hypotheses"
+    :aria-labelledby="headingId"
+    class="flex flex-col"
+  >
     <div class="mb-1 flex items-baseline gap-2">
       <h3 :id="headingId" class="text-text-heading m-0 text-base font-bold">
         {{ t("alerts.incidents.rcaSummary.hypotheses") }}
@@ -53,7 +58,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :key="hypothesis.id"
           data-test="rca-hypothesis"
           :data-status="hypothesis.status"
-          class="grid grid-cols-[8rem_minmax(0,1fr)_auto] items-start gap-x-3 px-3.5 py-2.5"
+          :data-hypothesis-id="hypothesis.id"
+          tabindex="-1"
+          class="grid grid-cols-[8rem_minmax(0,1fr)_auto] items-start gap-x-3 px-3.5 py-2.5 transition-colors duration-700 outline-none"
+          :class="{ 'bg-surface-tint-accent': highlighted === hypothesis.id }"
         >
           <!-- The status column wraps a long label ("Root cause · not confirmed", VE18). -->
           <span class="min-w-0 pt-px">
@@ -120,6 +128,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="mt-2"
               :entry="openEntry"
               :hypotheses="hypotheses"
+              :hypothesis-id="hypothesis.id"
+              @open-hypothesis="showHypothesis"
               :org="org"
               with-header
             />
@@ -193,7 +203,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, ref, useId } from "vue";
+import { computed, onUnmounted, ref, useId } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
@@ -239,6 +249,7 @@ defineEmits<{
 const { t } = useI18nTyped();
 const headingId = useId();
 const baseId = useId();
+const section = ref<HTMLElement | null>(null);
 
 const ACTION_LABEL: Record<RcaSteerAction, I18nText> = {
   disprove: t("alerts.incidents.rcaSteer.action.disprove"),
@@ -278,4 +289,21 @@ const cardId = (id: string) => `${baseId}-card-${id}`;
 const openEntry = computed(
   () => props.evidence.find((entry) => entry.number === open.value?.number) ?? null,
 );
+
+const highlighted = ref<string | null>(null);
+let highlightTimer: number | undefined;
+/** Scrolls to a hypothesis row, focuses it and tints it briefly (an evidence link). */
+const showHypothesis = (id: string) => {
+  const rows = section.value?.querySelectorAll<HTMLElement>("[data-hypothesis-id]") ?? [];
+  const row = [...rows].find((el) => el.dataset.hypothesisId === id);
+  if (!row) return;
+  row.scrollIntoView({ block: "center", behavior: "smooth" });
+  row.focus({ preventScroll: true });
+  highlighted.value = id;
+  clearTimeout(highlightTimer);
+  highlightTimer = window.setTimeout(() => (highlighted.value = null), 1_500);
+};
+onUnmounted(() => clearTimeout(highlightTimer));
+
+defineExpose({ showHypothesis });
 </script>

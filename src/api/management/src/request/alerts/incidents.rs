@@ -3372,8 +3372,14 @@ mod tests {
         assert_eq!(card["headline"], "The pool ran dry");
         assert_eq!(card["band"], "medium");
         assert_eq!(
-            card["band_reason"],
-            "medium · claimed high · decisive: logs"
+            card["confidence"],
+            json!({
+                "claimed": "high",
+                "evidence": "medium",
+                "evidence_reason": "1 decisive source (logs)",
+                "next_level": "High needs a second decisive source and a ruled-out alternative",
+                "caps": [],
+            })
         );
         assert!(card["leading"].is_null() && card["verdict_so_far"].is_null());
         assert_eq!(

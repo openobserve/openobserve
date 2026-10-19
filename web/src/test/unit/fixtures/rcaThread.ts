@@ -333,7 +333,12 @@ export function rcaRunSummary(overrides: Partial<RcaRunSummary> = {}): RcaRunSum
       outcome_reason: "root_cause_graded",
       headline: "checkout-api deploy 4f2c1e exhausted the orders-db connection pool",
       band: "high",
-      band_reason: "high · decisive: traces + change · ruled out: node CPU",
+      confidence: {
+        claimed: "high",
+        evidence: "high",
+        evidence_reason: "2 decisive sources (traces + change), 1 alternative ruled out",
+        caps: [],
+      },
       suspect_change: {
         kind: "deploy",
         reference: "4f2c1e",
@@ -464,7 +469,12 @@ export const rcaRunSummaryInconclusive = (
       outcome_reason: "no_confirmed_cause",
       headline: "orders-db connection pool exhaustion after checkout-api deploy 4f2c1e",
       band: "low",
-      band_reason: "low · no confirmed cause",
+      confidence: {
+        claimed: "medium",
+        evidence: "low",
+        evidence_reason: "no confirmed cause",
+        caps: [],
+      },
       suspect_change: { ...base.card.suspect_change!, shown_state: "not_read" },
     },
     hypotheses: [
@@ -497,7 +507,12 @@ export const rcaRunSummaryBlocked = (overrides: Partial<RcaRunSummary> = {}): Rc
       outcome_reason: "leading_blocked",
       headline: "orders-db pool saturated at 14:04. The change behind it can't be checked",
       band: "low",
-      band_reason: "low · no confirmed cause",
+      confidence: {
+        claimed: "medium",
+        evidence: "low",
+        evidence_reason: "no confirmed cause",
+        caps: [],
+      },
       suspect_change: undefined,
       needs: "Change history",
     },

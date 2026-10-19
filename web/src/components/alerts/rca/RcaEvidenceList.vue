@@ -106,7 +106,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </button>
         <div v-if="opened.has(entry.number)" :id="rowId(entry.number)" class="ps-12.5 pe-3.5 pb-3">
-          <RcaEvidenceCard :entry="entry" :hypotheses="hypotheses" :org="org" />
+          <RcaEvidenceCard
+            :entry="entry"
+            :hypotheses="hypotheses"
+            :org="org"
+            @open-hypothesis="$emit('open-hypothesis', $event)"
+          />
         </div>
       </li>
     </ul>
@@ -179,6 +184,11 @@ const props = defineProps<{
   unverified: RcaUnverifiedCitation[];
   hypotheses: RcaSummaryHypothesis[];
   org: string;
+}>();
+
+defineEmits<{
+  /** A citation's hypothesis link was clicked. */
+  "open-hypothesis": [hypothesisId: string];
 }>();
 
 const { t } = useI18nTyped();

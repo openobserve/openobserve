@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :selected-run-id="cardRunId"
         :live="live"
         :subtitle="subtitle"
-        :has-report="!!reportText"
+        :has-report="!!ownReport"
         :can-build-on-previous="!!reportRun"
         :has-thread="!!thread && thread.transcript === 'available'"
         :can-ask="canAsk"
@@ -84,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :stage="rca.summary.stage"
         :live-mode="currentRun?.mode ?? null"
         :failed-mode="currentRun?.mode ?? null"
-        :earlier-report-note="earlierReportNote"
+        :has-earlier-report="hasEarlierReport"
         :error="error"
         :cancelled-text="cancelledText"
         :triggering="triggering"
@@ -123,8 +123,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :hypotheses="recordSummary.hypotheses"
           :org="orgId"
           :live="cardState === 'investigating'"
+          @open-hypothesis="hypothesesSection?.showHypothesis($event)"
         />
         <RcaHypotheses
+          ref="hypothesesSection"
           :hypotheses="recordSummary.hypotheses"
           :outcome="recordSummary.card.outcome"
           :evidence="recordSummary.evidence"
@@ -141,6 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :unverified="recordSummary.unverified"
           :hypotheses="recordSummary.hypotheses"
           :org="orgId"
+          @open-hypothesis="hypothesesSection?.showHypothesis($event)"
         />
         <RcaBlindSpots
           ref="blindSpots"
@@ -152,6 +155,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :triggering="triggering"
           @resume="resumeLatest"
         />
+        <!-- The shown run's markdown, collapsed under its structured record. -->
+        <OCollapsible
+          v-if="showFullReport"
+          data-test="rca-full-report"
+          trigger-class="-mx-2 w-[calc(100%+1rem)]!"
+        >
+          <template #trigger="{ open }">
+            <span class="text-text-heading flex-1 text-base font-bold">
+              {{ t("alerts.incidents.rcaRun.fullReport") }}
+            </span>
+            <OIcon
+              name="expand-more"
+              size="md"
+              class="text-collapsible-icon transition-transform duration-200"
+              :class="open ? 'rotate-180' : 'rotate-0'"
+            />
+          </template>
+          <p
+            v-if="ownReportLoading && !ownReport"
+            data-test="rca-full-report-loading"
+            class="text-text-secondary m-0 flex items-center gap-2 pt-2 text-sm"
+          >
+            <OSpinner variant="dots" size="xs" />
+            {{ t("alerts.incidents.rcaRun.loadingReport") }}
+          </p>
+          <RcaReportContent
+            v-else
+            data-test="rca-full-report-content"
+            class="max-w-215 pt-2"
+            :html="formattedReport"
+            :is-dark-mode="isDark"
+          />
+        </OCollapsible>
       </template>
       <p
         v-else-if="summaryStatus === 'loading' && !showReport"
@@ -164,7 +200,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <template v-if="showReport">
         <p
-          v-if="reportLoading && !reportText"
+          v-if="ownReportLoading && !ownReport"
           data-test="rca-report-loading"
           class="text-text-secondary m-0 flex items-center gap-2 text-sm"
         >
@@ -172,7 +208,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("alerts.incidents.rcaRun.loadingReport") }}
         </p>
         <RcaReportContent
-          v-else-if="reportText"
+          v-else-if="ownReport"
           data-test="rca-existing-container"
           class="max-w-215"
           :html="formattedReport"
@@ -180,7 +216,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </template>
       <p
-        v-if="live && !reportRun && !recordSummary"
+        v-if="cardState === 'investigating' && !recordSummary"
         data-test="rca-report-pending"
         class="text-text-secondary text-compact m-0"
       >
@@ -223,6 +259,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, onUnmounted, ref, toRef, watch } from "vue";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
@@ -280,7 +318,7 @@ const props = withDefaults(
     incidentId: string;
     /** Run summary of the latest run with the detail fields, or null when none ran. */
     rca: RcaSummary | null;
-    /** Newest completed run; its report shows unless an earlier one is picked. */
+    /** Newest completed run; its report shows for that run only, never under a later run. */
     reportRun?: RcaRunItem | null;
     /** A completed run picked from the history, or null to follow the latest run. */
     viewedRun?: RcaRunItem | null;
@@ -386,9 +424,10 @@ const recordSummary = computed(() => {
 /** Evidence id → number for the thread's chips (03 VE24); null shows raw ids. */
 const evidenceNumbers = computed(() => rcaEvidenceNumbers(recordSummary.value));
 
+/** The markdown takes the place of the record: v1 runs, legacy runs, and unreadable summaries. */
 const showReport = computed(() => {
+  if (cardState.value !== "analyzed") return false;
   if (summary.value?.legacy || threadRunIsV1.value) return true;
-  if (cardState.value !== "analyzed") return earlierReportNote.value !== null;
   if (recordSummary.value) return false;
   return (
     summaryStatus.value !== "loading" &&
@@ -397,6 +436,15 @@ const showReport = computed(() => {
   );
 });
 
+/** A finished run with a record keeps its markdown in a collapsed "Full report". */
+const showFullReport = computed(
+  () =>
+    cardState.value === "analyzed" &&
+    recordSummary.value !== null &&
+    (!!ownReport.value || ownReportLoading.value),
+);
+
+const hypothesesSection = ref<InstanceType<typeof RcaHypotheses> | null>(null);
 const evidenceList = ref<InstanceType<typeof RcaEvidenceList> | null>(null);
 const blindSpots = ref<InstanceType<typeof RcaBlindSpots> | null>(null);
 const showBlindSpots = () =>
@@ -439,6 +487,11 @@ const cardState = computed<RcaCardState>(() => {
 
 const cardRunId = computed(() => props.viewedRun?.run_id ?? props.rca?.run_id ?? "");
 
+/** The loaded report belongs to the shown run; an earlier run's report never shows for it. */
+const ownsReport = computed(() => (props.viewedRun ?? props.reportRun)?.run_id === cardRunId.value);
+const ownReport = computed(() => (ownsReport.value ? props.reportText : ""));
+const ownReportLoading = computed(() => ownsReport.value && props.reportLoading);
+
 /** The latest run is paused for an answer (03 VE22); a picked run never is. */
 const waitingInput = computed(() => !props.viewedRun && props.rca?.state === "waiting_input");
 
@@ -479,14 +532,11 @@ const runDuration = computed(() => {
   return formatRcaDuration(ms);
 });
 
-// Names the report shown below while the latest run has none of its own (02 TH40 M, L, E).
-const earlierReportNote = computed<I18nText | null>(() => {
-  if (cardState.value === "analyzed") return null;
+// A re-run follows a completed run: the banners offer its modes (02 TH40 M, L).
+const hasEarlierReport = computed(() => {
+  if (cardState.value === "analyzed") return false;
   const shown = props.reportRun;
-  if (!shown || shown.run_id === props.rca?.run_id) return null;
-  return t("alerts.incidents.rcaRun.earlierReportBelow", {
-    time: formatTimestampInTimezone(shown.started_at, "HH:mm", "UTC"),
-  });
+  return !!shown && shown.run_id !== props.rca?.run_id;
 });
 
 const staleSince = computed(() => (props.rca ? formatRcaClock(props.rca.updated_at) : ""));
@@ -509,7 +559,7 @@ const cancelledText = computed<I18nText | null>(() => {
     : t("alerts.incidents.rcaRun.cancelledAtChecks", values);
 });
 
-const formattedReport = computed(() => (props.reportText ? renderRcaReport(props.reportText) : ""));
+const formattedReport = computed(() => (ownReport.value ? renderRcaReport(ownReport.value) : ""));
 
 // The thread column describes the thread's run, which is not always the latest.
 const threadRunState = computed<RcaRunState | null>(() => {
@@ -635,17 +685,17 @@ const copyText = async (text: string, success: I18nText, failure: I18nText) => {
 };
 
 const copyReport = () => {
-  if (!props.reportText) return;
+  if (!ownReport.value) return;
   void copyText(
-    props.reportText,
+    ownReport.value,
     t("alerts.incidents.rcaCopied"),
     t("alerts.incidents.rcaCopyFailed"),
   );
 };
 
 const downloadReport = () => {
-  if (!props.reportText) return;
-  const blob = new Blob([props.reportText], { type: "text/markdown;charset=utf-8" });
+  if (!ownReport.value) return;
+  const blob = new Blob([ownReport.value], { type: "text/markdown;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
