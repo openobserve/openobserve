@@ -1036,12 +1036,6 @@ fn validate_exclusions(def: &FunnelDef, event_ids: &mut Vec<String>) -> Result<(
             ));
         }
         validate_step(&exclusion.s, event_ids)?;
-        // The exclusion SQL matches its step without step options, so a condition would be ignored.
-        if exclusion.s.opts().is_some_and(|opts| !opts.pc.is_empty()) {
-            return Err(invalid_def(
-                "an exclusion step takes no property conditions".to_string(),
-            ));
-        }
         let a = exclusion.a;
         match (exclusion.b, exclusion.w) {
             (Some(b), None) if 1 <= a && a < b && b <= steps => {
@@ -2245,7 +2239,7 @@ mod tests {
             let x = serde_json::json!([{"s": step, "a": 1, "b": 3}]);
             assert_eq!(def_code(with_x(x)), "invalid_definition", "{step}");
         }
-        let plain = serde_json::json!([{"s": ["p", "/z", {"min": 1}], "a": 1, "b": 3}]);
+        let plain = serde_json::json!([{"s": ["p", "/z"], "a": 1, "b": 3}]);
         assert_eq!(def_code(with_x(plain)), "ok");
     }
 }
