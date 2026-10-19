@@ -433,14 +433,13 @@ export function projectCycleCost(
 export interface EstimateInputs {
   ingestGb: number;
   searchCount: number;
-  searchMinutes: number;
   pipelineCount: number;
   retentionDays: number;
   aiCredits: number;
   /** Converts a pipeline count into processed megabytes. */
   avgStreamMb: number;
-  /** Converts search minutes into scanned megabytes. */
-  scanRateMbPerMin: number;
+  /** Converts a search count into scanned megabytes. */
+  scanPerSearchMb: number;
   browserChecks: number;
   browserSteps: number;
   browserRegions: number;
@@ -540,7 +539,7 @@ export function estimateCost(
   if (!details) return { lines: [], total: 0 };
   const num = (value: number) => (Number.isFinite(Number(value)) ? Number(value) : 0);
   const ingestMb = num(input.ingestGb) * MB_PER_GB;
-  const scannedMb = num(input.searchCount) * num(input.searchMinutes) * num(input.scanRateMbPerMin);
+  const scannedMb = num(input.searchCount) * num(input.scanPerSearchMb);
   const pipelineMb = num(input.pipelineCount) * num(input.avgStreamMb);
   const credits = num(input.aiCredits);
   const browserRuns = browserStepRuns(input);

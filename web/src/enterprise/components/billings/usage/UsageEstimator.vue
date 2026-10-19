@@ -124,13 +124,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @update:model-value="setField('avgStreamMb', $event)"
                   />
                   <OInput
-                    :model-value="inputs.scanRateMbPerMin"
+                    :model-value="inputs.scanPerSearchMb"
                     type="number"
                     size="md"
-                    :label="t('billing.usageV2.avgScanRate')"
-                    :suffix="rawMbPerMin"
-                    data-test="billings-usageestimator-scan-rate"
-                    @update:model-value="setField('scanRateMbPerMin', $event)"
+                    :label="t('billing.usageV2.avgScanPerSearch')"
+                    :suffix="rawMb"
+                    data-test="billings-usageestimator-scan-per-search"
+                    @update:model-value="setField('scanPerSearchMb', $event)"
                   />
                 </div>
               </OPopover>
@@ -154,7 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="md"
                 :label="t(field.labelKey)"
                 :suffix="field.suffix"
-                :help-text="field.key === 'searchMinutes' ? scanNote : field.rate"
+                :help-text="field.rate"
                 :data-test="`billings-usageestimator-${field.key}`"
                 @update:model-value="setField(field.key, $event)"
               >
@@ -274,7 +274,7 @@ import {
   type MeterKey,
 } from "./meteringModel";
 import { meterColorFor } from "./usageCharts";
-import { averageStreamSizeSql, searchScanRateSql } from "./usageQueries";
+import { averageStreamSizeSql, searchScanSizeSql } from "./usageQueries";
 
 type FieldKey = keyof EstimateInputs;
 
@@ -301,7 +301,6 @@ interface FieldDef {
 }
 
 const MB_PER_GB = 1024;
-const SECONDS_PER_MINUTE = 60;
 
 /** Below a cent a line is noise, so it renders quietly rather than as a real cost. */
 const CENT = 0.005;
@@ -319,7 +318,6 @@ const { t } = useI18nTyped();
 const store = useStore();
 
 const rawMb = "MB";
-const rawMbPerMin = "MB/min";
 
 const SCENARIOS: { value: ScenarioKey; labelKey: I18nKey }[] = [
   { value: "current", labelKey: "billing.usageV2.scenarioCurrent" },
@@ -354,14 +352,6 @@ const FIELDS: FieldDef[] = [
     suffix: "",
     min: 0,
     max: 1000,
-    step: 5,
-  },
-  {
-    key: "searchMinutes",
-    labelKey: "billing.usageV2.searchDuration",
-    suffix: "min",
-    min: 1,
-    max: 1440,
     step: 5,
   },
   {
@@ -426,12 +416,11 @@ const FIELDS: FieldDef[] = [
 const DEFAULTS: EstimateInputs = {
   ingestGb: 100,
   searchCount: 50,
-  searchMinutes: 60,
   pipelineCount: 5,
   retentionDays: 30,
   aiCredits: 0,
   avgStreamMb: 0,
-  scanRateMbPerMin: 0,
+  scanPerSearchMb: 0,
   browserChecks: 0,
   browserSteps: 5,
   browserRegions: 1,
@@ -452,6 +441,9 @@ const scenario = ref<ScenarioKey>("current");
 
 const round = (value: number) => Number(value.toFixed(2));
 
+/** Four significant digits, for a size that can be a fraction of a megabyte. */
+const significant = (value: number) => Number(value.toPrecision(4));
+
 /** Fields the user typed in; history that lands later must not overwrite them. */
 const edited = new Set<FieldKey>();
 
@@ -470,15 +462,20 @@ const currentScenario = computed<EstimateInputs>(() => {
   const details = props.details;
   const assumptions = {
     avgStreamMb: inputs.avgStreamMb,
-    scanRateMbPerMin: inputs.scanRateMbPerMin,
+    scanPerSearchMb: inputs.scanPerSearchMb,
   };
   if (!details) return { ...DEFAULTS, ...assumptions };
   const perMonth = (amount: number | string | undefined) => monthlyPace(amount, details);
   const scannedMb = perMonth(details.query?.metered_amount);
-  const scanPerSearch = DEFAULTS.searchMinutes * assumptions.scanRateMbPerMin;
   const pipelineMb = perMonth(details.pipeline?.metered_amount);
-  // Whole searches and checks; the duration or interval absorbs the rest, so the total matches the bill.
-  const searches = fitWholeCount(scanPerSearch > 0 ? scannedMb / scanPerSearch : 0);
+  // Whole searches and checks; the size per search or the interval absorbs the rest, so the total
+  // matches the bill. With no search history yet, the default count stands in.
+  const searchCount =
+    assumptions.scanPerSearchMb > 0
+      ? fitWholeCount(scannedMb / assumptions.scanPerSearchMb).count
+      : scannedMb > 0
+        ? DEFAULTS.searchCount
+        : 0;
   const browser = fitWholeCount(
     perMonth(details.synthetics_browser?.metered_amount) / BROWSER_RUNS_PER_CHECK,
   );
@@ -488,9 +485,9 @@ const currentScenario = computed<EstimateInputs>(() => {
   return {
     ...assumptions,
     ingestGb: round(perMonth(details.ingestion?.metered_amount) / MB_PER_GB),
-    searchCount: scanPerSearch > 0 ? searches.count : DEFAULTS.searchCount,
-    // The slider starts at one minute; below it the cost is a fraction of a cent.
-    searchMinutes: Math.max(round(DEFAULTS.searchMinutes * searches.scale), 1),
+    searchCount,
+    scanPerSearchMb:
+      searchCount > 0 ? significant(scannedMb / searchCount) : assumptions.scanPerSearchMb,
     pipelineCount:
       assumptions.avgStreamMb > 0
         ? Math.round(pipelineMb / assumptions.avgStreamMb)
@@ -528,15 +525,6 @@ const meterLabel = (key: MeterKey) => {
   const def = METERS.find((entry) => entry.key === key);
   return def ? t(def.labelKey) : raw(key);
 };
-
-const scannedMb = computed(
-  () => Number(inputs.searchCount) * Number(inputs.searchMinutes) * Number(inputs.scanRateMbPerMin),
-);
-
-const scannedText = computed(() => raw(formatSizeFromMB(scannedMb.value)));
-
-/** Search is planned in minutes but billed on scanned volume, so the field states the conversion. */
-const scanNote = computed(() => t("billing.usageV2.scanNote", { volume: scannedText.value }));
 
 const runCount = (runs: number) => raw(addCommasToNumber(Math.round(runs)));
 
@@ -620,20 +608,20 @@ const loadDefaults = async () => {
   try {
     const [streams, scan] = await Promise.all([
       runScalarQuery(averageStreamSizeSql(orgId), "streams"),
-      runScalarQuery(searchScanRateSql(orgId), "scan"),
+      runScalarQuery(searchScanSizeSql(orgId), "scan"),
     ]);
     const streamCount = Number(streams.streams) || 0;
     if (!edited.has("avgStreamMb")) {
       inputs.avgStreamMb = streamCount > 0 ? round(Number(streams.total) / streamCount) : 0;
     }
-    const seconds = Number(scan.seconds) || 0;
-    if (!edited.has("scanRateMbPerMin")) {
-      inputs.scanRateMbPerMin =
-        seconds > 0 ? round((Number(scan.total) / seconds) * SECONDS_PER_MINUTE) : 0;
+    // A search is priced by the data it scans; how long it ran does not enter the bill.
+    const searches = Number(scan.searches) || 0;
+    if (!edited.has("scanPerSearchMb")) {
+      inputs.scanPerSearchMb = searches > 0 ? significant(Number(scan.total) / searches) : 0;
     }
   } catch {
     inputs.avgStreamMb = inputs.avgStreamMb || 0;
-    inputs.scanRateMbPerMin = inputs.scanRateMbPerMin || 0;
+    inputs.scanPerSearchMb = inputs.scanPerSearchMb || 0;
   }
   loadingHistory.value = false;
   // The answers land a moment after the tab opens; a preset picked or a value typed by then stays.

@@ -24,7 +24,7 @@ import {
   eventVolumeSql,
   meterTotalSql,
   orgVolumeSql,
-  searchScanRateSql,
+  searchScanSizeSql,
   trendsCostSql,
 } from "./usageQueries";
 import { cyclesNewestFirst, parseMeteringResponse, type MeteringDetails } from "./meteringModel";
@@ -115,14 +115,18 @@ describe("usageQueries", () => {
 
   it("reads the estimator defaults from ingestion and search rows", () => {
     expect(averageStreamSizeSql("default")).toContain("count(distinct stream_name)");
-    expect(searchScanRateSql("default")).toContain("sum(response_time)");
+    // Partitions of one streamed search share its trace id before "-{n}", so they count once.
+    expect(searchScanSizeSql("default")).toContain(
+      "count(distinct split_part(trace_id, '-', 1)) as searches",
+    );
+    expect(searchScanSizeSql("default")).not.toContain("response_time");
   });
 
   it("reads a super org's estimator history across the group, counting each org's streams apart", () => {
     const streams = averageStreamSizeSql(null);
     expect(streams).not.toContain("org_id =");
     expect(streams).toContain("count(distinct concat(org_id, '/', stream_name))");
-    expect(searchScanRateSql(null)).toMatch(/where event = 'Search'$/);
+    expect(searchScanSizeSql(null)).toMatch(/where event = 'Search'$/);
   });
 
   it("leaves out the zero-length invoice Stripe creates at subscription, so it is never Last Cycle", () => {

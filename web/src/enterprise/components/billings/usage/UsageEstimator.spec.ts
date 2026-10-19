@@ -16,6 +16,7 @@
 import { enableAutoUnmount, flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import i18n from "@/locales";
+import { formatSizeFromMB } from "@/utils/formatters";
 import store from "@/test/unit/helpers/store";
 import { mockMeteringResponse } from "./meteringMock";
 import {
@@ -27,16 +28,17 @@ import {
 
 // The two history reads, released by each test when it wants them to land.
 let releaseHistory!: () => void;
+// Search history: one search that scanned 300 GB, far more than this cycle's billed scan.
+const BIG_SEARCH = { total: 307_200, seconds: 60, searches: 1 };
+let scanHistory: Record<string, number> = BIG_SEARCH;
 const search = vi.fn(
   (_sql: string, options: { key: string }) =>
     new Promise((resolve) => {
       const previous = releaseHistory;
       releaseHistory = () => {
         previous?.();
-        // 300 MB scanned per minute of searching; 10 streams of 50 MB.
-        resolve(
-          options.key === "scan" ? [{ total: 300, seconds: 60 }] : [{ total: 500, streams: 10 }],
-        );
+        // 10 streams of 50 MB.
+        resolve(options.key === "scan" ? [scanHistory] : [{ total: 500, streams: 10 }]);
       };
     }),
 );
@@ -63,6 +65,7 @@ describe("UsageEstimator My Current Usage", () => {
   beforeEach(() => {
     search.mockClear();
     releaseHistory = () => {};
+    scanHistory = BIG_SEARCH;
   });
 
   const mountEstimator = () =>
@@ -74,12 +77,13 @@ describe("UsageEstimator My Current Usage", () => {
     releaseHistory();
     await flushPromises();
 
-    // Under one 60-minute search a month: one shorter search, not zero searches.
+    // Under one typical search a month: one smaller search, not zero searches.
     const scannedMb = monthlyPace(1000, details);
     expect(field(wrapper, "searchCount").props("modelValue")).toBe(1);
-    const duration = field(wrapper, "searchMinutes").props("modelValue") as number;
-    // The duration keeps two decimals, so the total lands within a fraction of a percent.
-    expect(Math.abs(duration * 300 - scannedMb) / scannedMb).toBeLessThan(0.001);
+    // The search line scans what the bill does, so the estimate matches it.
+    expect(wrapper.find('[data-test="billings-usageestimator-line-query"]').text()).toContain(
+      `${formatSizeFromMB(scannedMb)} scanned`,
+    );
 
     // A third of a default check: one check that runs a third as often.
     const perCheck = browserStepRuns({
@@ -92,6 +96,24 @@ describe("UsageEstimator My Current Usage", () => {
     const exact = monthlyPace(5000, details) / perCheck;
     expect(field(wrapper, "browserChecks").props("modelValue")).toBe(1);
     expect(field(wrapper, "browserIntervalSec").props("modelValue")).toBe(Math.round(300 / exact));
+  });
+
+  it("prices a search by the data it scans, not by how long it runs", async () => {
+    // The issue's history: 10 searches scanned 2,970 MB in all, each done in 0.3 seconds.
+    scanHistory = { total: 2970, seconds: 3, searches: 10 };
+    const wrapper = mountEstimator();
+    await flushPromises();
+    releaseHistory();
+    await flushPromises();
+
+    field(wrapper, "searchCount").vm.$emit("update:modelValue", 10);
+    await flushPromises();
+    // 10 searches of about 297 MB each (≈ 2.9 GB, ≈ $0.03), not 10 hour-long scans at 59 GB a
+    // minute. The size per search is squared with this cycle's billed scan, so it is near, not exact.
+    const line = wrapper.find('[data-test="billings-usageestimator-line-query"]').text();
+    const scannedGb = Number(/([\d.]+) GB scanned/.exec(line)?.[1]);
+    expect(Math.abs(scannedGb - 2.9) / 2.9).toBeLessThan(0.05);
+    expect(line).toContain("$0.03");
   });
 
   it("says it is reading history instead of showing defaults as current usage", async () => {

@@ -321,10 +321,13 @@ export function averageStreamSizeSql(orgId: string | null): string {
   );
 }
 
-/** Estimator default: megabytes scanned per minute of search. `response_time` is seconds. */
-export function searchScanRateSql(orgId: string | null): string {
+/**
+ * Estimator default: megabytes scanned per search. A streamed search writes one usage row per
+ * partition, each under the search's trace id plus "-{n}", so searches are counted by that id.
+ */
+export function searchScanSizeSql(orgId: string | null): string {
   return (
-    `select sum(size) as total, sum(response_time) as seconds ` +
+    `select sum(size) as total, count(distinct split_part(trace_id, '-', 1)) as searches ` +
     `from "${USAGE_STREAM_NAME}" ${orgWhere(orgId)}event = 'Search'`
   );
 }

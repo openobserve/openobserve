@@ -318,12 +318,11 @@ describe("estimateCost", () => {
   const input = {
     ingestGb: 100,
     searchCount: 10,
-    searchMinutes: 60,
     pipelineCount: 5,
     retentionDays: 30,
     aiCredits: 4,
     avgStreamMb: 200,
-    scanRateMbPerMin: 100,
+    scanPerSearchMb: 6000,
     browserChecks: 0,
     browserSteps: 5,
     browserRegions: 1,
@@ -369,7 +368,7 @@ describe("estimateCost", () => {
     const { lines, total } = estimateCost(priced, input);
     const cost = (key: string) => lines.find((line) => line.key === key)?.cost ?? 0;
     expect(cost("ingestion")).toBeCloseTo(50, 5);
-    expect(cost("query")).toBeCloseTo((10 * 60 * 100 * 0.01) / 1024, 5);
+    expect(cost("query")).toBeCloseTo((10 * 6000 * 0.01) / 1024, 5);
     expect(cost("pipeline")).toBeCloseTo((5 * 200 * 0.2) / 1024, 5);
     expect(cost("ai")).toBeCloseTo(2, 5);
     expect(total).toBeCloseTo(
