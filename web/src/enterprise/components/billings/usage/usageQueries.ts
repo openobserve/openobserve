@@ -50,6 +50,11 @@ function escapeLiteral(value: string): string {
   return String(value).replace(/'/g, "''");
 }
 
+/** Counts from this moment (microseconds) when a chart's window opens earlier, at a day boundary. */
+function sinceClause(since?: number): string {
+  return since ? ` AND _timestamp >= ${Math.floor(since)}` : "";
+}
+
 function sectionWhere(orgId: string, spec: SectionSpec): string {
   const extra = spec.where ? ` and ${spec.where}` : "";
   return `org_id = '${escapeLiteral(orgId)}' and event = '${escapeLiteral(spec.event)}'${extra}`;
@@ -198,11 +203,16 @@ export const DRILLDOWNS: Partial<Record<MeterKey, DrilldownSection[]>> = {
 };
 
 /** Daily cost per entity; the chart keeps the top few itself, so it need not wait for the table's ranking. */
-export function dailyEntitySql(orgId: string, spec: DrilldownSection, rate: number): string {
+export function dailyEntitySql(
+  orgId: string,
+  spec: DrilldownSection,
+  rate: number,
+  since?: number,
+): string {
   return (
     `SELECT histogram(_timestamp, '1 day') as "x_axis_1", ` +
     `sum(size) * ${rate} as "y_axis_1", ${spec.expression} as "breakdown_1" ` +
-    `FROM "${USAGE_STREAM_NAME}" WHERE ${sectionWhere(orgId, spec)} ` +
+    `FROM "${USAGE_STREAM_NAME}" WHERE ${sectionWhere(orgId, spec)}${sinceClause(since)} ` +
     `GROUP BY x_axis_1, breakdown_1 ORDER BY x_axis_1 ASC`
   );
 }
@@ -216,6 +226,7 @@ export function trendsCostSql(
   events: string[] = PRICED_EVENTS,
   /** Also return each bucket's raw volume, read in the same pass, for the Volume view. */
   withVolume = false,
+  since?: number,
 ): string {
   const inList = events.map((event) => `'${escapeLiteral(event)}'`).join(", ");
   return (
@@ -224,7 +235,7 @@ export function trendsCostSql(
     (withVolume ? `sum(size) as "volume", ` : "") +
     `event as "breakdown_1" FROM "${USAGE_STREAM_NAME}" ` +
     `WHERE ${orgId === null ? "" : `org_id = '${escapeLiteral(orgId)}' AND `}` +
-    `event IN (${inList}) GROUP BY x_axis_1, breakdown_1 ORDER BY x_axis_1 ASC`
+    `event IN (${inList})${sinceClause(since)} GROUP BY x_axis_1, breakdown_1 ORDER BY x_axis_1 ASC`
   );
 }
 
@@ -263,6 +274,7 @@ export function dailyOrgCostSql(
   orgs: { id: string; name: string }[],
   otherLabel: string,
   events: string[] = PRICED_EVENTS,
+  since?: number,
 ): string {
   const inList = events.map((event) => `'${escapeLiteral(event)}'`).join(", ");
   const names = orgs
@@ -274,7 +286,7 @@ export function dailyOrgCostSql(
   return (
     `SELECT histogram(_timestamp, '1 day') as "x_axis_1", ` +
     `sum(size * ${priceCaseSql(prices, events)}) as "y_axis_1", ${band} as "breakdown_1" ` +
-    `FROM "${USAGE_STREAM_NAME}" WHERE event IN (${inList}) ` +
+    `FROM "${USAGE_STREAM_NAME}" WHERE event IN (${inList})${sinceClause(since)} ` +
     `GROUP BY x_axis_1, breakdown_1 ORDER BY x_axis_1 ASC`
   );
 }

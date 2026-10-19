@@ -96,16 +96,27 @@ export function buildTrendsPanelSchema(opts: {
   decimals?: number;
   /** Horizontal reference lines, such as the run rate, drawn across the bars. */
   markLines?: MarkLine[];
+  /** Counts from this moment (microseconds) when the window opens earlier. */
+  since?: number;
   t: TranslateFn;
 }) {
-  const { orgId, cycles, bucket, events = PRICED_EVENTS, decimals = 2, markLines = [], t } = opts;
+  const {
+    orgId,
+    cycles,
+    bucket,
+    events = PRICED_EVENTS,
+    decimals = 2,
+    markLines = [],
+    since,
+    t,
+  } = opts;
   const seriesColors = events.map((event) => ({
     value: event,
     color: meterColorFor(meterForEvent(event)?.key ?? "ingestion"),
   }));
   return buildStackedCostPanelSchema({
     id: "usage-trends-cost",
-    sql: trendsCostSql(orgId, cyclePrices(cycles), bucket, events),
+    sql: trendsCostSql(orgId, cyclePrices(cycles), bucket, events, false, since),
     seriesColors,
     decimals,
     markLines,

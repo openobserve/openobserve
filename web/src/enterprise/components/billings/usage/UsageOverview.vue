@@ -741,10 +741,19 @@ const missingMeterNames = computed(() => {
 });
 
 /** Elapsed days only, so the bars use the full pane width instead of empty future days. */
+/** The cycle's first moment; the charts count from here even though their window opens earlier. */
+const cycleStartUs = computed(() => (props.details?.cycle_start ?? 0) * 1_000_000);
+
+/**
+ * Daily bars start at 00:00 UTC, so the window opens at the start of the cycle's first UTC day,
+ * or that day's bar would sit before the axis and be cut off. Elapsed days only, so the bars use
+ * the full pane width instead of empty future days.
+ */
 const elapsedTimeObj = computed(() => {
-  const start = (props.details?.cycle_start ?? 0) * 1_000_000;
+  const dayStart = Math.floor((props.details?.cycle_start ?? 0) / 86_400) * 86_400 * 1_000_000;
   const end = Math.min((props.details?.cycle_end ?? 0) * 1_000_000, Date.now() * 1000);
-  return { start_time: new Date(start), end_time: new Date(Math.max(end, start)) };
+  // Microseconds in a Date, as the dashboard renderer reads its time window.
+  return { start_time: new Date(dayStart), end_time: new Date(Math.max(end, dayStart)) };
 });
 
 const viewKey = computed(
@@ -811,6 +820,8 @@ const chartSchema = computed(() => {
         cyclePrices([props.details]),
         props.billingOrgs.map((org) => ({ id: org.id, name: org.name })),
         otherLabel,
+        undefined,
+        cycleStartUs.value,
       ),
       seriesColors: props.billingOrgs.map((org, index) => ({
         value: org.name,
@@ -824,6 +835,7 @@ const chartSchema = computed(() => {
       orgId: usageOrgId.value,
       cycles: [props.details],
       bucket: "1 day",
+      since: cycleStartUs.value,
       t,
     });
   }
@@ -833,7 +845,7 @@ const chartSchema = computed(() => {
   const ranked = chartNamesFor.value === `${viewKey.value}-${spec.id}` ? chartNames.value : [];
   return buildStackedCostPanelSchema({
     id: `usage-overview-${meterKey}-${spec.id}`,
-    sql: dailyEntitySql(usageOrgId.value, spec, meterRate(meterKey)),
+    sql: dailyEntitySql(usageOrgId.value, spec, meterRate(meterKey), cycleStartUs.value),
     seriesColors: entitySeriesColors(meterKey, ranked, OTHERS_SERIES),
     topResults: CHART_TOP,
     fixedColor: meterColorFor(meterKey),

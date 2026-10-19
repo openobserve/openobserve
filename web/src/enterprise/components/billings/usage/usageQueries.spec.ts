@@ -214,3 +214,16 @@ describe("usage volume queries for an org with no bill", () => {
     expect(daily).not.toContain("case");
   });
 });
+
+describe("usage chart queries counting from a moment", () => {
+  it("adds the time condition only when asked, so other callers are unchanged", () => {
+    const [byStream] = DRILLDOWNS.ingestion!;
+    expect(dailyEntitySql("org", byStream, 1)).not.toContain("_timestamp >=");
+    expect(dailyEntitySql("org", byStream, 1, 1_700_000_000_000_000)).toContain(
+      "AND _timestamp >= 1700000000000000",
+    );
+    expect(trendsCostSql("org", [], "1 day")).not.toContain("_timestamp >=");
+    expect(trendsCostSql("org", [], "1 day", undefined, false, 5)).toContain("_timestamp >= 5");
+    expect(dailyOrgCostSql([], [], "Other", undefined, 5)).toContain("_timestamp >= 5");
+  });
+});

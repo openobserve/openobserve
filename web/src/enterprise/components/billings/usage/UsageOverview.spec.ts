@@ -241,3 +241,33 @@ describe("UsageOverview for an org with no bill", () => {
     expect(schema.config.unit).toBe("currency");
   });
 });
+
+describe("UsageOverview daily chart window", () => {
+  beforeEach(() => {
+    route.query = {};
+    store.state.organizationData.organizationSettings.usage_stream_enabled = true;
+  });
+
+  it("opens at 00:00 UTC of the cycle's first day, so that day's bar shows, and counts from the cycle start", async () => {
+    // The mock cycle starts partway through a day, as Stripe cycles do.
+    const details = mockMeteringResponse().upcoming!;
+    expect(details.cycle_start % 86_400).not.toBe(0);
+    const wrapper = mount(UsageOverview, {
+      props: { details, lastLoadedAt: 1, projected: null, refreshing: false },
+      global: {
+        plugins: [i18n, store],
+        stubs: { UsageCachedChart: true, UsageMeterBreakdown: true, UsageBillStrip: true },
+      },
+    });
+    await flushPromises();
+
+    const chart = wrapper.findComponent({ name: "UsageCachedChart" });
+    const window = chart.props("selectedTimeObj") as { start_time: Date };
+    // Microseconds in a Date, as the dashboard renderer reads it.
+    expect(window.start_time.getTime()).toBe(
+      Math.floor(details.cycle_start / 86_400) * 86_400 * 1_000_000,
+    );
+    const sql = (chart.props("panelSchema") as any).queries[0].query as string;
+    expect(sql).toContain(`_timestamp >= ${details.cycle_start * 1_000_000}`);
+  });
+});
