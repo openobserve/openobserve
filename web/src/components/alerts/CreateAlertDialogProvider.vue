@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import CreateAlertFromSourceDialog from "@/components/alerts/CreateAlertFromSourceDialog.vue";
+import { defineAsyncComponent } from "vue";
 import type { AlertPrefill } from "@/ts/interfaces/alertPrefill";
 import {
   alertCreationDialog as dialog,
@@ -46,6 +46,16 @@ import {
   rebuildAlertPrefill,
   useAlertCreation,
 } from "@/composables/alerts/useAlertCreation";
+
+// Mounted on every route from App.vue, so a static import would put sql-formatter and highlight.js on the login page.
+const CreateAlertFromSourceDialog = defineAsyncComponent({
+  loader: () => import("@/components/alerts/CreateAlertFromSourceDialog.vue"),
+  // A failed load renders nothing to close, so the request must be cleared here or every later open is a no-op.
+  onError: (_err, _retry, fail) => {
+    closeAlertCreationDialog();
+    fail();
+  },
+});
 
 const { openAlertCreation } = useAlertCreation();
 

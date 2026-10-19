@@ -14,11 +14,16 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
-import { mount } from "@vue/test-utils";
+import { flushPromises, mount } from "@vue/test-utils";
 import i18n from "@/locales";
 
 import CreateAlertDialogProvider from "@/components/alerts/CreateAlertDialogProvider.vue";
 import { ALERT_PREFILL_VERSION, type AlertPrefill } from "@/ts/interfaces/alertPrefill";
+
+// Every test but one stubs the dialog by name, so only the unstubbed test ever runs this loader.
+vi.mock("@/components/alerts/CreateAlertFromSourceDialog.vue", () => {
+  throw new Error("chunk gone");
+});
 
 const mockOpenAlertCreation = vi.fn(() => true);
 vi.mock("@/composables/alerts/useAlertCreation", async (importOriginal) => {
@@ -141,5 +146,13 @@ describe("CreateAlertDialogProvider", () => {
 
     expect(wrapper.findAllComponents(DialogStub)).toHaveLength(1);
     expect(alertCreationDialog.value?.prefill.streamName).toBe("second");
+  });
+
+  it("clears the request when the dialog chunk fails to load", async () => {
+    wrapper = mount(CreateAlertDialogProvider, { global: { plugins: [i18n] } });
+    requestAlertCreation(prefill());
+    await flushPromises();
+
+    expect(alertCreationDialog.value).toBeNull();
   });
 });
