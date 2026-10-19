@@ -68,7 +68,7 @@ test.describe("Pipeline Conditions - Comprehensive Tests", () => {
     // Lightweight pipeline cleanup
     try {
       if (currentPipelineName) {
-        await pageManager.apiCleanup.deletePipeline(currentPipelineName).catch(() => {});
+        await pageManager.apiCleanup.cleanupPipelines([], [], [new RegExp(`^${currentPipelineName}$`)]).catch(() => {});
         testLogger.info('Cleaned up pipeline', { currentPipelineName });
       }
     } catch (error) {
