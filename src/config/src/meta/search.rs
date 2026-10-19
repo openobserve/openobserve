@@ -524,8 +524,8 @@ impl Response {
             .collect();
     }
 
-    pub fn add_hit(&mut self, hit: &json::Value) {
-        self.hits.push(hit.to_owned());
+    pub fn add_hit(&mut self, hit: json::Value) {
+        self.hits.push(hit);
         self.total += 1;
     }
 
@@ -2098,7 +2098,7 @@ mod tests {
         let hit = json::json!({"num":12});
         let mut val_map = json::Map::new();
         val_map.insert("id".to_string(), json::json!({"id":1}));
-        res.add_hit(&hit); // total+1
+        res.add_hit(hit); // total+1
         assert_eq!(res.total, 11);
     }
 
