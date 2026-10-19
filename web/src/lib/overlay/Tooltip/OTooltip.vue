@@ -125,6 +125,7 @@ let childShowTimer: ReturnType<typeof setTimeout> | null = null;
 // bubble; entering the bubble cancels this timer and keeps the tooltip open.
 let childHideTimer: ReturnType<typeof setTimeout> | null = null;
 const HOVERABLE_GRACE_MS = 120;
+let labelsTrigger = false;
 
 // Called from the content bubble's hover handlers (child mode). Entering the
 // bubble cancels a pending close; leaving it closes the tooltip.
@@ -181,6 +182,16 @@ onMounted(() => {
     parentEl.value = candidate;
     if (parentEl.value) {
       parentEl.value.setAttribute(TOOLTIP_TRIGGER_ATTR, triggerMarker.value);
+      // An icon-only trigger has no other name, so the tooltip text becomes it.
+      const trigger = parentEl.value;
+      const hasOwnName =
+        trigger.hasAttribute("aria-label") ||
+        trigger.hasAttribute("aria-labelledby") ||
+        !!trigger.textContent?.trim();
+      if (props.content && !props.overflowOnly && !hasOwnName) {
+        trigger.setAttribute("aria-label", String(props.content));
+        labelsTrigger = true;
+      }
       // Open after `props.delay` ms of hover (matching wrapper mode); leaving
       // before then cancels the pending open so a quick pass-over shows nothing.
       // Mount the reka tree (if not already) and open it. Deferring the mount to
@@ -235,6 +246,7 @@ onMounted(() => {
         parentEl.value?.removeEventListener("focus", show);
         parentEl.value?.removeEventListener("blur", hide);
         parentEl.value?.removeAttribute(TOOLTIP_TRIGGER_ATTR);
+        if (labelsTrigger) parentEl.value?.removeAttribute("aria-label");
       };
     }
   }

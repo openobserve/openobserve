@@ -181,6 +181,29 @@ describe("OTooltip", () => {
     });
   });
 
+  describe("trigger naming", () => {
+    it("uses the tooltip text as the name of an icon-only trigger", () => {
+      const wrapper = mount({
+        render: () => h("button", { "data-testid": "btn" }, [h(OTooltip, { content: "Refresh" })]),
+      });
+      expect(wrapper.find('[data-testid="btn"]').attributes("aria-label")).toBe("Refresh");
+    });
+
+    it("leaves a trigger that already has text or a name alone", () => {
+      const wrapper = mount({
+        render: () =>
+          h("div", [
+            h("button", { "data-testid": "text" }, ["Save", h(OTooltip, { content: "Hint" })]),
+            h("button", { "data-testid": "named", "aria-label": "Own" }, [
+              h(OTooltip, { content: "Hint" }),
+            ]),
+          ]),
+      });
+      expect(wrapper.find('[data-testid="text"]').attributes("aria-label")).toBeUndefined();
+      expect(wrapper.find('[data-testid="named"]').attributes("aria-label")).toBe("Own");
+    });
+  });
+
   // ── Overflow-only and anchored tooltips ────────────────────────────────────
   describe("overflow-only", () => {
     // jsdom has no layout, so a test sets the two widths the cut-off check compares.

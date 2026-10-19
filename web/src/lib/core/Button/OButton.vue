@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import type { ButtonProps, ButtonEmits, ButtonSlots } from "./OButton.types";
 import { Primitive } from "reka-ui";
-import { computed, useAttrs, useId } from "vue";
+import { computed, ref, nextTick, onMounted, useAttrs, useId } from "vue";
+import { warnIfUnnamedIconOnly } from "./iconOnlyName";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 defineOptions({ inheritAttrs: false });
@@ -23,6 +24,12 @@ const attrs = useAttrs();
 const id = useId();
 const unavailable = computed(() => props.disabled && props.focusableUnavailable);
 const reasonId = computed(() => props.descriptionId ?? `${id}-reason`);
+const rootRef = ref<{ $el?: Element } | null>(null);
+// Waits a tick so a child OTooltip has already named its trigger.
+onMounted(async () => {
+  await nextTick();
+  if (props.size === "icon") warnIfUnnamedIconOnly(rootRef.value?.$el);
+});
 
 defineSlots<ButtonSlots>();
 
@@ -424,6 +431,7 @@ function handleClick(event: MouseEvent): void {
 
 <template>
   <Primitive
+    ref="rootRef"
     :as="as"
     :as-child="asChild"
     :class="classes"
