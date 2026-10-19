@@ -411,12 +411,7 @@ pub(crate) async fn read_instance_metrics_body(
     if !can_read_stream(org_id, user_id, probe_stream, StreamType::Metrics).await {
         return Err(unauthorized_response());
     }
-    let (start_time, end_time) = resolve_range(q.start_time, q.end_time);
-    if start_time >= end_time {
-        return Err(MetaHttpResponse::bad_request(
-            "start_time must be before end_time",
-        ));
-    }
+    let (start_time, end_time) = resolve_range(q.start_time, q.end_time)?;
 
     // Each catalog stream's REAL schema, concurrently. This is the server-side
     // replacement for the browser's `/streams?type=metrics` catalog read plus
