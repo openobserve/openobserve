@@ -1584,6 +1584,16 @@ mod tests {
         assert!(wrong.is_empty(), "{wrong:#?}");
     }
 
+    /// The handler extracts `Json<Vec<Value>>`, so an object body is rejected before it runs.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn workflow_trigger_body_is_documented_as_an_array() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let body = &spec["paths"]["/api/{org_id}/workflows/{id}/trigger"]["post"]["requestBody"];
+        let schema = &body["content"]["application/json"]["schema"];
+        assert_eq!(schema["type"], "array", "{body}");
+    }
+
     #[cfg(feature = "enterprise")]
     #[test]
     fn the_scrape_stops_at_the_end_of_service_routes() {

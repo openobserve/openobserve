@@ -853,7 +853,7 @@ pub async fn test_workflow(
         ("org_id" = String, Path, description = "Organization id"),
         ("id" = String, Path, description = "Workflow id"),
     ),
-    request_body(content = inline(Object), description = "Workflow inputs", content_type = "application/json"),
+    request_body(content = Vec<serde_json::Value>, description = "Workflow inputs, one JSON value per input event", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
@@ -1042,7 +1042,7 @@ pub async fn enable_workflow(
     params(
         ("org_id" = String, Path, description = "Organization id"),
         ("id" = String, Path, description = "Workflow id"),
-        ("start_time" = Option<i64>, Query, description = "Start time in Unix timestamp microseconds, defaults to 7 days before end_time"),
+        ("start_time" = Option<i64>, Query, description = "Start time in Unix timestamp microseconds, defaults to 7 days before now"),
         ("end_time" = Option<i64>, Query, description = "End time in Unix timestamp microseconds, defaults to now"),
     ),
     responses(
