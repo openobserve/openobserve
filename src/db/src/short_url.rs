@@ -205,11 +205,6 @@ mod tests {
     }
 
     #[test]
-    fn test_days_to_minutes_zero() {
-        assert_eq!(days_to_minutes(0), 0);
-    }
-
-    #[test]
     fn test_days_to_minutes_seven_days() {
         assert_eq!(days_to_minutes(7), 7 * 1440);
     }

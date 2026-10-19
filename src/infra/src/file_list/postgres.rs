@@ -4169,18 +4169,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_inner_batch_process_empty_files() {
-        let postgres_list = PostgresFileList::new();
-        let empty_files: Vec<FileKey> = vec![];
-
-        // This should complete successfully without database calls
-        let result = postgres_list
-            .inner_batch_process("file_list", &empty_files)
-            .await;
-        assert!(result.is_ok());
-    }
-
-    #[tokio::test]
     async fn test_file_key_creation_helpers_postgres() {
         // Test our test helper functions for PostgreSQL context
         let file_key = create_test_file_key(

@@ -11,8 +11,9 @@ const parentDataTest = computed(() => $attrs["data-test"] as string | undefined)
 
 // Forward tabindex to the switch control; keep it off the wrapper (avoids a double tab-stop).
 const inputTabindex = computed(() => $attrs["tabindex"] as number | string | undefined);
+const inputAriaLabel = computed(() => $attrs["aria-label"] as string | undefined);
 const wrapperAttrs = computed(() => {
-  const { tabindex: _tabindex, ...rest } = $attrs;
+  const { tabindex: _tabindex, "aria-label": _ariaLabel, ...rest } = $attrs;
   return rest;
 });
 
@@ -117,6 +118,7 @@ const hasLabel = computed(
       role="switch"
       :aria-checked="isChecked"
       :aria-labelledby="hasLabel ? labelId : undefined"
+      :aria-label="hasLabel ? undefined : inputAriaLabel"
       :data-state="isChecked ? 'checked' : 'unchecked'"
       :data-test="parentDataTest ? `${parentDataTest}-btn` : undefined"
       :disabled="disabled"

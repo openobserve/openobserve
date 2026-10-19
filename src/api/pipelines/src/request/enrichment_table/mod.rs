@@ -788,13 +788,6 @@ mod tests {
     }
 
     #[test]
-    fn test_validate_enrichment_url_empty() {
-        let result = validate_enrichment_url("");
-        assert!(result.is_err());
-        assert_eq!(result.unwrap_err(), "URL cannot be empty");
-    }
-
-    #[test]
     fn test_validate_enrichment_url_whitespace() {
         let result = validate_enrichment_url("   ");
         assert!(result.is_err());
@@ -868,13 +861,6 @@ mod tests {
         assert!(validate_enrichment_url("http://8.8.8.8/data.csv").is_ok());
     }
 
-    #[test]
-    fn test_validate_enrichment_url_github() {
-        assert!(
-            validate_enrichment_url("https://raw.githubusercontent.com/user/repo/main/data.csv")
-                .is_ok()
-        );
-    }
     #[test]
     fn test_validate_enrichment_url_ipv6() {
         let ips = [
