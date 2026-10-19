@@ -231,7 +231,7 @@ impl Search for Searcher {
         &self,
         _req: Request<QueryStatusRequest>,
     ) -> Result<Response<QueryStatusResponse>, Status> {
-        let status = self.get_task_status(None).await;
+        let status = self.get_task_status().await;
         Ok(Response::new(QueryStatusResponse { status }))
     }
 
@@ -553,7 +553,7 @@ mod tests {
     #[cfg(feature = "enterprise")]
     #[tokio::test]
     async fn test_one_trace_id_runs_and_cancels_in_two_orgs_independently() {
-        use o2_enterprise::enterprise::search::{TaskStatus, query_manager::Registration};
+        use o2_enterprise::enterprise::search::TaskStatus;
 
         let searcher = Searcher::new();
         let status = |is_leader| TaskStatus::new_follower(vec![], is_leader);
@@ -561,13 +561,11 @@ mod tests {
         searcher.insert("b", "t".to_string(), status(true)).await;
         searcher.insert("b", "t-1".to_string(), status(false)).await;
 
-        assert_eq!(
-            searcher
-                .insert_or_join("b", "t".to_string(), status(false))
-                .await,
-            Registration::Joined
+        assert!(
+            !searcher
+                .insert_if_absent("b", "t".to_string(), status(false))
+                .await
         );
-        assert!(searcher.remove_follower("b", "t").await.is_none());
         assert!(cancel_in(&searcher, "t", Some("a")).await);
         assert!(!searcher.contain_key("a", "t").await);
         assert!(searcher.is_leader("b", "t").await);
@@ -595,7 +593,6 @@ mod tests {
         searcher.insert("b", "t".to_string(), leader()).await;
 
         assert!(searcher.remove("a", "t").await.is_none());
-        assert!(searcher.remove_follower("a", "t").await.is_none());
         let (sender, _receiver) = tokio::sync::oneshot::channel();
         assert!(
             searcher

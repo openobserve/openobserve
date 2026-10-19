@@ -19325,6 +19325,7 @@
     },
     "queries": {
       "queryCancelled": "查询已取消",
+      "queryNotCancelled": "查询未取消：查询已结束，或你没有取消它的权限",
       "fetchingRunningQueries": "正在获取运行中的查询..."
     },
     "reports": {

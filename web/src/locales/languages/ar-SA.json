@@ -19325,6 +19325,7 @@
     },
     "queries": {
       "queryCancelled": "تم إلغاء الاستعلام",
+      "queryNotCancelled": "لم يتم إلغاء الاستعلام: ربما انتهى بالفعل أو لا يمكنك إلغاؤه",
       "fetchingRunningQueries": "أحضر استعلامات جارية..."
     },
     "reports": {

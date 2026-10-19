@@ -19325,6 +19325,7 @@
     },
     "queries": {
       "queryCancelled": "Abfrage abgebrochen",
+      "queryNotCancelled": "Abfrage nicht abgebrochen: Sie ist bereits beendet oder Sie dürfen sie nicht abbrechen",
       "fetchingRunningQueries": "Laufende Abfragen werden abgerufen..."
     },
     "reports": {

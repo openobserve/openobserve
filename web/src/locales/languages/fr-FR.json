@@ -19325,6 +19325,7 @@
     },
     "queries": {
       "queryCancelled": "Requête annulée",
+      "queryNotCancelled": "Requête non annulée : elle est déjà terminée ou vous n'êtes pas autorisé à l'annuler",
       "fetchingRunningQueries": "Récupération des requêtes en cours..."
     },
     "reports": {

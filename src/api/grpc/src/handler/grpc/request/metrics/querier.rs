@@ -25,10 +25,7 @@ use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 #[cfg(feature = "enterprise")]
-use {
-    o2_enterprise::enterprise::search::{TaskStatus, query_manager::Registration},
-    search_service::SEARCH_SERVER,
-};
+use {o2_enterprise::enterprise::search::TaskStatus, search_service::SEARCH_SERVER};
 
 use crate::handler::grpc::{
     MetadataMap,
@@ -142,17 +139,14 @@ struct FollowerRegistration(Option<(String, String)>);
 impl FollowerRegistration {
     // on a single node the leader entry already exists and must outlive this request
     async fn register(org_id: &str, trace_id: &str) -> Self {
-        let registration = SEARCH_SERVER
-            .insert_or_join(
+        let inserted = SEARCH_SERVER
+            .insert_if_absent(
                 org_id,
                 trace_id.to_string(),
                 TaskStatus::new_follower(vec![], false),
             )
             .await;
-        Self(
-            matches!(registration, Registration::Inserted)
-                .then(|| (org_id.to_string(), trace_id.to_string())),
-        )
+        Self(inserted.then(|| (org_id.to_string(), trace_id.to_string())))
     }
 
     async fn finish(mut self) {

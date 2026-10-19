@@ -623,11 +623,22 @@ export default defineComponent({
 
     const deleteQuery = () => {
       SearchService.delete_running_queries(store.state.zoConfig.meta_org, deleteDialog.value.data)
-        .then(() => {
+        .then((response: any) => {
           selectedRow.value[selectedQueryTypeTab.value] = [];
 
           getRunningQueries();
 
+          // the cancel answers 200 with is_success false for a finished query or one the user may not cancel
+          const results: { is_success?: boolean }[] = Array.isArray(response?.data)
+            ? response.data
+            : [];
+          if (results.length > 0 && results.every((result) => !result.is_success)) {
+            toast({
+              message: t("toastMessages.queries.queryNotCancelled"),
+              variant: "warning",
+            });
+            return;
+          }
           toast({
             message: t("toastMessages.queries.queryCancelled"),
             variant: "info",

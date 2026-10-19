@@ -19325,6 +19325,7 @@
     },
     "queries": {
       "queryCancelled": "Запрос отменен",
+      "queryNotCancelled": "Запрос не отменен: он уже завершен или у вас нет прав на его отмену",
       "fetchingRunningQueries": "Получение выполняющихся запросов..."
     },
     "reports": {

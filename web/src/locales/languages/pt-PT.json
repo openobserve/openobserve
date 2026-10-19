@@ -19325,6 +19325,7 @@
     },
     "queries": {
       "queryCancelled": "Consulta cancelada",
+      "queryNotCancelled": "Consulta não cancelada: já terminou ou não tem permissão para a cancelar",
       "fetchingRunningQueries": "Buscando consultas em execução..."
     },
     "reports": {

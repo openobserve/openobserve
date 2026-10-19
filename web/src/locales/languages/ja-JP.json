@@ -19325,6 +19325,7 @@
     },
     "queries": {
       "queryCancelled": "クエリがキャンセルされました",
+      "queryNotCancelled": "クエリはキャンセルされませんでした：すでに終了しているか、キャンセルする権限がありません",
       "fetchingRunningQueries": "実行中のクエリを取得中..."
     },
     "reports": {
