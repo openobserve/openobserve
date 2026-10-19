@@ -333,7 +333,8 @@ fn mask_slack_callback_query(url: &str) -> String {
     let Some((path, rest)) = url.split_once('?') else {
         return url.to_string();
     };
-    if !(path.contains("/slack/") && path.ends_with("/callback")) {
+    let route = path.trim_end_matches('/');
+    if !(route.contains("/slack/") && route.ends_with("/callback")) {
         return url.to_string();
     }
     let (query, fragment) = match rest.split_once('#') {
@@ -408,6 +409,14 @@ mod tests {
                 "/web/slack/connect/callback?code=cd&org_identifier=default",
                 "/web/slack/connect/callback?code=…&org_identifier=default",
             ),
+            (
+                "/web/slack/oauth/callback/?code=FAKECD2&state=FAKEST2",
+                "/web/slack/oauth/callback/?code=…&state=…",
+            ),
+            (
+                "https://o2.test/web/slack/link/callback//?state=st&code=cd#top",
+                "https://o2.test/web/slack/link/callback//?state=…&code=…#top",
+            ),
         ] {
             assert_eq!(mask_log_url(url), masked);
         }
@@ -415,6 +424,8 @@ mod tests {
             "/web/logs?code=x",
             "/api/default/slack/settings?state=on",
             "/web/slack/oauth/callback",
+            "/web/slack/oauth/callbacks/?code=x",
+            "/web/slack/callback-info/?state=x",
             "-",
         ] {
             assert_eq!(mask_log_url(untouched), untouched);
