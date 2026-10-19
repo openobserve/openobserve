@@ -392,6 +392,20 @@ const DAYS_PER_MONTH = 30;
 
 const finite = (value: number) => (Number.isFinite(Number(value)) ? Number(value) : 0);
 
+/**
+ * Usage so far restated as a 30 day month, from the days that have passed rather than the
+ * whole cycle; at least one day, so the first hours of a cycle do not swing it.
+ */
+export function monthlyPace(
+  amount: number | string | undefined,
+  details: MeteringDetails,
+  now: number = Date.now(),
+): number {
+  const cycleDays = (details.cycle_end - details.cycle_start) / SECONDS_PER_DAY;
+  const daysPassed = Math.max(cycleProgress(details, now).elapsed * cycleDays, 1);
+  return ((Number(amount) || 0) / daysPassed) * DAYS_PER_MONTH;
+}
+
 /** Scheduled runs in a 30 day month; a check with no interval never runs. */
 export function runsPerMonth(intervalSec: number): number {
   const interval = finite(intervalSec);

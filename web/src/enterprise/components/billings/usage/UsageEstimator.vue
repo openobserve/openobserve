@@ -258,6 +258,7 @@ import {
   formatCost,
   formatRate,
   METERS,
+  monthlyPace,
   type EstimateInputs,
   type EstimateLine,
   type MeteringDetails,
@@ -292,8 +293,6 @@ interface FieldDef {
 
 const MB_PER_GB = 1024;
 const SECONDS_PER_MINUTE = 60;
-const SECONDS_PER_DAY = 86400;
-const DAYS_PER_MONTH = 30;
 
 /** Below a cent a line is noise, so it renders quietly rather than as a real cost. */
 const CENT = 0.005;
@@ -442,18 +441,8 @@ const setField = (key: FieldKey, value: unknown) => {
   inputs[key] = Number.isFinite(next) && next > 0 ? next : 0;
 };
 
-/** Days in the billing cycle, so a cycle figure can be read as a month. */
-const cycleDays = computed(() => {
-  const days =
-    ((props.details?.cycle_end ?? 0) - (props.details?.cycle_start ?? 0)) / SECONDS_PER_DAY;
-  return days > 0 ? days : DAYS_PER_MONTH;
-});
-
-const perMonth = (amount: number | string | undefined) =>
-  ((Number(amount) || 0) / cycleDays.value) * DAYS_PER_MONTH;
-
 /**
- * This org's own cycle, restated as a month. Search and pipeline counts are not
+ * This org's cycle so far, restated as a month. Search and pipeline counts are not
  * metered, so they come from the metered volume through the same assumptions the
  * form uses, and fall back to the defaults while an assumption is still zero.
  */
@@ -464,6 +453,7 @@ const currentScenario = computed<EstimateInputs>(() => {
     scanRateMbPerMin: inputs.scanRateMbPerMin,
   };
   if (!details) return { ...DEFAULTS, ...assumptions };
+  const perMonth = (amount: number | string | undefined) => monthlyPace(amount, details);
   const scannedMb = perMonth(details.query?.metered_amount);
   const scanPerSearch = DEFAULTS.searchMinutes * assumptions.scanRateMbPerMin;
   const pipelineMb = perMonth(details.pipeline?.metered_amount);

@@ -35,6 +35,7 @@ import {
   formatVolume,
   METERS,
   meterForEvent,
+  monthlyPace,
   unitRate,
   type MeteringDetails,
 } from "./meteringModel";
@@ -198,6 +199,15 @@ describe("meteringModel cycle math", () => {
     expect(cycleProgress(details, start + 10.5 * day).day).toBe(11);
     expect(cycleProgress(details, start + 99 * day).day).toBe(30);
     expect(cycleProgress(details, start).totalDays).toBe(30);
+  });
+
+  it("reads usage so far as a month from the days that have passed", () => {
+    // 900 GB by day 9 is 100 GB a day, so 3,000 GB a month, not 900 spread over the whole cycle.
+    expect(monthlyPace(900, details, start + 9 * day)).toBeCloseTo(3000);
+    // An hour in still counts as one day, so a cycle's first hours do not swing it.
+    expect(monthlyPace(10, details, start + day / 24)).toBeCloseTo(300);
+    // Once the cycle is over, the whole cycle has passed.
+    expect(monthlyPace(900, details, start + 99 * day)).toBeCloseTo(900);
   });
 
   it("hides the projection for the first days of a cycle", () => {

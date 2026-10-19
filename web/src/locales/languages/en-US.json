@@ -8160,7 +8160,7 @@
       "scenarioFiveTimes": "5× Growth",
       "resetEstimate": "Reset",
       "expectedUsage": "Expected Monthly Usage",
-      "expectedUsageHint": "Prefilled from your last 30 days",
+      "expectedUsageHint": "Prefilled from this cycle so far",
       "yourEstimate": "Your Estimate",
       "assumptionsFrom": "From your last 30 days",
       "scanNote": "Scans about {volume} per month.",
