@@ -15,7 +15,10 @@
 
 //! Values a link never froze, picked the way the live dashboard picks a variable's value on load.
 
-use std::{cmp::Ordering, collections::BTreeMap};
+use std::{
+    cmp::Ordering,
+    collections::{BTreeMap, BTreeSet},
+};
 
 use config::{
     meta::{
@@ -108,6 +111,34 @@ impl<'a> Defaults<'a> {
 
     pub fn into_values(self) -> BTreeMap<String, Value> {
         self.values
+    }
+
+    /// The values queries `from` reaches through their stream, field and filter references.
+    #[cfg_attr(not(feature = "enterprise"), allow(dead_code))]
+    pub fn reachable_queries(
+        &self,
+        from: &BTreeSet<String>,
+    ) -> (BTreeSet<String>, Vec<ValuesQuery>) {
+        let mut reached = from.clone();
+        let mut queries = Vec::new();
+        let mut left = self.pending.clone();
+        // Each instance joins at most once, so a cycle ends the walk instead of looping it.
+        loop {
+            let before = left.len();
+            left.retain(|&idx| {
+                let key = &self.instances[idx].key;
+                let hit = reached.contains(key)
+                    || self.dependencies(idx).iter().any(|k| reached.contains(k));
+                if hit {
+                    reached.insert(key.clone());
+                    queries.push(self.values_query(idx));
+                }
+                !hit
+            });
+            if left.len() == before {
+                return (reached, queries);
+            }
+        }
     }
 
     fn is_pending(&self, key: &str) -> bool {
@@ -644,6 +675,35 @@ mod tests {
         let values = d.into_values();
         assert_eq!(values["a"], Value::Null);
         assert_eq!(values["b"], json!([]));
+    }
+
+    #[test]
+    fn a_changed_value_reaches_every_values_query_built_from_it_through_a_cycle() {
+        let dash = dashboard(json!([
+            { "type": "custom", "name": "a", "value": "x" },
+            { "type": "query_values", "name": "b", "query_data": { "stream": "s_$a", "field": "b" } },
+            { "type": "query_values", "name": "c", "query_data": { "stream": "s", "field": "c",
+                "filter": [ { "name": "b", "operator": "=", "value": "$b" },
+                            { "name": "d", "operator": "=", "value": "$d" } ] } },
+            { "type": "query_values", "name": "d", "query_data": { "stream": "s", "field": "d",
+                "filter": [ { "name": "c", "operator": "=", "value": "$c" } ] } },
+            { "type": "query_values", "name": "e", "query_data": { "stream": "other", "field": "e" } },
+            { "type": "query_values", "name": "f", "query_data": { "stream": "s", "field": "f",
+                "filter": [ { "name": "b", "operator": "=", "value": "$b" } ] } }
+        ]));
+        let frozen = BTreeMap::from([
+            ("a".to_string(), json!("new")),
+            ("f".to_string(), json!("v")),
+        ]);
+        let d = Defaults::new(&dash, frozen);
+        let (reached, queries) = d.reachable_queries(&BTreeSet::from(["a".to_string()]));
+        assert_eq!(
+            reached,
+            BTreeSet::from(["a", "b", "c", "d"].map(String::from)),
+            "a frozen f stops the walk and e reads nothing changed"
+        );
+        let streams: Vec<&str> = queries.iter().map(|q| q.stream.as_str()).collect();
+        assert_eq!(streams, ["s_new", "s", "s"]);
     }
 
     #[test]

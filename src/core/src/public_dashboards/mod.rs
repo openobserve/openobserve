@@ -19,6 +19,7 @@ pub mod access;
 mod authz_check;
 mod defaults;
 pub mod flight;
+mod formula;
 pub mod intent;
 mod mask;
 pub mod materialize;
@@ -51,8 +52,9 @@ use config::{
         stream::StreamType,
     },
     utils::{
-        query_select_utils::replace_o2_custom_patterns, rand::generate_random_string,
-        time::now_micros,
+        query_select_utils::replace_o2_custom_patterns,
+        rand::generate_random_string,
+        time::{now_micros, parse_milliseconds},
     },
 };
 use defaults::{Defaults, ValuesQuery};
@@ -78,6 +80,9 @@ const MAX_RANGES: usize = 10;
 const MIN_RANGE_SECS: i64 = 60;
 const MAX_RANGE_SECS: i64 = 365 * 86_400;
 const MAX_FROZEN_VARIABLES_BYTES: usize = 64 * 1024;
+/// The live heatmap's column bound and least step when no step is configured.
+const HEATMAP_MAX_COLUMNS: f64 = 120.0;
+const HEATMAP_MIN_STEP_SECS: f64 = 15.0;
 /// A lost compare-and-set re-reads and re-applies the edit at most this many times.
 const EDIT_ATTEMPTS: usize = 5;
 /// Refusal for a dashboard the build can't render; the admin API maps it to 400.
@@ -330,6 +335,18 @@ impl LinkValues {
             .for_panel(tab_id, panel_id)
             .substitute(text, query_type, now - 3_600_000_000, now)
     }
+
+    /// The PromQL expressions the panel's build sends, planned over the same hour.
+    #[cfg_attr(not(feature = "enterprise"), allow(dead_code))]
+    fn plan_promql(
+        &self,
+        tab_id: &str,
+        panel: &Panel,
+    ) -> Result<Vec<Option<String>>, formula::FormulaError> {
+        let now = now_micros();
+        let vars = self.vars.for_panel(tab_id, &panel.id);
+        plan_promql(panel, &vars, now - 3_600_000_000, now)
+    }
 }
 
 /// One authorizer health answer per build or deadline check, asked only when a check denies.
@@ -516,6 +533,15 @@ impl Collected {
             error: None,
         }
     }
+}
+
+/// One panel query the live PromQL executor sends: its expression, first instant and step.
+struct PromqlRun<'a> {
+    qi: usize,
+    q: &'a config::meta::dashboards::v8::Query,
+    expr: String,
+    start: i64,
+    step: i64,
 }
 
 /// The pool every lifecycle and security gate reads, so a lagging replica never decides one.
@@ -920,10 +946,19 @@ pub fn validate_dashboard(
     let vars = QueryVars::new(dash, frozen.clone(), None);
     let (start, end) = (now - 3_600_000_000, now);
     for (tab, panel) in panels {
-        if panel.query_type == "promql" || panel.typ == "custom_chart" {
+        if panel.typ == "custom_chart" {
             continue;
         }
         let panel_vars = vars.for_panel(&tab.tab_id, &panel.id);
+        if panel.query_type == "promql" {
+            if let Err(e) = plan_promql(panel, &panel_vars, start, end) {
+                return Err(format!(
+                    "Panel \"{}\" has a formula that uses {e}. Fix the formula, then publish.",
+                    panel.title
+                ));
+            }
+            continue;
+        }
         let over = panel
             .queries
             .iter()
@@ -1240,7 +1275,7 @@ async fn authorize_variable_edit(
         })
 }
 
-/// The queries of every panel that reads a changed frozen value, substituted with the new values.
+/// The values queries a changed frozen value reaches and the queries of every panel reading one.
 #[cfg(feature = "enterprise")]
 fn variable_edit_sources(
     link: &PublicDashboard,
@@ -1251,35 +1286,54 @@ fn variable_edit_sources(
 
     let old = parse_frozen_vars(link.frozen_variables.as_deref());
     // A removed key falls back to the dashboard's default, which the editor must read too.
-    let changed: BTreeSet<&String> = old
+    let changed: BTreeSet<String> = old
         .keys()
         .chain(frozen.keys())
         .filter(|key| old.get(*key) != frozen.get(*key))
+        .cloned()
         .collect();
     let Some(v8) = dash.v8.as_ref().filter(|_| !changed.is_empty()) else {
         return vec![];
     };
+    let (reached, values_queries) = Defaults::new(dash, frozen.clone()).reachable_queries(&changed);
+    let mut sources: Vec<QuerySource> = values_queries
+        .into_iter()
+        .map(|q| QuerySource::Sql {
+            org_id: link.org_id.clone(),
+            sql: q.sql,
+            default_type: q.stream_type,
+        })
+        .collect();
     let new_json = serde_json::to_string(frozen).ok();
     let values = LinkValues::new(dash, new_json.as_deref());
-    let mut sources = Vec::new();
     for tab in &v8.tabs {
         for panel in &tab.panels {
-            let texts: Vec<&str> = panel.queries.iter().filter_map(query_text).collect();
+            let texts = template_texts(panel);
+            let texts: Vec<&str> = texts.iter().map(String::as_str).collect();
             let reads_changed = values
                 .vars
                 .referenced(&tab.tab_id, &panel.id, &texts)
                 .iter()
-                .any(|(_, key)| changed.contains(key));
+                .any(|(_, key)| reached.contains(key));
             if !reads_changed {
                 continue;
             }
             let promql = panel.query_type == "promql";
-            for q in panel.queries.iter() {
-                let Some(text) = query_text(q) else {
-                    continue;
-                };
+            let planned = promql
+                .then(|| values.plan_promql(&tab.tab_id, panel).ok())
+                .flatten();
+            for (qi, q) in panel.queries.iter().enumerate() {
                 let lang = if promql { "promql" } else { "sql" };
-                let text = values.substitute(&tab.tab_id, &panel.id, text, lang);
+                // A sent PromQL query is checked as the build sends it, a formula as its expansion.
+                let text = match planned.as_ref().and_then(|p| p[qi].clone()) {
+                    Some(expr) => expr,
+                    None => {
+                        let Some(text) = query_text(q) else {
+                            continue;
+                        };
+                        values.substitute(&tab.tab_id, &panel.id, text, lang)
+                    }
+                };
                 sources.push(if promql {
                     QuerySource::PromQl {
                         org_id: link.org_id.clone(),
@@ -1341,7 +1395,8 @@ async fn run_panel(
         return structural(NotAvailableReason::Unsupported, manifest);
     }
     let used: Vec<String> = manifest.resolved_variables.keys().cloned().collect();
-    if used.iter().any(|k| values.denied.contains(k)) {
+    // A denied values query can reach any panel through a chained variable, as at the deadline.
+    if !values.denied.is_empty() {
         return PanelRun::not_available(
             &panel.id,
             Class::Denied,
@@ -1354,13 +1409,18 @@ async fn run_panel(
         let error = "a variable's values query failed".to_string();
         return ctx.panel_failed(panel, manifest, error);
     }
-    if !panel.queries.iter().any(|q| query_text(q).is_some()) {
+    let has_query = panel
+        .queries
+        .iter()
+        .any(|q| query_text(q).is_some() || formula::is_formula(&query_config(q)));
+    if !has_query {
         return structural(NotAvailableReason::NoQuery, manifest);
     }
     let is_promql = panel.query_type == "promql";
     let shifted = panel
         .queries
         .iter()
+        .filter(|q| !(is_promql && is_hidden(q)))
         .any(|q| !time_shifts(q, ctx.end, is_promql).is_empty());
     if shifted && !get_config().public_dashboards.time_shifts {
         return structural(NotAvailableReason::Unsupported, manifest);
@@ -1382,15 +1442,11 @@ fn panel_manifest(
     tab: &Tab,
     panel: &Panel,
 ) -> ManifestPanel {
-    let texts: Vec<&str> = panel
-        .queries
-        .iter()
-        .flat_map(|q| [q.query.as_deref(), q.vrl_function_query.as_deref()])
-        .flatten()
-        .collect();
+    let texts = template_texts(panel);
+    let texts: Vec<&str> = texts.iter().map(String::as_str).collect();
     let used = vars.referenced(&tab.tab_id, &panel.id, &texts);
     ManifestPanel {
-        intent: intent::panel_intent(ctx.dash, vars, frozen, tab, panel),
+        intent: intent::panel_intent(ctx.dash, frozen, panel),
         resolved_variables: used
             .iter()
             .map(|(_, key)| {
@@ -1398,10 +1454,8 @@ fn panel_manifest(
                 (key.clone(), value.unwrap_or(serde_json::Value::Null))
             })
             .collect(),
-        values_dependencies: used
-            .iter()
-            .filter_map(|(_, key)| values.deps.get(key).cloned())
-            .collect(),
+        // Every values query of the build, as a chained variable can feed any panel.
+        values_dependencies: values.deps.values().cloned().collect(),
         built_at: Some(ctx.now),
         ..Default::default()
     }
@@ -1531,26 +1585,44 @@ async fn run_promql_panel(
     vars: &PanelVars,
     mut manifest: ManifestPanel,
 ) -> PanelRun {
-    let max_series = get_config().limit.max_dashboard_series;
-    let queries: Vec<(usize, &config::meta::dashboards::v8::Query, String)> = panel
-        .queries
-        .iter()
-        .enumerate()
-        .filter_map(|(qi, q)| {
-            let expr = vars.substitute(query_text(q)?, "promql", ctx.start, ctx.end);
-            Some((qi, q, expr))
-        })
-        .collect();
-    for (_, q, expr) in &queries {
-        let target = (q.fields.stream_type, q.fields.stream.as_str());
-        record_sources(&mut manifest, "promql", expr, target);
+    let structural = |reason, manifest| {
+        PanelRun::not_available(&panel.id, Class::Structural, reason, manifest, None)
+    };
+    let Ok(plan) = plan_promql(panel, vars, ctx.start, ctx.end) else {
+        return structural(NotAvailableReason::Unsupported, manifest);
+    };
+    let mut runs = Vec::new();
+    for (qi, (q, expr)) in panel.queries.iter().zip(plan).enumerate() {
+        let Some(expr) = expr else {
+            continue;
+        };
+        let Ok(step) = promql_step(panel, q, ctx.start, ctx.end) else {
+            return structural(NotAvailableReason::Unsupported, manifest);
+        };
+        let instant = query_config(q).get("query_type").and_then(|v| v.as_str()) == Some("instant");
+        // An instant query is evaluated once, at the window end, as the live panel asks for it.
+        let start = if instant { ctx.end } else { ctx.start };
+        runs.push(PromqlRun {
+            qi,
+            q,
+            expr,
+            start,
+            step,
+        });
+    }
+    if runs.is_empty() {
+        return structural(NotAvailableReason::NoQuery, manifest);
+    }
+    for run in &runs {
+        let target = (run.q.fields.stream_type, run.q.fields.stream.as_str());
+        record_sources(&mut manifest, "promql", &run.expr, target);
         if let Err(reason) = ctx
             .search
             .authorize(
                 &ctx.link.org_id,
                 &ctx.link.published_by,
                 "promql",
-                expr,
+                &run.expr,
                 target,
                 ctx.probe,
             )
@@ -1566,38 +1638,61 @@ async fn run_promql_panel(
         }),
         ..Default::default()
     };
-    let mut kept: Vec<Vec<serde_json::Value>> = Vec::with_capacity(queries.len());
-    // The live renderer sends every unshifted query first, then each query's shifts.
-    let shifted: Vec<(usize, &str, Option<Shift>)> = queries
-        .iter()
-        .enumerate()
-        .map(|(i, (_, _, expr))| (i, expr.as_str(), None))
-        .chain(queries.iter().enumerate().flat_map(|(i, (_, q, expr))| {
-            time_shifts(q, ctx.end, true)
+    // Slot i is panel query i, sent or not; the shifts follow, as the live renderer orders them.
+    let slots: Vec<(usize, Option<&PromqlRun>, Option<Shift>)> = (0..panel.queries.len())
+        .map(|qi| (qi, runs.iter().find(|r| r.qi == qi), None))
+        .chain(runs.iter().flat_map(|r| {
+            time_shifts(r.q, ctx.end, true)
                 .into_iter()
-                .map(move |s| (i, expr.as_str(), Some(s)))
+                .map(move |s| (r.qi, Some(r), Some(s)))
         }))
         .collect();
-    for (i, expr, shift) in shifted {
+    let max_series = get_config().limit.max_dashboard_series;
+    let mut kept: BTreeMap<usize, Vec<serde_json::Value>> = BTreeMap::new();
+    for (qi, run, shift) in slots {
+        let Some(run) = run else {
+            out.data
+                .push(serde_json::json!({ "resultType": "matrix", "result": [] }));
+            out.meta.push(serde_json::Value::Null);
+            let mut meta = query_meta(ctx.start, ctx.end, "promql", qi, None);
+            meta["notSent"] = serde_json::Value::Bool(true);
+            out.queries.push(meta);
+            continue;
+        };
         if ctx.family.is_cancelled() {
             return ctx.panel_failed(panel, manifest, "the build timed out".to_string());
         }
         let gap = shift.as_ref().map_or(0, |s| s.gap_ms * 1000);
-        let (start, end) = (ctx.start - gap, ctx.end - gap);
+        let (start, end) = (run.start - gap, ctx.end - gap);
         let trace_id = ctx.family.child();
-        let (mut data, partial) =
-            match run_promql(ctx, &panel.id, &trace_id, expr, start, end).await {
-                Ok(v) => v,
-                Err(e) => return ctx.panel_failed(panel, manifest, e),
-            };
-        let keep = shift.as_ref().and_then(|_| kept.get(i)).map(Vec::as_slice);
-        let metrics = cut_series(&mut data, max_series, keep);
+        let req = promql_request(ctx, &panel.id, &run.expr, start, end, run.step);
+        let (mut data, partial) = match ctx
+            .search
+            .promql(
+                &trace_id,
+                &ctx.link.org_id,
+                &req,
+                &ctx.identity,
+                ctx.timeout(),
+            )
+            .await
+        {
+            Ok(v) => v,
+            Err(e) => return ctx.panel_failed(panel, manifest, e),
+        };
+        let keep = shift
+            .as_ref()
+            .and_then(|_| kept.get(&qi))
+            .map(Vec::as_slice);
+        let (metrics, dropped) = cut_series(&mut data, max_series, keep);
+        // A shifted result is cut to its base's series, which is alignment, not truncation.
         if shift.is_none() {
-            kept.push(metrics);
+            out.truncated |= dropped;
+            kept.insert(qi, metrics);
         }
         out.partial |= partial;
         manifest.queries.push(ExecutedQuery {
-            text: expr.to_string(),
+            text: run.expr.clone(),
             query_type: "promql".to_string(),
             window: Window { start, end },
             time_shift_micros: gap,
@@ -1607,36 +1702,10 @@ async fn run_promql_panel(
         });
         out.data.push(data);
         out.meta.push(serde_json::Value::Null);
-        out.queries.push(query_meta(
-            start,
-            end,
-            "promql",
-            queries[i].0,
-            shift.as_ref(),
-        ));
+        out.queries
+            .push(query_meta(start, end, "promql", qi, shift.as_ref()));
     }
     out.into_run(panel, manifest, ctx.now)
-}
-
-/// One PromQL range query as the public identity; a response with warnings is partial.
-async fn run_promql(
-    ctx: &Ctx<'_>,
-    panel_id: &str,
-    trace_id: &str,
-    expr: &str,
-    start: i64,
-    end: i64,
-) -> Result<(serde_json::Value, bool), String> {
-    let req = promql_request(ctx, panel_id, expr, start, end);
-    ctx.search
-        .promql(
-            trace_id,
-            &ctx.link.org_id,
-            &req,
-            &ctx.identity,
-            ctx.timeout(),
-        )
-        .await
 }
 
 /// The search a PromQL panel query runs: its cache on, typed and timed for public dashboards.
@@ -1646,12 +1715,13 @@ fn promql_request(
     expr: &str,
     start: i64,
     end: i64,
+    step: i64,
 ) -> promql_service::MetricsQueryRequest {
     promql_service::MetricsQueryRequest {
         query: expr.to_string(),
         start,
         end,
-        step: ((end - start) / 400).max(1_000_000),
+        step,
         query_exemplars: false,
         use_cache: Some(true),
         search_type: Some(search::SearchEventType::PublicDashboard),
@@ -1942,27 +2012,133 @@ fn query_meta(
     })
 }
 
-/// Keeps the series the live chart keeps (a shifted query keeps its base's) and returns them.
+/// Keeps the series the live chart keeps (a shifted query, its base's); true if the cap cut any.
 fn cut_series(
     data: &mut serde_json::Value,
     max: usize,
     keep: Option<&[serde_json::Value]>,
-) -> Vec<serde_json::Value> {
+) -> (Vec<serde_json::Value>, bool) {
     let Some(series) = data.get_mut("result").and_then(|r| r.as_array_mut()) else {
-        return vec![];
+        return (vec![], false);
     };
     if let Some(keep) = keep {
         series.retain(|s| s.get("metric").is_some_and(|m| keep.contains(m)));
     }
+    let dropped = series.len() > max;
     series.truncate(max);
-    series
+    let kept = series
         .iter()
         .map(|s| s.get("metric").cloned().unwrap_or_default())
+        .collect();
+    (kept, dropped)
+}
+
+/// `planQueries`: what the live executor sends per panel query, None for a hidden or empty one.
+fn plan_promql(
+    panel: &Panel,
+    vars: &PanelVars,
+    start: i64,
+    end: i64,
+) -> Result<Vec<Option<String>>, formula::FormulaError> {
+    let configs: Vec<serde_json::Value> = panel.queries.iter().map(query_config).collect();
+    let texts: Vec<String> = panel
+        .queries
+        .iter()
+        .zip(&configs)
+        .map(|(q, cfg)| {
+            let text = cfg.get("formula").and_then(|v| v.as_str());
+            let text = text.or(q.query.as_deref()).unwrap_or_default();
+            vars.substitute(text, "promql", start, end)
+        })
+        .collect();
+    let inputs: BTreeMap<String, Option<String>> = formula::query_refs(&configs)
+        .into_iter()
+        .zip(configs.iter().zip(&texts))
+        .filter_map(|(letter, (cfg, text))| {
+            Some((letter?, (!formula::is_formula(cfg)).then(|| text.clone())))
+        })
+        .collect();
+    configs
+        .iter()
+        .zip(texts)
+        .map(|(cfg, text)| {
+            if cfg.get("hide").and_then(|v| v.as_bool()) == Some(true) {
+                return Ok(None);
+            }
+            let expr = if formula::is_formula(cfg) {
+                formula::substitute(&text, &inputs)?
+            } else {
+                text
+            };
+            // An empty query fails on the server, so it keeps its slot without a search.
+            Ok(Some(expr).filter(|e| !e.trim().is_empty()))
+        })
         .collect()
+}
+
+/// The step the live panel sends: the query's, else the panel's, else a heatmap's column bound.
+fn promql_step(
+    panel: &Panel,
+    q: &config::meta::dashboards::v8::Query,
+    start: i64,
+    end: i64,
+) -> Result<i64, String> {
+    // "0" is the panel schema's way of saying no step is set.
+    let explicit = |cfg: serde_json::Value| {
+        cfg.get("step_value")
+            .and_then(|v| v.as_str())
+            .map(str::trim)
+            .filter(|s| !s.is_empty() && *s != "0")
+            .map(str::to_string)
+    };
+    let configured = explicit(query_config(q))
+        .or_else(|| explicit(serde_json::to_value(&panel.config).unwrap_or_default()));
+    let window = end - start;
+    // The query_range handler parses the string the live panel sends; zero means no step.
+    let configured = match configured {
+        Some(s) => i64::try_from(parse_milliseconds(&s).map_err(|e| e.to_string())?)
+            .unwrap_or(i64::MAX)
+            .saturating_mul(1000),
+        None => 0,
+    };
+    let step = match configured {
+        0 if panel.typ == "heatmap" => {
+            let secs = (window.max(0) as f64 / 1_000_000.0 / HEATMAP_MAX_COLUMNS).ceil();
+            secs.max(HEATMAP_MIN_STEP_SECS) as i64 * 1_000_000
+        }
+        0 => window / 400,
+        step => step,
+    };
+    Ok(step.max(1_000_000))
 }
 
 fn query_text(q: &config::meta::dashboards::v8::Query) -> Option<&str> {
     q.query.as_deref().filter(|t| !t.trim().is_empty())
+}
+
+fn query_config(q: &config::meta::dashboards::v8::Query) -> serde_json::Value {
+    serde_json::to_value(&q.config).unwrap_or_default()
+}
+
+fn is_hidden(q: &config::meta::dashboards::v8::Query) -> bool {
+    query_config(q).get("hide").and_then(|v| v.as_bool()) == Some(true)
+}
+
+/// Every text of a panel that can name a variable: each query, VRL function and formula.
+fn template_texts(panel: &Panel) -> Vec<String> {
+    panel
+        .queries
+        .iter()
+        .flat_map(|q| {
+            let cfg = query_config(q);
+            let formula = cfg
+                .get("formula")
+                .and_then(|v| v.as_str())
+                .map(str::to_string);
+            [q.query.clone(), q.vrl_function_query.clone(), formula]
+        })
+        .flatten()
+        .collect()
 }
 
 /// Records the streams and cipher keys a query reads, denied or not, for the deadline check.
@@ -2414,6 +2590,7 @@ mod tests {
             rev: 1,
             enabled: true,
             max_links,
+            max_links_set_by: None,
             updated_at: 1,
             updated_by: "a".into(),
         };
@@ -2590,7 +2767,6 @@ mod tests {
         );
         let info = ctx.dashboard_info(
             &dash.v8.as_ref().unwrap().tabs[0],
-            max_links_set_by: None,
             &dash.v8.as_ref().unwrap().tabs[0].panels[0],
         );
         assert_eq!((info.panel_id.as_str(), info.tab_id.as_str()), ("a", "t0"));
@@ -2602,7 +2778,10 @@ mod tests {
     fn gate16_the_promql_request_uses_its_cache_the_public_type_and_the_live_step() {
         let (link, dash, family) = ctx_parts();
         let ctx = ctx(&link, &dash, &family);
-        let req = promql_request(&ctx, "a", "up", 0, 4_000_000_000);
+        let panel = &dash.v8.as_ref().unwrap().tabs[0].panels[0];
+        let step = promql_step(panel, &panel.queries[0], 0, 4_000_000_000).unwrap();
+        assert_eq!(step, 10_000_000);
+        let req = promql_request(&ctx, "a", "up", 0, 4_000_000_000, step);
         assert_eq!(req.use_cache, Some(true));
         assert_eq!(
             req.search_type,
@@ -2610,8 +2789,8 @@ mod tests {
         );
         assert_eq!(req.step, 10_000_000);
         assert_eq!(
-            promql_request(&ctx, "a", "up", 0, 60_000_000).step,
-            1_000_000
+            promql_step(panel, &panel.queries[0], 0, 60_000_000),
+            Ok(1_000_000)
         );
         assert_eq!(
             req.search_event_context.unwrap().panel_id.as_deref(),
@@ -2680,11 +2859,17 @@ mod tests {
     fn gate16_series_are_cut_as_the_chart_cuts_them() {
         let series = |names: &[&str]| json!({ "resultType": "matrix", "result": names.iter().map(|n| json!({ "metric": { "pod": n }, "values": [] })).collect::<Vec<_>>() });
         let mut base = series(&["a", "b", "c"]);
-        let kept = cut_series(&mut base, 2, None);
+        let (kept, dropped) = cut_series(&mut base, 2, None);
         assert_eq!(kept, [json!({ "pod": "a" }), json!({ "pod": "b" })]);
+        assert!(dropped);
         assert_eq!(base["result"].as_array().unwrap().len(), 2);
+        assert!(
+            !cut_series(&mut series(&["a", "b"]), 2, None).1,
+            "at the cap"
+        );
         let mut shifted = series(&["c", "b", "z", "a"]);
-        cut_series(&mut shifted, 2, Some(&kept));
+        let (_, dropped) = cut_series(&mut shifted, 2, Some(&kept));
+        assert!(!dropped, "aligning a shift to its base is not truncation");
         let pods: Vec<_> = shifted["result"]
             .as_array()
             .unwrap()
@@ -2775,6 +2960,7 @@ mod tests {
             rev: 1,
             enabled,
             max_links,
+            max_links_set_by: None,
             updated_at: 1,
             updated_by: "admin".into(),
         }
@@ -2960,7 +3146,6 @@ mod tests {
     fn gate04_a_variable_edit_checks_only_the_panels_that_read_the_changed_value() {
         let (mut link, ..) = ctx_parts();
         link.frozen_variables = Some(json!({ "src.p.c": "safe", "env": "prod" }).to_string());
-            max_links_set_by: None,
         let dash = templated_dashboard();
         let frozen = |v: serde_json::Value| -> BTreeMap<String, serde_json::Value> {
             serde_json::from_value(v).unwrap()
@@ -3060,6 +3245,8 @@ mod tests {
         calls: AtomicUsize,
         /// Refuses each query whose text contains the pattern, with this reason.
         refuse: Option<(NotAvailableReason, &'static str)>,
+        /// Each PromQL request as `(query, start, end, step)`.
+        promql_reqs: std::sync::Mutex<Vec<(String, i64, i64, i64)>>,
     }
 
     #[async_trait]
@@ -3112,6 +3299,12 @@ mod tests {
             _timeout: i64,
         ) -> Result<(serde_json::Value, bool), String> {
             self.calls.fetch_add(1, Ordering::SeqCst);
+            self.promql_reqs.lock().unwrap().push((
+                req.query.clone(),
+                req.start,
+                req.end,
+                req.step,
+            ));
             let result: Vec<_> = (0..self.series)
                 .map(|i| json!({ "metric": { "pod": format!("p{i}") }, "values": [[req.start / 1_000_000, "1"]] }))
                 .collect();
@@ -3275,7 +3468,7 @@ mod tests {
         };
         for typ in ["line", "area", "bar", "metric", "gauge", "table"] {
             let run = run_one(&search, typed_panel("p", typ, "promql", "up", Some("1d"))).await;
-            assert_eq!(run.class, Class::Fresh, "{typ}");
+            assert_eq!(run.class, Class::Truncated, "{typ}");
             let r = &run.result;
             assert_eq!(r.data.len(), 2, "{typ}");
             assert_eq!(r.data[0]["resultType"], "matrix");
@@ -3555,5 +3748,429 @@ mod tests {
             .unwrap();
         assert!(header.is_withheld("p"));
         assert_eq!(header.next_retry_at, stored.header.next_retry_at);
+    }
+
+    #[tokio::test]
+    async fn review_instant_promql_must_evaluate_at_end_only() {
+        let search = FakeSearch {
+            series: 1,
+            ..Default::default()
+        };
+        let p = typed_panel("p", "metric", "promql", "up", None);
+        let mut p = serde_json::to_value(p).unwrap();
+        p["queries"][0]["config"]["query_type"] = json!("instant");
+        let run = run_one(&search, serde_json::from_value(p).unwrap()).await;
+        let q = &run.result.metadata["queries"][0];
+        assert_eq!(
+            q["startTime"], q["endTime"],
+            "instant query must not evaluate a range"
+        );
+    }
+
+    #[tokio::test]
+    async fn review_formula_must_execute_instead_of_hidden_inputs() {
+        let search = FakeSearch {
+            series: 1,
+            ..Default::default()
+        };
+        let p = typed_panel("p", "line", "promql", "up", None);
+        let mut p = serde_json::to_value(p).unwrap();
+        let mut a = p["queries"][0].clone();
+        a["query"] = json!("up");
+        a["config"]["ref"] = json!("A");
+        a["config"]["hide"] = json!(true);
+        let mut b = a.clone();
+        b["query"] = json!("down");
+        b["config"]["ref"] = json!("B");
+        let mut f = a.clone();
+        f["query"] = json!("");
+        f["config"] = json!({"promql_legend":"", "formula":"A / B * 100"});
+        p["queries"] = json!([a, b, f]);
+        let run = run_one(&search, serde_json::from_value(p).unwrap()).await;
+        assert_eq!(
+            run.manifest.queries.len(),
+            1,
+            "only expanded formula should execute"
+        );
+        assert!(run.manifest.queries[0].text.contains("100"));
+    }
+
+    #[tokio::test]
+    async fn review_promql_series_cut_must_signal_truncation() {
+        let search = FakeSearch {
+            series: get_config().limit.max_dashboard_series + 1,
+            ..Default::default()
+        };
+        let run = run_one(&search, typed_panel("p", "line", "promql", "up", None)).await;
+        assert_eq!(
+            run.class,
+            Class::Truncated,
+            "dropping series must be visible to readers"
+        );
+    }
+
+    fn review_chained_dashboard() -> Dashboard {
+        let (_, mut dash, _) = ctx_parts();
+        dash.v8.as_mut().unwrap().tabs[0].panels = vec![typed_panel(
+            "p",
+            "table",
+            "sql",
+            "SELECT * FROM output WHERE svc = '$b'",
+            None,
+        )];
+        dash.v8.as_mut().unwrap().variables = Some(serde_json::from_value(json!({"list":[
+            {"type":"query_values", "name":"a", "label":"A", "query_data":{"stream_type":"logs", "stream":"secret_source", "field":"tenant"}},
+            {"type":"query_values", "name":"b", "label":"B", "query_data":{"stream_type":"logs", "stream":"public_source", "field":"svc", "filter":[{"name":"tenant", "operator":"=", "value":"$a"}]}}
+        ]})).unwrap());
+        dash
+    }
+
+    #[tokio::test]
+    async fn review_chained_variable_manifest_must_include_upstream_source() {
+        let (link, _, family) = ctx_parts();
+        let dash = review_chained_dashboard();
+        let search = FakeSearch {
+            hits: 1,
+            ..Default::default()
+        };
+        let ctx = ctx_with(&search, &link, &dash, &family);
+        let frozen = BTreeMap::new();
+        let values = fill_defaults(&ctx, frozen.clone()).await;
+        let vars = QueryVars::new(&dash, values.values.clone(), None);
+        let tab = &dash.v8.as_ref().unwrap().tabs[0];
+        let m = panel_manifest(&ctx, &vars, &frozen, &values, tab, &tab.panels[0]);
+        assert!(
+            m.values_dependencies
+                .iter()
+                .flat_map(|d| &d.sources)
+                .any(|(_, s)| s == "secret_source"),
+            "panel data depends on a through b and must be revoked when a's stream is revoked: {m:?}"
+        );
+    }
+
+    #[test]
+    fn review_chained_frozen_filter_change_must_change_intent() {
+        let dash = review_chained_dashboard();
+        let before = BTreeMap::from([("a".to_string(), json!("all-tenants"))]);
+        let after = BTreeMap::from([("a".to_string(), json!("one-tenant"))]);
+        assert_ne!(
+            intent::intents(&dash, &before),
+            intent::intents(&dash, &after),
+            "narrowed upstream filter must mask old downstream data"
+        );
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn review_chained_frozen_edit_must_not_skip_editor_authorization() {
+        let (mut link, ..) = ctx_parts();
+        let dash = review_chained_dashboard();
+        link.frozen_variables = Some(json!({"a":"all-tenants"}).to_string());
+        let after = BTreeMap::from([("a".to_string(), json!("one-tenant"))]);
+        assert!(
+            !variable_edit_sources(&link, &dash, &after).is_empty(),
+            "upstream frozen edit influences a public panel and must reach the authorization guard"
+        );
+    }
+
+    /// The SQL and PromQL texts the link-edit guard authorizes, in order.
+    #[cfg(feature = "enterprise")]
+    fn guarded_texts(sources: Vec<crate::authz::QuerySource>) -> Vec<String> {
+        sources
+            .into_iter()
+            .map(|s| match s {
+                crate::authz::QuerySource::Sql { sql, .. } => sql,
+                crate::authz::QuerySource::PromQl { query, .. } => query,
+                other => panic!("{other:?}"),
+            })
+            .collect()
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn a_link_edit_authorizes_the_formula_the_build_sends() {
+        let (mut link, mut dash, _) = ctx_parts();
+        let v8 = dash.v8.as_mut().unwrap();
+        v8.tabs[0].panels = vec![promql_panel(
+            "line",
+            json!([
+                { "query": "up", "config": { "ref": "A", "hide": true } },
+                { "query": "", "config": { "formula": "A / sum(${m}_total)" } }
+            ]),
+        )];
+        v8.variables = Some(
+            serde_json::from_value(
+                json!({ "list": [{ "type": "custom", "name": "m", "label": "M", "value": "old" }] }),
+            )
+            .unwrap(),
+        );
+        link.frozen_variables = Some(json!({ "m": "old" }).to_string());
+        let after = BTreeMap::from([("m".to_string(), json!("new"))]);
+        let texts = guarded_texts(variable_edit_sources(&link, &dash, &after));
+        assert!(
+            texts.iter().any(|t| t == "(up) / sum(new_total)"),
+            "only the formula reads m, and the build sends its expansion: {texts:?}"
+        );
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn a_link_edit_authorizes_a_values_query_whose_stream_follows_the_changed_value() {
+        let (mut link, mut dash, _) = ctx_parts();
+        dash.v8.as_mut().unwrap().variables = Some(
+            serde_json::from_value(json!({ "list": [
+                { "type": "custom", "name": "a", "label": "A", "value": "old" },
+                { "type": "query_values", "name": "b", "label": "B",
+                  "query_data": { "stream_type": "logs", "stream": "s_$a", "field": "x" } }
+            ] }))
+            .unwrap(),
+        );
+        link.frozen_variables = Some(json!({ "a": "old" }).to_string());
+        let after = BTreeMap::from([("a".to_string(), json!("new"))]);
+        let texts = guarded_texts(variable_edit_sources(&link, &dash, &after));
+        assert!(
+            texts.iter().any(|t| t.contains(r#"FROM "s_new""#)),
+            "no panel reads b, but its values query reads the stream a selects: {texts:?}"
+        );
+    }
+
+    /// A PromQL panel `p` whose queries take each item's `query` and `config` keys.
+    fn promql_panel(typ: &str, queries: serde_json::Value) -> Panel {
+        let mut p = serde_json::to_value(typed_panel("p", typ, "promql", "up", None)).unwrap();
+        let template = p["queries"][0].clone();
+        p["queries"] = queries
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|q| {
+                let mut t = template.clone();
+                t["query"] = q["query"].clone();
+                for (k, v) in q["config"].as_object().unwrap() {
+                    t["config"][k] = v.clone();
+                }
+                t
+            })
+            .collect();
+        serde_json::from_value(p).unwrap()
+    }
+
+    fn promql_reqs(search: &FakeSearch) -> Vec<(String, i64, i64, i64)> {
+        search.promql_reqs.lock().unwrap().clone()
+    }
+
+    #[tokio::test]
+    async fn chained_a_denied_values_query_withholds_every_panel_as_the_deadline_does() {
+        let (link, _, family) = ctx_parts();
+        let mut dash = review_chained_dashboard();
+        dash.v8.as_mut().unwrap().tabs[0].panels.push(typed_panel(
+            "q",
+            "table",
+            "sql",
+            "SELECT * FROM output",
+            None,
+        ));
+        let search = FakeSearch {
+            hits: 1,
+            refuse: Some((NotAvailableReason::Unauthorized, "secret_source")),
+            ..Default::default()
+        };
+        let ctx = ctx_with(&search, &link, &dash, &family);
+        let values = fill_defaults(&ctx, BTreeMap::new()).await;
+        let vars = QueryVars::new(&dash, values.values.clone(), None);
+        let tab = &dash.v8.as_ref().unwrap().tabs[0];
+        for panel in &tab.panels {
+            let run = run_panel(&ctx, &vars, &BTreeMap::new(), &values, tab, panel).await;
+            assert_eq!(run.class, Class::Denied, "{}", panel.id);
+            assert!(
+                run.manifest
+                    .values_dependencies
+                    .iter()
+                    .flat_map(|d| &d.sources)
+                    .any(|(_, s)| s == "secret_source"),
+                "{}",
+                panel.id
+            );
+        }
+        assert_eq!(search.calls.load(Ordering::SeqCst), 0, "no query ran");
+    }
+
+    #[tokio::test]
+    async fn formula_runs_once_with_hidden_inputs_in_their_live_slots() {
+        let search = FakeSearch {
+            series: 1,
+            ..Default::default()
+        };
+        let panel = promql_panel(
+            "line",
+            json!([
+                { "query": "x", "config": { "hide": true } },
+                { "query": "y", "config": { "hide": true } },
+                { "query": "", "config": { "formula": "B - A", "time_shift": [{ "offSet": "1d" }] } }
+            ]),
+        );
+        let run = run_one(&search, panel).await;
+        assert_eq!(run.class, Class::Fresh);
+        let sent: Vec<String> = promql_reqs(&search).into_iter().map(|r| r.0).collect();
+        assert_eq!(sent, ["(y) - (x)", "(y) - (x)"]);
+        let empty = json!({ "resultType": "matrix", "result": [] });
+        let r = &run.result;
+        assert_eq!(r.data.len(), 4);
+        assert_eq!(r.data[0], empty);
+        assert_eq!(r.data[1], empty);
+        assert_eq!(r.data[2]["result"].as_array().unwrap().len(), 1);
+        let meta = r.metadata["queries"].as_array().unwrap();
+        let index: Vec<_> = meta.iter().map(|m| m["panelQueryIndex"].clone()).collect();
+        assert_eq!(index, [json!(0), json!(1), json!(2), json!(2)]);
+        let not_sent: Vec<bool> = meta.iter().map(|m| m["notSent"] == true).collect();
+        assert_eq!(not_sent, [true, true, false, false]);
+        assert_eq!(meta[3]["timeRangeGap"]["seconds"], 86_400_000);
+        assert_eq!(run.manifest.queries.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn a_formula_naming_a_missing_query_is_unsupported_and_refused_at_publish() {
+        let missing = promql_panel(
+            "line",
+            json!([
+                { "query": "x", "config": { "ref": "A" } },
+                { "query": "", "config": { "formula": "A / B" } }
+            ]),
+        );
+        let search = FakeSearch {
+            series: 1,
+            ..Default::default()
+        };
+        let run = run_one(&search, missing.clone()).await;
+        assert_eq!(
+            run.result.state,
+            PanelState::NotAvailable {
+                reason: NotAvailableReason::Unsupported
+            }
+        );
+        assert_eq!(search.calls.load(Ordering::SeqCst), 0);
+        let dash_with = |panel: Panel| {
+            let (_, mut dash, _) = ctx_parts();
+            dash.v8.as_mut().unwrap().tabs[0].panels = vec![panel];
+            dash
+        };
+        assert_eq!(
+            validate_dashboard(&dash_with(missing), &BTreeMap::new(), 0).unwrap_err(),
+            "Panel \"p\" has a formula that uses B, which is not a query in this panel. Fix the \
+             formula, then publish."
+        );
+        let nested = promql_panel(
+            "line",
+            json!([
+                { "query": "", "config": { "ref": "A", "formula": "1" } },
+                { "query": "", "config": { "formula": "A * 2" } }
+            ]),
+        );
+        assert!(
+            validate_dashboard(&dash_with(nested), &BTreeMap::new(), 0)
+                .unwrap_err()
+                .contains("uses A, which is another formula")
+        );
+        // A hidden formula never runs, so the live view shows no error for it either.
+        let hidden = promql_panel(
+            "line",
+            json!([
+                { "query": "x", "config": { "ref": "A" } },
+                { "query": "", "config": { "formula": "A / B", "hide": true } }
+            ]),
+        );
+        assert!(validate_dashboard(&dash_with(hidden), &BTreeMap::new(), 0).is_ok());
+    }
+
+    /// The `(start, end, step)` of the one PromQL request a panel sends over a 4000 s window.
+    async fn promql_args(
+        typ: &str,
+        panel_cfg: serde_json::Value,
+        query_cfg: serde_json::Value,
+    ) -> (i64, i64, i64) {
+        let mut panel = serde_json::to_value(promql_panel(
+            typ,
+            json!([{ "query": "up", "config": query_cfg }]),
+        ))
+        .unwrap();
+        for (k, v) in panel_cfg.as_object().unwrap() {
+            panel["config"][k] = v.clone();
+        }
+        let (link, mut dash, family) = ctx_parts();
+        dash.v8.as_mut().unwrap().tabs[0].panels = vec![serde_json::from_value(panel).unwrap()];
+        let search = FakeSearch {
+            series: 1,
+            ..Default::default()
+        };
+        let mut ctx = ctx_with(&search, &link, &dash, &family);
+        (ctx.start, ctx.end) = (1_000_000_000, 5_000_000_000);
+        let tab = &dash.v8.as_ref().unwrap().tabs[0];
+        let vars = QueryVars::new(&dash, BTreeMap::new(), None);
+        let values = Values::default();
+        run_panel(&ctx, &vars, &BTreeMap::new(), &values, tab, &tab.panels[0]).await;
+        let reqs = promql_reqs(&search);
+        assert_eq!(reqs.len(), 1, "{typ} {query_cfg}");
+        (reqs[0].1, reqs[0].2, reqs[0].3)
+    }
+
+    #[tokio::test]
+    async fn instant_and_stepped_promql_requests_carry_the_live_arguments() {
+        let (start, end, s) = (1_000_000_000, 5_000_000_000, 1_000_000);
+        let none = json!({});
+        let cases = [
+            ("line", none.clone(), none.clone(), (start, end, 10 * s)),
+            (
+                "metric",
+                none.clone(),
+                json!({ "query_type": "instant" }),
+                (end, end, 10 * s),
+            ),
+            (
+                "line",
+                json!({ "step_value": "1m" }),
+                json!({ "step_value": "30s" }),
+                (start, end, 30 * s),
+            ),
+            (
+                "line",
+                json!({ "step_value": "1m" }),
+                none.clone(),
+                (start, end, 60 * s),
+            ),
+            (
+                "line",
+                json!({ "step_value": "2m" }),
+                json!({ "step_value": " 0 " }),
+                (start, end, 120 * s),
+            ),
+            ("heatmap", none.clone(), none.clone(), (start, end, 34 * s)),
+            (
+                "heatmap",
+                none.clone(),
+                json!({ "step_value": "5s" }),
+                (start, end, 5 * s),
+            ),
+            (
+                "line",
+                none.clone(),
+                json!({ "step_value": "500ms" }),
+                (start, end, s),
+            ),
+            (
+                "line",
+                none.clone(),
+                json!({ "step_value": "0s" }),
+                (start, end, 10 * s),
+            ),
+            (
+                "heatmap",
+                none.clone(),
+                json!({ "step_value": "0s" }),
+                (start, end, 34 * s),
+            ),
+        ];
+        for (typ, panel_cfg, query_cfg, want) in cases {
+            let got = promql_args(typ, panel_cfg.clone(), query_cfg.clone()).await;
+            assert_eq!(got, want, "{typ} {panel_cfg} {query_cfg}");
+        }
     }
 }

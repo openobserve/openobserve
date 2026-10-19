@@ -18,42 +18,30 @@
 use std::collections::BTreeMap;
 
 use config::{
-    meta::dashboards::{
-        Dashboard,
-        v8::{Panel, Tab},
-    },
+    meta::dashboards::{Dashboard, v8::Panel},
     utils::hash::{Sum64, gxhash},
 };
 use serde_json::{Value, json};
-
-use super::variables::QueryVars;
 
 /// Panel id to intent for every panel of the dashboard under the link's frozen values.
 pub fn intents(dash: &Dashboard, frozen: &BTreeMap<String, Value>) -> BTreeMap<String, String> {
     let Some(v8) = dash.v8.as_ref() else {
         return BTreeMap::new();
     };
-    let vars = QueryVars::new(dash, frozen.clone(), None);
+    let variables = variables_hash(dash, frozen);
     v8.tabs
         .iter()
-        .flat_map(|tab| tab.panels.iter().map(move |panel| (tab, panel)))
-        .map(|(tab, panel)| {
-            (
-                panel.id.clone(),
-                panel_intent(dash, &vars, frozen, tab, panel),
-            )
-        })
+        .flat_map(|tab| tab.panels.iter())
+        .map(|panel| (panel.id.clone(), intent_with(&variables, panel)))
         .collect()
 }
 
-/// Hash of the query definitions as written and the scoped frozen variables they reference.
-pub fn panel_intent(
-    dash: &Dashboard,
-    vars: &QueryVars,
-    frozen: &BTreeMap<String, Value>,
-    tab: &Tab,
-    panel: &Panel,
-) -> String {
+/// Hash of the query definitions as written, every variable definition and every frozen value.
+pub fn panel_intent(dash: &Dashboard, frozen: &BTreeMap<String, Value>, panel: &Panel) -> String {
+    intent_with(&variables_hash(dash, frozen), panel)
+}
+
+fn intent_with(variables: &str, panel: &Panel) -> String {
     let queries: Vec<Value> = panel
         .queries
         .iter()
@@ -66,37 +54,29 @@ pub fn panel_intent(
                 "stream": q.fields.stream,
                 "limit": cfg.get("limit"),
                 "time_shift": cfg.get("time_shift"),
+                "hide": cfg.get("hide"),
+                "formula": cfg.get("formula"),
+                "ref": cfg.get("ref"),
+                "query_type": cfg.get("query_type"),
+                "step_value": cfg.get("step_value"),
             })
         })
         .collect();
-    let texts: Vec<&str> = panel
-        .queries
-        .iter()
-        .flat_map(|q| [q.query.as_deref(), q.vrl_function_query.as_deref()])
-        .flatten()
-        .collect();
-    let definitions = dash
-        .v8
-        .as_ref()
-        .and_then(|v8| v8.variables.as_ref())
-        .map(|v| v.list.as_slice())
-        .unwrap_or_default();
-    let variables: Vec<Value> = vars
-        .referenced(&tab.tab_id, &panel.id, &texts)
-        .into_iter()
-        .map(|(name, key)| {
-            json!({
-                "key": key,
-                "frozen": frozen.get(&key),
-                "definition": definitions.iter().find(|v| v.name == name),
-            })
-        })
-        .collect();
+    let panel_cfg = serde_json::to_value(&panel.config).unwrap_or_default();
     let doc = json!({
         "query_type": panel.query_type,
+        "heatmap": panel.typ == "heatmap",
+        "step_value": panel_cfg.get("step_value"),
         "queries": queries,
         "variables": variables,
     });
+    format!("{:016x}", gxhash::new().sum64(&doc.to_string()))
+}
+
+/// One hash over all variables and frozen values: a chained variable can reach any panel.
+fn variables_hash(dash: &Dashboard, frozen: &BTreeMap<String, Value>) -> String {
+    let definitions = dash.v8.as_ref().and_then(|v8| v8.variables.as_ref());
+    let doc = json!({ "definitions": definitions, "frozen": frozen });
     format!("{:016x}", gxhash::new().sum64(&doc.to_string()))
 }
 
@@ -163,7 +143,7 @@ mod tests {
     }
 
     #[test]
-    fn gate05_intent_moves_with_query_vrl_shift_and_referenced_frozen_values_only() {
+    fn gate05_intent_moves_with_query_vrl_shift_and_any_variable_or_frozen_value() {
         let base_dash = dashboard(json!([panel("p1", sql(), None, None)]), vars());
         let frozen: BTreeMap<String, Value> =
             serde_json::from_value(json!({ "env": "prod" })).unwrap();
@@ -195,7 +175,8 @@ mod tests {
         );
         let unrelated: BTreeMap<String, Value> =
             serde_json::from_value(json!({ "env": "prod", "unused": "x" })).unwrap();
-        assert_eq!(
+        // Any frozen value can feed a panel through a chained variable.
+        assert_ne!(
             intents(&base_dash, &unrelated)["p1"],
             base,
             "a variable the panel does not read"
@@ -203,10 +184,35 @@ mod tests {
         let mut other_vars = vars();
         other_vars[2]["label"] = json!("Renamed");
         let variable_only = dashboard(json!([panel("p1", sql(), None, None)]), other_vars);
-        assert_eq!(
+        assert_ne!(
             intents(&variable_only, &frozen)["p1"],
             base,
             "an edit to a variable the panel does not read"
         );
+    }
+
+    #[test]
+    fn intent_moves_with_hide_formula_ref_query_type_and_steps() {
+        let frozen = BTreeMap::new();
+        let base = intents(
+            &dashboard(json!([panel("p1", sql(), None, None)]), vars()),
+            &frozen,
+        );
+        for (key, value) in [
+            ("hide", json!(true)),
+            ("formula", json!("A * 2")),
+            ("ref", json!("B")),
+            ("query_type", json!("instant")),
+            ("step_value", json!("30s")),
+        ] {
+            let mut p = panel("p1", sql(), None, None);
+            p["queries"][0]["config"][key] = value;
+            let changed = intents(&dashboard(json!([p]), vars()), &frozen);
+            assert_ne!(changed["p1"], base["p1"], "{key}");
+        }
+        let mut p = panel("p1", sql(), None, None);
+        p["config"]["step_value"] = json!("1m");
+        let changed = intents(&dashboard(json!([p]), vars()), &frozen);
+        assert_ne!(changed["p1"], base["p1"], "the panel step");
     }
 }
