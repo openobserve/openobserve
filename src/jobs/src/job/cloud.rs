@@ -687,15 +687,15 @@ async fn run_budget_warning_emails() {
                     continue;
                 }
             };
-            if !settings.budget_config.is_empty() {
-                if let Err(e) =
-                    send_budget_warning_emails(&org.org_id, settings.budget_config).await
-                {
-                    log::error!(
-                        "error in sending warning emails for budget config for org {} : {e}",
-                        org.org_id
-                    );
-                }
+            if !settings.budget_config.is_empty()
+                && let Some(cid) = &org.customer_id
+                && let Err(e) =
+                    send_budget_warning_emails(&org.org_id, cid, settings.budget_config).await
+            {
+                log::error!(
+                    "error in sending warning emails for budget config for org {} : {e}",
+                    org.org_id
+                );
             }
         }
     }
@@ -703,6 +703,7 @@ async fn run_budget_warning_emails() {
 
 async fn send_budget_warning_emails(
     org_id: &str,
+    customer_id: &str,
     config: Vec<BudgetNotificationConfiguration>,
 ) -> Result<(), anyhow::Error> {
     let member_orgs =
@@ -710,7 +711,11 @@ async fn send_budget_warning_emails(
             .await?;
 
     let upcoming_invoice =
-        o2_enterprise::enterprise::cloud::billings::get_upcoming_invoice_details(org_id).await?;
+        o2_enterprise::enterprise::cloud::billings::get_upcoming_invoice_details(customer_id)
+            .await?;
+
+    let cycle_start = upcoming_invoice.cycle_start * 1_000_000;
+    let cycle_end = upcoming_invoice.cycle_end * 1_000_000;
 
     let member_orgs: HashSet<_> = member_orgs.into_iter().map(|v| v.member_org_id).collect();
     let allowed_configs: Vec<_> = config
@@ -729,40 +734,36 @@ async fn send_budget_warning_emails(
         })
         .collect();
 
-    let total_config = allowed_configs
-        .iter()
-        .filter(|v| v.org_id == "total")
-        .next();
+    let total_config = allowed_configs.iter().find(|v| v.org_id == "total");
     let child_configs: Vec<_> = allowed_configs
         .iter()
         .filter(|v| v.org_id != "total")
         .collect();
 
-    let start_str = chrono::DateTime::from_timestamp_micros(upcoming_invoice.cycle_start)
+    let start_str = chrono::DateTime::from_timestamp_micros(cycle_start)
         .unwrap()
         .to_utc()
         .to_rfc2822();
-    let end_str = chrono::DateTime::from_timestamp_micros(upcoming_invoice.cycle_end)
+    let end_str = chrono::DateTime::from_timestamp_micros(cycle_end)
         .unwrap()
         .to_utc()
         .to_rfc2822();
 
     if let Some(total) = total_config
         && !total.paused
+        && total.warn_at_amount <= upcoming_invoice.total_cost
     {
-        if total.warn_at_amount <= upcoming_invoice.total_cost {
-            send_warning_email(
-                org_id,
-                None,
-                &start_str,
-                &end_str,
-                total.total_budget_amount,
-                total.warn_at_amount,
-                upcoming_invoice.total_cost,
-                true,
-            )
-            .await?;
-        }
+        send_warning_email(
+            org_id,
+            None,
+            &start_str,
+            &end_str,
+            total.total_budget_amount,
+            total.warn_at_amount,
+            upcoming_invoice.total_cost,
+            true,
+        )
+        .await?;
     }
 
     for child_config in child_configs {
@@ -772,15 +773,15 @@ async fn send_budget_warning_emails(
 
         let res = get_usage(
             format!("select sum(size) as size, event from \"{USAGE_STREAM}\" where org_id='{}' group by event",child_config.org_id),
-            upcoming_invoice.cycle_start * 1_000_000,
-            upcoming_invoice.cycle_end * 1_000_000,
+            cycle_start,
+            cycle_end,
             false,
         )
         .await?;
 
         let res: Vec<_> = res
             .into_iter()
-            .map(|v| serde_json::from_value::<UsageRecords>(v))
+            .map(serde_json::from_value::<UsageRecords>)
             .collect::<Result<Vec<_>, _>>()?;
         let event_map: HashMap<_, _> = res.into_iter().map(|v| (v.event, v.size)).collect();
 
@@ -789,17 +790,19 @@ async fn send_budget_warning_emails(
                 "select sum(mb_hours) as size, 'retention' as event from \"{DATA_RETENTION_USAGE_STREAM}\" where org_id='{}'", 
                 child_config.org_id
             ),
-        upcoming_invoice.cycle_start,
-        upcoming_invoice.cycle_end,
+        cycle_start,
+        cycle_end,
         false
-        ).await?;
+        ).await.inspect_err(|e|{
+            log::error!("error in getting retention for org {org_id} for budget warning check : {e}");
+        }).unwrap_or_default();
 
         let retention: Vec<_> = retention
             .into_iter()
-            .map(|v| serde_json::from_value::<UsageRecords>(v))
+            .map(serde_json::from_value::<UsageRecords>)
             .collect::<Result<Vec<_>, _>>()?;
 
-        let retention_amt = match retention.get(0) {
+        let retention_amt = match retention.first() {
             Some(v) => v.size,
             None => {
                 log::warn!(
@@ -865,6 +868,7 @@ fn calculate_total_cost(
     total_cost
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn send_warning_email(
     org_id: &str,
     child_org: Option<&str>,

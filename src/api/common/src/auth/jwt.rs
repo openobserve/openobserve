@@ -936,13 +936,13 @@ pub async fn process_domain_org_mapping(
                     .await;
                 }
 
-                if !add_tuples.is_empty() || !remove_tuples.is_empty() {
-                    if let Err(e) = update_tuples(add_tuples, remove_tuples).await {
-                        log::error!(
-                            "error updating claim based role tuples for user {user_email} org {} : {e}",
-                            mapped.org_id
-                        );
-                    }
+                if (!add_tuples.is_empty() || !remove_tuples.is_empty())
+                    && let Err(e) = update_tuples(add_tuples, remove_tuples).await
+                {
+                    log::error!(
+                        "error updating claim based role tuples for user {user_email} org {} : {e}",
+                        mapped.org_id
+                    );
                 }
             }
 
