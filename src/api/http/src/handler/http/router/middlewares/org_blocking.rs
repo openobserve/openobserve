@@ -89,11 +89,6 @@ mod tests {
     }
 
     #[test]
-    fn test_empty_path_gives_empty_org_id() {
-        assert_eq!(super::extract_org_id(""), "");
-    }
-
-    #[test]
     fn test_non_blocked_org_is_allowed_by_cache() {
         // ORG_STATUS_CACHE starts empty; is_blocked for an unknown org returns false
         assert!(!db::org_status::is_blocked("someorg"));

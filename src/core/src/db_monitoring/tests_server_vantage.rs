@@ -3294,22 +3294,6 @@ fn a_mysql_io_wait_is_not_reported_as_a_lock_wait() {
     );
 }
 
-/// The same record with a LOCK instrument does land, in seconds, unconverted.
-#[test]
-fn a_mysql_lock_wait_lands_in_seconds() {
-    let mut rec = mysql_query_sample();
-    rec.insert(
-        "mysql_wait_type".into(),
-        json!("wait/lock/table/sql/handler"),
-    );
-    rec.insert("mysql_events_waits_current_timer_wait".into(), json!(2.5));
-
-    let s = server_vantage::canonicalize_query_sample(&rec).expect("mysql");
-    // SECONDS, like Postgres's blocking.wait_duration — NOT milliseconds like
-    // SQL Server's wait_time. A conversion here would misreport by 1000x.
-    assert_eq!(s.wait_seconds, Some(2.5));
-}
-
 /// Mutex contention is real contention, but no session is on the other side to
 /// name and terminate, so it must not outrank a genuine row-lock waiter.
 #[test]

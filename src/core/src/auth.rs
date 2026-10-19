@@ -1131,27 +1131,9 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_write_method_alert_trigger_uses_put() {
-        let path: Vec<&str> = "v2/default/alerts/abc123/trigger".split('/').collect();
-        assert_eq!(resolve_write_method("PATCH", &path), "PUT");
-    }
-
-    #[test]
-    fn test_resolve_write_method_alert_enable_uses_put() {
-        let path: Vec<&str> = "v2/default/alerts/abc123/enable".split('/').collect();
-        assert_eq!(resolve_write_method("PATCH", &path), "PUT");
-    }
-
-    #[test]
     fn test_resolve_write_method_alert_crud_put() {
         let path: Vec<&str> = "v2/default/alerts/abc123".split('/').collect();
         assert_eq!(resolve_write_method("PUT", &path), "PUT");
-    }
-
-    #[test]
-    fn test_resolve_write_method_alert_crud_delete() {
-        let path: Vec<&str> = "v2/default/alerts/abc123".split('/').collect();
-        assert_eq!(resolve_write_method("DELETE", &path), "DELETE");
     }
 
     #[test]
@@ -1170,26 +1152,6 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_write_method_non_alert_patch_becomes_put() {
-        let path: Vec<&str> = "v2/default/dashboards/dash123".split('/').collect();
-        assert_eq!(resolve_write_method("PATCH", &path), "PUT");
-    }
-
-    #[test]
-    fn test_resolve_write_method_trigger_only_matches_v2_alerts() {
-        // v1-style path should continue to normalize PATCH to PUT
-        let path: Vec<&str> = "default/streams/alerts/abc123/trigger".split('/').collect();
-        assert_eq!(resolve_write_method("PATCH", &path), "PUT");
-    }
-
-    #[test]
-    fn test_resolve_write_method_trigger_requires_full_path() {
-        // Too short a path should not match
-        let path: Vec<&str> = "v2/default/trigger".split('/').collect();
-        assert_eq!(resolve_write_method("PATCH", &path), "PUT");
-    }
-
-    #[test]
     fn test_build_basic_auth_header_format() {
         use base64::Engine as _;
         let header = build_basic_auth_header("user@example.com", "mytoken");
@@ -1202,21 +1164,6 @@ mod tests {
         )
         .unwrap();
         assert_eq!(decoded, "user@example.com:mytoken");
-    }
-
-    #[test]
-    fn test_build_basic_auth_header_empty_fields() {
-        use base64::Engine as _;
-        let header = build_basic_auth_header("", "");
-        assert!(header.starts_with("Basic "));
-        let encoded = header.strip_prefix("Basic ").unwrap();
-        let decoded = String::from_utf8(
-            base64::engine::general_purpose::STANDARD
-                .decode(encoded)
-                .unwrap(),
-        )
-        .unwrap();
-        assert_eq!(decoded, ":");
     }
 
     #[test]

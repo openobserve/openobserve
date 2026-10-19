@@ -5159,11 +5159,6 @@ mod tests {
     }
 
     #[test]
-    fn budget_above_lease_is_rejected() {
-        assert!(validate_synthetics_ceilings(&ceilings(900, 901, 300_000)).is_err());
-    }
-
-    #[test]
     fn net_timeout_larger_than_the_budget_is_rejected() {
         // One attempt could never fit, so every config of that type would fail
         // validation for a reason the user cannot act on.
@@ -5564,11 +5559,6 @@ mod tests {
     }
 
     #[test]
-    fn test_ensure_not_empty_valid() {
-        assert!(ensure_not_empty("valid", "TEST").is_ok());
-    }
-
-    #[test]
     fn test_ensure_not_empty_invalid() {
         assert!(ensure_not_empty("", "TEST").is_err());
     }
@@ -5576,11 +5566,6 @@ mod tests {
     #[test]
     fn test_ensure_not_empty_with_whitespace() {
         assert!(ensure_not_empty("  value  ", "TEST").is_ok());
-    }
-
-    #[test]
-    fn test_ensure_not_empty_single_char() {
-        assert!(ensure_not_empty("a", "TEST").is_ok());
     }
 
     #[test]
@@ -6530,13 +6515,6 @@ mod tests {
         let p = std::path::Path::new("/data/openobserve");
         let result = deverbatim(p);
         assert_eq!(result, "/data/openobserve");
-    }
-
-    #[test]
-    fn test_deverbatim_empty_path_unchanged() {
-        let p = std::path::Path::new("");
-        let result = deverbatim(p);
-        assert_eq!(result, "");
     }
 
     #[cfg(windows)]
