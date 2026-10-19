@@ -175,7 +175,7 @@ export class OnCallTeamDetailPage {
   ruleName(index) { return `[data-test="oncall-schedule-rule-name-${index}"]`; }
   ruleRemove(index) { return `[data-test="oncall-schedule-rule-remove-${index}"]`; }
   ruleMembers(index) { return `[data-test="oncall-schedule-members-${index}"]`; }
-  rulePriority(index) { return `[data-test="oncall-schedule-priority-${index}"]`; }
+  ruleTabIcon(index) { return `[data-test="oncall-schedule-rule-tab-icon-${index}"]`; }
   ruleRestriction(ruleIndex, index) {
     return `[data-test="oncall-schedule-restriction-${ruleIndex}-${index}"]`;
   }
@@ -394,8 +394,10 @@ export class OnCallTeamDetailPage {
   }
 
   /** §8.6: a shift rule with nobody on it is refused, and the drawer says so. */
-  async expectRuleNeedsPeople(ruleIndex) {
-    await expect(this.page.locator(this.ruleNeedsPeople(ruleIndex))).toBeVisible({ timeout: 20000 });
+  /** A fresh rule is flagged on its tab, not with a message nobody has earned yet. */
+  async expectRuleTabFlagged(ruleIndex) {
+    await expect(this.page.locator(this.ruleTabIcon(ruleIndex))).toBeVisible({ timeout: 20000 });
+    await expect(this.page.locator(this.ruleNeedsPeople(ruleIndex))).toHaveCount(0);
   }
 
   async expectRotationNeedsRules() {

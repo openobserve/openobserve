@@ -191,8 +191,7 @@ test.describe('On-call schedules and rotations', {
     await pm.oncallTeamDetailPage.openRotationEditorFor(rotationId);
     await pm.oncallTeamDetailPage.openShiftRule(0);
 
-    // The "When it applies" section is unfolded already for a rule that carries
-    // a restriction, so the window is on screen without opening anything.
+    // A rule that carries a restriction shows its windows inline.
     const window = pm.oncallTeamDetailPage.getRuleRestriction(0, 0);
     await expect(window, 'the seeded restriction must be rendered').toBeVisible({ timeout: 20000 });
 
@@ -263,8 +262,8 @@ test.describe('On-call schedules and rotations', {
   /**
    * §8.6 — a shift rule with nobody in it is the one state that looks
    * configured on a calendar and pages nobody. The server refuses it, so the
-   * drawer has to say so beside the pick that fixes it rather than letting the
-   * save fail with a field name.
+   * drawer flags the rule's tab rather than letting the save fail with a field
+   * name.
    */
   test('§8.6 a shift rule with nobody in it is called out in the editor', {
     tag: ['@P1'],
@@ -289,7 +288,7 @@ test.describe('On-call schedules and rotations', {
     const before = await pm.oncallTeamDetailPage.countShiftRuleTabs();
     await pm.oncallTeamDetailPage.addShiftRule();
     await pm.oncallTeamDetailPage.openShiftRule(before);
-    await pm.oncallTeamDetailPage.expectRuleNeedsPeople(before);
+    await pm.oncallTeamDetailPage.expectRuleTabFlagged(before);
 
     // The stored schedule must be untouched: the warning is about a draft.
     const stored = await getTeamSchedule(page, team.id);

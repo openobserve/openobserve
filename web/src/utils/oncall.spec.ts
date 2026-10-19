@@ -44,8 +44,19 @@ import {
   isSnoozed,
   isStaffed,
   isUnresolved,
+  coverageHoursSummary,
+  effectiveRivals,
+  effectiveWeekCoverage,
   memberAt,
   nextHandover,
+  nextHandoverAfter,
+  overlappingRules,
+  overlapStanding,
+  prioritiesFor,
+  resolvedStretches,
+  ruleHoursSummary,
+  rulesClash,
+  shiftLengthWords,
   normalizeDimensionValue,
   ownershipPath,
   priorityLabel,
@@ -71,6 +82,7 @@ import {
   windowContains,
 } from "@/utils/oncall";
 import type { TranslateFn } from "@/types/i18n";
+import i18n from "@/locales";
 
 const ANCHOR = 1_700_000_000_000_000;
 
@@ -1636,5 +1648,413 @@ describe("toZonedInputValue / fromZonedInputValue", () => {
 
   it("answers empty for an instant that is not one", () => {
     expect(toZonedInputValue(Number.NaN, "UTC")).toBe("");
+  });
+});
+
+describe("rotation editor: how several shift rules add up", () => {
+  /** Monday 2026-01-05 00:00 UTC. */
+  const MON = Date.UTC(2026, 0, 5) * 1000;
+  const HOUR = MICROS_PER_HOUR;
+  const t = i18n.global.t as unknown as TranslateFn;
+
+  function shiftRule(name: string, over: Partial<ShiftRule> = {}): ShiftRule {
+    return {
+      name,
+      members: [`${name.toLowerCase()}@o2.ai`],
+      shift_micros: MICROS_PER_WEEK,
+      anchor_micros: MON,
+      priority: 0,
+      restrictions: [],
+      ...over,
+    };
+  }
+
+  const base = shiftRule("Base");
+  const office = shiftRule("Office", {
+    priority: 1,
+    restrictions: [window([0, 1, 2, 3, 4], 540, 1020)],
+  });
+
+  describe("resolvedStretches", () => {
+    const stretch = (
+      from: number,
+      to: number,
+      member: string | null,
+      ruleIndex: number | null,
+    ) => ({
+      startMicros: MON + from * HOUR,
+      endMicros: MON + to * HOUR,
+      member,
+      ruleIndex,
+    });
+
+    it.each([
+      [
+        "one stretch per person on a plain rotation",
+        [shiftRule("Base", { members: ["ana", "bob"], shift_micros: MICROS_PER_DAY })],
+        48,
+        "UTC",
+        [stretch(0, 24, "ana", 0), stretch(24, 48, "bob", 0)],
+      ],
+      [
+        "the restricted rule over the catch-all, inside its window only",
+        [base, office],
+        24,
+        "UTC",
+        [
+          stretch(0, 9, "base@o2.ai", 0),
+          stretch(9, 17, "office@o2.ai", 1),
+          stretch(17, 24, "base@o2.ai", 0),
+        ],
+      ],
+      [
+        "nobody where no rule applies",
+        [office],
+        24,
+        "UTC",
+        [stretch(0, 9, null, null), stretch(9, 17, "office@o2.ai", 0), stretch(17, 24, null, null)],
+      ],
+      [
+        "priority over specificity",
+        [shiftRule("Base", { priority: 5 }), office],
+        24,
+        "UTC",
+        [stretch(0, 24, "base@o2.ai", 0)],
+      ],
+      [
+        "a retired rule stops at its end",
+        [shiftRule("Base", { ends_at: MON + 12 * HOUR })],
+        24,
+        "UTC",
+        [stretch(0, 12, "base@o2.ai", 0), stretch(12, 24, null, null)],
+      ],
+      [
+        "a rule that has not started yet",
+        [shiftRule("Base", { starts_at: MON + 6 * HOUR })],
+        24,
+        "UTC",
+        [stretch(0, 6, null, null), stretch(6, 24, "base@o2.ai", 0)],
+      ],
+      [
+        "windows in the team's zone, not UTC",
+        [base, office],
+        24,
+        "Asia/Kolkata",
+        [
+          stretch(0, 3.5, "base@o2.ai", 0),
+          stretch(3.5, 11.5, "office@o2.ai", 1),
+          stretch(11.5, 24, "base@o2.ai", 0),
+        ],
+      ],
+      [
+        "a window that is not on a quarter hour",
+        [base, shiftRule("Blip", { priority: 1, restrictions: [window([], 605, 610)] })],
+        24,
+        "UTC",
+        [
+          stretch(0, 10 + 5 / 60, "base@o2.ai", 0),
+          stretch(10 + 5 / 60, 10 + 10 / 60, "blip@o2.ai", 1),
+          stretch(10 + 10 / 60, 24, "base@o2.ai", 0),
+        ],
+      ],
+    ])("%s", (_name, rules, hours, tz, expected) => {
+      expect(resolvedStretches(rules, MON, MON + hours * HOUR, tz)).toMatchObject(expected);
+    });
+
+    // A bound of the scanned range is not a handover, so a stretch cut by it is open on that side.
+    it.each([
+      ["one person all along", [shiftRule("Base")], 2, 26, [[true, true]]],
+      [
+        "handovers on both bounds",
+        [shiftRule("Base", { members: ["ana", "bob"], shift_micros: MICROS_PER_DAY })],
+        0,
+        24,
+        [[false, false]],
+      ],
+      [
+        "the catch-all around a window",
+        [base, office],
+        0,
+        24,
+        [
+          [true, false],
+          [false, false],
+          [false, true],
+        ],
+      ],
+      ["a window cut by both bounds", [base, office], 10, 12, [[true, true]]],
+    ])("%s", (_name, rules, from, to, expected) => {
+      const open = resolvedStretches(rules, MON + from * HOUR, MON + to * HOUR, "UTC").map((s) => [
+        s.openStart,
+        s.openEnd,
+      ]);
+      expect(open).toEqual(expected);
+    });
+  });
+
+  describe("rulesClash", () => {
+    it.each([
+      ["same priority, both all hours", shiftRule("A"), shiftRule("B"), true],
+      [
+        "missing fields read as their defaults",
+        { ...shiftRule("A"), priority: undefined, restrictions: undefined },
+        shiftRule("B"),
+        true,
+      ],
+      [
+        "same priority, different hours",
+        shiftRule("A", { priority: 10, restrictions: [window([], 0, 480)] }),
+        shiftRule("B", { priority: 10, restrictions: [window([], 480, 960)] }),
+        false,
+      ],
+      ["different priority, same hours", shiftRule("A", { priority: 1 }), shiftRule("B"), false],
+      [
+        "days in a different order are different",
+        shiftRule("A", { restrictions: [window([0, 1], 0, 60)] }),
+        shiftRule("B", { restrictions: [window([1, 0], 0, 60)] }),
+        false,
+      ],
+    ])("%s", (_name, a, b, expected) => {
+      expect(rulesClash(a, b)).toBe(expected);
+    });
+  });
+
+  describe("overlappingRules", () => {
+    const sun = (name: string, start: number, end: number) =>
+      shiftRule(name, { priority: 10, restrictions: [window([], start, end)] });
+    const followTheSun = [sun("APAC", 0, 480), sun("EMEA", 480, 960), sun("AMER", 960, 1440), base];
+
+    it.each([
+      ["a window over the catch-all", [base, office], 0, [1]],
+      ["follow-the-sun regions meet only the catch-all", followTheSun, 0, [3]],
+      ["the catch-all meets every region", followTheSun, 3, [0, 1, 2]],
+      [
+        "different days never meet",
+        [
+          office,
+          shiftRule("Tue", { restrictions: [window([1], 0, 1440)] }),
+          shiftRule("Sat", { restrictions: [window([5], 0, 1440)] }),
+        ],
+        2,
+        [],
+      ],
+      [
+        "a Sunday night runs into Monday",
+        [
+          shiftRule("Night", { restrictions: [window([6], 1320, 360)] }),
+          shiftRule("Early", { restrictions: [window([0], 60, 120)] }),
+        ],
+        0,
+        [1],
+      ],
+      [
+        "a zero-length window covers nothing",
+        [shiftRule("Zero", { restrictions: [window([], 600, 600)] }), base],
+        0,
+        [],
+      ],
+    ])("%s", (_name, rules, index, expected) => {
+      expect(overlappingRules(rules, index)).toEqual(expected);
+    });
+  });
+
+  describe("overlapStanding", () => {
+    const top = shiftRule("Top", { priority: 2, restrictions: [window([], 0, 60)] });
+    it.each([
+      ["the restricted rule wins", [base, office], 1, { winsOver: [0], losesTo: [] }],
+      ["the catch-all loses", [base, office], 0, { winsOver: [], losesTo: [1] }],
+      [
+        "wins over one, loses to another",
+        [
+          shiftRule("Mid", { priority: 1 }),
+          shiftRule("Low", { restrictions: [window([], 0, 60)] }),
+          top,
+        ],
+        0,
+        { winsOver: [1], losesTo: [2] },
+      ],
+    ])("%s", (_name, rules, index, expected) => {
+      expect(overlapStanding(rules, index)).toEqual(expected);
+    });
+  });
+
+  describe("prioritiesFor", () => {
+    const night = shiftRule("Night", { priority: 5, restrictions: [window([], 1320, 360)] });
+    it.each([
+      ["already in that order", [base, office], 1, true, [0, 1]],
+      ["the catch-all goes on top", [base, office], 0, true, [2, 1]],
+      ["a window drops below, never negative", [base, office], 1, false, [1, 0]],
+      [
+        "a region below a catch-all it overlaps",
+        [shiftRule("APAC", { priority: 10, restrictions: [window([], 0, 480)] }), base],
+        0,
+        false,
+        [0, 1],
+      ],
+      ["other rules keep their order", [base, office, night], 1, false, [1, 0, 6]],
+      ["nothing to overlap, nothing changes", [office, night], 0, true, [1, 5]],
+    ])("%s", (_name, rules, index, wins, expected) => {
+      expect(prioritiesFor(rules, index, wins)).toEqual(expected);
+    });
+  });
+
+  describe("ruleHoursSummary", () => {
+    it.each([
+      ["no windows", [], "All hours"],
+      ["the working week", [window([0, 1, 2, 3, 4], 540, 1080)], "Mon–Fri 09:00–18:00"],
+      ["every day past midnight", [window([], 1320, 360)], "Every day 22:00–06:00 next day"],
+      ["a whole weekend", [window([5, 6], 0, 1440)], "Sat, Sun all day"],
+      [
+        "several windows",
+        [window([0], 540, 720), window([4], 780, 1020)],
+        "Mon 09:00–12:00, Fri 13:00–17:00",
+      ],
+    ])("%s", (_name, restrictions, expected) => {
+      expect(ruleHoursSummary(shiftRule("A", { restrictions }), t)).toBe(expected);
+    });
+  });
+
+  describe("nextHandoverAfter", () => {
+    it.each([
+      [
+        "the end of the shift in progress",
+        shiftRule("A"),
+        MON + 2 * MICROS_PER_DAY,
+        MON + MICROS_PER_WEEK,
+      ],
+      [
+        "a handover instant starts a new shift",
+        shiftRule("A"),
+        MON + MICROS_PER_WEEK,
+        MON + 2 * MICROS_PER_WEEK,
+      ],
+      [
+        "a rule whose first shift is still ahead",
+        shiftRule("A", { anchor_micros: MON + MICROS_PER_DAY }),
+        MON,
+        MON + MICROS_PER_DAY + MICROS_PER_WEEK,
+      ],
+      [
+        "a rule not yet in force",
+        shiftRule("A", { starts_at: MON + 8 * MICROS_PER_DAY }),
+        MON,
+        MON + 2 * MICROS_PER_WEEK,
+      ],
+    ])("%s", (_name, rule, now, expected) => {
+      expect(nextHandoverAfter(rule, now)).toBe(expected);
+    });
+  });
+
+  describe("effectiveWeekCoverage / effectiveRivals", () => {
+    const DAY = 1440;
+    const region = (name: string, start: number, end: number, over: Partial<ShiftRule> = {}) =>
+      shiftRule(name, { priority: 10, restrictions: [window([], start, end)], ...over });
+    const everyDay = (start: number, end: number) =>
+      [0, 1, 2, 3, 4, 5, 6].map((d): [number, number] => [d * DAY + start, d * DAY + end]);
+    const india = region("India", 0, 720);
+    const americas = region("Americas", 720, 1440);
+    const catchAll = shiftRule("Catch-all");
+
+    it.each([
+      ["a lone rule gets the whole week", [base], 0, [[0, 7 * DAY]], []],
+      [
+        "the window that wins keeps its hours",
+        [base, office],
+        1,
+        [0, 1, 2, 3, 4].map((d): [number, number] => [d * DAY + 540, d * DAY + 1020]),
+        [],
+      ],
+      ["a catch-all under regions that cover the day", [india, americas, catchAll], 2, [], [0, 1]],
+      [
+        "regions under a catch-all set to win",
+        [india, americas, shiftRule("Catch-all", { priority: 11 })],
+        0,
+        [],
+        [2],
+      ],
+      [
+        "a retired rival takes nothing",
+        [india, shiftRule("Catch-all", { priority: 11, ends_at: MON })],
+        0,
+        everyDay(0, 720),
+        [],
+      ],
+      [
+        "a rival with nobody in it takes nothing",
+        [india, shiftRule("Empty", { priority: 11, members: [] })],
+        0,
+        everyDay(0, 720),
+        [],
+      ],
+      [
+        "a catch-all under a weekday rule keeps the weekend",
+        [
+          base,
+          shiftRule("Weekdays", { priority: 1, restrictions: [window([0, 1, 2, 3, 4], 0, DAY)] }),
+        ],
+        0,
+        [[5 * DAY, 7 * DAY]],
+        [1],
+      ],
+    ])("%s", (_name, rules, index, coverage, rivals) => {
+      expect(effectiveWeekCoverage(rules, index, MON)).toEqual(coverage);
+      expect(effectiveRivals(rules, index, MON)).toEqual(rivals);
+    });
+  });
+
+  describe("coverageHoursSummary", () => {
+    const DAY = 1440;
+    it.each([
+      ["the whole week", [[0, 7 * DAY]], "All hours"],
+      ["a whole weekend", [[5 * DAY, 7 * DAY]], "Sat, Sun all day"],
+      [
+        "identical days grouped",
+        [
+          [5 * DAY, 5 * DAY + 480],
+          [6 * DAY, 6 * DAY + 480],
+        ],
+        "Sat, Sun 00:00–08:00",
+      ],
+      ["across midnight", [[4 * DAY + 1320, 5 * DAY + 360]], "Fri 22:00–06:00 next day"],
+      [
+        "across the end of the week",
+        [
+          [0, 360],
+          [6 * DAY + 1320, 7 * DAY],
+        ],
+        "Sun 22:00–06:00 next day",
+      ],
+      [
+        "every day",
+        [0, 1, 2, 3, 4, 5, 6].map((d) => [d * DAY + 540, d * DAY + 1020]),
+        "Every day 09:00–17:00",
+      ],
+      [
+        "two shapes",
+        [
+          [0, 480],
+          [DAY + 600, DAY + 660],
+        ],
+        "Mon 00:00–08:00, Tue 10:00–11:00",
+      ],
+    ])("%s", (_name, spans, expected) => {
+      expect(coverageHoursSummary(spans as Array<[number, number]>, t)).toBe(expected);
+    });
+  });
+
+  describe("shiftLengthWords", () => {
+    it.each([
+      [8 * HOUR, "8 hours"],
+      [MICROS_PER_DAY, "day"],
+      [36 * HOUR, "36 hours"],
+      [MICROS_PER_WEEK, "week"],
+      [2 * MICROS_PER_WEEK, "2 weeks"],
+      [3 * MICROS_PER_DAY, "3 days"],
+      [90 * 60_000_000, "1 h 30 min"],
+      [45 * 60_000_000, "45 minutes"],
+      [90_000_000, null],
+    ])("%i micros reads %s", (micros, expected) => {
+      expect(shiftLengthWords(micros, t)).toBe(expected);
+    });
   });
 });

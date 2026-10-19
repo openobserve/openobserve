@@ -14,40 +14,33 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!--
-  The answer a rotation's shift rules produce, merged into one chronological
-  timeline. A cadence and an anchor are not readable as a rota until you see
-  the dates they generate. Split out of OnCallScheduleEditor so a rotation
-  with several rules can show every rule's upcoming shifts together
-  (comparable at a glance) even when the rest of each rule's configuration is
-  tabbed and only one is visible at a time.
-
-  Rules sharing an anchor and cadence (e.g. a primary and secondary covering
-  the same weeks) land on identical windows, so those collapse into a single
-  row instead of repeating the same date range once per rule.
--->
+<!-- Who actually holds the rotation, stretch by stretch: the same winner the engine picks. -->
 <template>
   <div>
     <div
-      v-if="combined.length"
+      v-if="stretches.length"
       class="border-border-default divide-border-default rounded-default flex flex-col divide-y border"
     >
       <div
-        v-for="shift in combined"
-        :key="`${shift.startMicros}-${shift.endMicros}`"
+        v-for="stretch in stretches"
+        :key="stretch.startMicros"
         class="flex flex-wrap items-center gap-3 px-3 py-1.5"
-        :class="isCurrent(shift) ? 'bg-status-success-bg' : ''"
+        :class="isCurrent(stretch) ? 'bg-status-success-bg' : ''"
         data-test="oncall-schedule-preview-shift"
       >
-        <template v-for="(entry, entryIndex) in shift.entries" :key="entry.ruleName + entry.member">
-          <span v-if="entryIndex" class="text-text-secondary text-xs">{{ raw("·") }}</span>
-          <OText v-if="rules.length > 1" variant="label" class="shrink-0">{{
-            raw(entry.ruleName)
-          }}</OText>
-          <OUserCell :value="entry.member" />
-        </template>
-        <OText variant="meta" class="ms-auto">{{ raw(shiftRange(shift)) }}</OText>
-        <OTag v-if="isCurrent(shift)" variant="success-soft" size="xs">
+        <OText
+          v-if="rules.length > 1 && stretch.ruleIndex !== null"
+          variant="label"
+          class="shrink-0"
+        >
+          {{ raw(rules[stretch.ruleIndex].name) }}
+        </OText>
+        <OUserCell v-if="stretch.member" :value="stretch.member" />
+        <OText v-else variant="meta" data-test="oncall-schedule-preview-nobody">
+          {{ t("oncall.upcomingNobody") }}
+        </OText>
+        <OText variant="meta" class="ms-auto">{{ stretchRange(stretch) }}</OText>
+        <OTag v-if="isCurrent(stretch)" variant="success-soft" size="xs">
           {{ t("oncall.onCallNowTag") }}
         </OTag>
       </div>
@@ -67,31 +60,60 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import type { ShiftRule } from "@/ts/interfaces/oncall";
-import type { CombinedShift } from "@/utils/oncall";
-import { combinedUpcomingShifts } from "@/utils/oncall";
+import { MICROS_PER_WEEK } from "@/ts/interfaces/oncall";
+import type { Stretch } from "@/utils/oncall";
+import { formatInZone, isShiftRuleValid, resolvedStretches } from "@/utils/oncall";
+import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
 
 const PREVIEW_SHIFTS = 5;
+const PREVIEW_ROWS = 10;
+// Bounds the scan: window edges are found a quarter hour at a time.
+const MAX_HORIZON_MICROS = 4 * MICROS_PER_WEEK;
 
 const props = defineProps<{
   rules: ShiftRule[];
   /** "Now", shared with the caller so every rule's list agrees on when "now" is. */
   nowMicros: number;
+  /** The team's zone: windows are read in it and times are shown in it. */
+  timezone: string;
 }>();
 
 const { t } = useI18nTyped();
 
-const combined = computed<CombinedShift[]>(() =>
-  combinedUpcomingShifts(props.rules, props.nowMicros, PREVIEW_SHIFTS),
-);
+const stretches = computed<Stretch[]>(() => {
+  if (!props.rules.some(isShiftRuleValid)) return [];
+  const longest = Math.max(...props.rules.map((rule) => rule.shift_micros || 0));
+  const lookback = Math.min(longest, MICROS_PER_WEEK);
+  const horizon = Math.min(PREVIEW_SHIFTS * longest, MAX_HORIZON_MICROS);
+  return resolvedStretches(
+    props.rules,
+    props.nowMicros - lookback,
+    props.nowMicros + horizon,
+    props.timezone,
+  )
+    .filter((stretch) => stretch.endMicros > props.nowMicros)
+    .slice(0, PREVIEW_ROWS);
+});
 
-function isCurrent(shift: CombinedShift): boolean {
-  return shift.startMicros <= props.nowMicros && props.nowMicros < shift.endMicros;
+function isCurrent(stretch: Stretch): boolean {
+  return stretch.startMicros <= props.nowMicros && props.nowMicros < stretch.endMicros;
 }
 
-function shiftRange(shift: CombinedShift): string {
-  const start = new Date(shift.startMicros / 1000);
-  const end = new Date(shift.endMicros / 1000);
-  return `${start.toLocaleString()} — ${end.toLocaleString()}`;
+function stretchRange(stretch: Stretch): I18nText {
+  const opts: Intl.DateTimeFormatOptions = {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  };
+  const start = raw(formatInZone(stretch.startMicros, props.timezone, opts));
+  const end = raw(formatInZone(stretch.endMicros, props.timezone, opts));
+  if (stretch.openStart && stretch.openEnd) return t("oncall.upcomingNoChange");
+  if (stretch.openStart) return t("oncall.upcomingUntil", { end });
+  if (stretch.openEnd) return t("oncall.upcomingFrom", { start });
+  return raw(`${start} — ${end}`);
 }
 </script>

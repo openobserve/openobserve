@@ -41,7 +41,12 @@ import type {
   VerificationRefusalBody,
 } from "@/ts/interfaces/oncall";
 import { PROMOTE_SEVERITIES } from "@/ts/interfaces/oncall";
-import { MICROS_PER_DAY, MICROS_PER_HOUR, MICROS_PER_WEEK } from "@/ts/interfaces/oncall";
+import {
+  MICROS_PER_DAY,
+  MICROS_PER_HOUR,
+  MICROS_PER_MINUTE,
+  MICROS_PER_WEEK,
+} from "@/ts/interfaces/oncall";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import type { RowRailTone } from "@/lib/core/Table/OTable.types";
 import type { I18nKey, I18nText, TranslateFn } from "@/types/i18n";
@@ -112,43 +117,6 @@ export function upcomingShifts(rule: ShiftRule, fromMicros: number, count: numbe
     });
   }
   return shifts;
-}
-
-/** One time window, and everyone on call for it across a set of rules. */
-export interface CombinedShift {
-  startMicros: number;
-  endMicros: number;
-  /** One per rule that has a shift over this exact window, in rule order. */
-  entries: { ruleName: string; member: string }[];
-}
-
-/**
- * The next shifts of several rules at once, merged into a single chronological
- * timeline instead of one list per rule.
- *
- * Rules that share an anchor and cadence land on identical windows — the
- * common case, e.g. a primary and secondary covering the same weeks — and
- * those collapse into one row so the time only has to be read once. Rules
- * that don't align just interleave by start time.
- */
-export function combinedUpcomingShifts(
-  rules: ShiftRule[],
-  fromMicros: number,
-  countPerRule: number,
-): CombinedShift[] {
-  const byWindow = new Map<string, CombinedShift>();
-  for (const rule of rules) {
-    for (const shift of upcomingShifts(rule, fromMicros, countPerRule)) {
-      const key = `${shift.startMicros}-${shift.endMicros}`;
-      let combined = byWindow.get(key);
-      if (!combined) {
-        combined = { startMicros: shift.startMicros, endMicros: shift.endMicros, entries: [] };
-        byWindow.set(key, combined);
-      }
-      combined.entries.push({ ruleName: shift.rule ?? "", member: shift.member });
-    }
-  }
-  return [...byWindow.values()].sort((a, b) => a.startMicros - b.startMicros);
 }
 
 /** Every person named by any rule of a rotation, de-duplicated, in rule order. */
@@ -958,6 +926,253 @@ export function resolveNextHolder(
   return members[wrapped] ?? null;
 }
 
+/** One continuous stretch of a rotation: who holds it, and which rule put them there. */
+export interface Stretch {
+  startMicros: number;
+  endMicros: number;
+  /** `null` is nobody on call: no rule applies. */
+  member: string | null;
+  /** Index into the rules the stretch was resolved from; `null` with nobody. */
+  ruleIndex: number | null;
+  /** The same holder was already on before the scanned range: the start is not a handover. */
+  openStart: boolean;
+  /** The same holder stays on past the scanned range: the end is not a handover. */
+  openEnd: boolean;
+}
+
+/** Which overlapping rules a rule beats, and which beat it, by index. */
+export interface OverlapStanding {
+  winsOver: number[];
+  losesTo: number[];
+}
+
+const MICROS_PER_QUARTER_HOUR = 15 * MICROS_PER_MINUTE;
+const MAX_HANDOVERS_PER_RULE = 2000;
+const MINUTES_PER_WEEK = 7 * 1440;
+
+/** Who holds the rotation made of `rules`, stretch by stretch over `[from, until)`. [pure] */
+export function resolvedStretches(
+  rules: ShiftRule[],
+  fromMicros: number,
+  untilMicros: number,
+  timezone: string,
+): Stretch[] {
+  const rotation: Rotation = { id: "", name: "", shift_rules: rules };
+  const edges = stretchEdges(rules, fromMicros, untilMicros, timezone);
+  const holderAt = (at: number) => {
+    const { member, rule } = resolveHolder(rotation, at, timezone);
+    return { member, ruleIndex: rule ? rules.indexOf(rule) : null };
+  };
+  const same = (a: { member: string | null; ruleIndex: number | null }, b: typeof a) =>
+    a.member === b.member && a.ruleIndex === b.ruleIndex;
+  const out: Stretch[] = [];
+  for (let i = 0; i + 1 < edges.length; i++) {
+    const holder = holderAt(edges[i]);
+    const last = out[out.length - 1];
+    if (last && same(last, holder)) {
+      last.endMicros = edges[i + 1];
+    } else {
+      out.push({
+        startMicros: edges[i],
+        endMicros: edges[i + 1],
+        ...holder,
+        openStart: false,
+        openEnd: false,
+      });
+    }
+  }
+  if (out.length) {
+    out[0].openStart = same(out[0], holderAt(fromMicros - 1));
+    out[out.length - 1].openEnd = same(out[out.length - 1], holderAt(untilMicros));
+  }
+  return out;
+}
+
+/** Whether the server refuses `a` and `b` side by side: same priority and identical windows. [pure] */
+export function rulesClash(a: ShiftRule, b: ShiftRule): boolean {
+  const left = a.restrictions ?? [];
+  const right = b.restrictions ?? [];
+  return (
+    (a.priority ?? 0) === (b.priority ?? 0) &&
+    left.length === right.length &&
+    left.every((w, i) => sameWindow(w, right[i]))
+  );
+}
+
+/** Indices of the other rules sharing any team-local minute of the week with `rules[index]`. [pure] */
+export function overlappingRules(rules: ShiftRule[], index: number): number[] {
+  const mine = weekCoverage(rules[index]);
+  return rules.flatMap((rule, k) =>
+    k !== index && spansMeet(mine, weekCoverage(rule)) ? [k] : [],
+  );
+}
+
+/** Which overlapping rules `rules[index]` beats and which beat it, in the backend's order. [pure] */
+export function overlapStanding(rules: ShiftRule[], index: number): OverlapStanding {
+  const standing: OverlapStanding = { winsOver: [], losesTo: [] };
+  for (const k of overlappingRules(rules, index)) {
+    const order = compareShiftRules(rules[index], rules[k]);
+    // On a full tie the backend's max_by keeps the later rule.
+    if (order > 0 || (order === 0 && index > k)) standing.winsOver.push(k);
+    else standing.losesTo.push(k);
+  }
+  return standing;
+}
+
+/** Priorities that make `rules[index]` win or lose against every rule it overlaps, all ≥ 0. [pure] */
+export function prioritiesFor(rules: ShiftRule[], index: number, wins: boolean): number[] {
+  const current = rules.map((rule) => rule.priority ?? 0);
+  const { winsOver, losesTo } = overlapStanding(rules, index);
+  if (!(wins ? losesTo : winsOver).length) return current;
+  const rivals = [...winsOver, ...losesTo].map((k) => current[k]);
+  if (wins) return current.map((p, k) => (k === index ? Math.max(...rivals) + 1 : p));
+  const lowered = Math.min(...rivals) - 1;
+  // Lifting every rule by the same amount keeps all other pairs in their order.
+  const lift = Math.max(0, -lowered);
+  return current.map((p, k) => (k === index ? lowered : p) + lift);
+}
+
+/** Rivals that take hours from `rules[index]`: they overlap and beat it, have people, and are not retired. [pure] */
+export function effectiveRivals(rules: ShiftRule[], index: number, nowMicros: number): number[] {
+  return overlapStanding(rules, index).losesTo.filter((k) => {
+    const rival = rules[k];
+    return isShiftRuleValid(rival) && !(rival.ends_at != null && rival.ends_at <= nowMicros);
+  });
+}
+
+/** The team-local minutes of the week where `rules[index]` applies and wins, as `[start, end)` spans. [pure] */
+export function effectiveWeekCoverage(
+  rules: ShiftRule[],
+  index: number,
+  nowMicros: number,
+): Array<[number, number]> {
+  const minutes = new Uint8Array(MINUTES_PER_WEEK);
+  for (const [start, end] of weekCoverage(rules[index])) minutes.fill(1, start, end);
+  for (const k of effectiveRivals(rules, index, nowMicros)) {
+    for (const [start, end] of weekCoverage(rules[k])) minutes.fill(0, start, end);
+  }
+  return spansOf(minutes);
+}
+
+/** End of the shift in progress at `nowMicros`, or of the first shift when the rule has not begun. [pure] */
+export function nextHandoverAfter(rule: ShiftRule, nowMicros: number): number {
+  const { shift_micros: shift, anchor_micros: anchor } = rule;
+  const at = Math.max(nowMicros, anchor, rule.starts_at ?? nowMicros);
+  if (!shift || shift <= 0) return at;
+  return anchor + (Math.floor((at - anchor) / shift) + 1) * shift;
+}
+
+/** Every instant in `(from, until)` at which the resolved holder can change, plus both ends. */
+function stretchEdges(
+  rules: ShiftRule[],
+  fromMicros: number,
+  untilMicros: number,
+  timezone: string,
+): number[] {
+  if (untilMicros <= fromMicros) return [];
+  const edges = new Set<number>([fromMicros, untilMicros]);
+  const candidates = [
+    ...rules.flatMap((rule) => [rule.starts_at, rule.ends_at]),
+    ...rules.flatMap((rule) => handoversBetween(rule, fromMicros, untilMicros)),
+    ...windowEdgesBetween(rules, fromMicros, untilMicros, timezone),
+  ];
+  for (const at of candidates) {
+    if (at != null && at > fromMicros && at < untilMicros) edges.add(at);
+  }
+  return [...edges].sort((a, b) => a - b);
+}
+
+function handoversBetween(rule: ShiftRule, fromMicros: number, untilMicros: number): number[] {
+  const { shift_micros: shift, anchor_micros: anchor } = rule;
+  if (!shift || shift <= 0) return [];
+  const out: number[] = [];
+  let at = anchor + (Math.floor((fromMicros - anchor) / shift) + 1) * shift;
+  while (at < untilMicros && out.length < MAX_HANDOVERS_PER_RULE) {
+    out.push(at);
+    at += shift;
+  }
+  return out;
+}
+
+/** Instants where a local window edge or a local midnight falls; every real offset is whole quarter hours. */
+function windowEdgesBetween(
+  rules: ShiftRule[],
+  fromMicros: number,
+  untilMicros: number,
+  timezone: string,
+): number[] {
+  const windows = rules.flatMap((rule) => rule.restrictions ?? []);
+  if (!windows.length) return [];
+  const minutes = new Set<number>([0]);
+  for (const w of windows) {
+    minutes.add(w.start_minute % MINUTES_PER_DAY);
+    minutes.add(w.end_minute % MINUTES_PER_DAY);
+  }
+  const out: number[] = [];
+  const first = Math.floor(fromMicros / MICROS_PER_QUARTER_HOUR) * MICROS_PER_QUARTER_HOUR;
+  for (let at = first; at < untilMicros; at += MICROS_PER_QUARTER_HOUR) {
+    const wall = wallTimeInZone(at, timezone);
+    if (!wall) continue;
+    for (const minute of minutes) {
+      const ahead = (minute - wall.minuteOfDay + MINUTES_PER_DAY) % MINUTES_PER_DAY;
+      if (ahead < 15) out.push(at + ahead * MICROS_PER_MINUTE);
+    }
+  }
+  return out;
+}
+
+function sameWindow(a: TimeWindow, b: TimeWindow): boolean {
+  const left = a.days ?? [];
+  const right = b.days ?? [];
+  return (
+    a.start_minute === b.start_minute &&
+    a.end_minute === b.end_minute &&
+    left.length === right.length &&
+    left.every((day, i) => day === right[i])
+  );
+}
+
+/** The team-local minutes of the week a rule covers, as `[start, end)` spans. */
+function weekCoverage(rule: ShiftRule): Array<[number, number]> {
+  const windows = rule.restrictions ?? [];
+  if (!windows.length) return [[0, MINUTES_PER_WEEK]];
+  return windows.flatMap(windowCoverage);
+}
+
+function windowCoverage(window: TimeWindow): Array<[number, number]> {
+  const { start_minute: start, end_minute: end } = window;
+  if (start === end) return [];
+  const days = window.days?.length ? window.days : [0, 1, 2, 3, 4, 5, 6];
+  return days.flatMap((day): Array<[number, number]> => {
+    const at = day * MINUTES_PER_DAY;
+    if (start < end) return [[at + start, at + end]];
+    // The after-midnight half belongs to the previous day's window, so it lands on the next day.
+    const next = ((day + 1) % 7) * MINUTES_PER_DAY;
+    return [
+      [at + start, at + MINUTES_PER_DAY],
+      [next, next + end],
+    ];
+  });
+}
+
+function spansOf(minutes: Uint8Array): Array<[number, number]> {
+  const out: Array<[number, number]> = [];
+  let start = -1;
+  for (let at = 0; at <= minutes.length; at++) {
+    const on = at < minutes.length && minutes[at] === 1;
+    if (on && start < 0) start = at;
+    if (!on && start >= 0) {
+      out.push([start, at]);
+      start = -1;
+    }
+  }
+  return out;
+}
+
+function spansMeet(a: Array<[number, number]>, b: Array<[number, number]>): boolean {
+  return a.some(([s1, e1]) => b.some(([s2, e2]) => s1 < e2 && s2 < e1));
+}
+
 /**
  * An instant rendered in the SCHEDULE's timezone, not the browser's.
  *
@@ -1054,6 +1269,86 @@ export function describeRestrictions(windows: TimeWindow[] | undefined, t: Trans
   // Every fragment above is already translated; this last call is the seam a
   // translator uses to reorder or re-punctuate the list.
   return t("oncall.restrictionList", { windows: described });
+}
+
+/** A rule's hours in words: "All hours", or each window joined. [pure] */
+export function ruleHoursSummary(rule: ShiftRule, t: TranslateFn): I18nText {
+  const windows = rule.restrictions ?? [];
+  if (!windows.length) return t("oncall.ruleHoursAll");
+  return windowsSummary(windows, t);
+}
+
+/** Week-minute spans in the same words as a rule's hours, identical days grouped. [pure] */
+export function coverageHoursSummary(spans: Array<[number, number]>, t: TranslateFn): I18nText {
+  const minutes = new Uint8Array(MINUTES_PER_WEEK);
+  for (const [start, end] of spans) minutes.fill(1, start, end);
+  if (minutes.every((on) => on === 1)) return t("oncall.ruleHoursAll");
+  return windowsSummary(coverageWindows(minutes), t);
+}
+
+/** A shift length as the words after "every", exactly; `null` when it is not whole minutes. [pure] */
+export function shiftLengthWords(micros: number, t: TranslateFn): I18nText | null {
+  if (micros > 0 && micros % MICROS_PER_WEEK === 0) {
+    const weeks = micros / MICROS_PER_WEEK;
+    return t("oncall.shiftEveryWeeks", { count: weeks }, weeks);
+  }
+  if (micros > 0 && micros % MICROS_PER_DAY === 0) {
+    const days = micros / MICROS_PER_DAY;
+    return t("oncall.shiftEveryDays", { count: days }, days);
+  }
+  if (micros > 0 && micros % MICROS_PER_HOUR === 0) {
+    const hours = micros / MICROS_PER_HOUR;
+    return t("oncall.shiftEveryHours", { count: hours }, hours);
+  }
+  if (micros <= 0 || micros % MICROS_PER_MINUTE !== 0) return null;
+  const hours = Math.floor(micros / MICROS_PER_HOUR);
+  const minutes = (micros % MICROS_PER_HOUR) / MICROS_PER_MINUTE;
+  if (!hours) return t("oncall.shiftEveryMinutes", { count: minutes }, minutes);
+  return t("oncall.shiftEveryHoursMinutes", { hours, minutes });
+}
+
+function windowsSummary(windows: TimeWindow[], t: TranslateFn): I18nText {
+  return t("oncall.restrictionList", { windows: windows.map((w) => windowWords(w, t)).join(", ") });
+}
+
+/** Covered minutes as windows: a run past midnight becomes one window that ends next day. */
+function coverageWindows(minutes: Uint8Array): TimeWindow[] {
+  const ranges = [0, 1, 2, 3, 4, 5, 6].flatMap((day) =>
+    spansOf(minutes.subarray(day * MINUTES_PER_DAY, (day + 1) * MINUTES_PER_DAY)).map(
+      ([start, end]) => ({ day, start, end }),
+    ),
+  );
+  const consumed = new Set<(typeof ranges)[number]>();
+  const merged = ranges.flatMap((range) => {
+    if (consumed.has(range)) return [];
+    const next =
+      range.end === MINUTES_PER_DAY && range.start > 0
+        ? ranges.find(
+            (r) =>
+              r.day === (range.day + 1) % 7 && r.start === 0 && r.end < range.start && r !== range,
+          )
+        : undefined;
+    if (!next) return [range];
+    consumed.add(next);
+    return [{ ...range, end: next.end }];
+  });
+  const byShape = new Map<string, TimeWindow>();
+  for (const { day, start, end } of merged.filter((r) => !consumed.has(r))) {
+    const key = `${start}-${end}`;
+    const shape = byShape.get(key) ?? { days: [], start_minute: start, end_minute: end };
+    shape.days!.push(day);
+    byShape.set(key, shape);
+  }
+  return [...byShape.values()];
+}
+
+function windowWords(window: TimeWindow, t: TranslateFn): string {
+  const everyDay = new Set(window.days ?? []).size % 7 === 0;
+  const days = everyDay ? t("oncall.ruleHoursEveryDay") : describeDays(window.days, t);
+  const { start_minute: start, end_minute: end } = window;
+  if (start === 0 && end === MINUTES_PER_DAY) return t("oncall.restrictionWindowAllDay", { days });
+  const key = end < start ? "oncall.ruleHoursWindowNextDay" : "oncall.restrictionWindow";
+  return t(key, { days, from: formatMinuteOfDay(start), to: formatMinuteOfDay(end) });
 }
 
 /**

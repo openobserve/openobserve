@@ -191,10 +191,11 @@
                      rather than hover-revealed, since a tab strip this short
                      has no crowding to hide it from. -->
                 <OIcon
-                  v-if="ruleTabIcon(rule)"
-                  :name="ruleTabIcon(rule) as any"
+                  v-if="ruleTabIcon(rule, ruleIndex)"
+                  :name="ruleTabIcon(rule, ruleIndex) as any"
                   size="sm"
                   class="shrink-0"
+                  :data-test="`oncall-schedule-rule-tab-icon-${ruleIndex}`"
                 />
                 <span class="truncate">{{
                   raw(
@@ -254,26 +255,46 @@
                     </OTag>
                   </div>
 
+                  <OText variant="meta" :data-test="`oncall-schedule-rule-summary-${ruleIndex}`">
+                    {{ ruleSummary(ruleIndex) }}
+                  </OText>
+                  <p
+                    v-if="ruleUsage(ruleIndex)"
+                    class="text-xs"
+                    :class="
+                      ruleUsage(ruleIndex)?.kind === 'never-used'
+                        ? 'text-status-warning-text'
+                        : 'text-text-secondary'
+                    "
+                    :data-test="`oncall-schedule-rule-${ruleUsage(ruleIndex)?.kind}-${ruleIndex}`"
+                  >
+                    {{ ruleUsage(ruleIndex)?.text }}
+                  </p>
+
                   <OnCallShiftRuleFields
                     :rule="rule"
                     :rule-index="ruleIndex"
-                    :multi-rule="multiRule"
                     :has-team-members="!!props.members.length"
                     :member-options="memberOptions"
                     :shift-options="shiftOptions"
                     :day-options="dayOptions"
+                    :from-minute-options="fromMinuteOptions"
                     :minute-options="minuteOptions"
-                    :priority-options="priorityOptions"
                     :timezone="props.timezone"
-                    :handover-hint="handoverHint"
+                    :first-shift-sentence="firstShiftSentence(rule)"
+                    :show-needs-people="showNeedsPeople(rule)"
+                    :overlap-names="overlapNames(ruleIndex)"
+                    :overlap-count="overlapCount(ruleIndex)"
+                    :overlap-choice="overlapChoice(ruleIndex)"
                     :set-members="setMembers"
                     :away-clashes-for="awayClashesFor"
                     :short-date="shortDate"
                     :handover-input="handoverInput"
                     :set-anchor="setAnchor"
-                    :uses-advanced="usesAdvanced"
+                    :set-hours-mode="setHoursMode"
                     :add-restriction="addRestriction"
                     :remove-restriction="removeRestriction"
+                    :set-overlap-winner="(wins: boolean) => setOverlapWinner(ruleIndex, wins)"
                     :is-retired="isRetired"
                     :set-retired="setRetired"
                     :retired-at-local="retiredAtLocal"
@@ -293,7 +314,11 @@
                  without switching tabs. -->
             <div class="border-border-default flex flex-col gap-4 border-t pt-4">
               <OText variant="section">{{ t("oncall.upcoming") }}</OText>
-              <OnCallUpcomingList :rules="namedShiftRules" :now-micros="nowMicros" />
+              <OnCallUpcomingList
+                :rules="namedShiftRules"
+                :now-micros="nowMicros"
+                :timezone="props.timezone"
+              />
             </div>
           </template>
         </section>
@@ -333,7 +358,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, reactive, ref, watch } from "vue";
 import { useStore } from "vuex";
 
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -375,11 +400,22 @@ import type { I18nKey, I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
 import analytics from "@/services/product_analytics";
 import {
+  coverageHoursSummary,
+  effectiveRivals,
+  effectiveWeekCoverage,
+  formatInZone,
   formatMinuteOfDay,
   fromZonedInputValue,
+  nextHandoverAfter,
+  overlappingRules,
+  overlapStanding,
+  prioritiesFor,
   resolveHolder,
   resolveNextHolder,
+  ruleHoursSummary,
+  rulesClash,
   SHIFT_PRESETS,
+  shiftLengthWords,
   toZonedInputValue,
 } from "@/utils/oncall";
 
@@ -502,12 +538,6 @@ const namedShiftRules = computed(() =>
   })),
 );
 
-/// Whether this rule already uses anything behind the fold — an unfolded
-/// section is how a restriction the API wrote stops being invisible.
-function usesAdvanced(rule: ShiftRule): boolean {
-  return (rule.restrictions?.length ?? 0) > 0 || (rule.priority ?? 0) !== 0 || isRetired(rule);
-}
-
 /// A rotation the user has not saved yet: the drawer says "Add", and its empty
 /// preview is expected rather than a fault.
 const isNew = ref(false);
@@ -559,10 +589,6 @@ const nameClash = computed<I18nText | "">(() => {
   );
   return rival ? t("oncall.rotationNameClash", { name: raw(rival.name) }) : "";
 });
-
-/// The zone the handover is measured in. It is the team's, never the browser's,
-/// and getting that wrong is the single easiest mistake in this form.
-const handoverHint = computed(() => t("oncall.firstHandoverHint", { zone: raw(props.timezone) }));
 
 function removeRotation(rotation: Rotation) {
   draft.value = draft.value.filter((r) => r !== rotation);
@@ -619,32 +645,94 @@ const minuteOptions = computed(() =>
   })),
 );
 
-/// Offered rather than typed. Two rules that both apply and share a priority
-/// are equally in force, and the server rejects the ENTIRE save rather than
-/// the one rule — so a free number field is a way to take a working rota down
-/// while editing something else.
-const priorityOptions = computed(() => {
-  const rules = active.value?.shift_rules ?? [];
-  const highest = rules.reduce((max, r) => Math.max(max, r.priority ?? 0), 0);
-  const levels = new Set<number>([0, highest, highest + 1]);
-  return [...levels]
-    .filter((level) => level >= 0)
-    .sort((a, b) => a - b)
-    .map((level) => ({
-      label: level === 0 ? t("oncall.rotationPriorityBase") : raw(String(level)),
-      value: level,
-    }));
-});
+// The server refuses a window starting at 24:00.
+const fromMinuteOptions = computed(() => minuteOptions.value.slice(0, -1));
 
-/// Only rules of the SAME rotation compete. Two rotations resolve at the same
-/// instant with their own people, so an identical priority across them is not
-/// a clash — reading it as one is the confusion this rework removed.
+// The server refuses two rules of one rotation only when priority and hours are both identical.
 function priorityClashFor(rule: ShiftRule): I18nText | "" {
   const rules = active.value?.shift_rules ?? [];
-  const rival = rules.find(
-    (other) => other !== rule && (other.priority ?? 0) === (rule.priority ?? 0),
-  );
-  return rival ? t("oncall.rotationPriorityClash", { name: raw(rival.name) }) : "";
+  const at = rules.indexOf(rule);
+  const rival = rules.findIndex((other, k) => k !== at && rulesClash(rule, other));
+  return rival < 0 ? "" : t("oncall.ruleClash", { name: raw(namedShiftRules.value[rival].name) });
+}
+
+function overlapNames(index: number): string {
+  const rules = active.value?.shift_rules ?? [];
+  return overlappingRules(rules, index)
+    .map((k) => namedShiftRules.value[k].name)
+    .join(", ");
+}
+
+function overlapCount(index: number): number {
+  return overlappingRules(active.value?.shift_rules ?? [], index).length;
+}
+
+function overlapChoice(index: number): "wins" | "loses" | undefined {
+  const { winsOver, losesTo } = overlapStanding(active.value?.shift_rules ?? [], index);
+  if (winsOver.length && !losesTo.length) return "wins";
+  if (losesTo.length && !winsOver.length) return "loses";
+  return undefined;
+}
+
+function setOverlapWinner(index: number, wins: boolean) {
+  const rules = active.value?.shift_rules ?? [];
+  prioritiesFor(rules, index, wins).forEach((priority, k) => {
+    rules[k].priority = priority;
+  });
+}
+
+/// The rule's hours, then who wins where it overlaps another rule.
+function ruleSummary(index: number): I18nText {
+  const rules = active.value?.shift_rules ?? [];
+  const nameList = (indices: number[]) =>
+    indices.map((k) => namedShiftRules.value[k].name).join(", ");
+  const { winsOver, losesTo } = overlapStanding(rules, index);
+  const parts: string[] = [ruleHoursSummary(rules[index], t)];
+  if (winsOver.length) parts.push(t("oncall.ruleWinsOver", { names: raw(nameList(winsOver)) }));
+  if (losesTo.length) {
+    parts.push(t("oncall.ruleLosesTo", { names: raw(nameList(losesTo)) }, losesTo.length));
+  }
+  const named = namedShiftRules.value;
+  const effective = effectiveWeekCoverage(named, index, nowMicros.value);
+  // A rival that counts always takes some minutes, so rivals mean the hours differ.
+  if (effective.length && effectiveRivals(named, index, nowMicros.value).length) {
+    parts.push(t("oncall.ruleOnCallOnly", { hours: coverageHoursSummary(effective, t) }));
+  }
+  return t("oncall.ruleSummaryLine", { parts: parts.join(" · ") });
+}
+
+/// A staffed rule that wins no minute: a mistake if it has windows, a standby if it has none.
+function ruleUsage(index: number): { kind: "never-used" | "standby"; text: I18nText } | null {
+  const rules = namedShiftRules.value;
+  const rule = rules[index];
+  if (!rule?.members.length || effectiveWeekCoverage(rules, index, nowMicros.value).length) {
+    return null;
+  }
+  const rivals = effectiveRivals(rules, index, nowMicros.value);
+  const names = raw(rivals.map((k) => rules[k].name).join(", "));
+  return rule.restrictions?.length
+    ? { kind: "never-used", text: t("oncall.ruleNeverWins", { names }, rivals.length) }
+    : { kind: "standby", text: t("oncall.ruleStandby", { names }, rivals.length) };
+}
+
+/// "{person} starts {when}, then …" — only true once two people take turns.
+function firstShiftSentence(rule: ShiftRule): I18nText | "" {
+  const length = shiftLengthWords(rule.shift_micros, t);
+  if (rule.members.length < 2 || !length) return "";
+  return t("oncall.firstShiftSentence", {
+    person: raw(rule.members[0]),
+    when: raw(
+      formatInZone(rule.anchor_micros, props.timezone, {
+        weekday: "short",
+        day: "numeric",
+        month: "short",
+        hour: "2-digit",
+        minute: "2-digit",
+        hourCycle: "h23",
+      }),
+    ),
+    length,
+  });
 }
 
 /// ── Retiring a rule ───────────────────────────────────────────────────────
@@ -658,7 +746,7 @@ function priorityClashFor(rule: ShiftRule): I18nText | "" {
 /// The end is exclusive, like every other boundary here.
 const isRetired = (rule: ShiftRule) => rule.ends_at !== undefined;
 
-const retiredAt = (rule: ShiftRule) => rule.ends_at ?? nowMicros.value;
+const retiredAt = (rule: ShiftRule) => rule.ends_at ?? nextHandoverAfter(rule, nowMicros.value);
 
 /// The date/time pickers carry no timezone of their own — so the value is
 /// rendered in the TEAM's zone and labelled with it, rather than in whatever
@@ -668,9 +756,7 @@ function retiredAtLocal(rule: ShiftRule): string {
 }
 
 function setRetired(rule: ShiftRule, on: boolean) {
-  // Defaults to now: "retire this" almost always means "as of today", and a
-  // date somebody has to fill in before the checkbox means anything is a
-  // second step for the common case.
+  // The next handover, so whoever holds the shift in progress finishes it.
   rule.ends_at = on ? retiredAt(rule) : undefined;
 }
 
@@ -679,8 +765,7 @@ function setRetiredAt(rule: ShiftRule, value: string | number) {
   if (micros !== null) rule.ends_at = micros;
 }
 
-/// A window with no days applies on no day, which is a rule that resolves to
-/// nobody — so a new one starts as the working week.
+// A window with no days applies every day; a new one starts as the working week.
 function addRestriction(rule: ShiftRule) {
   rule.restrictions = [
     ...(rule.restrictions ?? []),
@@ -693,6 +778,11 @@ function removeRestriction(rule: ShiftRule, index: number) {
   rule.restrictions = rule.restrictions.filter((_, at) => at !== index);
 }
 
+function setHoursMode(rule: ShiftRule, onlyDuring: boolean) {
+  if (!onlyDuring) rule.restrictions = [];
+  else if (!rule.restrictions?.length) addRestriction(rule);
+}
+
 /// A second rule is follow-the-sun: the same position, different hours. It gets
 /// a distinct priority for the same reason the server demands one — two rules
 /// equally in force are refused as a whole.
@@ -700,6 +790,7 @@ function addRule() {
   const rotation = active.value;
   if (!rotation) return;
   const highest = rotation.shift_rules.reduce((max, r) => Math.max(max, r.priority ?? 0), 0);
+  const from = rotation.shift_rules[Number(activeRuleTab.value)];
   rotation.shift_rules.push({
     // Never the rotation's name: the rotation is the position, the rule is who
     // holds it and when, and one word for both is what "Base" exists to avoid.
@@ -707,10 +798,11 @@ function addRule() {
       ? String(t("oncall.shiftRuleNthName", { n: rotation.shift_rules.length + 1 }))
       : BASE_SHIFT_RULE_NAME,
     members: [],
-    shift_micros: MICROS_PER_WEEK,
+    shift_micros: from?.shift_micros ?? MICROS_PER_WEEK,
     // Top of the hour, so a handover is readable rather than landing at
     // whatever minute somebody happened to click Add.
-    anchor_micros: Math.floor(nowMicros.value / 3_600_000_000) * 3_600_000_000,
+    anchor_micros:
+      from?.anchor_micros ?? Math.floor(nowMicros.value / 3_600_000_000) * 3_600_000_000,
     priority: rotation.shift_rules.length ? highest + 1 : 0,
     restrictions: [],
   });
@@ -739,14 +831,23 @@ function ruleHasProblem(rule: ShiftRule): boolean {
   return !rule.members.length || !!priorityClashFor(rule);
 }
 
-function ruleTabIcon(rule: ShiftRule): string | undefined {
+function ruleTabIcon(rule: ShiftRule, index: number): string | undefined {
   if (ruleHasProblem(rule)) return "error-outline";
+  if (ruleUsage(index)?.kind === "never-used") return "warning-amber";
   if (isRetired(rule)) return "pause-circle-filled";
   return undefined;
 }
 
+// Missing people are said out loud once the picker was used or the server stored the rule empty.
+const peopleAsked = reactive(new WeakSet<ShiftRule>());
+
+function showNeedsPeople(rule: ShiftRule): boolean {
+  return !rule.members.length && peopleAsked.has(rule);
+}
+
 function setMembers(rule: ShiftRule, members: string[]) {
   rule.members = [...members];
+  peopleAsked.add(rule);
 }
 
 /// In the TEAM's zone, which is what the label beside it promises and what
@@ -774,6 +875,9 @@ function reset() {
       restrictions: rule.restrictions ? [...rule.restrictions] : undefined,
     })),
   }));
+  for (const rule of draft.value.flatMap((r) => r.shift_rules)) {
+    if (!rule.members.length) peopleAsked.add(rule);
+  }
   nowMicros.value = Date.now() * 1000;
 }
 

@@ -113,6 +113,23 @@ const stubs = {
     props: ["modelValue"],
     template: `<div :data-test="$attrs['data-test']"><input type="time" :value="modelValue" @input="$emit('update:modelValue', $event.target.value)" /></div>`,
   },
+  OToggleGroup: {
+    name: "OToggleGroup",
+    props: ["modelValue"],
+    emits: ["update:modelValue"],
+    template: "<div :data-selected='modelValue'><slot /></div>",
+  },
+  OToggleGroupItem: {
+    name: "OToggleGroupItem",
+    props: ["value"],
+    template: `<button @click="$parent.$emit('update:modelValue', value)"><slot /></button>`,
+  },
+  VueDraggableNext: {
+    name: "VueDraggableNext",
+    props: ["modelValue"],
+    emits: ["update:modelValue"],
+    template: "<div><slot /></div>",
+  },
   OSelect: {
     name: "OSelect",
     props: ["modelValue", "options", "multiple"],
@@ -487,13 +504,12 @@ describe("OnCallScheduleEditor", () => {
       ]);
     });
 
-    /// A window with no days applies on no day, which is a rotation resolving
-    /// to nobody — so a new one starts as the working week.
+    // Choosing "Only during…" starts from the working week rather than an empty window.
     it("adds a window that already means something", async () => {
       const wrapper = render({ schedule: schedule([rota("Primary", [layer()])]) });
       await openRotation(wrapper);
 
-      await wrapper.find('[data-test="oncall-schedule-restriction-add-0"]').trigger("click");
+      await wrapper.find('[data-test="oncall-schedule-hours-0-only"]').trigger("click");
       await flushPromises();
       await wrapper.find('[data-test="oncall-rotation-done"]').trigger("click");
       await flushPromises();
@@ -524,19 +540,13 @@ describe("OnCallScheduleEditor", () => {
       ).toEqual([]);
     });
 
-    /// Two rules of ONE rotation equally in force are refused as a WHOLE — the
-    /// rotation that works today goes down with the edit — so Save has to be
-    /// unreachable rather than the reader learning it from a 400.
-    it("blocks a save that would collide with a sibling rule's priority", async () => {
+    /// Two rules of ONE rotation with the same priority and the same hours are
+    /// refused as a WHOLE, so Save has to be unreachable rather than a 400.
+    it("blocks a save when two rules have the same priority and hours", async () => {
       const wrapper = render({
-        schedule: schedule([rota("Primary", [layer(), layer({ name: "Weekend", priority: 1 })])]),
+        schedule: schedule([rota("Primary", [layer(), layer({ name: "Weekend" })])]),
       });
       await openRotation(wrapper);
-
-      wrapper
-        .findComponent('[data-test="oncall-schedule-priority-1"]')
-        .vm.$emit("update:modelValue", 0);
-      await flushPromises();
 
       expect(wrapper.find('[data-test="oncall-schedule-priority-clash-1"]').exists()).toBe(true);
       expect(
@@ -592,7 +602,7 @@ describe("OnCallScheduleEditor — retiring a shift rule", () => {
     await flushPromises();
   }
 
-  it("writes ends_at when a rule is retired", async () => {
+  it("retires a rule at its next handover by default", async () => {
     const wrapper = render({ schedule: schedule([WEEKEND]) });
     await openRotation(wrapper);
 
@@ -602,9 +612,8 @@ describe("OnCallScheduleEditor — retiring a shift rule", () => {
     await flushPromises();
 
     await save(wrapper);
-    // Defaults to now: "retire this" almost always means "as of today", and a
-    // date somebody must fill in first makes the common case two steps.
-    expect(savedRotations()[0].shift_rules[0].ends_at).toBe(NOW * 1000);
+    // The weekly shift that began at ANCHOR (= now) runs to its end.
+    expect(savedRotations()[0].shift_rules[0].ends_at).toBe(ANCHOR + MICROS_PER_WEEK);
   });
 
   it("clears ends_at when the rule is put back into service", async () => {
@@ -680,5 +689,291 @@ describe("OnCallScheduleEditor — retiring a shift rule", () => {
 
     expect(wrapper.find('[data-test="oncall-schedule-default-rot_primary"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="oncall-schedule-default-rot_extra"]').exists()).toBe(false);
+  });
+});
+
+/// The drawer has to explain what several shift rules add up to.
+describe("OnCallScheduleEditor — explaining several shift rules", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+    vi.clearAllMocks();
+    service.setSchedule.mockResolvedValue({ data: {} } as any);
+    service.listUnavailability.mockResolvedValue({ data: [] } as any);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  const region = (name: string, start: number, end: number) =>
+    rule({
+      name,
+      priority: 10,
+      restrictions: [{ days: [], start_minute: start, end_minute: end }],
+    });
+  const office = rule({
+    name: "Office",
+    priority: 1,
+    restrictions: [{ days: [0, 1, 2, 3, 4], start_minute: 540, end_minute: 1080 }],
+  });
+  const drawerRules = (wrapper: any) =>
+    (wrapper.findComponent({ name: "OTable" }).props("data") as any[])[0].shift_rules;
+
+  async function openTab(wrapper: any, index: number) {
+    await wrapper.find(`[data-test="oncall-schedule-rule-tab-${index}"]`).trigger("click");
+    await flushPromises();
+  }
+
+  it("R1: a lone person's stretch is not given scan-bound times", async () => {
+    const wrapper = render({ schedule: schedule([rota("Primary")]) });
+    await openRotation(wrapper);
+
+    const rows = wrapper.findAll('[data-test="oncall-schedule-preview-shift"]');
+    expect(rows).toHaveLength(1);
+    expect(rows[0].text()).toContain("No change in view");
+  });
+
+  const followTheSun = () =>
+    rota("Primary", [
+      region("India", 0, 720),
+      region("Americas", 720, 1440),
+      rule({ name: "Follow-the-sun catch-all", priority: 0 }),
+    ]);
+
+  it("R12: says the hours a rule actually gets", async () => {
+    const wrapper = render({
+      schedule: schedule([
+        rota("Primary", [region("India", 0, 720), rule({ name: "Catch-all", priority: 0 })]),
+      ]),
+    });
+    await openRotation(wrapper);
+    await openTab(wrapper, 1);
+
+    expect(wrapper.find('[data-test="oncall-schedule-rule-summary-1"]').text()).toBe(
+      "All hours · India wins over this · on call only Every day 12:00–24:00",
+    );
+  });
+
+  it("R13: the preset catch-all reads as standby, with no icon and Save enabled", async () => {
+    const wrapper = render({ schedule: schedule([followTheSun()]) });
+    await openRotation(wrapper);
+    await openTab(wrapper, 2);
+
+    expect(wrapper.find('[data-test="oncall-schedule-rule-standby-2"]').text()).toBe(
+      "Standby: India, Americas cover all its hours right now.",
+    );
+    expect(wrapper.find('[data-test="oncall-schedule-rule-tab-icon-2"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test^="oncall-schedule-rule-never-used-"]').exists()).toBe(false);
+    expect(
+      wrapper.find('[data-test="oncall-rotation-done"]').attributes("disabled"),
+    ).toBeUndefined();
+  });
+
+  it("R13: regions under a winning catch-all are flagged as never used, Save still enabled", async () => {
+    const wrapper = render({ schedule: schedule([followTheSun()]) });
+    await openRotation(wrapper);
+    await openTab(wrapper, 2);
+    await wrapper.find('[data-test="oncall-schedule-overlap-2-wins"]').trigger("click");
+    await flushPromises();
+
+    for (const index of [0, 1]) {
+      await openTab(wrapper, index);
+      expect(wrapper.find(`[data-test="oncall-schedule-rule-never-used-${index}"]`).text()).toBe(
+        "Never used: Follow-the-sun catch-all covers all its hours and wins over it.",
+      );
+      expect(wrapper.find(`[data-test="oncall-schedule-rule-tab-icon-${index}"]`).exists()).toBe(
+        true,
+      );
+    }
+    expect(
+      wrapper.find('[data-test="oncall-rotation-done"]').attributes("disabled"),
+    ).toBeUndefined();
+  });
+
+  it("R2: opens a follow-the-sun rotation with Save enabled", async () => {
+    const wrapper = render({
+      schedule: schedule([
+        rota("Primary", [
+          region("APAC", 0, 480),
+          region("EMEA", 480, 960),
+          region("AMER", 960, 1440),
+          rule({ name: "Follow-the-sun catch-all", priority: 0 }),
+        ]),
+      ]),
+    });
+    await openRotation(wrapper);
+
+    expect(wrapper.find('[data-test^="oncall-schedule-priority-clash-"]').exists()).toBe(false);
+    expect(
+      wrapper.find('[data-test="oncall-rotation-done"]').attributes("disabled"),
+    ).toBeUndefined();
+  });
+
+  it("R3: says each rule's hours and who wins where it overlaps", async () => {
+    const wrapper = render({ schedule: schedule([rota("Primary", [rule(), office])]) });
+    await openRotation(wrapper);
+
+    expect(wrapper.find('[data-test="oncall-schedule-rule-summary-0"]').text()).toBe(
+      "All hours · Office wins over this · on call only Mon 00:00–09:00, Mon–Thu 18:00–09:00 next day, Fri 18:00–24:00, Sat, Sun all day",
+    );
+    await openTab(wrapper, 1);
+    expect(wrapper.find('[data-test="oncall-schedule-rule-summary-1"]').text()).toBe(
+      "Mon–Fri 09:00–18:00 · wins over Base",
+    );
+  });
+
+  it("R4: offers no winner choice to rules that never overlap", async () => {
+    const wrapper = render({
+      schedule: schedule([rota("Primary", [region("APAC", 0, 480), region("EMEA", 480, 960)])]),
+    });
+    await openRotation(wrapper);
+
+    expect(wrapper.find('[data-test="oncall-schedule-overlap-0"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="oncall-schedule-priority-0"]').exists()).toBe(false);
+  });
+
+  it("R4: choosing the winner reorders priorities, never below zero", async () => {
+    const wrapper = render({ schedule: schedule([rota("Primary", [rule(), office])]) });
+    await openRotation(wrapper);
+
+    const choice = wrapper.find('[data-test="oncall-schedule-overlap-0"] [data-selected]');
+    expect(choice.attributes("data-selected")).toBe("loses");
+
+    await wrapper.find('[data-test="oncall-schedule-overlap-0-wins"]').trigger("click");
+    await flushPromises();
+    expect(drawerRules(wrapper).map((r: any) => r.priority)).toEqual([2, 1]);
+
+    await openTab(wrapper, 1);
+    await wrapper.find('[data-test="oncall-schedule-overlap-1-wins"]').trigger("click");
+    await flushPromises();
+    expect(drawerRules(wrapper).map((r: any) => r.priority)).toEqual([2, 3]);
+
+    await wrapper.find('[data-test="oncall-schedule-overlap-1-loses"]').trigger("click");
+    await flushPromises();
+    expect(drawerRules(wrapper).map((r: any) => r.priority)).toEqual([2, 1]);
+  });
+
+  it("R5: a new rule copies the shift length and first shift of the rule it came from", async () => {
+    const wrapper = render({
+      schedule: schedule([
+        rota("Primary", [rule({ shift_micros: MICROS_PER_WEEK / 7, anchor_micros: ANCHOR - 5 })]),
+      ]),
+    });
+    await openRotation(wrapper);
+
+    await wrapper.find('[data-test="oncall-schedule-rule-add"]').trigger("click");
+    await flushPromises();
+
+    const added = drawerRules(wrapper)[1];
+    expect(added.shift_micros).toBe(MICROS_PER_WEEK / 7);
+    expect(added.anchor_micros).toBe(ANCHOR - 5);
+    expect(added.members).toEqual([]);
+    expect(added.restrictions).toEqual([]);
+    expect(added.priority).toBe(1);
+  });
+
+  it("R7: marks a window that ends the next day and never offers a 24:00 start", async () => {
+    const wrapper = render({
+      schedule: schedule([
+        rota("Primary", [
+          rule({ restrictions: [{ days: [], start_minute: 1320, end_minute: 360 }] }),
+        ]),
+      ]),
+    });
+    await openRotation(wrapper);
+
+    expect(wrapper.find('[data-test="oncall-schedule-restriction-next-day-0-0"]').exists()).toBe(
+      true,
+    );
+    const [, from, to] = wrapper
+      .find('[data-test="oncall-schedule-restriction-0-0"]')
+      .findAllComponents({ name: "OSelect" });
+    expect(from.props("options").at(-1).value).toBe(1410);
+    expect(to.props("options").at(-1).value).toBe(1440);
+  });
+
+  it("R8: reads the first shift as a sentence", async () => {
+    const wrapper = render({
+      schedule: schedule([
+        rota("Primary", [
+          rule({
+            members: ["ana@o2.ai", "bob@o2.ai"],
+            anchor_micros: Date.UTC(2026, 0, 5, 9) * 1000,
+          }),
+        ]),
+      ]),
+    });
+    await openRotation(wrapper);
+
+    const sentence = wrapper.find('[data-test="oncall-schedule-first-shift-0"]').text();
+    expect(sentence).toContain("ana@o2.ai starts");
+    expect(sentence).toContain("09:00");
+    expect(sentence).toContain("passes to the next person every week.");
+  });
+
+  it("R9: All hours and Only during… switch the rule's windows", async () => {
+    const wrapper = render({ schedule: schedule([rota("Primary")]) });
+    await openRotation(wrapper);
+    const hours = () =>
+      wrapper.find('[data-test="oncall-schedule-hours-0"]').attributes("data-selected");
+
+    expect(hours()).toBe("all");
+    await wrapper.find('[data-test="oncall-schedule-hours-0-only"]').trigger("click");
+    await flushPromises();
+    expect(drawerRules(wrapper)[0].restrictions).toHaveLength(1);
+
+    await wrapper.find('[data-test="oncall-schedule-restriction-remove-0-0"]').trigger("click");
+    await flushPromises();
+    expect(hours()).toBe("all");
+
+    await wrapper.find('[data-test="oncall-schedule-hours-0-only"]').trigger("click");
+    await wrapper.find('[data-test="oncall-schedule-hours-0-all"]').trigger("click");
+    await flushPromises();
+    expect(drawerRules(wrapper)[0].restrictions).toEqual([]);
+  });
+
+  it("R10: holds the missing-people message until the picker is used", async () => {
+    const wrapper = render({ schedule: schedule([rota("Primary")]) });
+    await openRotation(wrapper);
+
+    await wrapper.find('[data-test="oncall-schedule-rule-add"]').trigger("click");
+    await flushPromises();
+    expect(wrapper.find('[data-test="oncall-rotation-needs-people-1"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="oncall-schedule-rule-tab-icon-1"]').exists()).toBe(true);
+
+    await wrapper
+      .findComponent('[data-test="oncall-schedule-members-1"]')
+      .vm.$emit("update:modelValue", []);
+    await flushPromises();
+    expect(wrapper.find('[data-test="oncall-rotation-needs-people-1"]').exists()).toBe(true);
+  });
+
+  it("R10: says so at once for a rule the server stored empty", async () => {
+    const wrapper = render({ schedule: schedule([rota("Primary", [rule({ members: [] })])]) });
+    await openRotation(wrapper);
+
+    expect(wrapper.find('[data-test="oncall-rotation-needs-people-0"]').exists()).toBe(true);
+  });
+
+  it("R11: dragging the handover order rewrites members", async () => {
+    const wrapper = render({
+      schedule: schedule([rota("Primary", [rule({ members: ["ana@o2.ai", "bob@o2.ai"] })])]),
+    });
+    await openRotation(wrapper);
+
+    const order = wrapper.findComponent('[data-test="oncall-schedule-member-order-0"]');
+    expect(order.text()).toContain("1.");
+    order.vm.$emit("update:modelValue", ["bob@o2.ai", "ana@o2.ai"]);
+    await flushPromises();
+
+    expect(drawerRules(wrapper)[0].members).toEqual(["bob@o2.ai", "ana@o2.ai"]);
+  });
+
+  it("R11: has no order list for a single person", async () => {
+    const wrapper = render({ schedule: schedule([rota("Primary")]) });
+    await openRotation(wrapper);
+
+    expect(wrapper.find('[data-test="oncall-schedule-member-order-0"]').exists()).toBe(false);
   });
 });
