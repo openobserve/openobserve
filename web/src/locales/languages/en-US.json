@@ -18960,6 +18960,8 @@
         "resetToDefault": "Reset to default",
         "resetColumnWidths": "Reset column widths"
       },
+      "selectAllRows": "Select all rows",
+      "selectRow": "Select row {name}",
       "removeColumnAria": "Remove column",
       "formatColumnAria": "Format column",
       "selectedOfTotal": "{selected} of {total} selected",
