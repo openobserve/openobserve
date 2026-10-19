@@ -2678,7 +2678,7 @@ mod tests {
         remove(&current_key).await.unwrap();
     }
 
-    // These tests share the result buckets' size accounting.
+    // Serializes the public dashboard tests; other result-cache tests still write the same buckets.
     static PUBLIC_DASHBOARD_TESTS: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
     fn public_key(range: &str) -> (String, String) {
@@ -2700,12 +2700,27 @@ mod tests {
         }
     }
 
+    /// The bucket's size minus its indexed sizes, which every correct write keeps.
+    async fn unindexed_size(bucket: usize) -> i64 {
+        let files = RESULT_FILES[bucket].read().await;
+        let indexed: usize = match &files.data {
+            CacheStrategy::Lru(cache) => cache.iter().map(|(_, size)| size).sum(),
+            CacheStrategy::Fifo(queue, _) => queue.iter().map(|(_, size)| size).sum(),
+            CacheStrategy::TimeLru(_, caches, _) => caches
+                .iter()
+                .flat_map(|c| c.iter().map(|(_, size)| size))
+                .sum(),
+        };
+        files.cur_size as i64 - indexed as i64
+    }
+
     #[tokio::test]
     async fn public_dashboard_replace_overwrites_and_accounts_the_difference() {
         let _serial = PUBLIC_DASHBOARD_TESTS.lock().await;
         let (_, key) = public_key("r3600");
         let bucket = get_bucket_idx(&key);
-        let before = RESULT_FILES[bucket].read().await.cur_size;
+        // Concurrent tests change this bucket's total, so it is checked against the index.
+        let unindexed = unindexed_size(bucket).await;
         public_dashboards_replace(&key, 1, Bytes::from_static(b"0123456789"))
             .await
             .unwrap();
@@ -2714,20 +2729,20 @@ mod tests {
             Bytes::from_static(b"0123456789")
         );
         assert_eq!(indexed_size(&key).await, Some(10));
+        assert_eq!(unindexed_size(bucket).await, unindexed);
         // No skip-if-exists: the same key takes the new bytes.
         public_dashboards_replace(&key, 2, Bytes::from(vec![7u8; 25]))
             .await
             .unwrap();
         assert_eq!(get(&key, None).await.unwrap().len(), 25);
         assert_eq!(indexed_size(&key).await, Some(25));
-        let after = RESULT_FILES[bucket].read().await.cur_size;
-        assert_eq!(after, before + 25);
+        assert_eq!(unindexed_size(bucket).await, unindexed);
         let path = get_file_path(&key).unwrap();
         assert!(!Path::new(&format!("{path}.2.tmp")).exists());
         public_dashboards_evict(&key).await.unwrap();
         assert!(get(&key, None).await.is_none());
         assert_eq!(indexed_size(&key).await, None);
-        assert_eq!(RESULT_FILES[bucket].read().await.cur_size, before);
+        assert_eq!(unindexed_size(bucket).await, unindexed);
     }
 
     #[tokio::test]
