@@ -256,13 +256,28 @@ describe("UsageView for an org with no bill of its own", () => {
   it("treats a member org as one with no bill, since its super org pays", async () => {
     metering.mockResolvedValue(bill);
     members.mockResolvedValue({ data: [] });
-    membership.mockResolvedValue({ data: { membership: { payer_org_id: "payer" } } });
+    membership.mockResolvedValue({
+      data: { membership: { payer_org_id: "payer", payer_org_name: "Payer Org" } },
+    });
     const wrapper = mount(UsageView, { global: { plugins: [i18n, store] } });
     await flushPromises();
 
     expect(tabs(wrapper)).toEqual([]);
     // Reporting is off, so Overview offers to turn it on instead of reading a stream.
     expect(wrapper.findComponent({ name: "UsageOverview" }).props("details")).toBeNull();
+    // The page says who pays, and where the costs are.
+    expect(wrapper.find('[data-test="billings-usageview-payer"]').text()).toContain(
+      "Billed through Payer Org",
+    );
+  });
+
+  it("names no payer for an org that pays its own bill", async () => {
+    metering.mockResolvedValue(bill);
+    members.mockResolvedValue({ data: [] });
+    const wrapper = mount(UsageView, { global: { plugins: [i18n, store] } });
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="billings-usageview-payer"]').exists()).toBe(false);
   });
 });
 

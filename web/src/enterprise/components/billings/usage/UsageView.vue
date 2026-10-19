@@ -52,6 +52,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OTab name="estimation" :label="t('billing.usageV2.estimationTab')" />
     </OTabs>
 
+    <!-- A member's own page shows usage only, so it says where the costs went. -->
+    <OBanner
+      v-if="payer !== null"
+      variant="info"
+      icon="info"
+      dense
+      data-test="billings-usageview-payer"
+    >
+      {{ t("billing.usageV2.billedThrough", { payer }) }}
+    </OBanner>
+
     <!-- Account-wide, so it sits above every tab as it did on main; same cases and wording as the AI chat notice. -->
     <OBanner
       v-if="aiCreditsMessage"
@@ -249,8 +260,12 @@ const projected = computed(() => projectCycleCost(details.value, lastLoadedAt.va
 /** A super org's orgs, itself first; empty for any other org. */
 const billingOrgs = ref<BillingOrg[]>([]);
 
-/** A member of a super org: its super org pays, so it is shown its usage, not a bill of its own. */
-const isMember = ref(false);
+/**
+ * The super org that pays for this org, when it is a billing-group member: it is shown its usage,
+ * not a bill of its own, and is told who pays. `null` for any other org.
+ */
+const payer = ref<string | null>(null);
+const isMember = computed(() => payer.value !== null);
 
 /**
  * Billed through Stripe: the bill came back and no super org pays it. Every other org, such as
@@ -268,15 +283,16 @@ const usageStreamEnabled = computed<boolean>(
   () => !!store.state?.organizationData?.organizationSettings?.usage_stream_enabled,
 );
 
-/** A failure keeps what is shown, as the org list does. */
-const fetchIsMember = async (): Promise<boolean> => {
+/** The paying org's name, or `null` for an org that is not a member. A failure keeps what is shown, as the org list does. */
+const fetchPayer = async (): Promise<string | null> => {
   try {
     const res = await BillingService.get_billing_group_membership(
       store.state.selectedOrganization.identifier,
     );
-    return !!res?.data?.membership;
+    const membership = res?.data?.membership;
+    return membership ? String(membership.payer_org_name || membership.payer_org_id || "") : null;
   } catch {
-    return isMember.value;
+    return payer.value;
   }
 };
 
@@ -385,19 +401,19 @@ const loadDetails = async () => {
   refreshFailed.value = false;
   try {
     // Published together: the bill alone renders the plain meter view, which then flips to the org view.
-    const [metering, orgs, member] = await Promise.all([
+    const [metering, orgs, payerName] = await Promise.all([
       fetchMetering(),
       fetchBillingOrgs(),
-      fetchIsMember(),
+      fetchPayer(),
     ]);
-    const usageOnly = !metering?.upcoming || member;
+    const usageOnly = !metering?.upcoming || payerName !== null;
     const volumes =
       usageOnly && usageStreamEnabled.value
         ? await fetchVolumes(lastLoadedAt.value !== null)
         : null;
     response.value = metering;
     billingOrgs.value = orgs;
-    isMember.value = member;
+    payer.value = payerName;
     volume.value = volumes;
     lastLoadedAt.value = Date.now();
     loadFailure.value = null;

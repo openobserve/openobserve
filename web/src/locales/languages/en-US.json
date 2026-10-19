@@ -8147,6 +8147,7 @@
       "billedDay": "Billed, day {day} of {total}",
       "segmentTitleDiscounted": "{meter}: {billed} billed ({gross} gross, {discount} discount), {share} of bill",
       "volumeAtRate": "{volume} · {rate}",
+      "billedThrough": "Billed through {payer}. Costs and budgets are on that organization's Usage page.",
       "volumeAtRateBilled": "{volume} · {rate}, billed as {amount} {unit}",
       "percentInParens": "({percent}%)",
       "colGross": "Gross",
