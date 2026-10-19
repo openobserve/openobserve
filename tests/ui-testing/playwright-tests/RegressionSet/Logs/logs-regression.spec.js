@@ -1680,19 +1680,15 @@ test.describe("Logs Regression Bugs", () => {
     await page.waitForTimeout(1000); // Small buffer for Monaco to process field values
     testLogger.info('✅ Auto-search completed, field values cached');
 
-    // Set multi-condition WHERE query with mixed quotes.
-    // The first condition has a properly closed quote: http = 'te'
-    // The second condition has a partial open quote: host = 'te
-    // The hasOpenQuote fix ensures the second condition correctly detects
-    // the opening quote, even though the first condition's quote is closed.
-    const mixedQuoteQuery = `SELECT * FROM "e2e_automate" WHERE http = 'te' AND host = 'te`;
+    // Both fields must exist in e2e_automate, or the open-quote value list is legitimately empty.
+    const mixedQuoteQuery = `SELECT * FROM "e2e_automate" WHERE kubernetes_host = 'ip' AND kubernetes_container_name = 'co`;
     await pm.logsPage.setQueryEditorContent(mixedQuoteQuery);
 
     // Wait for Monaco to process the content
     await page.waitForTimeout(500);
 
     // Verify the query text is set correctly - the full query should be present
-    await pm.logsPage.expectQueryEditorContainsText('host = \'te');
+    await pm.logsPage.expectQueryEditorContainsText('kubernetes_container_name = \'co');
     testLogger.info('✅ Mixed quote query text verified in editor');
 
     // Verify no error states are present (editor should not show errors for this pattern)
@@ -1704,11 +1700,11 @@ test.describe("Logs Regression Bugs", () => {
     testLogger.info('✅ No editor error states for mixed quote pattern');
 
     // SECONDARY CHECK: Trigger Ctrl+Space to open suggestion widget in the
-    // value context of the second condition (after host = 'te).
+    // value context of the second condition (after kubernetes_container_name = 'co).
     // This is the key behavior the hasOpenQuote fix enables: the scoped
     // regex must detect the open quote in the second condition independently
     // from the closed quote in the first condition, so value completions work.
-    // Without the fix, the regex would see the closed quote ('te') from the
+    // Without the fix, the regex would see the closed quote ('ip') from the
     // first condition and fail to detect the open quote in the second.
     testLogger.info('Triggering suggestion widget after partial open quote in second condition...');
     await pm.logsPage.triggerEditorSuggestions();
@@ -1726,6 +1722,9 @@ test.describe("Logs Regression Bugs", () => {
 
     // Verify actual field values are suggested (proving hasOpenQuote fix works)
     expect(result.rowCount).toBeGreaterThan(0);
+    // A row count alone passed on keyword/function rows before #15344; the real value must be offered.
+    expect(result.hasFunctions, 'Functions must not be suggested inside an open quote').toBe(false);
+    expect(result.firstFew.some((t) => t.includes('controller')), `Expected value "controller", got ${JSON.stringify(result.firstFew)}`).toBe(true);
     testLogger.info(`✅ ${result.rowCount} value suggestions in mixed quote context`);
 
     testLogger.info("Test passed: Mixed quote handling verified");
