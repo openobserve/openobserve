@@ -47,8 +47,14 @@ const stored = {
   data: {
     data: {
       budget_config: [
-        { org_id: "total", total_budget_amount: 500 },
-        { org_id: store.state.selectedOrganization.identifier, total_budget_amount: 500 },
+        { org_id: "total", total_budget_amount: 500, warn_at_amount: 400, paused: false },
+        {
+          org_id: store.state.selectedOrganization.identifier,
+          total_budget_amount: 500,
+          warn_at_amount: 400,
+          paused: false,
+        },
+        { org_id: "member-a", total_budget_amount: 100, warn_at_amount: 80, paused: false },
       ],
     },
   },
@@ -100,5 +106,57 @@ describe.each([
     save.vm.$emit("click");
     await flushPromises();
     expect(post).not.toHaveBeenCalled();
+  });
+});
+
+// The budget job emails every admin each hour while spend is at or over the warn line, so $0 is never sent.
+describe("an emptied Warn % field", () => {
+  const savedFor = (orgId: string) =>
+    post.mock.calls[0][1].budget_config.find((c: { org_id: string }) => c.org_id === orgId);
+
+  beforeEach(() => {
+    getSettings.mockReset().mockResolvedValue(stored);
+    post.mockReset().mockResolvedValue({ data: {} });
+  });
+
+  it("keeps the org's warn line at its share when the budget is saved", async () => {
+    const wrapper = mount(UsageBudget, { props: { details }, global: { plugins: [i18n, store] } });
+    await flushPromises();
+
+    byTestId(wrapper, "OInput", "billings-usagebudget-warn-percent").vm.$emit(
+      "update:modelValue",
+      "",
+    );
+    byTestId(wrapper, "OInput", "billings-usagebudget-total").vm.$emit("update:modelValue", 600);
+    await flushPromises();
+    byTestId(wrapper, "OButton", "billings-usagebudget-save").vm.$emit("click");
+    await flushPromises();
+
+    expect(savedFor(store.state.selectedOrganization.identifier)).toMatchObject({
+      total_budget_amount: 600,
+      warn_at_amount: 480,
+    });
+  });
+
+  it("keeps a member's warn line in the super org table", async () => {
+    const wrapper = mount(UsageSuperBudget, {
+      props: { details, billingOrgs },
+      global: { plugins: [i18n, store] },
+    });
+    await flushPromises();
+
+    byTestId(wrapper, "OInput", "billings-usagesuperbudget-warn-member-a").vm.$emit(
+      "update:modelValue",
+      "0",
+    );
+    byTestId(wrapper, "OInput", "billings-usagesuperbudget-budget-member-a").vm.$emit(
+      "update:modelValue",
+      200,
+    );
+    await flushPromises();
+    byTestId(wrapper, "OButton", "billings-usagesuperbudget-save").vm.$emit("click");
+    await flushPromises();
+
+    expect(savedFor("member-a")).toMatchObject({ total_budget_amount: 200, warn_at_amount: 160 });
   });
 });

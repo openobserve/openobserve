@@ -213,6 +213,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :aria-label="t('billing.usageV2.warnPercentFor', { org: row.label })"
                   :data-test="`billings-usagesuperbudget-warn-${row.id}`"
                   @update:model-value="setOrgWarn(row.id, $event)"
+                  @blur="showSaved($event, percentLabel(row.draft))"
                 />
               </div>
               <span
@@ -350,7 +351,7 @@ import {
 import {
   budgetFor,
   budgetStatus,
-  clampPercent,
+  nextWarnPercent,
   draftOf,
   sameBudget,
   superBudgetConfigs,
@@ -455,7 +456,11 @@ const setOrgBudget = (id: string, value: unknown) => {
   if (orgDrafts[id]) orgDrafts[id].budget = toNumber(value);
 };
 const setOrgWarn = (id: string, value: unknown) => {
-  if (orgDrafts[id]) orgDrafts[id].warnPercent = clampPercent(toNumber(value));
+  if (orgDrafts[id]) orgDrafts[id].warnPercent = nextWarnPercent(value, orgDrafts[id].warnPercent);
+};
+/** An entry that was not taken, such as an emptied field, shows the kept value once focus leaves. */
+const showSaved = (event: FocusEvent, value: number) => {
+  (event.target as HTMLInputElement).value = String(value);
 };
 const setOrgAlerts = (id: string, value: unknown) => {
   if (orgDrafts[id]) orgDrafts[id].alertsOn = !!value;

@@ -19,6 +19,7 @@ import {
   budgetStatus,
   configOf,
   draftOf,
+  nextWarnPercent,
   sameBudget,
   superBudgetConfigs,
   TOTAL_BUDGET_ID,
@@ -103,5 +104,16 @@ describe("budgetModel", () => {
       expect(budgetStatus(85, 100, 80)).toBe("warn");
       expect(budgetStatus(120, 100, 80)).toBe("over");
     });
+  });
+
+  // A 0% line is always crossed, and the budget job checks every hour, so it would email all day.
+  it("keeps the current warn percent for an empty field or one under 1%", () => {
+    expect(nextWarnPercent("", 80)).toBe(80);
+    expect(nextWarnPercent(null, 80)).toBe(80);
+    expect(nextWarnPercent("0", 80)).toBe(80);
+    expect(nextWarnPercent(0.5, 80)).toBe(80);
+    expect(nextWarnPercent("abc", 80)).toBe(80);
+    expect(nextWarnPercent("50", 80)).toBe(50);
+    expect(nextWarnPercent(150, 80)).toBe(100);
   });
 });

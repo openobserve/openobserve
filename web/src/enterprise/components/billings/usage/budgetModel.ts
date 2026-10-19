@@ -57,6 +57,15 @@ export function warnPercentFor(amount: number, total: number): number {
   return total > 0 ? clampPercent((amount / total) * 100) : DEFAULT_WARN_PERCENT;
 }
 
+/** Below this, a warn line rounds to $0, which the hourly budget job treats as always crossed. */
+export const MIN_WARN_PERCENT = 1;
+
+/** A typed warn percent; an empty field or one under 1% keeps the current one. */
+export function nextWarnPercent(value: unknown, current: number): number {
+  const n = Number(value);
+  return value !== "" && value != null && n >= MIN_WARN_PERCENT ? clampPercent(n) : current;
+}
+
 export function clampPercent(value: number): number {
   return Number.isFinite(value) ? Math.min(Math.max(value, 0), 100) : 0;
 }

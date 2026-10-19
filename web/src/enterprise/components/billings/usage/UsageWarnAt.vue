@@ -33,6 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :aria-label="t('billing.usageV2.warnPercent')"
           :data-test="`${dataTest}-percent`"
           @update:model-value="setPercent"
+          @blur="showSaved($event, percentLabel)"
         />
       </div>
       <span class="text-text-secondary text-sm" aria-hidden="true">=</span>
@@ -46,6 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :aria-label="t('billing.usageV2.warnAmount')"
           :data-test="`${dataTest}-amount`"
           @update:model-value="setAmount"
+          @blur="showSaved($event, amount)"
         />
       </div>
     </div>
@@ -60,7 +62,7 @@ import { computed } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import { formatCost } from "./meteringModel";
-import { clampPercent, warnAmountFor, warnPercentFor } from "./budgetModel";
+import { nextWarnPercent, warnAmountFor, warnPercentFor } from "./budgetModel";
 
 const props = defineProps<{
   /** The budget the warn line is a share of. */
@@ -78,14 +80,17 @@ const amount = computed(() => warnAmountFor(percent.value, props.budget));
 /** One decimal at most, so 80 reads "80" and a typed dollar amount still shows its share. */
 const percentLabel = computed(() => Math.round(percent.value * 10) / 10);
 
-const toNumber = (value: unknown) => {
-  const n = Number(value);
-  return Number.isFinite(n) && n > 0 ? n : 0;
+/** An entry that was not taken, such as an emptied field, shows the kept value once focus leaves. */
+const showSaved = (event: FocusEvent, value: number) => {
+  (event.target as HTMLInputElement).value = String(value);
 };
+
 const setPercent = (value: unknown) => {
-  percent.value = clampPercent(toNumber(value));
+  percent.value = nextWarnPercent(value, percent.value);
 };
+/** A dollar figure goes through the same rule as a percent, so $0 cannot set a 0% line either. */
 const setAmount = (value: unknown) => {
-  percent.value = warnPercentFor(toNumber(value), props.budget);
+  const share = value === "" || value == null ? 0 : warnPercentFor(Number(value), props.budget);
+  percent.value = nextWarnPercent(share, percent.value);
 };
 </script>
