@@ -877,6 +877,7 @@ onBeforeMount(async () => {
       .then(async (res: any) => {
         await setupEditingReport(res.data);
         originalReportData.value = snapshot();
+        if (query?.step === "destinations") step.value = 3;
       })
       .catch((err) => {
         // Optional chaining throughout: this catch also receives non-HTTP
@@ -1360,6 +1361,12 @@ const goBackToOrigin = useListBackNavigation({
 });
 
 const goToReports = () => {
+  const returnTo = router.currentRoute.value.query.returnTo;
+  // Only an in-app path: a full URL here would make the form an open redirect.
+  if (typeof returnTo === "string" && returnTo.startsWith("/") && !returnTo.startsWith("//")) {
+    router.replace(returnTo);
+    return;
+  }
   const entryFolder = router.currentRoute.value.query.folder;
   // Saving into another folder must land on that folder, not the one the form was opened from.
   if (entryFolder && selectedReportFolderId.value && entryFolder !== selectedReportFolderId.value) {

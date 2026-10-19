@@ -55,7 +55,11 @@ vi.mock("@/services/stream", async (importOriginal) => {
 const { getFieldValuesForSuggestion } = vi.hoisted(() => ({
   getFieldValuesForSuggestion: vi.fn(async () => ["ERROR", "INFO"]),
 }));
-vi.mock("@/composables/fieldValueStore", () => ({ getFieldValuesForSuggestion }));
+vi.mock("@/composables/fieldValueStore", () => ({
+  getFieldValuesForSuggestion,
+  requestFieldValues: vi.fn().mockResolvedValue([]),
+  fieldValuesUnavailable: vi.fn(() => false),
+}));
 
 vi.mock("@/components/QueryEditor.vue", () => ({
   default: {

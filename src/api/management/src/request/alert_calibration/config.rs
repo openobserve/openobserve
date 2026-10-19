@@ -36,7 +36,7 @@ use super::{deployment_disabled, error_response};
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
-        (status = 404, description = "Alert calibration is disabled for this deployment, or the org has no config", content_type = "application/json", body = Object),
+        (status = 404, description = "Alert calibration is disabled for this deployment", content_type = "application/json", body = Object),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = Object),
     )
 )]

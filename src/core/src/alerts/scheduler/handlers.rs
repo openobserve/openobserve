@@ -58,7 +58,9 @@ use crate::{
         },
         derived_streams::DerivedStreamExt,
     },
-    dashboards::reports::SendReport,
+    dashboards::reports::{
+        SendReport, TRIGGER_SOURCE_SCHEDULED, apply_send_result, record_run, run_row,
+    },
     db::{self, alerts::alert::set_without_updating_trigger},
     ingestion::ingestion_service,
     pipeline::batch_execution::ExecutablePipeline,
@@ -4553,15 +4555,39 @@ async fn handle_report_triggers(
         retries: 0,
         ..trigger.clone()
     };
+    // Fills the scheduler's view of the run into a row built from the report.
+    let scheduled_row = |mut row: TriggerData| {
+        row._timestamp = now;
+        row.org = trigger.org.clone();
+        row.next_run_at = now;
+        row.is_realtime = trigger.is_realtime;
+        row.is_silenced = trigger.is_silenced;
+        row.start_time = trigger.start_time.unwrap_or_default();
+        row.end_time = now;
+        row.retries = trigger.retries;
+        row.delay_in_secs = Some(Duration::microseconds(processing_delay).num_seconds());
+        row.scheduler_trace_id = Some(scheduler_trace_id.clone());
+        row.time_in_queue_ms = Some(Duration::microseconds(time_in_queue).num_milliseconds());
+        row.scheduled_for = Some(trigger.next_run_at);
+        row
+    };
 
-    let (_report_folder, mut report) = match db::dashboards::reports::get_by_id(conn, report_id)
-        .await
-    {
+    let (_report_folder, report) = match db::dashboards::reports::get_by_id(conn, report_id).await {
         Ok((folder, report)) => (folder, report),
         Err(e) => {
             log::error!(
                 "[SCHEDULER trace_id {scheduler_trace_id}] Error getting report: org: {org_id}, report name: {report_id}, error: {e}"
             );
+            // A deleted report keeps its id with an empty name so history can show it.
+            publish_triggers_usage(scheduled_row(TriggerData {
+                module: TriggerDataType::Report,
+                key: format!("/{report_id}"),
+                status: RunOutcome::Error,
+                error: Some(e.to_string()),
+                source_node: Some(LOCAL_NODE.name.clone()),
+                trigger_source: Some(TRIGGER_SOURCE_SCHEDULED.to_string()),
+                ..Default::default()
+            }));
             // if trigger max retries is reached, update the next run at
             if trigger.retries + 1 >= max_retries {
                 // next run at is after 5mins
@@ -4582,34 +4608,12 @@ async fn handle_report_triggers(
                 )
                 .await?;
             }
-            publish_triggers_usage(TriggerData {
-                _timestamp: now,
-                org: trigger.org.clone(),
-                module: TriggerDataType::Report,
-                key: format!("/{report_id}"),
-                next_run_at: now,
-                is_realtime: trigger.is_realtime,
-                is_silenced: trigger.is_silenced,
-                status: RunOutcome::Error,
-                start_time: trigger.start_time.unwrap_or_default(),
-                end_time: trigger.end_time.unwrap_or_default(),
-                retries: trigger.retries,
-                error: None,
-                success_response: None,
-                is_partial: None,
-                delay_in_secs: Some(Duration::microseconds(processing_delay).num_seconds()),
-                evaluation_took_in_secs: None,
-                source_node: Some(LOCAL_NODE.name.clone()),
-                query_took: None,
-                scheduler_trace_id: Some(scheduler_trace_id.clone()),
-                time_in_queue_ms: Some(Duration::microseconds(time_in_queue).num_milliseconds()),
-                ..Default::default()
-            });
             return Err(anyhow::anyhow!(
                 "Error getting report: {report_id}, error: {e}"
             ));
         }
     };
+    let base_row = || scheduled_row(run_row(&report, report_id, now));
 
     // The report is fetched by ID alone, so refuse to run one whose org drifted from its trigger.
     if &report.org_id != org_id {
@@ -4617,6 +4621,12 @@ async fn handle_report_triggers(
             "[SCHEDULER trace_id {scheduler_trace_id}] Report {report_id} belongs to org {}, not to its trigger org {org_id}; skipping",
             report.org_id
         );
+        // Published without a last-run write: the report belongs to another org.
+        publish_triggers_usage(TriggerData {
+            status: RunOutcome::Error,
+            error: Some("org mismatch".to_string()),
+            ..base_row()
+        });
         db::scheduler::delete(
             &trigger.org,
             db::scheduler::TriggerModule::Report,
@@ -4638,7 +4648,15 @@ async fn handle_report_triggers(
                 report_name,
                 trigger.org
             );
-            report.enabled = false;
+            record_run(
+                report_id,
+                TriggerData {
+                    status: RunOutcome::Skipped,
+                    error: Some("trial expired, report paused".to_string()),
+                    ..base_row()
+                },
+            )
+            .await;
             if let Err(e) = crate::dashboards::reports::enable(
                 &report.org_id,
                 &_report_folder.folder_id,
@@ -4678,6 +4696,16 @@ async fn handle_report_triggers(
         );
         // update trigger, check on next week
         new_trigger.next_run_at += Duration::try_days(7).unwrap().num_microseconds().unwrap();
+        record_run(
+            report_id,
+            TriggerData {
+                next_run_at: new_trigger.next_run_at,
+                status: RunOutcome::Skipped,
+                error: Some("report disabled".to_string()),
+                ..base_row()
+            },
+        )
+        .await;
         db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
         return Ok(());
     }
@@ -4700,31 +4728,8 @@ async fn handle_report_triggers(
     }
 
     let mut trigger_data_stream = TriggerData {
-        _timestamp: now,
-        org: trigger.org.clone(),
-        module: if report.destinations.is_empty() {
-            TriggerDataType::CachedReport
-        } else {
-            TriggerDataType::Report
-        },
-        key: format!("{report_name}/{report_id}"),
         next_run_at: new_trigger.next_run_at,
-        is_realtime: trigger.is_realtime,
-        is_silenced: trigger.is_silenced,
-        status: RunOutcome::Succeeded,
-        start_time: trigger.start_time.unwrap_or_default(),
-        end_time: trigger.end_time.unwrap_or_default(),
-        retries: trigger.retries,
-        error: None,
-        success_response: None,
-        is_partial: None,
-        delay_in_secs: Some(Duration::microseconds(processing_delay).num_seconds()),
-        evaluation_took_in_secs: None,
-        source_node: Some(LOCAL_NODE.name.clone()),
-        query_took: None,
-        scheduler_trace_id: Some(scheduler_trace_id.clone()),
-        time_in_queue_ms: Some(Duration::microseconds(time_in_queue).num_milliseconds()),
-        ..Default::default()
+        ..base_row()
     };
 
     if trigger.retries >= max_retries {
@@ -4735,10 +4740,25 @@ async fn handle_report_triggers(
             org_id = new_trigger.org,
             report_name = report_name
         );
+        trigger_data_stream.status = RunOutcome::Skipped;
+        trigger_data_stream.error = Some(format!(
+            "max retries ({max_retries}) reached, run not attempted"
+        ));
+        // Not stored as the last run: the failure that exhausted the retries stays on the list.
+        publish_triggers_usage(trigger_data_stream);
         db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
         return Ok(());
     }
-    match report.send_subscribers().await {
+    let started = Instant::now();
+    let result = report.send_subscribers().await;
+    apply_send_result(&mut trigger_data_stream, &result, started);
+    // Published before the trigger update, whose database error would otherwise drop the row.
+    log::debug!(
+        "[SCHEDULER trace_id {scheduler_trace_id}] publish_triggers_usage for report: {}",
+        trigger_data_stream.key
+    );
+    record_run(report_id, trigger_data_stream).await;
+    match result {
         Ok(_) => {
             log::info!(
                 "[SCHEDULER trace_id {scheduler_trace_id}] Report name: {report_name} id: {report_id} sent to destination"
@@ -4779,7 +4799,6 @@ async fn handle_report_triggers(
             log::debug!(
                 "[SCHEDULER trace_id {scheduler_trace_id}] Update trigger for report name: {report_name} id: {report_id}"
             );
-            trigger_data_stream.end_time = now_micros();
         }
         Err(e) => {
             log::error!(
@@ -4791,12 +4810,8 @@ async fn handle_report_triggers(
                 log::debug!(
                     "[SCHEDULER trace_id {scheduler_trace_id}] This report trigger: {org_id}/{report_name} has reached maximum possible retries"
                 );
-                trigger_data_stream.next_run_at = new_trigger.next_run_at;
                 db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
             } else {
-                if run_once {
-                    report.enabled = true;
-                }
                 // Otherwise update its status only
                 db::scheduler::update_status(
                     &new_trigger.org,
@@ -4810,16 +4825,8 @@ async fn handle_report_triggers(
                 )
                 .await?;
             }
-            trigger_data_stream.end_time = now_micros();
-            trigger_data_stream.status = RunOutcome::Error;
-            trigger_data_stream.error = Some(format!("error processing report: {e}"));
         }
     }
-    log::debug!(
-        "[SCHEDULER trace_id {scheduler_trace_id}] publish_triggers_usage for report: {}",
-        trigger_data_stream.key
-    );
-    publish_triggers_usage(trigger_data_stream);
 
     Ok(())
 }

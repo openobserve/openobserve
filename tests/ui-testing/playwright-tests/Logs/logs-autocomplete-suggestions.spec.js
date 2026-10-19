@@ -1245,3 +1245,1178 @@ test.describe("Autocomplete Value Suggestions - Cold Start & TTL", () => {
         testLogger.info('Cold start test completed');
     });
 });
+
+// Key contract matrix: each row reads ZO_EDITOR_SUGGEST_MODE from the page, so this file runs once per mode.
+const QUERY_EDITOR_HOST = '[data-test="logs-search-bar-query-editor"]';
+
+/** The effective ZO_EDITOR_SUGGEST_MODE the browser received in zoConfig. */
+async function getSuggestMode(page) {
+    return await page.evaluate(() => {
+        const app = document.querySelector('#app')?.__vue_app__;
+        const raw = app?.config?.globalProperties?.$store?.state?.zoConfig?.editor_suggest_mode;
+        const value = typeof raw === 'string' ? raw.trim().toLowerCase() : '';
+        return ['automatic', 'typing', 'off'].includes(value) ? value : 'automatic';
+    });
+}
+
+/** Put text in the Logs editor without typing it, caret at the end, editor focused. */
+async function seedEditor(page, text) {
+    await page.waitForFunction((host) => {
+        const el = document.querySelector(host);
+        return !!el && (window.monaco?.editor?.getEditors?.() || []).some((e) => el.contains(e.getDomNode()));
+    }, QUERY_EDITOR_HOST, { timeout: 15000 });
+    await page.evaluate(({ host, value }) => {
+        const el = document.querySelector(host);
+        const ed = window.monaco.editor.getEditors().find((e) => el.contains(e.getDomNode()));
+        ed.focus();
+        ed.setValue(value);
+        const model = ed.getModel();
+        const line = model.getLineCount();
+        ed.setPosition({ lineNumber: line, column: model.getLineMaxColumn(line) });
+        ed.trigger('e2e', 'hideSuggestWidget', {});
+    }, { host: QUERY_EDITOR_HOST, value: text });
+}
+
+/** The query editor's model text (not the rendered view). */
+async function editorText(page) {
+    return await page.evaluate((host) => {
+        const el = document.querySelector(host);
+        const ed = (window.monaco?.editor?.getEditors?.() || []).find((e) => el?.contains(e.getDomNode()));
+        return ed?.getValue?.() ?? '';
+    }, QUERY_EDITOR_HOST).then((text) => text.replace(/\r\n/g, '\n'));
+}
+
+/** The query editor's caret. */
+async function editorCaret(page) {
+    return await page.evaluate((host) => {
+        const el = document.querySelector(host);
+        const ed = (window.monaco?.editor?.getEditors?.() || []).find((e) => el?.contains(e.getDomNode()));
+        const p = ed?.getPosition?.();
+        return p ? { lineNumber: p.lineNumber, column: p.column } : null;
+    }, QUERY_EDITOR_HOST);
+}
+
+/** Visible suggest rows and which one, if any, is highlighted. */
+async function menuState(page) {
+    const widget = page.locator('.monaco-editor .suggest-widget.visible');
+    if (!(await widget.isVisible().catch(() => false))) return { visible: false, rows: [], headers: [], focused: null };
+    const all = await widget.locator('.monaco-list-row').evaluateAll((nodes) =>
+        nodes
+            .map((n) => ({
+                index: Number(n.getAttribute('data-index')),
+                label: (n.getAttribute('aria-label') || n.textContent || '').split(',')[0].trim(),
+                focused: n.classList.contains('focused'),
+                header: !!n.querySelector('.codicon-symbol-folder'),
+            }))
+            .sort((a, b) => a.index - b.index),
+    );
+    // Group header rows are layout, never a choice, so `rows` holds only the rows under them.
+    const rows = all.filter((r) => !r.header);
+    return {
+        visible: true,
+        rows: rows.map((r) => r.label),
+        headers: all.filter((r) => r.header).map((r) => r.label),
+        focused: all.find((r) => r.focused)?.label ?? null,
+        focusedIsHeader: !!all.find((r) => r.focused)?.header,
+    };
+}
+
+/** Wait until a suggest menu is on screen; returns its state. */
+async function waitForMenu(page, timeout = 8000) {
+    await page.locator('.monaco-editor .suggest-widget.visible').waitFor({ state: 'visible', timeout });
+    // Monaco paints rows one frame after the widget becomes visible.
+    await expect.poll(async () => (await menuState(page)).rows.length, { timeout: 3000 }).toBeGreaterThan(0);
+    return await menuState(page);
+}
+
+test.describe("Autocomplete key contract — Enter never inserts from a menu it did not ask for", () => {
+    test.describe.configure({ mode: 'serial' });
+
+    let pm;
+    let mode;
+    const streamName = 'e2e_automate';
+    const orgName = process.env["ORGNAME"] || 'default';
+
+    test.beforeEach(async ({ page }, testInfo) => {
+        testLogger.testStart(testInfo.title, testInfo.file);
+        await navigateToBase(page);
+        pm = new PageManager(page);
+        await page.waitForLoadState('domcontentloaded');
+        await ingestTestData(page);
+        await waitForStreamData(page, streamName, 1).catch(() => {});
+        await page.goto(`${logData.logsUrl}?org_identifier=${orgName}`);
+        await page.waitForLoadState('domcontentloaded');
+        await pm.logsPage.selectStream(streamName);
+        mode = await getSuggestMode(page);
+        testLogger.info(`ZO_EDITOR_SUGGEST_MODE in the browser: ${mode}`);
+    });
+
+    // 07a: a comma opened the catalog with row 1 highlighted, and Enter inserted it.
+    test("Enter after a comma is a newline (07a)", {
+        tag: ['@all', '@autosuggestions', '@logs', '@keycontract']
+    }, async ({ page }) => {
+        test.skip(mode === 'off', 'off is the editor before the fix');
+        await seedEditor(page, `SELECT level`);
+        await page.keyboard.type(',');
+        const menu = await waitForMenu(page);
+        expect(menu.focused, 'a comma menu must open with nothing highlighted').toBeNull();
+        await page.keyboard.press('Enter');
+        expect(await editorText(page)).toBe(`SELECT level,\n`);
+    });
+
+    // 07b: typing the closing quote by hand opened a highlighted catalog.
+    test("Enter after a hand-typed closing quote is a newline (07b)", {
+        tag: ['@all', '@autosuggestions', '@logs', '@keycontract']
+    }, async ({ page }) => {
+        test.skip(mode === 'off', 'off is the editor before the fix');
+        await seedEditor(page, `SELECT * FROM "${streamName}" WHERE level = 'error`);
+        await page.keyboard.type("'");
+        const text = await editorText(page);
+        const menu = await menuState(page);
+        if (menu.visible) expect(menu.focused).toBeNull();
+        await page.keyboard.press('Enter');
+        expect(await editorText(page)).toBe(`${text}\n`);
+    });
+
+    // 07c: an auto menu whose row equals the typed word swallowed Enter.
+    test("Enter after a whole word in GROUP BY is a newline (07c)", {
+        tag: ['@all', '@autosuggestions', '@logs', '@keycontract']
+    }, async ({ page }) => {
+        test.skip(mode === 'off', 'off is the editor before the fix');
+        await seedEditor(page, `SELECT level, count(*) FROM "${streamName}" GROUP BY lev`);
+        await page.keyboard.type('el');
+        await waitForMenu(page).catch(() => null);
+        await page.keyboard.press('Enter');
+        expect(await editorText(page)).toBe(`SELECT level, count(*) FROM "${streamName}" GROUP BY level\n`);
+    });
+
+    // 07d: a space after a value opened the catalog with row 1 highlighted.
+    test("Enter after a typed space is a newline (07d)", {
+        tag: ['@all', '@autosuggestions', '@logs', '@keycontract']
+    }, async ({ page }) => {
+        test.skip(mode === 'off', 'off is the editor before the fix');
+        await seedEditor(page, `SELECT * FROM "${streamName}" WHERE level = 'error'`);
+        await page.keyboard.type(' ');
+        const menu = await waitForMenu(page);
+        expect(menu.focused, 'a typed-space menu must open with nothing highlighted').toBeNull();
+        await page.keyboard.press('Enter');
+        expect(await editorText(page)).toBe(`SELECT * FROM "${streamName}" WHERE level = 'error' \n`);
+    });
+
+    test("Tab indents when no menu is open", {
+        tag: ['@all', '@autosuggestions', '@logs', '@keycontract']
+    }, async ({ page }) => {
+        await seedEditor(page, `SELECT *`);
+        await page.keyboard.press('Escape');
+        await page.keyboard.press('Tab');
+        expect(await editorText(page)).toMatch(/^SELECT \*[ \t]+$/);
+    });
+
+    // P0-4: a value position offers values (or an honest status row), never the catalog.
+    test("a space after = opens values with no quote typed, and no functions", {
+        tag: ['@all', '@autosuggestions', '@logs', '@keycontract', '@values']
+    }, async ({ page }) => {
+        await seedEditor(page, `SELECT * FROM "${streamName}" WHERE level =`);
+        await page.keyboard.type(' ');
+        const menu = await waitForMenu(page);
+        if (mode !== 'off') expect(menu.focused, 'a typed-space menu opens unhighlighted').toBeNull();
+        for (const notAValue of ['match_all', 'count', 'SELECT', 'AND']) {
+            expect(menu.rows, `${notAValue} offered in a value position`).not.toContain(notAValue);
+        }
+    });
+
+    test("a bare = 50 keeps value help", {
+        tag: ['@all', '@autosuggestions', '@logs', '@values']
+    }, async ({ page }) => {
+        await seedEditor(page, `SELECT * FROM "${streamName}" WHERE code = `);
+        await page.keyboard.type('5');
+        const menu = await waitForMenu(page).catch(() => ({ visible: false, rows: [] }));
+        for (const notAValue of ['match_all', 'count', 'SELECT']) {
+            expect(menu.rows, `${notAValue} offered after = 5`).not.toContain(notAValue);
+        }
+    });
+
+    test("ILIKE ' offers values or nothing, never fields", {
+        tag: ['@all', '@autosuggestions', '@logs', '@values']
+    }, async ({ page }) => {
+        await seedEditor(page, `SELECT * FROM "${streamName}" WHERE level ILIKE `);
+        await page.keyboard.type("'");
+        const menu = await waitForMenu(page).catch(() => ({ visible: false, rows: [] }));
+        for (const field of ['code', 'log', 'kubernetes_pod_name', 'level']) {
+            expect(menu.rows, `field ${field} offered inside a string`).not.toContain(field);
+        }
+        if (menu.rows.length) {
+            await page.keyboard.press('Tab');
+            const text = await editorText(page);
+            expect(text, 'an ILIKE value is inserted as a complete pattern').toMatch(/ILIKE '(%.*%')?/);
+        }
+    });
+
+    test("a Utf8 value that looks numeric is quoted", {
+        tag: ['@all', '@autosuggestions', '@logs', '@values', '@quoting']
+    }, async ({ page }) => {
+        await seedEditor(page, `SELECT * FROM "${streamName}" WHERE kubernetes_labels_app_kubernetes_io_version = `);
+        await page.keyboard.press('Control+Space');
+        const menu = await waitForMenu(page).catch(() => ({ visible: false, rows: [] }));
+        // The label shows the inserted form, so a quoted Utf8 value reads '1.2' in the menu.
+        test.skip(!menu.rows.some((r) => /^'?[0-9.]+'?$/.test(r)), 'no numeric-looking value captured for this field');
+        const row = menu.rows.findIndex((r) => /^'?[0-9.]+'?$/.test(r));
+        for (let i = 0; i < row; i++) await page.keyboard.press('ArrowDown');
+        await page.keyboard.press('Enter');
+        expect(await editorText(page)).toMatch(/= '[0-9.]+'/);
+    });
+
+    test("IS N then Enter writes IS NULL, never ORDER BY's NULLS FIRST", {
+        tag: ['@all', '@autosuggestions', '@logs', '@keycontract']
+    }, async ({ page }) => {
+        const prefix = `SELECT * FROM "${streamName}" WHERE level IS`;
+        await seedEditor(page, prefix);
+        await page.keyboard.type(' N');
+        const menu = await waitForMenu(page);
+        expect(menu.rows.slice(0, 2)).toEqual(['IS NULL', 'IS NOT NULL']);
+        await page.keyboard.press('Enter');
+        await expect.poll(() => editorText(page)).toBe(`SELECT * FROM "${streamName}" WHERE level IS NULL`);
+    });
+
+    test("typed letters still highlight row 1 and Enter accepts it", {
+        tag: ['@all', '@autosuggestions', '@logs', '@keycontract']
+    }, async ({ page }) => {
+        await seedEditor(page, `SELECT * FROM "${streamName}" WHERE `);
+        await page.keyboard.type('lev');
+        const menu = await waitForMenu(page);
+        expect(menu.focused, 'a menu opened by typing letters keeps row 1 highlighted').not.toBeNull();
+        await page.keyboard.press('Enter');
+        expect(await editorText(page)).toContain('WHERE level');
+    });
+
+    const escapeRe = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const NOT_VALUES = ['match_all', 'count', 'cast_to_arr'];
+
+    /** The first two quoted values the level column offers, or null when fewer were captured. */
+    async function levelValues(page) {
+        await seedEditor(page, `SELECT * FROM "${streamName}" WHERE level IN (`);
+        await page.keyboard.type("'");
+        // The typed quote's menu is reopened highlighted, so read it once the values have landed.
+        let quoted = [];
+        await expect.poll(async () => {
+            quoted = (await menuState(page)).rows.filter((r) => /^'.+'$/.test(r));
+            return quoted.length;
+        }, { timeout: 10000 }).toBeGreaterThanOrEqual(2).catch(() => {});
+        return quoted.length >= 2 ? quoted : null;
+    }
+
+    test("a comma inside IN opens values for the IN field, unhighlighted, without the ones chosen", {
+        tag: ['@all', '@autosuggestions', '@logs', '@keycontract', '@values', '@inlist']
+    }, async ({ page }) => {
+        const values = await levelValues(page);
+        test.skip(!values, 'fewer than two level values captured');
+        await seedEditor(page, `SELECT * FROM "${streamName}" WHERE level IN (${values[0]}`);
+        await page.keyboard.type(',');
+        const menu = await waitForMenu(page, 10000);
+        if (mode !== 'off') expect(menu.focused).toBeNull();
+        for (const notAValue of [...NOT_VALUES, values[0]]) expect(menu.rows).not.toContain(notAValue);
+        expect(menu.rows.some((r) => /^'.+'$/.test(r))).toBe(true);
+    });
+
+    test("a bare letter after an IN comma offers quoted values, and Enter replaces the letter", {
+        tag: ['@all', '@autosuggestions', '@logs', '@keycontract', '@values', '@inlist']
+    }, async ({ page }) => {
+        const values = await levelValues(page);
+        test.skip(!values, 'fewer than two level values captured');
+        const prefix = `SELECT * FROM "${streamName}" WHERE level IN (${values[0]},`;
+        await seedEditor(page, prefix);
+        await page.keyboard.type(values[1][1]);
+        const menu = await waitForMenu(page, 10000);
+        expect(menu.rows[0]).toMatch(/^'/);
+        await page.keyboard.press('Enter');
+        expect(await editorText(page)).toMatch(new RegExp(`^${escapeRe(prefix)}'[^']+'$`));
+    });
+
+    test("NOT IN continues the same way", {
+        tag: ['@all', '@autosuggestions', '@logs', '@keycontract', '@values', '@inlist']
+    }, async ({ page }) => {
+        const values = await levelValues(page);
+        test.skip(!values, 'fewer than two level values captured');
+        const prefix = `SELECT * FROM "${streamName}" WHERE level NOT IN (${values[0]},`;
+        await seedEditor(page, prefix);
+        await page.keyboard.type(values[1][1]);
+        const menu = await waitForMenu(page, 10000);
+        expect(menu.rows[0]).toMatch(/^'/);
+        expect(menu.rows).not.toContain(values[0]);
+    });
+
+    test("a numeric IN list offers bare numbers", {
+        tag: ['@all', '@autosuggestions', '@logs', '@keycontract', '@values', '@inlist']
+    }, async ({ page }) => {
+        await seedEditor(page, `SELECT * FROM "${streamName}" WHERE code IN (`);
+        await page.keyboard.type(' ');
+        const first = await waitForMenu(page, 10000).catch(() => ({ rows: [] }));
+        const numbers = first.rows.filter((r) => /^\d+$/.test(r));
+        test.skip(numbers.length < 2, 'fewer than two code values captured');
+        const prefix = `SELECT * FROM "${streamName}" WHERE code IN (${numbers[0]}, `;
+        await seedEditor(page, prefix);
+        await page.keyboard.press('Control+Space');
+        const menu = await waitForMenu(page, 10000);
+        expect(menu.rows.some((r) => /^\d+$/.test(r))).toBe(true);
+        expect(menu.rows.some((r) => /^'/.test(r))).toBe(false);
+        expect(menu.rows).not.toContain(numbers[0]);
+        await page.keyboard.press('Enter');
+        expect(await editorText(page)).toMatch(new RegExp(`^${escapeRe(prefix)}\\d+$`));
+    });
+
+    test("a function row shows its signature after the name, not in the type column", {
+        tag: ['@all', '@autosuggestions', '@logs', '@keycontract']
+    }, async ({ page }) => {
+        await seedEditor(page, `SELECT * FROM "${streamName}" WHERE `);
+        await page.keyboard.type('cast_to_a');
+        await waitForMenu(page);
+        const row = page.locator('.monaco-editor .suggest-widget.visible .monaco-list-row', { hasText: 'cast_to_arr' }).first();
+        await expect(row.locator('.signature-label')).toHaveText('(field)');
+        await expect(row.locator('.details-label')).toHaveText('');
+    });
+});
+
+// The off switch must hold even when the editor mounts before the authenticated config arrives.
+test.describe("Autocomplete key contract — the mode is known before the full config", () => {
+    const streamName = 'e2e_automate';
+    const orgName = process.env["ORGNAME"] || 'default';
+
+    test("with /api/*/config held back 2 s, off still gives today's editor", {
+        tag: ['@all', '@autosuggestions', '@logs', '@keycontract']
+    }, async ({ page }) => {
+        await navigateToBase(page);
+        await page.route('**/api/*/config', async (route) => {
+            await new Promise((r) => setTimeout(r, 2000));
+            await route.continue();
+        });
+        await page.goto(`${logData.logsUrl}?org_identifier=${orgName}`);
+        await seedEditor(page, `SELECT * FROM "${streamName}" WHERE `);
+        const mode = await getSuggestMode(page);
+        test.skip(mode !== 'off', 'this row is for ZO_EDITOR_SUGGEST_MODE=off');
+        const options = await page.evaluate((host) => {
+            const el = document.querySelector(host);
+            const ed = window.monaco.editor.getEditors().find((e) => el.contains(e.getDomNode()));
+            const raw = ed.getRawOptions();
+            return { selectionMode: raw.suggest?.selectionMode, enter: raw.acceptSuggestionOnEnter };
+        }, QUERY_EDITOR_HOST);
+        expect(options).toEqual({ selectionMode: 'always', enter: 'on' });
+        await seedEditor(page, `SELECT level`);
+        await page.keyboard.type(',');
+        const menu = await waitForMenu(page);
+        expect(menu.focused, 'off keeps row 1 highlighted, as today').not.toBeNull();
+        await page.keyboard.press('Tab');
+        const text = await editorText(page);
+        expect(text.startsWith('SELECT level,') && text.length > 'SELECT level,'.length, `Tab accepted row 1: ${text}`).toBe(true);
+        expect(text).toContain(menu.focused);
+    });
+});
+
+test.describe("Autocomplete key contract — chained menus (Automatic)", () => {
+    test.describe.configure({ mode: 'serial' });
+
+    let pm;
+    let mode;
+    const streamName = 'e2e_automate';
+    const orgName = process.env["ORGNAME"] || 'default';
+    const WHERE = `SELECT * FROM "${streamName}" WHERE `;
+
+    test.beforeEach(async ({ page }, testInfo) => {
+        testLogger.testStart(testInfo.title, testInfo.file);
+        await navigateToBase(page);
+        pm = new PageManager(page);
+        await page.waitForLoadState('domcontentloaded');
+        await ingestTestData(page);
+        await waitForStreamData(page, streamName, 1).catch(() => {});
+        await page.goto(`${logData.logsUrl}?org_identifier=${orgName}`);
+        await page.waitForLoadState('domcontentloaded');
+        await pm.logsPage.selectStream(streamName);
+        mode = await getSuggestMode(page);
+    });
+
+    /** Type `lev`, accept `level` with Tab, and wait for the chained operator menu. */
+    async function chainToOperators(page) {
+        await seedEditor(page, WHERE);
+        await page.keyboard.type('lev');
+        await waitForMenu(page);
+        await page.keyboard.press('Tab');
+        await expect.poll(() => editorText(page)).toBe(`${WHERE}level `);
+        return await waitForMenu(page);
+    }
+
+    test("Tab on a field opens operators, nothing highlighted, = first", {
+        tag: ['@all', '@autosuggestions', '@logs', '@keycontract', '@chain']
+    }, async ({ page }) => {
+        test.skip(mode !== 'automatic', 'only Automatic chains');
+        const menu = await chainToOperators(page);
+        expect(menu.focused).toBeNull();
+        expect(menu.rows[0]).toBe('=');
+    });
+
+    test("the chained menu opens with the Operators header over =, and Tab writes =", {
+        tag: ['@all', '@autosuggestions', '@logs', '@keycontract', '@chain']
+    }, async ({ page }) => {
+        test.skip(mode !== 'automatic', 'only Automatic chains');
+        const menu = await chainToOperators(page);
+        expect(menu.headers[0]).toBe('Operators');
+        expect(menu.rows[0]).toBe('=');
+        expect(menu.rows.findIndex((r) => r.startsWith('str_match')), 'match functions sort below the plain operators')
+            .toBeGreaterThan(menu.rows.indexOf('='));
+        await page.keyboard.press('Tab');
+        await expect.poll(() => editorText(page)).toBe(`${WHERE}level = `);
+    });
+
+    test("a match-function row still rewrites the field", {
+        tag: ['@all', '@autosuggestions', '@logs', '@keycontract', '@chain']
+    }, async ({ page }) => {
+        test.skip(mode !== 'automatic', 'only Automatic chains');
+        await chainToOperators(page);
+        await page.keyboard.type('str');
+        await waitForMenu(page);
+        await page.keyboard.press('Tab');
+        await expect.poll(() => editorText(page)).toBe(`${WHERE}str_match(level, '')`);
+    });
+
+    test("after a wrap, undo then redo puts the caret back between the quotes (F3)", {
+        tag: ['@all', '@autosuggestions', '@logs', '@keycontract', '@chain']
+    }, async ({ page }) => {
+        test.skip(mode !== 'automatic', 'only Automatic chains');
+        await chainToOperators(page);
+        await page.keyboard.type('str');
+        await waitForMenu(page);
+        await page.keyboard.press('Tab');
+        const wrapped = `${WHERE}str_match(level, '')`;
+        await expect.poll(() => editorText(page)).toBe(wrapped);
+        const inQuotes = { lineNumber: 1, column: `${WHERE}str_match(level, '`.length + 1 };
+        expect(await editorCaret(page)).toEqual(inQuotes);
+        // Monaco picks its undo keys from the user agent, which the Desktop Chrome device sets to Windows.
+        const mod = await page.evaluate(() => (/Macintosh/.test(navigator.userAgent) ? 'Meta' : 'Control'));
+        await page.keyboard.press('Escape');
+        await page.keyboard.press(`${mod}+z`);
+        await expect.poll(() => editorText(page)).not.toBe(wrapped);
+        await page.keyboard.press(`${mod}+Shift+z`);
+        await expect.poll(() => editorText(page)).toBe(wrapped);
+        expect(await editorCaret(page)).toEqual(inQuotes);
+    });
+
+    for (const [clause, prefix, fieldText] of [
+        ['HAVING', `SELECT level, count(*) AS n FROM "${streamName}" GROUP BY level HAVING `, 'level'],
+        ['ON', `SELECT * FROM "${streamName}" a JOIN "${streamName}" b ON a.`, 'level'],
+    ]) {
+        test(`a field after ${clause} chains like one in WHERE`, {
+            tag: ['@all', '@autosuggestions', '@logs', '@keycontract', '@chain']
+        }, async ({ page }) => {
+            await seedEditor(page, prefix);
+            await page.keyboard.type('lev');
+            await waitForMenu(page);
+            await page.keyboard.press('Tab');
+            if (mode !== 'automatic') {
+                expect(await editorText(page)).toBe(`${prefix}${fieldText}`);
+                return;
+            }
+            await expect.poll(() => editorText(page)).toBe(`${prefix}${fieldText} `);
+            const menu = await waitForMenu(page);
+            expect(menu.focused).toBeNull();
+            expect(menu.rows[0]).toBe('=');
+        });
+    }
+
+    for (const [typed, field] of [['=', 'level'], ['>=', 'code']]) {
+        test(`typing ${typed} straight after a field opens values (P0-2)`, {
+            tag: ['@all', '@autosuggestions', '@logs', '@keycontract', '@values']
+        }, async ({ page }) => {
+            await seedEditor(page, `${WHERE}${field}`);
+            await page.keyboard.type(typed);
+            if (mode === 'off') {
+                await page.waitForTimeout(1200);
+                const menu = await menuState(page);
+                expect(menu.focused === null || !menu.visible, 'off opens no new highlighted menu on =').toBe(true);
+                return;
+            }
+            const menu = await waitForMenu(page, 5000);
+            expect(menu.focused, 'opened by a trigger character, so unhighlighted').toBeNull();
+            for (const notAValue of ['match_all', 'count', 'SELECT']) {
+                expect(menu.rows).not.toContain(notAValue);
+            }
+        });
+    }
+
+    test("Enter on a chained operator menu is a newline", {
+        tag: ['@all', '@autosuggestions', '@logs', '@keycontract', '@chain']
+    }, async ({ page }) => {
+        test.skip(mode !== 'automatic', 'only Automatic chains');
+        await chainToOperators(page);
+        await page.keyboard.press('Enter');
+        expect(await editorText(page)).toBe(`${WHERE}level \n`);
+    });
+
+    test("Esc closes a chained menu and leaves the text", {
+        tag: ['@all', '@autosuggestions', '@logs', '@keycontract', '@chain']
+    }, async ({ page }) => {
+        test.skip(mode !== 'automatic', 'only Automatic chains');
+        await chainToOperators(page);
+        await page.keyboard.press('Escape');
+        await expect.poll(async () => (await menuState(page)).visible).toBe(false);
+        expect(await editorText(page)).toBe(`${WHERE}level `);
+    });
+
+    test("typing goes through a chained menu", {
+        tag: ['@all', '@autosuggestions', '@logs', '@keycontract', '@chain']
+    }, async ({ page }) => {
+        test.skip(mode !== 'automatic', 'only Automatic chains');
+        await chainToOperators(page);
+        await page.keyboard.type('!=');
+        expect(await editorText(page)).toBe(`${WHERE}level !=`);
+    });
+
+    test("Tab, Tab, e, Tab from lev writes level = '…e…'", {
+        tag: ['@all', '@autosuggestions', '@logs', '@keycontract', '@chain']
+    }, async ({ page }) => {
+        test.skip(mode !== 'automatic', 'only Automatic chains');
+        await chainToOperators(page);
+        await page.keyboard.press('Tab');
+        await expect.poll(() => editorText(page)).toBe(`${WHERE}level = `);
+        const values = await waitForMenu(page, 10000);
+        expect(values.focused, 'the chained value menu opens unhighlighted').toBeNull();
+        test.skip(!values.rows.some((r) => /e/i.test(r) && !/values/i.test(r)), 'no level value with an e captured');
+        await page.keyboard.type('e');
+        await waitForMenu(page);
+        await page.keyboard.press('Tab');
+        expect(await editorText(page)).toMatch(new RegExp(`level = '[^']*e[^']*'$`, 'i'));
+    });
+
+    test("a field in SELECT, GROUP BY or ORDER BY does not chain", {
+        tag: ['@all', '@autosuggestions', '@logs', '@keycontract', '@chain']
+    }, async ({ page }) => {
+        for (const prefix of ['SELECT ', `SELECT count(*) FROM "${streamName}" GROUP BY `, `SELECT * FROM "${streamName}" ORDER BY `]) {
+            await seedEditor(page, prefix);
+            await page.keyboard.type('lev');
+            await waitForMenu(page);
+            await page.keyboard.press('Tab');
+            expect(await editorText(page), prefix).toBe(`${prefix}level`);
+        }
+    });
+
+    test("Enter right after an opening quote takes the highlighted first value and closes the quote", {
+        tag: ['@all', '@autosuggestions', '@logs', '@keycontract']
+    }, async ({ page }) => {
+        test.skip(mode === 'off', 'off is the editor before the fix');
+        await seedEditor(page, `${WHERE}level = `);
+        await page.keyboard.type("'");
+        const menu = await waitForMenu(page, 10000).catch(() => null);
+        test.skip(!menu, 'no level values captured');
+        await expect.poll(async () => (await menuState(page)).focused, { timeout: 2000 }).toBe(menu.rows[0]);
+        await page.keyboard.press('Enter');
+        expect(await editorText(page)).toBe(`${WHERE}level = ${menu.rows[0]}`);
+    });
+
+    test("no menu opens inside a -- comment", {
+        tag: ['@all', '@autosuggestions', '@logs', '@keycontract']
+    }, async ({ page }) => {
+        await seedEditor(page, `-- show me errors`);
+        await page.keyboard.type(' ');
+        await page.keyboard.type(',');
+        await expect.poll(async () => (await menuState(page)).visible, { timeout: 1500 }).toBe(false);
+        await page.waitForTimeout(500);
+        expect((await menuState(page)).visible, 'a comment never gets a menu').toBe(false);
+    });
+
+    test("a value fetch slower than the budget shows one row that inserts nothing", {
+        tag: ['@all', '@autosuggestions', '@logs', '@keycontract', '@values']
+    }, async ({ page }) => {
+        await clearIndexedDB(page);
+        await page.route((url) => url.toString().includes('/_values?'), async (route) => {
+            await new Promise((r) => setTimeout(r, 3000));
+            await route.continue();
+        });
+        const request = page.waitForRequest((r) => r.url().includes('/_values?'), { timeout: 5000 });
+        await seedEditor(page, `${WHERE}method =`);
+        await page.keyboard.type(' ');
+        await request;
+        if (mode === 'off') {
+            // A highlighted menu never shows a row that inserts nothing, because Enter would take it.
+            await page.waitForTimeout(1500);
+            expect((await menuState(page)).rows.some((r) => /still loading/i.test(r))).toBe(false);
+        } else {
+            const menu = await waitForMenu(page, 5000);
+            expect(menu.rows).toHaveLength(1);
+            expect(menu.rows[0]).toMatch(/still loading/i);
+        }
+        await page.keyboard.press('Enter');
+        expect(await editorText(page)).toBe(`${WHERE}method = \n`);
+    });
+
+    test("Esc during a slow value fetch: the values never pop up", {
+        tag: ['@all', '@autosuggestions', '@logs', '@keycontract', '@values']
+    }, async ({ page }) => {
+        await clearIndexedDB(page);
+        await page.route((url) => url.toString().includes('/_values?'), async (route) => {
+            await new Promise((r) => setTimeout(r, 600));
+            await route.continue();
+        });
+        const request = page.waitForRequest((r) => r.url().includes('/_values?'), { timeout: 5000 });
+        await seedEditor(page, `${WHERE}stream =`);
+        await page.keyboard.type(' ');
+        await request;
+        await page.keyboard.press('Escape');
+        await page.waitForTimeout(1500);
+        expect((await menuState(page)).visible, 'values appeared after Esc').toBe(false);
+    });
+
+    test("← during a slow value fetch drops the answer", {
+        tag: ['@all', '@autosuggestions', '@logs', '@keycontract', '@values']
+    }, async ({ page }) => {
+        await clearIndexedDB(page);
+        await page.route((url) => url.toString().includes('/_values?'), async (route) => {
+            await new Promise((r) => setTimeout(r, 600));
+            await route.continue();
+        });
+        const request = page.waitForRequest((r) => r.url().includes('/_values?'), { timeout: 5000 });
+        await seedEditor(page, `${WHERE}stream =`);
+        await page.keyboard.type(' ');
+        await request;
+        await page.keyboard.press('ArrowLeft');
+        await page.waitForTimeout(1500);
+        expect((await menuState(page)).visible, 'values appeared after the caret moved away').toBe(false);
+    });
+
+    test("typing forward during a slow value fetch keeps the values", {
+        tag: ['@all', '@autosuggestions', '@logs', '@keycontract', '@values']
+    }, async ({ page }) => {
+        await clearIndexedDB(page);
+        await page.route((url) => url.toString().includes('/_values?'), async (route) => {
+            // Well under the 1000 ms budget, so the answer is pending, not past it.
+            await new Promise((r) => setTimeout(r, 300));
+            await route.continue();
+        });
+        const request = page.waitForRequest((r) => r.url().includes('/_values?'), { timeout: 5000 });
+        await seedEditor(page, `${WHERE}stream =`);
+        await page.keyboard.type(' ');
+        await request;
+        await page.keyboard.type("'s");
+        const menu = await waitForMenu(page, 5000);
+        expect(menu.rows.some((r) => /^'?std/.test(r)), `values kept: ${menu.rows.join(', ')}`).toBe(true);
+    });
+
+    test("typing forward past the budget shows that values are still loading (R5)", {
+        tag: ['@all', '@autosuggestions', '@logs', '@keycontract', '@values']
+    }, async ({ page }) => {
+        test.skip(mode === 'off', 'off is the editor before the fix');
+        await clearIndexedDB(page);
+        await page.route((url) => url.toString().includes('/_values?'), async (route) => {
+            await new Promise((r) => setTimeout(r, 4000));
+            await route.continue();
+        });
+        const request = page.waitForRequest((r) => r.url().includes('/_values?'), { timeout: 5000 });
+        await seedEditor(page, `${WHERE}stream =`);
+        await page.keyboard.type(' ');
+        await request;
+        await page.keyboard.type("'s");
+        // Monaco renders the hint's spaces as non-breaking spaces.
+        await expect(page.locator('.monaco-editor .o2-suggest-inline-hint').first()).toHaveText(/still\sloading/i, { timeout: 3000 });
+    });
+
+    for (const [name, typed, expected] of [
+        ['a space', ' ', ' '],
+        ['=', '=', '='],
+        ['Enter', null, '\n'],
+    ]) {
+        test(`Enter-accept a field, then ${name}`, {
+            tag: ['@all', '@autosuggestions', '@logs', '@keycontract', '@chain']
+        }, async ({ page }) => {
+            await seedEditor(page, WHERE);
+            await page.keyboard.type('lev');
+            await waitForMenu(page);
+            await page.keyboard.press('Enter');
+            if (typed) await page.keyboard.type(typed);
+            else await page.keyboard.press('Enter');
+            const chainSpace = mode === 'automatic' ? ' ' : '';
+            // The chain's space already stands for the one typed right after it.
+            const typedAfter = mode === 'automatic' && typed === ' ' ? '' : expected;
+            expect(await editorText(page)).toBe(`${WHERE}level${chainSpace}${typedAfter}`);
+        });
+    }
+});
+
+// Spike 4's scenario matrix in the real editor: no key or click ever lands on a group header.
+test.describe("Autocomplete group headers — never a target", () => {
+    test.describe.configure({ mode: 'serial' });
+    const streamName = 'e2e_automate';
+    const orgName = process.env["ORGNAME"] || 'default';
+    const WHERE = `SELECT * FROM "${streamName}" WHERE `;
+    let mode;
+
+    test.beforeEach(async ({ page }, testInfo) => {
+        testLogger.testStart(testInfo.title, testInfo.file);
+        await navigateToBase(page);
+        const pm = new PageManager(page);
+        await ingestTestData(page);
+        await waitForStreamData(page, streamName, 1).catch(() => {});
+        await page.goto(`${logData.logsUrl}?org_identifier=${orgName}`);
+        await page.waitForLoadState('domcontentloaded');
+        await pm.logsPage.selectStream(streamName);
+        mode = await getSuggestMode(page);
+        test.skip(mode === 'off', 'off keeps the flat menus');
+    });
+
+    /** The value menu for level, opened by a typed space; null when fewer than two level values were captured. */
+    async function valueMenu(page) {
+        await seedEditor(page, `${WHERE}level =`);
+        await page.keyboard.type(' ');
+        const menu = await waitForMenu(page, 10000).catch(() => null);
+        // Only the captured data decides a skip, so a menu that lost its headers fails the header assertions.
+        return menu && menu.rows.filter((r) => /^'/.test(r)).length >= 2 ? menu : null;
+    }
+    const undoKey = (page) => page.evaluate(() => (/Macintosh/.test(navigator.userAgent) ? 'Meta' : 'Control'));
+
+    test("the value menu opens unhighlighted, values first and then fields", {
+        tag: ['@all', '@autosuggestions', '@logs', '@headers']
+    }, async ({ page }) => {
+        const menu = await valueMenu(page);
+        test.skip(!menu, 'fewer than two level values captured');
+        // Monaco renders only the rows in view, so the Functions header below the fields may not be in the DOM yet.
+        expect(menu.headers.slice(0, 2)).toEqual(['Values · recent', 'Fields']);
+        expect(menu.focused).toBeNull();
+    });
+
+    test("Tab, Tab, Tab from a field prefix writes a whole predicate", {
+        tag: ['@all', '@autosuggestions', '@logs', '@headers', '@chain']
+    }, async ({ page }) => {
+        test.skip(mode !== 'automatic', 'only Automatic chains');
+        await seedEditor(page, WHERE);
+        await page.keyboard.type('lev');
+        await waitForMenu(page);
+        await page.keyboard.press('Tab');
+        await expect.poll(() => editorText(page)).toBe(`${WHERE}level `);
+        await waitForMenu(page);
+        await page.keyboard.press('Tab');
+        await expect.poll(() => editorText(page)).toBe(`${WHERE}level = `);
+        const values = await waitForMenu(page, 10000);
+        test.skip(!values.rows.some((r) => /^'/.test(r)), 'no level value captured');
+        await page.keyboard.press('Tab');
+        await expect.poll(() => editorText(page)).toBe(`${WHERE}level = ${values.rows[0]}`);
+    });
+
+    test("Tab on a header-first menu takes the first real row", {
+        tag: ['@all', '@autosuggestions', '@logs', '@headers']
+    }, async ({ page }) => {
+        const menu = await valueMenu(page);
+        test.skip(!menu, 'fewer than two level values captured');
+        await page.keyboard.press('Tab');
+        await expect.poll(() => editorText(page)).toBe(`${WHERE}level = ${menu.rows[0]}`);
+    });
+
+    test("↓↓ then Enter takes the second value, never a header", {
+        tag: ['@all', '@autosuggestions', '@logs', '@headers']
+    }, async ({ page }) => {
+        const menu = await valueMenu(page);
+        test.skip(!menu, 'fewer than two level values captured');
+        await page.keyboard.press('ArrowDown');
+        await expect.poll(async () => (await menuState(page)).focused).toBe(menu.rows[0]);
+        await page.keyboard.press('ArrowDown');
+        await expect.poll(async () => (await menuState(page)).focused).toBe(menu.rows[1]);
+        await page.keyboard.press('Enter');
+        await expect.poll(() => editorText(page)).toBe(`${WHERE}level = ${menu.rows[1]}`);
+    });
+
+    test("↑ on the first value stays on it, and PageDown/PageUp never stop on a header", {
+        tag: ['@all', '@autosuggestions', '@logs', '@headers']
+    }, async ({ page }) => {
+        const menu = await valueMenu(page);
+        test.skip(!menu, 'fewer than two level values captured');
+        await page.keyboard.press('ArrowDown');
+        await page.keyboard.press('ArrowUp');
+        await expect.poll(async () => (await menuState(page)).focused).toBe(menu.rows[0]);
+        for (const key of ['PageDown', 'PageUp', 'PageUp']) {
+            await page.keyboard.press(key);
+            await page.waitForTimeout(150);
+            expect((await menuState(page)).focusedIsHeader, key).toBe(false);
+        }
+    });
+
+    test("Ctrl+Space on the open menu then Enter takes the first value", {
+        tag: ['@all', '@autosuggestions', '@logs', '@headers']
+    }, async ({ page }) => {
+        const menu = await valueMenu(page);
+        test.skip(!menu, 'fewer than two level values captured');
+        await page.keyboard.press('Control+Space');
+        await expect.poll(async () => (await menuState(page)).focused).toBe(menu.rows[0]);
+        await page.keyboard.press('Enter');
+        await expect.poll(() => editorText(page)).toBe(`${WHERE}level = ${menu.rows[0]}`);
+    });
+
+    test("a click on a header does nothing: the menu stays, the editor keeps focus, Tab still works", {
+        tag: ['@all', '@autosuggestions', '@logs', '@headers']
+    }, async ({ page }) => {
+        const menu = await valueMenu(page);
+        test.skip(!menu, 'fewer than two level values captured');
+        for (const header of menu.headers) {
+            await page.locator('.monaco-editor .suggest-widget.visible .monaco-list-row', { has: page.locator('.codicon-symbol-folder') })
+                .filter({ hasText: header }).first().click({ force: true });
+        }
+        const after = await menuState(page);
+        expect(after.visible).toBe(true);
+        expect(await editorText(page)).toBe(`${WHERE}level = `);
+        await page.keyboard.press('Tab');
+        await expect.poll(() => editorText(page)).toBe(`${WHERE}level = ${menu.rows[0]}`);
+    });
+
+    test("a prefix only fields match drops the Values header", {
+        tag: ['@all', '@autosuggestions', '@logs', '@headers']
+    }, async ({ page }) => {
+        const menu = await valueMenu(page);
+        test.skip(!menu, 'fewer than two level values captured');
+        await page.keyboard.type('k8s');
+        await expect.poll(async () => (await menuState(page)).headers).toEqual(['Fields']);
+        const after = await menuState(page);
+        expect(after.rows.every((r) => /k8s/.test(r))).toBe(true);
+        expect(after.focusedIsHeader).toBe(false);
+    });
+
+    test("a prefix only values match drops the Fields header", {
+        tag: ['@all', '@autosuggestions', '@logs', '@headers']
+    }, async ({ page }) => {
+        const menu = await valueMenu(page);
+        test.skip(!menu, 'fewer than two level values captured');
+        const whole = menu.rows[0].replace(/'/g, '');
+        await page.keyboard.type(whole);
+        const after = await waitForMenu(page, 5000);
+        test.skip(after.headers.includes('Fields'), `a field also starts with ${whole}`);
+        expect(after.headers).toEqual(['Values · recent']);
+        expect(after.focused).toBe(menu.rows[0]);
+    });
+
+    test("a function name after = completes under Functions: CAS then Tab writes CAST(", {
+        tag: ['@all', '@autosuggestions', '@logs', '@headers']
+    }, async ({ page }) => {
+        await seedEditor(page, `${WHERE}level = `);
+        await page.keyboard.type('CAS');
+        await expect.poll(async () => (await menuState(page)).headers).toContain('Functions');
+        expect((await menuState(page)).focused).toBe('CAST');
+        await page.keyboard.press('Tab');
+        expect(await editorText(page)).toMatch(/level = CAST\(/);
+    });
+
+    test("_timestamp >= now offers now() under Functions", {
+        tag: ['@all', '@autosuggestions', '@logs', '@headers']
+    }, async ({ page }) => {
+        await seedEditor(page, `${WHERE}_timestamp >= `);
+        await page.keyboard.type('now');
+        await expect.poll(async () => (await menuState(page)).headers).toContain('Functions');
+        // A server function's row label carries its signature, e.g. `now ()`.
+        expect((await menuState(page)).focused).toMatch(/^now\b/);
+        await page.keyboard.press('Tab');
+        expect(await editorText(page)).toMatch(/_timestamp >= now\(\)/);
+    });
+
+    test("typed letters keep the Operators header while its group still has matches", {
+        tag: ['@all', '@autosuggestions', '@logs', '@headers']
+    }, async ({ page }) => {
+        await seedEditor(page, `${WHERE}level`);
+        await page.keyboard.type(' ');
+        await waitForMenu(page);
+        await page.keyboard.type('I');
+        await expect.poll(async () => (await menuState(page)).headers[0]).toBe('Operators');
+        expect((await menuState(page)).rows[0]).toBe('IN');
+    });
+
+    test("an underscored prefix keeps the grouped menu: re_n gives re_not_match under Functions and fields", {
+        tag: ['@all', '@autosuggestions', '@logs', '@headers']
+    }, async ({ page }) => {
+        await seedEditor(page, `${WHERE}level`);
+        await page.keyboard.type(' ');
+        await waitForMenu(page);
+        await page.keyboard.type('re_n');
+        await expect.poll(async () => (await menuState(page)).headers).toEqual(['Functions and fields']);
+        expect((await menuState(page)).rows[0]).toMatch(/^re_not_match/);
+    });
+
+    test("the match functions sit under Functions and fields, not Operators", {
+        tag: ['@all', '@autosuggestions', '@logs', '@headers']
+    }, async ({ page }) => {
+        await seedEditor(page, `${WHERE}level`);
+        await page.keyboard.type(' ');
+        const menu = await waitForMenu(page);
+        expect(menu.headers).toEqual(['Operators', 'Functions and fields']);
+        const all = await page.locator('.monaco-editor .suggest-widget.visible .monaco-list-row').evaluateAll((nodes) =>
+            nodes.sort((a, b) => a.dataset.index - b.dataset.index).map((n) => (n.querySelector('.codicon-symbol-folder') ? '#' : '') + (n.getAttribute('aria-label') || '').split(',')[0].trim()));
+        const header = all.indexOf('#Functions and fields');
+        expect(header).toBeGreaterThan(0);
+        expect(all.findIndex((r) => r.startsWith('str_match'))).toBeGreaterThan(header);
+    });
+
+    test("Tab on a menu that holds only a header and a still-loading row inserts nothing and closes it", {
+        tag: ['@all', '@autosuggestions', '@logs', '@headers', '@values']
+    }, async ({ page }) => {
+        await clearIndexedDB(page);
+        await page.route((url) => url.toString().includes('/_values?'), async (route) => {
+            await new Promise((r) => setTimeout(r, 3000));
+            await route.continue();
+        });
+        await seedEditor(page, `${WHERE}method =`);
+        await page.keyboard.type(' ');
+        const menu = await waitForMenu(page, 5000);
+        expect(menu.rows).toHaveLength(1);
+        expect(menu.rows[0]).toMatch(/still loading/i);
+        await page.keyboard.press('Tab');
+        await expect.poll(async () => (await menuState(page)).visible).toBe(false);
+        expect(await editorText(page)).toBe(`${WHERE}method = `);
+    });
+
+    test("a typed quote's highlight never reaches a later comma menu (V3)", {
+        tag: ['@all', '@autosuggestions', '@logs', '@headers', '@keycontract']
+    }, async ({ page }) => {
+        await seedEditor(page, `${WHERE}level = `);
+        await page.keyboard.type("'e");
+        await seedEditor(page, WHERE);
+        await page.keyboard.type('level,');
+        const menu = await waitForMenu(page);
+        await page.waitForTimeout(300);
+        expect((await menuState(page)).focused, 'the comma menu opens unhighlighted').toBeNull();
+        await page.keyboard.press('Enter');
+        expect(await editorText(page)).toBe(`${WHERE}level,\n`);
+        expect(menu.rows.length).toBeGreaterThan(0);
+    });
+
+    test("Esc closes the grouped menu and leaves the text", {
+        tag: ['@all', '@autosuggestions', '@logs', '@headers']
+    }, async ({ page }) => {
+        const menu = await valueMenu(page);
+        test.skip(!menu, 'fewer than two level values captured');
+        await page.keyboard.press('Escape');
+        await expect.poll(async () => (await menuState(page)).visible).toBe(false);
+        expect(await editorText(page)).toBe(`${WHERE}level = `);
+    });
+
+    test("undo after an accept is one step, with no stop left by a header", {
+        tag: ['@all', '@autosuggestions', '@logs', '@headers']
+    }, async ({ page }) => {
+        const menu = await valueMenu(page);
+        test.skip(!menu, 'fewer than two level values captured');
+        await page.keyboard.press('ArrowDown');
+        await page.keyboard.press('Enter');
+        await expect.poll(() => editorText(page)).toBe(`${WHERE}level = ${menu.rows[0]}`);
+        await page.keyboard.press('Escape');
+        await page.keyboard.press(`${await undoKey(page)}+z`);
+        await expect.poll(() => editorText(page)).toBe(`${WHERE}level = `);
+    });
+});
+
+const LEAD_PREDICATES = ["level = 'x'", 'level IS NULL', "level IN ('a','b')", 'code BETWEEN 1 AND 5', '(code = 1)'];
+
+test.describe("Autocomplete — after a complete predicate, AND and OR lead", () => {
+    test.describe.configure({ mode: 'serial' });
+    const streamName = 'e2e_automate';
+    const orgName = process.env["ORGNAME"] || 'default';
+    let mode;
+    let pm;
+
+    test.beforeEach(async ({ page }, testInfo) => {
+        testLogger.testStart(testInfo.title, testInfo.file);
+        await navigateToBase(page);
+        pm = new PageManager(page);
+        await ingestTestData(page);
+        await waitForStreamData(page, streamName, 1).catch(() => {});
+        await page.goto(`${logData.logsUrl}?org_identifier=${orgName}`);
+        await page.waitForLoadState('domcontentloaded');
+        await pm.logsPage.selectStream(streamName);
+        mode = await getSuggestMode(page);
+    });
+
+    /** Seed the predicate, type the space that opens the menu, and return the rows Monaco ranks first. */
+    async function leadAfter(page, text) {
+        await seedEditor(page, text);
+        await page.keyboard.type(' ');
+        return (await waitForMenu(page, 5000)).rows;
+    }
+
+    test("in the filter, AND and OR lead after every predicate shape, nothing highlighted", {
+        tag: ['@all', '@autosuggestions', '@logs', '@keycontract', '@lead']
+    }, async ({ page }) => {
+        test.skip(await pm.logsPage.isSqlModeEnabled(), 'the Logs filter is in full SQL mode');
+        for (const predicate of LEAD_PREDICATES) {
+            const rows = await leadAfter(page, predicate);
+            expect(rows.slice(0, 2), predicate).toEqual(['AND', 'OR']);
+            if (mode !== 'off') expect((await menuState(page)).focused, predicate).toBeNull();
+        }
+        expect((await leadAfter(page, '(code = 1')).slice(0, 3)).toEqual(['AND', 'OR', ')']);
+    });
+
+    test("in full SQL, AND and OR lead, then the clauses that can follow", {
+        tag: ['@all', '@autosuggestions', '@logs', '@keycontract', '@lead']
+    }, async ({ page }) => {
+        const WHERE = `SELECT * FROM "${streamName}" WHERE `;
+        await pm.logsPage.enableSqlModeIfDisabled();
+        for (const predicate of LEAD_PREDICATES) {
+            const rows = await leadAfter(page, `${WHERE}${predicate}`);
+            expect(rows.slice(0, 5), predicate).toEqual(['AND', 'OR', 'GROUP BY', 'ORDER BY', 'LIMIT']);
+        }
+    });
+
+    test("Tab on AND chains into the field menu", {
+        tag: ['@all', '@autosuggestions', '@logs', '@keycontract', '@lead', '@chain']
+    }, async ({ page }) => {
+        test.skip(mode !== 'automatic', 'only Automatic chains');
+        test.skip(await pm.logsPage.isSqlModeEnabled(), 'the Logs filter is in full SQL mode');
+        await leadAfter(page, "level = 'x'");
+        await page.keyboard.press('Tab');
+        await expect.poll(() => editorText(page)).toBe("level = 'x' AND ");
+        const menu = await waitForMenu(page, 5000);
+        expect(menu.focused).toBeNull();
+        expect(menu.rows.slice(0, 2)).not.toEqual(['AND', 'OR']);
+        await page.keyboard.type('lev');
+        expect((await waitForMenu(page, 5000)).rows).toContain('level');
+    });
+});
+
+test.describe("Logs landing auto-run — cancel, then run, runs once (S2)", () => {
+    const streamName = 'e2e_automate';
+    const orgName = process.env["ORGNAME"] || 'default';
+
+    test("no second search follows the user's own run", {
+        tag: ['@all', '@logs', '@autorun']
+    }, async ({ page }) => {
+        test.setTimeout(120000);
+        await navigateToBase(page);
+        await ingestTestData(page);
+        await waitForStreamData(page, streamName, 1).catch(() => {});
+        const autoRun = await page.evaluate(() => {
+            const app = document.querySelector('#app')?.__vue_app__;
+            return !!app?.config?.globalProperties?.$store?.state?.zoConfig?.auto_query_enabled;
+        });
+        test.skip(!autoRun, 'the landing only auto-runs with ZO_AUTO_QUERY_ENABLED=true');
+        // Slow stream metadata keeps the landing load running past the user's own run, which is the race.
+        await page.route((url) => /\/streams\?|\/streams\/[^/]+\/schema/.test(url.toString()), async (route) => {
+            await new Promise((r) => setTimeout(r, 8000));
+            await route.continue().catch(() => {});
+        });
+        await page.route((url) => url.toString().includes('_search_stream'), async (route) => {
+            await new Promise((r) => setTimeout(r, 3000));
+            await route.continue().catch(() => {});
+        });
+        const searches = [];
+        page.on('request', (r) => {
+            if (r.url().includes('_search_stream') && !r.url().includes('is_ui_histogram')) searches.push(Date.now());
+        });
+        await page.goto(`${logData.logsUrl}?org_identifier=${orgName}&stream_type=logs&stream=${streamName}&period=15m&sql_mode=true&refresh=0`);
+        const button = page.locator('[data-test="logs-search-bar-refresh-btn"]').filter({ visible: true }).first();
+        await expect(button).toHaveText(/cancel/i, { timeout: 15000 });
+        await seedEditor(page, `SELECT * FROM "${streamName}" WHERE level = 'error'`);
+        await button.click();
+        await page.waitForTimeout(10000);
+        const ranAt = Date.now();
+        await button.click();
+        await page.waitForTimeout(25000);
+        expect(searches.filter((t) => t >= ranAt), 'searches after the user\'s run').toHaveLength(1);
+    });
+});
+
+test.describe("Logs landing auto-run — run, then cancel, runs nothing more (S2 residual)", () => {
+    const streamName = 'e2e_automate';
+    const orgName = process.env["ORGNAME"] || 'default';
+
+    test("a search the user cancels is not followed by the landing run", {
+        tag: ['@all', '@logs', '@autorun']
+    }, async ({ page }) => {
+        test.setTimeout(120000);
+        await navigateToBase(page);
+        await ingestTestData(page);
+        await waitForStreamData(page, streamName, 1).catch(() => {});
+        const autoRun = await page.evaluate(() => {
+            const app = document.querySelector('#app')?.__vue_app__;
+            return !!app?.config?.globalProperties?.$store?.state?.zoConfig?.auto_query_enabled;
+        });
+        test.skip(!autoRun, 'the landing only auto-runs with ZO_AUTO_QUERY_ENABLED=true');
+        await page.route((url) => /\/streams\?|\/streams\/[^/]+\/schema/.test(url.toString()), async (route) => {
+            await new Promise((r) => setTimeout(r, 8000));
+            await route.continue().catch(() => {});
+        });
+        await page.route((url) => url.toString().includes('_search_stream'), async (route) => {
+            await new Promise((r) => setTimeout(r, 5000));
+            await route.continue().catch(() => {});
+        });
+        const searches = [];
+        page.on('request', (r) => {
+            if (r.url().includes('_search_stream') && !r.url().includes('is_ui_histogram')) searches.push(Date.now());
+        });
+        await page.goto(`${logData.logsUrl}?org_identifier=${orgName}&stream_type=logs&stream=${streamName}&period=15m&sql_mode=true&refresh=0`);
+        const button = page.locator('[data-test="logs-search-bar-refresh-btn"]').filter({ visible: true }).first();
+        await expect(button).toHaveText(/cancel/i, { timeout: 15000 });
+        await seedEditor(page, `SELECT * FROM "${streamName}" WHERE level = 'error'`);
+        await button.click();
+        await page.waitForTimeout(10000);
+        await button.click();
+        await expect(button).toHaveText(/cancel/i, { timeout: 5000 });
+        await page.waitForTimeout(1500);
+        await button.click();
+        const cancelledAt = Date.now();
+        await page.waitForTimeout(25000);
+        expect(searches.filter((t) => t >= cancelledAt), 'searches after the user cancelled').toHaveLength(0);
+    });
+});
+
+// The zero-setup acceptance row: the same keys without Tab give the same SQL tokens in every mode.
+const ZERO_SETUP_SEQUENCES = [
+    { name: 'field by Enter, then = value', steps: [['type', 'lev'], ['menu'], ['press', 'Enter'], ['type', "= 'error"], ['press', 'End']] },
+    { name: 'field by Enter, then space = value', steps: [['type', 'lev'], ['menu'], ['press', 'Enter'], ['type', " = 'error"], ['press', 'End']] },
+    { name: 'field by click, then = value', steps: [['type', 'lev'], ['menu'], ['click', 'level'], ['type', "= 'error"], ['press', 'End']] },
+    { name: 'Esc on every menu', steps: [['type', 'level '], ['press', 'Escape'], ['type', '= '], ['press', 'Escape'], ['type', "'error"], ['press', 'Escape'], ['press', 'End']] },
+    { name: 'a whole query typed through', steps: [['type', "level = 'error' AND code >= 500"], ['press', 'Escape']] },
+    { name: 'Enter after a comma', enterRow: true, steps: [['type', 'level,'], ['menu'], ['press', 'Enter']] },
+    { name: 'Enter after a typed space', enterRow: true, steps: [['type', "level = 'error' "], ['menu'], ['press', 'Enter']] },
+    { name: 'a letter after an IN comma, then Enter', enterRow: true, steps: [['type', "level IN ('a',"], ['menu'], ['type', 'e'], ['menu'], ['press', 'Enter']] },
+];
+
+const sqlTokens = (text) => text.match(/'(?:[^']|'')*'?|"[^"]*"?|\w+|[^\s\w]/g) || [];
+
+test.describe("Autocomplete zero-setup row — never pressing Tab gives today's SQL", () => {
+    test.describe.configure({ mode: 'serial' });
+    const fs = require('fs');
+    const path = require('path');
+    const streamName = 'e2e_automate';
+    const orgName = process.env["ORGNAME"] || 'default';
+    const WHERE = `SELECT * FROM "${streamName}" WHERE `;
+    // Not test-results/: Playwright empties its outputDir at the start of every run.
+    const resultFile = (m) => path.join(__dirname, '..', '..', 'zero-setup-results', `zero-setup-${m}.json`);
+
+    test("replays the sequences and records the tokens for this mode", {
+        tag: ['@all', '@autosuggestions', '@logs', '@keycontract', '@zerosetup']
+    }, async ({ page }) => {
+        await navigateToBase(page);
+        const pm = new PageManager(page);
+        await ingestTestData(page);
+        await waitForStreamData(page, streamName, 1).catch(() => {});
+        await page.goto(`${logData.logsUrl}?org_identifier=${orgName}`);
+        await pm.logsPage.selectStream(streamName);
+        const mode = await getSuggestMode(page);
+        const results = {};
+        for (const sequence of ZERO_SETUP_SEQUENCES) {
+            await seedEditor(page, WHERE);
+            for (const [step, arg] of sequence.steps) {
+                if (step === 'type') await page.keyboard.type(arg);
+                else if (step === 'press') await page.keyboard.press(arg);
+                else if (step === 'menu') await waitForMenu(page).catch(() => null);
+                else if (step === 'click') await selectSuggestion(page, pm, arg);
+            }
+            results[sequence.name] = sqlTokens(await editorText(page));
+        }
+        fs.mkdirSync(path.dirname(resultFile(mode)), { recursive: true });
+        fs.writeFileSync(resultFile(mode), JSON.stringify(results, null, 2));
+        testLogger.info(`zero-setup tokens recorded for ${mode}`);
+    });
+
+    test("compares the modes once all three runs have recorded", {
+        tag: ['@all', '@autosuggestions', '@logs', '@keycontract', '@zerosetup']
+    }, async () => {
+        const read = (m) => (fs.existsSync(resultFile(m)) ? JSON.parse(fs.readFileSync(resultFile(m), 'utf8')) : null);
+        const automatic = read('automatic');
+        const typing = read('typing');
+        const off = read('off');
+        test.skip(!automatic || !typing || !off, 'run this file once per ZO_EDITOR_SUGGEST_MODE value first');
+        for (const sequence of ZERO_SETUP_SEQUENCES) {
+            expect(automatic[sequence.name], `automatic vs typing: ${sequence.name}`).toEqual(typing[sequence.name]);
+            if (!sequence.enterRow) {
+                expect(typing[sequence.name], `typing vs off: ${sequence.name}`).toEqual(off[sequence.name]);
+            }
+        }
+    });
+});

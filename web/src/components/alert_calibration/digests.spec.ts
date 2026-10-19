@@ -50,7 +50,6 @@ const run = (overrides: Partial<RunRow> = {}): RunRow => ({
   coverage_error_clusters_truncated: false,
   coverage_error_clusters_unattributed: 0,
   coverage_stream_substrate_empty: false,
-  coverage_meta_fallback_used: false,
   ...overrides,
 });
 
@@ -133,13 +132,11 @@ describe("a run's verdict", () => {
       run({
         coverage_definitions_without_facts: 1,
         coverage_facts_without_definition: 2,
-        coverage_meta_fallback_used: true,
       }),
     );
     expect(notes).toEqual([
       "2 alerts had trigger rows but no definition, usually ones deleted during the window; not counted as a gap.",
       "1 alert had no trigger rows in the window, which is not counted as a gap.",
-      "Read from the triggers stream of the _meta organization, which is not counted as a gap.",
     ]);
     expect(coverageNotes(gt, run())).toEqual([]);
   });

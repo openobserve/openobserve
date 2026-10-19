@@ -21,7 +21,7 @@ use svix_ksuid::Ksuid;
 
 pub(crate) async fn process(msg: Message) -> Result<()> {
     match msg.message_type {
-        MessageType::ReportsTable => {
+        MessageType::ReportsTable | MessageType::ReportsLastRun => {
             let msg = msg.try_into()?;
             process_msg(msg).await?;
         }
@@ -88,6 +88,18 @@ pub(crate) async fn process_msg(msg: ReportMessage) -> Result<()> {
                     .await
                     .map_err(|e| infra::errors::Error::Message(e.to_string()))?;
             }
+        }
+        ReportMessage::LastRun {
+            org_id,
+            report_id,
+            at,
+            status,
+            error,
+        } => {
+            // The table op, not the core recorder, so the apply is not published again.
+            table::reports::set_last_run(&org_id, &report_id, at, &status, error.as_deref())
+                .await
+                .map_err(|e| infra::errors::Error::Message(e.to_string()))?;
         }
         ReportMessage::Reset => {
             table::reports::delete_all(conn)

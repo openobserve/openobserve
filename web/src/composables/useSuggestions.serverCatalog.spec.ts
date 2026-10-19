@@ -92,6 +92,26 @@ describe("Phase 2 — the server catalog is actually fetched (B4 wiring)", () =>
     expect(names).toContain("date_trunc");
   });
 
+  it("marks the functions the server calls aggregate or window, local ones included", async () => {
+    vi.mocked(queryFunctions.list).mockResolvedValue({
+      data: {
+        list: [
+          { name: "count", signature: "(x)", kind: "aggregate" },
+          { name: "row_number", signature: "()", kind: "window" },
+          { name: "date_trunc", signature: "(p, t)", kind: "scalar" },
+        ],
+      },
+    } as any);
+    const c = makeComposable({ storedValues: [] });
+    await run(c, "SELECT * FROM stream WHERE ");
+    const byName = (name: string) =>
+      (c.effectiveSuggestions.value as any[]).find((s) => s.name === name);
+    expect(byName("count")?.aggregate).toBe(true);
+    expect(byName("row_number")?.aggregate).toBe(true);
+    expect(byName("date_trunc")?.aggregate).toBeUndefined();
+    expect(byName("spath")?.aggregate).toBeUndefined();
+  });
+
   it("does not refetch for the same organisation", async () => {
     const c = makeComposable({ storedValues: [] });
     await run(c, "SELECT * FROM stream WHERE ");

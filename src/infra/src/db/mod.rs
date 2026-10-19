@@ -330,6 +330,17 @@ pub fn parse_key(mut key: &str) -> (String, String, String) {
     (module, key1, key2)
 }
 
+pub fn escape_like_prefix(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for c in s.chars() {
+        if matches!(c, '\\' | '%' | '_') {
+            out.push('\\');
+        }
+        out.push(c);
+    }
+    out
+}
+
 pub fn build_key(module: &str, key1: &str, key2: &str, start_dt: i64) -> String {
     if key1.is_empty() {
         format!("/{module}/")
@@ -405,6 +416,12 @@ impl<'a> IndexStatement<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_escape_like_prefix_escapes_wildcards() {
+        assert_eq!(escape_like_prefix("a_b%c\\d"), "a\\_b\\%c\\\\d");
+        assert_eq!(escape_like_prefix("acme-prod"), "acme-prod");
+    }
 
     #[test]
     fn test_parse_key_three_parts() {

@@ -33,6 +33,7 @@ import useSearchHistogramManager from "@/composables/useLogs/useSearchHistogramM
 import useSearchPagination from "@/composables/useLogs/useSearchPagination";
 import type { TranslateFn } from "@/types/i18n";
 import analytics from "@/services/product_analytics";
+import { flushEditorSuggestSummary } from "@/utils/query/editorSuggestStats";
 import { useLogsAutoRun } from "@/composables/useLogs/logsAutoRun";
 import {
   failPendingPageNavigation,
@@ -136,6 +137,7 @@ export const useSearchStream = (t: TranslateFn) => {
 
     if (payload.type === "search" && !payload.isPagination && searchObj.meta.refreshInterval == 0) {
       analytics.track("logs_search_completed");
+      flushEditorSuggestSummary();
     }
 
     // Process histogram if needed

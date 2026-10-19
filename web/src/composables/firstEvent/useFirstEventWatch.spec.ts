@@ -24,7 +24,7 @@ interface FakeRow {
   stats?: { doc_num?: number; doc_time_min?: number; doc_time_max?: number };
 }
 
-const rows: Record<string, FakeRow[]> = { logs: [], metrics: [], traces: [] };
+const rows: Record<string, FakeRow[]> = { logs: [], metrics: [], traces: [], profiles: [] };
 const nameList = vi.fn(
   async (_org: string, type: string, _schema: boolean, offset = -1, limit = -1, keyword = "") => {
     const all = (rows[type] ?? []).filter((r) => !keyword || r.name.includes(keyword));
@@ -136,6 +136,7 @@ beforeEach(() => {
   rows.logs = [];
   rows.metrics = [];
   rows.traces = [];
+  rows.profiles = [];
   for (const k of Object.keys(zoConfig)) delete zoConfig[k];
   setVisibility("visible");
   localStorage.clear();
@@ -253,6 +254,18 @@ describe("useFirstEventWatch — confirmation", () => {
       rangeStart: docMin - 900_000_000,
       rangeEnd: docMin + 900_000_000,
     });
+  });
+
+  it("detects a new profiles stream on the profiles setup page", async () => {
+    const docMin = (NOW - HOUR) * 1000;
+    search.mockImplementation(async () => ({ data: { hits: [{ _timestamp: docMin }] } }));
+    const w = watchOf("profiles");
+    w.start("open");
+    await vi.advanceTimersByTimeAsync(1);
+    rows.profiles = [{ name: "default", stats: { doc_num: 40, doc_time_min: docMin } }];
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(w.state.value).toBe("received");
+    expect(w.result.value).toMatchObject({ streamName: "default", streamType: "profiles" });
   });
 
   it("does not count internal streams or non-user types", async () => {

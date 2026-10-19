@@ -2118,7 +2118,8 @@ export default defineComponent({
         if (cols?.length) {
           const fields = (cols as any[]).map((c: any) => ({
             name: typeof c === "string" ? c : (c.value ?? c.label ?? c),
-            type: c.type ?? "Utf8",
+            // An untyped column must read as unknown, so operators and quoting fall back to the value itself.
+            type: c.type,
           }));
           updateFieldKeywords(fields);
         }

@@ -489,25 +489,35 @@ impl super::Db for SqliteDb {
         need_watch: bool,
         start_dt: Option<i64>,
     ) -> Result<()> {
-        // event watch
+        let (module, key1, key2) = super::parse_key(key);
+        let (mut sql, params) = build_delete_sql(module, key1, key2, with_prefix, start_dt);
+        let client = CLIENT_RW.clone();
+
+        // A delete at one start_dt is watched as that single key.
+        let items = if need_watch && with_prefix && start_dt.is_none() {
+            // The deleted rows themselves, so no listing can miss a key or name a surviving one.
+            sql.push_str(" RETURNING id, module, key1, key2");
+            let mut query = sqlx::query(&sql);
+            for p in params {
+                query = query.bind(p);
+            }
+            decode_deleted_keys(query.fetch_all(&client).await?)?
+        } else {
+            let mut query = sqlx::query(&sql);
+            for p in params {
+                query = query.bind(p);
+            }
+            if let Some(dt) = start_dt {
+                query = query.bind(dt);
+            }
+            query.execute(&client).await?;
+            match start_dt {
+                Some(dt) => vec![format!("{key}/{dt}")],
+                None => vec![key.to_string()],
+            }
+        };
+
         if need_watch {
-            let with_prefix = if start_dt.is_some() {
-                false
-            } else {
-                with_prefix
-            };
-            let new_key = if let Some(start_dt) = start_dt {
-                format!("{}/{}", key, start_dt)
-            } else {
-                key.to_string()
-            };
-            // find all keys then send event
-            let items = if with_prefix {
-                let db = super::get_db().await;
-                db.list_keys(key).await?
-            } else {
-                vec![new_key.to_string()]
-            };
             let tx = CHANNEL.watch_tx.clone();
             tokio::task::spawn(async move {
                 for key in items {
@@ -523,83 +533,6 @@ impl super::Db for SqliteDb {
                     }
                 }
             });
-        }
-
-        let (module, key1, key2) = super::parse_key(key);
-        let client = CLIENT_RW.clone();
-
-        if with_prefix {
-            if key1.is_empty() {
-                // module = $1 [, start_dt = $2]
-                if let Some(dt) = start_dt {
-                    sqlx::query("DELETE FROM meta WHERE module = $1 AND start_dt = $2")
-                        .bind(&module)
-                        .bind(dt)
-                        .execute(&client)
-                        .await?;
-                } else {
-                    sqlx::query("DELETE FROM meta WHERE module = $1")
-                        .bind(&module)
-                        .execute(&client)
-                        .await?;
-                }
-            } else if key2.is_empty() {
-                // module = $1, key1 = $2 [, start_dt = $3]
-                if let Some(dt) = start_dt {
-                    sqlx::query(
-                        "DELETE FROM meta WHERE module = $1 AND key1 = $2 AND start_dt = $3",
-                    )
-                    .bind(&module)
-                    .bind(&key1)
-                    .bind(dt)
-                    .execute(&client)
-                    .await?;
-                } else {
-                    sqlx::query("DELETE FROM meta WHERE module = $1 AND key1 = $2")
-                        .bind(&module)
-                        .bind(&key1)
-                        .execute(&client)
-                        .await?;
-                }
-            } else {
-                // module = $1, key1 = $2, key2 = $3, key2/% = $4 [, start_dt = $5]
-                if let Some(dt) = start_dt {
-                    sqlx::query("DELETE FROM meta WHERE module = $1 AND key1 = $2 AND (key2 = $3 OR key2 LIKE $4) AND start_dt = $5")
-                        .bind(&module)
-                        .bind(&key1)
-                        .bind(&key2)
-                        .bind(format!("{}/%", key2))
-                        .bind(dt)
-                        .execute(&client)
-                        .await?;
-                } else {
-                    sqlx::query("DELETE FROM meta WHERE module = $1 AND key1 = $2 AND (key2 = $3 OR key2 LIKE $4)")
-                        .bind(&module)
-                        .bind(&key1)
-                        .bind(&key2)
-                        .bind(format!("{}/%", key2))
-                        .execute(&client)
-                        .await?;
-                }
-            }
-        } else {
-            // module = $1, key1 = $2, key2 = $3 [, start_dt = $4]
-            if let Some(dt) = start_dt {
-                sqlx::query("DELETE FROM meta WHERE module = $1 AND key1 = $2 AND key2 = $3 AND start_dt = $4")
-                    .bind(&module)
-                    .bind(&key1)
-                    .bind(&key2)
-                    .bind(dt)
-                    .execute(&client)
-                    .await?;
-            } else {
-                sqlx::query("DELETE FROM meta WHERE module = $1 AND key1 = $2 AND key2 = $3")
-                    .bind(&module)
-                    .bind(&key1)
-                    .bind(&key2)
-                    .execute(&client)
-                    .await?;
-            }
         }
         Ok(())
     }
@@ -619,14 +552,7 @@ impl super::Db for SqliteDb {
             params.push(key1);
         }
         if !key2.is_empty() {
-            sql.push_str(&format!(
-                " AND (key2 = ${} OR key2 LIKE ${})",
-                params.len() + 1,
-                params.len() + 2
-            ));
-            let key2_prefix = format!("{}/%", key2);
-            params.push(key2);
-            params.push(key2_prefix);
+            push_key2_filter(&mut sql, &mut params, key2);
         }
         sql.push_str(" ORDER BY start_dt ASC");
 
@@ -662,14 +588,7 @@ impl super::Db for SqliteDb {
             params.push(key1);
         }
         if !key2.is_empty() {
-            sql.push_str(&format!(
-                " AND (key2 = ${} OR key2 LIKE ${})",
-                params.len() + 1,
-                params.len() + 2
-            ));
-            let key2_prefix = format!("{}/%", key2);
-            params.push(key2);
-            params.push(key2_prefix);
+            push_key2_filter(&mut sql, &mut params, key2);
         }
 
         sql.push_str(" ORDER BY start_dt ASC");
@@ -737,14 +656,7 @@ impl super::Db for SqliteDb {
             params.push(key1);
         }
         if !key2.is_empty() {
-            sql.push_str(&format!(
-                " AND (key2 = ${} OR key2 LIKE ${})",
-                params.len() + 1,
-                params.len() + 2
-            ));
-            let key2_prefix = format!("{}/%", key2);
-            params.push(key2);
-            params.push(key2_prefix);
+            push_key2_filter(&mut sql, &mut params, key2);
         }
 
         let pool = CLIENT_RO.clone();
@@ -984,14 +896,7 @@ pub(crate) fn build_list_by_start_dt_sql(
         params.push(key1);
     }
     if !key2.is_empty() {
-        sql.push_str(&format!(
-            " AND (key2 = ${} OR key2 LIKE ${})",
-            params.len() + 1,
-            params.len() + 2
-        ));
-        let key2_prefix = format!("{key2}/%");
-        params.push(key2);
-        params.push(key2_prefix);
+        push_key2_filter(&mut sql, &mut params, key2);
     }
     // min_dt / max_dt are intentionally NOT pushed into params here.
     // The caller binds them as i64 after the string-params loop.
@@ -1007,10 +912,161 @@ pub(crate) fn build_list_by_start_dt_sql(
     (sql, params)
 }
 
+/// A meta delete and its string binds; a `start_dt` filter binds last, as an `i64`.
+fn build_delete_sql(
+    module: String,
+    key1: String,
+    key2: String,
+    with_prefix: bool,
+    start_dt: Option<i64>,
+) -> (String, Vec<String>) {
+    let mut sql = "DELETE FROM meta WHERE module = $1".to_string();
+    let mut params = vec![module];
+    if !with_prefix || !key1.is_empty() {
+        sql.push_str(" AND key1 = $2");
+        params.push(key1);
+        if !with_prefix {
+            sql.push_str(" AND key2 = $3");
+            params.push(key2);
+        } else if !key2.is_empty() {
+            push_key2_filter(&mut sql, &mut params, key2);
+        }
+    }
+    if start_dt.is_some() {
+        sql.push_str(&format!(" AND start_dt = ${}", params.len() + 1));
+    }
+    (sql, params)
+}
+
+/// The keys of `RETURNING id, module, key1, key2` rows, skipping bad UTF-8 as the listings do.
+fn decode_deleted_keys(rows: Vec<SqliteRow>) -> sqlx::Result<Vec<String>> {
+    let mut keys = Vec::with_capacity(rows.len());
+    for row in rows {
+        let key = (|| -> sqlx::Result<String> {
+            let module: String = row.try_get("module")?;
+            let key1: String = row.try_get("key1")?;
+            let key2: String = row.try_get("key2")?;
+            Ok(format!("/{module}/{key1}/{key2}"))
+        })();
+        match key {
+            Ok(key) => keys.push(key),
+            Err(sqlx::Error::ColumnDecode { index, source })
+                if source.is::<std::str::Utf8Error>() =>
+            {
+                let id = row.try_get::<i64, _>("id").unwrap_or_default();
+                log::error!(
+                    "[SQLITE] deleted meta row with invalid UTF-8 gets no event, id: {id}, column: {index}, error: {source}"
+                );
+            }
+            Err(e) => return Err(e),
+        }
+    }
+    Ok(keys)
+}
+
+// SQLite's LIKE is case-insensitive and needs an ESCAPE clause; substr is an exact prefix match.
+fn key2_prefix_match(prefix: &str, n: usize) -> String {
+    format!("substr(key2, 1, {}) = ${n}", prefix.chars().count())
+}
+
+fn push_key2_filter(sql: &mut String, params: &mut Vec<String>, key2: String) {
+    let n = params.len();
+    let key2_prefix = format!("{key2}/");
+    sql.push_str(&format!(
+        " AND (key2 = ${} OR {})",
+        n + 1,
+        key2_prefix_match(&key2_prefix, n + 2)
+    ));
+    params.push(key2);
+    params.push(key2_prefix);
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::db::MetaRecord;
+
+    #[test]
+    fn test_watched_prefix_delete_emits_the_rows_it_returns() {
+        let src = include_str!("sqlite.rs");
+        let start = src.find("    async fn delete(\n").expect("delete");
+        let body = src[start..].split("\n    }\n").next().expect("body");
+        assert!(body.contains("\" RETURNING id, module, key1, key2\""));
+        assert!(
+            !body.contains("list_keys"),
+            "the delete must not list first"
+        );
+        let returned = body.find("decode_deleted_keys(").expect("returning decode");
+        let emitted = body.find("Event::Delete(").expect("event");
+        assert!(returned < emitted, "events go out after the delete");
+    }
+
+    #[test]
+    fn test_build_delete_sql_matches_each_key_shape() {
+        let s = |v: &str| v.to_string();
+        let (sql, params) = build_delete_sql(s("m"), s(""), s(""), true, Some(7));
+        assert_eq!(sql, "DELETE FROM meta WHERE module = $1 AND start_dt = $2");
+        assert_eq!(params, [s("m")]);
+        let (sql, params) = build_delete_sql(s("m"), s("o"), s(""), true, None);
+        assert_eq!(sql, "DELETE FROM meta WHERE module = $1 AND key1 = $2");
+        assert_eq!(params, [s("m"), s("o")]);
+        let (sql, params) = build_delete_sql(s("m"), s("o"), s("ab"), true, Some(7));
+        assert_eq!(
+            sql,
+            "DELETE FROM meta WHERE module = $1 AND key1 = $2 AND (key2 = $3 OR substr(key2, 1, 3) = $4) AND start_dt = $5"
+        );
+        assert_eq!(params, [s("m"), s("o"), s("ab"), s("ab/")]);
+        let (sql, params) = build_delete_sql(s("m"), s("o"), s("k"), false, None);
+        assert_eq!(
+            sql,
+            "DELETE FROM meta WHERE module = $1 AND key1 = $2 AND key2 = $3"
+        );
+        assert_eq!(params, [s("m"), s("o"), s("k")]);
+    }
+
+    #[tokio::test]
+    async fn test_returning_delete_names_exactly_the_deleted_rows() {
+        let pool = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .unwrap();
+        sqlx::query(
+            "CREATE TABLE meta (id INTEGER PRIMARY KEY AUTOINCREMENT, module VARCHAR NOT NULL, \
+             key1 VARCHAR NOT NULL, key2 VARCHAR NOT NULL, start_dt INTEGER NOT NULL, value TEXT NOT NULL)",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO meta (module, key1, key2, start_dt, value) VALUES \
+             ('function', 'org', 'f1', 1, ''), ('function', 'org', 'f2', 1, ''), \
+             ('function', 'org', CAST(X'6d657461646174612f80' AS TEXT), 2, ''), \
+             ('function', 'org1', 'f1', 1, '')",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        let (mut sql, params) =
+            build_delete_sql("function".into(), "org".into(), String::new(), true, None);
+        sql.push_str(" RETURNING id, module, key1, key2");
+        let mut query = sqlx::query(&sql);
+        for p in params {
+            query = query.bind(p);
+        }
+        let mut keys = decode_deleted_keys(query.fetch_all(&pool).await.unwrap()).unwrap();
+        keys.sort();
+        assert_eq!(keys, ["/function/org/f1", "/function/org/f2"]);
+        let left: Vec<String> = sqlx::query_scalar("SELECT key1 FROM meta")
+            .fetch_all(&pool)
+            .await
+            .unwrap();
+        assert_eq!(
+            left,
+            ["org1"],
+            "the bad row is deleted, another org's row is not"
+        );
+    }
 
     #[test]
     fn test_sqlite_db_new() {
@@ -1308,14 +1364,14 @@ mod tests {
         assert_eq!(params[0], "module");
         assert_eq!(params[1], "key1");
         assert_eq!(params[2], "key2");
-        assert_eq!(params[3], "key2/%");
+        assert_eq!(params[3], "key2/");
         assert!(
             sql.contains("AND module = $1"),
             "module param missing: {sql}"
         );
         assert!(sql.contains("AND key1 = $2"), "key1 param missing: {sql}");
         assert!(
-            sql.contains("AND (key2 = $3 OR key2 LIKE $4)"),
+            sql.contains("AND (key2 = $3 OR substr(key2, 1, 5) = $4)"),
             "key2 param missing: {sql}"
         );
         assert!(
@@ -1368,8 +1424,8 @@ mod tests {
     #[test]
     fn test_build_list_by_start_dt_sql_key2_prefix_pattern() {
         let (sql, params) = build_list_by_start_dt_sql("/m/k1/k2", 0, 0);
-        assert_eq!(params[3], "k2/%");
-        assert!(sql.contains("OR key2 LIKE $4"));
+        assert_eq!(params[3], "k2/");
+        assert!(sql.contains("OR substr(key2, 1, 3) = $4"));
     }
 
     #[test]
