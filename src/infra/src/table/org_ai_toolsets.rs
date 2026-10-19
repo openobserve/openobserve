@@ -20,8 +20,8 @@
 //! org's per-org DEK via [`cipher::get_dek`].
 
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, EntityTrait, Order, QueryFilter, QueryOrder, QuerySelect, Set,
-    SqlErr,
+    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, Order, QueryFilter, QueryOrder,
+    QuerySelect, Set, SqlErr,
 };
 use svix_ksuid::{Ksuid, KsuidLike};
 
@@ -222,6 +222,27 @@ pub async fn list(
         .collect()
 }
 
+/// `(id, name)` of every toolset of `org`, newest first; `data` is neither read nor decrypted.
+pub async fn list_names(org: &str) -> Result<Vec<(String, String)>, errors::Error> {
+    list_names_with(get_orm_client_ro().await, org).await
+}
+
+pub async fn list_names_with<C: ConnectionTrait>(
+    client: &C,
+    org: &str,
+) -> Result<Vec<(String, String)>, errors::Error> {
+    let names = Entity::find()
+        .select_only()
+        .column(Column::Id)
+        .column(Column::Name)
+        .filter(Column::Org.eq(org))
+        .order_by(Column::CreatedAt, Order::Desc)
+        .into_tuple::<(String, String)>()
+        .all(client)
+        .await?;
+    Ok(names)
+}
+
 /// Update an existing toolset. The caller supplies plaintext `data`; this
 /// function re-encrypts it with the org's DEK before persisting.
 pub async fn update(entry: OrgToolset) -> Result<(), errors::Error> {
@@ -344,5 +365,44 @@ mod tests {
         let encrypted = encrypt_data(&dek, "").unwrap();
         let decrypted = decrypt_data(&dek, &encrypted).unwrap();
         assert_eq!(decrypted, "");
+    }
+
+    #[tokio::test]
+    async fn names_are_listed_without_reading_any_data() {
+        use sea_orm::{Database, Schema};
+
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        let backend = db.get_database_backend();
+        let stmt = Schema::new(backend).create_table_from_entity(Entity);
+        db.execute(backend.build(&stmt)).await.unwrap();
+        for (id, org, name, at) in [
+            ("a", "o", "GitHub", 1),
+            ("b", "o", "Kube", 2),
+            ("c", "x", "Other", 3),
+        ] {
+            ActiveModel {
+                id: Set(id.to_string()),
+                org: Set(org.to_string()),
+                name: Set(name.to_string()),
+                kind: Set("mcp".to_string()),
+                description: Set(None),
+                // Not ciphertext: a read that decrypted would fail on it.
+                data: Set(Some("not-encrypted".to_string())),
+                created_by: Set("u".to_string()),
+                created_at: Set(at),
+                updated_at: Set(at),
+            }
+            .insert(&db)
+            .await
+            .unwrap();
+        }
+        let names = list_names_with(&db, "o").await.unwrap();
+        assert_eq!(
+            names,
+            vec![
+                ("b".to_string(), "Kube".to_string()),
+                ("a".to_string(), "GitHub".to_string())
+            ]
+        );
     }
 }
