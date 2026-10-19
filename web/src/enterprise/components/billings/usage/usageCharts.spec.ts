@@ -45,7 +45,7 @@ describe("usageCharts", () => {
       now: 2 * day + 60,
       forecast: { pace: 10, paceDays: 3, projected: 50, low: 40, high: 60 },
       meterLabel: (key) => key,
-      money: (v) => `$${v}`,
+      format: (v) => `$${v}`,
       slotLabel: (ts) => String(ts / day),
       labels: { spendToDate: "spend", forecast: "fc", dayTotal: "total", projected: "proj" },
     });
@@ -54,6 +54,34 @@ describe("usageCharts", () => {
     expect(byName("spend").data).toEqual([10, 20, 30, null, null]);
     expect(byName("fc").data).toEqual([null, null, 30, 40, 50]);
     expect(byName("fc").endLabel.formatter).toBe("proj $50");
+  });
+
+  it("charts the data meters' volume per day, without counted meters or a forecast", () => {
+    const day = 86_400;
+    const option = buildTrendsChartOption({
+      rows: [
+        { ts: 0, event: "Ingestion", cost: 10, volume: 2048 },
+        { ts: 0, event: "AiCredits", cost: 5, volume: 7 },
+        { ts: day, event: "Search", cost: 1, volume: 512 },
+      ],
+      events: ["Ingestion", "Search", "AiCredits"],
+      start: 0,
+      end: 3 * day,
+      bucket: day,
+      now: day + 60,
+      forecast: { pace: 10, paceDays: 3, projected: 50, low: 40, high: 60 },
+      measure: "volume",
+      meterLabel: (key) => key,
+      format: (v) => `${v} MB`,
+      slotLabel: (ts) => String(ts / day),
+      labels: { spendToDate: "spend", forecast: "fc", dayTotal: "total", projected: "proj" },
+    });
+    const names = option.series.map((s: any) => s.name);
+    expect(names).toEqual(["ingestion", "query"]);
+    const byName = (name: string) => option.series.find((s: any) => s.name === name) as any;
+    expect(byName("ingestion").data).toEqual([2048, null, null]);
+    expect(byName("query").data).toEqual([null, 512, null]);
+    expect(option.yAxis[0].axisLabel.formatter(1024)).toBe("1024 MB");
   });
 
   it("leaves the forecast out when there is none", () => {
@@ -66,7 +94,7 @@ describe("usageCharts", () => {
       now: 1,
       forecast: null,
       meterLabel: (k) => k,
-      money: String,
+      format: String,
       slotLabel: String,
       labels: { spendToDate: "s", forecast: "f", dayTotal: "t", projected: "p" },
     });

@@ -22,6 +22,7 @@ import {
   priceAt,
   priceCaseSql,
   summarizeTrend,
+  toCostRows,
   toEpochSeconds,
   trendBucket,
 } from "./trendsModel";
@@ -105,5 +106,17 @@ describe("trendsModel", () => {
     expect(trendBucket(0, 15 * 60)).toBe("1 minute");
     expect(trendBucket(0, 24 * 3600)).toBe("1 hour");
     expect(trendBucket(0, 30 * DAY)).toBe("1 day");
+  });
+
+  it("reads the chart query's rows, keeping the raw volume when the query returned it", () => {
+    expect(
+      toCostRows([
+        { x_axis_1: "2026-10-11T00:00:00", breakdown_1: "Ingestion", y_axis_1: 10, volume: 2048 },
+        { x_axis_1: "2026-10-12T00:00:00", breakdown_1: "Search", y_axis_1: 1 },
+      ]),
+    ).toEqual([
+      { ts: Date.UTC(2026, 9, 11) / 1000, event: "Ingestion", cost: 10, volume: 2048 },
+      { ts: Date.UTC(2026, 9, 12) / 1000, event: "Search", cost: 1, volume: 0 },
+    ]);
   });
 });

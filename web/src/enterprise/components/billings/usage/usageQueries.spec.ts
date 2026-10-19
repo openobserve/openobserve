@@ -182,6 +182,11 @@ describe("usageQueries", () => {
       expect(sql).not.toContain("case");
     });
 
+    it("adds each bucket's raw volume to the trends query only when asked", () => {
+      expect(trendsCostSql("o", [], "1 day")).not.toContain('sum(size) as "volume"');
+      expect(trendsCostSql("o", [], "1 day", undefined, true)).toContain('sum(size) as "volume"');
+    });
+
     it("labels the daily series by org name and folds unknown orgs into Other", () => {
       const sql = dailyOrgCostSql(
         cyclePrices([details]),

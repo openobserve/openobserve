@@ -202,6 +202,9 @@ export function buildStackedCostPanelSchema(opts: {
 
 const DAY_SECONDS = 86_400;
 
+/** Meters measured in megabytes; counted meters (credits, runs) cannot share a GB axis with them. */
+export const VOLUME_METERS: MeterKey[] = ["ingestion", "query", "pipeline", "remote_pipeline"];
+
 /** Series that carry the forecast, left out of the per-day tooltip rows. */
 const FORECAST_SERIES = new Set(["lo", "hi"]);
 
@@ -220,8 +223,11 @@ export function buildTrendsChartOption(opts: {
   now: number;
   /** Only drawn on a daily bucket, because the run rate is per day. */
   forecast: Forecast | null;
+  /** Cost, or each meter's raw volume, which drops the counted meters and the forecast. */
+  measure?: "cost" | "volume";
   meterLabel: (key: MeterKey) => string;
-  money: (value: number) => string;
+  /** Formats an axis or tooltip value: money for cost, a size for volume. */
+  format: (value: number) => string;
   slotLabel: (ts: number) => string;
   labels: {
     spendToDate: string;
@@ -230,14 +236,19 @@ export function buildTrendsChartOption(opts: {
     projected: string;
   };
 }) {
-  const { rows, bucket, now, money, labels } = opts;
+  const { rows, bucket, now, format, labels } = opts;
+  const byVolume = opts.measure === "volume";
   const first = Math.floor(opts.start / bucket) * bucket;
   const slots: number[] = [];
   for (let ts = first; ts < opts.end; ts += bucket) slots.push(ts);
   const n = slots.length;
   const index = new Map(slots.map((ts, i) => [ts, i]));
 
-  const meters = METERS.filter((def) => def.events.some((event) => opts.events.includes(event)));
+  const meters = METERS.filter(
+    (def) =>
+      def.events.some((event) => opts.events.includes(event)) &&
+      (!byVolume || VOLUME_METERS.includes(def.key)),
+  );
   const meterOf = new Map<string, MeterKey>();
   for (const def of meters) for (const event of def.events) meterOf.set(event, def.key);
 
@@ -247,13 +258,14 @@ export function buildTrendsChartOption(opts: {
     const key = meterOf.get(row.event);
     const i = index.get(Math.floor(row.ts / bucket) * bucket);
     if (!key || i === undefined) continue;
-    perMeter.get(key)![i] += row.cost;
-    totals[i] += row.cost;
+    const value = byVolume ? (row.volume ?? 0) : row.cost;
+    perMeter.get(key)![i] += value;
+    totals[i] += value;
   }
 
   // Slots up to and including the one holding `now` are actuals; the rest are future.
   const elapsed = Math.max(slots.filter((ts) => ts <= now).length, 1);
-  const f = bucket === DAY_SECONDS && elapsed < n ? opts.forecast : null;
+  const f = !byVolume && bucket === DAY_SECONDS && elapsed < n ? opts.forecast : null;
   const cum: number[] = [];
   totals.slice(0, elapsed).forEach((v, i) => cum.push((cum[i - 1] ?? 0) + v));
   const from = cum[elapsed - 1] ?? 0;
@@ -322,7 +334,7 @@ export function buildTrendsChartOption(opts: {
           // The projected total sits on the end of the dashed line, where the eye lands.
           endLabel: {
             show: true,
-            formatter: `${labels.projected} ${money(f.projected)}`,
+            formatter: `${labels.projected} ${format(f.projected)}`,
             color: accent,
             fontWeight: 600,
             align: "right",
@@ -355,13 +367,13 @@ export function buildTrendsChartOption(opts: {
     yAxis: [
       {
         type: "value",
-        axisLabel: { color: muted, formatter: money },
+        axisLabel: { color: muted, formatter: format },
         splitLine: { lineStyle: { color: chartAxisLine(), type: "dashed" } },
       },
       {
         type: "value",
         show: !!f,
-        axisLabel: { color: muted, formatter: money },
+        axisLabel: { color: muted, formatter: format },
         splitLine: { show: false },
       },
     ],
@@ -381,8 +393,8 @@ export function buildTrendsChartOption(opts: {
         const d = params[0]?.dataIndex ?? 0;
         if (f && d >= elapsed) {
           return (
-            `<b>${days[d]} · ${labels.forecast}</b><br/>${money(mid[d] ?? f.projected)}` +
-            `<br/><span style="opacity:.75">${money(low[d] ?? f.low)} – ${money(high[d] ?? f.high)}</span>`
+            `<b>${days[d]} · ${labels.forecast}</b><br/>${format(mid[d] ?? f.projected)}` +
+            `<br/><span style="opacity:.75">${format(low[d] ?? f.low)} – ${format(high[d] ?? f.high)}</span>`
           );
         }
         const lines = params
@@ -395,14 +407,14 @@ export function buildTrendsChartOption(opts: {
           )
           .map(
             (p) =>
-              `${p.marker}${p.seriesName}<span style="float:right;margin-left:1.125rem">${money(p.value!)}</span>`,
+              `${p.marker}${p.seriesName}<span style="float:right;margin-left:1.125rem">${format(p.value!)}</span>`,
           );
         const spend = f
-          ? `<br/>${labels.spendToDate}<span style="float:right;margin-left:1.125rem">${money(cum[d])}</span>`
+          ? `<br/>${labels.spendToDate}<span style="float:right;margin-left:1.125rem">${format(cum[d])}</span>`
           : "";
         return (
           `<b>${days[d]}</b><br/>${lines.join("<br/>")}<br/>${labels.dayTotal}` +
-          `<span style="float:right;margin-left:1.125rem;font-weight:600">${money(totals[d])}</span>${spend}`
+          `<span style="float:right;margin-left:1.125rem;font-weight:600">${format(totals[d])}</span>${spend}`
         );
       },
     },

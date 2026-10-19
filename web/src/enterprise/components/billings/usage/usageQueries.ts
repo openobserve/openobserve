@@ -214,11 +214,14 @@ export function trendsCostSql(
   prices: CyclePrice[],
   bucket: string,
   events: string[] = PRICED_EVENTS,
+  /** Also return each bucket's raw volume, read in the same pass, for the Volume view. */
+  withVolume = false,
 ): string {
   const inList = events.map((event) => `'${escapeLiteral(event)}'`).join(", ");
   return (
     `SELECT histogram(_timestamp, '${escapeLiteral(bucket)}') as "x_axis_1", ` +
     `sum(size * ${priceCaseSql(prices, events)}) as "y_axis_1", ` +
+    (withVolume ? `sum(size) as "volume", ` : "") +
     `event as "breakdown_1" FROM "${USAGE_STREAM_NAME}" ` +
     `WHERE ${orgId === null ? "" : `org_id = '${escapeLiteral(orgId)}' AND `}` +
     `event IN (${inList}) GROUP BY x_axis_1, breakdown_1 ORDER BY x_axis_1 ASC`

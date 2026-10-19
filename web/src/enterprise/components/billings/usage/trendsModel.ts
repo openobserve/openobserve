@@ -36,6 +36,8 @@ export interface CostRow {
   ts: number;
   event: string;
   cost: number;
+  /** Megabytes, or a count for counted meters; only present when the query asked for it. */
+  volume?: number;
 }
 
 export interface MeterTotal {
@@ -132,6 +134,16 @@ export function bucketSeconds(value: unknown): number {
   const iso = /[zZ]|[+-]\d\d:?\d\d$/.test(text) ? text : `${text}Z`;
   const ms = Date.parse(iso);
   return Number.isFinite(ms) ? Math.floor(ms / 1000) : 0;
+}
+
+/** One chart-query row per bucket and event, with the raw volume when the query asked for it. */
+export function toCostRows(hits: Record<string, unknown>[]): CostRow[] {
+  return hits.map((hit) => ({
+    ts: bucketSeconds(hit.x_axis_1),
+    event: String(hit.breakdown_1 ?? ""),
+    cost: Number(hit.y_axis_1) || 0,
+    volume: Number(hit.volume) || 0,
+  }));
 }
 
 /** Totals the chart query's rows by day and by meter; the days narrow to an isolated meter. */

@@ -27,9 +27,8 @@ vi.mock("vue-router", () => ({
   useRoute: () => ({ query: {} }),
   useRouter: () => ({ replace: vi.fn() }),
 }));
-vi.mock("./useUsageSearch", () => ({
-  useUsageSearch: () => ({ search: vi.fn().mockResolvedValue([]) }),
-}));
+const search = vi.fn().mockResolvedValue([]);
+vi.mock("./useUsageSearch", () => ({ useUsageSearch: () => ({ search }) }));
 
 const { default: UsageTrends } = await import("./UsageTrends.vue");
 
@@ -63,5 +62,39 @@ describe("UsageTrends usage reporting", () => {
     // The page still learns the new value straight away.
     expect(store.state.organizationData.organizationSettings.usage_stream_enabled).toBe(true);
     expect(store.state.organizationData.organizationSettings.scrape_interval).toBe(15);
+  });
+});
+
+describe("UsageTrends cost and volume", () => {
+  it("switches the chart to volume without asking the server again", async () => {
+    store.state.organizationData.organizationSettings = {
+      ...store.state.organizationData.organizationSettings,
+      usage_stream_enabled: true,
+    };
+    const upcoming = mockMeteringResponse().upcoming!;
+    const day = new Date(upcoming.cycle_start * 1000).toISOString().slice(0, 19);
+    search.mockReset().mockResolvedValue([
+      { x_axis_1: day, breakdown_1: "Ingestion", y_axis_1: 10, volume: 2048 },
+      { x_axis_1: day, breakdown_1: "AiCredits", y_axis_1: 5, volume: 7 },
+    ]);
+    const wrapper = mount(UsageTrends, {
+      props: { details: upcoming, cycles: [upcoming], billingOrgs: [] },
+      global: { plugins: [i18n, store], stubs: { DateTime: true, AsyncComponentWrapper: true } },
+    });
+    await flushPromises();
+    expect(search.mock.calls[0][0]).toContain('sum(size) as "volume"');
+
+    const measure = wrapper
+      .findAllComponents({ name: "OToggleGroup" })
+      .find((group) => group.vm.$attrs["data-test"] === "billings-usagetrends-measure")!;
+    measure.vm.$emit("update:modelValue", "volume");
+    await flushPromises();
+
+    const header = wrapper.find('[data-test="billings-usagetrends-chart-pane"]');
+    expect(header.text()).toContain("Volume Over Time");
+    // The forecast is money, so it has no place on a volume chart.
+    expect(wrapper.find('[data-test="billings-usagetrends-forecast-toggle"]').exists()).toBe(false);
+    // Volume came back with the cost rows, so switching sends nothing.
+    expect(search).toHaveBeenCalledTimes(1);
   });
 });

@@ -99,19 +99,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="grid @min-[56.25rem]/usage-trends:grid-cols-[minmax(0,1.6fr)_minmax(17.5rem,0.9fr)]"
         >
           <div class="flex min-w-0 flex-col" data-test="billings-usagetrends-chart-pane">
-            <UsagePaneHeader
-              :title="
-                forecast ? t('billing.usageV2.spendToDate') : t('billing.usageV2.costOverTime')
-              "
-              :subtitle="t('billing.usageV2.estimatedAtCyclePrice')"
-            >
-              <template v-if="canForecast" #actions>
+            <UsagePaneHeader :title="chartTitle" :subtitle="chartSubtitle">
+              <template #actions>
                 <OSwitch
+                  v-if="canForecast && measure === 'cost'"
                   v-model="showForecast"
                   size="sm"
                   :label="t('billing.usageV2.forecast')"
                   data-test="billings-usagetrends-forecast-toggle"
                 />
+                <!-- Both views come from the same query, so switching redraws without a request. -->
+                <OToggleGroup
+                  :model-value="measure"
+                  data-test="billings-usagetrends-measure"
+                  @update:model-value="onMeasureChange"
+                >
+                  <OToggleGroupItem value="cost" size="sm">
+                    {{ t("billing.usageV2.measureCost") }}
+                  </OToggleGroupItem>
+                  <OToggleGroupItem value="volume" size="sm">
+                    {{ t("billing.usageV2.measureVolume") }}
+                  </OToggleGroupItem>
+                </OToggleGroup>
               </template>
             </UsagePaneHeader>
             <OEmptyState
@@ -214,6 +223,7 @@ import { timestampToTimezoneDate } from "@/utils/timezone";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import KpiCardRow from "@/components/common/KpiCardRow.vue";
 import { useMutation } from "@tanstack/vue-query";
+import { formatSizeFromMB } from "@/utils/formatters";
 import { updateOrgSettingsMutation } from "@/services/organizations.queries";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import UsageKpiCard from "./UsageKpiCard.vue";
@@ -230,11 +240,11 @@ import { buildTrendsChartOption, meterColorFor } from "./usageCharts";
 import { useUsageSearch } from "./useUsageSearch";
 import { trendsCostSql } from "./usageQueries";
 import {
-  bucketSeconds,
   cyclePrices,
   forecastCycle,
   PRICED_EVENTS,
   summarizeTrend,
+  toCostRows,
   toEpochSeconds,
   trendBucket,
   type CostRow,
@@ -470,13 +480,6 @@ let latestLoad = 0;
 /** The chart's own query at a daily bucket, so the totals are exactly what the bars add up to. */
 const { search } = useUsageSearch();
 
-const toCostRows = (hits: Record<string, unknown>[]): CostRow[] =>
-  hits.map((hit) => ({
-    ts: bucketSeconds(hit.x_axis_1),
-    event: String(hit.breakdown_1 ?? ""),
-    cost: Number(hit.y_axis_1) || 0,
-  }));
-
 /** Days stream oldest first, so the run rate and projection are only right once all have landed; the KPIs wait for that and only the list streams. */
 const waitingForFirstChunk = computed(() => loading.value && !rows.value.length);
 
@@ -488,16 +491,19 @@ const loadCosts = async (refresh = false) => {
   // Cleared, so streamed days never mix with the previous range's.
   rows.value = [];
   try {
-    const hits = await search(trendsCostSql(usageOrg.value, prices.value, bucket.value), {
-      start: range.value.start * 1_000_000,
-      end: range.value.end * 1_000_000,
-      size: 10_000,
-      key: "trends",
-      refresh,
-      onRows: (partial) => {
-        if (loadId === latestLoad) rows.value = toCostRows(partial);
+    const hits = await search(
+      trendsCostSql(usageOrg.value, prices.value, bucket.value, undefined, true),
+      {
+        start: range.value.start * 1_000_000,
+        end: range.value.end * 1_000_000,
+        size: 10_000,
+        key: "trends",
+        refresh,
+        onRows: (partial) => {
+          if (loadId === latestLoad) rows.value = toCostRows(partial);
+        },
       },
-    });
+    );
     if (loadId !== latestLoad) return;
     rows.value = toCostRows(hits);
     streamMissing.value = false;
@@ -540,6 +546,13 @@ const subCent = (value: number) => value > 0 && value < 0.01;
 const precise = computed(() => subCent(summary.value.total));
 
 const showForecast = ref(true);
+
+/** Cost, or the data meters' raw volume, which the old daily usage chart showed. */
+const measure = ref<"cost" | "volume">("cost");
+
+const onMeasureChange = (value: unknown) => {
+  if (value === "cost" || value === "volume") measure.value = value;
+};
 
 /** Only the open cycle has days left to project, so the toggle shows for that range alone. */
 const canForecast = computed(() => {
@@ -655,6 +668,20 @@ const BUCKET_SECONDS: Record<string, number> = {
 
 const SLOT_TIME = new Intl.DateTimeFormat("en-US", { hour: "2-digit", minute: "2-digit" });
 
+const chartTitle = computed(() =>
+  measure.value === "volume"
+    ? t("billing.usageV2.volumeOverTime")
+    : forecast.value
+      ? t("billing.usageV2.spendToDate")
+      : t("billing.usageV2.costOverTime"),
+);
+
+const chartSubtitle = computed(() =>
+  measure.value === "volume"
+    ? t("billing.usageV2.volumeSubtitle")
+    : t("billing.usageV2.estimatedAtCyclePrice"),
+);
+
 const chartOption = computed(() => {
   const step = BUCKET_SECONDS[bucket.value] ?? SECONDS_PER_DAY;
   const money = (value: number) => String(formatCost(value, precise.value));
@@ -666,8 +693,9 @@ const chartOption = computed(() => {
     bucket: step,
     now: nowSeconds(),
     forecast: forecast.value,
+    measure: measure.value,
     meterLabel: (key) => String(meterLabel(key)),
-    money,
+    format: measure.value === "volume" ? (value) => formatSizeFromMB(value) : money,
     slotLabel: (ts) =>
       (step === SECONDS_PER_DAY ? SHORT_DATE : SLOT_TIME).format(new Date(ts * 1000)),
     labels: {
