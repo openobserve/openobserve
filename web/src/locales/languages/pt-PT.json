@@ -5463,7 +5463,7 @@
       "idempotentSuffix": "(idempotente):",
       "iFixedItTestAgain": "Eu corrigi — testar novamente",
       "initRumLogsDesc": "Envolva seu aplicativo em `OpenObserveProvider`. Os endpoints abaixo são desta organização — o SDK anexa `/rum` e `/logs` a eles. Ajuste `applicationId`, `service` e `env` para descrever seu aplicativo. O `clientToken` é enviado dentro do bundle do seu aplicativo por design; ele só pode gravar eventos RUM e você pode rotacioná-lo pelo cabeçalho desta página.",
-      "installAgentLinuxDesc": "Execute isso no host como **root** (ou com `sudo`).",
+      "installAgentLinuxDesc": "Execute isto no host como **root** (ou com `sudo`).",
       "installAgentMacosDesc": "Execute isto no Mac com `sudo`. Ele instala o agente como um daemon launchd, além de um segundo daemon que faz a ponte do log unificado do macOS para ele.",
       "installAgentTitle": "Instalar o Agente",
       "installAgentWindowsDesc": "Execute isto no **PowerShell como Administrador**.",

@@ -5466,7 +5466,7 @@
       "installAgentLinuxDesc": "Esegui questo sull'host come **root** (o con `sudo`).",
       "installAgentMacosDesc": "Esegui questo comando sul Mac con `sudo`. Installa l'agente come daemon launchd, più un secondo daemon che collega il log unificato di macOS ad esso.",
       "installAgentTitle": "Installa l'agente",
-      "installAgentWindowsDesc": "Esegui questo comando in **PowerShell come amministratore**.",
+      "installAgentWindowsDesc": "Esegui questo in **PowerShell come amministratore**.",
       "installReactNativeSdkDesc": "Aggiungi l'SDK core e i pacchetti opzionali session-replay e navigation. Su iOS, esegui `npx pod-install` dopo, così i moduli nativi vengono collegati.",
       "installReactNativeSdkTitle": "Installa l'SDK React Native",
       "installsViaPip": "Installa tramite pip e verifica le importazioni:",

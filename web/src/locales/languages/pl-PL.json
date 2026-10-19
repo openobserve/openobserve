@@ -5466,7 +5466,7 @@
       "installAgentLinuxDesc": "Uruchom to na hoście jako **root** (lub z `sudo`).",
       "installAgentMacosDesc": "Uruchom to na Macu z `sudo`. Instaluje agenta jako demona launchd oraz drugi demon, który przekazuje ujednolicony dziennik macOS do niego.",
       "installAgentTitle": "Zainstaluj agenta",
-      "installAgentWindowsDesc": "Uruchom to w **PowerShell jako Administrator**.",
+      "installAgentWindowsDesc": "Uruchom to w **PowerShell z uprawnieniami administratora**.",
       "installReactNativeSdkDesc": "Dodaj podstawowe SDK oraz opcjonalne pakiety session-replay i nawigacji. W systemie iOS uruchom następnie `npx pod-install`, aby natywne moduły zostały połączone.",
       "installReactNativeSdkTitle": "Zainstaluj SDK React Native",
       "installsViaPip": "Instaluje przez pip i weryfikuje importy:",

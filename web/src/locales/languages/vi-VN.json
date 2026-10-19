@@ -5463,7 +5463,7 @@
       "idempotentSuffix": "(idempotent):",
       "iFixedItTestAgain": "Tôi đã khắc phục — kiểm tra lại",
       "initRumLogsDesc": "Bọc ứng dụng của bạn trong `OpenObserveProvider`. Các điểm cuối bên dưới thuộc tổ chức này — SDK thêm `/rum` và `/logs` vào chúng. Điều chỉnh `applicationId`, `service` và `env` để mô tả ứng dụng của bạn. `clientToken` được đóng gói trong bundle ứng dụng của bạn theo thiết kế; nó chỉ có thể ghi sự kiện RUM và bạn có thể xoay vòng nó từ tiêu đề của trang này.",
-      "installAgentLinuxDesc": "Chạy lệnh này trên máy chủ với quyền **root** (hoặc với `sudo`).",
+      "installAgentLinuxDesc": "Chạy lệnh này trên máy chủ với tư cách **root** (hoặc dùng `sudo`).",
       "installAgentMacosDesc": "Chạy lệnh này trên Mac với `sudo`. Nó cài đặt agent như một daemon launchd, cùng với một daemon thứ hai để chuyển tiếp log thống nhất của macOS vào đó.",
       "installAgentTitle": "Cài đặt Agent",
       "installAgentWindowsDesc": "Chạy lệnh này trong **PowerShell với quyền Quản trị viên**.",
