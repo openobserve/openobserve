@@ -179,7 +179,8 @@ export const METERS: MeterDef[] = [
     key: "ai",
     labelKey: "billing.aiCredits",
     rateUnitKey: "billing.usageV2.unitCredit",
-    events: ["AiCredits", "NewIncident"],
+    // NewIncident is a size-1 activity record beside the incident's AiCredits; the backend never bills it.
+    events: ["AiCredits"],
     billedAsKey: "billing.usageV2.billedAi",
   },
   {
@@ -477,6 +478,7 @@ export interface Estimate {
 const MB_PER_GB = 1024;
 
 const SECONDS_PER_DAY = 86400;
+const HOURS_PER_DAY = 24;
 
 const DAYS_PER_MONTH = 30;
 
@@ -529,17 +531,15 @@ export function apiCheckRuns(input: EstimateInputs): number {
   return finite(input.apiChecks) * finite(input.apiRegions) * runsPerMonth(input.apiIntervalSec);
 }
 
-/**
- * Cost per stored megabyte per day, derived from this org's own billed
- * retention. `base_cost` is not usable here: that meter's unit is not a plain
- * megabyte, so a guessed conversion would invent a number.
- */
+/** Cost per stored megabyte per day: the org's own billed rate once it has retention usage, else list price. */
 export function retentionDailyRate(details: MeteringDetails | null | undefined): number {
   const meter = details?.retention;
-  const cycleDays = ((details?.cycle_end ?? 0) - (details?.cycle_start ?? 0)) / SECONDS_PER_DAY;
-  const amount = Number(meter?.metered_amount) || 0;
-  if (!meter || amount <= 0 || cycleDays <= 0) return 0;
-  return (Number(meter.metered_cost) || 0) / (amount * cycleDays);
+  if (!meter) return 0;
+  const amount = Number(meter.metered_amount) || 0;
+  const cost = Number(meter.metered_cost) || 0;
+  // `metered_amount` is MB-hours, not stored MB, so cost / amount is already per MB-hour and must not be divided by the cycle's days.
+  const perMbHour = amount > 0 && cost > 0 ? cost / amount : unitRate(meter);
+  return perMbHour * HOURS_PER_DAY;
 }
 
 /** What a month of the given usage would cost at list price, one line per meter. */

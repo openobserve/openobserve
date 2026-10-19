@@ -20,6 +20,7 @@ import {
   cyclePrices,
   forecastCycle,
   priceAt,
+  PRICED_EVENTS,
   priceCaseSql,
   summarizeTrend,
   toCostRows,
@@ -65,6 +66,27 @@ describe("trendsModel", () => {
     const gapped = cyclePrices([first, cycle(second.cycle_start + 10 * DAY, 5)]);
     expect(priceAt(gapped, "Ingestion", second.cycle_start + DAY)).toBeCloseTo(0.000439453125, 12);
     expect(priceAt(gapped, "Ingestion", first.cycle_start - DAY)).toBeCloseTo(0.000439453125, 12);
+  });
+
+  it("prices only billable AI credits, not the informational NewIncident record", () => {
+    const aiPrices = cyclePrices([
+      {
+        cycle_start: first.cycle_start,
+        cycle_end: first.cycle_end,
+        ai: { base_cost: 0.5, unit_divisor: 1, metered_amount: 0, metered_cost: 0 },
+      } as unknown as MeteringDetails,
+    ]);
+    const usage = [
+      { event: "AiCredits", size: 10 },
+      { event: "NewIncident", size: 1 },
+    ];
+    const cost = usage.reduce(
+      (sum, row) => sum + row.size * (aiPrices[0].rates[row.event] ?? 0),
+      0,
+    );
+    expect(cost).toBe(5);
+    expect(PRICED_EVENTS).not.toContain("NewIncident");
+    expect(priceCaseSql(aiPrices)).not.toContain("NewIncident");
   });
 
   it("writes the same boundaries into SQL, switching price at the next cycle's start", () => {
