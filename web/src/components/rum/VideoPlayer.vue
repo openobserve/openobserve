@@ -359,7 +359,7 @@ const speedOptions = [
 const speedValue = computed(() => props.speed ?? localSpeed.value);
 const skipInactivityValue = computed(() => props.skipInactivity ?? localSkipInactivity.value);
 
-// Covers the replay surface until the player is built, so its first frame never shows under the loader.
+// Covers the replay surface until the player is built or loading settles, so its first frame never shows under the loader.
 const showLoader = computed(
   () => !playerBuilt.value && (props.isLoading || expectsMoreData(props.loadState)),
 );
