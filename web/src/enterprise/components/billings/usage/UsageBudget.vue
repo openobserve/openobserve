@@ -19,7 +19,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   Every figure previews the draft settings, so the effect of a new budget shows before it is saved.
 -->
 <template>
-  <div class="@container/budget flex flex-col gap-3 pb-3" data-test="billings-usagebudget-root">
+  <!-- A failed read is not "no budgets": saving then would replace every stored budget. -->
+  <div v-if="loadFailed" data-test="billings-usagebudget-error">
+    <OEmptyState
+      size="hero"
+      variant="error"
+      illustration="broken-panel"
+      :title="t('billing.usageV2.budgetLoadFailedTitle')"
+      :description="t('billing.usageV2.budgetLoadFailed')"
+      :action-label="t('common.retry')"
+      action-icon="refresh"
+      @action="loadSettings"
+    />
+  </div>
+  <div
+    v-else
+    class="@container/budget flex flex-col gap-3 pb-3"
+    data-test="billings-usagebudget-root"
+  >
     <KpiCardRow :columns="4" class="shrink-0" data-test="billings-usagebudget-kpis">
       <UsageKpiCard
         v-for="card in kpiCards"
@@ -208,6 +225,7 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import KpiCardRow from "@/components/common/KpiCardRow.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import organizations from "@/services/organizations";
@@ -283,12 +301,19 @@ const resetDraft = () => {
   alertsOn.value = config ? !config.paused : true;
 };
 
+/** Save waits for the stored list: it sends the whole list, so one built without it would erase the rest. */
+const loaded = ref(false);
+const loadFailed = ref(false);
+
 const loadSettings = async () => {
+  loaded.value = false;
+  loadFailed.value = false;
   try {
     const res = await organizations.get_organization_settings(orgId.value);
     savedConfigs.value = res?.data?.data?.budget_config ?? [];
+    loaded.value = true;
   } catch {
-    savedConfigs.value = [];
+    loadFailed.value = true;
   }
   resetDraft();
 };
@@ -335,7 +360,7 @@ const dirty = computed(() => {
   );
 });
 
-const canSave = computed(() => hasBudget.value && dirty.value && !saving.value);
+const canSave = computed(() => loaded.value && hasBudget.value && dirty.value && !saving.value);
 
 /** Sends only `budget_config`; the backend leaves every setting it is not sent untouched. */
 const save = async () => {

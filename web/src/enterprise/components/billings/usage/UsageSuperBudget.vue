@@ -20,7 +20,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   Every edit is a draft until the save bar commits them all in one request.
 -->
 <template>
+  <!-- A failed read is not "no budgets": saving then would replace every stored budget. -->
+  <div v-if="loadFailed" class="h-full min-h-0" data-test="billings-usagesuperbudget-error">
+    <OEmptyState
+      size="hero"
+      variant="error"
+      illustration="broken-panel"
+      :title="t('billing.usageV2.budgetLoadFailedTitle')"
+      :description="t('billing.usageV2.budgetLoadFailed')"
+      :action-label="t('common.retry')"
+      action-icon="refresh"
+      @action="load"
+    />
+  </div>
   <div
+    v-else
     class="@container/super-budget flex h-full min-h-0 flex-col gap-3 overflow-y-auto"
     data-test="billings-usagesuperbudget-root"
   >
@@ -292,7 +306,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OButton>
       <OButton
         variant="primary"
-        :disabled="!pending.any"
+        :disabled="!pending.any || !loaded"
         :loading="saving"
         data-test="billings-usagesuperbudget-save"
         @click="save"
@@ -316,6 +330,7 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import KpiCardRow from "@/components/common/KpiCardRow.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -408,12 +423,19 @@ const resetDrafts = () => {
   for (const org of props.billingOrgs) orgDrafts[org.id] = savedDraft(org.id);
 };
 
+/** Save waits for the stored list: it sends the whole list, so one built without it would erase the rest. */
+const loaded = ref(false);
+const loadFailed = ref(false);
+
 const load = async () => {
+  loaded.value = false;
+  loadFailed.value = false;
   try {
     const res = await organizations.get_organization_settings(orgId.value);
     saved.value = res?.data?.data?.budget_config ?? [];
+    loaded.value = true;
   } catch {
-    saved.value = [];
+    loadFailed.value = true;
   }
   resetDrafts();
 };
@@ -526,7 +548,7 @@ const pendingText = computed(() => {
 
 /** Sends only `budget_config`: the whole array, since it replaces what is stored. */
 const save = async () => {
-  if (!pending.value.any) return;
+  if (!pending.value.any || !loaded.value) return;
   saving.value = true;
   const next = superBudgetConfigs(
     { ...totalDraft },
