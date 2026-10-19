@@ -318,6 +318,31 @@ describe("OTable", () => {
       expect(events.at(-1)![0]).toEqual({ page: 2, size: 20 });
     });
 
+    it("gives every pagination control an accessible name", () => {
+      wrapper = mount(OTable, {
+        props: {
+          data: makeRows(20),
+          columns: makeColumns(),
+          pagination: "server",
+          totalCount: 100,
+          totalCountExact: true,
+          pageSize: 20,
+          currentPage: 2,
+        },
+      });
+
+      for (const id of ["first", "prev", "next", "last"]) {
+        const label = wrapper
+          .find(`[data-test="o2-table-${id}-page-btn"]`)
+          .attributes("aria-label");
+        expect(label).toBeTruthy();
+      }
+      expect(wrapper.find("nav[aria-label]").exists()).toBe(true);
+      expect(
+        wrapper.find('[data-test="o2-table-page-size-select-trigger"]').attributes("aria-label"),
+      ).toBeTruthy();
+    });
+
     it("should reflect a pageSize prop change in the footer", async () => {
       wrapper = mount(OTable, {
         props: {
