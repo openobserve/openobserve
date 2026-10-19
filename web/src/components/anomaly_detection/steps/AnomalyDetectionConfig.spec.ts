@@ -770,19 +770,6 @@ describe("AnomalyDetectionConfig", () => {
 
       expect(wrapper.find('[data-test="anomaly-sensitivity-tier-4"]').text()).toBe(before);
     });
-
-    it("keeps the toggle bar and the level box on one centred row", async () => {
-      wrapper = mountConfig({ band_width: 3 });
-      await flushPromises();
-
-      let row: HTMLElement | null = wrapper.find('[data-test="anomaly-sensitivity-level"]')
-        .element as HTMLElement;
-      while (row && !row.querySelector('[data-test="anomaly-sensitivity-tier"]')) {
-        row = row.parentElement;
-      }
-      expect(row).not.toBeNull();
-      expect(row?.className).toContain("items-center");
-    });
   });
 
   // Wire contract: `alert_budget_per_day` set = budget mode, which the server rejects band_width beside.

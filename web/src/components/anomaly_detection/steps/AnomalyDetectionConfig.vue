@@ -558,7 +558,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </div>
             </div>
-            <div v-else class="flex flex-wrap items-center gap-3">
+            <div v-else class="flex flex-col items-start gap-3">
               <OToggleGroup
                 :model-value="bandTier"
                 :aria-label="t('alerts.sensitivity')"
@@ -586,7 +586,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span class="text-text-secondary text-xs">{{ autoLevelLabel }}</span>
                 <output class="text-sm font-medium tabular-nums">{{ autoLevelValue }}</output>
               </div>
-              <div v-else class="flex items-start gap-2">
+              <div v-else class="flex flex-wrap items-start gap-2">
                 <label
                   for="anomaly-manual-level"
                   class="text-input-label-text pt-2 text-xs font-medium whitespace-nowrap"
