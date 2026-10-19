@@ -16,7 +16,9 @@
 #[cfg(feature = "enterprise")]
 use {
     config::meta::search::ScanStats,
-    o2_enterprise::enterprise::search::{QueryManager, TaskStatus, WorkGroup},
+    o2_enterprise::enterprise::search::{
+        QueryManager, TaskStatus, WorkGroup, query_manager::Registration,
+    },
 };
 
 #[derive(Clone, Debug)]
@@ -34,44 +36,76 @@ impl Searcher {
     }
 
     // check is the trace_id in the query_manager
-    pub async fn contain_key(&self, trace_id: &str) -> bool {
-        self.query_manager.contain_key(trace_id).await
+    pub async fn contain_key(&self, org_id: &str, trace_id: &str) -> bool {
+        self.query_manager.contain_key(org_id, trace_id).await
     }
 
     // insert the trace_id and task_status into the query_manager
-    pub async fn insert(&self, trace_id: String, task_status: TaskStatus) {
-        self.query_manager.insert(trace_id, task_status).await;
+    pub async fn insert(&self, org_id: &str, trace_id: String, task_status: TaskStatus) {
+        self.query_manager
+            .insert(org_id, trace_id, task_status)
+            .await;
+    }
+
+    /// Registers a task, or joins the org's existing task under the same id.
+    pub async fn insert_or_join(
+        &self,
+        org_id: &str,
+        trace_id: String,
+        task_status: TaskStatus,
+    ) -> Registration {
+        self.query_manager
+            .insert_or_join(org_id, trace_id, task_status)
+            .await
     }
 
     // remove the trace_id from the query_manager
-    pub async fn remove(
+    pub async fn remove(&self, org_id: &str, trace_id: &str) -> Option<(String, TaskStatus)> {
+        self.query_manager.remove(org_id, trace_id).await
+    }
+
+    /// Removes the org's exact `trace_id` entry only when it is not a leader.
+    pub async fn remove_follower(
         &self,
+        org_id: &str,
         trace_id: &str,
-        query_cancelled: bool,
+    ) -> Option<(String, TaskStatus)> {
+        self.query_manager.remove_follower(org_id, trace_id).await
+    }
+
+    /// Removes `trace_id` and its `{trace_id}-` sub-tasks in `org_id`, or in every org for `None`.
+    pub async fn cancel(
+        &self,
+        org_id: Option<&str>,
+        trace_id: &str,
     ) -> Option<Vec<(String, TaskStatus)>> {
-        self.query_manager.remove(trace_id, query_cancelled).await
+        self.query_manager.cancel(org_id, trace_id).await
     }
 
     // check is the trace_id in the query_manager and is_leader
-    pub async fn is_leader(&self, trace_id: &str) -> bool {
-        self.query_manager.is_leader(trace_id).await
+    pub async fn is_leader(&self, org_id: &str, trace_id: &str) -> bool {
+        self.query_manager.is_leader(org_id, trace_id).await
     }
 
     // insert the sender into the query_manager by trace_id
     pub async fn insert_sender(
         &self,
+        org_id: &str,
         trace_id: &str,
         sender: tokio::sync::oneshot::Sender<()>,
         query_start: bool,
     ) -> Result<(), infra::errors::Error> {
         self.query_manager
-            .insert_sender(trace_id, sender, query_start)
+            .insert_sender(org_id, trace_id, sender, query_start)
             .await
     }
 
     // get all task status that is leader
-    pub async fn get_task_status(&self) -> Vec<proto::cluster_rpc::QueryStatus> {
-        let mut status = self.query_manager.get_task_status().await;
+    pub async fn get_task_status(
+        &self,
+        org_id: Option<&str>,
+    ) -> Vec<proto::cluster_rpc::QueryStatus> {
+        let mut status = self.query_manager.get_task_status(org_id).await;
 
         // Enrich dashboard searches submitted without names so query management can display the
         // dashboard and folder instead of only their IDs.
@@ -94,16 +128,21 @@ impl Searcher {
     }
 
     // add file stats
-    pub async fn add_file_stats(&self, trace_id: &str, scan_stats: &ScanStats) {
+    pub async fn add_file_stats(&self, org_id: &str, trace_id: &str, scan_stats: &ScanStats) {
         self.query_manager
-            .add_file_stats(trace_id, scan_stats)
+            .add_file_stats(org_id, trace_id, scan_stats)
             .await;
     }
 
     // add work group
-    pub async fn add_work_group(&self, trace_id: &str, work_group: Option<WorkGroup>) {
+    pub async fn add_work_group(
+        &self,
+        org_id: &str,
+        trace_id: &str,
+        work_group: Option<WorkGroup>,
+    ) {
         self.query_manager
-            .add_work_group(trace_id, work_group)
+            .add_work_group(org_id, trace_id, work_group)
             .await;
     }
 }

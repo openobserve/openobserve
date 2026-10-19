@@ -64,7 +64,7 @@ test.describe('RUM Product Analytics on the real engine', () => {
     const funnel = encodeDef({ s: [['p', a], ['c', b], ['p', c]], u: 'sessions', w: 'session' });
     await pa.goto('funnels', { app: facts.appId, period: '7d', funnel });
     await pa.expectFunnelCounts(facts.funnel.counts);
-    await expect(pa.funnelOrderLabel).toContainText('In order (other events allowed between)');
+    await expect(pa.funnelOrderLabel).toHaveAttribute('aria-label', 'In order (other events allowed between)');
 
     // B then A: s4 (B,A,B) and s5 (B,A) both reach A after B; s1 and s2 do not.
     const reversed = encodeDef({ s: [['c', b], ['p', a]], u: 'sessions', w: 'session' });

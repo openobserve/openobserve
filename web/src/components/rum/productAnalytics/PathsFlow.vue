@@ -88,6 +88,7 @@ const palette = computed(() => {
     p: chartColor("--color-chart-series-1"),
     c: chartColor("--color-chart-series-3"),
     e: chartColor("--color-chart-series-5"),
+    r: chartColor("--color-status-negative"),
     other: chartColor("--color-border-strong"),
     exit: chartColor("--color-text-secondary"),
     start: chartColor("--color-text-secondary"),

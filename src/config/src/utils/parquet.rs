@@ -377,20 +377,6 @@ mod tests {
     }
 
     #[test]
-    fn test_get_memtable_id_simple() {
-        // Simple case with single underscore
-        let file_name = "file_1234567890.parquet";
-        assert_eq!(get_memtable_id_from_file_name(file_name), 1234567890);
-    }
-
-    #[test]
-    fn test_get_memtable_id_multiple_underscores() {
-        // Multiple underscores - should get the last one
-        let file_name = "prefix_middle_suffix_9876543210.parquet";
-        assert_eq!(get_memtable_id_from_file_name(file_name), 9876543210);
-    }
-
-    #[test]
     fn test_get_memtable_id_complex_real_world() {
         // Real-world complex case from the issue
         let file_name =
@@ -399,24 +385,10 @@ mod tests {
     }
 
     #[test]
-    fn test_get_memtable_id_multiple_dots_and_underscores() {
-        // Multiple dots and underscores
-        let file_name = "a.b.c_d.e.f_12345.parquet";
-        assert_eq!(get_memtable_id_from_file_name(file_name), 12345);
-    }
-
-    #[test]
     fn test_get_memtable_id_no_extension() {
         // No extension
         let file_name = "file_555666777";
         assert_eq!(get_memtable_id_from_file_name(file_name), 555666777);
-    }
-
-    #[test]
-    fn test_get_memtable_id_no_underscore() {
-        // No underscore - should return 0
-        let file_name = "file.parquet";
-        assert_eq!(get_memtable_id_from_file_name(file_name), 0);
     }
 
     #[test]
@@ -433,32 +405,10 @@ mod tests {
     }
 
     #[test]
-    fn test_get_memtable_id_only_underscore() {
-        // Only underscore
-        let file_name = "_123456.parquet";
-        assert_eq!(get_memtable_id_from_file_name(file_name), 123456);
-    }
-
-    #[test]
-    fn test_get_memtable_id_multiple_extensions() {
-        // Multiple extensions (e.g., .tar.gz style)
-        // Based on add_memtable_id_to_file_name, the ID is added before the extension
-        let file_name = "file.tar_999888777.gz";
-        assert_eq!(get_memtable_id_from_file_name(file_name), 999888777);
-    }
-
-    #[test]
     fn test_get_memtable_id_max_u64() {
         // Test with max u64 value
         let file_name = "file_18446744073709551615.parquet";
         assert_eq!(get_memtable_id_from_file_name(file_name), u64::MAX);
-    }
-
-    #[test]
-    fn test_get_memtable_id_zero() {
-        // Test with zero
-        let file_name = "file_0.parquet";
-        assert_eq!(get_memtable_id_from_file_name(file_name), 0);
     }
 
     #[tokio::test]

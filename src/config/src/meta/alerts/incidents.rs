@@ -435,75 +435,6 @@ pub struct IncidentWithAlerts {
     pub composite_alerts: Vec<CompositeAlertSummary>,
 }
 
-/// Organization-level incident correlation configuration
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-pub struct IncidentCorrelationConfig {
-    /// Enable incident correlation for this org
-    #[serde(default)]
-    pub enabled: bool,
-
-    /// Time window for correlating alerts to same incident (minutes)
-    #[serde(default = "default_time_window")]
-    pub time_window_minutes: u64,
-
-    /// Minimum alerts to create an incident
-    #[serde(default = "default_min_alerts")]
-    pub min_alerts_for_incident: u32,
-
-    /// When to send notifications
-    #[serde(default)]
-    pub notification_strategy: NotificationStrategy,
-
-    /// Enable Service Graph topology enrichment
-    #[serde(default = "default_true")]
-    pub use_service_graph: bool,
-
-    /// Enable root cause inference
-    #[serde(default = "default_true")]
-    pub root_cause_detection: bool,
-
-    /// Auto-resolve after N minutes of no new alerts (None = use global default, 0 = disabled)
-    #[serde(default)]
-    pub auto_resolve_after_minutes: Option<i64>,
-
-    /// Time window for hierarchical incident upgrade (minutes)
-    #[serde(default = "default_upgrade_window")]
-    pub upgrade_window_minutes: u64,
-
-    /// Default severity for new incidents
-    #[serde(default)]
-    pub default_severity: IncidentSeverity,
-}
-
-impl Default for IncidentCorrelationConfig {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            time_window_minutes: default_time_window(),
-            min_alerts_for_incident: default_min_alerts(),
-            notification_strategy: NotificationStrategy::default(),
-            use_service_graph: true,
-            root_cause_detection: true,
-            auto_resolve_after_minutes: None,
-            upgrade_window_minutes: default_upgrade_window(),
-            default_severity: IncidentSeverity::default(),
-        }
-    }
-}
-
-/// Notification strategy for incidents
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum NotificationStrategy {
-    /// Only notify when a new incident is created
-    #[default]
-    NewIncidentOnly,
-    /// Notify on all updates (new alerts added, status changes)
-    AllUpdates,
-    /// No notifications
-    None,
-}
-
 /// Outcome of correlating an alert to an incident.
 ///
 /// Used by the scheduler to decide whether and how to send a notification
@@ -555,22 +486,6 @@ impl IncidentCorrelationOutcome {
             | Self::SeverityEscalated { service_name, .. } => service_name,
         }
     }
-}
-
-fn default_time_window() -> u64 {
-    60
-}
-
-fn default_min_alerts() -> u32 {
-    1
-}
-
-fn default_upgrade_window() -> u64 {
-    30
-}
-
-fn default_true() -> bool {
-    true
 }
 
 /// Whether an incident's member alert is an OpenObserve alert or an
@@ -1273,16 +1188,6 @@ mod tests {
     }
 
     #[test]
-    fn test_default_config() {
-        let config = IncidentCorrelationConfig::default();
-        assert!(!config.enabled);
-        assert_eq!(config.time_window_minutes, 60);
-        assert_eq!(config.min_alerts_for_incident, 1);
-        assert!(config.use_service_graph);
-        assert!(config.root_cause_detection);
-    }
-
-    #[test]
     fn test_incident_status_from_str_case_insensitive() {
         assert_eq!(
             "OPEN".parse::<IncidentStatus>().unwrap(),
@@ -1492,48 +1397,6 @@ mod tests {
         assert_eq!(KeyType::from_stored("Secondary"), KeyType::Secondary);
         assert_eq!(KeyType::from_stored("AlertId"), KeyType::AlertId);
         assert_eq!(KeyType::from_stored("unknown"), KeyType::AlertId);
-    }
-
-    #[test]
-    fn test_key_type_can_upgrade_alert_id_to_secondary() {
-        assert!(KeyType::AlertId.can_upgrade_to(KeyType::Secondary));
-    }
-
-    #[test]
-    fn test_key_type_can_upgrade_alert_id_to_primary() {
-        assert!(KeyType::AlertId.can_upgrade_to(KeyType::Primary));
-    }
-
-    #[test]
-    fn test_key_type_can_upgrade_secondary_to_primary() {
-        assert!(KeyType::Secondary.can_upgrade_to(KeyType::Primary));
-    }
-
-    #[test]
-    fn test_key_type_can_upgrade_same_level_secondary() {
-        // Same level upgrades allowed (dimension refinement)
-        assert!(KeyType::Secondary.can_upgrade_to(KeyType::Secondary));
-    }
-
-    #[test]
-    fn test_key_type_can_upgrade_same_level_primary() {
-        // Same level upgrades allowed (dimension refinement)
-        assert!(KeyType::Primary.can_upgrade_to(KeyType::Primary));
-    }
-
-    #[test]
-    fn test_key_type_cannot_downgrade_primary_to_secondary() {
-        assert!(!KeyType::Primary.can_upgrade_to(KeyType::Secondary));
-    }
-
-    #[test]
-    fn test_key_type_cannot_downgrade_primary_to_alert_id() {
-        assert!(!KeyType::Primary.can_upgrade_to(KeyType::AlertId));
-    }
-
-    #[test]
-    fn test_key_type_cannot_downgrade_secondary_to_alert_id() {
-        assert!(!KeyType::Secondary.can_upgrade_to(KeyType::AlertId));
     }
 
     // ========== DimensionRelationship Tests ==========
@@ -2121,26 +1984,6 @@ mod tests {
             service_name: "service-z".to_string(),
         };
         assert_eq!(repeated.service_name(), "service-z");
-    }
-
-    #[test]
-    fn test_default_time_window() {
-        assert_eq!(default_time_window(), 60);
-    }
-
-    #[test]
-    fn test_default_min_alerts() {
-        assert_eq!(default_min_alerts(), 1);
-    }
-
-    #[test]
-    fn test_default_upgrade_window() {
-        assert_eq!(default_upgrade_window(), 30);
-    }
-
-    #[test]
-    fn test_default_true() {
-        assert!(default_true());
     }
 
     #[test]

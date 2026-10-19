@@ -309,7 +309,7 @@ async fn run(
 
         let mut results = config::meta::search::Response::default();
         for h in deliverable {
-            results.add_hit(&h);
+            results.add_hit(h);
         }
         results.set_total(total_across_partitions);
         if !range_error.is_empty() && !range_error_sent {
@@ -375,7 +375,7 @@ async fn run(
 
         let mut results = config::meta::search::Response::default();
         for h in deliverable {
-            results.add_hit(&h);
+            results.add_hit(h);
         }
         results.set_total(total_across_partitions);
         if !range_error.is_empty() {

@@ -123,12 +123,6 @@ impl EnrichmentTableUrlJob {
         self.error_message = Some(error);
         self.updated_at = chrono::Utc::now().timestamp_micros();
     }
-
-    pub fn update_progress(&mut self, bytes: u64, records: i64) {
-        self.total_bytes_fetched += bytes;
-        self.total_records_processed += records;
-        self.updated_at = chrono::Utc::now().timestamp_micros();
-    }
 }
 
 #[cfg(test)]
@@ -272,24 +266,6 @@ mod tests {
 
         job.increment_retry("Second retry".to_string());
         assert_eq!(job.retry_count, 2);
-    }
-
-    #[test]
-    fn test_update_progress() {
-        let mut job = EnrichmentTableUrlJob::new(
-            "org".to_string(),
-            "table".to_string(),
-            "url".to_string(),
-            false,
-        );
-
-        job.update_progress(1024, 10);
-        assert_eq!(job.total_bytes_fetched, 1024);
-        assert_eq!(job.total_records_processed, 10);
-
-        job.update_progress(2048, 20);
-        assert_eq!(job.total_bytes_fetched, 3072);
-        assert_eq!(job.total_records_processed, 30);
     }
 
     #[test]
