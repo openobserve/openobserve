@@ -193,7 +193,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="lg"
         >
           <template #label>
-            <img :src="getImageURL('images/common/function.svg')" class="h-4 w-4 dark:invert" />
+            <img
+              alt=""
+              :src="getImageURL('images/common/function.svg')"
+              class="h-4 w-4 dark:invert"
+            />
           </template>
         </OSwitch>
         <QueryTypeSelector @click.stop></QueryTypeSelector>

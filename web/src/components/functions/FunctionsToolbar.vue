@@ -191,6 +191,7 @@
         @mouseleave="isHovered = false"
       >
         <img
+          alt=""
           :src="getBtnLogo"
           class="opacity-70 transition-transform duration-600 [.ai-btn-active_&]:!opacity-100"
         />

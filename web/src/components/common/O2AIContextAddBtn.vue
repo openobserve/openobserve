@@ -12,6 +12,7 @@
   >
     <div class="flex flex-nowrap items-center">
       <img
+        alt=""
         :height="props.imageHeight"
         :width="props.imageWidth"
         :src="getBtnLogo"

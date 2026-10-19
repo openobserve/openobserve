@@ -85,6 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @mouseleave="isHovered = false"
         >
           <img
+            alt=""
             :src="getBtnLogo"
             class="transition-transform duration-[600ms] ease-[ease] group-hover:rotate-180"
             style="width: 1.125rem; height: 1.125rem"

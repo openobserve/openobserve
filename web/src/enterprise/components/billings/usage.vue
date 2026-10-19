@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ t("billing.errorTracking") }}
                 </div>
                 <div class="opacity-80">
-                  <img :src="errorTrackingIcon" />
+                  <img alt="" :src="errorTrackingIcon" />
                 </div>
               </div>
             </div>
@@ -82,7 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ t("billing.rumSession") }}
                 </div>
                 <div class="opacity-80">
-                  <img :src="rumSessionIcon" />
+                  <img alt="" :src="rumSessionIcon" />
                 </div>
               </div>
             </div>
@@ -121,7 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               class="bg-bg-gray rounded-default flex h-7 w-7 shrink-0 items-center justify-center"
             >
-              <img :src="tile.icon" class="h-4 w-4" />
+              <img alt="" :src="tile.icon" class="h-4 w-4" />
             </div>
           </div>
           <div class="flex items-baseline gap-1 whitespace-nowrap">

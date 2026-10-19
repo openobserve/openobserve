@@ -184,10 +184,18 @@ describe("ChartRenderer", () => {
   });
 
   describe("Component Rendering & Initialization", () => {
+    it("exposes the label as the accessible name of the chart", async () => {
+      await wrapper.setProps({ label: "CPU usage" });
+      expect(wrapper.find('[data-test="chart-renderer"]').attributes("aria-label")).toBe(
+        "CPU usage",
+      );
+    });
+
     it("should render chart container with correct attributes", () => {
       expect(wrapper.find('[data-test="chart-renderer"]').exists()).toBe(true);
       const container = wrapper.find('[data-test="chart-renderer"]');
-      expect(container.attributes("id")).toBe("chart1");
+      expect(container.attributes("id")).toMatch(/^chart-/);
+      expect(container.attributes("role")).toBe("img");
       // Sizing moved from inline `style="height:100%;width:100%"` to utilities.
       expect(container.classes()).toContain("h-full");
       expect(container.classes()).toContain("w-full");

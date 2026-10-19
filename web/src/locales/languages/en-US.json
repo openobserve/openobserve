@@ -582,6 +582,7 @@
   },
   "common": {
     "copiedToClipboard": "Copied to clipboard",
+    "customLogoAlt": "Organization logo",
     "queryEditorAriaLabel": "Query editor. Press Escape to move to the next control.",
     "inlineEdit": {
       "autoHint": "Click to rename. Until you do, this name is generated from your configuration and keeps up as you change it."
@@ -18960,6 +18961,8 @@
         "resetToDefault": "Reset to default",
         "resetColumnWidths": "Reset column widths"
       },
+      "selectAllRows": "Select all rows",
+      "selectRow": "Select row {name}",
       "removeColumnAria": "Remove column",
       "formatColumnAria": "Format column",
       "selectedOfTotal": "{selected} of {total} selected",

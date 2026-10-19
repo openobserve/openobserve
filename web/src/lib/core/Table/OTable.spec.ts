@@ -912,6 +912,18 @@ describe("OTable", () => {
       expect(wrapper.find('[data-test="o2-table-select-cell"]').exists()).toBe(true);
     });
 
+    it("names the select-all and row checkboxes", () => {
+      wrapper = mount(OTable, {
+        props: { data: makeRows(3), columns: makeColumns(), selection: "multiple" },
+      });
+      const all = wrapper.find('[data-test="o2-table-select-all"] [role="checkbox"]');
+      expect(all.attributes("aria-label")).toBe("Select all rows");
+      const row = wrapper.find('[data-test="o2-table-select-0"]');
+      expect(
+        row.attributes("aria-label") ?? row.find("[aria-label]").attributes("aria-label"),
+      ).toMatch(/^Select row /);
+    });
+
     it("does not render checkbox column when selection is none", () => {
       wrapper = mount(OTable, {
         props: {
