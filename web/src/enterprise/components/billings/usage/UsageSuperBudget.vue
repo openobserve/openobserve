@@ -562,8 +562,8 @@ const save = async () => {
   );
   try {
     await organizations.post_organization_settings(orgId.value, { budget_config: next });
+    // Drafts are not reset: the saved ones now match, and an edit typed during the request stays pending.
     saved.value = next;
-    resetDrafts();
     store.dispatch("setOrganizationSettings", {
       ...(store.state?.organizationData?.organizationSettings ?? {}),
       budget_config: next,

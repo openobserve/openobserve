@@ -168,3 +168,60 @@ describe("an emptied Warn % field", () => {
     expect(savedFor("member-a")).toMatchObject({ total_budget_amount: 200, warn_at_amount: 160 });
   });
 });
+
+describe("super org Budget saving", () => {
+  beforeEach(() => {
+    getSettings.mockReset().mockResolvedValue(stored);
+  });
+
+  it("keeps an edit typed while a save is running, as still unsaved", async () => {
+    let finishSave!: (value: unknown) => void;
+    post.mockReset().mockReturnValue(new Promise((resolve) => (finishSave = resolve)));
+    const wrapper = mount(UsageSuperBudget, {
+      props: { details, billingOrgs, projected: null },
+      global: { plugins: [i18n, store] },
+    });
+    await flushPromises();
+    const budgetOf = (id: string) =>
+      byTestId(wrapper, "OInput", `billings-usagesuperbudget-budget-${id}`);
+
+    budgetOf("member-a").vm.$emit("update:modelValue", 200);
+    await flushPromises();
+    byTestId(wrapper, "OButton", "billings-usagesuperbudget-save").vm.$emit("click");
+    await flushPromises();
+
+    // The payer's budget changes before the save comes back.
+    budgetOf("payer").vm.$emit("update:modelValue", 300);
+    finishSave({ data: {} });
+    await flushPromises();
+
+    expect(budgetOf("payer").props("modelValue")).toBe(300);
+    expect(budgetOf("member-a").props("modelValue")).toBe(200);
+    const bar = wrapper.find('[data-test="billings-usagesuperbudget-savebar"]').text();
+    expect(bar).not.toContain("All changes saved");
+  });
+
+  it("reads All changes saved after a save, with no draft left pending", async () => {
+    post.mockReset().mockResolvedValue({ data: {} });
+    const wrapper = mount(UsageSuperBudget, {
+      props: { details, billingOrgs, projected: null },
+      global: { plugins: [i18n, store] },
+    });
+    await flushPromises();
+
+    byTestId(wrapper, "OInput", "billings-usagesuperbudget-budget-member-a").vm.$emit(
+      "update:modelValue",
+      150,
+    );
+    byTestId(wrapper, "OInput", "billings-usagesuperbudget-warn-member-a").vm.$emit(
+      "update:modelValue",
+      "33.3",
+    );
+    await flushPromises();
+    byTestId(wrapper, "OButton", "billings-usagesuperbudget-save").vm.$emit("click");
+    await flushPromises();
+
+    const bar = wrapper.find('[data-test="billings-usagesuperbudget-savebar"]').text();
+    expect(bar).toContain("All changes saved");
+  });
+});
