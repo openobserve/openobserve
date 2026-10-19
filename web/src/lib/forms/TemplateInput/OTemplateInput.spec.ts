@@ -47,6 +47,7 @@ const Host = defineComponent({
   props: {
     initial: { type: String, default: "" },
     suggestions: { type: Array, default: undefined },
+    delimiter: { type: String, default: "double" },
   },
   emits: ["select", "blur", "keydown"],
   setup(props) {
@@ -60,6 +61,7 @@ const Host = defineComponent({
       type="url"
       label="Starting URL"
       :suggestions="suggestions"
+      :delimiter="delimiter"
       @select="(name) => $emit('select', name)"
       @blur="(event) => $emit('blur', event)"
       @keydown="(event) => $emit('keydown', event)"
@@ -133,6 +135,17 @@ describe("OTemplateInput", { timeout: 20_000 }, () => {
     press("Enter");
     await flushPromises();
     expect(hostText()).toBe("https://{{BASE_URL}}/path");
+    expect(wrapper.emitted("select")).toEqual([["BASE_URL"]]);
+    expect(list()).toBeNull();
+  });
+
+  it("with delimiter=single, opens the list on a lone { and inserts a single-brace token", async () => {
+    mountHost({ delimiter: "single" });
+    await type("https://{ba/path", 11);
+    expect(list()).not.toBeNull();
+    press("Enter");
+    await flushPromises();
+    expect(hostText()).toBe("https://{BASE_URL}/path");
     expect(wrapper.emitted("select")).toEqual([["BASE_URL"]]);
     expect(list()).toBeNull();
   });

@@ -15,7 +15,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import OTemplateSuggestList from "./OTemplateSuggestList.vue";
-import { tokenFor } from "./useTemplateSuggest";
 import type { TemplateSuggestion } from "./OTemplateInput.types";
 import type { TemplateOverlayProps, TemplateOverlaySlots } from "./OTemplateOverlay.types";
 
@@ -38,7 +37,7 @@ defineSlots<TemplateOverlaySlots<T>>();
     class="bg-select-content-bg border-select-content-border rounded-default absolute start-0 bottom-full z-10 mb-1 max-w-72 border px-2 py-1.5 shadow-md"
   >
     <span class="text-accent text-2xs font-mono font-semibold">{{
-      tokenFor(props.suggest.peekName.value)
+      props.suggest.format(props.suggest.peekName.value)
     }}</span>
     <span class="text-text-secondary block text-xs wrap-break-word">{{
       props.suggest.peekValue.value
@@ -51,6 +50,7 @@ defineSlots<TemplateOverlaySlots<T>>();
     :boundary="props.boundary"
     :matches="props.suggest.matches.value"
     :highlighted-index="props.suggest.highlightedIndex.value"
+    :format="props.suggest.format"
     :data-test="props.dataTest"
     @select="props.suggest.accept"
     @highlight="props.suggest.highlight"

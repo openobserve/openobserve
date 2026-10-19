@@ -49,6 +49,7 @@ const Host = defineComponent({
     initial: { type: String, default: "" },
     suggestions: { type: Array, default: undefined },
     values: { type: Object, default: undefined },
+    delimiter: { type: String, default: "double" },
   },
   emits: ["select", "blur"],
   setup(props) {
@@ -61,6 +62,7 @@ const Host = defineComponent({
       data-test="msg"
       :suggestions="suggestions"
       :values="values"
+      :delimiter="delimiter"
       @select="(name) => $emit('select', name)"
       @blur="(event) => $emit('blur', event)"
     />
@@ -233,6 +235,17 @@ describe("OTemplateTextarea", { timeout: 20_000 }, () => {
       await flushPromises();
       expect(enter.defaultPrevented).toBe(true);
       expect(hostText()).toBe("see {{BASE_URL}} and more");
+      expect(wrapper.emitted("select")).toEqual([["BASE_URL"]]);
+      expect(list()).toBeNull();
+    });
+
+    it("with delimiter=single, opens on a lone { and inserts a single-brace token", async () => {
+      mountHost({ delimiter: "single" });
+      await type("see {ba and more", 7);
+      const enter = press("Enter");
+      await flushPromises();
+      expect(enter.defaultPrevented).toBe(true);
+      expect(hostText()).toBe("see {BASE_URL} and more");
       expect(wrapper.emitted("select")).toEqual([["BASE_URL"]]);
       expect(list()).toBeNull();
     });

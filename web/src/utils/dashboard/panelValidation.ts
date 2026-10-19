@@ -2,6 +2,7 @@ import type { TranslateFn } from "@/types/i18n";
 import { CURRENT_DASHBOARD_SCHEMA_VERSION } from "@/utils/dashboard/convertDashboardSchemaVersion";
 import functionValidation from "@/components/dashboards/addPanel/dynamicFunction/functionValidation.json";
 import { isFormulaQuery } from "@/utils/dashboard/promql/formula";
+import { validateAnnotationSources } from "@/utils/dashboard/validateAnnotationSources";
 
 /**
  * Validates a single condition item
@@ -1042,6 +1043,8 @@ export const validateDashboardJson = (t: TranslateFn, dashboardJson: any): strin
       }),
     );
   }
+
+  errors.push(...validateAnnotationSources(t, dashboardJson?.annotationSources));
 
   // Check tabs
   if (!Array.isArray(dashboardJson?.tabs) || dashboardJson?.tabs?.length === 0) {

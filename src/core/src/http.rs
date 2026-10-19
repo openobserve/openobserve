@@ -216,6 +216,12 @@ impl From<DashboardError> for Response {
             DashboardError::PanelAlreadyExists(panel_id, tab_id) => MetaHttpResponse::conflict(
                 format!("Panel with id {panel_id} already exists in tab {tab_id}"),
             ),
+            DashboardError::TooManyAnnotationSources(max) => MetaHttpResponse::bad_request(
+                format!("A dashboard can have at most {max} annotation sources"),
+            ),
+            DashboardError::InvalidAnnotationSource(reason) => {
+                MetaHttpResponse::bad_request(reason)
+            }
         }
     }
 }
