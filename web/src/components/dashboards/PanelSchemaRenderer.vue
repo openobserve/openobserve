@@ -97,6 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ref="chartRendererRef"
           :data="chartRendererData"
           :height="chartPanelHeight"
+          :label="panelSchema?.title"
           :render-type="panelSchema?.type === 'metric' ? 'svg' : 'canvas'"
           @updated:data-zoom="onDataZoom"
           @error="errorDetail = $event"
