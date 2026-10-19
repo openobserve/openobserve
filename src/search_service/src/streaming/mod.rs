@@ -28,9 +28,7 @@ use config::{
     meta::{
         dashboards::usage_report::DashboardInfo,
         function::{RESULT_ARRAY, VRLResultResolver},
-        search::{
-            Request, ScanStats, SearchEventType, StreamResponses, TimeOffset, ValuesEventContext,
-        },
+        search::{Request, SearchEventType, StreamResponses, TimeOffset, ValuesEventContext},
         sql::OrderBy,
         stream::StreamType,
     },
@@ -74,7 +72,10 @@ pub mod utils;
 // Re-export commonly used functions for easier access
 #[cfg(feature = "enterprise")]
 pub use cache::write_partial_results_to_cache;
-pub use cache::{handle_cache_responses_and_deltas, write_results_to_cache};
+pub use cache::{
+    handle_cache_responses_and_deltas, summarize_results, write_first_page_to_cache,
+    write_results_to_cache,
+};
 pub use execution::do_partitioned_search;
 pub use sorting::order_search_results;
 
@@ -262,7 +263,10 @@ pub async fn process_search_stream_request(
     // partition.
     let mut hits_to_skip = req.query.from;
 
-    if req.query.from == 0 && !req.query.track_total_hits && req.query.streaming_id.is_none() {
+    let (accumulated_stats, accumulated_records) = if req.query.from == 0
+        && !req.query.track_total_hits
+        && req.query.streaming_id.is_none()
+    {
         // check cache for the first page
         let (c_resp, _should_exec_query) = match search_cache::prepare_cache_response(
             &trace_id,
@@ -518,59 +522,58 @@ pub async fn process_search_stream_request(
             start.elapsed().as_millis()
         );
         // Step 3: Write to results cache
-        // cache only if from is 0 and is not an aggregate_query
-        if req.query.from == 0
-            && let Err(e) = write_results_to_cache(
-                c_resp,
-                start_time,
-                end_time,
-                &mut accumulated_results,
-                req.clear_cache,
-            )
-            .instrument(search_span.clone())
-            .await
-            .map_err(|e| {
+        match write_first_page_to_cache(
+            c_resp,
+            &req,
+            start_time,
+            end_time,
+            &mut accumulated_results,
+            extract_patterns,
+        )
+        .instrument(search_span.clone())
+        .await
+        {
+            Ok(summary) => summary,
+            Err(e) => {
                 log::error!(
                     "[HTTP2_STREAM trace_id {trace_id}] Error writing results to cache: {e}",
                 );
-                e
-            })
-        {
-            // send audit response first
-            #[cfg(feature = "enterprise")]
-            {
-                let resp = e.http_status();
-                if audit_enabled {
-                    // Using spawn to handle the async call
-                    audit(AuditMessage {
-                        user_email: user_id,
-                        org_id,
-                        _timestamp: config::utils::time::now_micros(),
-                        protocol: Protocol::Http,
-                        response_meta: ResponseMeta {
-                            http_method: _audit_ctx.as_ref().unwrap().method.to_string(),
-                            http_path: _audit_ctx.as_ref().unwrap().path.to_string(),
-                            http_query_params: _audit_ctx
-                                .as_ref()
-                                .unwrap()
-                                .query_params
-                                .to_string(),
-                            http_body: _audit_ctx.as_ref().unwrap().body.to_string(),
-                            http_response_code: resp,
-                            error_msg: Some(e.to_string()),
-                            trace_id: Some(trace_id.to_string()),
-                        },
-                    })
-                    .await;
+                // send audit response first
+                #[cfg(feature = "enterprise")]
+                {
+                    let resp = e.http_status();
+                    if audit_enabled {
+                        // Using spawn to handle the async call
+                        audit(AuditMessage {
+                            user_email: user_id,
+                            org_id,
+                            _timestamp: config::utils::time::now_micros(),
+                            protocol: Protocol::Http,
+                            response_meta: ResponseMeta {
+                                http_method: _audit_ctx.as_ref().unwrap().method.to_string(),
+                                http_path: _audit_ctx.as_ref().unwrap().path.to_string(),
+                                http_query_params: _audit_ctx
+                                    .as_ref()
+                                    .unwrap()
+                                    .query_params
+                                    .to_string(),
+                                http_body: _audit_ctx.as_ref().unwrap().body.to_string(),
+                                http_response_code: resp,
+                                error_msg: Some(e.to_string()),
+                                trace_id: Some(trace_id.to_string()),
+                            },
+                        })
+                        .await;
+                    }
                 }
-            }
 
-            if sender.send(Err(e)).await.is_err() {
-                log::warn!(
-                    "[HTTP2_STREAM trace_id {trace_id}] Sender is closed, stop sending message to client",
-                );
+                if sender.send(Err(e)).await.is_err() {
+                    log::warn!(
+                        "[HTTP2_STREAM trace_id {trace_id}] Sender is closed, stop sending message to client",
+                    );
+                }
+                return;
             }
-            return;
         }
     } else {
         // Step 4: Search without cache for req with from > 0
@@ -634,7 +637,8 @@ pub async fn process_search_stream_request(
             }
             return;
         }
-    }
+        summarize_results(&accumulated_results)
+    };
 
     #[allow(unused_mut)]
     let mut search_role = "leader".to_string();
@@ -646,13 +650,6 @@ pub async fn process_search_stream_request(
 
     // search is done
     let took_time = start.elapsed().as_millis();
-    let mut accumulated_stats = ScanStats::default();
-    let mut accumulated_records = 0;
-    for result in &accumulated_results {
-        let (stats, hits) = result.stats();
-        accumulated_stats.add(&stats);
-        accumulated_records += hits;
-    }
     let trace_id_clone = trace_id.clone();
     let org_id_clone = org_id.clone();
     async move {

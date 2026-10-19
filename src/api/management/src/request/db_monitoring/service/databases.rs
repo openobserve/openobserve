@@ -26,12 +26,7 @@ pub(crate) async fn read_databases_body(
     user_id: &str,
     q: &DatabasesQuery,
 ) -> Result<Value, HttpResponse> {
-    let (start_time, end_time) = resolve_range(q.start_time, q.end_time);
-    if start_time >= end_time {
-        return Err(MetaHttpResponse::bad_request(
-            "start_time must be before end_time",
-        ));
-    }
+    let (start_time, end_time) = resolve_range(q.start_time, q.end_time)?;
     let baseline = parse_baseline_pair(q.baseline_start_time, q.baseline_end_time)?;
 
     let (current, baseline_out) = read_current_and_baseline(

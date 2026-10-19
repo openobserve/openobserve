@@ -27,7 +27,10 @@ use config::{
         search::{Query as SearchQuery, Request as SearchRequest},
         stream::StreamType,
     },
-    utils::{sql::quote_sql_string, time::now_micros},
+    utils::{
+        sql::quote_sql_string,
+        time::{now_micros, validate_time_range},
+    },
 };
 use infra::errors::{Error as InfraError, ErrorCodes};
 use o2_enterprise::enterprise::alert_calibration_service;
@@ -93,6 +96,7 @@ pub struct CalibrationStatus {
     params(("org_id" = String, Path, description = "Organization name"), DigestRange),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Invalid time range", content_type = "application/json", body = Object),
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
         (status = 404, description = "Alert calibration is disabled for this deployment", content_type = "application/json", body = Object),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = Object),
@@ -118,6 +122,7 @@ pub async fn list_runs(Path(org_id): Path<String>, Query(range): Query<DigestRan
     params(("org_id" = String, Path, description = "Organization name"), AlertRuns),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Invalid time range", content_type = "application/json", body = Object),
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
         (status = 404, description = "Alert calibration is disabled for this deployment", content_type = "application/json", body = Object),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = Object),
@@ -147,6 +152,7 @@ pub async fn list_runs_for_alert(
     params(("org_id" = String, Path, description = "Organization name"), RunWindow),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Invalid time range", content_type = "application/json", body = Object),
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
         (status = 404, description = "Alert calibration is disabled for this deployment", content_type = "application/json", body = Object),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = Object),
@@ -174,6 +180,7 @@ pub async fn get_run_records(Path(org_id): Path<String>, Query(run): Query<RunWi
     params(("org_id" = String, Path, description = "Organization name"), DigestRange),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Invalid time range", content_type = "application/json", body = Object),
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
         (status = 404, description = "Alert calibration is disabled for this deployment", content_type = "application/json", body = Object),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = Object),
@@ -266,6 +273,9 @@ async fn read(
 ) -> Response {
     if let Some(disabled) = deployment_disabled() {
         return disabled;
+    }
+    if let Err(msg) = validate_time_range(start_time, end_time) {
+        return MetaHttpResponse::bad_request(msg);
     }
     let request = SearchRequest {
         query: SearchQuery {

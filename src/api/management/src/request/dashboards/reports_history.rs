@@ -23,7 +23,11 @@ use config::{
         self_reporting::usage::{TRIGGERS_STREAM, TriggerData, TriggerDataType, normalize_outcome},
         stream::StreamType,
     },
-    utils::{json, sql::escape_sql_string, time::now_micros},
+    utils::{
+        json,
+        sql::escape_sql_string,
+        time::{now_micros, validate_time_range},
+    },
 };
 use openobserve_api_common::extractors::Headers;
 use openobserve_core::{
@@ -467,9 +471,7 @@ fn parse_filter(org_id: &str, query: &ReportHistoryQuery) -> Result<HistoryFilte
     let start_time = query
         .start_time
         .unwrap_or_else(|| (Utc::now() - Duration::days(7)).timestamp_micros());
-    if start_time >= end_time {
-        return Err("start_time must be before end_time".to_string());
-    }
+    validate_time_range(start_time, end_time).map_err(str::to_string)?;
     let report_id = match query.report_id.as_deref().filter(|s| !s.is_empty()) {
         Some(raw) => Some(
             raw.parse::<Ksuid>()
@@ -996,6 +998,34 @@ mod tests {
         assert!(parse_filter("org", &q).is_err());
         let q = ReportHistoryQuery {
             report_id: Some(ksuid().to_string()),
+            ..Default::default()
+        };
+        assert!(parse_filter("org", &q).is_ok());
+    }
+
+    #[test]
+    fn parse_filter_rejects_non_positive_times() {
+        for (start_time, end_time) in [
+            (Some(0), None),
+            (Some(-1), None),
+            (None, Some(0)),
+            (None, Some(-5)),
+            (Some(-10), Some(-5)),
+        ] {
+            let q = ReportHistoryQuery {
+                start_time,
+                end_time,
+                ..Default::default()
+            };
+            assert_eq!(
+                parse_filter("org", &q).err().as_deref(),
+                Some("start_time and end_time must be positive microsecond timestamps"),
+                "start_time={start_time:?} end_time={end_time:?}"
+            );
+        }
+        let q = ReportHistoryQuery {
+            start_time: Some(1),
+            end_time: Some(2),
             ..Default::default()
         };
         assert!(parse_filter("org", &q).is_ok());
