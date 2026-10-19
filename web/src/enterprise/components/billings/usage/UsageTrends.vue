@@ -454,7 +454,7 @@ const rangeLabel = computed(() =>
 
 // ── Data ─────────────────────────────────────────────────────────
 
-const prices = computed(() => cyclePrices(props.cycles.length ? props.cycles : []));
+const prices = computed(() => cyclePrices(props.cycles));
 
 const only = ref<MeterKey | null>(null);
 
