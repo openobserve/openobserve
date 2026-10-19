@@ -1,6 +1,0 @@
-{
-  "group": "Streams",
-  "spec_filename": "ingestion-setup-card-tracing.spec.js",
-  "create_group": false,
-  "browser": "chrome"
-}
