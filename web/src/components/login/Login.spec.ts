@@ -1321,6 +1321,17 @@ describe("Login", () => {
     expect(wrapper.vm.autoRedirectDexLogin).toBe(true);
   });
 
+  it("exposes the internal-login toggle as a button with aria-expanded", async () => {
+    store.state.zoConfig.sso_enabled = true;
+    store.state.zoConfig.native_login_enabled = true;
+    wrapper = mount(Login, { global: { plugins: [i18n, store, router] } });
+    const toggle = wrapper.find('[data-test="login-as-internal-user"]');
+    expect(toggle.element.tagName).toBe("BUTTON");
+    expect(toggle.attributes("aria-expanded")).toBe("false");
+    await toggle.trigger("click");
+    expect(toggle.attributes("aria-expanded")).toBe("true");
+  });
+
   // Test 53: Test tab and innerTab refs
   it("should have correct tab and innerTab values", () => {
     wrapper = mount(Login, {
