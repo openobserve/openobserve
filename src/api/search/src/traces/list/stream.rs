@@ -291,7 +291,6 @@ async fn run(
             &plan,
             deliverable_q1,
             (p_start, p_end),
-            false,
             &base_req,
             &sender,
         )
@@ -355,13 +354,11 @@ async fn run(
             return;
         }
 
-        // Heap rows are per-partition aggregates, so every trace needs the full re-aggregation.
         let Some(batch) = load_batch(
             &ctx,
             &plan,
             deliverable_q1,
             (start_time, end_time),
-            true,
             &base_req,
             &sender,
         )
@@ -408,14 +405,10 @@ async fn load_batch(
     plan: &TraceListPlan,
     hits: Vec<json::Value>,
     range: (i64, i64),
-    partial: bool,
     base_request: &Request,
     sender: &mpsc::Sender<Result<StreamResponses, infra::errors::Error>>,
 ) -> Option<TraceBatch> {
-    let hits = match ctx
-        .summarize_traces(plan, base_request, hits, range, partial)
-        .await
-    {
+    let hits = match ctx.summarize_traces(plan, base_request, hits, range).await {
         Ok(hits) => hits,
         Err(error) => {
             log::error!(

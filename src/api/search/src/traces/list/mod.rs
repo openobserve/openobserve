@@ -88,7 +88,7 @@ pub async fn run(ctx: &TraceSearchContext, plan: &TraceListPlan) -> Result<Trace
         return Ok(TraceListResult::Empty(Box::new(response)));
     }
     let hits = ctx
-        .summarize_traces(plan, &request, response.hits, options.range, false)
+        .summarize_traces(plan, &request, response.hits, options.range)
         .await
         .inspect_err(|error| {
             log::error!("get traces latest full-summary error: {error:?}");

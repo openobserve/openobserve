@@ -79,7 +79,6 @@ impl TraceSearchContext {
         base_request: &Request,
         hits: Vec<json::Value>,
         range: (i64, i64),
-        partial: bool,
     ) -> Result<Vec<json::Value>, Error> {
         let ids = sanitize_trace_ids(
             hits.iter()
@@ -91,8 +90,7 @@ impl TraceSearchContext {
         let lookup_started = std::time::Instant::now();
         let indexed = self.index_ranges(&ids, range).await;
         let lookup_took = lookup_started.elapsed();
-        let recompute_all = partial || plan.is_filtered();
-        let scope = summary_scope(&ids, &indexed, range, recompute_all);
+        let scope = summary_scope(&ids, &indexed, range, plan.recompute_all());
         let summary_window = scope.as_ref().map(|(_, window)| *window);
         let mut recomputed = 0;
         let mut summary_took = Duration::ZERO;

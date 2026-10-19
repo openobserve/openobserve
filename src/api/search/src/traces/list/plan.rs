@@ -87,6 +87,11 @@ impl TraceListPlan {
         !self.filter().is_empty()
     }
 
+    // Heap rows of the streamed duration sort are per-partition aggregates.
+    pub fn recompute_all(&self) -> bool {
+        self.is_filtered() || (self.mode == TraceListMode::Streaming && self.sort.by_duration)
+    }
+
     fn sql(&self, stream_name: &str) -> String {
         let sql = self.select_sql(stream_name);
         let filter = self.filter();
@@ -447,6 +452,38 @@ mod tests {
             assert_eq!((request.query.start_time, request.query.end_time), (1, 2));
             assert_eq!(request.timeout, 17);
             assert_eq!(request.search_type, base.search_type);
+        }
+    }
+
+    #[test]
+    fn only_filtered_pages_and_the_streamed_duration_sort_recompute_every_trace() {
+        for (sort_by, filter, expected) in [
+            ("start_time", "", [false, false]),
+            ("duration", "", [false, true]),
+            ("start_time", "service_name = 'api'", [true, true]),
+        ] {
+            let mut query = query();
+            query.insert("sort_by".to_string(), sort_by.to_string());
+            if !filter.is_empty() {
+                query.insert("filter".to_string(), filter.to_string());
+            }
+            for (mode, expected) in [TraceListMode::Complete, TraceListMode::Streaming]
+                .into_iter()
+                .zip(expected)
+            {
+                let plan = TraceListPlan {
+                    options: TraceListOptions::parse(&query, mode).unwrap(),
+                    sort: TraceSort::parse(&query).unwrap(),
+                    columns: TraceColumns::default(),
+                    llm_schema: None,
+                    mode,
+                };
+                assert_eq!(
+                    plan.recompute_all(),
+                    expected,
+                    "{sort_by} {filter:?} {mode:?}"
+                );
+            }
         }
     }
 
