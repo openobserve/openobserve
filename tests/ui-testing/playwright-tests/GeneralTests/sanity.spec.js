@@ -61,6 +61,10 @@ test.describe("Sanity Test Cases", () => {
       testLogger.warn('Setting time range failed, continuing test', { error: error.message });
     }
 
+    // With Auto Run on (cloud default), the histogram/SQL toggles start searches that the tests' refresh clicks then cancel.
+    await pm.logsPage.disableAutoRun();
+    await pm.logsPage.waitForRunQueryButton();
+
     testLogger.info('Test setup completed');
   });
 
