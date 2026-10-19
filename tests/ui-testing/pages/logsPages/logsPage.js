@@ -13215,7 +13215,21 @@ export class LogsPage {
 
     /** Refreshes and waits for the results table to render. */
     async runSearchAndWaitForResults(timeout = 30000) {
-        await this.page.locator(this.searchBarRefreshButton).click();
+        // A click while the load-time search is in flight hits the Cancel variant of this button.
+        await this.waitForRunQueryButton(timeout);
+        // The table is already visible from the load-time search, so gate on this click's own hits response.
+        const [response] = await Promise.all([
+            this.page.waitForResponse(
+                (r) =>
+                    r.request().method() === 'POST' &&
+                    /\/_search(_stream)?\?/.test(r.url()) &&
+                    !r.url().includes('is_ui_histogram'),
+                { timeout }
+            ),
+            this.page.locator(this.searchBarRefreshButton).click(),
+        ]);
+        await response.finished();
+        await this.waitForRunQueryButton(timeout);
         await expect(this.resultsTable()).toBeVisible({ timeout });
     }
 
@@ -13294,6 +13308,8 @@ export class LogsPage {
     /** Opens the first row's detail and returns the stream name that row came from. */
     async openFirstHitDetail(timeout = 20000) {
         const streamCell = this.streamNameCells().first();
+        // The grid is rebuilt per streamed chunk; a one-shot read can land on a cell not yet filled.
+        await expect(streamCell).toHaveText(/\S/, { timeout });
         const hitStream = (await streamCell.innerText()).trim();
         await streamCell.click();
         await expect(this.page.locator(this.logDetailDialog)).toBeVisible({ timeout });
