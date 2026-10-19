@@ -25,7 +25,7 @@ use utoipa::ToSchema;
 /// - Mapping equivalent field names across logs, traces, and metrics (e.g., `service`,
 ///   `service.name`, `app` all mean "service identity")
 /// - Alert deduplication fingerprinting
-/// - Populating `ServiceIdentityConfig` and `IncidentGroupingConfig` via the recommendations UI
+/// - Populating `ServiceIdentityConfig` via the recommendations UI
 ///
 /// # Field Name Overlaps
 ///
@@ -142,7 +142,6 @@ impl FieldAlias {
 
 const MAX_SETS: usize = 5;
 const MAX_DISTINGUISH_BY: usize = 5;
-const MAX_GROUP_BY: usize = 5;
 const MAX_TRACKED_ALIASES: usize = 30;
 
 /// One identity set — a disambiguation scheme for one class of workloads.
@@ -365,30 +364,6 @@ pub fn obsolete_set_ids(old: &ServiceIdentityConfig, new: &ServiceIdentityConfig
         )
         .map(|s| s.id.clone())
         .collect()
-}
-
-#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
-pub struct IncidentGroupingConfig {
-    pub group_by: Vec<String>,
-    pub fallback_group_by: Vec<String>,
-    #[serde(default = "default_upgrade_window")]
-    pub upgrade_window_minutes: u32,
-}
-
-fn default_upgrade_window() -> u32 {
-    30
-}
-
-impl IncidentGroupingConfig {
-    pub fn validate(&self) -> Result<(), String> {
-        if self.group_by.len() > MAX_GROUP_BY {
-            return Err(format!("group_by max {} fields", MAX_GROUP_BY));
-        }
-        if self.fallback_group_by.len() > MAX_GROUP_BY {
-            return Err(format!("fallback_group_by max {} fields", MAX_GROUP_BY));
-        }
-        Ok(())
-    }
 }
 
 #[cfg(test)]
@@ -697,90 +672,6 @@ mod tests {
         assert_eq!(cov.ratio, 1.0);
     }
 
-    // ========== IncidentGroupingConfig::validate() Tests ==========
-
-    #[test]
-    fn test_incident_grouping_config_validate_empty_ok() {
-        // Empty group_by and fallback_group_by are valid (up to max)
-        let cfg = IncidentGroupingConfig::default();
-        assert!(cfg.validate().is_ok());
-    }
-
-    #[test]
-    fn test_incident_grouping_config_validate_max_group_by() {
-        let cfg = IncidentGroupingConfig {
-            group_by: vec![
-                "k8s-cluster".to_string(),
-                "k8s-namespace".to_string(),
-                "region".to_string(),
-                "cloud-account".to_string(),
-                "environment".to_string(),
-            ],
-            fallback_group_by: vec![],
-            upgrade_window_minutes: 30,
-        };
-        assert!(cfg.validate().is_ok());
-    }
-
-    #[test]
-    fn test_incident_grouping_config_validate_too_many_group_by() {
-        let cfg = IncidentGroupingConfig {
-            group_by: vec![
-                "a".to_string(),
-                "b".to_string(),
-                "c".to_string(),
-                "d".to_string(),
-                "e".to_string(),
-                "f".to_string(), // 6 exceeds MAX_GROUP_BY = 5
-            ],
-            fallback_group_by: vec![],
-            upgrade_window_minutes: 30,
-        };
-        let err = cfg.validate().unwrap_err();
-        assert!(err.contains("group_by max"));
-    }
-
-    #[test]
-    fn test_incident_grouping_config_validate_too_many_fallback_group_by() {
-        let cfg = IncidentGroupingConfig {
-            group_by: vec![],
-            fallback_group_by: vec![
-                "a".to_string(),
-                "b".to_string(),
-                "c".to_string(),
-                "d".to_string(),
-                "e".to_string(),
-                "f".to_string(), // 6 exceeds MAX_GROUP_BY = 5
-            ],
-            upgrade_window_minutes: 30,
-        };
-        let err = cfg.validate().unwrap_err();
-        assert!(err.contains("fallback_group_by max"));
-    }
-
-    #[test]
-    fn test_incident_grouping_config_validate_max_both_ok() {
-        // Both group_by and fallback_group_by at max (3) is valid
-        let cfg = IncidentGroupingConfig {
-            group_by: vec![
-                "a".to_string(),
-                "b".to_string(),
-                "c".to_string(),
-                "d".to_string(),
-                "e".to_string(),
-            ],
-            fallback_group_by: vec![
-                "x".to_string(),
-                "y".to_string(),
-                "z".to_string(),
-                "1".to_string(),
-                "2".to_string(),
-            ],
-            upgrade_window_minutes: 30,
-        };
-        assert!(cfg.validate().is_ok());
-    }
-
     #[test]
     fn test_field_alias_group_none_absent_from_json() {
         let alias = FieldAlias::new("host", "Host", &["host", "hostname"]);
@@ -809,11 +700,6 @@ mod tests {
         let obj = json.as_object().unwrap();
         assert!(obj.contains_key("is_workload_type"));
         assert_eq!(obj["is_workload_type"], serde_json::json!(true));
-    }
-
-    #[test]
-    fn test_default_upgrade_window() {
-        assert_eq!(default_upgrade_window(), 30);
     }
 
     #[test]
