@@ -26,7 +26,7 @@ use config::{
 use datafusion::{
     common::{DataFusionError, Result, tree_node::TreeNodeRecursion},
     execution::{SendableRecordBatchStream, TaskContext},
-    physical_expr::{EquivalenceProperties, Partitioning, PhysicalExpr},
+    physical_expr::{AcrossPartitions, EquivalenceProperties, Partitioning, PhysicalExpr},
     physical_plan::{
         DisplayAs, DisplayFormatType, ExecutionPlan, PlanProperties,
         execution_plan::{Boundedness, EmissionType},
@@ -77,7 +77,7 @@ impl RemoteScanExec {
         // Sharing happens on the leader only, a follower must never see a marker.
         let input = strip_shared_subplan_markers(input)?;
         let output_partitions = remote_scan_node.nodes.len();
-        let cache = Self::compute_properties(Arc::clone(&input.schema()), output_partitions);
+        let cache = Self::compute_properties(&input, output_partitions)?;
 
         // serialize the input plan and set it as the plan for the remote scan node
         let proto = get_physical_extension_codec();
@@ -162,17 +162,29 @@ impl RemoteScanExec {
 
     /// This function creates the cache object that stores the plan properties such as schema,
     /// equivalence properties, ordering, partitioning, etc.
-    fn compute_properties(schema: SchemaRef, n_partitions: usize) -> Arc<PlanProperties> {
-        let eq_properties = EquivalenceProperties::new(schema);
+    fn compute_properties(
+        input: &Arc<dyn ExecutionPlan>,
+        n_partitions: usize,
+    ) -> Result<Arc<PlanProperties>> {
+        let mut eq_properties = EquivalenceProperties::new(input.schema());
+        // Followers each run their own copy of the input; only literal constants hold on all.
+        eq_properties.add_constants(
+            input
+                .properties()
+                .eq_properties
+                .constants()
+                .into_iter()
+                .filter(|c| matches!(c.across_partitions, AcrossPartitions::Uniform(Some(_)))),
+        )?;
         let output_partitioning = Self::output_partitioning_helper(n_partitions);
-        Arc::new(PlanProperties::new(
+        Ok(Arc::new(PlanProperties::new(
             eq_properties,
             // Output Partitioning
             output_partitioning,
             // Execution Mode
             EmissionType::Incremental,
             Boundedness::Bounded,
-        ))
+        )))
     }
 
     pub fn set_analyze(mut self) -> Self {
