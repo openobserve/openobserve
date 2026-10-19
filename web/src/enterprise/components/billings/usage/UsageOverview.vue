@@ -709,13 +709,13 @@ const kpiCards = computed<KpiCard[]>(() => {
       key: "discount",
       label: t("billing.usageV2.discount"),
       icon: "receipt-long",
-      value: discounted ? formatCost(-discountAmount.value) : EM_DASH,
-      positive: discounted,
+      value: formatCost(-discountAmount.value),
+      positive: true,
       valueSuffix:
-        discounted && subtotal.value > 0
+        subtotal.value > 0
           ? raw(`${((discountAmount.value / subtotal.value) * 100).toFixed(1)}%`)
           : undefined,
-      hint: discounted ? discountedMeterNames.value : t("billing.usageV2.noDiscount"),
+      hint: discountedMeterNames.value,
     });
   return cards;
 });

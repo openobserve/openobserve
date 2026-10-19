@@ -20,7 +20,7 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import { mockMeteringResponse } from "./meteringMock";
 import { DRILLDOWNS } from "./usageQueries";
-import { volumeDetails } from "./meteringModel";
+import { formatCost, subtotalCost, volumeDetails } from "./meteringModel";
 
 const route = reactive<{ query: Record<string, string | undefined> }>({ query: {} });
 vi.mock("vue-router", () => ({
@@ -241,6 +241,40 @@ describe("UsageOverview for an org with no bill", () => {
     expect(pane.text()).toContain("Daily Cost");
     const schema = wrapper.findComponent({ name: "UsageCachedChart" }).props("panelSchema") as any;
     expect(schema.config.unit).toBe("currency");
+  });
+});
+
+describe("UsageOverview discount card", () => {
+  beforeEach(() => {
+    route.query = {};
+  });
+
+  const mountWith = (details: unknown) =>
+    mount(UsageOverview, {
+      props: { details, lastLoadedAt: 1, projected: null, refreshing: false },
+      global: {
+        plugins: [i18n, store],
+        stubs: { UsageCachedChart: true, UsageMeterBreakdown: true, UsageBillStrip: true },
+      },
+    });
+
+  it("shows the discount, its share of the subtotal and the discounted meters", async () => {
+    const details = mockMeteringResponse().upcoming!;
+    const wrapper = mountWith(details);
+    await flushPromises();
+    const card = wrapper.find('[data-test="billings-usageoverview-kpi-discount"]');
+    const subtotal = subtotalCost(details);
+    expect(card.text()).toContain(String(formatCost(-details.total_discounted_amount)));
+    expect(card.text()).toContain(
+      `${((details.total_discounted_amount / subtotal) * 100).toFixed(1)}%`,
+    );
+    expect(card.text()).toContain("Ingestion");
+  });
+
+  it("has no discount card when nothing was discounted", async () => {
+    const wrapper = mountWith({ ...mockMeteringResponse().upcoming!, total_discounted_amount: 0 });
+    await flushPromises();
+    expect(wrapper.find('[data-test="billings-usageoverview-kpi-discount"]').exists()).toBe(false);
   });
 });
 
