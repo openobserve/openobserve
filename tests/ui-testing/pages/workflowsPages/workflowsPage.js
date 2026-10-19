@@ -14,9 +14,10 @@
 //        via evaluate() to bypass the interception.
 //   K10 — the workflows list GET is slow (~16-20s); readiness/list helpers use generous timeouts.
 //   K11 — under CI parallel load a node-drawer dropdown click can land without the list opening,
-//         and waiting longer never recovers it; openSelect() re-clicks a trigger that is still closed.
+//         and waiting longer never recovers it; openSelect() re-clicks a trigger that is still closed
+//         and reports every re-click (warn log + screenshot) so a real UI bug stays visible.
 
-const { expect } = require('@playwright/test');
+const { expect, test } = require('@playwright/test');
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
 const { getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js');
 const MonacoEditorHelper = require('../../playwright-tests/utils/MonacoEditorHelper.js');
@@ -838,12 +839,39 @@ class WorkflowsPage {
   /** Open an OSelect until `option` shows (K11); an open list with no such option still fails. */
   async openSelect(triggerSel, option) {
     const trigger = this.page.locator(triggerSel);
+    let clicks = 0;
     await expect(async () => {
       if ((await trigger.getAttribute('data-state')) !== 'open') {
+        if (clicks > 0) await this.reportSelectReclick(triggerSel, clicks);
+        clicks += 1;
         await trigger.click({ timeout: 5000 });
       }
       await expect(option).toBeVisible({ timeout: 3000 });
     }).toPass({ timeout: DRAWER_TIMEOUT_MS });
+  }
+
+  /** A re-click may be hiding a real UI bug, so leave a warning, screenshot and state in the report. */
+  async reportSelectReclick(triggerSel, clicksSoFar) {
+    const state = await this.page.evaluate((sel) => {
+      const t = document.querySelector(sel);
+      const active = document.activeElement;
+      return {
+        dataState: t?.getAttribute('data-state') ?? null,
+        ariaExpanded: t?.getAttribute('aria-expanded') ?? null,
+        openPopovers: document.querySelectorAll('[data-reka-popper-content-wrapper]').length,
+        activeElement: active?.getAttribute('data-test') || active?.tagName || null,
+      };
+    }, triggerSel).catch((e) => ({ evaluateError: e.message }));
+    const detail = { triggerSel, clicksSoFar, ...state };
+    testLogger.warn('K11 select re-click: the previous click left the dropdown closed', detail);
+    const info = test.info();
+    info.annotations.push({ type: 'k11-select-reclick', description: JSON.stringify(detail) });
+    await info.attach(`k11-select-reclick-${clicksSoFar}.json`, {
+      body: JSON.stringify(detail, null, 2),
+      contentType: 'application/json',
+    });
+    const shot = await this.page.screenshot().catch(() => null);
+    if (shot) await info.attach(`k11-select-reclick-${clicksSoFar}.png`, { body: shot, contentType: 'image/png' });
   }
 
   /** Pick an OSelect option by its VALUE (options stamp data-test-value). */
