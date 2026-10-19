@@ -39,12 +39,16 @@ const {
   allDayRestriction,
   setTeamSchedule,
   getTeamSchedule,
+  createCover,
+  api,
   baseUrl,
   orgId,
   uniqueName,
   deleteOnCallFixturesByPrefix,
+  HOUR_MICROS,
+  DAY_MICROS,
 } = require('../utils/oncall-seed.js');
-const { createOrgUser, oncallUserEmail } = require('../utils/oncall-seed-ext.js');
+const { createOrgUser, oncallUserEmail, createAbsence } = require('../utils/oncall-seed-ext.js');
 
 const PREFIX = 'e2e_oncall_sched';
 
@@ -359,5 +363,99 @@ test.describe('On-call schedules and rotations', {
     const chart = (await pm.oncallTeamDetailPage.readTimelineLabels()).join(' | ');
     expect(chart, 'a raw address on a band is the defect, not a formatting preference')
       .not.toContain(named.email);
+  });
+
+  // ------------------------------------------------------- A5 preview parity
+
+  /**
+   * A5 — what the drawer previews for an unsaved rotation is what the calendar
+   * shows once it is saved. The cover and the absence are in the window so a
+   * preview that ignored either would disagree with the saved calendar.
+   */
+  test('A5 the drawer preview equals the saved schedule, cover and absence included', {
+    tag: ['@P1'],
+  }, async ({ page }, testInfo) => {
+    const prefix = workerPrefix(testInfo);
+    const emails = [];
+    for (const who of ['ana', 'bo', 'cy', 'di']) {
+      const { email } = await createOrgUser(page, {
+        email: oncallUserEmail(uniqueName(prefix), who),
+      });
+      emails.push(email);
+    }
+    const [ana, bo, cy, di] = emails;
+
+    const team = await createTeam(page, { name: uniqueName(prefix) });
+    const rotationId = `${prefix}_parity`;
+    const now = Date.now() * 1000;
+    // Ana holds the base from an hour ago, so her absence below has a shift to take away.
+    await setTeamSchedule(page, team.id, {
+      rotations: [rotation({
+        id: rotationId,
+        name: 'Parity',
+        members: [ana, bo],
+        shiftMicros: DAY_MICROS,
+        anchorMicros: now - HOUR_MICROS,
+      })],
+    });
+    await addTeamMembers(page, team.id, [ana, bo, cy, di]);
+    const cover = { fromMicros: now + HOUR_MICROS / 2, toMicros: now + (3 * HOUR_MICROS) / 2 };
+    await createCover(page, team.id, { userEmail: di, rotationId, ...cover });
+    const absence = { fromMicros: now + 2 * HOUR_MICROS, toMicros: now + 20 * HOUR_MICROS };
+    const away = await createAbsence(page, { userEmail: ana, ...absence });
+    expect(away.ok, `absence refused: ${away.text}`).toBe(true);
+
+    const detail = pm.oncallTeamDetailPage;
+    await detail.goto(ORG, team.id, 'schedule');
+    await detail.openScheduleTab();
+    await detail.openRotationEditorFor(rotationId);
+
+    // Office hours over the base: a second rule, staffed, restricted to the working week.
+    const office = await detail.countShiftRuleTabs();
+    await detail.addShiftRule();
+    await detail.openShiftRule(office);
+    await detail.setRuleMembers(office, [cy]);
+    const settled = page.waitForResponse((res) => {
+      if (!res.url().includes('/resolved-schedule/preview')) return false;
+      const rules = res.request().postDataJSON()?.rotation?.shift_rules ?? [];
+      return rules.length === 2 && (rules[1].restrictions ?? []).length > 0;
+    });
+    await detail.setRuleHoursOnlyDuring(office);
+    const previewResponse = await settled;
+    expect(previewResponse.ok(), 'the preview request must succeed').toBe(true);
+    const { from, to } = previewResponse.request().postDataJSON();
+    const previewed = (await previewResponse.json()).map((s) => ({
+      from: s.from, to: s.to, user: s.user_email ?? null,
+    }));
+
+    // The list shows a run of the preview's own segments once that answer has rendered.
+    let rows = [];
+    await expect.poll(async () => {
+      rows = await detail.readPreviewRows();
+      const at = previewed.findIndex((s) => s.from === rows[0]?.from);
+      return at >= 0 && JSON.stringify(previewed.slice(at, at + rows.length)) === JSON.stringify(rows);
+    }, { timeout: 20000, message: 'the list renders the settled preview' }).toBe(true);
+    expect(rows.length, 'the preview lists several stretches').toBeGreaterThan(2);
+    expect(rows.some((r) => r.user === di), 'the cover is in the preview').toBe(true);
+    expect(
+      rows.filter((r) => r.user === ana && r.from < absence.toMicros && r.to > absence.fromMicros),
+      'the absence is honoured in the preview',
+    ).toEqual([]);
+
+    await detail.closeRotationEditor();
+
+    const res = await api(
+      page, 'get',
+      `${baseUrl()}/api/${ORG}/oncall/teams/${encodeURIComponent(team.id)}/resolved-schedule` +
+        `?from=${from}&to=${to}&rotation_id=${encodeURIComponent(rotationId)}`,
+    );
+    expect(res.ok(), 'the saved schedule resolves').toBe(true);
+    const saved = (await res.json()).map((s) => ({
+      from: s.from, to: s.to, user: s.user_email ?? null,
+    }));
+    const start = saved.findIndex((s) => s.from === rows[0].from);
+    expect(start, 'the first previewed row starts a saved segment').toBeGreaterThanOrEqual(0);
+    expect(saved.slice(start, start + rows.length), 'preview rows equal the saved segments')
+      .toEqual(rows);
   });
 });

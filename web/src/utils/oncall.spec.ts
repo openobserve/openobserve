@@ -53,7 +53,6 @@ import {
   overlappingRules,
   overlapStanding,
   prioritiesFor,
-  resolvedStretches,
   ruleHoursSummary,
   rulesClash,
   shiftLengthWords,
@@ -77,6 +76,7 @@ import {
   shiftBands,
   shortReachReason,
   toZonedInputValue,
+  zonedMidnight,
   stateTagVariant,
   upcomingShifts,
   windowContains,
@@ -1575,6 +1575,19 @@ describe("rungProblem", () => {
 /// while the label promised the team's, so an operator in Berlin editing an
 /// Asia/Kolkata team saw the handover three and a half hours from where it was
 /// and moved it there by saving.
+describe("zonedMidnight", () => {
+  const KOLKATA_10AM = Date.UTC(2026, 7, 17, 4, 30);
+  it.each([
+    ["Asia/Kolkata", KOLKATA_10AM, 0, Date.UTC(2026, 7, 16, 18, 30)],
+    ["America/New_York", KOLKATA_10AM, 0, Date.UTC(2026, 7, 17, 4, 0)],
+    ["UTC", KOLKATA_10AM, 2, Date.UTC(2026, 7, 19)],
+    // Starts in EST and lands in EDT: the step is local days, not 24-hour blocks.
+    ["America/New_York", Date.UTC(2026, 2, 1, 17), 14, Date.UTC(2026, 2, 15, 4, 0)],
+  ])("%s from %i plus %i days", (zone, startMs, days, expectedMs) => {
+    expect(zonedMidnight(startMs * 1000, zone, days)).toBe(expectedMs * 1000);
+  });
+});
+
 describe("toZonedInputValue / fromZonedInputValue", () => {
   /// The instant Asia/Kolkata calls 2026-08-17 10:00 — UTC+05:30.
   const KOLKATA_10AM = Date.UTC(2026, 7, 17, 4, 30) * 1000;
@@ -1673,123 +1686,6 @@ describe("rotation editor: how several shift rules add up", () => {
   const office = shiftRule("Office", {
     priority: 1,
     restrictions: [window([0, 1, 2, 3, 4], 540, 1020)],
-  });
-
-  describe("resolvedStretches", () => {
-    const stretch = (
-      from: number,
-      to: number,
-      member: string | null,
-      ruleIndex: number | null,
-    ) => ({
-      startMicros: MON + from * HOUR,
-      endMicros: MON + to * HOUR,
-      member,
-      ruleIndex,
-    });
-
-    it.each([
-      [
-        "one stretch per person on a plain rotation",
-        [shiftRule("Base", { members: ["ana", "bob"], shift_micros: MICROS_PER_DAY })],
-        48,
-        "UTC",
-        [stretch(0, 24, "ana", 0), stretch(24, 48, "bob", 0)],
-      ],
-      [
-        "the restricted rule over the catch-all, inside its window only",
-        [base, office],
-        24,
-        "UTC",
-        [
-          stretch(0, 9, "base@o2.ai", 0),
-          stretch(9, 17, "office@o2.ai", 1),
-          stretch(17, 24, "base@o2.ai", 0),
-        ],
-      ],
-      [
-        "nobody where no rule applies",
-        [office],
-        24,
-        "UTC",
-        [stretch(0, 9, null, null), stretch(9, 17, "office@o2.ai", 0), stretch(17, 24, null, null)],
-      ],
-      [
-        "priority over specificity",
-        [shiftRule("Base", { priority: 5 }), office],
-        24,
-        "UTC",
-        [stretch(0, 24, "base@o2.ai", 0)],
-      ],
-      [
-        "a retired rule stops at its end",
-        [shiftRule("Base", { ends_at: MON + 12 * HOUR })],
-        24,
-        "UTC",
-        [stretch(0, 12, "base@o2.ai", 0), stretch(12, 24, null, null)],
-      ],
-      [
-        "a rule that has not started yet",
-        [shiftRule("Base", { starts_at: MON + 6 * HOUR })],
-        24,
-        "UTC",
-        [stretch(0, 6, null, null), stretch(6, 24, "base@o2.ai", 0)],
-      ],
-      [
-        "windows in the team's zone, not UTC",
-        [base, office],
-        24,
-        "Asia/Kolkata",
-        [
-          stretch(0, 3.5, "base@o2.ai", 0),
-          stretch(3.5, 11.5, "office@o2.ai", 1),
-          stretch(11.5, 24, "base@o2.ai", 0),
-        ],
-      ],
-      [
-        "a window that is not on a quarter hour",
-        [base, shiftRule("Blip", { priority: 1, restrictions: [window([], 605, 610)] })],
-        24,
-        "UTC",
-        [
-          stretch(0, 10 + 5 / 60, "base@o2.ai", 0),
-          stretch(10 + 5 / 60, 10 + 10 / 60, "blip@o2.ai", 1),
-          stretch(10 + 10 / 60, 24, "base@o2.ai", 0),
-        ],
-      ],
-    ])("%s", (_name, rules, hours, tz, expected) => {
-      expect(resolvedStretches(rules, MON, MON + hours * HOUR, tz)).toMatchObject(expected);
-    });
-
-    // A bound of the scanned range is not a handover, so a stretch cut by it is open on that side.
-    it.each([
-      ["one person all along", [shiftRule("Base")], 2, 26, [[true, true]]],
-      [
-        "handovers on both bounds",
-        [shiftRule("Base", { members: ["ana", "bob"], shift_micros: MICROS_PER_DAY })],
-        0,
-        24,
-        [[false, false]],
-      ],
-      [
-        "the catch-all around a window",
-        [base, office],
-        0,
-        24,
-        [
-          [true, false],
-          [false, false],
-          [false, true],
-        ],
-      ],
-      ["a window cut by both bounds", [base, office], 10, 12, [[true, true]]],
-    ])("%s", (_name, rules, from, to, expected) => {
-      const open = resolvedStretches(rules, MON + from * HOUR, MON + to * HOUR, "UTC").map((s) => [
-        s.openStart,
-        s.openEnd,
-      ]);
-      expect(open).toEqual(expected);
-    });
   });
 
   describe("rulesClash", () => {

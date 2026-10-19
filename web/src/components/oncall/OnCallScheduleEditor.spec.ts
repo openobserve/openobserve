@@ -24,7 +24,7 @@ import type { OnCallSchedule, OnCallTeamMember } from "@/ts/interfaces/oncall";
 import { MICROS_PER_WEEK } from "@/ts/interfaces/oncall";
 
 vi.mock("@/services/oncall", () => ({
-  default: { setSchedule: vi.fn(), listUnavailability: vi.fn() },
+  default: { setSchedule: vi.fn(), listUnavailability: vi.fn(), previewResolvedSchedule: vi.fn() },
 }));
 vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 import analytics from "@/services/product_analytics";
@@ -164,12 +164,13 @@ function render(
   opts: {
     members?: OnCallTeamMember[];
     schedule?: OnCallSchedule | null;
+    timezone?: string;
   } = {},
 ) {
   return mount(OnCallScheduleEditor, {
     props: {
       teamId: "team_1",
-      timezone: "UTC",
+      timezone: opts.timezone ?? "UTC",
       schedule: opts.schedule ?? null,
       members: opts.members ?? members("ana@o2.ai", "bob@o2.ai"),
     },
@@ -184,6 +185,7 @@ describe("OnCallScheduleEditor", () => {
     vi.clearAllMocks();
     service.setSchedule.mockResolvedValue({ data: {} } as any);
     service.listUnavailability.mockResolvedValue({ data: [] } as any);
+    service.previewResolvedSchedule.mockResolvedValue({ data: [] } as any);
   });
 
   afterEach(() => {
@@ -198,35 +200,81 @@ describe("OnCallScheduleEditor", () => {
     expect(wrapper.find('[data-test="oncall-schedule-add-rotation"]').exists()).toBe(false);
   });
 
-  // The preview is the point of the tab: you cannot judge a rotation you
-  // cannot see.
-  it("previews the upcoming shifts of a rotation", async () => {
+  // A3: the drawer asks the server, over 14 days from the TEAM's midnight, for the draft as it stands.
+  it("asks the server to resolve the open draft from the team's midnight", async () => {
     const wrapper = render({
-      schedule: schedule([rota("Primary", [rule({ members: ["ana@o2.ai", "bob@o2.ai"] })])]),
+      schedule: schedule([rota("Primary")]),
+      timezone: "Asia/Kolkata",
     });
     await flushPromises();
+    expect(service.previewResolvedSchedule).not.toHaveBeenCalled();
+
     await openRotation(wrapper);
 
-    const shifts = wrapper.findAll('[data-test="oncall-schedule-preview-shift"]');
-    expect(shifts.length).toBeGreaterThan(1);
-    expect(shifts[0].text()).toContain("ana@o2.ai");
-    expect(shifts[1].text()).toContain("bob@o2.ai");
+    expect(service.previewResolvedSchedule).toHaveBeenCalledTimes(1);
+    const [args] = service.previewResolvedSchedule.mock.calls[0];
+    // NOW is 03:43 on 15 Nov in Kolkata, so its day began at 18:30 UTC the day before.
+    expect(args.from).toBe(Date.UTC(2023, 10, 14, 18, 30) * 1000);
+    expect(args.to).toBe(Date.UTC(2023, 10, 28, 18, 30) * 1000);
+    expect(args.team_id).toBe("team_1");
+    expect(args.rotation.id).toBe("rot_primary");
   });
 
-  // Whoever holds the current shift is the answer to "who do I call now", so
-  // exactly one row carries the marker.
-  it("marks exactly one shift as current", async () => {
-    const wrapper = render({
-      schedule: schedule([rota("Primary", [rule({ members: ["ana@o2.ai", "bob@o2.ai"] })])]),
-    });
+  // A3: one request once typing stops, not one per keystroke.
+  it("sends one request for a burst of edits, after they settle", async () => {
+    const wrapper = render({ schedule: schedule([rota("Primary")]) });
+    await openRotation(wrapper);
+    const name = wrapper.find('[data-test="oncall-schedule-name"]');
+    for (const typed of ["P", "Pa", "Pag"]) {
+      await name.setValue(typed);
+      vi.advanceTimersByTime(100);
+    }
     await flushPromises();
+    expect(service.previewResolvedSchedule).toHaveBeenCalledTimes(1);
+
+    vi.advanceTimersByTime(400);
+    await flushPromises();
+    expect(service.previewResolvedSchedule).toHaveBeenCalledTimes(2);
+    expect(service.previewResolvedSchedule.mock.calls[1][0].rotation.name).toBe("Pag");
+  });
+
+  // A3: rows are the server's segments; edges where the fetch stopped read as open.
+  it("lists the server's segments, current one marked, cut edges open", async () => {
+    const from = Date.UTC(2023, 10, 14) * 1000;
+    const to = Date.UTC(2023, 10, 28) * 1000;
+    const hour = 3_600_000_000;
+    const at = (micros: number) => ({ rotation_id: "rot_primary", rotation: "Base", from: micros });
+    service.previewResolvedSchedule.mockResolvedValue({
+      data: [
+        { ...at(from), to: ANCHOR - hour, user_email: "carol@o2.ai" },
+        { ...at(ANCHOR - hour), to: ANCHOR + hour, user_email: "ana@o2.ai" },
+        { ...at(ANCHOR + hour), to: ANCHOR + 5 * hour, rotation: undefined },
+        { ...at(ANCHOR + 5 * hour), to, user_email: "bob@o2.ai" },
+      ],
+    } as any);
+    const wrapper = render({ schedule: schedule([rota("Primary")]) });
     await openRotation(wrapper);
 
-    const marked = wrapper
-      .findAll('[data-test="oncall-schedule-preview-shift"]')
-      .filter((s) => s.text().includes("Now"));
-    expect(marked).toHaveLength(1);
-    expect(marked[0].text()).toContain("ana@o2.ai");
+    const rows = wrapper.findAll('[data-test="oncall-schedule-preview-shift"]');
+    expect(rows.map((r) => r.attributes("data-user"))).toEqual(["ana@o2.ai", "", "bob@o2.ai"]);
+    expect(rows[0].text()).toContain("Now");
+    expect(rows[0].text()).toContain("—");
+    expect(rows[1].text()).toContain("Nobody is on call");
+    expect(rows[2].text()).toContain("From");
+    expect(rows.filter((r) => r.text().includes("Now"))).toHaveLength(1);
+  });
+
+  // A3: a refusal is said where the rows would be, not swallowed into an empty list.
+  it("shows the endpoint's refusal in the list area", async () => {
+    service.previewResolvedSchedule.mockRejectedValue({
+      response: { data: { message: "window too long" } },
+    });
+    const wrapper = render({ schedule: schedule([rota("Primary")]) });
+    await openRotation(wrapper);
+
+    expect(wrapper.find('[data-test="oncall-schedule-preview-error"]').text()).toBe(
+      "window too long",
+    );
   });
 
   // The anchor used to be silently "now", so a rotation created at 14:32
@@ -241,11 +289,10 @@ describe("OnCallScheduleEditor", () => {
     const field = wrapper.find('[data-test="oncall-schedule-handover-0-date"] input');
     expect(field.exists()).toBe(true);
 
-    const before = wrapper.findAll('[data-test="oncall-schedule-preview-shift"]')[0].text();
     await field.setValue("not-a-date");
     await flushPromises();
-    const after = wrapper.findAll('[data-test="oncall-schedule-preview-shift"]')[0].text();
-    expect(after).toBe(before);
+    const rows = wrapper.findComponent({ name: "OTable" }).props("data") as any[];
+    expect(rows[0].shift_rules[0].anchor_micros).toBe(ANCHOR);
   });
 
   /// Dropping the empty one and reporting success is how a rotation somebody
@@ -587,6 +634,7 @@ describe("OnCallScheduleEditor — retiring a shift rule", () => {
     vi.clearAllMocks();
     service.setSchedule.mockResolvedValue({ data: {} } as any);
     service.listUnavailability.mockResolvedValue({ data: [] } as any);
+    service.previewResolvedSchedule.mockResolvedValue({ data: [] } as any);
   });
 
   afterEach(() => {
@@ -700,6 +748,7 @@ describe("OnCallScheduleEditor — explaining several shift rules", () => {
     vi.clearAllMocks();
     service.setSchedule.mockResolvedValue({ data: {} } as any);
     service.listUnavailability.mockResolvedValue({ data: [] } as any);
+    service.previewResolvedSchedule.mockResolvedValue({ data: [] } as any);
   });
 
   afterEach(() => {
@@ -725,7 +774,17 @@ describe("OnCallScheduleEditor — explaining several shift rules", () => {
     await flushPromises();
   }
 
-  it("R1: a lone person's stretch is not given scan-bound times", async () => {
+  it("R1: a segment cut by both window edges says there is no change in view", async () => {
+    service.previewResolvedSchedule.mockResolvedValue({
+      data: [
+        {
+          rotation_id: "rot_primary",
+          from: Date.UTC(2023, 10, 14) * 1000,
+          to: Date.UTC(2023, 10, 28) * 1000,
+          user_email: "ana@o2.ai",
+        },
+      ],
+    } as any);
     const wrapper = render({ schedule: schedule([rota("Primary")]) });
     await openRotation(wrapper);
 

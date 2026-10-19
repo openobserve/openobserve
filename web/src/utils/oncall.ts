@@ -926,67 +926,13 @@ export function resolveNextHolder(
   return members[wrapped] ?? null;
 }
 
-/** One continuous stretch of a rotation: who holds it, and which rule put them there. */
-export interface Stretch {
-  startMicros: number;
-  endMicros: number;
-  /** `null` is nobody on call: no rule applies. */
-  member: string | null;
-  /** Index into the rules the stretch was resolved from; `null` with nobody. */
-  ruleIndex: number | null;
-  /** The same holder was already on before the scanned range: the start is not a handover. */
-  openStart: boolean;
-  /** The same holder stays on past the scanned range: the end is not a handover. */
-  openEnd: boolean;
-}
-
 /** Which overlapping rules a rule beats, and which beat it, by index. */
 export interface OverlapStanding {
   winsOver: number[];
   losesTo: number[];
 }
 
-const MICROS_PER_QUARTER_HOUR = 15 * MICROS_PER_MINUTE;
-const MAX_HANDOVERS_PER_RULE = 2000;
 const MINUTES_PER_WEEK = 7 * 1440;
-
-/** Who holds the rotation made of `rules`, stretch by stretch over `[from, until)`. [pure] */
-export function resolvedStretches(
-  rules: ShiftRule[],
-  fromMicros: number,
-  untilMicros: number,
-  timezone: string,
-): Stretch[] {
-  const rotation: Rotation = { id: "", name: "", shift_rules: rules };
-  const edges = stretchEdges(rules, fromMicros, untilMicros, timezone);
-  const holderAt = (at: number) => {
-    const { member, rule } = resolveHolder(rotation, at, timezone);
-    return { member, ruleIndex: rule ? rules.indexOf(rule) : null };
-  };
-  const same = (a: { member: string | null; ruleIndex: number | null }, b: typeof a) =>
-    a.member === b.member && a.ruleIndex === b.ruleIndex;
-  const out: Stretch[] = [];
-  for (let i = 0; i + 1 < edges.length; i++) {
-    const holder = holderAt(edges[i]);
-    const last = out[out.length - 1];
-    if (last && same(last, holder)) {
-      last.endMicros = edges[i + 1];
-    } else {
-      out.push({
-        startMicros: edges[i],
-        endMicros: edges[i + 1],
-        ...holder,
-        openStart: false,
-        openEnd: false,
-      });
-    }
-  }
-  if (out.length) {
-    out[0].openStart = same(out[0], holderAt(fromMicros - 1));
-    out[out.length - 1].openEnd = same(out[out.length - 1], holderAt(untilMicros));
-  }
-  return out;
-}
 
 /** Whether the server refuses `a` and `b` side by side: same priority and identical windows. [pure] */
 export function rulesClash(a: ShiftRule, b: ShiftRule): boolean {
@@ -1060,65 +1006,6 @@ export function nextHandoverAfter(rule: ShiftRule, nowMicros: number): number {
   const at = Math.max(nowMicros, anchor, rule.starts_at ?? nowMicros);
   if (!shift || shift <= 0) return at;
   return anchor + (Math.floor((at - anchor) / shift) + 1) * shift;
-}
-
-/** Every instant in `(from, until)` at which the resolved holder can change, plus both ends. */
-function stretchEdges(
-  rules: ShiftRule[],
-  fromMicros: number,
-  untilMicros: number,
-  timezone: string,
-): number[] {
-  if (untilMicros <= fromMicros) return [];
-  const edges = new Set<number>([fromMicros, untilMicros]);
-  const candidates = [
-    ...rules.flatMap((rule) => [rule.starts_at, rule.ends_at]),
-    ...rules.flatMap((rule) => handoversBetween(rule, fromMicros, untilMicros)),
-    ...windowEdgesBetween(rules, fromMicros, untilMicros, timezone),
-  ];
-  for (const at of candidates) {
-    if (at != null && at > fromMicros && at < untilMicros) edges.add(at);
-  }
-  return [...edges].sort((a, b) => a - b);
-}
-
-function handoversBetween(rule: ShiftRule, fromMicros: number, untilMicros: number): number[] {
-  const { shift_micros: shift, anchor_micros: anchor } = rule;
-  if (!shift || shift <= 0) return [];
-  const out: number[] = [];
-  let at = anchor + (Math.floor((fromMicros - anchor) / shift) + 1) * shift;
-  while (at < untilMicros && out.length < MAX_HANDOVERS_PER_RULE) {
-    out.push(at);
-    at += shift;
-  }
-  return out;
-}
-
-/** Instants where a local window edge or a local midnight falls; every real offset is whole quarter hours. */
-function windowEdgesBetween(
-  rules: ShiftRule[],
-  fromMicros: number,
-  untilMicros: number,
-  timezone: string,
-): number[] {
-  const windows = rules.flatMap((rule) => rule.restrictions ?? []);
-  if (!windows.length) return [];
-  const minutes = new Set<number>([0]);
-  for (const w of windows) {
-    minutes.add(w.start_minute % MINUTES_PER_DAY);
-    minutes.add(w.end_minute % MINUTES_PER_DAY);
-  }
-  const out: number[] = [];
-  const first = Math.floor(fromMicros / MICROS_PER_QUARTER_HOUR) * MICROS_PER_QUARTER_HOUR;
-  for (let at = first; at < untilMicros; at += MICROS_PER_QUARTER_HOUR) {
-    const wall = wallTimeInZone(at, timezone);
-    if (!wall) continue;
-    for (const minute of minutes) {
-      const ahead = (minute - wall.minuteOfDay + MINUTES_PER_DAY) % MINUTES_PER_DAY;
-      if (ahead < 15) out.push(at + ahead * MICROS_PER_MINUTE);
-    }
-  }
-  return out;
 }
 
 function sameWindow(a: TimeWindow, b: TimeWindow): boolean {
@@ -1768,6 +1655,19 @@ export function fromZonedInputValue(value: string, timezone: string): number | n
   } catch {
     return asIfUtc * 1000;
   }
+}
+
+/** The start of the `timezone` day `days` after the one holding `micros`, in micros. DST-correct. [pure] */
+export function zonedMidnight(micros: number, timezone: string, days = 0): number {
+  const [year, month, day] = toZonedInputValue(micros, timezone)
+    .slice(0, 10)
+    .split("-")
+    .map(Number);
+  const date = new Date(0);
+  date.setUTCFullYear(year, month - 1, day + days);
+  const midnight = fromZonedInputValue(`${date.toISOString().slice(0, 10)}T00:00`, timezone);
+  if (midnight === null) throw new RangeError(`no local midnight for ${micros} in ${timezone}`);
+  return midnight;
 }
 
 /**

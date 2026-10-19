@@ -101,6 +101,8 @@ export class OnCallTeamDetailPage {
       scheduleNoMembers: '[data-test="oncall-schedule-no-members"]',
       scheduleEmpty: '[data-test="oncall-schedule-empty"]',
       rotationsTable: '[data-test="oncall-rotations-table"]',
+      previewShift: '[data-test="oncall-schedule-preview-shift"]',
+      previewError: '[data-test="oncall-schedule-preview-error"]',
 
       // Quick start drawer (OnCallSchedulePresets).
       presetsDrawer: '[data-test="oncall-presets-drawer"]',
@@ -378,6 +380,36 @@ export class OnCallTeamDetailPage {
 
   async addShiftRule() {
     await this.page.locator(this.locators.scheduleRuleAdd).click();
+  }
+
+  /** A multi-select, so each option is matched on its value (the email) and the popover closed after. */
+  async setRuleMembers(ruleIndex, emails) {
+    const field = this.ruleMembers(ruleIndex);
+    const trigger = this.page.locator(part(field, 'trigger')).first();
+    await trigger.waitFor({ state: 'visible', timeout: 15000 });
+    await trigger.click();
+    for (const email of emails) {
+      const option = this.page.locator(`${part(field, 'option')}[data-test-value="${email}"]`).first();
+      await option.waitFor({ state: 'visible', timeout: 15000 });
+      await option.click();
+    }
+    await this.page.keyboard.press('Escape');
+  }
+
+  /** "Only during…" seeds the rule with the working week, 09:00–17:00. */
+  async setRuleHoursOnlyDuring(ruleIndex) {
+    await this.page.locator(`[data-test="oncall-schedule-hours-${ruleIndex}-only"]`).click();
+  }
+
+  /** The Upcoming shifts rows as the server resolved them: `{ from, to, user }`, micros. */
+  async readPreviewRows() {
+    return await this.page.locator(this.locators.previewShift).evaluateAll((rows) =>
+      rows.map((row) => ({
+        from: Number(row.getAttribute('data-from')),
+        to: Number(row.getAttribute('data-to')),
+        user: row.getAttribute('data-user') || null,
+      })),
+    );
   }
 
   async addRestriction(ruleIndex) {

@@ -315,7 +315,8 @@
             <div class="border-border-default flex flex-col gap-4 border-t pt-4">
               <OText variant="section">{{ t("oncall.upcoming") }}</OText>
               <OnCallUpcomingList
-                :rules="namedShiftRules"
+                :rotation="active"
+                :team-id="props.teamId"
                 :now-micros="nowMicros"
                 :timezone="props.timezone"
               />

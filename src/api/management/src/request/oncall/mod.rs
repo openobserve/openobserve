@@ -407,6 +407,14 @@ pub struct ResolvedScheduleQuery {
     pub rotation_id: Option<String>,
 }
 
+/// An unsaved rotation and the window to resolve it over, in micros.
+#[derive(Debug, Deserialize, utoipa::ToSchema)]
+pub struct PreviewResolvedScheduleRequest {
+    pub rotation: Rotation,
+    pub from: i64,
+    pub to: i64,
+}
+
 /// A person, a window, or both; listing every absence an org ever recorded is not a question.
 #[derive(Debug, Default, Deserialize)]
 pub struct UnavailabilityQuery {
@@ -1304,6 +1312,55 @@ pub async fn get_resolved_schedule(
     #[cfg(not(feature = "enterprise"))]
     {
         let _ = (org_id, team_id, q);
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
+#[utoipa::path(
+    post,
+    path = "/{org_id}/oncall/teams/{team_id}/resolved-schedule/preview",
+    context_path = "/api",
+    tag = "OnCall",
+    operation_id = "PreviewResolvedOnCallSchedule",
+    summary = "The resolved schedule an unsaved rotation would produce, without saving it",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("team_id" = String, Path, description = "Team ID"),
+    ),
+    request_body(content = PreviewResolvedScheduleRequest, content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Window inverted or too long", content_type = "application/json", body = Object),
+    ),
+)]
+pub async fn preview_resolved_schedule(
+    Path((org_id, team_id)): Path<(String, String)>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+    ValidatedJson(body): ValidatedJson<PreviewResolvedScheduleRequest>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        // A read: nothing is written, so it costs what the GET costs.
+        if !allowed(&org_id, &user_email.user_id, CONFIG, "GET").await {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
+        match o2_enterprise::enterprise::oncall::service::preview_resolved_schedule(
+            &org_id,
+            &team_id,
+            body.rotation,
+            body.from,
+            body.to,
+        )
+        .await
+        {
+            Ok(segments) => MetaHttpResponse::json(segments),
+            Err(e) => to_response(e),
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, team_id, body);
         MetaHttpResponse::forbidden("Not Supported")
     }
 }

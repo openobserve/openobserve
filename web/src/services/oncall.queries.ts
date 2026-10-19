@@ -203,6 +203,29 @@ export const resolvedScheduleQuery = (
     staleTime: MEDIUM_STALE_TIME,
   });
 
+/** The drawer's preview of an unsaved rotation, resolved by the server exactly as the calendar will be. */
+export const resolvedSchedulePreviewQuery = (
+  org: string,
+  teamId: string,
+  rotation: Rotation,
+  from: number,
+  to: number,
+) =>
+  queryOptions({
+    queryKey: oncallKeys.resolvedSchedulePreview(org, teamId, from, to, rotation),
+    queryFn: async (): Promise<ResolvedSegment[]> =>
+      (
+        await oncallService.previewResolvedSchedule({
+          org_identifier: org,
+          team_id: teamId,
+          rotation,
+          from,
+          to,
+        })
+      ).data ?? [],
+    staleTime: MEDIUM_STALE_TIME,
+  });
+
 export const teamOverridesQuery = (org: string, teamId: string, from?: number, to?: number) =>
   queryOptions({
     queryKey: oncallKeys.overrides(org, teamId, from, to),
