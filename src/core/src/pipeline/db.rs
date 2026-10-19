@@ -250,6 +250,7 @@ pub async fn cache_scheduled_pipeline(pipeline: &Pipeline) {
 }
 
 /// Removes a scheduled pipeline from the cache.
+#[cfg(test)]
 pub async fn remove_scheduled_pipeline_from_cache(pipeline_id: &str) {
     SCHEDULED_PIPELINES.write().await.remove(pipeline_id);
 }

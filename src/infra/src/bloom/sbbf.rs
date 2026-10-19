@@ -88,6 +88,7 @@ pub fn mask_from_hash(hash: u64) -> [u32; 8] {
 }
 
 /// Decode a 32-byte SBBF block from raw little-endian bytes.
+#[cfg(test)]
 #[inline]
 fn block_from_bytes(bytes: &[u8; BLOCK_BYTES]) -> [u32; 8] {
     let mut out = [0u32; 8];
@@ -218,6 +219,7 @@ impl Sbbf {
 
     /// Parse from bytes produced by `to_bytes`. Used by tests; production
     /// readers go through [`check_block`] without materializing this struct.
+    #[cfg(test)]
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, &'static str> {
         if bytes.is_empty() || !bytes.len().is_multiple_of(BLOCK_BYTES) {
             return Err("SBBF bytes must be a non-zero multiple of 32");

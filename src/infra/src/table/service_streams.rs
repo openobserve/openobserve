@@ -20,14 +20,14 @@
 //! Streams are split into four typed columns.
 
 use sea_orm::{
-    ColumnTrait, ConnectionTrait, EntityTrait, FromQueryResult, QueryFilter, Schema, Set,
+    ColumnTrait, ConnectionTrait, EntityTrait, FromQueryResult, QueryFilter, Set,
     entity::prelude::*, sea_query::Expr,
 };
 use serde::{Deserialize, Serialize};
 use svix_ksuid::KsuidLike;
 
 use crate::{
-    db::{get_orm_client_ddl, get_orm_client_ro, get_orm_client_rw},
+    db::{get_orm_client_ro, get_orm_client_rw},
     errors::{self, DbError, Error},
 };
 
@@ -163,24 +163,6 @@ impl ServiceRecord {
             last_seen: 0,
         }
     }
-}
-
-pub async fn create_table() -> Result<(), errors::Error> {
-    let client = get_orm_client_ddl().await;
-    let builder = client.get_database_backend();
-
-    let schema = Schema::new(builder);
-    let create_table_stmt = schema
-        .create_table_from_entity(Entity)
-        .if_not_exists()
-        .take();
-
-    client
-        .execute(builder.build(&create_table_stmt))
-        .await
-        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
-
-    Ok(())
 }
 
 /// Upsert a service record.
