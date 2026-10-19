@@ -2155,6 +2155,12 @@ pub struct Common {
         help = "Enable per-stream trace time indexes and trace time-range lookup"
     )]
     pub trace_time_index_enabled: bool,
+    #[env_config(
+        name = "ZO_TRACE_LIST_TIME_INDEX_ENABLED",
+        default = true,
+        help = "Complete trace list summaries from the trace time index; off keeps the per-partition aggregates"
+    )]
+    pub trace_list_time_index_enabled: bool,
     #[env_config(name = "OTEL_OTLP_HTTP_ENDPOINT", default = "")]
     pub otel_otlp_url: String,
     #[env_config(name = "OTEL_OTLP_GRPC_ENDPOINT", default = "")]

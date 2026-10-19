@@ -16,7 +16,7 @@
 use std::time::Duration;
 
 use config::{
-    TIMESTAMP_COL_NAME,
+    TIMESTAMP_COL_NAME, get_config,
     meta::{
         search::{Request, Response},
         stream::StreamType,
@@ -143,6 +143,9 @@ impl TraceSearchContext {
         ids: &[String],
         range: (i64, i64),
     ) -> HashMap<String, TraceTimeRange> {
+        if !get_config().common.trace_list_time_index_enabled {
+            return HashMap::new();
+        }
         let around = TraceTimeRange {
             start_time: range.0,
             end_time: range.1,
