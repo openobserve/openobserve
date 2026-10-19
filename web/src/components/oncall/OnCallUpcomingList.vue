@@ -18,11 +18,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div>
     <p
-      v-if="previewError"
+      v-if="error"
       class="text-status-error-text text-xs"
       data-test="oncall-schedule-preview-error"
     >
-      {{ previewError }}
+      {{ error }}
     </p>
 
     <div
@@ -53,97 +53,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <!-- An empty preview is the most common state of a NEW rule, and saying
-         why beats showing nothing. -->
-    <OText
-      v-else-if="!hasValidRule || preview.isSuccess.value"
-      variant="meta"
-      data-test="oncall-schedule-preview-empty"
-    >
+    <!-- A new rule usually previews nothing yet, and saying why beats a blank. -->
+    <OText v-else-if="showEmpty" variant="meta" data-test="oncall-schedule-preview-empty">
       {{ t("oncall.rotationPreviewEmpty") }}
     </OText>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from "vue";
-import { useStore } from "vuex";
-import { keepPreviousData, useQuery } from "@tanstack/vue-query";
-import { debounce } from "lodash-es";
+import { computed } from "vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
-import { resolvedSchedulePreviewQuery } from "@/services/oncall.queries";
-import type { ResolvedSegment, Rotation } from "@/ts/interfaces/oncall";
-import { formatInZone, isShiftRuleValid, zonedMidnight } from "@/utils/oncall";
+import type { ResolvedSegment } from "@/ts/interfaces/oncall";
+import { formatInZone } from "@/utils/oncall";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
 
 const PREVIEW_ROWS = 10;
-const PREVIEW_DAYS = 14;
-const PREVIEW_DEBOUNCE_MS = 400;
 
 const props = defineProps<{
-  /** The rotation being edited, saved or not. */
-  rotation: Rotation;
-  teamId: string;
-  /** "Now", shared with the caller so every rule's list agrees on when "now" is. */
+  segments: ResolvedSegment[];
+  windowFrom: number;
+  windowTo: number;
   nowMicros: number;
-  /** The team's zone: the window starts at its midnight and times are shown in it. */
+  /** The team's zone: times are shown in it. */
   timezone: string;
+  multiRule: boolean;
+  error: I18nText | null;
+  showEmpty: boolean;
 }>();
 
 const { t } = useI18nTyped();
-const store = useStore();
-const orgId = computed<string>(() => store.state.selectedOrganization.identifier);
-
-// A plain copy, so the query key is the draft as it stood rather than a live proxy.
-const snapshot = (): Rotation => JSON.parse(JSON.stringify(props.rotation));
-const draft = ref<Rotation>(snapshot());
-const settle = debounce(() => {
-  draft.value = snapshot();
-}, PREVIEW_DEBOUNCE_MS);
-watch(() => props.rotation, settle, { deep: true });
-onBeforeUnmount(() => settle.cancel());
-
-const windowFrom = computed(() => zonedMidnight(props.nowMicros, props.timezone));
-const windowTo = computed(() => zonedMidnight(props.nowMicros, props.timezone, PREVIEW_DAYS));
-
-// Nobody to put on call yet: the hint says what is missing, and there is nothing to ask the server.
-const hasValidRule = computed(() => draft.value.shift_rules.some(isShiftRuleValid));
-
-const preview = useQuery(() =>
-  Object.assign(
-    resolvedSchedulePreviewQuery(
-      orgId.value,
-      props.teamId,
-      draft.value,
-      windowFrom.value,
-      windowTo.value,
-    ),
-    {
-      enabled: !!orgId.value && !!props.teamId && hasValidRule.value,
-      placeholderData: keepPreviousData,
-    },
-  ),
-);
-
-const multiRule = computed(() => props.rotation.shift_rules.length > 1);
 
 const rows = computed<ResolvedSegment[]>(() =>
-  hasValidRule.value
-    ? (preview.data.value ?? [])
-        .filter((segment) => segment.to > props.nowMicros)
-        .slice(0, PREVIEW_ROWS)
-    : [],
+  props.segments.filter((segment) => segment.to > props.nowMicros).slice(0, PREVIEW_ROWS),
 );
-
-const previewError = computed<I18nText | null>(() => {
-  const err: any = preview.error.value;
-  if (!err || !hasValidRule.value) return null;
-  const message = err?.response?.data?.message;
-  return message ? raw(String(message)) : t("oncall.upcomingPreviewFailed");
-});
 
 function isCurrent(segment: ResolvedSegment): boolean {
   return segment.from <= props.nowMicros && props.nowMicros < segment.to;
@@ -161,8 +106,8 @@ function segmentRange(segment: ResolvedSegment): I18nText {
   };
   const start = raw(formatInZone(segment.from, props.timezone, opts));
   const end = raw(formatInZone(segment.to, props.timezone, opts));
-  const openStart = segment.from <= windowFrom.value;
-  const openEnd = segment.to >= windowTo.value;
+  const openStart = segment.from <= props.windowFrom;
+  const openEnd = segment.to >= props.windowTo;
   if (openStart && openEnd) return t("oncall.upcomingNoChange");
   if (openStart) return t("oncall.upcomingUntil", { end });
   if (openEnd) return t("oncall.upcomingFrom", { start });

@@ -125,7 +125,7 @@ function render(over: Record<string, unknown> = {}) {
       "onUpdate:window": () => {},
       ...over,
     } as any,
-    global: { plugins: [i18n], stubs },
+    global: { plugins: [i18n, store], stubs },
   });
 }
 
@@ -645,6 +645,7 @@ describe("OnCallScheduleTimeline", () => {
 
   // The org's users are the IAM list's own cache entry, so a revisit of the Schedule tab costs nothing.
   it("serves the org's users to a remount from the cache", async () => {
+    vi.mocked(usersService.orgUsers).mockClear();
     vi.mocked(usersService.orgUsers).mockResolvedValue({
       data: { data: [{ email: "ana@o2.ai", first_name: "Ana" }] },
     } as any);

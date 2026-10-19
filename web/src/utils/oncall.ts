@@ -25,6 +25,7 @@ import type {
   EscalationTarget,
   L0Policy,
   ResponseState,
+  ResolvedSegment,
   Rotation,
   ShiftRule,
   TimeWindow,
@@ -41,12 +42,7 @@ import type {
   VerificationRefusalBody,
 } from "@/ts/interfaces/oncall";
 import { PROMOTE_SEVERITIES } from "@/ts/interfaces/oncall";
-import {
-  MICROS_PER_DAY,
-  MICROS_PER_HOUR,
-  MICROS_PER_MINUTE,
-  MICROS_PER_WEEK,
-} from "@/ts/interfaces/oncall";
+import { MICROS_PER_DAY, MICROS_PER_HOUR, MICROS_PER_WEEK } from "@/ts/interfaces/oncall";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import type { RowRailTone } from "@/lib/core/Table/OTable.types";
 import type { I18nKey, I18nText, TranslateFn } from "@/types/i18n";
@@ -934,6 +930,162 @@ export interface OverlapStanding {
 
 const MINUTES_PER_WEEK = 7 * 1440;
 
+/** The Covers quick picks, as the exact windows each one writes (aligned with the server's presets). */
+export const COVERS_PRESETS = {
+  all: [],
+  businessHours: [{ days: [0, 1, 2, 3, 4], start_minute: 540, end_minute: 1020 }],
+  weekdays: [{ days: [0, 1, 2, 3, 4], start_minute: 0, end_minute: 1440 }],
+  weekends: [{ days: [5, 6], start_minute: 0, end_minute: 1440 }],
+} as const satisfies Record<string, readonly TimeWindow[]>;
+
+export type CoversPreset = keyof typeof COVERS_PRESETS | "custom";
+
+/** The quick pick whose windows equal `restrictions` exactly, else `custom`. [pure] */
+export function coversPresetOf(restrictions: readonly TimeWindow[] | undefined): CoversPreset {
+  const windows = restrictions ?? [];
+  const keys = Object.keys(COVERS_PRESETS) as Array<keyof typeof COVERS_PRESETS>;
+  const match = keys.find((key) => {
+    const preset: readonly TimeWindow[] = COVERS_PRESETS[key];
+    return preset.length === windows.length && preset.every((w, i) => sameWindow(w, windows[i]));
+  });
+  return match ?? "custom";
+}
+
+/** `members` rotated so `person` sits at `index`; unchanged when they are not in it. [pure] */
+export function rotateMembersTo(members: string[], person: string, index: number): string[] {
+  const at = members.indexOf(person);
+  if (at < 0 || !members.length) return [...members];
+  const shift = (((at - index) % members.length) + members.length) % members.length;
+  return members.map((_, i) => members[(i + shift) % members.length]);
+}
+
+/** `members` in handover order starting at `holder`; from the top when there is none. [pure] */
+export function turnLine(members: string[], holder: string | null): string[] {
+  const at = holder ? members.indexOf(holder) : -1;
+  return at < 0 ? [...members] : [...members.slice(at), ...members.slice(0, at)];
+}
+
+/** The rostered person behind a segment: the server's scheduled holder when someone else stands in. [pure] */
+function turnHolder(segment: ResolvedSegment): string | null {
+  return segment.scheduled_email ?? segment.user_email ?? null;
+}
+
+/** Who holds the turn of rule `ruleName` now, or next, in the server's segments. [pure] */
+export function ruleHolder(
+  segments: readonly ResolvedSegment[],
+  ruleName: string,
+  nowMicros: number,
+): { email: string; now: boolean } | null {
+  const turns = segments.filter((s) => s.rotation === ruleName && turnHolder(s));
+  const current = turns.find((s) => s.from <= nowMicros && nowMicros < s.to);
+  if (current) return { email: turnHolder(current) as string, now: true };
+  const next = turns.find((s) => s.from > nowMicros);
+  return next ? { email: turnHolder(next) as string, now: false } : null;
+}
+
+/** The team-local weekday (0 = Monday) and minute of day of an instant. [pure] */
+export function anchorWeekdayTime(
+  anchorMicros: number,
+  timezone: string,
+): { weekday: number; minute: number } {
+  const local = toZonedInputValue(anchorMicros, timezone);
+  const [year, month, day] = local.slice(0, 10).split("-").map(Number);
+  const date = new Date(0);
+  date.setUTCFullYear(year, month - 1, day);
+  const [hours, minutes] = local.slice(11, 16).split(":").map(Number);
+  return { weekday: (date.getUTCDay() + 6) % 7, minute: hours * 60 + minutes };
+}
+
+/** The first shift moved to `weekday` (or its own day when null) at `minute`, within its team-local week. [pure] */
+export function anchorAtWeekdayTime(
+  anchorMicros: number,
+  timezone: string,
+  weekday: number | null,
+  minute: number,
+): number | null {
+  const local = toZonedInputValue(anchorMicros, timezone);
+  const [year, month, day] = local.slice(0, 10).split("-").map(Number);
+  const date = new Date(0);
+  date.setUTCFullYear(year, month - 1, day);
+  if (weekday !== null) {
+    date.setUTCDate(date.getUTCDate() + weekday - ((date.getUTCDay() + 6) % 7));
+  }
+  const time = `${String(Math.floor(minute / 60)).padStart(2, "0")}:${String(minute % 60).padStart(2, "0")}`;
+  return fromZonedInputValue(`${date.toISOString().slice(0, 10)}T${time}`, timezone);
+}
+
+/** One team-local day of a preview, with the segments cut at its midnights. */
+export interface DayRow {
+  start: number;
+  end: number;
+  pieces: Array<{ from: number; to: number; segment: ResolvedSegment }>;
+}
+
+/** `days` team-local day rows from the day holding `fromMicros`. [pure] */
+export function dayRows(
+  segments: readonly ResolvedSegment[],
+  fromMicros: number,
+  days: number,
+  timezone: string,
+): DayRow[] {
+  return Array.from({ length: days }, (_, day) => {
+    const start = zonedMidnight(fromMicros, timezone, day);
+    const end = zonedMidnight(fromMicros, timezone, day + 1);
+    const pieces = segments
+      .filter((segment) => segment.from < end && segment.to > start)
+      .map((segment) => ({
+        from: Math.max(segment.from, start),
+        to: Math.min(segment.to, end),
+        segment,
+      }));
+    return { start, end, pieces };
+  });
+}
+
+/** Up to `max` ends of the rule's turns after now and before the window's end; a cover inside a turn does not end it. [pure] */
+export function stopChoices(
+  segments: readonly ResolvedSegment[],
+  ruleName: string,
+  nowMicros: number,
+  windowTo: number,
+  max = 3,
+): Array<{ email: string; at: number }> {
+  const turns: Array<{ email: string; to: number }> = [];
+  for (const segment of segments) {
+    const email = segment.rotation === ruleName ? turnHolder(segment) : null;
+    if (!email) continue;
+    const last = turns[turns.length - 1];
+    if (last && last.email === email && last.to === segment.from) last.to = segment.to;
+    else turns.push({ email, to: segment.to });
+  }
+  return turns
+    .filter((turn) => turn.to > nowMicros && turn.to < windowTo)
+    .slice(0, max)
+    .map((turn) => ({ email: turn.email, at: turn.to }));
+}
+
+/** With `rules[index]` stopped: the in-force rules sharing its hours, and its hours nobody else covers. [pure] */
+export function stopConsequence(
+  rules: ShiftRule[],
+  index: number,
+  nowMicros: number,
+): { takers: number[]; gap: Array<[number, number]> } {
+  const mine = weekCoverage(rules[index]);
+  const takers = rules.flatMap((rule, k) =>
+    k !== index &&
+    isShiftRuleValid(rule) &&
+    !(rule.ends_at != null && rule.ends_at <= nowMicros) &&
+    spansMeet(mine, weekCoverage(rule))
+      ? [k]
+      : [],
+  );
+  const minutes = new Uint8Array(MINUTES_PER_WEEK);
+  for (const [start, end] of mine) minutes.fill(1, start, end);
+  for (const k of takers)
+    for (const [start, end] of weekCoverage(rules[k])) minutes.fill(0, start, end);
+  return { takers, gap: spansOf(minutes) };
+}
+
 /** Whether the server refuses `a` and `b` side by side: same priority and identical windows. [pure] */
 export function rulesClash(a: ShiftRule, b: ShiftRule): boolean {
   const left = a.restrictions ?? [];
@@ -998,14 +1150,6 @@ export function effectiveWeekCoverage(
     for (const [start, end] of weekCoverage(rules[k])) minutes.fill(0, start, end);
   }
   return spansOf(minutes);
-}
-
-/** End of the shift in progress at `nowMicros`, or of the first shift when the rule has not begun. [pure] */
-export function nextHandoverAfter(rule: ShiftRule, nowMicros: number): number {
-  const { shift_micros: shift, anchor_micros: anchor } = rule;
-  const at = Math.max(nowMicros, anchor, rule.starts_at ?? nowMicros);
-  if (!shift || shift <= 0) return at;
-  return anchor + (Math.floor((at - anchor) / shift) + 1) * shift;
 }
 
 function sameWindow(a: TimeWindow, b: TimeWindow): boolean {
@@ -1171,27 +1315,6 @@ export function coverageHoursSummary(spans: Array<[number, number]>, t: Translat
   for (const [start, end] of spans) minutes.fill(1, start, end);
   if (minutes.every((on) => on === 1)) return t("oncall.ruleHoursAll");
   return windowsSummary(coverageWindows(minutes), t);
-}
-
-/** A shift length as the words after "every", exactly; `null` when it is not whole minutes. [pure] */
-export function shiftLengthWords(micros: number, t: TranslateFn): I18nText | null {
-  if (micros > 0 && micros % MICROS_PER_WEEK === 0) {
-    const weeks = micros / MICROS_PER_WEEK;
-    return t("oncall.shiftEveryWeeks", { count: weeks }, weeks);
-  }
-  if (micros > 0 && micros % MICROS_PER_DAY === 0) {
-    const days = micros / MICROS_PER_DAY;
-    return t("oncall.shiftEveryDays", { count: days }, days);
-  }
-  if (micros > 0 && micros % MICROS_PER_HOUR === 0) {
-    const hours = micros / MICROS_PER_HOUR;
-    return t("oncall.shiftEveryHours", { count: hours }, hours);
-  }
-  if (micros <= 0 || micros % MICROS_PER_MINUTE !== 0) return null;
-  const hours = Math.floor(micros / MICROS_PER_HOUR);
-  const minutes = (micros % MICROS_PER_HOUR) / MICROS_PER_MINUTE;
-  if (!hours) return t("oncall.shiftEveryMinutes", { count: minutes }, minutes);
-  return t("oncall.shiftEveryHoursMinutes", { hours, minutes });
 }
 
 function windowsSummary(windows: TimeWindow[], t: TranslateFn): I18nText {

@@ -51,6 +51,11 @@ function part(selector, suffix) {
   return selector.replace(/"\]$/, `-${suffix}"]`);
 }
 
+// The drawer's footer is sticky, so a select near the bottom edge opens under it unless it is centred first.
+async function centre(locator) {
+  await locator.evaluate((el) => el.scrollIntoView({ block: 'center' }));
+}
+
 export class OnCallTeamDetailPage {
   constructor(page) {
     this.page = page;
@@ -102,6 +107,7 @@ export class OnCallTeamDetailPage {
       scheduleEmpty: '[data-test="oncall-schedule-empty"]',
       rotationsTable: '[data-test="oncall-rotations-table"]',
       previewShift: '[data-test="oncall-schedule-preview-shift"]',
+      previewListToggle: '[data-test="oncall-draft-preview-list"]',
       previewError: '[data-test="oncall-schedule-preview-error"]',
 
       // Quick start drawer (OnCallSchedulePresets).
@@ -176,7 +182,9 @@ export class OnCallTeamDetailPage {
   rulePanel(index) { return `[data-test="oncall-schedule-rule-panel-${index}"]`; }
   ruleName(index) { return `[data-test="oncall-schedule-rule-name-${index}"]`; }
   ruleRemove(index) { return `[data-test="oncall-schedule-rule-remove-${index}"]`; }
-  ruleMembers(index) { return `[data-test="oncall-schedule-members-${index}"]`; }
+  rulePeopleAdd(index) { return `[data-test="oncall-rule-people-add-${index}"]`; }
+  rulePeopleEdit(index) { return `[data-test="oncall-rule-people-edit-${index}"]`; }
+  ruleCovers(index) { return `[data-test="oncall-schedule-covers-${index}"]`; }
   ruleTabIcon(index) { return `[data-test="oncall-schedule-rule-tab-icon-${index}"]`; }
   ruleRestriction(ruleIndex, index) {
     return `[data-test="oncall-schedule-restriction-${ruleIndex}-${index}"]`;
@@ -208,8 +216,7 @@ export class OnCallTeamDetailPage {
   memberMarkAway(memberId) { return `[data-test="oncall-members-mark-away-${memberId}"]`; }
   memberShift(memberId) { return `[data-test="oncall-members-shift-${memberId}"]`; }
 
-  /** The handover row's zone label and its time input, both indexed by row position. */
-  handoverTimezone(index) { return `[data-test="oncall-schedule-handover-${index}-timezone"]`; }
+  /** The handover row's time select, indexed by rule position. */
   handoverTime(index) { return `[data-test="oncall-schedule-handover-${index}-time"]`; }
 
   /** An L0 hold band carries the agent id, so it is matched by prefix. */
@@ -248,10 +255,11 @@ export class OnCallTeamDetailPage {
     return this.page.locator(part(this.locators.scheduleName, 'field')).first();
   }
 
-  getHandoverTimezone(index) { return this.page.locator(this.handoverTimezone(index)).first(); }
-  /** The picker's `<input>`; the wrapper has no value to read. */
-  getHandoverTimeInput(index) {
-    return this.page.locator(`${this.handoverTime(index)} input`).first();
+  /** The drawer states the team's zone once, in the "Who's on call" heading. */
+  getPreviewZone() { return this.page.locator('[data-test="oncall-draft-preview-zone"]').first(); }
+  /** The select's trigger, which shows the chosen time. */
+  getHandoverTimeTrigger(index) {
+    return this.page.locator(part(this.handoverTime(index), 'trigger')).first();
   }
 
   /** How many shift-rule tabs the drawer currently has — the next rule's index. */
@@ -378,27 +386,43 @@ export class OnCallTeamDetailPage {
     await expect(tab).toHaveAttribute('data-state', 'active', { timeout: 10000 });
   }
 
+  /** "+" opens the new rule's rename popover; it is closed so the tab body can be used. */
   async addShiftRule() {
+    const before = await this.countShiftRuleTabs();
     await this.page.locator(this.locators.scheduleRuleAdd).click();
+    const rename = this.page.locator(`[data-test="oncall-schedule-rule-rename-popover-${before}"]`);
+    await rename.waitFor({ state: 'visible', timeout: 10000 });
+    await this.page.keyboard.press('Escape');
+    await rename.waitFor({ state: 'hidden', timeout: 10000 });
   }
 
-  /** A multi-select, so each option is matched on its value (the email) and the popover closed after. */
+  /** Adds people one pick at a time through the rule's "Add person…" search; options match on email. */
   async setRuleMembers(ruleIndex, emails) {
-    const field = this.ruleMembers(ruleIndex);
-    const trigger = this.page.locator(part(field, 'trigger')).first();
-    await trigger.waitFor({ state: 'visible', timeout: 15000 });
-    await trigger.click();
+    const edit = this.page.locator(this.rulePeopleEdit(ruleIndex));
+    if (await edit.count()) await edit.click();
+    const field = this.rulePeopleAdd(ruleIndex);
     for (const email of emails) {
+      const trigger = this.page.locator(part(field, 'trigger')).first();
+      await trigger.waitFor({ state: 'visible', timeout: 15000 });
+      await centre(trigger);
+      await trigger.click();
       const option = this.page.locator(`${part(field, 'option')}[data-test-value="${email}"]`).first();
       await option.waitFor({ state: 'visible', timeout: 15000 });
       await option.click();
     }
-    await this.page.keyboard.press('Escape');
   }
 
-  /** "Only during…" seeds the rule with the working week, 09:00–17:00. */
-  async setRuleHoursOnlyDuring(ruleIndex) {
-    await this.page.locator(`[data-test="oncall-schedule-hours-${ruleIndex}-only"]`).click();
+  /** Covers quick pick by its value: all, businessHours, weekdays, weekends or custom. */
+  async setRuleCovers(ruleIndex, pick) {
+    const field = this.ruleCovers(ruleIndex);
+    const trigger = this.page.locator(part(field, 'trigger')).first();
+    await centre(trigger);
+    await trigger.click();
+    await this.page.locator(`${part(field, 'option')}[data-test-value="${pick}"]`).first().click();
+  }
+
+  async showPreviewList() {
+    await this.page.locator(this.locators.previewListToggle).click();
   }
 
   /** The Upcoming shifts rows as the server resolved them: `{ from, to, user }`, micros. */

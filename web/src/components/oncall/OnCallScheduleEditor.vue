@@ -150,11 +150,28 @@
           </p>
         </div>
 
+        <OnCallDraftPreview
+          v-if="active.shift_rules.length"
+          v-model:page="preview.page.value"
+          class="border-border-default border-t pt-6"
+          :rotation="active"
+          :active-rule-name="activeRule?.name ?? ''"
+          :segments="preview.segments.value"
+          :window-from="preview.windowFrom.value"
+          :window-to="preview.windowTo.value"
+          :now-micros="nowMicros"
+          :timezone="props.timezone"
+          :error="preview.error.value"
+          :show-empty="!preview.hasValidRule.value || preview.loaded.value"
+          :name-of="nameOf"
+        />
+
         <!-- The rules. Always tabbed, even with just one — the Base rule
              gets a tab of its own like any other, so there's one layout to
              read rather than a plain form that turns into tabs the moment a
              second rule shows up. -->
-        <section class="flex flex-col gap-4">
+        <section class="border-border-default flex flex-col gap-4 border-t pt-6">
+          <h3 class="text-base font-semibold">{{ t("oncall.rotationSectionRules") }}</h3>
           <p
             v-if="!active.shift_rules.length"
             class="text-status-warning-text text-xs"
@@ -178,18 +195,11 @@
             >
               <OTab
                 v-for="(rule, ruleIndex) in active.shift_rules"
-                :key="ruleIndex"
+                :key="ruleKey(rule)"
                 :name="String(ruleIndex)"
                 :data-test="`oncall-schedule-rule-tab-${ruleIndex}`"
               >
-                <!-- Custom slot content instead of the label/icon props: a
-                     multi-rule rotation needs a delete affordance ON the tab
-                     rather than a separate button buried in the panel below,
-                     where it read as deleting the FORM rather than the tab.
-                     Matches the dashboard panel's query-tab close icon
-                     (DashboardQueryEditor.vue) — inline, always-dimly-visible
-                     rather than hover-revealed, since a tab strip this short
-                     has no crowding to hide it from. -->
+                <!-- A status icon before the name; the rare actions sit in the trailing menu. -->
                 <OIcon
                   v-if="ruleTabIcon(rule, ruleIndex)"
                   :name="ruleTabIcon(rule, ruleIndex) as any"
@@ -204,17 +214,24 @@
                       : String(t("oncall.shiftRuleNthName", { n: ruleIndex + 1 })),
                   )
                 }}</span>
-                <OIcon
-                  v-if="multiRule"
-                  name="close"
-                  size="sm"
-                  :aria-label="t('oncall.removeShiftRule')"
-                  class="hover:bg-hover-gray text-text-secondary cursor-pointer opacity-60 transition-all duration-150 hover:rounded-full hover:opacity-100"
-                  :data-test="`oncall-schedule-rule-remove-${ruleIndex}`"
-                  @click.stop.prevent="removeRule(ruleIndex)"
-                  @mousedown.stop.prevent
-                  @pointerdown.stop.prevent
-                />
+                <template #trailing>
+                  <OnCallRuleTabMenu
+                    :rule="rule"
+                    :rule-index="ruleIndex"
+                    :rule-label="namedShiftRules[ruleIndex].name"
+                    :can-remove="multiRule"
+                    :renaming="renamingRule === rule"
+                    :choices="stopChoicesFor(rule)"
+                    :consequence="stopConsequenceFor(ruleIndex)"
+                    :timezone="props.timezone"
+                    :now-micros="nowMicros"
+                    :name-of="nameOf"
+                    @remove="removeRule(ruleIndex)"
+                    @stop="(at: number) => (rule.ends_at = at)"
+                    @unstop="rule.ends_at = undefined"
+                    @renamed="renamingRule = null"
+                  />
+                </template>
               </OTab>
             </OTabs>
             <OButton
@@ -234,27 +251,11 @@
             <OTabPanels v-model="activeRuleTab" keep-alive>
               <OTabPanel
                 v-for="(rule, ruleIndex) in active.shift_rules"
-                :key="ruleIndex"
+                :key="ruleKey(rule)"
                 :name="String(ruleIndex)"
                 :data-test="`oncall-schedule-rule-panel-${ruleIndex}`"
               >
                 <div class="flex flex-col gap-4 pt-3">
-                  <div v-if="multiRule || isRetired(rule)" class="flex flex-wrap items-end gap-3">
-                    <OInput
-                      v-model="rule.name"
-                      class="min-w-0 flex-1"
-                      :label="t('oncall.shiftRuleName')"
-                      :data-test="`oncall-schedule-rule-name-${ruleIndex}`"
-                    />
-                    <OTag v-if="isRetired(rule)" variant="default-soft" size="xs">
-                      {{
-                        t("oncall.rotationRetiredOnDate", {
-                          date: raw(shortDate(rule.ends_at ?? 0)),
-                        })
-                      }}
-                    </OTag>
-                  </div>
-
                   <OText variant="meta" :data-test="`oncall-schedule-rule-summary-${ruleIndex}`">
                     {{ ruleSummary(ruleIndex) }}
                   </OText>
@@ -275,13 +276,14 @@
                     :rule="rule"
                     :rule-index="ruleIndex"
                     :has-team-members="!!props.members.length"
-                    :member-options="memberOptions"
+                    :team-members="teamMemberEmails"
+                    :holder="ruleHolder(preview.currentSegments.value, rule.name, nowMicros)"
+                    :name-of="nameOf"
                     :shift-options="shiftOptions"
                     :day-options="dayOptions"
                     :from-minute-options="fromMinuteOptions"
                     :minute-options="minuteOptions"
                     :timezone="props.timezone"
-                    :first-shift-sentence="firstShiftSentence(rule)"
                     :show-needs-people="showNeedsPeople(rule)"
                     :overlap-names="overlapNames(ruleIndex)"
                     :overlap-count="overlapCount(ruleIndex)"
@@ -289,38 +291,15 @@
                     :set-members="setMembers"
                     :away-clashes-for="awayClashesFor"
                     :short-date="shortDate"
-                    :handover-input="handoverInput"
-                    :set-anchor="setAnchor"
-                    :set-hours-mode="setHoursMode"
                     :add-restriction="addRestriction"
                     :remove-restriction="removeRestriction"
                     :set-overlap-winner="(wins: boolean) => setOverlapWinner(ruleIndex, wins)"
-                    :is-retired="isRetired"
-                    :set-retired="setRetired"
-                    :retired-at-local="retiredAtLocal"
-                    :set-retired-at="setRetiredAt"
                     :priority-clash-for="priorityClashFor"
                     @open-members="openMembers"
                   />
                 </div>
               </OTabPanel>
             </OTabPanels>
-
-            <!-- Kept out from under the tabs and shown for every rule at
-                 once, merged into one timeline: it's the one place a
-                 follow-the-sun handover gets checked by eye, and that only
-                 works if every rule's shifts are visible — and lined up
-                 against each other by time, not repeated once per rule —
-                 without switching tabs. -->
-            <div class="border-border-default flex flex-col gap-4 border-t pt-4">
-              <OText variant="section">{{ t("oncall.upcoming") }}</OText>
-              <OnCallUpcomingList
-                :rotation="active"
-                :team-id="props.teamId"
-                :now-micros="nowMicros"
-                :timezone="props.timezone"
-              />
-            </div>
           </template>
         </section>
       </div>
@@ -379,7 +358,10 @@ import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import OnCallShiftRuleFields from "./OnCallShiftRuleFields.vue";
-import OnCallUpcomingList from "./OnCallUpcomingList.vue";
+import OnCallDraftPreview from "./OnCallDraftPreview.vue";
+import OnCallRuleTabMenu from "./OnCallRuleTabMenu.vue";
+import { useRotationPreview } from "@/composables/useRotationPreview";
+import { useOrgUserNames } from "@/composables/useOrgUserNames";
 import { queryClient } from "@/composables/query/queryClient";
 import { setTeamScheduleMutation, unavailabilityQuery } from "@/services/oncall.queries";
 import { useMutation } from "@tanstack/vue-query";
@@ -406,18 +388,17 @@ import {
   effectiveWeekCoverage,
   formatInZone,
   formatMinuteOfDay,
-  fromZonedInputValue,
-  nextHandoverAfter,
   overlappingRules,
   overlapStanding,
   prioritiesFor,
   resolveHolder,
   resolveNextHolder,
+  ruleHolder,
   ruleHoursSummary,
   rulesClash,
   SHIFT_PRESETS,
-  shiftLengthWords,
-  toZonedInputValue,
+  stopChoices,
+  stopConsequence,
 } from "@/utils/oncall";
 
 const props = defineProps<{
@@ -566,6 +547,16 @@ function awayClashesFor(rule: ShiftRule): Unavailability[] {
   return editorAbsences.value.filter((a) => chosen.has(a.user_email.toLowerCase()));
 }
 
+const stamp = (micros: number) =>
+  formatInZone(micros, props.timezone, {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  });
+
 function shortDate(micros: number): string {
   return new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short" }).format(
     new Date(micros / 1000),
@@ -615,9 +606,50 @@ function openMembers() {
   emit("open-members");
 }
 
-const memberOptions = computed(() =>
-  props.members.map((m) => ({ label: raw(m.user_email), value: m.user_email })),
-);
+const teamMemberEmails = computed(() => props.members.map((m) => m.user_email));
+
+// One server preview for the whole drawer: the picture, the list, the people line and the stop choices all read it.
+const { nameOf } = useOrgUserNames();
+
+const preview = useRotationPreview({
+  rotation: () => active.value,
+  teamId: () => props.teamId,
+  timezone: () => props.timezone,
+  nowMicros: () => nowMicros.value,
+});
+
+const activeRule = computed(() => active.value?.shift_rules[Number(activeRuleTab.value)] ?? null);
+
+// Rules carry no id, so a tab and its panel keep their state by the rule object, not its position.
+const ruleKeys = new WeakMap<ShiftRule, number>();
+let nextRuleKey = 0;
+function ruleKey(rule: ShiftRule): number {
+  if (!ruleKeys.has(rule)) ruleKeys.set(rule, nextRuleKey++);
+  return ruleKeys.get(rule) as number;
+}
+
+/// The rule just added by "+": its tab opens straight into renaming, or it stays "Rule N".
+const renamingRule = ref<ShiftRule | null>(null);
+
+function stopChoicesFor(rule: ShiftRule) {
+  return stopChoices(
+    preview.currentSegments.value,
+    rule.name,
+    nowMicros.value,
+    preview.currentWindowTo.value,
+  );
+}
+
+/// Who takes a stopped rule's hours, or which of them nobody covers.
+function stopConsequenceFor(index: number): { text: I18nText; gap: boolean } {
+  const rules = namedShiftRules.value;
+  const { takers, gap } = stopConsequence(rules, index, nowMicros.value);
+  if (gap.length) {
+    return { text: t("oncall.stopGap", { hours: coverageHoursSummary(gap, t) }), gap: true };
+  }
+  const names = raw(takers.map((k) => rules[k].name).join(", "));
+  return { text: t("oncall.stopTakers", { names }), gap: false };
+}
 
 const shiftOptions = computed(() =>
   SHIFT_PRESETS.map((preset) => ({ label: t(preset.labelKey), value: preset.micros })),
@@ -699,6 +731,8 @@ function ruleSummary(index: number): I18nText {
   if (effective.length && effectiveRivals(named, index, nowMicros.value).length) {
     parts.push(t("oncall.ruleOnCallOnly", { hours: coverageHoursSummary(effective, t) }));
   }
+  const endsAt = rules[index].ends_at;
+  if (endsAt !== undefined) parts.push(t("oncall.ruleStops", { date: raw(stamp(endsAt)) }));
   return t("oncall.ruleSummaryLine", { parts: parts.join(" · ") });
 }
 
@@ -716,55 +750,8 @@ function ruleUsage(index: number): { kind: "never-used" | "standby"; text: I18nT
     : { kind: "standby", text: t("oncall.ruleStandby", { names }, rivals.length) };
 }
 
-/// "{person} starts {when}, then …" — only true once two people take turns.
-function firstShiftSentence(rule: ShiftRule): I18nText | "" {
-  const length = shiftLengthWords(rule.shift_micros, t);
-  if (rule.members.length < 2 || !length) return "";
-  return t("oncall.firstShiftSentence", {
-    person: raw(rule.members[0]),
-    when: raw(
-      formatInZone(rule.anchor_micros, props.timezone, {
-        weekday: "short",
-        day: "numeric",
-        month: "short",
-        hour: "2-digit",
-        minute: "2-digit",
-        hourCycle: "h23",
-      }),
-    ),
-    length,
-  });
-}
-
-/// ── Retiring a rule ───────────────────────────────────────────────────────
-///
-/// `ends_at` is how a rule is taken out of service without deleting it.
-/// Deleting was the only way to stop one, and it discarded exactly the record
-/// the field exists to keep: "the weekend rule ran until March" stopped being
-/// something the schedule could say, and the calendar lost the reason those
-/// hours had been covered at all.
-///
-/// The end is exclusive, like every other boundary here.
+/// A stopped rule keeps its record; `ends_at` is exclusive, like every other boundary here.
 const isRetired = (rule: ShiftRule) => rule.ends_at !== undefined;
-
-const retiredAt = (rule: ShiftRule) => rule.ends_at ?? nextHandoverAfter(rule, nowMicros.value);
-
-/// The date/time pickers carry no timezone of their own — so the value is
-/// rendered in the TEAM's zone and labelled with it, rather than in whatever
-/// zone the reader's laptop is set to.
-function retiredAtLocal(rule: ShiftRule): string {
-  return toZonedInputValue(retiredAt(rule), props.timezone);
-}
-
-function setRetired(rule: ShiftRule, on: boolean) {
-  // The next handover, so whoever holds the shift in progress finishes it.
-  rule.ends_at = on ? retiredAt(rule) : undefined;
-}
-
-function setRetiredAt(rule: ShiftRule, value: string | number) {
-  const micros = fromZonedInputValue(String(value), props.timezone);
-  if (micros !== null) rule.ends_at = micros;
-}
 
 // A window with no days applies every day; a new one starts as the working week.
 function addRestriction(rule: ShiftRule) {
@@ -777,11 +764,6 @@ function addRestriction(rule: ShiftRule) {
 function removeRestriction(rule: ShiftRule, index: number) {
   if (!rule.restrictions) return;
   rule.restrictions = rule.restrictions.filter((_, at) => at !== index);
-}
-
-function setHoursMode(rule: ShiftRule, onlyDuring: boolean) {
-  if (!onlyDuring) rule.restrictions = [];
-  else if (!rule.restrictions?.length) addRestriction(rule);
 }
 
 /// A second rule is follow-the-sun: the same position, different hours. It gets
@@ -810,6 +792,7 @@ function addRule() {
   // Land on the rule just added — otherwise it's created behind whichever
   // tab was already open, and looks like the click did nothing.
   activeRuleTab.value = String(rotation.shift_rules.length - 1);
+  renamingRule.value = rotation.shift_rules[rotation.shift_rules.length - 1];
 }
 
 function removeRule(index: number) {
@@ -849,22 +832,6 @@ function showNeedsPeople(rule: ShiftRule): boolean {
 function setMembers(rule: ShiftRule, members: string[]) {
   rule.members = [...members];
   peopleAsked.add(rule);
-}
-
-/// In the TEAM's zone, which is what the label beside it promises and what
-/// every restriction window is evaluated in. Read and written with the
-/// browser's zone, an operator in Berlin editing an Asia/Kolkata team saw the
-/// handover three and a half hours from where it was — and moved it there by
-/// saving.
-function handoverInput(rule: ShiftRule): string {
-  return toZonedInputValue(rule.anchor_micros, props.timezone);
-}
-
-function setAnchor(rule: ShiftRule, value: string) {
-  const micros = fromZonedInputValue(value, props.timezone);
-  // An incomplete value means the user is mid-edit; keeping the previous
-  // anchor beats writing NaN and blanking the preview.
-  if (micros !== null) rule.anchor_micros = micros;
 }
 
 function reset() {

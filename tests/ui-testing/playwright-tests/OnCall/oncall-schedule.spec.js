@@ -420,7 +420,7 @@ test.describe('On-call schedules and rotations', {
       const rules = res.request().postDataJSON()?.rotation?.shift_rules ?? [];
       return rules.length === 2 && (rules[1].restrictions ?? []).length > 0;
     });
-    await detail.setRuleHoursOnlyDuring(office);
+    await detail.setRuleCovers(office, 'businessHours');
     const previewResponse = await settled;
     expect(previewResponse.ok(), 'the preview request must succeed').toBe(true);
     const { from, to } = previewResponse.request().postDataJSON();
@@ -429,6 +429,7 @@ test.describe('On-call schedules and rotations', {
     }));
 
     // The list shows a run of the preview's own segments once that answer has rendered.
+    await detail.showPreviewList();
     let rows = [];
     await expect.poll(async () => {
       rows = await detail.readPreviewRows();

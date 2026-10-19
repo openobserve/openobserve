@@ -27,6 +27,10 @@ vi.mock("@/services/oncall", () => ({
   default: { setSchedule: vi.fn(), listUnavailability: vi.fn(), previewResolvedSchedule: vi.fn() },
 }));
 vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
+// Names for the drawer's labels; an empty roster leaves every label as the email.
+vi.mock("@/services/users", () => ({
+  default: { orgUsers: vi.fn(() => Promise.resolve({ data: { data: [] } })) },
+}));
 import analytics from "@/services/product_analytics";
 
 const service = vi.mocked(oncallService);
@@ -64,6 +68,33 @@ function rule(over: Record<string, unknown> = {}) {
 async function openRotation(wrapper: any, index = 0) {
   const rows = wrapper.findComponent({ name: "OTable" }).props("data") as any[];
   wrapper.findComponent({ name: "OTable" }).vm.$emit("row-click", rows[index]);
+  await flushPromises();
+}
+
+/// The People list opens with Edit; a rule nobody is in already shows it.
+async function addPerson(wrapper: any, ruleIndex: number, email: string) {
+  const edit = wrapper.find(`[data-test="oncall-rule-people-edit-${ruleIndex}"]`);
+  if (edit.exists()) await edit.trigger("click");
+  await wrapper
+    .findComponent(`[data-test="oncall-rule-people-add-${ruleIndex}"]`)
+    .vm.$emit("update:modelValue", email);
+  await flushPromises();
+}
+
+async function removePerson(wrapper: any, ruleIndex: number, position: number) {
+  const edit = wrapper.find(`[data-test="oncall-rule-people-edit-${ruleIndex}"]`);
+  if (edit.exists()) await edit.trigger("click");
+  await wrapper
+    .find(`[data-test="oncall-rule-person-remove-${ruleIndex}-${position}"]`)
+    .trigger("click");
+  await flushPromises();
+}
+
+const drawerRules = (wrapper: any) =>
+  (wrapper.findComponent({ name: "OTable" }).props("data") as any[])[0].shift_rules;
+
+async function showList(wrapper: any) {
+  await wrapper.find('[data-test="oncall-draft-preview-list"]').trigger("click");
   await flushPromises();
 }
 
@@ -123,6 +154,25 @@ const stubs = {
     name: "OToggleGroupItem",
     props: ["value"],
     template: `<button @click="$parent.$emit('update:modelValue', value)"><slot /></button>`,
+  },
+  ODropdown: { name: "ODropdown", template: "<div><slot name='trigger' /><slot /></div>" },
+  ODropdownItem: {
+    name: "ODropdownItem",
+    props: ["disabled"],
+    emits: ["select"],
+    template: `<button :disabled="disabled" @click="$emit('select')"><slot /></button>`,
+  },
+  ODropdownSeparator: { name: "ODropdownSeparator", template: "<hr />" },
+  OPopover: {
+    name: "OPopover",
+    props: ["open"],
+    template: "<div><slot name='trigger' /><div v-if='open'><slot /></div></div>",
+  },
+  ORadioGroup: { name: "ORadioGroup", props: ["modelValue"], template: "<div><slot /></div>" },
+  ORadio: {
+    name: "ORadio",
+    props: ["value"],
+    template: `<button @click="$parent.$emit('update:modelValue', value)"><slot name="label" /></button>`,
   },
   VueDraggableNext: {
     name: "VueDraggableNext",
@@ -254,6 +304,7 @@ describe("OnCallScheduleEditor", () => {
     } as any);
     const wrapper = render({ schedule: schedule([rota("Primary")]) });
     await openRotation(wrapper);
+    await showList(wrapper);
 
     const rows = wrapper.findAll('[data-test="oncall-schedule-preview-shift"]');
     expect(rows.map((r) => r.attributes("data-user"))).toEqual(["ana@o2.ai", "", "bob@o2.ai"]);
@@ -262,6 +313,64 @@ describe("OnCallScheduleEditor", () => {
     expect(rows[1].text()).toContain("Nobody is on call");
     expect(rows[2].text()).toContain("From");
     expect(rows.filter((r) => r.text().includes("Now"))).toHaveLength(1);
+  });
+
+  // B1: paging asks for the next fortnight once; switching Picture/List asks nothing.
+  it("pages the preview with one request and toggles views with none", async () => {
+    const wrapper = render({ schedule: schedule([rota("Primary")]) });
+    await openRotation(wrapper);
+    expect(service.previewResolvedSchedule).toHaveBeenCalledTimes(1);
+
+    await showList(wrapper);
+    await wrapper.find('[data-test="oncall-draft-preview-picture"]').trigger("click");
+    await flushPromises();
+    expect(service.previewResolvedSchedule).toHaveBeenCalledTimes(1);
+
+    await wrapper.find('[data-test="oncall-draft-preview-next"]').trigger("click");
+    await flushPromises();
+    expect(service.previewResolvedSchedule).toHaveBeenCalledTimes(2);
+    const [first, second] = service.previewResolvedSchedule.mock.calls.map(([args]) => args);
+    expect(second.from).toBe(first.to);
+  });
+
+  // B1: one row per team day; the open tab's rule is solid, other rules soft, gaps a gap.
+  it("draws the picture one day per row with the open rule in full colour", async () => {
+    const day = 86_400_000_000;
+    const from = Date.UTC(2023, 10, 14) * 1000;
+    service.previewResolvedSchedule.mockResolvedValue({
+      data: [
+        {
+          rotation_id: "rot_primary",
+          rotation: "Base",
+          from,
+          to: from + day / 2,
+          user_email: "ana@o2.ai",
+        },
+        {
+          rotation_id: "rot_primary",
+          rotation: "Office",
+          from: from + day / 2,
+          to: from + 1.5 * day,
+          user_email: "bob@o2.ai",
+        },
+        { rotation_id: "rot_primary", from: from + 1.5 * day, to: from + 14 * day },
+      ],
+    } as any);
+    const wrapper = render({
+      schedule: schedule([
+        rota("Primary", [rule({ name: "Base" }), rule({ name: "Office", priority: 1 })]),
+      ]),
+    });
+    await openRotation(wrapper);
+
+    const tracks = wrapper.findComponent({ name: "OScheduleTimeline" }).props("tracks") as any[];
+    expect(tracks).toHaveLength(14);
+    expect(tracks[0].bands.map((b: any) => [b.variant, b.tone])).toEqual([
+      ["solid", 1],
+      ["soft", 2],
+    ]);
+    expect(tracks[1].bands.map((b: any) => b.tone)).toEqual([2, "gap"]);
+    expect(String(tracks[0].bands[0].ariaLabel)).toContain("Base");
   });
 
   // A3: a refusal is said where the rows would be, not swallowed into an empty list.
@@ -277,22 +386,31 @@ describe("OnCallScheduleEditor", () => {
     );
   });
 
-  // The anchor used to be silently "now", so a rotation created at 14:32
-  // handed over at 14:32 forever. It is an explicit field now.
-  it("exposes the first handover and keeps the previous value on junk input", async () => {
-    const wrapper = render({
-      schedule: schedule([rota("Primary")]),
-    });
-    await flushPromises();
+  // B3: weekday and time move the first shift within its own team-local week.
+  it("moves the first shift with the handover weekday and time", async () => {
+    const wrapper = render({ schedule: schedule([rota("Primary")]) });
     await openRotation(wrapper);
 
-    const field = wrapper.find('[data-test="oncall-schedule-handover-0-date"] input');
-    expect(field.exists()).toBe(true);
-
-    await field.setValue("not-a-date");
+    // ANCHOR is Tue 14 Nov 2023 22:13 UTC.
+    await wrapper
+      .findComponent('[data-test="oncall-schedule-handover-0-time"]')
+      .vm.$emit("update:modelValue", 540);
     await flushPromises();
-    const rows = wrapper.findComponent({ name: "OTable" }).props("data") as any[];
-    expect(rows[0].shift_rules[0].anchor_micros).toBe(ANCHOR);
+    expect(drawerRules(wrapper)[0].anchor_micros).toBe(Date.UTC(2023, 10, 14, 9) * 1000);
+
+    await wrapper
+      .findComponent('[data-test="oncall-schedule-handover-0-weekday"]')
+      .vm.$emit("update:modelValue", 0);
+    await flushPromises();
+    expect(drawerRules(wrapper)[0].anchor_micros).toBe(Date.UTC(2023, 10, 13, 9) * 1000);
+  });
+
+  it("asks no weekday of a daily handover", async () => {
+    const wrapper = render({
+      schedule: schedule([rota("Primary", [rule({ shift_micros: 86_400_000_000 })])]),
+    });
+    await openRotation(wrapper);
+    expect(wrapper.find('[data-test="oncall-schedule-handover-0-weekday"]').exists()).toBe(false);
   });
 
   /// Dropping the empty one and reporting success is how a rotation somebody
@@ -306,10 +424,7 @@ describe("OnCallScheduleEditor", () => {
 
     // Empty the second rotation the way a user would, through its editor.
     await openRotation(wrapper, 1);
-    await wrapper
-      .findComponent('[data-test="oncall-schedule-members-0"]')
-      .vm.$emit("update:modelValue", []);
-    await flushPromises();
+    await removePerson(wrapper, 0, 0);
 
     await wrapper.find('[data-test="oncall-schedule-save"]').trigger("click");
     await flushPromises();
@@ -330,10 +445,7 @@ describe("OnCallScheduleEditor", () => {
 
     expect(wrapper.find('[data-test="oncall-rotation-done"]').attributes("disabled")).toBeDefined();
 
-    await wrapper
-      .findComponent('[data-test="oncall-schedule-members-0"]')
-      .vm.$emit("update:modelValue", ["ana@o2.ai"]);
-    await flushPromises();
+    await addPerson(wrapper, 0, "ana@o2.ai");
 
     expect(
       wrapper.find('[data-test="oncall-rotation-done"]').attributes("disabled"),
@@ -475,10 +587,7 @@ describe("OnCallScheduleEditor", () => {
 
     await wrapper.find('[data-test="oncall-schedule-add-rotation"]').trigger("click");
     await flushPromises();
-    await wrapper
-      .findComponent('[data-test="oncall-schedule-members-0"]')
-      .vm.$emit("update:modelValue", ["ana@o2.ai"]);
-    await flushPromises();
+    await addPerson(wrapper, 0, "ana@o2.ai");
 
     await wrapper.find('[data-test="oncall-rotation-done"]').trigger("click");
     await flushPromises();
@@ -512,10 +621,7 @@ describe("OnCallScheduleEditor", () => {
     await flushPromises();
     await openRotation(wrapper);
 
-    await wrapper
-      .findComponent('[data-test="oncall-schedule-members-0"]')
-      .vm.$emit("update:modelValue", ["ana@o2.ai", "bob@o2.ai"]);
-    await flushPromises();
+    await addPerson(wrapper, 0, "bob@o2.ai");
 
     wrapper.findComponent({ name: "ODrawer" }).vm.$emit("update:open", false);
     await flushPromises();
@@ -551,20 +657,39 @@ describe("OnCallScheduleEditor", () => {
       ]);
     });
 
-    // Choosing "Only during…" starts from the working week rather than an empty window.
-    it("adds a window that already means something", async () => {
+    // B3: each Covers pick writes exactly its windows; Custom starts from the working week.
+    it.each([
+      ["all", []],
+      ["businessHours", [{ days: [0, 1, 2, 3, 4], start_minute: 540, end_minute: 1020 }]],
+      ["weekdays", [{ days: [0, 1, 2, 3, 4], start_minute: 0, end_minute: 1440 }]],
+      ["weekends", [{ days: [5, 6], start_minute: 0, end_minute: 1440 }]],
+      ["custom", [{ days: [0, 1, 2, 3, 4], start_minute: 540, end_minute: 1020 }]],
+    ])("writes %s", async (pick, windows) => {
       const wrapper = render({ schedule: schedule([rota("Primary", [layer()])]) });
       await openRotation(wrapper);
 
-      await wrapper.find('[data-test="oncall-schedule-hours-0-only"]').trigger("click");
+      await wrapper
+        .findComponent('[data-test="oncall-schedule-covers-0"]')
+        .vm.$emit("update:modelValue", pick);
       await flushPromises();
-      await wrapper.find('[data-test="oncall-rotation-done"]').trigger("click");
-      await flushPromises();
+      expect(drawerRules(wrapper)[0].restrictions).toEqual(windows);
+      expect(wrapper.find('[data-test="oncall-schedule-restriction-0-0"]').exists()).toBe(
+        pick === "custom",
+      );
+    });
 
-      const sent = (service.setSchedule.mock.calls[0][0] as any).data.rotations[0];
-      expect(sent.shift_rules[0].restrictions).toEqual([
-        { days: [0, 1, 2, 3, 4], start_minute: 540, end_minute: 1020 },
-      ]);
+    it.each([
+      [[], "all"],
+      [[{ days: [5, 6], start_minute: 0, end_minute: 1440 }], "weekends"],
+      [[{ days: [5], start_minute: 600, end_minute: 840 }], "custom"],
+    ])("shows %j as %s", async (restrictions, pick) => {
+      const wrapper = render({
+        schedule: schedule([rota("Primary", [layer({ restrictions })])]),
+      });
+      await openRotation(wrapper);
+      expect(
+        wrapper.findComponent('[data-test="oncall-schedule-covers-0"]').props("modelValue"),
+      ).toBe(pick);
     });
 
     it("removes a window", async () => {
@@ -650,80 +775,147 @@ describe("OnCallScheduleEditor — retiring a shift rule", () => {
     await flushPromises();
   }
 
-  it("retires a rule at its next handover by default", async () => {
+  const hour = 3_600_000_000;
+  const turns = () =>
+    service.previewResolvedSchedule.mockResolvedValue({
+      data: [
+        {
+          rotation_id: "rot_weekend",
+          rotation: "Weekend",
+          from: ANCHOR - hour,
+          to: ANCHOR + hour,
+          user_email: "ana@o2.ai",
+        },
+        {
+          rotation_id: "rot_weekend",
+          rotation: "Weekend",
+          from: ANCHOR + hour,
+          to: ANCHOR + 2 * hour,
+          user_email: "bob@o2.ai",
+        },
+      ],
+    } as any);
+
+  // The chosen item's popover opens as the menu closes, in place of focus returning to the trigger.
+  async function openStop(wrapper: any, index = 0) {
+    const item = `[data-test="oncall-schedule-rule-stop-${index}"]`;
+    await wrapper.find(item).trigger("click");
+    const menu = wrapper
+      .findAllComponents({ name: "ODropdown" })
+      .find((d: any) => d.find(item).exists());
+    menu.vm.$emit("close-auto-focus", new Event("focus"));
+    await flushPromises();
+  }
+
+  // B4: nothing is chosen for the reader, and the confirm waits for a choice.
+  it("stops a rule only once a stop is chosen", async () => {
+    turns();
     const wrapper = render({ schedule: schedule([WEEKEND]) });
     await openRotation(wrapper);
+    await openStop(wrapper);
 
-    wrapper
-      .findComponent('[data-test="oncall-schedule-retire-0"]')
-      .vm.$emit("update:modelValue", true);
+    const confirm = () => wrapper.find('[data-test="oncall-schedule-rule-stop-confirm-0"]');
+    expect(confirm().attributes("disabled")).toBeDefined();
+    expect(wrapper.find('[data-test="oncall-schedule-rule-stop-choice-0-0"]').text()).toContain(
+      "ana@o2.ai",
+    );
+
+    await wrapper.find('[data-test="oncall-schedule-rule-stop-choice-0-1"]').trigger("click");
+    await flushPromises();
+    expect(confirm().attributes("disabled")).toBeUndefined();
+    await confirm().trigger("click");
     await flushPromises();
 
+    expect(drawerRules(wrapper)[0].ends_at).toBe(ANCHOR + 2 * hour);
+    expect(wrapper.find('[data-test="oncall-schedule-rule-summary-0"]').text()).toContain("stops");
+    expect(wrapper.find('[data-test="oncall-schedule-rule-tab-icon-0"]').exists()).toBe(true);
     await save(wrapper);
-    // The weekly shift that began at ANCHOR (= now) runs to its end.
-    expect(savedRotations()[0].shift_rules[0].ends_at).toBe(ANCHOR + MICROS_PER_WEEK);
+    expect(savedRotations()[0].shift_rules[0].ends_at).toBe(ANCHOR + 2 * hour);
   });
 
-  it("clears ends_at when the rule is put back into service", async () => {
-    const wrapper = render({
-      schedule: schedule([rota("Weekend", [rule({ ends_at: ANCHOR + MICROS_PER_WEEK })])]),
-    });
-    await openRotation(wrapper);
-
-    wrapper
-      .findComponent('[data-test="oncall-schedule-retire-0"]')
-      .vm.$emit("update:modelValue", false);
-    await flushPromises();
-
-    await save(wrapper);
-    expect(savedRotations()[0].shift_rules[0].ends_at).toBeUndefined();
-  });
-
-  /// The date is read and written in the TEAM's zone, which is what the field
-  /// says on its label and what every restriction window is evaluated in.
-  it("reads the retirement date as the team's wall clock", async () => {
+  it("reads a picked date as the team's wall clock", async () => {
     const wrapper = mount(OnCallScheduleEditor, {
       props: {
         teamId: "team_1",
         timezone: "Asia/Kolkata",
-        schedule: schedule([
-          rota("Weekend", [rule({ ends_at: Date.UTC(2026, 7, 17, 4, 30) * 1000 })]),
-        ]),
+        schedule: schedule([WEEKEND]),
         members: members("ana@o2.ai"),
       },
       global: { plugins: [i18n, store], stubs },
     });
     await openRotation(wrapper);
+    await openStop(wrapper);
 
-    const dateField = wrapper.findComponent('[data-test="oncall-schedule-retire-at-0-date"]');
-    const timeField = wrapper.findComponent('[data-test="oncall-schedule-retire-at-0-time"]');
-    expect(dateField.props("modelValue")).toBe("2026-08-17");
-    expect(timeField.props("modelValue")).toBe("10:00");
-
-    dateField.vm.$emit("update:modelValue", "2026-08-18");
+    await wrapper.find('[data-test="oncall-schedule-rule-stop-pick-0"]').trigger("click");
     await flushPromises();
-    await save(wrapper);
+    await wrapper
+      .find('[data-test="oncall-schedule-rule-stop-date-0"] input')
+      .setValue("2026-08-17");
+    await wrapper.find('[data-test="oncall-schedule-rule-stop-time-0"] input').setValue("10:00");
+    await wrapper.find('[data-test="oncall-schedule-rule-stop-confirm-0"]').trigger("click");
+    await flushPromises();
 
-    expect(savedRotations()[0].shift_rules[0].ends_at).toBe(Date.UTC(2026, 7, 18, 4, 30) * 1000);
+    expect(drawerRules(wrapper)[0].ends_at).toBe(Date.UTC(2026, 7, 17, 4, 30) * 1000);
   });
 
-  /// A retired rule stays in the rotation — it still resolves for the past — so
-  /// it has to say it is not staffing anything now. Without that, the name it
-  /// shows sends somebody looking for a person who is not on call.
-  ///
-  /// It is marked beside the RULE, not on the rotation row: a rotation is not
-  /// retired, one of its rules is, and the others may still be staffing it.
-  it("marks a retired rule rather than hiding it", async () => {
+  // F5: a picked instant at or before now is no choice at all.
+  it("refuses a picked stop in the past", async () => {
+    const wrapper = render({ schedule: schedule([WEEKEND]) });
+    await openRotation(wrapper);
+    await openStop(wrapper);
+
+    await wrapper.find('[data-test="oncall-schedule-rule-stop-pick-0"]').trigger("click");
+    await flushPromises();
+    await wrapper
+      .find('[data-test="oncall-schedule-rule-stop-date-0"] input')
+      .setValue("2023-11-14");
+    await wrapper.find('[data-test="oncall-schedule-rule-stop-time-0"] input').setValue("09:00");
+    await flushPromises();
+
+    expect(
+      wrapper.find('[data-test="oncall-schedule-rule-stop-confirm-0"]').attributes("disabled"),
+    ).toBeDefined();
+    expect(wrapper.find('[data-test="oncall-schedule-rule-stop-past-0"]').exists()).toBe(true);
+  });
+
+  // B4: the consequence names who takes the hours, or warns of the gap.
+  it("says what stopping leaves behind", async () => {
     const wrapper = render({
       schedule: schedule([
-        rota("Weekend", [rule({ name: "Current" }), rule({ name: "Old", ends_at: ANCHOR })]),
+        rota("Weekend", [
+          rule({ name: "Base" }),
+          rule({
+            name: "Office",
+            priority: 1,
+            restrictions: [{ days: [0, 1, 2, 3, 4], start_minute: 540, end_minute: 1020 }],
+          }),
+        ]),
       ]),
     });
-    await flushPromises();
     await openRotation(wrapper);
+    await openStop(wrapper, 0);
+    await openStop(wrapper, 1);
 
-    expect(wrapper.find('[data-test="oncall-schedule-retire-at-0"]').exists()).toBe(false);
-    expect(wrapper.find('[data-test="oncall-schedule-retire-at-1"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="oncall-schedule-rule-stop-consequence-1"]').text()).toContain(
+      "Base",
+    );
+    expect(wrapper.find('[data-test="oncall-schedule-rule-stop-consequence-0"]').text()).toContain(
+      "Leaves a gap",
+    );
+  });
+
+  it("clears ends_at with Don't stop", async () => {
+    const wrapper = render({
+      schedule: schedule([rota("Weekend", [rule({ ends_at: ANCHOR + MICROS_PER_WEEK })])]),
+    });
+    await openRotation(wrapper);
+    expect(wrapper.find('[data-test="oncall-schedule-rule-stop-0"]').exists()).toBe(false);
+
+    await wrapper.find('[data-test="oncall-schedule-rule-unstop-0"]').trigger("click");
+    await flushPromises();
+
+    await save(wrapper);
+    expect(savedRotations()[0].shift_rules[0].ends_at).toBeUndefined();
   });
 
   /// A rotation the system staffed is not something somebody designed, and
@@ -766,8 +958,6 @@ describe("OnCallScheduleEditor — explaining several shift rules", () => {
     priority: 1,
     restrictions: [{ days: [0, 1, 2, 3, 4], start_minute: 540, end_minute: 1080 }],
   });
-  const drawerRules = (wrapper: any) =>
-    (wrapper.findComponent({ name: "OTable" }).props("data") as any[])[0].shift_rules;
 
   async function openTab(wrapper: any, index: number) {
     await wrapper.find(`[data-test="oncall-schedule-rule-tab-${index}"]`).trigger("click");
@@ -787,6 +977,7 @@ describe("OnCallScheduleEditor — explaining several shift rules", () => {
     } as any);
     const wrapper = render({ schedule: schedule([rota("Primary")]) });
     await openRotation(wrapper);
+    await showList(wrapper);
 
     const rows = wrapper.findAll('[data-test="oncall-schedule-preview-shift"]');
     expect(rows).toHaveLength(1);
@@ -952,46 +1143,6 @@ describe("OnCallScheduleEditor — explaining several shift rules", () => {
     expect(to.props("options").at(-1).value).toBe(1440);
   });
 
-  it("R8: reads the first shift as a sentence", async () => {
-    const wrapper = render({
-      schedule: schedule([
-        rota("Primary", [
-          rule({
-            members: ["ana@o2.ai", "bob@o2.ai"],
-            anchor_micros: Date.UTC(2026, 0, 5, 9) * 1000,
-          }),
-        ]),
-      ]),
-    });
-    await openRotation(wrapper);
-
-    const sentence = wrapper.find('[data-test="oncall-schedule-first-shift-0"]').text();
-    expect(sentence).toContain("ana@o2.ai starts");
-    expect(sentence).toContain("09:00");
-    expect(sentence).toContain("passes to the next person every week.");
-  });
-
-  it("R9: All hours and Only during… switch the rule's windows", async () => {
-    const wrapper = render({ schedule: schedule([rota("Primary")]) });
-    await openRotation(wrapper);
-    const hours = () =>
-      wrapper.find('[data-test="oncall-schedule-hours-0"]').attributes("data-selected");
-
-    expect(hours()).toBe("all");
-    await wrapper.find('[data-test="oncall-schedule-hours-0-only"]').trigger("click");
-    await flushPromises();
-    expect(drawerRules(wrapper)[0].restrictions).toHaveLength(1);
-
-    await wrapper.find('[data-test="oncall-schedule-restriction-remove-0-0"]').trigger("click");
-    await flushPromises();
-    expect(hours()).toBe("all");
-
-    await wrapper.find('[data-test="oncall-schedule-hours-0-only"]').trigger("click");
-    await wrapper.find('[data-test="oncall-schedule-hours-0-all"]').trigger("click");
-    await flushPromises();
-    expect(drawerRules(wrapper)[0].restrictions).toEqual([]);
-  });
-
   it("R10: holds the missing-people message until the picker is used", async () => {
     const wrapper = render({ schedule: schedule([rota("Primary")]) });
     await openRotation(wrapper);
@@ -1001,11 +1152,23 @@ describe("OnCallScheduleEditor — explaining several shift rules", () => {
     expect(wrapper.find('[data-test="oncall-rotation-needs-people-1"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="oncall-schedule-rule-tab-icon-1"]').exists()).toBe(true);
 
-    await wrapper
-      .findComponent('[data-test="oncall-schedule-members-1"]')
-      .vm.$emit("update:modelValue", []);
-    await flushPromises();
+    await addPerson(wrapper, 1, "bob@o2.ai");
+    await removePerson(wrapper, 1, 0);
     expect(wrapper.find('[data-test="oncall-rotation-needs-people-1"]').exists()).toBe(true);
+  });
+
+  // B2: "+" lands on the new rule with its name ready to type; the body has no name field.
+  it("opens a new rule's rename popover", async () => {
+    const wrapper = render({ schedule: schedule([rota("Primary")]) });
+    await openRotation(wrapper);
+    expect(wrapper.find('[data-test="oncall-schedule-rule-name-0"]').exists()).toBe(false);
+
+    await wrapper.find('[data-test="oncall-schedule-rule-add"]').trigger("click");
+    vi.runOnlyPendingTimers();
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="oncall-schedule-rule-name-1"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="oncall-schedule-rule-name-0"]').exists()).toBe(false);
   });
 
   it("R10: says so at once for a rule the server stored empty", async () => {
@@ -1020,19 +1183,154 @@ describe("OnCallScheduleEditor — explaining several shift rules", () => {
       schedule: schedule([rota("Primary", [rule({ members: ["ana@o2.ai", "bob@o2.ai"] })])]),
     });
     await openRotation(wrapper);
+    await wrapper.find('[data-test="oncall-rule-people-edit-0"]').trigger("click");
 
-    const order = wrapper.findComponent('[data-test="oncall-schedule-member-order-0"]');
-    expect(order.text()).toContain("1.");
-    order.vm.$emit("update:modelValue", ["bob@o2.ai", "ana@o2.ai"]);
+    wrapper
+      .findComponent('[data-test="oncall-rule-people-list-0"]')
+      .vm.$emit("update:modelValue", ["bob@o2.ai", "ana@o2.ai"]);
     await flushPromises();
 
     expect(drawerRules(wrapper)[0].members).toEqual(["bob@o2.ai", "ana@o2.ai"]);
   });
 
-  it("R11: has no order list for a single person", async () => {
-    const wrapper = render({ schedule: schedule([rota("Primary")]) });
+  // B3: the collapsed line starts at whoever the server says holds the turn.
+  it("starts the people line at the person on now", async () => {
+    service.previewResolvedSchedule.mockResolvedValue({
+      data: [
+        {
+          rotation_id: "rot_primary",
+          rotation: "Base",
+          from: ANCHOR - 1,
+          to: ANCHOR + 1,
+          user_email: "cy@o2.ai",
+        },
+      ],
+    } as any);
+    const wrapper = render({
+      schedule: schedule([
+        rota("Primary", [rule({ members: ["ana@o2.ai", "bob@o2.ai", "cy@o2.ai"] })]),
+      ]),
+      members: members("ana@o2.ai", "bob@o2.ai", "cy@o2.ai"),
+    });
     await openRotation(wrapper);
 
-    expect(wrapper.find('[data-test="oncall-schedule-member-order-0"]').exists()).toBe(false);
+    const line = wrapper.find('[data-test="oncall-rule-people-line-0"]').text();
+    expect(line.indexOf("cy@o2.ai")).toBeLessThan(line.indexOf("ana@o2.ai"));
+    expect(wrapper.find('[data-test="oncall-rule-people-holder-0"]').text()).toBe("on now");
+  });
+
+  // F2: an away holder's turn is still theirs; the stand-in is not where the turn sits.
+  it("makes a person on call now on the rostered turn, not the stand-in's", async () => {
+    service.previewResolvedSchedule.mockResolvedValue({
+      data: [
+        {
+          rotation_id: "rot_primary",
+          rotation: "Base",
+          from: ANCHOR - 1,
+          to: ANCHOR + 1,
+          user_email: "bob@o2.ai",
+          scheduled_email: "ana@o2.ai",
+        },
+      ],
+    } as any);
+    const wrapper = render({
+      schedule: schedule([
+        rota("Primary", [rule({ members: ["ana@o2.ai", "bob@o2.ai", "cy@o2.ai"] })]),
+      ]),
+      members: members("ana@o2.ai", "bob@o2.ai", "cy@o2.ai"),
+    });
+    await openRotation(wrapper);
+    expect(wrapper.find('[data-test="oncall-rule-people-line-0"]').text()).toMatch(/^ana@o2\.ai/);
+    await wrapper.find('[data-test="oncall-rule-people-edit-0"]').trigger("click");
+
+    await wrapper.find('[data-test="oncall-rule-person-make-current-0-2"]').trigger("click");
+    await flushPromises();
+
+    expect(drawerRules(wrapper)[0].members).toEqual(["cy@o2.ai", "ana@o2.ai", "bob@o2.ai"]);
+  });
+
+  // F1: paging does not move who is on now; the line reads the current fortnight.
+  it("keeps the people line on the current turn while paging", async () => {
+    service.previewResolvedSchedule.mockImplementation(
+      async ({ from }: any) =>
+        ({
+          data: [
+            {
+              rotation_id: "rot_primary",
+              rotation: "Base",
+              from,
+              to: from + 14 * 86_400_000_000,
+              user_email: from <= ANCHOR ? "cy@o2.ai" : "bob@o2.ai",
+            },
+          ],
+        }) as any,
+    );
+    const wrapper = render({
+      schedule: schedule([
+        rota("Primary", [rule({ members: ["ana@o2.ai", "bob@o2.ai", "cy@o2.ai"] })]),
+      ]),
+      members: members("ana@o2.ai", "bob@o2.ai", "cy@o2.ai"),
+    });
+    await openRotation(wrapper);
+    await wrapper.find('[data-test="oncall-draft-preview-next"]').trigger("click");
+    await flushPromises();
+
+    expect(service.previewResolvedSchedule).toHaveBeenCalledTimes(2);
+    expect(wrapper.find('[data-test="oncall-rule-people-line-0"]').text()).toMatch(/^cy@o2\.ai/);
+  });
+
+  // F1: an edit returns the picture to the current fortnight.
+  it("returns to the current fortnight on any edit", async () => {
+    const wrapper = render({ schedule: schedule([rota("Primary")]) });
+    await openRotation(wrapper);
+    await wrapper.find('[data-test="oncall-draft-preview-next"]').trigger("click");
+    await flushPromises();
+    expect(
+      wrapper.find('[data-test="oncall-draft-preview-prev"]').attributes("disabled"),
+    ).toBeUndefined();
+
+    await wrapper.find('[data-test="oncall-schedule-name"]').setValue("Renamed");
+    await flushPromises();
+    expect(
+      wrapper.find('[data-test="oncall-draft-preview-prev"]').attributes("disabled"),
+    ).toBeDefined();
+  });
+
+  // B3: "Make on call now" turns the list so the chosen person sits on the current turn's index.
+  it("makes a person on call now by rotating the list", async () => {
+    service.previewResolvedSchedule.mockResolvedValue({
+      data: [
+        {
+          rotation_id: "rot_primary",
+          rotation: "Base",
+          from: ANCHOR - 1,
+          to: ANCHOR + 1,
+          user_email: "bob@o2.ai",
+        },
+      ],
+    } as any);
+    const wrapper = render({
+      schedule: schedule([
+        rota("Primary", [rule({ members: ["ana@o2.ai", "bob@o2.ai", "cy@o2.ai"] })]),
+      ]),
+      members: members("ana@o2.ai", "bob@o2.ai", "cy@o2.ai"),
+    });
+    await openRotation(wrapper);
+    await wrapper.find('[data-test="oncall-rule-people-edit-0"]').trigger("click");
+
+    await wrapper.find('[data-test="oncall-rule-person-make-current-0-2"]').trigger("click");
+    await flushPromises();
+
+    expect(drawerRules(wrapper)[0].members).toEqual(["bob@o2.ai", "cy@o2.ai", "ana@o2.ai"]);
+  });
+
+  it("adds everyone on the team who is not in the rule", async () => {
+    const wrapper = render({ schedule: schedule([rota("Primary")]) });
+    await openRotation(wrapper);
+    await wrapper.find('[data-test="oncall-rule-people-edit-0"]').trigger("click");
+    await wrapper.find('[data-test="oncall-rule-people-add-all-0"]').trigger("click");
+    await flushPromises();
+
+    expect(drawerRules(wrapper)[0].members).toEqual(["ana@o2.ai", "bob@o2.ai"]);
   });
 });

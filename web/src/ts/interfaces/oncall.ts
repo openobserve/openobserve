@@ -855,6 +855,8 @@ export interface ResolvedSegment {
   rotation?: string | null;
   /** Present when a cover took this span from the rotation. */
   override_id?: string | null;
+  /** Whom the roster puts on here before absences and covers; present only when someone else holds it. */
+  scheduled_email?: string | null;
 }
 
 /** `GET /oncall/teams/{id}/load`. Who has been carrying the pager. */

@@ -49,13 +49,11 @@ import {
   effectiveWeekCoverage,
   memberAt,
   nextHandover,
-  nextHandoverAfter,
   overlappingRules,
   overlapStanding,
   prioritiesFor,
   ruleHoursSummary,
   rulesClash,
-  shiftLengthWords,
   normalizeDimensionValue,
   ownershipPath,
   priorityLabel,
@@ -77,6 +75,16 @@ import {
   shortReachReason,
   toZonedInputValue,
   zonedMidnight,
+  coversPresetOf,
+  COVERS_PRESETS,
+  rotateMembersTo,
+  turnLine,
+  ruleHolder,
+  anchorAtWeekdayTime,
+  anchorWeekdayTime,
+  dayRows,
+  stopChoices,
+  stopConsequence,
   stateTagVariant,
   upcomingShifts,
   windowContains,
@@ -1664,10 +1672,189 @@ describe("toZonedInputValue / fromZonedInputValue", () => {
   });
 });
 
+describe("rotation drawer, part B", () => {
+  const MON = Date.UTC(2026, 0, 5) * 1000;
+  const HOUR = MICROS_PER_HOUR;
+  const seg = (
+    from: number,
+    to: number,
+    user?: string,
+    rule?: string,
+    override?: string,
+    scheduled?: string,
+  ) => ({
+    rotation_id: "rot",
+    from: MON + from * HOUR,
+    to: MON + to * HOUR,
+    user_email: user,
+    rotation: rule,
+    override_id: override,
+    scheduled_email: scheduled,
+  });
+
+  // B3 Covers: a pick writes exactly these windows, and only exact windows read back as that pick.
+  it.each([
+    ["all", []],
+    ["businessHours", [window([0, 1, 2, 3, 4], 540, 1020)]],
+    ["weekdays", [window([0, 1, 2, 3, 4], 0, 1440)]],
+    ["weekends", [window([5, 6], 0, 1440)]],
+  ] as const)("covers %s round-trips", (key, windows) => {
+    expect(COVERS_PRESETS[key]).toEqual(windows);
+    expect(coversPresetOf(windows as unknown as TimeWindow[])).toBe(key);
+  });
+
+  it.each([
+    ["different hours", [window([0, 1, 2, 3, 4], 540, 1080)]],
+    ["two windows", [window([0, 1, 2, 3, 4], 540, 1020), window([5], 600, 840)]],
+    ["one weekend day", [window([5], 0, 1440)]],
+  ])("covers %s is custom", (_name, windows) => {
+    expect(coversPresetOf(windows)).toBe("custom");
+  });
+
+  // B3 Make on call now: an array rotation that puts the person at the turn's index.
+  it.each([
+    [["a", "b", "c", "d"], "c", 0, ["c", "d", "a", "b"]],
+    [["a", "b", "c", "d"], "a", 2, ["c", "d", "a", "b"]],
+    [["a", "b", "c"], "b", 1, ["a", "b", "c"]],
+    [["a", "b"], "z", 0, ["a", "b"]],
+  ])("rotateMembersTo(%j, %s, %i)", (members, person, index, expected) => {
+    expect(rotateMembersTo(members, person, index)).toEqual(expected);
+  });
+
+  it.each([
+    [["a", "b", "c", "d"], "c", ["c", "d", "a", "b"]],
+    [["a", "b"], null, ["a", "b"]],
+  ])("turnLine(%j, %s)", (members, holder, expected) => {
+    expect(turnLine(members, holder)).toEqual(expected);
+  });
+
+  // B3 People line: read from the server's segments, covers ignored.
+  it.each([
+    ["on now", [seg(-1, 1, "ana", "Base"), seg(1, 3, "bo", "Base")], { email: "ana", now: true }],
+    ["next up", [seg(-1, 1, "cy", "Office"), seg(1, 3, "bo", "Base")], { email: "bo", now: false }],
+    [
+      "a cover keeps the rostered turn",
+      [seg(-1, 1, "di", "Base", "ov1", "ana"), seg(1, 3, "bo", "Base")],
+      { email: "ana", now: true },
+    ],
+    [
+      "an absence keeps the rostered turn",
+      [seg(-1, 1, "bo", "Base", undefined, "ana")],
+      { email: "ana", now: true },
+    ],
+    [
+      "a gap left by an away holder keeps the rostered turn",
+      [seg(-1, 1, undefined, "Base", undefined, "ana")],
+      { email: "ana", now: true },
+    ],
+    ["never in the window", [seg(-1, 3, "cy", "Office")], null],
+  ])("ruleHolder: %s", (_name, segments, expected) => {
+    expect(ruleHolder(segments as any, "Base", MON)).toEqual(expected);
+  });
+
+  // B3 Handover: weekday and time move the first shift within its team-local week, DST-correct.
+  it.each([
+    [
+      "Kolkata weekly to Wed 09:00",
+      Date.UTC(2026, 2, 2, 3, 30),
+      "Asia/Kolkata",
+      2,
+      540,
+      Date.UTC(2026, 2, 4, 3, 30),
+    ],
+    [
+      "daily keeps the date",
+      Date.UTC(2026, 2, 2, 3, 30),
+      "Asia/Kolkata",
+      null,
+      0,
+      Date.UTC(2026, 2, 1, 18, 30),
+    ],
+    [
+      "New York across spring forward",
+      Date.UTC(2026, 2, 2, 14),
+      "America/New_York",
+      6,
+      540,
+      Date.UTC(2026, 2, 8, 13),
+    ],
+  ])("anchorAtWeekdayTime: %s", (_name, anchorMs, zone, weekday, minute, expectedMs) => {
+    expect(anchorAtWeekdayTime(anchorMs * 1000, zone, weekday, minute)).toBe(expectedMs * 1000);
+  });
+
+  it("anchorWeekdayTime reads the team-local weekday and minute", () => {
+    expect(anchorWeekdayTime(Date.UTC(2026, 2, 4, 3, 30) * 1000, "Asia/Kolkata")).toEqual({
+      weekday: 2,
+      minute: 540,
+    });
+  });
+
+  // B1 Picture: one row per team-local day, segments cut at its midnights.
+  it("dayRows cuts segments at the team's midnights", () => {
+    const rows = dayRows([seg(-2, 30, "ana", "Base")] as any, MON, 2, "UTC");
+    expect(rows.map((r) => [r.start, r.end])).toEqual([
+      [MON, MON + 24 * HOUR],
+      [MON + 24 * HOUR, MON + 48 * HOUR],
+    ]);
+    expect(rows[0].pieces.map((p) => [p.from, p.to])).toEqual([[MON, MON + 24 * HOUR]]);
+    expect(rows[1].pieces.map((p) => [p.from, p.to])).toEqual([[MON + 24 * HOUR, MON + 30 * HOUR]]);
+  });
+
+  // B4: the next ends of this rule's own stretches, inside the window and after now.
+  it("stopChoices lists up to three real ends of the rule's turns", () => {
+    const segments = [
+      seg(-5, 1, "ana", "Base"),
+      seg(1, 2, "cy", "Office"),
+      seg(2, 4, "bo", "Base"),
+      seg(4, 5, "di", "Base", "ov", "bo"),
+      seg(5, 6, "ana", "Base"),
+      seg(6, 7, "bo", "Base"),
+      seg(7, 9, "ana", "Base"),
+    ];
+    expect(stopChoices(segments as any, "Base", MON, MON + 9 * HOUR)).toEqual([
+      { email: "ana", at: MON + HOUR },
+      { email: "bo", at: MON + 5 * HOUR },
+      { email: "ana", at: MON + 6 * HOUR },
+    ]);
+  });
+
+  // B4: who takes the stopped rule's hours, or which hours nobody covers.
+  it.each([
+    [
+      "the catch-all takes them",
+      [rule("Base"), rule("Office", [window([0, 1, 2, 3, 4], 540, 1020)])],
+      1,
+      [0],
+      0,
+    ],
+    [
+      "nobody takes them",
+      [rule("Night", [window([], 0, 480)]), rule("Day", [window([], 480, 1440)])],
+      0,
+      [],
+      7,
+    ],
+  ])("stopConsequence: %s", (_name, rules, index, takers, gapSpans) => {
+    const result = stopConsequence(rules, index, MON);
+    expect(result.takers).toEqual(takers);
+    expect(result.gap).toHaveLength(gapSpans);
+  });
+
+  function rule(name: string, restrictions: TimeWindow[] = []): ShiftRule {
+    return {
+      name,
+      members: [`${name}@o2.ai`],
+      shift_micros: MICROS_PER_DAY,
+      anchor_micros: MON,
+      priority: restrictions.length ? 1 : 0,
+      restrictions,
+    };
+  }
+});
+
 describe("rotation editor: how several shift rules add up", () => {
   /** Monday 2026-01-05 00:00 UTC. */
   const MON = Date.UTC(2026, 0, 5) * 1000;
-  const HOUR = MICROS_PER_HOUR;
   const t = i18n.global.t as unknown as TranslateFn;
 
   function shiftRule(name: string, over: Partial<ShiftRule> = {}): ShiftRule {
@@ -1810,37 +1997,6 @@ describe("rotation editor: how several shift rules add up", () => {
     });
   });
 
-  describe("nextHandoverAfter", () => {
-    it.each([
-      [
-        "the end of the shift in progress",
-        shiftRule("A"),
-        MON + 2 * MICROS_PER_DAY,
-        MON + MICROS_PER_WEEK,
-      ],
-      [
-        "a handover instant starts a new shift",
-        shiftRule("A"),
-        MON + MICROS_PER_WEEK,
-        MON + 2 * MICROS_PER_WEEK,
-      ],
-      [
-        "a rule whose first shift is still ahead",
-        shiftRule("A", { anchor_micros: MON + MICROS_PER_DAY }),
-        MON,
-        MON + MICROS_PER_DAY + MICROS_PER_WEEK,
-      ],
-      [
-        "a rule not yet in force",
-        shiftRule("A", { starts_at: MON + 8 * MICROS_PER_DAY }),
-        MON,
-        MON + 2 * MICROS_PER_WEEK,
-      ],
-    ])("%s", (_name, rule, now, expected) => {
-      expect(nextHandoverAfter(rule, now)).toBe(expected);
-    });
-  });
-
   describe("effectiveWeekCoverage / effectiveRivals", () => {
     const DAY = 1440;
     const region = (name: string, start: number, end: number, over: Partial<ShiftRule> = {}) =>
@@ -1935,22 +2091,6 @@ describe("rotation editor: how several shift rules add up", () => {
       ],
     ])("%s", (_name, spans, expected) => {
       expect(coverageHoursSummary(spans as Array<[number, number]>, t)).toBe(expected);
-    });
-  });
-
-  describe("shiftLengthWords", () => {
-    it.each([
-      [8 * HOUR, "8 hours"],
-      [MICROS_PER_DAY, "day"],
-      [36 * HOUR, "36 hours"],
-      [MICROS_PER_WEEK, "week"],
-      [2 * MICROS_PER_WEEK, "2 weeks"],
-      [3 * MICROS_PER_DAY, "3 days"],
-      [90 * 60_000_000, "1 h 30 min"],
-      [45 * 60_000_000, "45 minutes"],
-      [90_000_000, null],
-    ])("%i micros reads %s", (micros, expected) => {
-      expect(shiftLengthWords(micros, t)).toBe(expected);
     });
   });
 });

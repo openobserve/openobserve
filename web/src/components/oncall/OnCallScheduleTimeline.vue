@@ -349,8 +349,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
-import { useStore } from "vuex";
+import { computed, ref, watch } from "vue";
 
 import useBreakpoint from "@/composables/useBreakpoint";
 import { useOnCallClock } from "@/composables/useOnCallClock";
@@ -383,8 +382,7 @@ import {
   zonedMidnight,
 } from "@/utils/oncall";
 import { formatMicrosDuration } from "@/utils/formatters";
-import { queryClient } from "@/composables/query/queryClient";
-import { orgUsersQuery } from "@/services/users.queries";
+import { useOrgUserNames } from "@/composables/useOrgUserNames";
 
 const props = withDefaults(
   defineProps<{
@@ -429,31 +427,11 @@ const window = defineModel<{ from: number; to: number }>("window", { required: t
 
 const { t } = useI18nTyped();
 const { isMobile } = useBreakpoint();
-const store = useStore();
 
 const nowMicros = useOnCallClock();
 
-/// Fetched for band labels only: a bar drawn at a few percent of the window's
-/// width has no room for an email, and at a dozen members "o2q-apac1…" and
-/// "o2q-apac2…" clip to the same illegible prefix. The aria-label keeps the
-/// full email regardless — this is a display-only lookup.
-const orgUsers = ref<{ email: string; first_name?: string; last_name?: string }[]>([]);
-
-function nameOf(email: string): string {
-  const user = orgUsers.value.find((u) => u.email.toLowerCase() === email.toLowerCase());
-  const name = [user?.first_name, user?.last_name].filter(Boolean).join(" ").trim();
-  return name || email;
-}
-
-onMounted(async () => {
-  try {
-    const orgId = store.state.selectedOrganization.identifier;
-    orgUsers.value = await queryClient.fetchQuery(orgUsersQuery(orgId));
-  } catch {
-    // Labels fall back to the raw email, which is what they showed before.
-    orgUsers.value = [];
-  }
-});
+// Band labels only: a narrow bar has no room for an email; the aria-label keeps the full address.
+const { nameOf } = useOrgUserNames();
 
 /// The lane dots, spelled out rather than built from the index: Tailwind reads
 /// class names as literal text, so a template-built `bg-schedule-band-${n}-...`
