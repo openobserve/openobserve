@@ -217,11 +217,28 @@ const USD_PRECISE = new Intl.NumberFormat("en-US", {
   maximumFractionDigits: 4,
 });
 
+/**
+ * Billing dates read in UTC, as the budget emails state them: the daily usage buckets start at
+ * UTC midnight, so a browser time zone would put every day label one day off west of UTC.
+ */
 const CYCLE_DATE = new Intl.DateTimeFormat("en-US", {
   year: "numeric",
   month: "short",
   day: "numeric",
+  timeZone: "UTC",
 });
+const DAY_DATE = new Intl.DateTimeFormat("en-US", {
+  month: "short",
+  day: "numeric",
+  timeZone: "UTC",
+});
+
+/** "Oct 12" for a moment in Unix seconds, read in UTC. */
+export const formatDay = (seconds: number): string => DAY_DATE.format(new Date(seconds * 1000));
+
+/** "Oct 12, 2026" for a moment in Unix seconds, read in UTC. */
+export const formatFullDay = (seconds: number): string =>
+  CYCLE_DATE.format(new Date(seconds * 1000));
 
 /** `precise` shows four decimals, for a range so short that two decimals would read $0.00. */
 export function formatCost(amount: number | null | undefined, precise = false): I18nText {
@@ -255,8 +272,8 @@ export function formatRate(
 
 export function formatCycle(details: MeteringDetails, t: TranslateFn): I18nText {
   return t("billing.usageV2.cycleRange", {
-    start: CYCLE_DATE.format(new Date(details.cycle_start * 1000)),
-    end: CYCLE_DATE.format(new Date(details.cycle_end * 1000)),
+    start: formatFullDay(details.cycle_start),
+    end: formatFullDay(details.cycle_end),
   });
 }
 

@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { TranslateFn } from "@/types/i18n";
 import { raw } from "@/types/i18n";
 import {
@@ -374,5 +374,24 @@ describe("estimateCost", () => {
       expect(rows.some((row) => row.key === "retention")).toBe(false);
       expect(scopedMeterRows(null, {}, t)).toEqual([]);
     });
+  });
+});
+
+describe("meteringModel billing dates", () => {
+  // The daily usage buckets start at UTC midnight; west of UTC a browser-zone label is a day early.
+  it("reads billing days in UTC, whatever the browser's time zone", async () => {
+    const zone = process.env.TZ;
+    process.env.TZ = "America/Los_Angeles";
+    try {
+      vi.resetModules();
+      const model = await import("./meteringModel");
+      const oct12 = Date.UTC(2026, 9, 12) / 1000;
+      expect(new Date(oct12 * 1000).getDate()).toBe(11);
+      expect(model.formatDay(oct12)).toBe("Oct 12");
+      expect(model.formatFullDay(oct12)).toBe("Oct 12, 2026");
+    } finally {
+      process.env.TZ = zone;
+      vi.resetModules();
+    }
   });
 });

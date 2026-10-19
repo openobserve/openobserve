@@ -292,6 +292,7 @@ import {
   cycleProgress,
   effectiveRate,
   formatCost,
+  formatDay,
   formatVolume,
   formatCycle,
   netCost,
@@ -399,13 +400,7 @@ const progress = computed(() =>
 
 const projected = computed(() => props.projected);
 
-const cycleEndText = computed(() =>
-  raw(
-    new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(
-      new Date((props.details?.cycle_end ?? 0) * 1000),
-    ),
-  ),
-);
+const cycleEndText = computed(() => raw(formatDay(props.details?.cycle_end ?? 0)));
 
 // ── Super org: the bill by org ───────────────────────────────────
 //

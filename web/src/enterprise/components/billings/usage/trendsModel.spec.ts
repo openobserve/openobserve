@@ -24,6 +24,7 @@ import {
   summarizeTrend,
   toCostRows,
   toEpochSeconds,
+  topMeter,
   trendBucket,
 } from "./trendsModel";
 
@@ -99,6 +100,19 @@ describe("trendsModel", () => {
     expect(forecastCycle(summary, start, now - 1, now)).toBeNull();
     // On a cycle's first day there is no complete day to average yet.
     expect(forecastCycle(summary, start, start + 30 * DAY, start + 3600)).toBeNull();
+  });
+
+  it("names the isolated meter as Top Meter, with its share of every meter's cost", () => {
+    const rows = [
+      { ts: 0, event: "Ingestion", cost: 10 },
+      { ts: 0, event: "Search", cost: 2 },
+    ];
+    expect(topMeter(summarizeTrend(rows))).toMatchObject({ key: "ingestion", cost: 10 });
+    // Isolating Search once read "Ingestion · $10.00 · 500% of cost".
+    const search = topMeter(summarizeTrend(rows, "query"), "query")!;
+    expect(search).toMatchObject({ key: "query", cost: 2 });
+    expect(search.share).toBeCloseTo(2 / 12, 6);
+    expect(topMeter(summarizeTrend(rows, "pipeline"), "pipeline")).toBeNull();
   });
 
   it("leaves today's unfinished day out of the run rate", () => {

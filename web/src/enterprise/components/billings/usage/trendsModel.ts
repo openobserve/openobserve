@@ -40,6 +40,13 @@ export interface CostRow {
   volume?: number;
 }
 
+export interface TopMeter {
+  key: MeterKey;
+  cost: number;
+  /** Of every meter's cost in the range, so an isolated meter still reads as its true share. */
+  share: number;
+}
+
 export interface MeterTotal {
   key: MeterKey;
   cost: number;
@@ -171,6 +178,16 @@ export function summarizeTrend(rows: CostRow[], only: MeterKey | null = null): T
     ? (byMeter.get(only)?.cost ?? 0)
     : meters.reduce((sum, meter) => sum + meter.cost, 0);
   return { total, days, meters };
+}
+
+/** The Top Meter card's meter: the isolated one while a meter is isolated, else the costliest. */
+export function topMeter(summary: TrendSummary, only: MeterKey | null = null): TopMeter | null {
+  const all = summary.meters.reduce((sum, meter) => sum + meter.cost, 0);
+  const top = only
+    ? summary.meters.find((meter) => meter.key === only)
+    : summary.meters.find((meter) => meter.cost > 0);
+  if (!top || top.cost <= 0) return null;
+  return { key: top.key, cost: top.cost, share: all > 0 ? top.cost / all : 0 };
 }
 
 /**

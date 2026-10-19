@@ -233,6 +233,8 @@ import UsagePaneHeader from "./UsagePaneHeader.vue";
 import UsageChartSkeleton from "./UsageChartSkeleton.vue";
 import {
   formatCost,
+  formatDay,
+  formatFullDay,
   METERS,
   projectCycleCost,
   type BillingOrg,
@@ -248,6 +250,7 @@ import {
   PRICED_EVENTS,
   summarizeTrend,
   toCostRows,
+  topMeter,
   toEpochSeconds,
   trendBucket,
   type CostRow,
@@ -274,14 +277,6 @@ interface MeterRow {
 }
 
 const SECONDS_PER_DAY = 86_400;
-
-const SHORT_DATE = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" });
-
-const FULL_DATE = new Intl.DateTimeFormat("en-US", {
-  month: "short",
-  day: "numeric",
-  year: "numeric",
-});
 
 const props = withDefaults(
   defineProps<{
@@ -443,7 +438,7 @@ const onPresetChange = (value: unknown) => {
 const historyNote = computed(() =>
   String(
     t("billing.usageV2.historyStartsOn", {
-      date: raw(FULL_DATE.format(new Date(oldest.value * 1000))),
+      date: raw(formatFullDay(oldest.value)),
     }),
   ),
 );
@@ -492,8 +487,8 @@ watch(
 
 const rangeLabel = computed(() =>
   t("billing.usageV2.rangeDates", {
-    start: raw(SHORT_DATE.format(new Date(range.value.start * 1000))),
-    end: raw(SHORT_DATE.format(new Date(measuredEnd.value * 1000))),
+    start: raw(formatDay(range.value.start)),
+    end: raw(formatDay(measuredEnd.value)),
   }),
 );
 
@@ -637,9 +632,9 @@ const kpiCards = computed(() => {
     ts: 0,
     cost: 0,
   });
-  const top = s.meters.find((meter) => meter.cost > 0);
+  const top = topMeter(s, only.value);
   const cost = (value: number) => (loadError.value ? raw("—") : formatCost(value, precise.value));
-  const date = (seconds: number) => raw(SHORT_DATE.format(new Date(seconds * 1000)));
+  const date = (seconds: number) => raw(formatDay(seconds));
 
   const cards: { key: string; label: I18nText; icon: IconName; value: I18nText; hint: I18nText }[] =
     [
@@ -694,7 +689,7 @@ const kpiCards = computed(() => {
         hint: top
           ? t("billing.usageV2.topMeterOfCost", {
               cost: cost(top.cost),
-              percent: s.total > 0 ? Math.round((top.cost / s.total) * 100) : 0,
+              percent: Math.round(top.share * 100),
             })
           : t("billing.usageV2.noUsageInRange"),
       },
@@ -745,7 +740,8 @@ const chartOption = computed(() => {
     meterLabel: (key) => String(meterLabel(key)),
     format: measure.value === "volume" ? (value) => formatSizeFromMB(value) : money,
     slotLabel: (ts) =>
-      (step === SECONDS_PER_DAY ? SHORT_DATE : SLOT_TIME).format(new Date(ts * 1000)),
+      // Day slots start at UTC midnight; hour slots read in local time.
+      step === SECONDS_PER_DAY ? formatDay(ts) : SLOT_TIME.format(new Date(ts * 1000)),
     labels: {
       spendToDate: String(t("billing.usageV2.spendToDate")),
       forecast: String(t("billing.usageV2.forecast")),
