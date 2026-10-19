@@ -131,7 +131,7 @@ pub async fn search(
 
     let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
     if SEARCH_SERVER
-        .insert_sender(trace_id, abort_sender, true)
+        .insert_sender(&sql.org_id, trace_id, abort_sender, true)
         .await
         .is_err()
     {
