@@ -250,6 +250,19 @@ const defineEditorThemes = (monaco: any): void => {
   });
 };
 
+// Tab is bound to indentation and suggestion accept, so Escape is the keyboard exit.
+const focusControlAfter = (container: HTMLElement) => {
+  const tabbables = Array.from(
+    document.querySelectorAll<HTMLElement>(
+      'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+    ),
+  ).filter((el) => !container.contains(el) && el.offsetParent !== null);
+  const next = tabbables.find(
+    (el) => container.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING,
+  );
+  (next ?? (document.activeElement as HTMLElement | null))?.focus();
+};
+
 // Per editor: the latest value request, and the lookup that already refilled a still-loading menu.
 const valueRefills = new WeakMap<object, { seq: number; refilled: string | null }>();
 
@@ -894,6 +907,7 @@ export default defineComponent({
       editorObj = monaco.editor.create(editorElement as HTMLElement, {
         value: props.query?.trim(),
         language: props.language,
+        ariaLabel: t("common.queryEditorAriaLabel"),
         // Monaco paints its own text and ignores the CSS cascade — without this it
         // falls back to its built-in Menlo/Monaco/Courier New stack, which differs
         // per OS and from the rest of the app.
@@ -964,6 +978,14 @@ export default defineComponent({
         groupsHeaders(suggestMode.value),
       );
       valueQuoteKey = editorObj.createContextKey(VALUE_QUOTE_CONTEXT_KEY, false);
+      editorObj.addAction?.({
+        id: "o2.editor.escapeToNextControl",
+        label: t("common.queryEditorAriaLabel"),
+        keybindings: [monaco.KeyCode.Escape],
+        precondition:
+          "textInputFocus && !suggestWidgetVisible && !findWidgetVisible && !parameterHintsVisible && !editorHasSelection",
+        run: () => focusControlAfter(editorElement as HTMLElement),
+      });
       editorObj.addAction?.({
         id: "o2.suggest.closeValueQuote",
         label: t("sqlEditor.completion.closeValueQuote"),
@@ -2173,6 +2195,11 @@ export default defineComponent({
    decorations API). These nodes are created by the library at runtime and never
    carry the scoped data-v attribute, so they are unreachable from utilities and
    must stay as :deep() CSS. */
+
+.logs-query-editor:focus-within {
+  outline: 2px solid var(--color-focus-ring-accent) !important;
+  outline-offset: -2px;
+}
 
 .logs-query-editor :deep(.monaco-editor),
 .logs-query-editor :deep(.monaco-editor .monaco-editor) {
