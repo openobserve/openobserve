@@ -15,6 +15,7 @@
 
 import { enableAutoUnmount, flushPromises, mount } from "@vue/test-utils";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { defineComponent, h, KeepAlive } from "vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import { mockMeteringResponse } from "./meteringMock";
@@ -56,5 +57,50 @@ describe("UsageMeterBreakdown group-by sections", () => {
     expect(payload.unavailable).toEqual(expect.arrayContaining(["user", "dashboard", "scheduled"]));
     expect(payload.unavailable).not.toContain("alert");
     expect(payload.activeId).not.toBe("dashboard");
+  });
+});
+
+describe("UsageMeterBreakdown kept alive", () => {
+  const details = mockMeteringResponse().upcoming!;
+  const schema = {
+    schema: ["stream_name", "alert_name", "event", "size"].map((name) => ({ name })),
+  };
+
+  // The page credits every report to the meter on screen, as the real Overview does.
+  const heard: string[] = [];
+  const Page = defineComponent({
+    props: { meter: { type: String, required: true } },
+    setup: (props) => () =>
+      h(KeepAlive, null, [
+        h(UsageMeterBreakdown, {
+          key: props.meter,
+          meterKey: props.meter as any,
+          details,
+          refreshToken: 0,
+          onSections: () => heard.push(`sections for ${props.meter}`),
+          "onTop-names": () => heard.push(`top-names for ${props.meter}`),
+        }),
+      ]),
+  });
+
+  it("stays quiet while hidden, then reports its results when shown again", async () => {
+    const page = mount(Page, {
+      props: { meter: "query" },
+      global: { plugins: [i18n, store], stubs: { OTable: true } },
+    });
+    await flushPromises();
+    const releaseSearchSchema = releaseSchema;
+
+    // The user moves to Ingestion before Search has read its schema.
+    await page.setProps({ meter: "ingestion" });
+    await flushPromises();
+    releaseSearchSchema(schema);
+    await flushPromises();
+    expect(heard).toEqual([]);
+
+    // Back on Search, its groupings and top names arrive for the right meter.
+    await page.setProps({ meter: "query" });
+    await flushPromises();
+    expect(heard).toEqual(["sections for query", "top-names for query"]);
   });
 });

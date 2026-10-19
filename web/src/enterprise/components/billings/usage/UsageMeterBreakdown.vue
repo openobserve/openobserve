@@ -111,7 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, onActivated, ref, watch } from "vue";
+import { computed, onActivated, onDeactivated, ref, watch } from "vue";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -224,10 +224,16 @@ const sections = computed<DrilldownSection[]>(() =>
   availableSections(allSections.value, schemaFields.value),
 );
 
+/**
+ * Kept alive, a hidden breakdown keeps loading. It reports nothing until it is shown again, because
+ * the page credits every report to the meter on screen; showing it re-sends its latest results.
+ */
+let shown = true;
+
 /** All groupings every time, so the control does not change shape; the ones with no data are disabled. */
 const emitSections = () => {
   // Nothing until the schema is read: the chart starts its query from these, and the control must not change shape.
-  if (!isRetention.value && !schemaRead.value) return;
+  if (!shown || (!isRetention.value && !schemaRead.value)) return;
   const available = new Set(sections.value.map((item) => item.id));
   emit("sections", {
     sections: allSections.value,
@@ -445,10 +451,14 @@ let lastTopNames: TopNames | null = null;
 
 const emitTopNames = (payload: TopNames) => {
   lastTopNames = payload;
-  emit("top-names", payload);
+  if (shown) emit("top-names", payload);
 };
 
+onDeactivated(() => {
+  shown = false;
+});
 onActivated(() => {
+  shown = true;
   emitSections();
   if (lastTopNames) emit("top-names", lastTopNames);
 });
