@@ -235,7 +235,10 @@ test.describe("Logs Regression Bugs", () => {
     // Enter subquery
     const subquery = 'SELECT kubernetes_pod_name FROM (SELECT * FROM "e2e_automate" WHERE kubernetes_pod_name IS NOT NULL LIMIT 10)';
     testLogger.info(`Entering subquery: ${subquery}`);
+    // Bug #7751 is about SQL-mode queries; filter mode rejects the LIMIT before any request is sent.
+    await pm.logsPage.enableSqlModeIfNeeded();
     await pm.logsPage.clearAndFillQueryEditor(subquery);
+    await pm.logsPage.expectSqlModeActive();
     await pm.logsPage.waitForTimeout(500);
 
     // Run query
@@ -307,7 +310,10 @@ test.describe("Logs Regression Bugs", () => {
     // Enter aggregation query
     const aggQuery = 'SELECT kubernetes_pod_name, count(*) as total FROM "e2e_automate" WHERE kubernetes_pod_name IS NOT NULL GROUP BY kubernetes_pod_name LIMIT 10';
     testLogger.info(`Entering aggregation query: ${aggQuery}`);
+    // Bug #7751 is about SQL-mode queries; filter mode rejects the LIMIT before any request is sent.
+    await pm.logsPage.enableSqlModeIfNeeded();
     await pm.logsPage.clearAndFillQueryEditor(aggQuery);
+    await pm.logsPage.expectSqlModeActive();
     await pm.logsPage.waitForTimeout(500);
 
     // Run query

@@ -1785,11 +1785,28 @@ describe("useRoutes (router.ts)", () => {
       expect(reportsRoute.name).toBe("reports");
     });
 
-    it("should splice createReport route at index 14", () => {
+    it("should splice createReport route at index 15", () => {
       config.isCloud = "false";
       const { homeChildRoutes } = useRoutes();
-      const createReportRoute = homeChildRoutes[14];
+      const createReportRoute = homeChildRoutes[15];
       expect(createReportRoute.name).toBe("createReport");
+    });
+
+    it("registers the guarded report detail route between list and create", () => {
+      config.isCloud = "false";
+      const { homeChildRoutes } = useRoutes();
+      const route = homeChildRoutes[14];
+      expect(route.name).toBe("reportDetail");
+      expect(route.path).toBe("/reports/detail/:report_id");
+      expect(route.props).toBe(true);
+      expect(route.meta.titleKey).toBe("routeTitles.reportDetail");
+      expect(enTitle(route.meta.titleKey)).toBe("Report");
+      expect(typeof route.component).toBe("function");
+      const to = {};
+      const from = {};
+      const next = vi.fn();
+      route.beforeEnter(to, from, next);
+      expect(routeGuard).toHaveBeenCalledWith(to, from, next);
     });
 
     it("should have beforeEnter guard for reports route", () => {
@@ -1920,7 +1937,8 @@ describe("useRoutes (router.ts)", () => {
       config.isCloud = "false";
       const { homeChildRoutes } = useRoutes();
       expect(homeChildRoutes[13].name).toBe("reports");
-      expect(homeChildRoutes[14].name).toBe("createReport");
+      expect(homeChildRoutes[14].name).toBe("reportDetail");
+      expect(homeChildRoutes[15].name).toBe("createReport");
       expect(findRoute(homeChildRoutes, "infraHosts")).toBeDefined();
     });
   });
@@ -1941,6 +1959,12 @@ describe("useRoutes (router.ts)", () => {
       const { homeChildRoutes } = useRoutes();
       const route = findRoute(homeChildRoutes, "createReport");
       expect(route).toBeUndefined();
+    });
+
+    it("should NOT include reportDetail route when isCloud is 'true'", () => {
+      config.isCloud = "true";
+      const { homeChildRoutes } = useRoutes();
+      expect(findRoute(homeChildRoutes, "reportDetail")).toBeUndefined();
     });
   });
 
@@ -2232,7 +2256,7 @@ describe("useRoutes (router.ts)", () => {
       config.isCloud = "true";
       const { homeChildRoutes: cloudRoutes } = useRoutes();
 
-      expect(nonCloudRoutes.length).toBe(cloudRoutes.length + 2);
+      expect(nonCloudRoutes.length).toBe(cloudRoutes.length + 3);
     });
 
     /**
@@ -2339,6 +2363,33 @@ describe("useRoutes (router.ts)", () => {
       } finally {
         store.state.zoConfig = { ...store.state.zoConfig, custom_hide_menus: previous };
       }
+    });
+  });
+
+  describe("profiles route guard", () => {
+    const enter = (zoConfig: Record<string, unknown>) => {
+      const previous = store.state.zoConfig;
+      store.state.zoConfig = zoConfig;
+      try {
+        const route: any = useRoutes().homeChildRoutes.find((r: any) => r.name === "profiles");
+        const next = vi.fn();
+        route.beforeEnter({ query: { org_identifier: "acme" } }, {}, next);
+        return next;
+      } finally {
+        store.state.zoConfig = previous;
+      }
+    };
+
+    it("sends a typed /profiles URL home when profiling is off", () => {
+      expect(enter({ build_type: "enterprise", profiling_enabled: false })).toHaveBeenCalledWith({
+        name: "home",
+        query: { org_identifier: "acme" },
+      });
+    });
+
+    it("opens the page when profiling is on, or while /config is still loading", () => {
+      expect(enter({ profiling_enabled: true })).toHaveBeenCalledWith();
+      expect(enter({})).toHaveBeenCalledWith();
     });
   });
 

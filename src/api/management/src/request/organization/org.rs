@@ -1202,24 +1202,17 @@ pub async fn enable_org_storage(
 
     let target_org_id = req.org_id;
 
-    let mut org_settings = match db::organization::get_org_setting(&target_org_id).await {
-        Ok(org) => org,
-        Err(e) => {
-            return MetaHttpResponse::not_found(e.to_string());
-        }
-    };
-    if org_settings.org_storage_enabled {
-        return MetaHttpResponse::bad_request("org storage already enabled for this org");
-    }
-    org_settings.org_storage_enabled = true;
-
-    if let Err(e) = db::organization::set_org_setting(&target_org_id, &org_settings).await {
-        return MetaHttpResponse::internal_error(format!(
+    let enabled = db::organization::update_org_setting(&target_org_id, |org_settings| {
+        !std::mem::replace(&mut org_settings.org_storage_enabled, true)
+    })
+    .await;
+    match enabled {
+        Ok(true) => MetaHttpResponse::ok("successfully enabled org storage"),
+        Ok(false) => MetaHttpResponse::bad_request("org storage already enabled for this org"),
+        Err(e) => MetaHttpResponse::internal_error(format!(
             "error while saving settings for org {target_org_id} : {e}"
-        ));
+        )),
     }
-
-    MetaHttpResponse::ok("successfully enabled org storage")
 }
 
 /// RenameOrganization

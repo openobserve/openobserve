@@ -1270,7 +1270,7 @@ export class LogsPage {
             // Wait for button to leave Cancel/loading state before clicking —
             // otherwise a click on "Cancel" aborts the in-flight query instead
             // of starting a fresh one.
-            await this.page.waitForFunction(
+            const settled = await this.page.waitForFunction(
                 (sel) => {
                     const b = document.querySelector(sel);
                     if (!b) return false;
@@ -1280,8 +1280,13 @@ export class LogsPage {
                 },
                 this.queryButton,
                 { timeout: 30000 },
-            ).catch(() => {});
-            await queryBtn.click();
+            ).then(() => true).catch(() => false);
+            // A retry on a still-busy button would cancel and restart the same search; keep waiting on it instead.
+            if (settled || attempt === 1) {
+                await queryBtn.click();
+            } else {
+                testLogger.debug(`selectRunQuery: search still running on attempt ${attempt} — waiting instead of re-clicking`);
+            }
 
             try {
                 await this.page.waitForSelector('[data-test="logs-search-result-logs-table"]', {
@@ -1682,6 +1687,11 @@ export class LogsPage {
     // when the query contains SELECT...FROM. Delegate to the canonical enableSqlModeIfNeeded.
     async enableSQLMode() {
         await this.enableSqlModeIfNeeded();
+    }
+
+    async expectSqlModeActive() {
+        // Filter mode rejects LIMIT client-side, so a run before this flips sends no request at all.
+        await expect.poll(() => this._isSqlModeEnabledViaVue(), { timeout: 10000 }).toBe(true);
     }
 
     // Quick Mode methods (now inside the utilities hamburger menu)

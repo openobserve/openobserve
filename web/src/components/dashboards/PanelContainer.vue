@@ -540,6 +540,8 @@ import {
   buildPrefillFromPanel,
   executedPanelQuery,
   panelQueryChoices,
+  alertableQueryIndexes,
+  type PanelQueryShape,
 } from "@/utils/alerts/prefill/fromPanel";
 import type { AlertBuildOptions } from "@/ts/interfaces/alertPrefill";
 import { isFormulaQuery } from "@/utils/dashboard/promql/formula";
@@ -1320,7 +1322,10 @@ export default defineComponent({
     buildPanelAlertPrefill(options: AlertBuildOptions = {}) {
       const queries = this.props.data.queries || [];
       // A saved-hidden query is not drawn, so it is not what the user means to alert on.
-      const visible = queries.flatMap((query: any, i: number) => (query?.config?.hide ? [] : [i]));
+      const visible = alertableQueryIndexes(
+        queries,
+        queries.flatMap((query: PanelQueryShape, i: number) => (query?.config?.hide ? [] : [i])),
+      );
       const queryIndex = options.queryIndex ?? visible[0] ?? 0;
       return buildPrefillFromPanel({
         panelTitle: this.props.data.title,

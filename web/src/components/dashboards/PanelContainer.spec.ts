@@ -21,6 +21,8 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import config from "@/aws-exports";
+import { needsConfirmation, normalizePrefill } from "@/utils/alerts/alertPrefill";
+import { getAlertSource } from "@/utils/alerts/alertSourceRegistry";
 
 // Mock shortURL service
 vi.mock("@/services/short_url", () => ({
@@ -939,11 +941,38 @@ describe("PanelContainer", () => {
         'avg(disk_used{host=~"a"})',
         "sum(rate(io_ops[1m]))",
       ]);
+      // The panel menu always opens the query-only dialog for a multi-query panel.
+      expect(needsConfirmation(normalizePrefill(first))).toBe(true);
+      expect(getAlertSource(first.source).pickQueryOnly).toBe(true);
 
       const second = wrapper.vm.buildPanelAlertPrefill({ queryIndex: 1 });
       expect(second.promql).toBe("sum(rate(io_ops[1m]))");
       expect(second.streamName).toBe("io_ops");
       expect(second.queryIndex).toBe(1);
+    });
+
+    it("offers no empty query slot as an alert target", async () => {
+      const query = (text: string) => ({
+        query: text,
+        fields: { stream: "io_ops", stream_type: "metrics" },
+      });
+      wrapper = createWrapper({
+        data: { ...mockPanelData, queryType: "promql", queries: [query("up"), query(" ")] },
+      });
+      await wrapper.vm.metaDataValue({ queries: [{ query: "up", panelQueryIndex: 0 }] });
+      expect(wrapper.vm.buildPanelAlertPrefill().queryChoices).toBeUndefined();
+
+      wrapper = createWrapper({
+        data: {
+          ...mockPanelData,
+          queryType: "promql",
+          queries: [query("up"), query(""), query("rate(io_ops[1m])")],
+        },
+      });
+      await wrapper.vm.metaDataValue({ queries: [] });
+      expect(
+        wrapper.vm.buildPanelAlertPrefill().queryChoices.map((c: { index: number }) => c.index),
+      ).toEqual([0, 2]);
     });
 
     describe("with a formula and hidden inputs", () => {

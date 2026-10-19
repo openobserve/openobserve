@@ -154,6 +154,46 @@ describe("buildPrefillFromPanel", () => {
     expect(p.meta?.sqlHaving).toEqual({ column: "cnt", operator: ">=", value: 42 });
   });
 
+  describe("a chart threshold on a built query", () => {
+    const builtQuery = {
+      query: 'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1"',
+      customQuery: false,
+      fields: {
+        stream: "triggers",
+        stream_type: "logs",
+        y: [{ alias: "y_axis_1", aggregationFunction: "count" }],
+      },
+    };
+    const thresholdPanel = (overrides: Partial<PanelPrefillInput> = {}) =>
+      sqlPanel({
+        threshold: 4.42,
+        condition: "above",
+        yAxisColumn: "y_axis_1",
+        queries: [builtQuery, builtQuery],
+        ...overrides,
+      });
+
+    it("is written into the SQL when the query was picked, since the form saves the SQL", () => {
+      const p = buildPrefillFromPanel(
+        thresholdPanel({
+          queryChoices: [
+            { index: 0, query: builtQuery.query },
+            { index: 1, query: builtQuery.query },
+          ],
+        }),
+        makeId,
+      );
+      expect(p.meta?.sqlHaving).toEqual({ column: "y_axis_1", operator: ">=", value: 4.42 });
+      expect(p.aggregation?.having).toEqual({ column: "y_axis_1", operator: ">=", value: 1 });
+    });
+
+    it("is written into the SQL on a single-query panel too, leaving the aggregation at its default", () => {
+      const p = buildPrefillFromPanel(thresholdPanel({ queries: [builtQuery] }), makeId);
+      expect(p.meta?.sqlHaving).toEqual({ column: "y_axis_1", operator: ">=", value: 4.42 });
+      expect(p.aggregation?.having).toEqual({ column: "y_axis_1", operator: ">=", value: 1 });
+    });
+  });
+
   it("maps list filters onto alert conditions", () => {
     const p = buildPrefillFromPanel(
       sqlPanel({
@@ -351,6 +391,26 @@ describe("buildPrefillFromPanel — the query the user points at", () => {
     expect(needsConfirmation(p)).toBe(true);
   });
 
+  it("applies the chart threshold to whichever query was chosen", () => {
+    const choices = [
+      { index: 0, query: "avg(disk_used)" },
+      { index: 1, query: "sum(rate(io_ops[1m]))" },
+    ];
+    const p = buildPrefillFromPanel(
+      promqlPanel({
+        queryIndex: 0,
+        queryChoices: choices,
+        threshold: 4,
+        condition: "below",
+        executedQuery: "avg(disk_used)",
+      }),
+      makeId,
+    );
+    expect(p.promql).toBe("avg(disk_used)");
+    expect(p.queryIndex).toBe(0);
+    expect(p.promqlCondition).toEqual({ column: "value", operator: "<=", value: 4 });
+  });
+
   it("does not ask for a dialog when there is only one choice", () => {
     const p = normalizePrefill(
       buildPrefillFromPanel(
@@ -387,6 +447,93 @@ describe("buildPrefillFromPanel — unresolved dashboard variables", () => {
       makeId,
     );
     expect(isPrefillBlocked(normalizePrefill(p))).toBe(false);
+  });
+});
+
+describe("buildPrefillFromPanel — a code-mode PromQL query's stream", () => {
+  const codeQuery = (query: string, stream: string) => ({
+    query,
+    customQuery: true,
+    fields: { stream, stream_type: "metrics" },
+  });
+  const LEFTOVER = "traces_service_graph_request_server_failed_total";
+  const other = codeQuery("up", "up");
+  const promqlPanel = (overrides: Partial<PanelPrefillInput> = {}): PanelPrefillInput => {
+    const queries = [...(overrides.queries ?? []), other];
+    return {
+      panelTitle: "Disk",
+      panelType: "line",
+      queryType: "promql",
+      ...overrides,
+      queries,
+      queryChoices: queries.map((query, index) => ({ index, query: query.query })),
+    };
+  };
+
+  it("reads the same stream whether the query stands alone or beside a sibling", () => {
+    const query = codeQuery("traces_service_graph_request_client_seconds_count", LEFTOVER);
+    const executedQuery = "traces_service_graph_request_client_seconds_count";
+    const alone = buildPrefillFromPanel(
+      { panelTitle: "Disk", queryType: "promql", queries: [query], executedQuery },
+      makeId,
+    );
+    const picked = buildPrefillFromPanel(promqlPanel({ queries: [query], executedQuery }), makeId);
+    expect(alone.streamName).toBe(executedQuery);
+    expect(picked.streamName).toBe(alone.streamName);
+    expect(alone.streamCandidates).toBeUndefined();
+  });
+
+  it("takes the metric the query reads, not the editor's leftover stream pick", () => {
+    const p = buildPrefillFromPanel(
+      promqlPanel({
+        queries: [codeQuery("traces_service_graph_request_client_seconds_count", LEFTOVER)],
+        executedQuery: "traces_service_graph_request_client_seconds_count",
+      }),
+      makeId,
+    );
+    expect(p.streamName).toBe("traces_service_graph_request_client_seconds_count");
+    expect(p.streamCandidates).toBeUndefined();
+  });
+
+  it("offers each metric when the query reads several", () => {
+    const p = buildPrefillFromPanel(
+      promqlPanel({
+        queries: [codeQuery("sum(rate(errors[5m])) / sum(rate(requests[5m]))", LEFTOVER)],
+        executedQuery: "sum(rate(errors[5m])) / sum(rate(requests[5m]))",
+      }),
+      makeId,
+    );
+    expect(p.streamName).toBe("errors");
+    expect(p.streamCandidates?.map((c) => c.name)).toEqual(["errors", "requests"]);
+  });
+
+  it("keeps the stream pick when the query reads it", () => {
+    const p = buildPrefillFromPanel(
+      promqlPanel({
+        queries: [codeQuery("rate(req_total[5m]) / rate(req_errors[5m])", "req_errors")],
+        executedQuery: "rate(req_total[5m]) / rate(req_errors[5m])",
+      }),
+      makeId,
+    );
+    expect(p.streamName).toBe("req_errors");
+    expect(p.streamCandidates).toBeUndefined();
+  });
+
+  it("keeps a builder query's stream, and the pick when the text names no metric", () => {
+    const builder = buildPrefillFromPanel(
+      promqlPanel({
+        queries: [{ ...codeQuery("rate(cpu[5m])", "cpu_seconds"), customQuery: false }],
+        executedQuery: "rate(cpu[5m])",
+      }),
+      makeId,
+    );
+    expect(builder.streamName).toBe("cpu_seconds");
+
+    const constant = buildPrefillFromPanel(
+      promqlPanel({ queries: [codeQuery("vector(1)", LEFTOVER)], executedQuery: "vector(1)" }),
+      makeId,
+    );
+    expect(constant.streamName).toBe(LEFTOVER);
   });
 });
 

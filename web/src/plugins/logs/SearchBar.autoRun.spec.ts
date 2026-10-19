@@ -525,7 +525,7 @@ describe("SearchBar — auto-run wiring (item 2)", () => {
       expect(searchObj.data.query).toContain("status=500");
       expect(searchObj.data.query).toContain("level='error'");
       expect(logs).not.toHaveBeenCalled();
-      expect(wrapper!.vm.showRunPendingDot).toBe(true);
+      expect(wrapper!.vm.showRunQueryPending).toBe(true);
     });
 
     it("runs a relative time change with Auto Run on, and not with it off (D1)", async () => {
