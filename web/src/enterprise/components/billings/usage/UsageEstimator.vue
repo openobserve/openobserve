@@ -14,22 +14,6 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!--
-  What a month would cost, asked in the terms people actually plan in.
-
-  The page opens on this org's own usage rather than an empty form, and every
-  field carries the rate it is priced at, so a number reads against its price
-  without leaving the field. The estimate is broken down by meter, because one
-  total hides which meter a change moved.
-
-  Nobody knows how many gigabytes a search will scan or a pipeline will process,
-  so the data per search and per stream start from this org's own history, and
-  stay editable because a plan is not the past.
-
-  Retention is priced from the org's own metered cost per stored megabyte per
-  day rather than from `base_cost`, because that meter's unit is not a plain
-  megabyte and a guessed conversion would quietly invent a number.
--->
 <template>
   <div
     class="@container/estimator flex h-full flex-col gap-3"
@@ -92,7 +76,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :subtitle="t('billing.usageV2.expectedUsageHint')"
           >
             <template #actions>
-              <!-- Conversions, not plans: rarely edited, so they wait behind a button instead of taking a block of the form. -->
               <OPopover align="end" :aria-label="t('billing.usageV2.assumptions')">
                 <template #trigger>
                   <OButton
@@ -278,10 +261,6 @@ interface ShapeDef {
 
 type ScenarioKey = "current" | "twice" | "fiveTimes";
 
-/**
- * A browser draws a range thumb at the nearest `min + n × step`, so a count's slider steps by one:
- * a coarser step would show 7 searches at 5.
- */
 interface FieldDef {
   key: FieldKey;
   labelKey: I18nKey;
@@ -456,11 +435,6 @@ const setField = (key: FieldKey, value: unknown) => {
   edited.add(key);
 };
 
-/**
- * This org's cycle so far, restated as a month. Search and pipeline counts are not
- * metered, so they come from the metered volume through the same assumptions the
- * form uses, and fall back to the defaults while an assumption is still zero.
- */
 const currentScenario = computed<EstimateInputs>(() => {
   const details = props.details;
   const assumptions = {
@@ -471,8 +445,6 @@ const currentScenario = computed<EstimateInputs>(() => {
   const perMonth = (amount: number | string | undefined) => monthlyPace(amount, details);
   const scannedMb = perMonth(details.query?.metered_amount);
   const pipelineMb = perMonth(details.pipeline?.metered_amount);
-  // Whole searches and checks; the size per search or the interval absorbs the rest, so the total
-  // matches the bill. With no search history yet, the default count stands in.
   const searchCount =
     assumptions.scanPerSearchMb > 0
       ? fitWholeCount(scannedMb / assumptions.scanPerSearchMb).count

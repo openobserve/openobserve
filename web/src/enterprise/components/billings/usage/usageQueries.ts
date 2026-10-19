@@ -202,12 +202,6 @@ export const DRILLDOWNS: Partial<Record<MeterKey, DrilldownSection[]>> = {
   synthetics_protocol: [byCheck("SyntheticsProtocolSteps")],
 };
 
-/**
- * Without a LIMIT the server returns at most 1,000 rows, and a month of 1,300 streams is about
- * 6,700, so the chart's 'others' band lost most of them. An explicit LIMIT is honoured instead.
- * ponytail: rows still cap here (about 3,200 entities a day for a 31-day cycle); rank the top
- * entities in SQL if an org outgrows it.
- */
 const DAILY_ENTITY_ROWS = 100_000;
 
 /** Daily cost per entity; the chart keeps the top few itself, so it need not wait for the table's ranking. */
@@ -321,10 +315,6 @@ export function averageStreamSizeSql(orgId: string | null): string {
   );
 }
 
-/**
- * Estimator default: megabytes scanned per search. A streamed search writes one usage row per
- * partition, each under the search's trace id plus "-{n}", so searches are counted by that id.
- */
 export function searchScanSizeSql(orgId: string | null): string {
   return (
     `select sum(size) as total, count(distinct split_part(trace_id, '-', 1)) as searches ` +

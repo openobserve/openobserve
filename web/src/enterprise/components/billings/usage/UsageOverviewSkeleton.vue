@@ -14,10 +14,6 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!--
-  The Overview page's own shape while the metering call is in flight, so the
-  cards, the strip and the table land where the placeholders already are.
--->
 <template>
   <div class="flex h-full min-h-0 flex-col gap-2.5" data-test="billings-usageoverview-skeleton">
     <div class="flex shrink-0 items-center justify-between gap-2">

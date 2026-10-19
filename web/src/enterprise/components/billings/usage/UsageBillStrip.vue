@@ -14,13 +14,6 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!--
-  How the bill splits across meters, and the meter selector for the breakdown
-  below it. The totals live in the cards above and the table footer, so the bar
-  carries shares only. The bar is a tab list: Left and Right move between meters, Escape
-  returns to all meters. No legend: the table below names every meter beside the
-  same colour dot, and a segment too narrow for a label has its title on hover.
--->
 <template>
   <div
     class="border-border-default flex items-center border-b px-4 py-2.5"
@@ -161,8 +154,6 @@ const segmentStyle = (row: BillRow) => {
     // Grow by share, not by dollars: grow factors summing under 1 leave the row part-empty.
     flex: `${shareOf(row)} 1 0%`,
     backgroundColor: background,
-    // The fill is a chart colour, not a surface, so it stays light in dark mode:
-    // the label has to read against the segment, not against the theme.
     color: getContrastColor(background, chartTextColor(), CONTRAST_THRESHOLD),
     borderColor: isSelected ? shadeOf(color, 3, chartTextColor()) : "transparent",
   };

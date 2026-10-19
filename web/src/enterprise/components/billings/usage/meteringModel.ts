@@ -47,10 +47,6 @@ export interface MeteringDetails {
   missing_details: MissingDetail[];
 }
 
-/**
- * What `price_details` carries: the cycle being billed now, then closed cycles
- * newest first, and the timestamp metering data starts at.
- */
 export interface MeteringResponse {
   upcoming: MeteringDetails;
   past: MeteringDetails[];
@@ -72,10 +68,6 @@ export function parseMeteringResponse(body: unknown): MeteringResponse | null {
   return { upcoming: body as MeteringDetails, past: [], oldest_ts: value.cycle_start };
 }
 
-/**
- * Every cycle the API returned, newest first, so an index is "cycles back". Stripe opens a
- * subscription with a $0 invoice that starts and ends at once; it covers no usage, so it is left out.
- */
 export function cyclesNewestFirst(response: MeteringResponse | null): MeteringDetails[] {
   if (!response) return [];
   const past = response.past
@@ -230,10 +222,6 @@ const USD_PRECISE = new Intl.NumberFormat("en-US", {
   maximumFractionDigits: 4,
 });
 
-/**
- * Billing dates read in UTC, as the budget emails state them: the daily usage buckets start at
- * UTC midnight, so a browser time zone would put every day label one day off west of UTC.
- */
 const CYCLE_DATE = new Intl.DateTimeFormat("en-US", {
   year: "numeric",
   month: "short",
@@ -303,10 +291,6 @@ export function meterForEvent(event: string): MeterDef | undefined {
   return METERS.find((def) => def.events.includes(event));
 }
 
-/**
- * Stripe bills a divided meter per started unit, so 297 MB at $0.50 per GB costs $0.50. When that
- * rounding moves the amount by 1% or more, the row says what was billed, read back from the bill.
- */
 function billedAs(
   meter: PricingDetails | null | undefined,
   def: MeterDef,
@@ -356,10 +340,6 @@ export function buildMeterRows(
 /** Meters that count credits or runs rather than megabytes. */
 const COUNTED_METERS: MeterKey[] = ["ai", "synthetics_browser", "synthetics_protocol"];
 
-/**
- * A usage-only bill for an org Stripe does not bill: each meter's volume from the org's `usage`
- * stream over a window, and no money anywhere, so Overview can draw its screen from volume alone.
- */
 export function volumeDetails(
   volumes: Record<string, number>,
   start: number,
@@ -471,10 +451,6 @@ const DAYS_PER_MONTH = 30;
 
 const finite = (value: number) => (Number.isFinite(Number(value)) ? Number(value) : 0);
 
-/**
- * Usage so far restated as a 30 day month, from the days that have passed rather than the
- * whole cycle; at least one day, so the first hours of a cycle do not swing it.
- */
 export function monthlyPace(
   amount: number | string | undefined,
   details: MeteringDetails,
@@ -485,11 +461,6 @@ export function monthlyPace(
   return ((Number(amount) || 0) / daysPassed) * DAYS_PER_MONTH;
 }
 
-/**
- * A whole count for a form field, with the factor its size field must scale by so the total stays
- * exact: 0.33 of a 60-minute search is 1 search of 20 minutes, not 0 searches. At least one once
- * there is any usage, so a small but billed meter never estimates to $0.
- */
 export function fitWholeCount(exact: number): { count: number; scale: number } {
   if (!(exact > 0)) return { count: 0, scale: 1 };
   const count = Math.max(1, Math.round(exact));
@@ -518,11 +489,6 @@ export function apiCheckRuns(input: EstimateInputs): number {
   return finite(input.apiChecks) * finite(input.apiRegions) * runsPerMonth(input.apiIntervalSec);
 }
 
-/**
- * Cost per stored megabyte per day, derived from this org's own billed
- * retention. `base_cost` is not usable here: that meter's unit is not a plain
- * megabyte, so a guessed conversion would invent a number.
- */
 export function retentionDailyRate(details: MeteringDetails | null | undefined): number {
   const meter = details?.retention;
   const cycleDays = ((details?.cycle_end ?? 0) - (details?.cycle_start ?? 0)) / SECONDS_PER_DAY;
@@ -594,10 +560,6 @@ export interface MeterShare {
   billed: number;
 }
 
-/**
- * One org's meters inside a super org's bill, from its share of each meter's billed amount.
- * Retention writes no usage events, so it cannot be split by org and is left out.
- */
 export function scopedMeterRows(
   details: MeteringDetails | null | undefined,
   shares: Partial<Record<MeterKey, MeterShare>>,
@@ -631,10 +593,6 @@ export interface BillingOrg {
   isSelf: boolean;
 }
 
-/**
- * The orgs a super org pays for, itself first, from `GET /billing_group/members`.
- * Empty for any other org, which is how the page knows it is not a super org.
- */
 export function billingGroupOrgs(members: unknown, selfId: string): BillingOrg[] {
   const list = Array.isArray(members) ? members : [];
   if (!list.length) return [];

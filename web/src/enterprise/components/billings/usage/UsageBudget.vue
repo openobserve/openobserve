@@ -14,10 +14,6 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!--
-  The Budget tab: how this cycle's spend tracks against a budget, and the budget itself.
-  Every figure previews the draft settings, so the effect of a new budget shows before it is saved.
--->
 <template>
   <!-- A failed read is not "no budgets": saving then would replace every stored budget. -->
   <div v-if="loadFailed" data-test="billings-usagebudget-error">

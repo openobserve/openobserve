@@ -34,10 +34,6 @@ export interface OrgCost {
   byMeter: Partial<Record<MeterKey, MeterShare>>;
 }
 
-/**
- * Splits each meter's billed amount across orgs by their share of its volume. The orgs then
- * add up to the bill, discounts and rounding included, even when the volumes are off.
- */
 export function priceOrgVolumes(
   hits: Record<string, unknown>[],
   cycle: MeteringDetails,
@@ -74,13 +70,6 @@ export function priceOrgVolumes(
   return byOrg;
 }
 
-/**
- * A super org's cost per org for the current cycle.
- *
- * Stripe itemises a super org's bill for the super org only, but every member's usage
- * also lands in the super org's `usage` stream with its own org_id. So each org's cost
- * is its share of the bill, by its usage.
- */
 /** One org-cost read, as the Usage page hands it to every tab that shows per-org spend. */
 export interface OrgCostsState {
   costs: Record<string, OrgCost>;

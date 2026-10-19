@@ -30,7 +30,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @loading-state-change="busy = $event"
       @error="onError"
     />
-    <!-- Until the org reports usage its `usage` stream does not exist; say so over the chart, as the old page did, instead of the server's text. -->
     <div
       v-if="streamMissing"
       class="absolute inset-0 z-10 flex items-center justify-center"

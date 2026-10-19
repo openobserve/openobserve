@@ -14,18 +14,8 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!--
-  The Usage tab: cost now, cost over time, and cost if you grow.
-
-  One fetch of the metering API serves all three tabs, so the cycle, the rates
-  and the totals cannot disagree between them.
--->
 <template>
   <div class="flex h-full flex-col gap-2.5 px-3" data-test="billings-usageview-root">
-    <!--
-      Which tabs an org has is known only once its bill loads, so the first load shows a placeholder
-      bar of the tab bar's own height: real tab names that then vanish would read as a glitch.
-    -->
     <div
       v-if="loading && lastLoadedAt === null"
       class="flex h-11 shrink-0 items-center gap-6 border-b px-3 pt-0.75"
@@ -227,10 +217,6 @@ const activeTab = computed<UsageTab>(() => {
   return TABS.includes(value as UsageTab) ? (value as UsageTab) : "overview";
 });
 
-/**
- * Leaving Overview drops its selection, because a meter that Overview no longer
- * shows would still be sitting in the URL when the user comes back.
- */
 const selectTab = (value: unknown) => {
   if (typeof value !== "string" || !TABS.includes(value as UsageTab)) return;
   const query: LocationQueryRaw = { ...route.query, tab: value };
@@ -260,17 +246,9 @@ const projected = computed(() => projectCycleCost(details.value, lastLoadedAt.va
 /** A super org's orgs, itself first; empty for any other org. */
 const billingOrgs = ref<BillingOrg[]>([]);
 
-/**
- * The super org that pays for this org, when it is a billing-group member: it is shown its usage,
- * not a bill of its own, and is told who pays. `null` for any other org.
- */
 const payer = ref<string | null>(null);
 const isMember = computed(() => payer.value !== null);
 
-/**
- * Billed through Stripe: the bill came back and no super org pays it. Every other org, such as
- * one billed by a marketplace or contract, or a member, sees usage volumes and nothing priced.
- */
 const billed = computed(() => !!details.value && !isMember.value);
 
 /** One grey label per tab a billed org gets, about as wide as its name. */
@@ -325,10 +303,6 @@ const fetchVolumes = async (refresh: boolean): Promise<MeteringDetails> => {
   }
 };
 
-/**
- * A failure keeps the list already shown for this org, so a Refresh does not drop a super org's
- * org view; with none shown yet it reads as "not a super org", and the page shows the bill by meter.
- */
 const fetchBillingOrgs = async (): Promise<BillingOrg[]> => {
   const orgId = store.state.selectedOrganization.identifier;
   try {
@@ -434,10 +408,6 @@ const refresh = () => {
   void loadDetails();
 };
 
-/**
- * One org-cost read for the whole page: Overview's Cost by Org and the super org Budget judge
- * spend on the same figures, and a Refresh on any tab reaches it.
- */
 const orgCostRead = useOrgCosts(
   computed(() => (billed.value ? details.value : null)),
   computed(() => (billed.value ? billingOrgs.value : [])),

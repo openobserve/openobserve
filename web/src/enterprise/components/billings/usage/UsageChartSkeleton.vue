@@ -14,11 +14,6 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!--
-  Placeholder for a chart panel: a row of bars in the shape the real chart takes.
-  The background is opaque, because the renderer below already paints its axes
-  and grid lines while it loads and they must not show through the placeholder.
--->
 <template>
   <div
     class="bg-surface-base flex h-full w-full items-end gap-1 overflow-hidden"

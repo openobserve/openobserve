@@ -14,13 +14,6 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!--
-  Cost for the current billing cycle, with what drives each meter beside it.
-
-  Meter costs come only from the metering API; the `usage` stream is read only
-  for the breakdown and the daily chart, where it is the sole source and so
-  cannot contradict a billed number.
--->
 <template>
   <div class="flex h-full min-h-0 flex-col gap-2.5" data-test="billings-usageoverview-root">
     <OBanner
@@ -393,10 +386,6 @@ const props = withDefaults(
     /** The cycle's projected total, worked out once by the page so every tab shows the same figure. */
     projected: number | null;
     refreshing: boolean;
-    /**
-     * An org Stripe does not bill: `details` holds only each meter's volume over a window, so the
-     * screen shows volumes and hides every money figure. Off, Overview is the bill as before.
-     */
     volumeOnly?: boolean;
     /** The super org's per-org spend, read once by the page. */
     orgCosts?: OrgCostsState;
@@ -470,12 +459,6 @@ const progress = computed(() =>
 const projected = computed(() => props.projected);
 
 const cycleEndText = computed(() => raw(formatDay(props.details?.cycle_end ?? 0)));
-
-// ── Super org: the bill by org ───────────────────────────────────
-//
-// Stripe itemises a super org's bill for the super org only, but every member's usage
-// also lands in the super org's `usage` stream with its own org_id. So each org's cost
-// is its usage priced at this bill's rates and discounts: an estimate that tracks the bill.
 
 const isSuperOrg = computed(() => props.billingOrgs.length > 0);
 
@@ -749,11 +732,6 @@ const missingMeterNames = computed(() => {
 /** The cycle's first moment; the charts count from here even though their window opens earlier. */
 const cycleStartUs = computed(() => (props.details?.cycle_start ?? 0) * 1_000_000);
 
-/**
- * Daily bars start at 00:00 UTC, so the window opens at the start of the cycle's first UTC day,
- * or that day's bar would sit before the axis and be cut off. Elapsed days only, so the bars use
- * the full pane width instead of empty future days.
- */
 const elapsedTimeObj = computed(() => {
   const dayStart = Math.floor((props.details?.cycle_start ?? 0) / 86_400) * 86_400 * 1_000_000;
   const end = Math.min((props.details?.cycle_end ?? 0) * 1_000_000, Date.now() * 1000);

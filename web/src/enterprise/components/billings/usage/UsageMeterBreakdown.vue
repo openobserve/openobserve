@@ -14,14 +14,6 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!--
-  What drives one meter's cost, shown beside the meter list on Overview.
-
-  Cost and share are computed here rather than in the SQL: the rate belongs to
-  the metering API, and a price baked into a query is a second place for it to
-  go stale. Retention has no `usage` event at all, so it reads stream storage
-  and shows share of storage rather than an invented price.
--->
 <template>
   <div
     :key="`${meterKey}-${activeSection?.id ?? ''}`"
@@ -172,10 +164,6 @@ const props = defineProps<{
   group?: string;
   /** Bumped by the page's Refresh, which must reach the server for every read here. */
   refreshToken: number;
-  /**
-   * A super org's member to break down. The search still runs in the super org, whose
-   * stream holds every member's usage; only the `org_id` filter and name lookups change.
-   */
   scopeOrgId?: string;
   /** Price per unit to use instead of the bill's, so a member's rows add up to its share. */
   rate?: number;
@@ -232,10 +220,6 @@ const sections = computed<DrilldownSection[]>(() =>
   availableSections(allSections.value, schemaFields.value),
 );
 
-/**
- * Kept alive, a hidden breakdown keeps loading. It reports nothing until it is shown again, because
- * the page credits every report to the meter on screen; showing it re-sends its latest results.
- */
 let shown = true;
 
 /** All groupings every time, so the control does not change shape; the ones with no data are disabled. */
@@ -285,7 +269,6 @@ const columns = computed<OTableColumnDef<BreakdownRow>[]>(() => {
     id: "name",
     header: isRetention.value ? t("billing.usageV2.colStream") : groupLabel.value,
     accessorKey: "name",
-    // The elastic column: it takes whatever width the fixed columns leave.
     meta: { isName: true, autoWidth: true },
     minSize: 160,
   };
@@ -393,11 +376,6 @@ type Labeler = (raws: RawRow[]) => RawRow[];
 
 const keepNames: Labeler = (raws) => raws;
 
-/**
- * Pipeline and check names live in the org's own lists. A super org admin need not belong to a
- * member org, and a 401 from one signs the session out in cloud, so a member org the user does
- * not belong to shows ids instead of asking.
- */
 const canReadNames = computed(
   () =>
     usageOrgId.value === orgId.value ||

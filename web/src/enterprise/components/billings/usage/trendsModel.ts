@@ -190,10 +190,6 @@ export function topMeter(summary: TrendSummary, only: MeterKey | null = null): T
   return { key: top.key, cost: top.cost, share: all > 0 ? top.cost / all : 0 };
 }
 
-/**
- * Trailing-week run rate over complete days: today is still filling in and would pull it down.
- * A day with no usage has no row, so the window is zero-filled first.
- */
 export function forecastCycle(
   summary: TrendSummary,
   cycleStart: number,

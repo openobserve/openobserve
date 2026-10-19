@@ -14,11 +14,6 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!--
-  The Budget tab of a super org: one overall budget for the whole group's bill, saved
-  under org_id "total", and a budget per org, the super org included, under its own id.
-  Every edit is a draft until the save bar commits them all in one request.
--->
 <template>
   <!-- A failed read is not "no budgets": saving then would replace every stored budget. -->
   <div v-if="loadFailed" class="h-full min-h-0" data-test="billings-usagesuperbudget-error">
@@ -515,7 +510,6 @@ const columns = computed<OTableColumnDef<OrgRow>[]>(() => [
     minSize: 160,
   },
   { id: "spend", header: t("billing.usageV2.colSpendThisCycle"), accessorKey: "spend", size: 220 },
-  // Narrow fixed columns leave the org names room at laptop widths; Spend keeps its badge on one line.
   { id: "budget", header: t("billing.usageV2.colBudget"), accessorKey: "id", size: 112 },
   { id: "warn", header: t("billing.usageV2.warnAt"), accessorKey: "id", size: 160 },
   { id: "alerts", header: t("billing.usageV2.colAlerts"), accessorKey: "id", size: 56 },

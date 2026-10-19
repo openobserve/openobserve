@@ -232,11 +232,6 @@ export const VOLUME_METERS: MeterKey[] = ["ingestion", "query", "pipeline", "rem
 /** Series that carry the forecast, left out of the per-day tooltip rows. */
 const FORECAST_SERIES = new Set(["lo", "hi"]);
 
-/**
- * Trends chart as a plain ECharts option: stacked cost bars per meter and, for the open
- * cycle, the cumulative spend with a dashed projection and its range on a second axis.
- * `PanelSchemaRenderer` cannot add those series, so the page renders this with `ChartRenderer`.
- */
 export function buildTrendsChartOption(opts: {
   rows: CostRow[];
   events: string[];

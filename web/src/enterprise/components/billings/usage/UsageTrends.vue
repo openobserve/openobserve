@@ -133,7 +133,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :description="t('billing.usageTrends.waitingForData')"
               data-test="billings-usagetrends-empty"
             />
-            <!-- The renderer sizes itself with h-full, so its parent needs a definite height. -->
             <div v-else class="relative h-90 w-full p-2">
               <UsageChartSkeleton
                 v-if="loading"
@@ -353,10 +352,6 @@ const clamp = (span: Window): Window => {
   return { start, end: span.end > start ? span.end : start + length };
 };
 
-/**
- * The range lives in the URL, `from`/`to` in microseconds as logs keeps them, so a reload shows the same days.
- * Read as numbers first: a change to any other query key then leaves the window, and the chart, alone.
- */
 const fromSeconds = computed(() => Math.floor(Number(route.query.from) / 1_000_000));
 const toSeconds = computed(() => Math.floor(Number(route.query.to) / 1_000_000));
 const customWindow = computed<Window | null>(() => {
@@ -404,10 +399,6 @@ const onPresetChange = (value: unknown) => {
   setRange({ range: value === "current" ? undefined : (value as Preset) });
 };
 
-/**
- * Why days before `oldest` are greyed out, shown on the picker's info icon and on the days.
- * The hour count only turns that note on: Trends has no relative presets for it to limit.
- */
 const historyNote = computed(() =>
   String(
     t("billing.usageV2.historyStartsOn", {
@@ -449,10 +440,6 @@ const measuredEnd = computed(() => Math.min(range.value.end, nowSeconds()));
 
 const picker = ref<{ setAbsoluteTime: (start: number, end: number) => void } | null>(null);
 
-/**
- * The picker reads its dates only when it opens, so it is set to every new range: after a preset,
- * and after a ‹ step past the data start, which the range moves forward to start on that day.
- */
 watch(
   () => [range.value.start, measuredEnd.value],
   ([start, end]) => picker.value?.setAbsoluteTime(start * 1_000_000, end * 1_000_000),
@@ -573,10 +560,6 @@ const canForecast = computed(() => {
   return preset.value === "current" && !!cycle && cycle.cycle_end > nowSeconds();
 });
 
-/**
- * The bill's projection, the figure every tab shows. One org of a group is projected from its own
- * cost the same way, because the bill is not split by org.
- */
 const projectedTotal = computed(() => {
   const cycle = upcoming.value;
   if (!cycle || !(props.billingOrgs.length && selectedOrg.value)) return props.projected;

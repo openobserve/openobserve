@@ -156,12 +156,10 @@ const labelColumn = computed<OTableColumnDef<BillRow>>(() => ({
   id: "label",
   header: props.nameHeader ?? t("billing.usageV2.colMeter"),
   accessorKey: "label",
-  // The elastic column: it takes whatever width the fixed columns leave.
   meta: { isName: true, autoWidth: true },
   minSize: 160,
 }));
 
-// A plain column, not `isAction`: an action column is measured, so it would not keep this width.
 const openColumn: OTableColumnDef<BillRow> = {
   id: "open",
   header: raw(""),

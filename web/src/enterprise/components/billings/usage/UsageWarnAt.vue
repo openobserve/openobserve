@@ -14,10 +14,6 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!--
-  A budget's warn line as two linked fields, "80 % = $36.00": type either one and the
-  other follows. The percent is the model, so a new budget keeps the same share.
--->
 <template>
   <div class="flex flex-col gap-1.5">
     <span class="text-xs font-semibold">{{ t("billing.usageV2.warnAt") }}</span>

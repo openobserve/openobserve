@@ -34,10 +34,6 @@ export function budgetFor(
   return (configs ?? []).find((config) => config.org_id === orgId) ?? null;
 }
 
-/**
- * The whole array is saved at once and a billing group keeps its members' budgets
- * in it too, so only this org's entry is replaced.
- */
 export function withBudget(
   configs: BudgetConfig[] | null | undefined,
   entry: BudgetConfig,
@@ -49,10 +45,6 @@ export function withBudget(
 
 const cents = (value: number) => Math.round(value * 100) / 100;
 
-/**
- * Two amounts are the same to the cent. Whole cents, not `< 0.01`: in floating point 36.01 - 36
- * is 0.00999…, so a one-cent change would read as no change and Save would stay off.
- */
 export function sameCents(a: number, b: number): boolean {
   return Math.round(a * 100) === Math.round(b * 100);
 }
@@ -144,10 +136,6 @@ export function sameBudget(a: BudgetDraft, b: BudgetDraft): boolean {
   );
 }
 
-/**
- * The full `budget_config` a super org saves: its overall budget under `total`, then one
- * entry per org that has a budget. An org cleared to no budget is left out, which removes it.
- */
 export function superBudgetConfigs(
   total: BudgetDraft,
   orgs: Record<string, BudgetDraft>,
