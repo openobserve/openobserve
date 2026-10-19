@@ -369,7 +369,7 @@ import type {
   RcaThread,
   RcaThreadQuestion,
 } from "@/services/incidents";
-import type { RcaThreadStatus } from "@/composables/useRcaThread";
+import type { RcaReadStatus } from "@/composables/useIncidentRca";
 import type { RcaSteerSendResult } from "@/composables/useRcaSteering";
 import {
   formatRcaClock,
@@ -391,7 +391,7 @@ import RcaThreadStep from "./RcaThreadStep.vue";
 const props = withDefaults(
   defineProps<{
     thread: RcaThread | null;
-    status: RcaThreadStatus;
+    status: RcaReadStatus;
     /** The thread's run is running or waiting for input. */
     runLive: boolean;
     /** State of the thread's run; a run that is not live gets the final note. */

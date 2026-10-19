@@ -20,9 +20,6 @@ const { toastMock } = vi.hoisted(() => ({ toastMock: vi.fn() }));
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: toastMock }));
 vi.mock("@/services/incidents", () => ({
   default: {
-    getRcaThread: vi.fn(),
-    getRcaSummary: vi.fn(),
-    getRcaSteering: vi.fn(),
     steerRca: vi.fn(),
     getRcaFeedback: vi.fn(),
   },
@@ -35,8 +32,8 @@ import type { RcaAskPayload } from "@/utils/incidents/rcaAskAttachment";
 import store from "@/test/unit/helpers/store";
 import incidentsService from "@/services/incidents";
 import { formatTimestamp } from "@/utils/date";
-import { RCA_UNFINISHED_TOOL_ERROR, rcaThreadPlainText } from "@/utils/incidents/rcaThread";
-import { RCA_STEERING_POLL_MS } from "@/composables/useRcaSteering";
+import { rcaThreadPlainText } from "@/utils/incidents/rcaThread";
+import type { RcaReadStatus } from "@/composables/useIncidentRca";
 import {
   rcaBlindSpot,
   RCA_T0,
@@ -61,19 +58,30 @@ import {
   rcaV1Summary,
   sec,
 } from "@/test/unit/fixtures/rcaThread";
-import type { RcaRunSummary } from "@/services/incidents";
+import type { RcaRunSummary, RcaSteering, RcaThread } from "@/services/incidents";
 
-const getRcaThread = vi.mocked(incidentsService.getRcaThread);
-const getRcaSummary = vi.mocked(incidentsService.getRcaSummary);
-const getRcaSteering = vi.mocked(incidentsService.getRcaSteering);
 const steerRca = vi.mocked(incidentsService.steerRca);
 const getRcaFeedback = vi.mocked(incidentsService.getRcaFeedback);
 
-/** Every read of a run answers `summary` with that run's id. */
-const answerSummary = (summary: RcaRunSummary) =>
-  getRcaSummary.mockImplementation(
-    (_org, _incident, runId) => Promise.resolve({ data: { ...summary, run_id: runId } }) as never,
-  );
+/** What the live stream holds for the thread's run (05 LU17); a test sets the parts it needs. */
+interface StreamAnswers {
+  thread: RcaThread | null;
+  threadStatus: RcaReadStatus;
+  runSummary: RcaRunSummary | null;
+  runSummaryStatus: RcaReadStatus;
+  steering: RcaSteering | null;
+}
+let answers: StreamAnswers;
+
+/** The stream's parts as props; the summary carries the id of the thread's run. */
+const streamProps = (props: Record<string, unknown>) => {
+  const runId = props.threadRunId as string | null | undefined;
+  const { runSummary } = answers;
+  return {
+    ...answers,
+    runSummary: runSummary && runId ? { ...runSummary, run_id: runId } : runSummary,
+  };
+};
 
 const REPORT = "## Root Cause\n\nMemory leak in the payment service.";
 
@@ -89,10 +97,10 @@ const stubs = {
   },
 };
 
-function mountPanel(props: Record<string, unknown> = {}) {
+function mountPanel(props: Record<string, unknown> = {}, extraStubs: Record<string, unknown> = {}) {
   return mount(IncidentRCAAnalysis, {
-    props: { orgId: "default", incidentId: "inc-1", ...props },
-    global: { plugins: [i18n, store], stubs },
+    props: { orgId: "default", incidentId: "inc-1", ...streamProps(props), ...props },
+    global: { plugins: [i18n, store], stubs: { ...stubs, ...extraStubs } },
     attachTo: document.body,
   });
 }
@@ -146,14 +154,17 @@ describe("IncidentRCAAnalysis", () => {
   const writeText = vi.mocked(navigator.clipboard.writeText);
 
   beforeEach(() => {
-    getRcaThread.mockReset();
-    getRcaThread.mockResolvedValue({ data: rcaThread() } as never);
-    // Phase 2 cases: runs with no stored record (VE42).
-    getRcaSummary.mockReset();
-    answerSummary(rcaRunSummaryLegacy());
+    answers = {
+      thread: rcaThread(),
+      threadStatus: "ready",
+      // Phase 2 cases: runs with no stored record (VE42).
+      runSummary: rcaRunSummaryLegacy(),
+      runSummaryStatus: "ready",
+      steering: rcaSteering(),
+    };
     writeText.mockReset().mockResolvedValue(undefined);
-    getRcaSteering.mockReset().mockResolvedValue({ data: rcaSteering() } as never);
     steerRca.mockReset().mockResolvedValue({ data: { run_state: "running" } } as never);
+    getRcaFeedback.mockClear();
   });
 
   afterEach(() => {
@@ -177,7 +188,6 @@ describe("IncidentRCAAnalysis", () => {
       await byTest(wrapper, "trigger-rca-btn").trigger("click");
 
       expect(wrapper.emitted("trigger-rca")).toEqual([[{ buildOnPrevious: false }]]);
-      expect(getRcaThread).not.toHaveBeenCalled();
     });
   });
 
@@ -215,11 +225,16 @@ describe("IncidentRCAAnalysis", () => {
     });
 
     it("shows the analysis loading line until the summary answers, then the report loading line (legacy)", async () => {
+      answers.runSummary = null;
+      answers.runSummaryStatus = "loading";
       wrapper = mountPanel({ ...completedProps(), reportText: "", reportLoading: true });
 
       expect(byTest(wrapper, "rca-summary-loading").text()).toBe("Loading the analysis…");
       expect(byTest(wrapper, "rca-report-loading").exists()).toBe(false);
-      await flushPromises();
+      await wrapper.setProps({
+        runSummary: rcaRunSummaryLegacy({ run_id: "run-1" }),
+        runSummaryStatus: "ready",
+      });
 
       expect(byTest(wrapper, "rca-summary-loading").exists()).toBe(false);
       expect(byTest(wrapper, "rca-report-loading").text()).toBe("Loading report…");
@@ -246,11 +261,10 @@ describe("IncidentRCAAnalysis", () => {
   });
 
   describe("TH38: the thread column", () => {
-    it("reads the thread of the run and shows it Live with its trigger", async () => {
+    it("shows the thread of the run Live with its trigger", async () => {
       wrapper = mountPanel(liveProps());
       await flushPromises();
 
-      expect(getRcaThread).toHaveBeenCalledWith("default", "inc-1", "run-2", undefined);
       expect(byTest(wrapper, "rca-thread-live-pill").text()).toBe("Live");
       expect(byTest(wrapper, "rca-thread-start-trigger").text()).toBe("Re-analyze by a.rao");
       expect(wrapper.findAll('[data-test="rca-thread-step"]')).toHaveLength(2);
@@ -272,9 +286,7 @@ describe("IncidentRCAAnalysis", () => {
     });
 
     it("a completed run is Saved with the final note", async () => {
-      getRcaThread.mockResolvedValue({
-        data: rcaThread({ run_id: "run-1", active: false, steps: [rcaStep()] }),
-      } as never);
+      answers.thread = rcaThread({ run_id: "run-1", active: false, steps: [rcaStep()] });
       wrapper = mountPanel(completedProps());
       await flushPromises();
 
@@ -282,26 +294,9 @@ describe("IncidentRCAAnalysis", () => {
       expect(byTest(wrapper, "rca-thread-final-note").exists()).toBe(true);
     });
 
-    it("TH32: polls every 4 s while live and stops after one final read", async () => {
-      vi.useFakeTimers();
-      wrapper = mountPanel(liveProps());
-      await vi.advanceTimersByTimeAsync(0);
-      expect(getRcaThread).toHaveBeenCalledTimes(1);
-
-      await vi.advanceTimersByTimeAsync(8_000);
-      expect(getRcaThread).toHaveBeenCalledTimes(3);
-      expect(getRcaThread.mock.calls[1][3]).toBe("12.100.200");
-
-      await wrapper.setProps({
-        rca: rcaSummary({ state: "completed", current_run: rcaRun({ state: "completed" }) }),
-        threadLive: false,
-      });
-      await vi.advanceTimersByTimeAsync(60_000);
-      expect(getRcaThread).toHaveBeenCalledTimes(4);
-    });
-
-    it("TH32: a 410 shows the expired transcript and stops", async () => {
-      getRcaThread.mockRejectedValue({ isAxiosError: true, response: { status: 410 } });
+    it("TH32: an expired thread shows the expired transcript", async () => {
+      answers.thread = null;
+      answers.threadStatus = "expired";
       wrapper = mountPanel(liveProps());
       await flushPromises();
 
@@ -397,7 +392,7 @@ describe("IncidentRCAAnalysis", () => {
 
     it("E: names who cancelled, when, after how long, and the checks finished", async () => {
       // One finished step and one that never finished.
-      getRcaThread.mockResolvedValue({ data: rcaThread({ active: false }) } as never);
+      answers.thread = rcaThread({ active: false });
       wrapper = mountPanel({
         rca: rcaSummary({
           state: "cancelled",
@@ -433,27 +428,26 @@ describe("IncidentRCAAnalysis", () => {
       `Cancelled by a.rao at 08:56:20 UTC after 1m00s. ${done} of ${total} checks finished; the partial results below are not a verdict.`;
 
     it("E (m1): a step cut off by the run's end does not count; m = max(thread steps, summary.steps)", async () => {
-      const cut = rcaToolCall({ status: "error", error: RCA_UNFINISHED_TOOL_ERROR });
-      getRcaThread.mockResolvedValue({
-        data: rcaThread({
-          active: false,
-          report_submitted: false,
-          // Every step closed by the projection; the third was cut off mid-call.
-          steps: [
-            rcaStep({ index: 1 }),
-            rcaStep({ index: 2 }),
-            rcaStep({ index: 3, tool_calls: [rcaToolCall(), cut] }),
-          ],
-        }),
-      } as never);
+      const cut = rcaToolCall({ status: "error", interrupted: true });
+      answers.thread = rcaThread({
+        active: false,
+        report_submitted: false,
+        // Every step closed by the projection; the second was cut off mid-call and the
+        // last never finished before the run ended.
+        steps: [
+          rcaStep({ index: 1 }),
+          rcaStep({ index: 2, tool_calls: [rcaToolCall(), cut] }),
+          rcaStep({ index: 3 }),
+        ],
+      });
       wrapper = mountPanel(cancelledProps(4));
       await flushPromises();
 
-      expect(byTest(wrapper, "rca-cancelled-message").text()).toBe(cancelledSentence(2, 4));
+      expect(byTest(wrapper, "rca-cancelled-message").text()).toBe(cancelledSentence(1, 4));
     });
 
     it("E (m1): the thread's step count wins when the summary lags", async () => {
-      getRcaThread.mockResolvedValue({ data: rcaThread({ active: false }) } as never);
+      answers.thread = rcaThread({ active: false });
       wrapper = mountPanel(cancelledProps(1));
       await flushPromises();
 
@@ -461,7 +455,8 @@ describe("IncidentRCAAnalysis", () => {
     });
 
     it("E (m1): with no thread, n = m - 1 from the summary", async () => {
-      getRcaThread.mockRejectedValue({ isAxiosError: true, response: { status: 410 } });
+      answers.thread = null;
+      answers.threadStatus = "expired";
       wrapper = mountPanel(cancelledProps(5));
       await flushPromises();
 
@@ -469,7 +464,8 @@ describe("IncidentRCAAnalysis", () => {
     });
 
     it("E (m1): with no thread and no steps, 0 of 0", async () => {
-      getRcaThread.mockRejectedValue({ isAxiosError: true, response: { status: 410 } });
+      answers.thread = null;
+      answers.threadStatus = "expired";
       wrapper = mountPanel(cancelledProps(0));
       await flushPromises();
 
@@ -518,7 +514,6 @@ describe("IncidentRCAAnalysis", () => {
       expect(byTest(wrapper, "rca-verdict-state").text()).toBe("Analyzed");
       expect(byTest(wrapper, "rca-error-banner").exists()).toBe(false);
       expect(byTest(wrapper, "rca-run-selector-label").text()).toBe("Run 1 · Oct 9, 08:53 UTC");
-      expect(getRcaThread).toHaveBeenCalledWith("default", "inc-1", "run-1", undefined);
     });
 
     it("the subtitle names the trigger and age", async () => {
@@ -556,15 +551,21 @@ describe("IncidentRCAAnalysis", () => {
       ended_at: RCA_T0 - sec(3600),
     });
     const NO_TRANSCRIPT = "This run has no stored transcript.";
+    /** A pre-upgrade run: the stream reads nothing for it. */
+    const V1_STREAM = {
+      threadRunIsV1: true,
+      thread: null,
+      threadStatus: "idle",
+      runSummary: null,
+      runSummaryStatus: "idle",
+      steering: null,
+    } as const;
 
     beforeEach(() => {
       getRcaFeedback.mockReset().mockResolvedValue({ data: { items: [], mine: null } } as never);
     });
 
     const expectNoRunReads = () => {
-      expect(getRcaThread).not.toHaveBeenCalled();
-      expect(getRcaSummary).not.toHaveBeenCalled();
-      expect(getRcaSteering).not.toHaveBeenCalled();
       expect(getRcaFeedback).not.toHaveBeenCalled();
     };
 
@@ -576,6 +577,7 @@ describe("IncidentRCAAnalysis", () => {
         reportText: REPORT,
         threadRunId: "v1-0",
         threadLive: false,
+        ...V1_STREAM,
       });
       await flushPromises();
 
@@ -622,12 +624,10 @@ describe("IncidentRCAAnalysis", () => {
         "The report below is from the 08:53 UTC run.",
       );
       expect(byTest(wrapper, "rca-existing-container").text()).toContain("Memory leak");
-      expect(getRcaThread).toHaveBeenCalledWith("default", "inc-1", "run-1", undefined);
-      expect(getRcaThread).not.toHaveBeenCalledWith("default", "inc-1", "v1-0", undefined);
     });
 
     it("the selector opens a v1 report; the picked v1 run shows its report and reads no thread", async () => {
-      answerSummary(rcaRunSummary());
+      answers.runSummary = rcaRunSummary();
       wrapper = mountPanel({ ...completedProps(), history: [rcaRunItem(), V1] });
       await flushPromises();
       expect(byTest(wrapper, "rca-what-happened").exists()).toBe(true);
@@ -636,14 +636,12 @@ describe("IncidentRCAAnalysis", () => {
       await byTest(wrapper, "rca-history-item-1").trigger("click");
       expect(wrapper.emitted("view-run")).toEqual([["v1-0"]]);
 
-      getRcaThread.mockClear();
-      getRcaSummary.mockClear();
-      getRcaSteering.mockClear();
       getRcaFeedback.mockClear();
       await wrapper.setProps({
         viewedRun: V1,
         threadRunId: "v1-0",
         reportText: "## Root Cause\n\nDisk full on the ledger node.",
+        ...V1_STREAM,
       });
       await flushPromises();
 
@@ -724,9 +722,7 @@ describe("IncidentRCAAnalysis", () => {
     });
 
     it("Copy thread is disabled when the run has no transcript", async () => {
-      getRcaThread.mockResolvedValue({
-        data: rcaThread({ transcript: "none", steps: [], started: null }),
-      } as never);
+      answers.thread = rcaThread({ transcript: "none", steps: [], started: null });
       wrapper = mountPanel(completedProps());
       await flushPromises();
 
@@ -772,30 +768,18 @@ describe("IncidentRCAAnalysis", () => {
     it.each([
       [
         "transcript none",
-        () =>
-          getRcaThread.mockResolvedValue({
-            data: rcaThread({ run_id: "run-1", transcript: "none", steps: [], started: null }),
-          } as never),
-      ],
-      [
-        "410",
-        () => getRcaThread.mockRejectedValue({ isAxiosError: true, response: { status: 410 } }),
-      ],
-      [
-        "410 transcript_incomplete",
-        () =>
-          getRcaThread.mockRejectedValue({
-            isAxiosError: true,
-            response: { status: 410, data: { error_code: "transcript_incomplete" } },
-          }),
-      ],
-      [
-        "503",
         () => {
-          vi.spyOn(console, "error").mockImplementation(() => {});
-          getRcaThread.mockRejectedValue({ isAxiosError: true, response: { status: 503 } });
+          answers.thread = rcaThread({
+            run_id: "run-1",
+            transcript: "none",
+            steps: [],
+            started: null,
+          });
         },
       ],
+      ["expired", () => ((answers.thread = null), (answers.threadStatus = "expired"))],
+      ["incomplete", () => ((answers.thread = null), (answers.threadStatus = "incomplete"))],
+      ["unavailable", () => ((answers.thread = null), (answers.threadStatus = "unavailable"))],
     ])("m5: the stats line falls back to the run's stats for %s", async (_case, arrange) => {
       arrange();
       wrapper = mountPanel(statsProps());
@@ -804,11 +788,9 @@ describe("IncidentRCAAnalysis", () => {
       expect(byTest(wrapper, "rca-thread-stats").text()).toBe("5 checks · 11 tool calls · 1m47s");
     });
 
-    it("a 410 transcript_incomplete shows the incomplete message, not the expired one", async () => {
-      getRcaThread.mockRejectedValue({
-        isAxiosError: true,
-        response: { status: 410, data: { error_code: "transcript_incomplete" } },
-      });
+    it("an incomplete transcript shows the incomplete message, not the expired one", async () => {
+      answers.thread = null;
+      answers.threadStatus = "incomplete";
       wrapper = mountPanel(statsProps());
       await flushPromises();
 
@@ -816,14 +798,11 @@ describe("IncidentRCAAnalysis", () => {
         "Part of this run's transcript was lost, so the thread cannot be shown.",
       );
       expect(byTest(wrapper, "rca-thread-retry-btn").exists()).toBe(false);
-      expect(getRcaThread).toHaveBeenCalledTimes(1);
     });
 
-    it("Retry: a saved run whose thread read failed re-reads once on Retry", async () => {
-      vi.spyOn(console, "error").mockImplementation(() => {});
-      getRcaThread
-        .mockRejectedValueOnce({ isAxiosError: true, response: { status: 503 } })
-        .mockResolvedValue({ data: rcaThread({ run_id: "run-1", active: false }) } as never);
+    it("Retry: a saved run whose thread could not be read asks for the live stream again", async () => {
+      answers.thread = null;
+      answers.threadStatus = "unavailable";
       wrapper = mountPanel(completedProps());
       await flushPromises();
       expect(byTest(wrapper, "rca-thread-empty").text()).toContain(
@@ -831,17 +810,19 @@ describe("IncidentRCAAnalysis", () => {
       );
 
       await byTest(wrapper, "rca-thread-retry-btn").trigger("click");
-      await flushPromises();
+      expect(wrapper.emitted("retry-live")).toEqual([[]]);
 
-      expect(getRcaThread).toHaveBeenCalledTimes(2);
-      expect(getRcaThread).toHaveBeenLastCalledWith("default", "inc-1", "run-1", undefined);
+      await wrapper.setProps({
+        thread: rcaThread({ run_id: "run-1", active: false }),
+        threadStatus: "ready",
+      });
       expect(byTest(wrapper, "rca-thread-retry-btn").exists()).toBe(false);
       expect(wrapper.findAll('[data-test="rca-thread-step"]')).toHaveLength(2);
     });
 
-    it("Retry is not offered while the run is live (its poll retries)", async () => {
-      vi.spyOn(console, "error").mockImplementation(() => {});
-      getRcaThread.mockRejectedValue({ isAxiosError: true, response: { status: 503 } });
+    it("Retry is not offered while the run is live (the stream reconnects)", async () => {
+      answers.thread = null;
+      answers.threadStatus = "unavailable";
       wrapper = mountPanel(liveProps());
       await flushPromises();
 
@@ -860,11 +841,10 @@ describe("IncidentRCAAnalysis", () => {
     const shownSections = (w: VueWrapper) => SECTIONS.filter((id) => byTest(w, id).exists());
 
     it("a graded run shows its verdict and structured sections instead of the markdown report", async () => {
-      answerSummary(rcaRunSummary());
+      answers.runSummary = rcaRunSummary();
       wrapper = mountPanel(completedProps());
       await flushPromises();
 
-      expect(getRcaSummary).toHaveBeenCalledWith("default", "inc-1", "run-1", undefined);
       for (const id of SECTIONS) expect(byTest(wrapper, id).exists()).toBe(true);
       expect(byTest(wrapper, "rca-existing-container").exists()).toBe(false);
       expect(byTest(wrapper, "rca-verdict-state").text()).toBe("Root cause identified");
@@ -884,8 +864,8 @@ describe("IncidentRCAAnalysis", () => {
     });
 
     it("a finished run whose summary cannot be read falls back to the markdown report (F1)", async () => {
-      vi.spyOn(console, "error").mockImplementation(() => {});
-      getRcaSummary.mockRejectedValue({ isAxiosError: true, response: { status: 503 } });
+      answers.runSummary = null;
+      answers.runSummaryStatus = "unavailable";
       wrapper = mountPanel(completedProps());
       await flushPromises();
 
@@ -895,9 +875,9 @@ describe("IncidentRCAAnalysis", () => {
 
     it("completed with a record but no outcome: Analyzed with no band, the sections, no markdown", async () => {
       const base = rcaRunSummary();
-      answerSummary(
-        rcaRunSummary({ card: { ...base.card, outcome: undefined, outcome_reason: undefined } }),
-      );
+      answers.runSummary = rcaRunSummary({
+        card: { ...base.card, outcome: undefined, outcome_reason: undefined },
+      });
       wrapper = mountPanel(completedProps());
       await flushPromises();
 
@@ -908,11 +888,10 @@ describe("IncidentRCAAnalysis", () => {
     });
 
     it("A live: Leading card with no band; the timeline comes with the report; groups read Being tested", async () => {
-      answerSummary(rcaRunSummaryLive());
+      answers.runSummary = rcaRunSummaryLive();
       wrapper = mountPanel(liveProps());
       await flushPromises();
 
-      expect(getRcaSummary).toHaveBeenCalledWith("default", "inc-1", "run-2", undefined);
       expect(byTest(wrapper, "rca-verdict-headline").text()).toBe(
         "Leading: Deploy 4f2c1e exhausted the orders-db pool",
       );
@@ -926,29 +905,8 @@ describe("IncidentRCAAnalysis", () => {
       expect(byTest(wrapper, "rca-report-pending").exists()).toBe(false);
     });
 
-    it("polls the summary with the thread while live, then one final read (03 §12)", async () => {
-      vi.useFakeTimers();
-      getRcaSummary
-        .mockResolvedValueOnce({ data: rcaRunSummaryLive({ state_version: "s1" }) } as never)
-        .mockResolvedValue({
-          data: { run_id: "run-2", not_modified: true, state_version: "s1" },
-        } as never);
-      wrapper = mountPanel(liveProps());
-      await vi.advanceTimersByTimeAsync(0);
-      await vi.advanceTimersByTimeAsync(8_000);
-      expect(getRcaSummary).toHaveBeenCalledTimes(3);
-      expect(getRcaSummary.mock.calls[2][3]).toBe("s1");
-
-      await wrapper.setProps({
-        rca: rcaSummary({ state: "completed", current_run: rcaRun({ state: "completed" }) }),
-        threadLive: false,
-      });
-      await vi.advanceTimersByTimeAsync(60_000);
-      expect(getRcaSummary).toHaveBeenCalledTimes(4);
-    });
-
     it("waiting_input: the pill reads 'Blocked · waiting for an answer'", async () => {
-      answerSummary(rcaRunSummaryLive({ state: "waiting_input" }));
+      answers.runSummary = rcaRunSummaryLive({ state: "waiting_input" });
       wrapper = mountPanel(liveProps({ rca: rcaSummary({ state: "waiting_input" }) }));
       await flushPromises();
 
@@ -956,7 +914,7 @@ describe("IncidentRCAAnalysis", () => {
     });
 
     it("D blocked: 'Needs: Change history' and the blind spot's button", async () => {
-      answerSummary(rcaRunSummaryBlocked());
+      answers.runSummary = rcaRunSummaryBlocked();
       wrapper = mountPanel(completedProps());
       await flushPromises();
 
@@ -966,8 +924,8 @@ describe("IncidentRCAAnalysis", () => {
     });
 
     it("E cancelled with a partial record: no timeline, hypotheses, the run_end blind spot with no button", async () => {
-      answerSummary(rcaRunSummaryCancelled());
-      getRcaThread.mockResolvedValue({ data: rcaThread({ active: false }) } as never);
+      answers.runSummary = rcaRunSummaryCancelled();
+      answers.thread = rcaThread({ active: false });
       wrapper = mountPanel({
         rca: rcaSummary({
           state: "cancelled",
@@ -993,10 +951,10 @@ describe("IncidentRCAAnalysis", () => {
 
     it("F9: a thread chip shows the entry number and opens that entry in the Evidence index", async () => {
       Element.prototype.scrollIntoView = vi.fn();
-      answerSummary(rcaRunSummary({ evidence: [rcaEvidenceEntry({ number: 1, ids: ["e3"] })] }));
-      getRcaThread.mockResolvedValue({
-        data: rcaThread({ run_id: "run-1", active: false, steps: [rcaStep()] }),
-      } as never);
+      answers.runSummary = rcaRunSummary({
+        evidence: [rcaEvidenceEntry({ number: 1, ids: ["e3"] })],
+      });
+      answers.thread = rcaThread({ run_id: "run-1", active: false, steps: [rcaStep()] });
       wrapper = mountPanel(completedProps());
       await flushPromises();
 
@@ -1021,7 +979,7 @@ describe("IncidentRCAAnalysis", () => {
 
     it("the band chip opens 'Cited but not verified' (VE33)", async () => {
       Element.prototype.scrollIntoView = vi.fn();
-      answerSummary(rcaRunSummary());
+      answers.runSummary = rcaRunSummary();
       wrapper = mountPanel(completedProps());
       await flushPromises();
 
@@ -1031,21 +989,18 @@ describe("IncidentRCAAnalysis", () => {
       expect(document.activeElement).toBe(byTest(wrapper, "rca-unverified").element);
     });
 
-    it("a 410 on the summary of a live run leaves the card in its Phase 2 form and stops", async () => {
-      getRcaSummary.mockRejectedValue({ isAxiosError: true, response: { status: 410 } });
+    it("an expired summary of a live run leaves the card in its Phase 2 form", async () => {
+      answers.runSummary = null;
+      answers.runSummaryStatus = "expired";
       wrapper = mountPanel(liveProps());
       await flushPromises();
 
       expect(byTest(wrapper, "rca-verdict-headline").text()).toBe("Investigating");
       expect(shownSections(wrapper)).toEqual([]);
-      expect(getRcaSummary).toHaveBeenCalledTimes(1);
     });
 
-    it("the run ends and its final summary read fails: the live view goes and the markdown report shows (F1)", async () => {
-      vi.spyOn(console, "error").mockImplementation(() => {});
-      getRcaSummary
-        .mockResolvedValueOnce({ data: rcaRunSummaryLive() } as never)
-        .mockRejectedValue({ isAxiosError: true, response: { status: 503 } });
+    it("the run ends and its final summary cannot be read: the live view goes and the markdown report shows (F1)", async () => {
+      answers.runSummary = rcaRunSummaryLive();
       wrapper = mountPanel(liveProps());
       await flushPromises();
       expect(byTest(wrapper, "rca-verdict-headline").text()).toContain("Leading: ");
@@ -1055,10 +1010,11 @@ describe("IncidentRCAAnalysis", () => {
         reportRun: rcaRunItem({ run_id: "run-2" }),
         reportText: REPORT,
         threadLive: false,
+        runSummary: null,
+        runSummaryStatus: "unavailable",
       });
       await flushPromises();
 
-      expect(getRcaSummary).toHaveBeenCalledTimes(2);
       expect(shownSections(wrapper)).toEqual([]);
       expect(byTest(wrapper, "rca-verdict-state").text()).toBe("Analyzed");
       expect(byTest(wrapper, "rca-verdict-headline").text()).not.toContain("Leading");
@@ -1067,17 +1023,13 @@ describe("IncidentRCAAnalysis", () => {
 
     it("F9: a thread chip for an id reused by a later entry opens the first entry (VE5, VE24)", async () => {
       Element.prototype.scrollIntoView = vi.fn();
-      answerSummary(
-        rcaRunSummary({
-          evidence: [
-            rcaEvidenceEntry({ number: 1, ids: ["e3"] }),
-            rcaEvidenceEntry({ number: 2, ids: ["e3", "e7"], call_id: "call-9" }),
-          ],
-        }),
-      );
-      getRcaThread.mockResolvedValue({
-        data: rcaThread({ run_id: "run-1", active: false, steps: [rcaStep()] }),
-      } as never);
+      answers.runSummary = rcaRunSummary({
+        evidence: [
+          rcaEvidenceEntry({ number: 1, ids: ["e3"] }),
+          rcaEvidenceEntry({ number: 2, ids: ["e3", "e7"], call_id: "call-9" }),
+        ],
+      });
+      answers.thread = rcaThread({ run_id: "run-1", active: false, steps: [rcaStep()] });
       wrapper = mountPanel(completedProps());
       await flushPromises();
 
@@ -1103,11 +1055,7 @@ describe("IncidentRCAAnalysis", () => {
       template: `<div v-if="open"><slot /></div>`,
     };
     const mountSteerable = (props: Record<string, unknown>) =>
-      mount(IncidentRCAAnalysis, {
-        props: { orgId: "default", incidentId: "inc-1", ...props },
-        global: { plugins: [i18n, store], stubs: { ...stubs, ODialog: ODialogStub } },
-        attachTo: document.body,
-      });
+      mountPanel(props, { ODialog: ODialogStub });
     const pausedProps = () =>
       liveProps({
         rca: rcaSummary({
@@ -1117,16 +1065,15 @@ describe("IncidentRCAAnalysis", () => {
         }),
       });
 
-    it("SG37: reads the steering view of the thread's run; can_steer shows the composer", async () => {
+    it("SG37: can_steer on the thread's run shows the composer", async () => {
       wrapper = mountSteerable(liveProps());
       await flushPromises();
 
-      expect(getRcaSteering).toHaveBeenCalledWith("default", "inc-1", "run-2");
       expect(byTest(wrapper, "rca-steer-composer").exists()).toBe(true);
     });
 
-    it("SG37: a reader without RCA permission (403) sees the thread and no composer", async () => {
-      getRcaSteering.mockRejectedValue({ isAxiosError: true, response: { status: 403, data: {} } });
+    it("SG37: a reader without RCA permission (no steering view) sees the thread and no composer", async () => {
+      answers.steering = null;
       wrapper = mountSteerable(liveProps());
       await flushPromises();
 
@@ -1136,17 +1083,16 @@ describe("IncidentRCAAnalysis", () => {
     });
 
     it("SG37: can_steer false hides the composer on a live run", async () => {
-      getRcaSteering.mockResolvedValue({ data: rcaSteering({ can_steer: false }) } as never);
+      answers.steering = rcaSteering({ can_steer: false });
       wrapper = mountSteerable(liveProps());
       await flushPromises();
 
       expect(byTest(wrapper, "rca-steer-composer").exists()).toBe(false);
     });
 
-    it("send: POSTs the message, then re-reads the steering view at once", async () => {
+    it("send: POSTs the message and reads nothing (05 LU18)", async () => {
       wrapper = mountSteerable(liveProps());
       await flushPromises();
-      const reads = getRcaSteering.mock.calls.length;
 
       await wrapper.find('[data-test="rca-steer-composer"] textarea').setValue("Check the pool");
       await wrapper.find('[data-test="rca-steer-composer"]').trigger("submit");
@@ -1156,13 +1102,15 @@ describe("IncidentRCAAnalysis", () => {
         text: "Check the pool",
         kind: "message",
       });
-      expect(getRcaSteering.mock.calls.length).toBe(reads + 1);
+      for (const [name, call] of Object.entries(incidentsService)) {
+        if (name !== "steerRca") expect(call, name).not.toHaveBeenCalled();
+      }
+      expect(wrapper.emitted("steered")).toBeUndefined();
     });
 
-    it("SG40: a run_closing 409 keeps the text visible after the poll hides the composer", async () => {
-      vi.useFakeTimers();
+    it("SG40: a run_closing 409 keeps the text visible after the stream hides the composer", async () => {
       wrapper = mountSteerable(pausedProps());
-      await vi.advanceTimersByTimeAsync(0);
+      await flushPromises();
       steerRca.mockRejectedValue({
         isAxiosError: true,
         response: { status: 409, data: { error_code: "run_closing" } },
@@ -1170,10 +1118,9 @@ describe("IncidentRCAAnalysis", () => {
 
       await wrapper.find('[data-test="rca-steer-composer"] textarea').setValue("PR #812 at 14:02");
       await wrapper.find('[data-test="rca-steer-composer"]').trigger("submit");
-      await vi.advanceTimersByTimeAsync(0);
-      // A closed run is not re-read at once; the next 4 s poll closes the box.
-      getRcaSteering.mockResolvedValue({ data: rcaSteering({ can_steer: false }) } as never);
-      await vi.advanceTimersByTimeAsync(RCA_STEERING_POLL_MS);
+      await flushPromises();
+      // The stream's next steering view closes the box.
+      await wrapper.setProps({ steering: rcaSteering({ can_steer: false }) });
 
       expect(byTest(wrapper, "rca-steer-composer").exists()).toBe(false);
       expect(byTest(wrapper, "rca-thread-refusal-text").text()).toBe("PR #812 at 14:02");
@@ -1184,7 +1131,7 @@ describe("IncidentRCAAnalysis", () => {
       ).toBe("PR #812 at 14:02");
     });
 
-    it("SG40 race: a steering read hides the composer before the refused send settles; the text stays", async () => {
+    it("SG40 race: the stream hides the composer before the refused send settles; the text stays", async () => {
       wrapper = mountSteerable(pausedProps());
       await flushPromises();
       let refuse!: () => void;
@@ -1197,12 +1144,11 @@ describe("IncidentRCAAnalysis", () => {
             });
         }) as never,
       );
-      getRcaSteering.mockResolvedValue({ data: rcaSteering({ can_steer: false }) } as never);
 
       await wrapper.find('[data-test="rca-steer-composer"] textarea').setValue("PR #812 at 14:02");
       await wrapper.find('[data-test="rca-steer-composer"]').trigger("submit");
-      // The run stops being live: its final steering read closes the box first.
-      await wrapper.setProps({ threadLive: false });
+      // The stream's steering view closes the box first.
+      await wrapper.setProps({ steering: rcaSteering({ can_steer: false }) });
       await flushPromises();
       expect(byTest(wrapper, "rca-steer-composer").exists()).toBe(false);
 
@@ -1216,17 +1162,15 @@ describe("IncidentRCAAnalysis", () => {
     });
 
     it("SG40: 'Re-analyze with this message' opens frame I with the text; Start sends {guidance}", async () => {
-      getRcaSteering.mockResolvedValue({
-        data: rcaSteering({
-          items: [
-            rcaSteerRecord({
-              text: "Check PR #812",
-              status: "rejected",
-              status_reason: "finalizing",
-            }),
-          ],
-        }),
-      } as never);
+      answers.steering = rcaSteering({
+        items: [
+          rcaSteerRecord({
+            text: "Check PR #812",
+            status: "rejected",
+            status_reason: "finalizing",
+          }),
+        ],
+      });
       wrapper = mountSteerable(liveProps());
       await flushPromises();
       expect(byTest(wrapper, "rca-guidance-dialog").exists()).toBe(false);
@@ -1253,10 +1197,8 @@ describe("IncidentRCAAnalysis", () => {
     });
 
     it("SG39 frame D: paused banner with the step and the local deadline; 'Waiting for an answer'", async () => {
-      getRcaThread.mockResolvedValue({
-        data: rcaThread({ questions: [rcaThreadQuestion()] }),
-      } as never);
-      getRcaSteering.mockResolvedValue({ data: rcaSteeringPaused() } as never);
+      answers.thread = rcaThread({ questions: [rcaThreadQuestion()] });
+      answers.steering = rcaSteeringPaused();
       wrapper = mountSteerable(pausedProps());
       await flushPromises();
 
@@ -1272,16 +1214,14 @@ describe("IncidentRCAAnalysis", () => {
     });
 
     it("SG39 frame G: 'Unblocked by <author> at <read_at>' and 'Answered by <author>'", async () => {
-      getRcaThread.mockResolvedValue({
-        data: rcaThread({
-          run_id: "run-1",
-          active: false,
-          steps: [rcaStep()],
-          questions: [rcaThreadQuestion()],
-        }),
-      } as never);
-      getRcaSteering.mockResolvedValue({ data: rcaSteeringUnblocked() } as never);
-      answerSummary(rcaRunSummary());
+      answers.thread = rcaThread({
+        run_id: "run-1",
+        active: false,
+        steps: [rcaStep()],
+        questions: [rcaThreadQuestion()],
+      });
+      answers.steering = rcaSteeringUnblocked();
+      answers.runSummary = rcaRunSummary();
       wrapper = mountSteerable(completedProps());
       await flushPromises();
 
@@ -1292,21 +1232,9 @@ describe("IncidentRCAAnalysis", () => {
     });
 
     it("H16: a hypothesis action POSTs its body; the row shows 'Pending · <author>' until read", async () => {
-      answerSummary(rcaRunSummaryLive());
+      answers.runSummary = rcaRunSummaryLive();
       wrapper = mountSteerable(liveProps());
       await flushPromises();
-      getRcaSteering.mockResolvedValue({
-        data: rcaSteering({
-          items: [
-            rcaSteerRecord({
-              kind: "hypothesis_action",
-              action: "disprove",
-              hypothesis_id: "h1",
-              text: "Disprove h1",
-            }),
-          ],
-        }),
-      } as never);
 
       await wrapper.find('[data-test="rca-hypothesis-action-disprove"]').trigger("click");
       await flushPromises();
@@ -1316,6 +1244,19 @@ describe("IncidentRCAAnalysis", () => {
         kind: "hypothesis_action",
         action: "disprove",
         hypothesis_id: "h1",
+      });
+      // The sent row arrives on the stream (05 LU18).
+      await wrapper.setProps({
+        steering: rcaSteering({
+          items: [
+            rcaSteerRecord({
+              kind: "hypothesis_action",
+              action: "disprove",
+              hypothesis_id: "h1",
+              text: "Disprove h1",
+            }),
+          ],
+        }),
       });
       expect(byTest(wrapper, "rca-hypothesis-pending").text()).toBe("Pending · a.rao");
     });
@@ -1369,7 +1310,7 @@ describe("IncidentRCAAnalysis", () => {
       });
 
       it("a run with a record: the attachment carries the structured record", async () => {
-        answerSummary(rcaRunSummary());
+        answers.runSummary = rcaRunSummary();
         wrapper = mountPanel(completedProps());
         await flushPromises();
 
@@ -1462,12 +1403,10 @@ describe("IncidentRCAAnalysis", () => {
       });
 
       it("the resume_run blind spot of the latest run emits resume-rca", async () => {
-        answerSummary(
-          rcaRunSummaryCancelled({
-            state: "failed",
-            blind_spots: [rcaBlindSpot({ fix: "resume_run" })],
-          }),
-        );
+        answers.runSummary = rcaRunSummaryCancelled({
+          state: "failed",
+          blind_spots: [rcaBlindSpot({ fix: "resume_run" })],
+        });
         wrapper = mountPanel(failedProps({ resumeRunId: "run-2" }));
         await flushPromises();
 
@@ -1487,7 +1426,7 @@ describe("IncidentRCAAnalysis", () => {
 
     describe("J4 Feedback", () => {
       it("a graded finished run shows the question and reads the caller's feedback for that run", async () => {
-        answerSummary(rcaRunSummary());
+        answers.runSummary = rcaRunSummary();
         wrapper = mountPanel(completedProps());
         await flushPromises();
 
@@ -1504,7 +1443,7 @@ describe("IncidentRCAAnalysis", () => {
       });
 
       it("a live run has no feedback", async () => {
-        answerSummary(rcaRunSummaryLive());
+        answers.runSummary = rcaRunSummaryLive();
         wrapper = mountPanel(liveProps());
         await flushPromises();
 

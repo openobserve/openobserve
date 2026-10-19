@@ -188,6 +188,7 @@ use crate::{
         openobserve_api_management::request::alerts::incidents::delete_incident_rca_feedback,
         openobserve_api_management::request::alerts::incidents::resume_incident_rca_run,
         openobserve_api_management::request::alerts::incidents::get_incident_rca_summary,
+        openobserve_api_management::request::alerts::incidents::get_incident_rca_live_stream,
         openobserve_api_management::request::alerts::incidents::run_incident_rca_backtest,
         openobserve_api_management::request::alerts::templates::list_templates,
         openobserve_api_management::request::alerts::templates::get_template,

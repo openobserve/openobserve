@@ -943,99 +943,39 @@ pub async fn get_incident_rca_thread(
     Path((org_id, incident_id, run_id)): Path<(String, String, String)>,
     Query(query): Query<RcaThreadQuery>,
 ) -> Response {
-    use axum::{http::StatusCode, response::IntoResponse};
-    use config::meta::alerts::rca_runs::RunState;
-    use openobserve_core::{
-        ai_chat::rca_thread::{self, RcaThread, Transcript},
-        alerts::rca_turn::RcaTurnError,
-    };
-
-    let error_body = |status: StatusCode, message: &str, error_code: &str| {
-        (
-            status,
-            Json(serde_json::json!({
-                "code": status.as_u16(),
-                "message": message,
-                "error_code": error_code,
-            })),
-        )
-            .into_response()
-    };
+    use openobserve_core::alerts::rca_live::{RunParts, RunSession, StoreReader};
 
     let run = match infra::table::rca_runs::get(&org_id, &run_id).await {
         Ok(Some(run)) if run.incident_id.as_deref() == Some(incident_id.as_str()) => run,
         Ok(_) => return MetaHttpResponse::not_found("Run not found"),
         Err(e) => return MetaHttpResponse::internal_error(e),
     };
-    let state = run.state.parse::<RunState>().ok();
-    let active = state.is_some_and(|state| state.is_live());
-    let terminal = state.is_some_and(|state| state.is_terminal());
-
-    let no_transcript = || {
-        let version = rca_thread::state_version(-1, 0, run.updated_at, false);
-        MetaHttpResponse::json(RcaThread::without_transcript(
-            &run_id,
-            version,
-            active,
-            Transcript::None,
-        ))
-    };
-    let Some(session_id) = run.session_id.as_deref() else {
-        // A run from before the thread existed has no transcript (TH30).
-        return no_transcript();
-    };
-    let session = match infra::table::ai_chat_sessions::get(&org_id, session_id).await {
-        Ok(Some(session)) => session,
-        Ok(None) => {
-            // A run whose turn never started has its session id but never had a session.
-            let start_failure = run
-                .error
-                .as_ref()
-                .and_then(|error| error.get("code"))
-                .and_then(serde_json::Value::as_str)
-                .is_some_and(RcaTurnError::is_start_code);
-            if start_failure {
-                return no_transcript();
-            }
-            return error_body(
-                StatusCode::GONE,
-                "This analysis transcript has expired",
-                "transcript_expired",
-            );
-        }
+    let session = match RunSession::load(&org_id, &run).await {
+        Ok(session) => session,
         Err(e) => return MetaHttpResponse::internal_error(e),
     };
-    let show_tool_io =
-        match db::organization::get_org_setting_ai_rca_thread_tool_output(&org_id).await {
-            Ok(show) => show,
-            Err(e) => return MetaHttpResponse::internal_error(e),
-        };
-
-    let version = rca_thread::state_version(
-        session.last_committed_seq,
-        session.updated_at,
-        run.updated_at,
-        show_tool_io,
-    );
-    if query.known_version.as_deref() == Some(version.as_str()) {
+    let show_tool_io = match &session {
+        RunSession::Present(_) => {
+            match db::organization::get_org_setting_ai_rca_thread_tool_output(&org_id).await {
+                Ok(show) => show,
+                Err(e) => return MetaHttpResponse::internal_error(e),
+            }
+        }
+        _ => false,
+    };
+    let parts = RunParts::new(&org_id, &run, &session, &StoreReader);
+    if let Some(version) = parts.thread_version(show_tool_io)
+        && query.known_version.as_deref() == Some(version.as_str())
+    {
         return MetaHttpResponse::json(serde_json::json!({
             "not_modified": true,
             "state_version": version,
         }));
     }
-
-    let events = match openobserve_core::ai_chat::read_committed_events(&session, -1).await {
-        Ok(events) => events,
-        Err(e) => return read_error_response(&run_id, session_id, terminal, &e),
-    };
-    let turns = match infra::table::ai_chat_turns::list_for_session(&org_id, session_id).await {
-        Ok(turns) => turns,
-        Err(e) => return MetaHttpResponse::internal_error(e),
-    };
-    let mut thread = rca_thread::project_rca_thread(&events, &turns, active, show_tool_io);
-    thread.run_id = run_id;
-    thread.state_version = version;
-    MetaHttpResponse::json(thread)
+    match parts.thread(show_tool_io).await {
+        Ok(thread) => MetaHttpResponse::json(thread),
+        Err(e) => part_error_response(&e),
+    }
 }
 
 /// Optional body of `POST …/rca`: guidance for the new run (SG33).
@@ -1778,46 +1718,16 @@ async fn start_resumed_run(
     }
 }
 
-/// The answer for a thread whose committed events could not be read.
+/// The answer of a part route that could not build its part.
 #[cfg(feature = "enterprise")]
-fn read_error_response(
-    run_id: &str,
-    session_id: &str,
-    terminal: bool,
-    error: &openobserve_core::ai_chat::ReadError,
-) -> Response {
-    use axum::{http::StatusCode, response::IntoResponse};
-    use openobserve_core::ai_chat::ReadError;
-
-    let (status, message, error_code) = match error {
-        ReadError::Gap { .. } | ReadError::Divergence { .. } | ReadError::Corrupt(_)
-            if terminal =>
-        {
-            log::warn!(
-                "[INCIDENTS::RCA] thread of run {run_id} (session {session_id}) is incomplete: {error}"
-            );
-            (
-                StatusCode::GONE,
-                "Part of this analysis transcript could not be read",
-                "transcript_incomplete",
-            )
+fn part_error_response(error: &openobserve_core::alerts::rca_live::PartError) -> Response {
+    match error.status {
+        axum::http::StatusCode::NOT_FOUND => MetaHttpResponse::not_found(&error.message),
+        axum::http::StatusCode::INTERNAL_SERVER_ERROR => {
+            MetaHttpResponse::internal_error(&error.message)
         }
-        // Logged and counted by the reader.
-        _ => (
-            StatusCode::SERVICE_UNAVAILABLE,
-            "This analysis transcript could not be read in full; please retry",
-            "history_unavailable",
-        ),
-    };
-    (
-        status,
-        Json(serde_json::json!({
-            "code": status.as_u16(),
-            "message": message,
-            "error_code": error_code,
-        })),
-    )
-        .into_response()
+        status => rca_error_response(status, &error.message, error.error_code, None),
+    }
 }
 
 #[cfg(feature = "enterprise")]
@@ -1853,14 +1763,8 @@ pub async fn get_incident_rca_summary(
     Path((org_id, incident_id, run_id)): Path<(String, String, String)>,
     Query(query): Query<RcaThreadQuery>,
 ) -> Response {
-    use axum::{http::StatusCode, response::IntoResponse};
-    use config::meta::{
-        alerts::rca_runs::RunState,
-        oncall::rca_run::{self, RcaRunRecord},
-    };
-    use openobserve_core::{
-        ai_chat::{rca_ledger, rca_thread},
-        alerts::rca_turn::RcaTurnError,
+    use openobserve_core::alerts::rca_live::{
+        RunParts, RunSession, StoreReader, summary_reads_session,
     };
 
     let run = match infra::table::rca_runs::get(&org_id, &run_id).await {
@@ -1868,188 +1772,131 @@ pub async fn get_incident_rca_summary(
         Ok(_) => return MetaHttpResponse::not_found("Run not found"),
         Err(e) => return MetaHttpResponse::internal_error(e),
     };
-    let state = match run.state.parse::<RunState>() {
-        Ok(state) => state,
-        Err(_) => {
-            return MetaHttpResponse::internal_error(format!(
-                "run {run_id} has an unknown state {}",
-                run.state
-            ));
+    let session = if summary_reads_session(&run) {
+        match RunSession::load(&org_id, &run).await {
+            Ok(session) => session,
+            Err(e) => return MetaHttpResponse::internal_error(e),
         }
+    } else {
+        RunSession::None
     };
-    let not_modified = |version: &str| query.known_version.as_deref() == Some(version);
-    let not_modified_body = |version: String| {
-        MetaHttpResponse::json(serde_json::json!({
+    let parts = RunParts::new(&org_id, &run, &session, &StoreReader);
+    if let Some(version) = parts.summary_version()
+        && query.known_version.as_deref() == Some(version.as_str())
+    {
+        return MetaHttpResponse::json(serde_json::json!({
             "run_id": run_id,
             "state_version": version,
             "not_modified": true,
-        }))
-    };
-
-    if state.is_terminal() {
-        // A cancel (or a failure written by another node) commits the terminal state before
-        // the finalizer stores the partial record (VE34). Until then, build the same record
-        // from the transcript, versioned by the session so the stored record replaces it.
-        let awaiting_record =
-            run.result.is_none() && matches!(state, RunState::Failed | RunState::Cancelled);
-        if awaiting_record && let Some(session_id) = run.session_id.as_deref() {
-            match infra::table::ai_chat_sessions::get(&org_id, session_id).await {
-                Ok(Some(session)) => {
-                    let version = rca_thread::state_version(
-                        session.last_committed_seq,
-                        session.updated_at,
-                        run.updated_at,
-                        false,
-                    );
-                    if not_modified(&version) {
-                        return not_modified_body(version);
-                    }
-                    let events = match openobserve_core::ai_chat::read_committed_events(
-                        &session, -1,
-                    )
-                    .await
-                    {
-                        Ok(events) => events,
-                        Err(e) => return read_error_response(&run_id, session_id, true, &e),
-                    };
-                    let authors = steer_authors(&org_id, &run_id).await;
-                    return MetaHttpResponse::json(partial_summary(
-                        &run_id, state, version, &events, &authors,
-                    ));
-                }
-                // No session to read: the run stays legacy.
-                Ok(None) => {}
-                Err(e) => return MetaHttpResponse::internal_error(e),
-            }
-        }
-
-        let version = rca_thread::state_version(-1, 0, run.updated_at, false);
-        if not_modified(&version) {
-            return not_modified_body(version);
-        }
-        let summary = match run.result.clone() {
-            Some(result) => match serde_json::from_value::<RcaRunRecord>(result) {
-                Ok(record) => rca_run::summary_from_record(&run_id, state, version, &record),
-                Err(e) => {
-                    log::warn!(
-                        "[INCIDENTS::RCA] run {run_id} has an unreadable result record, serving it as legacy: {e}"
-                    );
-                    rca_run::summary_legacy(&run_id, state, version)
-                }
-            },
-            None => rca_run::summary_legacy(&run_id, state, version),
-        };
-        return MetaHttpResponse::json(summary);
+        }));
     }
+    match parts.summary(None).await {
+        Ok(summary) => MetaHttpResponse::json(summary),
+        Err(e) => part_error_response(&e),
+    }
+}
 
-    let empty_live = || {
-        let version = rca_thread::state_version(-1, 0, run.updated_at, false);
-        if not_modified(&version) {
-            return not_modified_body(version);
-        }
-        MetaHttpResponse::json(rca_run::summary_live(
-            &run_id,
-            state,
-            version,
-            &[],
-            &[],
-            &std::collections::BTreeMap::new(),
-        ))
+/// Query of `GET …/rca/live_stream`.
+#[derive(Debug, Deserialize, IntoParams, ToSchema)]
+pub struct RcaLiveStreamQuery {
+    /// The run whose thread, summary and steering to send; without it, only the incident's state.
+    #[serde(default)]
+    pub run_id: Option<String>,
+}
+
+#[cfg(feature = "enterprise")]
+/// GetIncidentRcaLiveStream
+#[utoipa::path(
+    get,
+    path = "/v2/{org_id}/alerts/incidents/{incident_id}/rca/live_stream",
+    context_path = "/api",
+    tag = "Incidents",
+    operation_id = "GetIncidentRcaLiveStream",
+    summary = "Stream the changes of the incident's analysis",
+    description = "Server-sent events. `rca` carries the incident's analysis state; with `run_id`, `thread`, `summary` and `steering` carry the bodies of the run's GET routes. Each event is a full snapshot and goes out when its part changes. `error` reports a part that could not be read, as `{part, status, error_code, message}`. `end` closes the stream once the run (or, without `run_id`, the latest run) ended. A stream also closes after 300 s; reconnect to get every part again.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("incident_id" = String, Path, description = "Incident ID"),
+        RcaLiveStreamQuery,
+    ),
+    responses(
+        (status = 200, description = "Event stream", content_type = "text/event-stream", body = String),
+        (status = 404, description = "Incident or run not found", content_type = "application/json", body = Object),
+        (status = 500, description = "Internal error", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": false})),
+    )
+)]
+pub async fn get_incident_rca_live_stream(
+    Path((org_id, incident_id)): Path<(String, String)>,
+    Query(query): Query<RcaLiveStreamQuery>,
+    Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    use openobserve_core::alerts::rca_live::{
+        LIVE_PROBE_INTERVAL, LiveSpec, LiveStream, OpenStream, StoreReader,
     };
-    let Some(session_id) = run.session_id.as_deref() else {
-        return empty_live();
-    };
-    let session = match infra::table::ai_chat_sessions::get(&org_id, session_id).await {
-        Ok(Some(session)) => session,
-        Ok(None) => {
-            // A run whose turn never started has its session id but never had a session.
-            let start_failure = run
-                .error
-                .as_ref()
-                .and_then(|error| error.get("code"))
-                .and_then(serde_json::Value::as_str)
-                .is_some_and(RcaTurnError::is_start_code);
-            if start_failure {
-                return empty_live();
-            }
-            let status = StatusCode::GONE;
-            return (
-                status,
-                Json(serde_json::json!({
-                    "code": status.as_u16(),
-                    "message": "This analysis transcript has expired",
-                    "error_code": "transcript_expired",
-                })),
-            )
-                .into_response();
-        }
+
+    // LU3: everything the stream can refuse is a JSON answer before the first byte.
+    match infra::table::alert_incidents::get(&org_id, &incident_id).await {
+        Ok(Some(_)) => {}
+        Ok(None) => return MetaHttpResponse::not_found("Incident not found"),
         Err(e) => return MetaHttpResponse::internal_error(e),
-    };
-
-    let version = rca_thread::state_version(
-        session.last_committed_seq,
-        session.updated_at,
-        run.updated_at,
-        false,
-    );
-    if not_modified(&version) {
-        return not_modified_body(version);
     }
-    let events = match openobserve_core::ai_chat::read_committed_events(&session, -1).await {
-        Ok(events) => events,
-        Err(e) => return read_error_response(&run_id, session_id, false, &e),
-    };
-    let transcript = rca_ledger::decode_run(&events);
-    let authors = steer_authors(&org_id, &run_id).await;
-    MetaHttpResponse::json(rca_run::summary_live(
-        &run_id,
-        state,
-        version,
-        &transcript.calls,
-        &transcript.tool_log,
-        &authors,
-    ))
-}
-
-/// The run's steer ids and their authors' emails, to name a lead's author (SG36). A read
-/// failure only drops the names, so it does not fail the summary.
-#[cfg(feature = "enterprise")]
-async fn steer_authors(org_id: &str, run_id: &str) -> std::collections::BTreeMap<String, String> {
-    match infra::table::rca_steering::list_for_run(org_id, run_id).await {
-        Ok(rows) => rows
-            .into_iter()
-            .map(|row| (row.steer_id, row.author_email))
-            .collect(),
-        Err(e) => {
-            log::warn!("[INCIDENTS::RCA] steering rows of run {run_id} could not be read: {e}");
-            std::collections::BTreeMap::new()
+    let (show_tool_io, can_steer) = match query.run_id.as_deref() {
+        Some(run_id) => {
+            if let Err(response) = incident_run(&org_id, &incident_id, run_id).await {
+                return response;
+            }
+            let show_tool_io =
+                match db::organization::get_org_setting_ai_rca_thread_tool_output(&org_id).await {
+                    Ok(show) => show,
+                    Err(e) => return MetaHttpResponse::internal_error(e),
+                };
+            let can_steer = crate::request::ai::chat::can_run_incident_rca(
+                &org_id,
+                &user_email.user_id,
+                &incident_id,
+            )
+            .await;
+            (show_tool_io, can_steer)
         }
-    }
-}
+        None => (false, false),
+    };
 
-/// The summary of a failed or cancelled run whose partial record is not stored yet: the
-/// record the finalizer will store, built from the committed events (VE34).
-#[cfg(feature = "enterprise")]
-fn partial_summary(
-    run_id: &str,
-    state: config::meta::alerts::rca_runs::RunState,
-    version: String,
-    events: &[o2_enterprise::enterprise::ai::chat::batcher::DurableEvent],
-    steer_authors: &std::collections::BTreeMap<String, String>,
-) -> config::meta::oncall::rca_run::RcaRunSummary {
-    use config::meta::oncall::rca_run;
+    let open = OpenStream::open(&org_id);
+    let spec = LiveSpec {
+        org_id,
+        incident_id,
+        run_id: query.run_id,
+        show_tool_io,
+        can_steer,
+    };
+    let events = async_stream::stream! {
+        let _open = open;
+        let mut live = LiveStream::new(spec, StoreReader, config::utils::time::now_micros());
+        let mut probe = tokio::time::interval(LIVE_PROBE_INTERVAL);
+        probe.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+        while !live.is_done() {
+            probe.tick().await;
+            for frame in live.tick(config::utils::time::now_micros()).await {
+                yield Ok::<bytes::Bytes, std::io::Error>(bytes::Bytes::from(frame.to_sse()));
+            }
+        }
+    };
 
-    let transcript = openobserve_core::ai_chat::rca_ledger::decode_run(events);
-    let end = rca_run::record_run_end(&rca_run::RunEndInput {
-        submit: None,
-        calls: &transcript.calls,
-        tool_log: &transcript.tool_log,
-        stages_run: &transcript.stages_run,
-        ended_by: rca_run::EndedBy::Agent,
-        completed: false,
-        steer_authors,
-    });
-    rca_run::summary_from_record(run_id, state, version, &end.record)
+    axum::http::Response::builder()
+        .status(axum::http::StatusCode::OK)
+        .header(
+            axum::http::header::CONTENT_TYPE,
+            mime::TEXT_EVENT_STREAM.as_ref(),
+        )
+        .header(axum::http::header::CACHE_CONTROL, "no-cache")
+        .header("X-Accel-Buffering", "no")
+        .body(axum::body::Body::from_stream(events))
+        .unwrap_or_else(|_| Response::new(axum::body::Body::empty()))
 }
 
 #[cfg(feature = "enterprise")]
@@ -2618,6 +2465,37 @@ pub async fn get_incident_rca_feedback(
     _headers: Headers<UserEmail>,
 ) -> Response {
     MetaHttpResponse::forbidden("Analysis feedback is only available in enterprise")
+}
+
+#[cfg(not(feature = "enterprise"))]
+#[utoipa::path(
+    get,
+    path = "/v2/{org_id}/alerts/incidents/{incident_id}/rca/live_stream",
+    context_path = "/api",
+    tag = "Incidents",
+    operation_id = "GetIncidentRcaLiveStream",
+    summary = "Stream the changes of the incident's analysis",
+    description = "Server-sent events of the incident's analysis. This endpoint is only available with enterprise features enabled.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("incident_id" = String, Path, description = "Incident ID"),
+        RcaLiveStreamQuery,
+    ),
+    responses(
+        (status = 403, description = "Not supported without enterprise features", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": false})),
+    )
+)]
+pub async fn get_incident_rca_live_stream(
+    _path: Path<(String, String)>,
+    _query: Query<RcaLiveStreamQuery>,
+    _headers: Headers<UserEmail>,
+) -> Response {
+    MetaHttpResponse::forbidden("Not Supported")
 }
 
 #[cfg(not(feature = "enterprise"))]
@@ -3676,120 +3554,6 @@ mod tests {
     }
 
     #[cfg(feature = "enterprise")]
-    fn tool_event(
-        seq: i64,
-        id: &str,
-        tool: &str,
-        input: serde_json::Value,
-        output: &str,
-    ) -> o2_enterprise::enterprise::ai::chat::batcher::DurableEvent {
-        o2_enterprise::enterprise::ai::chat::batcher::DurableEvent {
-            id: format!("evt_{seq}"),
-            aggregate_id: "ses_partial".to_string(),
-            seq,
-            event_type: "message.part.updated.1".to_string(),
-            data: serde_json::json!({"sessionID": "ses_partial", "part": {
-                "id": id, "type": "tool", "callID": format!("call_{id}"), "tool": tool,
-                "sessionID": "ses_partial", "messageID": "msg_a1",
-                "state": {"status": "completed", "input": input, "output": output,
-                          "time": {"start": 1_000 + seq, "end": 1_010 + seq}},
-            }}),
-        }
-    }
-
-    #[cfg(feature = "enterprise")]
-    #[test]
-    fn test_the_partial_summary_is_the_partial_record_of_the_transcript() {
-        use config::meta::alerts::rca_runs::RunState;
-        use o2_enterprise::enterprise::ai::chat::batcher::DurableEvent;
-        use serde_json::json;
-
-        const SQL: &str = "SELECT count(*) FROM app_logs WHERE level = 'error'";
-        let events: Vec<DurableEvent> = vec![
-            DurableEvent {
-                id: "evt_0".to_string(),
-                aggregate_id: "ses_partial".to_string(),
-                seq: 0,
-                event_type: "message.updated.1".to_string(),
-                data: json!({"sessionID": "ses_partial", "info": {"id": "msg_a1", "sessionID": "ses_partial", "role": "assistant", "time": {"created": 1_000}}}),
-            },
-            tool_event(
-                1,
-                "prt_s1",
-                "record_step",
-                json!({"stage": "context", "title": "Context"}),
-                "{}",
-            ),
-            tool_event(
-                2,
-                "prt_s2",
-                "record_step",
-                json!({"stage": "topology", "title": "Topology"}),
-                "{}",
-            ),
-            tool_event(
-                3,
-                "prt_t1",
-                "o2_SearchSQL",
-                json!({"org_id": "default", "type": "logs", "request_body": {"query": {"sql": SQL}}}),
-                r#"{"took": 3, "hits": [{}, {}], "total": 2}"#,
-            ),
-            tool_event(
-                4,
-                "prt_h1",
-                "record_hypothesis",
-                json!({"id": "h1", "statement": "The pool ran dry", "status": "testing", "reason": "r", "evidence": [
-                    {"id": "e1", "tool": "SearchSQL", "query": SQL, "polarity": "supports", "strength": "decisive", "observation": "errors rose"}
-                ]}),
-                "{}",
-            ),
-            tool_event(
-                5,
-                "prt_h2",
-                "record_hypothesis",
-                json!({"id": "h2", "statement": "A node ran hot", "status": "likely", "reason": "r"}),
-                "{}",
-            ),
-        ];
-
-        let summary = partial_summary(
-            "run_1",
-            RunState::Cancelled,
-            "5.1700.2000".to_string(),
-            &events,
-            &std::collections::BTreeMap::new(),
-        );
-        let body = serde_json::to_value(&summary).unwrap();
-        assert_eq!(body["legacy"], false);
-        assert_eq!(body["state"], "cancelled");
-        assert_eq!(body["state_version"], "5.1700.2000");
-        assert!(body["card"]["outcome"].is_null() && body["card"]["band"].is_null());
-        assert!(body["card"]["headline"].is_null());
-        let hypotheses: Vec<(&str, &str)> = body["hypotheses"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .map(|h| (h["id"].as_str().unwrap(), h["status"].as_str().unwrap()))
-            .collect();
-        assert_eq!(hypotheses, [("h2", "likely"), ("h1", "untested")]);
-        assert_eq!(body["evidence"][0]["ids"], json!(["e1"]));
-        assert_eq!(body["evidence"][0]["result_summary"], "2 rows · took 3 ms");
-        assert_eq!(body["timeline"], json!([]));
-        let run_end = body["blind_spots"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .find(|b| b["id"] == "run_end")
-            .expect("the run_end blind spot");
-        assert_eq!(run_end["title"], "5 stages did not run");
-        assert_eq!(
-            run_end["why"],
-            "Changes, Traces, Log patterns, Metrics, Converge"
-        );
-        assert_eq!(run_end["fix"], "resume_run");
-    }
-
-    #[cfg(feature = "enterprise")]
     #[tokio::test]
     async fn test_a_failed_thread_read_maps_by_run_state_and_error() {
         use axum::http::StatusCode;
@@ -3823,8 +3587,10 @@ mod tests {
             ),
         ] {
             let label = format!("terminal={terminal} {error:?}");
-            let (got, body) =
-                status_and_body(read_error_response("run_1", "ses_1", terminal, &error)).await;
+            let error = openobserve_core::alerts::rca_live::PartError::read(
+                "run_1", "ses_1", terminal, &error,
+            );
+            let (got, body) = status_and_body(part_error_response(&error)).await;
             assert_eq!(got, status, "{label}");
             assert_eq!(body["error_code"], code, "{label}");
             assert_eq!(body["code"], status.as_u16(), "{label}");
@@ -4519,6 +4285,193 @@ mod tests {
             stored,
             "the view writes nothing"
         );
+    }
+
+    #[cfg(feature = "enterprise")]
+    fn live_stream_as(
+        org_id: &str,
+        incident_id: &str,
+        run_id: Option<&str>,
+        user: &str,
+    ) -> impl Future<Output = Response> {
+        get_incident_rca_live_stream(
+            Path((org_id.to_string(), sid(org_id, incident_id))),
+            Query(RcaLiveStreamQuery {
+                run_id: run_id.map(|run_id| sid(org_id, run_id)),
+            }),
+            Headers(UserEmail {
+                user_id: user.to_string(),
+            }),
+        )
+    }
+
+    /// The events of a live stream up to `last`, as `(name, data)`.
+    #[cfg(feature = "enterprise")]
+    async fn live_events(response: Response, last: &str) -> Vec<(String, serde_json::Value)> {
+        use futures::StreamExt;
+
+        let mut body = response.into_body().into_data_stream();
+        let mut text = String::new();
+        let mut events = Vec::new();
+        while let Some(chunk) = body.next().await {
+            text.push_str(std::str::from_utf8(&chunk.unwrap()).unwrap());
+            while let Some(end) = text.find("\n\n") {
+                let frame: String = text.drain(..end + 2).collect();
+                let mut lines = frame.lines();
+                let name = lines.next().unwrap().strip_prefix("event: ").unwrap();
+                let data = lines.next().unwrap().strip_prefix("data: ").unwrap();
+                events.push((name.to_string(), serde_json::from_str(data).unwrap()));
+                if name == last {
+                    return events;
+                }
+            }
+        }
+        panic!("the stream closed before {last}: {events:?}");
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_the_live_stream_refuses_with_json_before_the_first_byte() {
+        use axum::http::StatusCode;
+
+        let conn = steering_tables().await;
+        let org = steering_org("live");
+        steering_incident(conn, &org, "inc_1", Some("run_1")).await;
+        steering_incident(conn, &org, "inc_2", None).await;
+        steering_run(conn, &org, "run_1", "inc_1", "running").await;
+
+        for (incident, run, message) in [
+            ("inc_unknown", None, "Incident not found"),
+            ("inc_2", Some("run_1"), "Run not found"),
+            ("inc_1", Some("run_unknown"), "Run not found"),
+        ] {
+            let response = live_stream_as(&org, incident, run, STEER_ROOT).await;
+            assert_eq!(
+                response.headers()[axum::http::header::CONTENT_TYPE],
+                "application/json",
+                "{incident}/{run:?}"
+            );
+            let (status, body) = status_and_body(response).await;
+            assert_eq!(status, StatusCode::NOT_FOUND, "{incident}/{run:?}");
+            assert_eq!(body["message"], message, "{incident}/{run:?}");
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_a_live_stream_without_a_run_sends_rca_then_end() {
+        let conn = steering_tables().await;
+        let org = steering_org("live");
+        steering_incident(conn, &org, "inc_1", None).await;
+
+        let response = live_stream_as(&org, "inc_1", None, STEER_ROOT).await;
+        assert_eq!(response.status(), axum::http::StatusCode::OK);
+        assert_eq!(
+            response.headers()[axum::http::header::CONTENT_TYPE],
+            "text/event-stream"
+        );
+        assert_eq!(response.headers()["X-Accel-Buffering"], "no");
+        let events = live_events(response, "end").await;
+        assert_eq!(
+            events,
+            [
+                ("rca".to_string(), serde_json::Value::Null),
+                ("end".to_string(), serde_json::json!({"state": null})),
+            ]
+        );
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_the_live_steering_names_who_can_steer_and_the_stream_is_counted() {
+        let conn = steering_tables().await;
+        let org = steering_org("live");
+        steering_incident(conn, &org, "inc_1", Some("run_live")).await;
+        steering_run(conn, &org, "run_live", "inc_1", "running").await;
+        // The org shows no tool input/output (TH34); cached, as the route reads it.
+        common::infra::config::ORGANIZATION_SETTING
+            .write()
+            .await
+            .insert(format!("/organization/setting/{org}"), Default::default());
+        let open = || {
+            config::metrics::RCA_LIVE_STREAMS
+                .with_label_values(&[org.as_str()])
+                .get()
+        };
+
+        for (user, can_steer) in [(STEER_ROOT, true), (STEER_READER, false)] {
+            let response = live_stream_as(&org, "inc_1", Some("run_live"), user).await;
+            assert_eq!(open(), 1, "{user}");
+            let events = live_events(response, "steering").await;
+            let names: Vec<&str> = events.iter().map(|(name, _)| name.as_str()).collect();
+            assert_eq!(names, ["rca", "thread", "summary", "steering"], "{user}");
+            assert_eq!(events[3].1["can_steer"], can_steer, "{user}");
+            assert_eq!(events[1].1["run_id"], sid(&org, "run_live"), "{user}");
+        }
+        assert_eq!(open(), 0, "a dropped stream is no longer counted");
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_each_live_part_is_its_get_body() {
+        use config::meta::alerts::rca_steering::{SteerKind, SteerRecord, SteerStatus};
+        use infra::table::entity::rca_runs;
+        use sea_orm::{ActiveModelTrait, EntityTrait};
+
+        let conn = steering_tables().await;
+        let org = steering_org("parity");
+        steering_incident(conn, &org, "inc_1", Some("run_done")).await;
+        let mut run = thread_run(&org, &sid(&org, "run_done"), &sid(&org, "inc_1"), None);
+        run.result = Some(stored_record());
+        rca_runs::Entity::insert(rca_runs::ActiveModel::from(run).reset_all())
+            .exec(conn)
+            .await
+            .unwrap();
+        let steer = SteerRecord {
+            org_id: org.clone(),
+            steer_id: "stg_parity".to_string(),
+            run_id: sid(&org, "run_done"),
+            incident_id: sid(&org, "inc_1"),
+            author_email: "a.rao@acme.io".to_string(),
+            kind: SteerKind::Message,
+            action: None,
+            hypothesis_id: None,
+            question_id: None,
+            text: "check the pool".to_string(),
+            status: SteerStatus::Applied,
+            status_reason: None,
+            created_at: 1_500,
+            delivered_at: Some(1_600),
+            read_at: Some(1_700),
+            acted_at: Some(1_800),
+            agent_note: Some("checked".to_string()),
+            opencode_message_id: None,
+        };
+        infra::table::rca_steering::insert(&steer).await.unwrap();
+        common::infra::config::ORGANIZATION_SETTING
+            .write()
+            .await
+            .insert(format!("/organization/setting/{org}"), Default::default());
+
+        let response = live_stream_as(&org, "inc_1", Some("run_done"), STEER_ROOT).await;
+        let events: std::collections::HashMap<String, serde_json::Value> =
+            live_events(response, "end").await.into_iter().collect();
+        let path = || Path((org.clone(), sid(&org, "inc_1"), sid(&org, "run_done")));
+        let no_version = || {
+            Query(RcaThreadQuery {
+                known_version: None,
+            })
+        };
+        let (_, thread) =
+            status_and_body(get_incident_rca_thread(path(), no_version()).await).await;
+        let (_, summary) =
+            status_and_body(get_incident_rca_summary(path(), no_version()).await).await;
+        let (_, steering) = steering_as(&org, "inc_1", "run_done", STEER_ROOT).await;
+        assert_eq!(events["thread"], thread);
+        assert_eq!(events["summary"], summary);
+        assert_eq!(events["steering"], steering);
+        assert_eq!(summary["card"]["headline"], "The pool ran dry");
+        assert_eq!(steering["items"][0]["steer_id"], "stg_parity");
     }
 
     #[cfg(feature = "enterprise")]
@@ -5948,5 +5901,19 @@ mod tests {
                 "Steering an analysis is only available in enterprise"
             );
         }
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    #[tokio::test]
+    async fn test_the_oss_live_stream_is_403() {
+        let response = get_incident_rca_live_stream(
+            Path(("default".to_string(), "inc_1".to_string())),
+            Query(RcaLiveStreamQuery { run_id: None }),
+            Headers(UserEmail {
+                user_id: "a.rao@acme.io".to_string(),
+            }),
+        )
+        .await;
+        assert_eq!(response.status(), axum::http::StatusCode::FORBIDDEN);
     }
 }

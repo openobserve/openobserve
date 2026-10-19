@@ -13,14 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it, vi, beforeEach } from "vitest";
-import incidents, {
-  type CancelRcaResponse,
-  type RcaRunSummaryResponse,
-  type RcaThreadResponse,
-  type TriggerRcaResponse,
-} from "./incidents";
-import http from "./http";
+import { afterEach, describe, expect, it, vi, beforeEach } from "vitest";
+import incidents, { type CancelRcaResponse, type TriggerRcaResponse } from "./incidents";
+import http, { attemptTokenRefresh } from "./http";
 import serviceStreamsApi from "./service_streams";
 import { gt } from "@/types/i18n";
 import analytics from "./product_analytics";
@@ -29,6 +24,7 @@ import analytics from "./product_analytics";
 vi.mock("./http");
 vi.mock("./service_streams");
 vi.mock("./product_analytics", () => ({ default: { track: vi.fn() } }));
+vi.mock("@/stores", () => ({ default: { state: { API_ENDPOINT: "http://api.test" } } }));
 
 describe("incidents service", () => {
   const mockHttp = {
@@ -181,7 +177,6 @@ describe("incidents service", () => {
       expect(res.data).toEqual({ message: "Analysis started", run_id: "run-7" });
     });
 
-
     it("SG33: sends the guidance as the JSON body and keeps the query flags", () => {
       mockHttp.post.mockResolvedValue({ data: { run_id: "run-1" } });
 
@@ -216,16 +211,6 @@ describe("incidents service", () => {
       );
       expect(res.data).toEqual({ run_state: "running" });
     });
-
-    it("getRcaSteering GETs the run's steering view", () => {
-      mockHttp.get.mockResolvedValue({ data: { items: [], open_question: null, can_steer: true } });
-
-      incidents.getRcaSteering("test-org", "inc-1", "run-2");
-
-      expect(mockHttp.get).toHaveBeenCalledWith(
-        "/api/v2/test-org/alerts/incidents/inc-1/rca/runs/run-2/steering",
-      );
-    });
   });
 
   describe("listRcaRuns", () => {
@@ -253,61 +238,95 @@ describe("incidents service", () => {
     });
   });
 
-  describe("getRcaThread", () => {
-    it("calls GET …/rca/runs/{run_id}/thread without known_version on the first read", () => {
-      mockHttp.get.mockResolvedValue({ data: { not_modified: true, state_version: "1.2.3" } });
+  describe("openRcaLiveStream (05 LU1, LU5, LU16)", () => {
+    /** A body whose reads return `chunks` one by one, so a frame can split across reads. */
+    const streamingResponse = (chunks: string[]) => {
+      const encoder = new TextEncoder();
+      let index = 0;
+      const body = {
+        getReader: () => ({
+          read: async () =>
+            index < chunks.length
+              ? { done: false, value: encoder.encode(chunks[index++]) }
+              : { done: true, value: undefined },
+        }),
+      };
+      return { ok: true, status: 200, body } as unknown as Response;
+    };
+    const refused = (status: number) => ({ ok: false, status }) as unknown as Response;
+    const stubFetch = (...responses: Response[]) => {
+      const fetchMock = vi.fn();
+      for (const response of responses) fetchMock.mockResolvedValueOnce(response);
+      vi.stubGlobal("fetch", fetchMock);
+      return fetchMock;
+    };
 
-      incidents.getRcaThread("test-org", "incident-123", "run-1");
+    afterEach(() => vi.unstubAllGlobals());
 
-      expect(mockHttp.get).toHaveBeenCalledWith(
-        "/api/v2/test-org/alerts/incidents/incident-123/rca/runs/run-1/thread",
-        { params: {} },
+    it("reads the run's events in order, frames split across reads, and resolves at end", async () => {
+      const fetchMock = stubFetch(
+        streamingResponse([
+          'event: rca\ndata: {"run_id":"run-2","state":"running"}\n\nevent: thr',
+          'ead\ndata: {"run_id":"run-2","steps":[]}\n\n: ping\n\n',
+          'event: end\ndata: {"state":"completed"}\n\n',
+        ]),
       );
-    });
+      const events: unknown[] = [];
 
-    it("sends known_version when given (02 TH31)", async () => {
-      const body: RcaThreadResponse = { not_modified: true, state_version: "4.5.6" };
-      mockHttp.get.mockResolvedValue({ data: body });
-
-      const res = await incidents.getRcaThread("test-org", "incident-123", "run-1", "4.5.6");
-
-      expect(mockHttp.get).toHaveBeenCalledWith(
-        "/api/v2/test-org/alerts/incidents/incident-123/rca/runs/run-1/thread",
-        { params: { known_version: "4.5.6" } },
-      );
-      expect(res.data).toEqual({ not_modified: true, state_version: "4.5.6" });
-    });
-  });
-
-  describe("getRcaSummary", () => {
-    it("calls GET …/rca/runs/{run_id}/summary without known_version on the first read", () => {
-      mockHttp.get.mockResolvedValue({
-        data: { run_id: "run-1", not_modified: true, state_version: "1" },
+      const result = await incidents.openRcaLiveStream("test-org", "inc-1", "run-2", {
+        onEvent: (event) => events.push(event),
       });
 
-      incidents.getRcaSummary("test-org", "incident-123", "run-1");
-
-      expect(mockHttp.get).toHaveBeenCalledWith(
-        "/api/v2/test-org/alerts/incidents/incident-123/rca/runs/run-1/summary",
-        { params: {} },
+      expect(fetchMock).toHaveBeenCalledWith(
+        "http://api.test/api/v2/test-org/alerts/incidents/inc-1/rca/live_stream?run_id=run-2",
+        expect.objectContaining({
+          method: "GET",
+          credentials: "include",
+          headers: { Accept: "text/event-stream" },
+        }),
       );
+      expect(events).toEqual([
+        { event: "rca", data: { run_id: "run-2", state: "running" } },
+        { event: "thread", data: { run_id: "run-2", steps: [] } },
+        { event: "end", data: { state: "completed" } },
+      ]);
+      expect(result).toEqual({ ended: true });
     });
 
-    it("sends known_version when given (03 §12)", async () => {
-      const body: RcaRunSummaryResponse = {
-        run_id: "run-1",
-        not_modified: true,
-        state_version: "4.5.6",
-      };
-      mockHttp.get.mockResolvedValue({ data: body });
+    it("without a run asks for the incident's state only", async () => {
+      const fetchMock = stubFetch(streamingResponse(["event: rca\ndata: null\n\n"]));
 
-      const res = await incidents.getRcaSummary("test-org", "incident-123", "run-1", "4.5.6");
+      const result = await incidents.openRcaLiveStream("test-org", "inc-1", null, {
+        onEvent: () => {},
+      });
 
-      expect(mockHttp.get).toHaveBeenCalledWith(
-        "/api/v2/test-org/alerts/incidents/incident-123/rca/runs/run-1/summary",
-        { params: { known_version: "4.5.6" } },
+      expect(fetchMock.mock.calls[0][0]).toBe(
+        "http://api.test/api/v2/test-org/alerts/incidents/inc-1/rca/live_stream",
       );
-      expect(res.data).toEqual(body);
+      expect(result).toEqual({ ended: false });
+    });
+
+    it("refreshes the token once on 401, then opens again", async () => {
+      const fetchMock = stubFetch(
+        refused(401),
+        streamingResponse(['event: end\ndata: {"state":null}\n\n']),
+      );
+
+      const result = await incidents.openRcaLiveStream("test-org", "inc-1", null, {
+        onEvent: () => {},
+      });
+
+      expect(attemptTokenRefresh).toHaveBeenCalledTimes(1);
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(result).toEqual({ ended: true });
+    });
+
+    it.each([403, 404, 503])("rejects a %i answer with its status", async (status) => {
+      stubFetch(refused(status));
+
+      await expect(
+        incidents.openRcaLiveStream("test-org", "inc-1", "run-2", { onEvent: () => {} }),
+      ).rejects.toMatchObject({ name: "RcaLiveStreamRefused", status });
     });
   });
 

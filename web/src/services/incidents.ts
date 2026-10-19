@@ -13,7 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import http from "./http";
+import http, { attemptTokenRefresh } from "./http";
+import store from "@/stores";
 import analytics from "./product_analytics";
 import type { TranslateFn } from "@/types/i18n";
 import type { ResolutionCause } from "@/ts/interfaces/oncall";
@@ -361,14 +362,6 @@ export interface RcaSteerResponse {
   run_state: RcaRunState;
 }
 
-/** The thread route's answer when `known_version` still matches (02 TH31). */
-export interface RcaThreadNotModified {
-  not_modified: true;
-  state_version: string;
-}
-
-export type RcaThreadResponse = RcaThread | RcaThreadNotModified;
-
 /** Why the outcome was derived (03 VE14). */
 export type RcaOutcomeReason =
   | "answer_deadline"
@@ -550,14 +543,35 @@ export interface RcaRunSummary {
   blind_spots: RcaBlindSpot[];
 }
 
-/** The summary route's answer when `known_version` still matches. */
-export interface RcaRunSummaryNotModified {
-  run_id: string;
-  not_modified: true;
-  state_version: string;
+/** The `data` of an `error` event of the live stream (05 LU5). */
+export interface RcaLiveError {
+  /** `transcript` covers the thread and the summary. */
+  part: "transcript" | "steering" | "rca";
+  /** The status the part's GET route answers with for the same fault. */
+  status: number;
+  error_code: string | null;
+  message: string;
 }
 
-export type RcaRunSummaryResponse = RcaRunSummary | RcaRunSummaryNotModified;
+/** One event of `GET …/rca/live_stream`; each part is a full snapshot (05 LU5). */
+export type RcaLiveEvent =
+  | { event: "rca"; data: RcaSummary | null }
+  | { event: "thread"; data: RcaThread }
+  | { event: "summary"; data: RcaRunSummary }
+  | { event: "steering"; data: RcaSteering }
+  | { event: "error"; data: RcaLiveError }
+  | { event: "end"; data: { state: RcaRunState | null } };
+
+/** The live stream did not open: `status` is the server's answer (05 LU16). */
+export class RcaLiveStreamRefused extends Error {
+  readonly status: number;
+
+  constructor(status: number) {
+    super(`The live stream was refused with status ${status}`);
+    this.name = "RcaLiveStreamRefused";
+    this.status = status;
+  }
+}
 
 export interface ListRcaRunsResponse {
   runs: RcaRunItem[];
@@ -709,6 +723,31 @@ export interface IncidentCorrelatedStreams {
   correlationData: CorrelationResponse | null;
 }
 
+const LIVE_EVENTS: Record<RcaLiveEvent["event"], true> = {
+  rca: true,
+  thread: true,
+  summary: true,
+  steering: true,
+  error: true,
+  end: true,
+};
+
+/** One `event:`/`data:` frame of the live stream; null for a heartbeat or an unknown event. */
+const parseLiveFrame = (frame: string): RcaLiveEvent | null => {
+  let name = "";
+  const data: string[] = [];
+  for (const line of frame.split("\n")) {
+    if (line.startsWith("event:")) name = line.slice(6).trim();
+    else if (line.startsWith("data:")) data.push(line.slice(5).trim());
+  }
+  if (!Object.hasOwn(LIVE_EVENTS, name) || data.length === 0) return null;
+  try {
+    return { event: name, data: JSON.parse(data.join("\n")) } as RcaLiveEvent;
+  } catch {
+    return null;
+  }
+};
+
 const incidents = {
   /**
    * List incidents with optional filtering and pagination
@@ -843,37 +882,47 @@ const incidents = {
     );
   },
 
-  /**
-   * Read the investigation thread of one run (02 TH29–TH31). With `known_version`
-   * equal to the server's, the answer is `{not_modified: true, state_version}`.
-   */
-  getRcaThread: (
+  /** Stream the incident's analysis (05 LU1) into `onEvent`; rejects with RcaLiveStreamRefused if refused. */
+  openRcaLiveStream: async (
     org_identifier: string,
     incident_id: string,
-    run_id: string,
-    known_version?: string,
-  ) => {
-    return http().get<RcaThreadResponse>(
-      `/api/v2/${org_identifier}/alerts/incidents/${incident_id}/rca/runs/${run_id}/thread`,
-      { params: known_version ? { known_version } : {} },
-    );
-  },
+    run_id: string | null,
+    options: { onEvent: (event: RcaLiveEvent) => void; signal?: AbortSignal },
+  ): Promise<{ ended: boolean }> => {
+    const query = run_id ? `?run_id=${encodeURIComponent(run_id)}` : "";
+    const url = `${store.state.API_ENDPOINT}/api/v2/${org_identifier}/alerts/incidents/${incident_id}/rca/live_stream${query}`;
+    const init: RequestInit = {
+      method: "GET",
+      credentials: "include",
+      headers: { Accept: "text/event-stream" },
+      signal: options.signal,
+    };
+    // The axios interceptor never sees a fetch: refresh the token here, once.
+    let response = await fetch(url, init);
+    if (response.status === 401) {
+      await attemptTokenRefresh(url);
+      response = await fetch(url, init);
+    }
+    const reader = response.ok ? response.body?.getReader() : undefined;
+    if (!reader) throw new RcaLiveStreamRefused(response.status);
 
-  /**
-   * Read the summary view of one run (03 §12): card, timeline, hypotheses,
-   * evidence and blind spots. With `known_version` equal to the server's, the
-   * answer is `{not_modified: true, state_version}`.
-   */
-  getRcaSummary: (
-    org_identifier: string,
-    incident_id: string,
-    run_id: string,
-    known_version?: string,
-  ) => {
-    return http().get<RcaRunSummaryResponse>(
-      `/api/v2/${org_identifier}/alerts/incidents/${incident_id}/rca/runs/${run_id}/summary`,
-      { params: known_version ? { known_version } : {} },
-    );
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let ended = false;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) return { ended };
+      buffer += decoder.decode(value, { stream: true });
+      // Events end with a blank line; a partial tail stays buffered.
+      const frames = buffer.split("\n\n");
+      buffer = frames.pop() ?? "";
+      for (const frame of frames) {
+        const event = parseLiveFrame(frame);
+        if (!event) continue;
+        if (event.event === "end") ended = true;
+        options.onEvent(event);
+      }
+    }
   },
 
   /**
@@ -898,16 +947,6 @@ const incidents = {
     return http().post<RcaSteerResponse>(
       `/api/v2/${org_identifier}/alerts/incidents/${incident_id}/rca/runs/${run_id}/steer`,
       body,
-    );
-  },
-
-  /**
-   * Read the steering rows of one run with their merged state, the open
-   * question and whether the user can steer it (04 §9.2).
-   */
-  getRcaSteering: (org_identifier: string, incident_id: string, run_id: string) => {
-    return http().get<RcaSteering>(
-      `/api/v2/${org_identifier}/alerts/incidents/${incident_id}/rca/runs/${run_id}/steering`,
     );
   },
 

@@ -1347,6 +1347,7 @@ pub fn service_routes() -> Router {
         .route("/v2/{org_id}/alerts/incidents/{incident_id}", get(alerts::incidents::get_incident))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca", post(alerts::incidents::trigger_incident_rca).delete(alerts::incidents::cancel_incident_rca))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs", get(alerts::incidents::list_incident_rca_runs))
+        .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca/live_stream", get(alerts::incidents::get_incident_rca_live_stream))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}", get(alerts::incidents::get_incident_rca_run))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/thread", get(alerts::incidents::get_incident_rca_thread))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/steer", post(alerts::incidents::steer_incident_rca_run))

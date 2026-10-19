@@ -212,6 +212,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :report-loading="rcaReportLoading"
               :thread-run-id="rcaThreadRunId"
               :thread-live="rcaThreadLive"
+              :thread-run-is-v1="rcaThreadRunIsV1"
+              :thread="rcaThread"
+              :thread-status="rcaThreadStatus"
+              :run-summary="rcaRunSummary"
+              :run-summary-status="rcaRunSummaryStatus"
+              :steering="rcaSteering"
               :triggering="rcaTriggering"
               :cancelling="rcaCancelling"
               :resume-run-id="rcaResumeRunId"
@@ -220,7 +226,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @trigger-rca="triggerRca"
               @cancel-rca="cancelRca"
               @view-run="viewRcaRun"
-              @steered="reloadRca"
+              @retry-live="retryRcaLive"
               @resume-rca="resumeRca"
               @ask-ai="askAboutRca"
             />
@@ -1761,7 +1767,8 @@ export default defineComponent({
       return resp ? buildChipDimensionsFromFilters(resp, semanticGroups.value) : {};
     });
 
-    // Run state, history and report text come from the detail's `rca` (01 RR-35).
+    // Run state, history and report text come from the detail's `rca` (01 RR-35); while the
+    // run is live or the Analysis tab is open, one live stream keeps them current (05 LU15).
     const {
       summary: rcaSummary,
       stale: rcaStale,
@@ -1773,6 +1780,13 @@ export default defineComponent({
       reportLoading: rcaReportLoading,
       threadRunId: rcaThreadRunId,
       threadLive: rcaThreadLive,
+      threadRunIsV1: rcaThreadRunIsV1,
+      thread: rcaThread,
+      threadStatus: rcaThreadStatus,
+      runSummary: rcaRunSummary,
+      runSummaryStatus: rcaRunSummaryStatus,
+      steering: rcaSteering,
+      retryLive: retryRcaLive,
       triggering: rcaTriggering,
       cancelling: rcaCancelling,
       resuming: rcaResuming,
@@ -1782,7 +1796,11 @@ export default defineComponent({
       trigger: triggerRca,
       cancel: cancelRca,
       resume: resumeRca,
-    } = useIncidentRca(incidentOrgId, incidentDetails);
+    } = useIncidentRca(
+      incidentOrgId,
+      incidentDetails,
+      computed(() => activeTab.value === "incidentAnalysis"),
+    );
 
     // J5: this routed page hands Ask to MainLayout; a new chat with the analysis attached.
     const askAboutRca = (payload: RcaAskPayload) => emit("sendToAiChat", payload);
@@ -2171,10 +2189,6 @@ export default defineComponent({
         !correlationError.value
       ) {
         fetchCorrelatedStreams();
-      }
-      // Switching to the Analysis tab re-reads the run state
-      if (newTab === "incidentAnalysis") {
-        void reloadRca();
       }
     });
 
@@ -2979,6 +2993,13 @@ export default defineComponent({
       rcaReportLoading,
       rcaThreadRunId,
       rcaThreadLive,
+      rcaThreadRunIsV1,
+      rcaThread,
+      rcaThreadStatus,
+      rcaRunSummary,
+      rcaRunSummaryStatus,
+      rcaSteering,
+      retryRcaLive,
       rcaTriggering,
       rcaCancelling,
       rcaResuming,

@@ -15,22 +15,13 @@
 
 import { ref, type Ref } from "vue";
 import { isAxiosError } from "axios";
-import incidentsService, {
-  type RcaRunState,
-  type RcaSteerRequest,
-  type RcaSteering,
-} from "@/services/incidents";
+import incidentsService, { type RcaSteerRequest } from "@/services/incidents";
 import { useViewerTimezone } from "@/composables/downtimes/useViewerTimezone";
 import { formatTimestampInTimezone } from "@/utils/date";
-import { isClosedRunRefusal } from "@/utils/incidents/rcaSteering";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import { useRcaPolling } from "@/composables/useRcaPolling";
-
-/** How often the steering view of a live run is re-read (04 H8; the thread's poll). */
-export const RCA_STEERING_POLL_MS = 4_000;
 
 export type RcaSteerSendResult =
-  | { ok: true; runState: RcaRunState }
+  | { ok: true }
   | {
       ok: false;
       /** `error_code` of the answer, e.g. `run_closing`; null for a network error. */
@@ -49,35 +40,15 @@ const errorCode = (body: Record<string, unknown> | null): string | null => {
   return typeof body?.code === "string" ? body.code : null;
 };
 
-/**
- * The steering rows, the open question and `can_steer` of one RCA run
- * (04 §9.2, SG22, SG37), plus `send` for the steer box and the hypothesis
- * actions (§9.1).
- *
- * The first read happens when the run id is set. While `live` is true the view
- * is re-read every 4 s; a successful send re-reads it at once. When `live`
- * turns false the poll stops after one final read. A 403 or 404 ends the reads
- * of the run and leaves no view, so the steer box stays hidden.
- */
+/** `send` for the steer box and hypothesis actions (04 §9.1); the stream shows the row (05 LU18). */
 export function useRcaSteering(
   orgRef: Ref<string>,
   incidentIdRef: Ref<string | null>,
   runIdRef: Ref<string | null>,
-  liveRef: Ref<boolean>,
 ) {
   const { t } = useI18nTyped();
   const timezone = useViewerTimezone();
 
-  const { data: steering, refresh } = useRcaPolling<RcaSteering>(
-    orgRef,
-    incidentIdRef,
-    runIdRef,
-    liveRef,
-    {
-      interval: RCA_STEERING_POLL_MS,
-      fetch: (org, incident, run) => incidentsService.getRcaSteering(org, incident, run),
-    },
-  );
   const sending = ref(false);
 
   /** The message for a refused send (04 §9.1). */
@@ -122,7 +93,7 @@ export function useRcaSteering(
     };
   };
 
-  /** Sends one message or hypothesis action to the run, then re-reads the view. */
+  /** Sends one message or hypothesis action to the run. */
   const send = async (request: RcaSteerRequest): Promise<RcaSteerSendResult> => {
     const org = orgRef.value;
     const incidentId = incidentIdRef.value;
@@ -132,22 +103,17 @@ export function useRcaSteering(
     }
     sending.value = true;
     try {
-      const response = await incidentsService.steerRca(org, incidentId, runId, request);
-      void refresh();
-      return { ok: true, runState: response.data.run_state };
+      await incidentsService.steerRca(org, incidentId, runId, request);
+      return { ok: true };
     } catch (error) {
       console.error("Failed to steer the RCA run:", error);
-      const refused = sendErrorMessage(error);
-      // A refused send can mean the run moved on: re-read it. A closed run is
-      // left to the 4 s poll, so the caller handles the refusal first (SG40).
-      if (!isClosedRunRefusal(refused.code)) void refresh();
-      return { ok: false, ...refused };
+      return { ok: false, ...sendErrorMessage(error) };
     } finally {
       sending.value = false;
     }
   };
 
-  return { steering, sending, refresh, send };
+  return { sending, send };
 }
 
 export default useRcaSteering;
