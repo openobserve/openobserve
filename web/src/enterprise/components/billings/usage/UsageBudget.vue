@@ -328,7 +328,7 @@ const warnPercentLabel = computed(() => Math.round(warnPercent.value * 10) / 10)
 const usedPercent = computed(() => (hasBudget.value ? (spent.value / draftTotal.value) * 100 : 0));
 const spendTone = computed(() => budgetTone(spent.value, draftTotal.value, warnAmount.value));
 
-/** An empty budget field suggests the projected cost, rounded up to a round number. */
+/** An empty budget field suggests the projected cost, raised to the next round number. */
 const suggestedBudget = computed(() => {
   const base = projected.value ?? spent.value;
   return base > 0 ? String(Math.ceil(base / 10) * 10) : "";
