@@ -20,6 +20,7 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import { mockMeteringResponse } from "./meteringMock";
 import { DRILLDOWNS } from "./usageQueries";
+import { volumeDetails } from "./meteringModel";
 
 const route = reactive<{ query: Record<string, string | undefined> }>({ query: {} });
 vi.mock("vue-router", () => ({
@@ -159,5 +160,84 @@ describe("UsageOverview meter drilldown chart", () => {
       .props("panelSchema") as any;
     expect(recoloured.queries[0].query).toBe(schema.queries[0].query);
     expect(recoloured.config.color.colorBySeries.map((entry: any) => entry.value)).toContain("app");
+  });
+});
+
+describe("UsageOverview for an org with no bill", () => {
+  const DAY = 86_400;
+  const end = Math.floor(Date.now() / 1000);
+  const start = end - 29 * DAY;
+  // 2 GB ingested, 4 GB scanned and 7 AI credits over the window; nothing priced.
+  const usage = volumeDetails({ Ingestion: 2048, Search: 4096, AiCredits: 7 }, start, end);
+
+  const mountOverview = (props: Record<string, unknown>) =>
+    mount(UsageOverview, {
+      props: { lastLoadedAt: 1, projected: null, refreshing: false, ...props },
+      global: {
+        plugins: [i18n, store],
+        stubs: { UsageCachedChart: true, UsageMeterBreakdown: true, UsageBillStrip: true },
+      },
+    });
+
+  beforeEach(() => {
+    route.query = {};
+    store.state.organizationData.organizationSettings.usage_stream_enabled = true;
+  });
+
+  it("shows each meter's volume on the same screen, with no money anywhere", async () => {
+    const wrapper = mountOverview({ details: usage, volumeOnly: true });
+    await flushPromises();
+
+    expect(wrapper.text()).not.toContain("$");
+    expect(wrapper.find('[data-test="billings-usageoverview-cycle"]').text()).toContain(
+      "Last 30 days",
+    );
+    const cards = wrapper.findAll('[data-test^="billings-usageoverview-kpi-"]');
+    expect(cards.map((card) => card.attributes("data-test"))).toEqual([
+      "billings-usageoverview-kpi-ingestion",
+      "billings-usageoverview-kpi-query",
+      "billings-usageoverview-kpi-pipeline",
+      "billings-usageoverview-kpi-ai",
+    ]);
+    expect(cards[0].text()).toContain("2.00 GB");
+    expect(cards[3].text()).toContain("7");
+    // A share across GB and credit counts means nothing, so there is no bill strip.
+    expect(wrapper.findComponent({ name: "UsageBillStrip" }).exists()).toBe(false);
+
+    const table = wrapper.findComponent({ name: "UsageMeterTable" });
+    expect(table.props("volumeOnly")).toBe(true);
+    expect((table.props("rows") as { key: string }[]).map((row) => row.key)).not.toContain(
+      "retention",
+    );
+    const pane = wrapper.find('[data-test="billings-usageoverview-daily-pane"]');
+    expect(pane.text()).toContain("Daily Volume");
+    const schema = wrapper.findComponent({ name: "UsageCachedChart" }).props("panelSchema") as any;
+    expect(schema.config.unit).toBe("megabytes");
+    expect(schema.queries[0].query).toContain('sum(size) as "y_axis_1"');
+  });
+
+  it("offers to turn usage reporting on while it is off", async () => {
+    store.state.organizationData.organizationSettings.usage_stream_enabled = false;
+    const wrapper = mountOverview({ details: null, volumeOnly: true });
+    await flushPromises();
+
+    const prompt = wrapper.findComponent('[data-test="billings-usageoverview-enable"]');
+    expect(prompt.exists()).toBe(true);
+    prompt.vm.$emit("action");
+    await flushPromises();
+    expect(wrapper.findComponent({ name: "ConfirmDialog" }).props("modelValue")).toBe(true);
+  });
+
+  it("leaves a Stripe-billed org's Overview as the bill", async () => {
+    const wrapper = mountOverview({ details: mockMeteringResponse().upcoming });
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="billings-usageoverview-kpi-so-far"]').exists()).toBe(true);
+    expect(wrapper.findComponent({ name: "UsageBillStrip" }).exists()).toBe(true);
+    expect(wrapper.findComponent({ name: "UsageMeterTable" }).props("volumeOnly")).toBe(false);
+    const pane = wrapper.find('[data-test="billings-usageoverview-daily-pane"]');
+    expect(pane.text()).toContain("Daily Cost");
+    const schema = wrapper.findComponent({ name: "UsageCachedChart" }).props("panelSchema") as any;
+    expect(schema.config.unit).toBe("currency");
   });
 });

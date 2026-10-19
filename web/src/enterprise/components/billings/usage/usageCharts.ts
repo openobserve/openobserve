@@ -124,9 +124,21 @@ export function buildStackedCostPanelSchema(opts: {
   topResults?: number;
   /** Colour of a band `seriesColors` does not name, instead of a palette colour. */
   fixedColor?: string;
+  /** What the bars measure: money by default, or megabytes or a count for an org with no bill. */
+  unit?: "currency" | "megabytes" | "numbers";
   t: TranslateFn;
 }) {
-  const { id, sql, seriesColors, decimals = 2, markLines = [], topResults, fixedColor, t } = opts;
+  const {
+    id,
+    sql,
+    seriesColors,
+    decimals = 2,
+    markLines = [],
+    topResults,
+    fixedColor,
+    unit = "currency",
+    t,
+  } = opts;
   return {
     version: 2,
     id,
@@ -136,7 +148,7 @@ export function buildStackedCostPanelSchema(opts: {
     config: {
       show_legends: true,
       legends_position: "bottom",
-      unit: "currency",
+      unit,
       unit_custom: "",
       decimals,
       axis_border_show: true,
@@ -169,7 +181,8 @@ export function buildStackedCostPanelSchema(opts: {
               alias: "y_axis_1",
               column: "y_axis_1",
               color: null,
-              label: t("billing.usageV2.colCost"),
+              label:
+                unit === "currency" ? t("billing.usageV2.colCost") : t("billing.usageV2.colVolume"),
             },
           ],
           z: [],

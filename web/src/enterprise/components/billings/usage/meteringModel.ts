@@ -316,6 +316,32 @@ export function buildMeterRows(
   });
 }
 
+/** Meters that count credits or runs rather than megabytes. */
+const COUNTED_METERS: MeterKey[] = ["ai", "synthetics_browser", "synthetics_protocol"];
+
+/**
+ * A usage-only bill for an org Stripe does not bill: each meter's volume from the org's `usage`
+ * stream over a window, and no money anywhere, so Overview can draw its screen from volume alone.
+ */
+export function volumeDetails(
+  volumes: Record<string, number>,
+  start: number,
+  end: number,
+): MeteringDetails {
+  const meters = Object.fromEntries(
+    METERS.map((def) => [
+      def.key,
+      {
+        base_cost: 0,
+        unit_divisor: COUNTED_METERS.includes(def.key) ? 1 : 1024,
+        metered_amount: def.events.reduce((sum, event) => sum + (Number(volumes[event]) || 0), 0),
+        metered_cost: 0,
+      },
+    ]),
+  ) as Record<MeterKey, PricingDetails>;
+  return { ...meters, total_cost: 0, cycle_start: start, cycle_end: end, missing_details: [] };
+}
+
 /** Used meters by cost, highest first; unused ones fold into a single line. */
 export function splitByUse(rows: MeterRow[]): { used: MeterRow[]; unused: MeterRow[] } {
   const used = rows.filter((row) => row.cost > 0 || row.missing).sort((a, b) => b.cost - a.cost);

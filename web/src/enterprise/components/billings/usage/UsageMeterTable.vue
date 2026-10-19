@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             <span class="truncate">{{ row.label }}</span>
           </span>
-          <span class="text-text-secondary ps-4.5 text-xs">
+          <span v-if="!volumeOnly" class="text-text-secondary ps-4.5 text-xs">
             {{
               row.subline ??
               t("billing.usageV2.volumeAtRate", { volume: row.volume, rate: row.rate })
@@ -87,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </span>
       </template>
       <!-- In #pagination-bar rather than a column footer: a footer only reaches the pane's edge while rows overflow. -->
-      <template #pagination-bar>
+      <template v-if="!volumeOnly" #pagination-bar>
         <div
           class="bg-table-header-bg border-table-header-border text-text-body grid border-t py-2 text-xs font-semibold"
           :style="{ gridTemplateColumns: gridTemplate }"
@@ -139,6 +139,8 @@ const props = defineProps<{
   loading?: boolean;
   /** Rows are still arriving; they show with OTable's streaming indicator instead of a skeleton. */
   streaming?: boolean;
+  /** An org with no bill: each meter's volume only, with no money and no totals across units. */
+  volumeOnly?: boolean;
 }>();
 const emit = defineEmits<{ select: [key: string] }>();
 
@@ -150,15 +152,40 @@ const shareOf = (row: BillRow) => (props.total > 0 ? (row.cost / props.total) * 
 
 const percentText = (value: number) => raw(`${value.toFixed(1)}%`);
 
-const columns = computed<OTableColumnDef<BillRow>[]>(() => [
+const labelColumn = computed<OTableColumnDef<BillRow>>(() => ({
+  id: "label",
+  header: props.nameHeader ?? t("billing.usageV2.colMeter"),
+  accessorKey: "label",
+  // The elastic column: it takes whatever width the fixed columns leave.
+  meta: { isName: true, autoWidth: true },
+  minSize: 160,
+}));
+
+// A plain column, not `isAction`: an action column is measured, so it would not keep this width.
+const openColumn: OTableColumnDef<BillRow> = {
+  id: "open",
+  header: raw(""),
+  hideable: false,
+  size: 32,
+};
+
+const columns = computed<OTableColumnDef<BillRow>[]>(() =>
+  props.volumeOnly ? volumeColumns.value : costColumns.value,
+);
+
+const volumeColumns = computed<OTableColumnDef<BillRow>[]>(() => [
+  labelColumn.value,
   {
-    id: "label",
-    header: props.nameHeader ?? t("billing.usageV2.colMeter"),
-    accessorKey: "label",
-    // The elastic column: it takes whatever width the fixed columns leave.
-    meta: { isName: true, autoWidth: true },
-    minSize: 160,
+    id: "volume",
+    header: t("billing.usageV2.colVolume"),
+    accessorFn: (row: BillRow) => row.volume,
+    size: 136,
   },
+  openColumn,
+]);
+
+const costColumns = computed<OTableColumnDef<BillRow>[]>(() => [
+  labelColumn.value,
   {
     id: "gross",
     header: t("billing.usageV2.colGross"),
@@ -183,8 +210,7 @@ const columns = computed<OTableColumnDef<BillRow>[]>(() => [
     accessorKey: "cost",
     size: 136,
   },
-  // A plain column, not `isAction`: an action column is measured, so it would not keep this width.
-  { id: "open", header: raw(""), hideable: false, size: 32 },
+  openColumn,
 ]);
 
 const { isMobile } = useBreakpoint();

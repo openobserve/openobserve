@@ -46,4 +46,29 @@ describe("UsageMeterTable", () => {
     expect(totals.text()).toContain("$9.00");
     wrapper.unmount();
   });
+
+  it("shows only each meter's volume for an org with no bill, with no totals across units", () => {
+    const row = {
+      key: "ingestion",
+      label: raw("Ingestion"),
+      volume: raw("2.00 GB"),
+      rate: raw("$0.00 / GB"),
+      cost: 0,
+      gross: 0,
+      discount: 0,
+      missing: false,
+      discountPercent: 0,
+      drillable: true,
+      hasBreakdown: true,
+    };
+    const wrapper = mount(UsageMeterTable, {
+      props: { rows: [row], total: 0, gross: 0, discount: 0, volumeOnly: true },
+      global: { plugins: [i18n, store] },
+    });
+
+    expect(wrapper.text()).toContain("2.00 GB");
+    expect(wrapper.text()).not.toContain("$");
+    expect(wrapper.find('[data-test="billings-usagemetertable-total"]').exists()).toBe(false);
+    wrapper.unmount();
+  });
 });

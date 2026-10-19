@@ -104,3 +104,21 @@ describe("UsageMeterBreakdown kept alive", () => {
     expect(heard).toEqual(["sections for query", "top-names for query"]);
   });
 });
+
+describe("UsageMeterBreakdown for an org with no bill", () => {
+  it("lists volume and share only, with no cost column", async () => {
+    const wrapper = mount(UsageMeterBreakdown, {
+      props: {
+        meterKey: "ingestion",
+        details: mockMeteringResponse().upcoming!,
+        refreshToken: 0,
+        volumeOnly: true,
+      },
+      global: { plugins: [i18n, store], stubs: { OTable: true } },
+    });
+    await flushPromises();
+
+    const columns = wrapper.findComponent({ name: "OTable" }).props("columns") as { id: string }[];
+    expect(columns.map((column) => column.id)).toEqual(["name", "volume", "share"]);
+  });
+});

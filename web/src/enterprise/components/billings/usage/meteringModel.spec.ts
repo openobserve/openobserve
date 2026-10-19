@@ -37,6 +37,7 @@ import {
   meterForEvent,
   monthlyPace,
   unitRate,
+  volumeDetails,
   type MeteringDetails,
 } from "./meteringModel";
 
@@ -393,5 +394,23 @@ describe("meteringModel billing dates", () => {
       process.env.TZ = zone;
       vi.resetModules();
     }
+  });
+});
+
+describe("meteringModel usage without a bill", () => {
+  it("adds each meter's events into its volume, in megabytes or a count, with no money", () => {
+    const usage = volumeDetails(
+      { Ingestion: 2048, AiCredits: 5, NewIncident: 2, Other: 9 },
+      10,
+      20,
+    );
+    expect(usage.ingestion).toMatchObject({
+      metered_amount: 2048,
+      unit_divisor: 1024,
+      metered_cost: 0,
+    });
+    expect(usage.ai).toMatchObject({ metered_amount: 7, unit_divisor: 1, metered_cost: 0 });
+    expect(usage.query.metered_amount).toBe(0);
+    expect(usage).toMatchObject({ total_cost: 0, cycle_start: 10, cycle_end: 20 });
   });
 });

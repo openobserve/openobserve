@@ -224,10 +224,7 @@ import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import { timestampToTimezoneDate } from "@/utils/timezone";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import KpiCardRow from "@/components/common/KpiCardRow.vue";
-import { useMutation } from "@tanstack/vue-query";
 import { formatSizeFromMB } from "@/utils/formatters";
-import { updateOrgSettingsMutation } from "@/services/organizations.queries";
-import { toast } from "@/lib/feedback/Toast/useToast";
 import UsageKpiCard from "./UsageKpiCard.vue";
 import UsagePaneHeader from "./UsagePaneHeader.vue";
 import UsageChartSkeleton from "./UsageChartSkeleton.vue";
@@ -243,6 +240,7 @@ import {
 } from "./meteringModel";
 import { buildTrendsChartOption, meterColorFor } from "./usageCharts";
 import { useUsageSearch } from "./useUsageSearch";
+import { useUsageReporting } from "./useUsageReporting";
 import { trendsCostSql } from "./usageQueries";
 import {
   cyclePrices,
@@ -327,37 +325,11 @@ const selectOrg = (value: unknown) => {
   router.replace({ query: { ...route.query, org: id } });
 };
 
-const usageStreamEnabled = computed<boolean>(
-  () => !!store.state?.organizationData?.organizationSettings?.usage_stream_enabled,
-);
-
-const showEnableConfirm = ref(false);
-const enabling = ref(false);
-
-const updateOrgSettings = useMutation(() => updateOrgSettingsMutation(orgId.value));
-
-/** Sends only the opt-in: the backend writes every field it gets, so this page's older copy of the rest would undo newer changes. */
-const enableUsageReporting = async () => {
-  showEnableConfirm.value = false;
-  if (enabling.value) return;
-  enabling.value = true;
-  try {
-    await updateOrgSettings.mutateAsync({ usage_stream_enabled: true });
-    store.dispatch("setOrganizationSettings", {
-      ...(store.state?.organizationData?.organizationSettings ?? {}),
-      usage_stream_enabled: true,
-    });
-    toast({ variant: "success", message: t("billing.usageTrends.enablePending"), timeout: 5000 });
-  } catch (e: any) {
-    toast({
-      variant: "error",
-      message: raw(e?.message) || t("billing.failedToEnableUsageReporting"),
-      timeout: 5000,
-    });
-  } finally {
-    enabling.value = false;
-  }
-};
+const {
+  enabled: usageStreamEnabled,
+  confirming: showEnableConfirm,
+  enable: enableUsageReporting,
+} = useUsageReporting();
 
 // ── Range ────────────────────────────────────────────────────────
 

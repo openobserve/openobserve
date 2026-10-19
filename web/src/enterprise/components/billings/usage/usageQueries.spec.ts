@@ -20,6 +20,8 @@ import {
   DRILLDOWNS,
   dailyOrgCostSql,
   dailyEntitySql,
+  dailyVolumeSql,
+  eventVolumeSql,
   meterTotalSql,
   orgVolumeSql,
   searchScanRateSql,
@@ -196,5 +198,19 @@ describe("usageQueries", () => {
       expect(sql).toContain("case org_id when 'm1' then 'Acme''s EU' else 'Other' end");
       expect(sql).toContain("histogram(_timestamp, '1 day')");
     });
+  });
+});
+
+describe("usage volume queries for an org with no bill", () => {
+  it("reads raw volume per event, for this org only, with the org id escaped", () => {
+    const totals = eventVolumeSql("o'rg", ["Ingestion", "Search"]);
+    expect(totals).toContain("sum(size) as volume");
+    expect(totals).toContain("org_id = 'o''rg'");
+    expect(totals).toContain("event in ('Ingestion', 'Search') group by event");
+
+    const daily = dailyVolumeSql("org", ["Ingestion"]);
+    expect(daily).toContain(`histogram(_timestamp, '1 day') as "x_axis_1"`);
+    expect(daily).toContain(`sum(size) as "y_axis_1"`);
+    expect(daily).not.toContain("case");
   });
 });

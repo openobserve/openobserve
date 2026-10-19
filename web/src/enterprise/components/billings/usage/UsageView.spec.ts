@@ -23,7 +23,7 @@ const mounts: Record<string, number> = {};
 const stub = (name: string) =>
   defineComponent({
     name,
-    props: ["details", "billingOrgs", "cycles", "projected"],
+    props: ["details", "billingOrgs", "cycles", "projected", "volumeOnly"],
     setup: () => {
       mounts[name] = (mounts[name] ?? 0) + 1;
     },
@@ -45,11 +45,15 @@ vi.mock("vue-router", () => ({
 const metering = vi.fn();
 const members = vi.fn();
 const aiUsage = vi.fn();
+const membership = vi.fn().mockResolvedValue({ data: { membership: null } });
+const search = vi.fn().mockResolvedValue([]);
+vi.mock("./useUsageSearch", () => ({ useUsageSearch: () => ({ search }) }));
 vi.mock("@/services/billings", () => ({
   default: {
     get_data_usage: (...args: unknown[]) => metering(...args),
     list_billing_group_members: (...args: unknown[]) => members(...args),
     get_ai_usage: (...args: unknown[]) => aiUsage(...args),
+    get_billing_group_membership: (...args: unknown[]) => membership(...args),
   },
 }));
 vi.mock("@/aws-exports", async (importOriginal) => {
@@ -158,6 +162,77 @@ describe("UsageView", () => {
     const overview = wrapper.findComponent({ name: "UsageOverview" });
     expect(overview.props("details")).toMatchObject({ total_cost: 1 });
     expect(overview.props("billingOrgs")).toEqual([]);
+  });
+});
+
+describe("UsageView for an org with no bill of its own", () => {
+  const tabs = (wrapper: ReturnType<typeof mount>) =>
+    wrapper.findAllComponents({ name: "OTab" }).map((tab) => tab.props("name"));
+  const reporting = (on: boolean) => {
+    store.state.organizationData.organizationSettings = {
+      ...store.state.organizationData.organizationSettings,
+      usage_stream_enabled: on,
+    };
+  };
+
+  afterEach(() => {
+    route.query = {};
+    membership.mockResolvedValue({ data: { membership: null } });
+    reporting(false);
+  });
+
+  it("keeps every tab and the bill for a Stripe-billed org, from the first frame", async () => {
+    let releaseBill!: (value: unknown) => void;
+    metering.mockReturnValue(new Promise((resolve) => (releaseBill = resolve)));
+    members.mockResolvedValue({ data: [] });
+    const wrapper = mount(UsageView, { global: { plugins: [i18n, store] } });
+    await flushPromises();
+    // Still loading: which tabs this org has is not known yet, so a placeholder bar holds their place.
+    expect(tabs(wrapper)).toEqual([]);
+    expect(wrapper.find('[data-test="billings-usageview-tabs-loading"]').exists()).toBe(true);
+
+    releaseBill(bill);
+    await flushPromises();
+
+    expect(tabs(wrapper)).toEqual(["overview", "trends", "budget", "estimation"]);
+    const overview = wrapper.findComponent({ name: "UsageOverview" });
+    expect(overview.props("volumeOnly")).toBe(false);
+    expect(overview.props("details")).toMatchObject({ total_cost: 1 });
+  });
+
+  it("shows only Overview, with 30 days of usage, when no bill comes back", async () => {
+    reporting(true);
+    metering.mockResolvedValue({ data: {} });
+    members.mockResolvedValue({ data: [] });
+    search.mockResolvedValue([
+      { event: "Ingestion", volume: 2048 },
+      { event: "AiCredits", volume: 7 },
+    ]);
+    // An old link to Budget still lands on Overview.
+    route.query = { tab: "budget" };
+    const wrapper = mount(UsageView, { global: { plugins: [i18n, store] } });
+    await flushPromises();
+
+    // Overview is the only view, so there is no one-tab bar, and the placeholder is gone too.
+    expect(tabs(wrapper)).toEqual([]);
+    expect(wrapper.find('[data-test="billings-usageview-tabs-loading"]').exists()).toBe(false);
+    const overview = wrapper.findComponent({ name: "UsageOverview" });
+    expect(overview.props("volumeOnly")).toBe(true);
+    expect(overview.props("details").ingestion.metered_amount).toBe(2048);
+    expect(overview.props("details").ai.metered_amount).toBe(7);
+    expect(overview.props("details").total_cost).toBe(0);
+  });
+
+  it("treats a member org as one with no bill, since its super org pays", async () => {
+    metering.mockResolvedValue(bill);
+    members.mockResolvedValue({ data: [] });
+    membership.mockResolvedValue({ data: { membership: { payer_org_id: "payer" } } });
+    const wrapper = mount(UsageView, { global: { plugins: [i18n, store] } });
+    await flushPromises();
+
+    expect(tabs(wrapper)).toEqual([]);
+    // Reporting is off, so Overview offers to turn it on instead of reading a stream.
+    expect(wrapper.findComponent({ name: "UsageOverview" }).props("details")).toBeNull();
   });
 });
 

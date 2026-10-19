@@ -75,7 +75,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span />
               <span class="px-2">{{ t("billing.usageV2.everythingElse") }}</span>
               <span v-if="!isMobile" class="px-2">{{ formatQuantity(rest) }}</span>
-              <span class="px-2">{{ isRetention ? EM_DASH : formatCost(rest * rate) }}</span>
+              <span v-if="!volumeOnly" class="px-2">{{
+                isRetention ? EM_DASH : formatCost(rest * rate)
+              }}</span>
               <span class="grid grid-cols-[minmax(2.5rem,1fr)_2.75rem] items-center gap-2.5 px-2">
                 <OProgressBar :value="restShare / 100" />
                 <span>{{ formatShare(restShare) }}</span>
@@ -85,7 +87,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span />
               <span class="px-2">{{ t("billing.usageV2.colTotal") }}</span>
               <span v-if="!isMobile" class="px-2">{{ formatQuantity(total) }}</span>
-              <span class="px-2">{{ isRetention ? EM_DASH : formatCost(total * rate) }}</span>
+              <span v-if="!volumeOnly" class="px-2">{{
+                isRetention ? EM_DASH : formatCost(total * rate)
+              }}</span>
               <span />
             </div>
           </div>
@@ -174,6 +178,8 @@ const props = defineProps<{
   scopeOrgId?: string;
   /** Price per unit to use instead of the bill's, so a member's rows add up to its share. */
   rate?: number;
+  /** An org with no bill: volume and share only, with no cost column. */
+  volumeOnly?: boolean;
 }>();
 /** Every grouping the meter offers; `unavailable` lists those this org has never recorded. */
 type SectionsPayload = {
@@ -312,7 +318,9 @@ const columns = computed<OTableColumnDef<BreakdownRow>[]>(() => {
         accessorFn: (row: BreakdownRow) => formatCost(row.cost),
         size: 88,
       };
-  return [name, volume, third, share];
+  return props.volumeOnly && !isRetention.value
+    ? [name, volume, share]
+    : [name, volume, third, share];
 });
 
 /** OTable drops the index column on a phone, so the bar drops it too. */

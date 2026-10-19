@@ -228,6 +228,26 @@ export function trendsCostSql(
   );
 }
 
+/** Each event's volume over the query window, for an org with usage but no bill. */
+export function eventVolumeSql(orgId: string, events: string[] = PRICED_EVENTS): string {
+  const inList = events.map((event) => `'${escapeLiteral(event)}'`).join(", ");
+  return (
+    `select event, sum(size) as volume from "${USAGE_STREAM_NAME}" ` +
+    `where org_id = '${escapeLiteral(orgId)}' and event in (${inList}) group by event`
+  );
+}
+
+/** Each event's volume per day, the Volume chart of an org with usage but no bill. */
+export function dailyVolumeSql(orgId: string, events: string[]): string {
+  const inList = events.map((event) => `'${escapeLiteral(event)}'`).join(", ");
+  return (
+    `SELECT histogram(_timestamp, '1 day') as "x_axis_1", sum(size) as "y_axis_1", ` +
+    `event as "breakdown_1" FROM "${USAGE_STREAM_NAME}" ` +
+    `WHERE org_id = '${escapeLiteral(orgId)}' AND event IN (${inList}) ` +
+    `GROUP BY x_axis_1, breakdown_1 ORDER BY x_axis_1 ASC`
+  );
+}
+
 /** Each org's volume per event across the stream; priced in code, since a cycle gives each event one rate. */
 export function orgVolumeSql(events: string[] = PRICED_EVENTS): string {
   const inList = events.map((event) => `'${escapeLiteral(event)}'`).join(", ");

@@ -22,7 +22,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div class="flex h-full flex-col gap-2.5 px-3" data-test="billings-usageview-root">
+    <!--
+      Which tabs an org has is known only once its bill loads, so the first load shows a placeholder
+      bar of the tab bar's own height: real tab names that then vanish would read as a glitch.
+    -->
+    <div
+      v-if="loading && lastLoadedAt === null"
+      class="flex h-11 shrink-0 items-center gap-6 border-b px-3 pt-0.75"
+      data-test="billings-usageview-tabs-loading"
+    >
+      <OSkeleton
+        v-for="width in TAB_SKELETON_WIDTHS"
+        :key="width"
+        type="text"
+        :class="['h-4', width]"
+      />
+    </div>
+    <!-- With Overview as the only view, a one-tab bar is just noise, so it goes. -->
     <OTabs
+      v-else-if="billed"
       :model-value="activeTab"
       data-test="billings-usageview-tabs"
       class="border-b"
@@ -113,11 +131,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <KeepAlive>
         <UsageOverview
           v-if="activeTab === 'overview'"
-          :details="details"
-          :billing-orgs="billingOrgs"
+          :details="billed ? details : volume"
+          :billing-orgs="billed ? billingOrgs : []"
           :last-loaded-at="lastLoadedAt"
-          :projected="projected"
+          :projected="billed ? projected : null"
           :refreshing="loading"
+          :volume-only="!billed"
           @refresh="loadDetails"
         />
         <UsageTrends
@@ -143,12 +162,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter, type LocationQueryRaw } from "vue-router";
 import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -162,11 +182,14 @@ import UsageTrends from "./UsageTrends.vue";
 import UsageEstimator from "./UsageEstimator.vue";
 import UsageBudget from "./UsageBudget.vue";
 import UsageSuperBudget from "./UsageSuperBudget.vue";
+import { useUsageSearch } from "./useUsageSearch";
+import { eventVolumeSql, USAGE_STREAM_NAME } from "./usageQueries";
 import {
   billingGroupOrgs,
   cyclesNewestFirst,
   parseMeteringResponse,
   projectCycleCost,
+  volumeDetails,
   type BillingOrg,
   type MeteringDetails,
   type MeteringResponse,
@@ -183,8 +206,10 @@ const route = useRoute();
 const router = useRouter();
 
 /** The tab lives in the URL, so a refresh or a shared link lands where the user was. */
+/** An org with no bill has Overview only, so an old link to another tab opens Overview. */
 const activeTab = computed<UsageTab>(() => {
   const value = String(route.query.tab ?? "");
+  if (!billed.value) return "overview";
   return TABS.includes(value as UsageTab) ? (value as UsageTab) : "overview";
 });
 
@@ -220,6 +245,66 @@ const projected = computed(() => projectCycleCost(details.value, lastLoadedAt.va
 
 /** A super org's orgs, itself first; empty for any other org. */
 const billingOrgs = ref<BillingOrg[]>([]);
+
+/** A member of a super org: its super org pays, so it is shown its usage, not a bill of its own. */
+const isMember = ref(false);
+
+/**
+ * Billed through Stripe: the bill came back and no super org pays it. Every other org, such as
+ * one billed by a marketplace or contract, or a member, sees usage volumes and nothing priced.
+ */
+const billed = computed(() => !!details.value && !isMember.value);
+
+/** One grey label per tab a billed org gets, about as wide as its name. */
+const TAB_SKELETON_WIDTHS = ["w-16", "w-14", "w-14", "w-28"];
+
+/** An org with no bill: each meter's volume over the last 30 days, from its own `usage` stream. */
+const volume = ref<MeteringDetails | null>(null);
+
+const usageStreamEnabled = computed<boolean>(
+  () => !!store.state?.organizationData?.organizationSettings?.usage_stream_enabled,
+);
+
+/** A failure keeps what is shown, as the org list does. */
+const fetchIsMember = async (): Promise<boolean> => {
+  try {
+    const res = await BillingService.get_billing_group_membership(
+      store.state.selectedOrganization.identifier,
+    );
+    return !!res?.data?.membership;
+  } catch {
+    return isMember.value;
+  }
+};
+
+const VOLUME_DAYS = 30;
+const SECONDS_PER_DAY = 86_400;
+const { search } = useUsageSearch();
+
+/** The stream appears only once the org reports usage, so until then every meter reads zero. */
+const fetchVolumes = async (refresh: boolean): Promise<MeteringDetails> => {
+  const end = Math.floor(Date.now() / 1000);
+  const start = (Math.floor(end / SECONDS_PER_DAY) - (VOLUME_DAYS - 1)) * SECONDS_PER_DAY;
+  try {
+    const hits = await search(eventVolumeSql(store.state.selectedOrganization.identifier), {
+      start: start * 1_000_000,
+      end: end * 1_000_000,
+      size: 100,
+      key: "volumes",
+      refresh,
+    });
+    const volumes = Object.fromEntries(
+      hits.map((hit) => [String(hit.event ?? ""), Number(hit.volume) || 0]),
+    );
+    return volumeDetails(volumes, start, end);
+  } catch (e: any) {
+    const message = String(e?.response?.data?.message ?? e?.message ?? "").toLowerCase();
+    if (message.includes("stream not found") && message.includes(USAGE_STREAM_NAME)) {
+      return volumeDetails({}, start, end);
+    }
+    throw e;
+  }
+};
 
 /**
  * A failure keeps the list already shown for this org, so a Refresh does not drop a super org's
@@ -297,9 +382,20 @@ const loadDetails = async () => {
   refreshFailed.value = false;
   try {
     // Published together: the bill alone renders the plain meter view, which then flips to the org view.
-    const [metering, orgs] = await Promise.all([fetchMetering(), fetchBillingOrgs()]);
+    const [metering, orgs, member] = await Promise.all([
+      fetchMetering(),
+      fetchBillingOrgs(),
+      fetchIsMember(),
+    ]);
+    const usageOnly = !metering?.upcoming || member;
+    const volumes =
+      usageOnly && usageStreamEnabled.value
+        ? await fetchVolumes(lastLoadedAt.value !== null)
+        : null;
     response.value = metering;
     billingOrgs.value = orgs;
+    isMember.value = member;
+    volume.value = volumes;
     lastLoadedAt.value = Date.now();
     loadFailure.value = null;
   } catch (e: any) {
@@ -312,4 +408,9 @@ const loadDetails = async () => {
 };
 
 onMounted(loadDetails);
+
+/** Turning reporting on from Overview starts the usage view of an org with no bill. */
+watch(usageStreamEnabled, (on) => {
+  if (on && !billed.value) void loadDetails();
+});
 </script>

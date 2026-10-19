@@ -30,8 +30,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="billings-usageoverview-missing-banner"
     />
 
+    <!-- An org with no bill shows usage from its own stream, which only exists once reporting is on. -->
     <OEmptyState
-      v-if="!details"
+      v-if="!details && volumeOnly"
+      size="block"
+      :title="
+        usageStreamEnabled
+          ? t('billing.usageTrends.waitingTitle')
+          : t('billing.usageTrends.enableTitle')
+      "
+      :description="
+        usageStreamEnabled
+          ? t('billing.usageTrends.waitingForData')
+          : t('billing.usageV2.enableVolumeSubtitle')
+      "
+      :action-label="usageStreamEnabled ? undefined : t('billing.usageTrends.enableButton')"
+      data-test="billings-usageoverview-enable"
+      @action="confirmingEnable = true"
+    />
+
+    <OEmptyState
+      v-else-if="!details"
       size="block"
       :title="t('billing.usageV2.noPricingTitle')"
       :description="t('billing.usageV2.noPricingSubtitle')"
@@ -41,10 +60,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template v-else>
       <div class="flex shrink-0 flex-wrap items-center justify-between gap-2">
         <div class="text-text-secondary text-sm" data-test="billings-usageoverview-cycle">
-          {{ formatCycle(details, t) }}
-          <span class="text-text-body ms-2 font-medium">
-            {{ t("billing.usageV2.cycleDay", { day: progress.day, total: progress.totalDays }) }}
-          </span>
+          <template v-if="volumeOnly">{{ windowLabel }}</template>
+          <template v-else>
+            {{ formatCycle(details, t) }}
+            <span class="text-text-body ms-2 font-medium">
+              {{ t("billing.usageV2.cycleDay", { day: progress.day, total: progress.totalDays }) }}
+            </span>
+          </template>
         </div>
         <ORefreshButton
           :last-run-at="lastLoadedAt"
@@ -78,8 +100,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :aria-label="t('billing.usageV2.costBreakdown')"
         data-test="billings-usageoverview-breakdown"
       >
+        <!-- No bill, no strip: a share across meters means nothing when GB and run counts mix. -->
         <UsageBillStrip
-          v-if="isSuperOrg"
+          v-if="isSuperOrg && !volumeOnly"
           :rows="orgRows"
           :total="orgTotals.total"
           :selected="selectedOrg?.id ?? null"
@@ -89,7 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @select="selectOrg"
         />
         <UsageBillStrip
-          v-else
+          v-else-if="!volumeOnly"
           :rows="rows"
           :total="total"
           :selected="selectedMeter"
@@ -167,7 +190,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :title="t('billing.usageV2.costByOrg')"
               :subtitle="t('billing.usageV2.orgCostEstimated')"
             />
-            <UsagePaneHeader v-else :title="t('billing.usageV2.costByMeter')" />
+            <UsagePaneHeader
+              v-else
+              :title="
+                volumeOnly ? t('billing.usageV2.usageByMeter') : t('billing.usageV2.costByMeter')
+              "
+            />
 
             <!-- Each meter's breakdown is kept, so drilling back into it shows its table without querying again. -->
             <KeepAlive :max="BREAKDOWN_CACHE_SIZE">
@@ -180,6 +208,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :details="details"
                 :group="selectedGroup"
                 :refresh-token="refreshToken"
+                :volume-only="volumeOnly"
                 @update:group="selectGroup"
                 @top-names="onTopNames"
                 @sections="onSections"
@@ -224,6 +253,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :gross="subtotal"
                 :discount="discountAmount"
                 :streaming="refreshing"
+                :volume-only="volumeOnly"
                 @select="(key) => selectMeter(key as MeterKey)"
               />
             </template>
@@ -231,10 +261,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <aside
             class="border-border-default flex min-h-0 min-w-0 flex-col overflow-hidden border-t @min-[56.25rem]/usage-breakdown:border-s @min-[56.25rem]/usage-breakdown:border-t-0"
-            :aria-label="t('billing.usageV2.dailyCost')"
+            :aria-label="chartTitle"
             data-test="billings-usageoverview-daily-pane"
           >
-            <UsagePaneHeader :title="t('billing.usageV2.dailyCost')" :subtitle="chartSubtitle" />
+            <UsagePaneHeader :title="chartTitle" :subtitle="chartSubtitle" />
             <!-- v-show, not v-if: the KeepAlive inside must survive the moment a drilldown has no chart yet. -->
             <div v-show="chartSchema" class="relative min-h-60 w-full flex-1 p-2">
               <!-- Each view is kept per key, so leaving a drilldown shows the drawn chart instead of querying again. -->
@@ -256,12 +286,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-else-if="!chartSchema"
               size="inline"
               :title="chartEmptyTitle"
+              :action-label="usageStreamEnabled ? undefined : t('billing.usageTrends.enableButton')"
               data-test="billings-usageoverview-daily-empty"
+              @action="confirmingEnable = true"
             />
           </aside>
         </div>
       </section>
     </template>
+
+    <ConfirmDialog
+      v-model="confirmingEnable"
+      data-test="billings-usageoverview-enable-confirm"
+      :title="t('billing.usageTrends.enableConfirmTitle')"
+      :message="t('billing.usageTrends.enableConfirmMessage')"
+      :ok-label="t('billing.usageTrends.enableButton')"
+      @update:ok="enableUsageReporting"
+      @update:cancel="confirmingEnable = false"
+    />
   </div>
 </template>
 
@@ -278,6 +320,7 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import KpiCardRow from "@/components/common/KpiCardRow.vue";
+import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { formatSizeFromMB } from "@/utils/formatters";
 import useBreakpoint from "@/composables/useBreakpoint";
 import UsageKpiCard from "./UsageKpiCard.vue";
@@ -295,6 +338,8 @@ import {
   formatDay,
   formatVolume,
   formatCycle,
+  METERS,
+  meterForEvent,
   netCost,
   scopedMeterRows,
   splitByUse,
@@ -309,14 +354,21 @@ import {
   buildStackedCostPanelSchema,
   buildTrendsPanelSchema,
   CHART_TOP,
+  VOLUME_METERS,
   entitySeriesColors,
   OTHERS_SERIES,
   meterColorFor,
   paletteColor,
 } from "./usageCharts";
-import { dailyOrgCostSql, dailyEntitySql, type DrilldownSection } from "./usageQueries";
+import {
+  dailyOrgCostSql,
+  dailyEntitySql,
+  dailyVolumeSql,
+  type DrilldownSection,
+} from "./usageQueries";
 import { cyclePrices } from "./trendsModel";
 import { useOrgCosts } from "./useOrgCosts";
+import { useUsageReporting } from "./useUsageReporting";
 
 interface KpiCard {
   key: string;
@@ -340,8 +392,13 @@ const props = withDefaults(
     /** The cycle's projected total, worked out once by the page so every tab shows the same figure. */
     projected: number | null;
     refreshing: boolean;
+    /**
+     * An org Stripe does not bill: `details` holds only each meter's volume over a window, so the
+     * screen shows volumes and hides every money figure. Off, Overview is the bill as before.
+     */
+    volumeOnly?: boolean;
   }>(),
-  { billingOrgs: () => [] },
+  { billingOrgs: () => [], volumeOnly: false },
 );
 const emit = defineEmits<{ refresh: [] }>();
 
@@ -377,11 +434,16 @@ const orgId = computed<string>(() => store.state.selectedOrganization.identifier
 /** The org whose usage the chart and breakdown count: a super org's chosen member, or this org. */
 const usageOrgId = computed(() => selectedOrg.value?.id ?? orgId.value);
 
-const usageStreamEnabled = computed<boolean>(
-  () => !!store.state?.organizationData?.organizationSettings?.usage_stream_enabled,
-);
+const {
+  enabled: usageStreamEnabled,
+  confirming: confirmingEnable,
+  enable: enableUsageReporting,
+} = useUsageReporting();
 
-const rows = computed<MeterRow[]>(() => buildMeterRows(props.details, t));
+/** Without a bill, retention has no usage event to count, so its row would only ever read zero. */
+const rows = computed<MeterRow[]>(() =>
+  buildMeterRows(props.details, t).filter((row) => !props.volumeOnly || row.key !== "retention"),
+);
 
 const split = computed(() => splitByUse(rows.value));
 
@@ -539,6 +601,10 @@ const meterTitle = computed(() =>
 
 /** One line of context in the pane header, so the breakdown adds no row of its own. */
 const meterSummary = computed(() => {
+  if (props.volumeOnly) {
+    const meter = selectedMeter.value ? props.details?.[selectedMeter.value] : null;
+    return meter ? formatVolume(meter) : undefined;
+  }
   const scoped = selectedOrg.value
     ? scopedRows.value.find((row) => row.key === selectedMeter.value)
     : null;
@@ -584,7 +650,33 @@ const discountedMeterNames = computed(() =>
   ),
 );
 
+/** The four meters an org with no bill sees first, each by its own unit. */
+const VOLUME_CARD_METERS: MeterKey[] = ["ingestion", "query", "pipeline", "ai"];
+
+const volumeCards = computed<KpiCard[]>(() =>
+  METERS.filter((def) => VOLUME_CARD_METERS.includes(def.key)).map((def) => ({
+    key: def.key,
+    label: t(def.labelKey),
+    icon: "bar-chart",
+    value: formatVolume(props.details?.[def.key]),
+    hint: t(def.billedAsKey),
+  })),
+);
+
+/** "Last 30 days: Sep 20 to Oct 19", the window an org with no bill is shown. */
+const windowLabel = computed(() => {
+  const start = props.details?.cycle_start ?? 0;
+  const end = Math.min(props.details?.cycle_end ?? 0, Math.floor(Date.now() / 1000));
+  return t("billing.usageV2.lastDaysRange", {
+    // Calendar days, today included: the window starts at midnight 29 days back.
+    days: Math.floor((end - start) / 86_400) + 1,
+    start: raw(formatDay(start)),
+    end: raw(formatDay(end)),
+  });
+});
+
 const kpiCards = computed<KpiCard[]>(() => {
+  if (props.volumeOnly) return volumeCards.value;
   const top = split.value.used.find((row) => !row.missing);
   const discounted = discountAmount.value > 0;
   // No discount this cycle: no tile, so nobody wonders what an empty "Discount" means.
@@ -675,9 +767,41 @@ const chartPending = computed(
     sectionsFor.value !== viewKey.value,
 );
 
+/** Daily megabytes per data meter, or one meter's top entities, for an org with no bill. */
+const volumeChartSchema = (meterKey: MeterKey | null) => {
+  if (!meterKey) {
+    const events = METERS.filter((def) => VOLUME_METERS.includes(def.key)).flatMap(
+      (def) => def.events,
+    );
+    return buildStackedCostPanelSchema({
+      id: "usage-overview-volume",
+      sql: dailyVolumeSql(usageOrgId.value, events),
+      seriesColors: events.map((event) => ({
+        value: event,
+        color: meterColorFor(meterForEvent(event)?.key ?? "ingestion"),
+      })),
+      unit: "megabytes",
+      t,
+    });
+  }
+  const spec = chartSection.value;
+  if (!spec) return null;
+  const ranked = chartNamesFor.value === `${viewKey.value}-${spec.id}` ? chartNames.value : [];
+  return buildStackedCostPanelSchema({
+    id: `usage-overview-volume-${meterKey}-${spec.id}`,
+    sql: dailyEntitySql(usageOrgId.value, spec, 1),
+    seriesColors: entitySeriesColors(meterKey, ranked, OTHERS_SERIES),
+    topResults: CHART_TOP,
+    fixedColor: meterColorFor(meterKey),
+    unit: spec.unit === "count" ? "numbers" : "megabytes",
+    t,
+  });
+};
+
 const chartSchema = computed(() => {
   if (!props.details || !usageStreamEnabled.value) return null;
   const meterKey = selectedMeter.value;
+  if (props.volumeOnly) return volumeChartSchema(meterKey);
   if (isSuperOrg.value && !selectedOrg.value) {
     const otherLabel = t("billing.usageV2.otherBand");
     return buildStackedCostPanelSchema({
@@ -718,11 +842,15 @@ const chartSchema = computed(() => {
 
 /** Refresh re-runs a chart through the new bill's window, not its key; the names only recolour it in place. */
 const chartKey = computed(() => {
-  const view = selectedOrg.value?.id ?? "orgs";
+  const view = `${props.volumeOnly ? "volume-" : ""}${selectedOrg.value?.id ?? "orgs"}`;
   return selectedMeter.value
     ? `${view}-${selectedMeter.value}-${chartSection.value?.id}`
     : `${view}-all`;
 });
+
+const chartTitle = computed(() =>
+  props.volumeOnly ? t("billing.usageV2.dailyVolume") : t("billing.usageV2.dailyCost"),
+);
 
 const chartSubtitle = computed(() =>
   selectedMeter.value
@@ -734,7 +862,9 @@ const chartSubtitle = computed(() =>
       ? raw(selectedOrg.value.name)
       : isSuperOrg.value
         ? t("billing.usageV2.byOrg")
-        : undefined,
+        : props.volumeOnly
+          ? t("billing.usageV2.volumeSubtitle")
+          : undefined,
 );
 
 const chartEmptyTitle = computed(() =>
