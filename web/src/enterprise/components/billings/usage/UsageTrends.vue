@@ -57,10 +57,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @update:model-value="selectOrg"
           />
         </div>
-        <!-- The logs search bar's picker; absolute-only is the mode in which it greys out days before `min-date`. -->
+        <!-- The logs search bar's picker, absolute only, so `min-date` keeps it from reaching before the data; ‹ stops there too. -->
         <DateTime
+          ref="picker"
           auto-apply
           disable-relative
+          :disable-prev-shift="range.start <= oldest"
           menu-align="end"
           class="ms-auto"
           default-type="absolute"
@@ -455,7 +457,7 @@ const minDate = computed(() =>
 /** The picker opens on the range the page is showing, in microseconds as it expects. */
 const pickerDefault = computed(() => ({
   startTime: range.value.start * 1_000_000,
-  endTime: range.value.end * 1_000_000,
+  endTime: measuredEnd.value * 1_000_000,
 }));
 
 /** DateTime also emits on mount; only a change the user made should leave the preset. */
@@ -476,6 +478,17 @@ const onPickerChange = (value: {
 
 /** Usage exists only up to now, so an open cycle's KPIs and labels stop at today, not the cycle end. */
 const measuredEnd = computed(() => Math.min(range.value.end, nowSeconds()));
+
+const picker = ref<{ setAbsoluteTime: (start: number, end: number) => void } | null>(null);
+
+/**
+ * The picker reads its dates only when it opens, so it is set to every new range: after a preset,
+ * and after a ‹ step past the data start, which the range moves forward to start on that day.
+ */
+watch(
+  () => [range.value.start, measuredEnd.value],
+  ([start, end]) => picker.value?.setAbsoluteTime(start * 1_000_000, end * 1_000_000),
+);
 
 const rangeLabel = computed(() =>
   t("billing.usageV2.rangeDates", {

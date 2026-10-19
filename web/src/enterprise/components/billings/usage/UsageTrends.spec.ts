@@ -15,6 +15,7 @@
 
 import { enableAutoUnmount, flushPromises, mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { defineComponent, h } from "vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import { mockMeteringResponse } from "./meteringMock";
@@ -35,6 +36,18 @@ vi.mock("vue-router", async () => {
 });
 const search = vi.fn().mockResolvedValue([]);
 vi.mock("./useUsageSearch", () => ({ useUsageSearch: () => ({ search }) }));
+
+// The picker as Trends sees it: its ‹ switch, and the setter the page keeps its label in step with.
+const setAbsoluteTime = vi.fn();
+const DateTimeStub = defineComponent({
+  name: "DateTime",
+  props: { disablePrevShift: Boolean },
+  emits: ["on:date-change"],
+  setup: (_, { expose }) => {
+    expose({ setAbsoluteTime });
+    return () => h("div");
+  },
+});
 
 const { default: UsageTrends } = await import("./UsageTrends.vue");
 
@@ -85,7 +98,10 @@ describe("UsageTrends cost and volume", () => {
     ]);
     const wrapper = mount(UsageTrends, {
       props: { details: upcoming, cycles: [upcoming], billingOrgs: [], projected: null },
-      global: { plugins: [i18n, store], stubs: { DateTime: true, AsyncComponentWrapper: true } },
+      global: {
+        plugins: [i18n, store],
+        stubs: { DateTime: DateTimeStub, AsyncComponentWrapper: true },
+      },
     });
     await flushPromises();
     expect(search.mock.calls[0][0]).toContain('sum(size) as "volume"');
@@ -114,7 +130,10 @@ describe("UsageTrends range in the URL", () => {
   const mountTrends = () =>
     mount(UsageTrends, {
       props: { details: upcoming, cycles: [upcoming], billingOrgs: [], projected: null },
-      global: { plugins: [i18n, store], stubs: { DateTime: true, AsyncComponentWrapper: true } },
+      global: {
+        plugins: [i18n, store],
+        stubs: { DateTime: DateTimeStub, AsyncComponentWrapper: true },
+      },
     });
 
   const rangeToggle = (wrapper: ReturnType<typeof mountTrends>) =>
@@ -160,6 +179,29 @@ describe("UsageTrends range in the URL", () => {
     expect(nav.route.query).toEqual({ tab: "trends" });
   });
 
+  it("turns ‹ off at the data start, and moves the picker back to it after a step past", async () => {
+    // A picked window starting a day after the data, then ‹ steps it two days back.
+    nav.route.query = { tab: "trends", from: String(from), to: String(to) };
+    setAbsoluteTime.mockClear();
+    const wrapper = mountTrends();
+    await flushPromises();
+    const picker = wrapper.findComponent({ name: "DateTime" });
+    expect(picker.props("disablePrevShift")).toBe(false);
+
+    const first = upcoming.cycle_start * 1_000_000;
+    picker.vm.$emit("on:date-change", {
+      startTime: first - 86_400_000_000,
+      endTime: first + 86_400_000_000,
+      userChangedValue: true,
+    });
+    await flushPromises();
+
+    // The chart starts on the first day of data, the label says so, and ‹ goes no further.
+    expect(search.mock.lastCall![1].start).toBe(first);
+    expect(setAbsoluteTime).toHaveBeenLastCalledWith(first, expect.any(Number));
+    expect(picker.props("disablePrevShift")).toBe(true);
+  });
+
   it("leaves the chart alone when another part of the URL changes", async () => {
     nav.route.query = { tab: "trends", from: String(from), to: String(to) };
     mountTrends();
@@ -188,7 +230,10 @@ describe("UsageTrends projected total", () => {
     nav.route.query = {};
     const wrapper = mount(UsageTrends, {
       props: { details: upcoming, cycles: [upcoming], billingOrgs: [], projected: 5000 },
-      global: { plugins: [i18n, store], stubs: { DateTime: true, AsyncComponentWrapper: true } },
+      global: {
+        plugins: [i18n, store],
+        stubs: { DateTime: DateTimeStub, AsyncComponentWrapper: true },
+      },
     });
     await flushPromises();
 
