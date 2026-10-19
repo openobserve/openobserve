@@ -16,10 +16,6 @@
 use config::meta::stream::{FileKey, FileListDeleted};
 use infra::errors::Result;
 
-pub async fn exist_pending_delete(file: &str) -> bool {
-    infra::file_list::pending_delete::exist(file).await
-}
-
 pub async fn add_pending_delete(org_id: &str, account: &str, file: &str) -> Result<()> {
     // add to local db for persistence
     let ts = config::utils::time::now_micros();
@@ -85,23 +81,6 @@ pub async fn remove_removing(file: &str) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[tokio::test]
-    async fn test_exist_pending_delete() {
-        // Test with non-existent file
-        let exists = exist_pending_delete("non_existent_file.parquet").await;
-        assert!(!exists);
-
-        // Add a file and test it exists
-        let test_file = "test_file_exist.parquet";
-        infra::file_list::pending_delete::register(test_file).await;
-
-        let exists = exist_pending_delete(test_file).await;
-        assert!(exists);
-
-        // Clean up
-        infra::file_list::pending_delete::unregister(test_file).await;
-    }
 
     #[tokio::test]
     async fn test_concurrent_access() {

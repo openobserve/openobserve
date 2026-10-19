@@ -62,17 +62,17 @@ pub async fn write_results_to_cache(
     let mut cached_responses = Vec::new();
     let mut search_responses = Vec::new();
 
-    for result in accumulated_results {
+    for result in accumulated_results.drain(..) {
         match result {
-            SearchResultType::Cached(resp) => cached_responses.push(resp.clone()),
-            SearchResultType::Search(resp) => search_responses.push(resp.clone()),
+            SearchResultType::Cached(resp) => cached_responses.push(resp),
+            SearchResultType::Search(resp) => search_responses.push(resp),
         }
     }
 
     let merged_response = cache::merge_response(
         &c_resp.trace_id,
-        &mut cached_responses,
-        &mut search_responses,
+        cached_responses,
+        search_responses,
         &c_resp.ts_column,
         c_resp.limit,
         c_resp.is_descending,
