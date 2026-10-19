@@ -77,6 +77,7 @@ struct PendingMigrations {
     query_history: bool,
     downtimes: bool,
     ai_chat_shares: bool,
+    missing_ownership: bool,
 }
 
 pub async fn init() -> Result<(), anyhow::Error> {
@@ -490,10 +491,7 @@ fn all_org_ownership_keys(pending: &PendingMigrations) -> Vec<&'static str> {
         keys.extend(["providers", "score_configs", "scorers", "eval_jobs"]);
     }
     if pending.llm_workbench {
-        // The Playground is new at 0.0.41. The four beside it shipped earlier
-        // without a migration branch, so orgs that predate their release never
-        // received an `_all_` tuple and custom roles could not be granted those
-        // resources at all. Emitting them here is idempotent.
+        // Playground shipped at 0.0.43, after this gate; the 0.0.57 back-fill covers it.
         keys.extend([
             "playground",
             "annotation_queues",
@@ -542,6 +540,19 @@ fn all_org_ownership_keys(pending: &PendingMigrations) -> Vec<&'static str> {
     if pending.ai_chat_shares {
         keys.push("ai_chat_shares");
     }
+    if pending.missing_ownership {
+        keys.extend([
+            "db_monitoring",
+            "search_inspector",
+            "status_page",
+            "mcp",
+            "playground",
+            "model_pricing",
+            LOGS_INSIGHTS_KEY,
+            LOGS_PATTERN_KEY,
+            RESULT_LOGS_CACHE_KEY,
+        ]);
+    }
     keys
 }
 
@@ -584,6 +595,7 @@ fn pending_migrations(latest: &str, existing: &str) -> PendingMigrations {
     let v0_0_53 = version_compare::Version::from("0.0.53").unwrap();
     let v0_0_54 = version_compare::Version::from("0.0.54").unwrap();
     let v0_0_55 = version_compare::Version::from("0.0.55").unwrap();
+    let v0_0_57 = version_compare::Version::from("0.0.57").unwrap();
 
     if meta_version > v0_0_5 && existing_model_version < v0_0_6 {
         pending.pipeline = true;
@@ -712,6 +724,11 @@ fn pending_migrations(latest: &str, existing: &str) -> PendingMigrations {
         log::info!("[OFGA:Local] AI chat share permissions migration needed");
         pending.ai_chat_shares = true;
     }
+    // Earlier arms were gated below the version these nine types shipped at, or missing.
+    if meta_version >= v0_0_57 && existing_model_version < v0_0_57 {
+        log::info!("[OFGA:Local] missing org-ownership back-fill needed");
+        pending.missing_ownership = true;
+    }
 
     pending
 }
@@ -764,5 +781,28 @@ mod tests {
 
         assert!(!pending_migrations("0.0.54", "0.0.53").ai_chat_shares);
         assert!(all_org_ownership_keys(&pending_migrations("0.0.55", "0.0.55")).is_empty());
+    }
+
+    #[test]
+    fn test_missing_ownership_back_fill_below_0_0_57() {
+        let pending = pending_migrations("0.0.57", "0.0.56");
+        assert!(pending.missing_ownership && !pending.ai_chat_shares);
+        assert_eq!(
+            all_org_ownership_keys(&pending),
+            vec![
+                "db_monitoring",
+                "search_inspector",
+                "status_page",
+                "mcp",
+                "playground",
+                "model_pricing",
+                LOGS_INSIGHTS_KEY,
+                LOGS_PATTERN_KEY,
+                RESULT_LOGS_CACHE_KEY,
+            ]
+        );
+
+        assert!(all_org_ownership_keys(&pending_migrations("0.0.57", "0.0.57")).is_empty());
+        assert!(!pending_migrations("0.0.56", "0.0.56").missing_ownership);
     }
 }
