@@ -30,9 +30,7 @@ use crate::{
     models::quality::{ListQualityQuery, ListQualityScoresQuery},
 };
 
-/// Same visibility as ListScoreConfigs, so Quality never shows a config the
-/// caller cannot open. The routes themselves only check the org-level trace
-/// grant.
+/// Same visibility as ListScoreConfigs; the routes only check the org-level trace grant.
 async fn visible_configs(org_id: &str, user_id: &str) -> Result<impl Fn(&str) -> bool, Response> {
     let permitted_objects = openobserve_api_common::auth::validator::list_objects_for_user(
         org_id,
@@ -150,7 +148,7 @@ pub async fn list_quality_scores(
 ) -> Response {
     match visible_configs(&org_id, &user_email.user_id).await {
         Ok(is_visible) if is_visible(&entity_id) => {}
-        Ok(_) => return MetaHttpResponse::forbidden("Unauthorized Access"),
+        Ok(_) => return quality_error_response(QualityError::NotFound(entity_id)),
         Err(response) => return response,
     }
     match quality::list_scores(&org_id, &entity_id, query.into()).await {

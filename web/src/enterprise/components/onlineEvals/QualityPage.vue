@@ -18,7 +18,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="flex min-h-0 min-w-0 flex-1 flex-col" data-test="quality-page">
     <!-- With a config open the page header is the detail header, as on the other detail pages. -->
     <OPageHeader
-      class="border-border-default shrink-0 border-b"
       :title="header.title"
       :subtitle="header.subtitle"
       :icon="configId ? undefined : 'star-rate'"
