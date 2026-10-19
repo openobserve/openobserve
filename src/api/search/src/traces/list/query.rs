@@ -106,12 +106,13 @@ impl TraceSearchContext {
             }
             None => hits,
         };
-        // Post-release tracking of what the time index adds to each list page.
+        // Filtered pages ran the summary before the index: only lookup and the widening are new.
         log::info!(
-            "[TRACES_LIST trace_id {}] time index cost: lookup={}ms summary={}ms ids={} indexed={} recomputed={} window={range:?} summary_window={summary_window:?}",
+            "[TRACES_LIST trace_id {}] page cost: lookup={}ms summary={}ms filtered={} ids={} indexed={} recomputed={} window={range:?} summary_window={summary_window:?}",
             self.trace_id,
             lookup_took.as_millis(),
             summary_took.as_millis(),
+            plan.is_filtered(),
             ids.len(),
             indexed.len(),
             recomputed,
