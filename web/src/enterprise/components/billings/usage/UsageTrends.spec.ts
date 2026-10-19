@@ -303,5 +303,9 @@ describe("UsageTrends projected total", () => {
     // The same figure Overview and Budget show, not a second projection.
     expect(card).toContain("$5,000.00");
     expect(card).toContain("at the last 7 days' pace");
+
+    // Read from usage records, not the bill, so it does not take the bill's name.
+    const total = wrapper.find('[data-test="billings-usagetrends-kpi-total"]').text();
+    expect(total).toContain("Estimated Cost So Far");
   });
 });

@@ -8097,6 +8097,7 @@
       "subtotal": "Subtotal",
       "discount": "Discount",
       "costSoFar": "Cost So Far",
+      "estimatedCostSoFar": "Estimated Cost So Far",
       "netOfDiscounts": "After discounts",
       "projectedTotal": "Projected Total",
       "estimate": "Estimate at current pace",

@@ -620,7 +620,8 @@ const kpiCards = computed(() => {
     [
       {
         key: "total",
-        label: f ? t("billing.usageV2.costSoFar") : t("billing.usageV2.totalCost"),
+        // An estimate from usage records, so it does not share Overview's name for the bill.
+        label: f ? t("billing.usageV2.estimatedCostSoFar") : t("billing.usageV2.totalCost"),
         icon: "attach-money",
         value: cost(s.total),
         hint: f
