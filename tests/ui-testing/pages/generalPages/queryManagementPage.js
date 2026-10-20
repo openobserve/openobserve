@@ -18,8 +18,7 @@ export class QueryManagementPage {
     this.sectionRail = page.locator('[data-test="section-rail"]');
     // General Settings page title (OPageHeader title-data-test for key "general").
     this.generalPageTitle = page.locator('[data-test="settings-general-page-title"]');
-    // Query Management rail tab — filtered out entirely on OSS (SectionRail drops
-    // `visible !== false` items), so count 0 rather than merely hidden.
+    // Query Management rail tab — filtered out on OSS (SectionRail drops `visible !== false` items), so count 0 rather than merely hidden.
     this.queryManagementTab = page.locator('[data-test="query-management-tab"]');
     this.enterpriseLockedPage = page.locator('[data-test="enterprise-feature-locked"]');
     this.queryListButton = page.locator('[data-test="queryList-btn"]');
@@ -39,8 +38,7 @@ export class QueryManagementPage {
     );
   }
 
-  // The All Queries tab is v-show-toggled, so the row actions exist in the DOM
-  // while User Summary is showing — wait for visibility, not just attachment.
+  // The All Queries tab is v-show-toggled, so wait for visibility, not just attachment.
   async openFirstQueryDetails() {
     const button = this.queryListButton.first();
     await expect(button).toBeVisible({ timeout: 15000 });
@@ -118,8 +116,7 @@ export class QueryManagementPage {
     );
   }
 
-  // Builds a stub status row in the shape RunningQueries consumes. Every row
-  // uses search_type 'dashboards' (the All Queries default) so it stays visible.
+  // Rows use search_type 'dashboards' (the All Queries default) so they stay visible.
   runningQuery(traceId, orgId, userId) {
     const now = Date.now() * 1000;
     return {
@@ -173,8 +170,7 @@ export class QueryManagementPage {
     );
   }
 
-  // Arms a wait for the next org-scoped cancel PUT and returns its JSON body.
-  // Call BEFORE the cancel action; await the returned promise after confirming.
+  // Call before the cancel action; await the returned promise after confirming.
   captureCancelRequest(org) {
     return this.page
       .waitForRequest(
@@ -226,8 +222,7 @@ export class QueryManagementPage {
     await btn.click();
   }
 
-  // Arms a wait for a cancel PUT; stop() resolves true if one fires, false if
-  // none fires within the settle window. Used to assert a dismiss issues no request.
+  // stop() resolves true if a cancel PUT fires, false if none does within the settle window (dismiss issues no request).
   startCancelWatcher(org) {
     const requestSeen = this.page.waitForRequest(
       (req) => req.method() === 'PUT' && req.url().includes(`/api/${org}/query_manager/cancel`),
