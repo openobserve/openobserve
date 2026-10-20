@@ -98,6 +98,8 @@ const CONTINUE_PROMPT: &str = "The previous turn stopped. Continue from the last
 const ERROR_BUSY: &str = "busy";
 /// The turn record's error code of a turn that reached its deadline.
 const TURN_TIMEOUT_CODE: &str = "turn_timeout";
+/// The request-context field that tells o2-ai how long this turn may run, in seconds.
+const TURN_SECONDS_FIELD: &str = "turn_seconds";
 /// Progress writes without a stage change are at least this far apart.
 const PROGRESS_INTERVAL: Duration = Duration::from_secs(5);
 /// The agent health probe's own deadline; the shared client's read timeout is minutes.
@@ -457,7 +459,16 @@ async fn start_turn(
     )
     .await?;
 
-    let mut request = QueryRequest::new(prompt, run.context.clone());
+    // The turn ends at `rca_timeout_secs`; o2-ai warns the agent before it, so a long
+    // investigation submits what it found instead of failing `timeout` with no report.
+    let mut context = run.context.clone();
+    if let Some(fields) = context.as_object_mut() {
+        fields.insert(
+            TURN_SECONDS_FIELD.to_string(),
+            serde_json::Value::from(get_o2_config().incidents.rca_timeout_secs),
+        );
+    }
+    let mut request = QueryRequest::new(prompt, context);
     request.mcps = (!mcps.is_empty()).then_some(mcps);
     request.clis = (!clis.is_empty()).then_some(clis);
     request.skills = (!skills.is_empty()).then_some(skills);
