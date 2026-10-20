@@ -305,8 +305,11 @@ pub struct FleetConfig {
     pub latest_version: i64,
     pub live_version: Option<i64>,
     pub collectors: usize,
-    /// The fleets whose desired version is this configuration.
+    /// The readable fleets whose desired or stable version is this configuration.
     pub fleets: Vec<CollectorFleet>,
+    /// Fleets using this configuration that the caller cannot read.
+    #[serde(default)]
+    pub fleets_hidden: usize,
     pub updated_at: i64,
     pub updated_by: String,
 }
@@ -603,7 +606,8 @@ pub struct FleetState {
 pub struct Fleet {
     pub id: String,
     pub name: String,
-    pub state: FleetState,
+    /// Null for a fleet the caller may list but not read.
+    pub state: Option<FleetState>,
     /// The fleet's own overrides; unset fields inherit the organization defaults.
     pub settings: FleetSettings,
 }
@@ -803,6 +807,8 @@ pub struct RolloutMember {
     pub state: MemberState,
     /// Skipped after a halt; included again by default in the next rollout.
     pub excluded: bool,
+    #[serde(default)]
+    pub evidence: Option<DeliveryEvidence>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, ToSchema)]
@@ -1027,6 +1033,7 @@ mod tests {
                 phase: 0,
                 state: MemberState::Rejected,
                 excluded: false,
+                evidence: None,
             }],
             events: vec![RolloutEvent {
                 at: 1,
@@ -1124,6 +1131,7 @@ mod tests {
                 live_version: None,
                 collectors: 0,
                 fleets: vec![],
+                fleets_hidden: 1,
                 updated_at: 1,
                 updated_by: "u".to_string(),
             },
@@ -1132,6 +1140,7 @@ mod tests {
         };
         let json = serde_json::to_value(&detail).unwrap();
         assert_eq!(json["id"], "edge");
+        assert_eq!(json["fleets_hidden"], 1);
         assert!(json.get("config").is_none());
         let publish: PublishRequest = serde_json::from_str(r#"{"yaml":"a: 1"}"#).unwrap();
         assert_eq!(publish.message, "");
@@ -1280,13 +1289,13 @@ mod tests {
             items: vec![Fleet {
                 id: "f1".to_string(),
                 name: "Edge".to_string(),
-                state: FleetState::default(),
+                state: None,
                 settings: FleetSettings::default(),
             }],
         };
         let json = serde_json::to_value(list).unwrap();
         assert_eq!(json["total"], 1);
-        assert!(json["items"][0]["state"]["rollout"].is_null());
+        assert!(json["items"][0]["state"].is_null(), "listed, not readable");
         assert!(json["items"][0]["settings"]["heartbeat_interval_secs"].is_null());
     }
 

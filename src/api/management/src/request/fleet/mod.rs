@@ -328,7 +328,7 @@ pub async fn redeliver_collector(
     context_path = "/api",
     tag = "Fleet",
     operation_id = "ListFleets",
-    summary = "The fleets the caller may read, each with its versions, counts and setting overrides",
+    summary = "The fleets the caller may list; state is null where the caller may not read the fleet",
     security(("Authorization" = [])),
     params(("org_id" = String, Path, description = "Organization name"), PageQuery),
     responses(
@@ -362,16 +362,19 @@ pub async fn list_fleets(
             Ok(states) => states,
             Err(e) => return to_response(e),
         };
-        let mut readable = Vec::with_capacity(listed.len());
+        let mut fleets = Vec::with_capacity(listed.len());
         for folder in listed {
-            if fleet_read(&org_id, user_id, &folder.folder_id)
+            let readable = fleet_read(&org_id, user_id, &folder.folder_id)
                 .await
-                .is_none()
-            {
-                readable.push(fleet_item(folder, &states));
+                .is_none();
+            let mut item = fleet_item(folder, &states);
+            if !readable {
+                item.state = None;
+                item.settings = FleetSettings::default();
             }
+            fleets.push(item);
         }
-        let (total, items) = page.page(readable);
+        let (total, items) = page.page(fleets);
         MetaHttpResponse::json(FleetList { total, items })
     }
     #[cfg(not(feature = "enterprise"))]
@@ -1994,7 +1997,7 @@ fn permitted_from(
 fn fleet_item(folder: Folder, states: &[config::meta::fleet::Fleet]) -> config::meta::fleet::Fleet {
     let found = states.iter().find(|s| s.id == folder.folder_id);
     config::meta::fleet::Fleet {
-        state: found.map(|s| s.state.clone()).unwrap_or_default(),
+        state: Some(found.and_then(|s| s.state.clone()).unwrap_or_default()),
         settings: found.map(|s| s.settings).unwrap_or_default(),
         id: folder.folder_id,
         name: folder.name,
@@ -2529,14 +2532,14 @@ mod tests {
         let stored = Fleet {
             id: "f1".to_string(),
             name: "stale".to_string(),
-            state: FleetState {
+            state: Some(FleetState {
                 desired: Some(FleetVersion {
                     config: "edge".to_string(),
                     version: 2,
                 }),
                 collectors: 3,
                 ..Default::default()
-            },
+            }),
             settings: FleetSettings {
                 retention_days: Some(0),
                 ..Default::default()
@@ -2547,7 +2550,7 @@ mod tests {
         assert_eq!(item.state, stored.state);
         assert_eq!(item.settings, stored.settings);
         let empty = fleet_item(folder("f2"), &[stored]);
-        assert_eq!(empty.state, FleetState::default());
+        assert_eq!(empty.state, Some(FleetState::default()));
         assert_eq!(empty.settings, FleetSettings::default());
     }
 }
