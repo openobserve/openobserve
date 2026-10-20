@@ -510,6 +510,8 @@ export class LogsPage {
         this.resultsSkeleton = '[data-test="logs-search-result-logs-table"] [data-test="o2-table-skeleton-body"]';
         this.resultsLoadingBanner = '[data-test="logs-search-result-logs-table"] [data-test="o2-table-loading-banner"]';
         this.noResultsFoundText = '[data-test="logs-search-no-events-found-text"]';
+        // States that only render once a search has run (or the auto-run guard held it); the pre-search "apply search" hero is excluded on purpose.
+        this.searchSettledStates = `${this.logsSearchResultTableRows}, ${this.noResultsFoundText}, [data-test="logs-search-error-state"], [data-test="logs-search-filter-error-message"], [data-test="logs-search-cancelled-state"], [data-test="logs-auto-run-guard"]`;
         this.resultsProgressBar = '[data-test="logs-results-progress"]';
         this.queryPlanDialog = '[data-test="query-plan-dialog"]';
         this.queryEditorSplitter = '[role="separator"][aria-orientation="horizontal"]';
@@ -13297,6 +13299,8 @@ export class LogsPage {
 
     /** Refreshes and waits for the results table to render. */
     async runSearchAndWaitForResults(timeout = 30000) {
+        // The button reads Run before the load-time search starts, so first wait for that search to have produced a state.
+        await expect(this.page.locator(this.searchSettledStates).first()).toBeVisible({ timeout });
         // A click while the load-time search is in flight hits the Cancel variant of this button.
         await this.waitForRunQueryButton(timeout);
         // The table is already visible from the load-time search, so gate on this click's own hits response.
