@@ -1,9 +1,0 @@
-web/src/constants/config.ts
-web/src/enterprise/components/billings/enterprisePlan.spec.ts
-web/src/enterprise/components/billings/enterprisePlan.vue
-web/src/enterprise/components/billings/plans.spec.ts
-web/src/enterprise/components/billings/plans.vue
-web/src/enterprise/components/billings/proPlan.spec.ts
-web/src/enterprise/components/billings/proPlan.vue
-web/src/enterprise/components/billings/usage/UsageView.spec.ts
-web/src/locales/languages/en-US.json

@@ -106,6 +106,17 @@ export class BillingPlansPage {
         });
     }
 
+    // Reads the live bootstrap `/config` response (the same endpoint the frontend boots from) to
+    // learn the build type ("opensource" | "enterprise" | "cloud"). The /billings route is only
+    // registered on Cloud/Enterprise builds (web/src/router/index.ts:30), so the spec skips the OSS
+    // build from this signal instead of relying on a rendered label.
+    async detectBuildType() {
+        const baseUrl = process.env['ZO_BASE_URL'].replace(/\/+$/, '');
+        const response = await this.page.request.get(`${baseUrl}/config`);
+        const body = await response.json();
+        return body.build_type;
+    }
+
     // ----------------------------------------------------------------
     // Navigation
     // ----------------------------------------------------------------

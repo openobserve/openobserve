@@ -2,7 +2,6 @@ const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const { getOrgIdentifier } = require('../utils/cloud-auth.js');
-const { isCloudEnvironment } = require('../../pages/cloudPages/cloud-env.js');
 
 // Pricing JSON documents (mock targets for the external https://openobserve.ai/pricing.json fetch).
 // Shapes copied from web/src/enterprise/components/billings/plans.spec.ts "pricing JSON" describe.
@@ -74,14 +73,20 @@ const managedProviderCases = [
 
 test.describe('Enterprise Billing Plans Pricing Cards testcases', () => {
     test.describe.configure({ mode: 'parallel' });
-    test.skip(!isCloudEnvironment(), 'Billing is Cloud-only');
 
     let pm;
+    let buildType;
 
     test.beforeEach(async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
-        await navigateToBase(page);
         pm = new PageManager(page);
+        // /billings is registered on Cloud and Enterprise builds only (web/src/router/index.ts:30), so skip the OSS build.
+        buildType = await pm.billingPlansPage.detectBuildType();
+        test.skip(
+            buildType === 'opensource',
+            `Billing plans are Cloud/Enterprise only (build_type: ${buildType})`,
+        );
+        await navigateToBase(page);
         testLogger.info('Test setup completed');
     });
 
@@ -199,6 +204,13 @@ test.describe('Enterprise Billing Plans Pricing Cards testcases', () => {
     test('should show the managed-billing panel for a child org', {
         tag: ['@billingPlansPricing', '@all', '@P2', '@cloud'],
     }, async ({ page }) => {
+        // fetchMembership returns early unless config.isCloud === "true" (plans.vue:248), so on this
+        // Enterprise build the membership is never fetched and the managed-billing panel cannot render.
+        // Park as fixme until the panel is wired for non-Cloud builds; the assertion body stays intact.
+        test.fixme(
+            buildType !== 'cloud',
+            'Child-org managed billing is Cloud-only: fetchMembership() returns early unless config.isCloud === "true" (plans.vue:248)',
+        );
         testLogger.info('Mocking a non-null billing-group membership');
         await pm.billingPlansPage.pinListSubscription({ subscription_type: '', provider: 'stripe' });
         await pm.billingPlansPage.mockPricingJson(PRICING_NEW);
