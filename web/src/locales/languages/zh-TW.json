@@ -10922,6 +10922,12 @@
     "selectionOffscreen": "{count} 個不在檢視中 | {count} 個不在檢視中",
     "clearSelection": "清除選擇",
     "addSelected": "新增 {count} 個警示 | 新增 {count} 個警示",
+    "alertType": "警示類型",
+    "alertTypeAll": "全部",
+    "alertTypeThreshold": "閾值",
+    "alertTypeAnomaly": "異常",
+    "enterprise": "Enterprise",
+    "enterpriseHint": "異常偵測警示需要 OpenObserve Enterprise。",
     "drawer": {
       "dataAvailable": "資料可用",
       "streamNotFound": "找不到串流",
@@ -10946,6 +10952,8 @@
       "neverIngestedCallout": "{stream} 存在但從未接收過資料，因此此警示沒有可觸發的對象。",
       "lastData": "最後資料 {when}",
       "staleCallout": "{stream} 最後接收資料的時間為 {when}。此警示將保持靜默，直到恢復資料擷取。",
+      "anomalyTrainingNote": "此警示從資料流本身的歷史中學習，在資料足以訓練之前保持靜默：視其間隔而定，需要數小時到大約一天。完整的平日與週末模型需要涵蓋一個週末的期間。",
+      "detection": "偵測",
       "unknownTime": "於未知時間"
     },
     "install": {
@@ -10984,6 +10992,9 @@
       "cancel": "取消",
       "done": "完成",
       "confirmLarge": "我了解此操作會在 {folder} 中建立 {count} 個警示，每個都會通知 {destination}。",
+      "tuneThresholdOnly": "僅適用於閾值警示。",
+      "anomalyTrainingNote": "異常警示在以足夠的資料流歷史完成訓練後才開始發出警示。",
+      "anomalyUnavailable": "異常警示需要已啟用異常偵測的 OpenObserve Enterprise，因此已略過此警示。",
       "confirmLargeNoDestination": "我了解這會在 {folder} 中建立 {count} 個警示，且它們目前都不會通知任何目標。"
     },
     "error": {

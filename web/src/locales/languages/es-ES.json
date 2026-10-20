@@ -10927,6 +10927,12 @@
     "selectionOffscreen": "{count} fuera de vista | {count} fuera de vista",
     "clearSelection": "Quitar selección",
     "addSelected": "Añadir {count} alerta | Añadir {count} alertas",
+    "alertType": "Tipo de alerta",
+    "alertTypeAll": "Todos",
+    "alertTypeThreshold": "Umbral",
+    "alertTypeAnomaly": "Anomalía",
+    "enterprise": "Enterprise",
+    "enterpriseHint": "Las alertas de detección de anomalías requieren OpenObserve Enterprise.",
     "drawer": {
       "dataAvailable": "Datos disponibles",
       "streamNotFound": "Stream no encontrado",
@@ -10951,6 +10957,8 @@
       "neverIngestedCallout": "{stream} existe pero nunca ha recibido datos, por lo que esta alerta no tiene nada sobre lo que activarse.",
       "lastData": "Últimos datos {when}",
       "staleCallout": "{stream} recibió datos por última vez {when}. Esta alerta permanecerá en silencio hasta que se reanude la ingesta.",
+      "anomalyTrainingNote": "Esta alerta aprende del propio historial del flujo y permanece en silencio hasta tener suficiente para entrenar: de varias horas a cerca de un día, según su intervalo. El modelo completo de días laborables y fin de semana necesita un periodo que incluya un fin de semana.",
+      "detection": "Detección",
       "unknownTime": "en un momento desconocido"
     },
     "install": {
@@ -10989,6 +10997,9 @@
       "cancel": "Cancelar",
       "done": "Listo",
       "confirmLarge": "Entiendo que esto crea {count} alertas en {folder}, cada una notificando a {destination}.",
+      "tuneThresholdOnly": "Solo se aplica a las alertas de umbral.",
+      "anomalyTrainingNote": "Las alertas de anomalías empiezan a avisar cuando se han entrenado con suficiente historial del flujo.",
+      "anomalyUnavailable": "Las alertas de anomalías requieren OpenObserve Enterprise con la detección de anomalías activada, así que esta se ha omitido.",
       "confirmLargeNoDestination": "Entiendo que esto crea {count} alertas en {folder}, ninguna de las cuales notifica a un destino todavía."
     },
     "error": {

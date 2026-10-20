@@ -10927,6 +10927,12 @@
     "selectionOffscreen": "{count} fora da vista | {count} fora da vista",
     "clearSelection": "Limpar seleção",
     "addSelected": "Adicionar {count} alerta | Adicionar {count} alertas",
+    "alertType": "Tipo de alerta",
+    "alertTypeAll": "Todos",
+    "alertTypeThreshold": "Limiar",
+    "alertTypeAnomaly": "Anomalia",
+    "enterprise": "Enterprise",
+    "enterpriseHint": "Os alertas de deteção de anomalias requerem o OpenObserve Enterprise.",
     "drawer": {
       "dataAvailable": "Dados disponíveis",
       "streamNotFound": "Stream não encontrado",
@@ -10951,6 +10957,8 @@
       "neverIngestedCallout": "{stream} existe, mas nunca recebeu dados, então este alerta não tem em que disparar.",
       "lastData": "Últimos dados {when}",
       "staleCallout": "{stream} recebeu dados pela última vez {when}. Este alerta permanecerá inativo até que a ingestão seja retomada.",
+      "anomalyTrainingNote": "Este alerta aprende com o histórico do próprio fluxo e fica em silêncio até ter o suficiente para treinar: de várias horas a cerca de um dia, consoante o intervalo. O modelo completo de dias úteis e fim de semana precisa de um período que inclua um fim de semana.",
+      "detection": "Deteção",
       "unknownTime": "em um horário desconhecido"
     },
     "install": {
@@ -10989,6 +10997,9 @@
       "cancel": "Cancelar",
       "done": "Concluído",
       "confirmLarge": "Compreendo que isto cria {count} alertas em {folder}, cada um a notificar {destination}.",
+      "tuneThresholdOnly": "Aplica-se apenas a alertas de limiar.",
+      "anomalyTrainingNote": "Os alertas de anomalia começam a disparar depois de treinarem com histórico suficiente do fluxo.",
+      "anomalyUnavailable": "Os alertas de anomalia requerem o OpenObserve Enterprise com a deteção de anomalias ativada, por isso este foi ignorado.",
       "confirmLargeNoDestination": "Entendo que isso cria {count} alertas em {folder}, nenhum dos quais notifica um destino ainda."
     },
     "error": {

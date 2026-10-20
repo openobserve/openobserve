@@ -10927,6 +10927,12 @@
     "selectionOffscreen": "{count} poza widokiem | {count} poza widokiem",
     "clearSelection": "Wyczyść zaznaczenie",
     "addSelected": "Dodaj {count} alert | Dodaj {count} alertów",
+    "alertType": "Typ alertu",
+    "alertTypeAll": "Wszystkie",
+    "alertTypeThreshold": "Próg",
+    "alertTypeAnomaly": "Anomalia",
+    "enterprise": "Enterprise",
+    "enterpriseHint": "Alerty wykrywania anomalii wymagają OpenObserve Enterprise.",
     "drawer": {
       "dataAvailable": "Dane dostępne",
       "streamNotFound": "Nie znaleziono strumienia",
@@ -10951,6 +10957,8 @@
       "neverIngestedCallout": "{stream} istnieje, ale nigdy nie otrzymał danych, więc ten alert nie ma na czym zadziałać.",
       "lastData": "Ostatnie dane {when}",
       "staleCallout": "{stream} ostatnio otrzymał dane {when}. Ten alert pozostanie cichy, aż do wznowienia pozyskiwania danych.",
+      "anomalyTrainingNote": "Ten alert uczy się na podstawie historii samego strumienia i milczy, dopóki nie ma jej dość do treningu: od kilku godzin do około doby, zależnie od interwału. Pełny model dni roboczych i weekendu wymaga okresu obejmującego weekend.",
+      "detection": "Wykrywanie",
       "unknownTime": "o nieznanej godzinie"
     },
     "install": {
@@ -10989,6 +10997,9 @@
       "cancel": "Anuluj",
       "done": "Gotowe",
       "confirmLarge": "Rozumiem, że utworzy to {count} alertów w {folder}, z których każdy powiadamia {destination}.",
+      "tuneThresholdOnly": "Dotyczy tylko alertów progowych.",
+      "anomalyTrainingNote": "Alerty anomalii zaczynają działać, gdy wytrenują się na wystarczającej historii strumienia.",
+      "anomalyUnavailable": "Alerty anomalii wymagają OpenObserve Enterprise z włączonym wykrywaniem anomalii, więc ten został pominięty.",
       "confirmLargeNoDestination": "Rozumiem, że spowoduje to utworzenie {count} alertów w {folder}, z których żaden nie powiadamia jeszcze miejsca docelowego."
     },
     "error": {

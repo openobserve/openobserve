@@ -10927,6 +10927,12 @@
     "selectionOffscreen": "{count} خارج العرض | {count} خارج العرض",
     "clearSelection": "مسح التحديد",
     "addSelected": "إضافة {count} تنبيه | إضافة {count} تنبيهات",
+    "alertType": "نوع التنبيه",
+    "alertTypeAll": "الكل",
+    "alertTypeThreshold": "حد",
+    "alertTypeAnomaly": "شذوذ",
+    "enterprise": "Enterprise",
+    "enterpriseHint": "تتطلب تنبيهات اكتشاف الشذوذ OpenObserve Enterprise.",
     "drawer": {
       "dataAvailable": "البيانات متاحة",
       "streamNotFound": "التدفق غير موجود",
@@ -10951,6 +10957,8 @@
       "neverIngestedCallout": "{stream} موجود لكنه لم يستقبل بيانات أبدًا، لذا لا يوجد شيء لتفعيل هذا التنبيه عليه.",
       "lastData": "آخر بيانات {when}",
       "staleCallout": "آخر بيانات {stream} استقبلت {when}. سيبقى هذا التنبيه صامتًا حتى يستأنف الاستيعاب.",
+      "anomalyTrainingNote": "يتعلم هذا التنبيه من سجل التدفق نفسه ويبقى صامتًا حتى تتوفر بيانات كافية للتدريب: من عدة ساعات إلى نحو يوم، بحسب الفاصل الزمني. يحتاج النموذج الكامل لأيام الأسبوع وعطلة نهاية الأسبوع إلى فترة تشمل عطلة نهاية أسبوع.",
+      "detection": "الاكتشاف",
       "unknownTime": "في وقت غير معروف"
     },
     "install": {
@@ -10989,6 +10997,9 @@
       "cancel": "إلغاء",
       "done": "تم",
       "confirmLarge": "أفهم أن هذا سينشئ {count} تنبيهات في {folder}، وسيرسل كل منها إشعارا إلى {destination}.",
+      "tuneThresholdOnly": "ينطبق على تنبيهات الحد فقط.",
+      "anomalyTrainingNote": "تبدأ تنبيهات الشذوذ في الإطلاق بعد أن تتدرب على قدر كافٍ من سجل التدفق.",
+      "anomalyUnavailable": "تتطلب تنبيهات الشذوذ OpenObserve Enterprise مع تفعيل اكتشاف الشذوذ، لذا تم تخطي هذا التنبيه.",
       "confirmLargeNoDestination": "أفهم أن هذا ينشئ عدد {count} من التنبيهات في {folder}، ولا يُعلم أي منها وجهة بعد."
     },
     "error": {

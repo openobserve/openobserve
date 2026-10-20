@@ -10927,6 +10927,12 @@
     "selectionOffscreen": "{count} görünmüyor | {count} görünmüyor",
     "clearSelection": "Seçimi temizle",
     "addSelected": "{count} uyarı ekle | {count} uyarı ekle",
+    "alertType": "Uyarı türü",
+    "alertTypeAll": "Tümü",
+    "alertTypeThreshold": "Eşik",
+    "alertTypeAnomaly": "Anomali",
+    "enterprise": "Enterprise",
+    "enterpriseHint": "Anomali algılama uyarıları OpenObserve Enterprise gerektirir.",
     "drawer": {
       "dataAvailable": "Veri mevcut",
       "streamNotFound": "Akış bulunamadı",
@@ -10951,6 +10957,8 @@
       "neverIngestedCallout": "{stream} mevcut ancak hiç veri almadı, bu yüzden bu uyarının tetikleneceği bir şey yok.",
       "lastData": "Son veri {when}",
       "staleCallout": "{stream} son veriyi {when} aldı. Bu uyarı, veri alımı yeniden başlayana kadar sessiz kalacak.",
+      "anomalyTrainingNote": "Bu uyarı akışın kendi geçmişinden öğrenir ve eğitim için yeterli veri olana kadar sessiz kalır: aralığına bağlı olarak birkaç saatten yaklaşık bir güne kadar. Hafta içi ve hafta sonunu kapsayan tam model, bir hafta sonunu içeren bir dönem gerektirir.",
+      "detection": "Algılama",
       "unknownTime": "bilinmeyen bir zamanda"
     },
     "install": {
@@ -10989,6 +10997,9 @@
       "cancel": "İptal",
       "done": "Bitti",
       "confirmLarge": "Bunun {folder} içinde {count} uyarı oluşturacağını ve her birinin {destination} adresine bildirim göndereceğini anlıyorum.",
+      "tuneThresholdOnly": "Yalnızca eşik uyarılarına uygulanır.",
+      "anomalyTrainingNote": "Anomali uyarıları, akışın geçmişiyle yeterince eğitildikten sonra tetiklenmeye başlar.",
+      "anomalyUnavailable": "Anomali uyarıları, anomali algılaması açık OpenObserve Enterprise gerektirir; bu nedenle bu uyarı atlandı.",
       "confirmLargeNoDestination": "{folder} içinde, hiçbiri henüz bir hedefe bildirim göndermeyen {count} uyarı oluşturulacağını anlıyorum."
     },
     "error": {

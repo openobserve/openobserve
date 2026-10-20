@@ -10927,6 +10927,12 @@
     "selectionOffscreen": "{count} 件は表示外 | {count} 件は表示外",
     "clearSelection": "選択を解除",
     "addSelected": "{count} 件のアラートを追加 | {count} 件のアラートを追加",
+    "alertType": "アラートの種類",
+    "alertTypeAll": "すべて",
+    "alertTypeThreshold": "しきい値",
+    "alertTypeAnomaly": "異常",
+    "enterprise": "Enterprise",
+    "enterpriseHint": "異常検知アラートには OpenObserve Enterprise が必要です。",
     "drawer": {
       "dataAvailable": "データあり",
       "streamNotFound": "ストリームが見つかりません",
@@ -10951,6 +10957,8 @@
       "neverIngestedCallout": "{stream} は存在しますが、一度もデータを受信していないため、このアラートが発火する対象がありません。",
       "lastData": "最終データ {when}",
       "staleCallout": "{stream} が最後にデータを受信したのは {when} です。取り込みが再開されるまで、このアラートは静かな状態が続きます。",
+      "anomalyTrainingNote": "このアラートはストリーム自体の履歴から学習し、学習に十分なデータがそろうまで通知しません。間隔に応じて数時間から約 1 日かかります。平日と週末を含む完全なモデルには、週末を含む期間が必要です。",
+      "detection": "検知",
       "unknownTime": "不明な時刻"
     },
     "install": {
@@ -10989,6 +10997,9 @@
       "cancel": "キャンセル",
       "done": "完了",
       "confirmLarge": "{folder} に {count} 件のアラートを作成し、それぞれが {destination} に通知することを理解しました。",
+      "tuneThresholdOnly": "しきい値アラートにのみ適用されます。",
+      "anomalyTrainingNote": "異常アラートは、ストリームの履歴で十分に学習した後に通知を開始します。",
+      "anomalyUnavailable": "異常アラートには異常検知が有効な OpenObserve Enterprise が必要なため、このアラートはスキップされました。",
       "confirmLargeNoDestination": "{folder} に {count} 件のアラートが作成され、そのいずれもまだ宛先に通知されないことを理解しました。"
     },
     "error": {
