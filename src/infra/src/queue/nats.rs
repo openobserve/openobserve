@@ -36,9 +36,6 @@ pub struct NatsQueue {
     prefix: String,
     consumer_name: String,
     is_durable: bool,
-    /// How many times a consumer receives one message before the server stops
-    /// redelivering it; 0 keeps the server default, which is unlimited.
-    max_deliver: i64,
 }
 
 pub struct NatsPullConsumer {
@@ -76,17 +73,11 @@ impl NatsQueue {
             prefix: prefix.to_string(),
             consumer_name: format_key(&get_config().common.instance_name),
             is_durable: false,
-            max_deliver: 0,
         }
     }
 
-    /// Super-cluster consumers leave a message unacked when they fail to apply
-    /// it, so they must cap redelivery or one bad message is retried forever.
     pub fn super_cluster() -> Self {
-        Self {
-            max_deliver: get_config().nats.super_cluster_max_deliver,
-            ..Self::new("super_cluster_queue_").with_consumer_name(get_cluster_name(), true)
-        }
+        Self::new("super_cluster_queue_").with_consumer_name(get_cluster_name(), true)
     }
 
     pub fn with_consumer_name(&self, consumer_name: String, is_durable: bool) -> Self {
@@ -94,7 +85,6 @@ impl NatsQueue {
             prefix: self.prefix.clone(),
             consumer_name: format_key(&consumer_name),
             is_durable,
-            max_deliver: self.max_deliver,
         }
     }
 
@@ -114,7 +104,6 @@ impl NatsQueue {
             name: Some(self.consumer_name.clone()),
             durable_name: self.is_durable.then(|| self.consumer_name.clone()),
             deliver_policy: get_deliver_policy(deliver_policy),
-            max_deliver: self.max_deliver,
             ..Default::default()
         };
         let consumer = stream
@@ -126,7 +115,6 @@ impl NatsQueue {
                     self.consumer_name
                 ))
             })?;
-        reconcile_max_deliver(&stream, &consumer.cached_info().config, self.max_deliver).await;
         let ack_wait = consumer.cached_info().config.ack_wait;
 
         Ok(NatsPullConsumer { consumer, ack_wait })
@@ -227,7 +215,6 @@ impl super::Queue for NatsQueue {
         let stream_name = format!("{}{}", self.prefix, format_key(topic));
         let consumer_name = self.consumer_name.clone();
         let is_durable = self.is_durable;
-        let max_deliver = self.max_deliver;
         let _task: JoinHandle<Result<()>> = tokio::task::spawn(async move {
             let client = get_nats_client().await.clone();
             let jetstream = jetstream::new(client);
@@ -243,7 +230,6 @@ impl super::Queue for NatsQueue {
                     None
                 },
                 deliver_policy: get_deliver_policy(deliver_policy),
-                max_deliver,
                 ..Default::default()
             };
             let consumer = stream
@@ -257,7 +243,6 @@ impl super::Queue for NatsQueue {
                         "Failed to get_or_create_consumer for nats stream {stream_name}: {e}"
                     ))
                 })?;
-            reconcile_max_deliver(&stream, &consumer.cached_info().config, max_deliver).await;
             // Consume messages from the consumer
             let mut messages = consumer.messages().await.map_err(|e| {
                 log::error!("Failed to get nats consumer messages for stream {stream_name}: {e}");
@@ -348,41 +333,6 @@ fn max_age_update(
     })
 }
 
-// updates a durable consumer created before the limit; failure only warns, as in reconcile_max_age
-async fn reconcile_max_deliver(
-    stream: &jetstream::stream::Stream,
-    current: &jetstream::consumer::Config,
-    max_deliver: i64,
-) {
-    let Some(updated) = max_deliver_update(current, max_deliver) else {
-        return;
-    };
-    let consumer = current.name.as_deref().unwrap_or_default();
-    let stream_name = &stream.cached_info().config.name;
-    match stream.update_consumer(updated).await {
-        Ok(_) => log::info!(
-            "[NATS:queue] consumer {consumer} on stream {stream_name} max_deliver updated from {} \
-             to {max_deliver}",
-            current.max_deliver
-        ),
-        Err(e) => log::warn!(
-            "[NATS:queue] failed to update consumer {consumer} on stream {stream_name} max_deliver \
-             from {} to {max_deliver}: {e}",
-            current.max_deliver
-        ),
-    }
-}
-
-fn max_deliver_update(
-    current: &jetstream::consumer::Config,
-    max_deliver: i64,
-) -> Option<jetstream::consumer::Config> {
-    (max_deliver > 0 && current.max_deliver != max_deliver).then(|| jetstream::consumer::Config {
-        max_deliver,
-        ..current.clone()
-    })
-}
-
 fn get_deliver_policy(deliver_policy: Option<queue::DeliverPolicy>) -> DeliverPolicy {
     if let Some(deliver_policy) = deliver_policy {
         return match deliver_policy {
@@ -449,59 +399,6 @@ mod tests {
                 ..updated
             },
             current
-        );
-    }
-
-    /// A durable consumer as the server reports it: an unlimited one reads
-    /// back as -1.
-    fn existing_consumer_config(max_deliver: i64) -> jetstream::consumer::Config {
-        jetstream::consumer::Config {
-            name: Some("region-a".to_string()),
-            durable_name: Some("region-a".to_string()),
-            deliver_policy: DeliverPolicy::All,
-            ack_policy: jetstream::consumer::AckPolicy::Explicit,
-            ack_wait: Duration::from_secs(30),
-            max_deliver,
-            max_ack_pending: 1000,
-            ..Default::default()
-        }
-    }
-
-    #[test]
-    fn test_max_deliver_update_none_when_equal() {
-        let current = existing_consumer_config(10);
-        assert!(max_deliver_update(&current, 10).is_none());
-    }
-
-    #[test]
-    fn test_max_deliver_update_none_when_unlimited_requested() {
-        let current = existing_consumer_config(-1);
-        assert!(max_deliver_update(&current, 0).is_none());
-    }
-
-    #[test]
-    fn test_max_deliver_update_limits_an_unlimited_consumer() {
-        let current = existing_consumer_config(-1);
-        let updated = max_deliver_update(&current, 10).unwrap();
-        assert_eq!(updated.max_deliver, 10);
-        assert_eq!(
-            jetstream::consumer::Config {
-                max_deliver: current.max_deliver,
-                ..updated
-            },
-            current
-        );
-    }
-
-    #[test]
-    fn test_with_consumer_name_keeps_max_deliver() {
-        let q = NatsQueue {
-            max_deliver: 10,
-            ..NatsQueue::new("prefix")
-        };
-        assert_eq!(
-            q.with_consumer_name("cluster".to_string(), true).max_deliver,
-            10
         );
     }
 }
