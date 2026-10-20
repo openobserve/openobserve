@@ -31,7 +31,6 @@ use openobserve_api_common::extractors::Headers;
 use openobserve_core::{auth::UserEmail, metrics};
 use promql_parser::parser;
 use promql_service as core_promql;
-use search_service::query_guard::AbortOnDrop;
 #[cfg(feature = "enterprise")]
 use {config::meta::stream::StreamType, o2_openfga::meta::mapping::OFGA_MODELS};
 
@@ -1528,7 +1527,7 @@ async fn search_streaming(
     let org_id = org_id.to_string();
     let user_email = user_email.to_string();
     let req_step = req.step;
-    let search_task = tokio::spawn(async move {
+    tokio::spawn(async move {
         // Send metadata first before any responses
         let promql_metadata = StreamResponses::PromqlMetadata {
             step: req_step,
@@ -1625,10 +1624,7 @@ async fn search_streaming(
 
     // Return streaming response
     let trace_id = trace_id.to_string();
-    // dropping the response stream (client gone) aborts the partition still being searched
-    let abort_search = AbortOnDrop(search_task.abort_handle());
     let stream = tokio_stream::wrappers::ReceiverStream::new(rx).flat_map(move |result| {
-        let _ = &abort_search;
         let chunks_iter = match result {
             Ok(v) => v.to_chunks(),
             Err(err) => {

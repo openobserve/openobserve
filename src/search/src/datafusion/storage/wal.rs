@@ -53,16 +53,11 @@ impl ObjectStore for FS {
 
     fn list(&self, prefix: Option<&Path>) -> BoxStream<'static, Result<ObjectMeta>> {
         let key = prefix.unwrap().to_string();
-        // every listing table registers its list, even an empty one, so a miss means lost state
         let objects = match super::file_list::get(&key) {
             Ok(objects) => objects,
             Err(e) => {
                 log::error!("Error getting file list for wal storage: {e}");
-                let err = Error::Generic {
-                    store: Self::name(),
-                    source: e.into(),
-                };
-                return futures::stream::once(async move { Err(err) }).boxed();
+                vec![]
             }
         };
         let values = objects

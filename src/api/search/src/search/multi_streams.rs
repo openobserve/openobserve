@@ -1524,10 +1524,8 @@ pub async fn search_multi_stream(
     // Pass needs_post_vrl (true only when per_query_response=true AND ResultArray VRL) and
     // the top-level query_fn for post-hoc application. When needs_post_vrl is false,
     // query_fn is already set on individual requests and this param is unused.
-    // the disconnect guard cancels by prefix, so requests sharing a trace_id must not share it
-    let query_id = config::ider::generate_query_id(&trace_id);
     tokio::spawn(process_search_stream_request_multi(
-        query_id.clone(),
+        trace_id.clone(),
         org_id.clone(),
         user_id,
         queries,
@@ -1545,9 +1543,9 @@ pub async fn search_multi_stream(
 
     // Cancel the running queries if the client disconnects before the search
     // produces a terminal event (e.g. the browser tab is closed). Cancellation
-    // is keyed by this request's query_id, which covers every `{query_id}-q{n}`
+    // is keyed by the parent trace_id, which covers every `{trace_id}-q{n}`
     // sub-query via prefix matching in the query manager.
-    let mut guard = SearchStreamGuard::new(org_id.clone(), query_id);
+    let mut guard = SearchStreamGuard::new(org_id.clone(), trace_id.clone());
 
     // Return streaming response
     let stream = tokio_stream::wrappers::ReceiverStream::new(rx).flat_map(move |result| {

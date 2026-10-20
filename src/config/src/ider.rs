@@ -93,11 +93,6 @@ pub fn generate_trace_id() -> String {
     opentelemetry::trace::TraceId::from(trace_id).to_string()
 }
 
-/// Per-request `{trace_id}-{16 hex}` execution id that a cancel by `trace_id` prefix still reaches.
-pub fn generate_query_id(trace_id: &str) -> String {
-    format!("{trace_id}-{}", generate_span_id())
-}
-
 /// Extract timestamp from UUID v7 trace ID
 /// Returns the timestamp in microseconds since Unix epoch, or None if parsing fails
 pub fn get_start_time_from_trace_id(trace_id: &str) -> Option<i64> {
@@ -308,21 +303,6 @@ mod tests {
             opentelemetry::trace::TraceId::from_hex(&trace_id).is_ok(),
             "Should be valid OpenTelemetry TraceId"
         );
-    }
-
-    #[test]
-    fn test_generate_query_id_keeps_trace_prefix_and_is_unique() {
-        let trace_id = generate_trace_id();
-        let a = generate_query_id(&trace_id);
-        let b = generate_query_id(&trace_id);
-        assert_ne!(a, b);
-        for id in [&a, &b] {
-            let (prefix, suffix) = id.split_once('-').unwrap();
-            assert_eq!(prefix, trace_id);
-            assert_eq!(suffix.len(), 16);
-            assert!(suffix.chars().all(|c| c.is_ascii_hexdigit()));
-        }
-        assert!(!a.starts_with(&b) && !b.starts_with(&a));
     }
 
     #[test]

@@ -49,10 +49,7 @@ use promql::{
 };
 use promql_parser::parser;
 use proto::cluster_rpc;
-use search_service::{
-    query_guard::{AbortOnDrop, QueryGuard},
-    server_internal_error,
-};
+use search_service::server_internal_error;
 use tracing::{Instrument, info_span};
 #[cfg(feature = "enterprise")]
 use {
@@ -94,8 +91,7 @@ pub async fn search(
     is_super_cluster: bool,
 ) -> Result<SearchResponse> {
     let trace_id = search_service::leader_trace_id(trace_id);
-    // callers such as Grafana share one trace_id across concurrent requests
-    let query_id = config::ider::generate_query_id(&trace_id);
+    let trace_id = trace_id.as_str();
     #[cfg(feature = "enterprise")]
     {
         let query = Some(req.query.clone());
@@ -105,7 +101,7 @@ pub async fn search(
         SEARCH_SERVER
             .insert(
                 org_id,
-                query_id.clone(),
+                trace_id.to_string(),
                 TaskStatus::new_leader(
                     vec![],
                     true,
@@ -121,28 +117,7 @@ pub async fn search(
             )
             .await;
     }
-    let guard = QueryGuard::new(org_id, &query_id);
-    let ret = search_registered(
-        &query_id,
-        org_id,
-        req,
-        user_email,
-        timeout,
-        is_super_cluster,
-    )
-    .await;
-    guard.finish().await;
-    ret
-}
 
-async fn search_registered(
-    trace_id: &str,
-    org_id: &str,
-    req: &MetricsQueryRequest,
-    user_email: &str,
-    timeout: i64,
-    is_super_cluster: bool,
-) -> Result<SearchResponse> {
     let timeout = if timeout > 0 {
         timeout as u64
     } else {
@@ -270,7 +245,6 @@ async fn search_registered(
     let query_task = DATAFUSION_RUNTIME.spawn(async move {
         search_in_cluster(&trace_id_move, req, &user_email_move, &nodes).await
     });
-    let _abort_query_task = AbortOnDrop(query_task.abort_handle());
     tokio::pin!(query_task);
 
     // run search in cluster
@@ -303,6 +277,10 @@ async fn search_registered(
 
     // release lock
     drop(_lock);
+
+    // Clean up task record before returning
+    #[cfg(feature = "enterprise")]
+    SEARCH_SERVER.remove(org_id, trace_id).await;
 
     match task {
         Ok(Ok(ret)) => Ok(ret),

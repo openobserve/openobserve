@@ -62,7 +62,6 @@ use crate::{
         settings::calculate_partition_settings, sql_context::PartitionSqlContext,
         stream_files::collect_stream_files,
     },
-    query_guard::{AbortOnDrop, QueryGuard},
 };
 
 pub mod cache;
@@ -74,7 +73,6 @@ pub mod grpc;
 pub mod grpc_search;
 pub mod grpc_server;
 pub mod partition;
-pub mod query_guard;
 pub mod query_range;
 #[cfg(feature = "enterprise")]
 pub mod search_jobs;
@@ -142,12 +140,10 @@ pub async fn search(
     #[cfg(feature = "enterprise")]
     let req_clusters = in_req.clusters.clone();
 
-    // callers may share one trace_id across concurrent requests, e.g. Grafana via traceparent
-    let query_id = ider::generate_query_id(&trace_id);
     let query: SearchQuery = in_req.query.clone().into();
     let req_query = query.clone();
     let mut request = config::datafusion::request::Request::new(
-        query_id.clone(),
+        trace_id.clone(),
         org_id.to_string(),
         stream_type,
         in_req.timeout,
@@ -180,7 +176,7 @@ pub async fn search(
         SEARCH_SERVER
             .insert(
                 org_id,
-                query_id.clone(),
+                trace_id.clone(),
                 TaskStatus::new_leader(
                     vec![],
                     true,
@@ -197,14 +193,11 @@ pub async fn search(
             .await;
     }
 
-    let guard = QueryGuard::new(org_id, &query_id);
-
     let span = tracing::span::Span::current();
     let handle = tokio::task::spawn(
         async move { cluster::http::search(request, query, req_regions, req_clusters, true).await }
             .instrument(span),
     );
-    let _abort_search = AbortOnDrop(handle.abort_handle());
     let res = match handle.await {
         Ok(Ok(res)) => Ok(res),
         Ok(Err(e)) => Err(e),
@@ -226,7 +219,15 @@ pub async fn search(
     );
 
     // remove task because task if finished
-    let _work_group = guard.finish().await;
+    let mut _work_group = None;
+    #[cfg(feature = "enterprise")]
+    {
+        if let Some((_, stat)) = SEARCH_SERVER.remove(org_id, &trace_id).await
+            && let Some(wg) = stat.work_group.as_ref()
+        {
+            _work_group = Some(wg.to_string());
+        };
+    }
 
     match res {
         Ok(mut res) => {
