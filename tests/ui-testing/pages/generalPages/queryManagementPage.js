@@ -29,6 +29,14 @@ export class QueryManagementPage {
     this.summaryList = page.locator('[data-test="running-queries-summary-list"]');
     this.allQueriesList = page.locator('[data-test="running-queries-all-queries-list"]');
     this.searchTypeFilter = this.allQueriesList.locator('[data-otoggle-value="dashboards"]');
+    // Cancel-flow controls: the confirm dialog and its primary/secondary actions.
+    this.confirmDialog = page.locator('[data-test="confirm-dialog"]');
+    this.confirmDialogPrimary = page.locator(
+      '[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]',
+    );
+    this.confirmDialogSecondary = page.locator(
+      '[data-test="confirm-dialog"] [data-test="o-dialog-secondary-btn"]',
+    );
   }
 
   // The All Queries tab is v-show-toggled, so the row actions exist in the DOM
@@ -110,6 +118,26 @@ export class QueryManagementPage {
     );
   }
 
+  // Builds a stub status row in the shape RunningQueries consumes. Every row
+  // uses search_type 'dashboards' (the All Queries default) so it stays visible.
+  runningQuery(traceId, orgId, userId) {
+    const now = Date.now() * 1000;
+    return {
+      trace_id: traceId,
+      user_id: userId,
+      org_id: orgId,
+      search_type: 'dashboards',
+      created_at: now - 5000000,
+      started_at: now - 5000000,
+      status: 'running',
+      work_group: 'default',
+      stream_type: 'logs',
+      query: { start_time: now - 60000000, end_time: now, sql: 'SELECT 1' },
+      scan_stats: { files: 1, records: 1, original_size: 1, compressed_size: 1 },
+      search_event_context: { folder_name: 'f', dashboard_name: 'd' },
+    };
+  }
+
   async navigateToRunningQueries(org) {
     await this.navigateToQueryManagement(org);
     await expect(this.queryTypeTabs).toBeVisible({ timeout: 15000 });
@@ -120,7 +148,10 @@ export class QueryManagementPage {
   }
 
   async selectQueryTypeTab(value) {
-    await this.queryTypeTab(value).click();
+    const tab = this.queryTypeTab(value);
+    await tab.click();
+    // Guard the toggle: confirm the tab actually became active before downstream actions.
+    await expect(tab).toHaveAttribute('data-state', 'on', { timeout: 10000 });
   }
 
   async drillIntoUser(email) {
@@ -133,5 +164,85 @@ export class QueryManagementPage {
     await expect(this.summaryList).toBeHidden();
     await expect(this.searchTypeFilter).toBeVisible();
     await expect(this.allQueriesList.getByText(email).first()).toBeVisible();
+  }
+
+  // Stubs the cancel route so a cancel resolves without hitting a live server.
+  async stubCancel(org) {
+    await this.page.route(`**/api/${org}/query_manager/cancel`, (route) =>
+      route.fulfill({ json: [{ trace_id: '', org_id: '', is_success: true }] }),
+    );
+  }
+
+  // Arms a wait for the next org-scoped cancel PUT and returns its JSON body.
+  // Call BEFORE the cancel action; await the returned promise after confirming.
+  captureCancelRequest(org) {
+    return this.page
+      .waitForRequest(
+        (req) => req.method() === 'PUT' && req.url().includes(`/api/${org}/query_manager/cancel`),
+        { timeout: 15000 },
+      )
+      .then((req) => req.postDataJSON());
+  }
+
+  async confirmCancel() {
+    await expect(this.confirmDialog).toBeVisible({ timeout: 10000 });
+    await this.confirmDialogPrimary.click();
+  }
+
+  async dismissCancelDialog() {
+    await expect(this.confirmDialog).toBeVisible({ timeout: 10000 });
+    await this.confirmDialogSecondary.click();
+  }
+
+  async expectConfirmDialogHidden() {
+    await expect(this.confirmDialog).toBeHidden({ timeout: 10000 });
+  }
+
+  // All Queries tab: cancel the row whose org_id cell matches `orgId`.
+  async cancelAllQueriesRow(orgId) {
+    const row = this.allQueriesList.locator('tr', { hasText: orgId }).first();
+    await expect(row).toBeVisible({ timeout: 15000 });
+    await row.locator('[data-test="cancelQuery-btn"]').first().click();
+  }
+
+  // Summary tab: cancel the summary row whose user_id cell matches `email`.
+  async cancelSummaryRow(email) {
+    const row = this.summaryList.locator('tr', { hasText: email }).first();
+    await expect(row).toBeVisible({ timeout: 15000 });
+    await row.locator('[data-test="cancelQuery-btn"]').first().click();
+  }
+
+  // Selects the All Queries row whose org_id cell matches `orgId` via its checkbox.
+  async selectAllQueriesRow(orgId) {
+    const row = this.allQueriesList.locator('tr', { hasText: orgId }).first();
+    await expect(row).toBeVisible({ timeout: 15000 });
+    await row.locator('label[data-test^="o2-table-select-"]').click();
+  }
+
+  // Clicks the bulk-cancel button surfaced by the All Queries selection bar.
+  async clickAllQueriesMultiCancel() {
+    const btn = this.allQueriesList.locator('[data-test="qm-multiple-cancel-query-btn"]');
+    await expect(btn).toBeVisible({ timeout: 10000 });
+    await btn.click();
+  }
+
+  // Arms a wait for a cancel PUT; stop() resolves true if one fires, false if
+  // none fires within the settle window. Used to assert a dismiss issues no request.
+  startCancelWatcher(org) {
+    const requestSeen = this.page.waitForRequest(
+      (req) => req.method() === 'PUT' && req.url().includes(`/api/${org}/query_manager/cancel`),
+      { timeout: 3000 },
+    );
+    return {
+      async stop() {
+        try {
+          await requestSeen;
+          return true;
+        } catch (error) {
+          // Timeout (no request fired) is the expected outcome for a dismiss.
+          return false;
+        }
+      },
+    };
   }
 }

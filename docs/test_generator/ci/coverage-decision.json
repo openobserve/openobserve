@@ -1,0 +1,11 @@
+{
+  "action": "new",
+  "target_spec": "tests/ui-testing/playwright-tests/GeneralTests/runningQueriesCancel.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/Management/settings-query-management-redirect.spec.js",
+    "tests/ui-testing/playwright-tests/RegressionSet/General/query-management-sql-tooltip.spec.js"
+  ],
+  "needs_registration": true,
+  "rationale": "The cancel flow is entirely uncovered in E2E. The two closest existing specs cover navigation/gating (Management/settings-query-management-redirect.spec.js) and the SQL cell tooltip (RegressionSet/General/query-management-sql-tooltip.spec.js); neither exercises the cancel action or the new org-scoped [{trace_id, org_id}] payload. The cancel contract changed (bare trace-id list -> org-scoped pairs; single-query DELETE route removed) and the frontend was reworked to group by org and send the new payload, so a dedicated spec is warranted. run-context places it in GeneralTests (closest shard for this _meta admin surface, matching the triage rationale), so no existing spec is a natural host to append/extend.",
+  "secondary_area_note": "The query_manager/status endpoint is now _meta-only (403 for other orgs) and the cancel RBAC scope (org ownership, settings-write grant, cloud-check bypass) is a backend behavior already covered by the pytest API test tests/api-testing/tests/rbac/query_manager/test_cancel_scope.py in this diff. That area is intentionally left to API testing, not E2E; the non-meta frontend redirect is already covered by Management/settings-query-management-redirect.spec.js."
+}
