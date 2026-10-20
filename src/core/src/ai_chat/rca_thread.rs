@@ -13,13 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! The investigation thread of an RCA run, projected from its chat session (TH29, TH33).
+//! The investigation thread of an RCA run, projected from its chat session.
 
 use config::{
     meta::{
         alerts::rca_steering::SteerKind,
         oncall::{
-            confidence::{KEY_ARG_MAX_BYTES, cut_bytes},
+            confidence::{KEY_ARG_MAX_BYTES, cut_bytes, is_prometheus_tool},
             rca_run::summarize_result,
         },
     },
@@ -53,12 +53,12 @@ pub(crate) fn rca_stage(stage: Option<&Value>) -> Option<&'static str> {
     config::meta::oncall::rca_run::protocol_stage(stage)
 }
 
-/// How one tool part counts in the thread (TH20, TH29).
+/// How one tool part counts in the thread.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ThreadPart {
     /// A `record_step` that opens a step with this stage.
     Step(Option<&'static str>),
-    /// A `record_step` the tool rejected (VE2): no step.
+    /// A `record_step` the tool rejected: no step.
     FailedStep,
     /// A visible tool row; before any step it opens the implicit step.
     Row,
@@ -226,7 +226,7 @@ pub struct RcaThread {
     pub started: Option<ThreadStart>,
     pub steps: Vec<ThreadStep>,
     pub user_messages: Vec<ThreadUserMessage>,
-    /// The run's questions to responders (SG25), in call order.
+    /// The run's questions to responders, in call order.
     pub questions: Vec<ThreadQuestion>,
     pub report_submitted: bool,
     pub stats: ThreadStats,
@@ -252,7 +252,7 @@ pub struct ThreadStep {
     pub note: Option<String>,
     pub note_truncated: bool,
     pub citations: Vec<String>,
-    /// The first step that starts after the agent read a steering message (§10.6).
+    /// The first step that starts after the agent read a steering message.
     pub from_steering: bool,
     pub tool_calls: Vec<ThreadToolCall>,
 }
@@ -276,11 +276,11 @@ pub struct ThreadToolCall {
     pub duration_ms: Option<i64>,
     pub result_summary: Option<String>,
     pub error: Option<String>,
-    /// Only with the org setting `ai_rca_thread_tool_output` (TH34).
+    /// Only with the org setting `ai_rca_thread_tool_output`.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[schema(value_type = Option<Object>)]
     pub input: Option<Value>,
-    /// Only with the org setting `ai_rca_thread_tool_output`; at most 16 KB (TH34).
+    /// Only with the org setting `ai_rca_thread_tool_output`; at most 16 KB.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub output: Option<String>,
 }
@@ -299,12 +299,12 @@ pub struct ThreadUserMessage {
     /// The question an answer replies to.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub question_id: Option<String>,
-    /// µs: when the agent read the message (SG20).
+    /// µs: when the agent read the message.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub read_at: Option<i64>,
 }
 
-/// A question the agent asked the responders (SG25).
+/// A question the agent asked the responders.
 #[derive(Debug, Clone, PartialEq, Serialize, ToSchema)]
 pub struct ThreadQuestion {
     /// The `ask_responders` call's `callID`.
@@ -363,7 +363,7 @@ impl RcaThread {
     }
 }
 
-/// TH31: version committed seq, session/run writes, and tool-IO visibility together.
+/// Version committed seq, session/run writes, and tool-IO visibility together.
 pub fn state_version(
     last_committed_seq: i64,
     session_updated_at: i64,
@@ -374,7 +374,7 @@ pub fn state_version(
     format!("{last_committed_seq}.{session_updated_at}.{run_updated_at}{io}")
 }
 
-/// The thread of an RCA session (TH29).
+/// The thread of an RCA session.
 pub fn project_rca_thread(
     events: &[DurableEvent],
     turns: &[ai_chat_turns::Model],
@@ -418,9 +418,9 @@ struct Builder {
     show_tool_io: bool,
     started: Option<ThreadStart>,
     user_messages: Vec<ThreadUserMessage>,
-    /// Steering messages in `user_messages` the agent has not read yet (SG20).
+    /// Steering messages in `user_messages` the agent has not read yet.
     unread: Vec<usize>,
-    /// The agent read a steering message, and no step has started since (§10.6).
+    /// The agent read a steering message, and no step has started since.
     steering_read: bool,
     questions: Vec<ThreadQuestion>,
     steps: Vec<StepAcc>,
@@ -478,7 +478,7 @@ impl Builder {
         }
     }
 
-    /// SG20: an assistant message reads every steering message before it.
+    /// An assistant message reads every steering message before it.
     fn assistant_message(&mut self, created: Option<i64>) {
         if self.unread.is_empty() {
             return;
@@ -675,7 +675,7 @@ impl Builder {
                     } else {
                         full
                     };
-                    // TH29: only what the reader sees is cited.
+                    // Only what the reader sees is cited.
                     step.citations = citations(&note);
                     step.note = Some(note);
                 }
@@ -697,7 +697,7 @@ impl Builder {
                 question.answered_at = answer.at;
             }
         }
-        // J10: copied events precede this run; duration starts at its own first turn.
+        // Copied events precede this run; duration starts at its own first turn.
         let first_ms = match turns.first() {
             Some(turn) if turn.start_seq.is_some_and(|seq| seq > 0) => Some(turn.started_at / 1000),
             _ => self.first_ms,
@@ -775,7 +775,7 @@ fn citations(note: &str) -> Vec<String> {
     found
 }
 
-/// The one argument that says what a tool call did (TH33).
+/// The one argument that says what a tool call did.
 pub(crate) fn key_arg(tool: &str, input: &Map<String, Value>) -> Option<String> {
     let request_body = obj(input.get("request_body"));
     let text = match tool {
@@ -784,7 +784,7 @@ pub(crate) fn key_arg(tool: &str, input: &Map<String, Value>) -> Option<String> 
             .and_then(|q| q.get("sql"))
             .and_then(Value::as_str)
             .map(str::to_string),
-        t if t.starts_with("Prometheus") => input
+        t if is_prometheus_tool(t) => input
             .get("query")
             .or_else(|| request_body.and_then(|rb| rb.get("query")))
             .and_then(Value::as_str)
@@ -814,7 +814,7 @@ pub(crate) fn tool_body(state: &Map<String, Value>) -> Value {
     }
 }
 
-/// A failed tool call's error, redacted and at most 200 characters (TH33).
+/// A failed tool call's error, redacted and at most 200 characters.
 pub(crate) fn error_text(error: Option<&Value>) -> String {
     let message = match error.filter(|e| truthy(e)) {
         Some(error) => redact_internal_details(&extract_error_message(error)),
@@ -824,10 +824,12 @@ pub(crate) fn error_text(error: Option<&Value>) -> String {
 }
 
 fn raw_output(state: &Map<String, Value>) -> Option<String> {
-    let text = match state.get("output").or_else(|| state.get("error")) {
-        Some(Value::String(s)) => s.clone(),
-        None | Some(Value::Null) => return None,
-        Some(other) => other.to_string(),
+    let text = match (state.get("output"), state.get("error")) {
+        (Some(Value::String(s)), _) => s.clone(),
+        (Some(other), _) if !other.is_null() => other.to_string(),
+        // An error can carry internal paths; show it as the step's error text does.
+        (_, Some(error)) if truthy(error) => redact_internal_details(&extract_error_message(error)),
+        _ => return None,
     };
     Some(cut_bytes(&text, OUTPUT_MAX_BYTES).to_string())
 }
@@ -1234,7 +1236,7 @@ pub(crate) mod tests {
         );
     }
 
-    /// TH29: no `bash`/`read` row; every visible row of the replay keeps its timing in µs.
+    /// No `bash`/`read` row; every visible row of the replay keeps its timing in µs.
     #[test]
     fn the_replay_session_shows_only_visible_tools_with_their_timing() {
         let events = load_replay();
@@ -1316,7 +1318,7 @@ pub(crate) mod tests {
         );
     }
 
-    /// TH33: without the org setting no row carries `input` or `output`, not even as null.
+    /// Without the org setting no row carries `input` or `output`, not even as null.
     #[test]
     fn tool_rows_carry_no_input_or_output_by_default() {
         let json =
@@ -1349,7 +1351,7 @@ pub(crate) mod tests {
         }
     }
 
-    /// TH34: the org setting adds the raw input (without the session arg) and output.
+    /// The org setting adds the raw input (without the session arg) and output.
     #[test]
     fn the_tool_io_setting_adds_input_and_output() {
         let thread = project_rca_thread(&rca_session(), &[], false, true);
@@ -1361,9 +1363,14 @@ pub(crate) mod tests {
         );
         let failed = &thread.steps[2].tool_calls[1];
         assert_eq!(failed.output.as_deref(), Some("connection refused"));
+        let state = json!({"status": "error", "error": "open /home/appuser/x: denied"});
+        assert_eq!(
+            raw_output(state.as_object().unwrap()).as_deref(),
+            Some("open [internal path]: denied")
+        );
     }
 
-    /// TH29: the open step of a live run has no end, and its unfinished call is running.
+    /// The open step of a live run has no end, and its unfinished call is running.
     #[test]
     fn a_live_run_keeps_its_last_step_open() {
         let mut s = Session::new();
@@ -1402,7 +1409,7 @@ pub(crate) mod tests {
         assert!(ended.steps[0].tool_calls[0].interrupted);
     }
 
-    /// TH31: the version names the session watermark, the session write and the run write.
+    /// The version names the session watermark, the session write and the run write.
     #[test]
     fn the_state_version_moves_with_each_of_its_parts() {
         let v = state_version(12, 1_700, 1_800, false);
@@ -1423,7 +1430,7 @@ pub(crate) mod tests {
         );
     }
 
-    /// TH18: the seven stage names map to themselves; anything else is no stage.
+    /// The seven stage names map to themselves; anything else is no stage.
     #[test]
     fn rca_stage_maps_the_seven_names_only() {
         for (stage, _) in config::meta::oncall::rca_run::RCA_STAGES {
@@ -1441,7 +1448,7 @@ pub(crate) mod tests {
         assert_eq!(rca_stage(None), None);
     }
 
-    /// TH18, TH29: a `record_step` with an unknown stage is a step without a stage.
+    /// A `record_step` with an unknown stage is a step without a stage.
     #[test]
     fn an_unknown_stage_never_shows_as_a_stage() {
         let mut s = Session::new();
@@ -1480,7 +1487,7 @@ pub(crate) mod tests {
         assert!(!json.contains("gather"), "{json}");
     }
 
-    /// TH29: a citation past the 1,000-char cut of a note is not returned.
+    /// A citation past the 1,000-char cut of a note is not returned.
     #[test]
     fn a_citation_past_the_note_cut_is_not_returned() {
         let mut s = Session::new();
@@ -1527,7 +1534,7 @@ pub(crate) mod tests {
         );
     }
 
-    /// TH30: a run without a transcript serializes `transcript: "none"` and no steps.
+    /// A run without a transcript serializes `transcript: "none"` and no steps.
     #[test]
     fn a_run_without_a_transcript_has_no_steps() {
         let json = serde_json::to_value(RcaThread::without_transcript(

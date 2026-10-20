@@ -20,15 +20,15 @@ use utoipa::ToSchema;
 
 use crate::meta::oncall::confidence::MatchKey;
 
-/// Most hypotheses kept for one run (VE6).
+/// Most hypotheses kept for one run.
 pub const MAX_HYPOTHESES: usize = 10;
-/// Most evidence items kept for one hypothesis (VE6).
+/// Most evidence items kept for one hypothesis.
 pub const MAX_EVIDENCE_ITEMS: usize = 10;
-/// Most blind spots kept for one run (VE8).
+/// Most blind spots kept for one run.
 pub const MAX_BLIND_SPOTS: usize = 10;
-/// Most characters kept for a statement, reason, observation or `why` (VE6).
+/// Most characters kept for a statement, reason, observation or `why`.
 pub const MAX_TEXT_CHARS: usize = 500;
-/// Most characters kept for a blind spot title (VE8).
+/// Most characters kept for a blind spot title.
 pub const MAX_TITLE_CHARS: usize = 100;
 pub const MAX_QUERY_BYTES: usize = crate::meta::oncall::confidence::KEY_ARG_MAX_BYTES;
 
@@ -94,7 +94,7 @@ pub struct EvidenceItem {
     pub first_cited_seq: i64,
 }
 
-/// One entry of a hypothesis' status history (VE11).
+/// One entry of a hypothesis' status history.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct StatusChange {
     /// Microseconds.
@@ -114,7 +114,7 @@ pub struct Hypothesis {
     pub reason: String,
     #[serde(default)]
     pub evidence: Vec<EvidenceItem>,
-    /// Steering (`stg_…`) or past-cause (`past:…`) ids; never evidence (R-D9).
+    /// Steering (`stg_…`) or past-cause (`past:…`) ids; never evidence.
     #[serde(default)]
     pub lead_ids: Vec<String>,
     pub first_seen_seq: i64,
@@ -127,7 +127,7 @@ pub struct EvidenceLedger {
     /// In first-seen order.
     #[serde(default)]
     pub hypotheses: Vec<Hypothesis>,
-    /// Values the hypothesis limits of VE6 cut or dropped.
+    /// Values the hypothesis limits cut or dropped.
     #[serde(default)]
     pub truncations: u32,
 }
@@ -154,7 +154,7 @@ pub enum BlindSpotFix {
     None,
 }
 
-/// Something the run could not check (VE8).
+/// Something the run could not check.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct BlindSpot {
     pub id: String,
@@ -182,13 +182,13 @@ pub struct LedgerCall {
     pub input: serde_json::Value,
 }
 
-/// What `build_ledger` cut, dropped and rewrote, for the ledger metrics (§14).
+/// What `build_ledger` cut, dropped and rewrote, for the ledger metrics.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct LedgerCounts {
     pub truncated: Vec<(&'static str, u32)>,
     /// `(tool, count)` of dropped calls; tool is `record_hypothesis` or `record_blind_spot`.
     pub invalid_calls: Vec<(String, u32)>,
-    /// `testing` hypotheses rewritten to `untested` at the end of the run (VE7).
+    /// `testing` hypotheses rewritten to `untested` at the end of the run.
     pub left_testing: u32,
 }
 
@@ -295,7 +295,7 @@ struct BlindSpotInput {
     fix: BlindSpotFix,
 }
 
-/// A `record_hypothesis` input that passes VE10, else `None`.
+/// A valid `record_hypothesis` input, else `None`.
 fn parse_hypothesis(input: &serde_json::Value) -> Option<HypothesisInput> {
     let h = HypothesisInput::deserialize(input).ok()?;
     let valid =
@@ -336,11 +336,11 @@ struct Builder {
     blind_spots: Vec<BlindSpot>,
     blind_spot_cuts: Vec<Cuts>,
     blind_spot_index: HashMap<String, usize>,
-    /// Distinct ids dropped past the run limits (VE6).
+    /// Distinct ids dropped past the run limits.
     dropped: Cuts,
     dropped_ids: std::collections::HashSet<(LedgerTool, String)>,
-    /// First seq of each cited item, by [CitedItem] identity (VE5, VE24).
-    first_cited: Vec<(CitedItem, i64)>,
+    /// First seq and first observation of each cited item, by [CitedItem] identity.
+    first_cited: Vec<(CitedItem, i64, String)>,
     invalid_hypothesis_calls: u32,
     invalid_blind_spot_calls: u32,
     saw_hypothesis_call: bool,
@@ -358,16 +358,16 @@ impl Builder {
         }
     }
 
-    /// Records a citation of `item` at `seq`; returns the item's first seq so far.
-    fn cite(&mut self, item: CitedItem, seq: i64) -> i64 {
-        match self.first_cited.iter_mut().find(|(k, _)| *k == item) {
-            Some((_, first)) => {
+    /// Records a citation of `item` at `seq`; returns the item's first seq and observation.
+    fn cite(&mut self, item: CitedItem, seq: i64, observation: String) -> (i64, String) {
+        match self.first_cited.iter_mut().find(|(k, ..)| *k == item) {
+            Some((_, first, first_observation)) => {
                 *first = (*first).min(seq);
-                *first
+                (*first, first_observation.clone())
             }
             None => {
-                self.first_cited.push((item, seq));
-                seq
+                self.first_cited.push((item, seq, observation.clone()));
+                (seq, observation)
             }
         }
     }
@@ -402,7 +402,11 @@ impl Builder {
             .take(MAX_EVIDENCE_ITEMS)
             .map(|e| {
                 let query = cut_bytes(e.query, MAX_QUERY_BYTES, F_QUERY, &mut cuts);
-                let first_cited_seq = self.cite(CitedItem::of(&e.id, &e.tool, &query), call.seq);
+                let observation =
+                    cut_chars(e.observation, MAX_TEXT_CHARS, F_OBSERVATION, &mut cuts);
+                // The first definition of an id with this tool and query sets its observation.
+                let (first_cited_seq, observation) =
+                    self.cite(CitedItem::of(&e.id, &e.tool, &query), call.seq, observation);
                 EvidenceItem {
                     first_cited_seq,
                     id: e.id,
@@ -410,7 +414,7 @@ impl Builder {
                     query,
                     polarity: e.polarity,
                     strength: e.strength,
-                    observation: cut_chars(e.observation, MAX_TEXT_CHARS, F_OBSERVATION, &mut cuts),
+                    observation,
                 }
             })
             .collect();
@@ -497,10 +501,10 @@ impl Builder {
     }
 }
 
-/// Fold ledger calls; run end demotes testing to untested with explicit server provenance.
+/// Fold ledger calls; with `ended_at_us`, each `testing` becomes `untested` at the run's end.
 pub fn build_ledger(
     calls: &[LedgerCall],
-    run_ended: bool,
+    ended_at_us: Option<i64>,
 ) -> (Option<EvidenceLedger>, Vec<BlindSpot>, LedgerCounts) {
     let mut b = Builder::default();
     for call in calls {
@@ -508,8 +512,7 @@ pub fn build_ledger(
     }
 
     let mut left_testing = 0;
-    if run_ended {
-        let at_us = calls.last().map(|c| c.at_us).unwrap_or_default();
+    if let Some(at_us) = ended_at_us {
         for h in b
             .hypotheses
             .iter_mut()
@@ -528,7 +531,7 @@ pub fn build_ledger(
 
     for item in b.hypotheses.iter_mut().flat_map(|h| h.evidence.iter_mut()) {
         let key = CitedItem::of(&item.id, &item.tool, &item.query);
-        if let Some((_, seq)) = b.first_cited.iter().find(|(k, _)| *k == key) {
+        if let Some((_, seq, _)) = b.first_cited.iter().find(|(k, ..)| *k == key) {
             item.first_cited_seq = *seq;
         }
     }
@@ -567,7 +570,7 @@ pub fn build_ledger(
     (ledger, b.blind_spots, counts)
 }
 
-/// VE12 rank: 1 `root_cause` … 7 `untested`; `symptom` and `ruled_out` never rank.
+/// Rank: 1 `root_cause` … 7 `untested`; `symptom` and `ruled_out` never rank.
 pub fn status_rank(s: HypothesisStatus) -> Option<u8> {
     match s {
         HypothesisStatus::RootCause => Some(1),
@@ -589,7 +592,7 @@ fn leading_in(hypotheses: &[Hypothesis]) -> Option<&Hypothesis> {
         .map(|(_, h)| h)
 }
 
-/// The leading hypothesis: best VE12 rank, then earliest `first_seen_seq`.
+/// The leading hypothesis: best rank, then earliest `first_seen_seq`.
 pub fn leading(ledger: &EvidenceLedger) -> Option<&Hypothesis> {
     leading_in(&ledger.hypotheses)
 }
@@ -607,7 +610,7 @@ pub fn subject(ledger: &EvidenceLedger) -> Option<&Hypothesis> {
         .or_else(|| leading(ledger))
 }
 
-/// One leading hypothesis of the run, as it was led (VE20).
+/// One leading hypothesis of the run, as it was led.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct LeadingEntry {
     pub id: String,
@@ -654,7 +657,7 @@ mod tests {
         ledger.hypotheses.iter().map(|h| h.id.as_str()).collect()
     }
 
-    /// VE4/VE10: the last call for an id sets its fields; `first_seen_seq` stays at the first.
+    /// The last call for an id sets its fields; `first_seen_seq` stays at the first.
     #[test]
     fn the_last_call_wins_and_first_seen_seq_is_kept() {
         let calls = [
@@ -688,7 +691,7 @@ mod tests {
         assert_eq!(hypothesis(&l, "h1").first_seen_seq, 9);
     }
 
-    /// VE5: one evidence id on two hypotheses keeps both items with one first seq.
+    /// One evidence id on two hypotheses keeps both items with one first seq.
     #[test]
     fn a_shared_evidence_id_sits_on_both_hypotheses() {
         let shared = item("e1", PROM, "q", "supports", "decisive");
@@ -705,9 +708,27 @@ mod tests {
         assert_eq!((b.id.as_str(), b.polarity), ("e1", Polarity::RulesOut));
         assert_eq!(a.first_cited_seq, 3);
         assert_eq!(b.first_cited_seq, 3, "the run-wide first seq of e1");
+        // A reuse of e1 with the same tool and query keeps the first definition's observation.
+        let mut reused = item("e1", PROM, "q", "contradicts", "supporting");
+        reused["observation"] = json!("a later note");
+        let mut calls = calls.to_vec();
+        calls.push(hyp(9, "h3", "testing", vec![reused]));
+        let l = ledger(&calls);
+        assert_eq!(
+            hypothesis(&l, "h3").evidence[0].observation,
+            hypothesis(&l, "h1").evidence[0].observation
+        );
+        // A reuse with another query is a citation of its own.
+        let mut other = item("e1", PROM, "q2", "supports", "supporting");
+        other["observation"] = json!("its own note");
+        calls.push(hyp(11, "h4", "testing", vec![other]));
+        assert_eq!(
+            hypothesis(&ledger(&calls), "h4").evidence[0].observation,
+            "its own note"
+        );
     }
 
-    /// VE6: 12 hypothesis ids keep the first 10; 12 items keep the first 10; both are counted.
+    /// 12 hypothesis ids keep the first 10; 12 items keep the first 10; both are counted.
     #[test]
     fn limits_keep_the_first_ten_and_count_the_cuts() {
         let mut calls: Vec<LedgerCall> = (1..=12)
@@ -727,7 +748,7 @@ mod tests {
             })
             .collect();
         calls.push(hyp(14, "h1", "likely", items));
-        let (l, _, counts) = build_ledger(&calls, false);
+        let (l, _, counts) = build_ledger(&calls, None);
         let l = l.unwrap();
         assert_eq!(
             ids(&l),
@@ -743,7 +764,7 @@ mod tests {
         assert_eq!(l.truncations, 4);
     }
 
-    /// VE6: long text is cut and counted under its field.
+    /// Long text is cut and counted under its field.
     #[test]
     fn long_text_is_cut_and_counted() {
         let long = "x".repeat(MAX_TEXT_CHARS + 5);
@@ -756,7 +777,7 @@ mod tests {
             ),
             spot(2, "b1", "logs", "none", &"t".repeat(MAX_TITLE_CHARS + 1)),
         ];
-        let (l, spots, counts) = build_ledger(&calls, false);
+        let (l, spots, counts) = build_ledger(&calls, None);
         let h1 = &l.unwrap().hypotheses[0];
         assert_eq!(h1.statement.chars().count(), MAX_TEXT_CHARS);
         assert_eq!(h1.evidence[0].query.len(), MAX_QUERY_BYTES);
@@ -772,7 +793,7 @@ mod tests {
         );
     }
 
-    /// VE7: at run end a `testing` hypothesis becomes `untested` with one more history entry.
+    /// At run end a `testing` hypothesis becomes `untested`, marked and dated at the run's end.
     #[test]
     fn testing_becomes_untested_at_run_end() {
         let calls = [
@@ -780,14 +801,14 @@ mod tests {
             hyp(2, "h2", "likely", vec![]),
             spot(5, "b1", "logs", "none", "no logs"),
         ];
-        let (live, _, live_counts) = build_ledger(&calls, false);
+        let (live, _, live_counts) = build_ledger(&calls, None);
         assert_eq!(
             live.unwrap().hypotheses[0].status,
             HypothesisStatus::Testing
         );
         assert_eq!(live_counts.left_testing, 0);
 
-        let (ended, _, counts) = build_ledger(&calls, true);
+        let (ended, _, counts) = build_ledger(&calls, Some(9_000_000));
         let ended = ended.unwrap();
         let h1 = hypothesis(&ended, "h1");
         assert_eq!(h1.status, HypothesisStatus::Untested);
@@ -801,7 +822,7 @@ mod tests {
                     trigger_steer_id: None
                 },
                 StatusChange {
-                    at_us: 5_000_000,
+                    at_us: 9_000_000,
                     status: HypothesisStatus::Untested,
                     run_ended: true,
                     trigger_steer_id: None
@@ -812,7 +833,7 @@ mod tests {
         assert_eq!(counts.left_testing, 1);
     }
 
-    /// VE10: invalid ids and unknown enum values are dropped and counted per tool.
+    /// Invalid ids and unknown enum values are dropped and counted per tool.
     #[test]
     fn invalid_calls_are_dropped_and_counted() {
         let calls = [
@@ -840,7 +861,7 @@ mod tests {
             spot(12, "b1", "logs", "call_someone", "t"),
             spot(13, "b2", "change", "connect_toolset", "no git"),
         ];
-        let (l, spots, counts) = build_ledger(&calls, false);
+        let (l, spots, counts) = build_ledger(&calls, None);
         assert_eq!(ids(&l.unwrap()), ["h2"]);
         assert_eq!(hypothesis(&ledger(&calls), "h2").first_seen_seq, 9);
         assert_eq!(
@@ -856,14 +877,14 @@ mod tests {
         );
 
         // Only invalid hypothesis calls: a ledger exists (the agent called the tool), and is empty.
-        let (only_invalid, ..) = build_ledger(&[hyp(1, "H1", "testing", vec![])], true);
+        let (only_invalid, ..) = build_ledger(&[hyp(1, "H1", "testing", vec![])], Some(2));
         assert_eq!(only_invalid.unwrap().hypotheses, vec![]);
-        // No hypothesis call at all: no ledger (NoLedger).
-        let (none, ..) = build_ledger(&[spot(1, "b1", "logs", "none", "t")], true);
+        // No hypothesis call at all: no ledger.
+        let (none, ..) = build_ledger(&[spot(1, "b1", "logs", "none", "t")], Some(2));
         assert_eq!(none, None);
     }
 
-    /// VE11: a history entry only when the status changes; the steering id rides along.
+    /// A history entry only when the status changes; the steering id rides along.
     #[test]
     fn history_records_only_status_changes() {
         let at = |h: i64, m: i64| (h * 3600 + m * 60) * 1_000_000;
@@ -899,7 +920,7 @@ mod tests {
         );
     }
 
-    /// VE12: rank table, and the leading hypothesis of the rule's sample.
+    /// Rank table, and the leading hypothesis of the rule's sample.
     #[test]
     fn the_leading_hypothesis_follows_the_rank_rule() {
         use HypothesisStatus::*;
@@ -937,7 +958,7 @@ mod tests {
         assert_eq!(subject(&l), None);
     }
 
-    /// VE13: the subject rule.
+    /// The subject rule.
     #[test]
     fn the_subject_follows_the_subject_rule() {
         let l = ledger(&[
@@ -967,7 +988,7 @@ mod tests {
         assert_eq!(subject(&l).unwrap().id, "h2");
     }
 
-    /// VE20: `h2` leads, then `h1`, then `h1` with a new statement: three entries.
+    /// `h2` leads, then `h1`, then `h1` with a new statement: three entries.
     #[test]
     fn leading_history_keeps_changes_of_id_or_statement() {
         let calls = [

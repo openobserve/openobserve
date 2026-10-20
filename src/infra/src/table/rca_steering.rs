@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Steering rows of RCA runs (`rca_steering`, 04 §8).
+//! Steering rows of RCA runs (`rca_steering`).
 
 use std::str::FromStr;
 
@@ -22,11 +22,17 @@ use config::meta::alerts::rca_steering::{
 };
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseTransaction, DbErr, EntityTrait,
-    PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, Set, sea_query::Expr,
+    PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, Set, TransactionTrait, sea_query::Expr,
 };
 
 pub use super::entity::rca_steering::Model;
-use super::entity::rca_steering::{ActiveModel, Column, Entity};
+use super::{
+    entity::{
+        rca_runs,
+        rca_steering::{ActiveModel, Column, Entity},
+    },
+    rca_runs::locked,
+};
 use crate::db::{get_orm_client_ro, get_orm_client_rw};
 
 /// The fields a [set_status] write may fill besides the status.
@@ -42,7 +48,7 @@ pub struct SteerPatch {
     pub kind: Option<SteerKind>,
 }
 
-/// The counts the SG10 rate limits decide with. `guidance` rows do not count.
+/// The counts the rate limits decide with. `guidance` rows do not count.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct RateCounts {
     /// The author's rows on the run.
@@ -60,7 +66,7 @@ pub async fn insert(record: &SteerRecord) -> Result<(), DbErr> {
     insert_with(get_orm_client_rw().await, record).await
 }
 
-/// [insert] inside the caller's transaction (the guidance row of a new run, SG33).
+/// [insert] inside the caller's transaction (the guidance row of a new run).
 pub async fn insert_in(txn: &DatabaseTransaction, record: &SteerRecord) -> Result<(), DbErr> {
     insert_with(txn, record).await
 }
@@ -90,6 +96,57 @@ pub async fn insert_with<C: ConnectionTrait>(conn: &C, record: &SteerRecord) -> 
     .insert(conn)
     .await?;
     Ok(())
+}
+
+/// Inserts `record` if `admit` accepts the run's rate counts; the locked run row serializes sends.
+pub async fn insert_within_limits<E>(
+    record: &SteerRecord,
+    since_us: i64,
+    admit: impl FnOnce(RateCounts, bool) -> Result<(), E>,
+) -> Result<Result<(), E>, DbErr> {
+    insert_within_limits_with(get_orm_client_rw().await, record, since_us, admit).await
+}
+
+/// [insert_within_limits] on a given connection.
+pub async fn insert_within_limits_with<C: TransactionTrait, E>(
+    db: &C,
+    record: &SteerRecord,
+    since_us: i64,
+    admit: impl FnOnce(RateCounts, bool) -> Result<(), E>,
+) -> Result<Result<(), E>, DbErr> {
+    let txn = db.begin().await?;
+    locked(
+        &txn,
+        rca_runs::Entity::find_by_id(record.run_id.as_str())
+            .filter(rca_runs::Column::OrgId.eq(record.org_id.as_str()))
+            .select_only()
+            .column(rca_runs::Column::RunId),
+    )
+    .into_tuple::<String>()
+    .one(&txn)
+    .await?;
+    let counts = rate_window_with(
+        &txn,
+        &record.org_id,
+        &record.run_id,
+        &record.author_email,
+        since_us,
+    )
+    .await?;
+    let pending = match (record.kind, record.hypothesis_id.as_deref(), record.action) {
+        (SteerKind::HypothesisAction, Some(hypothesis_id), Some(action)) => {
+            pending_action_exists_with(&txn, &record.org_id, &record.run_id, hypothesis_id, action)
+                .await?
+        }
+        _ => false,
+    };
+    if let Err(refused) = admit(counts, pending) {
+        txn.rollback().await?;
+        return Ok(Err(refused));
+    }
+    insert_with(&txn, record).await?;
+    txn.commit().await?;
+    Ok(Ok(()))
 }
 
 /// One row.
@@ -242,7 +299,7 @@ pub async fn set_status_with<C: ConnectionTrait>(
     Ok(update.exec(conn).await?.rows_affected > 0)
 }
 
-/// The SG10 counts of `author` on the run.
+/// The rate-limit counts of `author` on the run.
 pub async fn rate_window(
     org_id: &str,
     run_id: &str,
@@ -322,7 +379,7 @@ pub async fn pending_action_exists_with<C: ConnectionTrait>(
     Ok(pending > 0)
 }
 
-/// Deletes the rows of the given runs inside the caller's transaction (the RR-25 prune, 04 §8.5).
+/// Deletes the rows of the given runs inside the caller's transaction (the history prune).
 pub async fn delete_for_runs_in(
     txn: &DatabaseTransaction,
     org_id: &str,
@@ -410,8 +467,13 @@ mod tests {
         opts.max_connections(1);
         let db = Database::connect(opts).await.unwrap();
         let backend = db.get_database_backend();
-        let stmt = Schema::new(backend).create_table_from_entity(Entity);
-        db.execute(backend.build(&stmt)).await.unwrap();
+        let schema = Schema::new(backend);
+        for stmt in [
+            schema.create_table_from_entity(Entity),
+            schema.create_table_from_entity(rca_runs::Entity),
+        ] {
+            db.execute(backend.build(&stmt)).await.unwrap();
+        }
         db
     }
 
@@ -470,7 +532,7 @@ mod tests {
         }
     }
 
-    /// SG1: insert, get, list in send order, and the record round-trips every column.
+    /// Insert, get, list in send order, and the record round-trips every column.
     #[tokio::test]
     async fn sg1_insert_get_and_list_in_send_order() {
         let db = db().await;
@@ -517,7 +579,7 @@ mod tests {
         assert_eq!(ids, ["stg_a", "stg_c", "stg_b"]);
     }
 
-    /// SG2 / SG3 / §8.2: every (from, to) pair through `set_status`.
+    /// Every (from, to) pair through `set_status`.
     #[tokio::test]
     async fn sg2_sg3_set_status_follows_the_status_chart() {
         use SteerStatus::*;
@@ -561,7 +623,7 @@ mod tests {
                 } else {
                     assert_eq!(after, before, "{from} -> {to} wrote");
                 }
-                // SG2: the immutable columns.
+                // The immutable columns.
                 assert_eq!(
                     (
                         &after.org_id,
@@ -612,7 +674,7 @@ mod tests {
         );
     }
 
-    /// SG3: a late `delivered` after the reconcile wrote `read` keeps `read` and its times.
+    /// A late `delivered` after the reconcile wrote `read` keeps `read` and its times.
     #[tokio::test]
     async fn sg3_a_late_delivered_after_read_keeps_read() {
         let db = db().await;
@@ -667,7 +729,7 @@ mod tests {
         assert_eq!(r.read_at, Some(T0 + 2 * SEC));
     }
 
-    /// SG18: `kind` and `question_id` change only on a `queued` row.
+    /// `kind` and `question_id` change only on a `queued` row.
     #[tokio::test]
     async fn sg18_kind_and_question_id_change_only_from_queued() {
         let db = db().await;
@@ -767,6 +829,49 @@ mod tests {
         assert_eq!((c.author_total, c.run_total), (1, 4));
         let c = rate_window_with(&db, "other", RUN, a, T0).await.unwrap();
         assert_eq!(c, RateCounts::default());
+    }
+
+    #[tokio::test]
+    async fn sg10_concurrent_sends_see_each_other_before_their_insert() {
+        let db = db().await;
+        let a = "a.rao@acme.io";
+        let one_each = |counts: RateCounts, _pending: bool| {
+            if counts.author_since > 0 {
+                Err("rate_limited")
+            } else {
+                Ok(())
+            }
+        };
+        let (first, second) = (
+            row("stg_1", a, SteerKind::Message, T0),
+            row("stg_2", a, SteerKind::Message, T0),
+        );
+        let (x, y) = tokio::join!(
+            insert_within_limits_with(&db, &first, T0, one_each),
+            insert_within_limits_with(&db, &second, T0, one_each),
+        );
+        let admitted = [x.unwrap(), y.unwrap()];
+        assert_eq!(
+            admitted.iter().filter(|r| r.is_ok()).count(),
+            1,
+            "{admitted:?}"
+        );
+        assert_eq!(list_for_run_with(&db, ORG, RUN).await.unwrap().len(), 1);
+
+        let queued = action_row("stg_3", "h1", SteerAction::Disprove, SteerStatus::Queued);
+        insert_with(&db, &queued).await.unwrap();
+        let again = action_row("stg_4", "h1", SteerAction::Disprove, SteerStatus::Queued);
+        let seen = insert_within_limits_with(&db, &again, T0 + 100 * SEC, |_, pending| {
+            if pending {
+                Err("duplicate_action")
+            } else {
+                Ok(())
+            }
+        })
+        .await
+        .unwrap();
+        assert_eq!(seen, Err("duplicate_action"));
+        assert!(get_with(&db, ORG, "stg_4").await.unwrap().is_none());
     }
 
     #[tokio::test]

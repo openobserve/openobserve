@@ -150,7 +150,7 @@ mod tests {
         assert_eq!(Migration.name(), "m20261019_000001_create_rca_feedback");
     }
 
-    /// J1: column types, nullability, the primary key and the subject index.
+    /// Column types, nullability, the primary key and the subject index.
     #[test]
     fn rca_feedback_schema_matches_the_contract() {
         let sql = create_statement().to_string(PostgresQueryBuilder);

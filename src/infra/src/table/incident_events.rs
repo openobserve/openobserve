@@ -315,8 +315,7 @@ pub async fn append_with<C: TransactionTrait>(
     Ok(())
 }
 
-/// [append] inside the caller's transaction, so the event commits or rolls back with the
-/// caller's other writes (RR-4).
+/// [append] inside the caller's transaction, so the event commits or rolls back with it.
 pub async fn append_in(
     txn: &DatabaseTransaction,
     org_id: &str,
@@ -349,9 +348,7 @@ pub async fn append_in(
     Ok(())
 }
 
-/// The read of a decode-and-rewrite: it locks the incident's row, so two concurrent writers
-/// cannot both rewrite the same array and drop each other's event (RR-22). SQLite serializes
-/// writers and has no `FOR UPDATE`.
+/// Row lock so concurrent rewrites cannot drop each other's event; SQLite has no `FOR UPDATE`.
 fn locked_row(
     txn: &DatabaseTransaction,
     org_id: &str,
@@ -600,8 +597,7 @@ mod tests {
         );
     }
 
-    /// RR-22: `append` (via `append_with`) and `append_in` write identical rows for one
-    /// event, both when the timeline row exists and when it does not.
+    /// `append` and `append_in` write identical rows, with and without an existing row.
     #[tokio::test]
     async fn append_and_append_in_write_identical_rows() {
         use sea_orm::{ConnectOptions, Database, Schema};

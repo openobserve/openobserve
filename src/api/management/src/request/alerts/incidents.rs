@@ -488,7 +488,7 @@ pub async fn trigger_incident_rca(
     use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
     use openobserve_core::alerts::rca_runs;
 
-    // The body is optional; when present it is `{guidance}` (SG33).
+    // The body is optional; when present it is `{guidance}`.
     let guidance = if body.iter().all(u8::is_ascii_whitespace) {
         None
     } else {
@@ -536,7 +536,7 @@ pub async fn trigger_incident_rca(
         Err(e) => return MetaHttpResponse::internal_error(e),
     }
 
-    // RR-7: completed history determines both trigger type and Cloud usage feature.
+    // Completed history determines both trigger type and Cloud usage feature.
     let has_completed_run =
         match infra::table::rca_runs::newest_completed_for_incident(&org_id, &incident_id).await {
             Ok(run) => run.is_some(),
@@ -597,7 +597,7 @@ pub async fn trigger_incident_rca(
         }
     };
 
-    // RR-13: detached launch must terminate the persisted run even if the request disconnects.
+    // Detached launch must terminate the persisted run even if the request disconnects.
     let task = tokio::spawn(async move {
         // Meter usage only now, after the start: a refused start never costs a credit.
         #[cfg(feature = "cloud")]
@@ -685,7 +685,7 @@ async fn authorize_started_rca(
     }
 }
 
-/// `202 {message, run_id}`: the run is started and its turn spawned (TH13).
+/// `202 {message, run_id}`: the run is started and its turn spawned.
 #[cfg(feature = "enterprise")]
 fn rca_started_response(run_id: String) -> Response {
     json_status_response(
@@ -978,7 +978,7 @@ pub async fn get_incident_rca_thread(
     }
 }
 
-/// Optional body of `POST …/rca`: guidance for the new run (SG33).
+/// Optional body of `POST …/rca`: guidance for the new run.
 #[derive(Debug, Default, Deserialize, ToSchema)]
 pub struct TriggerRcaBody {
     /// What the responder wants this analysis to look at; 1 to 2000 characters.
@@ -986,7 +986,7 @@ pub struct TriggerRcaBody {
     pub guidance: Option<String>,
 }
 
-/// SG11: derive author from authentication and reject unknown body fields.
+/// Derive author from authentication and reject unknown body fields.
 #[derive(Debug, Deserialize, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct SteerRequestBody {
@@ -1089,7 +1089,7 @@ pub async fn steer_incident_rca_run(
     use axum::http::StatusCode;
     use openobserve_core::alerts::rca_steering;
 
-    // SG11: use 400 for malformed bodies, including forged author fields.
+    // Use 400 for malformed bodies, including forged author fields.
     let body: SteerRequestBody = match serde_json::from_slice(&body) {
         Ok(body) => body,
         Err(e) => {
@@ -1102,7 +1102,7 @@ pub async fn steer_incident_rca_run(
         }
     };
 
-    // SG7: OpenFGA middleware and RCA feature flags both gate writes.
+    // OpenFGA middleware and RCA feature flags both gate writes.
     if !crate::request::ai::chat::can_run_incident_rca(&org_id, &user_email.user_id, &incident_id)
         .await
     {
@@ -1200,7 +1200,7 @@ async fn incident_run(
     }
 }
 
-/// J2: feedback writes require RCA permission; unknown incidents return 404.
+/// Feedback writes require RCA permission; unknown incidents return 404.
 #[cfg(feature = "enterprise")]
 async fn require_rca_permission(
     org_id: &str,
@@ -1523,7 +1523,7 @@ pub async fn resume_incident_rca_run(
     response
 }
 
-/// J7: precheck → prepare → start → authorize → launch; the caller owns metrics.
+/// Precheck → prepare → start → authorize → launch; the caller owns metrics.
 #[cfg(feature = "enterprise")]
 async fn resume_run(
     org_id: String,
@@ -1540,9 +1540,11 @@ async fn resume_run(
         return MetaHttpResponse::bad_request("RCA is not enabled");
     }
     if !o2_cfg.ai.has_agent_target() {
-        return json_status_response(
+        return rca_error_response(
             StatusCode::SERVICE_UNAVAILABLE,
-            serde_json::json!({"error": "RCA agent URL is not configured"}),
+            "RCA agent URL is not configured",
+            Some("agent_not_configured"),
+            None,
         );
     }
 
@@ -1564,7 +1566,7 @@ async fn resume_run(
     start_resumed_run(org_id, incident_id, user_email, seed).await
 }
 
-/// The answer for a run that cannot be resumed (J7).
+/// The answer for a run that cannot be resumed.
 #[cfg(feature = "enterprise")]
 fn resume_error_response(
     run_id: &str,
@@ -1635,18 +1637,21 @@ async fn start_resumed_run(
         },
     );
 
-    // The start transaction is the in-flight guard and appends the Begin event.
-    let new_run_id = match rca_runs::start_run(rca_runs::StartRun {
-        org_id: org_id.clone(),
-        subject: rca_runs::RunSubject::Incident(incident_id.clone()),
-        trigger: RunTrigger::Resume,
-        mode: seed.mode,
-        started_by: user_email.user_id.clone(),
-        guidance: None,
-        skip_cooldown: true,
-        oncall_subjects: None,
-        context_used: Some(serde_json::json!({ "resumed_from": seed.resumed_from() })),
-    })
+    // The start transaction refuses a live run or any start since the check, and appends Begin.
+    let new_run_id = match rca_runs::start_run_if_latest(
+        rca_runs::StartRun {
+            org_id: org_id.clone(),
+            subject: rca_runs::RunSubject::Incident(incident_id.clone()),
+            trigger: RunTrigger::Resume,
+            mode: seed.mode,
+            started_by: user_email.user_id.clone(),
+            guidance: None,
+            skip_cooldown: true,
+            oncall_subjects: None,
+            context_used: Some(serde_json::json!({ "resumed_from": seed.resumed_from() })),
+        },
+        &seed.latest_run_id,
+    )
     .await
     {
         Ok(rca_runs::StartOutcome::Started { run_id }) => run_id,
@@ -1839,7 +1844,7 @@ pub async fn get_incident_rca_live_stream(
         LIVE_PROBE_INTERVAL, LiveSpec, LiveStream, OpenStream, StoreReader,
     };
 
-    // LU3: everything the stream can refuse is a JSON answer before the first byte.
+    // Everything the stream can refuse is a JSON answer before the first byte.
     match infra::table::alert_incidents::get(&org_id, &incident_id).await {
         Ok(Some(_)) => {}
         Ok(None) => return MetaHttpResponse::not_found("Incident not found"),
@@ -1903,7 +1908,7 @@ pub async fn get_incident_rca_live_stream(
 /// RunIncidentRcaBacktest
 #[utoipa::path(
     post,
-    path = "/{org_id}/alerts/incidents/rca/backtest",
+    path = "/v2/{org_id}/alerts/incidents/rca/backtest",
     context_path = "/api",
     tag = "Incidents",
     operation_id = "RunIncidentRcaBacktest",
@@ -1916,7 +1921,7 @@ pub async fn get_incident_rca_live_stream(
     request_body(content = o2_enterprise::enterprise::alerts::rca_backtest::BacktestRequest, description = "Backtest window and options", content_type = "application/json"),
     responses(
         (status = 200, description = "Backtest report", content_type = "application/json", body = o2_enterprise::enterprise::alerts::rca_backtest::BacktestReport),
-        (status = 400, description = "Invalid request", content_type = "application/json", body = ()),
+        (status = 400, description = "Invalid request; `error_code: invalid_body` for a body that does not parse", content_type = "application/json", body = Object),
         (status = 500, description = "Internal error", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -1927,15 +1932,30 @@ pub async fn get_incident_rca_live_stream(
 pub async fn run_incident_rca_backtest(
     Path(org_id): Path<String>,
     Headers(user_email): Headers<UserEmail>,
-    Json(body): Json<o2_enterprise::enterprise::alerts::rca_backtest::BacktestRequest>,
+    body: axum::body::Bytes,
 ) -> Response {
+    use axum::http::StatusCode;
     use o2_enterprise::enterprise::alerts::rca_backtest;
 
+    let body: rca_backtest::BacktestRequest = match serde_json::from_slice(&body) {
+        Ok(body) => body,
+        Err(e) => {
+            return rca_error_response(
+                StatusCode::BAD_REQUEST,
+                &format!("Invalid request body: {e}"),
+                Some("invalid_body"),
+                None,
+            );
+        }
+    };
     match rca_backtest::run_backtest(&org_id, &user_email.user_id, body).await {
         Ok(report) => MetaHttpResponse::json(report),
-        Err(e @ rca_backtest::BacktestError::Invalid(_)) => {
-            MetaHttpResponse::bad_request(e.to_string())
-        }
+        Err(e @ rca_backtest::BacktestError::Invalid(_)) => rca_error_response(
+            StatusCode::BAD_REQUEST,
+            &e.to_string(),
+            Some("invalid_request"),
+            None,
+        ),
         Err(rca_backtest::BacktestError::Internal(err)) => {
             log::error!("[INCIDENTS::RCA] backtest for org {org_id} failed: {err:#}");
             MetaHttpResponse::internal_error("The backtest failed; see the server log")
@@ -2561,7 +2581,7 @@ pub async fn resume_incident_rca_run(
 #[cfg(not(feature = "enterprise"))]
 #[utoipa::path(
     post,
-    path = "/{org_id}/alerts/incidents/rca/backtest",
+    path = "/v2/{org_id}/alerts/incidents/rca/backtest",
     context_path = "/api",
     tag = "Incidents",
     operation_id = "RunIncidentRcaBacktest",
@@ -2583,7 +2603,7 @@ pub async fn resume_incident_rca_run(
 pub async fn run_incident_rca_backtest(
     _path: Path<String>,
     _headers: Headers<UserEmail>,
-    _body: Json<serde_json::Value>,
+    _body: axum::body::Bytes,
 ) -> Response {
     MetaHttpResponse::forbidden("Not Supported")
 }
@@ -2788,7 +2808,6 @@ mod tests {
         assert_ne!(IncidentStatus::Acknowledged, IncidentStatus::Resolved);
     }
 
-    /// TH13: the trigger answer names the started run.
     #[test]
     fn test_rca_started_response_carries_the_run_id() {
         let json = serde_json::to_value(RcaStartedResponse {
@@ -2802,7 +2821,6 @@ mod tests {
         );
     }
 
-    /// SG11: the author is the authenticated user; a body that names one is refused.
     #[test]
     fn test_steer_body_refuses_an_author_field() {
         let body: SteerRequestBody = serde_json::from_str(
@@ -2821,7 +2839,6 @@ mod tests {
         assert_eq!(trigger.guidance.as_deref(), Some("look at db"));
     }
 
-    /// TH41: the cancel answer names the run it ended.
     #[test]
     fn test_cancel_rca_response_shape() {
         let json = serde_json::to_value(CancelRcaResponse {
@@ -2835,7 +2852,6 @@ mod tests {
         );
     }
 
-    /// RR-30: the run list pages with `limit` and `before`, and its items carry no report.
     #[test]
     fn test_list_rca_runs_query_and_response_shape() {
         use config::meta::alerts::rca_runs::{
@@ -2868,6 +2884,7 @@ mod tests {
                 confidence: None,
                 cancelled_by: Some("a.rao@acme.io".to_string()),
                 error_reason: None,
+                has_record: true,
             }],
             has_more: true,
         })
@@ -2880,10 +2897,10 @@ mod tests {
         assert_eq!(run["mode"], "build_on_previous");
         assert_eq!(run["state"], "cancelled");
         assert_eq!(run["cancelled_by"], "a.rao@acme.io");
+        assert_eq!(run["has_record"], true);
         assert!(run.get("report").is_none());
     }
 
-    /// RR-28: an incident that was never analyzed serializes `rca: null`.
     #[test]
     fn test_never_analyzed_incident_serializes_rca_null() {
         let incident = config::meta::alerts::incidents::Incident {
@@ -2923,7 +2940,6 @@ mod tests {
         (status, serde_json::from_slice(&body).unwrap())
     }
 
-    /// TH13: a started analysis answers 202 with the run it started.
     #[cfg(feature = "enterprise")]
     #[tokio::test]
     async fn test_a_started_analysis_is_a_202_naming_the_run() {
@@ -3089,7 +3105,7 @@ mod tests {
                 .await
                 .unwrap();
         }
-        // The org shows no tool input/output (TH34); cached, as the route reads it.
+        // The org shows no tool input/output; cached, as the route reads it.
         let settings_key = format!("/organization/setting/{org}");
         common::infra::config::ORGANIZATION_SETTING
             .write()
@@ -3178,7 +3194,7 @@ mod tests {
             serde_json::json!({"not_modified": true, "state_version": "41.1500.2000"})
         );
 
-        // TH31: with the setting on, the version names it, so the copy above is stale.
+        // With the setting on, the version names it, so the copy above is stale.
         common::infra::config::ORGANIZATION_SETTING
             .write()
             .await
@@ -3250,6 +3266,7 @@ mod tests {
             error_type: None,
             signal: signal_class("SearchSQL", &input),
             target: evidence_target("SearchSQL", &input),
+            observed: None,
             result_summary,
         }];
         let submit = parse_submit(&json!({
@@ -3275,6 +3292,7 @@ mod tests {
                 "stg_1".to_string(),
                 "a.rao@acme.io".to_string(),
             )]),
+            ended_at_us: 0,
         });
         serde_json::to_value(end.record).unwrap()
     }
@@ -3424,7 +3442,7 @@ mod tests {
             json!([{"id": "b1", "axis": "other", "title": "Feature-flag history", "why": "w", "fix": "connect_toolset"}])
         );
 
-        // VE42: no result, or one that does not read, is a legacy run.
+        // No result, or one that does not read, is a legacy run.
         for run_id in ["run_sum_legacy", "run_unreadable"] {
             let (status, body) = status_and_body(read("inc_1", run_id, None).await).await;
             assert_eq!(status, StatusCode::OK, "{run_id}");
@@ -3611,7 +3629,7 @@ mod tests {
 
     #[cfg(feature = "enterprise")]
     const STEER_ROOT: &str = "root@steering.incidents.test";
-    /// Fails it while the incident exists: `check_permissions` finds no user record (SG7).
+    /// Fails it while the incident exists: `check_permissions` finds no user record.
     #[cfg(feature = "enterprise")]
     const STEER_READER: &str = "reader@steering.incidents.test";
 
@@ -4064,7 +4082,7 @@ mod tests {
         }
         assert!(steer_rows(&org, "run_live").await.is_empty());
 
-        // SG8 counts scalar values, not bytes: 2,000 two-byte characters are 4,000 bytes.
+        // Counts scalar values, not bytes: 2,000 two-byte characters are 4,000 bytes.
         let longest = serde_json::json!({"text": "é".repeat(2000), "kind": "message"}).to_string();
         let (status, answer) =
             status_and_body(steer_as(&org, "inc_1", "run_live", STEER_ROOT, &longest).await).await;
@@ -4260,7 +4278,7 @@ mod tests {
             })
         );
 
-        // SG37: the reader sees the thread's messages but no steer box.
+        // The reader sees the thread's messages but no steer box.
         let (status, reader_view) = steering_as(&org, "inc_1", "run_live", STEER_READER).await;
         assert_eq!(status, StatusCode::OK, "{reader_view}");
         assert_eq!(reader_view["items"], root_view["items"]);
@@ -4394,7 +4412,7 @@ mod tests {
         let org = steering_org("live");
         steering_incident(conn, &org, "inc_1", Some("run_live")).await;
         steering_run(conn, &org, "run_live", "inc_1", "running").await;
-        // The org shows no tool input/output (TH34); cached, as the route reads it.
+        // The org shows no tool input/output; cached, as the route reads it.
         common::infra::config::ORGANIZATION_SETTING
             .write()
             .await
@@ -5543,6 +5561,7 @@ mod tests {
                 title: "Check the orders pool".to_string(),
             },
             mode: config::meta::alerts::rca_runs::RunMode::BuildOnPrevious,
+            latest_run_id: sid(org_id, source_run_id),
         }
     }
 
@@ -5846,7 +5865,6 @@ mod tests {
         }
     }
 
-    /// J2, J7: without enterprise features the feedback and resume routes answer 403.
     #[cfg(not(feature = "enterprise"))]
     #[tokio::test]
     async fn test_the_oss_feedback_and_resume_routes_are_403() {
@@ -5877,7 +5895,6 @@ mod tests {
         }
     }
 
-    /// §9.1: without enterprise features both steering routes answer 403.
     #[cfg(not(feature = "enterprise"))]
     #[tokio::test]
     async fn test_the_oss_steering_routes_are_403() {

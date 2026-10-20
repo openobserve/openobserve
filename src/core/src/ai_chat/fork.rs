@@ -13,16 +13,17 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! The Resume fork of an RCA run's session (J8): [plan_resume] picks the cut at the last
-//! finished step, [fork_run_session] copies the committed events up to it into a new
-//! session under fresh opencode ids ([rewrite_ids]), ready for the restore path.
+//! The Resume fork of an RCA run's session: cut at the last finished step, copy under fresh ids.
 
 use std::{borrow::Cow, collections::HashMap, sync::LazyLock};
 
 use anyhow::{Context, Result, bail};
-use config::utils::{
-    json::{Map, Value},
-    time::now_micros,
+use config::{
+    meta::oncall::rca_run::parse_submit,
+    utils::{
+        json::{Map, Value},
+        time::now_micros,
+    },
 };
 use infra::table::ai_chat_sessions::{self, Binding, NO_SEQ};
 use o2_enterprise::enterprise::ai::{
@@ -34,12 +35,15 @@ use sha2::{Digest, Sha256};
 
 use super::{
     REFRESH_BATCH, StreamChatStore,
-    rca_thread::{RECORD_STEP, SUBMIT_REPORT, ToolPart, rca_stage, step_title, updated_part},
+    projection::truthy,
+    rca_thread::{
+        RECORD_STEP, SUBMIT_REPORT, ThreadPart, ToolPart, rca_stage, step_title, updated_part,
+    },
     read_committed_events,
 };
 
-/// An opencode id: 4-letter family, `_`, 12 time-ordered chars and a 14-char base62 tail.
-/// `call_…` tool-call ids and 27-char `stg_…` steer ids do not match and stay as they are.
+/// An opencode id: 4-letter family, `_`, 12 time-ordered chars and a 14-char base62 tail; others
+/// stay as they are.
 static OPENCODE_ID: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"\b(?:evt|ses|msg|prt)_[0-9A-Za-z]{26}\b").expect("valid pattern")
 });
@@ -52,10 +56,9 @@ const BASE62: &[u8; 62] = b"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnop
 /// Where a resumed run starts over in its source session.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ResumePlan {
-    /// The last seq the fork keeps: the one before the first event of the message that holds
-    /// the last `record_step`.
+    /// Last seq kept: before the last `record_step`'s message, or its call after only text.
     pub cut_seq: i64,
-    /// `record_step` calls the kept events hold.
+    /// Steps the kept events show, the thread's implicit first step included.
     pub reused_steps: u32,
     /// The first step the cut drops, which the resumed run does again.
     pub from_step: PlannedStep,
@@ -89,6 +92,8 @@ pub struct RunFork {
 /// A `record_step` call over the updates of its part.
 struct StepCall<'a> {
     message_id: &'a str,
+    /// Seq of the call's first update, whatever its status.
+    opened_seq: i64,
     /// Seq of the first update that shows the call running or completed.
     first_seq: Option<i64>,
     /// `state.status` of the latest update.
@@ -101,6 +106,8 @@ struct StepCall<'a> {
 pub fn plan_resume(events: &[DurableEvent]) -> Result<ResumePlan, ResumeRefusal> {
     let mut calls: Vec<StepCall> = Vec::new();
     let mut by_call_id: HashMap<String, usize> = HashMap::new();
+    // The first visible tool row: before every step, the thread shows it in an implicit step.
+    let mut first_row_seq: Option<i64> = None;
     for event in events {
         let Some(part) = updated_part(event) else {
             continue;
@@ -109,11 +116,20 @@ pub fn plan_resume(events: &[DurableEvent]) -> Result<ResumePlan, ResumeRefusal>
             continue;
         };
         match call.tool {
-            SUBMIT_REPORT if call.status == "completed" => {
+            // A blank report is no report: the run failed without one.
+            SUBMIT_REPORT
+                if call.status == "completed"
+                    && parse_submit(&Value::Object(call.args())).is_some() =>
+            {
                 return Err(ResumeRefusal::ReportSubmitted);
             }
             RECORD_STEP => {}
-            _ => continue,
+            _ => {
+                if first_row_seq.is_none() && call.kind() == ThreadPart::Row {
+                    first_row_seq = Some(event.seq);
+                }
+                continue;
+            }
         }
         let Some(message_id) = part.get("messageID").and_then(Value::as_str) else {
             continue;
@@ -121,6 +137,7 @@ pub fn plan_resume(events: &[DurableEvent]) -> Result<ResumePlan, ResumeRefusal>
         let index = *by_call_id.entry(call.call_id()).or_insert_with(|| {
             calls.push(StepCall {
                 message_id,
+                opened_seq: event.seq,
                 first_seq: None,
                 status: "",
                 stage: None,
@@ -147,14 +164,26 @@ pub fn plan_resume(events: &[DurableEvent]) -> Result<ResumePlan, ResumeRefusal>
     let Some((_, last)) = steps.last() else {
         return Err(ResumeRefusal::NoFinishedStep);
     };
-    let cut_seq = events
+    let opens = events
         .iter()
         .filter(|event| message_of(event) == Some(last.message_id))
         .map(|event| event.seq)
         .min()
-        .ok_or(ResumeRefusal::NoFinishedStep)?
-        - 1;
-    let reused = steps.iter().filter(|(seq, _)| *seq <= cut_seq).count();
+        .ok_or(ResumeRefusal::NoFinishedStep)?;
+    // The text before the dropped call is the note of the last kept step.
+    let cut_seq = if only_text_before(events, last.message_id, opens, last.opened_seq) {
+        last.opened_seq - 1
+    } else {
+        opens - 1
+    };
+    let first_step_seq = calls
+        .iter()
+        .filter(|step| step.status != "error")
+        .map(|step| step.opened_seq)
+        .min();
+    let implicit = first_row_seq
+        .is_some_and(|row| row <= cut_seq && first_step_seq.is_none_or(|step| row < step));
+    let reused = steps.iter().filter(|(seq, _)| *seq <= cut_seq).count() + usize::from(implicit);
     let Some((_, dropped)) = steps.iter().find(|(seq, _)| *seq > cut_seq) else {
         return Err(ResumeRefusal::NoFinishedStep);
     };
@@ -171,6 +200,39 @@ pub fn plan_resume(events: &[DurableEvent]) -> Result<ResumePlan, ResumeRefusal>
             title: step_title(dropped.title, index),
         },
     })
+}
+
+/// Whether `message_id`'s events in `from..to` are only its text, some of it visible.
+fn only_text_before(events: &[DurableEvent], message_id: &str, from: i64, to: i64) -> bool {
+    let mut visible = false;
+    for event in events
+        .iter()
+        .filter(|event| (from..to).contains(&event.seq))
+    {
+        if message_of(event).is_some_and(|id| id != message_id) {
+            return false;
+        }
+        let Some(part) = updated_part(event) else {
+            continue;
+        };
+        match part.get("type").and_then(Value::as_str) {
+            Some("text") => visible |= is_visible_text(part),
+            Some("reasoning" | "step-start") => {}
+            _ => return false,
+        }
+    }
+    visible
+}
+
+/// A text part the thread shows as a note.
+fn is_visible_text(part: &Map<String, Value>) -> bool {
+    let hidden =
+        part.get("synthetic").is_some_and(truthy) || part.get("ignored").is_some_and(truthy);
+    !hidden
+        && part
+            .get("text")
+            .and_then(Value::as_str)
+            .is_some_and(|text| !text.trim().is_empty())
 }
 
 /// The opencode message an event belongs to: a message's own update, or one of its parts.
@@ -548,8 +610,8 @@ pub(crate) mod tests {
         s.events
     }
 
-    /// The last seq [three_steps] keeps: the one before `msg_a3` opens.
-    pub(crate) const THREE_STEPS_CUT: i64 = 13;
+    /// The last seq [three_steps] keeps: `msg_a3`'s text, the note of step 2, before its step call.
+    pub(crate) const THREE_STEPS_CUT: i64 = 15;
 
     fn titles(events: &[DurableEvent]) -> Vec<String> {
         project_rca_thread(events, &[], false, false)
@@ -570,7 +632,7 @@ pub(crate) mod tests {
     // ---- plan_resume ----
 
     #[test]
-    fn the_cut_falls_before_the_message_of_the_last_step() {
+    fn the_cut_drops_the_last_steps_call_and_keeps_the_note_before_it() {
         let events = three_steps();
         let plan = plan_resume(&events).unwrap();
         assert_eq!(
@@ -583,14 +645,21 @@ pub(crate) mod tests {
         );
         let cut = plan.cut_seq as usize;
         assert_eq!(
-            events[cut + 1].data["info"]["id"],
-            "msg_a3",
-            "the last step's message is dropped from its first update on"
+            events[cut + 1].data["part"]["tool"],
+            "record_step",
+            "the last step is dropped from its call's first update on"
         );
         assert_eq!(
             titles(&events[..=cut]),
             ["Load incident context", "Check pool saturation"],
             "the kept events show the reused steps whole"
+        );
+        let kept = project_rca_thread(&events[..=cut], &[], false, false);
+        let source = project_rca_thread(&events, &[], false, false);
+        assert!(source.steps[1].note.is_some());
+        assert_eq!(
+            kept.steps[1].note, source.steps[1].note,
+            "the last reused step keeps its note"
         );
         let full = project_rca_thread(&events, &[], true, false);
         let third = &full.steps[2];
@@ -598,6 +667,60 @@ pub(crate) mod tests {
             (third.index, third.stage.as_deref(), third.title.as_str()),
             (3, Some("changes"), "Check recent deploys"),
             "from_step is the step the thread showed"
+        );
+    }
+
+    #[test]
+    fn steps_are_numbered_as_the_thread_numbers_them() {
+        let mut s = Session::new();
+        prompt(&mut s);
+        assistant(&mut s, "msg_a1");
+        query(&mut s, "msg_a1", "prt_q0", "completed");
+        assistant(&mut s, "msg_a2");
+        step(
+            &mut s,
+            "msg_a2",
+            "prt_s1",
+            "completed",
+            "metrics",
+            "Check pool saturation",
+        );
+        query(&mut s, "msg_a2", "prt_q1", "completed");
+        assistant(&mut s, "msg_a3");
+        step(&mut s, "msg_a3", "prt_s2", "running", "changes", " ");
+
+        let plan = plan_resume(&s.events).unwrap();
+        let thread = project_rca_thread(&s.events, &[], true, false);
+        let redone = &thread.steps[plan.reused_steps as usize];
+        assert_eq!(
+            (plan.from_step.index, plan.from_step.title.as_str()),
+            (redone.index, redone.title.as_str()),
+            "the tool calls before the first record_step are the thread's first step"
+        );
+        assert_eq!(
+            titles(&s.events[..=plan.cut_seq as usize]).len(),
+            plan.reused_steps as usize
+        );
+
+        // That implicit step alone is a finished step to keep.
+        let mut only = Session::new();
+        prompt(&mut only);
+        assistant(&mut only, "msg_a1");
+        query(&mut only, "msg_a1", "prt_q0", "completed");
+        assistant(&mut only, "msg_a2");
+        step(
+            &mut only,
+            "msg_a2",
+            "prt_s1",
+            "running",
+            "metrics",
+            "Check pool saturation",
+        );
+        let plan = plan_resume(&only.events).unwrap();
+        assert_eq!(
+            (plan.reused_steps, plan.from_step.index),
+            (1, 2),
+            "{plan:?}"
         );
     }
 
@@ -757,7 +880,12 @@ pub(crate) mod tests {
 
     #[test]
     fn only_a_committed_report_refuses_the_resume() {
-        for (status, refused) in [("completed", true), ("error", false), ("running", false)] {
+        for (status, markdown, refused) in [
+            ("completed", "## Root cause", true),
+            ("completed", "  ", false),
+            ("error", "## Root cause", false),
+            ("running", "## Root cause", false),
+        ] {
             let mut s = Session {
                 events: three_steps(),
             };
@@ -766,7 +894,7 @@ pub(crate) mod tests {
                 "prt_p1",
                 "submit_report",
                 status,
-                json!({"markdown": "## Root cause"}),
+                json!({"markdown": markdown}),
                 json!({}),
                 5_000,
                 5_001,
@@ -775,7 +903,11 @@ pub(crate) mod tests {
             if refused {
                 assert_eq!(plan, Err(ResumeRefusal::ReportSubmitted), "{status}");
             } else {
-                assert_eq!(plan.unwrap().cut_seq, THREE_STEPS_CUT, "{status}");
+                assert_eq!(
+                    plan.unwrap().cut_seq,
+                    THREE_STEPS_CUT,
+                    "{status} {markdown:?}"
+                );
             }
         }
         // Wherever the report sits, even before the last step.
@@ -800,7 +932,7 @@ pub(crate) mod tests {
         assert_eq!(plan_resume(&events), Err(ResumeRefusal::ReportSubmitted));
     }
 
-    /// J7: nothing to resume when no step would be left before the cut.
+    /// Nothing to resume when no step would be left before the cut.
     #[test]
     fn no_step_before_the_cut_is_nothing_to_resume() {
         assert_eq!(plan_resume(&[]), Err(ResumeRefusal::NoFinishedStep));

@@ -2174,10 +2174,7 @@ pub(crate) async fn page_for_alert_identity(
     }
 }
 
-/// I9-I11, TH14: one RCA run for a whole firing, guarded by config and "no
-/// analysis already pending on these records". The run is started with the
-/// pending records as its `oncall_subjects` and then runs as an investigation
-/// turn whose finalizer delivers to, or releases, those records.
+/// One RCA run per firing; its finalizer delivers to, or releases, the pending on-call records.
 ///
 /// Blocked by any guard ⇒ `escalation::skip_analysis` for every record, so I9's
 /// removal of the incident-only gate never holds a page with nothing coming to
@@ -2216,8 +2213,8 @@ async fn trigger_rca_for_alert_firing(
 
     tokio::spawn(async move {
         // §2.3: the record's own `AnalysisState` is the in-flight marker a retried opener reads.
-        // Asked before the run starts, so a firing that reopened nothing starts no run and pays
-        // for neither the credentials fetch nor the health round-trip of `start_rca_turn`.
+        // Checked first so a firing that reopened nothing skips the credentials and health
+        // round-trips.
         let mut pending = Vec::new();
         for paged in &opened {
             if escalation::analysis_may_run(&org_id, &paged.response.subject).await {
@@ -2234,7 +2231,7 @@ async fn trigger_rca_for_alert_firing(
         let subjects: Vec<config::meta::oncall::SubjectRef> =
             pending.iter().map(|p| p.response.subject.clone()).collect();
 
-        // RR-37: one `alert` run per firing; every exit below ends it.
+        // One `alert` run per firing; every exit below ends it.
         let run_id = match rca_runs::start_run(rca_runs::StartRun {
             org_id: org_id.clone(),
             subject: rca_runs::RunSubject::Alert {
@@ -2292,7 +2289,7 @@ async fn trigger_rca_for_alert_firing(
             dimensions,
         };
 
-        // TH14: the turn's finalizer delivers the report to `oncall_subjects` or releases them.
+        // The turn's finalizer delivers the report to `oncall_subjects` or releases them.
         let run = RcaTurnRun {
             org_id: org_id.clone(),
             run_id: run_id.clone(),

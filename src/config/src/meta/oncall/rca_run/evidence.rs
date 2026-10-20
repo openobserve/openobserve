@@ -19,15 +19,16 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use utoipa::ToSchema;
 
-use super::{EvidenceLedger, Polarity, Strength};
+use super::{EvidenceLedger, Polarity, Strength, TimeWindow};
 use crate::meta::{
     oncall::confidence::{
-        SignalClass, ToolCallRecord, UnverifiedCitation, match_citation, signal_class,
+        SignalClass, ToolCallRecord, UnverifiedCitation, is_prometheus_tool, match_citation,
+        signal_class,
     },
     sql::resolve_stream_names,
 };
 
-/// The tools whose query is SQL in `request_body.query.sql` (VE25, VE26).
+/// The tools whose query is SQL in `request_body.query.sql`.
 const SQL_TOOLS: [&str; 4] = [
     "SearchSQL",
     "SearchAround",
@@ -41,15 +42,11 @@ fn is_sql_tool(tool: &str) -> bool {
     SQL_TOOLS.contains(&tool)
 }
 
-fn is_prometheus_tool(tool: &str) -> bool {
-    tool.starts_with("Prometheus")
-}
-
 fn is_shell_tool(tool: &str) -> bool {
     matches!(tool, "bash" | "shell") || tool.starts_with("cli_")
 }
 
-/// What the web app needs to open the same query (VE26, VE29).
+/// What the web app needs to open the same query.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct EvidenceTarget {
     pub signal: SignalClass,
@@ -87,15 +84,15 @@ fn as_i64(v: Option<&Value>) -> Option<i64> {
     }
 }
 
-/// A Prometheus time: RFC 3339, or Unix seconds as a number or a string; µs.
+/// A Prometheus time (RFC 3339 or epoch; a number's unit is read by magnitude, as PromQL does) in
+/// µs.
 fn prometheus_time_us(v: Option<&Value>) -> Option<i64> {
-    let seconds = |s: f64| s.is_finite().then_some((s * 1_000_000.0) as i64);
     match v? {
-        Value::Number(n) => n.as_f64().and_then(seconds),
+        Value::Number(n) => n.as_f64().and_then(epoch_micros),
         Value::String(s) => {
             let s = s.trim();
             match s.parse::<f64>() {
-                Ok(secs) => seconds(secs),
+                Ok(n) => epoch_micros(n),
                 Err(_) => chrono::DateTime::parse_from_rfc3339(s)
                     .ok()
                     .map(|t| t.timestamp_micros()),
@@ -105,7 +102,7 @@ fn prometheus_time_us(v: Option<&Value>) -> Option<i64> {
     }
 }
 
-/// Stream, time range and query of one call, from its unwrapped input (VE26).
+/// Stream, time range and query of one call, from its unwrapped input.
 pub fn evidence_target(tool: &str, input: &Value) -> EvidenceTarget {
     let mut target = EvidenceTarget {
         signal: signal_class(tool, input),
@@ -251,10 +248,27 @@ fn patterns_summary(body: &Value) -> Option<(String, Option<u64>)> {
 }
 
 fn prometheus_summary(body: &Value) -> Option<(String, Option<u64>)> {
-    let series = body
+    let result = body
         .pointer("/data/result")
-        .or_else(|| body.get("result"))?
-        .as_array()?;
+        .or_else(|| body.get("result"))?;
+    let result_type = body
+        .pointer("/data/resultType")
+        .or_else(|| body.get("resultType"))
+        .and_then(Value::as_str);
+    // A scalar or string result is one `[time, "value"]` pair, not a list of series.
+    if matches!(result_type, Some("scalar" | "string"))
+        || result
+            .as_array()
+            .is_some_and(|r| r.len() == 2 && !r[0].is_object() && !r[1].is_object())
+    {
+        let value = match result.get(1) {
+            Some(Value::String(s)) => s.clone(),
+            Some(v) => v.to_string(),
+            None => String::new(),
+        };
+        return Some((format!("scalar · {value}"), Some(1)));
+    }
+    let series = result.as_array()?;
     let points: u64 = series
         .iter()
         .map(|s| {
@@ -321,6 +335,114 @@ pub fn summarize_result(tool: &str, output: &Value) -> (String, Option<u64>) {
     })
 }
 
+/// Span (µs) of the in-range data timestamps a successful result shows; `None` without a range or
+/// times.
+pub fn observed_window(tool: &str, output: &Value, target: &EvidenceTarget) -> Option<TimeWindow> {
+    let (Some(start), Some(end)) = (target.start_us, target.end_us) else {
+        return None;
+    };
+    let body = decode_output(output);
+    let mut seen = ObservedTimes {
+        start,
+        end,
+        window: None,
+    };
+    if is_prometheus_tool(tool) {
+        if let Some(result) = body.pointer("/data/result").or_else(|| body.get("result")) {
+            seen.walk(result);
+        }
+    } else if tool == GET_LATEST_TRACES || is_sql_tool(tool) {
+        for rows in ["hits", "patterns"].iter().filter_map(|k| body.get(*k)) {
+            seen.walk(rows);
+        }
+        if let Some(data) = body.get("data").and_then(Value::as_str) {
+            seen.text(data, body.get("format").and_then(Value::as_str));
+        }
+    }
+    seen.window
+}
+
+/// The data timestamps found so far inside the queried range `start..=end`.
+struct ObservedTimes {
+    start: i64,
+    end: i64,
+    window: Option<TimeWindow>,
+}
+
+impl ObservedTimes {
+    fn add(&mut self, micros: Option<i64>) {
+        let Some(t) = micros.filter(|t| (self.start..=self.end).contains(t)) else {
+            return;
+        };
+        self.window = Some(match self.window {
+            Some(w) => TimeWindow {
+                start: w.start.min(t),
+                end: w.end.max(t),
+            },
+            None => TimeWindow { start: t, end: t },
+        });
+    }
+
+    fn walk(&mut self, value: &Value) {
+        match value {
+            Value::Array(items) => items.iter().for_each(|v| self.walk(v)),
+            Value::Object(map) => map.values().for_each(|v| self.walk(v)),
+            Value::Number(n) => self.add(n.as_f64().and_then(epoch_micros)),
+            Value::String(s) => self.add(text_micros(s)),
+            _ => {}
+        }
+    }
+
+    /// A `data` block: NDJSON lines, or the cells of a CSV or markdown table.
+    fn text(&mut self, data: &str, format: Option<&str>) {
+        if format == Some("ndjson") {
+            for line in data.lines() {
+                if let Ok(row) = serde_json::from_str::<Value>(line) {
+                    self.walk(&row);
+                }
+            }
+            return;
+        }
+        for cell in data.split(['\n', '|', ',', '"']) {
+            self.add(text_micros(cell));
+        }
+    }
+}
+
+/// A positive epoch time in s, ms, µs or ns, told apart by magnitude, as microseconds.
+fn epoch_micros(n: f64) -> Option<i64> {
+    if !n.is_finite() || n <= 0.0 {
+        return None;
+    }
+    let micros = if n >= 1e17 {
+        n / 1e3
+    } else if n >= 1e14 {
+        n
+    } else if n >= 1e11 {
+        n * 1e3
+    } else {
+        n * 1e6
+    };
+    Some(micros as i64)
+}
+
+/// A text cell as an epoch time: a number, or a date such as `2026-04-24T17:35:07Z`.
+fn text_micros(cell: &str) -> Option<i64> {
+    let cell = cell.trim();
+    if cell.is_empty() || cell.len() > 40 {
+        return None;
+    }
+    if let Ok(n) = cell.parse::<f64>() {
+        return epoch_micros(n);
+    }
+    if !cell.starts_with(|c: char| c.is_ascii_digit()) || !cell.contains('-') {
+        return None;
+    }
+    crate::utils::time::parse_str_to_time(cell)
+        .ok()
+        .map(|t| t.timestamp_micros())
+}
+
 /// The first word of each command in a shell line.
 fn command_words(command: &str) -> impl Iterator<Item = &str> {
     command
@@ -328,7 +450,7 @@ fn command_words(command: &str) -> impl Iterator<Item = &str> {
         .filter_map(|segment| segment.split_whitespace().next())
 }
 
-/// The kind label of an entry, from the tool that ran (VE25).
+/// The kind label of an entry, from the tool that ran.
 pub fn evidence_kind(record: &ToolCallRecord) -> String {
     let tool = record.tool.as_str();
     if is_sql_tool(tool) {
@@ -354,7 +476,7 @@ pub fn evidence_kind(record: &ToolCallRecord) -> String {
     record.tool.clone()
 }
 
-/// One hypothesis' use of an evidence entry (VE23).
+/// One hypothesis' use of an evidence entry.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct Citation {
     pub hypothesis_id: String,
@@ -365,23 +487,21 @@ pub struct Citation {
     pub observation: String,
 }
 
-/// One verified tool call that the ledger cites (VE23).
+/// One verified tool call that the ledger cites.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct EvidenceEntry {
-    /// 1-based, in the order of first citation (VE24).
+    /// 1-based, in the order of first citation.
     pub number: u32,
     /// The agent's evidence ids that map to this entry.
     pub ids: Vec<String>,
     pub call_id: String,
-    /// VE25.
     pub kind: String,
     pub target: SignalClass,
-    /// VE26/VE29: the web app builds the link from it.
+    /// The web app builds the link from it.
     pub link: EvidenceTarget,
-    /// VE27.
     pub result_summary: String,
     pub duration_ms: u64,
-    /// VE28: at least one citation is decisive.
+    /// At least one citation is decisive.
     pub decisive: bool,
     pub citations: Vec<Citation>,
 }
@@ -481,7 +601,7 @@ mod tests {
         rca_run::fixtures::{BASH, PROM, SQL, hyp, item, ledger_of, logs, prom, rec, shell},
     };
 
-    /// VE23: `e2` on `h1` and `e7` on `h4` that both match `c9` merge into one entry.
+    /// `e2` on `h1` and `e7` on `h4` that both match `c9` merge into one entry.
     #[test]
     fn items_of_one_call_merge_into_one_entry() {
         let ledger = ledger_of(&[
@@ -524,7 +644,7 @@ mod tests {
                 },
             ]
         );
-        // VE5: one id on two hypotheses is one entry with two citations too.
+        // One id on two hypotheses is one entry with two citations too.
         let ledger = ledger_of(&[
             hyp(
                 1,
@@ -545,7 +665,7 @@ mod tests {
         assert_eq!(entries[0].citations.len(), 2);
     }
 
-    /// VE24: numbers follow the first citation seq, not the call time.
+    /// Numbers follow the first citation seq, not the call time.
     #[test]
     fn entries_are_numbered_by_first_citation() {
         let ledger = ledger_of(&[
@@ -571,7 +691,7 @@ mod tests {
         assert_eq!(numbers, [(1, "e5", "c2"), (2, "e1", "c1")]);
     }
 
-    /// VE25: kind and target come from the tool that ran.
+    /// Kind and target come from the tool that ran.
     #[test]
     fn kind_and_target_come_from_the_tool() {
         let cases = [
@@ -664,7 +784,7 @@ mod tests {
         );
     }
 
-    /// VE26: stream, times and query come from the persisted input.
+    /// Stream, times and query come from the persisted input.
     #[test]
     fn targets_are_extracted_from_the_tool_input() {
         let sql = r#"SELECT count(*) FROM "checkout_api" WHERE code >= 500"#;
@@ -692,6 +812,15 @@ mod tests {
             &json!({"query": "up", "start": "1792144800.5", "end": "soon"}),
         );
         assert_eq!((t.start_us, t.end_us), (Some(1_792_144_800_500_000), None));
+        // The agent often passes microseconds, which the PromQL API reads by magnitude.
+        let t = evidence_target(
+            "PrometheusRangeQuery",
+            &json!({"query": "up", "start": "1777052100000000", "end": 1_777_053_006_626_864_i64}),
+        );
+        assert_eq!(
+            (t.start_us, t.end_us),
+            (Some(1_777_052_100_000_000), Some(1_777_053_006_626_864))
+        );
         let t = evidence_target(
             "PrometheusQuery",
             &json!({"query": "up", "time": "2026-10-16T10:00:00+02:00"}),
@@ -770,7 +899,7 @@ mod tests {
         );
     }
 
-    /// VE27: the summary comes from the output.
+    /// The summary comes from the output.
     #[test]
     fn result_summaries_are_built_from_the_output() {
         let series: Vec<_> = (0..6)
@@ -799,6 +928,21 @@ mod tests {
         assert_eq!(
             summarize_result("PrometheusQuery", &instant).0,
             "1 series · 1 point"
+        );
+        let scalar = json!({"data": {"resultType": "scalar", "result": [1, "42"]}});
+        assert_eq!(
+            summarize_result("PrometheusQuery", &scalar),
+            ("scalar · 42".to_string(), Some(1))
+        );
+        let untyped = json!({"data": {"result": [1, "7"]}});
+        assert_eq!(
+            summarize_result("PrometheusQuery", &untyped).0,
+            "scalar · 7"
+        );
+        // A metadata tool is not one of the three query tools.
+        assert_eq!(
+            evidence_target("PrometheusLabels", &json!({"query": "up"})).promql,
+            None
         );
 
         let hits = json!({"hits": [{}, {}, {}], "total": 120, "took": 15});
@@ -831,7 +975,7 @@ mod tests {
         );
     }
 
-    /// D2: SQL outputs with `agent_options.output_format` carry rows in a text `data` field.
+    /// SQL outputs with `agent_options.output_format` carry rows in a text `data` field.
     #[test]
     fn text_table_outputs_count_their_rows() {
         let s1_table = "| _timestamp | service_name | level | message | http_status | latency_ms | upstream | k8s_namespace_name |\n| --- | --- | --- | --- | --- | --- | --- | --- |\n| 1792125252548309 | checkout_p3s1 | error | payment gateway timeout after 5000ms calling POST /v1/charges | 504 | 5283 | payments-gateway | shop |\n| 1792125246548309 | checkout_p3s1 | info | checkout completed | 200 | 120 |  | shop |\n| 1792125240548309 | checkout_p3s1 | info | checkout completed | 200 | 50 |  | shop |\n";
@@ -893,7 +1037,7 @@ mod tests {
         );
     }
 
-    /// D2: an output with a `patterns` array counts patterns.
+    /// An output with a `patterns` array counts patterns.
     #[test]
     fn pattern_outputs_count_patterns() {
         let out = json!({"patterns": [{"template": "a"}, {"template": "b"}, {"template": "c"}], "took": 5});
@@ -921,7 +1065,66 @@ mod tests {
         );
     }
 
-    /// VE28: one decisive citation makes the entry decisive.
+    /// The data span is the in-range timestamps of the rows, whatever their format.
+    #[test]
+    fn observed_windows_come_from_the_row_timestamps_inside_the_queried_range() {
+        // The QA run: queried 19:05:00–19:50:00, the data ends at 19:35:08.
+        let (start, end) = (1_792_177_500_333_373_i64, 1_792_180_200_333_373_i64);
+        let sql_input = json!({"type": "logs", "request_body": {"query": {
+            "sql": "SELECT * FROM checkout_logs", "start_time": start, "end_time": end}}});
+        let target = evidence_target(SQL, &sql_input);
+        let window = |s: i64, e: i64| Some(TimeWindow { start: s, end: e });
+
+        // JSON hits: `_timestamp` and MIN/MAX(_timestamp) aliases; counts, codes, durations are not
+        // times.
+        let rows = json!({"took": 4, "total": 2, "hits": [
+            {"_timestamp": 1_792_179_308_166_386_i64, "status": 503, "duration_ms": 5000},
+            {"level": "error", "cnt": 217, "first_ts": 1_792_178_590_943_220_i64, "last_ts": 1_792_179_300_000_000_i64},
+        ]});
+        assert_eq!(
+            observed_window(SQL, &rows, &target),
+            window(1_792_178_590_943_220, 1_792_179_308_166_386)
+        );
+        // The same result as the stored tool output string.
+        assert_eq!(
+            observed_window(SQL, &json!(rows.to_string()), &target),
+            window(1_792_178_590_943_220, 1_792_179_308_166_386)
+        );
+        // A text table, with a date cell and a microsecond cell.
+        let table = json!({"took": 4, "hits": [], "total": 2, "format": "md_table",
+            "data": "| ts | n |\n| --- | --- |\n| 2026-10-16T19:20:00Z | 3 |\n| 1792179308166386 | 1 |"});
+        assert_eq!(
+            observed_window(SQL, &table, &target),
+            window(1_792_178_400_000_000, 1_792_179_308_166_386)
+        );
+        // Rows with no time in the range, and an empty result, show no data span.
+        let counts = json!({"hits": [{"cnt": 434, "ts": 1_000}], "total": 1});
+        assert_eq!(observed_window(SQL, &counts, &target), None);
+        assert_eq!(
+            observed_window(SQL, &json!({"hits": [], "total": 0}), &target),
+            None
+        );
+        // A call that names no range has nothing to anchor the times to.
+        let unanchored = evidence_target(SQL, &json!({"request_body": {"query": {"sql": "x"}}}));
+        assert_eq!(observed_window(SQL, &rows, &unanchored), None);
+        // Shell output is never read for times.
+        assert_eq!(observed_window(BASH, &rows, &target), None);
+
+        // PromQL samples are epoch seconds; the last sample bounds the data.
+        let prom_target = evidence_target(
+            PROM,
+            &json!({"query": "rate(x[5m])", "start": 1_792_177_500, "end": 1_792_180_200}),
+        );
+        let matrix = json!({"status": "success", "data": {"resultType": "matrix", "result": [
+            {"metric": {"service": "checkout-api"}, "values": [[1_792_178_590.5, "0.1"], [1_792_179_280, "0.506"]]},
+        ]}});
+        assert_eq!(
+            observed_window(PROM, &matrix, &prom_target),
+            window(1_792_178_590_500_000, 1_792_179_280_000_000)
+        );
+    }
+
+    /// One decisive citation makes the entry decisive.
     #[test]
     fn an_entry_with_a_decisive_citation_is_decisive() {
         let ledger = ledger_of(&[
@@ -954,7 +1157,7 @@ mod tests {
         );
     }
 
-    /// VE30: an item with no successful call is unverified (`not_run` or `failed`), never an entry.
+    /// An item with no successful call is unverified (`not_run` or `failed`), never an entry.
     #[test]
     fn unverified_items_are_listed_apart() {
         let ledger = ledger_of(&[hyp(

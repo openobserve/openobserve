@@ -89,9 +89,7 @@ pub struct SuspectChange {
     pub occurred_at: i64,
 }
 
-/// One verified evidence entry the verdict cites, by its number in the run's
-/// evidence list (VE39). The label is built by code from the entry; the link is
-/// built by the UI from the entry's target, so no URL is stored here.
+/// A verdict-cited evidence entry by number; no URL is stored, the UI builds the link.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct EvidenceRef {
     pub number: u32,
@@ -214,8 +212,7 @@ pub struct AnalysisVerdict {
     /// Identity-dimension paths, the same vocabulary routing uses.
     #[serde(default)]
     pub impacted_services: Vec<String>,
-    /// Up to five decisive evidence entries, in number order. Rows written
-    /// before VE39 carried `evidence_links`; they read with this empty.
+    /// Up to five decisive entries; rows predating this field read it empty.
     #[serde(default)]
     pub evidence: Vec<EvidenceRef>,
     pub page_recommendation: PageRecommendation,
@@ -258,8 +255,7 @@ pub struct AnalysisState {
     pub status: AnalysisStatus,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub verdict: Option<AnalysisVerdict>,
-    /// The code-graded confidence behind `verdict.confidence`, kept for display
-    /// (CG §5.6). Absent on rows written before grading.
+    /// Code-graded confidence behind `verdict.confidence`; absent on older rows.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub grade: Option<ConfidenceGrade>,
     /// When the run was asked for. The hold is measured from this, not from the
@@ -327,12 +323,9 @@ pub struct L0Policy {
     /// How far one verdict may raise a severity, so a P4 cannot become a P1 in
     /// a single hop.
     pub max_promotion_steps: u8,
-    /// A `Downgrade` at `medium` or `high` confidence rides quieter channels.
-    /// At `low` the page goes on its normal channels.
+    /// A `Downgrade` needs `medium` or `high` confidence to ride quieter channels.
     pub allow_downgrade: bool,
-    /// **Opt-in.** Until a team enables it, a Suppress verdict is recorded as a
-    /// recommendation and the page still goes out. Enabled, only a `high`
-    /// confidence Suppress silences the page.
+    /// Opt-in; when enabled only a `high`-confidence Suppress silences the page.
     pub allow_suppress: bool,
 }
 
@@ -628,14 +621,10 @@ pub enum VerdictOutcome {
     Page {
         severity: AlertPriority,
         promoted_from: Option<AlertPriority>,
-        /// A `Downgrade` the team allows, at `medium` or `high` confidence:
-        /// this firing rides a quieter channel set. The recorded severity is
-        /// `severity`, unchanged.
+        /// Quieter channel set for this firing; the recorded severity is unchanged.
         quieter_channels: bool,
     },
-    /// No page at all. Only a `high`-confidence `Suppress` the team opted into
-    /// reaches here. The record is still written, the verdict still lands on
-    /// the timeline, and the firing still appears in the team's digest.
+    /// No page; the record, timeline verdict and digest entry are still written.
     Suppress,
     /// The page has already gone out. The verdict rides as one ledger-deduped
     /// follow-up on non-interrupting channels. Also the P4/P5 outcome, where
@@ -674,12 +663,7 @@ fn hold_deadline(l0: &L0Policy, analysis: &AnalysisState, now: i64) -> i64 {
     analysis.requested_at.unwrap_or(now) + l0.triage_budget_micros()
 }
 
-/// A recommendation the confidence gate turned down (§5.4): the team allows
-/// the action, but the band is too weak for it. The page goes out on its
-/// normal channels, and the timeline says why.
-///
-/// A `Suppress` the team has not opted into, or a `Downgrade` the team does
-/// not allow, is not one of these: policy, not confidence, sent that page.
+/// An allowed recommendation refused because the confidence band was too weak.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ConfidenceRefusal {
     pub action: PageAction,
@@ -695,9 +679,6 @@ impl std::fmt::Display for ConfidenceRefusal {
 /// The verdict-application decision — pure over `(policy.l0, analysis,
 /// severity, now)`. `severity` is the firing's recorded severity, not the
 /// suggestion.
-///
-/// §5.4: a `Suppress` needs `high` confidence and a `Downgrade` needs `medium`
-/// or `high`. Below that the page goes out on its normal channels.
 pub fn apply_verdict(
     l0: &L0Policy,
     analysis: &AnalysisState,
@@ -707,9 +688,7 @@ pub fn apply_verdict(
     decide_verdict(l0, analysis, severity, now).0
 }
 
-/// The recommendation [`apply_verdict`] turned down for weak confidence, over
-/// the same inputs. `None` whenever the gate never weighed the action: no
-/// verdict, a promotion, a verdict past the hold, any mode but `Gate`.
+/// Why [`apply_verdict`] refused on confidence; `None` when the gate never weighed it.
 pub fn confidence_refusal(
     l0: &L0Policy,
     analysis: &AnalysisState,
@@ -719,8 +698,7 @@ pub fn confidence_refusal(
     decide_verdict(l0, analysis, severity, now).1
 }
 
-/// One source for [`apply_verdict`] and [`confidence_refusal`], so the
-/// timeline can never explain a refusal the engine did not make.
+/// Shared by both public fns so the timeline never explains a refusal the engine did not make.
 fn decide_verdict(
     l0: &L0Policy,
     analysis: &AnalysisState,
@@ -788,8 +766,8 @@ fn decide_verdict(
             }
             let action = verdict.page_recommendation.action;
             let confidence = verdict.confidence;
-            // `==` and `matches!`, never `>=`: the enum declares `High` first, so a derived order
-            // would rank `Low` above it.
+            // Never `>=`: the enum declares `High` first, so a derived order would rank `Low` above
+            // it.
             let refused = match action {
                 PageAction::Suppress => l0.allow_suppress && confidence != Confidence::High,
                 // Refused only where the team allows downgrades: otherwise policy sent the page.
@@ -810,8 +788,7 @@ fn decide_verdict(
                         quieter_channels: l0.allow_downgrade,
                     }
                 }
-                // A Suppress the team has not opted into, or one below `high`, and a Downgrade at
-                // `low`, are advice: the page still goes out on its normal channels.
+                // Unpermitted or under-confident actions are advice only.
                 PageAction::Page | PageAction::Downgrade | PageAction::Suppress => {
                     VerdictOutcome::Page {
                         severity,
@@ -2334,8 +2311,7 @@ mod tests {
         }
     }
 
-    /// Confidence §5.4: suppress needs `high`, downgrade needs `medium` or
-    /// `high`; below that the page goes out normally and the refusal is named.
+    /// Suppress needs `high`, downgrade needs `medium`+; below that the page goes out normally.
     #[test]
     fn test_suppress_and_downgrade_are_gated_on_the_confidence_band() {
         let at = FIRED_AT + 4 * SECOND;
@@ -3526,8 +3502,7 @@ mod tests {
         }
     }
 
-    /// VE39: evidence lines print `· [n] <label>` and never a URL; the reason line
-    /// replaces the bare band when the state carries a grade (CG §5.6).
+    /// Evidence lines print `· [n] <label>` without a URL; a grade replaces the bare band.
     #[test]
     fn test_verdict_lines_print_numbered_evidence_and_the_reason_line() {
         use crate::meta::oncall::confidence::{GradeReason, SignalClass};
@@ -3571,14 +3546,13 @@ mod tests {
             "probable cause: fd leak introduced by querier v0.14.2 (medium · claimed high · decisive: metrics)"
         );
 
-        // F3: the grade round-trips; `{"status":"skipped"}` stays exact (pinned above).
+        // The grade round-trips; `{"status":"skipped"}` stays exact (pinned above).
         let back: AnalysisState =
             serde_json::from_str(&serde_json::to_string(&state).unwrap()).unwrap();
         assert_eq!(back, state);
     }
 
-    /// VE39: an escalation row written before VE39 holds `evidence_links`; it reads
-    /// with an empty `evidence` list.
+    /// An old row with `evidence_links` reads with an empty `evidence` list.
     #[test]
     fn test_an_old_row_with_evidence_links_reads_with_no_evidence() {
         let old = serde_json::json!({

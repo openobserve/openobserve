@@ -2826,7 +2826,7 @@ pub static RCA_RUNS_WITHOUT_REPORT_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
     )
     .expect("Metric created")
 });
-// RCA verdicts (03 §14, confidence design §5.7); counted by the finalizer's winning end write.
+// RCA verdicts; counted by the finalizer's winning end write.
 pub static RCA_OUTCOME_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
         Opts::new(
@@ -2935,7 +2935,7 @@ pub static RCA_UNVERIFIED_CITATIONS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
     )
     .expect("Metric created")
 });
-// RCA steering and questions (04 §12; see core::alerts::rca_steering)
+// RCA steering and questions (see core::alerts::rca_steering)
 pub static RCA_STEERING_MESSAGES_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
         Opts::new(
@@ -3012,7 +3012,7 @@ pub static RCA_ANSWER_WAIT_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
     )
     .expect("Metric created")
 });
-// RCA feedback and resume (README §9)
+// RCA feedback and resume
 pub static RCA_FEEDBACK_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
         Opts::new(
@@ -3037,7 +3037,7 @@ pub static RCA_RESUME_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
     )
     .expect("Metric created")
 });
-// RCA live stream (05 LU20; see core::alerts::rca_live)
+// RCA live stream (see core::alerts::rca_live)
 pub static RCA_LIVE_STREAMS: Lazy<IntGaugeVec> = Lazy::new(|| {
     IntGaugeVec::new(
         Opts::new("rca_live_streams", "Open RCA live streams on this node")

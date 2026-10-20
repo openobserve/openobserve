@@ -437,10 +437,7 @@ pub async fn replace_muted_by_downtime_id_with<C: ConnectionTrait>(
     Ok(res.rows_affected == 1)
 }
 
-/// Records why automatic analysis runs never start for this incident (RR-45).
-///
-/// Writes only `rca_off_reason`; the incident creator calls it once, after routing.
-/// It leaves `updated_at` alone, so the write does not reorder the list.
+/// Records why automatic runs never start; leaves `updated_at` alone so the list order holds.
 pub async fn set_rca_off_reason(
     org_id: &str,
     id: &str,
@@ -525,8 +522,7 @@ pub async fn list_with<C: ConnectionTrait>(
 ) -> Result<Vec<alert_incidents::Model>, errors::Error> {
     let mut query = alert_incidents::Entity::find()
         .select_only()
-        // Select all columns EXCEPT topology_context for performance; the run summary
-        // columns are the list's AI analysis cell (RR-28, no join).
+        // Skip topology_context for performance; the run summary columns feed the list's AI cell.
         .column(alert_incidents::Column::Id)
         .column(alert_incidents::Column::OrgId)
         .column(alert_incidents::Column::Status)
@@ -1328,7 +1324,7 @@ mod tests {
         assert_eq!(rows[0].muted_by_downtime_id.as_deref(), Some("dt-1"));
     }
 
-    /// RR-28: the list selects the run summary columns (no join, no `topology_context`).
+    /// The list selects the run summary columns (no join, no `topology_context`).
     #[tokio::test]
     async fn the_list_carries_the_run_summary_columns() {
         let db = incidents_db().await;

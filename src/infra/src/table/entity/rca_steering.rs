@@ -1,5 +1,4 @@
-//! `SeaORM` Entity for the `rca_steering` table (one row per responder message to an RCA
-//! run).
+//! `SeaORM` Entity for the `rca_steering` table (one row per responder message to a run).
 
 use sea_orm::entity::prelude::*;
 

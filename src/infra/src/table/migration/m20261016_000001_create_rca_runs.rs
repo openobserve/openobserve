@@ -28,6 +28,7 @@ impl MigrationTrait for Migration {
         manager.create_table(create_statement()).await?;
         manager.create_index(subject_index()).await?;
         manager.create_index(incident_index()).await?;
+        manager.create_index(state_index()).await?;
         for (column, ty) in summary_columns() {
             add_column(manager, column, ty).await?;
         }
@@ -191,7 +192,7 @@ fn create_statement() -> TableCreateStatement {
         .to_owned()
 }
 
-/// History list, prune (RR-25) and cooldown (RR-8).
+/// History list, prune and cooldown.
 fn subject_index() -> IndexCreateStatement {
     Index::create()
         .name("rca_runs_subject_idx")
@@ -213,6 +214,17 @@ fn incident_index() -> IndexCreateStatement {
         .col(RcaRuns::OrgId)
         .col(RcaRuns::IncidentId)
         .col(RcaRuns::StartedAt)
+        .to_owned()
+}
+
+/// The sweeper's scans, each minute, of `running` runs and of passed answer deadlines.
+fn state_index() -> IndexCreateStatement {
+    Index::create()
+        .name("rca_runs_state_idx")
+        .if_not_exists()
+        .table(RcaRuns::Table)
+        .col(RcaRuns::State)
+        .col(RcaRuns::UpdatedAt)
         .to_owned()
 }
 
@@ -262,9 +274,14 @@ mod tests {
             ),
             "{sql}"
         );
+        let sql = state_index().to_string(PostgresQueryBuilder);
+        assert!(
+            sql.contains("\"rca_runs_state_idx\" ON \"rca_runs\" (\"state\", \"updated_at\")"),
+            "{sql}"
+        );
     }
 
-    /// RR-24 migration A: `up` twice is idempotent; `down` drops the columns and the table.
+    /// `up` twice is idempotent; `down` drops the columns and the table.
     #[tokio::test]
     async fn up_twice_is_idempotent_and_down_removes_everything_on_sqlite() {
         let db = Database::connect("sqlite::memory:").await.unwrap();
@@ -281,7 +298,11 @@ mod tests {
         Migration.up(&manager).await.unwrap();
 
         assert!(manager.has_table("rca_runs").await.unwrap());
-        for index in ["rca_runs_subject_idx", "rca_runs_incident_idx"] {
+        for index in [
+            "rca_runs_subject_idx",
+            "rca_runs_incident_idx",
+            "rca_runs_state_idx",
+        ] {
             assert!(
                 manager.has_index("rca_runs", index).await.unwrap(),
                 "{index}"

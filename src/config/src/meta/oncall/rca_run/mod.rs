@@ -24,7 +24,7 @@ mod summary;
 
 pub use evidence::{
     Citation, EvidenceEntry, EvidenceTarget, build_evidence, evidence_kind, evidence_target,
-    summarize_result,
+    observed_window, summarize_result,
 };
 pub use ledger::{
     BlindSpot, BlindSpotAxis, BlindSpotFix, EvidenceItem, EvidenceLedger, Hypothesis,
@@ -55,7 +55,7 @@ use super::{
 /// Version of [RcaRunRecord] written to `rca_runs.result`.
 pub const RCA_RECORD_SCHEMA_VERSION: u32 = 1;
 
-/// The seven stages of the RCA protocol: the `record_step` stage name and its label (VE34).
+/// The `record_step` stage names and their labels.
 pub const RCA_STAGES: [(&str, &str); 7] = [
     ("context", "Context"),
     ("topology", "Topology"),
@@ -80,15 +80,16 @@ pub fn stage_index(stage: &str) -> Option<i16> {
         .map(|index| (index + 1) as i16)
 }
 
-/// Most characters of a citation's observation in an [EvidenceRef] label (VE39).
+/// Most characters of a citation's observation in an [EvidenceRef] label.
 const EVIDENCE_REF_OBSERVATION_CHARS: usize = 120;
-/// Most decisive entries a verdict carries (VE38).
 const MAX_VERDICT_EVIDENCE: usize = 5;
 
-/// Most timeline entries kept from one submit (VE1).
 pub const MAX_TIMELINE_ENTRIES: usize = 20;
+/// Also caps a timeline entry's text.
+pub const MAX_CAUSE_CHARS: usize = 500;
+pub const MAX_IMPACT_SUMMARY_CHARS: usize = 200;
+pub const MAX_IMPACT_PEAK_CHARS: usize = 100;
 
-/// What the agent submits with `submit_report`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct RcaSubmit {
     pub markdown: String,
@@ -101,7 +102,6 @@ pub struct RcaSubmit {
     pub defects: Vec<String>,
 }
 
-/// The verdict as the agent claims it, before grading.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct SubmittedVerdict {
     pub probable_cause: String,
@@ -210,8 +210,8 @@ pub fn parse_submit(input: &Value) -> Option<RcaSubmit> {
         return None;
     }
     let mut defects = Vec::new();
-    let verdict = parse_verdict(input, &mut defects);
-    let timeline = input
+    let mut verdict = parse_verdict(input, &mut defects);
+    let mut timeline = input
         .get("timeline")
         .and_then(Value::as_array)
         .map(|entries| {
@@ -236,12 +236,52 @@ pub fn parse_submit(input: &Value) -> Option<RcaSubmit> {
             kept
         })
         .unwrap_or_default();
+    for (i, entry) in timeline.iter_mut().enumerate() {
+        if cut_to(&mut entry.text, MAX_CAUSE_CHARS) {
+            defects.push(format!(
+                "timeline[{i}].text: cut to {MAX_CAUSE_CHARS} characters"
+            ));
+        }
+    }
+    if let Some(v) = verdict.as_mut() {
+        let mut fields = vec![(
+            "verdict.probable_cause",
+            &mut v.probable_cause,
+            MAX_CAUSE_CHARS,
+        )];
+        if let Some(impact) = v.impact.as_mut() {
+            fields.push((
+                "verdict.impact.summary",
+                &mut impact.summary,
+                MAX_IMPACT_SUMMARY_CHARS,
+            ));
+            if let Some(peak) = impact.peak.as_mut() {
+                fields.push(("verdict.impact.peak", peak, MAX_IMPACT_PEAK_CHARS));
+            }
+        }
+        for (field, text, max) in fields {
+            if cut_to(text, max) {
+                defects.push(format!("{field}: cut to {max} characters"));
+            }
+        }
+    }
     Some(RcaSubmit {
         markdown: markdown.to_string(),
         verdict,
         timeline,
         defects,
     })
+}
+
+/// `true` when it cut; the tool schema's limits are not trusted.
+fn cut_to(s: &mut String, max: usize) -> bool {
+    match s.char_indices().nth(max) {
+        Some((end, _)) => {
+            s.truncate(end);
+            true
+        }
+        None => false,
+    }
 }
 
 /// Where a verdict field was found.
@@ -253,7 +293,7 @@ enum Found<T> {
     Missing,
 }
 
-/// Reads the verdict fields of one `submit_report` input, recording repairs.
+/// Records each repair as it reads verdict fields.
 struct VerdictReader<'a> {
     verdict: &'a Map<String, Value>,
     top: &'a Value,
@@ -283,7 +323,6 @@ impl VerdictReader<'_> {
         }
     }
 
-    /// A required field with a safe default.
     fn required<T: DeserializeOwned>(&mut self, key: &str, default: T, used: &str) -> T {
         match self.find(key, |v| T::deserialize(v).ok()) {
             Found::InVerdict(t) | Found::TopLevel(t) => t,
@@ -300,7 +339,6 @@ impl VerdictReader<'_> {
         }
     }
 
-    /// An optional field; an invalid value is dropped.
     fn optional<T: DeserializeOwned>(&mut self, key: &str) -> Option<T> {
         match self.find(key, |v| T::deserialize(v).ok()) {
             Found::InVerdict(t) | Found::TopLevel(t) => Some(t),
@@ -450,7 +488,7 @@ fn evidence_label(e: &EvidenceEntry) -> String {
     format!("{} · {place} · {observation}", e.kind)
 }
 
-/// What the agent claimed, kept for metrics and display only (VE19, VE35).
+/// The agent's claims, kept for metrics and display only; they never change the graded outcome.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
 pub struct VerdictClaims {
     pub confidence: Confidence,
@@ -459,7 +497,6 @@ pub struct VerdictClaims {
     pub suspect_change_state: Option<SuspectChangeState>,
 }
 
-/// The structured result of one run, stored in `rca_runs.result` (§11).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct RcaRunRecord {
     /// [RCA_RECORD_SCHEMA_VERSION].
@@ -471,7 +508,7 @@ pub struct RcaRunRecord {
     pub claims: Option<VerdictClaims>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub impact: Option<Impact>,
-    /// After VE15.
+    /// After the outcome lowered it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub grade: Option<ConfidenceGrade>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -482,12 +519,8 @@ pub struct RcaRunRecord {
     pub claimed_outcome: Option<RcaOutcome>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub answer_deadline_need: Option<String>,
-    /// Empty when the run has none.
     #[serde(default)]
     pub ledger: EvidenceLedger,
-    /// `false`: the agent never called `record_hypothesis`.
-    #[serde(default)]
-    pub has_ledger: bool,
     #[serde(default)]
     pub blind_spots: Vec<BlindSpot>,
     #[serde(default)]
@@ -496,7 +529,6 @@ pub struct RcaRunRecord {
     pub evidence: Vec<EvidenceEntry>,
     #[serde(default)]
     pub unverified: Vec<UnverifiedCitation>,
-    /// VE20.
     #[serde(default)]
     pub leading_history: Vec<LeadingEntry>,
     /// Only the calls that evidence entries use, in number order.
@@ -506,7 +538,6 @@ pub struct RcaRunRecord {
     pub steer_authors: BTreeMap<String, String>,
 }
 
-/// What the finalizer read from the run's transcript.
 #[derive(Debug, Clone, Copy)]
 pub struct RunEndInput<'a> {
     /// The last committed `submit_report`.
@@ -518,8 +549,9 @@ pub struct RunEndInput<'a> {
     pub ended_by: EndedBy,
     /// `true` for a run that ends `completed`; `false` for failed or cancelled.
     pub completed: bool,
-    /// The run's steer ids and their authors' emails (SG36).
     pub steer_authors: &'a BTreeMap<String, String>,
+    /// Dates the rewrite of still-`testing` hypotheses.
+    pub ended_at_us: i64,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -528,13 +560,13 @@ pub struct RunEndResult {
     /// The graded verdict for the on-call ladder; same as `record.verdict`.
     pub verdict: Option<AnalysisVerdict>,
     pub counts: LedgerCounts,
-    /// Timeline entries that show as Unverified (VE31).
+    /// Timeline entries that show as Unverified.
     pub timeline_unverified: u32,
-    /// `rca_summary.detail` (VE44): set only for a blocked outcome.
+    /// Set only for a blocked outcome.
     pub summary_detail: Option<String>,
 }
 
-/// VE34: one blind spot naming the stages with no step; `None` when all ran.
+/// One blind spot naming the stages with no step; `None` when all ran.
 fn run_end_blind_spot(stages_run: &[String]) -> Option<BlindSpot> {
     let missing: Vec<&str> = RCA_STAGES
         .iter()
@@ -557,7 +589,7 @@ fn run_end_blind_spot(stages_run: &[String]) -> Option<BlindSpot> {
     })
 }
 
-/// VE44: "Needs: <title>" of the first blind spot with a fix, else "Needs input".
+/// "Needs: <title>" of the first blind spot with a fix, else "Needs input".
 fn blocked_detail(blind_spots: &[BlindSpot]) -> String {
     match summary::needs_title(blind_spots) {
         Some(title) => format!("Needs: {title}"),
@@ -567,7 +599,7 @@ fn blocked_detail(blind_spots: &[BlindSpot]) -> String {
 
 /// Build the ledger, grade verified evidence and derive the final outcome in precedence order.
 pub fn record_run_end(input: &RunEndInput) -> RunEndResult {
-    let (ledger, mut blind_spots, counts) = build_ledger(input.calls, true);
+    let (ledger, mut blind_spots, counts) = build_ledger(input.calls, Some(input.ended_at_us));
     if !input.completed
         && let Some(spot) = run_end_blind_spot(input.stages_run)
     {
@@ -590,7 +622,7 @@ pub fn record_run_end(input: &RunEndInput) -> RunEndResult {
             apply_outcome(&mut grade, outcome, reason);
             (Some(grade), Some((outcome, reason)))
         }
-        // VE16: a deadline turn with no report is blocked, with no verdict or band.
+        // A deadline turn with no report is blocked, with no verdict or band.
         None if input.completed && input.ended_by == EndedBy::AnswerDeadline => (
             None,
             Some((RcaOutcome::Blocked, OutcomeReason::AnswerDeadline)),
@@ -615,7 +647,6 @@ pub fn record_run_end(input: &RunEndInput) -> RunEndResult {
         .filter_map(|e| input.tool_log.iter().find(|r| r.call_id == e.call_id))
         .cloned()
         .collect();
-    // SG36: the authors of the steer ids the ledger names.
     let steer_authors: BTreeMap<String, String> = ledger
         .iter()
         .flat_map(|l| &l.hypotheses)
@@ -644,7 +675,6 @@ pub fn record_run_end(input: &RunEndInput) -> RunEndResult {
         outcome_reason: outcome.map(|(_, r)| r),
         claimed_outcome: submitted.map(|v| v.claimed_outcome),
         answer_deadline_need: None,
-        has_ledger: ledger.is_some(),
         ledger: ledger.unwrap_or_default(),
         blind_spots,
         timeline,
@@ -739,10 +769,13 @@ pub(crate) mod fixtures {
             error_type: (!success).then(|| "http_403".to_string()),
             signal: signal_class(tool, &input),
             target: evidence_target(tool, &input),
+            observed: None,
             result_summary: format!("{call_id} summary"),
         }
     }
 
+    /// The end of a fixture run, after every fixture call; microseconds.
+    pub(crate) const RUN_END_US: i64 = 3_600_000_000;
     pub(crate) const PROM: &str = "PrometheusRangeQuery";
     pub(crate) const TRACES: &str = "GetLatestTraces";
     pub(crate) const SQL: &str = "SearchSQL";
@@ -828,7 +861,7 @@ pub(crate) mod fixtures {
     }
 
     pub(crate) fn ledger_of(calls: &[LedgerCall]) -> Option<EvidenceLedger> {
-        build_ledger(calls, true).0
+        build_ledger(calls, Some(RUN_END_US)).0
     }
 
     pub(crate) fn hypothesis<'a>(ledger: &'a EvidenceLedger, id: &str) -> &'a Hypothesis {
@@ -850,7 +883,7 @@ mod tests {
         oncall::agent::{ActionKind, PageAction},
     };
 
-    /// Every VE1 field, as `submit_report` sends it.
+    /// Every field, as `submit_report` sends it.
     fn full_payload() -> serde_json::Value {
         json!({
             "markdown": "# RCA\n\nThe querier leaks file descriptors.\n",
@@ -892,7 +925,7 @@ mod tests {
         })
     }
 
-    /// VE1: every field of the payload reaches `RcaSubmit`.
+    /// Every field of the payload reaches `RcaSubmit`.
     #[test]
     fn a_full_submit_payload_parses_every_field() {
         let submit = parse_submit(&full_payload()).expect("a full payload parses");
@@ -961,7 +994,7 @@ mod tests {
         );
     }
 
-    /// VE1/VE3: a stray `evidence_links` is ignored, at the top level and in the verdict.
+    /// A stray `evidence_links` is ignored, at the top level and in the verdict.
     #[test]
     fn evidence_links_in_a_submit_are_ignored() {
         let mut payload = full_payload();
@@ -1044,7 +1077,7 @@ mod tests {
         })
     }
 
-    /// 02 §9.1 leniency: each repair, as one table test.
+    /// Each lenient repair, as one table test.
     #[test]
     fn lenient_submit_repairs_are_listed() {
         let remove = |mut p: serde_json::Value, key: &str| {
@@ -1251,7 +1284,7 @@ mod tests {
         assert_eq!(parse_submit(&payload), None);
     }
 
-    /// VE1: at most 20 timeline entries are kept, in order.
+    /// At most 20 timeline entries are kept, in order.
     #[test]
     fn a_timeline_over_twenty_entries_keeps_the_first_twenty() {
         let mut payload = full_payload();
@@ -1366,10 +1399,11 @@ mod tests {
                 ended_by,
                 completed,
                 steer_authors: &BTreeMap::new(),
+                ended_at_us: RUN_END_US,
             })
         }
 
-        /// 03 §6.4: VE14 + VE15 as one table test through `record_run_end`.
+        /// Outcome and band lowering as one table test through `record_run_end`.
         #[test]
         fn the_outcome_table() {
             use Confidence::*;
@@ -1643,7 +1677,6 @@ mod tests {
 
             let unknown = submit(submitted("cause unknown", Confidence::High), vec![]);
             let t11 = run(&[], Some(&unknown), EndedBy::Agent, true);
-            assert!(!t11.record.has_ledger);
             assert!(
                 t11.record
                     .grade
@@ -1701,6 +1734,7 @@ mod tests {
                 ended_by: EndedBy::Agent,
                 completed: false,
                 steer_authors: &BTreeMap::new(),
+                ended_at_us: RUN_END_US,
             });
             assert_eq!(r.record.blind_spots[0].title, "1 stage did not run");
             // All seven stages ran: no run_end blind spot; a completed run never gets one.
@@ -1712,6 +1746,7 @@ mod tests {
                 ended_by: EndedBy::Agent,
                 completed: false,
                 steer_authors: &BTreeMap::new(),
+                ended_at_us: RUN_END_US,
             });
             assert!(r.record.blind_spots.is_empty());
             let r = record_run_end(&RunEndInput {
@@ -1722,11 +1757,12 @@ mod tests {
                 ended_by: EndedBy::Agent,
                 completed: true,
                 steer_authors: &BTreeMap::new(),
+                ended_at_us: RUN_END_US,
             });
             assert!(r.record.blind_spots.iter().all(|b| b.id != "run_end"));
         }
 
-        /// VE19: the claimed outcome never changes the outcome or the band; it is stored.
+        /// The claimed outcome never changes the outcome or the band; it is stored.
         #[test]
         fn the_claimed_outcome_never_changes_the_outcome() {
             let calls = [h(1, "h1", "inconclusive"), h(2, "h2", "symptom")];
@@ -1754,7 +1790,7 @@ mod tests {
             }
         }
 
-        /// VE38: the verdict carries the graded band, and the gate refuses a suppress at medium.
+        /// The verdict carries the graded band, and the gate refuses a suppress at medium.
         #[test]
         fn the_graded_band_reaches_the_gate() {
             let mut v = submitted("orders pool exhausted", Confidence::High);
@@ -1800,7 +1836,7 @@ mod tests {
             );
         }
 
-        /// VE38/VE39: up to five decisive entries in number order, labelled by code, no URL.
+        /// Up to five decisive entries in number order, labelled by code, no URL.
         #[test]
         fn the_verdict_carries_labelled_decisive_entries() {
             let obs = "o".repeat(200);
@@ -1831,7 +1867,7 @@ mod tests {
                 .collect();
             log.push(logs("c9", "SELECT * FROM \"checkout_api\"", 0));
             log.push(logs("c8", "SELECT * FROM \"orders\"", 9));
-            let (ledger, ..) = build_ledger(&calls, true);
+            let (ledger, ..) = build_ledger(&calls, Some(RUN_END_US));
             let (entries, _) = build_evidence(ledger.as_ref(), &log);
             let grade = crate::meta::oncall::confidence::grade_confidence(
                 &submitted("x", Confidence::High),
@@ -1855,7 +1891,7 @@ mod tests {
             assert!(!serde_json::to_string(&verdict).unwrap().contains("http"));
         }
 
-        /// VE31: a confirmed entry whose ids did not verify shows Unverified, and is counted.
+        /// A confirmed entry whose ids did not verify shows Unverified, and is counted.
         #[test]
         fn unverified_timeline_entries_are_counted() {
             let calls = [hyp(
@@ -1922,7 +1958,7 @@ mod tests {
             );
         }
 
-        /// VE44: the list detail of a blocked run; none otherwise.
+        /// The list detail of a blocked run; none otherwise.
         #[test]
         fn blocked_runs_carry_a_detail() {
             let named = submit(submitted("x", Confidence::High), vec![]);
@@ -1952,7 +1988,7 @@ mod tests {
                 .summary_detail,
                 Some("Needs input".to_string())
             );
-            // Frame B (root cause identified): no detail.
+            // Root cause identified: no detail.
             let b = run(
                 &[
                     root_with_two_classes(1, "h1", &[]),
@@ -1966,7 +2002,7 @@ mod tests {
             assert_eq!(b.summary_detail, None);
         }
 
-        /// §11: the record round-trips and lists only cited calls.
+        /// The record round-trips and lists only cited calls.
         #[test]
         fn the_record_round_trips_with_cited_calls_only() {
             let calls = [with_metric(1, "h1", "root_cause", "decisive")];

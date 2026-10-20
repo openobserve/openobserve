@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Responder feedback on RCA runs (`rca_feedback`, README §9).
+//! Responder feedback on RCA runs (`rca_feedback`).
 
 use std::str::FromStr;
 
@@ -317,7 +317,7 @@ mod tests {
         assert_eq!(list_for_run_with(&db, ORG, RUN).await.unwrap().len(), 2);
     }
 
-    /// J2 Undo: only the caller's row goes; a second delete reports nothing deleted.
+    /// Undo: only the caller's row goes; a second delete reports nothing deleted.
     #[tokio::test]
     async fn delete_own_removes_only_the_callers_row() {
         let db = db().await;

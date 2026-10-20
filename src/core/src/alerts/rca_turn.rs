@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! The investigation turns of an RCA run (02 TH1–TH28, TH41–TH44; 04 SG23–SG28, SG30).
+//! The investigation turns of an RCA run.
 
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
@@ -90,19 +90,19 @@ use crate::ai_chat::{
     read_committed_events,
 };
 
-/// TH25: the user text of the one continuation turn.
+/// The user text of the one continuation turn.
 const CONTINUE_PROMPT: &str = "The previous turn stopped. Continue from the last finished step. \
                                Do not repeat finished steps. Call submit_report when the \
                                investigation is complete.";
 /// `error.code` of a run whose session already had a turn running.
 const ERROR_BUSY: &str = "busy";
-/// The turn record's error code of a turn that reached its deadline (ENT `turn.rs`).
+/// The turn record's error code of a turn that reached its deadline.
 const TURN_TIMEOUT_CODE: &str = "turn_timeout";
-/// TH27: progress writes without a stage change are at least this far apart.
+/// Progress writes without a stage change are at least this far apart.
 const PROGRESS_INTERVAL: Duration = Duration::from_secs(5);
-/// TH14: the agent health probe's own deadline; the shared client's read timeout is minutes.
+/// The agent health probe's own deadline; the shared client's read timeout is minutes.
 const HEALTH_CHECK_TIMEOUT: Duration = Duration::from_secs(5);
-/// TH25: bounded continuation retries tolerate a restarting agent replica.
+/// Bounded continuation retries tolerate a restarting agent replica.
 const CONTINUATION_RETRY_BACKOFF: [Duration; 4] = [
     Duration::from_secs(5),
     Duration::from_secs(10),
@@ -111,25 +111,25 @@ const CONTINUATION_RETRY_BACKOFF: [Duration; 4] = [
 ];
 /// Running runs one sweep looks at; the next pass picks up the rest.
 const SWEEP_BATCH: u64 = 500;
-/// SG25: a run pauses for at most this many questions; a third one closes the deadline.
+/// A run pauses for at most this many questions; a third one closes the deadline.
 const MAX_QUESTIONS: i32 = 2;
-/// `rca_questions_total{result}` of a wait the deadline ended (§12).
+/// `rca_questions_total{result}` of a wait the deadline ended.
 const QUESTION_DEADLINE: &str = "deadline";
 
-/// The user text of an RCA turn (TH6).
+/// The user text of an RCA turn.
 #[derive(Debug, Clone, PartialEq)]
 pub enum RcaPrompt {
     Initial {
         trigger: RunTrigger,
         subject: RcaPromptSubject,
-        /// The rendered guidance message of a re-analysis (SG33), after a blank line.
+        /// The rendered guidance message of a re-analysis, after a blank line.
         guidance: Option<String>,
     },
-    /// The one continuation after an interrupted turn (TH25).
+    /// The one continuation after an interrupted turn.
     Continue,
-    /// SG18: steering messages joined by a blank line.
+    /// Steering messages joined by a blank line.
     Steer { messages: Vec<String> },
-    /// The finalize turn after the answer deadline (SG27, §10.4).
+    /// The finalize turn after the answer deadline.
     Deadline {
         question_id: String,
         /// µs; shown as `HH:MM UTC`.
@@ -153,7 +153,7 @@ pub enum RcaPromptSubject {
 }
 
 impl RcaPrompt {
-    /// The turn's user text and the session title; never blank (TH6).
+    /// The turn's user text and the session title; never blank.
     pub fn render(&self) -> String {
         match self {
             Self::Continue => CONTINUE_PROMPT.to_string(),
@@ -227,7 +227,7 @@ fn one_line(text: &str) -> String {
     text.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
-/// SG28: normalize the question's need to one "Needs: <x>" list detail.
+/// Normalize the question's need to one "Needs: <x>" list detail.
 fn needs_detail(need: &str) -> Option<String> {
     need_text(need).map(|need| format!("Needs: {need}"))
 }
@@ -282,10 +282,10 @@ pub struct TurnStarted {
     pub turn_id: String,
 }
 
-/// Why a turn did not start; the caller fails the run with [RcaTurnError::error_code] (TH24).
+/// Why a turn did not start; the caller fails the run with [RcaTurnError::error_code].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RcaTurnError {
-    /// The RCA active-turn cap is reached (TH10).
+    /// The RCA active-turn cap is reached.
     TurnLimit,
     Credentials(String),
     AgentUnavailable(String),
@@ -305,7 +305,7 @@ impl RcaTurnError {
         }
     }
 
-    /// TH30: a turn that never started may legitimately have no session row.
+    /// A turn that never started may legitimately have no session row.
     pub fn is_start_code(code: &str) -> bool {
         [
             admission::TURN_LIMIT,
@@ -330,14 +330,14 @@ impl From<AdmitError> for RcaTurnError {
     }
 }
 
-/// A run's first turn on a session forked for it (J8).
+/// A run's first turn on a session forked for it.
 #[derive(Debug, Clone)]
 pub struct ForkedSession {
     /// The fork, committed and bound to its own opencode session.
     pub session_id: String,
     /// Preserve `context_used.resumed_from` when the first turn writes its context.
     pub resumed_from: Value,
-    /// TH27: the fork's copied counts are the new run's starting counts.
+    /// The fork's copied counts are the new run's starting counts.
     pub reused: ThreadStats,
     /// The stage of the last copied step.
     pub stage: Option<String>,
@@ -364,6 +364,19 @@ async fn start_turn(
     prompt: RcaPrompt,
     fork: Option<ForkedSession>,
 ) -> Result<TurnStarted, RcaTurnError> {
+    // A cancel may have ended the run since the decision to continue it.
+    if run.session_id.is_some() {
+        match runs_table::get_rw(&run.org_id, &run.run_id).await {
+            Ok(Some(row)) if runs_table::to_item(&row).state == RunState::Running => {}
+            Ok(_) => {
+                return Err(RcaTurnError::Other(format!(
+                    "run {} is no longer running",
+                    run.run_id
+                )));
+            }
+            Err(e) => return Err(RcaTurnError::Other(format!("{e:#}"))),
+        }
+    }
     let prompt = prompt.render();
     let (mcps, clis, skills) = load_agent_tools(&run.org_id).await;
 
@@ -415,7 +428,7 @@ async fn start_turn(
         }
     };
 
-    // TH7: the run reads as SysRcaAgent; this is `sre_agent_email(org)` and its token.
+    // The run reads as SysRcaAgent; this is `sre_agent_email(org)` and its token.
     let (email, token) = crate::organization::get_sre_agent_credentials(&run.org_id)
         .await
         .map_err(|e| RcaTurnError::Credentials(format!("{e:#}")))?;
@@ -423,10 +436,10 @@ async fn start_turn(
     let client = get_agent_client().ok_or_else(|| {
         RcaTurnError::AgentUnavailable("the agent client is not initialized".to_string())
     })?;
-    // TH14: a refused or slow health check fails the run `agent_unavailable` before admission.
+    // A refused or slow health check fails the run `agent_unavailable` before admission.
     probe_health(client.health(&auth_header)).await?;
 
-    // TH10: all RCA turns of an org are SysRcaAgent's, so `per_user` caps the org's runs.
+    // All RCA turns of an org are SysRcaAgent's, so `per_user` caps the org's runs.
     let caps = TurnCaps {
         per_user: get_o2_config().incidents.rca_max_active_runs,
         ..TurnCaps::from_config()
@@ -463,7 +476,7 @@ async fn start_turn(
     };
     let settings = PersistSettings::for_rca();
     let store = Arc::new(StreamChatStore::new(settings.retention_days));
-    // TH7: o2-ai binds one opencode session to the run and HA routes to its replica.
+    // o2-ai binds one opencode session to the run and HA routes to its replica.
     let forward_headers = HashMap::from([(SESSION_ID_HEADER.to_string(), row.session_id.clone())]);
     let on_commit = observer(
         run.org_id.clone(),
@@ -481,7 +494,7 @@ async fn start_turn(
         last_committed_seq: row.last_committed_seq,
         opencode_session_id: row.opencode_session_id,
     };
-    // The finalizer's continuation (TH25) reuses the run and its session.
+    // The finalizer's continuation reuses the run and its session.
     let resume = RcaTurnRun {
         session_id: Some(row.session_id),
         ..run
@@ -500,12 +513,12 @@ async fn start_turn(
         })),
         on_commit: Some(on_commit),
     };
-    // TH8: no reader; the turn forwards no frames and goes on to its end.
+    // No reader; the turn forwards no frames and goes on to its end.
     spawn_headless_turn(spec, settings);
     Ok(started)
 }
 
-/// TH14: bound the agent health probe independently of the streaming timeout.
+/// Bound the agent health probe independently of the streaming timeout.
 async fn probe_health<T, E: std::fmt::Display>(
     probe: impl Future<Output = Result<T, E>>,
 ) -> Result<(), RcaTurnError> {
@@ -518,7 +531,7 @@ async fn probe_health<T, E: std::fmt::Display>(
     }
 }
 
-/// TH7.1: expose only the context actually provided to this run.
+/// Expose only the context actually provided to this run.
 fn context_used(
     context: &Value,
     mcps: &[McpEntry],
@@ -542,13 +555,13 @@ fn context_used(
     json!({ "past_causes": past_causes, "skills": skills, "toolsets": toolsets })
 }
 
-/// One `[past:<cause>] <summary>` context line (TH46) as `{id: "past:<cause>", summary}`.
+/// One `[past:<cause>] <summary>` context line as `{id: "past:<cause>", summary}`.
 fn past_cause(line: &str) -> Option<Value> {
     let (cause, summary) = line.trim_start().strip_prefix("[past:")?.split_once(']')?;
     Some(json!({ "id": format!("past:{cause}"), "summary": summary.trim() }))
 }
 
-/// Runs the finalizer of a turn that ended on this node, with the run to continue (TH9).
+/// Runs the finalizer of a turn that ended on this node, with the run to continue.
 fn spawn_finalize(run: RcaTurnRun, turn_id: String, end: TurnEnd) {
     let Ok(runtime) = tokio::runtime::Handle::try_current() else {
         log::error!(
@@ -646,7 +659,7 @@ async fn read_session(
     Ok((events, turns))
 }
 
-/// TH24: the `error.code` of a run whose turns ended without a report.
+/// The `error.code` of a run whose turns ended without a report.
 fn no_report_error(result: TurnResult) -> (&'static str, &'static str) {
     match result {
         TurnResult::Persisted => (ERROR_NO_REPORT, NO_REPORT_REASON),
@@ -657,6 +670,18 @@ fn no_report_error(result: TurnResult) -> (&'static str, &'static str) {
         TurnResult::PersistenceFailed => (ERROR_PERSISTENCE_FAILED, PERSISTENCE_FAILED_REASON),
         TurnResult::Deleted => (ERROR_TRANSCRIPT_DELETED, TRANSCRIPT_DELETED_REASON),
     }
+}
+
+/// A turn that cannot start after earlier turns ran: `interrupted`, so Resume can reuse them.
+pub(crate) fn continuation_start_failure(
+    error: &RcaTurnError,
+) -> (&'static str, &'static str, String) {
+    let code = error.error_code();
+    let details = match super::incidents::rca_turn_failure(error).1 {
+        Some(details) => format!("start: {code}: {details}"),
+        None => format!("start: {code}"),
+    };
+    (ERROR_INTERRUPTED, INTERRUPTED_REASON, details)
 }
 
 /// Transcript and counts are absent when session recovery failed.
@@ -672,7 +697,7 @@ struct RunEnd {
 impl RunEnd {
     async fn end(&self, result: TurnResult, turn_id: &str, resume: Option<RcaTurnRun>) -> bool {
         if self.item.state.is_terminal() {
-            // TH22, TH42: counts only.
+            // Counts only.
             self.write_final_stats().await;
             self.reconcile(Some(self.item.state)).await;
             return false;
@@ -690,7 +715,7 @@ impl RunEnd {
     ) -> Option<RunState> {
         let transcript = self.transcript.as_ref();
         let deadline_closed = self.run.deadline_closed_at.is_some();
-        // SG26, SG30: only an incident run waits; once its deadline closed it never waits again.
+        // Only an incident run waits; once its deadline closed it never waits again.
         if self.item.subject_type == RunSubjectType::Incident
             && !deadline_closed
             && let Some(question) = transcript.and_then(|t| t.open_question.as_ref())
@@ -866,7 +891,7 @@ impl RunEnd {
             .map(|code| format!("turn: {code}"))
     }
 
-    /// The final stats and summary counts, written with the run's end (TH27).
+    /// The final stats and summary counts, written with the run's end.
     fn counts(&self) -> RunUpdate {
         let Some(thread) = self.thread.as_ref() else {
             return RunUpdate::default();
@@ -930,7 +955,7 @@ impl RunEnd {
         }
     }
 
-    /// SG28: "Needs: <need>" of the run's last question, for a run its answer deadline closed.
+    /// "Needs: <need>" of the run's last question, for a run its answer deadline closed.
     fn deadline_detail(&self) -> Option<String> {
         needs_detail(&self.transcript.as_ref()?.questions.last()?.need)
     }
@@ -951,6 +976,7 @@ impl RunEnd {
             ended_by,
             completed: true,
             steer_authors: &authors,
+            ended_at_us: now_micros(),
         });
         if ended_by == EndedBy::AnswerDeadline {
             end.record.answer_deadline_need = transcript
@@ -1006,7 +1032,7 @@ impl RunEnd {
         }
     }
 
-    /// SG28: without a submitted report, complete blocked from the unanswered question and ledger.
+    /// Without a submitted report, complete blocked from the unanswered question and ledger.
     async fn complete_at_deadline(&self) -> Option<RunState> {
         let empty = RunTranscript::default();
         let transcript = self.transcript.as_ref().unwrap_or(&empty);
@@ -1019,6 +1045,7 @@ impl RunEnd {
             ended_by: EndedBy::AnswerDeadline,
             completed: true,
             steer_authors: &authors,
+            ended_at_us: now_micros(),
         });
         end.record.answer_deadline_need = transcript
             .questions
@@ -1062,7 +1089,7 @@ impl RunEnd {
         }
     }
 
-    /// VE38, F3: hand a completed run's report, verdict and grade to the on-call path.
+    /// Hand a completed run's report, verdict and grade to the on-call path.
     async fn deliver(&self, report: &str, end: &RunEndResult) {
         let verdict = end.verdict.as_ref();
         let grade = end.record.grade.as_ref();
@@ -1180,10 +1207,10 @@ impl RunEnd {
                     self.run.run_id,
                     e.error_code()
                 );
-                // TH24: a start error keeps its start code.
-                let (reason, details) = super::incidents::rca_turn_failure(&e);
+                // Turns ran, so the run stays resumable; the start code goes to the details.
+                let (code, reason, details) = continuation_start_failure(&e);
                 Some(
-                    self.fail_without_report(e.error_code(), reason, details)
+                    self.fail_without_report(code, reason, Some(details))
                         .await
                         .is_some(),
                 )
@@ -1225,7 +1252,7 @@ impl RunEnd {
                     log::info!("[RCA_TURN] run {run_id} ended while its continuation waited");
                     return Ok(None);
                 }
-                // The next start still checks the run; a cancel stops that turn (TH41).
+                // The next start still checks the run; a cancel stops that turn.
                 Err(e) => log::warn!(
                     "[RCA_TURN] cannot re-read run {run_id} before its continuation: {e}"
                 ),
@@ -1233,7 +1260,7 @@ impl RunEnd {
         }
     }
 
-    /// A run that ends with no submitted report (TH24, TH44).
+    /// A run that ends with no submitted report.
     async fn fail_without_report(
         &self,
         code: &str,
@@ -1293,7 +1320,7 @@ impl RunEnd {
         }
     }
 
-    /// TH15, TH24: no verdict is coming, so no triage hold waits out its budget for one.
+    /// No verdict is coming, so no triage hold waits out its budget for one.
     async fn release_without_verdict(&self) {
         match self.item.subject_type {
             RunSubjectType::Incident => {
@@ -1319,7 +1346,7 @@ impl RunEnd {
         })
     }
 
-    /// TH44: the end histograms of a run this call ended.
+    /// The end histograms of a run this call ended.
     fn observe(&self, state: RunState) {
         observe_end(
             &self.org_id,
@@ -1366,6 +1393,7 @@ fn partial_end(
         ended_by: EndedBy::Agent,
         completed: false,
         steer_authors,
+        ended_at_us: now_micros(),
     })
 }
 
@@ -1414,7 +1442,7 @@ fn record_json(run_id: &str, record: &RcaRunRecord) -> Option<Value> {
     }
 }
 
-/// F11: the verdict and ledger counts of a run whose end this finalizer wrote, once per run.
+/// The verdict and ledger counts of a run whose end this finalizer wrote, once per run.
 fn count_record(org_id: &str, trigger: RunTrigger, end: &RunEndResult) {
     let record = &end.record;
     if let Some(outcome) = record.outcome.as_ref() {
@@ -1537,7 +1565,7 @@ struct Tally {
     base_tokens: Tokens,
     steps: HashSet<String>,
     latest_step: Option<String>,
-    /// Rows came before any step: the implicit "Investigation" step (TH29).
+    /// Rows came before any step: the implicit "Investigation" step.
     implicit_step: bool,
     tool_calls: HashSet<String>,
     tokens: HashMap<String, Tokens>,
@@ -1642,7 +1670,6 @@ impl Tally {
     }
 }
 
-/// TH27: the turn's commit hook.
 pub fn observer(org_id: String, run_id: String, session_id: String) -> OnCommit {
     let (tx, rx) = mpsc::unbounded_channel();
     tokio::spawn(watch_progress(org_id, run_id, session_id, rx));
@@ -1707,12 +1734,12 @@ where
             continue;
         }
         match write(tally.patch()).await {
-            Ok(true) => {}
+            Ok(true) => dirty = false,
             Ok(false) => return true,
+            // Still dirty: the next write is due one interval later, with or without progress.
             Err(e) => log::warn!("[RCA_TURN] could not write the progress of run {run_id}: {e}"),
         }
         last_write = Instant::now();
-        dirty = false;
     }
 }
 
@@ -1722,7 +1749,7 @@ pub async fn cancel_rca_run(
     incident_id: &str,
     user_id: &str,
 ) -> anyhow::Result<Option<String>> {
-    // The primary: a cancel right after a start must see that run (RR-19).
+    // The primary: a cancel right after a start must see that run.
     let Some(incident) = infra::table::alert_incidents::get_rw(org_id, incident_id).await? else {
         return Ok(None);
     };
@@ -1789,7 +1816,7 @@ where
     if let Some(session_id) = run.session_id.as_deref() {
         stop(org_id, session_id).await;
     }
-    // SG24: what the transcript shows read stays read; every other row is not read.
+    // What the transcript shows read stays read; every other row is not read.
     let transcript = match read_session(org_id, run.session_id.as_deref()).await {
         Ok((events, _)) => Some(decode_run(&events)),
         Err(e) => {
@@ -1798,7 +1825,7 @@ where
         }
     };
     reconcile_steering(org_id, &run, transcript.as_ref(), Some(RunState::Cancelled)).await;
-    // §6: no verdict is coming, so nothing may go on holding a page for one.
+    // No verdict is coming, so nothing may go on holding a page for one.
     rca_service::skip_analysis_for_incident(org_id, incident_id).await;
     log::info!("[RCA_TURN] cancelled run {run_id} of incident {incident_id}");
     Ok(Some(run_id))
@@ -1813,7 +1840,7 @@ pub async fn turn_run_of(run: &RunRow) -> anyhow::Result<RcaTurnRun> {
         anyhow::bail!("run {} has no session", run.run_id);
     };
     let incident_id = run.subject_id.clone();
-    // RR-27: "Build on previous" extends the newest completed report, as at the start.
+    // "Build on previous" extends the newest completed report, as at the start.
     let previous = if item.mode == RunMode::BuildOnPrevious {
         rca_runs::newest_completed_report(&run.org_id, &incident_id)
             .await
@@ -1836,7 +1863,7 @@ pub async fn turn_run_of(run: &RunRow) -> anyhow::Result<RcaTurnRun> {
     })
 }
 
-/// Start the next turn of a paused incident run (SG18, SG27) with `prompt`.
+/// Start the next turn of a paused incident run with `prompt`.
 pub(crate) async fn start_resumed_turn(
     run: &RunRow,
     prompt: RcaPrompt,
@@ -1956,7 +1983,7 @@ where
     }
 }
 
-/// SG28 for a run whose finalize turn never started: completed `blocked` from its transcript.
+/// A run whose finalize turn never started completes `blocked` from its transcript.
 async fn end_at_deadline(org_id: &str, run_id: &str) -> bool {
     let run = match runs_table::get_rw(org_id, run_id).await {
         Ok(Some(run)) => run,
@@ -2028,10 +2055,14 @@ async fn sweep_run(run: RunRow, now: i64, timeout_secs: u64) -> anyhow::Result<b
             return Ok(finalize(run.org_id, run.run_id, turn.turn_id.clone(), end, None).await);
         }
     }
-    // No turn row: admission never finished, so the Phase 1 stale rule applies.
+    // No turn row: admission never finished, so the stale rule applies.
     let item = runs_table::to_item(&run);
     if !is_stale(item.state, run.updated_at, now, timeout_secs) {
         return Ok(false);
+    }
+    // The finalize turn of a closed answer deadline never started; the run still ends blocked.
+    if run.deadline_closed_at.is_some() {
+        return Ok(end_at_deadline(&run.org_id, &run.run_id).await);
     }
     let ending = RunEnd {
         org_id: run.org_id.clone(),
@@ -2124,7 +2155,7 @@ mod tests {
         },
     };
 
-    // ---- TH6: the prompt ----
+    // ---- the prompt ----
 
     const TRIGGERS: [(RunTrigger, &str); 8] = [
         (RunTrigger::AutoNewIncident, "new incident"),
@@ -2146,7 +2177,7 @@ mod tests {
         }
     }
 
-    /// TH6: the design's samples, word for word.
+    /// The design's samples, word for word.
     #[test]
     fn the_prompt_reads_as_the_design_samples() {
         let render = |trigger, subject| {
@@ -2186,7 +2217,7 @@ mod tests {
         );
     }
 
-    /// TH6: every trigger and every subject renders a non-blank text naming both.
+    /// Every trigger and every subject renders a non-blank text naming both.
     #[test]
     fn every_trigger_and_subject_renders_a_prompt() {
         let subjects = [
@@ -2222,7 +2253,7 @@ mod tests {
         }
     }
 
-    // ---- TH19, TH22–TH25, TH42: the finalizer ----
+    // ---- the finalizer ----
 
     /// The finalizer's view of the run: its row, the counts of `events` and their decoding.
     async fn ending(org_id: &str, run_id: &str, events: &[DurableEvent]) -> RunEnd {
@@ -2342,7 +2373,7 @@ mod tests {
         assert!(failures(&timeline(&org, &inc).await).is_empty());
     }
 
-    /// TH23: a committed report completes the run whatever ended the turn.
+    /// A committed report completes the run whatever ended the turn.
     #[tokio::test]
     async fn a_committed_report_completes_the_run_after_any_turn_end() {
         let _db = db().await;
@@ -2400,7 +2431,7 @@ mod tests {
         }
     }
 
-    /// TH24, 02 §9.1: a submit with a blank report is no report.
+    /// A submit with a blank report is no report.
     #[tokio::test]
     async fn a_blank_submitted_report_is_no_report() {
         let _db = db().await;
@@ -2565,7 +2596,7 @@ mod tests {
         assert!(released(hold_status(&org, &record).await));
     }
 
-    // ---- VE16, VE34, VE41, VE44, F6, F11: the run record ----
+    // ---- the run record ----
 
     const ALL_STAGES: [&str; 7] = [
         "context",
@@ -2594,8 +2625,8 @@ mod tests {
         s.events
     }
 
-    /// What the finalizer computes from `events` for a run that ends `completed`.
-    fn expected_end(events: &[DurableEvent], completed: bool) -> RunEndResult {
+    /// What the finalizer computes from `events`; `ended_at_us` comes from the stored record.
+    fn expected_end(events: &[DurableEvent], completed: bool, ended_at_us: i64) -> RunEndResult {
         let transcript = decode_run(events);
         record_run_end(&RunEndInput {
             submit: transcript.submit.as_ref(),
@@ -2605,7 +2636,18 @@ mod tests {
             ended_by: EndedBy::Agent,
             completed,
             steer_authors: &BTreeMap::new(),
+            ended_at_us,
         })
+    }
+
+    fn run_end_time(record: &RcaRunRecord) -> i64 {
+        record
+            .ledger
+            .hypotheses
+            .iter()
+            .flat_map(|h| &h.history)
+            .find(|c| c.run_ended)
+            .map_or(0, |c| c.at_us)
     }
 
     fn record_of(run: &config::meta::alerts::rca_runs::RcaRun) -> RcaRunRecord {
@@ -2618,7 +2660,7 @@ mod tests {
         summary.get("detail").cloned().unwrap_or(Value::Null)
     }
 
-    /// F11 counters of one org: outcome, claim, grade, failed citations.
+    /// Counters of one org: outcome, claim, grade, failed citations.
     fn record_counts(org: &str) -> (u64, u64, u64, u64) {
         (
             RCA_OUTCOME_TOTAL
@@ -2648,7 +2690,6 @@ mod tests {
         let (org, inc) = new_incident(None).await;
         let run_id = start(&org, &inc, RunTrigger::Manual).await;
         let events = reported(&ALL_STAGES, verdict(H1, "high", "root_cause_identified"));
-        let expected = expected_end(&events, true);
 
         assert!(end(&org, &run_id, &events, TurnResult::Persisted).await);
 
@@ -2656,11 +2697,13 @@ mod tests {
         assert_eq!(run.state, RunState::Completed);
         assert_eq!(run.report.as_deref(), Some(SECOND_REPORT));
         let record = record_of(&run);
-        assert_eq!(record, expected.record);
+        assert_eq!(
+            record,
+            expected_end(&events, true, run_end_time(&record)).record
+        );
         assert_eq!(record.schema_version, 1);
         assert_eq!(record.outcome, Some(RcaOutcome::RootCauseIdentified));
         assert_eq!(record.outcome_reason, Some(OutcomeReason::RootCauseGraded));
-        assert!(record.has_ledger);
         let statuses: Vec<(&str, HypothesisStatus)> = record
             .ledger
             .hypotheses
@@ -2705,7 +2748,7 @@ mod tests {
             "VE34: a completed run gets no run_end blind spot"
         );
 
-        // VE41: the columns copy the record; the incident mirrors them.
+        // The columns copy the record; the incident mirrors them.
         assert_eq!(run.outcome.as_deref(), Some("root_cause_identified"));
         assert_eq!(run.confidence.as_deref(), Some("high"));
         let incident = incident_row(&org, &inc).await;
@@ -2818,7 +2861,10 @@ mod tests {
             (None, None)
         );
         let record = record_of(&run);
-        assert_eq!(record, expected_end(&events, false).record);
+        assert_eq!(
+            record,
+            expected_end(&events, false, run_end_time(&record)).record
+        );
         assert_eq!(record.ledger.hypotheses.len(), 2);
         assert_eq!(
             (&record.verdict, &record.grade, &record.outcome),
@@ -2866,7 +2912,10 @@ mod tests {
             (None, None)
         );
         let record = record_of(&run);
-        assert_eq!(record, expected_end(&events, false).record);
+        assert_eq!(
+            record,
+            expected_end(&events, false, run_end_time(&record)).record
+        );
         assert_eq!(record.ledger.hypotheses.len(), 2);
         assert_eq!(
             (&record.verdict, &record.grade, &record.outcome),
@@ -2901,6 +2950,7 @@ mod tests {
             ended_by: EndedBy::Agent,
             completed: true,
             steer_authors: &BTreeMap::new(),
+            ended_at_us: now_micros(),
         })
         .verdict
         .expect("a graded verdict");
@@ -2970,7 +3020,7 @@ mod tests {
         }
     }
 
-    /// TH25: the first interruption records one continuation instead of failing the run.
+    /// The first interruption records one continuation instead of failing the run.
     #[tokio::test]
     async fn a_first_interruption_records_one_continuation() {
         let _db = db().await;
@@ -2992,13 +3042,26 @@ mod tests {
 
         let run = stored(&org, &run_id).await;
         assert_eq!(run.continuations, 1);
-        assert_ne!(
-            run.error.map(|e| e.code).as_deref(),
-            Some(ERROR_INTERRUPTED)
+        // No agent answers here: the continuation fails `interrupted` and keeps its start code.
+        let details = run
+            .error
+            .and_then(|error| error.details)
+            .unwrap_or_default();
+        assert!(
+            [
+                admission::TURN_LIMIT,
+                ERROR_CREDENTIALS,
+                ERROR_AGENT_UNAVAILABLE,
+                ERROR_BUSY,
+                ERROR_AGENT_ERROR,
+            ]
+            .iter()
+            .any(|code| details.contains(code)),
+            "{details}"
         );
     }
 
-    /// TH25: a second interruption fails the run `interrupted` and starts nothing.
+    /// A second interruption fails the run `interrupted` and starts nothing.
     #[tokio::test]
     async fn a_second_interruption_fails_the_run_interrupted() {
         let _db = db().await;
@@ -3077,9 +3140,9 @@ mod tests {
         assert_eq!(live.stage.as_deref(), Some("changes"));
     }
 
-    // ---- TH14, D1: the health probe ----
+    // ---- the health probe ----
 
-    /// TH14, D1: a probe that never answers gives up after [HEALTH_CHECK_TIMEOUT].
+    /// A probe that never answers gives up after [HEALTH_CHECK_TIMEOUT].
     #[tokio::test(start_paused = true)]
     async fn a_health_probe_that_never_answers_is_agent_unavailable() {
         let began = Instant::now();
@@ -3112,7 +3175,7 @@ mod tests {
         assert!(began.elapsed() < HEALTH_CHECK_TIMEOUT);
     }
 
-    // ---- TH25, D2: the continuation's start retries ----
+    // ---- the continuation's start retries ----
 
     fn started() -> TurnStarted {
         TurnStarted {
@@ -3183,9 +3246,9 @@ mod tests {
         clock.abort();
     }
 
-    /// TH24, TH25, D2: when every wait is spent, the run fails with the start's code.
+    /// When every wait is spent, the run fails `interrupted` with the start's code.
     #[tokio::test(start_paused = true)]
-    async fn a_continuation_that_never_reaches_the_agent_fails_agent_unavailable() {
+    async fn a_continuation_that_never_reaches_the_agent_fails_interrupted() {
         let clock = fast_clock();
         let _db = db().await;
         let (org, inc) = new_incident(None).await;
@@ -3212,7 +3275,18 @@ mod tests {
         let run = stored(&org, &run_id).await;
         clock.abort();
         assert_eq!(run.state, RunState::Failed);
-        assert_eq!(run.error.unwrap().code, ERROR_AGENT_UNAVAILABLE);
+        let error = run.error.unwrap();
+        assert_eq!(
+            error.code, ERROR_INTERRUPTED,
+            "earlier turns stay resumable"
+        );
+        assert!(
+            error
+                .details
+                .as_deref()
+                .is_some_and(|details| details.contains(ERROR_AGENT_UNAVAILABLE)),
+            "{error:?}"
+        );
         assert_eq!(run.continuations, 1);
     }
 
@@ -3301,12 +3375,35 @@ mod tests {
             );
             let run = stored(&org, &run_id).await;
             assert_eq!(run.state, RunState::Failed, "{error:?}");
-            assert_eq!(run.error.unwrap().code, code, "{error:?}");
+            let stored_error = run.error.unwrap();
+            assert_eq!(stored_error.code, ERROR_INTERRUPTED, "{error:?}");
+            assert!(
+                stored_error
+                    .details
+                    .as_deref()
+                    .is_some_and(|details| details.contains(code)),
+                "{stored_error:?}"
+            );
         }
         clock.abort();
     }
 
-    // ---- TH3, TH27: the observer ----
+    #[tokio::test]
+    async fn a_continuation_rechecks_that_its_run_is_live() {
+        let _db = db().await;
+        let (org, inc) = new_incident(None).await;
+        let run_id = start(&org, &inc, RunTrigger::Manual).await;
+        cancel_write(&org, &run_id).await;
+
+        let started = start_rca_turn(continuation(&org, &run_id, &inc), RcaPrompt::Continue).await;
+
+        assert!(
+            matches!(started, Err(RcaTurnError::Other(_))),
+            "{started:?}"
+        );
+    }
+
+    // ---- the observer ----
 
     #[test]
     fn the_observer_counts_the_visible_tool_parts_once() {
@@ -3350,7 +3447,7 @@ mod tests {
         )
     }
 
-    /// TH27, TH22: the live step count is the count the run ends with.
+    /// The live step count is the count the run ends with.
     #[test]
     fn the_observer_and_the_finalizer_count_the_same_steps() {
         let (whole, batched, ended) = step_counts(&rca_session());
@@ -3480,7 +3577,7 @@ mod tests {
         assert_eq!(step_counts(&hidden.events), (Some(0), Some(0), 0));
     }
 
-    /// TH18, TH29: a stage outside the seven names is no stage, live or in the thread.
+    /// A stage outside the seven names is no stage, live or in the thread.
     #[test]
     fn an_unknown_stage_is_never_the_runs_stage() {
         let mut tally = Tally::default();
@@ -3654,7 +3751,43 @@ mod tests {
         assert_eq!(*calls.lock(), 2, "each stage change tried its write");
     }
 
-    // ---- TH28: the sweeper ----
+    #[tokio::test(start_paused = true)]
+    async fn a_failed_progress_write_is_retried_one_interval_later() {
+        let writes: Arc<Mutex<Vec<Duration>>> = Arc::default();
+        let log = writes.clone();
+        let began = Instant::now();
+        let (tx, rx) = mpsc::unbounded_channel();
+        let task = tokio::spawn(write_progress(
+            Tally::default(),
+            rx,
+            "run_1",
+            move |_patch: RunUpdate| {
+                let mut log = log.lock();
+                log.push(began.elapsed());
+                std::future::ready(if log.len() == 1 {
+                    Err(anyhow::anyhow!("the database is down"))
+                } else {
+                    Ok(true)
+                })
+            },
+        ));
+
+        tx.send(Progress::of(&step_batch("prt_s1", "context")))
+            .unwrap();
+        tokio::time::sleep(PROGRESS_INTERVAL * 3).await;
+        drop(tx);
+        assert!(!task.await.unwrap());
+
+        let writes = writes.lock().clone();
+        assert_eq!(
+            writes.len(),
+            2,
+            "one retry, then nothing is dirty: {writes:?}"
+        );
+        assert!(writes[1] - writes[0] >= PROGRESS_INTERVAL, "{writes:?}");
+    }
+
+    // ---- the sweeper ----
 
     fn turn(
         session_id: &str,
@@ -3780,7 +3913,7 @@ mod tests {
         let ended_inc = crate::alerts::rca_runs::tests::add_incident(&org, None).await;
         let ended_run = start(&org, &ended_inc, RunTrigger::Manual).await;
         with_session(&org, &ended_run, "ses-ended").await;
-        // The run's last write came during its turn; a later one reads as a resume (SG18).
+        // The run's last write came during its turn; a later one reads as a resume.
         crate::alerts::rca_runs::tests::age(&org, &ended_inc, &ended_run, 200).await;
         add_turn(
             &org,
@@ -3931,7 +4064,7 @@ mod tests {
         let ended_inc = crate::alerts::rca_runs::tests::add_incident(&org, None).await;
         let ended_run = start(&org, &ended_inc, RunTrigger::Manual).await;
         with_session(&org, &ended_run, "ses-d4-ended").await;
-        // The run's last write came during its turn; a later one reads as a resume (SG18).
+        // The run's last write came during its turn; a later one reads as a resume.
         crate::alerts::rca_runs::tests::age(&org, &ended_inc, &ended_run, 300).await;
         let mut ended = turn(
             "ses-d4-ended",
@@ -4105,7 +4238,7 @@ mod tests {
         }
     }
 
-    // ---- SG26–SG28, SG30, SG42: questions and the answer deadline ----
+    // ---- questions and the answer deadline ----
 
     const NEED: &str = "deploy time of checkout-api";
     const QUESTION_TEXT: &str = "When did checkout-api deploy?";
@@ -4146,7 +4279,7 @@ mod tests {
         }
     }
 
-    /// Pause the run with an answer deadline `deadline`, as SG26 does.
+    /// Pause the run with an answer deadline `deadline`.
     async fn pause_until(org: &str, run_id: &str, deadline: i64) {
         let patch = RunUpdate {
             state: Some(RunState::WaitingInput),
@@ -4214,7 +4347,7 @@ mod tests {
         assert!(failures(&events).is_empty());
     }
 
-    /// SG30: an alert run never waits; a question with no report ends it as 02 says.
+    /// An alert run never waits; a question with no report ends it.
     #[tokio::test]
     async fn sg30_an_alert_run_never_waits_for_an_answer() {
         let _db = db().await;
@@ -4385,7 +4518,7 @@ mod tests {
         );
     }
 
-    /// Pause the run and close its deadline, as the SG27 sweeper's winner does.
+    /// Pause the run and close its deadline, as the sweeper's winner does.
     async fn deadline_closed(org: &str, run_id: &str) {
         let deadline = now_micros() - 1_000_000;
         pause_until(org, run_id, deadline).await;
@@ -4394,6 +4527,80 @@ mod tests {
                 .await
                 .unwrap()
         );
+    }
+
+    #[tokio::test]
+    async fn sg26_two_finalizers_of_a_third_question_start_one_finalize_turn() {
+        let _db = db().await;
+        let (org, inc) = new_incident(None).await;
+        let run_id = start(&org, &inc, RunTrigger::Manual).await;
+        ask_twice_before(&org, &run_id).await;
+        let events = asking();
+        // Both read the run before either closed its deadline.
+        let finalizers = [
+            ending(&org, &run_id, &events).await,
+            ending(&org, &run_id, &events).await,
+        ];
+        let question = finalizers[0]
+            .transcript
+            .as_ref()
+            .and_then(|t| t.open_question.clone())
+            .unwrap();
+        let starts = Arc::new(Mutex::new(0));
+
+        for finalizer in finalizers {
+            let count = starts.clone();
+            let ended = finalizer
+                .close_deadline_now_with(
+                    &question,
+                    Some(continuation(&org, &run_id, &inc)),
+                    move |_run, _prompt| {
+                        *count.lock() += 1;
+                        std::future::ready(Ok(started()))
+                    },
+                    || true,
+                )
+                .await;
+            assert_eq!(ended, None);
+        }
+
+        assert_eq!(*starts.lock(), 1, "one finalize turn");
+        let run = stored(&org, &run_id).await;
+        assert_eq!(run.state, RunState::Running);
+        assert!(run.deadline_closed_at.is_some());
+    }
+
+    #[tokio::test]
+    async fn sg28_a_closed_deadline_whose_finalize_turn_never_started_ends_blocked() {
+        let _db = db().await;
+        let timeout = get_o2_config().incidents.rca_timeout_secs;
+        let now = now_micros();
+        let sec = 1_000_000;
+        let (org, inc) = new_incident(None).await;
+        let run_id = start(&org, &inc, RunTrigger::Manual).await;
+        with_session(&org, &run_id, "ses-closed").await;
+        let asked_at = now - stale_threshold_us(timeout) - 300 * sec;
+        add_turn(
+            &org,
+            turn(
+                "ses-closed",
+                "t1",
+                ai_chat_turns::TURN_COMPLETED,
+                asked_at - sec,
+                Some(asked_at),
+                None,
+            ),
+        )
+        .await;
+        deadline_closed(&org, &run_id).await;
+        crate::alerts::rca_runs::tests::age(&org, &inc, &run_id, timeout as i64 + 121).await;
+
+        let run = runs_table::get_rw(&org, &run_id).await.unwrap().unwrap();
+        assert!(sweep_run(run, now, timeout).await.unwrap());
+
+        let run = stored(&org, &run_id).await;
+        assert_eq!(run.state, RunState::Completed);
+        assert_eq!(run.outcome.as_deref(), Some("blocked"));
     }
 
     #[tokio::test]

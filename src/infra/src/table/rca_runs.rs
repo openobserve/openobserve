@@ -40,7 +40,7 @@ use super::{
 };
 use crate::db::{get_orm_client_ro, get_orm_client_rw};
 
-/// `error.code` of a run that stopped writing (RR-6, RR-40).
+/// `error.code` of a run that stopped writing.
 pub const STALE_ERROR_CODE: &str = "stale";
 /// `error.reason` of a stale run.
 pub const STALE_ERROR_REASON: &str = "The analysis stopped responding";
@@ -72,13 +72,15 @@ pub struct NewRun {
 
 /// The values [start_run] decides with.
 #[derive(Debug, Clone, Copy)]
-pub struct StartGuards {
+pub struct StartGuards<'a> {
     pub now_us: i64,
     pub rca_timeout_secs: u64,
     /// `None` skips the cooldown (user-started runs).
     pub cooldown_us: Option<i64>,
-    /// `O2_INCIDENTS_RCA_HISTORY_LIMIT` (RR-25).
+    /// `O2_INCIDENTS_RCA_HISTORY_LIMIT`.
     pub history_limit: usize,
+    /// The incident's latest run the caller decided on (a Resume); any other start since wins.
+    pub latest_run_id: Option<&'a str>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -86,12 +88,12 @@ pub enum StartResult {
     Started {
         run_id: String,
         replaced_stale: Option<RunTrigger>,
-        /// The id of that stale run, so the caller closes its steering rows (SG23).
+        /// The id of that stale run, so the caller closes its steering rows.
         replaced_run_id: Option<String>,
     },
-    /// The latest run is live and not stale (RR-9), or a concurrent start won (RR-5).
+    /// The latest run is live and not stale, or a concurrent start won.
     InFlight,
-    /// The newest completed run ended within the cooldown (RR-8).
+    /// The newest completed run ended within the cooldown.
     CoolingDown,
 }
 
@@ -124,13 +126,13 @@ pub struct RunUpdate {
     pub final_stats_only: bool,
     /// Appended to the incident's timeline in the same transaction (incident subjects).
     pub event: Option<IncidentEvent>,
-    /// Answer deadline of a `waiting_input` run (SG26); `Some(None)` clears it.
+    /// Answer deadline of a `waiting_input` run; `Some(None)` clears it.
     pub input_deadline_at: Option<Option<i64>>,
-    /// The open question (SG26); `Some(None)` clears it.
+    /// The open question; `Some(None)` clears it.
     pub pending_question_id: Option<Option<String>>,
     /// Adds one to `questions_asked` in SQL.
     pub questions_asked_inc: bool,
-    /// When the answer deadline closed (SG27).
+    /// When the answer deadline closed; the write loses once it closed.
     pub deadline_closed_at: Option<i64>,
     pub now_us: i64,
 }
@@ -158,7 +160,7 @@ struct SeenSummary {
 }
 
 /// `SELECT ... FOR UPDATE`, except on SQLite, which serializes writers and has no row lock.
-fn locked<E: EntityTrait>(txn: &DatabaseTransaction, query: Select<E>) -> Select<E> {
+pub(crate) fn locked<E: EntityTrait>(txn: &DatabaseTransaction, query: Select<E>) -> Select<E> {
     if txn.get_database_backend() == sea_orm::DatabaseBackend::Sqlite {
         query
     } else {
@@ -178,7 +180,7 @@ fn encode<T: serde::Serialize>(value: &T, what: &str) -> Result<serde_json::Valu
 /// Atomically admit one run per incident and append its Begin event before pruning history.
 pub async fn start_run(
     new: NewRun,
-    guards: StartGuards,
+    guards: StartGuards<'_>,
     begin_event: Option<IncidentEvent>,
     guidance_row: Option<SteerRecord>,
 ) -> Result<StartResult, DbErr> {
@@ -196,7 +198,7 @@ pub async fn start_run(
 pub async fn start_run_with<C: TransactionTrait>(
     db: &C,
     new: NewRun,
-    guards: StartGuards,
+    guards: StartGuards<'_>,
     begin_event: Option<IncidentEvent>,
     guidance_row: Option<SteerRecord>,
 ) -> Result<StartResult, DbErr> {
@@ -234,6 +236,14 @@ pub async fn start_run_with<C: TransactionTrait>(
             .as_deref()
             .and_then(|s| RunState::from_str(s).ok());
         let seen_updated_at = seen.rca_updated_at.unwrap_or_default();
+        // A start since the caller's decision is the concurrent start that won.
+        if guards
+            .latest_run_id
+            .is_some_and(|latest| seen.rca_run_id.as_deref() != Some(latest))
+        {
+            txn.rollback().await?;
+            return Ok(StartResult::InFlight);
+        }
         if seen_state.is_some_and(|state| {
             is_live_blocking(state, seen_updated_at, now, guards.rca_timeout_secs)
         }) {
@@ -313,7 +323,7 @@ pub async fn start_run_with<C: TransactionTrait>(
             return Ok(StartResult::InFlight);
         }
 
-        // RR-6: the replaced run stopped writing; end it in this transaction.
+        // The replaced run stopped writing; end it in this transaction.
         if let Some(seen_run_id) = seen.rca_run_id.as_deref()
             && seen_state
                 .is_some_and(|state| is_stale(state, seen_updated_at, now, guards.rca_timeout_secs))
@@ -385,7 +395,7 @@ pub async fn start_run_with<C: TransactionTrait>(
     })
 }
 
-/// Ends a `running` run as `failed`/`stale` (RR-6).
+/// Ends a `running` run as `failed`/`stale`.
 async fn fail_stale_with(
     txn: &DatabaseTransaction,
     org_id: &str,
@@ -475,7 +485,7 @@ async fn prune_with(
     if doomed.is_empty() {
         return Ok(());
     }
-    // 04 §8.5: a pruned run's steering rows go with it.
+    // A pruned run's steering rows go with it.
     rca_steering::delete_for_runs_in(txn, org_id, &doomed).await?;
     rca_runs::Entity::delete_many()
         .filter(rca_runs::Column::OrgId.eq(org_id))
@@ -490,7 +500,7 @@ async fn prune_with(
     Ok(())
 }
 
-/// The states a run may move from to reach `target` (01 §7).
+/// The states a run may move from to reach `target`.
 fn allowed_from(target: Option<RunState>) -> &'static [RunState] {
     match target {
         None | Some(RunState::Completed) | Some(RunState::Failed) => &[RunState::Running],
@@ -581,11 +591,15 @@ fn merge_summary(mut summary: RunSummaryFields, upd: &RunUpdate) -> RunSummaryFi
         }
     }
     if let Some(user) = upd.steered_by_add.as_ref() {
-        summary.steered_by.retain(|u| u != user);
-        summary.steered_by.insert(0, user.clone());
-        summary.steered_by.truncate(STEERED_BY_MAX);
+        add_steered_by(&mut summary, user);
     }
     summary
+}
+
+fn add_steered_by(summary: &mut RunSummaryFields, user: &str) {
+    summary.steered_by.retain(|u| u != user);
+    summary.steered_by.insert(0, user.to_string());
+    summary.steered_by.truncate(STEERED_BY_MAX);
 }
 
 pub async fn update_run(org_id: &str, run_id: &str, upd: RunUpdate) -> Result<bool, DbErr> {
@@ -754,7 +768,9 @@ pub async fn update_run_with<C: TransactionTrait>(
         );
     }
     if let Some(closed_at) = upd.deadline_closed_at {
-        update = update.col_expr(rca_runs::Column::DeadlineClosedAt, Expr::value(closed_at));
+        update = update
+            .col_expr(rca_runs::Column::DeadlineClosedAt, Expr::value(closed_at))
+            .filter(rca_runs::Column::DeadlineClosedAt.is_null());
     }
     if update.exec(&txn).await?.rows_affected == 0 {
         txn.rollback().await?;
@@ -847,6 +863,9 @@ async fn final_stats_with<C: TransactionTrait>(
             if p.unblocked_by.is_some() {
                 summary.unblocked_by = p.unblocked_by.clone();
             }
+        }
+        if let Some(user) = upd.steered_by_add.as_ref() {
+            add_steered_by(&mut summary, user);
         }
         alert_incidents::Entity::update_many()
             .col_expr(
@@ -962,7 +981,7 @@ pub async fn list_for_incident(
     Ok((runs, has_more))
 }
 
-/// The newest `completed` run whose `incident_id` is the incident (RR-27, RR-29, RR-31).
+/// The newest `completed` run whose `incident_id` is the incident.
 pub async fn newest_completed_for_incident(
     org_id: &str,
     incident_id: &str,
@@ -1025,7 +1044,7 @@ pub async fn list_completed_between(
         .await
 }
 
-/// `running` runs, least recently written first, `limit` at most (TH28, RR-40).
+/// `running` runs, least recently written first, `limit` at most.
 pub async fn list_running(limit: u64) -> Result<Vec<Model>, DbErr> {
     rca_runs::Entity::find()
         .filter(rca_runs::Column::State.eq(RunState::Running.as_str()))
@@ -1055,7 +1074,7 @@ pub async fn list_waiting_past_deadline_with<C: ConnectionTrait>(
         .await
 }
 
-/// SG18: a steering message reopens a `waiting_input` run whose deadline is still open.
+/// A steering message reopens a `waiting_input` run whose deadline is still open.
 pub async fn resume_waiting(org_id: &str, run_id: &str) -> Result<bool, DbErr> {
     reopen_waiting_with(
         get_orm_client_rw().await,
@@ -1067,7 +1086,7 @@ pub async fn resume_waiting(org_id: &str, run_id: &str) -> Result<bool, DbErr> {
     .await
 }
 
-/// SG27: the sweeper closes the answer deadline the run was listed with.
+/// The sweeper closes the answer deadline the run was listed with.
 pub async fn close_deadline(
     org_id: &str,
     run_id: &str,
@@ -1183,7 +1202,7 @@ pub async fn reopen_waiting_with<C: TransactionTrait>(
     Ok(true)
 }
 
-/// Deletes every run of the org (RR-26).
+/// Deletes every run of the org.
 pub async fn delete_by_org(org_id: &str) -> Result<(), DbErr> {
     rca_runs::Entity::delete_many()
         .filter(rca_runs::Column::OrgId.eq(org_id))
@@ -1278,6 +1297,7 @@ pub fn to_item(m: &Model) -> RcaRunItem {
         confidence: m.confidence.clone(),
         cancelled_by: m.cancelled_by.clone(),
         error_reason: error_of(m).map(|e| e.reason),
+        has_record: m.result.is_some(),
     }
 }
 
@@ -1405,12 +1425,13 @@ mod tests {
         }
     }
 
-    fn guards(now_us: i64) -> StartGuards {
+    fn guards(now_us: i64) -> StartGuards<'static> {
         StartGuards {
             now_us,
             rca_timeout_secs: TIMEOUT,
             cooldown_us: None,
             history_limit: 25,
+            latest_run_id: None,
         }
     }
 
@@ -1526,7 +1547,7 @@ mod tests {
         decode_summary(m.rca_summary.as_ref())
     }
 
-    /// RR-2: the seven summary columns equal the run that `rca_run_id` names.
+    /// The seven summary columns equal the run that `rca_run_id` names.
     async fn assert_summary_mirrors_run(db: &DatabaseConnection, incident_id: &str) -> Model {
         let incident = inc(db, incident_id).await;
         let run_id = incident.rca_run_id.clone().expect("rca_run_id set");
@@ -1657,7 +1678,7 @@ mod tests {
         assert_eq!(runs_of(&db, "inc-1").await.len(), 1);
     }
 
-    /// RR-5 on SQLite: two starts issued together serialize; one starts, one is in flight.
+    /// On SQLite two starts issued together serialize; one starts, one is in flight.
     #[tokio::test]
     async fn rr5_two_starts_together_start_one_run() {
         let db = db().await;
@@ -1718,7 +1739,7 @@ mod tests {
         )
         .await
         .unwrap();
-        // TH44: the start names the trigger of the run it ended, so the caller counts it.
+        // The start names the trigger of the run it ended, so the caller counts it.
         let StartResult::Started {
             run_id: r2,
             replaced_stale,
@@ -1739,7 +1760,7 @@ mod tests {
         assert_eq!(incident.rca_run_id.as_deref(), Some(r2.as_str()));
         assert_eq!(incident.rca_state.as_deref(), Some("running"));
         assert_eq!(runs_of(&db, "inc-1").await[0].run_id, r2);
-        // D9: the stale replacement appends no event of its own.
+        // The stale replacement appends no event of its own.
         assert_eq!(event_types(&db, "inc-1").await.len(), 2);
     }
 
@@ -1813,7 +1834,7 @@ mod tests {
         run_id
     }
 
-    /// RR-11 / 01 §7: every (from, to) pair; a refused write changes no run, summary or event.
+    /// Every (from, to) pair; a refused write changes no run, summary or event.
     #[tokio::test]
     async fn rr11_update_run_follows_the_transition_table() {
         use RunState::*;
@@ -1867,7 +1888,7 @@ mod tests {
         }
     }
 
-    /// RR-11: completing a cancelled run is refused and writes no report, summary or event.
+    /// Completing a cancelled run is refused and writes no report, summary or event.
     #[tokio::test]
     async fn rr11_completing_a_cancelled_run_writes_nothing() {
         let db = db().await;
@@ -2063,7 +2084,7 @@ mod tests {
         assert_eq!(ids_of(&db, "inc-c").await, expected);
     }
 
-    /// RR-25 / RR-1: live runs are never pruned.
+    /// Live runs are never pruned.
     #[tokio::test]
     async fn rr25_prune_never_deletes_a_live_run() {
         let db = db().await;
@@ -2101,7 +2122,7 @@ mod tests {
         );
     }
 
-    /// The detail/list summary computes `stale` from `rca_updated_at` (RR-9).
+    /// The detail/list summary computes `stale` from `rca_updated_at`.
     #[tokio::test]
     async fn summary_from_incident_reports_stale() {
         let db = db().await;
@@ -2271,6 +2292,19 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn the_history_item_says_whether_a_cancelled_run_stored_a_record() {
+        let db = db().await;
+        let run_id = run_in_state(&db, "inc-1", RunState::Cancelled).await;
+        assert!(!to_item(&run(&db, &run_id).await.unwrap()).has_record);
+
+        let mut upd = update(None, T0 + 5 * SEC);
+        upd.final_stats_only = true;
+        upd.result = Some(serde_json::json!({"schema_version": 1, "ledger": {"hypotheses": []}}));
+        assert!(update_run_with(&db, ORG, &run_id, upd).await.unwrap());
+        assert!(to_item(&run(&db, &run_id).await.unwrap()).has_record);
+    }
+
+    #[tokio::test]
     async fn a_progress_write_stores_the_run_progress_columns() {
         let db = db().await;
         incident(&db, "inc-1").await;
@@ -2410,11 +2444,11 @@ mod tests {
         drop_postgres(db, &dsn, &name).await;
     }
 
-    // ---- Phase 4: questions and steering (04 §8.3, SG18, SG26, SG27, SG42, §8.5) ----
+    // ---- Questions and steering ----
 
     const DEADLINE: i64 = T0 + 600 * SEC;
 
-    /// The SG26 `waiting_input` write of the finalizer, with its SG42 event.
+    /// The finalizer's `waiting_input` write, with its event.
     fn waiting_update(now_us: i64, deadline: i64, question_id: &str) -> RunUpdate {
         let mut upd = update(Some(RunState::WaitingInput), now_us);
         upd.input_deadline_at = Some(Some(deadline));
@@ -2655,6 +2689,82 @@ mod tests {
             reopen_waiting_with(&db, ORG, &run_id, Reopen::Deadline(DEADLINE), now),
         );
         assert_eq!([a.unwrap(), b.unwrap()].iter().filter(|w| **w).count(), 1);
+    }
+
+    #[tokio::test]
+    async fn sg25_the_finalizers_deadline_close_is_a_compare_and_set() {
+        let db = db().await;
+        let run_id = run_in_state(&db, "inc-1", RunState::Running).await;
+        let close = |now_us| RunUpdate {
+            deadline_closed_at: Some(now_us),
+            ..update(None, now_us)
+        };
+        assert!(
+            update_run_with(&db, ORG, &run_id, close(T0 + SEC))
+                .await
+                .unwrap()
+        );
+        assert!(
+            !update_run_with(&db, ORG, &run_id, close(T0 + 2 * SEC))
+                .await
+                .unwrap(),
+            "the second finalizer loses"
+        );
+        let r = run(&db, &run_id).await.unwrap();
+        assert_eq!(r.deadline_closed_at, Some(T0 + SEC));
+        assert_eq!(r.updated_at, T0 + SEC);
+    }
+
+    #[tokio::test]
+    async fn a_resume_start_loses_to_any_start_since_its_decision() {
+        let db = db().await;
+        let source = run_in_state(&db, "inc-1", RunState::Failed).await;
+        fn resume_of(latest: &str) -> StartGuards<'_> {
+            StartGuards {
+                latest_run_id: Some(latest),
+                ..guards(T0 + 10 * SEC)
+            }
+        }
+        let other = start(&db, "inc-1", T0 + 5 * SEC).await;
+        finish(&db, &other, RunState::Failed, T0 + 6 * SEC).await;
+        let refused = start_run_with(
+            &db,
+            new_run(RunSubjectType::Incident, "inc-1"),
+            resume_of(&source),
+            Some(IncidentEvent::ai_analysis_begin()),
+            None,
+        )
+        .await
+        .unwrap();
+        assert_eq!(refused, StartResult::InFlight);
+        assert_eq!(inc(&db, "inc-1").await.rca_run_id, Some(other.clone()));
+
+        let started = start_run_with(
+            &db,
+            new_run(RunSubjectType::Incident, "inc-1"),
+            resume_of(&other),
+            Some(IncidentEvent::ai_analysis_begin()),
+            None,
+        )
+        .await
+        .unwrap();
+        assert!(
+            matches!(started, StartResult::Started { .. }),
+            "{started:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn sg23_a_steering_author_reaches_the_summary_of_an_ended_run() {
+        let db = db().await;
+        let run_id = run_in_state(&db, "inc-1", RunState::Completed).await;
+        let mut steered = update(None, T0 + 2 * SEC);
+        steered.final_stats_only = true;
+        steered.steered_by_add = Some("b.lee".to_string());
+        assert!(update_run_with(&db, ORG, &run_id, steered).await.unwrap());
+        let i = inc(&db, "inc-1").await;
+        assert_eq!(summary_of(&i).steered_by, vec!["b.lee".to_string()]);
+        assert_eq!(i.rca_state.as_deref(), Some("completed"));
     }
 
     #[tokio::test]

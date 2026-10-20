@@ -208,7 +208,6 @@ pub(super) fn running_since(now: i64) -> i64 {
     now - (max_turn + RUNNING_GRACE_SECS) * MICROS_PER_SEC
 }
 
-/// The response each admission refusal gets.
 pub(super) fn admit_error_response(error: AdmitError) -> Response {
     match error {
         AdmitError::InvalidSession(message) => MetaHttpResponse::bad_request(message),
@@ -889,7 +888,6 @@ mod tests {
         serde_json::from_slice(&body).unwrap()
     }
 
-    /// TH4: each admission refusal keeps the status and body the route answered before.
     #[tokio::test]
     async fn each_admit_error_maps_to_its_response() {
         let cases = [
@@ -933,7 +931,6 @@ mod tests {
         }
     }
 
-    /// TH4, TH10: a turn-cap refusal is the 429 with its scope.
     #[tokio::test]
     async fn a_turn_limit_admit_error_is_the_429() {
         for scope in ["user", "org", "node"] {

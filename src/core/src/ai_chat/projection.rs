@@ -45,7 +45,7 @@ const TEST_FUNCTION_MAX_OUTPUT_RESULTS: usize = 5;
 const ERROR_DUMP_CHARS: usize = 500;
 const FIRST_ERR_CHARS: usize = 200;
 
-/// Tools no projection shows; the sentinels at the end are RCA thread structure (TH20).
+/// Tools no projection shows; the sentinels at the end are RCA thread structure.
 pub(crate) const HIDDEN_TOOLS: [&str; 25] = [
     "tool_search",
     "convert_time_to_microseconds",
@@ -1442,6 +1442,19 @@ mod tests {
                 panic!("{name}: {diff}");
             }
         }
+    }
+
+    /// A `record_step` part is stored in full but projects to no tool frame.
+    #[test]
+    fn record_step_is_stored_but_never_projected() {
+        let (events, _) = load("record_step.json");
+        assert!(
+            events
+                .iter()
+                .any(|e| e.data.pointer("/part/tool") == Some(&json!("record_step")))
+        );
+        let projected = project(&events).to_string();
+        assert!(!projected.contains("record_step"), "{projected}");
     }
 
     #[test]

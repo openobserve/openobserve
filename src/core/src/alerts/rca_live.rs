@@ -58,15 +58,15 @@ use crate::ai_chat::{
     read_committed_events,
 };
 
-/// LU7: how often the node that holds a live stream reads the change markers.
+/// How often the node that holds a live stream reads the change markers.
 pub const LIVE_PROBE_INTERVAL: Duration = Duration::from_secs(1);
-/// LU14: a live stream closes after this long without `end`; the client reconnects.
+/// A live stream closes after this long without `end`; the client reconnects.
 pub const LIVE_STREAM_MAX: Duration = Duration::from_secs(300);
-/// LU5: a heartbeat after this long with no output.
+/// A heartbeat after this long with no output.
 const HEARTBEAT_AFTER: Duration = Duration::from_secs(15);
-/// LU11: a failed transcript read is retried after this long, changed or not.
+/// A failed transcript read is retried after this long, changed or not.
 const READ_RETRY_AFTER: Duration = Duration::from_secs(5);
-/// LU13: how long a terminal run may wait for its stored record (VE34).
+/// How long a terminal run may wait for its stored record.
 const SETTLE_WITHIN: Duration = Duration::from_secs(30);
 
 /// The status and message a part's GET route answers with when it cannot build the part.
@@ -80,7 +80,7 @@ pub struct PartError {
 /// The chat session behind a run's transcript.
 #[derive(Debug, Clone)]
 pub enum RunSession {
-    /// The run has no transcript: it predates the thread (TH30), or its turn never started.
+    /// The run has no transcript: it predates the thread, or its turn never started.
     None,
     /// The run had a session, and the session is gone.
     Expired,
@@ -98,7 +98,7 @@ pub trait TranscriptReader: Sync {
 /// The chat-events stream of this cluster.
 pub struct StoreReader;
 
-/// One run's parts; the transcript is read and decoded at most once, on first use (LU8).
+/// One run's parts; the transcript is read and decoded at most once, on first use.
 pub struct RunParts<'a, R> {
     org_id: &'a str,
     run: &'a RunRow,
@@ -108,14 +108,9 @@ pub struct RunParts<'a, R> {
     decoded: OnceLock<RunTranscript>,
 }
 
-/// One server-sent event of the live stream (LU5).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LiveFrame {
-    Event {
-        name: &'static str,
-        data: String,
-    },
-    /// The heartbeat comment.
+    Event { name: &'static str, data: String },
     Ping,
 }
 
@@ -124,20 +119,20 @@ pub enum LiveFrame {
 pub struct LiveSpec {
     pub org_id: String,
     pub incident_id: String,
-    /// Without a run the stream sends only `rca`, `error` and `end` (LU1).
+    /// Without a run the stream sends only `rca`, `error` and `end`.
     pub run_id: Option<String>,
-    /// The org setting `ai_rca_thread_tool_output`, read once at connect (LU8).
+    /// The org setting `ai_rca_thread_tool_output`, read once at connect.
     pub show_tool_io: bool,
-    /// `can_run_incident_rca` for the user, evaluated once at connect (LU12).
+    /// `can_run_incident_rca` for the user, evaluated once at connect.
     pub can_steer: bool,
 }
 
-/// LU20: one open live stream in `rca_live_streams`, until dropped.
+/// One open live stream in `rca_live_streams`, until dropped.
 pub struct OpenStream {
     org_id: String,
 }
 
-/// One live stream: a probe of the change markers, then the parts that changed (LU7–LU14).
+/// One live stream: a probe of the change markers, then the parts that changed.
 pub struct LiveStream<R> {
     spec: LiveSpec,
     reader: R,
@@ -146,16 +141,15 @@ pub struct LiveStream<R> {
     incident_mark: Option<IncidentMark>,
     run_mark: Option<RunMark>,
     steer_marks: Option<Vec<SteerMark>>,
-    /// LU11: after a 410 the stream sends no more `thread` or `summary`.
+    /// After a 410 the stream sends no more `thread` or `summary`.
     transcript_gone: bool,
-    /// LU11: when a failed transcript read is due again.
+    /// When a failed transcript read is due again.
     retry_at_us: Option<i64>,
-    /// LU13: when this stream first saw the run terminal.
+    /// When this stream first saw the run terminal.
     terminal_at_us: Option<i64>,
     sink: Sink,
 }
 
-/// LU7: the incident part of the fingerprint.
 #[derive(Debug, PartialEq, Eq)]
 struct IncidentMark {
     run_id: Option<String>,
@@ -164,7 +158,6 @@ struct IncidentMark {
     stale: bool,
 }
 
-/// LU7: the run part of the fingerprint.
 #[derive(Debug, PartialEq, Eq)]
 struct RunMark {
     updated_at: i64,
@@ -174,7 +167,7 @@ struct RunMark {
     session: Option<(i64, i64)>,
 }
 
-/// LU7: one steering row of the fingerprint; a row has no `updated_at`.
+/// A steering row of the fingerprint; a row has no `updated_at`.
 #[derive(Debug, PartialEq, Eq)]
 struct SteerMark {
     steer_id: String,
@@ -185,7 +178,6 @@ struct SteerMark {
     opencode_message_id: Option<String>,
 }
 
-/// The source of an `error` event (LU5).
 #[derive(Debug, Clone, Copy)]
 enum Part {
     /// The thread and the summary.
@@ -198,7 +190,7 @@ enum Part {
 #[derive(Default)]
 struct Sink {
     frames: Vec<LiveFrame>,
-    /// LU9: a hash of the last body sent, by event.
+    /// A hash of the last body sent, by event.
     sent: HashMap<&'static str, u64>,
     /// A hash of the last `error` body sent, by part.
     errors: HashMap<&'static str, u64>,
@@ -304,7 +296,7 @@ impl<'a, R: TranscriptReader> RunParts<'a, R> {
         }
     }
 
-    /// The thread's `state_version`; `None` when the thread is an error (TH31).
+    /// The thread's `state_version`; `None` when the thread is an error.
     pub fn thread_version(&self, show_tool_io: bool) -> Option<String> {
         match self.session {
             RunSession::None => Some(run_version(self.run)),
@@ -313,7 +305,6 @@ impl<'a, R: TranscriptReader> RunParts<'a, R> {
         }
     }
 
-    /// The body of GET `…/thread` (TH29, TH30).
     pub async fn thread(&self, show_tool_io: bool) -> Result<RcaThread, PartError> {
         let state = self.state();
         let active = state.is_some_and(|state| state.is_live());
@@ -357,7 +348,7 @@ impl<'a, R: TranscriptReader> RunParts<'a, R> {
         }
     }
 
-    /// The body of GET `…/summary` (03 §12); `None` rows are read when an author is needed.
+    /// The body of GET `…/summary`; `None` rows are read when an author is needed.
     pub async fn summary(
         &self,
         steer_rows: Option<&[SteerRecord]>,
@@ -384,6 +375,7 @@ impl<'a, R: TranscriptReader> RunParts<'a, R> {
                     session_version(session, run, false),
                     transcript,
                     &authors,
+                    run.ended_at.unwrap_or(run.updated_at),
                 ));
             }
             let version = run_version(run);
@@ -430,7 +422,7 @@ impl<'a, R: TranscriptReader> RunParts<'a, R> {
         ))
     }
 
-    /// The transcript for the steering view; a failed read leaves it out, as GET does (SG22).
+    /// The transcript for the steering view; a failed read leaves it out, as GET does.
     pub async fn steering_transcript(&self) -> Option<&RunTranscript> {
         let RunSession::Present(session) = self.session else {
             return None;
@@ -540,7 +532,7 @@ impl<R: TranscriptReader> LiveStream<R> {
             Err(e) => return self.sink.send_error(Part::Rca, &PartError::internal(e)),
         };
 
-        // LU10: `rca` only when the incident part changed; a `stale` flip counts.
+        // `rca` only when the incident part changed; a `stale` flip counts.
         let mark = IncidentMark::of(&incident, now_us);
         if self.incident_mark.as_ref() != Some(&mark) {
             match rca_runs::rca_detail_at(org_id, &incident, now_us).await {
@@ -552,7 +544,7 @@ impl<R: TranscriptReader> LiveStream<R> {
                 Err(e) => self.sink.send_error(Part::Rca, &PartError::internal(e)),
             }
         }
-        // LU13 (b): the stream stays while the latest run is live.
+        // The stream stays while the latest run is live.
         let latest_live = incident
             .rca_state
             .as_deref()
@@ -569,7 +561,7 @@ impl<R: TranscriptReader> LiveStream<R> {
             return;
         };
 
-        // LU13 (a): a terminal run is settled by its record, no session, or [SETTLE_WITHIN].
+        // A terminal run is settled by its record, no session, or [SETTLE_WITHIN].
         let terminal = run
             .state
             .parse::<RunState>()
@@ -583,8 +575,7 @@ impl<R: TranscriptReader> LiveStream<R> {
         }
     }
 
-    /// The run, session and steering reads, then the parts that changed; the run and whether
-    /// its session row exists, or `None` when this probe cannot go on.
+    /// Returns the run and whether its session row exists, or `None` when this probe cannot go on.
     async fn probe_run(&mut self, incident: &IncidentRow, now_us: i64) -> Option<(RunRow, bool)> {
         let org_id = self.spec.org_id.as_str();
         let run_id = self.spec.run_id.as_deref()?;
@@ -637,7 +628,7 @@ impl<R: TranscriptReader> LiveStream<R> {
         self.run_mark = Some(run_mark);
         self.steer_marks = Some(steer_marks);
 
-        // LU8: one transcript read builds the thread, the summary and the steering view.
+        // One transcript read builds the thread, the summary and the steering view.
         let session = RunSession::of(&run, session_row);
         let parts = RunParts::new(org_id, &run, &session, &self.reader);
         let mut failure = None;
@@ -735,7 +726,7 @@ impl Part {
 }
 
 impl Sink {
-    /// LU9: a part goes out only when its body differs from the last one sent.
+    /// A part goes out only when its body differs from the last one sent.
     fn send(&mut self, name: &'static str, value: &impl Serialize) {
         let data = body(value);
         let hash = hash_of(&data);
@@ -787,7 +778,7 @@ pub fn summary_reads_session(run: &RunRow) -> bool {
         .is_ok_and(|state| reads_session(run, state))
 }
 
-/// A live summary reads the session; so does an ended one until its record is stored (VE34).
+/// A live summary reads the session; so does an ended one until its record is stored.
 fn reads_session(run: &RunRow, state: RunState) -> bool {
     !state.is_terminal()
         || (run.result.is_none() && matches!(state, RunState::Failed | RunState::Cancelled))
@@ -815,7 +806,7 @@ fn session_version(session: &SessionRow, run: &RunRow, show_tool_io: bool) -> St
     )
 }
 
-/// The run's steer authors by steer id (SG36); a failed read only drops the names.
+/// The run's steer authors by steer id; a failed read only drops the names.
 async fn steer_authors(
     org_id: &str,
     run_id: &str,
@@ -838,13 +829,14 @@ async fn steer_authors(
     }
 }
 
-/// The record the finalizer will store for an ended run, built from its transcript (VE34).
+/// The record the finalizer will store for an ended run, built from its transcript.
 fn partial_summary(
     run_id: &str,
     state: RunState,
     version: String,
     transcript: &RunTranscript,
     steer_authors: &BTreeMap<String, String>,
+    ended_at_us: i64,
 ) -> RcaRunSummary {
     let end = rca_run::record_run_end(&rca_run::RunEndInput {
         submit: None,
@@ -854,6 +846,7 @@ fn partial_summary(
         ended_by: rca_run::EndedBy::Agent,
         completed: false,
         steer_authors,
+        ended_at_us,
     });
     rca_run::summary_from_record(run_id, state, version, &end.record)
 }
@@ -1043,6 +1036,7 @@ pub(crate) mod tests {
             ended_by: rca_run::EndedBy::Agent,
             completed: false,
             steer_authors: &BTreeMap::new(),
+            ended_at_us: 0,
         });
         serde_json::to_value(&end.record).unwrap()
     }
@@ -1263,7 +1257,7 @@ pub(crate) mod tests {
         let mut live = LiveStream::new(spec(&org, &inc, Some(&run_id)), &reader, now);
         live.tick(now).await;
 
-        // A cancel commits the state before the finalizer stores the record (VE34).
+        // A cancel commits the state before the finalizer stores the record.
         cancel_write(&org, &run_id).await;
         let frames = live.tick(now + SEC).await;
         let partial = data(&frames, "summary");
@@ -1529,6 +1523,7 @@ pub(crate) mod tests {
             "5.1700.2000".to_string(),
             &decode_run(&hypothesis_events()),
             &BTreeMap::new(),
+            0,
         );
         let body = serde_json::to_value(&summary).unwrap();
         assert_eq!(body["legacy"], false);
