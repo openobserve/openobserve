@@ -1,6 +1,0 @@
-{
-  "group": "Alerts",
-  "spec_filename": "alert-library-anomaly.spec.js",
-  "create_group": false,
-  "browser": "chrome"
-}

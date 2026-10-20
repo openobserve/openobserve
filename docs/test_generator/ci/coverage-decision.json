@@ -1,9 +1,0 @@
-{
-  "action": "new",
-  "target_spec": "tests/ui-testing/playwright-tests/Alerts/alert-library-anomaly.spec.js",
-  "existing_tests_considered": [
-    "tests/ui-testing/playwright-tests/Alerts/alert-library.spec.js"
-  ],
-  "needs_registration": true,
-  "rationale": "alert-library.spec.js covers the scheduled-alert library flows (browse/readiness/bulk-install/error states) with a shared beforeEach that builds a manifest containing NO anomaly_alerts. Anomaly alerts are a distinct entry class (anomaly_alerts array, alert_type stamped 'anomaly_detection', always-locked on OSS) with their own selectors and a different manifest shape, so the anomaly coverage needs its own beforeEach + spec. Appending anomaly tests into the existing spec would require overriding the shared manifest route per-test and diverge from its scheduled-alert setup. The run-context spec_path already names alert-library-anomaly.spec.js. Registration required: add the new spec to the Alerts shard run_files in ci_matrix.json."
-}
