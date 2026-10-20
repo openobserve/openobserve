@@ -156,9 +156,13 @@ fn hide_waiver_installations(waivers: &mut [Waiver]) {
     }
 }
 
+// same test as the enterprise key loader, so the UI and the 409 never disagree with it
+fn env_key_active(env_key: &str) -> bool {
+    !env_key.is_empty()
+}
+
 fn env_key_conflict(env_key: &str, pasted: &str) -> bool {
-    let env_key = env_key.trim();
-    !env_key.is_empty() && env_key != pasted.trim()
+    env_key_active(env_key) && env_key.trim() != pasted.trim()
 }
 
 pub async fn get_license_info(Headers(email): Headers<UserEmail>) -> Response {
@@ -198,7 +202,7 @@ pub async fn get_license_info(Headers(email): Headers<UserEmail>) -> Response {
         decision,
         base,
         evaluated_at,
-        env_key_active: !o2_cfg.common.license_key.trim().is_empty(),
+        env_key_active: env_key_active(&o2_cfg.common.license_key),
     };
     MetaHttpResponse::json(res)
 }
@@ -513,9 +517,16 @@ mod tests {
     #[test]
     fn test_env_key_conflict_only_when_env_set_and_different() {
         assert!(!env_key_conflict("", "eyJ.new"));
-        assert!(!env_key_conflict("  ", "eyJ.new"));
         assert!(!env_key_conflict("eyJ.same", " eyJ.same "));
         assert!(env_key_conflict("eyJ.old", "eyJ.new"));
+    }
+
+    #[test]
+    fn test_env_key_is_active_exactly_when_the_loader_reads_it() {
+        for (env_key, active) in [("", false), ("  ", true), ("eyJ.k", true)] {
+            assert_eq!(env_key_active(env_key), active, "{env_key:?}");
+            assert_eq!(env_key_conflict(env_key, "eyJ.new"), active, "{env_key:?}");
+        }
     }
 
     #[test]
