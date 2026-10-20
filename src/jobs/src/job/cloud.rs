@@ -911,15 +911,15 @@ async fn send_warning_email(
         }
     };
 
-    let subject = format!("Openobserve Cloud: Budget Warning notification for {name_id_pair} org",);
+    let subject = format!("OpenObserve Cloud: Budget Warning notification for {name_id_pair} org",);
 
     let info_line = if is_total_config {
         format!(
-            "This is a notification email based on configured total cost budget for org id <b>{parent_name_id_pair}</b>"
+            "This is a notification email based on configured total cost budget for org <b>{parent_name_id_pair}</b>"
         )
     } else {
         format!(
-            "This is a notification email based on configured cost budget for org id <b>{name_id_pair}</b>."
+            "This is a notification email based on configured cost budget for org <b>{name_id_pair}</b>."
         )
     };
 
@@ -928,12 +928,12 @@ async fn send_warning_email(
     {info_line}<br />
     You have configured a total budget of <b>${}</b>, with warning starting at <b>${}</b> or <b>{:.2}%</b>.<br/>
     The org has reached estimated cost of <b>${:.2}</b> or <b>{:.2}%</b> of the total budget, exceeding the warning level.<br/>
-    These amounts are for current billing cycle ranging from <b>{}</b> (UTC) to <b>{}</b> (UTC).<br/>
+    These amounts are for the current billing cycle ranging from <b>{}</b> (UTC) to <b>{}</b> (UTC).<br/>
     <br/>
-    These notifications will now continue till end of the cycle, and you can pause them from the Budget tab of the Usage section in Openobserve Cloud.<br/>
+    These notifications will now continue until the end of the cycle, and you can pause them from the Budget tab of the Usage section in OpenObserve Cloud.<br/>
     <br/>
     Regards,<br/>
-    The Openobserve Team"#,
+    The OpenObserve Team"#,
         total,
         warn,
         (warn / total) * 100.0,
