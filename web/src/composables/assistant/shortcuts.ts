@@ -63,7 +63,8 @@ let ownerRef: ShallowRef<symbol | undefined> | null = null;
 
 export type EscapeRung = (typeof ESCAPE_RUNGS)[number];
 
-export type FocusTarget = "card" | "composer";
+/** `answer` is the latest assistant article, the target of `assistantGoToAnswer` (`30` §1.6). */
+export type FocusTarget = "card" | "composer" | "answer";
 
 export interface AssistantShortcutsOptions {
   /** Overrides the runtime's gate, for specs. */
@@ -147,6 +148,12 @@ export function runEscapeLadder(event?: KeyboardEvent): boolean {
       if (handler(event)) return true;
     }
   }
+  return false;
+}
+
+/** `Ctrl+↑`/`⌘↑` from the composer's first line: focuses the latest answer of the visible container (round 2 X-28). */
+export function assistantGoToAnswer(): boolean {
+  for (const focus of focusTargets.get("answer") ?? []) if (focus()) return true;
   return false;
 }
 

@@ -602,7 +602,12 @@
       "legacy-smoke.spec.js",
       "shell.spec.js",
       "gates.spec.js",
-      "context.spec.js"
+      "context.spec.js",
+      "turns.spec.js",
+      "refusals.spec.js",
+      "home.spec.js",
+      "perf.spec.js",
+      "security.spec.js"
     ],
     "disabled": []
   }

@@ -4,15 +4,10 @@
 import { test } from "@playwright/test";
 
 const GAPS = [
-  ["SMOKE-02 v2 happy path from the header to done", "WP-06"],
-  ["SHELL-08 the composer and last message stay above an emulated keyboard (needs a visualViewport emulation)", "WP-06"],
-  ["SEC-11 record.ts replays the three blocks and no forged fourth in history and on the share", "WP-06"],
+  ["SEC-11 the shared page renders the three blocks and no forged fourth (history half: record.spec.ts)", "WP-12"],
   ["CTX-05 a door refuses the 21st row with the cap line and no In chat tick", "WP-07"],
   ["GATE-10 off_for_org copy per role (B-14 settingsEnabled)", "WP-14"],
   ["PERF-06 open and close x50 and 30 chat_300 records from history", "WP-11"],
-  ["TURN drop_mid_stream ends as failed{stream_dropped} with Retry", "WP-06"],
-  ["TURN keepalive_stall shows 'No response for {n} s'", "WP-06"],
-  ["ERR refusals restore the composer (HT-03) for every HTTP scenario", "WP-06"],
   ["DOOR log-row Explain sends through openAssistant", "WP-07"],
   ["EVID query block runs inline and opens in Logs", "WP-08"],
   ["DOCK alert editor docks the chat with Insert as diff", "WP-09"],
@@ -24,7 +19,6 @@ const GAPS = [
   ["HELPER inline query helper proposes a diff", "WP-13"],
   ["ADMIN-14 Settings › Assistant status @edition", "WP-14"],
   ["XTAB two-tab scenarios 3b and 3e", "WP-09"],
-  ["TEL-01 complete run records the ai_turn_* sequence", "WP-06"],
 ];
 
 test.describe("assistant states not reachable yet", () => {

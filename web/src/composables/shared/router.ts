@@ -312,6 +312,17 @@ const useRoutes = () => {
         titleKey: "routeTitles.sharedChat",
       },
     },
+    // The new-tab sign-in of `80` §2.3 lands here; it is authenticated, so a signed-out visit goes through login first.
+    ...(isAssistantV2()
+      ? [
+          {
+            path: "/close-tab",
+            name: "closeTab",
+            component: () => import("@/views/CloseTabView.vue"),
+            meta: { titleKey: "assistant.closeTab.title" },
+          },
+        ]
+      : []),
     {
       path: "/slack/oauth/callback",
       name: "slackOAuthCallback",

@@ -170,6 +170,19 @@ describe("states (`40` §1.3)", () => {
     await wrapper.get('[data-test="assistant-stop"]').trigger("click");
     expect(stop).toHaveBeenCalledWith(sid);
     expect(store.state.sessions[sid].composer.text).toBe("next one");
+    await flushPromises();
+    expect(document.activeElement).toBe(textarea().element);
+  });
+
+  it("holds Send with the reason while a retry_after counts down (U16)", async () => {
+    const reason = raw("Wait for the Retry countdown to end.");
+    const { wrapper, textarea, send } = setup({ cooldownReason: reason });
+    await type(textarea(), "again");
+    expect(wrapper.get('[data-test="assistant-send"]').attributes("aria-disabled")).toBe("true");
+    await textarea().trigger("keydown", { key: "Enter" });
+    expect(send).not.toHaveBeenCalled();
+    await wrapper.setProps({ cooldownReason: undefined });
+    expect(wrapper.get('[data-test="assistant-send"]').attributes("aria-disabled")).toBeUndefined();
   });
 
   it("is inert under an approval card: readonly, aria-disabled, the reason as helper (CT-07)", async () => {
@@ -705,5 +718,47 @@ describe("round 2 (U7–U9, U12, U16, U18–U19, F5, F8)", () => {
     await flushPromises();
     expect(store.state.sessions[sid].composer.text).toBe("");
     wrapper.unmount();
+  });
+});
+
+describe("WP-06: Go to answer and the stalled Stop", () => {
+  it("sends Ctrl+↑ or ⌘↑ to the latest answer only from the first line, never while composing (X-28)", async () => {
+    const { registerAssistantFocusTarget, resetAssistantShortcutsForTests } =
+      await import("@/composables/assistant/shortcuts");
+    resetAssistantShortcutsForTests();
+    const answer = vi.fn(() => true);
+    const off = registerAssistantFocusTarget("answer", answer);
+    const { textarea } = setup();
+    await type(textarea(), "line one\nline two");
+    const el = textarea().element;
+    el.setSelectionRange(el.value.length, el.value.length);
+    await textarea().trigger("keydown", { key: "ArrowUp", ctrlKey: true });
+    expect(answer).not.toHaveBeenCalled();
+    el.setSelectionRange(3, 3);
+    await textarea().trigger("keydown", { key: "ArrowUp", ctrlKey: true, isComposing: true });
+    expect(answer).not.toHaveBeenCalled();
+    await textarea().trigger("keydown", { key: "ArrowUp", metaKey: true });
+    expect(answer).toHaveBeenCalledTimes(1);
+    await textarea().trigger("keydown", { key: "ArrowUp", ctrlKey: true });
+    expect(answer).toHaveBeenCalledTimes(2);
+    off();
+  });
+
+  it("emphasises Stop once 30 s pass without a frame (HT-01 AC 3)", async () => {
+    vi.useFakeTimers({ now: 100_000 });
+    try {
+      const { wrapper, store, sid } = setup();
+      const session = store.state.sessions[sid];
+      session.turn = { state: "running_tool", tool: "SearchSQL", target: "default", callId: "c1" };
+      session.turnMeta.startedAt = 100_000;
+      session.turnMeta.lastFrameAt = 100_000;
+      await flushPromises();
+      const stop = () => wrapper.get('[data-test="assistant-stop"]');
+      expect(stop().classes().join(" ")).not.toContain("secondary");
+      await vi.advanceTimersByTimeAsync(31_000);
+      expect(stop().attributes("class")).toMatch(/bg-button-secondary|secondary/);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

@@ -150,7 +150,10 @@
       return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { "Content-Type": "application/json" } });
     }
     if (/\/api\/[^/]+\/ai\/chats\/[^/]+\/cancel/.test(url)) {
-      mock.cancels = (mock.cancels || []).concat([{ url, body: typeof init.body === "string" ? init.body : "", keepalive: !!(init.keepalive ?? input?.keepalive) }]);
+      // axios' fetch adapter passes a Request whose body is a stream, so the body and headers are read back from it.
+      const request = new Request(input, init);
+      const body = typeof init.body === "string" ? init.body : await request.clone().text().catch(() => "");
+      mock.cancels = (mock.cancels || []).concat([{ url, body, contentType: request.headers.get("content-type") || "", keepalive: !!(init.keepalive ?? input?.keepalive ?? request.keepalive) }]);
       if (mock.knobs.cancelDelayMs) await sleep(mock.knobs.cancelDelayMs);
       mock.release?.();
       const status = mock.knobs.cancelStatus || 200;

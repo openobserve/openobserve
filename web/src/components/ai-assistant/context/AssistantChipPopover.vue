@@ -17,6 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OPopover
     :open="open"
+    privacy="mask"
     side="top"
     align="start"
     :aria-label="chip.kind === 'time' ? t('assistant.context.time.swap') : chip.label"

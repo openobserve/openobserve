@@ -195,6 +195,17 @@ export interface AssistantStoreInternal extends AssistantStoreApi {
   trackSave(sid: Sid, save: Promise<unknown>): void;
   /** Once per restore: the draft came back from storage and how many images it lost (CT-06 AC 3). */
   takeRestoredDraft(sid: Sid): { imageCount: number } | null;
+  /** Resends the latest prompt as a new attempt; the composer draft is untouched (EB-09 AC 2). */
+  regenerate(sid: Sid): Promise<TurnTerminal>;
+  /** Sends an edited prompt as a new turn captioned "Edited from message {n}" (without B-12, EB-09 AC 4). */
+  editResend(
+    sid: Sid,
+    edit: { text: string; chips: ContextChip[]; images: ImageAttachment[]; editedFrom: number },
+  ): Promise<TurnTerminal>;
+  /** The latest turn can still be retried with its snapshot (HT-03 AC 5). */
+  canRetry(sid: Sid): boolean;
+  /** Cancels a turn this tab does not run, for `turn_busy`'s Stop it. */
+  cancelTurn(sid: Sid, turnId: string | null): Promise<boolean>;
 }
 
 export interface AssistantStoreOptions {
@@ -909,6 +920,10 @@ function createTurnSlice(core: StoreCore) {
     | "resolveConsent"
     | "dispatch"
     | "markNotSaved"
+    | "regenerate"
+    | "editResend"
+    | "canRetry"
+    | "cancelTurn"
   > = {
     send(sid, opts) {
       const session = core.session(sid);
@@ -928,6 +943,25 @@ function createTurnSlice(core: StoreCore) {
     },
     continueTurn: (sid) => deps.engine.continueTurn(sid),
     retrySave: (sid, turnId) => deps.engine.retrySave(sid, turnId),
+    regenerate(sid) {
+      if (!core.session(sid)) return Promise.resolve(refusedUnknown());
+      return track(sid, null, () => deps.engine.send(sid, { input: "regenerate" }));
+    },
+    editResend(sid, edit) {
+      if (!core.session(sid)) return Promise.resolve(refusedUnknown());
+      const snapshot: ComposerSnapshot = {
+        text: edit.text,
+        chips: edit.chips,
+        images: edit.images,
+        mentions: [],
+        timeOverride: null,
+      };
+      return track(sid, null, () =>
+        deps.engine.send(sid, { input: "edit_resend", snapshot, editedFrom: edit.editedFrom }),
+      );
+    },
+    canRetry: (sid) => deps.engine.canRetry?.(sid) ?? false,
+    cancelTurn: (sid, turnId) => deps.engine.cancelTurn?.(sid, turnId) ?? Promise.resolve(false),
     decideApproval: (sid, decision) => deps.approvals.decide(sid, decision),
     resolveConsent: (sid, accepted) => deps.consent.resolve(sid, accepted),
     dispatch: (sid, action) => deps.actions.apply(sid, action),

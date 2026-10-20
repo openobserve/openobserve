@@ -228,7 +228,15 @@ describe("turnEngine: send", () => {
     const drafts = vi.spyOn(h.store.drafts, "remove");
     void h.store.send(h.current.sid);
     expect(h.session().turn).toEqual({ state: "queued" });
-    expect(h.session().messages).toEqual([{ role: "user", content: "why is checkout failing?" }]);
+    expect(h.session().messages).toEqual([
+      {
+        role: "user",
+        content: "why is checkout failing?",
+        sentAt: expect.any(Number),
+        turnId: h.session().turnMeta.turnId,
+        chips: [expect.objectContaining({ id: "chip1", kind: "stream" })],
+      },
+    ]);
     expect(h.session().composer).toMatchObject({ text: "", chips: [], images: [] });
     expect(drafts).toHaveBeenCalledWith("k1", h.current.sid);
     await settle();
@@ -425,6 +433,17 @@ describe("turnEngine: refusals and retry (HT-03)", () => {
     expect(h.last().req.turnId).not.toBe(first);
   });
 
+  it("empties the composer again when Retry resends what the refusal gave back", async () => {
+    const h = setup();
+    withChip(h);
+    h.results.push(refusal(429, { error_code: "turn_limit" }));
+    await h.store.send(h.current.sid);
+    expect(h.session().composer.text).toBe("explain this");
+    void h.store.retry(h.current.sid);
+    await settle();
+    expect(h.session().composer).toMatchObject({ text: "", chips: [], images: [] });
+  });
+
   it("types a 409 lease as turn_busy carrying the running turn (SH-08)", async () => {
     const h = setup();
     h.type("q");
@@ -541,7 +560,10 @@ describe("turnEngine: restore once (constraint 11)", () => {
     expect(h.last().req.turnId).toBe(first.req.turnId);
     expect(h.last().req.sid).toBe(first.req.sid);
     expect(h.last().req.context).toEqual(first.req.context);
-    expect(h.session().messages).toHaveLength(1);
+    expect(h.session().messages).toHaveLength(2);
+    expect(h.session().messages[1].contentBlocks).toEqual([
+      { type: "turn_outcome", outcome: expect.objectContaining({ kind: "restored" }) },
+    ]);
     expect(h.session().turnMeta.restored).toBe(true);
     h.feed({ type: "message_delta", content: "whole" }, { type: "complete", persisted: true });
     h.end();
@@ -1285,5 +1307,247 @@ describe("turnEngine: round 3 follow-ups", () => {
     void h.engine.stopAll("sign_out");
     expect(signal.aborted).toBe(true);
     expect(signal.reason).toBe("sign_out");
+  });
+});
+
+describe("turnEngine: WP-06 outcomes, Regenerate and Edit and resend", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    clock = 0;
+    resetPrefsForTests();
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it("writes a failure into its answer, so a reload renders the same block (HT-01 AC 7)", async () => {
+    const h = setup({ persistence: false });
+    h.type("why?");
+    const run = h.store.send(h.current.sid);
+    await settle();
+    h.feed({ type: "message_delta", content: "partial" });
+    clock = 40_000;
+    h.end();
+    await run;
+    const answer = h.session().messages[1];
+    expect(answer.contentBlocks?.at(-1)).toMatchObject({
+      type: "turn_outcome",
+      outcome: {
+        kind: "failed",
+        code: "stream_dropped",
+        action: "retry",
+        elapsedMs: 40_000,
+        sessionId: h.current.sid,
+      },
+    });
+  });
+
+  it("writes a stop with nothing streamed into a new empty answer", async () => {
+    const h = setup();
+    h.type("why?");
+    const run = h.store.send(h.current.sid);
+    await settle();
+    h.feed({ type: "status", message: "thinking" });
+    const stopping = h.store.stop(h.current.sid);
+    await settle();
+    await stopping;
+    await run;
+    expect(h.session().messages).toHaveLength(2);
+    expect(h.session().messages[1].contentBlocks).toEqual([
+      { type: "turn_outcome", outcome: expect.objectContaining({ kind: "stopped", steps: 0 }) },
+    ]);
+  });
+
+  it("stores nothing for a refusal and offers its Retry while the snapshot exists (HT-03 AC 5)", async () => {
+    const h = setup();
+    h.results.push(refusal(429, { code: 429, error_code: "turn_limit", message: "busy" }));
+    h.type("why?");
+    await h.store.send(h.current.sid);
+    expect(h.session().messages).toEqual([]);
+    expect(h.store.canRetry(h.current.sid)).toBe(true);
+  });
+
+  it("regenerates the latest prompt as a new attempt; the old answer becomes a version and the draft stays (EB-09 AC 2)", async () => {
+    const h = setup();
+    h.type("why?");
+    const first = h.store.send(h.current.sid);
+    await settle();
+    h.feed(
+      { type: "message_delta", content: "first answer" },
+      { type: "complete", persisted: true },
+    );
+    h.end();
+    await first;
+    h.type("check cart too");
+    const again = h.store.regenerate(h.current.sid);
+    await settle();
+    expect(h.last().req.message.text).toBe("why?");
+    expect(h.session().composer.text).toBe("check cart too");
+    h.feed(
+      { type: "message_delta", content: "second answer" },
+      { type: "complete", persisted: true },
+    );
+    h.end();
+    await again;
+    const messages = h.session().messages;
+    expect(messages).toHaveLength(2);
+    expect(String(messages[1].content)).toBe("second answer");
+    expect(messages[1].versions?.map((v) => String(v.content))).toEqual(["first answer"]);
+    expect(tracked("ai_turn_sent").at(-1)?.[1]).toMatchObject({ input: "regenerate" });
+  });
+
+  it("puts the previous answer back when a regenerate is refused", async () => {
+    const h = setup();
+    h.type("why?");
+    const first = h.store.send(h.current.sid);
+    await settle();
+    h.feed({ type: "message_delta", content: "kept" }, { type: "complete", persisted: true });
+    h.end();
+    await first;
+    h.results.push(refusal(429, { code: 429, error_code: "turn_limit", message: "busy" }));
+    await h.store.regenerate(h.current.sid);
+    expect(h.session().messages.map((m) => String(m.content))).toEqual(["why?", "kept"]);
+    expect(h.session().composer.text).toBe("");
+  });
+
+  const answered = async (h: ReturnType<typeof setup>, text: string) => {
+    h.type("why?");
+    const first = h.store.send(h.current.sid);
+    await settle();
+    h.feed({ type: "message_delta", content: text }, { type: "complete", persisted: true });
+    h.end();
+    await first;
+  };
+
+  it("keeps turn_started's trace for Details when the turn fails before complete (S11)", async () => {
+    const h = setup();
+    h.type("why?");
+    const run = h.store.send(h.current.sid);
+    await settle();
+    h.feed({ type: "turn_started", turn_id: "srv-1", trace_id: "tr-early" });
+    await settle();
+    h.feed({ type: "error", error_type: "provider_error", message: "down" });
+    h.end();
+    await run;
+    const outcome = h
+      .session()
+      .messages.at(-1)
+      ?.contentBlocks?.find((block) => block.type === "turn_outcome")?.outcome;
+    expect(outcome).toMatchObject({ kind: "failed", traceId: "tr-early" });
+  });
+
+  it("shows the new attempt of a regenerate even when an older version was selected (F2)", async () => {
+    const h = setup();
+    await answered(h, "kept");
+    const userTurn = h.session().messages[0].turnId ?? "";
+    h.store.selectVersion(h.current.sid, userTurn, 1);
+    const again = h.store.regenerate(h.current.sid);
+    await settle();
+    expect(h.session().ui.activeVersion[userTurn]).toBeUndefined();
+    h.feed({ type: "message_delta", content: "new" }, { type: "complete", persisted: true });
+    h.end();
+    await again;
+  });
+
+  it("retries a refused regenerate as a new version, keeping one prompt and the draft (F3, S4)", async () => {
+    const h = setup();
+    await answered(h, "kept");
+    h.type("half-typed draft");
+    h.results.push(refusal(429, { code: 429, error_code: "rate_limited", message: "slow" }));
+    await h.store.regenerate(h.current.sid);
+    const again = h.store.retry(h.current.sid);
+    await settle();
+    expect(h.last().req.message.text).toBe("why?");
+    expect(h.session().composer.text).toBe("half-typed draft");
+    h.feed({ type: "message_delta", content: "fresh" }, { type: "complete", persisted: true });
+    h.end();
+    await again;
+    const messages = h.session().messages;
+    expect(messages.map((m) => m.role)).toEqual(["user", "assistant"]);
+    expect(String(messages[1].content)).toBe("fresh");
+    expect(messages[1].versions?.map((v) => String(v.content))).toEqual(["kept"]);
+  });
+
+  it("retries a failed regenerate as another version, not a second prompt (F3)", async () => {
+    const h = setup();
+    await answered(h, "kept");
+    const again = h.store.regenerate(h.current.sid);
+    await settle();
+    h.feed({ type: "error", error_type: "provider_error", message: "down" });
+    h.end();
+    await again;
+    expect(h.session().turn.state).toBe("failed");
+    const retry = h.store.retry(h.current.sid);
+    await settle();
+    h.feed({ type: "message_delta", content: "fresh" }, { type: "complete", persisted: true });
+    h.end();
+    await retry;
+    const messages = h.session().messages;
+    expect(messages.filter((m) => m.role === "user")).toHaveLength(1);
+    expect(String(messages.at(-1)?.content)).toBe("fresh");
+  });
+
+  it("keeps the draft when an edit is refused, and Retry resends the edit (S7)", async () => {
+    const h = setup();
+    await answered(h, "kept");
+    h.type("my draft");
+    h.results.push(refusal(429, { code: 429, error_code: "rate_limited", message: "slow" }));
+    await h.store.editResend(h.current.sid, {
+      text: "edited",
+      chips: [],
+      images: [],
+      editedFrom: 1,
+    });
+    expect(h.session().composer.text).toBe("my draft");
+    const retry = h.store.retry(h.current.sid);
+    await settle();
+    expect(h.last().req.message.text).toBe("edited");
+    expect(h.session().messages.at(-1)).toMatchObject({ content: "edited", editedFrom: 1 });
+    expect(h.session().composer.text).toBe("my draft");
+    h.feed({ type: "message_delta", content: "ok" }, { type: "complete", persisted: true });
+    h.end();
+    await retry;
+  });
+
+  it("gives a refused edit back to an empty composer", async () => {
+    const h = setup();
+    await answered(h, "kept");
+    h.results.push(refusal(429, { code: 429, error_code: "rate_limited", message: "slow" }));
+    await h.store.editResend(h.current.sid, {
+      text: "edited",
+      chips: [],
+      images: [],
+      editedFrom: 1,
+    });
+    expect(h.session().composer.text).toBe("edited");
+  });
+
+  it("sends an edit as a new turn captioned with its source, the composer untouched (EB-09 AC 4)", async () => {
+    const h = setup();
+    h.type("draft in progress");
+    const edit = h.store.editResend(h.current.sid, {
+      text: "edited",
+      chips: [],
+      images: [],
+      editedFrom: 1,
+    });
+    await settle();
+    expect(h.last().req.message.text).toBe("edited");
+    expect(h.session().messages[0]).toMatchObject({
+      role: "user",
+      content: "edited",
+      editedFrom: 1,
+    });
+    expect(h.session().composer.text).toBe("draft in progress");
+    h.feed({ type: "message_delta", content: "ok" }, { type: "complete", persisted: true });
+    h.end();
+    await edit;
+  });
+
+  it("cancels a turn this tab does not run, for Stop it", async () => {
+    const h = setup();
+    await expect(h.store.cancelTurn(h.current.sid, "active-1")).resolves.toBe(true);
+    expect(h.client.stop).toHaveBeenCalledWith(
+      "org1",
+      expect.objectContaining({ turnId: "active-1" }),
+    );
   });
 });
