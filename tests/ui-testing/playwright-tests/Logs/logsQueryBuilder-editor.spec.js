@@ -320,7 +320,7 @@ test.describe("Logs Query Builder - SQL Mode Toggle in Builder", () => {
         await pm.logsPage.enableSqlModeIfNeeded();
         await page.waitForLoadState('domcontentloaded');
 
-        const editorText = await pm.logsPage.getQueryEditorText();
+        const editorText = await pm.logsPage.getQueryEditorTextWhenReady();
         expect(editorText.toLowerCase()).toContain('select');
         expect(editorText.toLowerCase()).toContain('from');
 
