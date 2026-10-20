@@ -406,13 +406,13 @@ const getInlineEventText = (event: any): string => {
         : t("alerts.incidents.timeline.analysisCancelled");
 
     // A steered event carries user_id, so the user-event branch prefixes the
-    // username; an answer to a question reads "answered" (04 SG5).
+    // username; an answer to a question reads "answered".
     case "ai_analysis_steered":
       return data.kind === "answer"
         ? t("alerts.incidents.timeline.userAnsweredAnalysis")
         : t("alerts.incidents.timeline.userSteeredAnalysis");
 
-    // The need is agent text: bold() escapes it (04 SG42).
+    // The need is agent text: bold() escapes it.
     case "ai_analysis_needs_input":
       return data.need
         ? t("alerts.incidents.timeline.analysisNeedsInput", { need: bold(data.need) })

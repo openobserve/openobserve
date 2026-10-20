@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <aside
     data-test="rca-thread-column"
-    class="border-border-default bg-surface-panel flex h-full min-h-0 flex-col border-s"
+    class="border-border-default bg-surface-panel flex min-h-0 flex-none flex-col border-t max-lg:h-144 lg:h-full lg:border-s lg:border-t-0"
     :aria-label="t('alerts.incidents.rcaThread.title')"
   >
     <header
@@ -102,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <ol v-else-if="thread" class="m-0 flex list-none flex-col gap-3.5 p-0">
-        <!-- Start entry (TH38): trigger, time, the prompt, and the leads it was given. -->
+        <!-- Start entry: trigger, time, the prompt, and the leads it was given. -->
         <li
           v-if="thread.started"
           data-test="rca-thread-start"
@@ -175,11 +175,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="entry.kind === 'step'"
             :step="entry.step"
             :run-live="runLive"
+            :run-waiting="runWaiting"
             :evidence-numbers="evidenceNumbers"
             @open-evidence="$emit('open-evidence', $event)"
           />
 
-          <!-- "Needs input" (SG39): the agent's question and whether it was answered. -->
+          <!-- "Needs input": the agent's question and whether it was answered. -->
           <li
             v-else-if="entry.kind === 'question'"
             data-test="rca-thread-question"
@@ -215,7 +216,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </li>
 
-          <!-- A responder's message (SG38): right-side bubble with its pill. -->
+          <!-- A responder's message: right-side bubble with its pill. -->
           <li
             v-else
             data-test="rca-thread-steer"
@@ -254,7 +255,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <p
               data-test="rca-thread-steer-text"
-              class="bg-surface-tint-accent text-text-body text-compact m-0 max-w-full rounded-tl-lg rounded-tr-lg rounded-br-sm rounded-bl-lg px-3 py-2 break-words whitespace-pre-wrap"
+              class="bg-surface-tint-accent text-text-body text-compact rounded-surface rounded-br-default m-0 max-w-full px-3 py-2 break-words whitespace-pre-wrap"
             >
               <span v-if="entry.item.kind === 'guidance'" class="text-text-heading font-semibold">
                 {{ t("alerts.incidents.rcaSteer.guidance") }}:
@@ -281,9 +282,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </li>
         </template>
 
-        <!-- Live with no running step yet (before the first step, or between steps). -->
+        <!-- Live with no running step yet (before the first step, or between steps); a paused run waits instead. -->
         <li
-          v-if="runLive && !hasRunningStep"
+          v-if="runLive && !runWaiting && !hasRunningStep"
           data-test="rca-thread-working"
           class="grid grid-cols-[1.25rem_minmax(0,1fr)] gap-2.5"
         >
@@ -293,6 +294,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </p>
         </li>
       </ol>
+
+      <!-- A steering read failure hides messages and questions, not the thread, and is not a send failure. -->
+      <div
+        v-if="steeringStatus === 'unavailable' && !noTranscript"
+        data-test="rca-thread-steering-failed"
+        role="status"
+        class="text-text-secondary text-compact flex flex-col items-start gap-2"
+      >
+        <p class="m-0 flex items-start gap-2">
+          <OIcon name="info" size="sm" class="mt-0.5 shrink-0" />
+          {{ t("alerts.incidents.rcaSteer.loadFailed") }}
+        </p>
+        <OButton
+          data-test="rca-thread-steering-retry-btn"
+          variant="outline"
+          size="sm"
+          icon-left="refresh"
+          @click="$emit('retry')"
+        >
+          {{ t("common.retry") }}
+        </OButton>
+      </div>
     </div>
 
     <div
@@ -341,7 +364,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :sending="sending"
       :send="sendFromComposer"
     />
-    <!-- SG37: the finished note under every run that no longer takes messages. -->
+    <!-- The finished note under every run that no longer takes messages. -->
     <footer
       v-else-if="runState && !runLive"
       data-test="rca-thread-final-note"
@@ -400,15 +423,17 @@ const props = withDefaults(
     triggerLabel?: I18nText | null;
     /** `rca_runs.context_used` of the thread's run, when known. */
     contextUsed?: RcaContextUsed | null;
-    /** The run's stored stats; the stats line uses them when the thread has none (TH37). */
+    /** The run's stored stats; the stats line uses them when the thread has none. */
     runStats?: RcaRunStats | null;
     /** The run has no transcript to read (a pre-upgrade report), so no thread was requested. */
     noTranscript?: boolean;
-    /** Evidence id → entry number from the run's summary (03 VE24); null shows raw ids. */
+    /** Evidence id → entry number from the run's summary; null shows raw ids. */
     evidenceNumbers?: Map<string, number> | null;
-    /** Steering view of the thread's run (04 §9.2); null while unread or not allowed. */
+    /** Steering view of the thread's run; null while unread or not allowed. */
     steering?: RcaSteering | null;
-    /** The steer box shows (SG37): the run takes messages and the user may send them. */
+    /** How the steering read went; a failure shows apart from send failures. */
+    steeringStatus?: RcaReadStatus;
+    /** The steer box shows: the run takes messages and the user may send them. */
     canSteer?: boolean;
     /** The signed-in user's address ("Sending as"). */
     authorEmail?: string;
@@ -423,6 +448,7 @@ const props = withDefaults(
     noTranscript: false,
     evidenceNumbers: null,
     steering: null,
+    steeringStatus: "idle",
     canSteer: false,
     authorEmail: "",
     sending: false,
@@ -433,7 +459,7 @@ const props = withDefaults(
 const emit = defineEmits<{
   retry: [];
   "open-evidence": [number: number];
-  /** SG40: open the guidance dialog with this text. */
+  /** Open the guidance dialog with this text. */
   "reanalyze-with": [text: string];
 }>();
 
@@ -468,7 +494,7 @@ const emptyMessage = computed<I18nText | null>(() => {
   return null;
 });
 
-// TH37: always shown; the thread's stats, else the run's stored stats.
+// Always shown; the thread's stats, else the run's stored stats.
 const statsLine = computed(() => {
   const fromThread = props.thread?.transcript === "available" ? props.thread.stats : null;
   const run = props.runStats;
@@ -493,12 +519,12 @@ const statsLine = computed(() => {
     : line;
 });
 
-// Frames F, G: "steered N×"; the run's stored count first, else the rows that reached the agent.
+// "steered N×"; the run's stored count first, else the rows that reached the agent.
 const steeredCount = computed(
   () => props.runStats?.steered ?? rcaSteeredCount(props.steering?.items ?? []),
 );
 
-/** SG39: "Waiting for an answer" while open, "Answered by <author>" after. */
+/** "Waiting for an answer" while open, "Answered by <author>" after. */
 const questionStatus = (question: RcaThreadQuestion): string => {
   const answer = props.steering?.items.find(
     (item) => item.kind === "answer" && item.question_id === question.question_id,
@@ -512,7 +538,7 @@ const questionStatus = (question: RcaThreadQuestion): string => {
   return open ? t("alerts.incidents.rcaSteer.waitingForAnswer") : "";
 };
 
-/** Steps, questions and responder messages in time order (04 §10.6), as "Copy thread" lists them. */
+/** Steps, questions and responder messages in time order, as "Copy thread" lists them. */
 const entries = computed<RcaThreadEntry[]>(() =>
   props.thread ? rcaThreadEntries(props.thread, props.steering?.items ?? []) : [],
 );
@@ -540,6 +566,8 @@ const initials = (email: string): string =>
 const hasRunningStep = computed(
   () => props.thread?.steps.some((step) => step.ended_at === null) ?? false,
 );
+
+const runWaiting = computed(() => props.runLive && props.runState === "waiting_input");
 
 const contextItems = computed(() => {
   const used = props.contextUsed;
@@ -575,27 +603,38 @@ const contextSummary = computed(() => {
   return parts.length > 1 ? parts.join(" · ") : "";
 });
 
-/** Scrolls to the newest entry ("Follow in thread", 02 TH40 M). */
+/** Scrolls to the newest entry ("Follow in thread"). */
 const scrollToLatest = async () => {
   await nextTick();
   const el = scrollArea.value;
   if (el) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
 };
 
+/** Changes when an entry is added or the newest one grows or changes state. */
+const latestEntryKey = computed(() => {
+  const last = entries.value.at(-1);
+  if (!last) return "";
+  switch (last.kind) {
+    case "step":
+      return `${entries.value.length}:${last.key}:${last.step.ended_at}:${last.step.tool_calls.length}:${last.step.note?.length ?? 0}`;
+    case "question":
+      return `${entries.value.length}:${last.key}:${last.question.answered_by ?? ""}`;
+    case "steer":
+      return `${entries.value.length}:${last.key}:${last.item.status}`;
+  }
+});
+
 // While live, a reader at the bottom keeps seeing the newest entry.
-watch(
-  () => entries.value.length,
-  (count, previous) => {
-    const el = scrollArea.value;
-    if (!props.runLive || !el || count <= (previous ?? 0)) return;
-    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < el.clientHeight / 4;
-    if (atBottom) void scrollToLatest();
-  },
-);
+watch(latestEntryKey, () => {
+  const el = scrollArea.value;
+  if (!props.runLive || !el) return;
+  const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < el.clientHeight / 4;
+  if (atBottom) void scrollToLatest();
+});
 
 const composer = ref<InstanceType<typeof RcaSteerComposer> | null>(null);
 
-/** "Tell the agent" (frame D): focus the steer box. */
+/** "Tell the agent": focus the steer box. */
 const focusComposer = () => composer.value?.focus();
 
 /** The newest message the run refused as closed; cleared by a new run or the user. */

@@ -1592,11 +1592,7 @@ export default defineComponent({
       localStorage.removeItem("isFirstTimeLogin");
     };
 
-    /**
-     * `value` is a string, or `{ query, autoSend?, chipName?, newChat?, context? }`.
-     * With `chipName` the query arrives as a named context chip (never auto-sent), `newChat` opens
-     * a fresh chat first, and `context` is pinned as that chat's explicit context.
-     */
+    /** `value` is a query string or `{ query, autoSend?, chipName?, newChat?, context? }`; a chip never auto-sends. */
     const sendToAiChat = (value: any, append: boolean = true, autoSend: boolean = false) => {
       const wasOpen = store.state.isAiChatEnabled;
       if (!wasOpen) {

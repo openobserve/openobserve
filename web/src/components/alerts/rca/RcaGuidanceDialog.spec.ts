@@ -81,15 +81,31 @@ describe("RcaGuidanceDialog (04 §3 frame I, SG33, SG40)", () => {
     expect(dialog(wrapper).props("primaryButtonDisabled")).toBe(false);
   });
 
-  it("sends {guidance} with Build on previous by default when a report exists, then closes", async () => {
-    const wrapper = mountDialog({ initialGuidance: "  Check the pool  " });
+  it("sends {guidance} with Build on previous by default, and closes once the new run exists", async () => {
+    const wrapper = mountDialog({ initialGuidance: "  Check the pool  ", latestRunId: "run-1" });
 
     await dialog(wrapper).vm.$emit("click:primary");
 
     expect(wrapper.emitted("start")).toEqual([
       [{ buildOnPrevious: true, guidance: "Check the pool" }],
     ]);
+    expect(wrapper.emitted("update:open")).toBeUndefined();
+
+    await wrapper.setProps({ triggering: true });
+    await wrapper.setProps({ triggering: false, latestRunId: "run-2" });
+
     expect(wrapper.emitted("update:open")).toEqual([[false]]);
+  });
+
+  it("a start that creates no run keeps the dialog open with the guidance", async () => {
+    const wrapper = mountDialog({ initialGuidance: "Check the pool", latestRunId: "run-1" });
+
+    await dialog(wrapper).vm.$emit("click:primary");
+    await wrapper.setProps({ triggering: true });
+    await wrapper.setProps({ triggering: false });
+
+    expect(wrapper.emitted("update:open")).toBeUndefined();
+    expect((guidanceBox(wrapper).element as HTMLTextAreaElement).value).toBe("Check the pool");
   });
 
   it("sends the Fresh mode when picked", async () => {

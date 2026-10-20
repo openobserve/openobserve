@@ -52,7 +52,7 @@ describe("OnCallReportCard", () => {
     const wrapper = render(report("## Subject Summary\n\nThe pool was **exhausted**."));
 
     const card = wrapper.find('[data-test="oncall-report-card"]');
-    expect(card.find(".rca-h2").text()).toBe("Subject Summary");
+    expect(card.find("h2").text()).toBe("Subject Summary");
     expect(card.find("strong").text()).toBe("exhausted");
   });
 

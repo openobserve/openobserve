@@ -15,12 +15,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <!-- K: nothing ran yet (02 TH40). -->
+  <!-- Nothing ran yet. -->
   <div
     v-if="!rca"
     data-test="rca-analysis-container"
-    class="flex min-h-0 flex-1 flex-col overflow-auto px-7 pt-4 pb-10"
+    class="flex min-h-0 flex-1 flex-col gap-4 overflow-auto px-7 pt-4 pb-10"
   >
+    <RcaBlockedBanner
+      v-if="refusal"
+      class="max-w-215"
+      :refusal="refusal"
+      :retrying="triggering"
+      @retry="$emit('trigger-rca', refusal.retry ?? { buildOnPrevious: false })"
+    />
     <section
       data-test="rca-trigger-section"
       class="rounded-default border-border-default bg-surface-base flex max-w-215 flex-col items-start gap-2 border p-6"
@@ -31,25 +38,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <p class="text-text-body text-compact m-0">
         {{ t("alerts.incidents.rcaRun.noAnalysisText") }}
       </p>
-      <OButton
-        data-test="trigger-rca-btn"
-        variant="primary"
-        size="sm"
-        icon-left="auto-awesome"
-        :loading="triggering"
-        @click="$emit('trigger-rca', { buildOnPrevious: false })"
-      >
-        {{ t("alerts.incidents.rcaAnalyzeIncident") }}
-      </OButton>
+      <div class="flex flex-wrap items-center gap-2">
+        <OButton
+          data-test="trigger-rca-btn"
+          variant="primary"
+          size="sm"
+          icon-left="auto-awesome"
+          :loading="triggering"
+          @click="$emit('trigger-rca', { buildOnPrevious: false })"
+        >
+          {{ t("alerts.incidents.rcaAnalyzeIncident") }}
+        </OButton>
+        <span
+          v-if="analyzeCreditCost"
+          data-test="rca-credit-cost"
+          class="text-text-secondary text-xs"
+        >
+          {{ t("alerts.incidents.rcaCreditCost", { cost: analyzeCreditCost }, analyzeCreditCost) }}
+        </span>
+      </div>
     </section>
   </div>
 
   <div
     v-else
     data-test="rca-analysis-container"
-    class="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_25rem] overflow-hidden"
+    class="flex min-h-0 flex-1 flex-col overflow-auto lg:grid lg:grid-cols-[minmax(0,1fr)_25rem] lg:overflow-hidden"
   >
-    <div class="flex min-w-0 flex-col gap-6 overflow-auto px-7 pt-4 pb-10">
+    <div class="flex min-w-0 flex-col gap-6 px-7 pt-4 pb-10 lg:overflow-auto">
       <RcaAnalysisBar
         :runs="history"
         :latest-run-id="rca.run_id"
@@ -63,6 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :triggering="triggering"
         :resuming="resuming"
         :cancelling="cancelling"
+        :reanalyze-credit-cost="reanalyzeCreditCost"
         @select-run="$emit('view-run', $event)"
         @reanalyze="$emit('trigger-rca', $event)"
         @reanalyze-guidance="openGuidance('')"
@@ -83,9 +100,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :stage-index="rca.summary.stage_index"
         :stage="rca.summary.stage"
         :live-mode="currentRun?.mode ?? null"
-        :failed-mode="currentRun?.mode ?? null"
+        :failed-mode="viewedRun?.mode ?? currentRun?.mode ?? null"
         :has-earlier-report="hasEarlierReport"
-        :error="error"
+        :error="cardError"
+        :verdict-details="ownVerdict"
         :cancelled-text="cancelledText"
         :triggering="triggering"
         :cancelling="cancelling"
@@ -97,6 +115,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :paused-question="pausedQuestion"
         :deadline-text="deadlineText"
         :unblocked="unblocked"
+        :refusal="refusal"
+        :reanalyze-credit-cost="reanalyzeCreditCost"
         @cancel="$emit('cancel-rca')"
         @follow-thread="followThread"
         @retry="$emit('trigger-rca', $event)"
@@ -236,6 +256,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :no-transcript="threadRunIsV1"
       :evidence-numbers="evidenceNumbers"
       :steering="steering"
+      :steering-status="steeringStatus"
       :can-steer="canSteer"
       :author-email="authorEmail"
       :sending="steerSending"
@@ -250,6 +271,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :initial-guidance="guidanceText"
       :can-build-on-previous="!!reportRun"
       :triggering="triggering || resuming"
+      :latest-run-id="rca.run_id"
       @start="$emit('trigger-rca', $event)"
     />
   </div>
@@ -275,8 +297,9 @@ import type {
   RcaSteering,
   RcaSummary,
   RcaThread,
+  RcaVerdictDetails,
 } from "@/services/incidents";
-import type { RcaReadStatus } from "@/composables/useIncidentRca";
+import type { RcaReadStatus, RcaRefusal } from "@/composables/useIncidentRca";
 import { useRcaSteering } from "@/composables/useRcaSteering";
 import { useViewerTimezone } from "@/composables/downtimes/useViewerTimezone";
 import { formatTimestampInTimezone } from "@/utils/date";
@@ -299,6 +322,7 @@ import {
   type RcaUnblockedLine,
 } from "@/utils/incidents/rcaSteering";
 import RcaAnalysisBar from "./rca/RcaAnalysisBar.vue";
+import RcaBlockedBanner from "./rca/RcaBlockedBanner.vue";
 import RcaBlindSpots from "./rca/RcaBlindSpots.vue";
 import RcaEvidenceList from "./rca/RcaEvidenceList.vue";
 import RcaHypotheses from "./rca/RcaHypotheses.vue";
@@ -330,6 +354,8 @@ const props = withDefaults(
     error?: RcaRunError | null;
     /** Markdown of the shown report. */
     reportText?: string;
+    /** Impacted services and proposed actions of the shown report's stored verdict. */
+    reportVerdict?: RcaVerdictDetails | null;
     reportLoading?: boolean;
     /** The run whose thread shows: the picked run, else the latest. */
     threadRunId?: string | null;
@@ -337,18 +363,24 @@ const props = withDefaults(
     threadLive?: boolean;
     /** The thread's run is a pre-upgrade report with no thread, record or steering. */
     threadRunIsV1?: boolean;
-    /** The thread, summary and steering of the thread's run, from the live stream (05 LU17). */
+    /** The thread, summary and steering of the thread's run, from the live stream. */
     thread?: RcaThread | null;
     threadStatus?: RcaReadStatus;
     runSummary?: RcaRunSummary | null;
     runSummaryStatus?: RcaReadStatus;
     steering?: RcaSteering | null;
+    steeringStatus?: RcaReadStatus;
     triggering?: boolean;
     cancelling?: boolean;
     resumeRunId?: string | null;
     resuming?: boolean;
     /** The incident's title, for the Ask attachment header. */
     incidentTitle?: string;
+    /** A refused trigger or resume (AI credits, paid usage declined); no run records it. */
+    refusal?: RcaRefusal | null;
+    /** AI credits an analysis and a re-analysis use; unset outside cloud, where no cost shows. */
+    analyzeCreditCost?: number | null;
+    reanalyzeCreditCost?: number | null;
   }>(),
   {
     reportRun: null,
@@ -357,6 +389,7 @@ const props = withDefaults(
     stale: false,
     error: null,
     reportText: "",
+    reportVerdict: null,
     reportLoading: false,
     threadRunId: null,
     threadLive: false,
@@ -366,11 +399,15 @@ const props = withDefaults(
     runSummary: null,
     runSummaryStatus: "idle",
     steering: null,
+    steeringStatus: "idle",
     triggering: false,
     cancelling: false,
     resumeRunId: null,
     resuming: false,
     incidentTitle: "",
+    refusal: null,
+    analyzeCreditCost: null,
+    reanalyzeCreditCost: null,
   },
 );
 
@@ -421,7 +458,7 @@ const recordSummary = computed(() => {
   return current && !current.legacy && current.run_id === props.threadRunId ? current : null;
 });
 
-/** Evidence id → number for the thread's chips (03 VE24); null shows raw ids. */
+/** Evidence id → number for the thread's chips; null shows raw ids. */
 const evidenceNumbers = computed(() => rcaEvidenceNumbers(recordSummary.value));
 
 /** The markdown takes the place of the record: v1 runs, legacy runs, and unreadable summaries. */
@@ -469,10 +506,10 @@ onUnmounted(() => {
   if (tickTimer !== null) clearInterval(tickTimer);
 });
 
-/** The card shows a picked completed run, else the latest run. */
+/** The card shows a run picked from the history in its own state, else the latest run. */
 const cardState = computed<RcaCardState>(() => {
-  if (props.viewedRun) return "analyzed";
-  switch (props.rca?.state) {
+  // A picked run is never the latest, so it is never live.
+  switch (props.viewedRun?.state ?? props.rca?.state) {
     case "running":
     case "waiting_input":
       return "investigating";
@@ -485,14 +522,26 @@ const cardState = computed<RcaCardState>(() => {
   }
 });
 
+/** The failure of the shown run: a picked failed run carries only its reason. */
+const cardError = computed<RcaRunError | null>(() => {
+  const viewed = props.viewedRun;
+  if (!viewed) return props.error;
+  if (viewed.state !== "failed") return null;
+  return { code: "", reason: viewed.error_reason ?? "", details: null, trigger_type: null };
+});
+
 const cardRunId = computed(() => props.viewedRun?.run_id ?? props.rca?.run_id ?? "");
 
 /** The loaded report belongs to the shown run; an earlier run's report never shows for it. */
 const ownsReport = computed(() => (props.viewedRun ?? props.reportRun)?.run_id === cardRunId.value);
 const ownReport = computed(() => (ownsReport.value ? props.reportText : ""));
 const ownReportLoading = computed(() => ownsReport.value && props.reportLoading);
+/** The shown completed run's impacted services and proposed actions (inert text). */
+const ownVerdict = computed(() =>
+  ownsReport.value && cardState.value === "analyzed" ? props.reportVerdict : null,
+);
 
-/** The latest run is paused for an answer (03 VE22); a picked run never is. */
+/** The latest run is paused for an answer; a picked run never is. */
 const waitingInput = computed(() => !props.viewedRun && props.rca?.state === "waiting_input");
 
 /** Trigger + age of the shown run: "Auto on incident open · started 1m47s ago". */
@@ -506,25 +555,32 @@ const subtitle = computed<I18nText | string>(() => {
       ? rcaTriggerLabel(currentRun.value.trigger, currentRun.value.started_by)
       : null;
   const sinceMs = (us: number) => Math.max(0, now.value - us / 1000);
+  const shown = props.viewedRun ?? item;
   let age: I18nText;
-  if (props.viewedRun || rca.state === "completed") {
-    const endedAt = (props.viewedRun ?? item)?.ended_at ?? rca.updated_at;
+  if (cardState.value === "analyzed") {
+    const endedAt = shown?.ended_at ?? rca.updated_at;
     age = t("alerts.incidents.rcaRun.analyzedAgo", { time: humanizeElapsed(sinceMs(endedAt)) });
-  } else if (live.value) {
+  } else if (live.value && !props.viewedRun) {
     age = t("alerts.incidents.rcaRun.startedAgo", {
       time: formatRcaElapsed(sinceMs(rca.started_at)),
     });
-  } else if (rca.state === "cancelled") {
+  } else if (cardState.value === "cancelled") {
     age = t("alerts.incidents.rcaRun.stoppedAfter", { duration: runDuration.value });
   } else {
-    const endedAt = currentRun.value?.ended_at ?? rca.updated_at;
+    const endedAt = props.viewedRun
+      ? (props.viewedRun.ended_at ?? props.viewedRun.started_at)
+      : (currentRun.value?.ended_at ?? rca.updated_at);
     age = t("alerts.incidents.rcaRun.failedAgo", { time: humanizeElapsed(sinceMs(endedAt)) });
   }
   return trigger ? raw(`${trigger} · ${age}`) : age;
 });
 
-/** Run time of the latest run, from its stats or its timestamps. */
+/** Run time of the shown run, from its stats (latest run only) or its timestamps. */
 const runDuration = computed(() => {
+  const viewed = props.viewedRun;
+  if (viewed) {
+    return formatRcaDuration(((viewed.ended_at ?? viewed.started_at) - viewed.started_at) / 1000);
+  }
   const rca = props.rca;
   if (!rca) return "";
   const endedAt = currentRun.value?.ended_at ?? rca.updated_at;
@@ -532,27 +588,34 @@ const runDuration = computed(() => {
   return formatRcaDuration(ms);
 });
 
-// A re-run follows a completed run: the banners offer its modes (02 TH40 M, L).
+// A re-run follows a completed run: the banners offer its modes. A picked
+// run is not a re-run in progress, so it never offers them.
 const hasEarlierReport = computed(() => {
-  if (cardState.value === "analyzed") return false;
+  if (cardState.value === "analyzed" || props.viewedRun) return false;
   const shown = props.reportRun;
   return !!shown && shown.run_id !== props.rca?.run_id;
 });
 
 const staleSince = computed(() => (props.rca ? formatRcaClock(props.rca.updated_at) : ""));
 
-// E: "Cancelled by <user> at HH:MM:SS UTC after <duration>. <n> of <m> checks finished; …"
+// "Cancelled by <user> at HH:MM:SS UTC after <duration>. <n> of <m> checks finished; …"
 const cancelledText = computed<I18nText | null>(() => {
   const rca = props.rca;
-  if (!rca || rca.state !== "cancelled") return null;
-  const endedAt = currentRun.value?.ended_at ?? rca.updated_at;
+  if (!rca || cardState.value !== "cancelled") return null;
+  const viewed = props.viewedRun;
+  const runId = viewed?.run_id ?? rca.run_id;
+  const endedAt = viewed
+    ? (viewed.ended_at ?? viewed.started_at)
+    : (currentRun.value?.ended_at ?? rca.updated_at);
   const time = formatTimestampInTimezone(endedAt, "HH:mm:ss", "UTC");
-  const current = thread.value?.run_id === rca.run_id ? thread.value : null;
-  // The summary can count a step the last thread read did not see yet.
-  const total = Math.max(current?.steps.length ?? 0, rca.summary.steps);
+  const current = thread.value?.run_id === runId ? thread.value : null;
+  // The summary can count a step the last thread read did not see yet; it describes the latest run.
+  const total = Math.max(current?.steps.length ?? 0, viewed ? 0 : rca.summary.steps);
   // Without a thread, the step that was open at the cancel is the one not counted.
   const done = current ? finishedStepCount(current) : Math.max(total - 1, 0);
-  const user = currentRun.value?.cancelled_by ?? rca.summary.cancelled_by;
+  const user = viewed
+    ? viewed.cancelled_by
+    : (currentRun.value?.cancelled_by ?? rca.summary.cancelled_by);
   const values = { time, duration: runDuration.value, done, total };
   return user
     ? t("alerts.incidents.rcaRun.cancelledByChecks", { ...values, user: userLocalPart(user) })
@@ -591,8 +654,8 @@ const threadRunStats = computed<RcaRunStats | null>(() => {
 const threadColumn = ref<InstanceType<typeof RcaThreadColumn> | null>(null);
 const followThread = () => void threadColumn.value?.scrollToLatest();
 
-// Steering (04 SG37–SG40, H16): the rows, the open question and `can_steer` of the thread's run.
-// A sent row and a resumed run arrive on the live stream (05 LU18).
+// Steering: the rows, the open question and `can_steer` of the thread's run.
+// A sent row and a resumed run arrive on the live stream.
 const steering = toRef(props, "steering");
 const { sending: steerSending, send: steer } = useRcaSteering(
   toRef(props, "orgId"),
@@ -602,7 +665,7 @@ const { sending: steerSending, send: steer } = useRcaSteering(
 
 const authorEmail = computed<string>(() => store.state.userInfo?.email ?? "");
 
-/** The latest run is shown and live, and the server lets this user steer it (SG37). */
+/** The latest run is shown and live, and the server lets this user steer it. */
 const canSteer = computed(
   () =>
     !props.viewedRun &&
@@ -614,7 +677,7 @@ const canSteer = computed(
 const sendMessage = (text: string) => steer({ text, kind: "message" });
 
 const sendHypothesisAction = async (request: { hypothesisId: string; action: RcaSteerAction }) => {
-  // The server writes the text of an action (SG31).
+  // The server writes the text of an action.
   const result = await steer({
     text: "",
     kind: "hypothesis_action",
@@ -631,7 +694,7 @@ const latestThread = computed(() =>
   thread.value && thread.value.run_id === props.rca?.run_id ? thread.value : null,
 );
 
-/** Frame D: the step the paused run stopped after. */
+/** The step the paused run stopped after. */
 const pausedStep = computed(() =>
   waitingInput.value ? (latestThread.value?.steps.at(-1)?.title ?? null) : null,
 );
@@ -645,14 +708,14 @@ const pausedQuestion = computed(() => {
   );
 });
 
-/** SG39: the answer deadline in the viewer's local time. */
+/** The answer deadline in the viewer's local time. */
 const deadlineText = computed(() => {
   if (!waitingInput.value) return null;
   const deadline = steering.value?.open_question?.deadline_at ?? props.rca?.summary.deadline_at;
   return deadline ? formatTimestampInTimezone(deadline, "HH:mm", timezone.value) : null;
 });
 
-/** Frame G: "Unblocked by <author> at <time>" from the newest read answer (SG39). */
+/** "Unblocked by <author> at <time>" from the newest read answer. */
 const unblocked = computed<RcaUnblockedLine | null>(() => {
   if (cardState.value !== "analyzed") return null;
   const answer = rcaUnblockingAnswer(steering.value?.items ?? []);
@@ -666,7 +729,7 @@ const unblocked = computed<RcaUnblockedLine | null>(() => {
   };
 });
 
-// Frame I: "Re-analyze with guidance", from the menu or a message the run did not take (SG40).
+// "Re-analyze with guidance", from the menu or a message the run did not take.
 const guidanceOpen = ref(false);
 const guidanceText = ref("");
 const openGuidance = (text: string) => {
@@ -706,7 +769,7 @@ const downloadReport = () => {
   URL.revokeObjectURL(url);
 };
 
-// Copy thread (02 TH38): steps, questions and responder messages as plain text.
+// Copy thread: steps, questions and responder messages as plain text.
 const copyThread = () => {
   const current = thread.value;
   if (!current || current.transcript !== "available") return;

@@ -25,6 +25,7 @@ vi.mock("@/services/incidents", () => ({
 }));
 
 import i18n from "@/locales";
+import { withQueryClient } from "@/test/unit/helpers/queryClient";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import incidentsService, { type RcaFeedback as RcaFeedbackRow } from "@/services/incidents";
 import RcaFeedback from "./RcaFeedback.vue";
@@ -57,7 +58,7 @@ const httpError = (status: number, message?: string) => ({
 const mountFeedback = (runId = "run-1") =>
   mount(RcaFeedback, {
     props: { orgId: "default", incidentId: "inc-1", runId },
-    global: { plugins: [i18n] },
+    global: { plugins: [i18n, withQueryClient()] },
   });
 
 const byTest = (wrapper: VueWrapper, id: string) => wrapper.find(`[data-test="${id}"]`);
@@ -308,6 +309,26 @@ describe("RcaFeedback (J4)", () => {
       ).toBe("true");
       expect(byTest(wrapper, "rca-feedback-no-panel").find("textarea").element.value).toBe("flaky");
     });
+
+    it("busy: while the No is sending, the chips, note and Cancel are disabled", async () => {
+      const put = Promise.withResolvers<unknown>();
+      service.putRcaFeedback.mockReturnValue(put.promise as never);
+      wrapper = mountFeedback();
+      await flushPromises();
+
+      await byTest(wrapper, "rca-feedback-no").trigger("click");
+      await byTest(wrapper, "rca-feedback-send").trigger("click");
+
+      const panel = byTest(wrapper, "rca-feedback-no-panel");
+      for (const chip of panel.findAll('[data-test^="rca-feedback-chip-"]')) {
+        expect(chip.attributes("disabled")).toBeDefined();
+      }
+      expect(panel.find("textarea").attributes("disabled")).toBeDefined();
+      expect(byTest(wrapper, "rca-feedback-cancel").attributes("disabled")).toBeDefined();
+
+      put.resolve({ data: row({ verdict: "no" }) });
+      await flushPromises();
+    });
   });
 
   describe("Correct the cause", () => {
@@ -327,6 +348,12 @@ describe("RcaFeedback (J4)", () => {
       const options = wrapper!.findComponent(OSelect).props("options");
       expect(options).not.toContainEqual(expect.objectContaining({ value: "still_unknown" }));
       expect(options).toContainEqual(expect.objectContaining({ value: "capacity_or_load" }));
+    });
+
+    it("the correction note keeps the server's 1,000-character limit", async () => {
+      const panel = await openChange();
+
+      expect(panel.find("textarea").attributes("maxlength")).toBe("1000");
     });
 
     it("Save cause waits for a cause, then sends it with the note", async () => {

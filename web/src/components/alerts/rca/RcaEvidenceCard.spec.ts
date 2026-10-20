@@ -24,9 +24,11 @@ import i18n from "@/locales";
 import RcaEvidenceCard from "./RcaEvidenceCard.vue";
 import type { RcaEvidenceEntry, RcaSummaryHypothesis } from "@/services/incidents";
 import { rcaEvidenceLink } from "@/utils/incidents/rcaEvidenceLinks";
+import { formatRcaDuration } from "@/utils/incidents/rcaThread";
 import { rcaEvidenceEntry, rcaRunSummary } from "@/test/unit/fixtures/rcaThread";
 
 const HYPOTHESES = rcaRunSummary().hypotheses;
+const statementOf = (id: string) => HYPOTHESES.find((h) => h.id === id)!.statement;
 
 const mountCard = (
   entry: RcaEvidenceEntry,
@@ -76,15 +78,21 @@ describe("RcaEvidenceCard (03 VE23–VE29)", () => {
     expect(byTest(wrapper, "rca-evidence-query").text()).toBe(
       "SELECT count(*) FROM \"checkout_api\" WHERE level = 'error'",
     );
-    const citations = wrapper.findAll('[data-test="rca-evidence-citation"]').map((c) => c.text());
-    expect(citations[0]).toMatch(
-      /^Decisive · supports\s*the root cause\s*Agent's reading:\s*Errors begin 116 s after the rollout\.$/,
-    );
+    const citations = wrapper.findAll('[data-test="rca-evidence-citation"]');
+    const links = citations.map((c) => c.find('[data-test="rca-evidence-citation-hypothesis"]'));
+    // The sole root cause is named by its role; the statement stays in the tooltip.
+    const rootStatement = statementOf(rcaEvidenceEntry().citations[0].hypothesis_id);
+    expect(links[0].text()).not.toBe(rootStatement);
+    expect(links[0].attributes("title")).toBe(rootStatement);
+    expect(citations[0].text()).toContain(rcaEvidenceEntry().citations[0].observation);
     // A ruled-out hypothesis has no role name: the link is its statement.
-    expect(citations[1]).toMatch(/^Supporting · rules out\s*Node CPU saturation/);
-    expect(byTest(wrapper, "rca-evidence-result").text()).toMatch(
-      /^2 rows · took 41 ms\s*· checkout_api · 08:23:20–09:23:20 UTC · 0\.0s$/,
-    );
+    expect(links[1].text()).toBe(statementOf("h4"));
+    // The result summary carries the query time; the card does not add the call's duration again.
+    const result = byTest(wrapper, "rca-evidence-result").text();
+    const entry = rcaEvidenceEntry();
+    expect(result.split(entry.result_summary)).toHaveLength(2);
+    expect(result).toContain(entry.link.streams[0]);
+    expect(result).not.toContain(formatRcaDuration(entry.duration_ms));
   });
 
   it("a role two hypotheses share names the statement instead", () => {
@@ -93,7 +101,7 @@ describe("RcaEvidenceCard (03 VE23–VE29)", () => {
     });
 
     expect(byTest(wrapper, "rca-evidence-citation-hypothesis").text()).toBe(
-      "Deploy 4f2c1e opens one orders-db connection per line item",
+      statementOf(rcaEvidenceEntry().citations[0].hypothesis_id),
     );
   });
 
@@ -116,24 +124,23 @@ describe("RcaEvidenceCard (03 VE23–VE29)", () => {
     expect(citations[0].find('[data-test="rca-evidence-citation-hypothesis"]').exists()).toBe(
       false,
     );
-    expect(citations[0].text()).toMatch(/^Decisive · supports\s*Agent's reading/);
+    expect(citations[0].text()).toContain(entry.citations[0].observation);
     await citations[1].find('[data-test="rca-evidence-citation-hypothesis"]').trigger("click");
     expect(wrapper.emitted("open-hypothesis")).toEqual([["h4"]]);
   });
 
-  it("the header carries the number, kind, title and the Decisive pill", () => {
+  it("the header carries the number, kind and a strong pill for decisive evidence", () => {
     const wrapper = mountCard(rcaEvidenceEntry({ number: 3 }), true);
 
     const text = wrapper.text();
     expect(text).toContain("3");
     expect(text).toContain("SQL");
-    expect(text).toContain("Logs · checkout_api");
-    expect(text).toContain("Decisive");
-    expect(mountCard(rcaEvidenceEntry()).text()).not.toContain("Logs · checkout_api");
+    expect(wrapper.findComponent({ name: "RcaPill" }).props("tone")).toBe("strong");
+    expect(mountCard(rcaEvidenceEntry()).findComponent({ name: "RcaPill" }).exists()).toBe(false);
   });
 
   it.each([
-    ["SQL", rcaEvidenceEntry(), "Open in Logs"],
+    ["SQL", rcaEvidenceEntry()],
     [
       "PromQL",
       rcaEvidenceEntry({
@@ -141,7 +148,6 @@ describe("RcaEvidenceCard (03 VE23–VE29)", () => {
         target: "metrics",
         link: { signal: "metrics", streams: [], promql: "up" },
       }),
-      "Open in Metrics",
     ],
     [
       "Traces",
@@ -150,13 +156,11 @@ describe("RcaEvidenceCard (03 VE23–VE29)", () => {
         target: "traces",
         link: { signal: "traces", streams: ["default"], filter: "status_code=500" },
       }),
-      "Open in Traces",
     ],
-  ])("%s: the open button pushes the VE29 route", async (_kind, entry, label) => {
+  ])("%s: the open button pushes the evidence route", async (_kind, entry) => {
     const wrapper = mountCard(entry);
     const open = byTest(wrapper, "rca-evidence-open");
 
-    expect(open.text()).toBe(label);
     await open.trigger("click");
     expect(push).toHaveBeenCalledWith(rcaEvidenceLink(entry.link, "default")!.route);
   });

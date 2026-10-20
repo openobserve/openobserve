@@ -19,14 +19,20 @@ import incidentsService, {
   type RcaSteering,
   type RcaSummary,
   type RcaThread,
+  type RcaVerdictDetails,
 } from "@/services/incidents";
 import { incidentKeys } from "@/services/incidents.querykeys";
-import { useRcaTrigger } from "@/composables/useRcaTrigger";
+import {
+  useRcaTrigger,
+  type RcaResumeResult,
+  type RcaTriggerResult,
+} from "@/composables/useRcaTrigger";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { isLiveRca } from "@/utils/incidents/rcaCell";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { rcaVerdictDetails } from "@/utils/incidents/rcaSummary";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 
-/** How a part of the shown run reads: its data, or why there is none (02 TH32, 05 LU17). */
+/** How a part of the shown run reads: its data, or why there is none. */
 export type RcaReadStatus =
   | "idle"
   | "loading"
@@ -37,10 +43,22 @@ export type RcaReadStatus =
   | "unsupported"
   | "missing";
 
-/** LU16: the waits before each reconnect of a dropped live stream; the last repeats. */
-export const RCA_LIVE_RECONNECT_MS = [1_000, 2_000, 4_000, 8_000, 16_000, 30_000];
+/** The waits before each reconnect of a dropped live stream; the last repeats. */
+const RCA_LIVE_RECONNECT_MS = [1_000, 2_000, 4_000, 8_000, 16_000, 30_000];
 
 const isLiveState = (state: RcaRunState) => state === "running" || state === "waiting_input";
+
+/** Options of a trigger request, as the UI sends them. */
+export type RcaTriggerRequest = { buildOnPrevious?: boolean; guidance?: string };
+
+/** A trigger or resume the server refused before a run started; no event records it. */
+export interface RcaRefusal {
+  reason: I18nText;
+  /** The page that unblocks it, or null when retrying later is the remedy. */
+  remedy: "plans" | "contact" | null;
+  /** What Retry sends again: the refused trigger's options, or null for a refused resume. */
+  retry: { buildOnPrevious: boolean; guidance?: string } | null;
+}
 
 /** The server message of a rejected request, if it sent one. */
 const serverMessage = (error: unknown): string | null => {
@@ -54,7 +72,7 @@ const serverMessage = (error: unknown): string | null => {
     : null;
 };
 
-/** RR-35: run state, report text and, over one live stream (05 LU15), the shown run's parts. */
+/** Run state, report text and, over one live stream, the shown run's parts. */
 export function useIncidentRca(
   orgRef: Ref<string>,
   incidentRef: Ref<IncidentWithAlerts | null>,
@@ -64,7 +82,7 @@ export function useIncidentRca(
   const { requestRca, requestResume } = useRcaTrigger();
   const queryClient = useQueryClient();
 
-  // RR-34: invalidate list summaries whenever a run changes.
+  // Invalidate list summaries whenever a run changes.
   const invalidateList = (org: string) =>
     void queryClient.invalidateQueries({ queryKey: incidentKeys.all(org) });
 
@@ -105,7 +123,7 @@ export function useIncidentRca(
     () => viewedRun.value?.run_id ?? reportRun.value?.run_id ?? null,
   );
 
-  // The Thread follows the latest run (live or not) unless a run was picked (02 TH32).
+  // The Thread follows the latest run (live or not) unless a run was picked.
   const threadRunId = computed<string | null>(
     () => viewedRun.value?.run_id ?? summary.value?.run_id ?? null,
   );
@@ -122,7 +140,7 @@ export function useIncidentRca(
     return run?.report_format === "v1";
   });
 
-  // LU15: the run the stream reads while the Analysis tab is open; the run-scoped parts
+  // The run the stream reads while the Analysis tab is open; the run-scoped parts
   // answer 404 for a v1 run, so it has none.
   const liveRunId = computed(() =>
     analysisOpen.value && !threadRunIsV1.value ? threadRunId.value : null,
@@ -137,6 +155,8 @@ export function useIncidentRca(
 
   // Report text per run id. A completed run's report never changes.
   const reports = ref<Record<string, string>>({});
+  // Impacted services and proposed actions of each loaded run's stored verdict.
+  const verdicts = shallowRef<Record<string, RcaVerdictDetails | null>>({});
   // The run whose report is being fetched; only the displayed one counts as loading.
   const loadingRunId = ref<string | null>(null);
   const reportLoading = computed(
@@ -146,10 +166,15 @@ export function useIncidentRca(
     const id = displayedRunId.value;
     return id ? (reports.value[id] ?? "") : "";
   });
+  const reportVerdict = computed(() => {
+    const id = displayedRunId.value;
+    return id ? (verdicts.value[id] ?? null) : null;
+  });
 
   const triggering = ref(false);
   const resuming = ref(false);
   const cancelling = ref(false);
+  const refusal = shallowRef<RcaRefusal | null>(null);
 
   const isCurrentIncident = (org: string, incidentId: string) =>
     !lifecycle.signal.aborted && orgRef.value === org && incidentRef.value?.id === incidentId;
@@ -163,6 +188,7 @@ export function useIncidentRca(
       const response = await incidentsService.getRcaRun(org, incident.id, runId);
       if (!isCurrentIncident(org, incident.id)) return;
       reports.value = { ...reports.value, [runId]: response.data.report ?? "" };
+      verdicts.value = { ...verdicts.value, [runId]: rcaVerdictDetails(response.data.result) };
     } catch (error) {
       console.error("Failed to load RCA report:", error);
       if (isCurrentIncident(org, incident.id)) {
@@ -188,9 +214,19 @@ export function useIncidentRca(
       if (id === previousId) return;
       viewedRunId.value = null;
       reports.value = {};
+      verdicts.value = {};
       triggering.value = false;
       cancelling.value = false;
       resuming.value = false;
+      refusal.value = null;
+    },
+  );
+
+  // A new run supersedes a refusal.
+  watch(
+    () => summary.value?.run_id,
+    (runId, previousRunId) => {
+      if (runId && runId !== previousRunId) refusal.value = null;
     },
   );
 
@@ -214,7 +250,7 @@ export function useIncidentRca(
     }
   };
 
-  /** LU17: a transcript error reaches the thread and, unless it holds a finished run's record, the summary. */
+  /** A transcript error reaches the thread and, unless it holds a finished run's record, the summary. */
   const applyTranscriptError = ({ status, error_code }: RcaLiveError) => {
     if (status === 410 || status === 404) {
       thread.value = null;
@@ -230,9 +266,11 @@ export function useIncidentRca(
       }
       return;
     }
+    // A live snapshot of a run that ended is out of date: drop it so the thread offers Retry.
+    if (thread.value?.active && !threadLive.value) thread.value = null;
     if (!thread.value) threadStatus.value = "unavailable";
     const summaryData = runSummary.value;
-    // A live summary of a run that ended is out of date: drop it (02 TH32 clearOnTerminalError).
+    // Same for a live summary.
     if (summaryData && isLiveState(summaryData.state) && !threadLive.value) runSummary.value = null;
     if (!runSummary.value) runSummaryStatus.value = "unavailable";
   };
@@ -257,16 +295,19 @@ export function useIncidentRca(
         steeringStatus.value = "ready";
         break;
       case "error":
+        // 404 and 410 are answers about the run; anything else is a server fault worth a trace.
+        if (event.data.status !== 404 && event.data.status !== 410) {
+          console.error("RCA live stream could not read a part:", event.data);
+        }
         if (event.data.part === "transcript") applyTranscriptError(event.data);
         else if (event.data.part === "steering") steeringStatus.value = "unavailable";
-        else console.error("RCA live stream could not read the analysis state:", event.data);
         break;
       case "end":
         break;
     }
   };
 
-  /** LU15: hold a stream while the latest run is live or the Analysis tab is open. */
+  /** Hold a stream while the latest run is live or the Analysis tab is open. */
   const liveWanted = computed(() => live.value || analysisOpen.value);
 
   let connection: AbortController | null = null;
@@ -292,7 +333,7 @@ export function useIncidentRca(
     if (!incidentId || !liveWanted.value) return;
     const controller = new AbortController();
     connection = controller;
-    // LU16: reconnect after a drop, a network error or a 5xx; the wait grows until an event arrives.
+    // Reconnect after a drop, a network error or a 5xx; the wait grows until an event arrives.
     const reconnect = () => {
       if (connection !== controller) return;
       const wait = RCA_LIVE_RECONNECT_MS[Math.min(reconnects, RCA_LIVE_RECONNECT_MS.length - 1)];
@@ -346,7 +387,7 @@ export function useIncidentRca(
     { immediate: true },
   );
 
-  /** Reconnect at once (LU17). */
+  /** Reconnect at once. */
   const retryLive = () => {
     for (const status of [threadStatus, runSummaryStatus, steeringStatus]) {
       if (status.value === "unavailable") status.value = "loading";
@@ -360,41 +401,58 @@ export function useIncidentRca(
     if (!isLive && previous?.[0] && previous[1] === id) invalidateList(orgRef.value);
   });
 
-  /** Show a completed run's report and thread; null (or the latest run) follows the latest run. */
+  /** Pin a run with a stored record and its thread; null or the latest run follows the latest. */
   const viewRun = (runId: string | null) => {
     if (!runId || runId === summary.value?.run_id) {
       viewedRunId.value = null;
       return;
     }
     const run = history.value.find((item) => item.run_id === runId);
-    if (run?.state === "completed") viewedRunId.value = runId;
+    if (run && (run.state === "completed" || run.has_record)) viewedRunId.value = runId;
+  };
+
+  /** Turn a refused request into the panel's blocked state; false when it was not refused. */
+  const applyRefusal = (
+    result: RcaTriggerResult | RcaResumeResult,
+    retry: RcaRefusal["retry"],
+  ): boolean => {
+    if (result.status === "exhausted") {
+      refusal.value = { reason: result.notice, remedy: result.remedy, retry };
+      return true;
+    }
+    if (result.status === "declined") {
+      // Plans is where paid usage is turned on.
+      refusal.value = { reason: t("paidUsage.declinedNotice"), remedy: "plans", retry };
+      return true;
+    }
+    return false;
   };
 
   /** Reload committed failures before deciding whether a trigger error needs a toast. */
-  const trigger = async (options: { buildOnPrevious?: boolean; guidance?: string } = {}) => {
+  const trigger = async (options: RcaTriggerRequest = {}) => {
     const incident = incidentRef.value;
     if (!incident || triggering.value || resuming.value) return;
     const org = orgRef.value;
     const incidentId = incident.id;
     const previousRunId = currentRun.value?.run_id ?? null;
     const guidance = options.guidance?.trim();
+    const buildOnPrevious = options.buildOnPrevious === true;
 
     triggering.value = true;
     viewedRunId.value = null;
+    refusal.value = null;
     try {
       const result = await requestRca(
         org,
         incidentId,
-        {
-          build_on_previous: options.buildOnPrevious === true,
-          ...(guidance ? { guidance } : {}),
-        },
+        { build_on_previous: buildOnPrevious, ...(guidance ? { guidance } : {}) },
         {
           signal: lifecycle.signal,
           isStillActive: () => isCurrentIncident(org, incidentId),
         },
       );
       if (!isCurrentIncident(org, incidentId)) return;
+      if (applyRefusal(result, { buildOnPrevious, ...(guidance ? { guidance } : {}) })) return;
       if (result.status === "unavailable") {
         toast({ variant: "error", message: result.message });
         return;
@@ -464,12 +522,14 @@ export function useIncidentRca(
 
     resuming.value = true;
     viewedRunId.value = null;
+    refusal.value = null;
     try {
       const result = await requestResume(org, incidentId, runId, {
         signal: lifecycle.signal,
         isStillActive: () => isCurrentIncident(org, incidentId),
       });
       if (!isCurrentIncident(org, incidentId)) return;
+      if (applyRefusal(result, null)) return;
       if (result.status === "unavailable") {
         toast({ variant: "error", message: result.message });
         return;
@@ -535,11 +595,13 @@ export function useIncidentRca(
     steeringStatus,
     retryLive,
     reportText,
+    reportVerdict,
     reportLoading,
     triggering,
     cancelling,
     resuming,
     resumeRunId,
+    refusal,
     reload,
     viewRun,
     trigger,

@@ -15,15 +15,27 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
+import type * as ConsentModule from "@/composables/usePaidOverageConsent";
 
-const { toastMock } = vi.hoisted(() => ({ toastMock: vi.fn() }));
+const { toastMock, awsConfig, promptForConsent } = vi.hoisted(() => ({
+  toastMock: vi.fn(),
+  awsConfig: { isCloud: "false", isEnterprise: "true" },
+  promptForConsent: vi.fn(),
+}));
 
-vi.mock("@/aws-exports", () => ({ default: { isCloud: "false", isEnterprise: "true" } }));
+vi.mock("@/aws-exports", () => ({ default: awsConfig }));
+vi.mock("@/composables/usePaidOverageConsent", async (importOriginal) => ({
+  ...(await importOriginal<typeof ConsentModule>()),
+  usePaidOverageConsent: () => ({ promptForConsent }),
+}));
 vi.mock("@/services/incidents", () => ({ default: { triggerRca: vi.fn() } }));
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: toastMock }));
 
 import incidentsService, { type Incident } from "@/services/incidents";
 import store from "@/test/unit/helpers/store";
+import i18n from "@/locales";
+import { aiCreditsNotice } from "@/utils/aiCredits";
+import type { TranslateFn } from "@/types/i18n";
 import IncidentAiAnalysisCell from "./IncidentAiAnalysisCell.vue";
 
 const triggerRca = vi.mocked(incidentsService.triggerRca);
@@ -45,6 +57,7 @@ function mountCell() {
 describe("IncidentAiAnalysisCell (RR-33)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    awsConfig.isCloud = "false";
     store.state.selectedOrganization = {
       ...store.state.selectedOrganization,
       identifier: "default",
@@ -85,6 +98,62 @@ describe("IncidentAiAnalysisCell (RR-33)", () => {
     await button().trigger("click");
     await flushPromises();
     expect(triggerRca).toHaveBeenCalledTimes(2);
+  });
+
+  it("a server error asks the list to refetch, since the run may exist; a network error does not", async () => {
+    triggerRca.mockRejectedValueOnce({
+      isAxiosError: true,
+      response: { status: 503, data: { message: "Agent unavailable" } },
+    });
+    const wrapper = mountCell();
+    const button = () => wrapper.get('[data-test="incident-ai-analysis-analyze-btn"]');
+
+    await button().trigger("click");
+    await flushPromises();
+    expect(toastMock).toHaveBeenCalledWith({ variant: "error", message: "Agent unavailable" });
+    expect(wrapper.emitted("failed")).toHaveLength(1);
+
+    triggerRca.mockRejectedValueOnce({ isAxiosError: true, message: "Network Error" });
+    await button().trigger("click");
+    await flushPromises();
+    expect(wrapper.emitted("failed")).toHaveLength(1);
+  });
+
+  it("a 402 toasts the AI-credits notice instead of the raw server message", async () => {
+    const body = { error_type: "ai_credits_exhausted", remedy: "subscribe", message: "raw" };
+    triggerRca.mockRejectedValue({ isAxiosError: true, response: { status: 402, data: body } });
+    const wrapper = mountCell();
+
+    await wrapper.get('[data-test="incident-ai-analysis-analyze-btn"]').trigger("click");
+    await flushPromises();
+
+    expect(toastMock).toHaveBeenCalledWith({
+      variant: "error",
+      message: aiCreditsNotice(body, i18n.global.t as TranslateFn),
+    });
+    expect(wrapper.emitted("started")).toBeUndefined();
+  });
+
+  it("Cloud: declining paid usage tells the user and sends nothing more", async () => {
+    awsConfig.isCloud = "true";
+    triggerRca.mockRejectedValue({
+      isAxiosError: true,
+      response: {
+        status: 412,
+        data: { error_type: "paid_overage_consent_required", consent: { feature: "ai_credits" } },
+      },
+    });
+    promptForConsent.mockResolvedValue(false);
+    const wrapper = mountCell();
+
+    await wrapper.get('[data-test="incident-ai-analysis-analyze-btn"]').trigger("click");
+    await flushPromises();
+
+    expect(triggerRca).toHaveBeenCalledTimes(1);
+    expect(toastMock).toHaveBeenCalledWith({
+      variant: "info",
+      message: i18n.global.t("paidUsage.declinedNotice"),
+    });
   });
 
   it("a click on the cell opens the incident", async () => {

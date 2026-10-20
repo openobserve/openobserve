@@ -48,8 +48,8 @@ describe("RcaStageStepper (02 TH37)", () => {
       "",
       "",
     ]);
-    expect(items[3].find(".rca-stage-bar--done").exists()).toBe(true);
-    expect(items[5].find(".rca-stage-bar--todo").exists()).toBe(true);
+    expect(items[3].find('[data-state="done"]').exists()).toBe(true);
+    expect(items[5].find('[data-state="todo"]').exists()).toBe(true);
   });
 
   it("falls back to the stage id when the index is missing", () => {
@@ -62,6 +62,6 @@ describe("RcaStageStepper (02 TH37)", () => {
     const wrapper = mountStepper({ stageIndex: null, stage: null });
 
     expect(wrapper.find('[data-test="rca-stage-label"]').exists()).toBe(false);
-    expect(wrapper.findAll(".rca-stage-bar--todo")).toHaveLength(7);
+    expect(wrapper.findAll('[data-state="todo"]')).toHaveLength(7);
   });
 });

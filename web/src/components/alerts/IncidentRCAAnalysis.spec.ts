@@ -63,7 +63,7 @@ import type { RcaRunSummary, RcaSteering, RcaThread } from "@/services/incidents
 const steerRca = vi.mocked(incidentsService.steerRca);
 const getRcaFeedback = vi.mocked(incidentsService.getRcaFeedback);
 
-/** What the live stream holds for the thread's run (05 LU17); a test sets the parts it needs. */
+/** What the live stream holds for the thread's run; a test sets the parts it needs. */
 interface StreamAnswers {
   thread: RcaThread | null;
   threadStatus: RcaReadStatus;
@@ -157,7 +157,7 @@ describe("IncidentRCAAnalysis", () => {
     answers = {
       thread: rcaThread(),
       threadStatus: "ready",
-      // Phase 2 cases: runs with no stored record (VE42).
+      // Runs with no stored record.
       runSummary: rcaRunSummaryLegacy(),
       runSummaryStatus: "ready",
       steering: rcaSteering(),
@@ -183,11 +183,52 @@ describe("IncidentRCAAnalysis", () => {
       expect(byTest(wrapper, "rca-verdict-card").exists()).toBe(false);
       expect(byTest(wrapper, "rca-thread-column").exists()).toBe(false);
       expect(wrapper.findAll('[role="tab"]')).toHaveLength(0);
-      expect(byTest(wrapper, "trigger-rca-btn").text()).toBe("Analyze Incident");
+      expect(byTest(wrapper, "trigger-rca-btn").exists()).toBe(true);
 
       await byTest(wrapper, "trigger-rca-btn").trigger("click");
 
       expect(wrapper.emitted("trigger-rca")).toEqual([[{ buildOnPrevious: false }]]);
+    });
+  });
+
+  describe("AI credits", () => {
+    const refusal = {
+      reason: "Your organization has used all of its AI credits.",
+      remedy: "plans",
+      retry: { buildOnPrevious: false },
+    };
+
+    it("K: Analyze shows its cost only when it is known", () => {
+      wrapper = mountPanel({ rca: null, analyzeCreditCost: 50 });
+      expect(byTest(wrapper, "rca-credit-cost").text()).toBe("Uses 50 AI credits");
+
+      wrapper.unmount();
+      wrapper = mountPanel({ rca: null });
+      expect(byTest(wrapper, "rca-credit-cost").exists()).toBe(false);
+    });
+
+    it("K: a refused first run shows the blocked banner, and Retry resends it", async () => {
+      wrapper = mountPanel({ rca: null, refusal });
+
+      expect(byTest(wrapper, "rca-blocked-banner").exists()).toBe(true);
+      expect(byTest(wrapper, "rca-plans-btn").exists()).toBe(true);
+      await byTest(wrapper, "rca-blocked-retry-btn").trigger("click");
+
+      expect(wrapper.emitted("trigger-rca")).toEqual([[{ buildOnPrevious: false }]]);
+    });
+
+    it("a refused re-analysis shows the blocked banner on the card and costs in the menu", async () => {
+      wrapper = mountPanel({
+        ...completedProps(),
+        refusal: { ...refusal, remedy: "contact" },
+        reanalyzeCreditCost: 5,
+      });
+      await flushPromises();
+
+      expect(
+        byTest(wrapper, "rca-verdict-card").find('[data-test="rca-contact-btn"]').exists(),
+      ).toBe(true);
+      expect(byTest(wrapper, "rca-reanalyze-fresh-cost").text()).toBe("Uses 5 AI credits");
     });
   });
 
@@ -479,6 +520,7 @@ describe("IncidentRCAAnalysis", () => {
           trigger: "manual",
           started_by: "j.doe@acme.io",
           state: "failed",
+          has_record: false,
         }),
         rcaRunItem({ run_id: "run-1", trigger: "auto_new_incident" }),
       ];
@@ -510,6 +552,41 @@ describe("IncidentRCAAnalysis", () => {
 
       expect(byTest(wrapper, "rca-verdict-state").text()).toBe("Analyzed");
       expect(byTest(wrapper, "rca-error-banner").exists()).toBe(false);
+      expect(byTest(wrapper, "rca-run-selector-label").text()).toBe("Run 1 · Oct 9, 08:53 UTC");
+    });
+
+    it("a picked cancelled run with a record shows its own cancel line and partial record", async () => {
+      const viewedRun = rcaRunItem({
+        run_id: "run-1",
+        trigger: "reanalyze",
+        started_by: "j.doe@acme.io",
+        state: "cancelled",
+        cancelled_by: "j.doe@acme.io",
+        started_at: RCA_T0,
+        ended_at: RCA_T0 + sec(90),
+        has_record: true,
+      });
+      answers.runSummary = rcaRunSummaryCancelled();
+      answers.thread = rcaThread({ run_id: "run-1", active: false });
+      wrapper = mountPanel({
+        rca: rcaSummary({
+          run_id: "run-2",
+          state: "completed",
+          current_run: rcaRun({ run_id: "run-2", state: "completed" }),
+        }),
+        reportRun: rcaRunItem({ run_id: "run-2", trigger: "resume" }),
+        viewedRun,
+        history: [rcaRunItem({ run_id: "run-2", trigger: "resume" }), viewedRun],
+        threadRunId: "run-1",
+      });
+      await flushPromises();
+
+      expect(byTest(wrapper, "rca-cancelled-message").text()).toBe(
+        "Cancelled by j.doe at 08:54:50 UTC after 1m30s. 1 of 2 checks finished; the partial results below are not a verdict.",
+      );
+      expect(byTest(wrapper, "rca-reanalyzing-banner").exists()).toBe(false);
+      expect(byTest(wrapper, "rca-resume-btn").exists()).toBe(false);
+      expect(byTest(wrapper, "rca-hypotheses").exists()).toBe(true);
       expect(byTest(wrapper, "rca-run-selector-label").text()).toBe("Run 1 · Oct 9, 08:53 UTC");
     });
 
@@ -796,8 +873,8 @@ describe("IncidentRCAAnalysis", () => {
     const SECTIONS = [
       "rca-what-happened",
       "rca-hypotheses",
-      "rca-blind-spots",
       "rca-evidence-list",
+      "rca-blind-spots",
     ] as const;
 
     const shownSections = (w: VueWrapper) => SECTIONS.filter((id) => byTest(w, id).exists());
@@ -807,7 +884,10 @@ describe("IncidentRCAAnalysis", () => {
       wrapper = mountPanel(completedProps());
       await flushPromises();
 
-      for (const id of SECTIONS) expect(byTest(wrapper, id).exists()).toBe(true);
+      const order = ["rca-analysis-bar", "rca-verdict-card", ...SECTIONS, "rca-thread-column"].map(
+        (id) => byTest(wrapper, id).element,
+      );
+      for (let i = 1; i < order.length; i++) expect(precedes(order[i - 1], order[i])).toBe(true);
       expect(byTest(wrapper, "rca-existing-container").exists()).toBe(false);
       expect(byTest(wrapper, "rca-verdict-state").text()).toBe("Root cause identified");
       expect(byTest(wrapper, "rca-verdict-band").text()).toContain("High");
@@ -837,6 +917,31 @@ describe("IncidentRCAAnalysis", () => {
 
       expect(byTest(wrapper, "rca-hypotheses").exists()).toBe(true);
       expect(byTest(wrapper, "rca-full-report").exists()).toBe(false);
+    });
+
+    const VERDICT_DETAILS = {
+      impactedServices: ["service=checkout-api"],
+      proposedActions: [{ title: "Roll back 4f2c1e", kind: "rollback", detail: "" }],
+    };
+
+    it("a graded run's card shows its stored impacted services and proposed actions", async () => {
+      answers.runSummary = rcaRunSummary();
+      wrapper = mountPanel({ ...completedProps(), reportVerdict: VERDICT_DETAILS });
+      await flushPromises();
+
+      expect(byTest(wrapper, "rca-verdict-services").text()).toBe("service=checkout-api");
+      expect(byTest(wrapper, "rca-verdict-action").text()).toContain("Roll back 4f2c1e");
+    });
+
+    it("a live run never shows the earlier run's services or actions", async () => {
+      answers.runSummary = rcaRunSummaryLive();
+      wrapper = mountPanel(
+        liveProps({ reportRun: rcaRunItem(), reportText: REPORT, reportVerdict: VERDICT_DETAILS }),
+      );
+      await flushPromises();
+
+      expect(byTest(wrapper, "rca-verdict-services").exists()).toBe(false);
+      expect(byTest(wrapper, "rca-verdict-actions").exists()).toBe(false);
     });
 
     it("legacy (VE42): the Analyzed card and the markdown report, none of the new sections", async () => {
@@ -928,8 +1033,8 @@ describe("IncidentRCAAnalysis", () => {
       expect(byTest(wrapper, "rca-verdict-band").text()).toBe("No confidence");
       expect(shownSections(wrapper)).toEqual([
         "rca-hypotheses",
-        "rca-blind-spots",
         "rca-evidence-list",
+        "rca-blind-spots",
       ]);
       expect(byTest(wrapper, "rca-blind-spot").text()).toContain("3 stages did not run");
       expect(byTest(wrapper, "rca-blind-spot-action").exists()).toBe(false);
@@ -1246,7 +1351,7 @@ describe("IncidentRCAAnalysis", () => {
         action: "disprove",
         hypothesis_id: "h1",
       });
-      // The sent row arrives on the stream (05 LU18).
+      // The sent row arrives on the stream.
       await wrapper.setProps({
         steering: rcaSteering({
           items: [

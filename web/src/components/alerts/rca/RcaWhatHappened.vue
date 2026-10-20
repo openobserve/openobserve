@@ -138,7 +138,7 @@ const props = defineProps<{
   evidence: RcaEvidenceEntry[];
   hypotheses: RcaSummaryHypothesis[];
   org: string;
-  /** The run is live: the timeline comes with the report (VE36). */
+  /** The run is live: the timeline comes with the report. */
   live: boolean;
 }>();
 
@@ -176,7 +176,7 @@ const markerLabel = (status: RcaTimelineStatus): I18nText => {
 
 const entries = computed(() => sortedRcaTimeline(props.timeline));
 
-/** Confirmed and Inferred always; the other two only when a row uses them. */
+/** Confirmed and Likely always; the other two only when a row uses them. */
 const legend = computed<RcaTimelineStatus[]>(() =>
   (["confirmed", "likely", "unverified", "refuted"] as const).filter(
     (status) =>

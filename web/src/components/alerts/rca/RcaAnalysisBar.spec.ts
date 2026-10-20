@@ -38,7 +38,8 @@ const stubs = {
   },
 };
 
-// Newest first: a live re-run, a failed run, a cancelled run, and the first completed run.
+// Newest first: a live re-run, a failed run with no record, a cancelled run with a
+// partial record, and the first completed run.
 const RUNS = [
   rcaRunItem({
     run_id: "run-4",
@@ -54,12 +55,14 @@ const RUNS = [
     started_by: "a.rao@acme.io",
     state: "failed",
     started_at: RCA_T0 + sec(1800),
+    has_record: false,
   }),
   rcaRunItem({
     run_id: "run-2",
     trigger: "oncall_page",
     state: "cancelled",
     started_at: RCA_T0 + sec(900),
+    has_record: true,
   }),
   rcaRunItem({ run_id: "run-1", trigger: "auto_new_incident", state: "completed" }),
 ];
@@ -104,20 +107,21 @@ describe("RcaAnalysisBar (contract E5)", () => {
       expect(byTest(wrapper, "rca-run-selector-label").text()).toBe("Run 4 · live");
     });
 
-    it("only completed runs (and the way back to the latest) are selectable", async () => {
+    it("runs with something to show are selectable: completed, recorded, and the latest", async () => {
       const wrapper = mountBar();
       const items = wrapper.findAll('[data-test^="rca-history-item-"]');
 
       expect(items.map((item) => item.attributes("data-disabled"))).toEqual([
         "false",
         "true",
-        "true",
+        "false",
         "false",
       ]);
 
       for (const item of items) await item.trigger("click");
-      // The latest run selects null (follow the latest); the failed/cancelled rows emit nothing.
-      expect(wrapper.emitted("select-run")).toEqual([[null], ["run-1"]]);
+      // The latest run selects null (follow the latest); the cancelled run reopens its
+      // partial record; the failed run with no record emits nothing.
+      expect(wrapper.emitted("select-run")).toEqual([[null], ["run-2"], ["run-1"]]);
     });
 
     it("labels a picked earlier run as the selection", () => {
@@ -243,6 +247,22 @@ describe("RcaAnalysisBar (contract E5)", () => {
       );
       await item.trigger("click");
       expect(wrapper.emitted("reanalyze-guidance")).toHaveLength(1);
+    });
+  });
+
+  describe("AI credit cost", () => {
+    it("Fresh and Build on previous each show the re-analysis cost when it is known", () => {
+      const wrapper = mountBar({ live: false, reanalyzeCreditCost: 1 });
+
+      expect(byTest(wrapper, "rca-reanalyze-fresh-cost").text()).toBe("Uses 1 AI credit");
+      expect(byTest(wrapper, "rca-reanalyze-build-cost").text()).toBe("Uses 1 AI credit");
+    });
+
+    it("shows no cost when it is unknown", () => {
+      const wrapper = mountBar({ live: false });
+
+      expect(byTest(wrapper, "rca-reanalyze-fresh-cost").exists()).toBe(false);
+      expect(byTest(wrapper, "rca-reanalyze-build-cost").exists()).toBe(false);
     });
   });
 });

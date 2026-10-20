@@ -28,7 +28,7 @@ export interface RcaCellModel {
   tone: RcaCellTone;
   /** Muted text after the label; empty when none. */
   detail: I18nText;
-  /** Warning-text suffix when a newer run did not finish (RR-42); empty when none. */
+  /** Warning-text suffix when a newer run did not finish; empty when none. */
   rerunNote: I18nText;
   spinner: boolean;
   /** The row shows a ghost "Analyze" on hover (RCA off for this incident). */
@@ -36,11 +36,11 @@ export interface RcaCellModel {
 }
 
 export interface RcaCellOptions {
-  /** `incidents_rca_enabled` from `/config` (RR-43). */
+  /** `incidents_rca_enabled` from `/config`. */
   rcaEnabled: boolean;
   /** Epoch milliseconds. */
   now: number;
-  /** Zone of the "until HH:mm" answer deadline (04 SG26); UTC when not given. */
+  /** Zone of the "until HH:mm" answer deadline; UTC when not given. */
   timezone?: string;
 }
 
@@ -105,7 +105,7 @@ const bandDetail = (band: RcaBand | null): I18nText => (band ? gt(BAND_KEY[band]
 /** Joins the non-empty detail parts with " · ". */
 const joinDetail = (...parts: I18nText[]): I18nText => raw(parts.filter(Boolean).join(" · "));
 
-/** "steered by j.okafor, a.rao" (04 SG6, frame F), or empty. */
+/** "steered by j.okafor, a.rao", or empty. */
 const steeredByDetail = (rca: RcaSummary): I18nText =>
   rca.summary.steered_by.length > 0
     ? gt("alerts.incidents.aiAnalysis.steeredBy", {
@@ -175,7 +175,7 @@ export function rcaCellModel(
       );
     }
     case "waiting_input": {
-      // "Blocked · Needs change history · until 14:40" (04 SG26, frame D).
+      // "Blocked · Needs change history · until 14:40".
       const deadline = rca.summary.deadline_at;
       return state(
         gt("alerts.incidents.aiAnalysis.blocked"),
@@ -192,7 +192,7 @@ export function rcaCellModel(
     }
     case "completed": {
       if (!rca.outcome) {
-        // A run with no outcome (legacy, before Phase 3) reads "Analyzed".
+        // A legacy run with no outcome reads "Analyzed".
         return state(
           gt("alerts.incidents.aiAnalysis.analyzed"),
           "ok",
@@ -200,10 +200,10 @@ export function rcaCellModel(
         );
       }
       const outcome = OUTCOME[rca.outcome];
-      // A blocked run names what it needs (VE44); the others show the band.
+      // A blocked run names what it needs; the others show the band.
       const detail =
         rca.outcome === "blocked" ? raw(rca.summary.detail) : bandDetail(rca.confidence);
-      // "Root cause identified · Medium · unblocked by a.rao" (frame G).
+      // "Root cause identified · Medium · unblocked by a.rao".
       const unblockedBy = rca.summary.unblocked_by
         ? gt("alerts.incidents.aiAnalysis.unblockedBy", {
             user: userLocalPart(rca.summary.unblocked_by),
@@ -215,7 +215,7 @@ export function rcaCellModel(
     case "cancelled": {
       const cancelledBy = rca.summary.cancelled_by ? userLocalPart(rca.summary.cancelled_by) : null;
       if (previous) {
-        // A newer run that did not finish never hides the earlier result (RR-42).
+        // A newer run that did not finish never hides the earlier result.
         const rerunNote =
           rca.state === "failed"
             ? gt("alerts.incidents.aiAnalysis.rerunFailed")
@@ -231,20 +231,23 @@ export function rcaCellModel(
         });
       }
       // Preserve the server's special cancellation reason, including incident resolution.
+      // The step open at the cancel did not finish, so it is not counted.
+      const finished = Math.max(rca.summary.steps - 1, 0);
       const detail =
         rca.state === "failed" || rca.summary.detail
           ? raw(rca.summary.detail)
           : cancelledBy
-            ? gt("alerts.incidents.aiAnalysis.cancelledByAfterChecks", {
-                user: cancelledBy,
-                count: rca.summary.steps,
-              })
-            : gt("alerts.incidents.aiAnalysis.cancelledAfterChecks", { count: rca.summary.steps });
+            ? gt(
+                "alerts.incidents.aiAnalysis.cancelledByAfterChecks",
+                { user: cancelledBy, count: finished },
+                finished,
+              )
+            : gt("alerts.incidents.aiAnalysis.cancelledAfterChecks", { count: finished }, finished);
       return state(gt("alerts.incidents.aiAnalysis.failed"), "err", detail);
     }
   }
 }
 
-/** True for a run the list polls for (RR-34). */
+/** True for a run the list polls for. */
 export const isLiveRca = (rca: RcaSummary | null | undefined): boolean =>
   rca?.state === "running" || rca?.state === "waiting_input";

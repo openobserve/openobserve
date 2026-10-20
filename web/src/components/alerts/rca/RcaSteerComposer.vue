@@ -68,7 +68,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :key="chip.id"
         type="button"
         :data-test="`rca-steer-chip-${chip.id}`"
-        class="border-border-control text-text-body hover:bg-surface-subtle-hover bg-surface-base inline-flex h-6.5 cursor-pointer items-center rounded-full border px-2.5 text-xs"
+        class="border-border-control text-text-body hover:bg-surface-subtle-hover bg-surface-base inline-flex h-6.5 cursor-pointer items-center rounded-full border px-2.5 text-xs disabled:cursor-not-allowed disabled:opacity-50"
+        :disabled="sending"
         @click="prefill(chip.label)"
       >
         {{ chip.label }}
@@ -128,12 +129,12 @@ import type { RcaOpenQuestion } from "@/services/incidents";
 import type { RcaSteerSendResult } from "@/composables/useRcaSteering";
 import { isClosedRunRefusal } from "@/utils/incidents/rcaSteering";
 
-/** SG8: at most 2,000 characters. */
+/** At most 2,000 characters. */
 const MAX_STEER_CHARS = 2_000;
 
 const props = withDefaults(
   defineProps<{
-    /** The run waits for an answer (frame D). */
+    /** The run waits for an answer. */
     waitingInput: boolean;
     openQuestion?: RcaOpenQuestion | null;
     /** The signed-in user's address ("Sending as"). */

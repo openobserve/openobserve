@@ -135,6 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :now="now"
             @open="viewIncident(row, 'incidentAnalysis')"
             @started="loadIncidents(true)"
+            @failed="loadIncidents(true)"
           />
         </template>
         <template #cell-severity="{ row }">
@@ -358,7 +359,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { COL } from "@/lib/core/Table/OTable.types";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 
-/** Re-fetch period while a live RCA run is on the current page (RR-34). */
+/** Re-fetch period while a live RCA run is on the current page. */
 const RCA_LIVE_POLL_MS = 30_000;
 
 export default defineComponent({
@@ -392,7 +393,7 @@ export default defineComponent({
 
     const qTableRef: any = ref(null);
     const orgIdForList = useOrgId();
-    // RR-34: set from `liveRowOnPage` below; the query getter reads it, so a change
+    // Set from `liveRowOnPage` below; the query getter reads it, so a change
     // re-applies the options and TanStack restarts or stops its interval timer.
     const pollLiveRows = ref(false);
     const incidentsList = useQuery(() =>
@@ -481,14 +482,14 @@ export default defineComponent({
         sortOrder: sortOrder.value,
       });
     });
-    // RR-34: the table keeps its page when the rows change (a poll refetch), so
-    // a new filter or page size starts over on page 1 here.
+    // The table keeps its page when the rows change (a poll refetch), so
+    // a new filter, sort or page size starts over on page 1 here.
     const resetPage = () => {
       currentPage.value = 1;
       qTableRef.value?.restorePage?.(1);
       savePageState();
     };
-    watch([searchQuery, statusFilter, severityFilter, pageSize], () => {
+    watch([searchQuery, statusFilter, severityFilter, pageSize, sortBy, sortOrder], () => {
       if (!isRestoringState.value) resetPage();
     });
 
@@ -619,7 +620,7 @@ export default defineComponent({
       );
     });
 
-    // RR-34: OTable pages and sorts on the client, so mirror its only sortable
+    // OTable pages and sorts on the client, so mirror its only sortable
     // column to know which rows the current page shows.
     const liveRowOnPage = computed(() => {
       let rows = visibleIncidents.value;
@@ -638,7 +639,7 @@ export default defineComponent({
       { immediate: true },
     );
 
-    // RR-43: deployment-wide switch; undefined (older server) reads as disabled.
+    // Deployment-wide switch; undefined (older server) reads as disabled.
     const rcaEnabled = computed(() => store.state.zoConfig?.incidents_rca_enabled === true);
     // Elapsed and "ago" labels in the AI analysis cell are relative to this clock.
     const now = ref(Date.now());

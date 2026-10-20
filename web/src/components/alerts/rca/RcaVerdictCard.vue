@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </span>
     </div>
 
-    <!-- G: a completed run that a responder's answer unblocked (SG39). -->
+    <!-- A completed run that a responder's answer unblocked. -->
     <p
       v-if="unblockedText"
       data-test="rca-verdict-unblocked"
@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       {{ belowHeadline }}
     </p>
 
-    <!-- Confidence line: graded and partial runs only, never while live (VE-D2). -->
+    <!-- Confidence line: graded and partial runs only, never while live. -->
     <div
       v-if="showConfidence"
       data-test="rca-verdict-confidence"
@@ -120,7 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </button>
     </div>
 
-    <!-- CG §5.3.4: what the agent claimed, what the evidence allows and why, and any cap. -->
+    <!-- What the agent claimed, what the evidence allows and why, and any cap. -->
     <dl
       v-if="breakdown"
       data-test="rca-verdict-confidence-why"
@@ -167,6 +167,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ impactText }}
           </dd>
         </div>
+        <div v-if="impactedServices.length" class="max-w-105 min-w-0">
+          <dt class="text-text-muted text-xs">
+            {{ t("alerts.incidents.rcaSummary.impactedServices") }}
+          </dt>
+          <dd
+            data-test="rca-verdict-services"
+            class="text-text-heading m-0 text-sm font-semibold break-words"
+          >
+            {{ impactedServices.join(", ") }}
+          </dd>
+        </div>
       </dl>
       <!-- `contents`: the slot's control and panels are items of this wrapping row. -->
       <div v-if="$slots.feedback" data-test="rca-verdict-feedback" class="contents">
@@ -174,9 +185,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <!-- D: the run is paused for an answer (SG39); the deadline is local time. -->
+    <!-- Proposed actions: inert text; nothing runs from here (README non-goal). -->
+    <section
+      v-if="proposedActions.length"
+      data-test="rca-verdict-actions"
+      :aria-labelledby="actionsHeadingId"
+      class="flex max-w-225 flex-col gap-1.5"
+    >
+      <h3 :id="actionsHeadingId" class="text-text-muted m-0 text-xs font-normal">
+        {{ t("alerts.incidents.rcaSummary.proposedActions") }}
+        <span class="text-text-secondary">
+          · {{ t("alerts.incidents.rcaSummary.proposedActionsNote") }}
+        </span>
+      </h3>
+      <ol class="m-0 flex list-none flex-col gap-1.5 p-0">
+        <li
+          v-for="(action, idx) in proposedActions"
+          :key="idx"
+          data-test="rca-verdict-action"
+          class="text-sm"
+        >
+          <span class="text-text-heading font-semibold">{{ action.title }}</span>
+          <span data-test="rca-verdict-action-kind" class="text-text-secondary text-xs">
+            · {{ rcaActionKindLabel(action.kind) }}
+          </span>
+          <p v-if="action.detail" class="text-text-secondary text-compact m-0 break-words">
+            {{ action.detail }}
+          </p>
+        </li>
+      </ol>
+    </section>
+
+    <!-- The server refused to start a run (AI credits, paid usage declined); no run records it. -->
+    <RcaBlockedBanner
+      v-if="refusal"
+      :refusal="refusal"
+      :retrying="triggering || resuming"
+      @retry="refusal.retry ? $emit('retry', refusal.retry) : $emit('resume')"
+    />
+
+    <!-- The run is paused for an answer; the deadline is local time. -->
     <OBanner
-      v-if="cardState === 'investigating' && waitingInput"
+      v-else-if="cardState === 'investigating' && waitingInput"
       data-test="rca-paused-banner"
       variant="warning"
       icon="pause-circle-filled"
@@ -227,7 +277,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
     </OBanner>
 
-    <!-- N: stale live run (01 RR-19); it can still be cancelled. -->
+    <!-- Stale live run; it can still be cancelled. -->
     <OBanner
       v-else-if="cardState === 'investigating' && stale"
       data-test="rca-stale-banner"
@@ -251,7 +301,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
     </OBanner>
 
-    <!-- M: a re-run of an analyzed incident is live. -->
+    <!-- A re-run of an analyzed incident is live. -->
     <OBanner
       v-else-if="cardState === 'investigating' && hasEarlierReport"
       data-test="rca-reanalyzing-banner"
@@ -289,7 +339,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
     </OBanner>
 
-    <!-- L: the latest run failed (01 RR-47); the reason leads, details stay collapsed. -->
+    <!-- The latest run failed; the reason leads, details stay collapsed. -->
     <OBanner
       v-else-if="cardState === 'failed'"
       data-test="rca-error-banner"
@@ -355,6 +405,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-for="option in retryOptions"
             :key="option.dataTest"
             :data-test="option.dataTest"
+            :description="reanalyzeCostLabel ?? undefined"
             @select="$emit('retry', { buildOnPrevious: option.buildOnPrevious })"
           >
             {{ option.label }}
@@ -375,7 +426,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
     </OBanner>
 
-    <!-- E: the latest run was cancelled; its partial thread stays readable. -->
+    <!-- The latest run was cancelled; its partial thread stays readable. -->
     <OBanner
       v-else-if="cardState === 'cancelled'"
       data-test="rca-cancelled-banner"
@@ -420,9 +471,11 @@ import type {
   RcaRunError,
   RcaRunMode,
   RcaRunSummary,
+  RcaVerdictDetails,
 } from "@/services/incidents";
 import {
   RCA_OUTCOME_PILL,
+  rcaActionKindLabel,
   rcaBandLabel,
   rcaBandLevel,
   rcaUtcRange,
@@ -432,6 +485,8 @@ import { formatTimestampInTimezone } from "@/utils/date";
 import { rcaBlindSpotRoute } from "@/utils/incidents/rcaEvidenceLinks";
 import type { RcaCardState } from "@/utils/incidents/rcaThread";
 import type { RcaUnblockedLine } from "@/utils/incidents/rcaSteering";
+import type { RcaRefusal } from "@/composables/useIncidentRca";
+import RcaBlockedBanner from "./RcaBlockedBanner.vue";
 import RcaPill from "./RcaPill.vue";
 import RcaStageStepper from "./RcaStageStepper.vue";
 
@@ -440,7 +495,7 @@ const props = withDefaults(
     cardState: RcaCardState;
     /** Identifies the run the card shows; resets the error details toggle. */
     runId: string;
-    /** The shown run is live and waits for an answer (VE22). */
+    /** The shown run is live and waits for an answer. */
     waitingInput?: boolean;
     summary?: RcaRunSummary | null;
     stale?: boolean;
@@ -472,8 +527,14 @@ const props = withDefaults(
     pausedQuestion?: string | null;
     /** Answer deadline of the paused run in local "HH:mm". */
     deadlineText?: string | null;
-    /** A completed run unblocked by an answer (SG39). */
+    /** A completed run unblocked by an answer. */
     unblocked?: RcaUnblockedLine | null;
+    /** A refused trigger or resume: the blocked banner replaces the others. */
+    refusal?: RcaRefusal | null;
+    /** AI credits a re-analysis uses; unset outside cloud. */
+    reanalyzeCreditCost?: number | null;
+    /** Impacted services and proposed actions of the shown completed run's verdict. */
+    verdictDetails?: RcaVerdictDetails | null;
   }>(),
   {
     waitingInput: false,
@@ -497,27 +558,30 @@ const props = withDefaults(
     pausedQuestion: null,
     deadlineText: null,
     unblocked: null,
+    refusal: null,
+    reanalyzeCreditCost: null,
+    verdictDetails: null,
   },
 );
 
 defineEmits<{
   cancel: [];
   "follow-thread": [];
-  retry: [options: { buildOnPrevious: boolean }];
-  /** The band chip: open "Cited but not verified" (VE33). */
+  retry: [options: { buildOnPrevious: boolean; guidance?: string }];
+  /** The band chip: open "Cited but not verified". */
   "show-unverified": [];
   /** "N blind spots below". */
   "show-blind-spots": [];
-  /** Frame D "Tell the agent": focus the steer box. */
+  /** "Tell the agent": focus the steer box. */
   "tell-agent": [];
-  /** "Resume run" on L or E (J9). */
+  /** "Resume run" on a failed or cancelled run. */
   resume: [];
 }>();
 
 const { t } = useI18nTyped();
 const router = useRouter();
 
-/** Frame D: "Connect AI Toolset" when a blind spot of the run asks for one. */
+/** "Connect AI Toolset" when a blind spot of the run asks for one. */
 const connectToolsetRoute = computed(() =>
   props.summary?.blind_spots.some((spot) => spot.fix === "connect_toolset")
     ? rcaBlindSpotRoute("connect_toolset", props.org)
@@ -544,15 +608,24 @@ const BAR_HEIGHT = ["h-1.5", "h-2.25", "h-3"] as const;
 
 const card = computed(() => props.summary?.card ?? null);
 const live = computed(() => props.cardState === "investigating");
-/** A completed run with a derived outcome (VE16). */
+/** A completed run with a derived outcome. */
 const outcome = computed(() =>
   props.cardState === "analyzed" ? (card.value?.outcome ?? null) : null,
 );
-/** A failed or cancelled run with a stored partial record (VE34). */
+/** A failed or cancelled run with a stored partial record. */
 const partial = computed(
   () => (props.cardState === "failed" || props.cardState === "cancelled") && !!props.summary,
 );
 const graded = computed(() => outcome.value !== null);
+
+/** A graded run's stored impacted services and proposed actions. */
+const impactedServices = computed(() =>
+  graded.value ? (props.verdictDetails?.impactedServices ?? []) : [],
+);
+const proposedActions = computed(() =>
+  graded.value ? (props.verdictDetails?.proposedActions ?? []) : [],
+);
+const actionsHeadingId = useId();
 
 const pill = computed<{
   tone: RcaPillTone;
@@ -594,7 +667,7 @@ const pill = computed<{
         label: t("alerts.incidents.rcaRun.state.failed"),
       };
     default:
-      // A cancelled run with a partial record reads "Failed" (VE32 frame E); the recordless Phase 2 card keeps "Cancelled".
+      // A cancelled run with a partial record reads "Failed"; the recordless card keeps "Cancelled".
       return {
         tone: "err",
         icon: "cancel",
@@ -606,7 +679,7 @@ const pill = computed<{
   }
 });
 
-/** Next to the pill: the live label (VE21) or the inconclusive qualifier (VE17). */
+/** Next to the pill: the live label or the inconclusive qualifier. */
 const qualifier = computed<I18nText | null>(() => {
   if (live.value) {
     const soFar = card.value?.verdict_so_far;
@@ -649,7 +722,7 @@ const headline = computed<I18nText>(() => {
   }
 });
 
-/** Under the headline (VE32): contributing factor and blocked runs. */
+/** Under the headline: contributing factor and blocked runs. */
 const belowHeadline = computed<I18nText | null>(() => {
   if (outcome.value === "contributing_factor") {
     return t("alerts.incidents.rcaSummary.noSingleRootCause");
@@ -693,7 +766,7 @@ const CHANGE_KIND: Record<RcaChangeKind, I18nText> = {
   infra: t("alerts.incidents.rcaSummary.changeKind.infra"),
 };
 
-/** "Deploy 4f2c1e · 14:02 UTC (diff not read) (from a.rao)" (VE35); null hides the row. */
+/** "Deploy 4f2c1e · 14:02 UTC (diff not read) (from a.rao)"; null hides the row. */
 const suspectText = computed<I18nText | null>(() => {
   const change = card.value?.suspect_change;
   if (!change) return null;
@@ -704,7 +777,6 @@ const suspectText = computed<I18nText | null>(() => {
       time: formatTimestampInTimezone(change.occurred_at, "HH:mm", "UTC"),
     }),
   ];
-  if (change.shown_state === "under_test") parts.push(t("alerts.incidents.rcaSummary.underTest"));
   if (change.shown_state === "not_read") parts.push(t("alerts.incidents.rcaSummary.diffNotRead"));
   if (change.lead_author) {
     parts.push(t("alerts.incidents.rcaSummary.fromAuthor", { author: change.lead_author }));
@@ -722,7 +794,7 @@ const impactText = computed<I18nText>(() => {
   return raw(parts.join(" · "));
 });
 
-// Details stay collapsed for every new failure (01 RR-47).
+// Details stay collapsed for every new failure.
 const showErrorDetails = ref(false);
 const errorDetailsId = useId();
 watch(
@@ -730,7 +802,7 @@ watch(
   () => (showErrorDetails.value = false),
 );
 
-// Retry offers both modes, the failed run's mode first (02 TH40 L).
+// Retry offers both modes, the failed run's mode first.
 const retryOptions = computed(() => {
   const fresh = {
     buildOnPrevious: false,
@@ -743,5 +815,10 @@ const retryOptions = computed(() => {
     label: t("alerts.incidents.rcaBuildOnPrevious"),
   };
   return props.failedMode === "build_on_previous" ? [build, fresh] : [fresh, build];
+});
+
+const reanalyzeCostLabel = computed<I18nText | null>(() => {
+  const cost = props.reanalyzeCreditCost;
+  return cost ? t("alerts.incidents.rcaCreditCost", { cost }, cost) : null;
 });
 </script>

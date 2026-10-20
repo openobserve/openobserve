@@ -90,6 +90,24 @@ describe("useRcaTrigger (RR-33)", () => {
     awsConfig.isCloud = "false";
   });
 
+  it("sends one POST with the given params and returns the run id", async () => {
+    triggerRca.mockResolvedValue({ data: { message: "started", run_id: "run-1" } } as never);
+
+    const result = await useRcaTrigger().requestRca("org", "inc-1", {});
+
+    expect(triggerRca).toHaveBeenCalledTimes(1);
+    expect(triggerRca.mock.calls[0].slice(0, 3)).toEqual(["org", "inc-1", {}]);
+    expect(result).toMatchObject({ status: "started", runId: "run-1" });
+  });
+
+  it("passes the caller's abort signal to the request", async () => {
+    triggerRca.mockResolvedValue({ data: { run_id: "run-1" } } as never);
+    const controller = new AbortController();
+
+    await useRcaTrigger().requestRca("org", "inc-1", {}, { signal: controller.signal });
+
+    expect(triggerRca.mock.calls[0][3]?.signal).toBe(controller.signal);
+  });
 
   it("non-Cloud 412 returns the server message and never prompts", async () => {
     triggerRca.mockRejectedValue(httpError(412, { message: "AI SRE is not configured" }));
@@ -127,12 +145,7 @@ describe("useRcaTrigger (RR-33)", () => {
     promptForConsent.mockResolvedValue(true);
     const onConsentRequired = vi.fn();
 
-    const result = await useRcaTrigger().requestRca(
-      "org",
-      "inc-1",
-      {},
-      { onConsentRequired },
-    );
+    const result = await useRcaTrigger().requestRca("org", "inc-1", {}, { onConsentRequired });
 
     expect(onConsentRequired).toHaveBeenCalledTimes(1);
     expect(promptForConsent).toHaveBeenCalledTimes(1);
@@ -169,7 +182,7 @@ describe("useRcaTrigger (RR-33)", () => {
     expect(triggerRca).toHaveBeenCalledTimes(2);
   });
 
-  it("Cloud decline shows the declined notice and does not retry", async () => {
+  it("Cloud decline returns declined, leaves the notice to the caller and does not retry", async () => {
     awsConfig.isCloud = "true";
     triggerRca.mockRejectedValue(httpError(412, CONSENT_BODY));
     promptForConsent.mockResolvedValue(false);
@@ -178,13 +191,13 @@ describe("useRcaTrigger (RR-33)", () => {
 
     expect(result).toEqual({ status: "declined" });
     expect(triggerRca).toHaveBeenCalledTimes(1);
-    expect(toastMock).toHaveBeenCalledWith(expect.objectContaining({ variant: "info" }));
+    expect(toastMock).not.toHaveBeenCalled();
   });
 
-  it("Cloud decline after the caller moved on drops the toast", async () => {
+  it("Cloud consent settled after the caller moved on is dropped", async () => {
     awsConfig.isCloud = "true";
     triggerRca.mockRejectedValue(httpError(412, CONSENT_BODY));
-    promptForConsent.mockResolvedValue(false);
+    promptForConsent.mockResolvedValue(true);
 
     const result = await useRcaTrigger().requestRca(
       "org",
@@ -193,8 +206,49 @@ describe("useRcaTrigger (RR-33)", () => {
       { isStillActive: () => false },
     );
 
-    expect(result).toEqual({ status: "declined" });
-    expect(toastMock).not.toHaveBeenCalled();
+    expect(result).toEqual({ status: "dropped" });
+    expect(triggerRca).toHaveBeenCalledTimes(1);
+  });
+
+  describe("AI credits exhausted (402)", () => {
+    it.each([
+      ["subscribe", "plans"],
+      ["contact_account_manager", "contact"],
+      ["retry_later", null],
+    ])("remedy %s returns exhausted with remedy %s", async (remedy, expected) => {
+      triggerRca.mockRejectedValue(
+        httpError(402, { error_type: "ai_credits_exhausted", remedy, message: "Out" }),
+      );
+
+      const result = await useRcaTrigger().requestRca("org", "inc-1", {});
+
+      expect(result).toMatchObject({ status: "exhausted", remedy: expected });
+      expect(promptForConsent).not.toHaveBeenCalled();
+    });
+
+    it("a 402 on the consent retry is exhausted, not thrown", async () => {
+      awsConfig.isCloud = "true";
+      triggerRca
+        .mockRejectedValueOnce(httpError(412, CONSENT_BODY))
+        .mockRejectedValueOnce(
+          httpError(402, { error_type: "ai_credits_exhausted", remedy: "subscribe" }),
+        );
+      promptForConsent.mockResolvedValue(true);
+
+      const result = await useRcaTrigger().requestRca("org", "inc-1", {});
+
+      expect(result).toMatchObject({ status: "exhausted", remedy: "plans" });
+    });
+
+    it("a resume 402 is exhausted too", async () => {
+      resumeRca.mockRejectedValue(
+        httpError(402, { error_type: "ai_credits_exhausted", remedy: "contact_account_manager" }),
+      );
+
+      const result = await useRcaTrigger().requestResume("org", "inc-1", "run-2");
+
+      expect(result).toMatchObject({ status: "exhausted", remedy: "contact" });
+    });
   });
 
   describe("requestResume (J9)", () => {
@@ -259,7 +313,7 @@ describe("useRcaTrigger (RR-33)", () => {
       expect(result).toMatchObject({ status: "started", runId: "run-3" });
     });
 
-    it("Cloud decline does not resend and shows the declined notice", async () => {
+    it("Cloud decline does not resend and returns declined", async () => {
       awsConfig.isCloud = "true";
       resumeRca.mockRejectedValue(httpError(412, CONSENT_BODY));
       promptForConsent.mockResolvedValue(false);
@@ -268,7 +322,6 @@ describe("useRcaTrigger (RR-33)", () => {
 
       expect(result).toEqual({ status: "declined" });
       expect(resumeRca).toHaveBeenCalledTimes(1);
-      expect(toastMock).toHaveBeenCalledWith(expect.objectContaining({ variant: "info" }));
     });
 
     it("Cloud: a second denial after accept propagates", async () => {

@@ -299,6 +299,7 @@ const RCA_MIRRORS = {
   SteerStatusReason: "RcaSteerStatusReason",
   FeedbackVerdict: "RcaFeedbackVerdict",
   FeedbackReason: "RcaFeedbackReason",
+  ReportFormat: "RcaReportFormat",
 };
 void [_c1, _c2, _c3, _c4, _c5, _c6, _c7, _c8, _c9, _c10, _c11, _c12, _c13, _causes];
 

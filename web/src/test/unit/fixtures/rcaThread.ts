@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// Fixtures for the RCA investigation thread (02 TH29–TH38). Times are microseconds.
+// Fixtures for the RCA investigation thread. Times are microseconds.
 
 import type {
   RcaBlindSpot,
@@ -130,6 +130,7 @@ export function rcaRunItem(overrides: Partial<RcaRunItem> = {}): RcaRunItem {
     cancelled_by: null,
     error_reason: null,
     report_format: "v2",
+    has_record: true,
     ...overrides,
   };
 }
@@ -151,8 +152,6 @@ export function rcaRun(overrides: Partial<RcaRun> = {}): RcaRun {
     cancelled_by: null,
     outcome: null,
     confidence: null,
-    report: null,
-    result: null,
     error: null,
     session_id: "sess-2",
     stats: null,
@@ -201,6 +200,7 @@ export function rcaV1RunItem(overrides: Partial<RcaRunItem> = {}): RcaRunItem {
     started_at: RCA_T0,
     ended_at: RCA_T0,
     report_format: "v1",
+    has_record: false,
     ...overrides,
   });
 }
@@ -232,7 +232,7 @@ export function rcaV1Summary(items: RcaRunItem[] = [rcaV1RunItem()]): RcaSummary
   });
 }
 
-// Summary views (03 §12), one for each redesign frame plus a legacy run.
+// Summary views, one for each redesign frame plus a legacy run.
 
 export function rcaEvidenceEntry(overrides: Partial<RcaEvidenceEntry> = {}): RcaEvidenceEntry {
   return {
@@ -320,7 +320,7 @@ const PROMQL_ENTRY = rcaEvidenceEntry({
   ],
 });
 
-/** Frame B: completed, root cause identified, high band. */
+/** Completed, root cause identified, high band. */
 export function rcaRunSummary(overrides: Partial<RcaRunSummary> = {}): RcaRunSummary {
   return {
     run_id: "run-2",
@@ -428,7 +428,7 @@ export function rcaRunSummary(overrides: Partial<RcaRunSummary> = {}): RcaRunSum
   };
 }
 
-/** Frame A: live, the leading hypothesis was revised; no band, no timeline. */
+/** Live, the leading hypothesis was revised; no band, no timeline. */
 export const rcaRunSummaryLive = (overrides: Partial<RcaRunSummary> = {}): RcaRunSummary =>
   rcaRunSummary({
     state: "running",
@@ -457,7 +457,7 @@ export const rcaRunSummaryLive = (overrides: Partial<RcaRunSummary> = {}): RcaRu
     ...overrides,
   });
 
-/** Frame C: completed, inconclusive, low band, suspect change not read. */
+/** Completed, inconclusive, low band, suspect change not read. */
 export const rcaRunSummaryInconclusive = (
   overrides: Partial<RcaRunSummary> = {},
 ): RcaRunSummary => {
@@ -497,7 +497,7 @@ export const rcaRunSummaryInconclusive = (
   });
 };
 
-/** Frame D: completed, blocked on change history. */
+/** Completed, blocked on change history. */
 export const rcaRunSummaryBlocked = (overrides: Partial<RcaRunSummary> = {}): RcaRunSummary => {
   const base = rcaRunSummary();
   return rcaRunSummary({
@@ -528,7 +528,7 @@ export const rcaRunSummaryBlocked = (overrides: Partial<RcaRunSummary> = {}): Rc
   });
 };
 
-/** Frame E: cancelled with a partial record (VE34); no verdict, no grade, no timeline. */
+/** Cancelled with a partial record; no verdict, no grade, no timeline. */
 export const rcaRunSummaryCancelled = (overrides: Partial<RcaRunSummary> = {}): RcaRunSummary =>
   rcaRunSummary({
     state: "cancelled",
@@ -558,7 +558,7 @@ export const rcaRunSummaryCancelled = (overrides: Partial<RcaRunSummary> = {}): 
     ...overrides,
   });
 
-/** A run that finished with no stored record (VE42). */
+/** A run that finished with no stored record. */
 export const rcaRunSummaryLegacy = (overrides: Partial<RcaRunSummary> = {}): RcaRunSummary =>
   rcaRunSummaryCancelled({
     state: "completed",
@@ -569,7 +569,7 @@ export const rcaRunSummaryLegacy = (overrides: Partial<RcaRunSummary> = {}): Rca
     ...overrides,
   });
 
-/** One steering row (04 §8.1): a queued message from a.rao. */
+/** One steering row: a queued message from a.rao. */
 export function rcaSteerRecord(overrides: Partial<RcaSteerRecord> = {}): RcaSteerRecord {
   return {
     org_id: "default",
@@ -593,12 +593,12 @@ export function rcaSteerRecord(overrides: Partial<RcaSteerRecord> = {}): RcaStee
   };
 }
 
-/** The steering view (04 §9.2) of a live run the user can steer, with no rows. */
+/** The steering view of a live run the user can steer, with no rows. */
 export function rcaSteering(overrides: Partial<RcaSteering> = {}): RcaSteering {
   return { items: [], open_question: null, can_steer: true, ...overrides };
 }
 
-/** The question of frames D and G: change history no connected tool provides. */
+/** A paused run's question: change history no connected tool provides. */
 export function rcaThreadQuestion(overrides: Partial<RcaThreadQuestion> = {}): RcaThreadQuestion {
   return {
     question_id: "call_7f",
@@ -614,7 +614,7 @@ export function rcaThreadQuestion(overrides: Partial<RcaThreadQuestion> = {}): R
   };
 }
 
-/** Frame F: live and steered twice, the newest message applied. */
+/** Live and steered twice, the newest message applied. */
 export const rcaSteeringLive = (overrides: Partial<RcaSteering> = {}): RcaSteering =>
   rcaSteering({
     items: [
@@ -638,7 +638,7 @@ export const rcaSteeringLive = (overrides: Partial<RcaSteering> = {}): RcaSteeri
     ...overrides,
   });
 
-/** Frame D: paused on the change-history question until 14:40. */
+/** Paused on the change-history question until 14:40. */
 export const rcaSteeringPaused = (overrides: Partial<RcaSteering> = {}): RcaSteering => {
   const question = rcaThreadQuestion();
   return rcaSteering({
@@ -653,7 +653,7 @@ export const rcaSteeringPaused = (overrides: Partial<RcaSteering> = {}): RcaStee
   });
 };
 
-/** Frame G: the answer was read; the run then finished. */
+/** The answer was read; the run then finished. */
 export const rcaSteeringUnblocked = (overrides: Partial<RcaSteering> = {}): RcaSteering =>
   rcaSteering({
     can_steer: false,

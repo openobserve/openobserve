@@ -15,8 +15,10 @@
 
 // Display structured RCA verdicts, timeline, hypotheses and evidence metadata.
 
+import { z } from "zod";
 import { gt, raw, type I18nKey, type I18nText } from "@/types/i18n";
 import type {
+  RcaActionKind,
   RcaBand,
   RcaEvidenceEntry,
   RcaHypothesisStatus,
@@ -26,6 +28,7 @@ import type {
   RcaSummaryHypothesis,
   RcaSummaryStatusChange,
   RcaSummaryTimelineEntry,
+  RcaVerdictDetails,
 } from "@/services/incidents";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import { formatRcaClock } from "@/utils/incidents/rcaThread";
@@ -42,7 +45,7 @@ export const RCA_PILL_TONE_CLASS: Record<RcaPillTone, string> = {
   "warn-dash": "bg-surface-base text-status-warning-text border-status-warning-text border-dashed",
 };
 
-/** Pill of a completed run's outcome (03 VE32). */
+/** Pill of a completed run's outcome. */
 export const RCA_OUTCOME_PILL: Record<
   RcaOutcome,
   { key: I18nKey; tone: RcaPillTone; icon: IconName }
@@ -65,7 +68,7 @@ export const RCA_OUTCOME_PILL: Record<
 export const rcaBandLevel = (band?: RcaBand): 0 | 1 | 2 | 3 =>
   band === "high" ? 3 : band === "medium" ? 2 : band === "low" ? 1 : 0;
 
-/** "High confidence" … "No confidence" (03 VE33). */
+/** "High confidence" … "No confidence". */
 export function rcaBandLabel(band?: RcaBand): I18nText {
   switch (band) {
     case "high":
@@ -79,7 +82,7 @@ export function rcaBandLabel(band?: RcaBand): I18nText {
   }
 }
 
-/** VE12 rank; `symptom` and `ruled_out` never rank. */
+/** Hypothesis rank; `symptom` and `ruled_out` never rank. */
 const STATUS_RANK: Record<RcaHypothesisStatus, number | null> = {
   root_cause: 1,
   likely: 2,
@@ -113,7 +116,7 @@ export interface RcaHypothesisGroup {
 }
 
 const compareHypotheses = (a: RcaSummaryHypothesis, b: RcaSummaryHypothesis): number => {
-  // Ranked statuses first by VE12, then the never-ranked ones (symptom); then first seen.
+  // Ranked statuses first, then the never-ranked ones (symptom); then first seen.
   const ra = STATUS_RANK[a.status] ?? Number.MAX_SAFE_INTEGER;
   const rb = STATUS_RANK[b.status] ?? Number.MAX_SAFE_INTEGER;
   return ra !== rb ? ra - rb : a.first_seen_seq - b.first_seen_seq;
@@ -162,8 +165,7 @@ const STATUS_LABEL: Record<RcaHypothesisStatus, I18nKey> = {
 };
 
 /** Status word of a hypothesis or of a history entry. */
-export const rcaHypothesisStatusWord = (status: RcaHypothesisStatus): I18nText =>
-  gt(STATUS_LABEL[status]);
+const rcaHypothesisStatusWord = (status: RcaHypothesisStatus): I18nText => gt(STATUS_LABEL[status]);
 
 /** Status pill text of a hypothesis. */
 export function rcaHypothesisStatusLabel(
@@ -189,7 +191,7 @@ export const RCA_HYPOTHESIS_TONE: Record<RcaHypothesisStatus, RcaPillTone> = {
   blocked: "warn-dash",
 };
 
-/** "14:07:04 UTC · Testing (agent · after a.rao)" for one status change (VE11). */
+/** "14:07:04 UTC · Testing (agent · after a.rao)" for one status change. */
 export function rcaStatusHistoryLine(change: RcaSummaryStatusChange): I18nText {
   const actor = change.run_ended
     ? gt("alerts.incidents.rcaSummary.historyActorRunEnded")
@@ -203,22 +205,22 @@ export function rcaStatusHistoryLine(change: RcaSummaryStatusChange): I18nText {
   });
 }
 
-/** Timeline entries in time order (VE31). */
+/** Timeline entries in time order. */
 export const sortedRcaTimeline = (entries: RcaSummaryTimelineEntry[]): RcaSummaryTimelineEntry[] =>
   [...entries].sort((a, b) => a.at - b.at);
 
-/** Evidence id → entry number, for chips (VE24); null when there is no summary. */
+/** Evidence id → entry number, for chips; null when there is no summary. */
 export function rcaEvidenceNumbers(summary: RcaRunSummary | null): Map<string, number> | null {
   if (!summary || summary.legacy) return null;
   const numbers = new Map<string, number>();
   for (const entry of summary.evidence) {
-    // An id maps to the entry that cites it first (VE24); a later entry never overrides it.
+    // An id maps to the entry that cites it first; a later entry never overrides it.
     for (const id of entry.ids) if (!numbers.has(id)) numbers.set(id, entry.number);
   }
   return numbers;
 }
 
-/** Evidence filter of the index (VE28). */
+/** Evidence filter of the index. */
 export type RcaEvidenceFilter = "all" | "decisive" | "supporting";
 
 export function filterRcaEvidence(
@@ -244,7 +246,7 @@ export function rcaEvidenceKindIcon(kind: string): IconName {
 }
 
 /** Label of a signal class. */
-export function rcaSignalLabel(signal: RcaSignalClass): I18nText {
+function rcaSignalLabel(signal: RcaSignalClass): I18nText {
   switch (signal) {
     case "logs":
       return gt("alerts.incidents.rcaSummary.signal.logs");
@@ -278,4 +280,44 @@ export function rcaEvidenceTitle(entry: RcaEvidenceEntry): I18nText {
   return entry.link.streams.length > 0
     ? raw(`${target} · ${entry.link.streams.join(", ")}`)
     : target;
+}
+
+/** The part of `rca_runs.result` the card reads; the server writes both lists. */
+const StoredVerdict = z.object({
+  verdict: z.object({
+    impacted_services: z.array(z.string()).default([]),
+    proposed_actions: z
+      .array(
+        z.object({
+          title: z.string(),
+          kind: z.enum(["rollback", "scale", "restart", "runbook", "other"]),
+          detail: z.string(),
+        }),
+      )
+      .default([]),
+  }),
+});
+
+/** A stored record's impacted services and proposed actions; null when it has no verdict. */
+export function rcaVerdictDetails(result: unknown): RcaVerdictDetails | null {
+  const parsed = StoredVerdict.safeParse(result);
+  if (!parsed.success) return null;
+  const { impacted_services, proposed_actions } = parsed.data.verdict;
+  return { impactedServices: impacted_services, proposedActions: proposed_actions };
+}
+
+/** "Rollback", "Scale", … for a proposed action's kind. */
+export function rcaActionKindLabel(kind: RcaActionKind): I18nText {
+  switch (kind) {
+    case "rollback":
+      return gt("alerts.incidents.rcaSummary.actionKind.rollback");
+    case "scale":
+      return gt("alerts.incidents.rcaSummary.actionKind.scale");
+    case "restart":
+      return gt("alerts.incidents.rcaSummary.actionKind.restart");
+    case "runbook":
+      return gt("alerts.incidents.rcaSummary.actionKind.runbook");
+    case "other":
+      return gt("alerts.incidents.rcaSummary.actionKind.other");
+  }
 }

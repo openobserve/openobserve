@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// Display helpers for the investigation thread of an RCA run (02 TH37, TH38).
+// Display helpers for the investigation thread of an RCA run.
 
 import { gt, raw, type I18nText } from "@/types/i18n";
 import { formatTimestampInTimezone } from "@/utils/date";
@@ -28,7 +28,7 @@ import type {
   RcaTrigger,
 } from "@/services/incidents";
 
-/** The seven stages of the RCA protocol, in order (02 TH18). `stage_index` is 1-based. */
+/** The seven stages of the RCA protocol, in order. `stage_index` is 1-based. */
 export const RCA_STAGES = [
   "context",
   "topology",
@@ -42,9 +42,7 @@ export const RCA_STAGES = [
 /** What the verdict card shows: the latest run, or a completed run picked from the history. */
 export type RcaCardState = "investigating" | "analyzed" | "failed" | "cancelled";
 
-export type RcaStageId = (typeof RCA_STAGES)[number];
-
-/** "Auto on incident open", "Re-analyze by j.okafor", … (01 §12.3). */
+/** "Auto on incident open", "Re-analyze by j.okafor", … */
 export function rcaTriggerLabel(trigger: RcaTrigger, startedBy: string): I18nText {
   const user = userLocalPart(startedBy);
   switch (trigger) {
@@ -136,7 +134,7 @@ function splitNoteInto(segments: RcaNoteSegment[], note: string, marks: RcaNoteM
     } else if (cite !== undefined) {
       segments.push({ kind: "cite", id: cite });
     } else if (linkText !== undefined) {
-      // A link the agent writes shows as text and its URL in plain text (VE43).
+      // A link the agent writes shows as text and its URL in plain text.
       pushText(segments, `${linkText} (${linkUrl})`, marks);
     } else {
       splitNoteInto(segments, star ?? underscore ?? "", { ...marks, italic: true });
@@ -183,7 +181,7 @@ export function rcaToolStatusLabel(call: RcaToolCall): I18nText {
   }
 }
 
-/** One entry of the thread column, in time order (04 §10.6). Times are µs. */
+/** One entry of the thread column, in time order. Times are µs. */
 export type RcaThreadEntry =
   | { kind: "step"; key: string; at: number; step: RcaStep }
   | { kind: "question"; key: string; at: number; question: RcaThreadQuestion }

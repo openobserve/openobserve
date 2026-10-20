@@ -766,7 +766,7 @@ describe("IncidentList.vue", () => {
     });
   });
 
-  // ── AI analysis column (01 RR-32, RR-33, RR-34) ─────────────────────────────
+  // ── AI analysis column ─────────────────────────────
 
   describe("AI analysis column", () => {
     const liveRca = (): Incident["rca"] => ({
@@ -936,6 +936,18 @@ describe("IncidentList.vue", () => {
       await flushPromises();
 
       wrapper.vm.severityFilter = "P2";
+      await flushPromises();
+
+      expect(wrapper.vm.currentPage).toBe(1);
+    });
+
+    it("a sort change starts over on page 1", async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+      wrapper.vm.onPageChange(2);
+      await flushPromises();
+
+      wrapper.vm.sortBy = "last_alert_at";
       await flushPromises();
 
       expect(wrapper.vm.currentPage).toBe(1);

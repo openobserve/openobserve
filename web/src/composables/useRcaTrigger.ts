@@ -24,10 +24,10 @@ import {
   isPaidOverageConsentError,
   usePaidOverageConsent,
 } from "@/composables/usePaidOverageConsent";
-import { toast } from "@/lib/feedback/Toast/useToast";
+import { aiCreditsAction, aiCreditsNotice, isAiCreditsExhausted } from "@/utils/aiCredits";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 
-/** Query flags of `POST …/rca`; `guidance` is sent as the JSON body (04 SG33). */
+/** Query flags of `POST …/rca`; `guidance` is sent as the JSON body. */
 export type RcaTriggerParams = {
   build_on_previous?: boolean;
   guidance?: string;
@@ -42,17 +42,30 @@ export interface RcaTriggerOptions {
   onConsentRequired?: () => void;
 }
 
+/** The organization is out of AI credits: what to tell the user and the page that unblocks it. */
+export type RcaCreditsExhausted = {
+  status: "exhausted";
+  notice: I18nText;
+  /** Null when resending later is the remedy. */
+  remedy: "plans" | "contact" | null;
+};
+
+/** `declined`: the user declined paid usage; `dropped`: the caller moved on before it settled. */
 export type RcaTriggerResult =
   | { status: "started"; runId: string; data: TriggerRcaResponse }
   | { status: "declined" }
+  | { status: "dropped" }
+  | RcaCreditsExhausted
   | { status: "unavailable"; message: I18nText };
 
 export type RcaResumeResult =
   | { status: "started"; runId: string; data: ResumeRcaResponse }
   | { status: "declined" }
+  | { status: "dropped" }
+  | RcaCreditsExhausted
   | { status: "unavailable"; message: I18nText };
 
-/** Starts an RCA run and handles the paid-usage consent flow (RR-33). */
+/** Starts an RCA run and handles the paid-usage consent flow. */
 export function useRcaTrigger() {
   const { t } = useI18nTyped();
   const { promptForConsent } = usePaidOverageConsent();
@@ -64,7 +77,21 @@ export function useRcaTrigger() {
   type Gated<T> =
     | { status: "started"; data: T }
     | { status: "declined" }
+    | { status: "dropped" }
+    | RcaCreditsExhausted
     | { status: "unavailable"; message: I18nText };
+
+  const responseBody = (error: unknown): unknown =>
+    isAxiosError(error) ? error.response?.data : null;
+
+  const creditsExhausted = (body: unknown): RcaCreditsExhausted | null =>
+    isAiCreditsExhausted(body)
+      ? {
+          status: "exhausted",
+          notice: aiCreditsNotice(body, t),
+          remedy: aiCreditsAction(body) ?? null,
+        }
+      : null;
 
   /** One request with the 402/412 consent flow; a resume is metered like a manual run (J7). */
   const withConsent = async <T>(
@@ -78,7 +105,10 @@ export function useRcaTrigger() {
       return { status: "started", data: res.data };
     } catch (error: unknown) {
       const status = isAxiosError(error) ? (error.response?.status ?? 0) : 0;
-      const body: unknown = isAxiosError(error) ? error.response?.data : null;
+      const body = responseBody(error);
+
+      const exhausted = creditsExhausted(body);
+      if (exhausted) return exhausted;
 
       if (config.isCloud !== "true") {
         if (status !== 412) throw error;
@@ -99,16 +129,18 @@ export function useRcaTrigger() {
       const consentSignal = signal ?? lifecycle.signal;
       const accepted = await promptForConsent(org, "ai_credits", body.consent, consentSignal);
       const stillActive = !consentSignal.aborted && (opts.isStillActive?.() ?? true);
-      if (!accepted || !stillActive) {
-        if (!accepted && stillActive) {
-          toast({ variant: "info", message: t("paidUsage.declinedNotice") });
-        }
-        return { status: "declined" };
-      }
+      if (!stillActive) return { status: "dropped" };
+      if (!accepted) return { status: "declined" };
 
       // Exactly one guarded replacement request. A second denial propagates.
-      const retry = await send();
-      return { status: "started", data: retry.data };
+      try {
+        const retry = await send();
+        return { status: "started", data: retry.data };
+      } catch (retryError: unknown) {
+        const retryExhausted = creditsExhausted(responseBody(retryError));
+        if (retryExhausted) return retryExhausted;
+        throw retryError;
+      }
     }
   };
 

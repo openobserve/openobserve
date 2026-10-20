@@ -14,7 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!-- "AI analysis" cell of the incidents list (01 §12.1). A click anywhere in the
+<!-- "AI analysis" cell of the incidents list. A click anywhere in the
      cell opens the incident on its Analysis tab; "Analyze" starts a run instead. -->
 <template>
   <div
@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <span v-if="model.detail" class="truncate">{{ model.detail }}</span>
         <span v-if="model.detail && model.rerunNote" aria-hidden="true">·</span>
-        <!-- A newer run did not finish; the result shown is the earlier one (RR-42). -->
+        <!-- A newer run did not finish; the result shown is the earlier one. -->
         <span
           v-if="model.rerunNote"
           class="text-status-warning-text truncate"
@@ -99,7 +99,7 @@ import { useViewerTimezone } from "@/composables/downtimes/useViewerTimezone";
 
 const props = defineProps<{
   incident: Incident;
-  /** `incidents_rca_enabled` from `/config` (RR-43). */
+  /** `incidents_rca_enabled` from `/config`. */
   rcaEnabled: boolean;
   /** Epoch milliseconds; the list ticks it so elapsed labels stay current. */
   now: number;
@@ -110,6 +110,8 @@ const emit = defineEmits<{
   open: [];
   /** A run started; the list refetches to show it. */
   started: [runId: string];
+  /** The server answered with an error; it may have created a failed run, so the list refetches. */
+  failed: [];
 }>();
 
 // Strong warning uses the orange family of the list's P2 row rail.
@@ -139,7 +141,7 @@ const starting = ref(false);
 // The badge's accessible name is its visible label; the detail describes it.
 const detailId = `${useId()}-rca-detail`;
 
-// Spawned path (`reanalysis=true`, 202): the run continues on the server (RR-33).
+// Spawned path (`reanalysis=true`, 202): the run continues on the server.
 const analyze = async () => {
   if (starting.value) return;
   starting.value = true;
@@ -153,6 +155,10 @@ const analyze = async () => {
     );
     if (result.status === "unavailable") {
       toast({ variant: "error", message: result.message });
+    } else if (result.status === "exhausted") {
+      toast({ variant: "error", message: result.notice });
+    } else if (result.status === "declined") {
+      toast({ variant: "info", message: t("paidUsage.declinedNotice") });
     } else if (result.status === "started") {
       toast({ variant: "success", message: t("alerts.incidents.aiAnalysis.started") });
       emit("started", result.runId);
@@ -164,6 +170,7 @@ const analyze = async () => {
         ? raw(body.message)
         : t("alerts.incidents.reanalysisStartFailed");
     toast({ variant: "error", message });
+    if (isAxiosError(error) && error.response) emit("failed");
   } finally {
     starting.value = false;
   }

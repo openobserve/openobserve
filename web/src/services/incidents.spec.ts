@@ -191,6 +191,19 @@ describe("incidents service", () => {
         { params: { build_on_previous: true }, signal: undefined },
       );
     });
+
+    it("passes the abort signal with the request", () => {
+      mockHttp.post.mockResolvedValue({ data: { run_id: "run-1" } });
+      const controller = new AbortController();
+
+      incidents.triggerRca("test-org", "incident-123", {}, { signal: controller.signal });
+
+      expect(mockHttp.post.mock.calls[0][2]).toEqual({
+        params: {},
+        signal: controller.signal,
+      });
+      expect(mockHttp.post.mock.calls[0][2].signal).toBe(controller.signal);
+    });
   });
 
   describe("steering (04 §9.1, §9.2)", () => {

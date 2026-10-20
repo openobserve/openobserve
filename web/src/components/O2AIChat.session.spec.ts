@@ -1209,6 +1209,40 @@ describe("O2AIChat session, persistence and lifecycle", () => {
       expect(vm.chatMessages).toHaveLength(0);
     });
 
+    it("a new-chat hand-off drops the old draft and keeps one chip when two arrive together", async () => {
+      // The input's clear() empties it, chips included.
+      wrapper?.unmount();
+      wrapper = mountO2AIChat(
+        {},
+        {
+          ...handoffStubs,
+          RichTextInput: {
+            ...handoffStubs.RichTextInput,
+            methods: {
+              ...handoffStubs.RichTextInput.methods,
+              clear() {
+                insertedChips.length = 0;
+              },
+            },
+          },
+        },
+      );
+      vm = wrapper.vm;
+      await flushPromises();
+      await wait(150);
+      vm.inputMessage = "a half-written question";
+
+      vi.useFakeTimers();
+      await wrapper!.setProps({ aiChatPayload: handoff() });
+      await wrapper!.setProps({ aiChatPayload: handoff({ id: 2 }) });
+      await vi.advanceTimersByTimeAsync(60);
+      await nextTick();
+      vi.useRealTimers();
+
+      expect(vm.inputMessage).toBe("");
+      expect(insertedChips).toHaveLength(1);
+    });
+
     it("sends the sanitized context with the user's first turn in that chat", async () => {
       await deliver(handoff());
 

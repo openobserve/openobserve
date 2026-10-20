@@ -90,7 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <span data-test="rca-evidence-result" class="text-text-secondary min-w-0 flex-1">
         {{ entry.result_summary }}
-        <span class="text-text-muted">· {{ source }}</span>
+        <span v-if="source" class="text-text-muted">· {{ source }}</span>
       </span>
       <OButton
         v-if="link"
@@ -132,7 +132,6 @@ import type {
 } from "@/services/incidents";
 import { rcaEvidenceLink, rcaEvidenceQuery } from "@/utils/incidents/rcaEvidenceLinks";
 import { rcaEvidenceKindIcon, rcaEvidenceTitle, rcaUtcRange } from "@/utils/incidents/rcaSummary";
-import { formatRcaDuration } from "@/utils/incidents/rcaThread";
 import RcaPill from "./RcaPill.vue";
 
 const props = withDefaults(
@@ -168,13 +167,12 @@ const weightLabel = computed(() =>
     : t("alerts.incidents.rcaSummary.supporting"),
 );
 
-/** "checkout_api · 14:02:11–14:35:00 UTC · 41 ms" */
+/** "checkout_api · 14:02:11–14:35:00 UTC"; the result summary already carries the query time. */
 const source = computed(() => {
   const parts: string[] = [];
   if (props.entry.link.streams.length > 0) parts.push(props.entry.link.streams.join(", "));
   const range = rcaUtcRange(props.entry.link.start_us, props.entry.link.end_us);
   if (range) parts.push(range);
-  parts.push(formatRcaDuration(props.entry.duration_ms));
   return raw(parts.join(" · "));
 });
 
@@ -189,10 +187,7 @@ const openLabel = computed(() => {
   }
 });
 
-/**
- * Each citation's hypothesis as a link: "the root cause" or "a contributing factor" when only
- * one hypothesis holds that role, else its statement. None under the card's own hypothesis.
- */
+/** A role name links a citation when only one hypothesis holds that role, else its statement does. */
 const citationRows = computed(() => {
   const byId = new Map(props.hypotheses.map((h) => [h.id, h]));
   const perStatus = new Map<string, number>();
