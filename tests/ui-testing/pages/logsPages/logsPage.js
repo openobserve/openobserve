@@ -1100,6 +1100,7 @@ export class LogsPage {
     /** Wait until the Logs query editor's completion props know the selected stream's fields (and optionally a server function). */
     async waitForStreamFieldsLoaded(fieldName = 'level', functionName = null, timeout = 30000) {
         testLogger.info(`waitForStreamFieldsLoaded: waiting for field "${fieldName}"${functionName ? ` and function "${functionName}"` : ''} in the query editor`);
+        // Each check walks the whole vnode tree, so poll on an interval rather than every animation frame.
         await this.page.waitForFunction(({ field, fn }) => {
             const app = document.querySelector('#app');
             if (!app?._vnode) return false;
@@ -1127,7 +1128,7 @@ export class LogsPage {
             if (!fn) return hasField;
             const suggestions = Array.isArray(editor.suggestions) ? editor.suggestions : [];
             return hasField && suggestions.some((s) => (s?.name ?? s?.label) === fn);
-        }, { field: fieldName, fn: functionName }, { timeout });
+        }, { field: fieldName, fn: functionName }, { timeout, polling: 250 });
     }
 
     /** Read one o2FieldValues record by its "org|streamType|streamName|fieldName" key; null until the app has written it. */
