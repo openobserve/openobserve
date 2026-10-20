@@ -10714,6 +10714,12 @@
     "selectionOffscreen": "{count} nicht sichtbar | {count} nicht sichtbar",
     "clearSelection": "Auswahl aufheben",
     "addSelected": "{count} Alarm hinzufügen | {count} Alarme hinzufügen",
+    "alertType": "Alarmtyp",
+    "alertTypeAll": "Alle",
+    "alertTypeThreshold": "Schwellenwert",
+    "alertTypeAnomaly": "Anomalie",
+    "enterprise": "Enterprise",
+    "enterpriseHint": "Alarme zur Anomalieerkennung erfordern OpenObserve Enterprise.",
     "drawer": {
       "dataAvailable": "Daten verfügbar",
       "streamNotFound": "Stream nicht gefunden",
@@ -10738,6 +10744,8 @@
       "neverIngestedCallout": "{stream} existiert, hat aber noch nie Daten empfangen, daher hat dieser Alarm nichts, worauf er auslösen könnte.",
       "lastData": "Letzte Daten {when}",
       "staleCallout": "{stream} hat zuletzt Daten {when} empfangen. Dieser Alarm bleibt stumm, bis die Datenaufnahme wieder aufgenommen wird.",
+      "anomalyTrainingNote": "Dieser Alarm lernt aus dem bisherigen Verlauf des Streams und bleibt still, bis genug Daten zum Trainieren vorliegen: je nach Intervall einige Stunden bis etwa ein Tag. Das vollständige Modell für Werktage und Wochenende braucht einen Zeitraum, der ein Wochenende umfasst.",
+      "detection": "Erkennung",
       "unknownTime": "zu einem unbekannten Zeitpunkt"
     },
     "install": {
@@ -10776,6 +10784,9 @@
       "cancel": "Abbrechen",
       "done": "Fertig",
       "confirmLarge": "Mir ist klar, dass dies {count} Alarme in {folder} erstellt, die jeweils {destination} benachrichtigen.",
+      "tuneThresholdOnly": "Gilt nur für Schwellenwert-Alarme.",
+      "anomalyTrainingNote": "Anomalie-Alarme lösen erst aus, wenn sie mit genügend Verlauf des Streams trainiert wurden.",
+      "anomalyUnavailable": "Anomalie-Alarme erfordern OpenObserve Enterprise mit aktivierter Anomalieerkennung, daher wurde dieser übersprungen.",
       "confirmLargeNoDestination": "Mir ist klar, dass dies {count} Alarme in {folder} erstellt, von denen keiner ein Ziel benachrichtigt."
     },
     "error": {

@@ -17,6 +17,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   SEVERITY_ORDER,
+  alertTypeLabel,
+  alertTypeOf,
   categoryLabel,
   packLabel,
   severityBadgeValue,
@@ -81,6 +83,24 @@ describe("libraryFacets", () => {
 
     it("does not read through the prototype chain", () => {
       expect(packLabel("constructor")).toBe("constructor");
+    });
+  });
+
+  describe("alertTypeOf", () => {
+    it("reads anomaly_detection as anomaly", () => {
+      expect(alertTypeOf({ alert_type: "anomaly_detection" })).toBe("anomaly");
+    });
+
+    it("reads scheduled, and an absent type from a pre-1.1 manifest, as scheduled", () => {
+      expect(alertTypeOf({ alert_type: "scheduled" })).toBe("scheduled");
+      expect(alertTypeOf({})).toBe("scheduled");
+    });
+  });
+
+  describe("alertTypeLabel", () => {
+    it("calls scheduled alerts Threshold", () => {
+      expect(alertTypeLabel(t, "scheduled")).toBe("Threshold");
+      expect(alertTypeLabel(t, "anomaly")).toBe("Anomaly");
     });
   });
 

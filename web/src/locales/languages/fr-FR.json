@@ -10714,6 +10714,12 @@
     "selectionOffscreen": "{count} hors écran | {count} hors écran",
     "clearSelection": "Effacer la sélection",
     "addSelected": "Ajouter {count} alerte | Ajouter {count} alertes",
+    "alertType": "Type d'alerte",
+    "alertTypeAll": "Tous",
+    "alertTypeThreshold": "Seuil",
+    "alertTypeAnomaly": "Anomalie",
+    "enterprise": "Enterprise",
+    "enterpriseHint": "Les alertes de détection d'anomalies nécessitent OpenObserve Enterprise.",
     "drawer": {
       "dataAvailable": "Données disponibles",
       "streamNotFound": "Flux introuvable",
@@ -10738,6 +10744,8 @@
       "neverIngestedCallout": "{stream} existe mais n'a jamais reçu de données, donc cette alerte n'a rien sur quoi se déclencher.",
       "lastData": "Dernières données {when}",
       "staleCallout": "{stream} a reçu des données pour la dernière fois {when}. Cette alerte restera silencieuse jusqu'à la reprise de l'ingestion.",
+      "anomalyTrainingNote": "Cette alerte apprend de l'historique du flux lui-même et reste silencieuse tant qu'elle n'en a pas assez pour s'entraîner : de quelques heures à environ un jour, selon son intervalle. Le modèle complet jours ouvrés et week-end nécessite une période couvrant un week-end.",
+      "detection": "Détection",
       "unknownTime": "à un moment inconnu"
     },
     "install": {
@@ -10776,6 +10784,9 @@
       "cancel": "Annuler",
       "done": "Terminé",
       "confirmLarge": "Je comprends que cela crée {count} alertes dans {folder}, chacune notifiant {destination}.",
+      "tuneThresholdOnly": "S'applique uniquement aux alertes à seuil.",
+      "anomalyTrainingNote": "Les alertes d'anomalie commencent à se déclencher une fois entraînées sur un historique suffisant du flux.",
+      "anomalyUnavailable": "Les alertes d'anomalie nécessitent OpenObserve Enterprise avec la détection d'anomalies activée ; celle-ci a donc été ignorée.",
       "confirmLargeNoDestination": "Je comprends que cela crée {count} alertes dans {folder}, dont aucune ne notifie encore de destination."
     },
     "error": {
