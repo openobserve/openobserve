@@ -104,10 +104,10 @@ const restoredByWaiver = computed(
   () => props.decision.search_allowed && !!props.base && !props.base.search_allowed,
 );
 
-const reasons = computed(() => {
+const reasons = computed<{ key: string; text: string }[]>(() => {
   if (props.decision.search_allowed) return [];
   const d = props.decision;
-  return d.blocks.flatMap((block) => {
+  return d.blocks.flatMap((block): { key: string; text: string }[] => {
     switch (block) {
       case "usage_over_limit":
         return [
