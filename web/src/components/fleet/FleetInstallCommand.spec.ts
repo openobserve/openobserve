@@ -26,7 +26,7 @@ vi.mock("@/aws-exports", async (importOriginal) => {
 });
 
 vi.mock("@/services/fleet", () => ({
-  default: { listCollectors: vi.fn(), getCollector: vi.fn(), summary: vi.fn() },
+  default: { getSettings: vi.fn() },
 }));
 
 const CodeStub = {
@@ -47,59 +47,63 @@ const choose = async (w: ReturnType<typeof mountCommand>, os: string) => {
   await w.vm.$nextTick();
 };
 
+const code = (w: ReturnType<typeof mountCommand>) =>
+  w.find('[data-test="fleet-install-command-code"]').text();
+
 describe("FleetInstallCommand", () => {
   beforeEach(() => {
-    vi.mocked(fleet.summary).mockResolvedValue({ data: { target_version: "0.162.0" } } as any);
+    vi.mocked(fleet.getSettings).mockResolvedValue({
+      data: { target_collector_version: "0.163.1", restricted_components: [] },
+    } as any);
   });
 
   afterEach(() => vi.clearAllMocks());
 
-  it("shows the supervisor config for the current org and API endpoint on Linux", () => {
-    const code = mountCommand().find('[data-test="fleet-install-command-code"]').text();
-    expect(code).toContain(`org: ${store.state.selectedOrganization.identifier}`);
-    expect(code).toContain("token: o2ft_abc123");
-    expect(code).toMatch(/url: https?:\/\/\S+/);
-    expect(code).toContain("o2c-supervisor -config /etc/o2c-supervisor/supervisor.yaml");
-    expect(code).toContain("install -m 600");
+  it("offers Linux, macOS, Windows and Kubernetes", () => {
+    const offered = mountCommand()
+      .findAll('[data-test^="fleet-install-command-os-"]')
+      .map((b) => b.text());
+    expect(offered).toEqual(["Linux", "macOS", "Windows", "Kubernetes"]);
   });
 
-  it("names the org's target collector version in the prerequisites", async () => {
+  it("runs the install script for the current org with the token", () => {
+    const text = code(mountCommand());
+    expect(text).toContain("/agents/main/linux/install.sh");
+    expect(text).toContain(`--org '${store.state.selectedOrganization.identifier}'`);
+    expect(text).toContain("--token 'o2ft_abc123'");
+  });
+
+  it("installs and names the org's target collector version", async () => {
     const w = mountCommand();
     await flushPromises();
-    expect(fleet.summary).toHaveBeenCalled();
-    expect(w.find('[data-test="fleet-install-command-prereq"]').text()).toContain("0.162.0");
+    expect(w.find('[data-test="fleet-install-command-version"]').text()).toContain("0.163.1");
+    expect(code(w)).toContain("--version '0.163.1'");
   });
 
-  it("names an admin-set target version in the prerequisites", async () => {
-    vi.mocked(fleet.summary).mockResolvedValue({ data: { target_version: "0.170.0" } } as any);
+  it("says the script picks the version when the org sets none", async () => {
+    vi.mocked(fleet.getSettings).mockResolvedValue({
+      data: { target_collector_version: null, restricted_components: [] },
+    } as any);
     const w = mountCommand();
     await flushPromises();
-    expect(w.find('[data-test="fleet-install-command-prereq"]').text()).toContain("0.170.0");
-  });
-
-  it("falls back to wording, not a made-up version, until the summary loads", () => {
-    vi.mocked(fleet.summary).mockReturnValue(new Promise(() => {}) as any);
-    const text = mountCommand().find('[data-test="fleet-install-command-prereq"]').text();
-    expect(text).toContain("the org's target version");
-    expect(text).not.toMatch(/\d+\.\d+\.\d+/);
-  });
-
-  it("writes no initial configuration into the command", () => {
-    const code = mountCommand().find('[data-test="fleet-install-command-code"]').text();
-    expect(code).not.toContain("initial_config");
-  });
-
-  it("shows the macOS config on the macOS tab", async () => {
-    const w = mountCommand();
-    await choose(w, "macos");
-    expect(w.find('[data-test="fleet-install-command-code"]').text()).toContain(
-      "$HOME/o2c-supervisor/supervisor.yaml",
+    expect(w.find('[data-test="fleet-install-command-version"]').text()).toBe(
+      "Installs the latest supported collector version",
     );
+    expect(code(w)).not.toContain("--version");
   });
 
-  it("offers only the systems that have an install command", () => {
+  it("switches to HTTP polling with the proxy checkbox", async () => {
     const w = mountCommand();
-    const offered = w.findAll('[data-test^="fleet-install-command-os-"]').map((b) => b.text());
-    expect(offered).toEqual(["Linux", "macOS"]);
+    w.findComponent({ name: "OCheckbox" }).vm.$emit("update:modelValue", true);
+    await w.vm.$nextTick();
+    expect(code(w)).toContain("--transport http");
+  });
+
+  it("shows Helm with the fleet collector image on Kubernetes, without the proxy option", async () => {
+    const w = mountCommand();
+    await flushPromises();
+    await choose(w, "kubernetes");
+    expect(code(w)).toContain("ghcr.io/openobserve/otel-fleet-collector");
+    expect(w.find('[data-test="fleet-install-command-http"]').exists()).toBe(false);
   });
 });

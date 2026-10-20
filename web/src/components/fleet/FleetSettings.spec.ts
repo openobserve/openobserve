@@ -56,7 +56,7 @@ describe("FleetSettings", () => {
 
   beforeEach(() => {
     vi.mocked(fleet.getSettings).mockResolvedValue({
-      data: { restricted_components: ["debug", "file"], target_version: null },
+      data: { restricted_components: ["debug", "file"], target_collector_version: null },
     } as any);
     vi.mocked(fleet.listAudit).mockResolvedValue({
       data: {
@@ -75,7 +75,8 @@ describe("FleetSettings", () => {
   });
 
   async function mountSettings() {
-    wrapper = mount(FleetSettings, { attachTo: document.body, global: { plugins: [i18n, store] } });
+    wrapper = mount(FleetSettings, { attachTo: document.body, global: { plugins: [i18n, store], stubs: { FleetCollectorVersions: true } },
+    });
     await settle();
     return wrapper;
   }
@@ -141,7 +142,7 @@ describe("FleetSettings", () => {
 
   it("loads the restricted list and the target from the API", async () => {
     vi.mocked(fleet.getSettings).mockResolvedValue({
-      data: { restricted_components: ["debug", "pprof"], target_version: "0.170.0" },
+      data: { restricted_components: ["debug", "pprof"], target_collector_version: "0.170.0" },
     } as any);
     await mountSettings();
     expect(fleet.getSettings).toHaveBeenCalledWith(store.state.selectedOrganization.identifier);
@@ -151,7 +152,7 @@ describe("FleetSettings", () => {
 
   it("gives both controls a field width that takes the full row below md, and a placeholder", async () => {
     vi.mocked(fleet.getSettings).mockResolvedValue({
-      data: { restricted_components: [], target_version: null },
+      data: { restricted_components: [], target_collector_version: null },
     } as any);
     await mountSettings();
     const fixed = wrapper.findAll(".w-field-width-md");
@@ -202,7 +203,7 @@ describe("FleetSettings", () => {
   });
 
   it("saves an added component and a target as one full body", async () => {
-    const body = { restricted_components: ["debug", "file", "kafka"], target_version: "0.170.0" };
+    const body = { restricted_components: ["debug", "file", "kafka"], target_collector_version: "0.170.0" };
     vi.mocked(fleet.updateSettings).mockResolvedValue({ data: body } as any);
     await mountSettings();
     await edit("kafka", "0.170.0");
@@ -217,7 +218,7 @@ describe("FleetSettings", () => {
 
   it("re-seeds the form from the saved response", async () => {
     vi.mocked(fleet.updateSettings).mockResolvedValue({
-      data: { restricted_components: ["debug", "file"], target_version: "0.170.0" },
+      data: { restricted_components: ["debug", "file"], target_collector_version: "0.170.0" },
     } as any);
     await mountSettings();
     vi.mocked(fleet.getSettings).mockReturnValue(new Promise(() => {}));
@@ -229,22 +230,22 @@ describe("FleetSettings", () => {
 
   it("sends null when the target is cleared", async () => {
     vi.mocked(fleet.getSettings).mockResolvedValue({
-      data: { restricted_components: [], target_version: "0.170.0" },
+      data: { restricted_components: [], target_collector_version: "0.170.0" },
     } as any);
     vi.mocked(fleet.updateSettings).mockResolvedValue({
-      data: { restricted_components: [], target_version: null },
+      data: { restricted_components: [], target_collector_version: null },
     } as any);
     await mountSettings();
     await edit(null, "");
     await save();
     expect(fleet.updateSettings).toHaveBeenCalledWith(store.state.selectedOrganization.identifier, {
       restricted_components: [],
-      target_version: null,
+      target_collector_version: null,
     });
   });
 
   it("toasts the server's 400 message and keeps the form", async () => {
-    const message = "target_version must be MAJOR.MINOR.PATCH, for example 0.162.0";
+    const message = "target_collector_version must be MAJOR.MINOR.PATCH, for example 0.162.0";
     vi.mocked(fleet.updateSettings).mockRejectedValue({
       response: { status: 400, data: { code: 400, message } },
     });
@@ -277,7 +278,7 @@ describe("FleetSettings", () => {
 
   it("refetches every fleet read after a successful save", async () => {
     vi.mocked(fleet.updateSettings).mockResolvedValue({
-      data: { restricted_components: ["debug", "file"], target_version: "0.170.0" },
+      data: { restricted_components: ["debug", "file"], target_collector_version: "0.170.0" },
     } as any);
     const spy = vi.spyOn(queryClient, "invalidateQueries");
     try {
@@ -295,7 +296,7 @@ describe("FleetSettings", () => {
   it("follows a refetch while untouched and keeps unsaved edits through one", async () => {
     await mountSettings();
     vi.mocked(fleet.getSettings).mockResolvedValue({
-      data: { restricted_components: ["pprof"], target_version: "0.165.0" },
+      data: { restricted_components: ["pprof"], target_collector_version: "0.165.0" },
     } as any);
     await queryClient.invalidateQueries({ queryKey: fleetKeys.settings(org()) });
     await settle();
@@ -304,7 +305,7 @@ describe("FleetSettings", () => {
 
     await edit("kafka", "0.170.0");
     vi.mocked(fleet.getSettings).mockResolvedValue({
-      data: { restricted_components: ["zpages"], target_version: "0.180.0" },
+      data: { restricted_components: ["zpages"], target_collector_version: "0.180.0" },
     } as any);
     await queryClient.invalidateQueries({ queryKey: fleetKeys.settings(org()) });
     await settle();
@@ -319,7 +320,7 @@ describe("FleetSettings", () => {
     await mountSettings();
     await edit("kafka", "0.170.0");
     vi.mocked(fleet.getSettings).mockResolvedValue({
-      data: { restricted_components: ["pprof"], target_version: null },
+      data: { restricted_components: ["pprof"], target_collector_version: null },
     } as any);
     store.commit("setSelectedOrganization", { ...orgA, identifier: "org-b" });
     try {
@@ -376,7 +377,7 @@ describe("FleetSettings", () => {
     await flushPromises();
     expect(wrapper.find(sel("restricted-trigger")).attributes("disabled")).toBeDefined();
     expect(targetField().attributes("disabled")).toBeDefined();
-    finish({ restricted_components: ["debug", "file"], target_version: "0.170.0" });
+    finish({ restricted_components: ["debug", "file"], target_collector_version: "0.170.0" });
     await settle();
     expect(wrapper.find(sel("restricted-trigger")).attributes("disabled")).toBeUndefined();
     expect(targetField().attributes("disabled")).toBeUndefined();
@@ -390,16 +391,16 @@ describe("FleetSettings", () => {
     await saveButton().trigger("click");
     await flushPromises();
     vi.mocked(fleet.getSettings).mockResolvedValue({
-      data: { restricted_components: ["pprof"], target_version: null },
+      data: { restricted_components: ["pprof"], target_collector_version: null },
     } as any);
     store.commit("setSelectedOrganization", { ...orgA, identifier: "org-b" });
     try {
       await settle();
-      finish({ restricted_components: ["debug", "file"], target_version: "0.170.0" });
+      finish({ restricted_components: ["debug", "file"], target_collector_version: "0.170.0" });
       await settle();
       expect(fleet.updateSettings).toHaveBeenCalledWith(orgA.identifier, {
         restricted_components: ["debug", "file"],
-        target_version: "0.170.0",
+        target_collector_version: "0.170.0",
       });
       expect(selected()).toBe("pprof");
       expect((targetField().element as HTMLInputElement).value).toBe("");
@@ -412,7 +413,7 @@ describe("FleetSettings", () => {
     await mountSettings();
     await edit(null, "0.170.0");
     vi.mocked(fleet.getSettings).mockResolvedValue({
-      data: { restricted_components: ["pprof"], target_version: "0.165.0" },
+      data: { restricted_components: ["pprof"], target_collector_version: "0.165.0" },
     } as any);
     await queryClient.invalidateQueries({ queryKey: fleetKeys.settings(org()) });
     await settle();
@@ -436,4 +437,56 @@ describe("FleetSettings", () => {
     expect(fleet.listAudit).toHaveBeenCalledTimes(2);
     expect(wrapper.find('[data-test="fleet-settings-audit-error"]').exists()).toBe(false);
   });
+
+  describe("fleet defaults and alerts", () => {
+    const defaults = {
+      heartbeat_interval_secs: 30,
+      offline_heartbeats: 3,
+      retention_days: 30,
+      offline_ratio_percent: 20,
+      phase_timeout_secs: 1800,
+      gate: { observe_secs: 600, window_secs: 300, pass_percent: 95 },
+    };
+
+    beforeEach(() => {
+      vi.mocked(fleet.getSettings).mockResolvedValue({
+        data: {
+          restricted_components: [],
+          target_collector_version: null,
+          fleet_defaults: defaults,
+        },
+      } as any);
+    });
+
+    it("shows the defaults in minutes where the API stores seconds", async () => {
+      await mountSettings();
+      const field = (n: string) =>
+        wrapper.find(`[data-test="fleet-settings-defaults-form-${n}-field"]`).element as HTMLInputElement;
+      expect(field("heartbeat").value).toBe("30");
+      expect(field("phaseTimeoutMin").value).toBe("30");
+      expect(field("observeMin").value).toBe("10");
+    });
+
+    it("saves changed defaults inside the full settings body", async () => {
+      vi.mocked(fleet.updateSettings).mockImplementation(async (_o, body) => ({ data: body }) as any);
+      await mountSettings();
+      await wrapper.find('[data-test="fleet-settings-defaults-form-heartbeat-field"]').setValue("15");
+      await wrapper.find('[data-test="fleet-settings-defaults-form-save"]').trigger("click");
+      await settle();
+      expect(fleet.updateSettings).toHaveBeenCalledWith(org(), {
+        restricted_components: [],
+        target_collector_version: null,
+        fleet_defaults: { ...defaults, heartbeat_interval_secs: 15 },
+      });
+    });
+
+    it("links the alerts for fleets to the alert library", async () => {
+      await mountSettings();
+      expect(wrapper.find('[data-test="fleet-settings-alerts"]').text()).toContain(
+        "A rollout halted",
+      );
+      expect(wrapper.find('[data-test="fleet-settings-alert-library"]').exists()).toBe(true);
+    });
+  });
 });
+

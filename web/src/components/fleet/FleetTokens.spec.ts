@@ -21,6 +21,8 @@ import store from "@/test/unit/helpers/store";
 import fleet from "@/services/fleet";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import FleetTokens from "./FleetTokens.vue";
+import FleetRevokeTokenDialog from "./FleetRevokeTokenDialog.vue";
+import { apiCollector } from "./fleet.fixtures";
 import { purgeAllQueries, purgeOrgQueries, queryClient } from "@/composables/query/queryClient";
 import { heldTokenSecret, secretsEpoch } from "./fleetTokenSecrets";
 
@@ -132,8 +134,25 @@ describe("FleetTokens", () => {
 
   beforeEach(() => {
     vi.mocked(fleet.listTokens).mockResolvedValue({ data: { items: tokens } } as any);
+    vi.mocked(fleet.listCollectors).mockResolvedValue({
+      data: {
+        total: 3,
+        items: [
+          apiCollector({ id: "c1", name: "web-01", token_id: "t1", status: "online" }),
+          apiCollector({ id: "c2", name: "web-02", token_id: "t1", status: "offline" }),
+          apiCollector({ id: "c3", name: "db-01", token_id: "t2", status: "online" }),
+        ],
+      },
+    } as any);
     confirmMock.mockResolvedValue(true);
   });
+
+  const revokeDialog = () => wrapper.findComponent(FleetRevokeTokenDialog);
+
+  async function startRevoke(id = "t1") {
+    await wrapper.find(`[data-test="fleet-tokens-revoke-${id}"]`).trigger("click");
+    await flushPromises();
+  }
 
   afterEach(() => {
     wrapper?.unmount();
@@ -213,13 +232,27 @@ describe("FleetTokens", () => {
     expect(fleet.listTokens).toHaveBeenCalledTimes(2);
   });
 
-  it("revokes after a confirm that warns about connected collectors", async () => {
+  it("shows enrollments and the collectors in use, split online and offline", async () => {
+    wrapper = await mountTokens();
+    expect(wrapper.find('[data-test="fleet-tokens-in-use-t1"]').text()).toBe(
+      "1 online, 1 offline",
+    );
+    expect(wrapper.find('[data-test="fleet-tokens-in-use-t4"]').text()).toBe("—");
+  });
+
+  it("revokes from a dialog that lists the collectors using the token", async () => {
     vi.mocked(fleet.revokeToken).mockResolvedValue({ data: token({ revoked: true }) } as any);
     wrapper = await mountTokens();
-    await wrapper.find('[data-test="fleet-tokens-revoke-t1"]').trigger("click");
+    await startRevoke();
+    expect(revokeDialog().props("open")).toBe(true);
+    expect(revokeDialog().props("affected").map((c: { id: string }) => c.id)).toEqual([
+      "c1",
+      "c2",
+    ]);
+    expect(fleet.revokeToken).not.toHaveBeenCalled();
+    revokeDialog().vm.$emit("confirm", revokeDialog().props("token"));
     await settle();
-    expect(confirmMock).toHaveBeenCalledTimes(1);
-    expect(confirmMock.mock.calls[0][0].message).toContain("every collector");
+    expect(revokeDialog().props("open")).toBe(false);
     expect(fleet.revokeToken).toHaveBeenCalledWith(
       store.state.selectedOrganization.identifier,
       "t1",
@@ -252,11 +285,12 @@ describe("FleetTokens", () => {
     expect(wrapper.find('[data-test="fleet-tokens-error"]').exists()).toBe(true);
   });
 
-  it("does not revoke when the confirm is cancelled", async () => {
-    confirmMock.mockResolvedValue(false);
+  it("does not revoke when the dialog is cancelled", async () => {
     wrapper = await mountTokens();
-    await wrapper.find('[data-test="fleet-tokens-revoke-t1"]').trigger("click");
+    await startRevoke();
+    revokeDialog().vm.$emit("update:open", false);
     await settle();
+    expect(revokeDialog().props("open")).toBe(false);
     expect(fleet.revokeToken).not.toHaveBeenCalled();
   });
 
@@ -302,7 +336,8 @@ describe("FleetTokens", () => {
   it("disables revoke while a revoke is in flight", async () => {
     vi.mocked(fleet.revokeToken).mockReturnValue(new Promise(() => {}) as any);
     wrapper = await mountTokens();
-    await wrapper.find('[data-test="fleet-tokens-revoke-t1"]').trigger("click");
+    await startRevoke();
+    revokeDialog().vm.$emit("confirm", revokeDialog().props("token"));
     await flushPromises();
     expect(
       wrapper.find('[data-test="fleet-tokens-revoke-t2"]').attributes("disabled"),
@@ -317,7 +352,8 @@ describe("FleetTokens", () => {
       },
     });
     wrapper = await mountTokens();
-    await wrapper.find('[data-test="fleet-tokens-revoke-t1"]').trigger("click");
+    await startRevoke();
+    revokeDialog().vm.$emit("confirm", revokeDialog().props("token"));
     await settle();
     expect(toastMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -480,19 +516,14 @@ describe("FleetTokens", () => {
     expect(btn.attributes("disabled")).toBeUndefined();
   });
 
-  it("does not revoke in the new org when the org changes while confirming", async () => {
+  it("closes the revoke dialog when the org changes", async () => {
     const orgA = store.state.selectedOrganization;
-    let answer!: (v: boolean) => void;
-    confirmMock.mockReturnValue(new Promise((r) => (answer = r)));
     wrapper = await mountTokens();
-    await wrapper.find('[data-test="fleet-tokens-revoke-t1"]').trigger("click");
-    await flushPromises();
+    await startRevoke();
     store.commit("setSelectedOrganization", { ...orgA, identifier: "org-b" });
     await flushPromises();
-    answer(true);
-    await settle();
     try {
-      expect(fleet.revokeToken).not.toHaveBeenCalled();
+      expect(revokeDialog().props("open")).toBe(false);
     } finally {
       store.commit("setSelectedOrganization", orgA);
     }
@@ -535,26 +566,22 @@ describe("FleetTokens", () => {
     expect(block.text()).not.toMatch(/plaintext/i);
   });
 
-  it("does not revoke when the drawer's fleet changes while confirming", async () => {
-    let answer!: (v: boolean) => void;
-    confirmMock.mockReturnValue(new Promise((r) => (answer = r)));
+  it("closes the revoke dialog when the drawer's fleet changes", async () => {
     wrapper = await mountTokens();
-    await wrapper.find('[data-test="fleet-tokens-revoke-t1"]').trigger("click");
-    await flushPromises();
+    await startRevoke();
     await wrapper.setProps({ fleetId: "default" });
-    answer(true);
-    await settle();
-    expect(fleet.revokeToken).not.toHaveBeenCalled();
+    await flushPromises();
+    expect(revokeDialog().props("open")).toBe(false);
   });
 
-  it("asks for a destructive confirm before revoking", async () => {
-    vi.mocked(fleet.revokeToken).mockResolvedValue({ data: token({ revoked: true }) } as any);
+  it("enables the destructive revoke only once the token's name is typed", async () => {
     wrapper = await mountTokens();
-    await wrapper.find('[data-test="fleet-tokens-revoke-t1"]').trigger("click");
-    await settle();
-    expect(confirmMock.mock.calls[0][0]).toMatchObject({
-      confirmVariant: "destructive",
-      focusCancel: true,
-    });
+    await startRevoke();
+    const dialog = revokeDialog().findComponent({ name: "ODialog" });
+    expect(dialog.props("primaryButtonVariant")).toBe("destructive");
+    expect(dialog.props("primaryButtonDisabled")).toBe(true);
+    await revokeDialog().findComponent({ name: "OInput" }).vm.$emit("update:modelValue", "k8s-helm");
+    await flushPromises();
+    expect(dialog.props("primaryButtonDisabled")).toBe(false);
   });
 });

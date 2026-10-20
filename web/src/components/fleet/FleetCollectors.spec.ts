@@ -60,7 +60,13 @@ vi.mock("@/services/fleet", () => ({
   default: {
     listCollectors: vi.fn(),
     getCollector: vi.fn(),
-    unenrollCollector: vi.fn(),
+    listFleets: vi.fn(),
+    listTokens: vi.fn(),
+    deleteCollector: vi.fn(),
+    restartCollector: vi.fn(),
+    redeliverCollector: vi.fn(),
+    renameCollector: vi.fn(),
+    moveCollectors: vi.fn(),
   },
 }));
 
@@ -68,7 +74,7 @@ const collector = (over: Record<string, unknown> = {}) => ({
   id: "c1",
   name: "prod-web-01",
   hostname: "prod-web-01.acme.internal",
-  ip: "10.0.0.10",
+  last_connected_from: "10.0.0.10",
   status: "online",
   os: "linux",
   arch: "amd64",
@@ -78,7 +84,7 @@ const collector = (over: Record<string, unknown> = {}) => ({
   config: null,
   config_version: null,
   delivery: null,
-  drifted: null,
+  delivery_error: null,
   fleet: { id: "default", name: "default" },
   token_id: null,
   last_seen: Date.now(),
@@ -92,7 +98,7 @@ const items = [
     id: "c2",
     name: null,
     hostname: "edge-02",
-    ip: "10.9.9.9",
+    last_connected_from: "10.9.9.9",
     status: "offline",
     os: null,
     arch: null,
@@ -124,9 +130,9 @@ const DropdownItemStub = {
 };
 
 const MoveStub = {
-  name: "MoveAcrossFolders",
-  props: ["open", "activeFolderId", "moduleId", "type"],
-  emits: ["updated", "update:open"],
+  name: "FleetMoveDialog",
+  props: ["open", "collectorIds", "sourceFleetId"],
+  emits: ["moved", "update:open"],
   template: "<div />",
 };
 
@@ -139,7 +145,7 @@ async function mountList(path = "/", stubs: Record<string, unknown> = {}, props:
     props: { fleetId: "default", forbidden: false, allFleets: true, ...props },
     global: {
       plugins: [i18n, router, store],
-      stubs: { MoveAcrossFolders: MoveStub, ...stubs },
+      stubs: { FleetMoveDialog: MoveStub, ...stubs },
     },
   });
   await settle();
@@ -183,7 +189,9 @@ describe("FleetCollectors", () => {
 
   it("renders null config and OS as a dash in their own cells", async () => {
     wrapper = await mountList();
-    expect(wrapper.find('[data-test="fleet-collectors-config-c2"]').text()).toBe("—");
+    expect(wrapper.find('[data-test="fleet-collectors-config-c2"]').text()).toBe(
+      "No configuration assigned",
+    );
     expect(wrapper.find('[data-test="fleet-collectors-os-c2"]').text()).toBe("—");
     expect(wrapper.find('[data-test="fleet-collectors-os-c1"]').text()).toBe("Linux");
     expect(bodyText(wrapper)).not.toMatch(/undefined|null/);
@@ -201,7 +209,7 @@ describe("FleetCollectors", () => {
     expect(tiles(wrapper)).toMatchObject({
       offline: { value: 1 },
       degraded: { value: 0 },
-      drifted: { value: 0 },
+      unknown: { value: 0 },
       outdated: { value: 1 },
       online: { value: 1 },
       all: { value: 2 },
@@ -218,20 +226,6 @@ describe("FleetCollectors", () => {
     await settle();
     expect(bodyText(wrapper)).not.toContain("edge-02");
     expect(tiles(wrapper)).toMatchObject({ offline: { value: 1 }, all: { value: 2 } });
-  });
-
-  it("counts drift from the rows and filters to drifted collectors", async () => {
-    vi.mocked(fleet.listCollectors).mockResolvedValue({
-      data: { total: 2, items: [items[0], { ...items[1], drifted: true }] },
-    } as any);
-    wrapper = await mountList();
-    const drifted = tiles(wrapper).drifted;
-    expect(drifted.value).toBe(1);
-    expect(drifted.selectable).not.toBe(false);
-    wrapper.findComponent({ name: "OStatStrip" }).vm.$emit("select", "drifted");
-    await settle();
-    expect(bodyText(wrapper)).toContain("edge-02");
-    expect(bodyText(wrapper)).not.toContain("prod-web-01");
   });
 
   it("shows each collector's fleet in its own column in All mode only", async () => {
@@ -305,7 +299,7 @@ describe("FleetCollectors", () => {
     ["c2", "edge-02", "prod-web-01"],
     ["10.0.0.10", "prod-web-01", "edge-02"],
     ["edge", "edge-02", "prod-web-01"],
-  ])("search matches id, IP and fleet (%s)", async (q, shown, hidden) => {
+  ])("search matches id, peer address and fleet (%s)", async (q, shown, hidden) => {
     wrapper = await mountList();
     await wrapper.find('[data-test="fleet-collectors-search"] input').setValue(q);
     await settle();
@@ -341,8 +335,8 @@ describe("FleetCollectors", () => {
     expect(bodyText(wrapper)).toContain("prod-web-01");
     expect(bodyText(wrapper)).not.toContain("edge-02");
     wrapper.unmount();
-    wrapper = await mountList("/?status=drifted");
-    expect((wrapper.vm as any).statusFilter).toBe("drifted");
+    wrapper = await mountList("/?status=unknown");
+    expect((wrapper.vm as any).statusFilter).toBe("unknown");
   });
 
   it.each(["bogus"])("ignores an invalid ?status=%s", async (status) => {
@@ -400,27 +394,6 @@ describe("FleetCollectors", () => {
     ).toBe("Actions");
   });
 
-  it("shows the server's reason when an unenroll is refused", async () => {
-    confirmMock.mockResolvedValue(true);
-    vi.mocked(fleet.unenrollCollector).mockRejectedValue({
-      response: {
-        status: 403,
-        data: { message: "Only organization administrators can manage enrollment" },
-      },
-    });
-    wrapper = await mountList();
-    (wrapper.vm as any).selectedIds = ["c1"];
-    await settle();
-    await wrapper.find('[data-test="fleet-collectors-bulk-unenroll"]').trigger("click");
-    await settle();
-    expect(toastMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        variant: "error",
-        message: "Only organization administrators can manage enrollment",
-      }),
-    );
-  });
-
   it("shows no-access and drops cached rows when a refetch returns 403", async () => {
     wrapper = await mountList();
     vi.mocked(fleet.listCollectors).mockRejectedValueOnce({ response: { status: 403 } });
@@ -440,80 +413,6 @@ describe("FleetCollectors", () => {
     expect(wrapper.find('[data-test="fleet-collectors-error"]').exists()).toBe(false);
   });
 
-  it("renders unknown drift as a dash", async () => {
-    // The drift column is hidden by default; a persisted column choice shows it.
-    localStorage.setItem(
-      COLUMN_STORAGE_KEY,
-      JSON.stringify({ "fleet-collectors": { visibility: { drift: true } } }),
-    );
-    try {
-      wrapper = await mountList();
-      expect(wrapper.find('[data-test="fleet-collectors-drift-c1"]').text()).toBe("—");
-    } finally {
-      localStorage.removeItem(COLUMN_STORAGE_KEY);
-    }
-  });
-
-  it("renders none of the removed controls: row restart/upgrade and bulk upgrade", async () => {
-    wrapper = await mountList("/", { ODropdown: DropdownStub, ODropdownItem: DropdownItemStub });
-    (wrapper.vm as any).selectedIds = ["c1"];
-    await settle();
-    expect(wrapper.find('[data-test="fleet-collectors-row-unenroll-c1"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="fleet-collectors-bulk-unenroll"]').exists()).toBe(true);
-    for (const id of ["row-restart-c1", "row-upgrade-c1", "bulk-upgrade"]) {
-      expect(wrapper.find(`[data-test="fleet-collectors-${id}"]`).exists()).toBe(false);
-    }
-  });
-
-  it("bulk unenrolls once per selected collector after a confirm", async () => {
-    confirmMock.mockResolvedValue(true);
-    vi.mocked(fleet.unenrollCollector).mockResolvedValue({ status: 204 } as any);
-    wrapper = await mountList();
-    expect(fleet.listCollectors).toHaveBeenCalledTimes(1);
-    (wrapper.vm as any).selectedIds = ["c1", "c2"];
-    await settle();
-    const btn = wrapper.find('[data-test="fleet-collectors-bulk-unenroll"]');
-    expect(btn.attributes("aria-disabled")).toBeUndefined();
-    await btn.trigger("click");
-    await settle();
-    expect(confirmMock).toHaveBeenCalledTimes(1);
-    expect(confirmMock.mock.calls[0][0]).toMatchObject({
-      confirmVariant: "destructive",
-      focusCancel: true,
-    });
-    const org = store.state.selectedOrganization.identifier;
-    expect(fleet.unenrollCollector).toHaveBeenCalledTimes(2);
-    expect(fleet.unenrollCollector).toHaveBeenCalledWith(org, "c1");
-    expect(fleet.unenrollCollector).toHaveBeenCalledWith(org, "c2");
-    expect(fleet.listCollectors).toHaveBeenCalledTimes(2);
-    expect((wrapper.vm as any).selectedIds).toEqual([]);
-  });
-
-  it("does not unenroll when the bulk confirm is cancelled", async () => {
-    confirmMock.mockResolvedValue(false);
-    wrapper = await mountList();
-    (wrapper.vm as any).selectedIds = ["c1"];
-    await settle();
-    await wrapper.find('[data-test="fleet-collectors-bulk-unenroll"]').trigger("click");
-    await settle();
-    expect(fleet.unenrollCollector).not.toHaveBeenCalled();
-  });
-
-  it("unenrolls a single collector from its row menu", async () => {
-    confirmMock.mockResolvedValue(true);
-    vi.mocked(fleet.unenrollCollector).mockResolvedValue({ status: 204 } as any);
-    wrapper = await mountList("/", { ODropdown: DropdownStub, ODropdownItem: DropdownItemStub });
-    const item = wrapper.find('[data-test="fleet-collectors-row-unenroll-c1"]');
-    expect(item.attributes("disabled")).toBeUndefined();
-    await item.trigger("click");
-    await settle();
-    expect(fleet.unenrollCollector).toHaveBeenCalledTimes(1);
-    expect(fleet.unenrollCollector).toHaveBeenCalledWith(
-      store.state.selectedOrganization.identifier,
-      "c1",
-    );
-  });
-
   it("opens the drawer when ?collector= changes on an already mounted view", async () => {
     wrapper = await mountList();
     const drawer = () => wrapper.findComponent({ name: "FleetCollectorDrawer" });
@@ -522,26 +421,6 @@ describe("FleetCollectors", () => {
     await settle();
     expect(drawer().props("open")).toBe(true);
     expect(drawer().props("collectorId")).toBe("c2");
-  });
-
-  it("keeps failed ids selected and gives the first failure's reason after a partial unenroll", async () => {
-    confirmMock.mockResolvedValue(true);
-    vi.mocked(fleet.unenrollCollector).mockImplementation(((_org: string, id: string) =>
-      id === "c1"
-        ? Promise.resolve({ status: 204 })
-        : Promise.reject({
-            response: { status: 404, data: { message: "collector c2 not found" } },
-          })) as any);
-    wrapper = await mountList();
-    (wrapper.vm as any).selectedIds = ["c1", "c2"];
-    await settle();
-    await wrapper.find('[data-test="fleet-collectors-bulk-unenroll"]').trigger("click");
-    await settle();
-    expect((wrapper.vm as any).selectedIds).toEqual(["c2"]);
-    const call = toastMock.mock.calls.at(-1)![0];
-    expect(call.variant).toBe("warning");
-    expect(call.message).toContain("1 of 2");
-    expect(call.message).toContain("collector c2 not found");
   });
 
   it("offers only the OS filter on a phone through a filters drawer", async () => {
@@ -582,91 +461,8 @@ describe("FleetCollectors", () => {
     }
   });
 
-  it("does not unenroll in the new org when the org changes while confirming", async () => {
-    const orgA = store.state.selectedOrganization;
-    let answer!: (v: boolean) => void;
-    confirmMock.mockReturnValue(new Promise((r) => (answer = r)));
-    wrapper = await mountList();
-    (wrapper.vm as any).selectedIds = ["c1"];
-    await settle();
-    await wrapper.find('[data-test="fleet-collectors-bulk-unenroll"]').trigger("click");
-    await flushPromises();
-    store.commit("setSelectedOrganization", { ...orgA, identifier: "org-b" });
-    await flushPromises();
-    answer(true);
-    await settle();
-    try {
-      expect(fleet.unenrollCollector).not.toHaveBeenCalled();
-    } finally {
-      store.commit("setSelectedOrganization", orgA);
-    }
-  });
-
   const moveDialog = (w: VueWrapper) => w.findComponent({ name: "MoveAcrossFolders" });
 
-  it("moves a row's collector from its menu, naming its fleet as the source", async () => {
-    wrapper = await mountList("/", { ODropdown: DropdownStub, ODropdownItem: DropdownItemStub });
-    expect(moveDialog(wrapper).props("open")).toBe(false);
-    await wrapper.find('[data-test="fleet-collectors-row-move-c2"]').trigger("click");
-    await flushPromises();
-    expect(moveDialog(wrapper).props()).toMatchObject({
-      open: true,
-      type: "fleets",
-      moduleId: ["c2"],
-      activeFolderId: "f1",
-    });
-  });
-
-  it("moves a mixed selection in one request with no source fleet", async () => {
-    wrapper = await mountList();
-    (wrapper.vm as any).selectedIds = ["c1", "c2"];
-    await settle();
-    const btn = wrapper.find('[data-test="fleet-collectors-bulk-move"]');
-    expect(btn.attributes("aria-disabled")).toBeUndefined();
-    await btn.trigger("click");
-    await flushPromises();
-    expect(moveDialog(wrapper).props()).toMatchObject({
-      open: true,
-      moduleId: ["c1", "c2"],
-      activeFolderId: "",
-    });
-  });
-
-  it("names the shared source fleet when every selected collector is in it", async () => {
-    wrapper = await mountList();
-    (wrapper.vm as any).selectedIds = ["c2"];
-    await settle();
-    await wrapper.find('[data-test="fleet-collectors-bulk-move"]').trigger("click");
-    await flushPromises();
-    expect(moveDialog(wrapper).props("activeFolderId")).toBe("f1");
-  });
-
-  it("clears the selection and refetches every fleet read after a move", async () => {
-    wrapper = await mountList();
-    (wrapper.vm as any).selectedIds = ["c1", "c2"];
-    await settle();
-    const invalidate = vi.spyOn(queryClient, "invalidateQueries");
-    moveDialog(wrapper).vm.$emit("updated", "", "f1");
-    await flushPromises();
-    expect((wrapper.vm as any).selectedIds).toEqual([]);
-    expect(invalidate).toHaveBeenCalledWith({
-      queryKey: fleetKeys.all(store.state.selectedOrganization.identifier),
-    });
-    invalidate.mockRestore();
-  });
-
-  it("offers no Apply or Add to group, and unenroll to everyone", async () => {
-    wrapper = await mountList("/", { ODropdown: DropdownStub, ODropdownItem: DropdownItemStub });
-    expect(wrapper.find('[data-test="fleet-collectors-row-apply-c1"]').exists()).toBe(false);
-    expect(
-      wrapper.find('[data-test="fleet-collectors-row-unenroll-c1"]').attributes("disabled"),
-    ).toBeUndefined();
-    (wrapper.vm as any).selectedIds = ["c1"];
-    await settle();
-    expect(wrapper.find('[data-test="fleet-collectors-bulk-apply"]').exists()).toBe(false);
-    const bulk = wrapper.find('[data-test="fleet-collectors-bulk-unenroll"]');
-    expect(bulk.attributes("aria-disabled")).toBeUndefined();
-  });
   it.each<[string, (w: VueWrapper) => Promise<unknown>]>([
     ["search", (w) => w.find('[data-test="fleet-collectors-search"] input').setValue("prod")],
     ["status", (w) => w.find('[data-test="fleet-collectors-stat-offline"]').trigger("click")],
@@ -719,21 +515,6 @@ describe("FleetCollectors", () => {
     expect((wrapper.vm as any).selectedIds).toEqual(["c1"]);
   });
 
-  it("acts in bulk only on visible rows", async () => {
-    confirmMock.mockResolvedValue(true);
-    vi.mocked(fleet.unenrollCollector).mockResolvedValue({ status: 204 } as any);
-    wrapper = await mountList("/", {}, { allFleets: false, fleetId: "f1" });
-    (wrapper.vm as any).selectedIds = ["c1", "c2"];
-    await settle();
-    await wrapper.find('[data-test="fleet-collectors-bulk-unenroll"]').trigger("click");
-    await settle();
-    expect(fleet.unenrollCollector).toHaveBeenCalledTimes(1);
-    expect(fleet.unenrollCollector).toHaveBeenCalledWith(
-      store.state.selectedOrganization.identifier,
-      "c2",
-    );
-  });
-
   it("keeps the drawer open across a scope and a fleet change", async () => {
     vi.mocked(fleet.getCollector).mockReturnValue(new Promise(() => {}) as any);
     wrapper = await mountList("/?collector=c1", {}, { allFleets: false });
@@ -744,5 +525,141 @@ describe("FleetCollectors", () => {
     await settle();
     expect(drawer().props("open")).toBe(true);
     expect(drawer().props("collectorId")).toBe("c1");
+  });
+
+  describe("collector actions", () => {
+    const menu = { ODropdown: DropdownStub, ODropdownItem: DropdownItemStub };
+
+    beforeEach(() => {
+      confirmMock.mockResolvedValue(true);
+      vi.mocked(fleet.listFleets).mockResolvedValue({ data: { items: [] } } as any);
+    });
+
+    it("offers Move, Restart and Remove on a selection, and no unenroll anywhere", async () => {
+      wrapper = await mountList("/", menu);
+      (wrapper.vm as any).selectedIds = ["c1"];
+      await settle();
+      for (const id of ["bulk-move", "bulk-restart", "bulk-remove", "row-remove-c1"])
+        expect(wrapper.find(`[data-test="fleet-collectors-${id}"]`).exists(), id).toBe(true);
+      expect(wrapper.find('[data-test^="fleet-collectors-row-unenroll"]').exists()).toBe(false);
+    });
+
+    it("offers Restart, Redeliver and Rename from a row menu, Redeliver only with a configuration", async () => {
+      vi.mocked(fleet.listCollectors).mockResolvedValue({
+        data: { total: 2, items: [collector({ config: "edge", config_version: 2 }), items[1]] },
+      } as any);
+      wrapper = await mountList("/", menu);
+      for (const id of ["row-restart-c1", "row-redeliver-c1", "row-rename-c1"])
+        expect(wrapper.find(`[data-test="fleet-collectors-${id}"]`).exists(), id).toBe(true);
+      expect(wrapper.find('[data-test="fleet-collectors-row-redeliver-c2"]').exists()).toBe(false);
+    });
+
+    it("removes the selected rows once each after a confirm that warns they reappear", async () => {
+      vi.mocked(fleet.deleteCollector).mockResolvedValue({ status: 204 } as any);
+      wrapper = await mountList();
+      (wrapper.vm as any).selectedIds = ["c1", "c2"];
+      await settle();
+      await wrapper.find('[data-test="fleet-collectors-bulk-remove"]').trigger("click");
+      await settle();
+      expect(confirmMock.mock.calls[0][0].title).toBe("Remove 2 collectors?");
+      expect(confirmMock.mock.calls[0][0].message).toContain("1 of these collectors is online");
+      expect(fleet.deleteCollector).toHaveBeenCalledTimes(2);
+      expect((wrapper.vm as any).selectedIds).toEqual([]);
+    });
+
+    it("does not remove when the confirm is cancelled", async () => {
+      confirmMock.mockResolvedValue(false);
+      wrapper = await mountList("/", menu);
+      await wrapper.find('[data-test="fleet-collectors-row-remove-c1"]').trigger("click");
+      await settle();
+      expect(fleet.deleteCollector).not.toHaveBeenCalled();
+    });
+
+    it("keeps failed ids selected and names the first failure after a partial remove", async () => {
+      vi.mocked(fleet.deleteCollector)
+        .mockResolvedValueOnce({ status: 204 } as any)
+        .mockRejectedValueOnce({ response: { status: 403, data: { message: "no put on f1" } } });
+      wrapper = await mountList();
+      (wrapper.vm as any).selectedIds = ["c1", "c2"];
+      await settle();
+      await wrapper.find('[data-test="fleet-collectors-bulk-remove"]').trigger("click");
+      await settle();
+      expect((wrapper.vm as any).selectedIds).toEqual(["c2"]);
+      expect(toastMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          variant: "warning",
+          message: expect.stringContaining("no put on f1"),
+        }),
+      );
+    });
+
+    it("restarts the selection after a confirm, once per collector", async () => {
+      vi.mocked(fleet.restartCollector).mockResolvedValue({ data: { queued: true } } as any);
+      wrapper = await mountList();
+      (wrapper.vm as any).selectedIds = ["c1", "c2"];
+      await settle();
+      await wrapper.find('[data-test="fleet-collectors-bulk-restart"]').trigger("click");
+      await settle();
+      expect(fleet.restartCollector).toHaveBeenCalledTimes(2);
+    });
+
+    it("redelivers a row without asking", async () => {
+      vi.mocked(fleet.listCollectors).mockResolvedValue({
+        data: { total: 1, items: [collector({ config: "edge", config_version: 2 })] },
+      } as any);
+      vi.mocked(fleet.redeliverCollector).mockResolvedValue({ data: { revision: 2 } } as any);
+      wrapper = await mountList("/", menu);
+      await wrapper.find('[data-test="fleet-collectors-row-redeliver-c1"]').trigger("click");
+      await settle();
+      expect(confirmMock).not.toHaveBeenCalled();
+      expect(fleet.redeliverCollector).toHaveBeenCalledWith(
+        store.state.selectedOrganization.identifier,
+        "c1",
+      );
+    });
+
+    it("opens the rename dialog with the row's nickname", async () => {
+      wrapper = await mountList("/", menu);
+      await wrapper.find('[data-test="fleet-collectors-row-rename-c1"]').trigger("click");
+      await settle();
+      const dialog = wrapper.findComponent({ name: "FleetNameDialog" });
+      expect(dialog.props("open")).toBe(true);
+      expect(dialog.props("initial")).toBe("prod-web-01");
+    });
+
+    it("moves a row from its menu, naming its fleet as the source", async () => {
+      wrapper = await mountList("/", menu);
+      await wrapper.find('[data-test="fleet-collectors-row-move-c2"]').trigger("click");
+      const move = wrapper.findComponent(MoveStub);
+      expect(move.props("open")).toBe(true);
+      expect(move.props("collectorIds")).toEqual(["c2"]);
+      expect(move.props("sourceFleetId")).toBe("f1");
+    });
+
+    it("moves a mixed selection with no source fleet and clears the selection after", async () => {
+      wrapper = await mountList();
+      (wrapper.vm as any).selectedIds = ["c1", "c2"];
+      await settle();
+      await wrapper.find('[data-test="fleet-collectors-bulk-move"]').trigger("click");
+      const move = wrapper.findComponent(MoveStub);
+      expect(move.props("collectorIds")).toEqual(["c1", "c2"]);
+      expect(move.props("sourceFleetId")).toBe("");
+      move.vm.$emit("moved");
+      await settle();
+      expect((wrapper.vm as any).selectedIds).toEqual([]);
+    });
+
+    it("shows a placeholder for consistency until it is computed", async () => {
+      localStorage.setItem(
+        COLUMN_STORAGE_KEY,
+        JSON.stringify({ "fleet-collectors": { visibility: { consistency: true } } }),
+      );
+      try {
+        wrapper = await mountList();
+        expect(wrapper.find('[data-test="fleet-collectors-consistency-c1"]').text()).toBe("—");
+      } finally {
+        localStorage.removeItem(COLUMN_STORAGE_KEY);
+      }
+    });
   });
 });

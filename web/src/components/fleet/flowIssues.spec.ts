@@ -19,11 +19,8 @@ import { defineComponent } from "vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import { queryClient } from "@/composables/query/queryClient";
-import fleet, {
-  type FleetCollector,
-  type FleetFlowLink,
-  type FleetRollout,
-} from "@/services/fleet";
+import fleet, { type FleetFlowLink } from "@/services/fleet";
+import { apiCollector, apiRollout } from "./fleet.fixtures";
 import { raw } from "@/types/i18n";
 import { useFlowIssues } from "./flowIssues";
 
@@ -38,52 +35,8 @@ vi.mock("@/services/fleet", () => ({
 
 const DAY = 24 * 3600_000;
 
-const collector = (over: Partial<FleetCollector> = {}): FleetCollector => ({
-  id: "c1",
-  name: "web-01",
-  hostname: null,
-  ip: null,
-  status: "online",
-  os: "linux",
-  arch: "amd64",
-  distribution: null,
-  version: "0.162.0",
-  outdated: false,
-  config: "edge",
-  config_version: 2,
-  delivery: "running",
-  drifted: false,
-  fleet: { id: "default", name: "default" },
-  token_id: null,
-  last_seen: Date.now(),
-  enrolled_at: Date.now() - DAY,
-  ...over,
-});
-
-const rollout = (over: Partial<FleetRollout> = {}): FleetRollout => ({
-  id: "r1",
-  kind: "config",
-  config: "edge",
-  from_version: 1,
-  to_version: 2,
-  fleet: { id: "default", name: "default" },
-  strategy: "immediate",
-  status: "completed",
-  total: 1,
-  attempted: 1,
-  accepted: 1,
-  failed: 0,
-  assigned: 1,
-  started_at: Date.now() - 3600_000,
-  scheduled_for: null,
-  started_by: "ana@acme.io",
-  auto_rollback: false,
-  phases: [],
-  gates: [],
-  failure: null,
-  events: [],
-  ...over,
-});
+const collector = apiCollector;
+const rollout = apiRollout;
 
 const link = (over: Partial<FleetFlowLink> = {}): FleetFlowLink => ({
   config: "edge",
@@ -222,69 +175,49 @@ describe("flow map config issues", () => {
   });
 
   it("shows an auto-reverted rollout as an error, and one a user superseded as nothing", async () => {
-    const failure = { kind: "rejection" as const, gate: "rejected", observed: "1", threshold: "0" };
-    serve(
-      [],
-      [
-        rollout({
-          status: "superseded",
-          failure,
-          events: [{ key: "autoReverted", at: Date.now() }],
-        }),
-      ],
-    );
+    serve([], [rollout({ status: "reverted", auto_revert: true })]);
     let api = await mountIssues();
     const [issue] = api.configIssues("edge");
     expect(issue.severity).toBe("error");
     expect(String(issue.title)).toBe("v2 reverted automatically");
     wrapper?.unmount();
     queryClient.clear();
-    serve([], [rollout({ status: "superseded", failure })]);
+    serve([], [rollout({ status: "superseded" })]);
     api = await mountIssues();
     expect(api.configIssues("edge")).toEqual([]);
   });
 
-  it("skips a newer upgrade rollout and shows the older config rollout", async () => {
-    serve(
-      [],
-      [
-        rollout({ id: "u1", kind: "upgrade", status: "halted" }),
-        rollout({ id: "r0", status: "halted", started_at: Date.now() - DAY }),
-      ],
-    );
+  it("explains a halted rollout with its halt class and reason", async () => {
+    const halt = {
+      class: "proven_bad" as const,
+      reason: "1 collector rejected",
+      at: Date.now(),
+      exits: ["revert" as const],
+    };
+    serve([], [rollout({ status: "halted", halt })]);
     const api = await mountIssues();
     const [issue] = api.configIssues("edge");
-    expect(issue.action).toEqual({ kind: "rollout", rolloutId: "r0" });
+    expect(issue.severity).toBe("error");
+    expect(issue.evidence).toBe("Proven bad: 1 collector rejected");
+    expect(issue.action).toEqual({ kind: "rollout", rolloutId: "r1" });
   });
 
-  it("warns on drift, never on unknown drift, and informs on outdated collectors", async () => {
+  it("informs on outdated collectors and never mentions drift", async () => {
     serve([
-      collector({ id: "c1", name: "drifty", drifted: true }),
-      collector({ id: "c2", name: "unknown", drifted: null }),
       collector({ id: "c3", name: "old", outdated: true }),
-      collector({ id: "c4", config: "other", drifted: true }),
+      collector({ id: "c4", config: "other", outdated: true }),
     ]);
     const api = await mountIssues();
     const out = api.configIssues("edge");
-    expect(out.map((i) => [i.id, i.severity])).toEqual([
-      ["drift", "warning"],
-      ["behind", "info"],
-    ]);
-    expect(out[0].evidence).toContain("drifty");
-    expect(out[0].evidence).not.toContain("unknown");
-    expect(out[1].title).toBe("1 collector older than the target version");
-    expect(out[1].evidence).toBe("Older than the target version: old");
+    expect(out.map((i) => [i.id, i.severity])).toEqual([["behind", "info"]]);
+    expect(out[0].title).toBe("1 collector older than the target version");
+    expect(out[0].evidence).toBe("Older than the target version: old");
   });
 
-  it("sends drift and offline to the collectors of that config", async () => {
-    serve([collector({ id: "c1", drifted: true }), collector({ id: "c2", status: "offline" })]);
+  it("sends offline collectors to the collectors of that config", async () => {
+    serve([collector({ id: "c2", status: "offline" })]);
     const api = await mountIssues();
-    const actions = api
-      .configIssues("edge")
-      .filter((i) => i.action.kind === "collectors")
-      .map((i) => i.action);
-    expect(actions).toEqual([
-      { kind: "collectors", query: { q: "edge" } },
+    expect(api.configIssues("edge").map((i) => i.action)).toEqual([
       { kind: "collectors", query: { q: "edge" } },
     ]);
   });

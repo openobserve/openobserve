@@ -17,9 +17,17 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
-import fleet from "@/services/fleet";
+import fleet, { type FleetRollout } from "@/services/fleet";
 import { queryClient } from "@/composables/query/queryClient";
 import FleetRollouts from "./FleetRollouts.vue";
+import { apiCollector, apiFleet, apiRollout } from "./fleet.fixtures";
+
+const { confirmMock, toastMock } = vi.hoisted(() => ({ confirmMock: vi.fn(), toastMock: vi.fn() }));
+
+vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: toastMock }));
+vi.mock("@/composables/useConfirmDialog", () => ({
+  useConfirmDialog: () => ({ confirm: confirmMock }),
+}));
 
 vi.mock("@/aws-exports", async (importOriginal) => {
   const actual: any = await importOriginal();
@@ -31,95 +39,72 @@ vi.mock("@/services/fleet", () => ({
     listRollouts: vi.fn(),
     getRollout: vi.fn(),
     listFleets: vi.fn(),
+    listCollectors: vi.fn(),
+    resumeRollout: vi.fn(),
+    revertRollout: vi.fn(),
+    skipRollout: vi.fn(),
   },
 }));
 
-const phase = (size: number, status: string) => ({
-  id: "p1",
-  label: "all",
-  size,
-  assigned: size,
-  attempted: size,
-  accepted: 0,
-  failed: 0,
-  status,
-});
+const F1 = { id: "f1", name: "edge-fleet" };
 
-const rollout = (over: Record<string, unknown> = {}) => ({
-  id: "r1",
-  kind: "config",
-  config: "edge",
-  from_version: null,
-  to_version: 1,
-  fleet: { id: "f1", name: "edge-fleet" },
-  strategy: "immediate",
-  status: "completed",
-  total: 2,
-  attempted: 2,
-  accepted: 2,
-  failed: 0,
-  assigned: 2,
-  started_at: Date.now() - 60_000,
-  scheduled_for: null,
-  started_by: "ana@acme.io",
-  auto_rollback: false,
-  phases: [phase(2, "done")],
-  gates: [],
-  failure: null,
-  events: [{ key: "deploying", at: Date.now() - 60_000 }],
-  ...over,
-});
-
-const items = [
-  rollout(),
-  rollout({
-    id: "r2",
-    config: "gateway",
-    from_version: 1,
-    to_version: 2,
-    fleet: { id: "gone", name: null },
-    status: "in_progress",
-    total: 3,
-    accepted: 1,
-    phases: [phase(3, "running")],
-  }),
-  rollout({
-    id: "r3",
-    config: "edge",
-    from_version: 1,
-    to_version: 2,
-    status: "halted",
-    failed: 1,
-    failure: {
-      kind: "rejection",
-      gate: "rejected",
-      observed: "1",
-      threshold: "0",
-      message: "unknown receiver",
-    },
-    phases: [{ ...phase(2, "failed"), failed: 1 }],
-  }),
-];
-
-const newer = rollout({ id: "r5", config: "edge-newer", started_at: Date.now() - 1_000 });
-
-const apiFleet = (id: string, stable: { config: string; version: number }) => ({
-  id,
-  name: id,
-  state: {
-    desired: { config: "edge", version: 2 },
-    stable,
-    revision: null,
-    collectors: 2,
-    online: 2,
-    at_desired: 0,
+const halted = apiRollout({
+  id: "r3",
+  fleet: F1,
+  status: "halted",
+  total: 3,
+  running: 1,
+  batching: { kind: "canary", first: 2 },
+  halt: {
+    class: "proven_bad",
+    reason: "1 collector rejected: unknown receiver",
+    at: Date.now(),
+    exits: ["revert", "fix_forward", "skip"],
   },
+  phases: [
+    {
+      index: 0,
+      size: 2,
+      status: "failed",
+      targeted: 2,
+      sent: 2,
+      confirmed: 1,
+      rejected: 1,
+      gate: null,
+    },
+    {
+      index: 1,
+      size: 1,
+      status: "pending",
+      targeted: 0,
+      sent: 0,
+      confirmed: 0,
+      rejected: 0,
+      gate: null,
+    },
+  ],
+  members: [
+    { collector_id: "c1", phase: 0, state: "running", excluded: false },
+    { collector_id: "c2", phase: 0, state: "rejected", excluded: false },
+    { collector_id: "c3", phase: 1, state: "pending", excluded: false },
+  ],
+  events: [
+    { at: Date.now() - 60_000, key: "deploying", phase: 0, detail: null },
+    { at: Date.now() - 30_000, key: "rejected", phase: 0, detail: "unknown receiver" },
+    { at: Date.now() - 30_000, key: "halted", phase: 0, detail: null },
+  ],
+  started_at: Date.now() - 120_000,
 });
 
-const fleets = [
-  apiFleet("f1", { config: "edge", version: 1 }),
-  apiFleet("f2", { config: "edge", version: 4 }),
-];
+const done = apiRollout({ id: "r1", fleet: F1, started_at: Date.now() - 600_000 });
+const newer = apiRollout({
+  id: "r5",
+  fleet: F1,
+  config: "edge-newer",
+  started_at: Date.now() - 1_000,
+});
+const other = apiRollout({ id: "r2", config: "gateway", fleet: { id: "f2", name: "f2" } });
+const items: FleetRollout[] = [done, other, halted, newer];
 
 const DrawerStub = {
   props: ["open", "title", "subTitle"],
@@ -137,37 +122,51 @@ const settle = async () => {
 async function mountDrawer(rolloutId: string | null = null) {
   const wrapper = mount(FleetRollouts, {
     attachTo: document.body,
-    props: {
-      open: true,
-      fleetId: "f1",
-      fleetName: "edge-fleet",
-      rolloutId,
-    },
+    props: { open: true, fleetId: "f1", fleetName: "edge-fleet", rolloutId },
     global: { plugins: [i18n, store], stubs: { ODrawer: DrawerStub } },
   });
   await settle();
   return wrapper;
 }
 
-const bodyText = (w: VueWrapper) => w.find('[data-test="o2-table-body"]').text();
-const drawer = (w: VueWrapper) => w.find('[data-test="fleet-rollouts-drawer"]');
 const org = () => store.state.selectedOrganization.identifier;
 
 describe("FleetRollouts", () => {
   let wrapper: VueWrapper;
 
   beforeEach(() => {
-    vi.mocked(fleet.listFleets).mockResolvedValue({ data: { items: fleets } } as any);
-    vi.mocked(fleet.listRollouts).mockResolvedValue({ data: { items: [...items, newer] } } as any);
+    confirmMock.mockResolvedValue(true);
+    vi.mocked(fleet.listFleets).mockResolvedValue({
+      data: {
+        items: [
+          apiFleet({
+            id: "f1",
+            name: "edge-fleet",
+            state: {
+              desired: { config: "edge", version: 2 },
+              stable: { config: "edge", version: 1 },
+              rollout: { id: "r3", status: "halted" },
+              collectors: 3,
+              online: 3,
+              at_desired: 1,
+            },
+          }),
+        ],
+      },
+    } as any);
+    vi.mocked(fleet.listCollectors).mockResolvedValue({
+      data: {
+        total: 3,
+        items: [
+          apiCollector({ id: "c1", name: "web-01" }),
+          apiCollector({ id: "c2", name: "web-02" }),
+          apiCollector({ id: "c3", name: "web-03" }),
+        ],
+      },
+    } as any);
+    vi.mocked(fleet.listRollouts).mockResolvedValue({ data: { items } } as any);
     vi.mocked(fleet.getRollout).mockImplementation(
-      async (_o: string, id: string) =>
-        ({
-          data: {
-            ...[...items, newer].find((r) => r.id === id),
-            members: ["c1", "c2"],
-            still_on_previous: 0,
-          },
-        }) as any,
+      async (_o: string, id: string) => ({ data: items.find((r) => r.id === id) }) as any,
     );
   });
 
@@ -180,179 +179,116 @@ describe("FleetRollouts", () => {
   it("lists only this fleet's rollouts, the active one first and then the newest", async () => {
     wrapper = await mountDrawer();
     expect(fleet.listRollouts).toHaveBeenCalledWith(org());
-    const text = bodyText(wrapper);
+    const text = wrapper.find('[data-test="o2-table-body"]').text();
     expect(text).not.toContain("gateway");
-    expect(text.indexOf("unknown receiver")).toBeLessThan(text.indexOf("edge-newer"));
-    expect(text.indexOf("edge-newer")).toBeLessThan(text.lastIndexOf("→ v1"));
-    expect(text).not.toMatch(/vnull|undefined|null/);
+    expect(text.indexOf("Proven bad")).toBeLessThan(text.indexOf("edge-newer"));
+    expect(text).not.toMatch(/undefined|null/);
   });
 
-  it("says an empty fleet's rollout targeted no collectors, with a neutral bar", async () => {
-    vi.mocked(fleet.listRollouts).mockResolvedValue({
-      data: {
-        items: [
-          rollout({ id: "r0", total: 0, attempted: 0, accepted: 0, assigned: 0, phases: [] }),
-        ],
-      },
-    } as any);
-    vi.mocked(fleet.getRollout).mockResolvedValue({
-      data: {
-        ...rollout({
-          id: "r0",
-          total: 0,
-          attempted: 0,
-          accepted: 0,
-          assigned: 0,
-          phases: [],
-          events: [{ key: "completed", at: 1 }],
-        }),
-        members: [],
-        still_on_previous: 0,
-      },
-    } as any);
+  it("opens a rollout from its row and goes back to the list", async () => {
     wrapper = await mountDrawer();
-    expect(bodyText(wrapper)).toContain("No collectors targeted");
-    expect(bodyText(wrapper)).not.toContain("0 of 0");
-    expect(bodyText(wrapper)).not.toContain("Completed");
-    expect(wrapper.findComponent({ name: "OProgressBar" }).props("variant")).toBe("default");
-    await wrapper.setProps({ rolloutId: "r0" });
-    await settle();
-    expect(wrapper.find('[data-test="fleet-rollouts-status"]').text()).toBe(
-      "No collectors targeted",
-    );
-    const items = wrapper.findAllComponents({ name: "OTimelineItem" });
-    expect(items.map((i) => i.props("variant"))).toEqual(["muted"]);
-    expect(items.map((i) => String(i.props("title")))).toEqual(["No collectors targeted"]);
-  });
-
-  it("keeps a halted zero-collector rollout's timeline in its own tones", async () => {
-    vi.mocked(fleet.getRollout).mockResolvedValue({
-      data: {
-        ...rollout({
-          id: "h0",
-          status: "halted",
-          total: 0,
-          attempted: 0,
-          accepted: 0,
-          assigned: 0,
-          phases: [],
-          events: [
-            { key: "halted", at: 1 },
-            { key: "completed", at: 2 },
-          ],
-        }),
-        members: [],
-        still_on_previous: 0,
-      },
-    } as any);
-    wrapper = await mountDrawer("h0");
-    const items = wrapper.findAllComponents({ name: "OTimelineItem" });
-    expect(items.map((i) => i.props("variant"))).toEqual(["destructive", "success"]);
-    expect(String(items[1].props("title"))).toBe("Completed");
-    expect(wrapper.find('[data-test="fleet-rollouts-status"]').text()).toBe("Halted");
-  });
-
-  it("hides the zero-size phase the backend records for an empty completed rollout", async () => {
-    vi.mocked(fleet.getRollout).mockResolvedValue({
-      data: {
-        ...rollout({
-          id: "e0",
-          status: "completed",
-          total: 0,
-          attempted: 0,
-          accepted: 0,
-          assigned: 0,
-          phases: [phase(0, "running")],
-          gates: [{ id: "heartbeat", threshold: "95%", observed: "-", status: "pending" }],
-        }),
-        members: [],
-        still_on_previous: 0,
-      },
-    } as any);
-    wrapper = await mountDrawer("e0");
-    expect(wrapper.find('[data-test="fleet-rollouts-status"]').text()).toBe(
-      "No collectors targeted",
-    );
-    expect(wrapper.find('[data-test^="fleet-rollout-phases-"]').exists()).toBe(false);
-    expect(drawer(wrapper).text()).not.toContain("Progress");
-    expect(drawer(wrapper).text()).not.toContain("Running");
-  });
-
-  it("hides the Progress section of a rollout without phases", async () => {
-    vi.mocked(fleet.getRollout).mockResolvedValue({
-      data: { ...rollout({ id: "p0", phases: [] }), members: [], still_on_previous: 0 },
-    } as any);
-    wrapper = await mountDrawer("p0");
-    expect(drawer(wrapper).text()).not.toContain("Progress");
-  });
-
-  it("titles the list with the fleet's name", async () => {
-    wrapper = await mountDrawer();
-    expect(drawer(wrapper).text()).toContain("Rollouts");
-    expect(drawer(wrapper).text()).toContain("edge-fleet");
-  });
-
-  it("shows the rejection reason on a halted row", async () => {
-    wrapper = await mountDrawer();
-    expect(wrapper.find('[data-test="fleet-rollout-table-failure-r3"]').text()).toContain(
-      "unknown receiver",
-    );
-  });
-
-  it("opens a rollout from its row", async () => {
-    wrapper = await mountDrawer();
-    await wrapper.find('[data-test="o2-table-body"] tr').trigger("click");
+    await wrapper.findAll('[data-test="o2-table-body"] tr')[0].trigger("click");
     expect(wrapper.emitted("update:rolloutId")?.at(-1)).toEqual(["r3"]);
-  });
-
-  it("shows an error state with a retry when the list fails to load", async () => {
-    vi.mocked(fleet.listRollouts).mockRejectedValue(new Error("boom"));
-    wrapper = await mountDrawer();
+    await wrapper.setProps({ rolloutId: "r3" });
     await settle();
-    const error = wrapper.find('[data-test="fleet-rollout-table-error"]');
-    expect(error.exists()).toBe(true);
-    vi.mocked(fleet.listRollouts).mockResolvedValue({ data: { items } } as any);
-    error.findComponent({ name: "OEmptyState" }).vm.$emit("action", "retry");
-    await settle();
-    expect(fleet.listRollouts).toHaveBeenCalledTimes(2);
-    expect(bodyText(wrapper)).toContain("unknown receiver");
-  });
-
-  it("replaces the list with the rollout's detail, and goes back to the list", async () => {
-    wrapper = await mountDrawer("r3");
-    expect(fleet.getRollout).toHaveBeenCalledWith(org(), "r3");
-    const d = drawer(wrapper);
-    expect(d.find("h2").text()).toBe("edge");
-    expect(d.text()).toContain("v1 → v2");
-    expect(d.text()).toContain("unknown receiver");
-    expect(wrapper.find('[data-test="o2-table-body"]').exists()).toBe(false);
     await wrapper.find('[data-test="fleet-rollouts-back"]').trigger("click");
     expect(wrapper.emitted("update:rolloutId")?.at(-1)).toEqual([null]);
-    await wrapper.setProps({ rolloutId: null });
-    await settle();
-    expect(bodyText(wrapper)).toContain("edge-newer");
   });
 
-  it("asks the fleet to revert a halted rollout to its stable version", async () => {
+  it("shows the halt class and reason, the plan and the phases with counts", async () => {
+    wrapper = await mountDrawer("r3");
+    expect(wrapper.find('[data-test="fleet-rollout-outcome-title"]').text()).toBe(
+      "Halted: Proven bad",
+    );
+    expect(wrapper.find('[data-test="fleet-rollout-outcome-body"]').text()).toContain(
+      "unknown receiver",
+    );
+    expect(wrapper.find('[data-test="fleet-rollouts-plan"]').text()).toBe(
+      "Canary: first 2, then the rest",
+    );
+    expect(wrapper.find('[data-test="fleet-rollout-phases-status-0"]').text()).toBe("Failed");
+    expect(wrapper.find('[data-test="fleet-rollout-members-table"]').text()).toContain("web-02");
+  });
+
+  it("titles the timeline events, newest first", async () => {
+    wrapper = await mountDrawer("r3");
+    const titles = wrapper
+      .find('[data-test="fleet-rollouts-timeline"]')
+      .text()
+      .replace(/\s+/g, " ");
+    expect(titles).toContain("Halted");
+    expect(titles).toContain("Rejected by 1 collector");
+    expect(titles).toContain("Deploying phase 1");
+    expect(titles.indexOf("Deploying phase 1")).toBeGreaterThan(titles.indexOf("Halted"));
+  });
+
+  it("offers the exits the server lists and explains the rest", async () => {
+    wrapper = await mountDrawer("r3");
+    const btn = (exit: string) => wrapper.find(`[data-test="fleet-rollout-outcome-${exit}"]`);
+    expect(btn("revert").attributes("disabled")).toBeUndefined();
+    expect(btn("skip").attributes("disabled")).toBeUndefined();
+    expect(btn("fix_forward").attributes("disabled")).toBeUndefined();
+    expect(btn("resume").attributes("disabled")).toBeDefined();
+  });
+
+  it("reverts after a confirmation that names the stable version", async () => {
+    vi.mocked(fleet.revertRollout).mockResolvedValue({ data: halted } as any);
     wrapper = await mountDrawer("r3");
     await wrapper.find('[data-test="fleet-rollout-outcome-revert"]').trigger("click");
-    expect(wrapper.emitted("revert")?.at(-1)).toEqual(["f1", { config: "edge", version: 1 }]);
+    await settle();
+    expect(confirmMock.mock.calls[0][0].message).toContain("edge v1");
+    expect(confirmMock.mock.calls[0][0].confirmVariant).toBe("destructive");
+    expect(fleet.revertRollout).toHaveBeenCalledWith(org(), "r3");
   });
 
-  it("reverts a rollout of another fleet to that fleet's stable version, naming that fleet", async () => {
-    vi.mocked(fleet.listRollouts).mockRejectedValue(new Error("boom"));
-    vi.mocked(fleet.getRollout).mockResolvedValue({
-      data: {
-        ...rollout({ id: "r8", status: "halted", fleet: { id: "f2", name: "f2" }, to_version: 5 }),
-        members: ["c1"],
-        still_on_previous: 0,
-      },
-    } as any);
-    wrapper = await mountDrawer("r8");
+  it("skips exactly the failing members after a confirmation", async () => {
+    vi.mocked(fleet.skipRollout).mockResolvedValue({ data: halted } as any);
+    wrapper = await mountDrawer("r3");
+    await wrapper.find('[data-test="fleet-rollout-outcome-skip"]').trigger("click");
+    await settle();
+    expect(confirmMock.mock.calls[0][0].message).toContain("Excludes 1 failing collector");
+    expect(fleet.skipRollout).toHaveBeenCalledWith(org(), "r3", ["c2"]);
+  });
+
+  it("does nothing when an exit is cancelled", async () => {
+    confirmMock.mockResolvedValue(false);
+    wrapper = await mountDrawer("r3");
     await wrapper.find('[data-test="fleet-rollout-outcome-revert"]').trigger("click");
-    expect(wrapper.emitted("revert")?.at(-1)).toEqual(["f2", { config: "edge", version: 4 }]);
-    await wrapper.find('[data-test="fleet-rollout-outcome-retry"]').trigger("click");
-    expect(wrapper.emitted("retry")?.at(-1)?.[0]).toMatchObject({ id: "r8", fleetId: "f2" });
+    await settle();
+    expect(fleet.revertRollout).not.toHaveBeenCalled();
+  });
+
+  it("hands fix forward to the editor of the rollout's configuration", async () => {
+    wrapper = await mountDrawer("r3");
+    await wrapper.find('[data-test="fleet-rollout-outcome-fix_forward"]').trigger("click");
+    await settle();
+    expect(wrapper.emitted("fix-forward")?.[0]?.[0]).toMatchObject({ id: "r3", config: "edge" });
+  });
+
+  it("resumes a halt that offers it from its halted phase", async () => {
+    const timedOut = {
+      ...halted,
+      halt: { ...halted.halt!, class: "cannot_see" as const, exits: ["resume" as const] },
+    };
+    vi.mocked(fleet.getRollout).mockResolvedValue({ data: timedOut } as any);
+    vi.mocked(fleet.resumeRollout).mockResolvedValue({ data: timedOut } as any);
+    wrapper = await mountDrawer("r3");
+    await wrapper.find('[data-test="fleet-rollout-outcome-resume"]').trigger("click");
+    await settle();
+    expect(confirmMock.mock.calls[0][0].message).toContain("phase 1");
+    expect(fleet.resumeRollout).toHaveBeenCalledWith(org(), "r3");
+  });
+
+  it("shows the server's reason when an exit is refused", async () => {
+    vi.mocked(fleet.revertRollout).mockRejectedValue({
+      response: { status: 409, data: { message: "rollout is no longer halted" } },
+    });
+    wrapper = await mountDrawer("r3");
+    await wrapper.find('[data-test="fleet-rollout-outcome-revert"]').trigger("click");
+    await settle();
+    expect(toastMock).toHaveBeenCalledWith(
+      expect.objectContaining({ variant: "error", message: "rollout is no longer halted" }),
+    );
   });
 
   it("shows a spinner while the rollout loads", async () => {
@@ -366,190 +302,35 @@ describe("FleetRollouts", () => {
     [{ response: { status: 403 } }, "fleet-rollouts-detail-forbidden"],
     [{ response: { status: 404 } }, "fleet-rollouts-detail-not-found"],
     [new Error("boom"), "fleet-rollouts-detail-error"],
-  ])("shows why a rollout the list does not hold cannot open (%j)", async (err, shown) => {
+  ])("shows why a rollout cannot open (%j)", async (err, shown) => {
     vi.mocked(fleet.getRollout).mockRejectedValue(err);
     wrapper = await mountDrawer("gone");
     await settle();
     expect(wrapper.find(`[data-test="${shown}"]`).exists()).toBe(true);
-    expect(wrapper.find('[data-test="fleet-rollouts-back"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="fleet-rollouts-detail-loading"]').exists()).toBe(false);
   });
 
-  it.each([
-    [403, "fleet-rollouts-detail-forbidden"],
-    [404, "fleet-rollouts-detail-not-found"],
-  ])("lets a detail %s win over the rollout's cached list row", async (status, shown) => {
-    vi.mocked(fleet.getRollout).mockRejectedValue({ response: { status } });
-    wrapper = await mountDrawer("r3");
-    await settle();
-    expect(wrapper.find(`[data-test="${shown}"]`).exists()).toBe(true);
-    expect(wrapper.find('[data-test="fleet-rollout-outcome"]').exists()).toBe(false);
-    expect(wrapper.find('[data-test="fleet-rollout-outcome-revert"]').exists()).toBe(false);
+  it("says an empty fleet's rollout targeted no collectors and hides its phases", async () => {
+    const empty = apiRollout({ id: "r0", fleet: F1, total: 0, running: 0, phases: [] });
+    vi.mocked(fleet.listRollouts).mockResolvedValue({ data: { items: [empty] } } as any);
+    vi.mocked(fleet.getRollout).mockResolvedValue({ data: empty } as any);
+    wrapper = await mountDrawer("r0");
+    expect(wrapper.find('[data-test="fleet-rollout-outcome-title"]').text()).toBe(
+      "No collectors targeted",
+    );
+    expect(wrapper.find('[data-test="fleet-rollout-phases-r0"]').exists()).toBe(false);
   });
 
-  it("explains a missing rollout without claiming there is no data", async () => {
-    vi.mocked(fleet.getRollout).mockRejectedValue({ response: { status: 404 } });
-    wrapper = await mountDrawer("gone");
-    const text = wrapper.find('[data-test="fleet-rollouts-detail-not-found"]').text();
-    expect(text).toContain("This rollout no longer exists");
-    expect(text).not.toContain("no data");
-  });
-
-  it("keeps this fleet's rollouts under a stale-data banner when a refresh fails", async () => {
-    wrapper = await mountDrawer();
-    expect(wrapper.find('[data-test="fleet-rollouts-stale"]').exists()).toBe(false);
-    vi.mocked(fleet.listRollouts).mockRejectedValue(new Error("boom"));
-    await queryClient.refetchQueries({ type: "active" });
-    await settle();
-    expect(wrapper.find('[data-test="fleet-rollouts-stale"]').exists()).toBe(true);
-    expect(bodyText(wrapper)).toContain("edge-newer");
-  });
-
-  it("shows the load error when a refresh fails and the cache holds only other fleets' rollouts", async () => {
-    vi.mocked(fleet.listRollouts).mockResolvedValue({ data: { items: [items[1]] } } as any);
-    wrapper = await mountDrawer();
-    expect(wrapper.find('[data-test="fleet-rollout-table-empty"]').exists()).toBe(true);
-    vi.mocked(fleet.listRollouts).mockRejectedValue(new Error("boom"));
-    await queryClient.refetchQueries({ type: "active" });
-    await settle();
-    expect(wrapper.find('[data-test="fleet-rollout-table-error"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="fleet-rollouts-stale"]').exists()).toBe(false);
-  });
-
-  it("drops a loaded rollout for the not-found state when a refetch returns 404", async () => {
-    wrapper = await mountDrawer("r3");
-    expect(wrapper.find('[data-test="fleet-rollout-outcome-revert"]').exists()).toBe(true);
-    vi.mocked(fleet.getRollout).mockRejectedValue({ response: { status: 404 } });
-    await queryClient.refetchQueries({ type: "active" });
-    await settle();
-    expect(wrapper.find('[data-test="fleet-rollouts-detail-not-found"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="fleet-rollout-outcome"]').exists()).toBe(false);
-    expect(wrapper.find('[data-test="fleet-rollout-outcome-revert"]').exists()).toBe(false);
-  });
-
-  it("keeps a loaded rollout under a stale-data banner when a refetch fails otherwise", async () => {
-    wrapper = await mountDrawer("r3");
-    expect(wrapper.find('[data-test="fleet-rollouts-detail-stale"]').exists()).toBe(false);
-    vi.mocked(fleet.getRollout).mockRejectedValue(new Error("boom"));
-    await queryClient.refetchQueries({ type: "active" });
-    await settle();
-    expect(wrapper.find('[data-test="fleet-rollouts-detail-stale"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="fleet-rollout-outcome-revert"]').exists()).toBe(true);
-  });
-
-  it("retries a rollout that failed to load", async () => {
-    vi.mocked(fleet.getRollout)
-      .mockRejectedValueOnce(new Error("boom"))
-      .mockResolvedValue({
-        data: {
-          ...rollout({ id: "late", config: "late-config" }),
-          members: [],
-          still_on_previous: 0,
-        },
-      } as any);
-    wrapper = await mountDrawer("late");
-    const error = wrapper.find('[data-test="fleet-rollouts-detail-error"]');
-    expect(error.exists()).toBe(true);
-    error.findComponent({ name: "OEmptyState" }).vm.$emit("action", "retry");
-    await settle();
-    expect(fleet.getRollout).toHaveBeenCalledTimes(2);
-    expect(drawer(wrapper).find("h2").text()).toBe("late-config");
-  });
-
-  it("asks the fleet to retry a halted rollout with that revision", async () => {
-    wrapper = await mountDrawer("r3");
-    await wrapper.find('[data-test="fleet-rollout-outcome-retry"]').trigger("click");
-    expect(wrapper.emitted("retry")?.at(-1)?.[0]).toMatchObject({
-      id: "r3",
-      fleetId: "f1",
-      toVersion: 2,
-    });
-  });
-
-  it("passes the outcome's navigation up", async () => {
-    wrapper = await mountDrawer("r3");
-    await wrapper.find('[data-test="fleet-rollout-outcome-edit"]').trigger("click");
-    expect(wrapper.emitted("navigate")?.at(-1)).toEqual([{ tab: "editor", query: { id: "edge" } }]);
-  });
-
-  it("says a scheduled rollout was scheduled, not started, and when it starts", async () => {
-    const scheduled = rollout({
+  it("says when a scheduled rollout starts", async () => {
+    const scheduled = apiRollout({
       id: "r9",
+      fleet: F1,
       status: "scheduled",
-      scheduled_for: Date.now() + 2 * 3600_000,
-      attempted: 0,
-      accepted: 0,
-      assigned: 0,
+      start: { kind: "at", at: Date.now() + 30 * 60_000 },
     });
-    vi.mocked(fleet.listRollouts).mockResolvedValue({ data: { items: [scheduled] } } as any);
-    vi.mocked(fleet.getRollout).mockResolvedValue({
-      data: { ...scheduled, members: ["c1", "c2"], still_on_previous: 0 },
-    } as any);
-    wrapper = await mountDrawer();
-    expect(bodyText(wrapper)).toContain("Starts in 2h");
-    await wrapper.setProps({ rolloutId: "r9" });
-    await settle();
-    const d = drawer(wrapper);
-    expect(d.text()).toContain("Scheduled by ana@acme.io");
-    expect(d.text()).not.toContain("Started by");
-  });
-
-  it("titles the staged, halted, superseded and auto-reverted events", async () => {
-    vi.mocked(fleet.getRollout).mockResolvedValueOnce({
-      data: {
-        ...items[1],
-        strategy: "canary",
-        status: "superseded",
-        phases: [
-          { ...phase(1, "done"), id: "p1", label: "canary" },
-          { ...phase(2, "pending"), id: "p2", label: "remaining" },
-        ],
-        events: [
-          { key: "deploying", at: 1, phase: 0 },
-          { key: "observing", at: 2 },
-          { key: "gatePassed", at: 3 },
-          { key: "deploying", at: 4, phase: 1 },
-          { key: "gateFailed", at: 5 },
-          { key: "halted", at: 6 },
-          { key: "superseded", at: 7 },
-          { key: "autoReverted", at: 8 },
-        ],
-        members: ["c1", "c2", "c3"],
-        still_on_previous: 0,
-      },
-    } as any);
-    wrapper = await mountDrawer("r2");
-    const titles = wrapper
-      .findAllComponents({ name: "OTimelineItem" })
-      .map((i) => String(i.props("title")));
-    expect(titles).toEqual([
-      "Sending to 1 collector",
-      "Observing for 10 minutes, then checking heartbeats for 5",
-      "Health gates passed",
-      "Sending to 2 collectors",
-      "Health gate failed",
-      "Halted",
-      "Superseded by a newer desired version",
-      "Reverted automatically to the stable version",
-    ]);
-  });
-
-  it("adds the rejected event to the drawer timeline", async () => {
-    vi.mocked(fleet.getRollout).mockResolvedValueOnce({
-      data: {
-        ...items[2],
-        events: [
-          { key: "deploying", at: 1 },
-          { key: "rejected", at: 2 },
-        ],
-        members: ["c1"],
-        still_on_previous: 0,
-      },
-    } as any);
-    wrapper = await mountDrawer("r3");
-    const titles = wrapper
-      .findAllComponents({ name: "OTimelineItem" })
-      .map((i) => String(i.props("title")));
-    expect(titles).toEqual(["Sending to 2 collectors", "Rejected by 1 collector"]);
+    vi.mocked(fleet.getRollout).mockResolvedValue({ data: scheduled } as any);
+    wrapper = await mountDrawer("r9");
+    expect(wrapper.find('[data-test="fleet-rollout-outcome-body"]').text()).toMatch(
+      /Starts in (30|29)m/,
+    );
   });
 });

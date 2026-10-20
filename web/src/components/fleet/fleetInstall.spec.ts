@@ -14,123 +14,70 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect } from "vitest";
-import { installScript, resolveBaseUrl } from "./fleetInstall";
+import { installCommand, opampEndpoint, resolveBaseUrl } from "./fleetInstall";
 
-const target = { baseUrl: "https://o2.example.com", org: "acme", token: "o2ft_abc123" };
+const target = {
+  baseUrl: "https://o2.example.com",
+  org: "acme",
+  token: "o2ft_abc123",
+  version: "0.163.1",
+  http: false,
+};
 
-describe("installScript", () => {
-  const AUTH = `"Basic $(printf '%s' 'fleet:o2ft_abc123' | base64)"`;
-
-  it("writes the Linux config through a temp file and installs it as 0600", () => {
-    const lines = installScript("linux", target).split("\n");
-    expect(lines.slice(0, 3)).toEqual([
-      "sudo mkdir -p /etc/o2c-supervisor",
-      'tmp="$(mktemp)"',
-      `cat > "$tmp" <<'EOF'`,
-    ]);
-    const end = lines.indexOf("EOF");
-    expect(lines.slice(end + 1, end + 2)).toEqual([
-      'sudo install -m 600 "$tmp" /etc/o2c-supervisor/supervisor.yaml && rm -f "$tmp"',
-    ]);
-  });
-
-  it("puts the org, token and Linux system paths in the config", () => {
-    const script = installScript("linux", target);
-    expect(script).toContain("  url: https://o2.example.com\n  org: acme");
-    expect(script).toContain("auth:\n  email: fleet\n  token: o2ft_abc123");
-    expect(script).toContain("  executable: /usr/local/bin/otelcol-contrib");
-    expect(script).toContain("  config: /etc/o2c-supervisor/collector.yaml");
-    expect(script).toContain("  directory: /var/lib/o2c-supervisor");
-  });
-
-  it("runs the Linux supervisor as root with O2_AUTH scoped to that one command", () => {
-    const lines = installScript("linux", target).split("\n");
-    expect(lines[lines.length - 1]).toBe(
-      `sudo env O2_AUTH=${AUTH} o2c-supervisor -config /etc/o2c-supervisor/supervisor.yaml`,
+describe("installCommand", () => {
+  it("pipes the Linux script from the agents repository into sudo bash with the target", () => {
+    const cmd = installCommand("linux", target);
+    expect(cmd).toContain(
+      "curl -fsSL https://raw.githubusercontent.com/openobserve/agents/main/linux/install.sh | sudo bash -s --",
     );
+    expect(cmd).toContain("--url 'https://o2.example.com'");
+    expect(cmd).toContain("--org 'acme'");
+    expect(cmd).toContain("--token 'o2ft_abc123'");
+    expect(cmd).toContain("--version '0.163.1'");
+    expect(cmd).not.toContain("--transport");
   });
 
-  it("writes the macOS config under HOME, installed as 0600, with HOME expanded outside the heredoc", () => {
-    const script = installScript("macos", target);
-    const lines = script.split("\n");
-    expect(lines.slice(0, 3)).toEqual([
-      'mkdir -p "$HOME/o2c-supervisor"',
-      'tmp="$(mktemp)"',
-      `cat > "$tmp" <<'EOF'`,
-    ]);
-    expect(script).toContain("  executable: /usr/local/bin/otelcol-contrib");
-    expect(lines).toContain(
-      `printf '  config: %s\\nstorage:\\n  directory: %s\\n' "$HOME/o2c-supervisor/collector.yaml" "$HOME/o2c-supervisor/state" >> "$tmp"`,
+  it("uses the macOS script on macOS", () => {
+    expect(installCommand("macos", target)).toContain("/agents/main/macos/install.sh");
+  });
+
+  it("adds --transport http only when the proxy cannot carry WebSocket", () => {
+    expect(installCommand("linux", { ...target, http: true })).toContain("--transport http");
+    expect(installCommand("windows", { ...target, http: true })).toContain("-Transport http");
+  });
+
+  it("leaves the version to the script when the org sets none", () => {
+    expect(installCommand("linux", { ...target, version: null })).not.toContain("--version");
+  });
+
+  it("quotes values so a token with a quote stays one shell word", () => {
+    expect(installCommand("linux", { ...target, token: "a'b" })).toContain(`--token 'a'\\''b'`);
+  });
+
+  it("runs the PowerShell script on Windows", () => {
+    const cmd = installCommand("windows", target);
+    expect(cmd).toContain("irm https://raw.githubusercontent.com/openobserve/agents/main/windows/install.ps1");
+    expect(cmd).toContain("-Token 'o2ft_abc123'");
+  });
+
+  it("installs the Helm chart with the fleet collector image at the target version", () => {
+    const cmd = installCommand("kubernetes", target);
+    expect(cmd).toContain("helm upgrade --install");
+    expect(cmd).toContain("--set image.repository=ghcr.io/openobserve/otel-fleet-collector");
+    expect(cmd).toContain("--set image.tag='0.163.1'");
+    expect(cmd).toContain("--set opamp.endpoint='wss://o2.example.com/api/acme/v1/opamp'");
+  });
+});
+
+describe("opampEndpoint", () => {
+  it("uses WebSocket by default and the page scheme for HTTP polling", () => {
+    expect(opampEndpoint({ ...target })).toBe("wss://o2.example.com/api/acme/v1/opamp");
+    expect(opampEndpoint({ ...target, http: true })).toBe(
+      "https://o2.example.com/api/acme/v1/opamp",
     );
-    expect(lines).toContain(
-      'install -m 600 "$tmp" "$HOME/o2c-supervisor/supervisor.yaml" && rm -f "$tmp"',
+    expect(opampEndpoint({ ...target, baseUrl: "http://localhost:5080/o2" })).toBe(
+      "ws://localhost:5080/o2/api/acme/v1/opamp",
     );
-    expect(lines[lines.length - 1]).toBe(
-      `O2_AUTH=${AUTH} o2c-supervisor -config "$HOME/o2c-supervisor/supervisor.yaml"`,
-    );
-    expect(script).not.toContain("~");
-    expect(script).not.toContain("sudo");
-  });
-
-  it.each(["linux", "macos"] as const)("never exports O2_AUTH into the user's shell (%s)", (os) => {
-    expect(installScript(os, target)).not.toMatch(/export /);
-  });
-
-  it.each(["linux", "macos"] as const)(
-    "quotes every heredoc so $ in data stays literal (%s)",
-    (os) => {
-      const script = installScript(os, { ...target, baseUrl: "https://h/$x", org: "a$b" });
-      expect(script).not.toMatch(/<<EOF/);
-      expect(script).toContain("  url: https://h/$x");
-      expect(script).toContain("  org: a$b");
-    },
-  );
-
-  it.each(["linux", "macos"] as const)(
-    "never relies on a umask or on tee keeping a file mode (%s)",
-    (os) => {
-      const script = installScript(os, target);
-      expect(script).not.toContain("umask");
-      expect(script).not.toContain("tee ");
-      expect(script).not.toMatch(/install -m 600 \/dev\/stdin/);
-    },
-  );
-
-  const heredoc = (script: string) => {
-    const lines = script.split("\n");
-    return lines.slice(lines.indexOf(`cat > "$tmp" <<'EOF'`) + 1, lines.indexOf("EOF"));
-  };
-
-  it.each(["linux", "macos"] as const)(
-    "never asks for an initial configuration, since the token's fleet decides it (%s)",
-    (os) => {
-      const body = heredoc(installScript(os, target));
-      expect(body).not.toContain("fleet:");
-      expect(body.join("\n")).not.toContain("initial_config");
-    },
-  );
-
-  it("carries a placeholder token through unchanged", () => {
-    const script = installScript("linux", { ...target, token: "<TOKEN>" });
-    expect(script).toContain("  token: <TOKEN>");
-    expect(script).toContain("'fleet:<TOKEN>'");
-  });
-
-  it("never mentions a downloader, endpoint or chart that does not exist", () => {
-    for (const os of ["linux", "macos"] as const) {
-      const script = installScript(os, target);
-      for (const fake of [
-        "curl",
-        "brew install",
-        "/opt/homebrew",
-        "helm",
-        "enrollment-token",
-        "opamp-endpoint",
-        "wss://",
-      ]) {
-        expect(script).not.toContain(fake);
-      }
-    }
   });
 });
 

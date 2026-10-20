@@ -81,7 +81,7 @@ const collector = (over: Record<string, unknown> = {}) => ({
   id: "c1",
   name: "node-a",
   hostname: null,
-  ip: null,
+  last_connected_from: null,
   status: "online",
   os: "linux",
   arch: "amd64",
@@ -91,7 +91,7 @@ const collector = (over: Record<string, unknown> = {}) => ({
   config: null,
   config_version: null,
   delivery: null,
-  drifted: null,
+  delivery_error: null,
   fleet: { id: "f1", name: "edge" },
   token_id: "t1",
   last_seen: Date.now(),
@@ -264,7 +264,7 @@ describe("FleetInstallDialog", () => {
 
   it("opens the new collector in this fleet's collectors from View collectors", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
-    await router.push({ path: "/", query: { org_identifier: "acme", folder: "f9" } });
+    await router.push({ path: "/", query: { org_identifier: "acme", fleet: "f9" } });
     wrapper = mountDialog();
     await flushPromises();
     await pollWith([collector(), collector({ id: "c3", name: "node-new" })]);
@@ -274,7 +274,7 @@ describe("FleetInstallDialog", () => {
     expect(router.currentRoute.value.query).toEqual({
       org_identifier: "acme",
       tab: "fleets",
-      folder: "f1",
+      fleet: "f1",
       collector: "c3",
     });
   });

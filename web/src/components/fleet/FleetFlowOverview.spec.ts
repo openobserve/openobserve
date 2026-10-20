@@ -49,7 +49,7 @@ vi.mock("@/composables/useBreakpoint", async () => {
 vi.mock("@/services/fleet", () => ({
   default: {
     listConfigs: vi.fn(),
-    getFlow: vi.fn(),
+    getPipelines: vi.fn(),
     listCollectors: vi.fn(),
     listRollouts: vi.fn(),
   },
@@ -112,8 +112,8 @@ const baseConfigs = () => [config("a"), config("b"), config("tmpl", { template: 
 
 function serve(flow: FleetFlow | (() => Promise<any>), configs = baseConfigs()) {
   vi.mocked(fleet.listConfigs).mockResolvedValue({ data: { items: configs } } as any);
-  if (typeof flow === "function") vi.mocked(fleet.getFlow).mockImplementation(flow as any);
-  else vi.mocked(fleet.getFlow).mockResolvedValue({ data: flow } as any);
+  if (typeof flow === "function") vi.mocked(fleet.getPipelines).mockImplementation(flow as any);
+  else vi.mocked(fleet.getPipelines).mockResolvedValue({ data: flow } as any);
 }
 
 let wrapper: VueWrapper;
@@ -566,7 +566,7 @@ describe("FleetFlowOverview destinations", () => {
     serve(first);
     await mountOverview();
     expect(lists()[1].props("modelValue")).toEqual([D1.id]);
-    vi.mocked(fleet.getFlow).mockResolvedValue({ data: baseFlow() } as any);
+    vi.mocked(fleet.getPipelines).mockResolvedValue({ data: baseFlow() } as any);
     await vi.advanceTimersByTimeAsync(15_000);
     await flushPromises();
     expect(lists()[1].props("modelValue")).toEqual([D1.id, D2.id]);
@@ -581,7 +581,7 @@ describe("FleetFlowOverview window and states", () => {
       .findComponent<any>('[data-test="fleet-flow-overview-window"]')
       .vm.$emit("update:model-value", "5m");
     await flushPromises();
-    expect(fleet.getFlow).toHaveBeenLastCalledWith("default", "5m");
+    expect(fleet.getPipelines).toHaveBeenLastCalledWith("default", "5m");
   });
 
   it("shows the loading overlay on the first load", async () => {
@@ -595,10 +595,10 @@ describe("FleetFlowOverview window and states", () => {
     await mountOverview();
     const banner = wrapper.find('[data-test="fleet-flow-overview-error"]');
     expect(banner.text()).toContain("Could not load the telemetry flow");
-    const calls = vi.mocked(fleet.getFlow).mock.calls.length;
+    const calls = vi.mocked(fleet.getPipelines).mock.calls.length;
     await wrapper.find('[data-test="fleet-flow-overview-retry"]').trigger("click");
     await flushPromises();
-    expect(vi.mocked(fleet.getFlow).mock.calls.length).toBe(calls + 1);
+    expect(vi.mocked(fleet.getPipelines).mock.calls.length).toBe(calls + 1);
   });
 
   it("shows the no-configs empty state when the org has none", async () => {
@@ -653,7 +653,7 @@ describe("FleetFlowOverview window and states", () => {
     serve(baseFlow());
     await mountOverview();
     expect(wrapper.find('[data-test="fleet-flow-overview-forbidden"]').exists()).toBe(false);
-    vi.mocked(fleet.getFlow).mockRejectedValue({ response: { status: 403 } });
+    vi.mocked(fleet.getPipelines).mockRejectedValue({ response: { status: 403 } });
     await vi.advanceTimersByTimeAsync(15_000);
     await flushPromises();
     expect(wrapper.find('[data-test="fleet-flow-overview-forbidden"]').exists()).toBe(true);
@@ -677,7 +677,7 @@ describe("FleetFlowOverview selection", () => {
     await mountOverview();
     await selectConfigNode("a");
     expect(popover().exists()).toBe(true);
-    vi.mocked(fleet.getFlow).mockRejectedValue({ response: { status: 403 } });
+    vi.mocked(fleet.getPipelines).mockRejectedValue({ response: { status: 403 } });
     await vi.advanceTimersByTimeAsync(15_000);
     await flushPromises();
     expect(wrapper.find('[data-test="fleet-flow-overview-forbidden"]').exists()).toBe(true);

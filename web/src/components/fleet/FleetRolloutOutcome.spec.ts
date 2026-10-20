@@ -16,181 +16,84 @@
 import { describe, it, expect } from "vitest";
 import { mount } from "@vue/test-utils";
 import i18n from "@/locales";
+import type { FleetHaltClass, FleetHaltExit } from "@/services/fleet";
 import FleetRolloutOutcome from "./FleetRolloutOutcome.vue";
-import type { RolloutRow } from "./useFleetApi";
+import { apiRollout } from "./fleet.fixtures";
+import { toRolloutRow, type RolloutRow } from "./useFleetApi";
 
-const row = (over: Partial<RolloutRow> = {}): RolloutRow =>
-  ({
-    id: "r1",
-    config: "edge",
-    fromVersion: 1,
-    toVersion: 2,
-    fleetId: "f1",
-    fleetName: "edge",
-    strategy: "immediate",
-    status: "halted",
-    total: 2,
-    attempted: 2,
-    accepted: 0,
-    failed: 1,
-    assigned: 2,
-    startedAt: 1,
-    autoRollback: false,
-    scheduledFor: null,
-    gates: [],
-    startedBy: "ana@acme.io",
-    phases: [],
-    failure: {
-      kind: "rejection",
-      labelKey: "fleet.rollouts.gateRejected",
-      observed: "1",
-      threshold: "0",
-      message: "unknown receiver",
-    },
-    events: [],
-    members: ["c1", "c2"],
-    stillOnPrevious: 5,
-    ...over,
-  }) as RolloutRow;
+const halted = (cls: FleetHaltClass, exits: FleetHaltExit[], failing = true) =>
+  toRolloutRow(
+    apiRollout({
+      status: "halted",
+      total: 2,
+      running: 1,
+      halt: { class: cls, reason: "why it halted", at: Date.now(), exits },
+      members: [
+        { collector_id: "c1", phase: 0, state: "running", excluded: false },
+        { collector_id: "c2", phase: 0, state: failing ? "rejected" : "sent", excluded: false },
+      ],
+    }),
+  );
 
-const STABLE = { config: "edge", version: 1 };
+const mountOutcome = (rollout: RolloutRow) =>
+  mount(FleetRolloutOutcome, { props: { rollout }, global: { plugins: [i18n] } });
 
-const mountOutcome = (rollout: RolloutRow, stable: typeof STABLE | null = STABLE) =>
-  mount(FleetRolloutOutcome, { props: { rollout, stable }, global: { plugins: [i18n] } });
+const exitButton = (w: ReturnType<typeof mountOutcome>, exit: string) =>
+  w.find(`[data-test="fleet-rollout-outcome-${exit}"]`);
 
 describe("FleetRolloutOutcome", () => {
-  it("opens the rollout's fleet in the Fleets view, without a collector id", async () => {
-    const wrapper = mountOutcome(row());
-    const btn = wrapper.find('[data-test="fleet-rollout-outcome-collector"]');
-    expect(btn.exists()).toBe(true);
-    expect(btn.text()).toBe("View collectors");
-    await btn.trigger("click");
-    expect(wrapper.emitted("navigate")!.at(-1)).toEqual([
-      { tab: "fleets", query: { folder: "f1" } },
-    ]);
+  it("names the halt class and shows the server's reason", () => {
+    const w = mountOutcome(halted("looks_worse", ["revert", "resume", "fix_forward"]));
+    expect(w.find('[data-test="fleet-rollout-outcome-title"]').text()).toBe("Halted: Looks worse");
+    expect(w.find('[data-test="fleet-rollout-outcome-body"]').text()).toBe("why it halted");
   });
 
-  it("opens every fleet's collectors when the rollout's fleet was deleted", async () => {
-    const wrapper = mountOutcome(row({ fleetId: "", fleetName: null }));
-    await wrapper.find('[data-test="fleet-rollout-outcome-collector"]').trigger("click");
-    expect(wrapper.emitted("navigate")!.at(-1)).toEqual([
-      { tab: "fleets", query: { scope: "all" } },
-    ]);
+  it("always shows all four exits and enables only the offered ones", () => {
+    const w = mountOutcome(halted("looks_worse", ["revert", "resume", "fix_forward"]));
+    for (const exit of ["revert", "resume", "fix_forward"])
+      expect(exitButton(w, exit).attributes("disabled"), exit).toBeUndefined();
+    expect(exitButton(w, "skip").attributes("disabled")).toBeDefined();
   });
 
-  it("shows a halted rollout as an error banner naming the failure, with the counts", () => {
-    const banner = mountOutcome(row()).findComponent({ name: "OBanner" });
-    expect(banner.props("variant")).toBe("error");
-    expect(banner.text()).toContain("1 collector rejected the configuration: unknown receiver");
-    expect(banner.text()).toContain("2 of 2 attempted · 0 accepted · 1 failed");
-    expect(banner.text()).toContain("v2 stays desired until the fleet's desired version changes");
+  it("disables resume for a proven-bad halt the server does not resume", () => {
+    const w = mountOutcome(halted("proven_bad", ["revert", "fix_forward", "skip"]));
+    expect(exitButton(w, "resume").attributes("disabled")).toBeDefined();
+    expect(exitButton(w, "skip").attributes("disabled")).toBeUndefined();
   });
 
-  it("names a failed health gate on a halted rollout", () => {
-    const text = mountOutcome(
-      row({
-        failure: {
-          kind: "gate_failed",
-          labelKey: "fleet.rollouts.gateHeartbeat",
-          observed: "86.7%",
-          threshold: "≥ 99%",
-          message: null,
-        },
-      }),
-    ).text();
-    expect(text).toContain("Health gate failed: Heartbeat success 86.7% (limit ≥ 99%)");
-  });
-
-  it("offers Revert to the fleet's stable version and Retry on a halted rollout", async () => {
-    const wrapper = mountOutcome(row());
-    const revert = wrapper.find('[data-test="fleet-rollout-outcome-revert"]');
-    expect(revert.text()).toBe("Revert to v1");
-    await revert.trigger("click");
-    expect(wrapper.emitted("revert")).toEqual([[STABLE]]);
-    await wrapper.find('[data-test="fleet-rollout-outcome-retry"]').trigger("click");
-    expect(wrapper.emitted("retry")).toEqual([[]]);
-  });
-
-  it("offers no Revert without a stable version, or when stable is what halted", () => {
-    expect(
-      mountOutcome(row(), null).find('[data-test="fleet-rollout-outcome-revert"]').exists(),
-    ).toBe(false);
-    expect(
-      mountOutcome(row(), { config: "edge", version: 2 })
-        .find('[data-test="fleet-rollout-outcome-revert"]')
-        .exists(),
-    ).toBe(false);
-  });
-
-  it("keeps an auto-reverted rollout's failure and says it was reverted automatically, with no actions", () => {
-    const wrapper = mountOutcome(
-      row({ status: "superseded", events: [{ key: "autoReverted", at: 1 }] }),
-    );
-    const banner = wrapper.findComponent({ name: "OBanner" });
-    expect(banner.props("variant")).toBe("warning");
-    expect(banner.text()).toContain("1 collector rejected the configuration: unknown receiver");
-    expect(banner.text()).toContain("Reverted automatically");
-    expect(wrapper.find('[data-test="fleet-rollout-outcome-revert"]').exists()).toBe(false);
-    expect(wrapper.find('[data-test="fleet-rollout-outcome-retry"]').exists()).toBe(false);
-  });
-
-  it("says a superseded rollout was replaced by a newer desired version", () => {
-    const text = mountOutcome(row({ status: "superseded", failure: null })).text();
-    expect(text).toContain("A newer desired version replaced this rollout.");
-  });
-
-  it("shows no banner on an in-progress rollout", () => {
-    expect(
-      mountOutcome(row({ status: "in_progress", failure: null }))
-        .find('[data-test="fleet-rollout-outcome"]')
-        .exists(),
-    ).toBe(false);
-  });
-
-  it("says 1 collector, not 1 collectors, when a rollout of one collector completes", () => {
-    const text = mountOutcome(
-      row({ status: "completed", accepted: 1, total: 1, failure: null }),
-    ).text();
-    expect(text).toContain("v2 is running on 1 collector.");
-  });
-
-  it("says a completed rollout of an empty fleet targeted no collectors, without a success tone", () => {
+  it("disables skip when no member is failing, even when it is offered", () => {
     const w = mountOutcome(
-      row({ status: "completed", total: 0, attempted: 0, accepted: 0, failed: 0, failure: null }),
+      halted("cannot_see", ["revert", "resume", "fix_forward", "skip"], false),
     );
-    expect(w.findComponent({ name: "OBanner" }).props("variant")).toBe("info");
-    expect(w.text()).toContain("No collectors targeted");
-    expect(w.text()).toContain("The fleet had no collectors when v2 was set.");
-    expect(w.text()).not.toContain("0 of 0");
-    expect(w.text()).not.toContain("Completed");
+    expect(exitButton(w, "skip").attributes("disabled")).toBeDefined();
   });
 
-  it("says when a scheduled rollout starts", () => {
-    const text = mountOutcome(
-      row({ status: "scheduled", scheduledFor: Date.now() + 2 * 3600_000, failure: null }),
-    ).text();
-    expect(text).toContain("Starts in 2h");
+  it("emits the chosen exit", async () => {
+    const w = mountOutcome(halted("proven_bad", ["revert", "fix_forward", "skip"]));
+    await exitButton(w, "revert").trigger("click");
+    await exitButton(w, "skip").trigger("click");
+    expect(w.emitted("exit")).toEqual([["revert"], ["skip"]]);
   });
 
-  it("counts a start under an hour away in minutes", () => {
-    const text = mountOutcome(
-      row({ status: "scheduled", scheduledFor: Date.now() + 12 * 60_000, failure: null }),
-    ).text();
-    expect(text).toContain("Starts in 12m");
-    expect(text).not.toMatch(/Starts in \d+h/);
+  it("offers no exits outside a halt", () => {
+    const w = mountOutcome(toRolloutRow(apiRollout({ status: "completed", total: 2, running: 2 })));
+    expect(w.find('[data-test="fleet-rollout-outcome-revert"]').exists()).toBe(false);
+    expect(w.find('[data-test="fleet-rollout-outcome-title"]').text()).toBe("Completed");
   });
 
-  it("rounds a start more than an hour away up to whole hours", () => {
-    const text = mountOutcome(
-      row({ status: "scheduled", scheduledFor: Date.now() + 90 * 60_000, failure: null }),
-    ).text();
-    expect(text).toContain("Starts in 2h");
+  it("says an automatic revert happened", () => {
+    const w = mountOutcome(toRolloutRow(apiRollout({ status: "reverted", auto_revert: true })));
+    expect(w.find('[data-test="fleet-rollout-outcome-title"]').text()).toBe(
+      "Automatically reverted",
+    );
   });
 
-  it("says a due scheduled rollout is starting shortly", () => {
-    const text = mountOutcome(
-      row({ status: "scheduled", scheduledFor: Date.now() - 60_000, failure: null }),
-    ).text();
-    expect(text).toContain("Starting shortly");
+  it("counts progress in collectors while in progress", () => {
+    const w = mountOutcome(
+      toRolloutRow(apiRollout({ status: "in_progress", total: 40, running: 28 })),
+    );
+    expect(w.find('[data-test="fleet-rollout-outcome-body"]').text()).toBe(
+      "28 of 40 running the new version",
+    );
   });
 });
