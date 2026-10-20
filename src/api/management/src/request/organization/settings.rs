@@ -19,14 +19,20 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
 };
-#[cfg(feature = "cloud")]
-use config::META_ORG_ID;
 use db::organization::{get_org_setting, set_org_setting};
 use infra::errors::{DbError, Error};
 #[cfg(feature = "enterprise")]
 use {
     axum::extract::{Multipart, Query},
     o2_enterprise::enterprise::common::settings,
+};
+#[cfg(feature = "cloud")]
+use {
+    config::META_ORG_ID,
+    o2_enterprise::enterprise::cloud::{
+        billing_group::list_billing_group_members_of, billings::MeteringProvider, customer_billings,
+    },
+    std::collections::HashSet,
 };
 
 use crate::common::meta::{
@@ -74,6 +80,10 @@ pub async fn create(
         Ok(settings) => settings,
         Err(msg) => return MetaHttpResponse::bad_request(msg),
     };
+    #[cfg(feature = "cloud")]
+    if let Err(response) = check_budget_config(&org_id, &settings).await {
+        return response;
+    }
 
     match db::organization::update_org_setting(&org_id, |data| {
         apply_settings_payload(data, settings)
@@ -296,6 +306,64 @@ async fn check_domain_org_mappings(
     Ok(settings)
 }
 
+// Budgets are for Stripe-billed orgs only, and only for this org, its group members and the
+// group total; checked before the settings lock, since it reads billing and group tables.
+#[cfg(feature = "cloud")]
+async fn check_budget_config(
+    org_id: &str,
+    settings: &OrganizationSettingPayload,
+) -> Result<(), Response> {
+    let Some(configs) = settings.budget_config.as_ref() else {
+        return Ok(());
+    };
+    let billings = match customer_billings::get_by_org_id(org_id).await {
+        Ok(v) => v,
+        Err(e) => {
+            log::error!("error getting customer billings for org_id {org_id} : {e}");
+            return Err(MetaHttpResponse::internal_error(e));
+        }
+    };
+    if !billings
+        .first()
+        .is_some_and(|v| v.provider == MeteringProvider::Stripe)
+    {
+        return Err(MetaHttpResponse::bad_request(
+            "this org is not configured with stripe billing, so budget cannot be set".to_string(),
+        ));
+    }
+    let child_orgs = match list_billing_group_members_of(org_id).await {
+        Ok(v) => v,
+        Err(e) => {
+            log::error!("error in getting child orgs of {org_id} for budget config update : {e}");
+            return Err(MetaHttpResponse::internal_error(e));
+        }
+    };
+    let mut allowed_orgs: HashSet<_> = child_orgs.into_iter().map(|v| v.member_org_id).collect();
+    allowed_orgs.insert(org_id.to_string());
+    allowed_orgs.insert("total".to_string()); // special indicator for total of super org
+    if let Some(config) = configs.iter().find(|c| !allowed_orgs.contains(&c.org_id)) {
+        return Err(MetaHttpResponse::bad_request(format!(
+            "cannot set budget notification configuration for org {}",
+            config.org_id
+        )));
+    }
+    for config in configs {
+        if config.total_budget_amount <= 0.0 {
+            return Err(MetaHttpResponse::bad_request(format!(
+                "cannot set budget amount less than 0 for org {}",
+                config.org_id
+            )));
+        }
+        if config.warn_at_amount <= 0.0 || config.warn_at_amount > config.total_budget_amount {
+            return Err(MetaHttpResponse::bad_request(format!(
+                "invalid warning amount for org {}",
+                config.org_id
+            )));
+        }
+    }
+    Ok(())
+}
+
 // Runs under the settings lock on a fresh read, so it must not await or fail.
 fn apply_settings_payload(
     data: &mut OrganizationSetting,
@@ -354,6 +422,11 @@ fn apply_settings_payload(
     if let Some(mappings) = settings.domain_org_mappings {
         field_found = true;
         data.domain_org_mappings = mappings;
+    }
+    #[cfg(feature = "cloud")]
+    if let Some(configs) = settings.budget_config {
+        field_found = true;
+        data.budget_config = configs;
     }
     // this will always be taken from orgs table, never from settings
     data.free_trial_expiry = None;
