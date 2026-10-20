@@ -49,6 +49,9 @@ _cov_test() {
         --ignore-filename-regex 'job|.*generated.*' \
         --no-fail-fast \
         --retries 1 \
+        --json \
+        --summary-only \
+        --output-path report.json \
         -- \
         --skip users::tests \
         --skip bootstrap \
@@ -166,7 +169,7 @@ main() {
         ;;
     run-cov)
         shift
-        _cov_test --json --summary-only --output-path report.json "$@"
+        _cov_test "$@"
         ;;
     show-env)
         cmd_show_env
