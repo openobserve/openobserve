@@ -52,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         name="fleet"
         :label="t('fleet.collectors.fleet')"
         :options="fleetOptions"
-        :disabled="!!fleetId || !!retryOf"
+        :disabled="!!fleetId"
         required
         data-test="fleet-new-rollout-dialog-fleet"
         @update:model-value="onFleetPicked"
@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           name="config"
           :label="t('fleet.common.configuration')"
           :options="configOptions"
-          :disabled="!!toVersion || !!retryOf"
+          :disabled="!!toVersion"
           required
           data-test="fleet-new-rollout-dialog-config"
           @update:model-value="onConfigPicked"
@@ -76,35 +76,63 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="fleet-new-rollout-dialog-version"
         />
       </div>
+
       <div class="flex flex-col gap-1.5">
-        <OText :id="strategyLabelId" variant="label">{{ t("fleet.rollouts.strategy") }}</OText>
+        <OText :id="startLabelId" variant="label">{{ t("fleet.rollouts.start") }}</OText>
         <OFormToggleGroup
-          name="strategy"
-          :aria-labelledby="strategyLabelId"
-          data-test="fleet-new-rollout-dialog-strategy"
+          name="start"
+          :aria-labelledby="startLabelId"
+          data-test="fleet-new-rollout-dialog-start"
         >
-          <OToggleGroupItem
-            v-for="s in strategies"
-            :key="s.value"
-            :value="s.value"
-            size="sm"
-            :disabled="s.value === 'scheduled' && emptyFleet"
-          >
-            {{ s.label }}
-          </OToggleGroupItem>
+          <OToggleGroupItem value="now" size="sm">{{
+            t("fleet.rollouts.startNow")
+          }}</OToggleGroupItem>
+          <OToggleGroupItem value="at" size="sm" :disabled="emptyFleet">{{
+            t("fleet.rollouts.startAt")
+          }}</OToggleGroupItem>
         </OFormToggleGroup>
-        <OText v-if="emptyFleet" variant="meta" data-test="fleet-new-rollout-dialog-empty-fleet">{{
-          t("fleet.rollouts.emptyFleet")
-        }}</OText>
-      </div>
-      <div v-if="batched" class="grid grid-cols-1 gap-4 md:grid-cols-3">
         <OFormInput
-          name="initial"
-          type="number"
-          :label="t('fleet.rollouts.initialBatch')"
-          data-test="fleet-new-rollout-dialog-initial"
+          v-if="start === 'at'"
+          name="when"
+          type="datetime-local"
+          :label="t('fleet.rollouts.startTime')"
+          required
+          data-test="fleet-new-rollout-dialog-when"
         />
-        <template v-if="strategy === 'progressive'">
+      </div>
+
+      <div class="flex flex-col gap-1.5">
+        <OText :id="batchLabelId" variant="label">{{ t("fleet.rollouts.batching") }}</OText>
+        <OFormToggleGroup
+          name="batching"
+          :aria-labelledby="batchLabelId"
+          data-test="fleet-new-rollout-dialog-batching"
+        >
+          <OToggleGroupItem value="one" size="sm">{{
+            t("fleet.rollouts.oneBatch")
+          }}</OToggleGroupItem>
+          <OToggleGroupItem value="canary" size="sm">{{
+            t("fleet.badge.canary")
+          }}</OToggleGroupItem>
+          <OToggleGroupItem value="progressive" size="sm">{{
+            t("fleet.badge.progressive")
+          }}</OToggleGroupItem>
+        </OFormToggleGroup>
+        <div v-if="batching === 'canary'" class="grid grid-cols-1 gap-4 md:grid-cols-3">
+          <OFormInput
+            name="first"
+            type="number"
+            :label="t('fleet.rollouts.firstBatch')"
+            data-test="fleet-new-rollout-dialog-first"
+          />
+        </div>
+        <div v-else-if="batching === 'progressive'" class="grid grid-cols-1 gap-4 md:grid-cols-3">
+          <OFormInput
+            name="initial"
+            type="number"
+            :label="t('fleet.rollouts.initialBatch')"
+            data-test="fleet-new-rollout-dialog-initial"
+          />
           <OFormInput
             name="multiplier"
             type="number"
@@ -117,48 +145,56 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="t('fleet.rollouts.maxBatch')"
             data-test="fleet-new-rollout-dialog-max"
           />
-        </template>
-      </div>
-      <OFormInput
-        v-if="strategy === 'scheduled'"
-        name="when"
-        type="datetime-local"
-        :label="t('fleet.rollouts.startAt')"
-        required
-        data-test="fleet-new-rollout-dialog-when"
-      />
-      <div class="flex flex-col gap-2">
-        <OText variant="label">{{ t("fleet.rollouts.safety") }}</OText>
-        <template v-if="batched">
-          <OFormSwitch
-            name="gates"
-            :label="t('fleet.rollouts.useGates')"
-            :disabled="!gatesAllowed"
-            data-test="fleet-new-rollout-dialog-gates"
-            @change="gatesChoice = !!$event"
-          />
-          <OText v-if="!gatesAllowed && !emptyFleet" variant="meta">{{
-            t("fleet.rollouts.gatesNeedPhases")
+        </div>
+        <div
+          class="rounded-default border-border-default flex flex-col gap-0.5 border px-3 py-2"
+          aria-live="polite"
+          data-test="fleet-new-rollout-dialog-plan"
+        >
+          <OText variant="body-strong" class="tabular-nums">{{ planLine }}</OText>
+          <OText
+            v-if="preview.preview.value?.collapsed"
+            variant="meta"
+            data-test="fleet-new-rollout-dialog-collapsed"
+            >{{ t("fleet.rollouts.collapsed") }}</OText
+          >
+          <OText variant="meta" data-test="fleet-new-rollout-dialog-timeout">{{
+            t("fleet.rollouts.phaseTimeoutNote", { minutes: phaseTimeoutMin })
           }}</OText>
-        </template>
-        <OFormSwitch
-          name="autoRollback"
-          :label="t('fleet.rollouts.autoRollback')"
-          data-test="fleet-new-rollout-dialog-auto-rollback"
-        />
+        </div>
+      </div>
+
+      <div class="flex flex-col gap-3">
+        <OText variant="label">{{ t("fleet.rollouts.safety") }}</OText>
+        <div class="flex flex-col gap-0.5">
+          <OFormCheckbox
+            name="verify"
+            :label="t('fleet.rollouts.verify')"
+            data-test="fleet-new-rollout-dialog-verify"
+          />
+          <OText variant="meta">{{ t("fleet.rollouts.verifyHelp") }}</OText>
+        </div>
+        <div class="flex flex-col gap-0.5">
+          <OFormCheckbox
+            name="autoRevert"
+            :label="t('fleet.rollouts.autoRevert')"
+            data-test="fleet-new-rollout-dialog-auto-revert"
+          />
+          <OText variant="meta">{{ t("fleet.rollouts.autoRevertHelp") }}</OText>
+        </div>
       </div>
     </OForm>
   </ODialog>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, useId, watch } from "vue";
+import { computed, onBeforeUnmount, ref, useId, watch } from "vue";
 import { useMutation } from "@tanstack/vue-query";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
-import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
+import OFormCheckbox from "@/lib/forms/Checkbox/OFormCheckbox.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import OFormToggleGroup from "@/lib/core/ToggleGroup/OFormToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -168,16 +204,18 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useOrgId } from "@/composables/query/useOrgId";
 import { setFleetDesiredMutation } from "@/services/fleet.queries";
-import { raw, useI18nTyped } from "@/types/i18n";
 import type { FleetSetDesiredRequest } from "@/services/fleet";
-import { makeRolloutSchema, planHasPhases, type RolloutForm } from "./FleetNewRolloutDialog.schema";
+import { raw, useI18nTyped } from "@/types/i18n";
+import { makeRolloutSchema, requestOf, type RolloutForm } from "./FleetNewRolloutDialog.schema";
+import { useRolloutText } from "./rolloutText";
 import {
   isForbidden,
   serverMessage,
   useFleetConfigs,
   useFleetRollouts,
+  useFleetSettings,
   useFleets,
-  type RolloutRow,
+  usePlanPreview,
 } from "./useFleetApi";
 
 const props = defineProps<{
@@ -187,8 +225,6 @@ const props = defineProps<{
   toVersion?: number;
   /** Preselected fleet, which is then fixed. */
   fleetId?: string;
-  /** A halted revision to retry: its fleet and version are fixed, its strategy and safety kept. */
-  retryOf?: RolloutRow | null;
 }>();
 const emit = defineEmits<{
   "update:open": [value: boolean];
@@ -196,13 +232,18 @@ const emit = defineEmits<{
 }>();
 
 const FORM_ID = "fleet-new-rollout-form";
+// The preview is a server round trip, so typing in a count waits for a pause.
+const PREVIEW_DEBOUNCE_MS = 300;
+const DEFAULT_PHASE_TIMEOUT_SECS = 1800;
 
 const { t } = useI18nTyped();
+const { planText } = useRolloutText();
 const orgId = useOrgId();
 const setDesired = useMutation(() => setFleetDesiredMutation(orgId.value));
 const configs = useFleetConfigs(() => props.open);
 const fleets = useFleets(() => props.open);
 const rollouts = useFleetRollouts(undefined, () => props.open);
+const orgSettings = useFleetSettings();
 const listsForbidden = computed(() => configs.forbidden.value || isForbidden(fleets.error.value));
 const listsFailed = computed(
   () =>
@@ -211,76 +252,76 @@ const listsFailed = computed(
 );
 const retryLists = () => Promise.all([configs.refetch(), fleets.refetch()]);
 
-const defaults = (fleet: string, config: string, version: number): RolloutForm => ({
+const blank = (fleet: string, config: string, version: number): RolloutForm => ({
   fleet,
-  members: membersOf(fleet),
   config,
   version,
-  strategy: "immediate",
-  initial: 1,
-  multiplier: 5,
-  max: 100,
+  start: "now",
   when: "",
-  gates: planHasPhases(membersOf(fleet), 1),
-  autoRollback: true,
+  batching: "one",
+  first: 1,
+  initial: 1,
+  multiplier: 3,
+  max: 100,
+  verify: true,
+  autoRevert: true,
 });
 
 const form = useOForm<RolloutForm>({
-  defaultValues: {
-    fleet: "",
-    members: 0,
-    config: "",
-    version: 0,
-    strategy: "immediate",
-    initial: 1,
-    multiplier: 5,
-    max: 100,
-    when: "",
-    gates: false,
-    autoRollback: true,
-  },
+  defaultValues: blank("", "", 0),
   schema: makeRolloutSchema(t),
   onSubmit: submit,
 });
 
-const strategy = form.useStore((s) => s.values.strategy);
-const batched = computed(() => strategy.value === "canary" || strategy.value === "progressive");
-const members = form.useStore((s) => s.values.members);
-const emptyFleet = computed(() => members.value === 0);
-const gatesAllowed = form.useStore((s) => planHasPhases(s.values.members, s.values.initial));
+const start = form.useStore((s) => s.values.start);
+const batching = form.useStore((s) => s.values.batching);
+const values = form.useStore((s) => s.values);
+const chosenFleet = form.useStore((s) => s.values.fleet);
+const chosenConfig = form.useStore((s) => s.values.config);
 
-const strategyLabelId = useId();
-// The operator's explicit gates choice survives the plan dropping to one phase and back; untouched, gates default on.
-const gatesChoice = ref<boolean | null>(null);
-watch(gatesAllowed, (allowed) =>
-  form.setFieldValue("gates", allowed ? (gatesChoice.value ?? true) : false),
-);
-// The server refuses a schedule for a fleet with no members.
-watch(emptyFleet, (empty) => {
-  if (empty && strategy.value === "scheduled") form.setFieldValue("strategy", "immediate");
-});
-
-const strategies = computed(() => [
-  { value: "immediate", label: t("fleet.badge.immediate") },
-  { value: "canary", label: t("fleet.badge.canary") },
-  { value: "progressive", label: t("fleet.badge.progressive") },
-  { value: "scheduled", label: t("fleet.badge.scheduledStrategy") },
-]);
+const startLabelId = useId();
+const batchLabelId = useId();
 
 const readableFleets = computed(() => fleets.rows.value.filter((f) => f.readable));
 const fleetOptions = computed(() =>
   readableFleets.value.map((f) => ({ label: raw(f.name), value: f.id })),
 );
-const membersOf = (id: string) => readableFleets.value.find((f) => f.id === id)?.collectors ?? 0;
+const fleetRow = computed(() => readableFleets.value.find((f) => f.id === chosenFleet.value));
+const emptyFleet = computed(() => (fleetRow.value?.collectors ?? 0) === 0);
+
+// The server refuses a schedule for a fleet with no members.
+watch(emptyFleet, (empty) => {
+  if (empty && start.value === "at") form.setFieldValue("start", "now");
+});
+
+const phaseTimeoutMin = computed(() => {
+  const secs =
+    fleetRow.value?.settings.phase_timeout_secs ??
+    orgSettings.settings.value?.fleet_defaults?.phase_timeout_secs ??
+    DEFAULT_PHASE_TIMEOUT_SECS;
+  return Math.round(secs / 60);
+});
 
 const published = computed(() => configs.rows.value.filter((c) => c.version > 0));
-const chosenConfig = form.useStore((s) => s.values.config);
-
 const configOptions = computed(() =>
   published.value.map((c) => ({ label: raw(c.id), value: c.id })),
 );
+const latestOf = (id: string) => published.value.find((c) => c.id === id)?.version ?? 0;
+
+// A version whose rollout halted or was reverted is marked, so it is not picked again by accident.
+const failedVersions = computed(
+  () =>
+    new Set(
+      rollouts.rows.value
+        .filter((r) => r.status === "halted" || r.status === "reverted")
+        .map((r) => `${r.config}@${r.toVersion}`),
+    ),
+);
+const hasFailed = (config: string, version: number) =>
+  failedVersions.value.has(`${config}@${version}`);
+
 const versionOptions = computed(() => {
-  const latest = published.value.find((c) => c.id === chosenConfig.value)?.version ?? 0;
+  const latest = latestOf(chosenConfig.value);
   return Array.from({ length: latest }, (_, i) => latest - i).map((v) => ({
     label: hasFailed(chosenConfig.value, v)
       ? t("fleet.rollouts.versionFailedBefore", { version: v })
@@ -289,21 +330,7 @@ const versionOptions = computed(() => {
   }));
 });
 
-const latestOf = (id: string) => published.value.find((c) => c.id === id)?.version ?? 0;
-// A rollout that halted, including one later auto-reverted, carries its failure.
-const failedVersions = computed(
-  () =>
-    new Set(
-      rollouts.rows.value
-        .filter((r) => r.status === "halted" || r.failure)
-        .map((r) => `${r.config}@${r.toVersion}`),
-    ),
-);
-const hasFailed = (config: string, version: number) =>
-  failedVersions.value.has(`${config}@${version}`);
 function defaultVersion(fleetId: string, config: string) {
-  // Without a fresh rollouts read the failed versions are unknown, so the user picks.
-  if (rolloutsRead.value !== "done") return 0;
   const desired = readableFleets.value.find((f) => f.id === fleetId)?.desired;
   for (let v = latestOf(config); v > 0; v--) {
     const current = desired?.config === config && desired.version === v;
@@ -313,21 +340,6 @@ function defaultVersion(fleetId: string, config: string) {
 }
 const desiredOf = (id: string) => readableFleets.value.find((f) => f.id === id)?.desired?.config;
 
-// Re-read on every opening: a cached list can miss a version that failed elsewhere moments ago.
-const rolloutsRead = ref<"pending" | "done" | "failed">("pending");
-let openings = 0;
-watch(
-  () => props.open,
-  async (open) => {
-    rolloutsRead.value = "pending";
-    if (!open) return;
-    const opening = ++openings;
-    const res = await rollouts.refetch();
-    if (opening === openings && props.open) rolloutsRead.value = res.isError ? "failed" : "done";
-  },
-  { immediate: true },
-);
-
 // Defaults depend on these lists, so the form is seeded once per opening, after they load.
 const seeded = ref(false);
 watch(
@@ -335,76 +347,65 @@ watch(
     props.open,
     configs.loading.value,
     fleets.loading.value,
-    rolloutsRead.value === "pending",
+    rollouts.loading.value,
     listsFailed.value || listsForbidden.value,
   ],
-  ([open, configsLoading, fleetsLoading, rolloutsPending, listsUnusable]) => {
+  ([open, configsLoading, fleetsLoading, rolloutsLoading, listsUnusable]) => {
     if (!open) {
       seeded.value = false;
       return;
     }
-    if (seeded.value || configsLoading || fleetsLoading || rolloutsPending || listsUnusable) return;
-    const r = props.retryOf;
+    if (seeded.value || configsLoading || fleetsLoading || rolloutsLoading || listsUnusable) return;
     const ids = readableFleets.value.map((f) => f.id);
-    const fleet =
-      r?.fleetId ?? props.fleetId ?? (ids.includes("default") ? "default" : (ids[0] ?? "default"));
-    const config = r?.config ?? props.config ?? desiredOf(fleet) ?? "";
-    const seed = defaults(
-      fleet,
-      config,
-      r?.toVersion ?? props.toVersion ?? defaultVersion(fleet, config),
-    );
-    form.reset(r ? { ...seed, ...retryValues(r) } : seed);
-    gatesChoice.value = r ? r.gates.length > 0 : null;
+    const fleet = props.fleetId ?? (ids.includes("default") ? "default" : (ids[0] ?? "default"));
+    const config = props.config ?? desiredOf(fleet) ?? "";
+    form.reset(blank(fleet, config, props.toVersion ?? defaultVersion(fleet, config)));
     seeded.value = true;
   },
   { immediate: true },
 );
 
-// The response carries no batch, so a progressive retry re-enters its multiplier and cap.
-function retryValues(r: RolloutRow): Partial<RolloutForm> {
-  return {
-    strategy: r.strategy,
-    initial: r.phases[0]?.size ?? 1,
-    gates: r.gates.length > 0,
-    autoRollback: r.autoRollback,
-  };
-}
-
 function onFleetPicked(id: unknown) {
-  const fleet = String(id ?? "");
-  form.setFieldValue("members", membersOf(fleet));
-  if (props.toVersion == null && !props.retryOf)
-    form.setFieldValue("version", defaultVersion(fleet, form.state.values.config));
+  if (props.toVersion != null) return;
+  form.setFieldValue("version", defaultVersion(String(id ?? ""), form.state.values.config));
 }
 
 function onConfigPicked(id: unknown) {
   form.setFieldValue("version", defaultVersion(form.state.values.fleet, String(id ?? "")));
 }
 
-// The server refuses a field its strategy does not take, so each strategy sends only its own.
-function requestOf(value: RolloutForm): FleetSetDesiredRequest {
-  const body: FleetSetDesiredRequest = {
-    config: value.config,
-    version: value.version,
-    strategy: value.strategy,
-  };
-  if (value.strategy === "canary") body.batch = { initial: Number(value.initial) };
-  if (value.strategy === "progressive")
-    body.batch = {
-      initial: Number(value.initial),
-      multiplier: Number(value.multiplier),
-      max: Number(value.max),
-    };
-  if (value.strategy === "canary" || value.strategy === "progressive") body.gates = value.gates;
-  if (value.strategy === "scheduled") body.scheduled_for = new Date(value.when).getTime();
-  body.auto_rollback = value.autoRollback;
-  return body;
-}
+const previewBody = ref<FleetSetDesiredRequest | null>(null);
+let previewTimer: ReturnType<typeof setTimeout> | undefined;
+watch(
+  values,
+  (v) => {
+    clearTimeout(previewTimer);
+    previewTimer = setTimeout(() => {
+      previewBody.value = seeded.value ? requestOf(v) : null;
+    }, PREVIEW_DEBOUNCE_MS);
+  },
+  { deep: true, immediate: true },
+);
+onBeforeUnmount(() => clearTimeout(previewTimer));
+
+const preview = usePlanPreview(
+  () => chosenFleet.value || null,
+  () => previewBody.value,
+  () => props.open && seeded.value,
+);
+
+const planLine = computed(() => {
+  const p = preview.preview.value;
+  if (emptyFleet.value) return t("fleet.rollouts.emptyFleet");
+  if (!p) return preview.error.value ? t("fleet.rollouts.planUnavailable") : raw("—");
+  return planText(p.phases);
+});
 
 async function submit(value: RolloutForm) {
+  const body = requestOf(value);
+  if (!body) return;
   try {
-    await setDesired.mutateAsync({ fleet: value.fleet, body: requestOf(value) });
+    await setDesired.mutateAsync({ fleet: value.fleet, body });
     emit("update:open", false);
     emit("submitted");
     toast({ variant: "success", message: t("fleet.configs.rolloutCreated") });

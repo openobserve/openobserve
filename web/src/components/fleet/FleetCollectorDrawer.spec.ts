@@ -13,12 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import fleet from "@/services/fleet";
+import { queryClient } from "@/composables/query/queryClient";
 import FleetCollectorDrawer from "./FleetCollectorDrawer.vue";
+import { apiDetail } from "./fleet.fixtures";
 
 const { confirmMock, toastMock } = vi.hoisted(() => ({ confirmMock: vi.fn(), toastMock: vi.fn() }));
 
@@ -35,63 +37,74 @@ vi.mock("@/aws-exports", async (importOriginal) => {
 
 vi.mock("@/services/fleet", () => ({
   default: {
-    listCollectors: vi.fn(),
     getCollector: vi.fn(),
-    summary: vi.fn(),
-    unenrollCollector: vi.fn(),
+    listTokens: vi.fn(),
+    listFleets: vi.fn(),
+    deleteCollector: vi.fn(),
+    restartCollector: vi.fn(),
+    redeliverCollector: vi.fn(),
+    renameCollector: vi.fn(),
   },
 }));
 
-const detail = (over: Record<string, unknown> = {}) => ({
-  id: "c1",
-  name: "prod-web-01",
-  hostname: "prod-web-01.acme.internal",
-  ip: "10.0.0.10",
-  status: "degraded",
-  os: "linux",
-  arch: "amd64",
-  distribution: "Ubuntu 24.04",
-  version: "0.124.0",
-  outdated: false,
-  config: null,
-  config_version: null,
-  delivery: null,
-  drifted: null,
-  fleet: { id: "f1", name: "edge" },
-  token_id: null,
-  last_seen: Date.now(),
-  enrolled_at: Date.now(),
-  capabilities: ["ReportsStatus", "ReportsHealth"],
-  health: {
-    healthy: false,
-    status: "StatusRecoverableError",
-    last_error: "",
-    components: [
-      { id: "receiver:otlp", healthy: true, status: "StatusOK", last_error: "" },
-      {
-        id: "exporter:otlphttp/openobserve",
-        healthy: false,
-        status: "StatusPermanentError",
-        last_error: "401 Unauthorized",
-      },
-    ],
-  },
-  errors: ["exporter:otlphttp/openobserve: 401 Unauthorized"],
-  delivery_error: null,
-  effective_config: null,
-  assigned_at: null,
-  applied_at: null,
-  drift_since: null,
-  baseline_config: null,
-  ...over,
-});
+const EFFECTIVE = `receivers:
+  otlp: {}
+extensions:
+  health_check: {}
+  opamp:
+    server:
+      ws:
+        endpoint: wss://o2/api/default/v1/opamp
+service:
+  extensions: [health_check, opamp]
+  pipelines:
+    logs:
+      receivers: [otlp]
+      exporters: [debug]
+  telemetry:
+    resource:
+      attributes:
+        - name: openobserve.fleet.config_id
+          value: edge
+`;
 
-const MoveStub = {
-  name: "MoveAcrossFolders",
-  props: ["open", "activeFolderId", "moduleId", "type"],
-  emits: ["updated", "update:open"],
-  template: "<div />",
-};
+const detail = (over: Parameters<typeof apiDetail>[0] = {}) =>
+  apiDetail({
+    name: "prod-web-01",
+    hostname: "prod-web-01.acme.internal",
+    last_connected_from: "10.0.0.10",
+    token_id: "t1",
+    capabilities: ["AcceptsRemoteConfig", "AcceptsRestartCommand"],
+    health: {
+      healthy: false,
+      status: "StatusRecoverableError",
+      last_error: "exporter:otlphttp/openobserve: 401 Unauthorized",
+      components: [
+        { id: "receiver:otlp", healthy: true, status: "StatusOK", last_error: "" },
+        {
+          id: "exporter:otlphttp/openobserve",
+          healthy: false,
+          status: "StatusPermanentError",
+          last_error: "401 Unauthorized",
+        },
+      ],
+    },
+    effective_config: EFFECTIVE,
+    effective_reported_at: Date.now(),
+    assignment: { fleet: "default", config: "edge", version: 2, revision: 7 },
+    evidence: {
+      remote_status: "APPLIED",
+      remote_hash: "9f2c1a7e",
+      remote_at: Date.now(),
+      marker: { config: "edge", version: 2 },
+      last_heartbeat_at: Date.now(),
+    },
+    history: [
+      { at: 1, event: "enrolled", detail: null },
+      { at: 3, event: "moved_by_token", detail: "from staging" },
+    ],
+    ...over,
+  });
 
 const DrawerStub = {
   props: ["open", "title", "subTitle"],
@@ -99,7 +112,12 @@ const DrawerStub = {
 };
 const CodeStub = {
   props: ["code"],
-  template: '<pre data-test="fleet-collector-drawer-yaml">{{ code }}</pre>',
+  template: "<pre>{{ code }}</pre>",
+};
+const MoveStub = {
+  name: "FleetMoveDialog",
+  props: ["open", "collectorIds", "sourceFleetId"],
+  template: "<div />",
 };
 
 function mountDrawer(initialTab = "overview") {
@@ -107,31 +125,50 @@ function mountDrawer(initialTab = "overview") {
     props: { open: true, collectorId: "c1", initialTab },
     global: {
       plugins: [i18n, store],
-      stubs: {
-        ODrawer: DrawerStub,
-        FleetCodeEditor: CodeStub,
-        MoveAcrossFolders: MoveStub,
-      },
+      stubs: { ODrawer: DrawerStub, FleetCodeEditor: CodeStub, FleetMoveDialog: MoveStub },
     },
   });
 }
 
+const org = () => store.state.selectedOrganization.identifier;
+const sel = (name: string) => `[data-test="fleet-collector-drawer-${name}"]`;
+
 describe("FleetCollectorDrawer", () => {
   let wrapper: VueWrapper;
 
+  beforeEach(() => {
+    confirmMock.mockResolvedValue(true);
+    vi.mocked(fleet.getCollector).mockResolvedValue({ data: detail() } as any);
+    vi.mocked(fleet.listTokens).mockResolvedValue({
+      data: {
+        items: [
+          {
+            id: "t1",
+            name: "k8s-helm",
+            prefix: "o2ft_Qm7x",
+            created_at: 1,
+            expires_at: null,
+            uses: 1,
+            max_uses: null,
+            fleet: { id: "default", name: "default" },
+            revoked: false,
+          },
+        ],
+      },
+    } as any);
+    vi.mocked(fleet.listFleets).mockResolvedValue({ data: { items: [] } } as any);
+  });
+
   afterEach(() => {
     wrapper?.unmount();
+    queryClient.clear();
     vi.clearAllMocks();
   });
 
   it("fetches the detail for the org and collector", async () => {
-    vi.mocked(fleet.getCollector).mockResolvedValue({ data: detail() } as any);
     wrapper = mountDrawer();
     await flushPromises();
-    expect(fleet.getCollector).toHaveBeenCalledWith(
-      store.state.selectedOrganization.identifier,
-      "c1",
-    );
+    expect(fleet.getCollector).toHaveBeenCalledWith(org(), "c1");
   });
 
   it("does not fetch while closed", async () => {
@@ -143,384 +180,163 @@ describe("FleetCollectorDrawer", () => {
     expect(fleet.getCollector).not.toHaveBeenCalled();
   });
 
-  it("shows a spinner while the detail loads", async () => {
-    vi.mocked(fleet.getCollector).mockReturnValue(new Promise(() => {}) as any);
+  it.each([
+    [{ response: { status: 403 } }, "forbidden"],
+    [new Error("boom"), "error"],
+  ])("shows why the detail cannot load (%j)", async (err, shown) => {
+    vi.mocked(fleet.getCollector).mockRejectedValue(err);
     wrapper = mountDrawer();
     await flushPromises();
-    expect(wrapper.find('[data-test="fleet-collector-drawer-loading"]').exists()).toBe(true);
+    expect(wrapper.find(sel(shown)).exists()).toBe(true);
   });
 
-  it("shows the no-access state on a 403", async () => {
-    vi.mocked(fleet.getCollector).mockRejectedValue({ response: { status: 403 } });
+  it("shows where it last connected from and the token by name", async () => {
     wrapper = mountDrawer();
     await flushPromises();
-    expect(wrapper.find('[data-test="fleet-collector-drawer-forbidden"]').exists()).toBe(true);
+    expect(wrapper.find(sel("peer")).text()).toBe("10.0.0.10");
+    expect(wrapper.find(sel("token")).text()).toBe("k8s-helm (o2ft_Qm7x)");
+    expect(wrapper.find(sel("id")).text()).toBe("c1");
   });
 
-  it("shows no-access over cached detail when a refetch returns 403", async () => {
-    vi.mocked(fleet.getCollector).mockResolvedValueOnce({ data: detail() } as any);
+  it("renames the collector when the nickname is committed", async () => {
+    vi.mocked(fleet.renameCollector).mockResolvedValue({ data: {} } as any);
     wrapper = mountDrawer();
     await flushPromises();
-    vi.mocked(fleet.getCollector).mockRejectedValueOnce({ response: { status: 403 } });
-    await (wrapper.vm as any).refetch();
+    wrapper.findComponent({ name: "OInlineEdit" }).vm.$emit("commit", "web-primary");
     await flushPromises();
-    expect(wrapper.find('[data-test="fleet-collector-drawer-forbidden"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="fleet-collector-drawer-id"]').exists()).toBe(false);
+    expect(fleet.renameCollector).toHaveBeenCalledWith(org(), "c1", "web-primary");
   });
 
-  it("keeps the cached collector on screen when a refetch fails", async () => {
-    vi.mocked(fleet.getCollector).mockResolvedValueOnce({ data: detail() } as any);
-    wrapper = mountDrawer();
+  it("traces delivery to the assignment, the remote status and the marker", async () => {
+    wrapper = mountDrawer("delivery");
     await flushPromises();
-    vi.mocked(fleet.getCollector).mockRejectedValueOnce(new Error("boom"));
-    await (wrapper.vm as any).refetch();
-    await flushPromises();
-    expect(wrapper.find('[data-test="fleet-collector-drawer-error"]').exists()).toBe(false);
-    expect(wrapper.find('[data-test="fleet-collector-drawer-id"]').text()).toBe("c1");
+    expect(wrapper.find(sel("assignment")).text()).toBe("edge v2, revision 7");
+    expect(wrapper.find(sel("remote")).text()).toContain("APPLIED");
+    expect(wrapper.find(sel("remote")).text()).toContain("9f2c1a7e");
+    expect(wrapper.find(sel("marker")).text()).toBe("edge v2");
+    expect(wrapper.find(sel("evidence-line")).text()).toContain("hash 9f2c1a7e");
   });
 
-  it("shows the error state when the detail fails", async () => {
-    vi.mocked(fleet.getCollector).mockRejectedValue({ response: { status: 404 } });
-    wrapper = mountDrawer();
-    await flushPromises();
-    expect(wrapper.find('[data-test="fleet-collector-drawer-error"]').exists()).toBe(true);
-  });
-
-  it("renders the overview from API data", async () => {
-    vi.mocked(fleet.getCollector).mockResolvedValue({ data: detail() } as any);
-    wrapper = mountDrawer();
-    await flushPromises();
-    expect(wrapper.find("h2").text()).toBe("prod-web-01");
-    expect(wrapper.find('[data-test="fleet-collector-drawer-id"]').text()).toBe("c1");
-    expect(wrapper.find('[data-test="fleet-collector-drawer-os"]').text()).toBe(
-      "Ubuntu 24.04 · amd64",
-    );
-    expect(wrapper.find('[data-test="fleet-collector-drawer-capabilities"]').text()).toContain(
-      "ReportsHealth",
-    );
-  });
-
-  it("renders the fleet row and an empty state for a null config, with no label editor", async () => {
-    vi.mocked(fleet.getCollector).mockResolvedValue({ data: detail() } as any);
-    wrapper = mountDrawer();
-    await flushPromises();
-    expect(wrapper.find('[data-test="fleet-collector-drawer-config"]').text()).toBe(
-      "No configuration assigned",
-    );
-    expect(wrapper.find('[data-test="fleet-collector-drawer-fleet"]').text()).toBe("edge");
-    expect(wrapper.find('[data-test="fleet-collector-drawer-edit-labels"]').exists()).toBe(false);
-    expect(wrapper.find('[data-test="fleet-collector-drawer-labels"]').exists()).toBe(false);
-    expect(wrapper.text()).not.toContain("undefined");
-    expect(wrapper.text()).not.toContain("null");
-  });
-
-  it("renders a dash for a missing OS line", async () => {
-    vi.mocked(fleet.getCollector).mockResolvedValue({
-      data: detail({ os: null, arch: null, distribution: null }),
-    } as any);
-    wrapper = mountDrawer();
-    await flushPromises();
-    expect(wrapper.find('[data-test="fleet-collector-drawer-os"]').exists()).toBe(false);
-    expect(wrapper.text()).toContain("—");
-  });
-
-  it("renders none of the removed controls: restart and remediate", async () => {
-    vi.mocked(fleet.getCollector).mockResolvedValue({ data: detail({ drifted: true }) } as any);
-    wrapper = mountDrawer("config");
-    await flushPromises();
-    expect(wrapper.text()).toContain("differs from the assigned version");
-    expect(wrapper.find('[data-test="fleet-collector-drawer-restart"]').exists()).toBe(false);
-    expect(wrapper.find('[data-test="fleet-collector-drawer-remediate"]').exists()).toBe(false);
-  });
-
-  it("renders errors and per-component health on the health tab", async () => {
-    vi.mocked(fleet.getCollector).mockResolvedValue({ data: detail() } as any);
-    wrapper = mountDrawer("health");
-    await flushPromises();
-    expect(wrapper.find('[data-test="fleet-collector-drawer-errors"]').text()).toContain(
-      "401 Unauthorized",
-    );
-    const components = wrapper.find('[data-test="fleet-collector-drawer-components"]').text();
-    expect(components).toContain("receiver:otlp");
-    expect(components).toContain("exporter:otlphttp/openobserve");
-  });
-
-  it("shows a neutral no-health state, not a green all-clear, when health is null", async () => {
-    vi.mocked(fleet.getCollector).mockResolvedValue({
-      data: detail({ health: null, errors: [] }),
-    } as any);
-    wrapper = mountDrawer("health");
-    await flushPromises();
-    expect(wrapper.find('[data-test="fleet-collector-drawer-no-health"]').text()).toContain(
-      "No health reported",
-    );
-    expect(wrapper.find('[data-test="fleet-collector-drawer-no-errors"]').exists()).toBe(false);
-    expect(wrapper.find('[data-test="fleet-collector-drawer-components"]').text()).toBe(
-      "No component health reported",
-    );
-  });
-
-  it("labels an offline collector's errors as last reported, with components unknown", async () => {
-    vi.mocked(fleet.getCollector).mockResolvedValue({ data: detail({ status: "offline" }) } as any);
-    wrapper = mountDrawer("health");
-    await flushPromises();
-    expect(wrapper.find('[data-test="fleet-collector-drawer-last-reported"]').text()).toBe(
-      "Last reported",
-    );
-    expect(wrapper.find('[data-test="fleet-collector-drawer-errors"]').text()).toContain(
-      "401 Unauthorized",
-    );
-    const tags = wrapper
-      .find('[data-test="fleet-collector-drawer-components"]')
-      .findAllComponents({ name: "OTag" });
-    expect(tags.map((t) => t.props("value"))).toEqual(["unknown", "unknown"]);
-  });
-
-  it("does not label an online collector's errors as last reported", async () => {
-    vi.mocked(fleet.getCollector).mockResolvedValue({ data: detail() } as any);
-    wrapper = mountDrawer("health");
-    await flushPromises();
-    expect(wrapper.find('[data-test="fleet-collector-drawer-last-reported"]').exists()).toBe(false);
-  });
-
-  it("renders the reported YAML on the effective config tab", async () => {
-    vi.mocked(fleet.getCollector).mockResolvedValue({
-      data: detail({ effective_config: { yaml: "receivers:\n  otlp: {}", reported_at: 1 } }),
-    } as any);
-    wrapper = mountDrawer("config");
-    await flushPromises();
-    expect(wrapper.find('[data-test="fleet-collector-drawer-yaml"]').text()).toContain("otlp");
-  });
-
-  it("renders empty states for a null effective config and delivery", async () => {
-    vi.mocked(fleet.getCollector).mockResolvedValue({ data: detail() } as any);
-    wrapper = mountDrawer("config");
-    await flushPromises();
-    expect(wrapper.find('[data-test="fleet-collector-drawer-no-yaml"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="fleet-collector-drawer-delivery"]').text()).toBe("—");
-    expect(wrapper.text()).not.toContain("undefined");
-  });
-
-  it.each(["online", "offline"])(
-    "builds history from real timestamps only (%s)",
-    async (status) => {
-      vi.mocked(fleet.getCollector).mockResolvedValue({ data: detail({ status }) } as any);
-      wrapper = mountDrawer("history");
-      await flushPromises();
-      const titles = wrapper
-        .findAllComponents({ name: "OTimelineItem" })
-        .map((i) => i.props("title"));
-      expect(titles).toEqual(["Last seen", "Enrolled"]);
-      expect(wrapper.text()).not.toContain("Went offline");
-    },
-  );
-
-  it("says the assignment comes through the collector's fleet", async () => {
-    vi.mocked(fleet.getCollector).mockResolvedValue({
-      data: detail({ config: "edge-config", config_version: 3, delivery: "running" }),
-    } as any);
-    wrapper = mountDrawer("config");
-    await flushPromises();
-    expect(wrapper.find('[data-test="fleet-collector-drawer-assignment"]').text()).toBe(
-      "Through fleet edge → edge-config v3",
-    );
-  });
-
-  it("moves this collector from Move to fleet, naming its fleet as the source", async () => {
-    vi.mocked(fleet.getCollector).mockResolvedValue({ data: detail() } as any);
-    wrapper = mountDrawer();
-    await flushPromises();
-    const dialog = wrapper.findComponent({ name: "MoveAcrossFolders" });
-    expect(dialog.props("open")).toBe(false);
-    expect(wrapper.find('[data-test="fleet-collector-drawer-apply"]').exists()).toBe(false);
-    await wrapper.find('[data-test="fleet-collector-drawer-move"]').trigger("click");
-    await flushPromises();
-    expect(dialog.props()).toMatchObject({
-      open: true,
-      type: "fleets",
-      moduleId: ["c1"],
-      activeFolderId: "f1",
-    });
-  });
-
-  it("shows a collector moved to a fleet with no stable version as unassigned with its delivery", async () => {
-    vi.mocked(fleet.getCollector).mockResolvedValue({
-      data: detail({ config: null, delivery: "running", drifted: false }),
-    } as any);
-    wrapper = mountDrawer();
-    await flushPromises();
-    const cell = wrapper.find('[data-test="fleet-collector-drawer-config"]');
-    expect(cell.text()).toContain("No configuration assigned");
-    expect(cell.text()).toContain("Running");
-    await wrapper.setProps({ initialTab: "config" });
-    await flushPromises();
-  });
-
-  it("diffs the baseline against the current effective config when drifted", async () => {
+  it("shows a rejection's error and the placeholder for an unassigned fleet", async () => {
     vi.mocked(fleet.getCollector).mockResolvedValue({
       data: detail({
-        config: "edge",
-        config_version: 1,
-        delivery: "running",
-        drifted: true,
-        baseline_config: "receivers:\n  otlp: {}\n",
-        effective_config: { yaml: "receivers:\n  zipkin: {}\n", reported_at: Date.now() },
+        delivery: "rejected",
+        delivery_error: "unknown field endpiont",
+        assignment: null,
+        evidence: null,
       }),
+    } as any);
+    wrapper = mountDrawer("delivery");
+    await flushPromises();
+    expect(wrapper.find(sel("delivery-error")).text()).toContain("unknown field endpiont");
+    expect(wrapper.find(sel("assignment")).text()).toContain("Placeholder configuration");
+    expect(wrapper.find(sel("marker")).text()).toBe("not reported");
+  });
+
+  it("renders the health error and per-component health", async () => {
+    wrapper = mountDrawer("health");
+    await flushPromises();
+    expect(wrapper.find(sel("errors")).text()).toContain("401 Unauthorized");
+    expect(wrapper.find(sel("components")).text()).toContain("exporter:otlphttp/openobserve");
+  });
+
+  it("collapses the system-managed sections out of the effective config", async () => {
+    wrapper = mountDrawer("config");
+    await flushPromises();
+    const user = wrapper.find(sel("yaml")).text();
+    expect(user).toContain("health_check");
+    expect(user).not.toContain("opamp:");
+    expect(user).not.toContain("telemetry");
+    expect(wrapper.find(sel("system-yaml")).exists()).toBe(true);
+  });
+
+  it("shows an empty state without an effective config", async () => {
+    vi.mocked(fleet.getCollector).mockResolvedValue({
+      data: detail({ effective_config: null }),
     } as any);
     wrapper = mountDrawer("config");
     await flushPromises();
-    const diff = wrapper.find('[data-test="fleet-config-diff"]');
-    expect(diff.exists()).toBe(true);
-    expect(diff.text()).toContain("otlp: {}");
-    expect(diff.text()).toContain("zipkin: {}");
+    expect(wrapper.find(sel("no-yaml")).exists()).toBe(true);
   });
 
-  it("shows no diff without a baseline", async () => {
-    vi.mocked(fleet.getCollector).mockResolvedValue({
-      data: detail({
-        drifted: true,
-        effective_config: { yaml: "a: 1\n", reported_at: Date.now() },
-      }),
-    } as any);
-    wrapper = mountDrawer("config");
-    await flushPromises();
-    expect(wrapper.find('[data-test="fleet-config-diff"]').exists()).toBe(false);
-  });
-
-  it("adds assigned, applied and drift events to the history", async () => {
-    const now = Date.now();
-    vi.mocked(fleet.getCollector).mockResolvedValue({
-      data: detail({
-        last_seen: now,
-        enrolled_at: now - 40_000,
-        assigned_at: now - 30_000,
-        applied_at: now - 20_000,
-        drift_since: now - 10_000,
-      }),
-    } as any);
+  it("lists the history newest first, with moves by token named", async () => {
     wrapper = mountDrawer("history");
     await flushPromises();
-    const titles = wrapper
-      .findAllComponents({ name: "OTimelineItem" })
-      .map((i) => i.props("title"));
-    expect(titles).toEqual([
-      "Last seen",
-      "Drift detected",
-      "Configuration applied",
-      "Configuration assigned",
-      "Enrolled",
-    ]);
+    const text = wrapper.find(sel("history")).text();
+    expect(text.indexOf("Moved by its enrollment token")).toBeLessThan(text.indexOf("Enrolled"));
+    expect(text).toContain("from staging");
   });
 
-  it("unenrolls after a confirm and closes the drawer", async () => {
-    confirmMock.mockResolvedValue(true);
-    vi.mocked(fleet.getCollector).mockResolvedValue({ data: detail() } as any);
-    vi.mocked(fleet.unenrollCollector).mockResolvedValue({ status: 204 } as any);
+  it("restarts and redelivers the collector", async () => {
+    vi.mocked(fleet.restartCollector).mockResolvedValue({ data: { queued: true } } as any);
+    vi.mocked(fleet.redeliverCollector).mockResolvedValue({ data: { revision: 8 } } as any);
     wrapper = mountDrawer();
     await flushPromises();
-    await wrapper.find('[data-test="fleet-collector-drawer-unenroll"]').trigger("click");
+    await wrapper.find(sel("restart")).trigger("click");
+    await wrapper.find(sel("redeliver")).trigger("click");
     await flushPromises();
-    expect(confirmMock).toHaveBeenCalledTimes(1);
-    expect(fleet.unenrollCollector).toHaveBeenCalledWith(
-      store.state.selectedOrganization.identifier,
-      "c1",
-    );
-    expect(wrapper.emitted("update:open")).toEqual([[false]]);
-    expect(confirmMock.mock.calls[0][0]).toMatchObject({
-      confirmVariant: "destructive",
-      focusCancel: true,
-    });
-    expect(toastMock).toHaveBeenCalledWith(
-      expect.objectContaining({ variant: "success", message: "Unenrolled prod-web-01" }),
-    );
+    expect(fleet.restartCollector).toHaveBeenCalledWith(org(), "c1");
+    expect(fleet.redeliverCollector).toHaveBeenCalledWith(org(), "c1");
   });
 
-  it("keeps the drawer open when the unenroll is cancelled or fails", async () => {
-    vi.mocked(fleet.getCollector).mockResolvedValue({ data: detail() } as any);
+  it("disables restart for a collector that does not accept the command", async () => {
+    vi.mocked(fleet.getCollector).mockResolvedValue({
+      data: detail({ capabilities: ["AcceptsRemoteConfig"] }),
+    } as any);
     wrapper = mountDrawer();
     await flushPromises();
-    confirmMock.mockResolvedValueOnce(false);
-    await wrapper.find('[data-test="fleet-collector-drawer-unenroll"]').trigger("click");
+    expect(wrapper.find(sel("restart")).attributes("disabled")).toBeDefined();
+  });
+
+  it("removes after a confirm that warns an online host comes back, and closes", async () => {
+    vi.mocked(fleet.deleteCollector).mockResolvedValue({ status: 204 } as any);
+    wrapper = mountDrawer();
     await flushPromises();
-    expect(fleet.unenrollCollector).not.toHaveBeenCalled();
-    confirmMock.mockResolvedValueOnce(true);
-    vi.mocked(fleet.unenrollCollector).mockRejectedValue({ response: { status: 403 } });
-    await wrapper.find('[data-test="fleet-collector-drawer-unenroll"]').trigger("click");
+    await wrapper.find(sel("remove")).trigger("click");
     await flushPromises();
-    expect(fleet.unenrollCollector).toHaveBeenCalledTimes(1);
+    expect(confirmMock.mock.calls[0][0].message).toContain("reappears on its next heartbeat");
+    expect(fleet.deleteCollector).toHaveBeenCalledWith(org(), "c1");
+    expect(wrapper.emitted("update:open")?.at(-1)).toEqual([false]);
+  });
+
+  it("keeps the drawer open when the remove is cancelled", async () => {
+    confirmMock.mockResolvedValue(false);
+    wrapper = mountDrawer();
+    await flushPromises();
+    await wrapper.find(sel("remove")).trigger("click");
+    await flushPromises();
+    expect(fleet.deleteCollector).not.toHaveBeenCalled();
     expect(wrapper.emitted("update:open")).toBeUndefined();
   });
 
-  it("shows the server's reason when an unenroll is refused", async () => {
-    confirmMock.mockResolvedValue(true);
-    vi.mocked(fleet.getCollector).mockResolvedValue({ data: detail() } as any);
-    vi.mocked(fleet.unenrollCollector).mockRejectedValue({
-      response: {
-        status: 403,
-        data: { message: "Only organization administrators can manage enrollment" },
-      },
-    });
+  it("moves this collector, naming its fleet as the source", async () => {
     wrapper = mountDrawer();
     await flushPromises();
-    await wrapper.find('[data-test="fleet-collector-drawer-unenroll"]').trigger("click");
-    await flushPromises();
-    expect(toastMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        variant: "error",
-        message: "Only organization administrators can manage enrollment",
-      }),
-    );
-  });
-
-  it("offers unenroll to everyone, leaving refusal to the server", async () => {
-    vi.mocked(fleet.getCollector).mockResolvedValue({ data: detail() } as any);
-    wrapper = mountDrawer();
-    await flushPromises();
-    const btn = wrapper.find('[data-test="fleet-collector-drawer-unenroll"]');
-    expect(btn.attributes("aria-disabled")).toBeUndefined();
+    await wrapper.find(sel("move")).trigger("click");
+    const move = wrapper.findComponent(MoveStub);
+    expect(move.props("open")).toBe(true);
+    expect(move.props("collectorIds")).toEqual(["c1"]);
+    expect(move.props("sourceFleetId")).toBe("default");
   });
 
   it("closes itself when the org changes", async () => {
     const orgA = store.state.selectedOrganization;
-    vi.mocked(fleet.getCollector).mockResolvedValue({ data: detail() } as any);
     wrapper = mountDrawer();
     await flushPromises();
     store.commit("setSelectedOrganization", { ...orgA, identifier: "org-b" });
     await flushPromises();
     try {
-      expect(wrapper.emitted("update:open")).toEqual([[false]]);
-    } finally {
-      store.commit("setSelectedOrganization", orgA);
-    }
-  });
-
-  it("does not unenroll in the new org when the org changes while confirming", async () => {
-    const orgA = store.state.selectedOrganization;
-    let answer!: (v: boolean) => void;
-    confirmMock.mockReturnValue(new Promise((r) => (answer = r)));
-    vi.mocked(fleet.getCollector).mockResolvedValue({ data: detail() } as any);
-    wrapper = mountDrawer();
-    await flushPromises();
-    await wrapper.find('[data-test="fleet-collector-drawer-unenroll"]').trigger("click");
-    await flushPromises();
-    store.commit("setSelectedOrganization", { ...orgA, identifier: "org-b" });
-    await flushPromises();
-    answer(true);
-    await flushPromises();
-    try {
-      expect(fleet.unenrollCollector).not.toHaveBeenCalled();
+      expect(wrapper.emitted("update:open")?.at(-1)).toEqual([false]);
     } finally {
       store.commit("setSelectedOrganization", orgA);
     }
   });
 
   it("switches tab when initialTab changes while open", async () => {
-    vi.mocked(fleet.getCollector).mockResolvedValue({ data: detail() } as any);
-    wrapper = mountDrawer("overview");
+    wrapper = mountDrawer();
     await flushPromises();
-    expect(wrapper.find('[data-test="fleet-collector-drawer-errors"]').exists()).toBe(false);
-    await wrapper.setProps({ initialTab: "health" });
+    await wrapper.setProps({ initialTab: "history" });
     await flushPromises();
-    expect(wrapper.find('[data-test="fleet-collector-drawer-errors"]').exists()).toBe(true);
+    expect(wrapper.find(sel("history")).exists()).toBe(true);
   });
 });

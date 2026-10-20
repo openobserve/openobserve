@@ -15,41 +15,43 @@
 
 import { z } from "zod";
 import type { TranslateFn } from "@/types/i18n";
+import type { FleetSetDesiredRequest } from "@/services/fleet";
 
-export const STRATEGIES = ["immediate", "canary", "progressive", "scheduled"] as const;
+export const STARTS = ["now", "at"] as const;
+export const BATCHINGS = ["one", "canary", "progressive"] as const;
 
 // A number input emits a string, so the raw value is validated and coerced when the payload is built.
-const isCount = (v: unknown) => Number.isInteger(Number(v)) && Number(v) >= 1 && v !== "";
-
-/** Gates need a second phase, which canary and progressive have only when the fleet has more members than the first batch. */
-export const planHasPhases = (members: number, initial: unknown) =>
-  isCount(initial) && members > Number(initial);
+const isCount = (v: unknown) => v !== "" && Number.isInteger(Number(v)) && Number(v) >= 1;
 
 export const makeRolloutSchema = (t: TranslateFn) =>
   z
     .object({
       fleet: z.string().min(1, t("fleet.rollouts.pickFleet")),
-      /** The fleet's member count, which the plan is cut from. */
-      members: z.number(),
       config: z.string().min(1, t("fleet.rollouts.pickConfig")),
       version: z.number().int().min(1, t("fleet.rollouts.pickVersion")),
-      strategy: z.enum(STRATEGIES),
+      start: z.enum(STARTS),
+      when: z.string(),
+      batching: z.enum(BATCHINGS),
+      first: z.any(),
       initial: z.any(),
       multiplier: z.any(),
       max: z.any(),
-      when: z.string(),
-      gates: z.boolean(),
-      autoRollback: z.boolean(),
+      verify: z.boolean(),
+      autoRevert: z.boolean(),
     })
     .superRefine((v, ctx) => {
-      const batched = v.strategy === "canary" || v.strategy === "progressive";
-      const counts = v.strategy === "progressive" ? ["initial", "multiplier", "max"] : ["initial"];
-      for (const key of batched ? counts : []) {
-        if (!isCount(v[key as "initial"]))
+      const counts =
+        v.batching === "canary"
+          ? ["first"]
+          : v.batching === "progressive"
+            ? ["initial", "multiplier", "max"]
+            : [];
+      for (const key of counts) {
+        if (!isCount(v[key as "first"]))
           ctx.addIssue({ code: "custom", path: [key], message: t("fleet.rollouts.batchInvalid") });
       }
       if (
-        v.strategy === "progressive" &&
+        v.batching === "progressive" &&
         isCount(v.initial) &&
         isCount(v.max) &&
         Number(v.max) < Number(v.initial)
@@ -59,18 +61,40 @@ export const makeRolloutSchema = (t: TranslateFn) =>
           path: ["max"],
           message: t("fleet.rollouts.maxBelowInitial"),
         });
-      if (v.strategy === "scheduled" && !(new Date(v.when).getTime() > Date.now()))
+      if (v.start === "at" && !(new Date(v.when).getTime() > Date.now()))
         ctx.addIssue({
           code: "custom",
           path: ["when"],
           message: t("fleet.rollouts.startAtFuture"),
         });
-      if (batched && v.gates && !planHasPhases(v.members, v.initial))
-        ctx.addIssue({
-          code: "custom",
-          path: ["gates"],
-          message: t("fleet.rollouts.gatesNeedPhases"),
-        });
     });
 
 export type RolloutForm = z.infer<ReturnType<typeof makeRolloutSchema>>;
+
+/** The request for the form's values, or null while a field the server needs is not valid yet. */
+export function requestOf(v: RolloutForm): FleetSetDesiredRequest | null {
+  if (!v.config || !(v.version > 0)) return null;
+  let batching: FleetSetDesiredRequest["batching"];
+  if (v.batching === "canary") {
+    if (!isCount(v.first)) return null;
+    batching = { kind: "canary", first: Number(v.first) };
+  } else if (v.batching === "progressive") {
+    if (!isCount(v.initial) || !isCount(v.multiplier) || !isCount(v.max)) return null;
+    batching = {
+      kind: "progressive",
+      initial: Number(v.initial),
+      multiplier: Number(v.multiplier),
+      max: Number(v.max),
+    };
+  } else batching = { kind: "one" };
+  const at = new Date(v.when).getTime();
+  if (v.start === "at" && !Number.isFinite(at)) return null;
+  return {
+    config: v.config,
+    version: v.version,
+    start: v.start === "at" ? { kind: "at", at } : { kind: "now" },
+    batching,
+    verify: v.verify,
+    auto_revert: v.autoRevert,
+  };
+}

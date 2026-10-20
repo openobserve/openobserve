@@ -49,9 +49,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OTabs>
     </template>
 
-    <FleetOverview v-if="activeTab === 'overview'" @navigate="(tab, query) => go(tab, query)" />
-    <FleetFleets v-else-if="activeTab === 'fleets'" ref="createTarget" />
+    <FleetFleets v-if="activeTab === 'fleets'" ref="createTarget" />
     <FleetConfigurations v-else-if="activeTab === 'configurations'" ref="createTarget" />
+    <OContent
+      v-else-if="activeTab === 'pipelines'"
+      y
+      class="flex min-h-0 flex-1 flex-col"
+      data-test="fleet-manager-pipelines"
+    >
+      <FleetFlowOverview
+        v-model:expanded="pipelinesExpanded"
+        class="min-h-0 flex-1"
+        @navigate="(tab, query) => go(tab, query)"
+        @outdated="go('fleets', { scope: 'all', status: 'outdated' })"
+      />
+    </OContent>
     <FleetSettings v-else-if="activeTab === 'settings'" />
   </OPageLayout>
 </template>
@@ -66,7 +78,8 @@ import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
-import FleetOverview from "@/components/fleet/FleetOverview.vue";
+import OContent from "@/lib/core/Content/OContent.vue";
+import FleetFlowOverview from "@/components/fleet/FleetFlowOverview.vue";
 import FleetFleets from "@/components/fleet/FleetFleets.vue";
 import FleetConfigurations from "@/components/fleet/FleetConfigurations.vue";
 import FleetSettings from "@/components/fleet/FleetSettings.vue";
@@ -77,11 +90,12 @@ const route = useRoute();
 const router = useRouter();
 
 const createTarget = ref<{ create: () => void } | null>(null);
+const pipelinesExpanded = ref(false);
 
 const tabs = computed<{ name: FleetTab; label: I18nText; icon: IconName }[]>(() => [
-  { name: "overview", label: t("fleet.tabs.overview"), icon: "dashboard" },
   { name: "fleets", label: t("fleet.tabs.fleets"), icon: "folder" },
   { name: "configurations", label: t("fleet.tabs.configurations"), icon: "tune" },
+  { name: "pipelines", label: t("fleet.tabs.pipelines"), icon: "account-tree" },
   { name: "settings", label: t("fleet.tabs.settings"), icon: "admin-panel-settings" },
 ]);
 

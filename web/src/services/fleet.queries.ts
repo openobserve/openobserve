@@ -23,27 +23,27 @@ import fleet, {
   type FleetConfigVersion,
   type FleetFlow,
   type FleetFlowWindow,
+  type FleetPlanPreview,
   type FleetPublished,
   type FleetCollectorDetail,
   type FleetCreateTokenRequest,
   type FleetCreatedToken,
   type Fleet,
+  type FleetOrgSettings,
   type FleetRollout,
-  type FleetRolloutDetail,
   type FleetSetDesiredRequest,
   type FleetSettings,
   type FleetSummary,
   type FleetToken,
 } from "./fleet";
 import { fleetKeys } from "./fleet.querykeys";
-import { folderKeys } from "./common.querykeys";
 import { LIVE_STALE_TIME } from "@/composables/query/cachePolicy";
 import { queryClient } from "@/composables/query/queryClient";
 
 // Delivery and rollout state move without any write from this tab, so the views poll while they do.
 const DELIVERY_POLL_MS = 5000;
 
-// Push (30 s) plus ingest plus this poll must stay under the 60 s freshness promise for flow throughput.
+// Push (30 s) plus ingest plus this poll must stay under the 60 s freshness promise for pipeline throughput.
 export const FLOW_POLL_MS = 15_000;
 
 const inFlight = (delivery: string | null | undefined) =>
@@ -52,20 +52,12 @@ const inFlight = (delivery: string | null | undefined) =>
 // A scheduled rollout changes only when it becomes due, so a slow poll is enough to wake its row.
 const SCHEDULED_POLL_MS = 60_000;
 
-// The auto-revert commits in its own transaction after the halt, so the halt is not the last word.
-const revertOwed = (r: Pick<FleetRollout, "auto_rollback" | "failure">) =>
-  r.auto_rollback && (r.failure?.kind === "rejection" || r.failure?.kind === "gate_failed");
+// An auto-revert commits in its own transaction after the halt, so the halt is not the last word.
+const revertOwed = (r: Pick<FleetRollout, "auto_revert" | "halt">) =>
+  r.auto_revert && !!r.halt && r.halt.class !== "cannot_see";
 
-// Only assigned members can still report: a member of a skipped phase stays pending for good.
-const rolloutMoving = (
-  r: Pick<
-    FleetRollout,
-    "status" | "attempted" | "accepted" | "failed" | "assigned" | "auto_rollback" | "failure"
-  >,
-) =>
-  r.status === "in_progress" ||
-  (r.status === "completed" && r.attempted < r.assigned) ||
-  (r.status === "halted" && (r.attempted > r.accepted + r.failed || revertOwed(r)));
+const rolloutMoving = (r: Pick<FleetRollout, "status" | "auto_revert" | "halt">) =>
+  r.status === "in_progress" || (r.status === "halted" && revertOwed(r));
 
 const rolloutPoll = (rollouts: FleetRollout[]) => {
   if (rollouts.some(rolloutMoving)) return DELIVERY_POLL_MS;
@@ -73,11 +65,29 @@ const rolloutPoll = (rollouts: FleetRollout[]) => {
 };
 
 const fleetPoll = (fleets: Fleet[]) => {
-  const statuses = fleets.map((f) => f.state?.revision?.status);
+  const statuses = fleets.map((f) => f.state?.rollout?.status);
   // The fleet state cannot tell whether an auto-revert is owed, so a halted fleet keeps polling.
   if (statuses.includes("in_progress") || statuses.includes("halted")) return DELIVERY_POLL_MS;
   return statuses.includes("scheduled") ? SCHEDULED_POLL_MS : false;
 };
+
+export interface BulkResult {
+  succeeded: string[];
+  failed: string[];
+  firstError: unknown;
+}
+
+/** Runs one call per id; throws only when every call failed. */
+async function settleAll(ids: string[], call: (id: string) => Promise<unknown>) {
+  const results = await Promise.allSettled(ids.map(call));
+  const succeeded = ids.filter((_, i) => results[i].status === "fulfilled");
+  const failed = ids.filter((_, i) => results[i].status === "rejected");
+  const firstError =
+    (results.find((r) => r.status === "rejected") as PromiseRejectedResult | undefined)?.reason ??
+    null;
+  if (!succeeded.length && failed.length) throw firstError;
+  return { succeeded, failed, firstError } satisfies BulkResult;
+}
 
 export const collectorsInFlight = (collectors: FleetCollector[] | undefined) =>
   !!collectors?.some((c) => inFlight(c.delivery));
@@ -147,6 +157,22 @@ export const fleetsQuery = (org: string) =>
     refetchInterval: (query) => fleetPoll(query.state.data ?? []),
   });
 
+export const fleetSettingsOfQuery = (org: string, id: string) =>
+  queryOptions({
+    queryKey: fleetKeys.fleetSettings(org, id),
+    queryFn: async (): Promise<FleetSettings> => (await fleet.getFleetSettings(org, id)).data,
+    staleTime: LIVE_STALE_TIME,
+  });
+
+/** The plan the server would cut for this request; keyed by the body so each edit reads once. */
+export const fleetPlanPreviewQuery = (org: string, id: string, body: FleetSetDesiredRequest) =>
+  queryOptions({
+    queryKey: fleetKeys.preview(org, id, JSON.stringify(body)),
+    queryFn: async (): Promise<FleetPlanPreview> =>
+      (await fleet.previewDesired(org, id, body)).data,
+    staleTime: LIVE_STALE_TIME,
+  });
+
 export const fleetConfigsQuery = (org: string) =>
   queryOptions({
     queryKey: fleetKeys.configs(org),
@@ -188,7 +214,7 @@ export const fleetAuditQuery = (org: string) =>
 export const fleetSettingsQuery = (org: string) =>
   queryOptions({
     queryKey: fleetKeys.settings(org),
-    queryFn: async (): Promise<FleetSettings> => (await fleet.getSettings(org)).data,
+    queryFn: async (): Promise<FleetOrgSettings> => (await fleet.getSettings(org)).data,
     staleTime: LIVE_STALE_TIME,
   });
 
@@ -207,7 +233,7 @@ export const fleetRolloutsQuery = (org: string) =>
 export const fleetRolloutQuery = (org: string, id: string) =>
   queryOptions({
     queryKey: fleetKeys.rollout(org, id),
-    queryFn: async (): Promise<FleetRolloutDetail> => (await fleet.getRollout(org, id)).data,
+    queryFn: async (): Promise<FleetRollout> => (await fleet.getRollout(org, id)).data,
     staleTime: LIVE_STALE_TIME,
     refetchInterval: (query) => rolloutPoll(query.state.data ? [query.state.data] : []),
   });
@@ -215,7 +241,7 @@ export const fleetRolloutQuery = (org: string, id: string) =>
 export const fleetFlowQuery = (org: string, window: FleetFlowWindow) =>
   queryOptions({
     queryKey: fleetKeys.flow(org, window),
-    queryFn: async (): Promise<FleetFlow> => (await fleet.getFlow(org, window)).data,
+    queryFn: async (): Promise<FleetFlow> => (await fleet.getPipelines(org, window)).data,
     staleTime: LIVE_STALE_TIME,
     refetchInterval: FLOW_POLL_MS,
   });
@@ -237,39 +263,88 @@ export const revokeFleetTokenMutation = (org: string) =>
     meta: { invalidates: [fleetKeys.all(org)], silentError: true },
   });
 
-export interface UnenrollResult {
-  succeeded: string[];
-  failed: string[];
-  firstError: unknown;
-}
+const collectorWrites = (org: string) => [
+  fleetKeys.collectors(org),
+  fleetKeys.summary(org),
+  fleetKeys.fleets(org),
+  fleetKeys.audit(org),
+];
 
-export const unenrollCollectorsMutation = (org: string) =>
+export const deleteCollectorsMutation = (org: string) =>
   mutationOptions({
-    mutationFn: async (ids: string[]): Promise<UnenrollResult> => {
-      const results = await Promise.allSettled(ids.map((id) => fleet.unenrollCollector(org, id)));
-      const succeeded = ids.filter((_, i) => results[i].status === "fulfilled");
-      const failed = ids.filter((_, i) => results[i].status === "rejected");
-      const firstError =
-        (results.find((r) => r.status === "rejected") as PromiseRejectedResult | undefined)
-          ?.reason ?? null;
-      if (!succeeded.length && failed.length) throw firstError;
-      return { succeeded, failed, firstError };
-    },
+    mutationFn: (ids: string[]): Promise<BulkResult> =>
+      settleAll(ids, (id) => fleet.deleteCollector(org, id)),
     // Removed even while a drawer still observes it, or reopening ?collector=<id> shows a ghost; meta.removes skips active entries.
     onSuccess: ({ succeeded }) => {
       for (const id of succeeded) {
         queryClient.removeQueries({ queryKey: fleetKeys.collector(org, id) });
       }
     },
-    meta: {
-      invalidates: [
-        fleetKeys.collectors(org),
-        fleetKeys.summary(org),
-        fleetKeys.fleets(org),
-        fleetKeys.audit(org),
-      ],
-      silentError: true,
+    meta: { invalidates: collectorWrites(org), silentError: true },
+  });
+
+export const restartCollectorsMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: (ids: string[]): Promise<BulkResult> =>
+      settleAll(ids, (id) => fleet.restartCollector(org, id)),
+    meta: { invalidates: [fleetKeys.audit(org)], silentError: true },
+  });
+
+export const redeliverCollectorMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: async (id: string) => (await fleet.redeliverCollector(org, id)).data,
+    onSuccess: (_data, id) => {
+      queryClient.invalidateQueries({ queryKey: fleetKeys.collector(org, id) });
     },
+    meta: { invalidates: collectorWrites(org), silentError: true },
+  });
+
+export const renameCollectorMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: async (vars: { id: string; name: string }) =>
+      (await fleet.renameCollector(org, vars.id, vars.name)).data,
+    onSuccess: (_data, vars) => {
+      queryClient.invalidateQueries({ queryKey: fleetKeys.collector(org, vars.id) });
+    },
+    meta: { invalidates: [fleetKeys.collectors(org), fleetKeys.audit(org)], silentError: true },
+  });
+
+// A move assigns the destination's stable version at once, so every fleet read changes.
+export const moveCollectorsMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: async (vars: { ids: string[]; to: string }) =>
+      (await fleet.moveCollectors(org, vars.ids, vars.to)).data,
+    meta: { invalidates: [fleetKeys.all(org)], silentError: true },
+  });
+
+export const createFleetMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: async (name: string): Promise<Fleet> => (await fleet.createFleet(org, name)).data,
+    meta: { invalidates: [fleetKeys.fleets(org), fleetKeys.audit(org)], silentError: true },
+  });
+
+export const renameFleetMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: async (vars: { id: string; name: string }): Promise<Fleet> =>
+      (await fleet.renameFleet(org, vars.id, vars.name)).data,
+    // Collectors, tokens and rollouts carry the fleet's name.
+    meta: { invalidates: [fleetKeys.all(org)], silentError: true },
+  });
+
+export const deleteFleetMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: (id: string) => fleet.deleteFleet(org, id),
+    meta: { invalidates: [fleetKeys.all(org)], silentError: true },
+  });
+
+export const updateFleetSettingsOfMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: async (vars: { id: string; body: FleetSettings }): Promise<FleetSettings> =>
+      (await fleet.updateFleetSettings(org, vars.id, vars.body)).data,
+    onSuccess: (data, vars) => {
+      queryClient.setQueryData(fleetKeys.fleetSettings(org, vars.id), data);
+    },
+    meta: { invalidates: [fleetKeys.fleets(org), fleetKeys.audit(org)], silentError: true },
   });
 
 export const createFleetConfigMutation = (org: string) =>
@@ -332,16 +407,29 @@ export const setFleetDesiredMutation = (org: string) =>
       fleet: string;
       body: FleetSetDesiredRequest;
     }): Promise<FleetRollout> => (await fleet.setDesired(org, vars.fleet, vars.body)).data,
-    meta: {
-      invalidates: [fleetKeys.all(org), folderKeys.list(org, "fleets")],
-      silentError: true,
+    meta: { invalidates: [fleetKeys.all(org)], silentError: true },
+  });
+
+export type RolloutExit = "resume" | "skip" | "revert";
+
+export const rolloutExitMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: async (vars: {
+      id: string;
+      exit: RolloutExit;
+      collectorIds?: string[];
+    }): Promise<FleetRollout> => {
+      if (vars.exit === "resume") return (await fleet.resumeRollout(org, vars.id)).data;
+      if (vars.exit === "revert") return (await fleet.revertRollout(org, vars.id)).data;
+      return (await fleet.skipRollout(org, vars.id, vars.collectorIds ?? [])).data;
     },
+    meta: { invalidates: [fleetKeys.all(org)], silentError: true },
   });
 
 // A target change moves `outdated` in every collector read and adds an audit row, so every fleet read is stale.
 export const updateFleetSettingsMutation = (org: string) =>
   mutationOptions({
-    mutationFn: async (body: FleetSettings): Promise<FleetSettings> =>
+    mutationFn: async (body: FleetOrgSettings): Promise<FleetOrgSettings> =>
       (await fleet.updateSettings(org, body)).data,
     meta: { invalidates: [fleetKeys.all(org)], silentError: true },
   });

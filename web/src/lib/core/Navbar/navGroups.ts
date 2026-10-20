@@ -59,6 +59,8 @@ export const GATE_PREDICATES: Record<string, (c: NavGateContext) => boolean> = {
   downtimes: (c) => (c.isEnterprise || c.isCloud) && c.downtimesEnabled,
   // Enterprise/cloud plus `/config` `alert_calibration_enabled`, the same rule as the route guard.
   alertCalibration: (c) => (c.isEnterprise || c.isCloud) && c.alertCalibrationEnabled,
+  // Enterprise plus `/config` `fleet_enabled`; the route stays so management reads keep working.
+  fleet: (c) => c.isEnterprise && c.fleetEnabled,
 };
 
 /**
@@ -382,6 +384,7 @@ export const NAV_GROUPS: NavGroupDef[] = [
         titleKey: "menu.fleet",
         icon: "workspaces",
         name: "fleet",
+        gate: "fleet",
         activeOnRoutes: ["fleetConfigEditor"],
       },
     ],

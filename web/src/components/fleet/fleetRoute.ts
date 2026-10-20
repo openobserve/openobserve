@@ -15,13 +15,13 @@
 
 import type { LocationQuery, RouteLocationRaw } from "vue-router";
 
-export type FleetTab = "overview" | "fleets" | "configurations" | "settings";
+export type FleetTab = "fleets" | "configurations" | "pipelines" | "settings";
 
-const FLEET_TABS: FleetTab[] = ["overview", "fleets", "configurations", "settings"];
+const FLEET_TABS: FleetTab[] = ["fleets", "configurations", "pipelines", "settings"];
 
 export function resolveFleetTab(query: LocationQuery): FleetTab {
   const tab = query.tab as FleetTab;
-  return FLEET_TABS.includes(tab) ? tab : "overview";
+  return FLEET_TABS.includes(tab) ? tab : "fleets";
 }
 
 export function fleetLocation(

@@ -32,6 +32,8 @@ export const fleetKeys = {
   settings: (org: string) => orgKey(org, "fleet", "settings"),
   rollouts: (org: string) => orgKey(org, "fleet", "rollouts"),
   rollout: (org: string, id: string) => orgKey(org, "fleet", "rollout", id),
-  flows: (org: string) => orgKey(org, "fleet", "flow"),
-  flow: (org: string, window: string) => orgKey(org, "fleet", "flow", window),
+  flows: (org: string) => orgKey(org, "fleet", "pipelines"),
+  flow: (org: string, window: string) => orgKey(org, "fleet", "pipelines", window),
+  fleetSettings: (org: string, id: string) => orgKey(org, "fleet", "fleetSettings", id),
+  preview: (org: string, id: string, body: string) => orgKey(org, "fleet", "preview", id, body),
 };

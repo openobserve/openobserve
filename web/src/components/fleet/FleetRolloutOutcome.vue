@@ -23,57 +23,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="fleet-rollout-outcome"
   >
     <div class="flex flex-col gap-0.5">
-      <span class="font-medium">{{ outcome.title }}</span>
-      <span>{{ outcome.body }}</span>
-      <span v-if="outcome.hint">{{ outcome.hint }}</span>
-      <span v-if="outcome.at" class="text-xs opacity-80">{{ outcome.at }}</span>
+      <span class="font-medium" data-test="fleet-rollout-outcome-title">{{ outcome.title }}</span>
+      <span data-test="fleet-rollout-outcome-body">{{ outcome.body }}</span>
+      <span v-if="outcome.at" class="text-xs">{{ outcome.at }}</span>
     </div>
-    <template #actions>
-      <OButton
-        v-if="rollout.status === 'halted'"
-        variant="outline"
-        size="sm"
-        icon-left="refresh"
-        data-test="fleet-rollout-outcome-retry"
-        @click="emit('retry')"
-      >
-        {{ t("fleet.fleets.retry") }}
-      </OButton>
-      <OButton
-        v-if="revertTo"
-        variant="outline"
-        size="sm"
-        icon-left="undo"
-        data-test="fleet-rollout-outcome-revert"
-        @click="emit('revert', revertTo)"
-      >
-        {{ t("fleet.fleets.revert", { version: revertTo.version }) }}
-      </OButton>
-      <OButton
-        v-if="rollout.status !== 'completed'"
-        variant="outline"
-        size="sm"
-        icon-left="edit"
-        data-test="fleet-rollout-outcome-edit"
-        @click="emit('navigate', { tab: 'editor', query: { id: rollout.config } })"
-      >
-        {{ t("fleet.rollouts.editConfig") }}
-      </OButton>
-      <OButton
-        v-if="firstMember"
-        variant="outline"
-        size="sm"
-        icon-left="dns"
-        data-test="fleet-rollout-outcome-collector"
-        @click="
-          emit('navigate', {
-            tab: 'fleets',
-            query: rollout.fleetName === null ? { scope: 'all' } : { folder: rollout.fleetId },
-          })
-        "
-      >
-        {{ t("fleet.rollouts.viewCollectors") }}
-      </OButton>
+    <template v-if="rollout.status === 'halted' && rollout.halt" #actions>
+      <span v-for="exit in HALT_EXITS" :key="exit" class="inline-flex">
+        <OButton
+          :variant="exit === 'revert' ? 'outline-destructive' : 'outline'"
+          size="sm"
+          :icon-left="EXIT_ICON[exit]"
+          :disabled="!offered(exit) || busy"
+          :data-test="`fleet-rollout-outcome-${exit}`"
+          @click="emit('exit', exit)"
+        >
+          {{ exitLabel(exit) }}
+        </OButton>
+        <!-- A disabled button gets no pointer events, so the reason hangs on its wrapper. -->
+        <OTooltip v-if="!offered(exit)" :content="unavailableText(exit)" />
+      </span>
     </template>
   </OBanner>
 </template>
@@ -82,67 +50,70 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import type { IconName } from "@/lib/core/Icon/OIcon.icons";
+import type { FleetHaltExit } from "@/services/fleet";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useRolloutText } from "./rolloutText";
-import type { RolloutRow } from "./useFleetApi";
+import { failingMembers, HALT_EXITS, rolloutConfirmed, type RolloutRow } from "./useFleetApi";
 
-type Version = { config: string; version: number };
+const props = defineProps<{ rollout: RolloutRow; busy?: boolean }>();
+const emit = defineEmits<{ exit: [exit: FleetHaltExit] }>();
 
-const props = defineProps<{
-  rollout: RolloutRow;
-  /** The stable version of the rollout's fleet, which a revert goes back to. */
-  stable?: Version | null;
-}>();
-const emit = defineEmits<{
-  navigate: [target: { tab: string; query: Record<string, string> }];
-  revert: [to: Version];
-  retry: [];
-}>();
+const EXIT_ICON: Record<FleetHaltExit, IconName> = {
+  revert: "undo",
+  resume: "play-arrow",
+  fix_forward: "edit",
+  skip: "fast-forward",
+};
 
 const { t } = useI18nTyped();
-const { countsText, failureText, startsText } = useRolloutText();
+const { exitLabel, haltClassText, progressText, startsText } = useRolloutText();
 
-const firstMember = computed(() => props.rollout.members[0]);
+// Skip needs collectors to exclude, even when the server lists it.
+const offered = (exit: FleetHaltExit) =>
+  !!props.rollout.halt?.exits.includes(exit) &&
+  (exit !== "skip" || failingMembers(props.rollout).length > 0);
 
-const revertTo = computed(() => {
-  const r = props.rollout;
-  const s = props.stable;
-  if (r.status !== "halted" || !s) return null;
-  return s.config === r.config && s.version === r.toVersion ? null : s;
-});
+function unavailableText(exit: FleetHaltExit): I18nText {
+  if (exit === "skip" && props.rollout.halt?.exits.includes("skip"))
+    return t("fleet.rollouts.skipNothing");
+  if (exit === "resume" && props.rollout.halt?.class === "proven_bad")
+    return t("fleet.rollouts.resumeProvenBad");
+  return t("fleet.rollouts.exitNotOffered");
+}
 
-const eventTime = (key: string) => {
-  const at = props.rollout.events.find((e) => e.key === key)?.at;
-  return at ? raw(new Date(at).toLocaleTimeString()) : undefined;
-};
+const at = (ms: number | null | undefined) => (ms ? raw(new Date(ms).toLocaleString()) : undefined);
 
 const outcome = computed<{
   variant: "success" | "warning" | "error" | "info";
   title: I18nText;
   body: I18nText;
-  hint?: I18nText;
   at?: I18nText;
 } | null>(() => {
   const r = props.rollout;
-  if (r.status === "halted") {
+  if (r.status === "halted" && r.halt) {
     return {
       variant: "error",
-      title: r.failure ? failureText(r) : t("fleet.fleets.halted"),
-      body: countsText(r, r.total),
-      hint: t("fleet.rollouts.outcomeHalted", { to: r.toVersion }),
-      at: eventTime("halted"),
+      title: t("fleet.rollouts.haltedTitle", { class: haltClassText(r.halt.class) }),
+      body: raw(r.halt.reason),
+      at: at(r.halt.at),
     };
   }
-  // A superseded revision keeps the failure it halted on, so an automatic revert stays explained.
-  if (r.status === "superseded") {
-    const autoReverted = r.events.some((e) => e.key === "autoReverted");
+  if (r.status === "reverted") {
     return {
-      variant: r.failure ? "warning" : "info",
-      title: r.failure ? failureText(r) : t("fleet.badge.superseded"),
-      body: autoReverted
-        ? t("fleet.rollouts.outcomeAutoReverted")
-        : t("fleet.rollouts.outcomeSuperseded"),
-      at: eventTime(autoReverted ? "autoReverted" : "superseded"),
+      variant: "warning",
+      title: r.autoRevert ? t("fleet.rollouts.autoReverted") : t("fleet.badge.reverted"),
+      body: t("fleet.rollouts.outcomeReverted"),
+      at: at(r.endedAt),
+    };
+  }
+  if (r.status === "superseded") {
+    return {
+      variant: "info",
+      title: t("fleet.badge.superseded"),
+      body: t("fleet.rollouts.outcomeSuperseded"),
+      at: at(r.endedAt),
     };
   }
   if (r.status === "completed" && r.total === 0) {
@@ -150,27 +121,23 @@ const outcome = computed<{
       variant: "info",
       title: t("fleet.rollouts.noneTargeted"),
       body: t("fleet.rollouts.outcomeNoneTargeted", { to: r.toVersion }),
-      at: eventTime("completed"),
+      at: at(r.endedAt),
     };
   }
   if (r.status === "completed") {
+    const count = rolloutConfirmed(r);
     return {
       variant: "success",
       title: t("fleet.badge.completed"),
-      body: t(
-        "fleet.rollouts.outcomeCompleted",
-        { count: r.accepted, to: r.toVersion },
-        r.accepted,
-      ),
-      at: eventTime("completed"),
+      body: t("fleet.rollouts.outcomeCompleted", { count, to: r.toVersion }, count),
+      at: at(r.endedAt),
     };
   }
-  if (r.status === "scheduled" && r.scheduledFor) {
-    return {
-      variant: "info",
-      title: t("fleet.badge.scheduled"),
-      body: startsText(r.scheduledFor),
-    };
+  if (r.status === "scheduled" && r.start.kind === "at") {
+    return { variant: "info", title: t("fleet.badge.scheduled"), body: startsText(r.start.at) };
+  }
+  if (r.status === "in_progress") {
+    return { variant: "info", title: t("fleet.badge.inProgress"), body: progressText(r) };
   }
   return null;
 });

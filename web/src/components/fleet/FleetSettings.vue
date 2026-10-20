@@ -86,6 +86,54 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </OFormSection>
 
+      <OFormSection
+        :title="t('fleet.settings.fleetDefaults')"
+        :info="t('fleet.settings.fleetDefaultsDesc')"
+        data-test="fleet-settings-defaults"
+      >
+        <FleetSettingsForm
+          v-if="loaded && !forbidden && !loadFailed"
+          :key="defaultsKey"
+          :initial="loaded.fleet_defaults"
+          :defaults="loaded.fleet_defaults"
+          required
+          inline-submit
+          :disabled="!editable"
+          data-test="fleet-settings-defaults-form"
+          @save="saveDefaults"
+        />
+        <div v-else-if="!forbidden && !loadFailed" class="flex justify-center py-4">
+          <OSpinner />
+        </div>
+      </OFormSection>
+
+      <OFormSection
+        :title="t('fleet.settings.alerts')"
+        :info="t('fleet.settings.alertsDesc')"
+        data-test="fleet-settings-alerts"
+      >
+        <div class="flex flex-col gap-3">
+          <ul class="text-text-secondary flex list-disc flex-col gap-1 ps-5 text-sm">
+            <li>{{ t("fleet.settings.alertRolloutHalted") }}</li>
+            <li>{{ t("fleet.settings.alertAutoReverted") }}</li>
+            <li>{{ t("fleet.settings.alertOfflineRatio") }}</li>
+          </ul>
+          <div>
+            <OButton
+              variant="outline"
+              size="sm"
+              icon-right="open-in-new"
+              data-test="fleet-settings-alert-library"
+              @click="openAlertLibrary"
+            >
+              {{ t("fleet.settings.openAlertLibrary") }}
+            </OButton>
+          </div>
+        </div>
+      </OFormSection>
+
+      <FleetCollectorVersions class="shrink-0" />
+
       <OFormSection :title="t('fleet.settings.auditTrail')" data-test="fleet-settings-audit">
         <OTable
           :data="auditRows"
@@ -137,8 +185,11 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useOrgId } from "@/composables/query/useOrgId";
 import { updateFleetSettingsMutation } from "@/services/fleet.queries";
+import { useRoute, useRouter } from "vue-router";
 import { raw, useI18nTyped } from "@/types/i18n";
-import type { FleetAuditEvent, FleetSettings } from "@/services/fleet";
+import type { FleetAuditEvent, FleetOrgSettings, FleetSettings } from "@/services/fleet";
+import FleetCollectorVersions from "./FleetCollectorVersions.vue";
+import FleetSettingsForm from "./FleetSettingsForm.vue";
 import { isForbidden, serverMessage, useFleetAudit, useFleetSettings } from "./useFleetApi";
 
 const { t, te } = useI18nTyped();
@@ -160,33 +211,42 @@ const forbidden = current.forbidden;
 const loadFailed = computed(() => !!current.error.value && !current.settings.value);
 const update = useMutation(() => updateFleetSettingsMutation(orgId.value));
 
-const loaded = ref<FleetSettings | null>(null);
-const skipped = ref<FleetSettings | null>(null);
+const route = useRoute();
+const router = useRouter();
+const loaded = ref<FleetOrgSettings | null>(null);
+const skipped = ref<FleetOrgSettings | null>(null);
+const defaultsKey = computed(() => JSON.stringify(loaded.value?.fleet_defaults ?? null));
 const restricted = ref<string[]>([]);
 const target = ref("");
 // Edits made while a save is in flight would be replaced by its response.
 const editable = computed(() => !update.isPending.value);
 
-function seed(settings: FleetSettings | null) {
+function seed(settings: FleetOrgSettings | null) {
   loaded.value = settings;
   skipped.value = null;
   restricted.value = [...(settings?.restricted_components ?? [])];
-  target.value = settings?.target_version ?? "";
+  target.value = settings?.target_collector_version ?? "";
 }
 
 const restrictedOptions = computed(() =>
   restricted.value.map((c) => ({ label: raw(c), value: c })),
 );
 
-const body = computed<FleetSettings>(() => ({
-  restricted_components: [...restricted.value],
-  target_version: target.value.trim() || null,
-}));
+const body = computed<FleetOrgSettings | null>(() =>
+  loaded.value
+    ? {
+        ...loaded.value,
+        restricted_components: [...restricted.value],
+        target_collector_version: target.value.trim() || null,
+      }
+    : null,
+);
 
 const dirty = computed(
   () =>
     !!loaded.value &&
-    (body.value.target_version !== loaded.value.target_version ||
+    !!body.value &&
+    (body.value.target_collector_version !== loaded.value.target_collector_version ||
       body.value.restricted_components.join("\n") !==
         loaded.value.restricted_components.join("\n")),
 );
@@ -211,9 +271,27 @@ function addRestricted(name: string) {
 }
 
 async function save() {
+  if (body.value) await put(body.value);
+}
+
+// The defaults form only offers complete values, so every field is set.
+async function saveDefaults(defaults: FleetSettings) {
+  if (!loaded.value) return;
+  await put({
+    ...loaded.value,
+    fleet_defaults: defaults as FleetOrgSettings["fleet_defaults"],
+  });
+}
+
+function openAlertLibrary() {
+  const org = route.query.org_identifier;
+  router.push({ name: "alertLibrary", query: org ? { org_identifier: org } : {} });
+}
+
+async function put(next: FleetOrgSettings) {
   const org = orgId.value;
   try {
-    const saved = await update.mutateAsync(body.value);
+    const saved = await update.mutateAsync(next);
     // A response for the org the user has since left must not fill the new org's form.
     if (orgId.value === org) seed(saved);
     toast({ variant: "success", message: t("fleet.settings.saved") });

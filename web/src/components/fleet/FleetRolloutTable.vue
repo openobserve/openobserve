@@ -46,24 +46,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <template #cell-progress="{ row }">
       <div class="flex w-full min-w-0 flex-col gap-1">
-        <span class="text-xs tabular-nums">{{ countsText(row, row.total) }}</span>
+        <span class="text-xs tabular-nums">{{ progressText(row) }}</span>
         <OProgressBar
-          :value="row.total ? row.accepted / row.total : 0"
+          :value="row.total ? row.running / row.total : 0"
           :variant="barVariant(row)"
           size="xs"
         />
         <span
-          v-if="row.failure"
+          v-if="row.status === 'halted' && row.halt"
           class="text-status-error-text truncate text-xs"
-          :data-test="`fleet-rollout-table-failure-${row.id}`"
-          >{{ failureText(row) }}</span
+          :data-test="`fleet-rollout-table-halt-${row.id}`"
+          >{{ haltClassText(row.halt.class) }}</span
         >
       </div>
     </template>
 
     <template #cell-startedAt="{ row }">
-      <span v-if="row.status === 'scheduled' && row.scheduledFor" class="text-xs">{{
-        startsText(row.scheduledFor)
+      <span v-if="row.status === 'scheduled' && row.start.kind === 'at'" class="text-xs">{{
+        startsText(row.start.at)
       }}</span>
       <OTimeCell v-else :value="row.startedAt" unit="ms" mode="relative" />
     </template>
@@ -107,7 +107,7 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18nTyped();
-const { changeText, countsText, failureText, startsText } = useRolloutText();
+const { changeText, haltClassText, progressText, startsText } = useRolloutText();
 
 function fleetLabel(r: RolloutRow) {
   return r.fleetName === null ? t("fleet.fleets.deletedFleet") : raw(r.fleetName);
@@ -126,7 +126,7 @@ const columns = computed<OTableColumnDef<RolloutRow>[]>(() => [
       ]
     : []),
   { id: "status", header: t("fleet.common.status"), accessorKey: "status", size: 130 },
-  { id: "progress", header: t("fleet.rollouts.progress"), accessorKey: "accepted", size: 280 },
+  { id: "progress", header: t("fleet.rollouts.progress"), accessorKey: "running", size: 260 },
   { id: "startedAt", header: t("fleet.rollouts.started"), accessorKey: "startedAt", size: 120 },
 ]);
 

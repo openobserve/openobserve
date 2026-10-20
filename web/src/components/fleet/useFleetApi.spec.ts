@@ -32,6 +32,9 @@ import { queryClient } from "@/composables/query/queryClient";
 import { fleetKeys } from "@/services/fleet.querykeys";
 import {
   envVariables,
+  failingMembers,
+  rolloutConfirmed,
+  rolloutRejected,
   setPendingImport,
   takePendingImport,
   toConfigRow,
@@ -60,7 +63,7 @@ vi.mock("@/services/fleet", () => ({
     listConfigs: vi.fn(),
     listAudit: vi.fn(),
     listRollouts: vi.fn(),
-    getFlow: vi.fn(),
+    getPipelines: vi.fn(),
     getSettings: vi.fn(),
     summary: vi.fn(),
     listCollectors: vi.fn(),
@@ -84,37 +87,49 @@ function withRolloutText<T>(use: (text: ReturnType<typeof useRolloutText>) => T)
 
 const apiRollout = (over: Partial<FleetRollout> = {}): FleetRollout => ({
   id: "r1",
-  kind: "config",
+  fleet: { id: "f1", name: "edge" },
   config: "edge",
   from_version: 1,
   to_version: 2,
-  fleet: { id: "f1", name: "edge" },
-  strategy: "immediate",
+  start: { kind: "now" },
+  batching: { kind: "canary", first: 1 },
+  verify: true,
+  auto_revert: false,
   status: "in_progress",
+  halt: null,
   total: 3,
-  attempted: 2,
-  accepted: 1,
-  failed: 0,
-  assigned: 3,
-  started_at: 1790000000000,
-  scheduled_for: null,
-  started_by: "ana@acme.io",
-  auto_rollback: false,
+  running: 1,
   phases: [
     {
-      id: "p1",
-      label: "all",
-      size: 3,
-      assigned: 3,
-      attempted: 2,
-      accepted: 1,
-      failed: 0,
-      status: "running",
+      index: 0,
+      size: 1,
+      status: "done",
+      targeted: 1,
+      sent: 1,
+      confirmed: 1,
+      rejected: 0,
+      gate: { passed: true, observed: "100% healthy" },
+    },
+    {
+      index: 1,
+      size: 2,
+      status: "deploying",
+      targeted: 2,
+      sent: 1,
+      confirmed: 0,
+      rejected: 1,
+      gate: null,
     },
   ],
-  gates: [],
-  failure: null,
-  events: [{ key: "deploying", at: 1790000000000 }],
+  members: [
+    { collector_id: "c1", phase: 0, state: "running", excluded: false },
+    { collector_id: "c2", phase: 1, state: "rejected", excluded: false },
+    { collector_id: "c3", phase: 1, state: "sent", excluded: true },
+  ],
+  events: [{ at: 1, key: "started", phase: null, detail: null }],
+  started_by: "ana@acme.io",
+  started_at: 1790000000000,
+  ended_at: null,
   ...over,
 });
 
@@ -122,17 +137,17 @@ const apiCollector = (over: Partial<FleetCollector> = {}): FleetCollector => ({
   id: "c1",
   name: "prod-web-01",
   hostname: "prod-web-01.acme.internal",
-  ip: "10.0.0.10",
   status: "online",
   os: "linux",
   arch: "amd64",
   distribution: "Ubuntu 24.04",
   version: "0.124.0",
   outdated: false,
+  last_connected_from: "10.0.0.10",
   config: null,
   config_version: null,
   delivery: null,
-  drifted: null,
+  delivery_error: null,
   fleet: { id: "f1", name: "edge" },
   token_id: null,
   last_seen: 1790000000000,
@@ -144,175 +159,124 @@ const apiDetail = (over: Partial<FleetCollectorDetail> = {}): FleetCollectorDeta
   ...apiCollector(),
   capabilities: ["ReportsStatus"],
   health: null,
-  errors: [],
-  delivery_error: null,
   effective_config: null,
-  assigned_at: null,
-  applied_at: null,
-  drift_since: null,
-  baseline_config: null,
+  effective_reported_at: null,
+  assignment: null,
+  evidence: null,
+  history: [],
   ...over,
 });
 
 describe("toCollectorRow", () => {
   it("maps the API fields to the row", () => {
-    expect(toCollectorRow(apiCollector())).toEqual({
+    expect(
+      toCollectorRow(
+        apiCollector({
+          config: "edge",
+          config_version: 2,
+          delivery: "rejected",
+          delivery_error: "bad field",
+          token_id: "t1",
+        }),
+      ),
+    ).toEqual({
       id: "c1",
       name: "prod-web-01",
       hostname: "prod-web-01.acme.internal",
-      ip: "10.0.0.10",
       status: "online",
       os: "linux",
       arch: "amd64",
       distribution: "Ubuntu 24.04",
       version: "0.124.0",
       outdated: false,
-      config: null,
-      configVersion: null,
-      delivery: null,
-      drifted: null,
+      lastConnectedFrom: "10.0.0.10",
+      config: "edge",
+      configVersion: 2,
+      delivery: "rejected",
+      deliveryError: "bad field",
       fleetId: "f1",
       fleetName: "edge",
-      tokenId: null,
+      tokenId: "t1",
       lastSeen: 1790000000000,
       enrolledAt: 1788000000000,
     });
   });
 
-  it.each(["online", "degraded", "offline"] as const)("keeps status %s", (status) => {
-    expect(toCollectorRow(apiCollector({ status })).status).toBe(status);
-  });
-
-  it("takes outdated from the server instead of comparing versions", () => {
-    expect(toCollectorRow(apiCollector({ version: "0.1.0", outdated: false })).outdated).toBe(
-      false,
-    );
-    expect(toCollectorRow(apiCollector({ version: "9.9.9", outdated: true })).outdated).toBe(true);
-  });
-
-  it("names the row by hostname, then id, when the name is null", () => {
+  it("names a collector by its nickname, then its host name, then its id", () => {
+    expect(toCollectorRow(apiCollector({ name: "nick" })).name).toBe("nick");
     expect(toCollectorRow(apiCollector({ name: null })).name).toBe("prod-web-01.acme.internal");
     expect(toCollectorRow(apiCollector({ name: null, hostname: null })).name).toBe("c1");
   });
 
-  it("keeps unknown drift as null so it is never shown as in sync", () => {
-    expect(toCollectorRow(apiCollector({ drifted: null })).drifted).toBeNull();
-    expect(toCollectorRow(apiCollector({ drifted: false })).drifted).toBe(false);
-  });
-
-  it("places a collector the server sent without a fleet in the default fleet", () => {
-    const row = toCollectorRow({
-      ...apiCollector(),
-      fleet: undefined,
-    } as unknown as FleetCollector);
-    expect(row.fleetId).toBe("default");
-    expect(row.fleetName).toBe("default");
-  });
-
-  it("carries no label or group field", () => {
-    const row = toCollectorRow(apiCollector()) as unknown as Record<string, unknown>;
-    expect(row).not.toHaveProperty("labels");
-    expect(row).not.toHaveProperty("groups");
-  });
-
   it("turns missing optional fields into null, never undefined", () => {
-    const row = toCollectorRow({
-      id: "c2",
-      status: "offline",
-      last_seen: 1,
-      enrolled_at: 1,
-    } as any);
-    for (const field of [
+    const row = toCollectorRow({ id: "c1", status: "unknown" } as unknown as FleetCollector);
+    for (const key of [
       "hostname",
-      "ip",
       "os",
       "arch",
-      "distribution",
       "version",
+      "lastConnectedFrom",
       "config",
       "configVersion",
       "delivery",
-      "drifted",
+      "deliveryError",
+      "tokenId",
     ] as const) {
-      expect(row[field]).toBeNull();
+      expect(row[key], key).toBeNull();
     }
-    expect(row.outdated).toBe(false);
+    expect(row.fleetId).toBe("default");
   });
 });
 
 describe("toCollectorDetail", () => {
   it("defaults null detail fields to empty values", () => {
     const d = toCollectorDetail(apiDetail());
-    expect(d.capabilities).toEqual(["ReportsStatus"]);
     expect(d.healthReported).toBe(false);
     expect(d.components).toEqual([]);
-    expect(d.errors).toEqual([]);
-    expect(d).not.toHaveProperty("assignedVia");
     expect(d.effectiveConfig).toBeNull();
-    expect(d.assignedAt).toBeNull();
-    expect(d.appliedAt).toBeNull();
-    expect(d.driftSince).toBeNull();
-    expect(d.baselineConfig).toBeNull();
+    expect(d.assignment).toBeNull();
+    expect(d.evidence).toBeNull();
+    expect(d.history).toEqual([]);
   });
 
-  it("maps the delivery timestamps and the baseline config", () => {
-    const d = toCollectorDetail(
-      apiDetail({ assigned_at: 1, applied_at: 2, drift_since: 3, baseline_config: "a: 1\n" }),
-    );
-    expect([d.assignedAt, d.appliedAt, d.driftSince, d.baselineConfig]).toEqual([
-      1,
-      2,
-      3,
-      "a: 1\n",
-    ]);
-  });
-
-  it("maps component health to a status per component", () => {
+  it("maps the effective config, assignment, evidence and newest-first history", () => {
+    const evidence = {
+      remote_status: "APPLIED",
+      remote_hash: "ab",
+      remote_at: 5,
+      marker: { config: "edge", version: 2 },
+      last_heartbeat_at: 6,
+    };
     const d = toCollectorDetail(
       apiDetail({
-        health: {
-          healthy: false,
-          status: "StatusRecoverableError",
-          last_error: "",
-          components: [
-            { id: "receiver:otlp", healthy: true, status: "StatusOK", last_error: "" },
-            {
-              id: "exporter:otlphttp",
-              healthy: false,
-              status: "StatusPermanentError",
-              last_error: "401",
-            },
-          ],
-        },
+        effective_config: "receivers: {}",
+        effective_reported_at: 7,
+        assignment: { fleet: "f1", config: "edge", version: 2, revision: 3 },
+        evidence,
+        history: [
+          { at: 1, event: "enrolled", detail: null },
+          { at: 9, event: "running", detail: null },
+        ],
       }),
     );
-    expect(d.healthReported).toBe(true);
-    expect(d.components).toEqual([
-      { id: "receiver:otlp", status: "healthy", lastError: "" },
-      { id: "exporter:otlphttp", status: "degraded", lastError: "401" },
-    ]);
+    expect(d.effectiveConfig).toEqual({ yaml: "receivers: {}", reportedAt: 7 });
+    expect(d.assignment).toEqual({ fleet: "f1", config: "edge", version: 2, revision: 3 });
+    expect(d.evidence).toEqual(evidence);
+    expect(d.history.map((h) => h.event)).toEqual(["running", "enrolled"]);
   });
 
-  it("reports every component as unknown while the collector is offline", () => {
-    const d = toCollectorDetail(
-      apiDetail({
-        status: "offline",
-        health: {
-          healthy: true,
-          status: "StatusOK",
-          last_error: "",
-          components: [{ id: "receiver:otlp", healthy: true, status: "StatusOK", last_error: "" }],
-        },
-      }),
-    );
-    expect(d.components[0].status).toBe("unknown");
-  });
-
-  it("maps the effective config report", () => {
-    const d = toCollectorDetail(
-      apiDetail({ effective_config: { yaml: "receivers: {}", reported_at: 5 } }),
-    );
-    expect(d.effectiveConfig).toEqual({ yaml: "receivers: {}", reportedAt: 5 });
+  it("reports an offline collector's component health as unknown", () => {
+    const health = {
+      healthy: true,
+      status: "ok",
+      last_error: "",
+      components: [{ id: "r", healthy: true, status: "ok", last_error: "" }],
+    };
+    expect(toCollectorDetail(apiDetail({ health })).components[0].status).toBe("healthy");
+    expect(
+      toCollectorDetail(apiDetail({ ...apiCollector({ status: "offline" }), health })).components[0]
+        .status,
+    ).toBe("unknown");
   });
 });
 
@@ -453,19 +417,22 @@ const apiConfig = (over: Partial<FleetConfigItem> = {}): FleetConfigItem => ({
 
 describe("toConfigRow", () => {
   it("maps the API fields to the row, naming it by its id", () => {
-    const fleets = [{ id: "f1", name: "edge" }];
-    expect(toConfigRow(apiConfig({ fleets, live_version: 2, collectors: 4 }))).toEqual({
+    expect(
+      toConfigRow(apiConfig({ fleets: [{ id: "f1", name: "edge" }], fleets_hidden: 2 })),
+    ).toEqual({
       id: "edge-minimal",
       name: "edge-minimal",
       description: "Edge",
       template: false,
       version: 3,
-      liveVersion: 2,
-      collectors: 4,
+      liveVersion: null,
+      collectors: 0,
       fleets: [{ id: "f1", name: "edge" }],
+      fleetsHidden: 2,
       updatedAt: 1790000000000,
       updatedBy: "ana@acme.io",
     });
+    expect(toConfigRow(apiConfig()).fleetsHidden).toBe(0);
   });
 });
 
@@ -495,182 +462,74 @@ describe("pending import", () => {
 
 describe("toRolloutRow", () => {
   it("maps the API fields to the row", () => {
-    expect(toRolloutRow(apiRollout())).toEqual({
+    const row = toRolloutRow(apiRollout());
+    expect(row).toMatchObject({
       id: "r1",
-      kind: "config",
       config: "edge",
       fromVersion: 1,
       toVersion: 2,
       fleetId: "f1",
       fleetName: "edge",
-      strategy: "immediate",
+      start: { kind: "now" },
+      batching: { kind: "canary", first: 1 },
+      verify: true,
+      autoRevert: false,
       status: "in_progress",
+      halt: null,
       total: 3,
-      attempted: 2,
-      accepted: 1,
-      failed: 0,
-      assigned: 3,
-      startedAt: 1790000000000,
+      running: 1,
       startedBy: "ana@acme.io",
-      autoRollback: false,
-      scheduledFor: null,
-      gates: [],
-      phases: [
-        {
-          id: "p1",
-          labelKey: "fleet.rollouts.phaseAll",
-          size: 3,
-          attempted: 2,
-          accepted: 1,
-          failed: 0,
-          status: "running",
-        },
-      ],
-      failure: null,
-      events: [{ key: "deploying", at: 1790000000000 }],
-      members: [],
-      stillOnPrevious: 0,
+      startedAt: 1790000000000,
+      endedAt: null,
+    });
+    expect(row.phases).toHaveLength(2);
+    expect(row.members[2]).toEqual({
+      collectorId: "c3",
+      phase: 1,
+      state: "sent",
+      excluded: true,
+      evidence: null,
     });
   });
 
-  it("keeps the rollout kind, so upgrade rollouts can be told apart", () => {
-    expect(toRolloutRow(apiRollout({ kind: "upgrade" })).kind).toBe("upgrade");
+  it("keeps the halt with the exits the server offers", () => {
+    const halt = {
+      class: "proven_bad" as const,
+      reason: "1 collector rejected",
+      at: 5,
+      exits: ["revert" as const, "skip" as const],
+    };
+    expect(toRolloutRow(apiRollout({ status: "halted", halt })).halt).toEqual(halt);
   });
 
-  it("keeps a null from version and a deleted target fleet's id with no name", () => {
-    const row = toRolloutRow(apiRollout({ from_version: null, fleet: { id: "g1", name: null } }));
-    expect(row.fromVersion).toBeNull();
-    expect(row.fleetId).toBe("g1");
+  it("defaults missing lists and batching", () => {
+    const row = toRolloutRow({ id: "r", status: "completed" } as unknown as FleetRollout);
+    expect(row.phases).toEqual([]);
+    expect(row.members).toEqual([]);
+    expect(row.events).toEqual([]);
+    expect(row.batching).toEqual({ kind: "one" });
     expect(row.fleetName).toBeNull();
   });
 
-  it("maps a rejection failure to the rejected label with the collector's message", () => {
-    const row = toRolloutRow(
-      apiRollout({
-        status: "halted",
-        failed: 1,
-        failure: {
-          kind: "rejection",
-          gate: "rejected",
-          observed: "1",
-          threshold: "0",
-          message: "unknown receiver",
-        },
-      }),
-    );
-    expect(row.failure).toEqual({
-      kind: "rejection",
-      labelKey: "fleet.rollouts.gateRejected",
-      observed: "1",
-      threshold: "0",
-      message: "unknown receiver",
-    });
+  it("sums confirmed and rejected over the phases and finds the failing members", () => {
+    const row = toRolloutRow(apiRollout());
+    expect(rolloutConfirmed(row)).toBe(1);
+    expect(rolloutRejected(row)).toBe(1);
+    expect(failingMembers(row)).toEqual(["c2"]);
   });
 
-  it("maps each phase label to its own key", () => {
-    const phase = apiRollout().phases[0];
-    const row = toRolloutRow(
-      apiRollout({
-        strategy: "progressive",
-        phases: ["canary", "batch", "remaining", "all"].map((label, i) => ({
-          ...phase,
-          id: `p${i}`,
-          label,
-        })),
-      }),
-    );
-    expect(row.phases.map((p) => p.labelKey)).toEqual([
-      "fleet.rollouts.phaseCanary",
-      "fleet.rollouts.phaseBatch",
-      "fleet.rollouts.phaseRemaining",
-      "fleet.rollouts.phaseAll",
-    ]);
+  it("words progress in collectors, and an empty fleet as none targeted", () => {
+    const text = withRolloutText((r) => r);
+    expect(text.progressText(toRolloutRow(apiRollout()))).toBe("1 of 3 running the new version");
+    expect(text.progressText({ running: 0, total: 0 })).toBe("No collectors targeted");
   });
 
-  it("maps a heartbeat failure to the heartbeat gate and words it with the observed share", () => {
-    const row = toRolloutRow(
-      apiRollout({
-        status: "halted",
-        failure: { kind: "gate_failed", gate: "heartbeat", observed: "93.3%", threshold: "≥ 99%" },
-      }),
-    );
-    expect(row.failure?.labelKey).toBe("fleet.rollouts.gateHeartbeat");
-    expect(withRolloutText(({ failureText }) => failureText(row))).toBe(
-      "Health gate failed: Heartbeat success 93.3% (limit ≥ 99%)",
-    );
-  });
-
-  it("words a no-data halt as its own reason, not a failed gate", () => {
-    const row = toRolloutRow(
-      apiRollout({
-        status: "halted",
-        failure: { kind: "no_data", gate: "heartbeat", observed: "no data", threshold: "≥ 99%" },
-      }),
-    );
-    expect(row.failure?.labelKey).toBe("fleet.rollouts.failureNoData");
-    expect(withRolloutText(({ failureText }) => failureText(row))).toBe(
-      "Halted: no collector reported a heartbeat to check",
-    );
-  });
-
-  it("words an unknown gate neutrally with the server's reason", () => {
-    const row = toRolloutRow(
-      apiRollout({
-        status: "halted",
-        failure: { kind: "gate_failed", gate: "queue", observed: "82%", threshold: "≥ 99%" },
-      }),
-    );
-    expect(row.failure?.labelKey).toBe("fleet.rollouts.failureOther");
-    const text = withRolloutText(({ failureText }) => failureText(row));
-    expect(text).toBe("Halted: 82%");
-    expect(text).not.toContain("rejected");
-  });
-
-  it("maps the gates, the schedule and the automatic rollback setting", () => {
-    const row = toRolloutRow(
-      apiRollout({
-        status: "scheduled",
-        scheduled_for: 1790003600000,
-        auto_rollback: true,
-        gates: [{ id: "heartbeat", threshold: "≥ 99%", observed: "—", status: "pending" }],
-      }),
-    );
-    expect(row.autoRollback).toBe(true);
-    expect(row.scheduledFor).toBe(1790003600000);
-    expect(row.gates).toEqual([
-      {
-        id: "heartbeat",
-        labelKey: "fleet.rollouts.gateHeartbeat",
-        threshold: "≥ 99%",
-        observed: "—",
-        status: "pending",
-      },
-    ]);
-  });
-
-  it("counts a pending phase as none of its collectors attempted", () => {
-    const row = toRolloutRow(
-      apiRollout({
-        phases: [
-          {
-            ...apiRollout().phases[0],
-            status: "pending",
-            size: 2,
-            assigned: 0,
-            attempted: 0,
-            accepted: 0,
-          },
-        ],
-      }),
-    );
-    const text = withRolloutText(({ countsText }) => countsText(row.phases[0], row.phases[0].size));
-    expect(text).toContain("0 of 2 attempted");
-  });
-
-  it("takes members and still_on_previous from a detail", () => {
-    const row = toRolloutRow({ ...apiRollout(), members: ["c1", "c2"], still_on_previous: 4 });
-    expect(row.members).toEqual(["c1", "c2"]);
-    expect(row.stillOnPrevious).toBe(4);
+  it("words a plan as phases and a remaining tail", () => {
+    const text = withRolloutText((r) => r);
+    expect(text.planText([3, 9, 27, 61])).toBe("3 → 9 → 27 → remaining 61, 4 phases");
+    expect(text.planText([3, 37])).toBe("3 → remaining 37, 2 phases");
+    expect(text.planText([40])).toBe("40 collectors in one batch");
+    expect(text.planText([])).toBe("No collectors to update");
   });
 });
 
@@ -680,53 +539,50 @@ const apiFleet = (over: Partial<Fleet> = {}): Fleet => ({
   state: {
     desired: { config: "edge-config", version: 3 },
     stable: { config: "edge-config", version: 2 },
-    revision: { id: "r1", status: "in_progress" },
+    rollout: { id: "r1", status: "in_progress" },
     collectors: 4,
     online: 3,
     at_desired: 1,
+  },
+  settings: {
+    heartbeat_interval_secs: 15,
+    offline_heartbeats: null,
+    retention_days: null,
+    offline_ratio_percent: null,
+    phase_timeout_secs: null,
+    gate: null,
   },
   ...over,
 });
 
 describe("toFleetRow", () => {
-  it("maps desired, stable, the latest revision and the counts", () => {
+  it("maps desired, stable, the active rollout, the counts and the settings", () => {
     expect(toFleetRow(apiFleet())).toEqual({
       id: "f1",
       name: "edge",
       readable: true,
       desired: { config: "edge-config", version: 3 },
       stable: { config: "edge-config", version: 2 },
-      revision: { id: "r1", status: "in_progress" },
+      rollout: { id: "r1", status: "in_progress" },
       collectors: 4,
       online: 3,
       atDesired: 1,
+      settings: {
+        heartbeat_interval_secs: 15,
+        offline_heartbeats: null,
+        retention_days: null,
+        offline_ratio_percent: null,
+        phase_timeout_secs: null,
+        gate: null,
+      },
     });
   });
 
-  it("has no desired or stable version before one is set", () => {
-    const row = toFleetRow(
-      apiFleet({
-        state: {
-          desired: null,
-          stable: null,
-          revision: null,
-          collectors: 0,
-          online: 0,
-          at_desired: 0,
-        },
-      }),
-    );
-    expect(row.desired).toBeNull();
-    expect(row.stable).toBeNull();
-    expect(row.revision).toBeNull();
-    expect(row.readable).toBe(true);
-  });
-
-  it("is unreadable when the server withheld the fleet's state", () => {
-    const row = toFleetRow(apiFleet({ state: null }));
+  it("marks a fleet without state as unreadable and inherits every setting", () => {
+    const row = toFleetRow({ id: "f2", name: "x", state: null } as unknown as Fleet);
     expect(row.readable).toBe(false);
-    expect(row.collectors).toBe(0);
     expect(row.desired).toBeNull();
+    expect(row.settings.phase_timeout_secs).toBeNull();
   });
 });
 
@@ -861,7 +717,7 @@ describe("useFleetSettings", () => {
   }
 
   it("returns the settings payload", async () => {
-    const body = { restricted_components: ["debug"], target_version: "0.170.0" };
+    const body = { restricted_components: ["debug"], target_collector_version: "0.170.0" };
     vi.mocked(fleet.getSettings).mockResolvedValue({ data: body } as any);
     const read = mountRead(useFleetSettings);
     await flushPromises();
@@ -917,16 +773,16 @@ describe("useFleetFlow", () => {
   }
 
   it("returns the flow payload", async () => {
-    vi.mocked(fleet.getFlow).mockResolvedValue({ data: flow("1h") } as any);
+    vi.mocked(fleet.getPipelines).mockResolvedValue({ data: flow("1h") } as any);
     const read = mountRead(() => useFleetFlow(() => "1h"));
     await flushPromises();
     expect(read.flow.value).toEqual(flow("1h"));
     expect(read.forbidden.value).toBe(false);
-    expect(fleet.getFlow).toHaveBeenCalledWith("default", "1h");
+    expect(fleet.getPipelines).toHaveBeenCalledWith("default", "1h");
   });
 
   it("turns a 403 into no flow and forbidden", async () => {
-    vi.mocked(fleet.getFlow).mockRejectedValue({ response: { status: 403 } });
+    vi.mocked(fleet.getPipelines).mockRejectedValue({ response: { status: 403 } });
     const read = mountRead(() => useFleetFlow(() => "1h"));
     await flushPromises();
     expect(read.flow.value).toBeNull();
@@ -934,7 +790,7 @@ describe("useFleetFlow", () => {
   });
 
   it("refetches under a new key when the window changes", async () => {
-    vi.mocked(fleet.getFlow).mockImplementation(
+    vi.mocked(fleet.getPipelines).mockImplementation(
       async (_org, window) => ({ data: flow(window) }) as any,
     );
     const window = ref<FleetFlowWindow>("1h");
@@ -942,7 +798,7 @@ describe("useFleetFlow", () => {
     await flushPromises();
     window.value = "5m";
     await flushPromises();
-    expect(fleet.getFlow).toHaveBeenLastCalledWith("default", "5m");
+    expect(fleet.getPipelines).toHaveBeenLastCalledWith("default", "5m");
     expect(read.flow.value?.window).toBe("5m");
     expect(queryClient.getQueryData(fleetKeys.flow("default", "1h"))).toEqual(flow("1h"));
     expect(queryClient.getQueryData(fleetKeys.flow("default", "5m"))).toEqual(flow("5m"));

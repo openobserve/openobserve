@@ -184,8 +184,15 @@ const activeTokens = computed(() =>
 // Judged on this fleet's tokens: other fleets' cached rows must not hide a failed read.
 const tokensFailed = computed(() => !!tokens.error.value && !activeTokens.value.length);
 const pendingTokenId = ref<string | null>(null);
+// The token a collector presented last is the one it uses, so the count comes from the collector list.
 const tokenOptions = computed(() =>
-  activeTokens.value.map((tok) => ({ label: raw(tok.name), value: tok.id })),
+  activeTokens.value.map((tok) => {
+    const count = (collectors.data.value ?? []).filter((c) => c.token_id === tok.id).length;
+    return {
+      label: t("fleet.install.tokenOption", { name: raw(tok.name), count }, count),
+      value: tok.id,
+    };
+  }),
 );
 
 const chosenId = ref<string | null>(null);
@@ -313,7 +320,7 @@ function viewCollectors() {
   router.push(
     fleetLocation(
       "fleets",
-      { folder: props.fleetId, collector: connected.value?.id ?? "" },
+      { fleet: props.fleetId, collector: connected.value?.id ?? "" },
       route.query,
     ),
   );

@@ -101,12 +101,12 @@ const names = (list: { name: string }[]) =>
 /** Issues on configs and paths; config issues come from the collectors and rollouts, polled while mounted. */
 export function useFlowIssues() {
   const { t } = useI18nTyped();
-  const { failureText } = useRolloutText();
+  const { haltClassText, progressText } = useRolloutText();
   const collectors = useFleetCollectors(() => true, FLOW_POLL_MS);
   const rollouts = useFleetRollouts(FLOW_POLL_MS);
 
   function rolloutIssues(configId: string): PathIssue[] {
-    const latest = rollouts.rows.value.find((r) => r.kind !== "upgrade" && r.config === configId);
+    const latest = rollouts.rows.value.find((r) => r.config === configId);
     if (!latest) return [];
     if (latest.status === "in_progress") {
       return [
@@ -114,19 +114,13 @@ export function useFlowIssues() {
           id: `rollout-${latest.id}`,
           severity: "progress",
           title: t("fleet.flowIssues.rollingOut", { to: latest.toVersion }),
-          evidence: t("fleet.rollouts.counts", {
-            attempted: latest.attempted,
-            total: latest.total,
-            accepted: latest.accepted,
-            failed: latest.failed,
-          }),
+          evidence: progressText(latest),
           actionLabel: t("fleet.flowIssues.openRollout"),
           action: { kind: "rollout", rolloutId: latest.id },
         },
       ];
     }
-    const autoReverted =
-      latest.status === "superseded" && latest.events.some((e) => e.key === "autoReverted");
+    const autoReverted = latest.status === "reverted" && latest.autoRevert;
     const failed = latest.status === "halted" || autoReverted;
     if (!failed || Date.now() - latest.startedAt > RECENT_MS) return [];
     return [
@@ -136,7 +130,12 @@ export function useFlowIssues() {
         title: autoReverted
           ? t("fleet.flowIssues.autoReverted", { to: latest.toVersion })
           : t("fleet.flowIssues.rolloutHalted", { to: latest.toVersion }),
-        evidence: latest.failure ? failureText(latest) : t("fleet.flowIssues.noReason"),
+        evidence: latest.halt
+          ? t("fleet.rollouts.haltLine", {
+              class: haltClassText(latest.halt.class),
+              reason: raw(latest.halt.reason),
+            })
+          : t("fleet.flowIssues.noReason"),
         actionLabel: t("fleet.flowIssues.openRollout"),
         action: { kind: "rollout", rolloutId: latest.id },
       },
@@ -146,17 +145,6 @@ export function useFlowIssues() {
   function collectorIssues(configId: string): PathIssue[] {
     const own = collectors.rows.value.filter((c) => c.config === configId);
     const out: PathIssue[] = [];
-    const drifted = own.filter((c) => c.drifted === true);
-    if (drifted.length) {
-      out.push({
-        id: "drift",
-        severity: "warning",
-        title: t("fleet.flowIssues.drift", { count: drifted.length }),
-        evidence: t("fleet.flowIssues.driftEvidence", { names: names(drifted) }),
-        actionLabel: t("fleet.flowIssues.reviewDrift"),
-        action: { kind: "collectors", query: { q: configId } },
-      });
-    }
     const offline = own.filter((c) => c.status === "offline");
     if (offline.length) {
       out.push({

@@ -1003,6 +1003,25 @@ describe("FleetConfigEditor", () => {
     push.mockRestore();
   });
 
+  it("keeps the dialog open and names the references when the delete is refused with 409", async () => {
+    vi.mocked(fleet.deleteConfig).mockRejectedValue({
+      response: {
+        status: 409,
+        data: { message: "in use", references: { fleets: 2, collectors: 14, rollouts: 1 } },
+      },
+    });
+    wrapper = await mountEditor("edge");
+    await wrapper.find('[data-test="fleet-config-editor-delete"]').trigger("click");
+    await flushPromises();
+    await wrapper
+      .find('[data-test="fleet-config-editor-delete-dialog"] [data-test="dialog-primary"]')
+      .trigger("click");
+    await flushPromises();
+    expect(wrapper.find('[data-test="fleet-config-editor-delete-in-use"]').text()).toContain(
+      "fleets: 2, collectors: 14, active rollouts: 1",
+    );
+  });
+
   it("duplicates the saved YAML, not unsaved edits, under {id}-copy", async () => {
     vi.mocked(fleet.createConfig).mockResolvedValue({ data: detail({ id: "edge-copy" }) } as any);
     wrapper = await mountEditor("edge");
