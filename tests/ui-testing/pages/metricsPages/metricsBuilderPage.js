@@ -1435,16 +1435,14 @@ export class MetricsBuilderPage {
     // ===== Chart Type Switching =====
 
     /**
-     * Select a chart type by clicking its icon
+     * Select a chart type and assert it became the selected one
      * @param {string} chartType - e.g., 'line', 'bar', 'table', 'area', 'scatter', 'h-bar', 'stacked', 'h-stacked', 'pie', 'donut', 'heatmap', 'gauge'
      */
     async selectChartType(chartType) {
         const chartItem = this.page.locator(`[data-test="selected-chart-${chartType}-item"]`);
-        if (await chartItem.isVisible({ timeout: 3000 }).catch(() => false)) {
-            await chartItem.click();
-            return true;
-        }
-        return false;
+        await chartItem.waitFor({ state: 'visible' });
+        await chartItem.click();
+        await expect(chartItem).toHaveAttribute('data-selected', 'true');
     }
 
     /**

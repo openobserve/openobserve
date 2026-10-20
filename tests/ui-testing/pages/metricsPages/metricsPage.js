@@ -129,7 +129,10 @@ export class MetricsPage {
         this.configToggleAllSectionsTooltip = page
             .locator('[data-test="o-tooltip-content"]')
             .filter({ hasText: /(Collapse|Expand) all sections/ });
-        this.panelSidebarExpandedTitle = page.locator('[data-test="panel-sidebar-expanded-title"]').first();
+        this.panelSidebarExpandedTitle = page
+            .locator('[data-test="panel-sidebar-root"]')
+            .filter({ has: this.configToggleAllSectionsBtn })
+            .locator('[data-test="panel-sidebar-expanded-title"]');
         // All config-panel controls (used by getConfigSectionKeys to enumerate).
         this.allDashboardConfigControls = page.locator('[data-test^="dashboard-config-"]');
         // Metrics page does not yet surface a chart-type picker; this defensive
