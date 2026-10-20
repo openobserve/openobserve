@@ -20,8 +20,8 @@ use axum::{
 use config::utils::str::mask_license_key;
 use db::license;
 use o2_enterprise::enterprise::license::{
-    LICENSE_DB_KEY, License, check_license, get_license, ingestion_limit_exceeded_count,
-    ingestion_used, license_expired,
+    LICENSE_DB_KEY, License, LicenseDecision, LicenseStatus, Waiver, check_license, get_license,
+    ingestion_limit_exceeded_count, ingestion_used, license_expired, license_status,
 };
 use openobserve_api_common::extractors::Headers;
 use openobserve_core::auth::UserEmail;
@@ -37,6 +37,9 @@ struct LicenseResponse {
     expired: bool,
     ingestion_used: f64,
     ingestion_exceeded: u8,
+    waivers: Vec<Waiver>,
+    decision: LicenseDecision,
+    base: LicenseDecision,
 }
 
 pub struct SaveLicenseRequest {
@@ -130,6 +133,10 @@ fn viewer_license_fields(
     (key, license, installation_id)
 }
 
+fn license_status_fields(status: LicenseStatus) -> (Vec<Waiver>, LicenseDecision, LicenseDecision) {
+    (status.waivers, status.decision, status.base)
+}
+
 pub async fn get_license_info(Headers(email): Headers<UserEmail>) -> Response {
     let o2_cfg = o2_enterprise::enterprise::common::config::get_config();
 
@@ -153,6 +160,8 @@ pub async fn get_license_info(Headers(email): Headers<UserEmail>) -> Response {
         license,
     );
 
+    let (waivers, decision, base) = license_status_fields(license_status().await);
+
     let res = LicenseResponse {
         key,
         license,
@@ -160,6 +169,9 @@ pub async fn get_license_info(Headers(email): Headers<UserEmail>) -> Response {
         expired: license_expired().await,
         ingestion_exceeded: ingestion_limit_exceeded_count(),
         ingestion_used: ingestion_used() * 100.0, // convert to percentage
+        waivers,
+        decision,
+        base,
     };
     MetaHttpResponse::json(res)
 }
@@ -209,6 +221,7 @@ pub async fn refresh_license_limits(Headers(user_email): Headers<UserEmail>) -> 
 #[cfg(test)]
 mod tests {
     use config::utils::{base64, json};
+    use o2_enterprise::enterprise::license::Block;
 
     use super::*;
 
@@ -263,7 +276,41 @@ mod tests {
             expired: false,
             ingestion_used: 0.0,
             ingestion_exceeded: 0,
+            waivers: Vec::new(),
+            decision: LicenseDecision::default(),
+            base: LicenseDecision::default(),
         })
+        .unwrap()
+    }
+
+    fn status_fixture() -> LicenseStatus {
+        json::from_value(json::json!({
+            "decision": {
+                "search_allowed": true,
+                "exceeded_days": 4,
+                "allowed_days": 3,
+                "limit_today_gb": 200.0,
+                "used_today_gb": 122.0,
+                "waiver_ids_applied": ["wv_1"],
+            },
+            "base": {
+                "search_allowed": false,
+                "blocks": ["usage_over_limit"],
+                "exceeded_days": 4,
+                "allowed_days": 3,
+                "limit_today_gb": 200.0,
+                "used_today_gb": 122.0,
+            },
+            "waivers": [{
+                "id": "wv_1",
+                "type": "search_unblock",
+                "starts_at": 0,
+                "ends_at": 1000,
+                "note": "Search restored while you fix the log storm",
+            }],
+            "waiver_source": "licence_key",
+            "evaluated_at": 0,
+        }))
         .unwrap()
     }
 
@@ -336,5 +383,41 @@ mod tests {
         }
         let (key, _) = stored_license();
         assert!(!admin.contains(&key));
+    }
+
+    #[test]
+    fn test_license_response_carries_decision_and_waivers() {
+        let (waivers, decision, base) = license_status_fields(status_fixture());
+        let json = json::to_value(&LicenseResponse {
+            key: None,
+            license: None,
+            installation_id: String::new(),
+            expired: false,
+            ingestion_used: 0.0,
+            ingestion_exceeded: 0,
+            waivers,
+            decision,
+            base,
+        })
+        .unwrap();
+        assert_eq!(json["decision"]["search_allowed"], true);
+        assert_eq!(json["decision"]["exceeded_days"], 4);
+        assert_eq!(json["decision"]["allowed_days"], 3);
+        assert_eq!(json["decision"]["limit_today_gb"], 200.0);
+        assert_eq!(json["decision"]["waiver_ids_applied"][0], "wv_1");
+        assert_eq!(json["base"]["search_allowed"], false);
+        assert_eq!(json["base"]["blocks"][0], "usage_over_limit");
+        assert_eq!(json["waivers"][0]["type"], "search_unblock");
+    }
+
+    #[test]
+    fn test_blocks_and_unlimited_serialize_for_the_ui() {
+        let mut s = status_fixture();
+        s.decision.search_allowed = false;
+        s.decision.blocks = vec![Block::UsageOverLimit];
+        s.decision.limit_today_gb = None;
+        let d = json::to_value(license_status_fields(s).1).unwrap();
+        assert_eq!(d["blocks"][0], "usage_over_limit");
+        assert!(d["limit_today_gb"].is_null());
     }
 }
