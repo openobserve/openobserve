@@ -29,6 +29,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 
+const ENV_KEY_CONFLICT_MSG: &str = "This instance reads its license key from the O2_LICENSE_KEY environment variable, so a pasted key would not be used. Put the new key in O2_LICENSE_KEY and restart.";
+
 #[derive(Serialize, Deserialize)]
 struct LicenseResponse {
     key: Option<String>,
@@ -40,6 +42,7 @@ struct LicenseResponse {
     waivers: Vec<Waiver>,
     decision: LicenseDecision,
     base: LicenseDecision,
+    env_key_active: bool,
 }
 
 pub struct SaveLicenseRequest {
@@ -137,6 +140,11 @@ fn license_status_fields(status: LicenseStatus) -> (Vec<Waiver>, LicenseDecision
     (status.waivers, status.decision, status.base)
 }
 
+fn env_key_conflict(env_key: &str, pasted: &str) -> bool {
+    let env_key = env_key.trim();
+    !env_key.is_empty() && env_key != pasted.trim()
+}
+
 pub async fn get_license_info(Headers(email): Headers<UserEmail>) -> Response {
     let o2_cfg = o2_enterprise::enterprise::common::config::get_config();
 
@@ -172,6 +180,7 @@ pub async fn get_license_info(Headers(email): Headers<UserEmail>) -> Response {
         waivers,
         decision,
         base,
+        env_key_active: !o2_cfg.common.license_key.trim().is_empty(),
     };
     MetaHttpResponse::json(res)
 }
@@ -183,6 +192,11 @@ pub async fn store_license(
     let email = user_email.user_id;
     if check_license_permission(&email, "PUT").await.is_err() {
         return MetaHttpResponse::forbidden("Unauthorized Access to license");
+    }
+
+    let o2_cfg = o2_enterprise::enterprise::common::config::get_config();
+    if env_key_conflict(&o2_cfg.common.license_key, &req.raw_key) {
+        return MetaHttpResponse::conflict(ENV_KEY_CONFLICT_MSG);
     }
 
     if let Err(e) = check_license(&req.raw_key, &req.key).await {
@@ -279,6 +293,7 @@ mod tests {
             waivers: Vec::new(),
             decision: LicenseDecision::default(),
             base: LicenseDecision::default(),
+            env_key_active: false,
         })
         .unwrap()
     }
@@ -398,6 +413,7 @@ mod tests {
             waivers,
             decision,
             base,
+            env_key_active: false,
         })
         .unwrap();
         assert_eq!(json["decision"]["search_allowed"], true);
@@ -419,5 +435,31 @@ mod tests {
         let d = json::to_value(license_status_fields(s).1).unwrap();
         assert_eq!(d["blocks"][0], "usage_over_limit");
         assert!(d["limit_today_gb"].is_null());
+    }
+
+    #[test]
+    fn test_env_key_conflict_only_when_env_set_and_different() {
+        assert!(!env_key_conflict("", "eyJ.new"));
+        assert!(!env_key_conflict("  ", "eyJ.new"));
+        assert!(!env_key_conflict("eyJ.same", " eyJ.same "));
+        assert!(env_key_conflict("eyJ.old", "eyJ.new"));
+    }
+
+    #[test]
+    fn test_license_response_carries_env_key_active() {
+        let json = json::to_value(&LicenseResponse {
+            key: None,
+            license: None,
+            installation_id: String::new(),
+            expired: false,
+            ingestion_used: 0.0,
+            ingestion_exceeded: 0,
+            waivers: Vec::new(),
+            decision: LicenseDecision::default(),
+            base: LicenseDecision::default(),
+            env_key_active: true,
+        })
+        .unwrap();
+        assert_eq!(json["env_key_active"], true);
     }
 }
