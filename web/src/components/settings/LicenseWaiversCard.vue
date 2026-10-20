@@ -71,9 +71,14 @@ const nowUs = Date.now() * 1000;
 const rows = computed(() => knownWaivers(props.waivers));
 
 const columns = computed<OTableColumnDef[]>(() => [
-  { id: "waiver", header: t("about.waiver_col_waiver"), cell: " ", size: 280 },
-  { id: "window", header: t("about.waiver_col_window"), cell: " ", size: 280 },
-  { id: "note", header: t("about.waiver_col_note"), accessorKey: "note" },
+  { id: "waiver", header: t("about.waiver_col_waiver"), cell: " ", size: 240 },
+  { id: "window", header: t("about.waiver_col_window"), cell: " ", size: 220 },
+  {
+    id: "note",
+    header: t("about.waiver_col_note"),
+    accessorKey: "note",
+    meta: { autoWidth: true, fillRemaining: true },
+  },
 ]);
 
 function kindLabel(w: LicenseWaiver): string {

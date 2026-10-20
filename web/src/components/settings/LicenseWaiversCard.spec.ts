@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount } from "@vue/test-utils";
 import LicenseWaiversCard from "./LicenseWaiversCard.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
 import i18n from "@/locales";
 import type { LicenseWaiver } from "@/utils/licenseWaivers";
 
@@ -28,6 +29,15 @@ describe("LicenseWaiversCard", () => {
     vi.setSystemTime(NOW);
   });
   afterEach(() => vi.useRealTimers());
+
+  it("the note column takes the width the fixed columns leave", () => {
+    const columns = mountCard([waiver({})])
+      .findComponent(OTable)
+      .props("columns") as any[];
+    const note = columns.find((c) => c.id === "note");
+    expect(note.size).toBeUndefined();
+    expect(note.meta).toMatchObject({ autoWidth: true, fillRemaining: true });
+  });
 
   it("renders nothing when only unknown kinds arrive", () => {
     const w = mountCard([waiver({ type: "future_kind" })]);
