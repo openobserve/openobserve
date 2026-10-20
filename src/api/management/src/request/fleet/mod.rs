@@ -40,9 +40,14 @@ use openobserve_api_common::extractors::ValidatedJson;
 #[cfg(feature = "enterprise")]
 use crate::service::auth::{UserEmail, check_permissions};
 
-/// The org-level module that gates configurations, settings, audit and the overview.
+/// The org-level module of fleet-wide reads and writes that name no single fleet.
 #[cfg(feature = "enterprise")]
 const FLEET: &str = "fleet";
+#[cfg(feature = "enterprise")]
+const FLEET_CONFIGS: &str = "fleet_configs";
+/// Settings, audit, summary and pipelines.
+#[cfg(feature = "enterprise")]
+const FLEET_MANAGEMENT: &str = "fleet_management";
 #[cfg(feature = "enterprise")]
 const FLEETS: &str = "fleets";
 
@@ -1037,7 +1042,7 @@ pub async fn list_configs(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        if !allowed(&org_id, &user_email.user_id, "LIST").await {
+        if !allowed_on(FLEET_CONFIGS, &org_id, &user_email.user_id, "GET").await {
             return MetaHttpResponse::forbidden("Forbidden");
         }
         let permitted = match permitted_fleets(&org_id, &user_email.user_id).await {
@@ -1084,7 +1089,7 @@ pub async fn create_config(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        if !allowed(&org_id, &user_email.user_id, "POST").await {
+        if !allowed_on(FLEET_CONFIGS, &org_id, &user_email.user_id, "POST").await {
             return MetaHttpResponse::forbidden("Forbidden");
         }
         match o2_enterprise::enterprise::fleet::configs::create_config(
@@ -1129,7 +1134,7 @@ pub async fn get_config(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        if !allowed(&org_id, &user_email.user_id, "GET").await {
+        if !allowed_on(FLEET_CONFIGS, &org_id, &user_email.user_id, "GET").await {
             return MetaHttpResponse::forbidden("Forbidden");
         }
         let permitted = match permitted_fleets(&org_id, &user_email.user_id).await {
@@ -1174,7 +1179,7 @@ pub async fn delete_config(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        if !allowed(&org_id, &user_email.user_id, "DELETE").await {
+        if !allowed_on(FLEET_CONFIGS, &org_id, &user_email.user_id, "DELETE").await {
             return MetaHttpResponse::forbidden("Forbidden");
         }
         match o2_enterprise::enterprise::fleet::configs::delete_config(&org_id, &id).await {
@@ -1215,7 +1220,7 @@ pub async fn save_config_draft(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        if !allowed(&org_id, &user_email.user_id, "PUT").await {
+        if !allowed_on(FLEET_CONFIGS, &org_id, &user_email.user_id, "PUT").await {
             return MetaHttpResponse::forbidden("Forbidden");
         }
         match o2_enterprise::enterprise::fleet::configs::save_draft(
@@ -1266,7 +1271,7 @@ pub async fn publish_config_version(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        if !allowed(&org_id, &user_email.user_id, "POST").await {
+        if !allowed_on(FLEET_CONFIGS, &org_id, &user_email.user_id, "POST").await {
             return MetaHttpResponse::forbidden("Forbidden");
         }
         match o2_enterprise::enterprise::fleet::configs::publish(
@@ -1314,7 +1319,7 @@ pub async fn get_config_version(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        if !allowed(&org_id, &user_email.user_id, "GET").await {
+        if !allowed_on(FLEET_CONFIGS, &org_id, &user_email.user_id, "GET").await {
             return MetaHttpResponse::forbidden("Forbidden");
         }
         match o2_enterprise::enterprise::fleet::configs::get_version(&org_id, &id, version).await {
@@ -1352,7 +1357,7 @@ pub async fn validate_config(
     #[cfg(feature = "enterprise")]
     {
         // Validate changes nothing, so a viewer may run it.
-        if !allowed(&org_id, &user_email.user_id, "GET").await {
+        if !allowed_on(FLEET_CONFIGS, &org_id, &user_email.user_id, "GET").await {
             return MetaHttpResponse::forbidden("Forbidden");
         }
         match o2_enterprise::enterprise::fleet::configs::validate_config(&org_id, body).await {
@@ -1630,7 +1635,7 @@ pub async fn summary(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        if !allowed(&org_id, &user_email.user_id, "GET").await {
+        if !allowed_on(FLEET_MANAGEMENT, &org_id, &user_email.user_id, "GET").await {
             return MetaHttpResponse::forbidden("Forbidden");
         }
         let permitted = match permitted_fleets(&org_id, &user_email.user_id).await {
@@ -1673,7 +1678,7 @@ pub async fn get_pipelines(
     #[cfg(feature = "enterprise")]
     {
         let user_id = &user_email.user_id;
-        if !allowed(&org_id, user_id, "GET").await {
+        if !allowed_on(FLEET_MANAGEMENT, &org_id, user_id, "GET").await {
             return MetaHttpResponse::forbidden("Forbidden");
         }
         let permitted = match permitted_fleets(&org_id, user_id).await {
@@ -1716,7 +1721,7 @@ pub async fn list_audit(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        if !allowed(&org_id, &user_email.user_id, "LIST").await {
+        if !allowed_on(FLEET_MANAGEMENT, &org_id, &user_email.user_id, "GET").await {
             return MetaHttpResponse::forbidden("Forbidden");
         }
         match openobserve_core::fleet::list_audit(&org_id, query).await {
@@ -1754,7 +1759,7 @@ pub async fn get_settings(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        if !allowed(&org_id, &user_email.user_id, "GET").await {
+        if !allowed_on(FLEET_MANAGEMENT, &org_id, &user_email.user_id, "GET").await {
             return MetaHttpResponse::forbidden("Forbidden");
         }
         match o2_enterprise::enterprise::fleet::settings::get_settings(&org_id).await {
@@ -1792,7 +1797,7 @@ pub async fn update_settings(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        if !allowed(&org_id, &user_email.user_id, "PUT").await {
+        if !allowed_on(FLEET_MANAGEMENT, &org_id, &user_email.user_id, "PUT").await {
             return MetaHttpResponse::forbidden("Forbidden");
         }
         // Decoded after the permission check, so a bad shape is a 400 an outsider never sees.
@@ -1818,8 +1823,18 @@ pub async fn update_settings(
 /// A second lock behind `route_permissions`, which is first-match-wins and silently shadowable.
 #[cfg(feature = "enterprise")]
 async fn allowed(org_id: &str, user_id: &str, permission: &str) -> bool {
+    allowed_on(FLEET, org_id, user_id, permission).await
+}
+
+/// §13: configurations and management are org-level modules of their own.
+#[cfg(feature = "enterprise")]
+async fn allowed_on(module: &str, org_id: &str, user_id: &str, permission: &str) -> bool {
+    #[cfg(test)]
+    if let Some(answer) = tests::org_answer(module, permission) {
+        return answer;
+    }
     check_permissions(
-        org_id, org_id, user_id, FLEET, permission, None, true, false, false,
+        org_id, org_id, user_id, module, permission, None, true, false, false,
     )
     .await
 }
@@ -2127,6 +2142,20 @@ mod tests {
         })
     }
 
+    /// Org-level modules other than `fleet`, which the tests leave to the real check.
+    pub(super) fn org_answer(module: &str, verb: &str) -> Option<bool> {
+        if module == FLEET {
+            return None;
+        }
+        FGA.with(|fga| {
+            fga.borrow_mut().as_mut().map(|fga| {
+                let key = (module.to_string(), verb.to_string());
+                fga.asked.push(key.clone());
+                fga.grants.contains(&key)
+            })
+        })
+    }
+
     pub(super) fn listed_objects(_org_id: &str, _user_id: &str) -> Option<Option<Vec<String>>> {
         FGA.with(|fga| fga.borrow().as_ref().and_then(|fga| fga.listed.clone()))
     }
@@ -2336,6 +2365,37 @@ mod tests {
         );
         openfga_off();
         forget(root, "default");
+        forget(custom, ORG);
+    }
+
+    #[tokio::test]
+    async fn configs_and_management_are_checked_on_their_own_modules() {
+        let custom = "modules@fleet-fleets-handlers.test";
+        seed_member(custom, config::meta::user::UserRole::User, ORG);
+        openfga_on(&[(FLEET_CONFIGS, "GET"), (FLEET_MANAGEMENT, "PUT")], None);
+        assert!(allowed_on(FLEET_CONFIGS, ORG, custom, "GET").await);
+        assert!(!allowed_on(FLEET_CONFIGS, ORG, custom, "POST").await);
+        assert!(!allowed_on(FLEET_MANAGEMENT, ORG, custom, "GET").await);
+        assert!(allowed_on(FLEET_MANAGEMENT, ORG, custom, "PUT").await);
+        assert_eq!(
+            asked(),
+            vec![
+                ("fleet_configs".to_string(), "GET".to_string()),
+                ("fleet_configs".to_string(), "POST".to_string()),
+                ("fleet_management".to_string(), "GET".to_string()),
+                ("fleet_management".to_string(), "PUT".to_string()),
+            ]
+        );
+        let caller = UserEmail {
+            user_id: custom.to_string(),
+        };
+        let res = get_settings(Path(ORG.to_string()), Headers(caller)).await;
+        assert_eq!(
+            res.status(),
+            StatusCode::FORBIDDEN,
+            "a settings read is fleet_management GET"
+        );
+        openfga_off();
         forget(custom, ORG);
     }
 
