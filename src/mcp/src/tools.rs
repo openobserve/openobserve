@@ -393,35 +393,11 @@ pub fn init_mcp_tools(api: &OpenApi) -> Result<()> {
     let api_json = serde_json::to_value(api)?;
     let spec = rmcp_openapi::Spec::from_value(api_json)?;
 
-    let zo_config = config::get_config();
-    // Include ZO_BASE_URI so tool calls hit the routes actually mounted under it
-    let base_url = url::Url::parse(&format!(
-        "{}://localhost:{}{}",
-        config::cluster::get_http_schema(),
-        zo_config.http.port,
-        zo_config.common.base_uri
-    ))
-    .map_err(|e| anyhow::anyhow!("Invalid base URL: {e}"))?;
-
-    let mut mcp_marker =
-        reqwest::header::HeaderValue::from_str(&config::cluster::MCP_LOOPBACK_SECRET)?;
-    mcp_marker.set_sensitive(true);
-    let mut default_headers = reqwest::header::HeaderMap::new();
-    default_headers.insert("x-o2-mcp", mcp_marker);
-
-    let mut client_builder = reqwest::Client::builder()
-        .user_agent(format!("openobserve/{}", config::VERSION))
-        .timeout(std::time::Duration::from_secs(30))
-        .redirect(reqwest::redirect::Policy::none());
-    if zo_config.http.tls_enabled {
-        // Loopback to our own listener, whose cert is issued for the service name, not localhost
-        client_builder = client_builder.danger_accept_invalid_certs(true);
-    }
+    let (client_builder, base_url) = loopback_client_builder()?;
 
     // Create a single shared HTTP client instead of 200+ clients
-    let shared_client = rmcp_openapi::HttpClient::with_client(client_builder.build()?)
-        .with_base_url(base_url)?
-        .with_default_headers(default_headers);
+    let shared_client =
+        rmcp_openapi::HttpClient::with_client(client_builder.build()?).with_base_url(base_url)?;
 
     // Only extract metadata - this is fast (~186ms for 209 tools)
     // We skip generate_openapi_tools which creates 200+ HTTP clients (~19.5s)
@@ -602,6 +578,11 @@ pub fn get_tool_metadata(name: &str) -> Option<rmcp_openapi::ToolMetadata> {
         .cloned()
 }
 
+/// [`get_tool_metadata`] that answers `None` while MCP tools are not initialized.
+pub fn find_tool_metadata(name: &str) -> Option<rmcp_openapi::ToolMetadata> {
+    TOOL_METADATA_CACHE.get()?.get(name).cloned()
+}
+
 /// Get the summary fields config for a tool (if configured via x-o2-mcp extension)
 pub fn get_summary_config(tool_name: &str) -> Option<SummaryFieldsConfig> {
     SUMMARY_CONFIG_CACHE
@@ -612,6 +593,36 @@ pub fn get_summary_config(tool_name: &str) -> Option<SummaryFieldsConfig> {
 /// Register summary field configs for testing (safe to call multiple times).
 pub fn register_summary_configs(configs: HashMap<String, SummaryFieldsConfig>) {
     let _ = SUMMARY_CONFIG_CACHE.set(configs);
+}
+
+/// A client for this node's own API: base URL with `ZO_BASE_URI`, the MCP marker, no redirects.
+pub(crate) fn loopback_client_builder() -> Result<(reqwest::ClientBuilder, url::Url)> {
+    let zo_config = config::get_config();
+    // Include ZO_BASE_URI so tool calls hit the routes actually mounted under it
+    let base_url = url::Url::parse(&format!(
+        "{}://localhost:{}{}",
+        config::cluster::get_http_schema(),
+        zo_config.http.port,
+        zo_config.common.base_uri
+    ))
+    .map_err(|e| anyhow::anyhow!("Invalid base URL: {e}"))?;
+
+    let mut mcp_marker =
+        reqwest::header::HeaderValue::from_str(&config::cluster::MCP_LOOPBACK_SECRET)?;
+    mcp_marker.set_sensitive(true);
+    let mut default_headers = reqwest::header::HeaderMap::new();
+    default_headers.insert("x-o2-mcp", mcp_marker);
+
+    let mut client_builder = reqwest::Client::builder()
+        .user_agent(format!("openobserve/{}", config::VERSION))
+        .timeout(std::time::Duration::from_secs(30))
+        .redirect(reqwest::redirect::Policy::none())
+        .default_headers(default_headers);
+    if zo_config.http.tls_enabled {
+        // Loopback to our own listener, whose cert is issued for the service name, not localhost
+        client_builder = client_builder.danger_accept_invalid_certs(true);
+    }
+    Ok((client_builder, base_url))
 }
 
 /// Get the shared HTTP client for tool execution

@@ -1057,6 +1057,21 @@ fn ai_chat_routes(router: Router) -> Router {
         )
         .route("/{org_id}/ai/shared/{token}", get(ai::shares::get_shared))
         .route("/{org_id}/ai/shared/{token}/fork", post(ai::shares::fork))
+        .route(
+            "/{org_id}/ai/settings",
+            get(ai::settings::get_settings).put(ai::settings::put_settings),
+        )
+        .route("/{org_id}/ai/grants", get(ai::grants::list_grants))
+        .route("/{org_id}/ai/grants/{id}", delete(ai::grants::delete_grant))
+        .route("/{org_id}/ai/activity", get(ai::activity::list_activity))
+        .route(
+            "/{org_id}/ai/activity/{id}/undo",
+            post(ai::activity::undo_action),
+        )
+        .route(
+            "/{org_id}/ai/access_requests",
+            post(ai::access_requests::create_access_request),
+        )
 }
 
 #[cfg(feature = "enterprise")]
@@ -1727,7 +1742,8 @@ pub fn service_routes() -> Router {
 
             // AI
             .route("/{org_id}/ai/toolsets", get(ai::toolsets::list).post(ai::toolsets::create))
-            .route("/{org_id}/ai/toolsets/{id}", get(ai::toolsets::get).put(ai::toolsets::update).delete(ai::toolsets::delete))
+            .route("/{org_id}/ai/toolsets/{id}", get(ai::toolsets::get).put(ai::toolsets::update).patch(ai::toolsets::patch).delete(ai::toolsets::delete))
+            .route("/{org_id}/ai/toolsets/{id}/test", post(ai::toolsets::test))
 
             // RE patterns
             .route("/{org_id}/re_patterns", get(re_pattern::list).post(re_pattern::save))

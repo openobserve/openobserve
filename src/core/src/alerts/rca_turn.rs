@@ -99,6 +99,8 @@ const CONTINUE_PROMPT: &str = "The previous turn stopped. Continue from the last
                                investigation is complete.";
 /// `error.code` of a run whose session already had a turn running.
 const ERROR_BUSY: &str = "busy";
+/// `error.code` of a run whose org turned the assistant off.
+const ERROR_ASSISTANT_OFF: &str = "assistant_off";
 /// The turn record's error code of a turn that reached its deadline.
 const TURN_TIMEOUT_CODE: &str = "turn_timeout";
 /// The request-context field that tells o2-ai how long this turn may run, in seconds.
@@ -296,6 +298,8 @@ pub enum RcaTurnError {
     AgentUnavailable(String),
     /// Another turn of the run's session is running.
     Busy,
+    /// The org turned the assistant off.
+    AssistantOff,
     Other(String),
 }
 
@@ -306,6 +310,7 @@ impl RcaTurnError {
             Self::Credentials(_) => ERROR_CREDENTIALS,
             Self::AgentUnavailable(_) => ERROR_AGENT_UNAVAILABLE,
             Self::Busy => ERROR_BUSY,
+            Self::AssistantOff => ERROR_ASSISTANT_OFF,
             Self::Other(_) => ERROR_AGENT_ERROR,
         }
     }
@@ -317,6 +322,7 @@ impl RcaTurnError {
             ERROR_CREDENTIALS,
             ERROR_AGENT_UNAVAILABLE,
             ERROR_BUSY,
+            ERROR_ASSISTANT_OFF,
         ]
         .contains(&code)
     }
@@ -382,6 +388,10 @@ async fn start_turn(
             Err(e) => return Err(RcaTurnError::Other(format!("{e:#}"))),
         }
     }
+    // Every RCA turn, resumes and continuations included, runs under the org's own policy.
+    let policy = crate::ai_policy::rca_policy(&run.org_id)
+        .await
+        .ok_or(RcaTurnError::AssistantOff)?;
     let prompt = prompt.render();
     let (mcps, clis, skills) = load_agent_tools(&run.org_id).await;
 
@@ -473,6 +483,7 @@ async fn start_turn(
         );
     }
     let mut request = QueryRequest::new(prompt, context);
+    request.set_policy(&policy);
     request.mcps = (!mcps.is_empty()).then_some(mcps);
     request.clis = (!clis.is_empty()).then_some(clis);
     request.skills = (!skills.is_empty()).then_some(skills);

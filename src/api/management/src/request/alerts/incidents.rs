@@ -517,6 +517,10 @@ pub async fn trigger_incident_rca(
     if !o2_cfg.incidents.enabled || !o2_cfg.incidents.rca_enabled {
         return MetaHttpResponse::bad_request("RCA is not enabled");
     }
+    // Refused before a run row is written or the quota is charged.
+    if openobserve_core::ai_policy::rca_policy(&org_id).await.is_none() {
+        return crate::request::ai::settings::off_for_org();
+    }
 
     if !o2_cfg.ai.has_agent_target() {
         return axum::response::Response::builder()

@@ -859,9 +859,47 @@ pub struct ApiDoc;
     openobserve_api_management::request::ai::chats::stream_turn,
     openobserve_api_management::request::ai::capabilities::get_capabilities,
     openobserve_api_management::request::ai::capabilities::test_capabilities,
+    openobserve_api_management::request::ai::settings::get_settings,
+    openobserve_api_management::request::ai::settings::put_settings,
+    openobserve_api_management::request::ai::grants::list_grants,
+    openobserve_api_management::request::ai::grants::delete_grant,
+    openobserve_api_management::request::ai::activity::list_activity,
+    openobserve_api_management::request::ai::activity::undo_action,
+    openobserve_api_management::request::ai::access_requests::create_access_request,
+    openobserve_api_management::request::ai::toolsets::list,
+    openobserve_api_management::request::ai::toolsets::create,
+    openobserve_api_management::request::ai::toolsets::get,
+    openobserve_api_management::request::ai::toolsets::update,
+    openobserve_api_management::request::ai::toolsets::patch,
+    openobserve_api_management::request::ai::toolsets::delete,
+    openobserve_api_management::request::ai::toolsets::test,
 ))]
 #[openapi(components(schemas(
     openobserve_api_management::models::experiments::ExperimentResultRowSortBody,
+    o2_enterprise::enterprise::ai::toolsets::ToolsetResponse,
+    o2_enterprise::enterprise::ai::toolsets::ToolsetListResponse,
+    o2_enterprise::enterprise::ai::toolsets::ToolsetStatus,
+    o2_enterprise::enterprise::ai::toolsets::ToolsetState,
+    o2_enterprise::enterprise::ai::toolsets::ToolsetKind,
+    openobserve_api_management::request::ai::toolsets::ToolsetPatch,
+    openobserve_api_management::request::ai::toolsets::ToolsetTestResult,
+    openobserve_api_management::request::ai::toolsets::ToolsetTestError,
+    openobserve_api_management::request::ai::settings::SettingsView,
+    openobserve_api_management::request::ai::settings::Enforced,
+    openobserve_api_management::request::ai::settings::MemberSettingsView,
+    openobserve_api_management::request::ai::settings::SettingsUpdate,
+    common::meta::organization::AiPermissionTier,
+    common::meta::organization::AiDataSharingLevel,
+    openobserve_api_management::request::ai::grants::GrantView,
+    openobserve_api_management::request::ai::activity::ActivityPage,
+    openobserve_api_management::request::ai::activity::ActivityRow,
+    openobserve_api_management::request::ai::activity::Target,
+    openobserve_api_management::request::ai::activity::Approval,
+    openobserve_api_management::request::ai::activity::ActionResult,
+    openobserve_api_management::request::ai::activity::Undo,
+    openobserve_api_management::request::ai::activity::UndoResponse,
+    openobserve_api_management::request::ai::access_requests::AccessRequestBody,
+    openobserve_api_management::request::ai::access_requests::AccessRequestAccepted,
     o2_enterprise::enterprise::password_policy::lockout::LockoutState,
     openobserve_api_management::request::users::UserDetailsResponse,
     openobserve_api_management::request::alerts::incidents::RcaResumedResponse,
@@ -1478,6 +1516,38 @@ mod tests {
                 .unwrap_or_else(|| panic!("{method} {path} is not documented"));
             assert_eq!(op["x-o2-ratelimit"]["module"], "Query History");
             assert_eq!(op["x-o2-mcp"]["enabled"], false, "{method} {path}");
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn assistant_administration_is_documented_and_never_an_mcp_tool() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let paths = &spec["paths"];
+        for (path, method) in [
+            ("/api/{org_id}/ai/settings", "get"),
+            ("/api/{org_id}/ai/settings", "put"),
+            ("/api/{org_id}/ai/grants", "get"),
+            ("/api/{org_id}/ai/grants/{id}", "delete"),
+            ("/api/{org_id}/ai/activity", "get"),
+            ("/api/{org_id}/ai/activity/{id}/undo", "post"),
+            ("/api/{org_id}/ai/access_requests", "post"),
+            ("/api/{org_id}/ai/toolsets/{id}", "patch"),
+            ("/api/{org_id}/ai/toolsets/{id}/test", "post"),
+        ] {
+            let op = &paths[path][method];
+            assert!(op.is_object(), "{method} {path} is not documented");
+            assert_eq!(op["x-o2-mcp"]["enabled"], false, "{method} {path}");
+        }
+        let schemas = spec["components"]["schemas"].as_object().unwrap();
+        for name in [
+            "ToolsetResponse",
+            "ToolsetStatus",
+            "ToolsetState",
+            "SettingsView",
+            "ActivityRow",
+        ] {
+            assert!(schemas.contains_key(name), "schema {name} missing");
         }
     }
 

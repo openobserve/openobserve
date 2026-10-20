@@ -2363,7 +2363,11 @@ pub async fn rca_will_run(org_id: &str, incident_id: &str) -> bool {
     use o2_enterprise::enterprise::{alerts::rca_service, common::config::get_config};
 
     let cfg = get_config();
-    let will_run = cfg.incidents.enabled && cfg.incidents.rca_enabled && cfg.ai.has_agent_target();
+    // The org switch comes first, so an org that is off is never charged and starts no run.
+    let will_run = crate::ai_policy::rca_policy(org_id).await.is_some()
+        && cfg.incidents.enabled
+        && cfg.incidents.rca_enabled
+        && cfg.ai.has_agent_target();
     if !will_run {
         rca_service::skip_analysis_for_incident(org_id, incident_id).await;
     }
@@ -2577,6 +2581,7 @@ pub(crate) fn rca_turn_failure(
             (rca_runs::AGENT_UNAVAILABLE_REASON, Some(details.clone()))
         }
         RcaTurnError::Busy => (TURN_BUSY_REASON, None),
+        RcaTurnError::AssistantOff => (ASSISTANT_OFF_REASON, None),
         RcaTurnError::Other(details) => (rca_runs::AGENT_ERROR_REASON, Some(details.clone())),
     }
 }
@@ -2587,6 +2592,9 @@ const TURN_LIMIT_REASON: &str = "Too many analyses running";
 /// `error.reason` of a run whose session already had a turn running.
 #[cfg(feature = "enterprise")]
 const TURN_BUSY_REASON: &str = "The analysis session is busy";
+/// `error.reason` of a run whose org turned the assistant off.
+#[cfg(feature = "enterprise")]
+const ASSISTANT_OFF_REASON: &str = "O2 Assistant is turned off for this organization";
 
 /// How a started run's first turn is launched.
 #[cfg(feature = "enterprise")]
@@ -4157,6 +4165,12 @@ mod tests {
                 Some("down"),
             ),
             (RcaTurnError::Busy, "busy", TURN_BUSY_REASON, None),
+            (
+                RcaTurnError::AssistantOff,
+                "assistant_off",
+                ASSISTANT_OFF_REASON,
+                None,
+            ),
             (
                 RcaTurnError::Other("boom".to_string()),
                 "agent_error",
