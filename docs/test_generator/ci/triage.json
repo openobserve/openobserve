@@ -1,0 +1,31 @@
+{
+  "feature_slug": "query-editor-keyboard-accessibility",
+  "feature_title": "Query Editor Keyboard Accessibility (Escape / focus)",
+  "area": "Logs",
+  "edition": "both",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "logs-query-editor-keyboard.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Logs/logs-query-editor-keyboard.spec.js",
+  "playwright_group": "Logs-Features",
+  "source_files": [
+    "web/src/components/CodeQueryEditor.vue",
+    "web/src/utils/focusNextControl.ts",
+    "web/src/plugins/logs/SearchBar.vue",
+    "web/src/lib/overlay/Tooltip/OTooltip.vue",
+    "web/src/lib/overlay/Tooltip/triggerName.ts",
+    "web/src/lib/core/Button/OButton.vue",
+    "web/src/lib/forms/controlAttrs.ts"
+  ],
+  "existing_tests_in_diff": true,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "The changed file list is almost entirely open-source web frontend (web/src/components/**, web/src/lib/**, web/src/plugins/logs/**, web/src/views/**, locales). The only enterprise-owned path is web/src/enterprise/components/billings/plans.vue, and its change is a single decorative alt=\"\" on an image; no backend enterprise paths (enterprise/, o2_enterprise/, src/enterprise/) are touched. Because the diff spans both the OSS frontend and one enterprise UI file, edition is 'both', though the substance is a cross-cutting OSS accessibility refactor.",
+    "skip": "Not skipped. The trigger comment is empty and no tests-added/skip label was passed, so there is no explicit opt-out. The change is user-facing: it adds a Monaco Escape keybinding that exits the query editor to the next control, a focus-within ring on the editor, and accessible names (aria-label) for icon-only buttons/tooltips across the UI.",
+    "e2e": "E2E is warranted. The concrete, testable behavior is the new Escape action 'o2.editor.escapeToNextControl' in CodeQueryEditor.vue (guarded by precondition so it only fires when no suggest/find/selection widget owns the key) plus tooltip-driven aria-label naming for icon-only controls. The existing Playwright spec logs-autocomplete-suggestions.spec.js was updated to guard its own Escape presses against this behavior, confirming it is a user-visible interaction change.",
+    "area": "Logs. The behavioral change centers on CodeQueryEditor.vue, the SQL/PromQL query editor used by Logs search, and the touched E2E spec (logs-autocomplete-suggestions.spec.js) lives under playwright-tests/Logs/. Sibling specs (logs-sql-autocomplete.spec.js, monaco-query-prefill.spec.js) are also in the Logs area.",
+    "group": "Logs-Features. In the CI matrix, logs-autocomplete-suggestions.spec.js (the spec this change modifies) belongs to the Logs-Features shard (actual_folder 'Logs'), alongside other autocomplete/query-editor specs, so the new or extended spec joins that shard.",
+    "existing_tests": "One Playwright E2E spec changed in the diff: tests/ui-testing/playwright-tests/Logs/logs-autocomplete-suggestions.spec.js (its Escape presses are now guarded by menu visibility). It does not yet cover the new Escape-exits-to-next-control focus behavior, so coverage is partial and the Architect should extend or complement it. The many web/src/**/*.spec.ts files are Vitest unit tests, which are not E2E coverage."
+  }
+}
