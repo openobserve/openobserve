@@ -223,7 +223,7 @@ const setRowRef = (number: number, el: Element | ComponentPublicInstance | null)
 
 const unverifiedSection = ref<HTMLElement | null>(null);
 
-/** Opens entry `number` and scrolls it into view (a thread chip, VE24). */
+/** Opens entry `number` and scrolls it into view (a thread chip). */
 const openEntry = async (number: number) => {
   if (!props.evidence.some((entry) => entry.number === number)) return;
   if (!filterRcaEvidence(props.evidence, filter.value).some((e) => e.number === number)) {
@@ -234,7 +234,7 @@ const openEntry = async (number: number) => {
   rows.get(number)?.scrollIntoView({ block: "nearest", behavior: "smooth" });
 };
 
-/** Scrolls to "Cited but not verified" (the band chip, VE33). */
+/** Scrolls to "Cited but not verified" (the band chip). */
 const showUnverified = async () => {
   await nextTick();
   unverifiedSection.value?.scrollIntoView({ block: "nearest", behavior: "smooth" });

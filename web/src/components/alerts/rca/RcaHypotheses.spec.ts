@@ -98,7 +98,7 @@ describe("RcaHypotheses (03 VE11, VE12, VE18, VE36; F8)", () => {
       ["Not confirmed", ["Inconclusive", "Inconclusive"]],
       ["Explains the incident", ["Root cause · not confirmed"]],
     ]);
-    // The long VE18 label wraps inside the status column instead of spilling over.
+    // A long status label wraps inside the status column instead of spilling over.
     const pill = wrapper.findComponent({ name: "RcaPill" });
     expect(pill.props("wrap")).toBe(true);
     expect(

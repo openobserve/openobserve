@@ -377,7 +377,7 @@ describe("IncidentTimeline - getInlineEventText", () => {
     expect(vm.getInlineEventText({ type: "ai_analysis_steered", data: { kind: "answer" } })).toBe(
       "answered the analysis",
     );
-    expect(vm.getEventBadgeText({ type: "ai_analysis_steered" })).toBe("AI Steered");
+    expect(vm.getEventBadgeText({ type: "ai_analysis_steered" })).toBe("AI steered");
   });
 
   it("04 SG42: ai_analysis_needs_input names the need, escaped", async () => {
@@ -394,7 +394,7 @@ describe("IncidentTimeline - getInlineEventText", () => {
     expect(vm.getInlineEventText({ type: "ai_analysis_needs_input", data: {} })).toBe(
       "Analysis needs input",
     );
-    expect(vm.getEventBadgeText({ type: "ai_analysis_needs_input" })).toBe("AI Needs Input");
+    expect(vm.getEventBadgeText({ type: "ai_analysis_needs_input" })).toBe("AI needs input");
   });
 
   it("returns empty string for unknown type", async () => {

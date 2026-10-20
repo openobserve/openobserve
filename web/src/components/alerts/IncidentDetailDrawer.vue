@@ -209,6 +209,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :stale="rcaStale"
               :error="rcaError"
               :report-text="rcaReportText"
+              :report-verdict="rcaReportVerdict"
               :report-loading="rcaReportLoading"
               :thread-run-id="rcaThreadRunId"
               :thread-live="rcaThreadLive"
@@ -218,11 +219,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :run-summary="rcaRunSummary"
               :run-summary-status="rcaRunSummaryStatus"
               :steering="rcaSteering"
+              :steering-status="rcaSteeringStatus"
               :triggering="rcaTriggering"
               :cancelling="rcaCancelling"
               :resume-run-id="rcaResumeRunId"
               :resuming="rcaResuming"
               :incident-title="incidentDetails?.title || ''"
+              :refusal="rcaRefusal"
+              :analyze-credit-cost="aiCreditCosts?.incident ?? null"
+              :reanalyze-credit-cost="aiCreditCosts?.incident_reanalysis ?? null"
               @trigger-rca="triggerRca"
               @cancel-rca="cancelRca"
               @view-run="viewRcaRun"
@@ -1541,6 +1546,8 @@ import { copyToClipboard as copyToClipboardUtil } from "@/utils/clipboard";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import { useIncidentRca } from "@/composables/useIncidentRca";
 import type { RcaAskPayload } from "@/utils/incidents/rcaAskAttachment";
+import BillingService, { type AiCreditCounts } from "@/services/billings";
+import config from "@/aws-exports";
 
 export default defineComponent({
   name: "IncidentDetailDrawer",
@@ -1767,8 +1774,8 @@ export default defineComponent({
       return resp ? buildChipDimensionsFromFilters(resp, semanticGroups.value) : {};
     });
 
-    // Run state, history and report text come from the detail's `rca` (01 RR-35); while the
-    // run is live or the Analysis tab is open, one live stream keeps them current (05 LU15).
+    // Run state, history and report text come from the detail's `rca`; while the
+    // run is live or the Analysis tab is open, one live stream keeps them current.
     const {
       summary: rcaSummary,
       stale: rcaStale,
@@ -1777,6 +1784,7 @@ export default defineComponent({
       history: rcaHistory,
       viewedRun: rcaViewedRun,
       reportText: rcaReportText,
+      reportVerdict: rcaReportVerdict,
       reportLoading: rcaReportLoading,
       threadRunId: rcaThreadRunId,
       threadLive: rcaThreadLive,
@@ -1786,11 +1794,13 @@ export default defineComponent({
       runSummary: rcaRunSummary,
       runSummaryStatus: rcaRunSummaryStatus,
       steering: rcaSteering,
+      steeringStatus: rcaSteeringStatus,
       retryLive: retryRcaLive,
       triggering: rcaTriggering,
       cancelling: rcaCancelling,
       resuming: rcaResuming,
       resumeRunId: rcaResumeRunId,
+      refusal: rcaRefusal,
       reload: reloadRca,
       viewRun: viewRcaRun,
       trigger: triggerRca,
@@ -2538,7 +2548,7 @@ export default defineComponent({
       });
     };
 
-    // Esc leaves the page only when nothing else on it owns the key (01 RR-48): no
+    // Esc leaves the page only when nothing else on it owns the key: no
     // text field has focus and no dialog, menu, listbox or popover is open. Leaving
     // never cancels a run. Overlays close themselves on Esc, so whether one was open
     // is read in the capture phase, before their own handlers run.
@@ -2583,10 +2593,18 @@ export default defineComponent({
       if (!owned) close();
     };
 
+    // Credit costs label the analysis actions; without them the actions show no cost.
+    const aiCreditCosts = ref<AiCreditCounts | null>(null);
+
     // Add keyboard event listener on mount
     onMounted(() => {
       window.addEventListener("keydown", captureEscapeKey, true);
       window.addEventListener("keydown", handleEscapeKey);
+      if (config.isCloud === "true") {
+        BillingService.get_ai_usage(store.state.selectedOrganization.identifier)
+          .then((res) => (aiCreditCosts.value = res.data.costs ?? null))
+          .catch(() => {});
+      }
     });
 
     // Remove keyboard event listeners on unmount
@@ -2885,9 +2903,16 @@ export default defineComponent({
             });
             await reloadRca();
           } else {
+            const reanalysisCost = aiCreditCosts.value?.incident_reanalysis;
             const ok = await confirm({
               title: t("alerts.incidents.rerunAnalysisTitle"),
-              message: t("alerts.incidents.rerunAnalysisMessage"),
+              message: reanalysisCost
+                ? t(
+                    "alerts.incidents.rerunAnalysisMessageWithCost",
+                    { cost: reanalysisCost },
+                    reanalysisCost,
+                  )
+                : t("alerts.incidents.rerunAnalysisMessage"),
               confirmLabel: t("alerts.incidents.rerunAnalysisConfirmLabel"),
               cancelLabel: t("alerts.incidents.rerunAnalysisCancelLabel"),
               persistent: false,
@@ -2990,6 +3015,7 @@ export default defineComponent({
       rcaHistory,
       rcaViewedRun,
       rcaReportText,
+      rcaReportVerdict,
       rcaReportLoading,
       rcaThreadRunId,
       rcaThreadLive,
@@ -2999,6 +3025,9 @@ export default defineComponent({
       rcaRunSummary,
       rcaRunSummaryStatus,
       rcaSteering,
+      rcaSteeringStatus,
+      rcaRefusal,
+      aiCreditCosts,
       retryRcaLive,
       rcaTriggering,
       rcaCancelling,

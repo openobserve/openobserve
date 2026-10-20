@@ -29,7 +29,7 @@ export type RcaSteerSendResult =
       message: I18nText;
     };
 
-/** The JSON error body of the steer route (04 §9.1). */
+/** The JSON error body of the steer route. */
 const errorBody = (error: unknown): Record<string, unknown> | null => {
   const body: unknown = isAxiosError(error) ? error.response?.data : null;
   return body && typeof body === "object" ? (body as Record<string, unknown>) : null;
@@ -40,7 +40,7 @@ const errorCode = (body: Record<string, unknown> | null): string | null => {
   return typeof body?.code === "string" ? body.code : null;
 };
 
-/** `send` for the steer box and hypothesis actions (04 §9.1); the stream shows the row (05 LU18). */
+/** `send` for the steer box and hypothesis actions; the stream shows the row. */
 export function useRcaSteering(
   orgRef: Ref<string>,
   incidentIdRef: Ref<string | null>,
@@ -51,7 +51,7 @@ export function useRcaSteering(
 
   const sending = ref(false);
 
-  /** The message for a refused send (04 §9.1). */
+  /** The message for a refused send. */
   const sendErrorMessage = (error: unknown): { code: string | null; message: I18nText } => {
     const status = isAxiosError(error) ? (error.response?.status ?? 0) : 0;
     const body = errorBody(error);

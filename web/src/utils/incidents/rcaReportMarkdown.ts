@@ -132,7 +132,9 @@ const rcaMarked = new Marked({
   renderer: {
     heading({ tokens, depth }: Tokens.Heading) {
       const body = this.parser.parseInline(tokens);
-      return `<div class="${HEADING_CLASSES[depth - 1] || ""}">${body}</div>`;
+      // Real heading elements keep the outline for screen readers; h5 and h6 read as h4.
+      const level = Math.min(depth, 4);
+      return `<h${level} class="${HEADING_CLASSES[level - 1]}">${body}</h${level}>`;
     },
     code({ text }: Tokens.Code) {
       return `<div class="rca-code-block border rounded-default p-3 my-3 overflow-x-auto"><pre class="text-sm font-mono whitespace-pre m-0"><code>${escapeHtml(text)}</code></pre></div>`;
@@ -144,6 +146,10 @@ const rcaMarked = new Marked({
     link({ href, text, tokens }: Tokens.Link) {
       if (text === href) return escapeHtml(href);
       return `${this.parser.parseInline(tokens)} (${escapeHtml(href)})`;
+    },
+    // Never load a model-chosen remote image: show its alt text instead.
+    image({ text }: Tokens.Image) {
+      return escapeHtml(text);
     },
     list(token: Tokens.List) {
       const body = token.items.map((item) => this.listitem(item)).join("");
@@ -200,7 +206,9 @@ const rcaMarked = new Marked({
 
 // Allow only renderer-owned tags and attributes after raw HTML has been escaped.
 const ALLOWED_TAGS =
-  "div p ul ol li strong em code pre table thead tbody tr th td blockquote hr".split(" ");
+  "div p h1 h2 h3 h4 ul ol li strong em del br code pre table thead tbody tr th td blockquote hr".split(
+    " ",
+  );
 const ALLOWED_ATTR = ["class"];
 
 const VERDICT_FENCE = "```";

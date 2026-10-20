@@ -26,6 +26,7 @@ import {
   rcaStatusHistoryLine,
   rcaUtcRange,
   sortedRcaTimeline,
+  rcaVerdictDetails,
 } from "./rcaSummary";
 import {
   RCA_T0,
@@ -214,5 +215,29 @@ describe("rcaSummary helpers", () => {
     ).toBe("Change");
     expect(rcaUtcRange(RCA_T0, RCA_T0 + sec(60))).toBe("08:53:20–08:54:20 UTC");
     expect(rcaUtcRange(RCA_T0, undefined)).toBe("");
+  });
+});
+
+describe("rcaVerdictDetails (stored verdict on the card)", () => {
+  it("reads impacted services and proposed actions from a completed run's record", () => {
+    const result = {
+      schema_version: 1,
+      verdict: {
+        probable_cause: "pool shrank",
+        impacted_services: ["service=checkout-api"],
+        proposed_actions: [{ title: "Roll back", kind: "rollback", detail: "Revert 4f2c1e." }],
+      },
+      ledger: { hypotheses: [] },
+    };
+
+    expect(rcaVerdictDetails(result)).toEqual({
+      impactedServices: ["service=checkout-api"],
+      proposedActions: [{ title: "Roll back", kind: "rollback", detail: "Revert 4f2c1e." }],
+    });
+  });
+
+  it("is null for a record with no verdict (a cancelled or failed run) and for no record", () => {
+    expect(rcaVerdictDetails({ schema_version: 1, ledger: { hypotheses: [] } })).toBeNull();
+    expect(rcaVerdictDetails(undefined)).toBeNull();
   });
 });

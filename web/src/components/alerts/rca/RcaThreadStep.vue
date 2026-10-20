@@ -149,10 +149,12 @@ const props = withDefaults(
     step: RcaStep;
     /** The run is live: an unfinished step is the running one. */
     runLive: boolean;
-    /** Evidence id → entry number from the run's summary (03 VE24); null when no summary is loaded, so chips show the raw id. */
+    /** The live run is paused for an answer, so its unfinished step is not working. */
+    runWaiting?: boolean;
+    /** Evidence id → entry number from the run's summary; null when no summary is loaded, so chips show the raw id. */
     evidenceNumbers?: Map<string, number> | null;
   }>(),
-  { evidenceNumbers: null },
+  { runWaiting: false, evidenceNumbers: null },
 );
 
 defineEmits<{
@@ -164,9 +166,12 @@ const { t } = useI18nTyped();
 
 const callsListId = useId();
 
-/** running: the live step; stopped: the run's end cut it off; warn: a tool failed. */
-const status = computed<"running" | "stopped" | "warn" | "ok">(() => {
-  if (props.step.ended_at === null) return props.runLive ? "running" : "stopped";
+/** running: the live step; waiting: paused for an answer; stopped: the run's end cut it off; warn: a tool failed. */
+const status = computed<"running" | "waiting" | "stopped" | "warn" | "ok">(() => {
+  if (props.step.ended_at === null) {
+    if (!props.runLive) return "stopped";
+    return props.runWaiting ? "waiting" : "running";
+  }
   if (isInterruptedStep(props.step)) return "stopped";
   return props.step.tool_calls.some((call) => call.status === "error") ? "warn" : "ok";
 });
@@ -175,6 +180,8 @@ const statusIcon = computed(() => {
   switch (status.value) {
     case "stopped":
       return "error";
+    case "waiting":
+      return "help-outline";
     case "warn":
       return "warning";
     default:
@@ -186,6 +193,7 @@ const statusClass = computed(() => {
   switch (status.value) {
     case "stopped":
       return "text-status-negative";
+    case "waiting":
     case "warn":
       return "text-status-warning-text";
     default:
@@ -197,6 +205,8 @@ const statusLabel = computed(() => {
   switch (status.value) {
     case "stopped":
       return t("alerts.incidents.rcaThread.stepStopped");
+    case "waiting":
+      return t("alerts.incidents.rcaSteer.waitingForAnswer");
     case "warn":
       return t("alerts.incidents.rcaThread.stepToolFailed");
     default:

@@ -94,18 +94,20 @@ import ORadioGroup from "@/lib/forms/Radio/ORadioGroup.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import { useI18nTyped } from "@/types/i18n";
 
-/** SG33: 1 to 2,000 characters. */
+/** 1 to 2,000 characters. */
 const MAX_GUIDANCE_CHARS = 2_000;
 
 const props = withDefaults(
   defineProps<{
-    /** The text the dialog opens with (SG40: the message the run did not take). */
+    /** The text the dialog opens with (the message the run did not take). */
     initialGuidance?: string;
     /** A completed run exists to build on. */
     canBuildOnPrevious: boolean;
     triggering?: boolean;
+    /** The incident's latest run; a new id after Start means the run started. */
+    latestRunId?: string | null;
   }>(),
-  { initialGuidance: "", triggering: false },
+  { initialGuidance: "", triggering: false, latestRunId: null },
 );
 
 const isOpen = defineModel<boolean>("open", { default: false });
@@ -136,9 +138,24 @@ const canStart = computed(() => {
   return text.length > 0 && text.length <= MAX_GUIDANCE_CHARS && !props.triggering;
 });
 
+// The run before Start; null while no start is pending.
+const pendingFrom = ref<{ runId: string | null } | null>(null);
+
 const start = () => {
   if (!canStart.value) return;
+  pendingFrom.value = { runId: props.latestRunId };
   emit("start", { buildOnPrevious: mode.value === "build", guidance: guidance.value.trim() });
-  isOpen.value = false;
 };
+
+// Close once a new run exists (it can land after the request settles); a failed start keeps the guidance.
+watch(
+  () => props.latestRunId,
+  (runId) => {
+    if (pendingFrom.value && runId !== pendingFrom.value.runId) isOpen.value = false;
+  },
+);
+
+watch(isOpen, (open) => {
+  if (!open) pendingFrom.value = null;
+});
 </script>

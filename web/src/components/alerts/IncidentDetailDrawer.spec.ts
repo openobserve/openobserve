@@ -52,6 +52,12 @@ vi.mock("@/composables/usePaidOverageConsent", () => ({
   usePaidOverageConsent: () => ({ promptForConsent: mockPromptForConsent }),
 }));
 
+const mockGetAiUsage = vi.hoisted(() => vi.fn());
+vi.mock("@/services/billings", async (importOriginal) => {
+  const actual = await importOriginal<typeof BillingsModule>();
+  return { ...actual, default: { ...actual.default, get_ai_usage: mockGetAiUsage } };
+});
+
 // Mock incidents service
 vi.mock("@/services/incidents", async (importOriginal) => {
   const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
@@ -93,6 +99,7 @@ vi.mock("@/services/service_streams", () => ({
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
 import IncidentDetailDrawer from "./IncidentDetailDrawer.vue";
+import type * as BillingsModule from "@/services/billings";
 import { resolveBadge } from "@/lib/core/Badge/badgeGroups";
 import incidentsService, {
   Incident,
@@ -702,6 +709,7 @@ describe("IncidentDetailDrawer.vue", () => {
               cancelled_by: null,
               error_reason: null,
               report_format: "v2",
+              has_record: true,
             },
             history: [],
           },
@@ -1440,6 +1448,7 @@ describe("IncidentDetailDrawer.vue", () => {
             cancelled_by: null,
             error_reason: null,
             report_format: "v2" as const,
+            has_record: true,
           }
         : null,
       history: [],
@@ -1476,7 +1485,7 @@ describe("IncidentDetailDrawer.vue", () => {
           stats: { steps: 0, tool_calls: 0, duration_ms: 0 },
         },
       } as never);
-      // 03 §12: the summary of the same run, carried by the same stream.
+      // The summary of the same run, carried by the same stream.
       stream.emit({ event: "summary", data: rcaRunSummaryLive({ run_id: "run-2" }) });
       stream.emit({ event: "steering", data: rcaSteering() });
       await flushPromises();
@@ -1573,6 +1582,7 @@ describe("IncidentDetailDrawer.vue", () => {
       cancelled_by: null,
       error_reason: null,
       report_format: "v2" as const,
+      has_record: true,
     };
     const completed = {
       run_id: "run-2",
@@ -1818,7 +1828,12 @@ describe("IncidentDetailDrawer.vue", () => {
       vi.mocked(incidentsService.updateIncident).mockResolvedValueOnce({
         data: { severity: "P2", analysis_in_flight: false },
       } as never);
-      const failure = { code: "agent_unavailable", reason: "Agent unavailable", details: null };
+      const failure = {
+        code: "agent_unavailable",
+        reason: "Agent unavailable",
+        details: null,
+        trigger_type: null,
+      };
       const failedDetail = {
         data: createIncidentWithAlerts({
           id: "1",
@@ -1977,6 +1992,159 @@ describe("IncidentDetailDrawer.vue", () => {
       await flushPromises();
       expect(oncallService.listResponsesForIncident).not.toHaveBeenCalled();
       expect(wrapper.find('[data-test="incident-oncall-panel"]').exists()).toBe(false);
+    });
+  });
+
+  describe("AI credits", () => {
+    const COSTS = { chat: 1, incident: 50, incident_reanalysis: 20 };
+    const exhausted = (remedy: string) => ({
+      isAxiosError: true,
+      response: { status: 402, data: { error_type: "ai_credits_exhausted", remedy } },
+    });
+
+    const openAnalysis = async (isCloud = "false") => {
+      awsConfig.isCloud = isCloud;
+      wrapper = await createWrapper({}, {}, "1");
+      await flushPromises();
+      wrapper.vm.activeTab = "incidentAnalysis";
+      await flushPromises();
+    };
+
+    afterEach(() => {
+      awsConfig.isCloud = "false";
+    });
+
+    it("a 402 on Analyze shows the blocked banner with Plans and Retry, not a raw error", async () => {
+      vi.mocked(incidentsService.triggerRca).mockRejectedValueOnce(exhausted("subscribe"));
+      await openAnalysis();
+      mockToast.mockClear();
+
+      await wrapper.vm.triggerRca();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="rca-blocked-banner"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="rca-plans-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="rca-blocked-retry-btn"]').exists()).toBe(true);
+      expect(mockToast.mock.calls.some(([call]) => call.variant === "error")).toBe(false);
+    });
+
+    it("a contract org's 402 offers Contact sales", async () => {
+      vi.mocked(incidentsService.triggerRca).mockRejectedValueOnce(
+        exhausted("contact_account_manager"),
+      );
+      await openAnalysis();
+
+      await wrapper.vm.triggerRca();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="rca-contact-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="rca-plans-btn"]').exists()).toBe(false);
+    });
+
+    it("declining paid usage shows the blocked banner with Plans", async () => {
+      vi.mocked(incidentsService.triggerRca).mockRejectedValueOnce({
+        isAxiosError: true,
+        response: { status: 412, data: { error_type: "paid_overage_consent_required" } },
+      });
+      mockPromptForConsent.mockResolvedValue(false);
+      mockGetAiUsage.mockRejectedValue(new Error("off"));
+      await openAnalysis("true");
+
+      await wrapper.vm.triggerRca();
+      await flushPromises();
+
+      expect(incidentsService.triggerRca).toHaveBeenCalledTimes(1);
+      expect(wrapper.find('[data-test="rca-blocked-reason"]').text()).toBe(
+        "Paid AI usage is off, so this request wasn't sent.",
+      );
+      expect(wrapper.find('[data-test="rca-plans-btn"]').exists()).toBe(true);
+    });
+
+    it("the blocked banner clears once a run starts", async () => {
+      vi.mocked(incidentsService.triggerRca).mockRejectedValueOnce(exhausted("subscribe"));
+      await openAnalysis();
+      await wrapper.vm.triggerRca();
+      await flushPromises();
+      expect(wrapper.vm.rcaRefusal).not.toBeNull();
+
+      wrapper.vm.incidentDetails.rca = rcaSummary({ run_id: "run-9", state: "running" });
+      await flushPromises();
+
+      expect(wrapper.vm.rcaRefusal).toBeNull();
+      expect(wrapper.find('[data-test="rca-blocked-banner"]').exists()).toBe(false);
+    });
+
+    it("the blocked banner does not carry over to another incident", async () => {
+      vi.mocked(incidentsService.triggerRca).mockRejectedValueOnce(exhausted("subscribe"));
+      await openAnalysis();
+      await wrapper.vm.triggerRca();
+      await flushPromises();
+      expect(wrapper.vm.rcaRefusal).not.toBeNull();
+
+      vi.mocked(incidentsService.get).mockResolvedValueOnce({
+        data: createIncidentWithAlerts({ id: "2" }),
+      } as never);
+      router.currentRoute.value = {
+        ...router.currentRoute.value,
+        params: { id: "2" },
+      } as never;
+      await flushPromises();
+
+      expect(wrapper.vm.incidentDetails.id).toBe("2");
+      expect(wrapper.vm.rcaRefusal).toBeNull();
+    });
+
+    it("Cloud shows the Analyze cost from the org's AI usage", async () => {
+      mockGetAiUsage.mockResolvedValue({ data: { costs: COSTS } });
+      await openAnalysis("true");
+
+      expect(mockGetAiUsage).toHaveBeenCalledWith("default");
+      expect(wrapper.find('[data-test="rca-credit-cost"]').text()).toBe("Uses 50 AI credits");
+    });
+
+    it("shows no cost outside Cloud, or when the usage read fails", async () => {
+      await openAnalysis();
+      expect(mockGetAiUsage).not.toHaveBeenCalled();
+      expect(wrapper.find('[data-test="rca-credit-cost"]').exists()).toBe(false);
+      wrapper.unmount();
+
+      mockGetAiUsage.mockRejectedValue(new Error("off"));
+      await openAnalysis("true");
+      expect(wrapper.find('[data-test="rca-credit-cost"]').exists()).toBe(false);
+    });
+
+    it("the severity re-run prompt names the re-analysis cost when it is known", async () => {
+      mockGetAiUsage.mockResolvedValue({ data: { costs: COSTS } });
+      await openAnalysis("true");
+      vi.mocked(incidentsService.updateIncident).mockResolvedValueOnce({
+        data: { severity: "P2", analysis_in_flight: false },
+      } as never);
+
+      await wrapper.vm.updateSeverity("P2");
+      await flushPromises();
+
+      expect(mockConfirm).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message:
+            "Severity has changed. Would you like AI to re-analyze this incident? It uses 20 AI credits.",
+        }),
+      );
+    });
+
+    it("the severity re-run prompt has no cost when it is unknown", async () => {
+      await openAnalysis();
+      vi.mocked(incidentsService.updateIncident).mockResolvedValueOnce({
+        data: { severity: "P2", analysis_in_flight: false },
+      } as never);
+
+      await wrapper.vm.updateSeverity("P2");
+      await flushPromises();
+
+      expect(mockConfirm).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: "Severity has changed. Would you like AI to re-analyze this incident?",
+        }),
+      );
     });
   });
 });

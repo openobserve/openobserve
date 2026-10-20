@@ -29,6 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :model-value="cause"
       :options="causeOptions"
       clearable
+      :disabled="disabled"
       :placeholder="t('oncall.resolveCausePlaceholder')"
       :data-test="`${dataTestPrefix}-cause`"
       @update:model-value="(v) => emit('update:cause', (v as ResolutionCause) || '')"
@@ -40,6 +41,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :label="noteLabel ?? t('oncall.resolveCauseNote')"
     :placeholder="t('oncall.resolveCauseNotePlaceholder')"
     :rows="2"
+    :maxlength="noteMaxlength"
+    :disabled="disabled"
     :data-test="`${dataTestPrefix}-cause-note`"
     @update:model-value="(v) => emit('update:note', String(v ?? ''))"
   />
@@ -68,8 +71,18 @@ const props = withDefaults(
     noteLabel?: I18nText;
     /** Causes the select does not offer, e.g. `still_unknown` for a correction. */
     excludeCauses?: ResolutionCause[];
+    /** The server's note limit, when the caller has one. */
+    noteMaxlength?: number;
+    disabled?: boolean;
   }>(),
-  { causeLabel: undefined, causeHint: undefined, noteLabel: undefined, excludeCauses: () => [] },
+  {
+    causeLabel: undefined,
+    causeHint: undefined,
+    noteLabel: undefined,
+    excludeCauses: () => [],
+    noteMaxlength: undefined,
+    disabled: false,
+  },
 );
 
 const emit = defineEmits<{

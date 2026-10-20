@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="grid grid-cols-[8rem_minmax(0,1fr)_auto] items-start gap-x-3 px-3.5 py-2.5 transition-colors duration-700 outline-none"
           :class="{ 'bg-surface-tint-accent': highlighted === hypothesis.id }"
         >
-          <!-- The status column wraps a long label ("Root cause · not confirmed", VE18). -->
+          <!-- The status column wraps a long label ("Root cause · not confirmed"). -->
           <span class="min-w-0 pt-px">
             <RcaPill
               data-test="rca-hypothesis-status"
@@ -232,7 +232,7 @@ const props = withDefaults(
     org: string;
     /** The run is live: the open group reads "Being tested". */
     live: boolean;
-    /** The run takes messages and the user may send them: rows offer actions (H16). */
+    /** The run takes messages and the user may send them: rows offer actions. */
     canSteer?: boolean;
     /** Hypothesis id → local part of the author of its unread action. */
     pending?: Map<string, string>;

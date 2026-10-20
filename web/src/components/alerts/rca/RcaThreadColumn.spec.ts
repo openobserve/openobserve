@@ -195,6 +195,38 @@ describe("RcaThreadColumn", () => {
         "Working. Messages sent now are read after this turn.",
       );
     });
+
+    it("a run waiting for an answer shows no working row or running step", () => {
+      const paused = mountColumn({
+        thread: rcaThread({ steps: [rcaStep()] }),
+        runState: "waiting_input",
+      });
+      expect(byTest(paused, "rca-thread-working").exists()).toBe(false);
+
+      const pausedMidStep = mountColumn({ runState: "waiting_input" });
+      expect(pausedMidStep.find('[data-test="rca-thread-step-working"]').exists()).toBe(false);
+    });
+
+    it("keeps following the newest step while it grows, for a reader at the bottom", async () => {
+      const scrollTo = vi.fn();
+      const wrapper = mountColumn();
+      const area = wrapper.find(".overflow-auto").element as HTMLElement;
+      Object.defineProperties(area, {
+        scrollHeight: { configurable: true, value: 1000 },
+        clientHeight: { configurable: true, value: 400 },
+        scrollTop: { configurable: true, value: 600 },
+      });
+      area.scrollTo = scrollTo;
+      const thread = rcaThread();
+      const last = thread.steps.at(-1)!;
+
+      await wrapper.setProps({
+        thread: { ...thread, steps: [...thread.steps.slice(0, -1), { ...last, ended_at: RCA_T0 }] },
+      });
+      await flushPromises();
+
+      expect(scrollTo).toHaveBeenCalled();
+    });
   });
 
   describe("TH38: saved thread (frame B)", () => {
@@ -298,6 +330,16 @@ describe("RcaThreadColumn", () => {
       const wrapper = mountColumn({ thread: null, ...props });
 
       expect(byTest(wrapper, "rca-thread-retry-btn").exists()).toBe(false);
+    });
+
+    it("a steering read failure shows its own notice with Retry, apart from the thread", async () => {
+      const wrapper = mountColumn({ steeringStatus: "unavailable" });
+
+      expect(wrapper.findAll('[data-test="rca-thread-step"]').length).toBeGreaterThan(0);
+      const retry = byTest(wrapper, "rca-thread-steering-retry-btn");
+      await retry.trigger("click");
+      expect(wrapper.emitted("retry")).toHaveLength(1);
+      expect(byTest(mountColumn(), "rca-thread-steering-failed").exists()).toBe(false);
     });
   });
 

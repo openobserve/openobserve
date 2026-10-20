@@ -84,6 +84,14 @@ describe("RcaSteerComposer (04 SG37, §3 frames F and D)", () => {
     expect(document.activeElement).toBe(box);
   });
 
+  it("the chips are disabled while a message is sending", () => {
+    wrapper = mountComposer({ sending: true });
+
+    for (const id of ["check", "ignore", "focus", "changed"]) {
+      expect(byTest(wrapper, `rca-steer-chip-${id}`).attributes("disabled")).toBeDefined();
+    }
+  });
+
   it("caps the message at 2,000 characters", () => {
     wrapper = mountComposer();
     expect(textarea(wrapper).attributes("maxlength")).toBe("2000");

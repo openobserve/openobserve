@@ -13,8 +13,21 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { mount, type VueWrapper } from "@vue/test-utils";
+import type * as VueRouter from "vue-router";
+import type * as Vuex from "vuex";
+
+const { pushMock } = vi.hoisted(() => ({ pushMock: vi.fn() }));
+vi.mock("vue-router", async (importOriginal) => ({
+  ...(await importOriginal<typeof VueRouter>()),
+  useRouter: () => ({ push: pushMock }),
+}));
+vi.mock("vuex", async (importOriginal) => ({
+  ...(await importOriginal<typeof Vuex>()),
+  useStore: () => ({ state: { selectedOrganization: { identifier: "acme" } } }),
+}));
+
 import i18n from "@/locales";
 import RcaVerdictCard from "./RcaVerdictCard.vue";
 import {
@@ -294,7 +307,7 @@ describe("RcaVerdictCard", () => {
       });
     });
 
-    // M1 (01 RR-47): the global `p` colour must not override the banner text token.
+    // The global `p` colour must not override the banner text token.
     it.each([
       [
         "N",
@@ -434,6 +447,47 @@ describe("RcaVerdictCard", () => {
       expect(wrapper.emitted("show-blind-spots")).toHaveLength(1);
     });
 
+    it("B: shows the stored impacted services and proposed actions as text only", () => {
+      const verdictDetails = {
+        impactedServices: ["service=checkout-api", "service=orders-db"],
+        proposedActions: [
+          { title: "Roll back 4f2c1e", kind: "rollback", detail: "Revert the pool size change." },
+          { title: "Watch pool usage", kind: "other", detail: "" },
+        ],
+      };
+      const wrapper = mountCard({
+        cardState: "analyzed",
+        summary: rcaRunSummary(),
+        verdictDetails,
+      });
+
+      expect(text(wrapper, "rca-verdict-services")).toBe("service=checkout-api, service=orders-db");
+      const actions = wrapper.findAll('[data-test="rca-verdict-action"]');
+      expect(actions).toHaveLength(2);
+      expect(actions[0].text()).toContain("Roll back 4f2c1e");
+      expect(actions[0].find('[data-test="rca-verdict-action-kind"]').text()).toBe("· Rollback");
+      expect(actions[0].find("p").text()).toBe("Revert the pool size change.");
+      expect(actions[1].find('[data-test="rca-verdict-action-kind"]').text()).toBe("· Other");
+      expect(actions[1].find("p").exists()).toBe(false);
+      // Inert: no control runs an action.
+      expect(byTest(wrapper, "rca-verdict-actions").findAll("button, a")).toHaveLength(0);
+    });
+
+    it("a run that is not graded shows no services or actions", () => {
+      const verdictDetails = {
+        impactedServices: ["service=checkout-api"],
+        proposedActions: [{ title: "Roll back", kind: "rollback", detail: "" }],
+      };
+      const wrapper = mountCard({
+        cardState: "cancelled",
+        summary: rcaRunSummaryCancelled(),
+        verdictDetails,
+      });
+
+      expect(byTest(wrapper, "rca-verdict-services").exists()).toBe(false);
+      expect(byTest(wrapper, "rca-verdict-actions").exists()).toBe(false);
+    });
+
     it("the breakdown names the caps that lowered the band and what the next level needs (CG §5.3.4)", async () => {
       const base = rcaRunSummary();
       const withConfidence = (confidence: NonNullable<typeof base.card.confidence>) =>
@@ -520,7 +574,7 @@ describe("RcaVerdictCard", () => {
       expect(byTest(wrapper, "rca-verdict-qualifier").exists()).toBe(false);
     });
 
-    it("suspect change under test and from a steering lead (VE35)", () => {
+    it("suspect change from a steering lead (VE35)", () => {
       const base = rcaRunSummary();
       const wrapper = mountCard({
         cardState: "analyzed",
@@ -529,16 +583,14 @@ describe("RcaVerdictCard", () => {
             ...base.card,
             suspect_change: {
               ...base.card.suspect_change!,
-              shown_state: "under_test",
+              shown_state: "confirmed",
               lead_author: "a.rao",
             },
           },
         }),
       });
 
-      expect(text(wrapper, "rca-verdict-suspect")).toBe(
-        "Deploy 4f2c1e · 08:53 UTC (under test) (from a.rao)",
-      );
+      expect(text(wrapper, "rca-verdict-suspect")).toBe("Deploy 4f2c1e · 08:53 UTC (from a.rao)");
     });
 
     it("D: Blocked with 'Needs: Change history'; no suspect change hides its row (VE32, VE44)", () => {
@@ -564,7 +616,7 @@ describe("RcaVerdictCard", () => {
         summary: rcaRunSummaryCancelled(),
       });
 
-      // VE32 frame E: a stored record reads "Failed"; the headline says it was cancelled.
+      // A stored record reads "Failed"; the headline says it was cancelled.
       expect(text(wrapper, "rca-verdict-state")).toBe("Failed");
       expect(text(wrapper, "rca-verdict-headline")).toBe(
         "Run cancelled before a verdict. Partial results below",
@@ -730,5 +782,78 @@ describe("RcaVerdictCard", () => {
         "Unblocked by a.rao at 14:13 · change history from a human lead",
       );
     });
+  });
+
+  describe("blocked: the server refused to start a run", () => {
+    const refusal = (
+      remedy: "plans" | "contact" | null,
+      retry: unknown = { buildOnPrevious: true },
+    ) => ({
+      reason: "Your organization has used all of its AI credits.",
+      remedy,
+      retry,
+    });
+
+    it("replaces the run's banner and leads with Plans, then Retry", () => {
+      const wrapper = mountCard({ cardState: "failed", refusal: refusal("plans") });
+
+      expect(byTest(wrapper, "rca-blocked-banner").exists()).toBe(true);
+      expect(shownBanners(wrapper)).toEqual([]);
+      expect(byTest(wrapper, "rca-blocked-reason").text()).toBe(
+        "Your organization has used all of its AI credits.",
+      );
+      expect(buttonTexts(wrapper, "rca-blocked-banner")).toEqual(["Plans", "Retry analysis"]);
+    });
+
+    it("Plans opens the plans page of the org", async () => {
+      const wrapper = mountCard({ cardState: "analyzed", refusal: refusal("plans") });
+
+      await byTest(wrapper, "rca-plans-btn").trigger("click");
+
+      expect(pushMock).toHaveBeenCalledWith({
+        name: "plans",
+        query: { org_identifier: "acme" },
+      });
+    });
+
+    it("a contract org gets Contact sales instead of Plans", () => {
+      const wrapper = mountCard({ cardState: "analyzed", refusal: refusal("contact") });
+
+      expect(byTest(wrapper, "rca-contact-btn").exists()).toBe(true);
+      expect(byTest(wrapper, "rca-plans-btn").exists()).toBe(false);
+    });
+
+    it("with no page to open, only Retry shows", () => {
+      const wrapper = mountCard({ cardState: "analyzed", refusal: refusal(null) });
+
+      expect(buttonTexts(wrapper, "rca-blocked-banner")).toEqual(["Retry analysis"]);
+    });
+
+    it("Retry resends the refused trigger's options", async () => {
+      const options = { buildOnPrevious: true, guidance: "Check the pool" };
+      const wrapper = mountCard({ cardState: "analyzed", refusal: refusal("plans", options) });
+
+      await byTest(wrapper, "rca-blocked-retry-btn").trigger("click");
+
+      expect(wrapper.emitted("retry")).toEqual([[options]]);
+    });
+
+    it("Retry of a refused resume resumes again", async () => {
+      const wrapper = mountCard({ cardState: "failed", refusal: refusal("plans", null) });
+
+      await byTest(wrapper, "rca-blocked-retry-btn").trigger("click");
+
+      expect(wrapper.emitted("resume")).toHaveLength(1);
+      expect(wrapper.emitted("retry")).toBeUndefined();
+    });
+  });
+
+  it("the retry modes carry the re-analysis cost only when it is known", () => {
+    const failed = { cardState: "failed", hasEarlierReport: true };
+    const costed = mountCard({ ...failed, reanalyzeCreditCost: 5 });
+    expect(byTest(costed, "rca-retry-fresh").attributes("description")).toBe("Uses 5 AI credits");
+
+    const unknown = mountCard(failed);
+    expect(byTest(unknown, "rca-retry-fresh").attributes("description")).toBeUndefined();
   });
 });

@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton data-test="rca-run-selector" variant="outline" size="sm">
           <span
             v-if="selectedIsLive"
-            class="rca-live-dot bg-status-positive me-1.5 inline-block size-1.75 rounded-full"
+            class="bg-status-positive me-1.5 inline-block size-1.75 animate-pulse rounded-full motion-reduce:animate-none"
             aria-hidden="true"
           />
           <OIcon v-else name="history" size="sm" class="text-text-secondary me-1.5" />
@@ -93,6 +93,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @select="$emit('reanalyze', { buildOnPrevious: false })"
       >
         {{ t("alerts.incidents.rcaFreshAnalysis") }}
+        <span
+          v-if="reanalyzeCostLabel"
+          data-test="rca-reanalyze-fresh-cost"
+          class="text-text-secondary block text-xs"
+        >
+          {{ reanalyzeCostLabel }}
+        </span>
       </ODropdownItem>
       <ODropdownItem
         data-test="rca-reanalyze-build"
@@ -101,6 +108,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @select="$emit('reanalyze', { buildOnPrevious: true })"
       >
         {{ t("alerts.incidents.rcaBuildOnPrevious") }}
+        <span
+          v-if="reanalyzeCostLabel"
+          data-test="rca-reanalyze-build-cost"
+          class="text-text-secondary block text-xs"
+        >
+          {{ reanalyzeCostLabel }}
+        </span>
       </ODropdownItem>
       <ODropdownItem
         data-test="rca-reanalyze-guidance"
@@ -185,14 +199,22 @@ const props = withDefaults(
     /** A resume is in flight: Re-analyze waits for it. */
     resuming?: boolean;
     cancelling?: boolean;
+    /** AI credits a re-analysis uses; unset outside cloud, where no cost shows. */
+    reanalyzeCreditCost?: number | null;
   }>(),
-  { canAsk: false, triggering: false, resuming: false, cancelling: false },
+  {
+    canAsk: false,
+    triggering: false,
+    resuming: false,
+    cancelling: false,
+    reanalyzeCreditCost: null,
+  },
 );
 
 defineEmits<{
   "select-run": [runId: string | null];
   reanalyze: [options: { buildOnPrevious: boolean }];
-  /** "With guidance…": open the frame I dialog. */
+  /** "With guidance…": open the guidance dialog. */
   "reanalyze-guidance": [];
   cancel: [];
   "copy-report": [];
@@ -218,8 +240,9 @@ const items = computed(() =>
       runId: run.run_id,
       isLatest,
       selected: run.run_id === props.selectedRunId,
-      // Completed runs open a report; the latest run is always the way back.
-      openable: isLatest || run.state === "completed",
+      // Completed runs open a report and runs with a record (a cancelled or failed run's
+      // partial ledger) open it; the latest run is always the way back.
+      openable: isLatest || run.state === "completed" || run.has_record,
       label: liveRun
         ? t("alerts.incidents.rcaRun.runLive", { number })
         : t("alerts.incidents.rcaRun.runAt", { number, time: runTime(run.started_at) }),
@@ -233,27 +256,9 @@ const selectedItem = computed(() => items.value.find((item) => item.selected) ??
 const selectedIsLive = computed(() => props.live && selectedItem.value?.isLatest === true);
 
 const selectorLabel = computed(() => selectedItem.value?.label ?? t("alerts.incidents.rcaHistory"));
+
+const reanalyzeCostLabel = computed<I18nText | null>(() => {
+  const cost = props.reanalyzeCreditCost;
+  return cost ? t("alerts.incidents.rcaCreditCost", { cost }, cost) : null;
+});
 </script>
-
-<style scoped>
-/* Live pulse of the run selector (reference: o2pulse 1.4s). */
-.rca-live-dot {
-  animation: rca-live-pulse 1.4s ease-in-out infinite;
-}
-
-@keyframes rca-live-pulse {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.35;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .rca-live-dot {
-    animation: none;
-  }
-}
-</style>

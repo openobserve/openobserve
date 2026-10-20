@@ -107,7 +107,7 @@ const props = withDefaults(
 );
 
 defineEmits<{
-  /** The `resume_run` blind spot's button (VE37). */
+  /** The `resume_run` blind spot's button. */
   resume: [];
 }>();
 
@@ -130,7 +130,7 @@ const actionLabel = (fix: RcaBlindSpotFix): { label: I18nText; icon: IconName } 
   }
 };
 
-/** Blind spot id → its button, for the spots that have one (VE37). */
+/** Blind spot id → its button, for the spots that have one. */
 const actions = computed(() => {
   const byId: Record<string, { label: I18nText; icon: IconName; route: RouteLocationRaw }> = {};
   for (const spot of props.blindSpots) {

@@ -101,6 +101,16 @@ describe("RcaThreadStep (02 TH38)", () => {
     expect(wrapper.find('[data-test="rca-thread-step-calls"]').exists()).toBe(false);
   });
 
+  it("the open step of a run waiting for an answer is waiting, not working", () => {
+    const wrapper = mount(RcaThreadStep, {
+      props: { step: rcaStep({ ended_at: null }), runLive: true, runWaiting: true },
+      global: { plugins: [i18n] },
+    });
+
+    expect(wrapper.find('[data-test="rca-thread-step-working"]').exists()).toBe(false);
+    expect(wrapper.findComponent({ name: "OSpinner" }).exists()).toBe(false);
+  });
+
   it("a step without calls or note shows only its title", () => {
     const wrapper = mountStep(rcaStep({ note: null, citations: [], tool_calls: [] }));
 

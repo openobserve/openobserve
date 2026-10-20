@@ -16,11 +16,20 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { defineComponent, ref, type Ref } from "vue";
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
+import type * as ConsentModule from "@/composables/usePaidOverageConsent";
 
-const { toastMock } = vi.hoisted(() => ({ toastMock: vi.fn() }));
+const { toastMock, awsConfig, promptForConsent } = vi.hoisted(() => ({
+  toastMock: vi.fn(),
+  awsConfig: { isCloud: "false", isEnterprise: "true" },
+  promptForConsent: vi.fn(),
+}));
 
-vi.mock("@/aws-exports", () => ({ default: { isCloud: "false", isEnterprise: "true" } }));
+vi.mock("@/aws-exports", () => ({ default: awsConfig }));
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: toastMock }));
+vi.mock("@/composables/usePaidOverageConsent", async (importOriginal) => ({
+  ...(await importOriginal<typeof ConsentModule>()),
+  usePaidOverageConsent: () => ({ promptForConsent }),
+}));
 vi.mock("@/services/incidents", () => ({
   default: {
     get: vi.fn(),
@@ -43,10 +52,11 @@ import incidentsService, {
   type RcaSteering,
   type RcaSummary,
   type RcaThread,
+  type RcaVerdictDetails,
 } from "@/services/incidents";
 import { incidentKeys } from "@/services/incidents.querykeys";
 import { queryClient } from "@/composables/query/queryClient";
-import { useIncidentRca, type RcaReadStatus } from "./useIncidentRca";
+import { useIncidentRca, type RcaReadStatus, type RcaRefusal } from "./useIncidentRca";
 import {
   rcaRunSummary,
   rcaRunSummaryLive,
@@ -92,6 +102,7 @@ function reportRun(runId: string): RcaRunItem {
     cancelled_by: null,
     error_reason: null,
     report_format: "v2",
+    has_record: true,
   };
 }
 
@@ -134,6 +145,7 @@ interface IncidentRcaApi {
   displayedRunId: Readonly<Ref<string | null>>;
   threadRunId: Readonly<Ref<string | null>>;
   reportText: Readonly<Ref<string>>;
+  reportVerdict: Readonly<Ref<RcaVerdictDetails | null>>;
   currentError: Readonly<Ref<RcaRunError | null>>;
   triggering: Readonly<Ref<boolean>>;
   resuming: Readonly<Ref<boolean>>;
@@ -144,7 +156,8 @@ interface IncidentRcaApi {
   runSummaryStatus: Readonly<Ref<RcaReadStatus>>;
   steering: Readonly<Ref<RcaSteering | null>>;
   steeringStatus: Readonly<Ref<RcaReadStatus>>;
-  trigger: (options?: { buildOnPrevious?: boolean }) => Promise<void>;
+  trigger: (options?: { buildOnPrevious?: boolean; guidance?: string }) => Promise<void>;
+  refusal: Readonly<Ref<RcaRefusal | null>>;
   resume: (runId: string) => Promise<void>;
   cancel: () => Promise<void>;
   reload: () => Promise<void>;
@@ -182,6 +195,7 @@ describe("useIncidentRca (RR-35)", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    awsConfig.isCloud = "false";
     vi.useFakeTimers();
     connections.length = 0;
     service.getRcaRun.mockImplementation((_org, _id, runId) =>
@@ -249,6 +263,27 @@ describe("useIncidentRca (RR-35)", () => {
       host.api.viewRun("run-1");
       await flushPromises();
       expect(connections.map((c) => c.runId)).toEqual(["run-2", "run-1"]);
+    });
+
+    it("a cancelled run with a stored record can be reopened; one with nothing to show cannot", async () => {
+      const resumed = rca("completed", "run-3", "run-3");
+      resumed.history = [
+        reportRun("run-3"),
+        { ...reportRun("run-2"), state: "cancelled", has_record: true },
+        { ...reportRun("run-1"), state: "failed", has_record: false },
+      ];
+      host = mountHost(resumed);
+      host.analysisOpen.value = true;
+      await flushPromises();
+
+      host.api.viewRun("run-1");
+      await flushPromises();
+      expect(host.api.threadRunId.value).toBe("run-3");
+
+      host.api.viewRun("run-2");
+      await flushPromises();
+      expect(host.api.threadRunId.value).toBe("run-2");
+      expect(connections.at(-1)?.runId).toBe("run-2");
     });
 
     it("LU15: a v1 run streams without a run", async () => {
@@ -370,6 +405,46 @@ describe("useIncidentRca (RR-35)", () => {
       expect(host.api.threadStatus.value).toBe("incomplete");
       expect(host.api.runSummary.value).toBeNull();
       expect(host.api.runSummaryStatus.value).toBe("expired");
+    });
+
+    it("a failed final read after the run ends drops the live snapshot so the thread offers Retry", async () => {
+      host = mountHost(rca("running", "run-1", null));
+      host.analysisOpen.value = true;
+      await flushPromises();
+      const stream = connections.at(-1)!;
+      stream.emit({ event: "thread", data: rcaThread({ run_id: "run-1", active: true }) });
+      stream.emit({ event: "summary", data: rcaRunSummaryLive({ run_id: "run-1" }) });
+
+      stream.emit({ event: "rca", data: rca("completed", "run-1", "run-1") });
+      await flushPromises();
+      stream.emit({
+        event: "error",
+        data: { part: "transcript", status: 503, error_code: "history_unavailable", message: "m" },
+      });
+
+      expect(host.api.thread.value).toBeNull();
+      expect(host.api.threadStatus.value).toBe("unavailable");
+      expect(host.api.runSummary.value).toBeNull();
+    });
+
+    it("a server fault on a part is logged; a 404 or 410 answer is not", async () => {
+      const log = vi.spyOn(console, "error").mockImplementation(() => {});
+      host = mountHost(rca("running", "run-1", null));
+      host.analysisOpen.value = true;
+      await flushPromises();
+      const stream = connections.at(-1)!;
+
+      stream.emit({
+        event: "error",
+        data: { part: "transcript", status: 410, error_code: "transcript_expired", message: "m" },
+      });
+      expect(log).not.toHaveBeenCalled();
+      stream.emit({
+        event: "error",
+        data: { part: "steering", status: 500, error_code: null, message: "m" },
+      } as never);
+      expect(log).toHaveBeenCalledTimes(1);
+      log.mockRestore();
     });
 
     it("LU17: a stored summary survives a transcript that cannot be read", async () => {
@@ -512,6 +587,109 @@ describe("useIncidentRca (RR-35)", () => {
     });
   });
 
+  describe("a refused trigger (AI credits, paid usage declined)", () => {
+    const exhausted = (remedy: string) => ({
+      isAxiosError: true,
+      response: { status: 402, data: { error_type: "ai_credits_exhausted", remedy } },
+    });
+
+    it("a 402 sets the refusal with the page that unblocks it and the options to resend", async () => {
+      service.triggerRca.mockRejectedValue(exhausted("subscribe"));
+      host = mountHost(rca("completed", "run-1", "run-1"));
+      await flushPromises();
+
+      await host.api.trigger({ buildOnPrevious: true, guidance: "Check the pool" });
+
+      expect(host.api.refusal.value).toMatchObject({
+        remedy: "plans",
+        retry: { buildOnPrevious: true, guidance: "Check the pool" },
+      });
+      expect(toastMock).not.toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
+      expect(host.api.triggering.value).toBe(false);
+    });
+
+    it("a contract org's 402 points to Contact", async () => {
+      service.triggerRca.mockRejectedValue(exhausted("contact_account_manager"));
+      host = mountHost(null);
+
+      await host.api.trigger();
+
+      expect(host.api.refusal.value?.remedy).toBe("contact");
+    });
+
+    it("declining paid usage sets the refusal with Plans and sends nothing more", async () => {
+      awsConfig.isCloud = "true";
+      service.triggerRca.mockRejectedValue({
+        isAxiosError: true,
+        response: {
+          status: 412,
+          data: { error_type: "paid_overage_consent_required", consent: { feature: "ai_credits" } },
+        },
+      });
+      promptForConsent.mockResolvedValue(false);
+      host = mountHost(null);
+
+      await host.api.trigger();
+
+      expect(host.api.refusal.value).toEqual({
+        reason: "Paid AI usage is off, so this request wasn't sent.",
+        remedy: "plans",
+        retry: { buildOnPrevious: false },
+      });
+      expect(service.triggerRca).toHaveBeenCalledTimes(1);
+      expect(toastMock).not.toHaveBeenCalled();
+    });
+
+    it("a refused resume keeps no trigger options, so Retry resumes again", async () => {
+      service.resumeRca.mockRejectedValue(exhausted("subscribe"));
+      host = mountHost(rca("failed", "run-2", "run-1"));
+
+      await host.api.resume("run-2");
+
+      expect(host.api.refusal.value).toMatchObject({ remedy: "plans", retry: null });
+    });
+
+    it("clears on the next attempt", async () => {
+      service.triggerRca.mockRejectedValueOnce(exhausted("subscribe"));
+      host = mountHost(null);
+      await host.api.trigger();
+      expect(host.api.refusal.value).not.toBeNull();
+
+      const pending = Promise.withResolvers<never>();
+      service.triggerRca.mockReturnValueOnce(pending.promise);
+      service.get.mockResolvedValue(detail(null) as never);
+      const attempt = host.api.trigger();
+
+      expect(host.api.refusal.value).toBeNull();
+      pending.reject(new Error("later"));
+      await attempt;
+    });
+
+    it("clears when a run starts", async () => {
+      service.triggerRca.mockRejectedValue(exhausted("subscribe"));
+      host = mountHost(rca("completed", "run-1", "run-1"));
+      await host.api.trigger();
+      expect(host.api.refusal.value).not.toBeNull();
+
+      host.incident.value!.rca = rca("running", "run-2", "run-1");
+      await flushPromises();
+
+      expect(host.api.refusal.value).toBeNull();
+    });
+
+    it("clears when another incident opens", async () => {
+      service.triggerRca.mockRejectedValue(exhausted("subscribe"));
+      host = mountHost(null);
+      await host.api.trigger();
+      expect(host.api.refusal.value).not.toBeNull();
+
+      host.incident.value = { id: "inc-2", rca: null } as IncidentWithAlerts;
+      await flushPromises();
+
+      expect(host.api.refusal.value).toBeNull();
+    });
+  });
+
   it("RR-35: an older reload response does not overwrite a newer one", async () => {
     const olderRead = Promise.withResolvers<unknown>();
     const newerRead = Promise.withResolvers<unknown>();
@@ -540,6 +718,28 @@ describe("useIncidentRca (RR-35)", () => {
     expect(service.cancelRca).toHaveBeenCalledWith("default", "inc-1");
     expect(host.api.state.value).toBe("cancelled");
     expect(host.api.live.value).toBe(false);
+  });
+
+  it("the shown report's stored verdict gives the card its services and actions", async () => {
+    service.getRcaRun.mockResolvedValueOnce({
+      data: {
+        run_id: "run-2",
+        report: "report of run-2",
+        result: {
+          verdict: {
+            impacted_services: ["service=checkout-api"],
+            proposed_actions: [{ title: "Roll back", kind: "rollback", detail: "Revert." }],
+          },
+        },
+      },
+    } as never);
+    host = mountHost(rca("completed", "run-2", "run-2"));
+    await flushPromises();
+
+    expect(host.api.reportVerdict.value).toEqual({
+      impactedServices: ["service=checkout-api"],
+      proposedActions: [{ title: "Roll back", kind: "rollback", detail: "Revert." }],
+    });
   });
 
   describe("v1: pre-upgrade reports", () => {
@@ -595,7 +795,6 @@ describe("useIncidentRca (RR-35)", () => {
           state: base.state,
           trigger: "manual",
           session_id: "ses-1",
-          report: null,
           outcome: null,
           stats: { steps: 3 },
           error: { code: "timeout", reason: "Timed out", details: null, trigger_type: null },

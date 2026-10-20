@@ -50,12 +50,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           type="button"
           :data-test="`rca-feedback-chip-${reason}`"
           :aria-pressed="reasons.includes(reason)"
-          class="border-border-control inline-flex h-6.5 cursor-pointer items-center rounded-full border px-2.5 text-xs"
+          class="border-border-control inline-flex h-6.5 cursor-pointer items-center rounded-full border px-2.5 text-xs disabled:cursor-not-allowed disabled:opacity-50"
           :class="
             reasons.includes(reason)
               ? 'bg-surface-accent text-text-heading'
               : 'bg-surface-base text-text-body hover:bg-surface-subtle-hover'
           "
+          :disabled="busy"
           @click="toggleReason(reason)"
         >
           {{ t(`alerts.incidents.rcaFeedback.reason.${reason}`) }}
@@ -68,9 +69,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :placeholder="t('alerts.incidents.rcaFeedback.notePlaceholder')"
         :rows="2"
         :maxlength="MAX_NOTE_CHARS"
+        :disabled="busy"
       />
       <div class="flex justify-end gap-2">
-        <OButton data-test="rca-feedback-cancel" variant="ghost" size="sm" @click="closePanel">
+        <OButton
+          data-test="rca-feedback-cancel"
+          variant="ghost"
+          size="sm"
+          :disabled="busy"
+          @click="closePanel"
+        >
           {{ t("alerts.incidents.rcaFeedback.cancel") }}
         </OButton>
         <OButton
@@ -99,9 +107,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :cause-hint="null"
         :note-label="t('alerts.incidents.rcaFeedback.changeNoteLabel')"
         :exclude-causes="['still_unknown']"
+        :note-maxlength="MAX_NOTE_CHARS"
+        :disabled="busy"
       />
       <div class="flex justify-end gap-2">
-        <OButton data-test="rca-feedback-cancel" variant="ghost" size="sm" @click="closePanel">
+        <OButton
+          data-test="rca-feedback-cancel"
+          variant="ghost"
+          size="sm"
+          :disabled="busy"
+          @click="closePanel"
+        >
           {{ t("alerts.incidents.rcaFeedback.cancel") }}
         </OButton>
         <OButton
@@ -150,6 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, ref, useId, watch } from "vue";
 import { isAxiosError } from "axios";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/vue-query";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTextarea from "@/lib/forms/Input/OTextarea.vue";
@@ -157,12 +174,18 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OnCallResolveCauseForm from "@/components/oncall/OnCallResolveCauseForm.vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import incidentsService, {
-  type PutRcaFeedbackRequest,
-  type RcaFeedback,
-  type RcaFeedbackReason,
-  type RcaFeedbackVerdict,
+import type {
+  ListRcaFeedbackResponse,
+  PutRcaFeedbackRequest,
+  RcaFeedbackReason,
+  RcaFeedbackVerdict,
 } from "@/services/incidents";
+import {
+  deleteRcaFeedbackMutation,
+  putRcaFeedbackMutation,
+  rcaFeedbackQuery,
+} from "@/services/incidents.queries";
+import { incidentKeys } from "@/services/incidents.querykeys";
 import type { ResolutionCause } from "@/ts/interfaces/oncall";
 
 const props = defineProps<{
@@ -174,6 +197,7 @@ const props = defineProps<{
 const { t } = useI18nTyped();
 const questionId = useId();
 const noPromptId = useId();
+const queryClient = useQueryClient();
 
 /** The server's note limit (J2). */
 const MAX_NOTE_CHARS = 1000;
@@ -191,19 +215,31 @@ const options = computed<{ verdict: RcaFeedbackVerdict; label: I18nText }[]>(() 
   { verdict: "change", label: t("alerts.incidents.rcaFeedback.change") },
 ]);
 
+const read = useQuery(() =>
+  Object.assign(rcaFeedbackQuery(props.orgId, props.incidentId, props.runId), {
+    enabled: !!props.runId,
+  }),
+);
+const saveMutation = useMutation(() =>
+  putRcaFeedbackMutation(props.orgId, props.incidentId, props.runId),
+);
+const undoMutation = useMutation(() =>
+  deleteRcaFeedbackMutation(props.orgId, props.incidentId, props.runId),
+);
+
 /** The caller's saved row, or null. */
-const mine = ref<RcaFeedback | null>(null);
+const mine = computed(() => read.data.value?.mine ?? null);
 /** The open form: No (reasons) or Correct the cause. */
 const panel = ref<"no" | "change" | null>(null);
 const reasons = ref<RcaFeedbackReason[]>([]);
 const cause = ref<ResolutionCause | "">("");
 const note = ref("");
-const loading = ref(false);
-const saving = ref(false);
-const undoing = ref(false);
-const error = ref<I18nText | null>(null);
-/** One request at a time: the GET, a save or an Undo. */
-const busy = computed(() => loading.value || saving.value || undoing.value);
+const saving = computed(() => saveMutation.isPending.value);
+const undoing = computed(() => undoMutation.isPending.value);
+/** A write's failure; a read failure comes from the query. */
+const writeError = ref<I18nText | null>(null);
+/** One request at a time: the read, a save or an Undo. */
+const busy = computed(() => read.isLoading.value || saving.value || undoing.value);
 
 const trimmedNote = computed(() => note.value.trim() || undefined);
 
@@ -238,39 +274,29 @@ const errorText = (failure: unknown, fallback: I18nText): I18nText => {
   return message ? raw(message) : fallback;
 };
 
-/** Each mount and run change reads the caller's row; a late answer for another run is dropped. */
-let generation = 0;
-const load = async () => {
-  const current = ++generation;
-  mine.value = null;
-  panel.value = null;
-  error.value = null;
-  // A save or Undo still in flight belongs to the previous run: it must not keep this run busy.
-  saving.value = false;
-  undoing.value = false;
-  if (!props.runId) return;
-  loading.value = true;
-  try {
-    const response = await incidentsService.getRcaFeedback(
-      props.orgId,
-      props.incidentId,
-      props.runId,
-    );
-    if (current === generation) mine.value = response.data.mine;
-  } catch (failure) {
-    console.error("Failed to load RCA feedback:", failure);
-    if (current === generation) {
-      error.value = errorText(failure, t("alerts.incidents.rcaFeedback.loadFailed"));
-    }
-  } finally {
-    if (current === generation) loading.value = false;
-  }
-};
+const error = computed<I18nText | null>(() => {
+  if (writeError.value) return writeError.value;
+  const failure = read.error.value;
+  return failure ? errorText(failure, t("alerts.incidents.rcaFeedback.loadFailed")) : null;
+});
 
-watch(() => [props.orgId, props.incidentId, props.runId], load, { immediate: true });
+watch(read.error, (failure) => {
+  if (failure) console.error("Failed to load RCA feedback:", failure);
+});
+
+// Another run starts with its own row and a closed form; the old run's writes no longer hold it busy.
+watch(
+  () => [props.orgId, props.incidentId, props.runId],
+  () => {
+    panel.value = null;
+    writeError.value = null;
+    saveMutation.reset();
+    undoMutation.reset();
+  },
+);
 
 const choose = (verdict: RcaFeedbackVerdict) => {
-  error.value = null;
+  writeError.value = null;
   if (verdict === "yes") {
     if (mine.value?.verdict !== "yes") void save({ verdict: "yes" });
     else panel.value = null;
@@ -290,7 +316,7 @@ const choose = (verdict: RcaFeedbackVerdict) => {
 
 const closePanel = () => {
   panel.value = null;
-  error.value = null;
+  writeError.value = null;
 };
 
 const toggleReason = (reason: RcaFeedbackReason) => {
@@ -299,46 +325,42 @@ const toggleReason = (reason: RcaFeedbackReason) => {
     : [...reasons.value, reason];
 };
 
+/** Puts the caller's row into that run's cached read, so the form shows it before the refetch. */
+const setMine = (runId: string, row: ListRcaFeedbackResponse["mine"]) => {
+  queryClient.setQueryData<ListRcaFeedbackResponse>(
+    incidentKeys.rcaFeedback(props.orgId, props.incidentId, runId),
+    (current) => ({ items: current?.items ?? [], mine: row }),
+  );
+};
+
 const save = async (body: PutRcaFeedbackRequest) => {
   if (busy.value) return;
-  const current = generation;
-  saving.value = true;
-  error.value = null;
+  const runId = props.runId;
+  writeError.value = null;
   try {
-    const response = await incidentsService.putRcaFeedback(
-      props.orgId,
-      props.incidentId,
-      props.runId,
-      body,
-    );
-    if (current !== generation) return;
-    mine.value = response.data;
-    panel.value = null;
+    const row = await saveMutation.mutateAsync(body);
+    setMine(runId, row);
+    if (runId === props.runId) panel.value = null;
   } catch (failure) {
     console.error("Failed to save RCA feedback:", failure);
-    if (current === generation) {
-      error.value = errorText(failure, t("alerts.incidents.rcaFeedback.saveFailed"));
+    if (runId === props.runId) {
+      writeError.value = errorText(failure, t("alerts.incidents.rcaFeedback.saveFailed"));
     }
-  } finally {
-    if (current === generation) saving.value = false;
   }
 };
 
 const undo = async () => {
   if (busy.value) return;
-  const current = generation;
-  undoing.value = true;
-  error.value = null;
+  const runId = props.runId;
+  writeError.value = null;
   try {
-    await incidentsService.deleteRcaFeedback(props.orgId, props.incidentId, props.runId);
-    if (current === generation) mine.value = null;
+    await undoMutation.mutateAsync();
+    setMine(runId, null);
   } catch (failure) {
     console.error("Failed to undo RCA feedback:", failure);
-    if (current === generation) {
-      error.value = errorText(failure, t("alerts.incidents.rcaFeedback.undoFailed"));
+    if (runId === props.runId) {
+      writeError.value = errorText(failure, t("alerts.incidents.rcaFeedback.undoFailed"));
     }
-  } finally {
-    if (current === generation) undoing.value = false;
   }
 };
 </script>

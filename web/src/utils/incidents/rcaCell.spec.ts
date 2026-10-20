@@ -15,6 +15,7 @@
 
 import { describe, expect, it } from "vitest";
 import type { Incident, RcaSummary } from "@/services/incidents";
+import { gt } from "@/types/i18n";
 import { isLiveRca, rcaCellModel, type RcaCellModel } from "./rcaCell";
 
 const NOW = Date.UTC(2026, 9, 16, 12, 0, 0);
@@ -59,7 +60,7 @@ type Row = Pick<Incident, "rca" | "rca_off_reason" | "severity">;
 type Expected = Pick<RcaCellModel, "kind" | "label" | "tone" | "detail" | "rerunNote"> &
   Partial<Pick<RcaCellModel, "spinner" | "showAnalyzeOnHover">>;
 
-// 01 §12.1, Phase 1 rows; RR-42 previous-result rows; RR-43 precedence.
+// Basic rows, previous-result rows, and precedence.
 const cases: [string, Row, boolean, Expected][] = [
   [
     "RCA disabled",
@@ -202,7 +203,7 @@ const cases: [string, Row, boolean, Expected][] = [
       rerunNote: "re-run cancelled by a.rao",
     },
   ],
-  // 03 VE14, VE16, VE44: outcome labels with the band; blocked names what it needs.
+  // Outcome labels with the band; blocked names what it needs.
   [
     "Root cause identified · High",
     {
@@ -313,7 +314,7 @@ const cases: [string, Row, boolean, Expected][] = [
       rerunNote: "re-run cancelled by a.rao",
     },
   ],
-  // 04 SG26, SG6, SG39, SG41: the steering details of a list row.
+  // The steering details of a list row.
   [
     "SG26: waiting_input · Blocked · <need> · until <deadline>",
     {
@@ -398,15 +399,28 @@ describe("rcaCellModel (01 §12.1, RR-42, 03 VE14/VE44)", () => {
     expect(rcaCellModel(row, { rcaEnabled: true, now: NOW }).detail).toContain("Stage 5/7");
   });
 
-  it("includes completed checks on cancellation but keeps the resolved-incident reason", () => {
-    const row = {
-      rca: rca({ state: "cancelled", summary: { steps: 3, cancelled_by: "a.rao@acme.io" } }),
-      severity: "P2",
-    } as Row;
-    expect(rcaCellModel(row, { rcaEnabled: true, now: NOW }).detail).toContain("after 3 checks");
-    row.rca!.summary.detail = "Incident resolved";
-    expect(rcaCellModel(row, { rcaEnabled: true, now: NOW }).detail).toBe("Incident resolved");
-  });
+  it.each([
+    [3, 2],
+    [1, 0],
+    [0, 0],
+  ])(
+    "a cancel after %i steps counts %i finished checks; the resolved-incident reason wins",
+    (steps, finished) => {
+      const row = {
+        rca: rca({ state: "cancelled", summary: { steps, cancelled_by: "a.rao@acme.io" } }),
+        severity: "P2",
+      } as Row;
+      expect(rcaCellModel(row, { rcaEnabled: true, now: NOW }).detail).toBe(
+        gt(
+          "alerts.incidents.aiAnalysis.cancelledByAfterChecks",
+          { user: "a.rao", count: finished },
+          finished,
+        ),
+      );
+      row.rca!.summary.detail = "Incident resolved";
+      expect(rcaCellModel(row, { rcaEnabled: true, now: NOW }).detail).toBe("Incident resolved");
+    },
+  );
 
   it("SG26: the until time is in the viewer's zone", () => {
     const row = {

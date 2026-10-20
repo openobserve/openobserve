@@ -157,6 +157,13 @@ const rendered = computed(() => (props.report?.report ? renderRcaReport(props.re
   border-radius: 0;
   padding: 0;
 }
+/* The shared renderer boxes each code block; the card's `pre` is the box, so the wrapper goes flat. */
+.report-body :deep(.rca-code-block) {
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  margin: 0;
+}
 
 .report-body :deep(table) {
   width: 100%;

@@ -66,6 +66,30 @@ describe("rcaReportMarkdown", () => {
     expect(toDom(html).textContent?.split("https://evil.example").length).toBe(2);
   });
 
+  it("keeps hard line breaks and strikethrough", () => {
+    const dom = toDom(renderRcaReport("First line  \nsecond line with ~~old cause~~."));
+    expect(dom.querySelector("p br")).not.toBeNull();
+    expect(dom.querySelector("del")?.textContent).toBe("old cause");
+  });
+
+  it("renders an image as its alt text and never loads it", () => {
+    const html = renderRcaReport("Graph: ![error rate spike](https://evil.example/x.png)");
+    expect(toDom(html).querySelector("img")).toBeNull();
+    expect(html).not.toContain("evil.example");
+    expect(toDom(html).textContent).toContain("error rate spike");
+  });
+
+  it("renders headings as heading elements, deeper levels as h4", () => {
+    const dom = toDom(renderRcaReport("# One\n\n## Two\n\n### Three\n\n#### Four\n\n###### Six"));
+    expect(Array.from(dom.querySelectorAll("h1, h2, h3, h4")).map((h) => h.tagName)).toEqual([
+      "H1",
+      "H2",
+      "H3",
+      "H4",
+      "H4",
+    ]);
+  });
+
   it("removes the json verdict fence from the report", () => {
     expect(stripVerdictFence(VERDICT_REPORT)).not.toMatch(/verdict|suppress/);
     const text = toDom(renderRcaReport(VERDICT_REPORT)).textContent ?? "";

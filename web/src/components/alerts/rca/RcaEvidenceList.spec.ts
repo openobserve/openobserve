@@ -24,7 +24,7 @@ import RcaEvidenceList from "./RcaEvidenceList.vue";
 import type { RcaEvidenceEntry, RcaUnverifiedCitation } from "@/services/incidents";
 import { rcaEvidenceEntry, rcaRunSummary } from "@/test/unit/fixtures/rcaThread";
 
-/** Frame B's index: 7 entries, 4 of them Decisive. */
+/** 7 entries, 4 of them Decisive. */
 const SEVEN: RcaEvidenceEntry[] = [1, 2, 3, 4, 5, 6, 7].map((number) =>
   rcaEvidenceEntry({
     number,

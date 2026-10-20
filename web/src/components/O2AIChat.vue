@@ -896,11 +896,12 @@ export default defineComponent({
           const text = payload.text;
           const chipName = payload.chipName;
           const context = payload.context ?? null;
+          const freshChat = payload.newChat === true;
           // Deferred past addNewChat's chatUpdated re-entry, which would clear the pin set any sooner.
           nextTick(() => {
             setTimeout(() => {
               setPinnedContext(context);
-              pendingChips.value.push({
+              const chip: ReferenceChip = {
                 id: `context-${Date.now()}`,
                 filename: raw(chipName),
                 // J5: the chip shows its name ("Analysis · <run>"), not the first words of the record.
@@ -908,7 +909,18 @@ export default defineComponent({
                 fullContent: text,
                 charCount: text.length,
                 type: "context",
-              });
+              };
+              if (freshChat) {
+                // A new chat starts empty: the old draft and an earlier hand-off's chip go.
+                inputMessage.value = "";
+                contextReferences.value = [];
+                if (chatInput.value && typeof chatInput.value.clear === "function") {
+                  chatInput.value.clear();
+                }
+                pendingChips.value = [chip];
+              } else {
+                pendingChips.value.push(chip);
+              }
               caretBeforeChips = true;
               if (componentReady.value) processPendingChips();
             }, 50);

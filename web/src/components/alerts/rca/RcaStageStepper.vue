@@ -37,7 +37,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="flex min-w-0 flex-col gap-1"
         :aria-current="idx + 1 === current ? 'step' : undefined"
       >
-        <span class="rca-stage-bar rounded-full" :class="barClass(idx + 1)" />
+        <span
+          class="h-1 rounded-full"
+          :class="BAR_CLASS[barState(idx + 1)]"
+          :data-state="barState(idx + 1)"
+        />
         <span class="text-2xs truncate" :class="labelClass(idx + 1)">
           {{ rcaStageLabel(stage) }}
         </span>
@@ -77,12 +81,10 @@ const currentLabel = computed(() =>
   current.value > 0 ? rcaStageLabel(stages[current.value - 1]) : "",
 );
 
-const barClass = (position: number) =>
-  position < current.value
-    ? "rca-stage-bar--done"
-    : position === current.value
-      ? "rca-stage-bar--current"
-      : "rca-stage-bar--todo";
+const barState = (position: number) =>
+  position < current.value ? "done" : position === current.value ? "current" : "todo";
+
+const BAR_CLASS = { done: "bg-accent", current: "bg-accent/45", todo: "bg-border-default" };
 
 const labelClass = (position: number) =>
   position < current.value
@@ -91,22 +93,3 @@ const labelClass = (position: number) =>
       ? "text-text-heading font-bold"
       : "text-text-secondary";
 </script>
-
-<style scoped>
-.rca-stage-bar {
-  height: 0.25rem;
-}
-
-.rca-stage-bar--done {
-  background-color: var(--color-accent);
-}
-
-/* The current stage: the accent mixed with the surface (reference: theme 45%). */
-.rca-stage-bar--current {
-  background-color: color-mix(in srgb, var(--color-accent) 45%, var(--color-surface-base));
-}
-
-.rca-stage-bar--todo {
-  background-color: var(--color-border-default);
-}
-</style>
