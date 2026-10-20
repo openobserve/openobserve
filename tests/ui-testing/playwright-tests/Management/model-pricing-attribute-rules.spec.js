@@ -40,7 +40,8 @@ test.describe("Model Pricing — Attribute Rules", () => {
             await pm.modelPricingPage.fillRuleValues(1, 0, 'flex');
             await pm.modelPricingPage.addPriceRow('input', '0.000003', 1);
 
-            await pm.modelPricingPage.clickSave();
+            const saved = await pm.modelPricingPage.clickSave();
+            createdId = saved?.id;
             await pm.modelPricingPage.verifyModelInList(name);
 
             // The pricing drawer renders the saved rule line.

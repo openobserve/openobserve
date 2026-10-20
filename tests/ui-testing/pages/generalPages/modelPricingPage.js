@@ -360,7 +360,12 @@ export class ModelPricingPage {
                 { timeout: 60000 }
             )
             .then(
-                resp => ({ method: resp.request().method(), status: resp.status(), ok: resp.ok() }),
+                async resp => ({
+                    method: resp.request().method(),
+                    status: resp.status(),
+                    ok: resp.ok(),
+                    body: resp.ok() ? await resp.json().catch(() => null) : null,
+                }),
                 () => null
             );
 
@@ -383,6 +388,8 @@ export class ModelPricingPage {
             this.listTitle.waitFor({ state: 'visible', timeout: 15000 }),
             this.toastMessage.first().waitFor({ state: 'visible', timeout: 15000 }),
         ]).catch(() => {});
+
+        return response.body;
     }
 
     async clickCancel() {
