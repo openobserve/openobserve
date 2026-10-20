@@ -2,6 +2,8 @@
 // Page Object Model for PromQL Builder Mode UI interactions
 // Covers: Label Filters, Operations, Options, Query Mode tabs, Add to Dashboard
 
+import { expect } from '@playwright/test';
+
 // Keyed by page so every PageManager built on the same page shares one set of listeners instead of stacking more.
 const promqlTrackers = new WeakMap();
 
@@ -1433,16 +1435,14 @@ export class MetricsBuilderPage {
     // ===== Chart Type Switching =====
 
     /**
-     * Select a chart type by clicking its icon
+     * Select a chart type and assert it became the selected one
      * @param {string} chartType - e.g., 'line', 'bar', 'table', 'area', 'scatter', 'h-bar', 'stacked', 'h-stacked', 'pie', 'donut', 'heatmap', 'gauge'
      */
     async selectChartType(chartType) {
         const chartItem = this.page.locator(`[data-test="selected-chart-${chartType}-item"]`);
-        if (await chartItem.isVisible({ timeout: 3000 }).catch(() => false)) {
-            await chartItem.click();
-            return true;
-        }
-        return false;
+        await chartItem.waitFor({ state: 'visible' });
+        await chartItem.click();
+        await expect(chartItem).toHaveAttribute('data-selected', 'true');
     }
 
     /**
@@ -1461,6 +1461,11 @@ export class MetricsBuilderPage {
         const chartVisible = await this.chartRenderer.isVisible({ timeout: 5000 }).catch(() => false);
         const tableVisible = await this.dashboardPanelTable.isVisible({ timeout: 5000 }).catch(() => false);
         return chartVisible || tableVisible;
+    }
+
+    /** Assert the table chart renders; the table component mounts lazily after the first PromQL load settles. */
+    async expectTableRendered(timeout = 30000) {
+        await expect(this.dashboardPanelTable).toBeVisible({ timeout });
     }
 
     // ===== Add to Dashboard - Full Save Flow =====
