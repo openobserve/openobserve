@@ -14,8 +14,9 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import http from "./http";
+import { FLEET_MOCK, fleetMock } from "./fleet.mock";
 
-export type FleetCollectorStatus = "online" | "degraded" | "offline";
+export type FleetCollectorStatus = "unknown" | "online" | "degraded" | "offline";
 
 export type FleetDeliveryState = "assigned" | "sent" | "accepted" | "running" | "rejected";
 
@@ -26,23 +27,25 @@ export interface CollectorFleet {
 
 export interface FleetCollector {
   id: string;
+  /** The nickname, which defaults to the host name. */
   name: string | null;
   hostname: string | null;
-  ip: string | null;
-  status: FleetCollectorStatus;
   os: string | null;
   arch: string | null;
   distribution: string | null;
   version: string | null;
   outdated: boolean;
-  config: string | null;
-  config_version: number | null;
-  delivery: FleetDeliveryState | null;
-  drifted: boolean | null;
+  status: FleetCollectorStatus;
+  /** The connection's peer address, which the agent does not report itself. */
+  last_connected_from: string | null;
   fleet: CollectorFleet;
   token_id: string | null;
   last_seen: number;
   enrolled_at: number;
+  config: string | null;
+  config_version: number | null;
+  delivery: FleetDeliveryState | null;
+  delivery_error: string | null;
 }
 
 export interface FleetCollectorList {
@@ -64,22 +67,36 @@ export interface FleetCollectorHealth {
   components: FleetComponentHealth[];
 }
 
-export interface FleetEffectiveConfig {
-  yaml: string;
-  reported_at: number;
+export interface FleetAssignment {
+  fleet: string;
+  config: string;
+  version: number;
+  revision: number;
+}
+
+/** What the server last saw from the collector, which each delivery state is traced to. */
+export interface FleetDeliveryEvidence {
+  remote_status: string | null;
+  remote_hash: string | null;
+  remote_at: number | null;
+  marker: { config: string; version: number } | null;
+  last_heartbeat_at: number | null;
+}
+
+export interface FleetCollectorEvent {
+  at: number;
+  event: string;
+  detail: string | null;
 }
 
 export interface FleetCollectorDetail extends FleetCollector {
   capabilities: string[];
   health: FleetCollectorHealth | null;
-  errors: string[];
-  delivery_error: string | null;
-  effective_config: FleetEffectiveConfig | null;
-  assigned_at: number | null;
-  applied_at: number | null;
-  drift_since: number | null;
-  /** The redacted effective config at apply time, which drift is measured against. */
-  baseline_config: string | null;
+  effective_config: string | null;
+  effective_reported_at: number | null;
+  assignment: FleetAssignment | null;
+  evidence: FleetDeliveryEvidence | null;
+  history: FleetCollectorEvent[];
 }
 
 export interface FleetStatusCounts {
@@ -87,7 +104,6 @@ export interface FleetStatusCounts {
   online: number;
   degraded: number;
   offline: number;
-  drifted: number;
   outdated: number;
 }
 
@@ -103,10 +119,29 @@ export interface FleetSummary {
   rollouts_active: number;
 }
 
-/** `PUT` replaces both fields; a null target means the built-in default. */
+export interface FleetGateSettings {
+  observe_secs: number;
+  window_secs: number;
+  pass_percent: number;
+}
+
+/** A null field inherits the organization default. */
 export interface FleetSettings {
+  heartbeat_interval_secs: number | null;
+  offline_heartbeats: number | null;
+  retention_days: number | null;
+  offline_ratio_percent: number | null;
+  phase_timeout_secs: number | null;
+  gate: FleetGateSettings | null;
+}
+
+export type FleetDefaults = { [K in keyof FleetSettings]: NonNullable<FleetSettings[K]> };
+
+/** `PUT` replaces every field; a null target means the latest supported version. */
+export interface FleetOrgSettings {
+  target_collector_version: string | null;
   restricted_components: string[];
-  target_version: string | null;
+  fleet_defaults: FleetDefaults;
 }
 
 /** Mirrors `config::meta::fleet::EnrollmentToken`; it never carries the secret. */
@@ -145,7 +180,10 @@ export interface FleetConfigItem {
   latest_version: number;
   live_version: number | null;
   collectors: number;
+  /** The fleets the caller can read whose desired or stable version is this configuration. */
   fleets: CollectorFleet[];
+  /** Referencing fleets the caller cannot read. */
+  fleets_hidden?: number;
   updated_at: number;
   updated_by: string;
 }
@@ -190,6 +228,13 @@ export interface FleetPublished {
   warnings: FleetConfigIssues;
 }
 
+/** The 409 body of a reference-protected delete. */
+export interface FleetConfigReferences {
+  fleets: number;
+  collectors: number;
+  rollouts: number;
+}
+
 export interface FleetAuditEvent {
   id: string;
   at: number;
@@ -206,95 +251,108 @@ export interface FleetAuditList {
   audit_disabled?: boolean;
 }
 
-export type FleetRolloutStrategy = "immediate" | "canary" | "progressive" | "scheduled";
-
 export type FleetRolloutStatus =
-  "scheduled" | "in_progress" | "completed" | "halted" | "superseded";
+  | "scheduled"
+  | "in_progress"
+  | "halted"
+  | "completed"
+  | "superseded"
+  | "reverted";
 
-/** Mirrors `config::meta::fleet::SetDesiredRequest`; the server refuses any other field. */
+export type FleetRolloutStart = { kind: "now" } | { kind: "at"; at: number };
+
+export type FleetRolloutBatching =
+  | { kind: "one" }
+  | { kind: "canary"; first: number }
+  | { kind: "progressive"; initial: number; multiplier: number; max: number };
+
+/** Mirrors `config::meta::fleet::SetDesiredRequest`. */
 export interface FleetSetDesiredRequest {
   config: string;
   version: number;
-  strategy: FleetRolloutStrategy;
-  batch?: FleetRolloutBatch;
-  /** Epoch milliseconds; only with `scheduled`. */
-  scheduled_for?: number | null;
-  gates?: boolean;
-  auto_rollback?: boolean;
+  start: FleetRolloutStart;
+  batching: FleetRolloutBatching;
+  /** The health gate runs after every phase, the last one included. */
+  verify: boolean;
+  auto_revert: boolean;
 }
 
-/** `initial` alone for canary; all three for progressive. */
-export interface FleetRolloutBatch {
-  initial: number;
-  multiplier?: number;
-  max?: number;
+export interface FleetPlanPreview {
+  phases: number[];
+  /** The first batch covers the whole fleet, so the plan is one batch. */
+  collapsed: boolean;
+  eligible: number;
 }
+
+export type FleetHaltClass = "proven_bad" | "looks_worse" | "cannot_see";
+
+export type FleetHaltExit = "revert" | "resume" | "fix_forward" | "skip";
+
+export interface FleetRolloutHalt {
+  class: FleetHaltClass;
+  reason: string;
+  at: number;
+  /** The exits the server accepts for this halt. */
+  exits: FleetHaltExit[];
+}
+
+export type FleetPhaseStatus =
+  | "pending"
+  | "deploying"
+  | "converging"
+  | "observing"
+  | "verifying"
+  | "done"
+  | "failed"
+  | "stopped"
+  | "timed_out";
 
 export interface FleetRolloutPhase {
-  id: string;
-  label: string;
+  index: number;
   size: number;
-  /** Members this rollout actually assigned. */
-  assigned: number;
-  attempted: number;
-  accepted: number;
-  failed: number;
-  status: string;
+  status: FleetPhaseStatus;
+  targeted: number;
+  sent: number;
+  confirmed: number;
+  rejected: number;
+  gate: { passed: boolean; observed: string } | null;
 }
 
-export interface FleetRolloutGate {
-  id: string;
-  threshold: string;
-  observed: string;
-  status: string;
-}
-
-export type FleetHaltKind = "rejection" | "gate_failed" | "no_data";
-
-export interface FleetRolloutFailure {
-  kind: FleetHaltKind;
-  gate: string;
-  observed: string;
-  threshold: string;
-  message?: string | null;
+export interface FleetRolloutMember {
+  collector_id: string;
+  phase: number;
+  state: string;
+  excluded: boolean;
 }
 
 export interface FleetRolloutEvent {
-  key: string;
   at: number;
-  /** The phase index; set on `deploying` only. */
-  phase?: number | null;
+  key: string;
+  phase: number | null;
+  detail: string | null;
 }
 
 export interface FleetRollout {
   id: string;
-  kind: string;
+  fleet: CollectorFleet;
   config: string;
   /** Null when the members came from mixed versions or had none. */
   from_version: number | null;
   to_version: number;
-  fleet: CollectorFleet;
-  strategy: FleetRolloutStrategy;
+  start: FleetRolloutStart;
+  batching: FleetRolloutBatching;
+  verify: boolean;
+  auto_revert: boolean;
   status: FleetRolloutStatus;
+  halt: FleetRolloutHalt | null;
   total: number;
-  attempted: number;
-  accepted: number;
-  failed: number;
-  /** Members this rollout actually assigned. */
-  assigned: number;
-  started_at: number;
-  scheduled_for: number | null;
-  started_by: string;
-  auto_rollback: boolean;
+  running: number;
   phases: FleetRolloutPhase[];
-  gates: FleetRolloutGate[];
-  failure: FleetRolloutFailure | null;
+  members: FleetRolloutMember[];
   events: FleetRolloutEvent[];
-}
-
-export interface FleetRolloutDetail extends FleetRollout {
-  members: string[];
-  still_on_previous: number;
+  started_by: string;
+  started_at: number;
+  ended_at: number | null;
 }
 
 export type FleetFlowWindow = "5m" | "1h" | "24h";
@@ -333,11 +391,6 @@ export interface FleetFlow {
   metrics_restricted: boolean;
 }
 
-export interface FleetRevision {
-  id: string;
-  status: FleetRolloutStatus;
-}
-
 export interface FleetVersion {
   config: string;
   version: number;
@@ -345,9 +398,9 @@ export interface FleetVersion {
 
 export interface FleetState {
   desired: FleetVersion | null;
-  /** The last desired version the fleet converged to. */
+  /** The last version a rollout finished on, which newcomers receive. */
   stable: FleetVersion | null;
-  revision: FleetRevision | null;
+  rollout: { id: string; status: FleetRolloutStatus } | null;
   collectors: number;
   online: number;
   at_desired: number;
@@ -356,7 +409,9 @@ export interface FleetState {
 export interface Fleet {
   id: string;
   name: string;
+  /** Null when the caller may list the fleet but not read it. */
   state: FleetState | null;
+  settings: FleetSettings;
 }
 
 const collectorPath = (orgId: string, id: string) =>
@@ -368,12 +423,21 @@ const configPath = (orgId: string, id: string) =>
 const rolloutPath = (orgId: string, id: string) =>
   `/api/${orgId}/fleet/rollouts/${encodeURIComponent(id)}`;
 
-const fleet = {
+const fleetPath = (orgId: string, id: string) =>
+  `/api/${orgId}/fleet/fleets/${encodeURIComponent(id)}`;
+
+const api = {
   listCollectors: (orgId: string) =>
     http().get<FleetCollectorList>(`/api/${orgId}/fleet/collectors`),
   getCollector: (orgId: string, id: string) =>
     http().get<FleetCollectorDetail>(collectorPath(orgId, id)),
-  unenrollCollector: (orgId: string, id: string) => http().delete(collectorPath(orgId, id)),
+  renameCollector: (orgId: string, id: string, name: string) =>
+    http().patch<FleetCollector>(collectorPath(orgId, id), { name }),
+  deleteCollector: (orgId: string, id: string) => http().delete(collectorPath(orgId, id)),
+  restartCollector: (orgId: string, id: string) =>
+    http().post<{ queued: boolean }>(`${collectorPath(orgId, id)}/restart`),
+  redeliverCollector: (orgId: string, id: string) =>
+    http().post<{ revision: number }>(`${collectorPath(orgId, id)}/redeliver`),
   summary: (orgId: string) => http().get<FleetSummary>(`/api/${orgId}/fleet/summary`),
   listTokens: (orgId: string) => http().get<FleetTokenList>(`/api/${orgId}/fleet/tokens`),
   createToken: (orgId: string, body: FleetCreateTokenRequest) =>
@@ -398,19 +462,48 @@ const fleet = {
   deleteConfig: (orgId: string, id: string) => http().delete(configPath(orgId, id)),
   listAudit: (orgId: string) => http().get<FleetAuditList>(`/api/${orgId}/fleet/audit`),
   listRollouts: (orgId: string) =>
-    http().get<{ items: FleetRollout[] }>(`/api/${orgId}/fleet/rollouts`),
-  getRollout: (orgId: string, id: string) => http().get<FleetRolloutDetail>(rolloutPath(orgId, id)),
-  listFleets: (orgId: string) => http().get<{ items: Fleet[] }>(`/api/${orgId}/fleet/fleets`),
+    http().get<{ items: FleetRollout[]; total?: number }>(`/api/${orgId}/fleet/rollouts`),
+  getRollout: (orgId: string, id: string) => http().get<FleetRollout>(rolloutPath(orgId, id)),
+  resumeRollout: (orgId: string, id: string) =>
+    http().post<FleetRollout>(`${rolloutPath(orgId, id)}/resume`),
+  skipRollout: (orgId: string, id: string, collectorIds: string[]) =>
+    http().post<FleetRollout>(`${rolloutPath(orgId, id)}/skip`, { collector_ids: collectorIds }),
+  revertRollout: (orgId: string, id: string) =>
+    http().post<FleetRollout>(`${rolloutPath(orgId, id)}/revert`),
+  listFleets: (orgId: string) =>
+    http().get<{ items: Fleet[]; total?: number }>(`/api/${orgId}/fleet/fleets`),
+  createFleet: (orgId: string, name: string) =>
+    http().post<Fleet>(`/api/${orgId}/fleet/fleets`, { name }),
+  renameFleet: (orgId: string, id: string, name: string) =>
+    http().patch<Fleet>(fleetPath(orgId, id), { name }),
+  deleteFleet: (orgId: string, id: string) => http().delete(fleetPath(orgId, id)),
+  moveCollectors: (orgId: string, collectorIds: string[], toFleet: string) =>
+    http().post<{ moved: number }>(`/api/${orgId}/fleet/fleets/move`, {
+      collector_ids: collectorIds,
+      to_fleet: toFleet,
+    }),
+  getFleetSettings: (orgId: string, id: string) =>
+    http().get<FleetSettings>(`${fleetPath(orgId, id)}/settings`),
+  updateFleetSettings: (orgId: string, id: string, body: FleetSettings) =>
+    http().put<FleetSettings>(`${fleetPath(orgId, id)}/settings`, body),
   setDesired: (orgId: string, fleetId: string, body: FleetSetDesiredRequest) =>
-    http().put<FleetRollout>(
-      `/api/${orgId}/fleet/fleets/${encodeURIComponent(fleetId)}/desired`,
-      body,
-    ),
-  getFlow: (orgId: string, window: FleetFlowWindow) =>
-    http().get<FleetFlow>(`/api/${orgId}/fleet/flow`, { params: { window } }),
-  getSettings: (orgId: string) => http().get<FleetSettings>(`/api/${orgId}/fleet/settings`),
-  updateSettings: (orgId: string, body: FleetSettings) =>
-    http().put<FleetSettings>(`/api/${orgId}/fleet/settings`, body),
+    http().put<FleetRollout>(`${fleetPath(orgId, fleetId)}/desired`, body),
+  previewDesired: (orgId: string, fleetId: string, body: FleetSetDesiredRequest) =>
+    http().post<FleetPlanPreview>(`${fleetPath(orgId, fleetId)}/desired/preview`, body),
+  getPipelines: (orgId: string, window: FleetFlowWindow) =>
+    http().get<FleetFlow>(`/api/${orgId}/fleet/pipelines`, { params: { window } }),
+  getSettings: (orgId: string) => http().get<FleetOrgSettings>(`/api/${orgId}/fleet/settings`),
+  updateSettings: (orgId: string, body: FleetOrgSettings) =>
+    http().put<FleetOrgSettings>(`/api/${orgId}/fleet/settings`, body),
 };
+
+/** Every call resolves to `{ data }`, which is all the query layer reads. */
+export type FleetApi = {
+  [K in keyof typeof api]: (
+    ...args: Parameters<(typeof api)[K]>
+  ) => Promise<{ data: Awaited<ReturnType<(typeof api)[K]>>["data"] }>;
+};
+
+const fleet: FleetApi = FLEET_MOCK ? fleetMock : api;
 
 export default fleet;

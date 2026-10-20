@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { computed } from "vue";
-import { useQuery } from "@tanstack/vue-query";
+import { keepPreviousData, useQuery } from "@tanstack/vue-query";
 import { useOrgId } from "@/composables/query/useOrgId";
 import {
   collectorsInFlight,
@@ -25,9 +25,11 @@ import {
   fleetConfigsQuery,
   fleetConfigVersionQuery,
   fleetFlowQuery,
+  fleetPlanPreviewQuery,
   fleetsQuery,
   fleetRolloutQuery,
   fleetRolloutsQuery,
+  fleetSettingsOfQuery,
   fleetSettingsQuery,
   fleetSummaryQuery,
   fleetTokensQuery,
@@ -35,37 +37,41 @@ import {
 import type {
   FleetCollector,
   FleetCollectorDetail,
+  FleetCollectorEvent,
   FleetCollectorStatus,
   FleetConfigItem,
+  FleetDeliveryEvidence,
   FleetDeliveryState,
   FleetFlowWindow,
   Fleet,
-  FleetHaltKind,
+  FleetHaltExit,
   FleetRollout,
-  FleetRolloutDetail,
+  FleetRolloutBatching,
+  FleetRolloutHalt,
+  FleetRolloutPhase,
+  FleetRolloutStart,
   FleetRolloutStatus,
-  FleetRolloutStrategy,
+  FleetSetDesiredRequest,
+  FleetSettings,
   FleetToken,
 } from "@/services/fleet";
-import type { I18nKey } from "@/types/i18n";
 import { OS_LABEL, type FleetOs } from "./fleetFormat";
 
 export interface CollectorRow {
   id: string;
   name: string;
   hostname: string | null;
-  ip: string | null;
   status: FleetCollectorStatus;
   os: string | null;
   arch: string | null;
   distribution: string | null;
   version: string | null;
   outdated: boolean;
+  lastConnectedFrom: string | null;
   config: string | null;
   configVersion: number | null;
   delivery: FleetDeliveryState | null;
-  /** Null when drift is unknown, which is never shown as in sync. */
-  drifted: boolean | null;
+  deliveryError: string | null;
   fleetId: string;
   fleetName: string;
   tokenId: string | null;
@@ -83,13 +89,12 @@ export interface CollectorDetailView extends CollectorRow {
   capabilities: string[];
   /** False when the collector has never sent a health report. */
   healthReported: boolean;
+  healthError: string;
   components: ComponentHealthRow[];
-  errors: string[];
-  effectiveConfig: { yaml: string; reportedAt: number } | null;
-  assignedAt: number | null;
-  appliedAt: number | null;
-  driftSince: number | null;
-  baselineConfig: string | null;
+  effectiveConfig: { yaml: string; reportedAt: number | null } | null;
+  assignment: { fleet: string; config: string; version: number; revision: number } | null;
+  evidence: FleetDeliveryEvidence | null;
+  history: FleetCollectorEvent[];
 }
 
 export interface TokenRow {
@@ -118,66 +123,36 @@ export interface ConfigRow {
   version: number;
   liveVersion: number | null;
   collectors: number;
-  /** The fleets whose desired version is this configuration; a null name is a deleted fleet. */
+  /** The readable fleets whose desired or stable version is this configuration; a null name is a deleted fleet. */
   fleets: { id: string; name: string | null }[];
+  /** Referencing fleets the caller cannot read. */
+  fleetsHidden: number;
   updatedAt: number;
   updatedBy: string;
 }
 
-export interface RolloutPhaseRow {
-  id: string;
-  labelKey: I18nKey;
-  size: number;
-  attempted: number;
-  accepted: number;
-  failed: number;
-  status: string;
-}
-
-export interface RolloutGateRow {
-  id: string;
-  labelKey: I18nKey;
-  threshold: string;
-  observed: string;
-  status: string;
-}
-
-export interface RolloutFailureRow {
-  kind: FleetHaltKind;
-  labelKey: I18nKey;
-  observed: string;
-  threshold: string;
-  message: string | null;
-}
-
 export interface RolloutRow {
   id: string;
-  kind: string;
   config: string;
   fromVersion: number | null;
   toVersion: number;
   fleetId: string;
   /** Null once the fleet was deleted. */
   fleetName: string | null;
-  strategy: FleetRolloutStrategy;
+  start: FleetRolloutStart;
+  batching: FleetRolloutBatching;
+  verify: boolean;
+  autoRevert: boolean;
   status: FleetRolloutStatus;
+  halt: FleetRolloutHalt | null;
   total: number;
-  attempted: number;
-  accepted: number;
-  failed: number;
-  /** Members this rollout actually assigned; the rest kept their configuration. */
-  assigned: number;
-  startedAt: number;
+  running: number;
+  phases: FleetRolloutPhase[];
+  members: { collectorId: string; phase: number; state: string; excluded: boolean }[];
+  events: { at: number; key: string; phase: number | null; detail: string | null }[];
   startedBy: string;
-  autoRollback: boolean;
-  scheduledFor: number | null;
-  gates: RolloutGateRow[];
-  phases: RolloutPhaseRow[];
-  failure: RolloutFailureRow | null;
-  events: { key: string; at: number; phase?: number | null }[];
-  /** Detail only; empty on a list row. */
-  members: string[];
-  stillOnPrevious: number;
+  startedAt: number;
+  endedAt: number | null;
 }
 
 export interface FleetRow {
@@ -187,23 +162,23 @@ export interface FleetRow {
   readable: boolean;
   desired: { config: string; version: number } | null;
   stable: { config: string; version: number } | null;
-  revision: { id: string; status: FleetRolloutStatus } | null;
+  rollout: { id: string; status: FleetRolloutStatus } | null;
   collectors: number;
   online: number;
   atDesired: number;
+  settings: FleetSettings;
 }
 
-const PHASE_LABEL: Record<string, I18nKey> = {
-  canary: "fleet.rollouts.phaseCanary",
-  batch: "fleet.rollouts.phaseBatch",
-  remaining: "fleet.rollouts.phaseRemaining",
-  all: "fleet.rollouts.phaseAll",
+export const NO_OVERRIDES: FleetSettings = {
+  heartbeat_interval_secs: null,
+  offline_heartbeats: null,
+  retention_days: null,
+  offline_ratio_percent: null,
+  phase_timeout_secs: null,
+  gate: null,
 };
 
-const FAILURE_LABEL: Record<string, I18nKey> = {
-  rejected: "fleet.rollouts.gateRejected",
-  heartbeat: "fleet.rollouts.gateHeartbeat",
-};
+export const HALT_EXITS: FleetHaltExit[] = ["revert", "resume", "fix_forward", "skip"];
 
 const ACTIVE_ROLLOUT: FleetRolloutStatus[] = ["halted", "in_progress", "scheduled"];
 
@@ -217,17 +192,17 @@ export function toCollectorRow(c: FleetCollector): CollectorRow {
     id: c.id,
     name: c.name || c.hostname || c.id,
     hostname: c.hostname ?? null,
-    ip: c.ip ?? null,
-    status: c.status,
+    status: c.status ?? "unknown",
     os: c.os ?? null,
     arch: c.arch ?? null,
     distribution: c.distribution ?? null,
     version: c.version ?? null,
     outdated: !!c.outdated,
+    lastConnectedFrom: c.last_connected_from ?? null,
     config: c.config ?? null,
     configVersion: c.config_version ?? null,
     delivery: c.delivery ?? null,
-    drifted: c.drifted ?? null,
+    deliveryError: c.delivery_error ?? null,
     fleetId: c.fleet?.id ?? "default",
     fleetName: c.fleet?.name ?? c.fleet?.id ?? "default",
     tokenId: c.token_id ?? null,
@@ -242,75 +217,54 @@ export function toCollectorDetail(d: FleetCollectorDetail): CollectorDetailView 
     ...row,
     capabilities: d.capabilities ?? [],
     healthReported: !!d.health,
+    healthError: d.health?.last_error ?? "",
     components: (d.health?.components ?? []).map((c) => ({
       id: c.id,
       // An offline collector's last health report is stale, so it says nothing about now.
       status: row.status === "offline" ? "unknown" : c.healthy ? "healthy" : "degraded",
       lastError: c.last_error ?? "",
     })),
-    errors: d.errors ?? [],
     effectiveConfig: d.effective_config
-      ? { yaml: d.effective_config.yaml, reportedAt: d.effective_config.reported_at }
+      ? { yaml: d.effective_config, reportedAt: d.effective_reported_at ?? null }
       : null,
-    assignedAt: d.assigned_at ?? null,
-    appliedAt: d.applied_at ?? null,
-    driftSince: d.drift_since ?? null,
-    baselineConfig: d.baseline_config ?? null,
+    assignment: d.assignment ?? null,
+    evidence: d.evidence ?? null,
+    history: [...(d.history ?? [])].sort((a, b) => b.at - a.at),
   };
 }
 
-export function toRolloutRow(r: FleetRollout | FleetRolloutDetail): RolloutRow {
+export function toRolloutRow(r: FleetRollout): RolloutRow {
   return {
     id: r.id,
-    kind: r.kind,
     config: r.config,
     fromVersion: r.from_version ?? null,
     toVersion: r.to_version,
     fleetId: r.fleet?.id ?? "",
     fleetName: r.fleet?.name ?? null,
-    strategy: r.strategy,
+    start: r.start ?? { kind: "now" },
+    batching: r.batching ?? { kind: "one" },
+    verify: !!r.verify,
+    autoRevert: !!r.auto_revert,
     status: r.status,
-    total: r.total,
-    attempted: r.attempted,
-    accepted: r.accepted,
-    failed: r.failed,
-    assigned: r.assigned ?? 0,
-    startedAt: r.started_at,
+    halt: r.halt ?? null,
+    total: r.total ?? 0,
+    running: r.running ?? 0,
+    phases: r.phases ?? [],
+    members: (r.members ?? []).map((m) => ({
+      collectorId: m.collector_id,
+      phase: m.phase,
+      state: m.state,
+      excluded: !!m.excluded,
+    })),
+    events: (r.events ?? []).map((e) => ({
+      at: e.at,
+      key: e.key,
+      phase: e.phase ?? null,
+      detail: e.detail ?? null,
+    })),
     startedBy: r.started_by,
-    autoRollback: !!r.auto_rollback,
-    scheduledFor: r.scheduled_for ?? null,
-    gates: (r.gates ?? []).map((g) => ({
-      id: g.id,
-      // Heartbeat is the only gate the server runs.
-      labelKey: "fleet.rollouts.gateHeartbeat",
-      threshold: g.threshold,
-      observed: g.observed,
-      status: g.status,
-    })),
-    phases: (r.phases ?? []).map((p) => ({
-      id: p.id,
-      labelKey: PHASE_LABEL[p.label] ?? "fleet.rollouts.phaseAll",
-      size: p.size,
-      attempted: p.attempted,
-      accepted: p.accepted,
-      failed: p.failed,
-      status: p.status,
-    })),
-    failure: r.failure
-      ? {
-          kind: r.failure.kind,
-          labelKey:
-            r.failure.kind === "no_data"
-              ? "fleet.rollouts.failureNoData"
-              : (FAILURE_LABEL[r.failure.gate] ?? "fleet.rollouts.failureOther"),
-          observed: r.failure.observed,
-          threshold: r.failure.threshold,
-          message: r.failure.message ?? null,
-        }
-      : null,
-    events: r.events ?? [],
-    members: "members" in r ? (r.members ?? []) : [],
-    stillOnPrevious: "still_on_previous" in r ? (r.still_on_previous ?? 0) : 0,
+    startedAt: r.started_at,
+    endedAt: r.ended_at ?? null,
   };
 }
 
@@ -339,6 +293,7 @@ export function toConfigRow(c: FleetConfigItem): ConfigRow {
     liveVersion: c.live_version ?? null,
     collectors: c.collectors ?? 0,
     fleets: c.fleets ?? [],
+    fleetsHidden: c.fleets_hidden ?? 0,
     updatedAt: c.updated_at,
     updatedBy: c.updated_by ?? "",
   };
@@ -352,10 +307,11 @@ export function toFleetRow(f: Fleet): FleetRow {
     readable: s !== null,
     desired: s?.desired ?? null,
     stable: s?.stable ?? null,
-    revision: s?.revision ?? null,
+    rollout: s?.rollout ?? null,
     collectors: s?.collectors ?? 0,
     online: s?.online ?? 0,
     atDesired: s?.at_desired ?? 0,
+    settings: { ...NO_OVERRIDES, ...(f.settings ?? {}) },
   };
 }
 
@@ -406,6 +362,22 @@ export function isNotFound(err: unknown): boolean {
 
 export function rolloutTagValue(r: { status: string; total: number }): string {
   return r.status === "completed" && r.total === 0 ? "empty" : r.status;
+}
+
+/** Members this rollout moved to the new version, excluded ones left out. */
+export function rolloutConfirmed(r: Pick<RolloutRow, "phases">): number {
+  return r.phases.reduce((sum, p) => sum + p.confirmed, 0);
+}
+
+export function rolloutRejected(r: Pick<RolloutRow, "phases">): number {
+  return r.phases.reduce((sum, p) => sum + p.rejected, 0);
+}
+
+/** The collectors the halt can be skipped past: members that rejected or failed, not yet excluded. */
+export function failingMembers(r: Pick<RolloutRow, "members">): string[] {
+  return r.members
+    .filter((m) => !m.excluded && (m.state === "rejected" || m.state === "failed"))
+    .map((m) => m.collectorId);
 }
 
 export function isActiveRollout(r: RolloutRow): boolean {
@@ -654,5 +626,49 @@ export function useFleets(active: () => boolean = () => true) {
     loading: query.isPending,
     error: query.error,
     refetch: () => query.refetch(),
+  };
+}
+
+export function useFleetSettingsOf(id: () => string | null, active: () => boolean = () => true) {
+  const orgId = useOrgId();
+  const query = useQuery(() =>
+    Object.assign(fleetSettingsOfQuery(orgId.value, id() ?? ""), {
+      enabled: !!orgId.value && !!id() && active(),
+    }),
+  );
+  return {
+    settings: computed(() => (isForbidden(query.error.value) ? null : (query.data.value ?? null))),
+    forbidden: computed(() => isForbidden(query.error.value)),
+    loading: query.isPending,
+    error: query.error,
+    refetch: () => query.refetch(),
+  };
+}
+
+/** The server's plan for a desired change; null body means nothing valid to preview yet. */
+export function usePlanPreview(
+  fleetId: () => string | null,
+  body: () => FleetSetDesiredRequest | null,
+  active: () => boolean,
+) {
+  const orgId = useOrgId();
+  const placeholder: FleetSetDesiredRequest = {
+    config: "",
+    version: 0,
+    start: { kind: "now" },
+    batching: { kind: "one" },
+    verify: false,
+    auto_revert: false,
+  };
+  const query = useQuery(() =>
+    Object.assign(fleetPlanPreviewQuery(orgId.value, fleetId() ?? "", body() ?? placeholder), {
+      enabled: !!orgId.value && !!fleetId() && !!body() && active(),
+      placeholderData: keepPreviousData,
+    }),
+  );
+  return {
+    preview: computed(() => (body() ? (query.data.value ?? null) : null)),
+    fetching: query.isFetching,
+    error: query.error,
   };
 }
