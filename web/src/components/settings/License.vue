@@ -493,6 +493,8 @@ import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import { copyToClipboard } from "@/utils/clipboard";
+import { useLicenseRefresh } from "@/composables/useLicenseRefresh";
+import { LICENSE_REFRESH_SETTLE_MS } from "@/utils/licenseWaivers";
 import { makeLicenseSchema, type LicenseForm } from "./License.schema";
 
 const RenderDashboardCharts = defineAsyncComponent(
@@ -525,6 +527,7 @@ export default defineComponent({
     const showLicenseKeyModal = ref(false);
     const isLicenseKeyAutoFilled = ref(false);
     const store = useStore();
+    const { refreshLicenseLimits, reloadLicenseState } = useLicenseRefresh();
     const usageDashboardData = ref<any>(null);
     const dashboardRenderKey = ref(0);
 
@@ -588,6 +591,7 @@ export default defineComponent({
         window.history.replaceState({}, document.title, url.toString());
 
         await loadLicenseData();
+        setTimeout(reloadLicenseState, LICENSE_REFRESH_SETTLE_MS);
       } catch (error) {
         const e = error as { response?: { data?: { message?: string } } };
         console.error("Error updating license:", error);
@@ -619,24 +623,7 @@ export default defineComponent({
     };
 
     const triggerLimitRefresh = async () => {
-      try {
-        await licenseServer.refresh_license_limits();
-        toast({
-          variant: "success",
-          message: t("about.license_refresh_success"),
-        });
-      } catch (error) {
-        const e = error as { response?: { data?: { message?: string } } };
-        console.error("Error refreshing license:", error);
-        toast({
-          variant: "error",
-          message: raw(
-            t("about.failed_to_refresh_license") +
-              " : " +
-              (e?.response?.data?.message || t("settings.licensePage.unexpectedError")),
-          ),
-        });
-      }
+      if (await refreshLicenseLimits()) await loadLicenseData();
     };
 
     const maskKey = (key: string) => {

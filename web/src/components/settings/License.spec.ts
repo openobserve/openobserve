@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import License from "./License.vue";
 import { makeLicenseSchema } from "./License.schema";
@@ -6,6 +6,8 @@ import licenseServer from "@/services/license_server";
 import { createStore } from "vuex";
 import i18n from "@/locales";
 import type { AxiosResponse } from "axios";
+import zo_config from "@/services/config";
+import { LICENSE_REFRESH_SETTLE_MS } from "@/utils/licenseWaivers";
 
 // Helper to create mock Axios responses
 const createAxiosResponse = <T = any>(data: T): AxiosResponse<T> => ({
@@ -78,7 +80,15 @@ vi.mock("@/services/license_server", async (importOriginal) => {
     default: {
       get_license: vi.fn(),
       update_license: vi.fn(),
+      refresh_license_limits: vi.fn(),
     },
+  });
+});
+
+vi.mock("@/services/config", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: { get_config_full: vi.fn() },
   });
 });
 
@@ -430,6 +440,59 @@ describe("License.vue", () => {
 
     it("should show disclaimer for unlimited plans", () => {
       expect(wrapper.text()).toContain("Usage shows 0% for unlimited plans");
+    });
+  });
+
+  describe("License state reload after apply", () => {
+    const setConfig = vi.fn();
+
+    beforeEach(async () => {
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+      setConfig.mockClear();
+      vi.mocked(licenseServer.get_license).mockResolvedValue(createAxiosResponse(mockLicenseData));
+      vi.mocked(zo_config.get_config_full).mockResolvedValue(
+        createAxiosResponse({ license_search_allowed: true }),
+      );
+      store = createStore({
+        state: {
+          zoConfig: { license_server_url: "https://license.example.com", license_expiry: null },
+          selectedOrganization: { identifier: "acme" },
+        },
+        actions: { setConfig },
+      });
+      wrapper = mount(License, {
+        global: { plugins: [store, i18n], stubs: { LicensePeriod: true, ODialog: ODialogStub } },
+      });
+      await flushPromises();
+    });
+
+    afterEach(() => vi.useRealTimers());
+
+    it("applying a key reloads license state after the settle delay", async () => {
+      vi.mocked(licenseServer.update_license).mockResolvedValue(
+        createAxiosResponse({ success: true }),
+      );
+      wrapper.vm.licenseKey = "new-license-key";
+      await wrapper.vm.updateLicense();
+      await flushPromises();
+      await vi.advanceTimersByTimeAsync(LICENSE_REFRESH_SETTLE_MS - 1);
+      expect(setConfig).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(1);
+      await flushPromises();
+      expect(setConfig).toHaveBeenCalledTimes(1);
+    });
+
+    it("a 409 from the env key shows the server message", async () => {
+      vi.mocked(licenseServer.update_license).mockRejectedValue({
+        response: { status: 409, data: { message: "Remove O2_LICENSE_KEY first" } },
+      });
+      wrapper.vm.licenseKey = "new-license-key";
+      await wrapper.vm.updateLicense();
+      await flushPromises();
+      expect(mockToast.mock.calls.at(-1)?.[0].message).toContain("O2_LICENSE_KEY");
+      await vi.advanceTimersByTimeAsync(LICENSE_REFRESH_SETTLE_MS * 2);
+      await flushPromises();
+      expect(setConfig).not.toHaveBeenCalled();
     });
   });
 
