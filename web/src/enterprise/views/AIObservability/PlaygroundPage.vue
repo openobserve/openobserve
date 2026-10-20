@@ -1008,8 +1008,7 @@ async function resetVariant(variantId: string) {
 }
 
 function applySample(sample: PlaygroundSample, item: LlmDatasetItem, notify = true) {
-  // An object input also binds each top-level field by name, as the experiment
-  // runner does; the previous row's fields go first so none outlive their row.
+  // Object inputs also bind each top-level field, as the experiment runner does.
   const fields = inputFieldVariables(item.rawInput);
   draft.vars = withSampledVars(
     draft.vars,
@@ -1068,7 +1067,9 @@ async function stepSample(delta: number) {
   }
 }
 
+/** The row's field variables go with it: no later sample would know to drop them. */
 function clearSample() {
+  for (const name of draft.sample?.fields ?? []) delete draft.vars[name];
   draft.sample = null;
 }
 

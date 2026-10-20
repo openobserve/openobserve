@@ -645,6 +645,24 @@ describe("ExperimentForm", () => {
     );
   });
 
+  it("derives chips from the rows of the selected sources only", async () => {
+    vi.mocked(llmDatasetsService.listItems).mockResolvedValue({
+      ...emptyItemPage,
+      items: [
+        { rawInput: { question: "a", context: "b" }, source: "trace" },
+        { rawInput: { question: "c" }, source: "manual" },
+      ] as unknown as LlmDatasetItem[],
+    });
+    wrapper = await createWrapper();
+    setField(wrapper, "datasetId", "ds-1");
+    await flushPromises();
+    expect(wrapper.find('[data-test="ai-experiment-form-variable-context"]').exists()).toBe(false);
+
+    setField(wrapper, "sources", ["trace"]);
+    await flushPromises();
+    expect(wrapper.find('[data-test="ai-experiment-form-variable-context"]').exists()).toBe(true);
+  });
+
   it("warns when the user prompt references expected_output", async () => {
     wrapper = await createWrapper();
     setField(wrapper, "userPrompt", "Compare to {{ expected_output }}");

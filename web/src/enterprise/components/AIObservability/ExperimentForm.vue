@@ -281,11 +281,7 @@
                     required
                     data-test="ai-experiment-form-user-prompt"
                   />
-                  <!-- The chips are the variables a row's input exposes:
-                       `input`, plus every top-level field the dataset's rows
-                       share. Clicking one appends it, so the reference is also
-                       the input method. `expected_output` feeds scorers only,
-                       so it is shown but cannot be inserted. -->
+                  <!-- Chips: `input` plus the fields every row shares; `expected_output` feeds scorers only. -->
                   <div class="flex flex-wrap items-center gap-1.5">
                     <span class="text-text-secondary text-xs">
                       {{ t("aiObservability.experiments.form.variablesLabel") }}
@@ -317,7 +313,11 @@
                     class="text-status-warning-text text-2xs"
                     data-test="ai-experiment-form-expected-leak-warning"
                   >
-                    {{ t("aiObservability.playground.expectedLeakWarning", { token: expectedOutputToken }) }}
+                    {{
+                      t("aiObservability.playground.expectedLeakWarning", {
+                        token: expectedOutputToken,
+                      })
+                    }}
                   </p>
                 </div>
               </template>
@@ -624,6 +624,7 @@ import llmDatasetsService, {
   commonInputFields,
   DATASET_ITEMS_MAX_PAGE_SIZE,
   type LlmDataset,
+  type LlmDatasetItem,
 } from "@/services/llm-datasets.service";
 import { type RemoteTask } from "@/services/remote-tasks.service";
 import { chatProviders } from "@/services/llm-playground.service";
@@ -960,7 +961,16 @@ const scorerOptions = computed(() =>
 
 const scorerApplicability = computed(() => preview.value?.applicability?.scorerApplicability ?? []);
 
-const datasetInputFields = ref<string[]>([]);
+/** First page of the selected dataset; source toggles filter it without refetching. */
+const datasetRows = ref<LlmDatasetItem[]>([]);
+/** Fields every selected-source row shares — suggestions; preview validation stays the authority. */
+const datasetInputFields = computed(() =>
+  commonInputFields(
+    sources.value.length
+      ? datasetRows.value.filter((item) => sources.value.includes(item.source))
+      : datasetRows.value,
+  ),
+);
 const promptVariables = computed(() =>
   ["input", ...datasetInputFields.value].map((name) => ({ name, token: raw(`{{ ${name} }}`) })),
 );
@@ -969,31 +979,23 @@ const usesExpectedOutput = computed(() =>
   /\{\{\s*expected_output\s*\}\}/.test(String(userPrompt.value ?? "")),
 );
 
-/** Bumped per load, so a slow response for a dataset since deselected never
- *  lands over the newer one. */
-let datasetFieldsRequest = 0;
+/** Bumped per load, so a slow response for a since-deselected dataset is dropped. */
+let datasetRowsRequest = 0;
 
-/** The fields every (source-filtered) row of the dataset's first page shares.
- *  A suggestion only: preview validation stays the authority, and a failure
- *  just leaves the `{{ input }}` chip. */
-async function loadDatasetInputFields() {
+async function loadDatasetRows() {
   const id = datasetId.value;
-  const request = ++datasetFieldsRequest;
+  const request = ++datasetRowsRequest;
   if (!id || !orgId.value) {
-    datasetInputFields.value = [];
+    datasetRows.value = [];
     return;
   }
   try {
     const page = await llmDatasetsService.listItems(orgId.value, id, {
       size: DATASET_ITEMS_MAX_PAGE_SIZE,
     });
-    if (request !== datasetFieldsRequest) return;
-    const rows = sources.value.length
-      ? page.items.filter((item) => sources.value.includes(item.source))
-      : page.items;
-    datasetInputFields.value = commonInputFields(rows);
+    if (request === datasetRowsRequest) datasetRows.value = page.items;
   } catch {
-    if (request === datasetFieldsRequest) datasetInputFields.value = [];
+    if (request === datasetRowsRequest) datasetRows.value = [];
   }
 }
 
@@ -1246,7 +1248,7 @@ watch(
 const runPreviewAfterTyping = debounce(runPreview, 500);
 watch([systemPrompt, userPrompt], runPreviewAfterTyping);
 onBeforeUnmount(() => runPreviewAfterTyping.cancel());
-watch([datasetId, sources], loadDatasetInputFields, { deep: true, immediate: true });
+watch(datasetId, loadDatasetRows, { immediate: true });
 watch([promptId, promptSelectionMode, promptLabel, promptVersion], resolvePromptSelection);
 
 onBeforeRouteLeave((to, _from, next) => {
