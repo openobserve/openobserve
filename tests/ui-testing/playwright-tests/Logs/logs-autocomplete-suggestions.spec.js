@@ -2012,11 +2012,19 @@ test.describe("Autocomplete group headers — never a target", () => {
         tag: ['@all', '@autosuggestions', '@logs', '@headers']
     }, async ({ page }) => {
         const menu = await valueMenu(page);
-        const whole = menu.rows[0].replace(/'/g, '');
+        const fields = (await pm.logsPage.getQueryEditorFieldNames()).map((f) => f.toLowerCase());
+        expect(fields.length, 'the query editor should know the stream fields').toBeGreaterThan(0);
+        // Monaco's fuzzy filter needs the typed letters in order, so a value that is no field's subsequence can only match values.
+        const row = menu.rows.filter((r) => /^'/.test(r)).find((r) => {
+            const v = r.replace(/'/g, '').toLowerCase();
+            return !fields.some((f) => { let i = 0; for (const ch of f) if (ch === v[i]) i++; return i === v.length; });
+        });
+        expect(row, `no listed level value is free of a field match; values: ${menu.rows.join(', ')}`).toBeTruthy();
+        const whole = row.replace(/'/g, '');
         await page.keyboard.type(whole);
         const after = await waitForMenu(page, 5000);
-        expect(after.headers, `only values should match "${whole}"; a Fields header means the test data has a field with that prefix`).toEqual(['Values · recent']);
-        expect(after.focused).toBe(menu.rows[0]);
+        expect(after.headers, `only values should match "${whole}"`).toEqual(['Values · recent']);
+        expect(after.focused).toBe(row);
     });
 
     test("a function name after = completes under Functions: CAS then Tab writes CAST(", {
