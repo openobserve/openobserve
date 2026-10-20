@@ -35,7 +35,7 @@ const INSTANT_STEP_MICROS: i64 = 300_000_000;
 /// `O2_FLEET_ENABLED`, read once at startup; off stops every fleet job and refuses writes.
 pub fn enabled() -> bool {
     o2_enterprise::enterprise::common::config::get_config()
-        .opamp
+        .fleet
         .enabled
 }
 
