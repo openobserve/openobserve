@@ -1708,7 +1708,7 @@ test.describe("Logs Regression Bugs", () => {
     // This is the key behavior the hasOpenQuote fix enables: the scoped
     // regex must detect the open quote in the second condition independently
     // from the closed quote in the first condition, so value completions work.
-    // Without the fix, the regex would see the closed quote ('te') from the
+    // Without the fix, the regex would see the closed quote ('ve') from the
     // first condition and fail to detect the open quote in the second.
     testLogger.info('Triggering suggestion widget after partial open quote in second condition...');
     await pm.logsPage.triggerEditorSuggestions();
