@@ -20,6 +20,7 @@ import {
   formatSizeFromMB,
   addCommasToNumber,
   formatTimeWithSuffix,
+  formatTierRule,
   formatDuration,
   durationFormatter,
   maskText,
@@ -561,6 +562,46 @@ describe("minuteOfDayToHhmm", () => {
   it("normalises out-of-range and negative minutes into the day", () => {
     expect(minuteOfDayToHhmm(1500)).toBe("01:00");
     expect(minuteOfDayToHhmm(-60)).toBe("23:00");
+  });
+});
+
+describe("formatTierRule", () => {
+  const labels: Record<string, string> = {
+    "modelPricing.ruleOpIn": "is one of",
+    "modelPricing.ruleOpNotIn": "is not one of",
+    "modelPricing.ruleOpExists": "is set",
+    "modelPricing.ruleOpNotExists": "is not set",
+  };
+  const t = (key: string) => labels[key] ?? key;
+
+  it("labels set rules through t and counts extra keys", () => {
+    expect(
+      formatTierRule(
+        {
+          keys: ["openai.response.service_tier", "openai.request.service_tier"],
+          op: "in",
+          values: ["flex", "priority"],
+        },
+        t,
+      ),
+    ).toBe("openai.response.service_tier +1 is one of flex, priority");
+    expect(formatTierRule({ keys: ["speed"], op: "not_in", values: ["fast"] }, t)).toBe(
+      "speed is not one of fast",
+    );
+  });
+
+  it("renders presence and comparison rules", () => {
+    expect(formatTierRule({ keys: ["speed"], op: "exists" }, t)).toBe("speed is set");
+    expect(formatTierRule({ keys: ["speed"], op: "not_exists" }, t)).toBe("speed is not set");
+    expect(formatTierRule({ keys: ["usage.input"], op: "gte", value: 272000 }, t)).toBe(
+      "usage.input ≥ 272000",
+    );
+  });
+
+  it("skips blank keys and tolerates a missing operator", () => {
+    expect(formatTierRule({ keys: [" ", "service_tier"], values: ["flex"] }, t)).toBe(
+      "service_tier is one of flex",
+    );
   });
 });
 

@@ -71,27 +71,24 @@ describe("windowsCard builder", () => {
   it("uses PowerShell, not bash", () => {
     const install = windowsCard(SUBS, gt).steps[0];
     expect(install.chip?.label).toBe("PowerShell");
-    for (const v of install.variants!) {
-      expect(v.code.lang).toBe("powershell");
-      expect(v.code.raw).toContain("Invoke-WebRequest");
-      expect(v.code.raw).toContain("-AUTH_KEY");
-    }
+    expect(install.code?.lang).toBe("powershell");
+    expect(install.code?.raw).toContain("Invoke-WebRequest");
+    expect(install.code?.raw).toContain("-AUTH_KEY");
   });
 
-  it("points each variant at its matching install script", () => {
-    const [generic, ec2] = windowsCard(SUBS, gt).steps[0].variants!;
-    expect(generic.code.raw).toContain("/windows/install.ps1");
-    expect(generic.code.raw).not.toContain("/ec2/");
-    expect(ec2.code.raw).toContain("/windows/ec2/install.ps1");
-    expect(ec2.note).toContain("ec2:DescribeTags");
-    expect(generic.note).not.toContain("ec2:DescribeTags");
+  it("offers a single install command with no environment toggle", () => {
+    // The standard script also collects EC2 instance metadata — no AWS EC2 variant.
+    const install = windowsCard(SUBS, gt).steps[0];
+    expect(install.variants).toBeUndefined();
+    expect(install.code?.raw).toContain("/windows/install.ps1");
+    expect(install.code?.raw).not.toContain("/ec2/");
   });
 
   it("substitutes url/org and masks the ingestion token", () => {
-    const generic = windowsCard(SUBS, gt).steps[0].variants![0];
-    expect(generic.code.raw).toContain(`${SUBS.url}/api/${SUBS.org}/`);
-    expect(generic.code.raw).not.toContain("[BASIC_PASSCODE]");
-    expect(generic.code.masked).not.toContain(SUBS.token);
+    const code = windowsCard(SUBS, gt).steps[0].code!;
+    expect(code.raw).toContain(`${SUBS.url}/api/${SUBS.org}/`);
+    expect(code.raw).not.toContain("[BASIC_PASSCODE]");
+    expect(code.masked).not.toContain(SUBS.token);
   });
 
   it("adds the execution-policy guidance Linux does not need", () => {
