@@ -10714,6 +10714,12 @@
     "selectionOffscreen": "{count} ngoài màn hình | {count} ngoài màn hình",
     "clearSelection": "Xóa lựa chọn",
     "addSelected": "Thêm {count} cảnh báo | Thêm {count} cảnh báo",
+    "alertType": "Loại cảnh báo",
+    "alertTypeAll": "Tất cả",
+    "alertTypeThreshold": "Ngưỡng",
+    "alertTypeAnomaly": "Bất thường",
+    "enterprise": "Enterprise",
+    "enterpriseHint": "Cảnh báo phát hiện bất thường cần OpenObserve Enterprise.",
     "drawer": {
       "dataAvailable": "Có dữ liệu",
       "streamNotFound": "Không tìm thấy stream",
@@ -10738,6 +10744,8 @@
       "neverIngestedCallout": "{stream} tồn tại nhưng chưa bao giờ nhận dữ liệu, do đó cảnh báo này không có gì để kích hoạt.",
       "lastData": "Dữ liệu cuối cùng {when}",
       "staleCallout": "{stream} nhận dữ liệu cuối cùng {when}. Cảnh báo này sẽ không kích hoạt cho đến khi việc tiếp nhận dữ liệu trở lại.",
+      "anomalyTrainingNote": "Cảnh báo này học từ lịch sử của chính luồng dữ liệu và im lặng cho đến khi có đủ dữ liệu để huấn luyện: từ vài giờ đến khoảng một ngày, tùy theo khoảng thời gian của nó. Mô hình đầy đủ cho ngày thường và cuối tuần cần một khoảng thời gian bao gồm một cuối tuần.",
+      "detection": "Phát hiện",
       "unknownTime": "vào một thời điểm không xác định"
     },
     "install": {
@@ -10776,6 +10784,9 @@
       "cancel": "Hủy",
       "done": "Hoàn tất",
       "confirmLarge": "Tôi hiểu rằng thao tác này tạo {count} cảnh báo trong {folder}, mỗi cảnh báo thông báo tới {destination}.",
+      "tuneThresholdOnly": "Chỉ áp dụng cho cảnh báo ngưỡng.",
+      "anomalyTrainingNote": "Cảnh báo bất thường bắt đầu cảnh báo khi đã được huấn luyện trên đủ lịch sử của luồng dữ liệu.",
+      "anomalyUnavailable": "Cảnh báo bất thường cần OpenObserve Enterprise có bật phát hiện bất thường, nên cảnh báo này đã bị bỏ qua.",
       "confirmLargeNoDestination": "Tôi hiểu rằng thao tác này tạo {count} cảnh báo trong {folder}, và chưa có cảnh báo nào thông báo đến đích."
     },
     "error": {

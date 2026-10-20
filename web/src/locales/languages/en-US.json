@@ -10714,6 +10714,12 @@
     "selectionOffscreen": "{count} not in view | {count} not in view",
     "clearSelection": "Clear selection",
     "addSelected": "Add {count} alert | Add {count} alerts",
+    "alertType": "Alert type",
+    "alertTypeAll": "All",
+    "alertTypeThreshold": "Threshold",
+    "alertTypeAnomaly": "Anomaly",
+    "enterprise": "Enterprise",
+    "enterpriseHint": "Anomaly detection alerts need OpenObserve Enterprise.",
     "drawer": {
       "dataAvailable": "Data available",
       "streamNotFound": "Stream not found",
@@ -10738,6 +10744,8 @@
       "neverIngestedCallout": "{stream} exists but has never received data, so this alert has nothing to fire on.",
       "lastData": "Last data {when}",
       "staleCallout": "{stream} last received data {when}. This alert will stay quiet until ingestion resumes.",
+      "anomalyTrainingNote": "This alert learns from the stream's own history and stays quiet until it has enough to train: several hours to about a day, depending on its interval. The full weekday and weekend model needs a span that covers a weekend.",
+      "detection": "Detection",
       "unknownTime": "at an unknown time"
     },
     "install": {
@@ -10776,6 +10784,9 @@
       "cancel": "Cancel",
       "done": "Done",
       "confirmLarge": "I understand this creates {count} alerts in {folder}, each notifying {destination}.",
+      "tuneThresholdOnly": "Applies to threshold alerts only.",
+      "anomalyTrainingNote": "Anomaly alerts start alerting once they have trained on enough of the stream's history.",
+      "anomalyUnavailable": "Anomaly alerts need OpenObserve Enterprise with anomaly detection turned on, so this one was skipped.",
       "confirmLargeNoDestination": "I understand this creates {count} alerts in {folder}, none of which notify a destination yet."
     },
     "error": {

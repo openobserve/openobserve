@@ -10714,6 +10714,12 @@
     "selectionOffscreen": "{count} fuori vista | {count} fuori vista",
     "clearSelection": "Annulla selezione",
     "addSelected": "Aggiungi {count} avviso | Aggiungi {count} avvisi",
+    "alertType": "Tipo di avviso",
+    "alertTypeAll": "Tutti",
+    "alertTypeThreshold": "Soglia",
+    "alertTypeAnomaly": "Anomalia",
+    "enterprise": "Enterprise",
+    "enterpriseHint": "Gli avvisi di rilevamento anomalie richiedono OpenObserve Enterprise.",
     "drawer": {
       "dataAvailable": "Dati disponibili",
       "streamNotFound": "Stream non trovato",
@@ -10738,6 +10744,8 @@
       "neverIngestedCallout": "{stream} esiste ma non ha mai ricevuto dati, quindi questo avviso non ha nulla su cui scattare.",
       "lastData": "Ultimi dati {when}",
       "staleCallout": "{stream} ha ricevuto dati l'ultima volta {when}. Questo avviso resterà in silenzio fino alla ripresa dell'acquisizione.",
+      "anomalyTrainingNote": "Questo avviso impara dalla cronologia dello stream stesso e resta silenzioso finché non ne ha abbastanza per addestrarsi: da alcune ore a circa un giorno, a seconda del suo intervallo. Il modello completo per giorni feriali e fine settimana richiede un periodo che includa un fine settimana.",
+      "detection": "Rilevamento",
       "unknownTime": "in un momento sconosciuto"
     },
     "install": {
@@ -10776,6 +10784,9 @@
       "cancel": "Annulla",
       "done": "Fatto",
       "confirmLarge": "Ho capito che questo crea {count} avvisi in {folder}, ciascuno con notifica a {destination}.",
+      "tuneThresholdOnly": "Vale solo per gli avvisi a soglia.",
+      "anomalyTrainingNote": "Gli avvisi di anomalia iniziano a scattare dopo essersi addestrati su una cronologia sufficiente dello stream.",
+      "anomalyUnavailable": "Gli avvisi di anomalia richiedono OpenObserve Enterprise con il rilevamento anomalie attivo, quindi questo è stato saltato.",
       "confirmLargeNoDestination": "Comprendo che questo crea {count} avvisi in {folder}, nessuno dei quali notifica ancora una destinazione."
     },
     "error": {

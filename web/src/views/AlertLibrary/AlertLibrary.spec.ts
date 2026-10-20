@@ -21,6 +21,8 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import { makeAlertSectionRouter } from "@/test/unit/helpers/alertSectionRouter";
 import type { AlertLibraryEntry, AlertLibraryManifest } from "@/types/alertLibrary";
+import config from "@/aws-exports";
+import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 
 // See AlertSectionTabs.spec.ts — the app router is neither needed nor cheap.
 const router = makeAlertSectionRouter();
@@ -1097,6 +1099,307 @@ describe("AlertLibrary", () => {
       manifestRef.value = { ...manifestFixture, alerts: [...manifestFixture.alerts] };
       await flushPromises();
       expect(bar(wrapper).attributes("data-selected")).toBe("1");
+    });
+  });
+
+  describe("anomaly alerts", () => {
+    const ANOMALY = "apm/traces_server_error_ratio_anomaly";
+
+    // Listed apart and without alert_type, so only the list it came from makes it an anomaly alert.
+    const anomaly = entry({
+      id: ANOMALY,
+      name: "traces_server_error_ratio_anomaly",
+      pack: "apm",
+      category: "traces",
+      title: "Server error ratio is unusually high",
+      severity: "warning",
+      stream: "default",
+      stream_type: "traces",
+      query_type: "sql",
+      required_streams: ["default"],
+      description: "Share of SERVER spans with status ERROR is above its learned band.",
+    });
+
+    const withAnomaly: AlertLibraryManifest = {
+      ...manifestFixture,
+      format_version: "1.1.0",
+      anomaly_alert_count: 1,
+      anomaly_alerts: [anomaly],
+    };
+
+    const original = { isEnterprise: config.isEnterprise, zoConfig: store.state.zoConfig };
+    const upgrade = useEnterpriseUpgradeDialog();
+
+    const setAccess = (access: "enabled" | "locked" | "hidden") => {
+      (config as { isEnterprise: string }).isEnterprise = access === "locked" ? "false" : "true";
+      store.state.zoConfig = {
+        ...original.zoConfig,
+        build_type: "enterprise",
+        anomaly_detection_enabled: access === "enabled",
+      } as typeof original.zoConfig;
+    };
+
+    const card = (wrapper: ReturnType<typeof mount>) =>
+      wrapper.find(`[data-test="alert-library-card-${ANOMALY}"]`);
+
+    beforeEach(() => {
+      manifestRef.value = withAnomaly;
+      upgrade.close();
+    });
+
+    afterEach(() => {
+      (config as { isEnterprise: string }).isEnterprise = original.isEnterprise;
+      store.state.zoConfig = original.zoConfig;
+      upgrade.close();
+    });
+
+    it("lists anomaly alerts beside scheduled ones when enabled", async () => {
+      setAccess("enabled");
+      const wrapper = await mountView();
+      expect(card(wrapper).exists()).toBe(true);
+      expect(card(wrapper).find('[data-test="alert-library-card-enterprise"]').exists()).toBe(
+        false,
+      );
+      expect(wrapper.find('[data-test="alert-library-stat-all"]').text()).toContain("5");
+    });
+
+    it("hides anomaly alerts entirely when entitled but turned off", async () => {
+      setAccess("hidden");
+      const wrapper = await mountView();
+      expect(card(wrapper).exists()).toBe(false);
+      expect(wrapper.find('[data-test="alert-library-alert-type"]').exists()).toBe(false);
+    });
+
+    it("shows anomaly alerts locked when the build is not entitled", async () => {
+      setAccess("locked");
+      const wrapper = await mountView();
+      expect(card(wrapper).find('[data-test="alert-library-card-enterprise"]').exists()).toBe(true);
+    });
+
+    it("opens the upgrade dialog instead of the drawer for a locked card", async () => {
+      setAccess("locked");
+      const wrapper = await mountView();
+      await card(wrapper).trigger("click");
+      await flushPromises();
+
+      expect(upgrade.isOpen.value).toBe(true);
+      expect(wrapper.findComponent({ name: "LibraryDrawer" }).props("open")).toBe(false);
+    });
+
+    it("refuses to tick a locked card and offers the upgrade instead", async () => {
+      setAccess("locked");
+      const wrapper = await mountView();
+      await wrapper
+        .get(`[data-test="alert-library-select-${ANOMALY}"]`)
+        .get('[role="checkbox"]')
+        .trigger("click");
+      await flushPromises();
+
+      expect(upgrade.isOpen.value).toBe(true);
+      expect(card(wrapper).attributes("data-selected")).toBe("false");
+      expect(wrapper.find('[data-test="alert-library-selection-bar"]').exists()).toBe(false);
+    });
+
+    it("skips locked cards when selecting all in view", async () => {
+      setAccess("locked");
+      const wrapper = await mountView();
+      await wrapper
+        .get('[data-test="alert-library-select-all-in-view"]')
+        .get('[role="checkbox"]')
+        .trigger("click");
+      await flushPromises();
+
+      expect(
+        wrapper.get('[data-test="alert-library-selection-bar"]').attributes("data-selected"),
+      ).toBe("4");
+      expect(card(wrapper).attributes("data-selected")).toBe("false");
+      // The four it could tick are all ticked, so the box reads checked rather than partial.
+      expect(
+        wrapper
+          .get('[data-test="alert-library-select-all-in-view"]')
+          .get('[role="checkbox"]')
+          .attributes("aria-checked"),
+      ).toBe("true");
+    });
+
+    it("disables select-all over a view of locked cards only, rather than hiding it", async () => {
+      setAccess("locked");
+      const wrapper = await mountView();
+      await wrapper.get('[data-test="alert-library-alert-type-anomaly"]').trigger("click");
+      await flushPromises();
+
+      const box = wrapper.get('[data-test="alert-library-select-all-in-view"]');
+      const control = box.get('[role="checkbox"]');
+      expect(control.attributes("disabled")).toBeDefined();
+      expect(control.attributes("aria-checked")).toBe("false");
+      expect(box.attributes("title")).toBe("Anomaly detection alerts need OpenObserve Enterprise.");
+
+      await control.trigger("click");
+      await flushPromises();
+      expect(wrapper.find('[data-test="alert-library-selection-bar"]').exists()).toBe(false);
+      expect(card(wrapper).attributes("data-selected")).toBe("false");
+    });
+
+    it("offers no group select for a group of locked cards only", async () => {
+      setAccess("locked");
+      const wrapper = await mountView();
+      expect(wrapper.find('[data-test="alert-library-select-group-apm/traces"]').exists()).toBe(
+        false,
+      );
+      expect(wrapper.find('[data-test="alert-library-select-group-k8s/pod"]').exists()).toBe(true);
+    });
+
+    it("group select ticks only the selectable cards of a mixed group", async () => {
+      setAccess("locked");
+      const scheduledInGroup = entry({
+        id: "apm/traces_error_count_high",
+        name: "traces_error_count_high",
+        pack: "apm",
+        category: "traces",
+        title: "Trace errors are high",
+        severity: "warning",
+        stream: "default",
+        stream_type: "traces",
+        query_type: "sql",
+        required_streams: ["default"],
+      });
+      manifestRef.value = { ...withAnomaly, alerts: [...manifestFixture.alerts, scheduledInGroup] };
+      const wrapper = await mountView();
+
+      await wrapper.get('[data-test="alert-library-select-group-apm/traces"]').trigger("click");
+      await flushPromises();
+
+      expect(
+        wrapper.get('[data-test="alert-library-selection-bar"]').attributes("data-selected"),
+      ).toBe("1");
+      expect(
+        wrapper
+          .get('[data-test="alert-library-card-apm/traces_error_count_high"]')
+          .attributes("data-selected"),
+      ).toBe("true");
+      expect(card(wrapper).attributes("data-selected")).toBe("false");
+      expect(upgrade.isOpen.value).toBe(false);
+    });
+
+    const typeChip = (wrapper: ReturnType<typeof mount>, id: string) =>
+      wrapper.get(`[data-test="alert-library-alert-type-${id}"]`);
+
+    const pickType = async (wrapper: ReturnType<typeof mount>, id: string) => {
+      await typeChip(wrapper, id).trigger("click");
+      await flushPromises();
+    };
+
+    const podCard = (wrapper: ReturnType<typeof mount>) =>
+      wrapper.find('[data-test="alert-library-card-k8s/pod-oom-killed"]');
+
+    it("puts the type toggle in the search row, labelled, with no counts", async () => {
+      setAccess("enabled");
+      const wrapper = await mountView();
+      const group = wrapper.get('[data-test="alert-library-alert-type"]');
+
+      const toolbar = wrapper.get('[data-test="alert-library-toolbar"]').element;
+      expect(toolbar.contains(group.element)).toBe(true);
+      const searchBox = wrapper.get('[data-test="alert-library-search"]').element;
+      expect(searchBox.compareDocumentPosition(group.element)).toBe(
+        Node.DOCUMENT_POSITION_FOLLOWING,
+      );
+      expect(wrapper.find('[data-test="alert-library-rail-alert-type"]').exists()).toBe(false);
+
+      expect(group.attributes("aria-label")).toBe("Alert type");
+      expect(typeChip(wrapper, "all").text()).toBe("All");
+      expect(typeChip(wrapper, "scheduled").text()).toBe("Threshold");
+      expect(typeChip(wrapper, "anomaly").text()).toBe("Anomaly");
+    });
+
+    it("filters the grid by the picked type", async () => {
+      setAccess("enabled");
+      const wrapper = await mountView();
+      await pickType(wrapper, "anomaly");
+
+      expect(card(wrapper).exists()).toBe(true);
+      expect(podCard(wrapper).exists()).toBe(false);
+      expect(wrapper.find('[data-test="alert-library-stat-all"]').text()).toContain("1");
+
+      await pickType(wrapper, "scheduled");
+      expect(card(wrapper).exists()).toBe(false);
+      expect(podCard(wrapper).exists()).toBe(true);
+    });
+
+    it("keeps the type when its own chip is clicked again", async () => {
+      setAccess("enabled");
+      const wrapper = await mountView();
+      await pickType(wrapper, "anomaly");
+      await pickType(wrapper, "anomaly");
+      expect(podCard(wrapper).exists()).toBe(false);
+      expect(card(wrapper).exists()).toBe(true);
+    });
+
+    it("resets the type with Clear filters", async () => {
+      setAccess("enabled");
+      const wrapper = await mountView();
+      await pickType(wrapper, "anomaly");
+      wrapper.findComponent({ name: "LibraryRail" }).vm.$emit("update:severity", "critical");
+      await flushPromises();
+
+      const noResults = wrapper.findComponent('[data-test="alert-library-no-results"]');
+      expect(noResults.exists()).toBe(true);
+      noResults.vm.$emit("action");
+      await flushPromises();
+      expect(podCard(wrapper).exists()).toBe(true);
+      expect(card(wrapper).exists()).toBe(true);
+    });
+
+    it("drops the type filter when the toggle goes away", async () => {
+      setAccess("enabled");
+      const wrapper = await mountView();
+      await pickType(wrapper, "anomaly");
+      expect(podCard(wrapper).exists()).toBe(false);
+
+      setAccess("hidden");
+      await flushPromises();
+      expect(wrapper.find('[data-test="alert-library-alert-type"]').exists()).toBe(false);
+      expect(podCard(wrapper).exists()).toBe(true);
+    });
+
+    it("unticks an anomaly card that becomes locked", async () => {
+      setAccess("enabled");
+      const wrapper = await mountView();
+      await wrapper
+        .get(`[data-test="alert-library-select-${ANOMALY}"]`)
+        .get('[role="checkbox"]')
+        .trigger("click");
+      await flushPromises();
+      expect(card(wrapper).attributes("data-selected")).toBe("true");
+
+      setAccess("locked");
+      await flushPromises();
+      expect(card(wrapper).attributes("data-selected")).toBe("false");
+      expect(wrapper.find('[data-test="alert-library-selection-bar"]').exists()).toBe(false);
+    });
+
+    it("offers no type toggle for a manifest without anomaly alerts", async () => {
+      setAccess("enabled");
+      manifestRef.value = manifestFixture;
+      const wrapper = await mountView();
+      expect(wrapper.find('[data-test="alert-library-alert-type"]').exists()).toBe(false);
+    });
+
+    it("hands the wizard a batch without locked cards", async () => {
+      setAccess("locked");
+      const wrapper = await mountView();
+      await wrapper
+        .get('[data-test="alert-library-select-all-in-view"]')
+        .get('[role="checkbox"]')
+        .trigger("click");
+      await flushPromises();
+      await wrapper.get('[data-test="alert-library-add-selected"]').trigger("click");
+      await flushPromises();
+
+      const batch = wrapper
+        .findComponent({ name: "LibraryInstallDialog" })
+        .props("preselect") as AlertLibraryEntry[];
+      expect(batch.map((e) => e.id)).not.toContain(ANOMALY);
+      expect(batch).toHaveLength(4);
     });
   });
 });
