@@ -98,9 +98,13 @@ Present today (`mocks.mjs`):
 | `offline` | HTTP | the request rejects (`TypeError: Failed to fetch`) |
 | `unauthorized_401`, `forbidden_403`, `not_enabled_400`, `lease_409`, `already_submitted_409`, `upstream_429`, `agent_503`, `authz_503` | HTTP | today's wire body of each shape; the B-01 envelope instead with `envelopeEnabled` |
 | `consent_twice` | HTTP 412 | the 412 again on the same-turn retry after Enable |
+| `payloads_markdown` | SSE | one answer carrying the `99` §1.2 Markdown payloads (image beacon, `javascript:`/`data:` links, raw HTML, same-origin logout/share/autorun links) (WP-06) |
+| `long_answer_fenced` | SSE | a 400-delta unlabelled fence, then a 400-delta ```` ```sql ```` fence (PERF-02 variant, WP-06) |
+| `retrying_frame`, `compacting_frame` | SSE | a B-02 `retrying{attempt:2, reason, retry_after:20}` or `compacting` frame, then held open (WP-06) |
+| `permission_denied_frame` | SSE | `o2_UpdateAlert` refused by policy (`step{state:"failed"}` + `permission_denied`), then the answer goes on (WP-06) |
 
 Named by the specs and added by the WP that first needs them (`99` §5, honest-turns §0.4):
-`long_answer_fenced` (SSE); `permission_denied_frame`, `data_level_frame`,
+`data_level_frame`,
 `confirm_500`, `update_card`, `cli_card`,
 `permission_card`, `resource_changed_unreviewed`, `findings_inconclusive`, `multi_window`,
 `nl_needs_chat`, `nl_parse_error`, `rca_stream`, `delimiter_breakout`,

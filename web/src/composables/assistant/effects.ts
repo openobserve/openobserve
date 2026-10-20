@@ -19,6 +19,7 @@ import {
   type AiErrorCode,
   type AiEventProps,
 } from "@/services/assistantAnalytics";
+import type { ChatMessage } from "@/ts/interfaces/chat";
 
 import { sessionView, type AssistantStoreInternal } from "./assistantStore";
 import type {
@@ -48,6 +49,9 @@ export interface Effects {
 /** One frame's or event's change to the session; runs inside the batch's single commit. */
 export type SessionWork = (session: AssistantSession) => Effects;
 
+/** Where a turn's prompt came from; a Retry keeps it, so a retried Regenerate stays a new version. */
+export type TurnSource = "composer" | "regenerate" | "edit";
+
 /** What the engine knows about the turn an effect belongs to. */
 export interface EffectScope {
   turnId: string;
@@ -56,11 +60,14 @@ export interface EffectScope {
   userIndex: number;
   newSession: boolean;
   input: TurnInput;
+  source: TurnSource;
   surface: "chat" | "inline_helper" | "rca";
   toolCalls: number;
   toolErrors: number;
   /** Milliseconds the cancel took to be acknowledged; `null` when it was not (HT-04 AC 4). */
   cancelMs: number | null;
+  /** Regenerate: the answer the refused attempt replaced, put back as it was. */
+  replaced?: ChatMessage[] | null;
 }
 
 export interface EffectsDeps {
@@ -273,9 +280,22 @@ function applyMeta(session: AssistantSession, effect: TurnEffect, now: number): 
 function restoreDraft(store: AssistantStoreInternal, sid: Sid, scope: EffectScope): void {
   const session = store.state.sessions[sid] as AssistantSession | undefined;
   if (!session) return;
+  // A refused regenerate keeps the prompt and its answer; nothing came from the composer, so nothing goes back to it.
+  if (scope.source === "regenerate") {
+    if (scope.userIndex >= 0)
+      session.messages.splice(scope.userIndex + 1, Infinity, ...(scope.replaced ?? []));
+    return;
+  }
   if (scope.userIndex >= 0 && session.messages.length > scope.userIndex)
     session.messages.splice(scope.userIndex);
+  // An edit never overwrites the user's draft; Retry still resends the edit's own snapshot.
+  if (scope.source === "edit" && !composerEmpty(session)) return;
   if (scope.snapshot) store.restoreDraft(sid, scope.snapshot);
+}
+
+function composerEmpty(session: AssistantSession): boolean {
+  const { text, chips, images } = session.composer;
+  return !text.trim() && chips.length === 0 && images.length === 0;
 }
 
 function sentProps(scope: EffectScope): AiEventProps["ai_turn_sent"] {

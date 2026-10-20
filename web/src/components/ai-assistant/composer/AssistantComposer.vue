@@ -189,7 +189,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span class="grid">
           <AssistantIconButton
             v-if="showStop"
-            variant="outline"
+            :variant="stalled ? 'secondary' : 'outline'"
             :label="t('assistant.turn.stopLabel')"
             :icon="assistantGlyph.stop"
             :loading="state === 'stopping'"
@@ -273,6 +273,8 @@ export interface AssistantComposerProps {
   host?: AssistantHostAdapter;
   /** Only the composer the user sees announces, restores and takes focus requests. */
   visible?: boolean;
+  /** Send waits while the host counts a `retry_after` down; the reason says why. */
+  cooldownReason?: I18nText;
 }
 
 /** A starter prompt over a draft this long asks Replace · Append · Cancel (IW-06 AC 5). */
@@ -298,7 +300,9 @@ import AssistantMentionMenu, {
 } from "@/components/ai-assistant/context/AssistantMentionMenu.vue";
 import {
   MAX_IMAGES,
+  STALL_MS,
   UNDO_WINDOW_MS,
+  assistantGoToAnswer,
   isRunning,
   markHintSeen,
   periodMs,
@@ -342,6 +346,7 @@ const props = withDefaults(defineProps<AssistantComposerProps>(), {
   ghost: null,
   host: undefined,
   visible: true,
+  cooldownReason: undefined,
 });
 
 const { t } = useI18nTyped();
@@ -423,8 +428,31 @@ const state = computed(() => {
 });
 
 const showStop = computed(() => running.value);
-const canSend = computed(() => hasContent.value && !inertKind.value && !running.value);
+
+// After 30 s without a frame Stop is the one emphasised control (HT-01 AC 3); the clock runs only while a turn does.
+const clock = ref(Date.now());
+let clockTimer: ReturnType<typeof setInterval> | null = null;
+watch(
+  running,
+  (live) => {
+    if (live && !clockTimer) clockTimer = setInterval(() => (clock.value = Date.now()), 1_000);
+    if (!live && clockTimer) {
+      clearInterval(clockTimer);
+      clockTimer = null;
+    }
+  },
+  { immediate: true },
+);
+const stalled = computed(() => {
+  const meta = session.value?.turnMeta;
+  const last = meta?.lastFrameAt ?? meta?.startedAt ?? null;
+  return running.value && last !== null && clock.value - last >= STALL_MS;
+});
+const canSend = computed(
+  () => hasContent.value && !inertKind.value && !running.value && !props.cooldownReason,
+);
 const sendBlockedReason = computed(() => {
+  if (props.cooldownReason) return props.cooldownReason;
   if (inertKind.value)
     return inertKind.value === "approval"
       ? t("assistant.composer.waitingApproval")
@@ -669,6 +697,17 @@ function onKeydown(event: KeyboardEvent): void {
     event.preventDefault();
     return void trySend();
   }
+  // Ctrl+↑ / ⌘↑ on the first line goes to the latest answer; elsewhere the native caret move runs (round 2 X-28).
+  if (
+    event.key === "ArrowUp" &&
+    (event.ctrlKey || event.metaKey) &&
+    !event.altKey &&
+    !event.shiftKey &&
+    caretOnFirstLine(target)
+  ) {
+    if (assistantGoToAnswer()) event.preventDefault();
+    return;
+  }
   if (
     event.key === "ArrowUp" &&
     target.selectionStart === target.selectionEnd &&
@@ -738,6 +777,10 @@ function trySend(): void {
     if (!helperEmphasis.value) say(line);
     return emphasise(line);
   }
+  if (props.cooldownReason) {
+    if (blockedLine.value !== props.cooldownReason) say(props.cooldownReason);
+    return emphasise(props.cooldownReason);
+  }
   if (running.value) {
     trackAssistant("ai_composer_enter_blocked", {
       reason: elsewhere.value ? "elsewhere" : "running",
@@ -775,8 +818,10 @@ async function sendReply(id: Sid): Promise<void> {
   if (approval) await store.decideApproval(id, { approved: false, reason: "reply", reply });
 }
 
+// Stop turns into Send, so the textbox takes focus rather than the page (HT-04 AC 3).
 function stop(): void {
   if (liveSid.value) void store.stop(liveSid.value);
+  void nextTick(() => focusInput("end"));
 }
 
 function recall(direction: "older" | "newer"): boolean {
@@ -1203,6 +1248,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   offs.forEach((off) => off());
+  if (clockTimer) clearInterval(clockTimer);
   if (emphasisTimer) clearTimeout(emphasisTimer);
   if (clearedTimer) clearTimeout(clearedTimer);
   if (mentionTimer) clearTimeout(mentionTimer);

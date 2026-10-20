@@ -24,6 +24,7 @@ import { raw } from "@/types/i18n";
 import { fakeAssistant, fakeRouter, fakeVuex } from "../__tests__/fakeAssistant";
 import AssistantShell, {
   SHELL_ROUTE_CONTEXT,
+  STEP_ANNOUNCE_MS,
   type AssistantShellProps,
   type ShellRouteState,
 } from "./AssistantShell.vue";
@@ -432,5 +433,293 @@ describe("AssistantShell rows ⑤–⑦ (WP-05)", () => {
     expect(JSON.parse(localStorage.getItem("o2.assistant.hints:k1") ?? "{}")).toEqual({
       disclosure: true,
     });
+  });
+});
+
+describe("WP-06 conversation wiring", () => {
+  function live(
+    turn: Record<string, unknown>,
+    messages: unknown[] = [],
+    before: (store: any) => void = () => undefined,
+  ) {
+    fake.current = fakeAssistant();
+    const store = fake.current.store;
+    before(store);
+    const sid = store.createSession({
+      origin: { entryKind: "header_button", objectKind: "none", container: "sidebar" },
+    });
+    store.open({ kind: "sidebar", mode: "pinned" }, { sid, focus: "none" });
+    store.state.sessions[sid].messages.push(...(messages as never[]));
+    store.state.sessions[sid].turn = turn as never;
+    const wrapper = mount(AssistantShell, {
+      props: { placement: "sidebar" },
+      slots: { composer: '<div data-test="assistant-composer">composer</div>' },
+      global: {
+        plugins: [
+          fakeRouter([{ path: "/close-tab", name: "closeTab", component: {} }]),
+          fakeVuex(),
+        ],
+      },
+      attachTo: document.body,
+    });
+    return { wrapper, store, sid };
+  }
+
+  const MESSAGES = [
+    { role: "user", content: raw("why 5xx?"), sentAt: 0, turnId: "t1" },
+    {
+      role: "assistant",
+      content: raw("Because."),
+      contentBlocks: [{ type: "text", text: "Because." }],
+    },
+  ];
+
+  it("renders the transcript in ③ and Go to answer in the strip after a finished answer (X-28)", async () => {
+    const { wrapper } = live({ state: "done", saved: "server" }, MESSAGES);
+    await flushPromises();
+    expect(wrapper.find('section[role="log"]').exists()).toBe(true);
+    await wrapper.get('[data-test="assistant-strip-go-to-answer"]').trigger("click");
+    expect(document.activeElement?.getAttribute("data-test")).toBe("assistant-answer-t1");
+  });
+
+  it("offers Jump to latest with the unseen count once following stops (EB-11)", async () => {
+    const { wrapper, store, sid } = live({ state: "responding.writing" }, MESSAGES);
+    store.setFollow(sid, false);
+    store.state.sessions[sid].ui.unseen = 2;
+    await flushPromises();
+    const jump = wrapper.get('[data-test="assistant-scroll-latest"]');
+    expect(jump.text()).toBe("Jump to latest · 2 new");
+    expect(jump.attributes("aria-label")).toBe("Jump to latest, 2 new");
+    await jump.trigger("click");
+    expect(store.state.sessions[sid].ui.follow).toBe(true);
+  });
+
+  it("renders a refusal above the composer, never in the log (`30` §4.2)", async () => {
+    const error = { code: "turn_limit", phase: "pre_admission", retryable: true, action: "retry" };
+    let retry!: ReturnType<typeof vi.fn>;
+    const { wrapper, sid } = live({ state: "refused", error }, [], (store) => {
+      retry = vi
+        .spyOn(store, "retry")
+        .mockResolvedValue({ state: "done", saved: "server" }) as never;
+      vi.spyOn(store, "canRetry").mockReturnValue(true);
+    });
+    await flushPromises();
+    const lower = wrapper.get('[data-test="assistant-shell-lower"]');
+    const outcome = lower.get('[data-test="assistant-turn-outcome"]');
+    expect(outcome.attributes("data-kind")).toBe("refused");
+    expect(wrapper.find('section[role="log"] [data-test="assistant-turn-outcome"]').exists()).toBe(
+      false,
+    );
+    await outcome.get('[data-test="assistant-turn-outcome-action"]').trigger("click");
+    expect(retry).toHaveBeenCalledWith(sid);
+  });
+
+  it("names the action in the failure announcement (`95` §2.2)", async () => {
+    const error = {
+      code: "agent_unavailable",
+      phase: "post_admission",
+      retryable: true,
+      action: "retry",
+    };
+    const { wrapper, store, sid } = live({ state: "failed", error }, MESSAGES);
+    await flushPromises();
+    store.announce(sid, "assistant.error.agent_unavailable.title");
+    await flushPromises();
+    expect(wrapper.get('[data-test="assistant-status-region"]').text()).toBe(
+      "Failed. The assistant service didn't respond. Retry available.",
+    );
+  });
+
+  const RATE_LIMITED = {
+    code: "rate_limited",
+    phase: "pre_admission",
+    retryable: true,
+    action: "retry",
+    retryAfterMs: 30_000,
+  };
+
+  it("names the wait, not an available Retry, while retry_after runs (V5)", async () => {
+    const { wrapper, store, sid } = live({ state: "refused", error: RATE_LIMITED });
+    store.state.sessions[sid].turnMeta.endedAt = Date.now();
+    await flushPromises();
+    store.announce(sid, "assistant.error.rate_limited.titleTimed");
+    await flushPromises();
+    expect(wrapper.get('[data-test="assistant-status-region"]').text()).toBe(
+      "Not sent. The AI provider is rate-limiting requests. Retry in 30 s.",
+    );
+  });
+
+  it("counts retry_after from the refusal's own end, so a remounted shell keeps the deadline (V6)", async () => {
+    const first = live({ state: "refused", error: RATE_LIMITED });
+    first.store.state.sessions[first.sid].turnMeta.endedAt = Date.now() - 10_000;
+    await flushPromises();
+    const label = (w: typeof first.wrapper) =>
+      w.get('[data-test="assistant-turn-outcome-action"]').text();
+    expect(label(first.wrapper)).toMatch(/^Retry in 20 s/);
+    first.wrapper.unmount();
+    const again = mount(AssistantShell, {
+      props: { placement: "sidebar" },
+      slots: { composer: '<div data-test="assistant-composer">composer</div>' },
+      global: {
+        plugins: [
+          fakeRouter([{ path: "/close-tab", name: "closeTab", component: {} }]),
+          fakeVuex(),
+        ],
+      },
+      attachTo: document.body,
+    });
+    await flushPromises();
+    expect(label(again)).toMatch(/^Retry in 20 s/);
+  });
+
+  it("keeps focus on Stop it when the cancel fails, and never takes focus the reader moved (V7)", async () => {
+    const busy = {
+      code: "turn_busy",
+      phase: "pre_admission",
+      retryable: false,
+      action: "stop_it",
+      turnId: "run-1",
+    };
+    const failed = live({ state: "refused", error: busy });
+    vi.spyOn(failed.store, "cancelTurn").mockResolvedValue(false);
+    await flushPromises();
+    const button = failed.wrapper.get('[data-test="assistant-turn-outcome-action"]');
+    (button.element as HTMLElement).focus();
+    await button.trigger("click");
+    await flushPromises();
+    expect(document.activeElement).toBe(button.element);
+    failed.wrapper.unmount();
+
+    const moved = live({ state: "refused", error: busy });
+    let settle!: (value: boolean) => void;
+    vi.spyOn(moved.store, "cancelTurn").mockReturnValue(new Promise((r) => (settle = r)));
+    await flushPromises();
+    const outside = document.createElement("input");
+    document.body.appendChild(outside);
+    const action = moved.wrapper.get('[data-test="assistant-turn-outcome-action"]');
+    (action.element as HTMLElement).focus();
+    await action.trigger("click");
+    outside.focus();
+    settle(true);
+    await flushPromises();
+    expect(document.activeElement).toBe(outside);
+  });
+
+  it("grows a half sheet when a new outcome lands, and hides Go to answer with no answer text (U12)", async () => {
+    const { wrapper, store } = live(
+      {
+        state: "failed",
+        error: { code: "unknown", phase: "post_admission", retryable: true, action: "retry" },
+      },
+      [
+        { role: "user", content: raw("why?"), sentAt: 0, turnId: "t1" },
+        {
+          role: "assistant",
+          content: raw(""),
+          contentBlocks: [{ type: "turn_outcome", outcome: { kind: "failed", code: "unknown" } }],
+        },
+      ],
+    );
+    await flushPromises();
+    expect(wrapper.find('[data-test="assistant-strip-go-to-answer"]').exists()).toBe(false);
+    await wrapper.setProps({ sheet: true });
+    store.setSheetSnap("half");
+    wrapper.findComponent({ name: "AssistantTranscript" }).vm.$emit("outcome-shown");
+    await flushPromises();
+    expect(store.state.shell.sheetSnap).toBe("full");
+  });
+
+  it("keeps the failure line when a real failed turn grows the half sheet (W4)", async () => {
+    const { wrapper, store, sid } = live({ state: "connecting" }, [
+      { role: "user", content: raw("why 5xx?"), sentAt: 0, turnId: "t1" },
+      {
+        role: "assistant",
+        content: raw("partial"),
+        contentBlocks: [{ type: "text", text: "partial" }],
+      },
+    ]);
+    await wrapper.setProps({ sheet: true });
+    store.setSheetSnap("half");
+    await flushPromises();
+    const session = store.state.sessions[sid];
+    session.messages[1].contentBlocks.push({
+      type: "turn_outcome",
+      outcome: { kind: "failed", code: "agent_unavailable" },
+    });
+    session.turn = {
+      state: "failed",
+      error: {
+        code: "agent_unavailable",
+        phase: "post_admission",
+        retryable: true,
+        action: "retry",
+      },
+    };
+    store.announce(sid, "assistant.error.agent_unavailable.title");
+    await flushPromises();
+    expect(store.state.shell.sheetSnap).toBe("full");
+    expect(wrapper.get('[data-test="assistant-status-region"]').text()).toMatch(/^Failed\. /);
+  });
+
+  it("says Not sent for a refusal (HT-10 AC 2)", async () => {
+    const error = { code: "turn_limit", phase: "pre_admission", retryable: true, action: "retry" };
+    const { wrapper, store, sid } = live({ state: "refused", error });
+    await flushPromises();
+    store.announce(sid, "assistant.error.turn_limit.title");
+    await flushPromises();
+    expect(wrapper.get('[data-test="assistant-status-region"]').text()).toBe(
+      "Not sent. Too many answers are running. Wait for one to finish. Retry available.",
+    );
+  });
+
+  it("speaks tool steps at most once per 3 s, the latest winning (`95` §2.2)", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+    const { wrapper, store, sid } = live({ state: "connecting" });
+    await flushPromises();
+    const region = () => wrapper.get('[data-test="assistant-status-region"]').text();
+    store.announce(sid, "assistant.step.StreamList");
+    await flushPromises();
+    expect(region()).toBe("Listing streams");
+    store.announce(sid, "assistant.step.SearchSQL", { stream: "a" });
+    store.announce(sid, "assistant.step.SearchSQL", { stream: "b" });
+    await flushPromises();
+    expect(region()).toBe("Listing streams");
+    vi.advanceTimersByTime(STEP_ANNOUNCE_MS);
+    await flushPromises();
+    expect(region()).toBe("Querying b");
+    vi.useRealTimers();
+  });
+
+  it("opens the sign-in in a new tab with noopener and keeps this page (ERR-02)", async () => {
+    const tab = { opener: window } as unknown as Window;
+    const open = vi.spyOn(window, "open").mockReturnValue(tab);
+    const error = {
+      code: "session_expired",
+      phase: "pre_admission",
+      retryable: false,
+      action: "sign_in",
+    };
+    const { wrapper } = live({ state: "refused", error });
+    await flushPromises();
+    await wrapper.get('[data-test="assistant-turn-outcome-action"]').trigger("click");
+    expect(open).toHaveBeenCalledWith("/close-tab", "_blank");
+    expect(tab.opener).toBeNull();
+    expect(wrapper.find('[data-test="assistant-turn-outcome-popup-blocked"]').exists()).toBe(false);
+    open.mockRestore();
+  });
+
+  it("offers Open here when the browser blocks the sign-in tab (`80` §1.7)", async () => {
+    const open = vi.spyOn(window, "open").mockReturnValue(null);
+    const error = {
+      code: "session_expired",
+      phase: "pre_admission",
+      retryable: false,
+      action: "sign_in",
+    };
+    const { wrapper } = live({ state: "refused", error });
+    await flushPromises();
+    await wrapper.get('[data-test="assistant-turn-outcome-action"]').trigger("click");
+    expect(wrapper.find('[data-test="assistant-turn-outcome-open-here"]').exists()).toBe(true);
+    open.mockRestore();
   });
 });

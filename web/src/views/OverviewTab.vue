@@ -14,6 +14,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div class="px-page-edge text-text-body flex h-full flex-col gap-0 overflow-y-auto pt-2.5 pb-2.5">
+    <slot name="top" />
     <!-- Header: refresh + time picker -->
     <div v-if="pageState !== 'forbidden'" class="mb-4 flex justify-end">
       <div class="flex items-center gap-2">

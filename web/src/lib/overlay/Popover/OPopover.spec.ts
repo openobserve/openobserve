@@ -53,6 +53,16 @@ describe("OPopover", () => {
     expect(wrapper.find('[data-testid="content"]').exists()).toBe(true);
   });
 
+  it("masks its content for session replay only when privacy is mask", () => {
+    const plain = mount(OPopover, { props: { open: true }, slots: { default: "<p>x</p>" } });
+    expect(plain.find("[data-o-popover-content]").attributes("data-dd-privacy")).toBeUndefined();
+    const masked = mount(OPopover, {
+      props: { open: true, privacy: "mask" },
+      slots: { default: "<p>x</p>" },
+    });
+    expect(masked.find("[data-o-popover-content]").attributes("data-dd-privacy")).toBe("mask");
+  });
+
   it("follows the open prop back to closed", async () => {
     const wrapper = mount(OPopover, {
       props: { open: true },

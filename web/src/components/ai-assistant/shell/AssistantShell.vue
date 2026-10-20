@@ -97,7 +97,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- ③ body: the only scroll container -->
     <!-- Below md the body keeps room for the welcome's first block, so a half sheet never shows a single cut line (U4) -->
-    <div class="min-h-0 flex-1 overflow-y-auto max-md:min-h-20" data-test="assistant-shell-body">
+    <div
+      :class="[
+        'min-h-0 flex-1 max-md:min-h-20',
+        state === 'conversation' ? 'flex flex-col overflow-hidden' : 'overflow-y-auto',
+      ]"
+      data-test="assistant-shell-body"
+    >
       <AssistantGateState
         v-if="state === 'gate'"
         :reason="gateReason"
@@ -145,10 +151,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @select-starter="onStarter"
         @open-chat="onOpenChat"
       />
-      <!-- WP-06 renders the transcript here -->
-      <slot v-else-if="state === 'conversation'" name="transcript" />
-      <!-- WP-10 renders the approval and consent cards at the end of the transcript -->
-      <slot v-if="state === 'conversation'" name="cards" />
+      <slot v-else-if="state === 'conversation'" name="transcript">
+        <AssistantTranscript
+          ref="transcript"
+          :sid="activeSid ?? undefined"
+          :density="density"
+          @status-visible="(shown) => (statusRowVisible = shown)"
+          @outcome-shown="onOutcomeShown"
+        >
+          <!-- WP-10 renders the approval and consent cards at the end of the transcript -->
+          <template #cards><slot name="cards" /></template>
+        </AssistantTranscript>
+      </slot>
     </div>
 
     <!-- Below md the body yields down to its floor first; the lower stack scrolls only when even that is not enough -->
@@ -158,11 +172,68 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="flex shrink-0 flex-col max-md:min-h-0 max-md:shrink max-md:overflow-y-auto"
       data-test="assistant-shell-lower"
     >
-      <!-- ④ status strip with its one keyboard bridge (Review request or Go to answer); WP-06 and WP-10 -->
-      <slot name="status-strip" />
+      <!-- ④ status strip with its one keyboard bridge (Review request or Go to answer); WP-10 adds the review bridge -->
+      <slot name="status-strip">
+        <div
+          v-if="strip"
+          class="border-border-default flex min-w-0 shrink-0 flex-wrap items-center gap-x-2 gap-y-1 border-t px-3 py-1"
+          data-test="assistant-status-strip"
+        >
+          <AssistantTurnStatus
+            v-if="strip.status && session"
+            variant="block"
+            :turn="session.turn"
+            :meta="session.turnMeta"
+            :owned-by-this-tab="session.turnMeta.ownedByThisTab"
+            class="min-w-0 flex-1"
+            data-test="assistant-sticky-status"
+          />
+          <span v-else class="flex-1" />
+          <OButton
+            v-if="strip.jump"
+            variant="ghost"
+            size="sm"
+            :icon-left="assistantGlyph.jumpToLatest"
+            :aria-label="jumpName"
+            class="shrink-0 max-md:min-h-11 pointer-coarse:min-h-11"
+            data-test="assistant-scroll-latest"
+            @click="jumpToLatest"
+          >
+            {{ jumpLabel }}
+          </OButton>
+          <OButton
+            v-if="strip.goToAnswer"
+            variant="ghost"
+            size="sm"
+            class="shrink-0 max-md:min-h-11 pointer-coarse:min-h-11"
+            data-test="assistant-strip-go-to-answer"
+            @click="goToAnswer"
+          >
+            {{ t("assistant.strip.goToAnswer") }}
+          </OButton>
+        </div>
+      </slot>
       <slot name="tray">
         <AssistantContextTray :sid="activeSid" :collapsed="trayCollapsed" :visible="visible" />
       </slot>
+      <!-- A refusal stored nothing, so it sits above the composer that holds the restored prompt (`30` §4.2) -->
+      <div v-if="refusal" class="shrink-0 px-3 pt-1.5">
+        <AssistantTurnOutcome
+          kind="refused"
+          :error="refusal"
+          :role="capability.isAdmin ? 'admin' : 'member'"
+          :retry-snapshot-available="!!activeSid && store.canRetry(activeSid)"
+          :at="refusalAt"
+          :org="org"
+          :online="online"
+          :persistence="capability.persistence"
+          :signed-in="signedIn"
+          :popup-blocked="popupBlocked"
+          @action="(action) => onOutcomeAction(activeSid!, action, refusalRecord!)"
+          @open-here="openSignInHere"
+          @retry-ready="onRetryReady"
+        />
+      </div>
       <p
         v-if="unknownNotice"
         class="text-text-secondary shrink-0 px-3 pb-1 text-xs"
@@ -186,6 +257,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :ghost="ghost"
           :host="host"
           :visible="visible"
+          :cooldown-reason="coolingDown ? t('assistant.composer.rateLimited') : undefined"
         />
       </slot>
       <slot name="disclosure">
@@ -260,6 +332,9 @@ export interface ShellRouteContext {
 
 export const SHELL_ROUTE_CONTEXT: InjectionKey<ShellRouteContext> = Symbol("assistantShellRoute");
 
+/** Tool-step announcements are spaced at least this far apart (`95` §2.2). */
+export const STEP_ANNOUNCE_MS = 3_000;
+
 let lastKeydownAt = 0;
 
 /** The last keydown inside any assistant root, so a card never takes focus from a typing user (`95` §4). */
@@ -274,10 +349,15 @@ import {
   effectScope,
   inject,
   nextTick,
+  onBeforeUnmount,
+  onMounted,
   onScopeDispose,
+  provide,
   ref,
   shallowRef,
+  toRaw,
   watch,
+  type ComputedRef,
 } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
@@ -291,18 +371,33 @@ import AssistantContextTray from "@/components/ai-assistant/context/AssistantCon
 import AssistantGateState, {
   type GateCta,
 } from "@/components/ai-assistant/gate/AssistantGateState.vue";
+import AssistantTranscript from "@/components/ai-assistant/transcript/AssistantTranscript.vue";
+import AssistantTurnOutcome, {
+  outcomeActionLabel,
+  outcomeActionOf,
+  type OutcomeAction,
+} from "@/components/ai-assistant/turn/AssistantTurnOutcome.vue";
+import AssistantTurnStatus from "@/components/ai-assistant/turn/AssistantTurnStatus.vue";
 import AssistantWelcome from "@/components/ai-assistant/welcome/AssistantWelcome.vue";
 import {
+  isRunning,
   markHintSeen,
   readHints,
+  registerAssistantFocusTarget,
   useAssistantCapability,
   useAssistantName,
   useAssistantStarters,
   useAssistantStore,
+  type AssistantError,
   type Container,
   type GateReason,
   type Starter,
 } from "@/composables/assistant";
+import {
+  assistantSessionSourceKey,
+  assistantTranscriptHostKey,
+  type AssistantTranscriptHost,
+} from "@/composables/assistant/pure";
 import useBreakpoint from "@/composables/useBreakpoint";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -312,6 +407,8 @@ import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import { trackAssistant } from "@/services/assistantAnalytics";
+import { refreshSession } from "@/services/http";
+import type { ChatMessage, TurnOutcomeRecord } from "@/ts/interfaces/chat";
 import { useI18nTyped } from "@/types/i18n";
 
 import AssistantContainerMenu from "./AssistantContainerMenu.vue";
@@ -335,7 +432,7 @@ defineSlots<{
   disclosure?: () => unknown;
 }>();
 
-const { t } = useI18nTyped();
+const { t, te } = useI18nTyped();
 const { product } = useAssistantName();
 const store = useAssistantStore();
 const capability = useAssistantCapability();
@@ -349,6 +446,12 @@ const root = ref<HTMLElement | null>(null);
 const lower = ref<HTMLElement | null>(null);
 const region = ref<InstanceType<typeof AssistantStatusRegion> | null>(null);
 const composer = ref<InstanceType<typeof AssistantComposer> | null>(null);
+const transcript = ref<InstanceType<typeof AssistantTranscript> | null>(null);
+const statusRowVisible = ref(true);
+const online = ref(typeof navigator === "undefined" || navigator.onLine !== false);
+const signedIn = ref(false);
+const popupBlocked = ref(false);
+const dismissedRefusal = ref<unknown>(null);
 const learnOpen = ref(false);
 const openedByUser = ref(false);
 const disclosureDismissed = ref(false);
@@ -444,6 +547,333 @@ const ghost = computed(() => {
     ? { label: first.label, text: first.prompt, chips: first.chips, kind: first.kind }
     : null;
 });
+
+// The transcript imports no store (constraint 29); the shell hands it the session and the actions it may ask for.
+const messageSources = new Map<string, ComputedRef<ChatMessage[]>>();
+provide(assistantSessionSourceKey, (sid) => {
+  let source = messageSources.get(sid);
+  if (!source) {
+    source = computed(() => store.state.sessions[sid]?.messages ?? []);
+    messageSources.set(sid, source);
+  }
+  return source;
+});
+
+const transcriptHost: AssistantTranscriptHost = {
+  session: (sid) => store.state.sessions[sid] ?? null,
+  setFollow: (sid, follow) => store.setFollow(sid, follow),
+  setScroll(sid, top) {
+    const target = store.state.sessions[sid];
+    if (target) target.scroll.top = top;
+  },
+  selectVersion: (sid, turnId, n) => store.selectVersion(sid, turnId, n),
+  outcomeAction: (sid, action, outcome) => onOutcomeAction(sid, action, outcome),
+  isAdmin: () => capability.value.isAdmin,
+  persistence: () => capability.value.persistence,
+  online: () => online.value,
+  canRetry: (sid) => store.canRetry(sid),
+  focusComposer: focusAfterAction,
+};
+provide(assistantTranscriptHostKey, transcriptHost);
+
+const role = computed(() => (capability.value.isAdmin ? "admin" : "member"));
+
+const refusal = computed<AssistantError | null>(() => {
+  const turn = session.value?.turn;
+  if (turn?.state !== "refused" || dismissedRefusal.value === toRaw(turn)) return null;
+  return turn.error;
+});
+
+const refusalRecord = computed<TurnOutcomeRecord | null>(() =>
+  refusal.value
+    ? {
+        kind: "failed",
+        code: refusal.value.code,
+        ...(refusal.value.turnId && { turnId: refusal.value.turnId }),
+      }
+    : null,
+);
+
+// The refusal's own end time, kept on the session, so a remounted shell shows the same deadline.
+const refusalSeenAt = ref(Date.now());
+const refusalAt = computed(() => session.value?.turnMeta.endedAt ?? refusalSeenAt.value);
+const clock = ref(Date.now());
+let cooldownTimer: ReturnType<typeof setInterval> | null = null;
+const cooldownUntil = computed(() => {
+  const error = refusal.value;
+  return error?.code === "rate_limited" && error.retryAfterMs
+    ? refusalAt.value + error.retryAfterMs
+    : 0;
+});
+// Send waits out the same `retry_after` as the refusal's Retry, so the two paths agree (`80` §2.4).
+const coolingDown = computed(() => cooldownUntil.value > clock.value);
+
+// The strip speaks the status row's text while the row is out of view, and holds the one keyboard bridge (`30` §1.6, §3.2).
+const strip = computed(() => {
+  const current = session.value;
+  if (!current || state.value !== "conversation") return null;
+  const status = isRunning(current.turn) && !statusRowVisible.value;
+  const jump = !current.ui.follow;
+  // With no answer text there is nothing to go to; the outcome block is the latest content.
+  const goToAnswer =
+    ["done", "stopped", "failed"].includes(current.turn.state) && hasAnswerText(current.messages);
+  return status || jump || goToAnswer ? { status, jump, goToAnswer } : null;
+});
+
+const unseen = computed(() => session.value?.ui.unseen ?? 0);
+const jumpLabel = computed(() =>
+  unseen.value > 0
+    ? t("assistant.scroll.jumpToLatestCount", { count: unseen.value })
+    : t("assistant.scroll.jumpToLatest"),
+);
+const jumpName = computed(() =>
+  unseen.value > 0
+    ? t("assistant.scroll.jumpToLatestName", { count: unseen.value })
+    : t("assistant.scroll.jumpToLatest"),
+);
+
+function jumpToLatest(): void {
+  trackAssistant("ai_scroll_jump", { unseen: unseen.value });
+  transcript.value?.jumpToLatest();
+}
+
+function goToAnswer(): boolean {
+  return !!transcript.value?.focusLatestAnswer();
+}
+
+// A failure or refusal says its state word and names its one action in the same sentence (`95` §2.2).
+function announcementText(key: string, params: Record<string, unknown>): ReturnType<typeof t> {
+  const text = t(key, params);
+  const turn = session.value?.turn;
+  if (
+    !key.startsWith("assistant.error.") ||
+    (turn?.state !== "failed" && turn?.state !== "refused")
+  )
+    return text;
+  const state = turn.state === "failed" ? "failed" : "notSent";
+  // While `retry_after` runs, Retry is unavailable, so the line names the wait, not an available action.
+  const waitMs = turn.error.retryAfterMs
+    ? (session.value?.turnMeta.endedAt ?? Date.now()) + turn.error.retryAfterMs - Date.now()
+    : 0;
+  if (waitMs > 0)
+    return t(`assistant.announce.${state}RetryIn`, { title: text, s: Math.ceil(waitMs / 1000) });
+  const action = outcomeActionOf(turn.state, turn.error, {
+    role: role.value,
+    persistence: capability.value.persistence,
+    signedIn: signedIn.value,
+  });
+  if (!action) return t(`assistant.announce.${state}`, { title: text });
+  const label = outcomeActionLabel(action, turn.error.code, role.value, t, te);
+  return t(`assistant.announce.${state}WithAction`, { title: text, action: label });
+}
+
+// Tool steps are spoken at most once per STEP_ANNOUNCE_MS, the latest one winning (`95` §2.2).
+function announceLine(key: string, params: Record<string, unknown>): void {
+  const text = announcementText(key, params);
+  if (stepTimer) clearTimeout(stepTimer);
+  stepTimer = null;
+  const wait = stepSpokenAt + STEP_ANNOUNCE_MS - Date.now();
+  if (!key.startsWith("assistant.step.") || wait <= 0) {
+    if (key.startsWith("assistant.step.")) stepSpokenAt = Date.now();
+    return region.value?.announce(text);
+  }
+  stepTimer = setTimeout(() => {
+    stepTimer = null;
+    stepSpokenAt = Date.now();
+    region.value?.announce(text);
+  }, wait);
+}
+
+function onOutcomeAction(sid: string, action: OutcomeAction, outcome: TurnOutcomeRecord): void {
+  const query = { org_identifier: org.value };
+  const started = document.activeElement;
+  switch (action) {
+    case "retry":
+    case "ask_again":
+      signedIn.value = false;
+      void store.retry(sid);
+      return focusAfterAction();
+    case "continue":
+      store.continueTurn(sid);
+      return focusEntry();
+    case "edit_resend":
+      return stagePrompt(sid, outcome.turnId);
+    case "stop_it":
+      void stopBusy(sid).then((stopped) => stopped && focusAfterRequest(started));
+      return;
+    case "sign_in":
+      return signIn();
+    case "retry_save":
+      void store.retrySave(sid, outcome.turnId ?? store.state.sessions[sid]?.turnMeta.turnId ?? "");
+      return focusAfterAction();
+    case "reload_chat":
+      void store.openSession({ sid }).then(
+        () => focusAfterRequest(started),
+        () => undefined,
+      );
+      return;
+    case "open_iam_roles":
+      return void router.push({ name: "roles", query }).catch(() => undefined);
+    case "manage_usage":
+    case "view_plans":
+      return void router.push({ name: "plans", query }).catch(() => undefined);
+    default:
+      return;
+  }
+}
+
+function hasAnswerText(messages: ChatMessage[]): boolean {
+  const last = messages.at(-1);
+  return (
+    last?.role === "assistant" &&
+    !!last.contentBlocks?.some((block) => block.type === "text" && !!block.text?.trim())
+  );
+}
+
+// A half sheet grows so the new outcome's title and action fit; no "Expanded.", the outcome's own line is speaking (`30` §4.3).
+function onOutcomeShown(): void {
+  if (props.sheet && store.state.shell.sheetSnap === "half") store.setSheetSnap("full");
+}
+
+function onRetryReady(): void {
+  clock.value = Date.now();
+  region.value?.announce(t("assistant.outcome.canRetryNow"));
+}
+
+// After a round-trip, focus moves only if the reader is still on the control that started it (or it unmounted).
+function focusAfterRequest(started: Element | null): void {
+  void nextTick(() => {
+    const active = document.activeElement;
+    if (active === started || !active || active === document.body) focusEntry();
+  });
+}
+
+// The pressed control unmounts with its block or bar, so focus goes to the composer, never to the page.
+function focusAfterAction(): void {
+  void nextTick(focusEntry);
+}
+
+// Edit and resend from an outcome puts the original prompt back in the composer; nothing sends (HT-02 edge).
+function stagePrompt(sid: string, turnId: string | undefined): void {
+  const messages = store.state.sessions[sid]?.messages ?? [];
+  const prompt =
+    messages.find((message) => message.role === "user" && message.turnId === turnId) ??
+    [...messages].reverse().find((message) => message.role === "user");
+  if (!prompt) return;
+  store.stage(sid, {
+    text: String(prompt.content ?? ""),
+    chips: (prompt.chips ?? []).map((chip) => ({ ...toRaw(chip) })),
+    mode: "replace",
+  });
+  focusEntry();
+}
+
+// `turn_busy`'s Stop it cancels the turn that holds the lease, never the refused one (B-03).
+async function stopBusy(sid: string): Promise<boolean> {
+  const turn = store.state.sessions[sid]?.turn;
+  const activeTurnId = turn?.state === "refused" ? (turn.error.turnId ?? null) : null;
+  const stopped = await store.cancelTurn(sid, activeTurnId);
+  region.value?.announce(
+    stopped ? t("assistant.outcome.stopItSent") : t("assistant.outcome.stopItFailed"),
+  );
+  if (stopped && turn) dismissedRefusal.value = toRaw(turn);
+  return stopped;
+}
+
+let awaitingSignIn = false;
+let stepTimer: ReturnType<typeof setTimeout> | null = null;
+let stepSpokenAt = Number.NEGATIVE_INFINITY;
+
+// The sign-in runs in a new tab so this one keeps its page and draft (`80` §2.3; round 1 E-01).
+function signIn(): void {
+  awaitingSignIn = true;
+  // Without `noopener` a blocked tab shows as null; the tab is this app's own page and loses its opener at once.
+  const tab = window.open(router.resolve({ name: "closeTab" }).href, "_blank");
+  if (tab) tab.opener = null;
+  popupBlocked.value = !tab;
+}
+
+// Signing in here reloads this page, so the sign-in returns to it and the saved draft comes back.
+function openSignInHere(): void {
+  store.drafts.flush();
+  window.location.reload();
+}
+
+async function onVisibility(): Promise<void> {
+  if (!awaitingSignIn || document.visibilityState !== "visible") return;
+  awaitingSignIn = false;
+  if ((await refreshSession()) !== "refreshed") return;
+  signedIn.value = true;
+  region.value?.announce(t("assistant.outcome.signedIn"));
+}
+
+function onOnline(): void {
+  online.value = true;
+  if (refusal.value?.code === "offline") region.value?.announce(t("assistant.outcome.backOnline"));
+}
+
+function onOffline(): void {
+  online.value = false;
+}
+
+const offs: (() => void)[] = [];
+
+onMounted(() => {
+  window.addEventListener("online", onOnline);
+  window.addEventListener("offline", onOffline);
+  document.addEventListener("visibilitychange", onVisibility);
+  offs.push(
+    registerAssistantFocusTarget("answer", () => visible.value && goToAnswer()),
+    () => window.removeEventListener("online", onOnline),
+    () => window.removeEventListener("offline", onOffline),
+    () => document.removeEventListener("visibilitychange", onVisibility),
+  );
+});
+
+onBeforeUnmount(() => {
+  offs.forEach((off) => off());
+  if (stepTimer) clearTimeout(stepTimer);
+  if (cooldownTimer) clearInterval(cooldownTimer);
+});
+
+watch(
+  cooldownUntil,
+  (until) => {
+    if (cooldownTimer) clearInterval(cooldownTimer);
+    cooldownTimer = null;
+    clock.value = Date.now();
+    if (until <= clock.value) return;
+    cooldownTimer = setInterval(() => {
+      clock.value = Date.now();
+      if (clock.value < until || !cooldownTimer) return;
+      clearInterval(cooldownTimer);
+      cooldownTimer = null;
+    }, 1_000);
+  },
+  { immediate: true },
+);
+
+let restoredText: string | null = null;
+
+// Read after the restore lands, so the restored prompt itself never counts as an edit.
+watch(
+  refusal,
+  (error) => {
+    if (error) refusalSeenAt.value = Date.now();
+    restoredText = error ? (session.value?.composer.text ?? "") : null;
+  },
+  { flush: "post" },
+);
+
+// A declined consent note clears on the first keystroke after it (CC-06 AC 4).
+watch(
+  () => session.value?.composer.text,
+  (text) => {
+    const turn = session.value?.turn;
+    if (turn?.state !== "refused" || turn.error.code !== "consent_declined") return;
+    if (restoredText !== null && text !== restoredText) dismissedRefusal.value = toRaw(turn);
+  },
+);
 
 function dismissDisclosure(): void {
   disclosureDismissed.value = true;
@@ -581,7 +1011,7 @@ watch(
   () => store.announcement.value,
   (line) => {
     if (!line || !visible.value || line.sid !== store.state.shell.activeSid) return;
-    region.value?.announce(t(line.key, line.params ?? {}));
+    announceLine(line.key, line.params ?? {});
   },
 );
 

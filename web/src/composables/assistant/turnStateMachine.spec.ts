@@ -592,6 +592,19 @@ describe("turnReducer: one terminal per turn", () => {
     }
   });
 
+  it("stamps the end time on the turn, so retry_after counts from the refusal itself (V6)", () => {
+    const refused = run(
+      { state: "connecting" },
+      {
+        type: "fetch_error",
+        error: error({ status: 429, body: { error_code: "rate_limited", retry_after: 30 } }),
+      },
+      { now: 1_234 },
+    );
+    expect(refused.turn.state).toBe("refused");
+    expect(refused.effects).toContainEqual({ kind: "meta", patch: { endedAt: 1_234 } });
+  });
+
   it("emits ai_turn_ended exactly once over a whole turn, done included", () => {
     const events: TurnEvent[] = [
       { type: "send", turnId: "t1" },
@@ -664,9 +677,9 @@ describe("turnStatusText", () => {
 
   it("flips O2AIChat.stream.spec.ts:1268: an active tool reads as its step label, in a neutral tone", () => {
     const status = turnStatusText(S.tool, meta({ lastFrameAt: 3_000 }), t, 4_000);
-    expect(status).toEqual({ line: "Querying `default`", tone: "neutral" });
+    expect(status).toEqual({ line: "Querying default", tone: "neutral" });
     expect(turnStatusText(S.tool, meta({ lastFrameAt: 8_000 }), t, 12_000)?.line).toBe(
-      "Querying `default` · 12 s",
+      "Querying default · 12 s",
     );
   });
 
@@ -684,7 +697,7 @@ describe("turnStatusText", () => {
     const quiet = meta({ startedAt: 0, lastFrameAt: 0 });
     expect(turnStatusText(S.tool, quiet, t, STALL_MS - 1)?.tone).toBe("neutral");
     expect(turnStatusText(S.tool, quiet, t, STALL_MS)).toEqual({
-      line: "Querying `default` · 30 s",
+      line: "Querying default · 30 s",
       second: "No response for 30 s",
       tone: "warning",
     });
@@ -719,5 +732,99 @@ describe("turnStatusText", () => {
     let turn: TurnState = S.thinking;
     for (const frame of frames) turn = run(turn, frame).turn;
     expect(turn).toEqual({ state: "awaiting_approval", callId: "c9" });
+  });
+});
+
+describe("turnReducer: WP-23 lifecycle frames", () => {
+  const stepFrame = (state: string, callId = "c1") =>
+    ({
+      type: "step",
+      id: callId,
+      call_id: callId,
+      kind: "query",
+      label: "SearchSQL",
+      params: { stream: "default" },
+      state,
+    }) as TurnEvent;
+
+  it("keys a step on its top-level call_id and honours its state", () => {
+    const running = run(S.thinking, stepFrame("running", "c7"));
+    expect(running.turn).toMatchObject({ state: "running_tool", callId: "c7" });
+    expect(run(running.turn, stepFrame("done", "c7")).turn.state).toBe("responding.thinking");
+    expect(run(running.turn, stepFrame("failed", "c8")).turn).toBe(running.turn);
+  });
+
+  it("keeps the tool name of the tool_call when its running step follows", () => {
+    const step = run(S.tool, stepFrame("running", "c1"));
+    expect(step.turn).toBe(S.tool);
+    expect(step.effects.filter((effect) => effect.kind === "announce")).toEqual([]);
+  });
+
+  it("falls back to params.call_id when the step carries no top-level id", () => {
+    const frame = {
+      type: "step",
+      kind: "query",
+      label: "x",
+      params: { call_id: "c3" },
+    } as TurnEvent;
+    expect(run(S.thinking, frame).turn).toMatchObject({ state: "running_tool", callId: "c3" });
+  });
+
+  it("ends a cancelled{by:signed_out} turn as signed_out, any other cancel as elsewhere", () => {
+    const signedOut = run(S.writing, { type: "cancelled", by: "signed_out" } as TurnEvent);
+    expect(signedOut.turn).toMatchObject({ state: "failed", error: { code: "signed_out" } });
+    const server = run(S.writing, { type: "cancelled", by: "server", turn_id: "t1" } as TurnEvent);
+    expect(server.turn).toMatchObject({ error: { code: "cancelled_elsewhere" } });
+  });
+
+  it("reads complete{empty:true} as empty_response even with the notice text, and trusts empty:false", () => {
+    const empty = run(S.writing, { type: "complete", empty: true } as TurnEvent, {
+      steps: 0,
+      partial: true,
+    });
+    expect(empty.turn).toMatchObject({ state: "failed", error: { code: "empty_response" } });
+    const answered = run(S.thinking, { type: "complete", empty: false } as TurnEvent, {
+      steps: 0,
+      partial: false,
+    });
+    expect(answered.turn.state).toBe("done");
+  });
+
+  it("says a provider retry and its countdown, then clears it on the next answer frame", () => {
+    const retry = run(S.thinking, {
+      type: "retrying",
+      attempt: 2,
+      reason: "rate_limit",
+      retry_after: 12,
+    } as TurnEvent);
+    const patch = retry.effects.find((effect) => effect.kind === "meta");
+    expect(patch).toMatchObject({
+      patch: { retrying: { attempt: 2, retryAfterMs: 12_000, at: 1_000 } },
+    });
+    const m = meta({ ...(patch as { patch: Partial<TurnMeta> }).patch, startedAt: 0 });
+    expect(turnStatusText(S.thinking, m, t, 4_000)?.line).toBe(
+      "Retrying the AI provider in 9 s · attempt 2",
+    );
+    expect(turnStatusText(S.thinking, m, t, 20_000)?.line).toBe(
+      "Retrying the AI provider · attempt 2 · 20 s",
+    );
+    const delta = run(S.thinking, { type: "message_delta", content: "x" } as TurnEvent);
+    expect(delta.effects).toContainEqual({
+      kind: "meta",
+      patch: { retrying: null, compacting: false },
+    });
+  });
+
+  it("says compaction while the agent condenses earlier messages", () => {
+    const compacting = run(S.thinking, { type: "compacting" } as TurnEvent);
+    expect(compacting.effects).toContainEqual({ kind: "meta", patch: { compacting: true } });
+    expect(turnStatusText(S.thinking, meta({ compacting: true }), t, 1_000)?.line).toBe(
+      "Condensing earlier messages",
+    );
+  });
+
+  it("adds no lifecycle patch once the turn has ended", () => {
+    const ended = run(S.writing, { type: "complete" } as TurnEvent, { steps: 1, partial: true });
+    expect(ended.effects.filter((effect) => effect.kind === "meta")).toEqual([]);
   });
 });

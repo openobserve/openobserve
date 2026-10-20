@@ -233,12 +233,14 @@ const wrapperProps = computed<Record<string, unknown>>(() =>
         expandLabel: t("assistant.shell.sheetExpand"),
         collapseLabel: t("assistant.shell.sheetPeek"),
         dataTest: "assistant-ask-admin-sheet",
+        privacy: "mask",
       }
     : {
         side: "bottom",
         align: "start",
         ariaLabel: t("assistant.askAdmin.title"),
         contentClass: "w-[min(24rem,calc(100vw-1.5rem))]",
+        privacy: "mask",
       },
 );
 
