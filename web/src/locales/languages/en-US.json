@@ -8184,6 +8184,10 @@
       "span": "Span"
     },
     "beta": "Beta",
+    "claim": {
+      "name": "Evidence {n}, {step}",
+      "notAvailable": "Evidence not available in this view"
+    },
     "client": {
       "copyManually": "Couldn't copy. Select the text and copy it.",
       "popupBlocked": "Your browser blocked the new tab. Open it here instead?",
@@ -8322,6 +8326,7 @@
       "removeRow": "Remove row {n}",
       "rowsCount": "{count} row | {count} rows",
       "sent": "Sent with your message",
+      "sentLine": "Sent:",
       "startNew": "Start a new chat instead",
       "streamsValue": "{names} ({type})",
       "summary": "{scope} · {range}",
@@ -8340,6 +8345,9 @@
       "trimInternal": "Hide internal fields",
       "truncated": "truncated to {size}",
       "truncatedFields": "Cut to fit, longest values first: {fields}",
+      "used": "Used:",
+      "usedName": "Context used",
+      "usedNone": "No page context was used",
       "valueOff": "Off",
       "valueOn": "On"
     },
@@ -8623,8 +8631,97 @@
       "turn": "Turn",
       "when": "When"
     },
+    "evidence": {
+      "copied": "Query copied",
+      "fromStep": "from step {n}",
+      "groupName": "{language} query on {stream}, {range}",
+      "groupNameNoStream": "{language} query, {range}",
+      "lastMinutes": "last {count} min",
+      "noRows": "No rows in this range",
+      "noStreamAccess": "You don't have access to stream {stream}",
+      "openHint": "Opens with the query loaded. Nothing runs until you choose Run query.",
+      "opensNewTab": "{label} (opens in a new tab)",
+      "otherOrg": "This query belongs to {org}. Switch organization to run it.",
+      "queryFailed": "Query failed: {reason}",
+      "queryFailedPlain": "Query failed",
+      "rangeFallback": "range: unknown · runs on the last 15 min",
+      "rangeUnknown": "range: unknown",
+      "resultsOf": "Results of {name}",
+      "rowsCount": "{count} row | {count} rows",
+      "rowsScannedWindow": "{count} row · {took} · {size} scanned · {window} | {count} rows · {took} · {size} scanned · {window}",
+      "rowsWindow": "{count} row · {took} · {window} | {count} rows · {took} · {window}",
+      "scrollHint": "Scroll sideways for the full query",
+      "stopped": "Stopped",
+      "windowCapped": "{window} (cut to the last 7 days)"
+    },
+    "feedback": {
+      "addDetail": "Add detail (optional)",
+      "cancel": "Cancel",
+      "chatIdCopied": "Chat id copied",
+      "chatIdShort": "Chat {id}",
+      "copyChatId": "Copy chat id",
+      "disclosure": "Sends your rating, the reason and this chat's id. It never sends the chat text.",
+      "failed": "Couldn't send feedback. Try again.",
+      "groupName": "Rate this answer",
+      "helpful": "Helpful",
+      "localOnlyId": "This chat is saved in this browser only; the id still identifies it in server logs.",
+      "notHelpful": "Not helpful",
+      "reason": {
+        "other": "Something else",
+        "too_slow": "Too slow",
+        "wrong_action": "Did the wrong action",
+        "wrong_data": "Wrong data",
+        "wrong_query": "Wrong query"
+      },
+      "retry": "Try again",
+      "send": "Send",
+      "thanks": "Thanks for the feedback",
+      "whatWentWrong": "What went wrong?"
+    },
+    "findings": {
+      "comment": "What was the cause? (optional)",
+      "confidence": "Confidence: {level}",
+      "evidence": "Evidence",
+      "failed": "Couldn't send that. Try again.",
+      "inconclusive": "Inconclusive: the assistant couldn't confirm a cause",
+      "inferred": "Inferred",
+      "invalid": "Findings could not be shown as a card",
+      "level": {
+        "high": "high",
+        "inconclusive": "inconclusive",
+        "low": "low",
+        "medium": "medium"
+      },
+      "likelyCause": "Likely cause",
+      "nextSteps": "Next steps",
+      "no": "No",
+      "notSure": "Not sure",
+      "retry": "Try again",
+      "ruledOut": "Ruled out",
+      "send": "Send",
+      "thanks": "Thanks, that helps calibrate the assistant",
+      "title": "Findings",
+      "unknown": "Unknown",
+      "verified": "Verified by query",
+      "wasThisTheCause": "Was this the cause?",
+      "yes": "Yes"
+    },
     "footer": {
-      "notSavedHint": "This answer was given but could not be saved to history"
+      "credits": "{count} credit | {count} credits",
+      "creditsCountedHint": "Credits are counted when a request is accepted.",
+      "evaluated": "Evaluated {range}",
+      "evaluatedMore": "Evaluated {range} and {count} other window | Evaluated {range} and {count} other windows",
+      "includedCredits": "{count} included credit | {count} included credits",
+      "noQuery": "Answered without running a query",
+      "notSaved": "not saved",
+      "notSavedHint": "This answer was given but could not be saved to history",
+      "queries": "{count} query | {count} queries",
+      "rerun": "Re-run for now",
+      "rerunFor": "Re-run for {range}",
+      "stopped": "stopped",
+      "tokens": "{tokens} tokens · {count} model call | {tokens} tokens · {count} model calls",
+      "windowsName": "Evaluated windows",
+      "windowStep": "Step {n} · {range}"
     },
     "gate": {
       "announce": {
@@ -8703,6 +8800,31 @@
       "tooltip": "{product}",
       "unavailableName": "{product}, unavailable"
     },
+    "link": {
+      "cantOpen": "Can't open this here",
+      "fromAnswer": "Link in the answer",
+      "groupName": "{title}, {details}",
+      "id": "ID {id}",
+      "more": "More link actions",
+      "newTab": "Open in new tab",
+      "open": {
+        "alert": "Open alert “{name}”",
+        "alerts": "Open alerts",
+        "chat": "Open chat",
+        "dashboard": "Open dashboard “{name}”",
+        "dashboards": "Open dashboards",
+        "functions": "Open functions",
+        "incident": "Open incident “{name}”",
+        "incidents": "Open incidents",
+        "pipeline": "Open pipeline “{name}”",
+        "pipelines": "Open pipelines",
+        "trace": "Open trace {id}"
+      },
+      "openAction": "Open",
+      "opened": "Opened · {time}",
+      "openIn": "Open in {explorer}",
+      "unsupported": "This destination isn't supported in this version"
+    },
     "message": {
       "actionsName": "Message actions",
       "chipsName": "Context sent with this message",
@@ -8748,6 +8870,7 @@
       "backOnline": "You're back online.",
       "canRetryNow": "You can retry now.",
       "editResend": "Edit and resend",
+      "manualRoute": "Open in {explorer} instead",
       "noSnapshot": "The original message is no longer here to retry. Send it again from the message box.",
       "openHere": "Open here",
       "readonlyFailed": "Failed: {title}",
@@ -8758,6 +8881,18 @@
       "stopItFailed": "Couldn't stop the other answer. Try again.",
       "stopItSent": "Asked the other answer to stop.",
       "tryLater": "Try again later"
+    },
+    "query": {
+      "alert": "Create alert draft",
+      "copy": "Copy query",
+      "dashboard": "Add to dashboard",
+      "insert": "Insert as diff",
+      "more": "More query actions",
+      "newTab": "Open in new tab",
+      "open": "Open in {explorer}",
+      "run": "Run",
+      "running": "Running… · {n} s",
+      "stop": "Stop"
     },
     "scroll": {
       "jumpToLatest": "Jump to latest",
@@ -8801,6 +8936,37 @@
       "StreamSchema": "Reading schema for {stream}",
       "TraceSearch": "Searching traces",
       "update": "Updating {resource}"
+    },
+    "steps": {
+      "exit": "exit {code}",
+      "failedCount": "{count} failed",
+      "fields": "{count} field | {count} fields",
+      "hiddenByOwner": "{count} step hidden by the owner | {count} steps hidden by the owner",
+      "lines": "{count} line | {count} lines",
+      "outputTruncated": "Output truncated",
+      "rowName": "{step}, {state}",
+      "rows": "{count} row | {count} rows",
+      "soFar": "{count} step so far | {count} steps so far",
+      "step": {
+        "created": "Created {resource}",
+        "deleted": "Deleted {resource}",
+        "listed": "Listed streams",
+        "queried": "Queried {stream}",
+        "queriedMetrics": "Queried metrics",
+        "queryFailed": "Query failed",
+        "ran": "Ran {command}",
+        "ranTool": "Ran {tool}",
+        "schema": "Read schema for {stream}",
+        "searchedTraces": "Searched traces",
+        "toolFailed": "{tool} failed",
+        "updated": "Updated {resource}"
+      },
+      "stoppedBeforeFinish": "stopped before it finished",
+      "streams": "{count} stream | {count} streams",
+      "summary": "Worked through {count} step | Worked through {count} steps",
+      "summaryWith": "Worked through {count} step · {detail} | Worked through {count} steps · {detail}",
+      "window": "{from} → {to}",
+      "windowShowing": "{from} → {to} · Showing {shown} of {total} rows"
     },
     "strip": {
       "goToAnswer": "Go to answer"

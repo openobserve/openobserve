@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { resetAssistantV2ForTests } from "@/composables/assistant/flags";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { defineComponent, h, KeepAlive, nextTick, reactive, ref } from "vue";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
@@ -874,6 +875,86 @@ describe("Index.vue (Main Traces Page)", () => {
       await vi.waitFor(() => expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalled(), {
         timeout: 3000,
       });
+    });
+  });
+
+  describe("assistant links", () => {
+    afterEach(() => {
+      delete window.__O2_ASSISTANT_V2__;
+      resetAssistantV2ForTests();
+      delete store.state.zoConfig.auto_query_enabled;
+    });
+
+    it("applies an assistant link's stream and window without running it", async () => {
+      window.__O2_ASSISTANT_V2__ = true;
+      resetAssistantV2ForTests();
+      store.state.zoConfig.auto_query_enabled = true;
+      mockSearchObj.meta.liveMode = false;
+      routerCurrentRouteSpy.mockReturnValue({
+        value: {
+          query: { stream: "default", type: "ai_chat_query", t: "1", from: "1", to: "2" },
+          name: "traces",
+          path: "/traces",
+        },
+      } as any);
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            "services-catalog": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+      await vi.waitFor(() => expect(mockSearchObj.loadingStream).toBe(false));
+      await flushPromises();
+      expect(mockSearchObj.data.stream.selectedStream.value).toBe("default");
+      expect(mockFetchQueryDataWithHttpStream).not.toHaveBeenCalled();
+    });
+
+    it("re-applies a second assistant link on the open page from its nonce, still without running", async () => {
+      window.__O2_ASSISTANT_V2__ = true;
+      resetAssistantV2ForTests();
+      mockSearchObj.meta.liveMode = false;
+      const current = ref({
+        query: { stream: "default", type: "ai_chat_query", t: "1", from: "1", to: "2" } as Record<
+          string,
+          string
+        >,
+        name: "traces",
+        path: "/traces",
+      });
+      routerCurrentRouteSpy.mockReturnValue(current as any);
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            "services-catalog": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+      await vi.waitFor(() => expect(mockSearchObj.loadingStream).toBe(false));
+      await flushPromises();
+      current.value = {
+        ...current.value,
+        query: { ...current.value.query, t: "2", from: "5", to: "9", query: btoa("duration > 10") },
+      };
+      await vi.waitFor(() => expect(mockSearchObj.data.editorValue).toBe("duration > 10"));
+      expect(mockSearchObj.data.datetime).toMatchObject({ startTime: 5, endTime: 9 });
+      expect(mockFetchQueryDataWithHttpStream).not.toHaveBeenCalled();
     });
   });
 

@@ -447,4 +447,10 @@ describe("OCodeBlock", () => {
       wrapper.unmount();
     });
   });
+
+  it("drops the language and actions row when the host labels the code itself", () => {
+    const wrapper = mount(OCodeBlock, { props: { code: "SELECT 1", lang: "sql", toolbar: false } });
+    expect(wrapper.find(".o2-code-toolbar").exists()).toBe(false);
+    expect(wrapper.text()).toContain("SELECT 1");
+  });
 });

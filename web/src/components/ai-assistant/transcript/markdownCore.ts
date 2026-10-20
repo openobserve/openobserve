@@ -126,7 +126,15 @@ const BLOCK_END: ReadonlySet<string> = new Set([
 
 const BLOCK_START = /^[ \t]*(?:[-*+][ \t]|\d{1,9}[.)][ \t]|#{1,6}[ \t]|\|)/;
 
-const CLAIM_MARKER = /\[\^([A-Za-z0-9_-]{1,64})\]/g;
+const MAX_LINKS = 10;
+
+// The whitespace before a marker goes with it, so a chip sits against its word and never before punctuation.
+const CLAIM_MARKER = /[ \t]*\[\^([A-Za-z0-9_-]{1,64})\]/g;
+
+// Private-use characters hold a claim's place through escaping until the renderer writes its slot.
+const CLAIM_SLOT = /\uE000(\d{1,3})\uE001/g;
+
+const SLOT_CHARS = /[\uE000\uE001]/g;
 
 const PARTIAL_CLAIM = /\[(\^[A-Za-z0-9_-]{0,64})?$/;
 
@@ -184,6 +192,9 @@ let page: { origin: string; imageRemoved: string } = {
   imageRemoved: "",
 };
 
+// Same-origin hrefs of the block being rendered; the main thread allowlists them into link cards.
+let sameOrigin: string[] = [];
+
 /** A piece of a rendered block: prose HTML of at most PART_CHARS (sanitised as it mounts), a fence, or text. */
 export type MarkdownPart =
   | { kind: "html"; key: string; html: string }
@@ -225,8 +236,10 @@ export interface ParseResult {
   /** Why the block was not parsed but shown as plain text; absent for a parsed block. */
   rejected?: ShapeRisk;
   parts: MarkdownPart[];
-  /** `[^call_id]` markers in order of first citation; WP-08 renders them as claim chips (EB-05). */
+  /** `[^call_id]` markers in order of first citation; each sits in the HTML as `<wbr data-claim="index">`. */
   claims: string[];
+  /** Same-origin link targets (path and query), at most MAX_LINKS; never rendered as anchors. */
+  links?: string[];
   /** The block as a reader would paste it (Copy answer). */
   plain: string;
 }
@@ -261,7 +274,9 @@ function instance(): Marked {
       },
       text(token) {
         if ("tokens" in token && token.tokens) return this.parser.parseInline(token.tokens);
-        return spend("escaped" in token && token.escaped ? token.text : escapeHtml(token.text));
+        return spend(
+          slots("escaped" in token && token.escaped ? token.text : escapeHtml(token.text)),
+        );
       },
       // Raw HTML from the model is stripped; the text between its tags stays (EB-01 AC 3, SEC-04).
       html({ text, block }) {
@@ -295,7 +310,7 @@ function instance(): Marked {
                   ? CLASSES.cellStart
                   : "";
           return spend(
-            `<${tag}${align && ` class="${align}"`}>${escapeHtml(inlinePlain(item.tokens))}</${tag}>`,
+            `<${tag}${align && ` class="${align}"`}>${slots(escapeHtml(inlinePlain(item.tokens, true)))}</${tag}>`,
           );
         };
         const head = `<thead><tr>${token.header.map((item) => cell("th", item)).join("")}</tr></thead>`;
@@ -328,6 +343,7 @@ class OverBudget extends Error {
 /** Guard, lex and render one block; an unsafe shape or any throw falls back to the escaped text (`markdown_bomb`). */
 export function parseBlock(request: ParseRequest): ParseResult {
   page = { origin: request.origin, imageRemoved: request.imageRemoved };
+  sameOrigin = [];
   const claims: string[] = [];
   const risk = riskOf(request.text);
   if (risk) return { ...plainResult(request.blockId, request.text), rejected: risk };
@@ -339,15 +355,19 @@ export function parseBlock(request: ParseRequest): ParseResult {
   try {
     const open = request.state === "open";
     // Only a streaming block closes its own unterminated fence; a completed one is lexed exactly as sent (X11).
-    const repaired = open ? repairFence(request.text) : { text: request.text, open: false };
+    // The model's own slot characters go before lexing, so no code span or alt text can forge a slot.
+    const source = request.text.replace(SLOT_CHARS, "");
+    const repaired = open ? repairFence(source) : { text: source, open: false };
     const tokens = instance().lexer(repaired.text);
     // Markers come out of prose only; code keeps `[^0-9]` and every other bracket as written.
     stripClaims(tokens, claims, open);
     spend(claims.join(""));
     const parts = partsOf(request.blockId, tokens, repaired.open);
-    const plain = spend(tokens.map(plainOf).filter(Boolean).join("\n\n").trim());
+    const plain = spend(
+      tokens.map(plainOf).filter(Boolean).join("\n\n").replace(CLAIM_SLOT, "").trim(),
+    );
     // Highlighting spends only what the render left over, so it is dropped before a block is ever rejected (Y5).
-    return { parts: parts.map(highlightPart), claims, plain };
+    return { parts: parts.map(highlightPart), claims, links: [...sameOrigin], plain };
   } catch (error) {
     const rejected = error instanceof OverBudget ? error.risk : undefined;
     return { ...plainResult(request.blockId, request.text), ...(rejected && { rejected }) };
@@ -445,7 +465,7 @@ function breakHtmlRuns(html: string): string {
   return out + html.slice(last);
 }
 
-// Collects `[^id]` markers from text leaves in order; while streaming, a marker split at the very end is held back (EB-05 AC 7).
+// Collects `[^id]` markers from text leaves in order; while streaming, a marker split at the very end is held back.
 function stripClaims(tokens: Token[], claims: string[], open: boolean): void {
   const leaves: Token[] = [];
   collectLeaves(tokens, leaves);
@@ -454,7 +474,7 @@ function stripClaims(tokens: Token[], claims: string[], open: boolean): void {
     const textLeaf = leaf as Tokens.Text;
     textLeaf.text = textLeaf.text.replace(CLAIM_MARKER, (_all, id: string) => {
       if (!claims.includes(id)) claims.push(id);
-      return "";
+      return `\uE000${claims.indexOf(id)}\uE001`;
     });
   }
   const last = leaves[leaves.length - 1] as Tokens.Text | undefined;
@@ -642,7 +662,11 @@ function linkHtml(href: string | null | undefined, label: string): string {
   const url = parseUrl(href);
   if (!url || (url.protocol !== "http:" && url.protocol !== "https:"))
     return `<span>${label}</span>`;
-  if (url.origin === page.origin) return `<span>${label}</span>`;
+  if (url.origin === page.origin) {
+    const path = url.pathname + url.search;
+    if (sameOrigin.length < MAX_LINKS && !sameOrigin.includes(path)) sameOrigin.push(path);
+    return `<span>${label}</span>`;
+  }
   // `&` and `'` survive URL parsing and escape to five characters each, so the cap applies to the attribute as written (Z1).
   const attr = escapeAttr(url.href);
   if (attr.length > MAX_URL_CHARS) return `<span>${label}</span>`;
@@ -881,18 +905,24 @@ function listPlain(list: Tokens.List): string {
     .join("\n");
 }
 
-function inlinePlain(tokens: Token[] | undefined): string {
-  return (tokens ?? [])
+function inlinePlain(tokens: Token[] | undefined, keepSlots = false): string {
+  const text = (tokens ?? [])
     .map((token) => {
       if (token.type === "image") return (token as Tokens.Image).text;
       if (token.type === "br") return "\n";
       if (token.type === "html") return "";
       if (token.type === "codespan") return (token as Tokens.Codespan).text;
       const nested = (token as { tokens?: Token[] }).tokens;
-      if (nested) return inlinePlain(nested);
+      if (nested) return inlinePlain(nested, true);
       return decodeEntities((token as { text?: string }).text ?? "");
     })
     .join("");
+  return keepSlots ? text : text.replace(CLAIM_SLOT, "");
+}
+
+// A void tag is one piece to the splitter, so a cut never repeats a slot in two parts.
+function slots(html: string): string {
+  return html.replace(CLAIM_SLOT, '<wbr data-claim="$1">');
 }
 
 // The text of a raw HTML block: tags, comments and script or style bodies go, the words stay.
