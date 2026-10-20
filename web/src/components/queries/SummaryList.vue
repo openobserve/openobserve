@@ -242,7 +242,7 @@ export default defineComponent({
     const selectedRow = computed(() => props.selectedRows);
 
     const confirmDeleteAction = (props: any) => {
-      emit("delete:queries", props.row.trace_ids || []);
+      emit("delete:queries", props.row.queries || []);
     };
 
     const handleMultiQueryCancel = () => {

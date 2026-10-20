@@ -546,44 +546,25 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     testLogger.info('Default line chart query executed');
 
     // 2. Switch to table chart type
-    const tableSelected = await builder.selectChartType('table');
-    if (tableSelected) {
-      testLogger.info('Switched to table chart type');
+    await builder.selectChartType('table');
+    testLogger.info('Switched to table chart type');
 
-      // 3. Run query again with table chart
-      const respPromise2 = builder.waitForQueryResponse(15000);
-      await builder.clickRunQuery();
-      await respPromise2;
+    // 3. Run query again with table chart; the chart switch fires its own run, so settle before and after
+    await builder.waitForPromqlIdle();
+    await builder.clickRunQuery();
+    await builder.waitForPromqlIdle();
 
-      // 4. Verify no errors
-      expect(await pm.metricsPage.isErrorNotificationVisible()).toBe(false);
-      testLogger.info('Table chart query executed without errors');
+    // 4. Verify no errors
+    expect(await pm.metricsPage.isErrorNotificationVisible()).toBe(false);
+    testLogger.info('Table chart query executed without errors');
 
-      // 5. Verify table or chart rendered
-      const rendered = await builder.isChartRendered();
-      expect(rendered).toBe(true);
-      testLogger.info('Table/chart rendered successfully');
+    // 5. Verify the table rendered
+    await builder.expectTableRendered();
+    testLogger.info('Table rendered successfully');
 
-      // 6. Switch back to line chart
-      await builder.selectChartType('line');
-      testLogger.info('Switched back to line chart');
-    } else {
-      // Chart type selector might not be visible on metrics page
-      // (it may only appear in dashboard panel editor context)
-      testLogger.info('Table chart type not available on metrics page - checking area chart');
-
-      // Try area chart instead
-      const areaSelected = await builder.selectChartType('area');
-      if (areaSelected) {
-        const respPromise3 = builder.waitForQueryResponse(15000);
-        await builder.clickRunQuery();
-        await respPromise3;
-        expect(await pm.metricsPage.isErrorNotificationVisible()).toBe(false);
-        testLogger.info('Area chart query executed without errors');
-      } else {
-        testLogger.info('Chart type selector not available on metrics page (expected in dashboard context)');
-      }
-    }
+    // 6. Switch back to line chart
+    await builder.selectChartType('line');
+    testLogger.info('Switched back to line chart');
   });
 
   // =========================================================================
@@ -903,8 +884,7 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     testLogger.info('Builder state verified: metric, filter, operation, options all correct');
 
     // 8. Switch to Table chart type
-    const tableSelected = await builder.selectChartType('table');
-    expect(tableSelected).toBe(true);
+    await builder.selectChartType('table');
     testLogger.info('Switched to table chart type');
 
     // 9. Run query and intercept API request to verify PromQL query string
@@ -1083,8 +1063,7 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     testLogger.info('Builder state verified');
 
     // 7. Switch to table chart
-    const tableSelected = await builder.selectChartType('table');
-    expect(tableSelected).toBe(true);
+    await builder.selectChartType('table');
     testLogger.info('Table chart selected');
 
     // 8. Run query and capture API request

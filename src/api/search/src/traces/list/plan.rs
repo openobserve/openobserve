@@ -318,8 +318,8 @@ impl TraceColumns {
              count(DISTINCT {service_key}) AS service_count, \
              {root_service} AS root_service_name, \
              {root_operation} AS root_operation_name, \
-             first_value(service_name ORDER BY {TIMESTAMP_COL_NAME} ASC) AS first_service_name, \
-             first_value(operation_name ORDER BY {TIMESTAMP_COL_NAME} ASC) AS first_operation_name"
+             first_value(service_name ORDER BY {TIMESTAMP_COL_NAME} ASC, end_time DESC) AS first_service_name, \
+             first_value(operation_name ORDER BY {TIMESTAMP_COL_NAME} ASC, end_time DESC) AS first_operation_name"
         )
     }
 }
