@@ -592,6 +592,28 @@ describe("VideoPlayer", () => {
 
       localWrapper.unmount();
     });
+
+    it("should hand the replay a placeholder rule for canvases, which are never recorded", async () => {
+      const { default: rrwebPlayerMock } = await import("@openobserve/rrweb-player");
+      (rrwebPlayerMock as ReturnType<typeof vi.fn>).mockClear();
+
+      const localWrapper = mountComponent({ segments: [] });
+      await flushPromises();
+
+      await localWrapper.setProps({ segments: mockSegments });
+      await flushPromises();
+      await localWrapper.vm.$nextTick();
+
+      expect(rrwebPlayerMock).toHaveBeenCalled();
+      const { props } = (rrwebPlayerMock as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      expect(props.UNSAFE_replayCanvas).toBe(false);
+      expect(props.insertStyleRules).toHaveLength(1);
+      const [rule] = props.insertStyleRules;
+      expect(rule.startsWith("canvas {")).toBe(true);
+      expect(rule).toContain(encodeURIComponent("Canvas content not recorded"));
+
+      localWrapper.unmount();
+    });
   });
 
   // ==========================================================================

@@ -224,7 +224,13 @@ watch(
   { immediate: true, deep: true },
 );
 
-const selectedEventTypes = ref<string[]>(["error", "action", "view", "frustration"]);
+const selectedEventTypes = ref<string[]>([
+  "error",
+  "action",
+  "view",
+  "frustration",
+  "failed_request",
+]);
 const searchEvent = ref<string>("");
 
 const eventOptions = [
@@ -232,6 +238,7 @@ const eventOptions = [
   { label: t("rum.playerEvents.action"), value: "action" },
   { label: t("rum.playerEvents.view"), value: "view" },
   { label: t("rum.playerEvents.frustration"), value: "frustration" },
+  { label: t("rum.playerEvents.failedRequest"), value: "failed_request" },
 ];
 
 const searchEvents = (value: string | number | null) => {
