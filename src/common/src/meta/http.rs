@@ -59,13 +59,6 @@ pub struct HttpResponse {
     pub warnings: Option<Vec<String>>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct ESResponse {
-    pub took: u16,
-    pub errors: bool,
-    // pub items: Vec<Item>
-}
-
 impl HttpResponse {
     pub fn message(code: impl Into<u16>, message: impl ToString) -> Self {
         HttpResponse {
@@ -446,31 +439,6 @@ mod tests {
         assert_eq!(response.name, deserialized.name);
         assert_eq!(response.error_detail, deserialized.error_detail);
         assert_eq!(response.trace_id, deserialized.trace_id);
-    }
-
-    #[test]
-    fn test_es_response() {
-        let response = ESResponse {
-            took: 100,
-            errors: false,
-        };
-
-        assert_eq!(response.took, 100);
-        assert!(!response.errors);
-    }
-
-    #[test]
-    fn test_es_response_serialization() {
-        let response = ESResponse {
-            took: 100,
-            errors: false,
-        };
-
-        let serialized = serde_json::to_string(&response).unwrap();
-        let deserialized: ESResponse = serde_json::from_str(&serialized).unwrap();
-
-        assert_eq!(response.took, deserialized.took);
-        assert_eq!(response.errors, deserialized.errors);
     }
 
     #[test]

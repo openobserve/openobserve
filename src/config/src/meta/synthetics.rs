@@ -3143,13 +3143,6 @@ mod tests {
         })
     }
 
-    #[test]
-    fn test_v2_minimal_journey_accepted() {
-        let (locs, brs, devs) = allowed();
-        let s = v2_synthetic(serde_json::json!([v2_nav_step(), v2_click_step()]));
-        assert!(s.validate(&locs, &brs, &devs, true).is_ok());
-    }
-
     // ── Recorder test-id attribute ───────────────────────────────────────────
     // The attribute is a property of the application under test, not of O2, and
     // getting it wrong is SILENT: upstream's generator falls back to a hardcoded

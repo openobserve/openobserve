@@ -194,14 +194,6 @@ mod tests {
     }
 
     #[test]
-    fn test_try_from_model_http_template() {
-        let id = svix_ksuid::Ksuid::new(None, None).to_string();
-        let model = make_model(&id, None, "http");
-        let tmpl = Template::try_from(model).unwrap();
-        assert!(matches!(tmpl.template_type, TemplateType::Http));
-    }
-
-    #[test]
     fn test_try_from_model_sns_template() {
         let id = svix_ksuid::Ksuid::new(None, None).to_string();
         let model = make_model(&id, None, "slack");

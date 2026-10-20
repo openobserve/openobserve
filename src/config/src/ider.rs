@@ -185,16 +185,6 @@ impl MemorySize for SnowflakeIdGenerator {
     }
 }
 
-/// The `SnowflakeIdBucket` type is snowflake-id-bucket it easy to get id also have a id buffer.
-#[derive(Clone, Debug)]
-pub struct SnowflakeIdBucket {
-    /// Hidden the `SnowflakeIdGenerator` in bucket .
-    snowflake_id_generator: SnowflakeIdGenerator,
-
-    /// The bucket buffer;
-    bucket: Vec<i64>,
-}
-
 impl SnowflakeIdGenerator {
     /// Constructs a new `SnowflakeIdGenerator` using the UNIX epoch.
     /// Please make sure that machine_id is small than 1024(2^10);
@@ -261,52 +251,6 @@ impl SnowflakeIdGenerator {
         // last_time_millis is 64 bits, left shift 22 bit, store 42 bits, machine_id left shift 12
         // bits, idx complementing bits.
         (self.last_time_millis << 22) | ((self.machine_id << 12) as i64) | (self.idx as i64)
-    }
-
-    /// The lazy generate.
-    ///
-    /// Lazy generate.
-    /// Just start time record last_time_millis it consume every millis ID.
-    /// Maybe faster than standing time.
-    pub fn lazy_generate(&mut self) -> i64 {
-        self.idx = (self.idx + 1) % 4096;
-
-        if self.idx == 0 {
-            self.last_time_millis += 1;
-        }
-
-        // last_time_millis is 64 bits, left shift 22 bit, store 42 bits, machine_id left shift 12
-        // bits, idx complementing bits.
-        (self.last_time_millis << 22) | ((self.machine_id << 12) as i64) | (self.idx as i64)
-    }
-}
-
-impl SnowflakeIdBucket {
-    /// Constructs a new `SnowflakeIdBucket` using the UNIX epoch.
-    /// Please make sure that machine_id is small than 1024(2^10);
-    pub fn new(machine_id: i32) -> Self {
-        let snowflake_id_generator = SnowflakeIdGenerator::new(machine_id);
-        let bucket = Vec::new();
-
-        SnowflakeIdBucket {
-            snowflake_id_generator,
-            bucket,
-        }
-    }
-
-    pub fn get_id(&mut self) -> i64 {
-        if self.bucket.is_empty() {
-            self.generate_ids();
-            self.bucket.reverse();
-        }
-        self.bucket.pop().unwrap()
-    }
-
-    fn generate_ids(&mut self) {
-        for _ in 0..4091 {
-            self.bucket
-                .push(self.snowflake_id_generator.lazy_generate());
-        }
     }
 }
 
@@ -676,14 +620,6 @@ mod tests {
     }
 
     #[test]
-    fn test_snowflake_id_bucket() {
-        let mut bucket = SnowflakeIdBucket::new(1);
-        let id1 = bucket.get_id();
-        let id2 = bucket.get_id();
-        assert_ne!(id1, id2, "IDs from bucket should be unique");
-    }
-
-    #[test]
     fn test_generate_file_name() {
         let name1 = generate_file_name();
         let name2 = generate_file_name();
@@ -699,15 +635,6 @@ mod tests {
         let mut snowflake = SnowflakeIdGenerator::new(0);
         let id1 = snowflake.generate();
         let id2 = snowflake.generate();
-        assert_ne!(id1, id2);
-        assert!(id1 > 0);
-    }
-
-    #[test]
-    fn test_snowflake_generator_lazy_generate() {
-        let mut snowflake = SnowflakeIdGenerator::new(0);
-        let id1 = snowflake.lazy_generate();
-        let id2 = snowflake.lazy_generate();
         assert_ne!(id1, id2);
         assert!(id1 > 0);
     }

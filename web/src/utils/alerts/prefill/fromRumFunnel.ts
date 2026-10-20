@@ -44,7 +44,7 @@ export interface RumFunnelPrefillInput {
 /** Product Analytics funnel → AlertPrefill that fires when the funnel's conversion drops. */
 export const buildPrefillFromRumFunnel = (input: RumFunnelPrefillInput): AlertPrefill => {
   // The alert keeps the compiled SQL, so later edits to the funnel or its named events never reach it.
-  const warnings = [warn("rumFunnelSnapshot", "info")];
+  const warnings = [warn("rumFunnelSnapshot", "info"), warn("rumFunnelExclusions", "info")];
   const ready = input.def.steps.length > 1;
   if (!ready) warnings.push(warn("rumFunnelSteps", "blocking"));
   const period = periodMinutesFromRange(input.timeRange);

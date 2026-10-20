@@ -66,7 +66,9 @@ export class RumProductAnalyticsPage {
 
         this.funnels = page.locator('[data-test="rum-analytics-funnels"]');
         this.funnelCold = page.locator('[data-test="rum-analytics-funnel-cold"]');
-        this.funnelOrderLabel = page.locator('[data-test="rum-analytics-funnel-order-label"]');
+        this.funnelOrderLabel = page.locator('[data-test="rum-analytics-funnel-col-step"] [role="img"]');
+        this.funnelAddStepBtn = page.locator('[data-test="rum-analytics-funnel-add-step-btn"]');
+        this.funnelAddStep = page.locator('[data-test="rum-analytics-funnel-add-step"]');
         this.funnelAddDashboardBtn = page.locator('[data-test="rum-analytics-funnel-add-dashboard-btn"]');
         this.breakdownSelect = page.locator('[data-test="rum-analytics-funnel-breakdown-select"]');
         this.breakdown = page.locator('[data-test="rum-analytics-funnel-breakdown"]');
@@ -77,6 +79,7 @@ export class RumProductAnalyticsPage {
         this.pathsFlow = page.locator('[data-test="rum-analytics-paths-flow"]');
         this.pathsTopTable = page.locator('[data-test="rum-analytics-paths-top-table"]');
         this.pathsSessionFilter = page.locator('[data-test="rum-analytics-paths-session-filter"]');
+        this.pathsCohortPopover = page.locator('[data-test="rum-analytics-paths-cohort-popover"]');
         this.branchDrawer = page.locator('[data-test="rum-analytics-paths-branch-drawer"]');
 
         this.retention = page.locator('[data-test="rum-analytics-retention"]');
@@ -103,7 +106,9 @@ export class RumProductAnalyticsPage {
         this.invalidLink = page.locator('[data-test="rum-analytics-invalid-link"]');
         this.invalidLinkDismiss = page.locator('[data-test="rum-analytics-invalid-link-dismiss"]');
         this.deletedEventLink = page.locator('[data-test="rum-analytics-deleted-event-link"]');
-        this.syntheticExcluded = page.locator('[data-test="rum-analytics-synthetic-excluded"]');
+        this.exclusionsChip = page.locator('[data-test="rum-analytics-exclusions-chip"]');
+        this.exclusionsDrawer = page.locator('[data-test="rum-analytics-exclusions-drawer"]');
+        this.syntheticExcluded = page.locator('[data-test="rum-analytics-app-filters-synthetic"]');
         this.kpiSessions = page.locator('[data-test="rum-analytics-kpi-sessions"]');
 
         this.trendsClearBtn = page.locator('[data-test="rum-analytics-trends-clear-btn"]');
@@ -319,8 +324,44 @@ export class RumProductAnalyticsPage {
             .toEqual(expected);
     }
 
+    /** Suggested next steps; they render only inside the Add step popover, so call openAddStep first. */
     suggestion(text) {
         return this.page.locator('[data-test^="rum-analytics-funnel-suggestion-"]').filter({ hasText: text });
+    }
+
+    /** Opens the Add step popover; it closes itself after every added step. */
+    async openAddStep() {
+        if (await this.funnelAddStep.isVisible()) return;
+        await this.funnelAddStepBtn.click();
+        await expect(this.funnelAddStep).toBeVisible();
+    }
+
+    /** Adds a step from the Add step list, searching for it first; the row may sit under Suggested or its kind. */
+    async addStep(label) {
+        await this.openAddStep();
+        await this.funnelAddStep.locator('[data-test="o-field-list-search-field"]').fill(label);
+        const row = this.funnelAddStep
+            .locator('[data-test^="rum-analytics-funnel-suggestion-"], [data-test^="rum-analytics-funnel-add-step-"][data-test*=":"]')
+            .filter({ hasText: label });
+        await expect(row.first()).toBeVisible({ timeout: 20000 });
+        await row.first().click();
+        await expect(this.funnelAddStep).toBeHidden();
+    }
+
+    /** Drags step `from` onto step `to` by its handle; the list reorders only by drag. */
+    async dragStep(from, to) {
+        const handle = this.step(from).locator('.funnel-drag-handle');
+        const src = await handle.boundingBox();
+        const dst = await this.step(to).boundingBox();
+        const below = to > from;
+        await this.page.mouse.move(src.x + src.width / 2, src.y + src.height / 2);
+        await this.page.mouse.down();
+        const x = src.x + src.width / 2;
+        const y = below ? dst.y + dst.height * 0.75 : dst.y + dst.height * 0.25;
+        for (let k = 1; k <= 10; k++) {
+            await this.page.mouse.move(x, src.y + (y - src.y) * (k / 10));
+        }
+        await this.page.mouse.up();
     }
 
     dropoffBtn(i) {
@@ -329,6 +370,11 @@ export class RumProductAnalyticsPage {
 
     topPathSessionsBtn(i) {
         return this.page.locator(`[data-test="rum-analytics-paths-top-row-${i}-sessions-btn"]`);
+    }
+
+    async openExclusions() {
+        await this.exclusionsChip.click();
+        await expect(this.exclusionsDrawer).toBeVisible();
     }
 
     async openDropoff(i) {
@@ -651,6 +697,14 @@ export class RumProductAnalyticsPage {
     async saveBtnTooltip() {
         await this.funnelSaveBtnHolder.hover();
         const tip = this.page.getByRole('tooltip');
+        await expect(tip).toBeVisible({ timeout: 10000 });
+        return tip;
+    }
+
+    /** The OTooltip `target` shows on hover; reka's role="tooltip" node is visually hidden, so match the content. */
+    async tooltipOf(target) {
+        await target.hover();
+        const tip = this.page.locator('[data-test="o-tooltip-content"]');
         await expect(tip).toBeVisible({ timeout: 10000 });
         return tip;
     }

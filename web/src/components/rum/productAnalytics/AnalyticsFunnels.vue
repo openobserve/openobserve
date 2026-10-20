@@ -15,13 +15,73 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="flex flex-col" data-test="rum-analytics-funnels">
+  <div class="flex h-full min-h-0 flex-col" data-test="rum-analytics-funnels">
     <SavedFunnelBar
       :events="events"
       :events-ready="pa.eventsStatus.value === 'ready'"
       :compile-sql="savedSql"
-    />
-    <div class="px-page-edge flex flex-col gap-3 py-3">
+    >
+      <template v-if="def.steps.length" #actions>
+        <ODropdown v-if="recent.length" side="bottom" align="end">
+          <template #trigger>
+            <OButton
+              variant="ghost"
+              size="sm"
+              icon-left="history"
+              icon-right="arrow-drop-down"
+              data-test="rum-analytics-funnel-recent-btn"
+              >{{ t("rum.analytics.funnel.recent") }}</OButton
+            >
+          </template>
+          <ODropdownItem
+            v-for="(r, i) in recent"
+            :key="i"
+            :data-test="`rum-analytics-funnel-recent-menu-${i}`"
+            @select="funnelDraft.startNew(r)"
+          >
+            <KeySequence :keys="r.steps" :events="events" />
+          </ODropdownItem>
+        </ODropdown>
+        <span
+          v-if="recent.length"
+          class="border-border-default mx-1 h-5 border-s"
+          aria-hidden="true"
+        />
+        <span>
+          <OButton
+            variant="outline"
+            size="sm"
+            icon-left="shield-alert-outline"
+            :disabled="!alertReady"
+            data-test="rum-analytics-funnel-alert-btn"
+            @click="openAlert"
+            >{{ t("rum.analytics.funnel.alert") }}</OButton
+          >
+          <OTooltip :content="alertTip" />
+        </span>
+        <span>
+          <OButton
+            variant="outline"
+            size="sm"
+            icon-left="dashboard-customize"
+            :disabled="!dashboardReady"
+            data-test="rum-analytics-funnel-add-dashboard-btn"
+            @click="dashboardOpen = true"
+            >{{ t("rum.analytics.dashboard.add") }}</OButton
+          >
+          <OTooltip v-if="!dashboardReady" :content="dashboardTip" />
+        </span>
+      </template>
+      <template v-if="def.steps.length" #menu>
+        <ODropdownItem
+          icon-left="delete-sweep"
+          data-test="rum-analytics-funnel-clear-btn"
+          @select="clear"
+          >{{ t("rum.analytics.funnel.clearSteps") }}</ODropdownItem
+        >
+      </template>
+    </SavedFunnelBar>
+    <div class="px-page-edge flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto py-3">
       <OBanner
         v-if="usersFallback"
         variant="info"
@@ -35,6 +95,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         dense
         :content="t('rum.analytics.saved.missing')"
         data-test="rum-analytics-funnel-saved-missing"
+      />
+      <OBanner
+        v-if="needsNewer"
+        variant="warning"
+        dense
+        :content="t('rum.analytics.funnel.needsNewer')"
+        data-test="rum-analytics-funnel-needs-newer"
+      />
+      <OBanner
+        v-if="stale"
+        variant="info"
+        dense
+        :content="t('rum.analytics.saved.stale')"
+        data-test="rum-analytics-funnel-saved-stale"
       />
       <OBanner
         v-if="linkProblem === 'forbidden'"
@@ -88,15 +162,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OEmptyState>
       </OCard>
 
-      <OCard
+      <FunnelLayoutRail
         v-else
-        variant="outlined"
-        class="rounded-surface flex flex-col"
-        data-test="rum-analytics-funnel-card"
+        :def="def"
+        :result="result"
+        :removed="removed"
+        :suggestions="suggestions"
+        :suggestions-state="suggestionsState"
+        :state="funnelPanel"
+        :sampled="1"
+        :events="events"
+        :events-status="eventsStatus"
+        :deleted-names="namedEvents.deletedNames.value"
+        :unit-label="unitLabel"
+        :unit-noun="unitNoun"
+        :hide-time="!!def.breakdown"
+        :app="pa.state.app"
+        :app-filters="appFilters.counts.value"
+        :include-hidden="pa.state.includeExcluded"
+        :settings="layoutSettings"
+        :filter-fields="filterFields"
+        :filter-field-types="pa.schemaTypes.value"
+        :filter-values="filterValues"
+        :failed="funnelFailed"
+        @update:def="applyDef"
+        @filter-values="loadFilterValues"
+        @dropoff="openDropoff"
+        @suggestions-retry="retrySuggestions"
+        @include-hidden="appFilters.setIncludeHidden(router, true)"
+        @hide-hidden="appFilters.setIncludeHidden(router, false)"
+        @edit-app-filters="emit('open-exclusions')"
       >
-        <div class="border-border-default flex flex-wrap items-center gap-2 border-b px-4 py-2">
+        <template #header>
           <span
-            class="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2"
+            class="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2 max-md:basis-full"
             data-test="rum-analytics-funnel-overall"
           >
             <span class="text-text-heading text-sm font-semibold">{{
@@ -124,8 +223,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   })
                 }}</span
               >
+              <WhyEnteredPopover
+                v-if="!usersMode && def.steps.length > 1"
+                :count="firstUnits"
+                :app="pa.state.app"
+                :step1="firstLabel"
+                :state="whyState"
+                :lines="why"
+                :estimated="funnelPanel.sampled > 1"
+                @open="onWhyOpen"
+                @retry="loadWhy(true)"
+              />
             </template>
           </span>
+        </template>
+        <template #actions>
           <OToggleGroup
             :model-value="def.unit"
             type="single"
@@ -149,12 +261,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >{{ pa.usersUnit.value.label }}</OToggleGroupItem
             >
           </OToggleGroup>
+          <span class="border-border-default h-5 border-s max-md:hidden" aria-hidden="true" />
           <OSelect
             v-if="usersMode"
             :model-value="def.window"
             :options="windowOptions"
-            size="sm"
-            class="w-40"
+            size="xs"
+            width="sm"
             data-test="rum-analytics-funnel-window-select"
             @update:model-value="(v) => update({ window: v as FunnelWindow })"
           />
@@ -165,75 +278,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm"
             data-test="rum-analytics-funnel-window-fixed"
           />
+          <span class="border-border-default h-5 border-s max-md:hidden" aria-hidden="true" />
+          <label
+            for="rum-analytics-funnel-breakdown"
+            class="text-text-secondary text-xs font-semibold"
+            >{{ t("rum.analytics.funnel.breakdownLabel") }}</label
+          >
           <OSelect
+            id="rum-analytics-funnel-breakdown"
             :model-value="def.breakdown ?? 'none'"
             :options="breakdownOptions"
-            size="sm"
-            class="w-36"
+            size="xs"
+            width="xs"
             data-test="rum-analytics-funnel-breakdown-select"
             @update:model-value="
               (v) => update({ breakdown: v === 'none' ? null : (v as BreakdownDim) })
             "
           />
-          <span>
-            <OButton
-              variant="outline"
-              size="icon-toolbar"
-              icon-left="dashboard-customize"
-              :disabled="!dashboardReady"
-              :aria-label="dashboardTip"
-              data-test="rum-analytics-funnel-add-dashboard-btn"
-              @click="dashboardOpen = true"
-            />
-            <OTooltip :content="dashboardTip" />
-          </span>
-          <span>
-            <OButton
-              variant="outline"
-              size="icon-toolbar"
-              icon-left="shield-alert-outline"
-              :disabled="!alertReady"
-              :aria-label="alertTip"
-              data-test="rum-analytics-funnel-alert-btn"
-              @click="openAlert"
-            />
-            <OTooltip :content="alertTip" />
-          </span>
-          <ODropdown v-if="recent.length" side="bottom" align="end">
-            <template #trigger>
-              <OButton
-                variant="outline"
-                size="sm"
-                icon-left="history"
-                data-test="rum-analytics-funnel-recent-btn"
-                >{{ t("rum.analytics.funnel.recent") }}</OButton
-              >
-            </template>
-            <ODropdownItem
-              v-for="(r, i) in recent"
-              :key="i"
-              :data-test="`rum-analytics-funnel-recent-menu-${i}`"
-              @select="funnelDraft.startNew(r)"
-            >
-              <KeySequence :keys="r.steps" :events="events" />
-            </ODropdownItem>
-          </ODropdown>
-          <OButton
-            variant="ghost"
-            size="sm"
-            data-test="rum-analytics-funnel-clear-btn"
-            @click="clear"
-            >{{ t("rum.analytics.funnel.clear") }}</OButton
-          >
-        </div>
-
-        <div class="flex flex-col gap-2 px-4 py-3">
-          <span class="text-text-secondary text-xs" data-test="rum-analytics-funnel-order-label">{{
-            t("rum.analytics.funnel.orderLabel")
-          }}</span>
+        </template>
+        <template #notices>
           <span
             v-if="usersMode && result && result.step1Sessions !== null"
-            class="text-text-secondary flex items-center gap-1 text-xs"
+            class="text-text-secondary flex items-center gap-1 px-4 text-xs"
             data-test="rum-analytics-funnel-left-out"
             ><OIcon name="info-outline" size="sm" />{{
               t("rum.analytics.funnel.leftOut", {
@@ -248,6 +314,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="!identitySql"
             variant="info"
             dense
+            class="mx-4"
             :content="
               pa.identityGapText.value
                 ? t('rum.analytics.funnel.identityHintReason', { reason: pa.identityGapText.value })
@@ -267,6 +334,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OBanner>
           <NamedEventsNotice
             :status="eventsStatus"
+            class="mx-4"
             data-test="rum-analytics-funnel"
             @retry="pa.retryEvents()"
           />
@@ -274,12 +342,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="usersMode && pa.sampleRatio.value > 1"
             variant="default"
             dense
+            class="mx-4"
             :content="t('rum.analytics.funnel.usersExact')"
             data-test="rum-analytics-funnel-users-exact"
           />
 
           <AnalyticsPanelState
-            v-if="funnelPanel.status === 'error' || funnelPanel.status === 'forbidden'"
+            v-if="funnelFailed"
             :state="funnelPanel"
             data-test="rum-analytics-funnel"
             @retry="compute(true)"
@@ -289,6 +358,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="partial"
               variant="warning"
               dense
+              class="mx-4"
               :content="t('rum.analytics.partial')"
               data-test="rum-analytics-funnel-partial"
             />
@@ -313,28 +383,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
               </template>
             </OEmptyState>
-            <FunnelBuilder
-              :def="def"
-              :result="result"
-              :suggestions="suggestions"
-              :suggestions-state="suggestionsState"
-              :state="funnelPanel"
-              :sampled="1"
-              :events="events"
-              :events-status="eventsStatus"
-              :deleted-names="namedEvents.deletedNames.value"
-              :unit-label="unitLabel"
-              :unit-noun="unitNoun"
-              :hide-time="!!def.breakdown"
-              @update:def="(d) => (pa.funnel.value = d)"
-              @dropoff="openDropoff"
-              @suggestions-retry="retrySuggestions"
-            />
           </template>
+        </template>
+        <template #footer>
+          <span
+            v-if="!funnelFailed && def.x?.length"
+            class="text-text-secondary px-4 text-xs"
+            data-test="rum-analytics-funnel-exclusions-caption"
+            >{{ exclusionsCaption }}</span
+          >
           <template v-if="def.breakdown && breakdown && funnelPanel.status === 'ok'">
-            <span class="text-text-secondary text-xs">{{
+            <span class="text-text-secondary px-4 text-xs">{{
               t("rum.analytics.funnel.breakdownTimeHidden")
             }}</span>
+            <span
+              v-if="def.breakdown === 'app'"
+              class="text-text-secondary px-4 text-xs"
+              data-test="rum-analytics-funnel-by-app-rules"
+              >{{ t("rum.analytics.funnel.byAppRules", { app: raw(pa.state.app) }) }}</span
+            >
             <FunnelBreakdown
               :rows="breakdown.rows"
               :total="breakdown.total"
@@ -342,16 +409,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :dim-label="dimLabel"
               :events="events"
               :deleted-names="namedEvents.deletedNames.value"
+              :builtin-only="builtinOnlyApps"
             />
           </template>
-        </div>
-      </OCard>
+        </template>
+      </FunnelLayoutRail>
       <AddToDashboard
         v-if="dashboardOpen"
         v-model:open="dashboardOpen"
         :dashboard-panel-data="{ data: {} }"
         :panels="[dashboardPanel()]"
-        :notice="t('rum.analytics.dashboard.snapshot')"
+        :notice="t('rum.analytics.funnel.dashboardSnapshot')"
       />
       <DropoffDrawer
         v-if="dropoffCohort"
@@ -393,30 +461,41 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import AnalyticsPanelState from "@/components/rum/productAnalytics/AnalyticsPanelState.vue";
-import FunnelBuilder from "@/components/rum/productAnalytics/FunnelBuilder.vue";
 import FunnelBreakdown from "@/components/rum/productAnalytics/FunnelBreakdown.vue";
 import KeySequence from "@/components/rum/productAnalytics/KeySequence.vue";
 import DropoffDrawer from "@/components/rum/productAnalytics/DropoffDrawer.vue";
 import NamedEventsNotice from "@/components/rum/productAnalytics/NamedEventsNotice.vue";
 import SavedFunnelBar from "@/components/rum/productAnalytics/SavedFunnelBar.vue";
+import WhyEnteredPopover from "@/components/rum/productAnalytics/funnelParts/WhyEnteredPopover.vue";
+import { fitsLink } from "@/components/rum/productAnalytics/funnelParts/funnelEdits";
+import type { FilterValuesState } from "@/components/rum/productAnalytics/funnelParts/funnelFilters";
+import { whyLines, type WhyLines } from "@/components/rum/productAnalytics/funnelParts/whyEntered";
+import { toast } from "@/lib/feedback/Toast/useToast";
 import FunnelQuickStarts from "@/components/rum/productAnalytics/FunnelQuickStarts.vue";
 import useFunnelQuickStarts from "@/composables/rum/useFunnelQuickStarts";
 import useSavedFunnels from "@/composables/rum/useSavedFunnels";
 import useFunnelDraft, {
   editedInSession,
+  funnelStale,
   trackSessionEdits,
 } from "@/composables/rum/useFunnelDraft";
 import useProductAnalytics from "@/composables/rum/useProductAnalytics";
+import useAppFilterCounts from "@/composables/rum/useAppFilterCounts";
+import FunnelLayoutRail from "@/components/rum/productAnalytics/funnelLayouts/rail/FunnelLayoutRail.vue";
+import type { FunnelLayoutSetting } from "@/components/rum/productAnalytics/funnelLayouts/types";
 import { PA_ROUTES } from "@/utils/rum/productAnalyticsRoutes";
 import useAnalyticsSearch, { type PanelState } from "@/composables/rum/useAnalyticsSearch";
 import useNamedEvents from "@/composables/rum/useNamedEvents";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { addCommasToNumber } from "@/utils/formatters";
 import {
+  FILTER_FIELDS,
+  exclusionRemoved,
   foldBreakdown,
   formatCount,
   formatDuration,
   funnelParam,
+  isFilterColumn,
   toFunnelResult,
   type FunnelResult,
   type NamedEvent,
@@ -424,8 +503,11 @@ import {
 } from "@/utils/rum/productAnalyticsModel";
 import {
   DIMENSIONS,
+  filterValuesSql,
   funnelSql,
   nextStepsSql,
+  storedFunnelScope,
+  whyEnteredSql,
   type BreakdownDim,
   type BuildOpts,
   type FunnelCohort,
@@ -443,15 +525,19 @@ const AddToDashboard = defineAsyncComponent(() => import("@/plugins/metrics/AddT
 
 const DEBOUNCE_MS = 300;
 
+const emit = defineEmits<{ "open-exclusions": [] }>();
 const { t } = useI18nTyped();
 const router = useRouter();
 const pa = useProductAnalytics();
+const appFilters = useAppFilterCounts();
 const funnelDraft = useFunnelDraft();
 trackSessionEdits();
 const runner = useAnalyticsSearch();
 const { identitySql } = pa;
 
 const funnelPanel = runner.panel<Record<string, unknown>>("funnel");
+const valuesPanel = runner.panel<{ v: string; sessions: number }>("filter-values");
+const whyPanel = runner.panel<Record<string, unknown>>("why");
 const nextPanel = runner.panel<{ is_next: number; kind: string; k: string; units: number }>("next");
 const namedEvents = useNamedEvents();
 const savedFunnels = useSavedFunnels();
@@ -462,9 +548,12 @@ const eventsStatus = computed(() => (usesEvents.value ? pa.eventsStatus.value : 
 const { entries, entriesLoading, entriesFailed, recent, loadEntries, refreshRecent, pushRecent } =
   useFunnelQuickStarts(() => events.value);
 const dropoffCohort = ref<FunnelCohort | null>(null);
+const valuesField = ref<string | null>(null);
+const whyOpen = ref(false);
 const dashboardOpen = ref(false);
 const linkProblem = pa.savedLinkProblem;
 let timer: ReturnType<typeof setTimeout> | null = null;
+let whyTimer: ReturnType<typeof setTimeout> | null = null;
 let lastKey = "";
 let active = true;
 let activatedOnce = false;
@@ -514,17 +603,44 @@ const dimLabels = computed<Record<BreakdownDim, I18nText>>(() => ({
   country: t("rum.analytics.funnel.dims.country"),
   version: t("rum.analytics.funnel.dims.version"),
   env: t("rum.analytics.funnel.dims.env"),
+  app: t("rum.analytics.funnel.dims.app"),
 }));
 
 const breakdownOptions = computed(() => [
-  { label: t("rum.analytics.funnel.noBreakdown"), value: "none" },
+  { label: t("rum.analytics.funnel.breakdownNone"), value: "none" },
   ...(Object.keys(DIMENSIONS) as BreakdownDim[])
-    .filter((d) => pa.schema.value[DIMENSIONS[d]])
+    .filter((d) => (d === "app" ? !!pa.scope.value.apps?.length : pa.schema.value[DIMENSIONS[d]]))
     .map((d) => ({ label: dimLabels.value[d], value: d })),
 ]);
 
 const dimLabel = computed(() =>
   def.value.breakdown ? dimLabels.value[def.value.breakdown] : raw(""),
+);
+
+// Exclusions are applied to whatever the funnel's unit links together, so the caption names that span.
+const exclusionsCaption = computed<I18nText>(() => {
+  const w = effectiveDef.value.window;
+  if (w === "1h") return t("rum.analytics.funnel.exclusionsAcross1h");
+  if (w === "1d") return t("rum.analytics.funnel.exclusionsAcross1d");
+  if (w === "7d") return t("rum.analytics.funnel.exclusionsAcross7d");
+  return t("rum.analytics.funnel.exclusionsPerSession");
+});
+
+// An app with no settings row still gets the built-in bot rule, and only that.
+const builtinOnlyApps = computed(() =>
+  def.value.breakdown === "app"
+    ? pa.scopeSettings.value.filter((s) => s.id === null).map((s) => s.app)
+    : [],
+);
+
+// A NULL stored hash is a funnel saved before hashes existed, so it counts as changed.
+// The notice asks for a Save, so a read-only viewer, who cannot save, is not shown it.
+const stale = computed(
+  () => funnelStale(pa.openedFunnel.value) && namedEvents.permission.value !== "read",
+);
+
+const needsNewer = computed(
+  () => linkProblem.value === "unreadable" || pa.invalidParams.value.includes("funnel"),
 );
 
 const breakdown = computed(() =>
@@ -546,6 +662,80 @@ const result = computed<FunnelResult | null>(() => {
   const row = funnelPanel.value.rows[0] as Record<string, number> | undefined;
   return row ? toFunnelResult(row, effectiveDef.value) : null;
 });
+
+// Rows from an earlier run index another exclusion list, so they count only for the funnel on screen.
+const removed = computed<(number | null)[]>(() =>
+  funnelPanel.value.status === "ok" && funnelPanel.value.key === funnelKey.value
+    ? exclusionRemoved(funnelPanel.value.rows, def.value.x?.length ?? 0)
+    : [],
+);
+
+const filterFields = computed(() => [
+  ...FILTER_FIELDS.filter((f) => pa.schema.value[f]),
+  ...Object.keys(pa.schema.value).filter(isFilterColumn).sort(),
+]);
+
+// Rows from another field or scope must never be offered as this field's values.
+const filterValues = computed<FilterValuesState>(() => {
+  const p = valuesPanel.value;
+  const field = valuesField.value;
+  if (!field || p.key !== `${pa.scopeKey.value}|${field}`)
+    return { field, status: "idle", rows: [] };
+  if (p.status === "ok")
+    return {
+      field,
+      status: "ok",
+      rows: p.rows.map((r) => ({ value: String(r.v), sessions: Number(r.sessions) || 0 })),
+    };
+  if (p.status === "loading") return { field, status: "loading", rows: [] };
+  return {
+    field,
+    status: p.status === "error" || p.status === "forbidden" ? "error" : "idle",
+    rows: [],
+  };
+});
+
+const whyState = computed<"idle" | "loading" | "ok" | "error">(() => {
+  const p = whyPanel.value;
+  if (p.key !== funnelKey.value) return "idle";
+  if (p.status === "ok" || p.status === "loading") return p.status;
+  return p.status === "error" || p.status === "forbidden" ? "error" : "idle";
+});
+
+// The summary is the page's own, so only step 1 and Filter all steps need the popover's query.
+const why = computed<WhyLines | null>(() => {
+  const s = pa.summary.value;
+  if (whyState.value !== "ok" || !s || !result.value) return null;
+  const row = whyPanel.value.rows[0] ?? {};
+  return whyLines({
+    total: s.totalSessions,
+    synthetic: pa.schema.value.session_type ? s.syntheticSessions : 0,
+    builtinKept: s.builtinKeptSessions,
+    kept: s.sessions,
+    opened: Number(row.opened) || 0,
+    inFilter: Number(row.kept) || 0,
+    entered: firstUnits.value,
+    removed: removed.value,
+    atStep1: (def.value.x ?? []).map((x) => x.b === undefined && x.a === 1),
+    hasFilters: !!def.value.f?.length,
+  });
+});
+
+const layoutSettings = computed<FunnelLayoutSetting[]>(() => [
+  { id: "unit", label: t("rum.analytics.funnel.countBy"), value: unitLabel.value },
+  {
+    id: "window",
+    label: t("rum.analytics.funnel.railWindow"),
+    value:
+      windowOptions.value.find((o) => o.value === effectiveDef.value.window)?.label ??
+      t("rum.analytics.funnel.windowSession"),
+  },
+  {
+    id: "breakdown",
+    label: t("rum.analytics.funnel.railBreakdown"),
+    value: def.value.breakdown ? dimLabel.value : t("rum.analytics.funnel.noBreakdown"),
+  },
+]);
 
 const firstUnits = computed(() => result.value?.steps[0]?.units ?? 0);
 const lastUnits = computed(() => result.value?.steps[result.value.steps.length - 1]?.units ?? 0);
@@ -596,6 +786,9 @@ const suggestionsState = computed(() =>
 const pct = (v: number) => `${(v * 100).toFixed(1)}%`;
 
 // Undercounted numbers would seed the alert threshold, so a partial result holds Alert me back.
+const funnelFailed = computed(
+  () => funnelPanel.value.status === "error" || funnelPanel.value.status === "forbidden",
+);
 const partial = computed(() => funnelPanel.value.status === "ok" && !!funnelPanel.value.partial);
 const alertReady = computed(() => def.value.steps.length > 1 && !!result.value && !partial.value);
 const alertTip = computed<I18nText>(() => {
@@ -615,12 +808,15 @@ const dashboardTip = computed<I18nText>(() => {
     : t("rum.analytics.dashboard.funnelOnly");
 });
 
+// Stored and server-run SQL always keeps the app's rules; xall changes only what is displayed.
+const snapshotScope = () => ({ ...pa.scope.value, xall: undefined });
+
 // The alert starts at today's conversion, so it fires on any drop below what the user sees now.
 const openAlert = () => {
   const dt = pa.state.datetime;
   requestAlertCreation(
     buildPrefillFromRumFunnel({
-      scope: pa.scope.value,
+      scope: snapshotScope(),
       id: identitySql.value,
       def: { ...effectiveDef.value, breakdown: null },
       events: events.value,
@@ -651,7 +847,7 @@ watch(
 // A saved funnel's name is the panel's default title; the panel stays a snapshot.
 const dashboardPanel = () => {
   const panel = buildFunnelPanel(
-    pa.scope.value,
+    storedFunnelScope(pa.scope.value),
     def.value,
     events.value,
     t,
@@ -660,11 +856,14 @@ const dashboardPanel = () => {
   return pa.openedFunnel.value ? { ...panel, title: pa.openedFunnel.value.name } : panel;
 };
 
-// The time-relative SQL the funnel runs for `d`, kept beside it as a snapshot; null when Users cannot be counted here.
+// Stored SQL follows the definition, which remembers no page scope, so env, version, compared apps and new users stay out.
 const savedSql = (d: FunnelDef): string | null =>
-  d.unit === "users" && !identitySql.value
+  !pa.rulesReady.value || (d.unit === "users" && !identitySql.value)
     ? null
-    : funnelSql(pa.scope.value, identitySql.value, d, { events: events.value, sample: 1 });
+    : funnelSql(storedFunnelScope(pa.scope.value), identitySql.value, d, {
+        events: events.value,
+        sample: 1,
+      });
 
 // An sf link wins over the funnel it carried; only a confirmed absence drops it, a failed read keeps it for Retry.
 const resolveSavedLink = async (retry = false, quiet = false) => {
@@ -676,11 +875,12 @@ const resolveSavedLink = async (retry = false, quiet = false) => {
   let status = await savedFunnels.ensure(o, app, retry, quiet);
   // A load superseded by a forced reload settled nothing, so the newest reload in flight decides.
   while (status === "loading" && same()) status = await savedFunnels.ensure(o, app, false, quiet);
-  let found: SavedFunnel | null | "failed" =
+  let found: SavedFunnel | null | "failed" | "unreadable" =
     savedFunnels.funnels.value.find((f) => f.id === id) ?? null;
-  if (!found && status === "ready") found = await savedFunnels.fetchOne(o, app, id);
+  if (!found && status === "ready") found = await savedFunnels.readOne(o, app, id);
   if (!same() || status === "loading") return;
-  if (found === "failed" || status === "failed") pa.setSavedLinkIssue(app, id, "failed");
+  if (found === "unreadable") pa.setSavedLinkIssue(app, id, "unreadable");
+  else if (found === "failed" || status === "failed") pa.setSavedLinkIssue(app, id, "failed");
   else if (found) pa.openSavedFunnel(found, editedInSession(found.id, pa.funnel.value));
   else if (status === "forbidden") pa.setSavedLinkIssue(app, id, "forbidden");
   else pa.markSavedFunnelMissing();
@@ -699,9 +899,16 @@ const funnelKey = computed(() => {
   return `${pa.scopeKey.value}|${identitySql.value?.excluded.length ?? ""}|${JSON.stringify(funnelParam(d))}|${eventSignature(d)}`;
 });
 
-const update = (patch: Partial<FunnelDef>) => {
-  pa.funnel.value = { ...def.value, ...patch };
+// The URL keeps the funnel, so any edit that would push it past a link's length is refused.
+const applyDef = (d: FunnelDef) => {
+  if (!fitsLink(d)) {
+    toast({ variant: "error", message: t("rum.analytics.funnel.editTooLongForLink") });
+    return;
+  }
+  pa.funnel.value = d;
 };
+
+const update = (patch: Partial<FunnelDef>) => applyDef({ ...def.value, ...patch });
 
 const setSteps = (steps: StepRef[]) => {
   if (!steps.length) pa.detachSavedFunnel();
@@ -757,7 +964,7 @@ const compute = async (force = false) => {
     "funnel",
     {
       sql: funnelSql(pa.scope.value, identitySql.value, d, { ...opts, sample: 1 }),
-      ...cur,
+      ...pa.newUsersRange(cur, d.unit === "users" && !!identitySql.value),
       limit: d.breakdown ? 1000 : 1,
       sampled: 1,
     },
@@ -783,7 +990,7 @@ const runSuggestions = (
         { ...d, breakdown: null },
         { ...opts, sample: sampled },
       ),
-      ...cur,
+      ...pa.newUsersRange(cur, d.unit === "users" && !!identitySql.value),
       limit: 5,
       sampled,
     },
@@ -798,6 +1005,43 @@ const retrySuggestions = () => {
     events: events.value,
     sample: pa.sampleRatio.value,
   });
+};
+
+const loadFilterValues = (field: string) => {
+  valuesField.value = field;
+  if (!pa.schema.value[field]) return;
+  const key = `${pa.scopeKey.value}|${field}`;
+  const p = valuesPanel.value;
+  if (p.key === key && (p.status === "ok" || p.status === "loading")) return;
+  void runner.run(
+    "filter-values",
+    { sql: filterValuesSql(pa.scope.value, field), ...pa.resolveRange(), limit: 20, sampled: 1 },
+    key,
+  );
+};
+
+// Runs only while the popover is open, and never inside the funnel query, so the funnel keeps its row pruning.
+const loadWhy = (force = false) => {
+  const d = effectiveDef.value;
+  if (!whyOpen.value || usersMode.value || d.steps.length < 2) return;
+  const key = funnelKey.value;
+  const p = whyPanel.value;
+  if (!force && p.key === key && (p.status === "ok" || p.status === "loading")) return;
+  void runner.run(
+    "why",
+    {
+      sql: whyEnteredSql(pa.scope.value, d, { events: events.value, sample: 1 }),
+      ...pa.resolveRange(),
+      limit: 1,
+      sampled: 1,
+    },
+    key,
+  );
+};
+
+const onWhyOpen = (open: boolean) => {
+  whyOpen.value = open;
+  loadWhy();
 };
 
 const schedule = () => {
@@ -841,7 +1085,13 @@ const expectedDropped = computed(() => {
 
 const openCohortPaths = (cohort: FunnelCohort) => {
   dropoffCohort.value = null;
-  pa.paths.value = { ...pa.paths.value, anchor: null, cohort };
+  // Captured now: the open funnel can change later while Paths keeps this cohort.
+  const opened = pa.openedFunnel.value;
+  pa.paths.value = {
+    ...pa.paths.value,
+    anchor: null,
+    cohort: opened ? { ...cohort, name: opened.name, funnelId: opened.id } : cohort,
+  };
   pa.lastSubTab.value = "paths";
   void pa.pushSubTab(router, PA_ROUTES.paths);
 };
@@ -859,6 +1109,15 @@ watch(
     deep: true,
   },
 );
+
+// Typing an "Only when" value changes the key per keystroke, so the open popover reruns once typing settles.
+watch(funnelKey, () => {
+  if (whyTimer) clearTimeout(whyTimer);
+  whyTimer = setTimeout(() => {
+    whyTimer = null;
+    if (active) loadWhy();
+  }, DEBOUNCE_MS);
+});
 
 // Opening, saving or detaching a saved funnel need not change the steps, so the link is synced here.
 watch(
@@ -903,6 +1162,7 @@ onDeactivated(() => {
 
 onBeforeUnmount(() => {
   if (timer) clearTimeout(timer);
+  if (whyTimer) clearTimeout(whyTimer);
   runner.abortAll();
 });
 

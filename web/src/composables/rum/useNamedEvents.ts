@@ -61,10 +61,15 @@ const { items: events, permission, load, status, ensure, deny } = list;
 const deletedNames = ref<Record<string, string>>({});
 const deletedNamesRequested = new Set<string>();
 
+// A URL parameter rule may omit its value, and a click rule with an op carries a value instead of targets.
 const validRule = (r: unknown): r is NamedEvent["rules"][number] => {
   const rule = r as Record<string, unknown> | null;
-  if (rule?.t === "view") return typeof rule.value === "string" && typeof rule.op === "string";
-  return rule?.t === "action" && Array.isArray(rule.targets);
+  if (rule?.t === "view") {
+    if (typeof rule.op !== "string") return false;
+    return rule.op === "param" ? typeof rule.name === "string" : typeof rule.value === "string";
+  }
+  if (rule?.t === "error") return typeof rule.op === "string" && typeof rule.value === "string";
+  return rule?.t === "action" && (Array.isArray(rule.targets) || typeof rule.value === "string");
 };
 
 export function resetNamedEvents(): void {

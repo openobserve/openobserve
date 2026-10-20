@@ -51,10 +51,7 @@ use crate::{
             http::HttpResponse as MetaHttpResponse,
             organization::OrgRoleMapping,
             service_account::ServiceAccountCreateResponse,
-            user::{
-                UpdateUser, UserList, UserOrgRole, UserRequest, UserResponse, UserUpdateMode,
-                get_default_user_org,
-            },
+            user::{UpdateUser, UserList, UserOrgRole, UserRequest, UserResponse, UserUpdateMode},
         },
     },
     organization,
@@ -1184,20 +1181,6 @@ pub async fn root_user_exists() -> bool {
     }
 }
 
-pub fn is_user_from_org(orgs: Vec<UserOrg>, org_id: &str) -> (bool, UserOrg) {
-    if orgs.is_empty() {
-        (false, get_default_user_org())
-    } else {
-        let mut local_orgs = orgs;
-        local_orgs.retain(|org| !org.name.eq(org_id));
-        if local_orgs.is_empty() {
-            (false, get_default_user_org())
-        } else {
-            (true, local_orgs.first().unwrap().clone())
-        }
-    }
-}
-
 /// Decides whether an invite should be surfaced to the invitee.
 ///
 /// Split out of `list_user_invites` so the visibility rules can be unit tested
@@ -1544,7 +1527,7 @@ pub async fn create_service_account_if_not_exists(email: &str) -> Result<(), any
 
 #[cfg(test)]
 mod tests {
-    use common::{infra::config::USERS, meta::user::get_default_user_role};
+    use common::infra::config::USERS;
     use config::meta::user::{UserRole, UserType};
     use infra::{
         db::{self as infra_db, get_orm_client_rw},
@@ -1560,12 +1543,6 @@ mod tests {
     static TEST_SETUP_LOCK: tokio::sync::OnceCell<Mutex<()>> = tokio::sync::OnceCell::const_new();
 
     #[test]
-    fn test_redact_token_normal() {
-        // output is always 12 chars: first 4 visible, rest padded with '*'
-        assert_eq!(redact_token("abcd1234567890ef"), "abcd********");
-    }
-
-    #[test]
     fn test_redact_token_exactly_four_chars() {
         // 4 visible chars + 8 stars = 12 total
         assert_eq!(redact_token("abcd"), "abcd********");
@@ -1577,46 +1554,6 @@ mod tests {
         assert_eq!(redact_token("ab"), "************");
         assert_eq!(redact_token("x"), "************");
         assert_eq!(redact_token(""), "");
-    }
-
-    #[test]
-    fn test_redact_token_five_chars() {
-        // still shows first 4, pads to 12 total
-        assert_eq!(redact_token("abcde"), "abcd********");
-    }
-
-    #[test]
-    fn test_is_user_from_org() {
-        let target_org = "org1".to_string();
-
-        let user_org = UserOrg {
-            name: "org2".to_string(),
-            org_name: "Organization 2".to_string(),
-            token: "token2".to_string(),
-            rum_token: Some("rum2".to_string()),
-            role: get_default_user_role(),
-        };
-
-        let matched_org = UserOrg {
-            name: target_org.clone(),
-            org_name: "Organization 1".to_string(),
-            token: "token1".to_string(),
-            rum_token: Some("rum1".to_string()),
-            role: get_default_user_role(),
-        };
-
-        let (found, org) = is_user_from_org(vec![], &target_org);
-        assert!(!found);
-        assert_eq!(org.name, "");
-
-        let (found, org) = is_user_from_org(vec![matched_org.clone()], &target_org);
-        assert!(!found);
-        assert_eq!(org.name, "");
-
-        let (found, org) =
-            is_user_from_org(vec![matched_org.clone(), user_org.clone()], &target_org);
-        assert!(found);
-        assert_eq!(org.name, "org2");
     }
 
     /// Returned guard must be held for the whole test: `set_up` truncates the

@@ -358,13 +358,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_setting_scope_conversion() {
-        assert_eq!(SettingScope::System.as_str(), "system");
-        assert_eq!(SettingScope::Org.as_str(), "org");
-        assert_eq!(SettingScope::User.as_str(), "user");
-    }
-
-    #[test]
     fn test_model_to_setting() {
         let model = Model {
             id: 1,

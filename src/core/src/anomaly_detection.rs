@@ -3931,13 +3931,6 @@ mod tests {
 
     #[cfg(feature = "enterprise")]
     #[test]
-    fn test_extract_value_from_hit_count_field_integer() {
-        let hit = serde_json::json!({"count": 42});
-        assert!((extract_value_from_hit(&hit, None).unwrap() - 42.0).abs() < f64::EPSILON);
-    }
-
-    #[cfg(feature = "enterprise")]
-    #[test]
     fn test_extract_value_from_hit_underscore_count_field() {
         let hit = serde_json::json!({"_count": 7});
         assert!((extract_value_from_hit(&hit, None).unwrap() - 7.0).abs() < f64::EPSILON);

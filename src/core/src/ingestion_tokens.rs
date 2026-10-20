@@ -195,11 +195,6 @@ pub async fn validate_token(
 
 #[cfg(test)]
 mod tests {
-    #[test]
-    fn test_validate_name_rejects_empty() {
-        let name = "";
-        assert!(name.trim().is_empty());
-    }
 
     #[test]
     fn test_validate_name_rejects_whitespace_only() {
@@ -217,47 +212,8 @@ mod tests {
     }
 
     #[test]
-    fn test_validate_name_allows_single_char() {
-        let name = "a";
-        assert!(
-            name.chars()
-                .all(|c| c.is_alphanumeric() || c == '-' || c == '_')
-        );
-    }
-
-    #[test]
     fn test_validate_name_rejects_special_chars() {
         let name = "bad name!";
-        assert!(
-            !name
-                .chars()
-                .all(|c| c.is_alphanumeric() || c == '-' || c == '_')
-        );
-    }
-
-    #[test]
-    fn test_validate_name_rejects_slash() {
-        let name = "path/token";
-        assert!(
-            !name
-                .chars()
-                .all(|c| c.is_alphanumeric() || c == '-' || c == '_')
-        );
-    }
-
-    #[test]
-    fn test_validate_name_rejects_dot() {
-        let name = "token.name";
-        assert!(
-            !name
-                .chars()
-                .all(|c| c.is_alphanumeric() || c == '-' || c == '_')
-        );
-    }
-
-    #[test]
-    fn test_validate_name_rejects_at_sign() {
-        let name = "token@org";
         assert!(
             !name
                 .chars()

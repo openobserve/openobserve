@@ -214,6 +214,7 @@ test.describe('RUM Product Analytics schema-state regressions', () => {
       const w = watchSearch400(page);
       try {
         await pa.goto('funnels', { app: app.appId, period: '7d', funnel: funnelParam([['p', app.funnel.a]]) }, { org: state.org });
+        await pa.openAddStep();
         await expect(pa.suggestion(app.funnel.b).first()).toBeVisible({ timeout: 30000 });
         await expect(pa.funnelSuggestionsError).toHaveCount(0);
         await pa.suggestion(app.funnel.b).first().click();

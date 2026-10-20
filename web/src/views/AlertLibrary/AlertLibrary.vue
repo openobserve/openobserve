@@ -118,7 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                  row would push the grid down; the stat strip would re-flow its tiles.
                  Here the only thing that resizes is an empty text field. -->
             <div
-              class="border-border-default px-page-edge flex shrink-0 items-center gap-3 border-b py-2"
+              class="border-border-default px-page-edge flex shrink-0 flex-wrap items-center gap-3 border-b py-2"
               data-test="alert-library-toolbar"
             >
               <OButton
@@ -139,6 +139,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :placeholder="t('alert_library.searchPlaceholder')"
                 data-test="alert-library-search"
               />
+
+              <!-- Absent when the catalogue offers one kind only: a filter with one answer is noise. -->
+              <OToggleGroup
+                v-if="alertTypeOptions.length > 0"
+                type="single"
+                :model-value="alertType"
+                :aria-label="t('alert_library.alertType')"
+                class="shrink-0"
+                data-test="alert-library-alert-type"
+                @update:model-value="onAlertTypeChange"
+              >
+                <OToggleGroupItem
+                  v-for="item in alertTypeOptions"
+                  :key="item.id"
+                  :value="item.id"
+                  size="sm"
+                  :data-test="`alert-library-alert-type-${item.id}`"
+                >
+                  {{ item.label }}
+                </OToggleGroupItem>
+              </OToggleGroup>
 
               <!-- The tri-state is LAST and always present, so it never moves: the
                    selection controls grow leftward into the search field's width. -->
@@ -191,6 +212,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ref="selectAllBox"
                   size="sm"
                   :model-value="viewSelectionState"
+                  :disabled="selectableVisible.length === 0"
+                  :title="
+                    selectableVisible.length === 0 ? t('alert_library.enterpriseHint') : undefined
+                  "
                   :label="t('alert_library.selectAllInView')"
                   :aria-label="t('alert_library.selectAllInView')"
                   class="shrink-0"
@@ -281,16 +306,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </h2>
                     <!-- Suppressed at one group, where it duplicates the toolbar control. -->
                     <OButton
-                      v-if="groupedEntries.length > 1"
+                      v-if="groupedEntries.length > 1 && group.selectable.length > 0"
                       :id="`alert-library-select-group-id-${group.id}`"
                       variant="ghost"
                       size="xs"
                       class="ms-auto"
                       :aria-labelledby="`alert-library-select-group-id-${group.id} alert-library-group-heading-${group.id}`"
                       :data-test="`alert-library-select-group-${group.id}`"
-                      @click="toggleGroup(group.entries)"
+                      @click="toggleGroup(group.selectable)"
                     >
-                      {{ groupToggleLabel(group.entries) }}
+                      {{ groupToggleLabel(group.selectable) }}
                     </OButton>
                   </div>
                   <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
@@ -300,8 +325,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :entry="entry"
                       :ready="entryReady(entry)"
                       :selected="selectedIds.has(entry.id)"
+                      :locked="isLocked(entry)"
                       @open="openEntry(entry)"
-                      @update:selected="setSelected(entry.id, $event)"
+                      @update:selected="onCardSelected(entry, $event)"
                     />
                   </div>
                 </section>
@@ -335,6 +361,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from "vue";
+import type { AcceptableValue } from "reka-ui";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 
@@ -345,6 +372,9 @@ import LibraryEmptyState from "@/components/alertLibrary/LibraryEmptyState.vue";
 import LibraryInstallDialog from "@/components/alertLibrary/LibraryInstallDialog.vue";
 import LibraryRail from "@/components/alertLibrary/LibraryRail.vue";
 import {
+  ALERT_TYPE_ORDER,
+  alertTypeLabel,
+  alertTypeOf,
   categoryLabel,
   packLabel,
   severityLabel,
@@ -354,13 +384,17 @@ import {
 } from "@/components/alertLibrary/libraryFacets";
 import {
   useAlertLibrary,
+  useAnomalyLibraryAccess,
   toStreamsByType,
   streamDataState,
 } from "@/composables/alerts/useAlertLibrary";
 import type { AlertLibraryErrorCode } from "@/composables/alerts/useAlertLibrary";
 import useStreams from "@/composables/useStreams";
+import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import useBreakpoint from "@/composables/useBreakpoint";
@@ -372,7 +406,7 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import type { AlertLibraryEntry, AlertLibraryFile, StreamsByType } from "@/types/alertLibrary";
-import { raw, useI18nTyped, type I18nKey } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 
 /** Where the alerts are authored. Not the serving URL — that is a constant. */
 const CONTRIBUTE_URL = "https://github.com/openobserve/o2-alerts-library";
@@ -382,6 +416,8 @@ const store = useStore();
 const router = useRouter();
 
 const { manifest, isLoading, error, loadManifest, isReady } = useAlertLibrary();
+const anomalyAccess = useAnomalyLibraryAccess();
+const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
 const { getStreams } = useStreams(t);
 
 /** Empty = every category. The rail narrows, it does not gate. */
@@ -391,6 +427,7 @@ const railSearch = ref("");
 const { isMobile } = useBreakpoint();
 const mobileFiltersOpen = ref(false);
 const severity = ref("all");
+const alertType = ref("all");
 /** Stat-strip facet. `null` = no availability filter; "all" never sticks. */
 const facet = ref<"ready" | "missing" | null>(null);
 const search = ref("");
@@ -416,7 +453,16 @@ const streamsPending = ref(true);
  */
 const readinessKnown = ref(false);
 
-const entries = computed<AlertLibraryEntry[]>(() => manifest.value?.alerts ?? []);
+const entries = computed<AlertLibraryEntry[]>(() => {
+  const scheduled = manifest.value?.alerts ?? [];
+  if (anomalyAccess.value === "hidden") return scheduled;
+  // Stamped, since the list an entry came from is what makes it an anomaly alert.
+  const anomaly = (manifest.value?.anomaly_alerts ?? []).map((entry) => ({
+    ...entry,
+    alert_type: "anomaly_detection" as const,
+  }));
+  return [...scheduled, ...anomaly];
+});
 const lastFetched = computed<number | null>(() => store.state.alertLibrary?.lastFetched ?? null);
 const loadFailed = computed(() => !!error.value && !manifest.value);
 /**
@@ -458,6 +504,9 @@ const errorDescription = computed(() => {
 const entryReady = (entry: AlertLibraryEntry): boolean =>
   readinessKnown.value ? isReady(entry, streamsByType.value) : true;
 
+const isLocked = (entry: AlertLibraryEntry): boolean =>
+  anomalyAccess.value !== "enabled" && alertTypeOf(entry) === "anomaly";
+
 // ── scope ──────────────────────────────────────────────────────────────────
 /**
  * Everything the rail and the search have narrowed to, BEFORE the stat strip's
@@ -491,6 +540,9 @@ const matchesCategory = (entry: AlertLibraryEntry): boolean =>
 const matchesSeverity = (entry: AlertLibraryEntry): boolean =>
   severity.value === "all" || entry.severity === severity.value;
 
+const matchesAlertType = (entry: AlertLibraryEntry): boolean =>
+  alertType.value === "all" || alertTypeOf(entry) === alertType.value;
+
 const matchesFacet = (entry: AlertLibraryEntry): boolean => {
   if (facet.value === "ready") return entryReady(entry);
   if (facet.value === "missing") return !entryReady(entry);
@@ -499,7 +551,9 @@ const matchesFacet = (entry: AlertLibraryEntry): boolean => {
 
 const searchScoped = computed(() => {
   const needle = search.value.trim().toLowerCase();
-  return entries.value.filter((entry) => matchesCategory(entry) && matchesSearch(entry, needle));
+  return entries.value.filter(
+    (entry) => matchesCategory(entry) && matchesSearch(entry, needle) && matchesAlertType(entry),
+  );
 });
 
 const scopedEntries = computed(() => searchScoped.value.filter(matchesSeverity));
@@ -566,7 +620,14 @@ const categoryFacets = computed<LibraryFacet[]>(() => {
   const counts = new Map<string, number>();
   for (const id of selectedCategories.value) counts.set(id, 0);
   for (const entry of entries.value) {
-    if (!matchesSearch(entry, needle) || !matchesSeverity(entry) || !matchesFacet(entry)) continue;
+    if (
+      !matchesSearch(entry, needle) ||
+      !matchesSeverity(entry) ||
+      !matchesFacet(entry) ||
+      !matchesAlertType(entry)
+    ) {
+      continue;
+    }
     counts.set(entry.category, (counts.get(entry.category) ?? 0) + 1);
   }
   return [...counts.keys()]
@@ -595,6 +656,22 @@ const severityFacets = computed<LibraryFacet[]>(() => {
       count: tally.get(id) ?? 0,
     })),
   ];
+});
+
+// Empty when only one kind is on offer.
+const alertTypeOptions = computed<Array<{ id: string; label: I18nText }>>(() => {
+  if (!entries.value.some((entry) => alertTypeOf(entry) === "anomaly")) return [];
+  return [
+    { id: "all", label: t("alert_library.alertTypeAll") },
+    ...ALERT_TYPE_ORDER.map((id) => ({ id: id as string, label: alertTypeLabel(t, id) })),
+  ];
+});
+
+// The toggle hides with the options, which would leave a type filter nobody can see or lift.
+watch(alertTypeOptions, (options) => {
+  if (alertType.value !== "all" && !options.some((item) => item.id === alertType.value)) {
+    alertType.value = "all";
+  }
 });
 
 /**
@@ -671,6 +748,7 @@ const groupedEntries = computed(() => {
         label: categoryLabel(category),
         packLabel: packsOnScreen.size > 1 ? packLabel(pack) : null,
         entries: entriesInGroup,
+        selectable: entriesInGroup.filter((entry) => !isLocked(entry)),
       };
     });
 });
@@ -684,10 +762,13 @@ const offscreenCount = computed(() => {
   return [...selectedIds.value].filter((id) => !onScreen.has(id)).length;
 });
 
+// Locked cards can never be ticked, so counting them would leave "all" forever indeterminate.
+const selectableVisible = computed(() => visibleEntries.value.filter((entry) => !isLocked(entry)));
+
 const viewSelectionState = computed<boolean | "indeterminate">(() => {
-  const ticked = visibleEntries.value.filter((entry) => selectedIds.value.has(entry.id)).length;
+  const ticked = selectableVisible.value.filter((entry) => selectedIds.value.has(entry.id)).length;
   if (ticked === 0) return false;
-  return ticked === visibleEntries.value.length ? true : "indeterminate";
+  return ticked === selectableVisible.value.length ? true : "indeterminate";
 });
 
 const groupFullySelected = (groupEntries: AlertLibraryEntry[]) =>
@@ -705,6 +786,14 @@ const setSelected = (id: string, selected: boolean) => {
   selectedIds.value = next;
 };
 
+const onCardSelected = (entry: AlertLibraryEntry, selected: boolean) => {
+  if (isLocked(entry)) {
+    openUpgradeDialog();
+    return;
+  }
+  setSelected(entry.id, selected);
+};
+
 const selectAllBox = ref<{ $el: HTMLElement } | null>(null);
 
 // Clearing unmounts the button that was clicked, so focus would fall to <body>
@@ -719,7 +808,7 @@ const clearSelection = async () => {
 const toggleViewSelection = () => {
   const next = new Set(selectedIds.value);
   const selectAll = viewSelectionState.value !== true;
-  for (const entry of visibleEntries.value) {
+  for (const entry of selectableVisible.value) {
     if (selectAll) next.add(entry.id);
     else next.delete(entry.id);
   }
@@ -740,7 +829,7 @@ const toggleGroup = (groupEntries: AlertLibraryEntry[]) => {
 // Resolved against the whole manifest: the off-screen part of the batch must survive the hand-off.
 const addSelected = () => {
   pendingBatch.value = entries.value
-    .filter((entry) => selectedIds.value.has(entry.id))
+    .filter((entry) => selectedIds.value.has(entry.id) && !isLocked(entry))
     .sort(byGridOrder);
   installSeed.value = null;
   installOpen.value = true;
@@ -753,7 +842,8 @@ const onInstalled = ({ entryIds }: { entryIds: string[] }) => {
 
 // A dropped alert would fail its row for a reason nobody can act on; pruning nothing is a no-op.
 watch(entries, (available) => {
-  const live = new Set(available.map((entry) => entry.id));
+  // Locked too: a ticked card that became locked could not be unticked, since its box opens the upsell.
+  const live = new Set(available.filter((entry) => !isLocked(entry)).map((entry) => entry.id));
   if (selectedIds.value.size > 0) {
     const kept = [...selectedIds.value].filter((id) => live.has(id));
     if (kept.length !== selectedIds.value.size) selectedIds.value = new Set(kept);
@@ -768,9 +858,15 @@ const hasActiveFilters = computed(
   () =>
     selectedCategories.value.length > 0 ||
     severity.value !== "all" ||
+    alertType.value !== "all" ||
     facet.value !== null ||
     search.value.trim() !== "",
 );
+
+// Re-clicking the active chip yields ""; like severity, the type is widened with All, never cleared.
+const onAlertTypeChange = (value: AcceptableValue | AcceptableValue[] | boolean) => {
+  if (typeof value === "string" && value !== "") alertType.value = value;
+};
 
 const onStatSelect = (key: string) => {
   if (key === "all") {
@@ -785,11 +881,16 @@ const clearFilters = () => {
   selectedCategories.value = [];
   railSearch.value = "";
   severity.value = "all";
+  alertType.value = "all";
   facet.value = null;
   search.value = "";
 };
 
 const openEntry = (entry: AlertLibraryEntry) => {
+  if (isLocked(entry)) {
+    openUpgradeDialog();
+    return;
+  }
   selectedEntry.value = entry;
   drawerOpen.value = true;
 };
