@@ -22,8 +22,7 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use config::meta::model_pricing::{
-    BUILT_IN_ORG, META_ORG, MatchKind, ModelPricingDefinition, PricingSource,
-    PricingTierDefinition,
+    BUILT_IN_ORG, META_ORG, MatchKind, ModelPricingDefinition, PricingSource, PricingTierDefinition,
 };
 use db::model_pricing::{self, CachedModelPricing};
 use openobserve_core::traces::otel::pricing::{
@@ -1086,7 +1085,9 @@ mod tests {
     #[test]
     fn test_derive_test_string_skips_optional_provider_prefix_group() {
         assert_eq!(
-            derive_test_string(r"(?i)^(?:[\w-]+[/.:])*gpt-5\.4-mini(?:-\d{4}-\d{2}-\d{2}|-\d{8})?$"),
+            derive_test_string(
+                r"(?i)^(?:[\w-]+[/.:])*gpt-5\.4-mini(?:-\d{4}-\d{2}-\d{2}|-\d{8})?$"
+            ),
             "gpt-5.4-mini"
         );
         assert_eq!(derive_test_string(r"(?i)(?:openai/)?gpt-4o"), "gpt-4o");

@@ -178,8 +178,14 @@ impl PricingTier {
                 value: min as f64,
             }),
             prices: HashMap::from([
-                ("input".to_string(), self.input_price_per_million / 1_000_000.0),
-                ("output".to_string(), self.output_price_per_million / 1_000_000.0),
+                (
+                    "input".to_string(),
+                    self.input_price_per_million / 1_000_000.0,
+                ),
+                (
+                    "output".to_string(),
+                    self.output_price_per_million / 1_000_000.0,
+                ),
             ]),
             utc_windows: self.utc_windows.clone(),
             ..Default::default()
@@ -706,8 +712,14 @@ mod tests {
     fn test_model_pricing_matches() {
         let pricing = ModelPricing::simple("gpt-4", "gpt-4", 30.0, 60.0);
         assert_eq!(pricing.match_kind("gpt-4"), Some(MatchKind::Exact));
-        assert_eq!(pricing.match_kind("gpt-4-0613"), Some(MatchKind::Approximate));
-        assert_eq!(pricing.match_kind("azure/gpt-4"), Some(MatchKind::Approximate));
+        assert_eq!(
+            pricing.match_kind("gpt-4-0613"),
+            Some(MatchKind::Approximate)
+        );
+        assert_eq!(
+            pricing.match_kind("azure/gpt-4"),
+            Some(MatchKind::Approximate)
+        );
         assert_eq!(pricing.match_kind("gpt-3.5-turbo"), None);
     }
 
@@ -724,7 +736,10 @@ mod tests {
         // gpt-5.2 pattern uses \\. to match literal dot — should NOT match "gpt-512"
         let pricing = ModelPricing::simple("gpt-5\\.2", "gpt-5.2", 1.75, 14.00);
         assert_eq!(pricing.match_kind("gpt-5.2"), Some(MatchKind::Exact));
-        assert_eq!(pricing.match_kind("gpt-5.2-something"), Some(MatchKind::Approximate));
+        assert_eq!(
+            pricing.match_kind("gpt-5.2-something"),
+            Some(MatchKind::Approximate)
+        );
         assert_eq!(pricing.match_kind("gpt-512"), None);
         assert_eq!(pricing.match_kind("gpt-5x2"), None);
     }
@@ -733,8 +748,14 @@ mod tests {
     fn test_dot_escape_gemini_versions() {
         // Gemini patterns use \\. for version dots
         let pricing = ModelPricing::simple("gemini-2\\.5-flash", "gemini-2.5-flash", 0.30, 2.50);
-        assert_eq!(pricing.match_kind("gemini-2.5-flash"), Some(MatchKind::Exact));
-        assert_eq!(pricing.match_kind("gemini-2.5-flash-001"), Some(MatchKind::Approximate));
+        assert_eq!(
+            pricing.match_kind("gemini-2.5-flash"),
+            Some(MatchKind::Exact)
+        );
+        assert_eq!(
+            pricing.match_kind("gemini-2.5-flash-001"),
+            Some(MatchKind::Approximate)
+        );
         assert_eq!(pricing.match_kind("gemini-225-flash"), None);
         assert_eq!(pricing.match_kind("gemini-2x5-flash"), None);
     }
@@ -744,7 +765,10 @@ mod tests {
         // gpt-3.5 uses \\. — should not match gpt-315 or gpt-3X5
         let pricing = ModelPricing::simple("gpt-3\\.5-turbo", "gpt-3.5-turbo", 0.50, 1.50);
         assert_eq!(pricing.match_kind("gpt-3.5-turbo"), Some(MatchKind::Exact));
-        assert_eq!(pricing.match_kind("gpt-3.5-turbo-0125"), Some(MatchKind::Approximate));
+        assert_eq!(
+            pricing.match_kind("gpt-3.5-turbo-0125"),
+            Some(MatchKind::Approximate)
+        );
         assert_eq!(pricing.match_kind("gpt-315-turbo"), None);
     }
 
@@ -941,12 +965,24 @@ mod tests {
         let kind_of =
             |model: &str| find_compiled(&table, model).map(|(p, k)| (p.canonical.as_str(), k));
 
-        assert_eq!(kind_of("gpt-5.4-mini"), Some(("gpt-5.4-mini", MatchKind::Exact)));
+        assert_eq!(
+            kind_of("gpt-5.4-mini"),
+            Some(("gpt-5.4-mini", MatchKind::Exact))
+        );
         assert_eq!(kind_of("gpt-5.4"), Some(("gpt-5.4", MatchKind::Exact)));
-        assert_eq!(kind_of("claude-opus-5-5"), Some(("claude-opus-5-5", MatchKind::Exact)));
-        assert_eq!(kind_of("claude-opus-5"), Some(("claude-opus-5", MatchKind::Exact)));
+        assert_eq!(
+            kind_of("claude-opus-5-5"),
+            Some(("claude-opus-5-5", MatchKind::Exact))
+        );
+        assert_eq!(
+            kind_of("claude-opus-5"),
+            Some(("claude-opus-5", MatchKind::Exact))
+        );
         // No exact match: the first approximate one in table order.
-        assert_eq!(kind_of("gpt-5.4-nano"), Some(("gpt-5.4", MatchKind::Approximate)));
+        assert_eq!(
+            kind_of("gpt-5.4-nano"),
+            Some(("gpt-5.4", MatchKind::Approximate))
+        );
         assert_eq!(kind_of("o3"), None);
     }
 
@@ -976,13 +1012,21 @@ mod tests {
     #[test]
     fn test_resolve_pricing_built_in_definition_wins_between_equal_kinds() {
         // Both exact.
-        let entries = vec![definition_entry("bi-gpt-4o", "(?i)^gpt-4o$", PricingSource::BuiltIn)];
+        let entries = vec![definition_entry(
+            "bi-gpt-4o",
+            "(?i)^gpt-4o$",
+            PricingSource::BuiltIn,
+        )];
         assert_eq!(
             resolved(&entries, "gpt-4o"),
             Some(("bi-gpt-4o".to_string(), MatchKind::Exact))
         );
         // Both approximate.
-        let entries = vec![definition_entry("bi-gpt-4o", "(?i)gpt-4o", PricingSource::BuiltIn)];
+        let entries = vec![definition_entry(
+            "bi-gpt-4o",
+            "(?i)gpt-4o",
+            PricingSource::BuiltIn,
+        )];
         assert_eq!(
             resolved(&entries, "gpt-4o-2024-08-06"),
             Some(("bi-gpt-4o".to_string(), MatchKind::Approximate))
@@ -991,7 +1035,11 @@ mod tests {
 
     #[test]
     fn test_resolve_pricing_compiled_exact_beats_built_in_approximate() {
-        let entries = vec![definition_entry("bi-gpt-4", "(?i)gpt-4", PricingSource::BuiltIn)];
+        let entries = vec![definition_entry(
+            "bi-gpt-4",
+            "(?i)gpt-4",
+            PricingSource::BuiltIn,
+        )];
         assert_eq!(
             resolved(&entries, "gpt-4o"),
             Some(("compiled:gpt-4o".to_string(), MatchKind::Exact))
@@ -1017,19 +1065,25 @@ mod tests {
         );
         assert_eq!(
             resolved(&[], "anthropic/claude-sonnet-4-6"),
-            Some(("compiled:claude-sonnet-4-6".to_string(), MatchKind::Approximate))
+            Some((
+                "compiled:claude-sonnet-4-6".to_string(),
+                MatchKind::Approximate
+            ))
         );
         assert_eq!(resolved(&[], "unknown-model-xyz"), None);
     }
 
     #[test]
     fn test_to_definition_prices_like_the_compiled_entry() {
-        let sonnet = find_compiled(&MODEL_PRICING, "claude-sonnet-4-6").unwrap().0;
+        let sonnet = find_compiled(&MODEL_PRICING, "claude-sonnet-4-6")
+            .unwrap()
+            .0;
         let def = sonnet.to_definition();
         assert_eq!(def.source, PricingSource::BuiltIn);
         assert_eq!(def.match_pattern, "claude-sonnet-4-6");
         for input in [100_000i64, 300_000] {
-            let usage = HashMap::from([("input".to_string(), input), ("output".to_string(), 1_000)]);
+            let usage =
+                HashMap::from([("input".to_string(), input), ("output".to_string(), 1_000)]);
             let result = db::model_pricing::calculate_cost_from_definition(
                 &def,
                 &usage,
@@ -1037,7 +1091,10 @@ mod tests {
                 &config::meta::model_pricing::PricingContext::default(),
             );
             let (_, _, total) = sonnet.cost(input, 1_000, None);
-            assert!((result.cost["total"] - total).abs() < 1e-12, "input={input}");
+            assert!(
+                (result.cost["total"] - total).abs() < 1e-12,
+                "input={input}"
+            );
         }
     }
 }

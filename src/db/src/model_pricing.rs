@@ -1651,7 +1651,10 @@ mod tests {
             PricingSource::BuiltIn,
         );
 
-        for entries in [vec![opus5.clone(), opus55.clone()], vec![opus55, opus5.clone()]] {
+        for entries in [
+            vec![opus5.clone(), opus55.clone()],
+            vec![opus55, opus5.clone()],
+        ] {
             assert_eq!(
                 best(&entries, "claude-opus-5-5"),
                 ("Claude Opus 5.5".to_string(), MatchKind::Exact)
