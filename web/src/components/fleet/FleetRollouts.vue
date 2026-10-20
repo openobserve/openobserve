@@ -49,8 +49,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :value="rolloutTagValue(active)"
             data-test="fleet-rollouts-status"
           />
-          <OTag type="fleetStrategy" :value="active.strategy" />
+          <OTag type="fleetBatching" :value="active.batching.kind" />
+          <OText variant="meta" data-test="fleet-rollouts-plan">{{
+            batchingText(active.batching)
+          }}</OText>
           <OText variant="meta">{{
+            active.verify ? t("fleet.rollouts.verifyOn") : t("fleet.rollouts.verifyOff")
+          }}</OText>
+          <OText v-if="active.autoRevert" variant="meta">{{
+            t("fleet.rollouts.autoRevertOn")
+          }}</OText>
+          <OText variant="meta" class="ms-auto">{{
             active.status === "scheduled"
               ? t("fleet.rollouts.scheduledBy", { user: raw(active.startedBy) })
               : t("fleet.rollouts.startedBy", { user: raw(active.startedBy) })
@@ -59,24 +68,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <FleetRolloutOutcome
           :rollout="active"
-          :stable="stableOf(active.fleetId)"
-          @navigate="emit('navigate', $event)"
-          @revert="emit('revert', active.fleetId, $event)"
-          @retry="emit('retry', active)"
+          :busy="exitMutation.isPending.value"
+          @exit="onExit"
         />
 
-        <OTimeline v-if="active.events.length" data-test="fleet-rollouts-timeline">
-          <OTimelineItem
-            v-for="(ev, i) in active.events"
-            :key="i"
-            :title="eventTitle(active, ev)"
-            :subtitle="raw(new Date(ev.at).toLocaleTimeString())"
-            :variant="eventVariant(active, ev.key)"
-          />
-        </OTimeline>
-
-        <!-- The backend records an empty rollout with a zero-size phase that never runs. -->
         <FleetRolloutPhases v-if="rolloutTagValue(active) !== 'empty'" :rollout="active" />
+
+        <div v-if="active.events.length" class="flex flex-col gap-2">
+          <OText variant="panel-title">{{ t("fleet.rollouts.timeline") }}</OText>
+          <OTimeline data-test="fleet-rollouts-timeline">
+            <OTimelineItem
+              v-for="(ev, i) in timeline"
+              :key="i"
+              :title="eventTitle(ev)"
+              :subtitle="raw(new Date(ev.at).toLocaleString())"
+              :variant="EVENT_VARIANT[ev.key] ?? 'muted'"
+            >
+              <OText v-if="ev.detail" variant="meta">{{ ev.detail }}</OText>
+            </OTimelineItem>
+          </OTimeline>
+        </div>
       </template>
       <OEmptyState
         v-else-if="isForbidden(detail.error.value)"
@@ -127,6 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
+import { useMutation } from "@tanstack/vue-query";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OText from "@/lib/core/Typography/OText.vue";
@@ -137,6 +149,11 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OTimeline from "@/lib/data/Timeline/OTimeline.vue";
 import OTimelineItem from "@/lib/data/Timeline/OTimelineItem.vue";
 import type { TimelineItemVariant } from "@/lib/data/Timeline/OTimelineItem.types";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import { useConfirmDialog } from "@/composables/useConfirmDialog";
+import { useOrgId } from "@/composables/query/useOrgId";
+import { rolloutExitMutation } from "@/services/fleet.queries";
+import type { FleetHaltExit } from "@/services/fleet";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import FleetRolloutPhases from "./FleetRolloutPhases.vue";
 import FleetRolloutOutcome from "./FleetRolloutOutcome.vue";
@@ -144,16 +161,16 @@ import FleetRolloutTable from "./FleetRolloutTable.vue";
 import { useRolloutText } from "./rolloutText";
 import {
   byActiveThenNewest,
+  failingMembers,
   isForbidden,
   isNotFound,
   rolloutTagValue,
+  serverMessage,
   useFleetRollout,
   useFleetRollouts,
   useFleets,
   type RolloutRow,
 } from "./useFleetApi";
-
-type Version = { config: string; version: number };
 
 const props = defineProps<{
   open: boolean;
@@ -164,14 +181,35 @@ const props = defineProps<{
 const emit = defineEmits<{
   "update:open": [value: boolean];
   "update:rolloutId": [id: string | null];
-  /** Carries the rollout's own fleet, which a link may open before the fleet is selected. */
-  revert: [fleetId: string, to: Version];
-  retry: [rollout: RolloutRow];
+  /** Fix forward publishes a new version, which happens in the configuration editor. */
+  "fix-forward": [rollout: RolloutRow];
   navigate: [target: { tab: string; query: Record<string, string> }];
 }>();
 
+const EVENT_VARIANT: Record<string, TimelineItemVariant> = {
+  started: "primary",
+  scheduled: "info",
+  deploying: "primary",
+  converged: "success",
+  observing: "info",
+  gatePassed: "success",
+  gateFailed: "destructive",
+  rejected: "destructive",
+  timedOut: "destructive",
+  halted: "destructive",
+  resumed: "primary",
+  skipped: "info",
+  reverted: "destructive",
+  autoReverted: "destructive",
+  superseded: "muted",
+  completed: "success",
+};
+
 const { t } = useI18nTyped();
-const { changeText } = useRolloutText();
+const { batchingText, changeText, exitLabel } = useRolloutText();
+const { confirm } = useConfirmDialog();
+const orgId = useOrgId();
+const exitMutation = useMutation(() => rolloutExitMutation(orgId.value));
 
 const list = useFleetRollouts();
 const fleets = useFleets();
@@ -195,53 +233,101 @@ const active = computed(() => {
   if (detail.error.value) return null;
   return list.rows.value.find((r) => r.id === props.rolloutId) ?? null;
 });
+const timeline = computed(() => [...(active.value?.events ?? [])].sort((a, b) => b.at - a.at));
 
-const stableOf = (fleetId: string) =>
-  fleets.rows.value.find((f) => f.id === fleetId)?.stable ?? null;
-
-const EVENT_VARIANT: Record<string, TimelineItemVariant> = {
-  deploying: "primary",
-  observing: "info",
-  gatePassed: "success",
-  gateFailed: "destructive",
-  rejected: "destructive",
-  halted: "destructive",
-  superseded: "muted",
-  autoReverted: "destructive",
-  completed: "success",
-};
-
-function eventVariant(r: RolloutRow, key: string): TimelineItemVariant {
-  return rolloutTagValue(r) === "empty" ? "muted" : (EVENT_VARIANT[key] ?? "muted");
-}
-
-function eventTitle(r: RolloutRow, ev: RolloutRow["events"][number]) {
+function eventTitle(ev: RolloutRow["events"][number]): I18nText {
+  const phase = ev.phase != null ? ev.phase + 1 : null;
   switch (ev.key) {
-    case "deploying": {
-      // A 3a event carries no phase and sent to every member.
-      const count = (ev.phase != null ? r.phases[ev.phase]?.size : undefined) ?? r.total;
-      return t("fleet.rollouts.eventDeploying", { count }, count);
-    }
+    case "started":
+      return t("fleet.rollouts.eventStarted");
+    case "scheduled":
+      return t("fleet.badge.scheduled");
+    case "deploying":
+      return phase
+        ? t("fleet.rollouts.eventDeployingPhase", { n: phase })
+        : t("fleet.rollouts.eventDeployingAll");
+    case "converged":
+      return t("fleet.rollouts.eventConverged", { n: phase ?? 1 });
     case "observing":
       return t("fleet.rollouts.eventObserving");
     case "gatePassed":
       return t("fleet.rollouts.eventGatePassed");
     case "gateFailed":
       return t("fleet.rollouts.eventGateFailed");
-    case "rejected":
-      return t("fleet.rollouts.eventRejected", { count: r.failed }, r.failed);
+    case "rejected": {
+      const count = (ev.phase != null ? active.value?.phases[ev.phase]?.rejected : 0) || 1;
+      return t("fleet.rollouts.eventRejected", { count }, count);
+    }
+    case "timedOut":
+      return t("fleet.rollouts.eventTimedOut");
     case "halted":
       return t("fleet.rollouts.eventHalted");
+    case "resumed":
+      return t("fleet.rollouts.eventResumed");
+    case "skipped":
+      return t("fleet.rollouts.eventSkipped");
+    case "reverted":
+      return t("fleet.badge.reverted");
+    case "autoReverted":
+      return t("fleet.rollouts.autoReverted");
     case "superseded":
       return t("fleet.rollouts.eventSuperseded");
-    case "autoReverted":
-      return t("fleet.rollouts.eventAutoReverted");
     case "completed":
-      return rolloutTagValue(r) === "empty"
-        ? t("fleet.rollouts.noneTargeted")
-        : t("fleet.badge.completed");
+      return t("fleet.badge.completed");
     default:
       return raw(ev.key);
+  }
+}
+
+function stableVersion(r: RolloutRow) {
+  return fleets.rows.value.find((f) => f.id === r.fleetId)?.stable ?? null;
+}
+
+async function confirmExit(r: RolloutRow, exit: FleetHaltExit): Promise<boolean> {
+  const halted = r.phases.findIndex((p) => p.status === "failed" || p.status === "timed_out");
+  const failing = failingMembers(r).length;
+  const stable = stableVersion(r);
+  const messages: Record<FleetHaltExit, I18nText> = {
+    revert: stable
+      ? t("fleet.rollouts.confirmRevert", {
+          config: raw(stable.config),
+          version: stable.version,
+        })
+      : t("fleet.rollouts.confirmRevertNoStable"),
+    resume: t("fleet.rollouts.confirmResume", { n: halted >= 0 ? halted + 1 : 1 }),
+    fix_forward: t("fleet.rollouts.confirmFixForward", { config: raw(r.config) }),
+    skip: t("fleet.rollouts.confirmSkip", { count: failing }, failing),
+  };
+  return confirm({
+    title: t("fleet.rollouts.confirmExitTitle", { exit: exitLabel(exit) }),
+    message: messages[exit],
+    confirmLabel: exitLabel(exit),
+    confirmVariant: exit === "revert" ? "destructive" : "primary",
+    focusCancel: exit === "revert" || exit === "skip",
+  });
+}
+
+async function onExit(exit: FleetHaltExit) {
+  const r = active.value;
+  if (!r) return;
+  const org = orgId.value;
+  if (!(await confirmExit(r, exit)) || orgId.value !== org) return;
+  if (exit === "fix_forward") {
+    emit("fix-forward", r);
+    return;
+  }
+  try {
+    await exitMutation.mutateAsync({
+      id: r.id,
+      exit,
+      collectorIds: exit === "skip" ? failingMembers(r) : undefined,
+    });
+    toast({ variant: "success", message: t("fleet.rollouts.exitDone", { exit: exitLabel(exit) }) });
+  } catch (err) {
+    toast({
+      variant: "error",
+      message: raw(serverMessage(err)) || t("fleet.common.requestFailed"),
+    });
   }
 }
 </script>

@@ -33,6 +33,7 @@ import syntheticsService from "@/services/synthetics";
 import downtimesService from "@/services/downtimes";
 import type { SyntheticsEnvironment } from "@/types/synthetics";
 import workflowService from "@/services/workflows";
+import fleetService from "@/services/fleet";
 import onlineEvalsService from "@/services/online-evals.service";
 import llmQueuesService from "@/services/llm-queues.service";
 import llmDatasetsService from "@/services/llm-datasets.service";
@@ -402,15 +403,12 @@ export const useRoleEntityLoaders = (deps: LoaderDeps) => {
     });
   };
   // Collectors are not FGA objects, so a fleet has no child entities to expand.
+  // Fleets have their own API; the folders API no longer exposes them.
   const getFleets = async () => {
-    const fleets: any = await commonService.list_Folders(
-      store.state.selectedOrganization.identifier,
-      "fleets",
-    );
-    if (!fleets.data.list.find((folder: any) => folder.folderId === "default")) {
-      fleets.data.list.unshift({ folderId: "default", name: "default" });
-    }
-    updateResourceEntities("fleets", ["folderId"], [...fleets.data.list], false, "name");
+    const res = await fleetService.listFleets(store.state.selectedOrganization.identifier);
+    const list = (res.data?.items ?? []).map((f) => ({ id: f.id, name: f.name }));
+    if (!list.some((f) => f.id === "default")) list.unshift({ id: "default", name: "default" });
+    updateResourceEntities("fleets", ["id"], list, false, "name");
     return true;
   };
   const _getGroups = async () => {

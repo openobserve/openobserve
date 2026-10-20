@@ -13,83 +13,86 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import type { FleetOs } from "./fleetFormat";
+export type InstallPlatform = "linux" | "macos" | "windows" | "kubernetes";
 
-/** Platforms the o2c-supervisor runs on today; the rest have no install path yet. */
-export type SupervisedOs = Extract<FleetOs, "linux" | "macos">;
+export const INSTALL_PLATFORMS: InstallPlatform[] = ["linux", "macos", "windows", "kubernetes"];
 
 export interface InstallTarget {
   baseUrl: string;
   org: string;
   token: string;
+  /** The collector version to install; null lets the script pick its latest supported one. */
+  version: string | null;
+  /** HTTP polling for proxies that cannot carry WebSocket. */
+  http: boolean;
 }
 
-interface SupervisorLayout {
-  prepare: string;
-  /** Config lines the generator can write literally inside the quoted heredoc. */
-  literal: string[];
-  /** Shell lines run after the heredoc, for values only the user's shell knows. */
-  append: string[];
-  install: string;
-  run: (auth: string) => string;
+const SCRIPT_BASE = "https://raw.githubusercontent.com/openobserve/agents/main";
+const IMAGE = "ghcr.io/openobserve/otel-fleet-collector";
+
+/** The OpAMP endpoint the supervisor connects to; the scheme picks the transport. */
+export function opampEndpoint(target: Pick<InstallTarget, "baseUrl" | "org" | "http">): string {
+  const url = new URL(target.baseUrl);
+  const secure = url.protocol === "https:";
+  const scheme = target.http ? url.protocol.replace(":", "") : secure ? "wss" : "ws";
+  return `${scheme}://${url.host}${url.pathname.replace(/\/+$/, "")}/api/${target.org}/v1/opamp`;
 }
 
-// Quoted heredocs keep url, org and token literal; install -m 600 sets the mode even when the file exists.
-const LAYOUT: Record<SupervisedOs, SupervisorLayout> = {
-  linux: {
-    prepare: "sudo mkdir -p /etc/o2c-supervisor",
-    literal: [
-      "collector:",
-      "  executable: /usr/local/bin/otelcol-contrib",
-      "  config: /etc/o2c-supervisor/collector.yaml",
-      "storage:",
-      "  directory: /var/lib/o2c-supervisor",
-    ],
-    append: [],
-    install: 'sudo install -m 600 "$tmp" /etc/o2c-supervisor/supervisor.yaml && rm -f "$tmp"',
-    run: (auth) =>
-      `sudo env O2_AUTH=${auth} o2c-supervisor -config /etc/o2c-supervisor/supervisor.yaml`,
-  },
-  // The supervisor expands neither ~ nor $HOME, so the shell resolves HOME outside the quoted heredoc.
-  macos: {
-    prepare: 'mkdir -p "$HOME/o2c-supervisor"',
-    literal: ["collector:", "  executable: /usr/local/bin/otelcol-contrib"],
-    append: [
-      `printf '  config: %s\\nstorage:\\n  directory: %s\\n' "$HOME/o2c-supervisor/collector.yaml" "$HOME/o2c-supervisor/state" >> "$tmp"`,
-    ],
-    install: 'install -m 600 "$tmp" "$HOME/o2c-supervisor/supervisor.yaml" && rm -f "$tmp"',
-    run: (auth) => `O2_AUTH=${auth} o2c-supervisor -config "$HOME/o2c-supervisor/supervisor.yaml"`,
-  },
-};
+// Single quotes keep url, org and token literal in the user's shell.
+const q = (v: string) => `'${v.replace(/'/g, `'\\''`)}'`;
 
-export function isSupervisedOs(os: FleetOs): os is SupervisedOs {
-  return Object.hasOwn(LAYOUT, os);
-}
-
-/** Shell lines that write the supervisor config as 0600 and start the supervisor with its exporter credential. */
-export function installScript(os: SupervisedOs, target: InstallTarget): string {
-  const layout = LAYOUT[os];
-  // Set on the command alone, so the credential never lands in the user's shell environment.
-  const auth = `"Basic $(printf '%s' 'fleet:${target.token}' | base64)"`;
+function unixCommand(os: "linux" | "macos", t: InstallTarget): string {
+  const args = [
+    `--url ${q(t.baseUrl)}`,
+    `--org ${q(t.org)}`,
+    `--token ${q(t.token)}`,
+    ...(t.version ? [`--version ${q(t.version)}`] : []),
+    ...(t.http ? ["--transport http"] : []),
+  ];
   return [
-    layout.prepare,
-    'tmp="$(mktemp)"',
-    `cat > "$tmp" <<'EOF'`,
-    "server:",
-    `  url: ${target.baseUrl}`,
-    `  org: ${target.org}`,
-    "auth:",
-    "  email: fleet",
-    `  token: ${target.token}`,
-    ...layout.literal,
-    "EOF",
-    ...layout.append,
-    layout.install,
-    layout.run(auth),
+    `curl -fsSL ${SCRIPT_BASE}/${os}/install.sh | sudo bash -s -- \\`,
+    ...args.map((a, i) => `  ${a}${i < args.length - 1 ? " \\" : ""}`),
   ].join("\n");
 }
 
-/** Absolute base URL for `server.url`; a relative endpoint means the app's own origin. */
+function windowsCommand(t: InstallTarget): string {
+  const ps = (v: string) => `'${v.replace(/'/g, "''")}'`;
+  const args = [
+    `-Url ${ps(t.baseUrl)}`,
+    `-Org ${ps(t.org)}`,
+    `-Token ${ps(t.token)}`,
+    ...(t.version ? [`-Version ${ps(t.version)}`] : []),
+    ...(t.http ? ["-Transport http"] : []),
+  ];
+  return [
+    `& ([scriptblock]::Create((irm ${SCRIPT_BASE}/windows/install.ps1))) \``,
+    ...args.map((a, i) => `  ${a}${i < args.length - 1 ? " `" : ""}`),
+  ].join("\n");
+}
+
+function helmCommand(t: InstallTarget): string {
+  const sets = [
+    `--set image.repository=${IMAGE}`,
+    ...(t.version ? [`--set image.tag=${q(t.version)}`] : []),
+    `--set opamp.endpoint=${q(opampEndpoint(t))}`,
+    `--set opamp.token=${q(t.token)}`,
+  ];
+  return [
+    "helm repo add openobserve https://charts.openobserve.ai && helm repo update",
+    "helm upgrade --install otel-fleet-collector openobserve/otel-fleet-collector \\",
+    "  --namespace openobserve-collector --create-namespace \\",
+    ...sets.map((s, i) => `  ${s}${i < sets.length - 1 ? " \\" : ""}`),
+  ].join("\n");
+}
+
+/** One command per platform; re-running it upgrades or reconfigures an existing install. */
+export function installCommand(platform: InstallPlatform, target: InstallTarget): string {
+  if (platform === "windows") return windowsCommand(target);
+  if (platform === "kubernetes") return helmCommand(target);
+  return unixCommand(platform, target);
+}
+
+/** Absolute base URL; a relative endpoint means the app's own origin. */
 export function resolveBaseUrl(endpoint: string, origin: string): string {
   let url: URL;
   try {

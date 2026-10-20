@@ -116,8 +116,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <template #cell-fleets="{ row }">
         <div
-          v-if="row.fleets.length"
-          class="flex flex-wrap gap-1"
+          v-if="row.fleets.length || row.fleetsHidden"
+          class="flex flex-wrap items-center gap-1"
           :data-test="`fleet-configurations-fleets-${row.id}`"
         >
           <OTag
@@ -126,6 +126,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="default-soft"
             :label="f.name === null ? t('fleet.fleets.deletedFleet') : raw(f.name)"
           />
+          <OText
+            v-if="row.fleetsHidden"
+            variant="meta"
+            :data-test="`fleet-configurations-fleets-hidden-${row.id}`"
+            >{{ t("fleet.configs.hiddenFleets", { count: row.fleetsHidden }) }}</OText
+          >
         </div>
         <span v-else class="text-text-secondary">{{ raw("—") }}</span>
       </template>
@@ -167,6 +173,7 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OText from "@/lib/core/Typography/OText.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useRoute, useRouter } from "vue-router";
@@ -209,7 +216,7 @@ const columns = computed<OTableColumnDef<ConfigRow>[]>(() => [
   },
   {
     id: "fleets",
-    header: t("fleet.tabs.fleets"),
+    header: t("fleet.configs.usedByFleets"),
     accessorFn: (r) => r.fleets.map((f) => f.name ?? "").join(" "),
     size: 240,
     hideable: true,

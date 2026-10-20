@@ -354,7 +354,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click:secondary="deleteOpen = false"
       @click:primary="deleteConfig"
     >
-      <OText variant="body">{{ t("fleet.editor.deleteBody") }}</OText>
+      <div class="flex flex-col gap-3">
+        <OText variant="body">{{ t("fleet.editor.deleteBody") }}</OText>
+        <OBanner
+          v-if="deleteRefs"
+          variant="error"
+          dense
+          :content="
+            t('fleet.editor.deleteInUse', {
+              fleets: deleteRefs.fleets,
+              collectors: deleteRefs.collectors,
+              rollouts: deleteRefs.rollouts,
+            })
+          "
+          data-test="fleet-config-editor-delete-in-use"
+        />
+      </div>
     </ODialog>
   </OPageLayout>
 </template>
@@ -376,6 +391,7 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OText from "@/lib/core/Typography/OText.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
@@ -430,7 +446,7 @@ import {
   saveFleetConfigDraftMutation,
   validateFleetConfigMutation,
 } from "@/services/fleet.queries";
-import type { FleetConfigIssues } from "@/services/fleet";
+import type { FleetConfigIssues, FleetConfigReferences } from "@/services/fleet";
 
 const { t } = useI18nTyped();
 const route = useRoute();
@@ -483,6 +499,8 @@ const publishOpen = ref(false);
 const rolloutOpen = ref(false);
 const publishMessage = ref("");
 const deleteOpen = ref(false);
+const deleteRefs = ref<FleetConfigReferences | null>(null);
+watch(deleteOpen, (open) => open || (deleteRefs.value = null));
 const createOpen = ref(false);
 const createTitle = ref<I18nText>(raw(""));
 const createYaml = ref("");
@@ -959,6 +977,7 @@ async function save() {
 
 async function deleteConfig() {
   if (isNew.value || !loaded.value) return;
+  deleteRefs.value = null;
   try {
     await deleteMutation.mutateAsync(id.value);
     deleteOpen.value = false;
@@ -966,7 +985,12 @@ async function deleteConfig() {
     leaveAllowed = true;
     router.push(backTo);
   } catch (err) {
-    toastFailure(err);
+    // A 409 names what still references the configuration, which the counts ignore permissions for.
+    const refs = (
+      err as { response?: { status?: number; data?: { references?: FleetConfigReferences } } }
+    )?.response;
+    if (refs?.status === 409 && refs.data?.references) deleteRefs.value = refs.data.references;
+    else toastFailure(err);
   }
 }
 

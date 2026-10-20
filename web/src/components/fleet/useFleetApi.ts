@@ -148,7 +148,13 @@ export interface RolloutRow {
   total: number;
   running: number;
   phases: FleetRolloutPhase[];
-  members: { collectorId: string; phase: number; state: string; excluded: boolean }[];
+  members: {
+    collectorId: string;
+    phase: number;
+    state: string;
+    excluded: boolean;
+    evidence: FleetDeliveryEvidence | null;
+  }[];
   events: { at: number; key: string; phase: number | null; detail: string | null }[];
   startedBy: string;
   startedAt: number;
@@ -255,6 +261,7 @@ export function toRolloutRow(r: FleetRollout): RolloutRow {
       phase: m.phase,
       state: m.state,
       excluded: !!m.excluded,
+      evidence: m.evidence ?? null,
     })),
     events: (r.events ?? []).map((e) => ({
       at: e.at,

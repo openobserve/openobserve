@@ -252,12 +252,7 @@ export interface FleetAuditList {
 }
 
 export type FleetRolloutStatus =
-  | "scheduled"
-  | "in_progress"
-  | "halted"
-  | "completed"
-  | "superseded"
-  | "reverted";
+  "scheduled" | "in_progress" | "halted" | "completed" | "superseded" | "reverted";
 
 export type FleetRolloutStart = { kind: "now" } | { kind: "at"; at: number };
 
@@ -323,6 +318,8 @@ export interface FleetRolloutMember {
   phase: number;
   state: string;
   excluded: boolean;
+  /** Not in the M1 contract yet; the members table falls back to the collector list without it. */
+  evidence?: FleetDeliveryEvidence | null;
 }
 
 export interface FleetRolloutEvent {

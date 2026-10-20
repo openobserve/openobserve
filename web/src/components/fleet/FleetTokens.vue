@@ -110,15 +110,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </template>
 
-        <template #cell-name="{ row }">
-          <div class="flex min-w-0 flex-col">
-            <span class="truncate font-medium">{{ row.name }}</span>
-            <span
-              class="text-text-secondary font-mono text-xs"
-              :data-test="`fleet-tokens-prefix-${row.id}`"
-              >{{ masked(row.prefix) }}</span
-            >
-          </div>
+        <template #cell-prefix="{ row }">
+          <span
+            class="text-text-secondary font-mono text-xs"
+            :data-test="`fleet-tokens-prefix-${row.id}`"
+            >{{ masked(row.prefix) }}</span
+          >
+        </template>
+
+        <template #cell-inUse="{ row }">
+          <span class="tabular-nums" :data-test="`fleet-tokens-in-use-${row.id}`">
+            <template v-if="usage(row.id).total">{{
+              t("fleet.enrollment.inUse", usage(row.id))
+            }}</template>
+            <span v-else class="text-text-muted">{{ DASH }}</span>
+          </span>
         </template>
 
         <template #cell-state="{ row }">
@@ -153,7 +159,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :aria-label="t('fleet.enrollment.revoke')"
             :disabled="revokeToken.isPending.value"
             :data-test="`fleet-tokens-revoke-${row.id}`"
-            @click="revoke(row)"
+            @click="revoking = row"
           >
             <OTooltip :content="t('fleet.enrollment.revoke')" />
           </OButton>
@@ -172,6 +178,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </OTable>
     </div>
+    <FleetRevokeTokenDialog
+      :open="!!revoking"
+      :token="revoking"
+      :affected="affected"
+      :loading="revokeToken.isPending.value"
+      @update:open="(v) => !v && (revoking = null)"
+      @confirm="revoke"
+    />
   </ODrawer>
 </template>
 
@@ -192,15 +206,16 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import { useOrgId } from "@/composables/query/useOrgId";
 import { revokeFleetTokenMutation } from "@/services/fleet.queries";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import FleetRevokeTokenDialog from "./FleetRevokeTokenDialog.vue";
 import FleetTokenForm from "./FleetTokenForm.vue";
 import {
   isForbidden,
   serverMessage,
   tokenState,
+  useFleetCollectors,
   useFleetTokens,
   type TokenRow,
   type TokenState,
@@ -220,7 +235,6 @@ const STATE_VARIANT: Record<
 };
 
 const { t } = useI18nTyped();
-const { confirm } = useConfirmDialog();
 const orgId = useOrgId();
 
 const list = useFleetTokens(() => props.open);
@@ -230,6 +244,28 @@ const lastUpdatedAt = list.lastUpdatedAt;
 const forbidden = computed(() => isForbidden(list.error.value));
 const refresh = () => list.refetch();
 const revokeToken = useMutation(() => revokeFleetTokenMutation(orgId.value));
+const collectors = useFleetCollectors(() => props.open);
+const revoking = ref<TokenRow | null>(null);
+
+const DASH = raw("—");
+
+// A collector uses the token it presented last, which is what revoking cuts off.
+const usageByToken = computed(() => {
+  const out = new Map<string, { online: number; offline: number; total: number }>();
+  for (const c of collectors.rows.value) {
+    if (!c.tokenId) continue;
+    const u = out.get(c.tokenId) ?? { online: 0, offline: 0, total: 0 };
+    if (c.status === "offline" || c.status === "unknown") u.offline += 1;
+    else u.online += 1;
+    u.total += 1;
+    out.set(c.tokenId, u);
+  }
+  return out;
+});
+const usage = (id: string) => usageByToken.value.get(id) ?? { online: 0, offline: 0, total: 0 };
+const affected = computed(() =>
+  revoking.value ? collectors.rows.value.filter((c) => c.tokenId === revoking.value?.id) : [],
+);
 
 const search = ref("");
 const mode = ref<"list" | "create" | "created">("list");
@@ -251,6 +287,7 @@ const loadError = computed(() =>
 
 // A plaintext shown for one org or fleet must not stay on screen after a switch.
 watch([orgId, () => props.fleetId], () => {
+  revoking.value = null;
   toList();
   search.value = "";
 });
@@ -269,11 +306,24 @@ function stateLabel(row: TokenRow): I18nText {
 }
 
 const columns = computed<OTableColumnDef<TokenRow>[]>(() => [
-  { id: "name", header: t("fleet.common.name"), accessorKey: "name", size: 200, sortable: true },
+  { id: "name", header: t("fleet.common.name"), accessorKey: "name", size: 180, sortable: true },
+  {
+    id: "prefix",
+    header: t("fleet.enrollment.prefix"),
+    accessorKey: "prefix",
+    size: 150,
+    meta: { cellOverflowTooltip: false },
+  },
   { id: "state", header: t("fleet.common.status"), accessorKey: "revoked", size: 110 },
-  { id: "uses", header: t("fleet.enrollment.uses"), accessorKey: "uses", size: 110 },
-  { id: "expiresAt", header: t("fleet.enrollment.expires"), accessorKey: "expiresAt", size: 120 },
-  { id: "createdAt", header: t("fleet.enrollment.created"), accessorKey: "createdAt", size: 120 },
+  { id: "expiresAt", header: t("fleet.enrollment.expires"), accessorKey: "expiresAt", size: 110 },
+  { id: "uses", header: t("fleet.enrollment.enrollments"), accessorKey: "uses", size: 110 },
+  {
+    id: "inUse",
+    header: t("fleet.enrollment.inUseHeader"),
+    accessorFn: (r) => usage(r.id).total,
+    size: 140,
+  },
+  { id: "createdAt", header: t("fleet.enrollment.created"), accessorKey: "createdAt", size: 110 },
   { id: "actions", header: raw(""), isAction: true, size: 56 },
 ]);
 
@@ -297,17 +347,10 @@ function onCreated(token: { id: string; token: string }) {
 async function revoke(row: TokenRow) {
   const org = orgId.value;
   const fleet = props.fleetId;
-  const ok = await confirm({
-    title: t("fleet.enrollment.revokeTitle", { name: raw(row.name) }),
-    message: t("fleet.enrollment.revokeMessage"),
-    confirmLabel: t("fleet.enrollment.revoke"),
-    confirmVariant: "destructive",
-    focusCancel: true,
-  });
-  // The row belongs to the org and fleet the confirm was opened in; the mutation follows the current ones.
-  if (!ok || orgId.value !== org || props.fleetId !== fleet) return;
   try {
     await revokeToken.mutateAsync(row.id);
+    // The row belongs to the org and fleet the dialog was opened in.
+    if (orgId.value === org && props.fleetId === fleet) revoking.value = null;
     toast({
       variant: "success",
       message: t("fleet.enrollment.revokedToast", { name: raw(row.name) }),

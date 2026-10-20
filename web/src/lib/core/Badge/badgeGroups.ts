@@ -1939,21 +1939,21 @@ export const BADGE_GROUPS = {
       completed: { variant: "success-soft", labelKey: "fleet.badge.completed" },
       halted: { variant: "error-soft", labelKey: "fleet.badge.halted" },
       superseded: { variant: "default-soft", labelKey: "fleet.badge.superseded" },
+      reverted: { variant: "warning-soft", labelKey: "fleet.badge.reverted" },
       // A completed rollout of an empty fleet; not a status the server sends.
       empty: { variant: "default-soft", labelKey: "fleet.rollouts.noneTargeted" },
     },
     fallback: { variant: "default-soft" },
   },
 
-  // Fleet Manager rollout strategy — a category, so plain with one hue per kind.
-  fleetStrategy: {
+  // Fleet rollout batching — a category, so plain with one hue per kind.
+  fleetBatching: {
     mode: "plain",
     shape: "pill",
     values: {
-      immediate: { variant: "default-soft", labelKey: "fleet.badge.immediate" },
+      one: { variant: "default-soft", labelKey: "fleet.rollouts.oneBatch" },
       canary: { variant: "amber-soft", labelKey: "fleet.badge.canary" },
       progressive: { variant: "blue-soft", labelKey: "fleet.badge.progressive" },
-      scheduled: { variant: "purple-soft", labelKey: "fleet.badge.scheduledStrategy" },
     },
     fallback: { variant: "default-soft" },
   },

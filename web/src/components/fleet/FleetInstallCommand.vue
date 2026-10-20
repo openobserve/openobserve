@@ -17,12 +17,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="flex flex-col gap-3" data-test="fleet-install-command">
     <OToggleGroup
-      :model-value="os"
+      :model-value="platform"
       data-test="fleet-install-command-os"
-      @update:model-value="(v) => (os = v as SupervisedOs)"
+      @update:model-value="(v) => (platform = v as InstallPlatform)"
     >
       <OToggleGroupItem
-        v-for="opt in osOptions"
+        v-for="opt in platformOptions"
         :key="opt.value"
         :value="opt.value"
         size="sm"
@@ -31,15 +31,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ opt.label }}
       </OToggleGroupItem>
     </OToggleGroup>
-    <OText variant="meta" data-test="fleet-install-command-prereq">{{
-      t("fleet.install.prerequisites", { version: collectorVersion })
+    <OText variant="meta" data-test="fleet-install-command-version">{{
+      version
+        ? t("fleet.install.versionLine", { version: raw(version) })
+        : t("fleet.install.versionLatest")
     }}</OText>
+    <OCheckbox
+      v-if="platform !== 'kubernetes'"
+      v-model="http"
+      :label="t('fleet.install.httpTransport')"
+      data-test="fleet-install-command-http"
+    />
     <FleetCodeEditor
-      class="h-80"
+      class="h-60"
       :code="command"
-      language="shell"
+      :language="platform === 'windows' ? 'powershell' : 'shell'"
       data-test="fleet-install-command-code"
     />
+    <OText variant="meta" data-test="fleet-install-command-note">{{
+      platform === "kubernetes" ? t("fleet.install.kubernetesNote") : t("fleet.install.rerunNote")
+    }}</OText>
   </div>
 </template>
 
@@ -48,34 +59,43 @@ import { computed, ref } from "vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OText from "@/lib/core/Typography/OText.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import { useOrgId } from "@/composables/query/useOrgId";
 import { getIngestionURL } from "@/utils/queryUtils";
 import { raw, useI18nTyped } from "@/types/i18n";
 import FleetCodeEditor from "./FleetCodeEditor.vue";
-import { OS_LABEL, type FleetOs } from "./fleetFormat";
-import { installScript, isSupervisedOs, resolveBaseUrl, type SupervisedOs } from "./fleetInstall";
-import { useFleetSummary } from "./useFleetApi";
+import { OS_LABEL } from "./fleetFormat";
+import {
+  INSTALL_PLATFORMS,
+  installCommand,
+  resolveBaseUrl,
+  type InstallPlatform,
+} from "./fleetInstall";
+import { useFleetSettings } from "./useFleetApi";
 
 const props = defineProps<{ token: string }>();
 
 const { t } = useI18nTyped();
 const orgId = useOrgId();
 const baseUrl = resolveBaseUrl(getIngestionURL(), window.location.origin);
-const summary = useFleetSummary().summary;
-const collectorVersion = computed(() =>
-  summary.value?.target_version
-    ? raw(summary.value.target_version)
-    : t("fleet.install.targetVersionFallback"),
-);
+const settings = useFleetSettings().settings;
+const version = computed(() => settings.value?.target_collector_version || null);
 
-const os = ref<SupervisedOs>("linux");
+const platform = ref<InstallPlatform>("linux");
+const http = ref(false);
 
-const osOptions = (Object.keys(OS_LABEL) as FleetOs[]).filter(isSupervisedOs).map((value) => ({
+const platformOptions = INSTALL_PLATFORMS.map((value) => ({
   value,
   label: raw(OS_LABEL[value]),
 }));
 
 const command = computed(() =>
-  installScript(os.value, { baseUrl, org: orgId.value, token: props.token }),
+  installCommand(platform.value, {
+    baseUrl,
+    org: orgId.value,
+    token: props.token,
+    version: version.value,
+    http: http.value && platform.value !== "kubernetes",
+  }),
 );
 </script>

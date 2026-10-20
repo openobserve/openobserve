@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :page-size="20"
       :page-size-options="[20, 50, 100]"
       :show-global-filter="false"
-      :column-visibility="{ ip: false, arch: false, drift: false }"
+      :column-visibility="{ lastConnectedFrom: false, arch: false }"
       :persist-columns="true"
       table-id="fleet-collectors"
       :loading="loading"
@@ -185,15 +185,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span v-if="row.configVersion !== null" class="text-text-secondary text-xs">{{
             t("fleet.common.versionShort", { version: row.configVersion })
           }}</span>
-          <OTag
-            v-if="row.delivery && row.delivery !== 'running'"
-            type="fleetDelivery"
-            :value="row.delivery"
-            size="xs"
-          />
         </span>
         <span v-else class="text-text-muted" :data-test="`fleet-collectors-config-${row.id}`">{{
-          DASH
+          t("fleet.collectors.noConfigAssigned")
         }}</span>
       </template>
 
@@ -207,22 +201,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTimeCell :value="row.lastSeen" unit="ms" mode="relative" />
       </template>
 
-      <template #cell-drift="{ row }">
-        <span :data-test="`fleet-collectors-drift-${row.id}`">
-          <OTag
-            v-if="row.drifted === true"
-            variant="warning-soft"
-            :label="t('fleet.collectors.drifted')"
-          />
-          <span v-else-if="row.drifted === false" class="text-text-secondary">{{
-            t("fleet.collectors.inSync")
-          }}</span>
+      <template #cell-delivery="{ row }">
+        <span :data-test="`fleet-collectors-delivery-${row.id}`">
+          <OTag v-if="row.delivery" type="fleetDelivery" :value="row.delivery" size="xs" />
           <span v-else class="text-text-muted">{{ DASH }}</span>
         </span>
       </template>
 
-      <template #cell-ip="{ row }">
-        <span v-if="row.ip">{{ row.ip }}</span>
+      <template #cell-consistency="{ row }">
+        <span class="text-text-muted" :data-test="`fleet-collectors-consistency-${row.id}`">{{
+          DASH
+        }}</span>
+      </template>
+
+      <template #cell-lastConnectedFrom="{ row }">
+        <OText v-if="row.lastConnectedFrom" variant="mono">{{ row.lastConnectedFrom }}</OText>
         <span v-else class="text-text-muted">{{ DASH }}</span>
       </template>
 
@@ -241,6 +234,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
           </template>
           <ODropdownItem
+            icon-left="restart-alt"
+            :data-test="`fleet-collectors-row-restart-${row.id}`"
+            @select="actions.restart([row])"
+          >
+            {{ t("fleet.collectors.restart") }}
+          </ODropdownItem>
+          <ODropdownItem
+            v-if="row.config"
+            icon-left="sync"
+            :data-test="`fleet-collectors-row-redeliver-${row.id}`"
+            @select="actions.redeliver(row)"
+          >
+            {{ t("fleet.collectors.redeliver") }}
+          </ODropdownItem>
+          <ODropdownItem
+            icon-left="edit"
+            :data-test="`fleet-collectors-row-rename-${row.id}`"
+            @select="openRename(row)"
+          >
+            {{ t("fleet.collectors.rename") }}
+          </ODropdownItem>
+          <ODropdownItem
             icon-left="drive-file-move"
             :data-test="`fleet-collectors-row-move-${row.id}`"
             @select="openMove([row])"
@@ -248,12 +263,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("fleet.collectors.moveToFleet") }}
           </ODropdownItem>
           <ODropdownItem
-            icon-left="link-off"
+            icon-left="delete"
             variant="destructive"
-            :data-test="`fleet-collectors-row-unenroll-${row.id}`"
-            @select="unenrollRows([row])"
+            :data-test="`fleet-collectors-row-remove-${row.id}`"
+            @select="removeRows([row])"
           >
-            {{ t("fleet.collectors.unenroll") }}
+            {{ t("fleet.collectors.remove") }}
           </ODropdownItem>
         </ODropdown>
       </template>
@@ -269,14 +284,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("fleet.collectors.moveToFleet") }}
         </OButton>
         <OButton
+          variant="outline"
+          size="sm"
+          icon-left="restart-alt"
+          :loading="actions.restarting.value"
+          data-test="fleet-collectors-bulk-restart"
+          @click="actions.restart(selectedRows)"
+        >
+          {{ t("fleet.collectors.restart") }}
+        </OButton>
+        <OButton
           variant="outline-destructive"
           size="sm"
-          icon-left="link-off"
-          :loading="unenroll.isPending.value"
-          data-test="fleet-collectors-bulk-unenroll"
-          @click="unenrollSelected"
+          icon-left="delete"
+          :loading="actions.removing.value"
+          data-test="fleet-collectors-bulk-remove"
+          @click="removeRows(selectedRows)"
         >
-          {{ t("fleet.collectors.unenroll") }}
+          {{ t("fleet.collectors.remove") }}
         </OButton>
       </template>
 
@@ -315,12 +340,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </ODrawer>
 
-    <MoveAcrossFolders
+    <FleetMoveDialog
       v-model:open="moveOpen"
-      :active-folder-id="moveSource"
-      :module-id="moveIds"
-      type="fleets"
-      @updated="onMoved"
+      :collector-ids="moveIds"
+      :source-fleet-id="moveSource"
+      @moved="onMoved"
+    />
+
+    <FleetNameDialog
+      v-model:open="renameOpen"
+      :title="t('fleet.collectors.renameTitle')"
+      :label="t('fleet.collectors.nickname')"
+      :help-text="t('fleet.collectors.nicknameHelp')"
+      :confirm-label="t('common.save')"
+      :initial="renameTarget?.name ?? ''"
+      :save="saveRename"
+      data-test="fleet-collectors-rename-dialog"
     />
 
     <FleetCollectorDrawer
@@ -334,7 +369,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
-import { useMutation } from "@tanstack/vue-query";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef, RowRailTone } from "@/lib/core/Table/OTable.types";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
@@ -352,29 +386,23 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
-import MoveAcrossFolders from "@/components/common/sidebar/MoveAcrossFolders.vue";
+import OText from "@/lib/core/Typography/OText.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import useBreakpoint from "@/composables/useBreakpoint";
-import { toast } from "@/lib/feedback/Toast/useToast";
-import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import { useOrgId } from "@/composables/query/useOrgId";
 import { queryClient } from "@/composables/query/queryClient";
-import { unenrollCollectorsMutation } from "@/services/fleet.queries";
 import { fleetKeys } from "@/services/fleet.querykeys";
 import { raw, useI18nTyped } from "@/types/i18n";
 import FleetCollectorDrawer from "./FleetCollectorDrawer.vue";
+import FleetMoveDialog from "./FleetMoveDialog.vue";
+import FleetNameDialog from "./FleetNameDialog.vue";
+import { useCollectorActions } from "./useCollectorActions";
 import { OS_LABEL, type FleetOs } from "./fleetFormat";
-import {
-  isForbidden,
-  osLabel,
-  serverMessage,
-  useFleetCollectors,
-  type CollectorRow,
-} from "./useFleetApi";
+import { isForbidden, osLabel, useFleetCollectors, type CollectorRow } from "./useFleetApi";
 
-const STATUS_FILTERS = ["offline", "degraded", "drifted", "outdated", "online"];
-const DRAWER_TABS = ["overview", "health", "config", "history"];
+const STATUS_FILTERS = ["offline", "degraded", "unknown", "outdated", "online"];
+const DRAWER_TABS = ["overview", "delivery", "health", "config", "history"];
 
 const DASH = raw("—");
 
@@ -386,9 +414,8 @@ const allFleets = defineModel<boolean>("allFleets", { default: false });
 
 const { t } = useI18nTyped();
 
-const { confirm } = useConfirmDialog();
 const orgId = useOrgId();
-const unenroll = useMutation(() => unenrollCollectorsMutation(orgId.value));
+const actions = useCollectorActions();
 
 const list = useFleetCollectors();
 const rowsAll = list.rows;
@@ -411,6 +438,8 @@ const drawerOpen = ref(false);
 const moveOpen = ref(false);
 const moveIds = ref<string[]>([]);
 const moveSource = ref("");
+const renameOpen = ref(false);
+const renameTarget = ref<CollectorRow | null>(null);
 const mobileFiltersOpen = ref(false);
 const { isDesktop } = useBreakpoint();
 const activeId = ref<string | null>(null);
@@ -428,6 +457,7 @@ watch(orgId, () => {
   selectedIds.value = [];
   drawerOpen.value = false;
   moveOpen.value = false;
+  renameOpen.value = false;
   mobileFiltersOpen.value = false;
 });
 
@@ -447,7 +477,6 @@ const isFiltered = computed(() => !!search.value || !!statusFilter.value || !!os
 
 function matchesStatus(c: CollectorRow, key: string | null) {
   if (!key || key === "all") return true;
-  if (key === "drifted") return c.drifted === true;
   if (key === "outdated") return c.outdated;
   return c.status === key;
 }
@@ -462,7 +491,7 @@ const rows = computed(() => {
     if (!matchesStatus(c, statusFilter.value)) return false;
     if (osFilter.value && c.os !== osFilter.value) return false;
     if (!q) return true;
-    return [c.id, c.name, c.hostname, c.ip, c.config, c.version, c.fleetName].some(
+    return [c.id, c.name, c.hostname, c.lastConnectedFrom, c.config, c.version, c.fleetName].some(
       (s) => !!s && s.toLowerCase().includes(q),
     );
   });
@@ -480,11 +509,10 @@ watch(tableRows, (visible) => {
 
 const statusCounts = computed(() => {
   if (loading.value || noAccess.value) return null;
-  const counts = { offline: 0, degraded: 0, drifted: 0, outdated: 0, online: 0, total: 0 };
+  const counts = { offline: 0, degraded: 0, unknown: 0, outdated: 0, online: 0, total: 0 };
   for (const c of scopeRows.value) {
     counts.total += 1;
     counts[c.status] += 1;
-    if (c.drifted === true) counts.drifted += 1;
     if (c.outdated) counts.outdated += 1;
   }
   return counts;
@@ -492,7 +520,7 @@ const statusCounts = computed(() => {
 
 const statusStats = computed<StatItem[]>(() => {
   const counts = statusCounts.value;
-  const n = (key: "offline" | "degraded" | "drifted" | "outdated" | "online") =>
+  const n = (key: "offline" | "degraded" | "unknown" | "outdated" | "online") =>
     counts?.[key] ?? DASH;
   const items: StatItem[] = [
     {
@@ -510,11 +538,11 @@ const statusStats = computed<StatItem[]>(() => {
       tone: "warning",
     },
     {
-      key: "drifted",
-      label: t("fleet.stats.drifted"),
-      value: n("drifted"),
-      icon: "sync-problem",
-      tone: "orange",
+      key: "unknown",
+      label: t("fleet.stats.unknown"),
+      value: n("unknown"),
+      icon: "help-outline",
+      tone: "neutral",
     },
     {
       key: "outdated",
@@ -594,6 +622,22 @@ const columns = computed<OTableColumnDef<CollectorRow>[]>(() => [
     size: 200,
     hideable: true,
   },
+  {
+    id: "delivery",
+    header: t("fleet.collectors.delivery"),
+    accessorKey: "delivery",
+    size: 110,
+    sortable: true,
+    hideable: true,
+  },
+  {
+    id: "consistency",
+    header: t("fleet.collectors.consistency"),
+    accessorFn: () => "",
+    size: 120,
+    hideable: true,
+    meta: { headerTooltip: t("fleet.collectors.consistencyPending") },
+  },
   ...(allFleets.value
     ? [
         {
@@ -607,13 +651,6 @@ const columns = computed<OTableColumnDef<CollectorRow>[]>(() => [
       ]
     : []),
   {
-    id: "drift",
-    header: t("fleet.collectors.drift"),
-    accessorKey: "drifted",
-    size: 100,
-    hideable: true,
-  },
-  {
     id: "lastSeen",
     header: t("fleet.collectors.lastSeen"),
     accessorKey: "lastSeen",
@@ -621,7 +658,13 @@ const columns = computed<OTableColumnDef<CollectorRow>[]>(() => [
     sortable: true,
     hideable: true,
   },
-  { id: "ip", header: t("fleet.collectors.ip"), accessorKey: "ip", size: 130, hideable: true },
+  {
+    id: "lastConnectedFrom",
+    header: t("fleet.collectors.lastConnectedFrom"),
+    accessorKey: "lastConnectedFrom",
+    size: 150,
+    hideable: true,
+  },
   { id: "actions", header: raw(""), isAction: true, size: 56 },
 ]);
 
@@ -656,7 +699,7 @@ const selectedRows = computed(() => {
   return tableRows.value.filter((c) => ids.has(c.id));
 });
 
-// A mixed selection names no source, since the shared dialog would otherwise send ?folder=default.
+// A mixed selection names no source, so every readable fleet is a destination.
 function openMove(targets: CollectorRow[]) {
   const sources = new Set(targets.map((c) => c.fleetId));
   moveIds.value = targets.map((c) => c.id);
@@ -666,57 +709,19 @@ function openMove(targets: CollectorRow[]) {
 
 function onMoved() {
   selectedIds.value = [];
-  moveOpen.value = false;
-  queryClient.invalidateQueries({ queryKey: fleetKeys.all(orgId.value) });
 }
 
-function unenrollSelected() {
-  unenrollRows(selectedRows.value);
+function openRename(row: CollectorRow) {
+  renameTarget.value = row;
+  renameOpen.value = true;
 }
 
-async function unenrollRows(targets: CollectorRow[]) {
-  if (!targets.length) return;
-  const org = orgId.value;
-  const ok = await confirm({
-    title:
-      targets.length === 1
-        ? t("fleet.collectors.unenrollTitle", { name: raw(targets[0].name) })
-        : t("fleet.collectors.unenrollManyTitle", { count: targets.length }),
-    message: t("fleet.collectors.unenrollMessage"),
-    confirmLabel: t("fleet.collectors.unenroll"),
-    confirmVariant: "destructive",
-    focusCancel: true,
-  });
-  // The rows belong to the org the confirm was opened in; the mutation follows the current one.
-  if (!ok || orgId.value !== org) return;
-  try {
-    const { succeeded, failed, firstError } = await unenroll.mutateAsync(targets.map((c) => c.id));
-    const gone = new Set(succeeded);
-    selectedIds.value = selectedIds.value.filter((id) => !gone.has(id));
-    toast(
-      failed.length
-        ? {
-            variant: "warning",
-            message: t("fleet.collectors.unenrollPartial", {
-              done: succeeded.length,
-              total: targets.length,
-              reason: raw(serverMessage(firstError)) || t("fleet.common.requestFailed"),
-            }),
-          }
-        : {
-            variant: "success",
-            message: t(
-              "fleet.collectors.unenrolledCount",
-              { count: succeeded.length },
-              succeeded.length,
-            ),
-          },
-    );
-  } catch (err) {
-    toast({
-      variant: "error",
-      message: raw(serverMessage(err)) || t("fleet.common.requestFailed"),
-    });
-  }
+function saveRename(name: string) {
+  return renameTarget.value ? actions.rename(renameTarget.value.id, name) : Promise.resolve(false);
+}
+
+async function removeRows(targets: CollectorRow[]) {
+  const gone = new Set(await actions.remove(targets));
+  selectedIds.value = selectedIds.value.filter((id) => !gone.has(id));
 }
 </script>

@@ -271,7 +271,19 @@ function membersOf(s: Store, fleet: string, phases: number[]) {
   return phases.flatMap((size, phase) => {
     const slice = ids.slice(at, at + size);
     at += size;
-    return slice.map((collector_id) => ({ collector_id, phase, state: "pending", excluded: false }));
+    return slice.map((collector_id) => ({
+      collector_id,
+      phase,
+      state: "pending",
+      excluded: false,
+      evidence: {
+        remote_status: phase === 0 ? "APPLIED" : null,
+        remote_hash: phase === 0 ? "9f2c1a7e" : null,
+        remote_at: phase === 0 ? NOW - 600_000 : null,
+        marker: null,
+        last_heartbeat_at: NOW - 20_000,
+      },
+    }));
   });
 }
 
@@ -499,7 +511,9 @@ function startRollout(fleetId: string, body: FleetSetDesiredRequest): FleetRollo
       gate: null,
     })),
     members: membersOf(store, fleetId, phases),
-    events: [{ at: Date.now(), key: scheduled ? "scheduled" : "started", phase: null, detail: null }],
+    events: [
+      { at: Date.now(), key: scheduled ? "scheduled" : "started", phase: null, detail: null },
+    ],
     started_by: "root@example.com",
     started_at: body.start.kind === "at" ? body.start.at : Date.now(),
     ended_at: null,
