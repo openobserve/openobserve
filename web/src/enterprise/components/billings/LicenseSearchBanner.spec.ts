@@ -18,7 +18,7 @@ import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { createStore } from "vuex";
 import i18n from "@/locales";
 import { queryClient } from "@/composables/query/queryClient";
-import { LICENSE_BANNER_POLL_MS } from "@/utils/licenseWaivers";
+import { DAY_US, LICENSE_BANNER_POLL_MS } from "@/utils/licenseWaivers";
 
 vi.mock("@/aws-exports", () => ({
   default: { isEnterprise: "true", isCloud: "false", isZincObserveCloud: "false" },
@@ -181,6 +181,50 @@ describe("LicenseSearchBanner", () => {
     store.commit("setConfig", restoredConfig(Date.UTC(2026, 9, 27)));
     await flushPromises();
     expect(w.find('[data-test="license-search-banner"]').exists()).toBe(true);
+  });
+
+  it("renders an icon in all three states", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(NOW);
+    for (const cfg of [
+      PAUSED,
+      restoredConfig(NOW + 7 * 86_400_000),
+      restoredConfig(NOW + 3600_000),
+    ]) {
+      const w = await mountBanner(cfg);
+      expect(w.find('[data-test="license-search-banner"] svg').exists()).toBe(true);
+      w.unmount();
+      wrapper = undefined;
+      queryClient.clear();
+    }
+  });
+
+  it("flips restored to ends-soon at one day before the end", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+    const until = NOW + 2 * 86_400_000;
+    const w = await mountBanner(restoredConfig(until));
+    expect(w.findComponent(OBanner).props("variant")).toBe("success");
+    await vi.advanceTimersByTimeAsync(until - DAY_US / 1000 - NOW + 1);
+    expect(w.findComponent(OBanner).props("variant")).toBe("warning");
+    expect(w.text()).toContain("Search restoration ends");
+  });
+
+  it("removes the banner and reloads once when the restoration ends", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+    const until = NOW + 3600_000;
+    vi.mocked(zoConfigService.get_config_full).mockResolvedValue({
+      data: { license_search_allowed: true },
+    } as never);
+    const w = await mountBanner(restoredConfig(until));
+    const spy = vi.spyOn(store, "dispatch");
+    await vi.advanceTimersByTimeAsync(3600_001);
+    expect(w.find('[data-test="license-search-banner"]').exists()).toBe(false);
+    expect(zoConfigService.get_config_full).toHaveBeenCalledTimes(1);
+    expect(spy).toHaveBeenCalledWith("setConfig", { license_search_allowed: true });
+    await vi.advanceTimersByTimeAsync(3600_000);
+    expect(zoConfigService.get_config_full).toHaveBeenCalledTimes(1);
   });
 
   it("stays dismissed on remount while the signature matches", async () => {

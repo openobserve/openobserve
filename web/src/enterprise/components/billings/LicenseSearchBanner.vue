@@ -73,6 +73,7 @@ import { useI18nTyped } from "@/types/i18n";
 import { copyToClipboard } from "@/utils/clipboard";
 import {
   activeSearchUnblock,
+  DAY_US,
   bannerSignature,
   formatUtc,
   LICENSE_BANNER_POLL_MS,
@@ -97,7 +98,8 @@ const readDismissed = (): string | null => {
 
 const dismissedSignature = ref<string | null>(readDismissed());
 
-const state = computed(() => licenseBannerState(store.state.zoConfig ?? {}, Date.now() * 1000));
+const nowUs = ref(Date.now() * 1000);
+const state = computed(() => licenseBannerState(store.state.zoConfig ?? {}, nowUs.value));
 const isPaused = computed(() => state.value.kind === "paused");
 const visible = computed(
   () => state.value.kind !== "none" && dismissedSignature.value !== bannerSignature(state.value),
@@ -120,7 +122,7 @@ const variant = computed(() => {
 });
 const icon = computed(() => {
   if (state.value.kind === "paused") return "error";
-  return state.value.kind === "restored" && state.value.endsSoon ? "schedule" : "check_circle";
+  return state.value.kind === "restored" && state.value.endsSoon ? "schedule" : "check-circle";
 });
 
 const pausedMessage = computed(() => {
@@ -143,7 +145,7 @@ const restoredMessage = computed(() => {
   const until = formatUtc(s.untilUs, locale.value, true);
   if (s.endsSoon) return t("about.banner_ends_soon", { until });
   const base = t("about.banner_restored", { until });
-  const note = activeSearchUnblock(licenseData.value?.waivers, Date.now() * 1000)?.note;
+  const note = activeSearchUnblock(licenseData.value?.waivers, nowUs.value)?.note;
   return note ? `${base} ${t("about.banner_restored_note", { note })}` : base;
 });
 
@@ -183,5 +185,43 @@ watch(
   { immediate: true },
 );
 
-onBeforeUnmount(stopPolling);
+const MAX_TIMEOUT_MS = 2 ** 31 - 1;
+let boundaryTimer: ReturnType<typeof setTimeout> | undefined;
+
+const clearBoundaryTimer = () => {
+  if (boundaryTimer !== undefined) clearTimeout(boundaryTimer);
+  boundaryTimer = undefined;
+};
+
+const waiverUntilUs = (): number | null => {
+  const zo = store.state.zoConfig;
+  const until = zo?.license_waiver_until;
+  return zo?.license_search_allowed === true && typeof until === "number" ? until : null;
+};
+
+// The ends-soon flip is strict (< one day), so the wake-up lands 1 ms past the boundary.
+const armBoundaryTimer = () => {
+  clearBoundaryTimer();
+  nowUs.value = Date.now() * 1000;
+  const until = waiverUntilUs();
+  if (until === null) return;
+  const next = [until - DAY_US, until].find((b) => b > nowUs.value);
+  if (next === undefined) return;
+  const delayMs = Math.ceil((next - nowUs.value) / 1000) + 1;
+  boundaryTimer = setTimeout(onBoundary, Math.min(delayMs, MAX_TIMEOUT_MS));
+};
+
+function onBoundary() {
+  const until = waiverUntilUs();
+  const expired = until !== null && until <= Date.now() * 1000;
+  armBoundaryTimer();
+  if (expired) reloadLicenseState();
+}
+
+watch(() => store.state.zoConfig, armBoundaryTimer, { immediate: true });
+
+onBeforeUnmount(() => {
+  stopPolling();
+  clearBoundaryTimer();
+});
 </script>
