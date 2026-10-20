@@ -582,6 +582,12 @@
   },
   "common": {
     "copiedToClipboard": "クリップボードにコピーしました",
+    "customLogoAlt": "組織のロゴ",
+    "dragToReorder": "ドラッグして並べ替え",
+    "timeAmount": "時間の値",
+    "timeUnit": "時間の単位",
+    "queryEditorAriaLabel": "クエリエディタ。Escape キーを押すと次のコントロールに移動します。",
+    "queryEditorEscapeAction": "フォーカスを次のコントロールに移動",
     "inlineEdit": {
       "autoHint": "クリックして名前を変更します。変更しない限り、この名前は設定から生成され、変更に応じて更新されます。"
     },
@@ -6075,6 +6081,11 @@
     "gpuExporter": "GPU エクスポーター"
   },
   "dashboard": {
+    "sortByClear": "並べ替えを解除",
+    "sortByAsc": "昇順で並べ替え",
+    "sortByDesc": "降順で並べ替え",
+    "panelError": "パネルエラー: {message}",
+    "panelWarning": "パネル警告",
     "saveConflict": {
       "notSaved": "未保存: 他のユーザーが先にこのダッシュボードを保存しました。",
       "notSavedChange": "未保存: {change}。他のユーザーが先にこのダッシュボードを保存しました。",
@@ -8149,16 +8160,14 @@
     "invoiceHistoryLabel": "請求書履歴",
     "upgradeNow": "今すぐアップグレード",
     "subscribe": "購読",
-    "features": "特徴",
-    "included": "何が含まれていますか？",
     "proPlanSubtitle": "小規模チーム向けのカスタムソリューション",
     "unlimitedNote": "ユーザー、ログ、メトリクス、トレースなど無制限。",
     "paymentNote": "支払いは、毎月の請求サイクル終了時の使用量に基づいて計算されます。",
     "proPlanLabel": "従量課金制",
-    "contactLabel": "セールスに問い合わせる",
+    "contactLabel": "営業に問い合わせる",
     "enterpriseLabel": "エンタープライズプラン",
     "enterpriseSubtitle": "企業のニーズに応える高度な機能とサポート",
-    "discountTag": "割引中",
+    "discountTag": "割引適用中",
     "enterpriseNote": "大量生産が必要ですか？スケールについて話そう！カスタマイズされたソリューションについてはお問い合わせください。",
     "contactSupport": "サポートに連絡",
     "usageTrends": {
@@ -8795,6 +8804,7 @@
     }
   },
   "alerts": {
+    "moreActions": "その他のアクション",
     "promRuleMode": "ルールモード",
     "promRulePreview": "{count} 件の返されたシリーズが現在一致しています。各シリーズは発火する前に保留期間を完了する必要があります。",
     "promRuleModeDescription": "式がシリーズを返したときに一致します。保留期間がゼロの場合はシングルアラートまたはマルチアラートを選択してください。保留期間を設定すると、マルチアラートが自動的に有効になります。参照されたメトリクスストリームを推測するには、ストリームを空のままにしてください。",
@@ -9789,6 +9799,7 @@
     "selectStreamTypeFirst": "最初にストリームタイプを選択してください",
     "previewEmptyState": "プレビューを表示するには、ストリームタイプとストリーム名を選択してください",
     "queryConfig": {
+      "aggregationFunction": "集計関数",
       "sectionTitle": "条件",
       "openFullEditor": "フルエディターを開く",
       "groupByTooltip": "これらのフィールドで結果をグループ化 — 固有の組み合わせごとにアラートがトリガーされる",
@@ -19244,6 +19255,8 @@
         "resetToDefault": "デフォルトにリセット",
         "resetColumnWidths": "列幅をリセット"
       },
+      "selectAllRows": "すべての行を選択",
+      "selectRow": "行 {name} を選択",
       "removeColumnAria": "列を削除",
       "formatColumnAria": "列の書式設定",
       "selectedOfTotal": "{total} 件中 {selected} 件を選択中",

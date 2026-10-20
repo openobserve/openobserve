@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="bg-card-glass-bg border-card-glass-border rounded-default dark:bg-surface-base dark:border-border-default mb-3 flex w-full flex-col gap-2 border px-4 py-2.5 text-left shadow-none transition-shadow duration-200 hover:shadow-sm"
     >
       <div class="flex flex-wrap items-center gap-x-3 gap-y-2">
-        <img :src="aiIcon" class="size-5 opacity-80" />
+        <img alt="" :src="aiIcon" class="size-5 opacity-80" />
         <div class="text-text-heading text-sm leading-5 font-semibold">
           {{ t("billing.aiCredits") }}
         </div>

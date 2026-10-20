@@ -582,6 +582,12 @@
   },
   "common": {
     "copiedToClipboard": "Copied to clipboard",
+    "customLogoAlt": "Organization logo",
+    "dragToReorder": "Drag to reorder",
+    "timeAmount": "Time amount",
+    "timeUnit": "Time unit",
+    "queryEditorAriaLabel": "Query editor. Press Escape to move to the next control.",
+    "queryEditorEscapeAction": "Move focus to the next control",
     "inlineEdit": {
       "autoHint": "Click to rename. Until you do, this name is generated from your configuration and keeps up as you change it."
     },
@@ -6075,6 +6081,11 @@
     "gpuExporter": "GPU exporter"
   },
   "dashboard": {
+    "sortByClear": "Clear sorting",
+    "sortByAsc": "Sort ascending",
+    "sortByDesc": "Sort descending",
+    "panelError": "Panel error: {message}",
+    "panelWarning": "Panel warning",
     "saveConflict": {
       "notSaved": "Not saved: someone else saved this dashboard first.",
       "notSavedChange": "Not saved: {change}. Someone else saved this dashboard first.",
@@ -8793,6 +8804,7 @@
     }
   },
   "alerts": {
+    "moreActions": "More actions",
     "promRuleMode": "Rule mode",
     "promRulePreview": "{count} returned series match now. Each series must complete the pending period before firing.",
     "promRuleModeDescription": "Matches when the expression returns any series. Choose Single or Multi alert when the pending period is zero; a pending period enables Multi alert automatically. Leave the stream empty to infer a referenced metrics stream.",
@@ -9787,6 +9799,7 @@
     "selectStreamTypeFirst": "Select a stream type first",
     "previewEmptyState": "Select a stream type and stream name to see a preview",
     "queryConfig": {
+      "aggregationFunction": "Aggregation function",
       "sectionTitle": "Conditions",
       "openFullEditor": "Open Full Editor",
       "groupByTooltip": "Group results by these fields — alert triggers per unique combination",
@@ -19242,6 +19255,8 @@
         "resetToDefault": "Reset to default",
         "resetColumnWidths": "Reset column widths"
       },
+      "selectAllRows": "Select all rows",
+      "selectRow": "Select row {name}",
       "removeColumnAria": "Remove column",
       "formatColumnAria": "Format column",
       "selectedOfTotal": "{selected} of {total} selected",

@@ -1328,7 +1328,7 @@ test.describe("Autocomplete key contract — Enter never inserts from a menu it 
         tag: ['@all', '@autosuggestions', '@logs', '@keycontract']
     }, async ({ page }) => {
         await seedEditor(page, `SELECT *`);
-        await page.keyboard.press('Escape');
+        if ((await menuState(page)).visible) await page.keyboard.press('Escape');
         await page.keyboard.press('Tab');
         expect(await editorText(page)).toMatch(/^SELECT \*[ \t]+$/);
     });
@@ -2135,7 +2135,7 @@ test.describe("Autocomplete group headers — never a target", () => {
         await page.keyboard.press('ArrowDown');
         await page.keyboard.press('Enter');
         await expect.poll(() => editorText(page)).toBe(`${WHERE}level = ${menu.rows[0]}`);
-        await page.keyboard.press('Escape');
+        if ((await menuState(page)).visible) await page.keyboard.press('Escape');
         await page.keyboard.press(`${await undoKey(page)}+z`);
         await expect.poll(() => editorText(page)).toBe(`${WHERE}level = `);
     });
