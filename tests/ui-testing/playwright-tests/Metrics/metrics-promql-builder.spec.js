@@ -550,19 +550,18 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     if (tableSelected) {
       testLogger.info('Switched to table chart type');
 
-      // 3. Run query again with table chart
-      const respPromise2 = builder.waitForQueryResponse(15000);
+      // 3. Run query again with table chart; the chart switch fires its own run, so settle before and after
+      await builder.waitForPromqlIdle();
       await builder.clickRunQuery();
-      await respPromise2;
+      await builder.waitForPromqlIdle();
 
       // 4. Verify no errors
       expect(await pm.metricsPage.isErrorNotificationVisible()).toBe(false);
       testLogger.info('Table chart query executed without errors');
 
-      // 5. Verify table or chart rendered
-      const rendered = await builder.isChartRendered();
-      expect(rendered).toBe(true);
-      testLogger.info('Table/chart rendered successfully');
+      // 5. Verify the table rendered
+      await builder.expectTableRendered();
+      testLogger.info('Table rendered successfully');
 
       // 6. Switch back to line chart
       await builder.selectChartType('line');

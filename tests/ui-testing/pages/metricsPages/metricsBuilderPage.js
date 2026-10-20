@@ -2,6 +2,8 @@
 // Page Object Model for PromQL Builder Mode UI interactions
 // Covers: Label Filters, Operations, Options, Query Mode tabs, Add to Dashboard
 
+import { expect } from '@playwright/test';
+
 // Keyed by page so every PageManager built on the same page shares one set of listeners instead of stacking more.
 const promqlTrackers = new WeakMap();
 
@@ -1461,6 +1463,11 @@ export class MetricsBuilderPage {
         const chartVisible = await this.chartRenderer.isVisible({ timeout: 5000 }).catch(() => false);
         const tableVisible = await this.dashboardPanelTable.isVisible({ timeout: 5000 }).catch(() => false);
         return chartVisible || tableVisible;
+    }
+
+    /** Assert the table chart renders; the table component mounts lazily after the first PromQL load settles. */
+    async expectTableRendered(timeout = 30000) {
+        await expect(this.dashboardPanelTable).toBeVisible({ timeout });
     }
 
     // ===== Add to Dashboard - Full Save Flow =====
