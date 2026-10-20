@@ -41,9 +41,6 @@ use utoipa::ToSchema;
 
 use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 
-/// Browser-generated UUID of one turn, so a retried request does not run the model twice.
-pub const X_O2_ASSISTANT_TURN_ID: &str = "x-o2-assistant-turn-id";
-
 pub(super) const MAX_TITLE_CHARS: usize = 200;
 const DEFAULT_PAGE: u64 = 50;
 const MAX_PAGE: u64 = 200;

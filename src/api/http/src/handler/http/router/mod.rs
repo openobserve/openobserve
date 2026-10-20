@@ -24,7 +24,7 @@ use axum::{
     routing::{delete, get, patch, post, put},
 };
 use config::get_config;
-use openobserve_api_common::X_O2_ASSISTANT_SESSION_ID;
+use openobserve_api_common::{X_O2_ASSISTANT_SESSION_ID, X_O2_ASSISTANT_TURN_ID};
 use openobserve_api_ingest::request::{clusters, logs, metrics, profiles, rum};
 #[cfg(feature = "profiling")]
 use openobserve_api_management::request::profiling;
@@ -120,6 +120,7 @@ pub fn cors_layer() -> CorsLayer {
             header::HeaderName::from_static("x-openobserve-parent-id"),
             header::HeaderName::from_static("x-openobserve-sampling-priority"),
             X_O2_ASSISTANT_SESSION_ID,
+            X_O2_ASSISTANT_TURN_ID,
         ])
         // Restrict CORS to the configured web_url origin, plus any extra origins in
         // ZO_CORS_ALLOWED_ORIGINS (comma-separated).  mirror_request() + allow_credentials(true)
@@ -4192,6 +4193,47 @@ mod tests {
     fn test_cors_empty_web_url_allows_all() {
         // Empty web_url is permissive (dev mode)
         assert!(is_origin_allowed(b"https://any.origin.com", ""));
+    }
+
+    #[tokio::test]
+    async fn test_cors_preflight_allows_assistant_chat_headers() {
+        // One header missing from the allow-list fails the preflight and the POST is never sent.
+        let app = Router::new()
+            .route(
+                "/default/ai/chat_stream",
+                axum::routing::post(|| async { "ok" }),
+            )
+            .layer(cors_layer());
+        let req = Request::builder()
+            .method(Method::OPTIONS)
+            .uri("/default/ai/chat_stream")
+            .header(header::ORIGIN, "http://localhost:8081")
+            .header(header::ACCESS_CONTROL_REQUEST_METHOD, "POST")
+            .header(
+                header::ACCESS_CONTROL_REQUEST_HEADERS,
+                "content-type,traceparent,x-o2-assistant-session-id,x-o2-assistant-turn-id",
+            )
+            .body(Body::empty())
+            .unwrap();
+
+        let response = app.oneshot(req).await.unwrap();
+        let allowed = response
+            .headers()
+            .get(header::ACCESS_CONTROL_ALLOW_HEADERS)
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or_default()
+            .to_ascii_lowercase();
+        for name in [
+            "content-type",
+            "traceparent",
+            X_O2_ASSISTANT_SESSION_ID.as_str(),
+            X_O2_ASSISTANT_TURN_ID.as_str(),
+        ] {
+            assert!(
+                allowed.split(',').any(|h| h.trim() == name),
+                "{name} missing from access-control-allow-headers: {allowed}"
+            );
+        }
     }
 
     #[test]

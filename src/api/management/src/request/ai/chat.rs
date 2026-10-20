@@ -24,7 +24,9 @@ use axum::{
 };
 #[cfg(feature = "enterprise")]
 use config::meta::oncall::rca::RcaContext;
-use openobserve_api_common::{X_O2_ASSISTANT_SESSION_ID, extractors::Headers};
+use openobserve_api_common::{
+    X_O2_ASSISTANT_SESSION_ID, X_O2_ASSISTANT_TURN_ID, extractors::Headers,
+};
 use serde::Deserialize;
 #[cfg(feature = "enterprise")]
 use {
@@ -987,7 +989,7 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
     // The browser's id for this turn, so a retried request does not run the model twice.
     let persist_turn_id = parts
         .headers
-        .get(super::chats::X_O2_ASSISTANT_TURN_ID)
+        .get(X_O2_ASSISTANT_TURN_ID.as_str())
         .and_then(|v| v.to_str().ok())
         .map(str::to_string);
 
