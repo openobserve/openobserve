@@ -44,7 +44,7 @@ const creatable = (name: string) =>
   });
 
 const stubs = {
-  FleetOverview: true,
+  FleetFlowOverview: true,
   FleetFleets: creatable("FleetFleets"),
   FleetConfigurations: creatable("FleetConfigurations"),
   FleetSettings: true,
@@ -87,32 +87,42 @@ describe("FleetManager", () => {
     },
   );
 
-  it.each(["overview", "settings"])("offers no create action on %s", async (tab) => {
+  it.each(["pipelines", "settings"])("offers no create action on %s", async (tab) => {
     wrapper = await mountAt(tab);
     expect(wrapper.find('[data-test^="fleet-manager-create-"]').exists()).toBe(false);
     expect(wrapper.text()).not.toContain("Add collector");
   });
 
   it.each([{}, { tab: "collectors" }, { tab: "enrollment" }])(
-    "shows Overview for a missing or unknown tab (%j)",
+    "shows Fleets for a missing or unknown tab (%j)",
     async (query) => {
       await router.push({ name: "fleet", query });
       wrapper = mount(FleetManager, { global: { plugins: [i18n, router, store], stubs } });
       await flushPromises();
-      expect(wrapper.findComponent({ name: "OTabs" }).props("modelValue")).toBe("overview");
+      expect(wrapper.findComponent({ name: "OTabs" }).props("modelValue")).toBe("fleets");
     },
   );
 
   it("has one row of four tabs, with no Enrollment, and no sub-tabs", async () => {
-    wrapper = await mountAt("overview");
+    wrapper = await mountAt("fleets");
     const tabs = wrapper.findAll('[data-test^="fleet-manager-tab-"]').map((t) => t.text());
-    expect(tabs).toEqual(["Overview", "Fleets", "Configurations", "Settings"]);
+    expect(tabs).toEqual(["Fleets", "Configurations", "Pipelines", "Settings"]);
     expect(wrapper.findAllComponents({ name: "OTabs" })).toHaveLength(1);
     expect(wrapper.find('[data-test="fleet-manager-subnav"]').exists()).toBe(false);
   });
 
+  it("titles the page Fleet management", async () => {
+    wrapper = await mountAt("fleets");
+    expect(wrapper.text()).toContain("Fleet management");
+  });
+
+  it("shows the pipelines map on the Pipelines tab", async () => {
+    wrapper = await mountAt("pipelines");
+    expect(wrapper.find('[data-test="fleet-manager-pipelines"]').exists()).toBe(true);
+  });
+
   it("switches tabs through ?tab= alone, keeping the org", async () => {
-    await router.push({ name: "fleet", query: { org_identifier: "acme", tab: "overview" } });
+    await router.push({ name: "fleet", query: { org_identifier: "acme", tab: "pipelines" } });
     wrapper = mount(FleetManager, { global: { plugins: [i18n, router, store], stubs } });
     await flushPromises();
     wrapper.findComponent({ name: "OTabs" }).vm.$emit("change", "configurations");

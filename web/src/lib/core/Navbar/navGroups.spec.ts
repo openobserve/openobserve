@@ -840,8 +840,16 @@ describe("GATE_PREDICATES", () => {
     onlineEvals: false,
     databaseMonitoring: false,
     downtimesEnabled: false,
+    alertCalibrationEnabled: false,
+    fleetEnabled: false,
     hiddenMenus: new Set<string>(),
     ...over,
+  });
+
+  it("fleet needs enterprise AND the runtime flag", () => {
+    expect(GATE_PREDICATES.fleet(ctx({ isEnterprise: true, fleetEnabled: true }))).toBe(true);
+    expect(GATE_PREDICATES.fleet(ctx({ isEnterprise: true }))).toBe(false);
+    expect(GATE_PREDICATES.fleet(ctx({ fleetEnabled: true }))).toBe(false);
   });
 
   it("databaseMonitoring gates on the runtime flag ALONE — it is an OSS feature", () => {

@@ -1442,7 +1442,7 @@
     "synthetic": "Synthetics",
     "experience": "Experience",
     "slos": "SLOs",
-    "fleet": "Fleet manager",
+    "fleet": "Fleet",
     "reliability": "Reliability",
     "onCall": "On-Call",
     "toggleNavigation": "Toggle navigation",
@@ -19004,7 +19004,7 @@
       "syntheticsJourney": "Synthetics journey",
       "downtimes": "Downtimes",
       "fleetConfigEditor": "Configuration editor",
-      "fleetOverview": "Fleet overview"
+      "fleetOverview": "Fleet pipelines"
     },
     "actions": {
       "openCheatsheet": "Open keyboard shortcuts cheatsheet",
@@ -24987,15 +24987,15 @@
     }
   },
   "fleet": {
-    "title": "Fleet manager",
-    "subtitle": "Enroll, configure and upgrade OpenTelemetry collectors over OpAMP",
+    "title": "Fleet management",
+    "subtitle": "Enroll OpenTelemetry collectors, version their configurations and roll changes out safely",
     "addCollector": "Add collector",
     "tabs": {
-      "overview": "Overview",
       "collectors": "Collectors",
       "fleets": "Fleets",
       "configurations": "Configurations",
-      "settings": "Settings"
+      "settings": "Settings",
+      "pipelines": "Pipelines"
     },
     "common": {
       "actions": "Actions",
