@@ -317,15 +317,11 @@ pub async fn unsubscribe(
         ("x-o2-mcp" = json!({"enabled": false}))
     ),
 )]
-pub async fn list_invoices(
-    Path(org_id): Path<String>,
-    Headers(user_email): Headers<UserEmail>,
-) -> Response {
-    let email = user_email.user_id.as_str();
+pub async fn list_invoices(Path(org_id): Path<String>) -> Response {
     if organization::get_org(&org_id).await.is_none() {
         return o2_cloud_billings::BillingError::OrgNotFound.into_http_response();
     }
-    match o2_cloud_billings::list_invoice(&org_id, email).await {
+    match o2_cloud_billings::list_invoice(&org_id).await {
         Ok(invoices) => {
             let body = ListInvoicesResponseBody {
                 invoices: invoices.unwrap_or_default(),
