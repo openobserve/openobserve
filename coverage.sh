@@ -50,6 +50,7 @@ _cov_test() {
         --no-cfg-coverage-nightly \
         --ignore-filename-regex 'job|.*generated.*' \
         --no-fail-fast \
+        --no-clean \
         --retries 1 \
         --json \
         --summary-only \
