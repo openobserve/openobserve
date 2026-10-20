@@ -308,7 +308,8 @@ export default defineComponent({
         );
         this.enterprisePlanFeatures = mapFeatures(enterprise?.features ?? []);
         this.proPlanPricingOptions = pricingOptions;
-        this.proPlanAdditionalInfo = payAsYouGo?.additionalInfo ?? "";
+        // The footnote explains an asterisked feature price, which the tiles replace.
+        this.proPlanAdditionalInfo = hasPriceBlock ? "" : (payAsYouGo?.additionalInfo ?? "");
         // Both cards show a price block or neither, so their feature lists stay aligned.
         this.enterprisePlanPrice =
           hasPriceBlock && enterprise?.price
