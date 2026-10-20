@@ -19641,7 +19641,6 @@
     },
     "queries": {
       "queryCancelled": "Đã hủy truy vấn",
-      "queryNotCancelled": "Chưa hủy truy vấn: truy vấn đã kết thúc hoặc bạn không có quyền hủy",
       "fetchingRunningQueries": "Đang tải các truy vấn đang chạy..."
     },
     "reports": {

@@ -19641,7 +19641,6 @@
     },
     "queries": {
       "queryCancelled": "Query geannuleerd",
-      "queryNotCancelled": "Query niet geannuleerd: deze is al voltooid of je mag deze niet annuleren",
       "fetchingRunningQueries": "Actieve queries ophalen..."
     },
     "reports": {

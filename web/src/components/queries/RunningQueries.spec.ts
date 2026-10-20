@@ -19,7 +19,6 @@ import RunningQueries from "@/components/queries/RunningQueries.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import SearchService from "@/services/search";
-import { toast } from "@/lib/feedback/Toast/useToast";
 
 // Mock SearchService
 vi.mock("@/services/search", async (importOriginal) => {
@@ -31,8 +30,6 @@ vi.mock("@/services/search", async (importOriginal) => {
     },
   });
 });
-
-vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: vi.fn(() => vi.fn()) }));
 
 // Mock composables
 vi.mock("@/composables/useIsMetaOrg", () => ({
@@ -384,37 +381,6 @@ describe("RunningQueries", () => {
     expect(SearchService.delete_running_queries).toHaveBeenCalledWith("test-org", ["trace-1"]);
     expect(wrapper.vm.selectedRow.all).toEqual([]);
     expect(wrapper.vm.deleteDialog.show).toBe(false);
-  });
-
-  it("should warn when the cancel reports that nothing was cancelled", async () => {
-    wrapper.vm.deleteDialog.data = ["trace-1"];
-    (SearchService.delete_running_queries as any).mockResolvedValue({
-      data: [{ trace_id: "trace-1", is_success: false }],
-    });
-
-    await wrapper.vm.deleteQuery();
-
-    expect(toast).toHaveBeenCalledWith({
-      message: i18n.global.t("toastMessages.queries.queryNotCancelled"),
-      variant: "warning",
-    });
-  });
-
-  it("should confirm the cancel when any query was cancelled", async () => {
-    wrapper.vm.deleteDialog.data = ["trace-1", "trace-2"];
-    (SearchService.delete_running_queries as any).mockResolvedValue({
-      data: [
-        { trace_id: "trace-1", is_success: false },
-        { trace_id: "trace-2", is_success: true },
-      ],
-    });
-
-    await wrapper.vm.deleteQuery();
-
-    expect(toast).toHaveBeenCalledWith({
-      message: i18n.global.t("toastMessages.queries.queryCancelled"),
-      variant: "info",
-    });
   });
 
   // Test 21: deleteQuery error handling

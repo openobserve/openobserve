@@ -19641,7 +19641,6 @@
     },
     "queries": {
       "queryCancelled": "Consulta cancelada",
-      "queryNotCancelled": "Consulta no cancelada: ya ha finalizado o no tienes permiso para cancelarla",
       "fetchingRunningQueries": "Obteniendo consultas en ejecución..."
     },
     "reports": {

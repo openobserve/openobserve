@@ -19641,7 +19641,6 @@
     },
     "queries": {
       "queryCancelled": "Query cancelled",
-      "queryNotCancelled": "Query not cancelled: it has already finished or you are not allowed to cancel it",
       "fetchingRunningQueries": "Fetching running queries..."
     },
     "reports": {

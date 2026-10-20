@@ -19636,7 +19636,6 @@
     },
     "queries": {
       "queryCancelled": "查詢已取消",
-      "queryNotCancelled": "查詢未取消：查詢已結束，或你沒有取消它的權限",
       "fetchingRunningQueries": "正在取得執行中的查詢..."
     },
     "reports": {
