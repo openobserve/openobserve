@@ -1,6 +1,0 @@
-[
-  { "title": "should cancel only the chosen org's copy when the same trace_id runs in two orgs", "action": "new", "verifies": "cancelling one org's row for a shared trace_id sends exactly [{ trace_id, org_id }] for that org only" },
-  { "title": "should send each selected row's org-scoped pair on bulk cancel", "action": "new", "verifies": "multi-select cancel emits each selected row's org-scoped {trace_id, org_id} pair and nothing else" },
-  { "title": "should flatten a user's queries across orgs into org-scoped pairs on summary cancel", "action": "new", "verifies": "User Summary cancel flattens the user's per-query {trace_id, org_id} pairs across orgs into the cancel payload" },
-  { "title": "should not fire a cancel request when the confirm dialog is dismissed", "action": "new", "verifies": "dismissing the confirm dialog closes it without issuing a cancel PUT" }
-]
