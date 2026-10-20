@@ -13,69 +13,71 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use config::meta::search::SearchEventContext;
 #[cfg(feature = "enterprise")]
-use {
-    config::meta::search::ScanStats,
-    o2_enterprise::enterprise::search::{QueryManager, TaskStatus, WorkGroup},
-};
+pub use o2_enterprise::enterprise::search::{QueryGuard, QueryHandle};
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::search::{QueryManager, TaskStatus};
+
+/// What query status shows for a leader query.
+pub struct LeaderInfo<'a> {
+    pub user_id: Option<&'a str>,
+    pub stream_type: &'a str,
+    pub sql: &'a str,
+    pub start_time: i64,
+    pub end_time: i64,
+    pub search_type: Option<String>,
+    pub search_event_context: Option<&'a SearchEventContext>,
+}
 
 #[derive(Clone, Debug)]
 #[cfg(feature = "enterprise")]
 pub struct Searcher {
-    pub query_manager: std::sync::Arc<QueryManager>,
+    pub query_manager: QueryManager,
 }
 
 #[cfg(feature = "enterprise")]
 impl Searcher {
     pub fn new() -> Self {
         Self {
-            query_manager: std::sync::Arc::new(QueryManager::new()),
+            query_manager: QueryManager::new(),
         }
     }
 
-    // check is the trace_id in the query_manager
-    pub async fn contain_key(&self, org_id: &str, trace_id: &str) -> bool {
-        self.query_manager.contain_key(org_id, trace_id).await
-    }
-
-    // insert the trace_id and task_status into the query_manager
-    pub async fn insert(&self, org_id: &str, trace_id: String, task_status: TaskStatus) {
-        self.query_manager
-            .insert(org_id, trace_id, task_status)
-            .await;
-    }
-
-    // remove the trace_id from the query_manager
-    pub async fn remove(&self, org_id: &str, trace_id: &str) -> Option<(String, TaskStatus)> {
-        self.query_manager.remove(org_id, trace_id).await
-    }
-
-    /// Removes `trace_id` and its `{trace_id}-` sub-tasks in `org_id`.
-    pub async fn cancel(&self, org_id: &str, trace_id: &str) -> Option<Vec<(String, TaskStatus)>> {
-        self.query_manager.cancel(org_id, trace_id).await
-    }
-
-    // check is the trace_id in the query_manager and is_leader
-    pub async fn is_leader(&self, org_id: &str, trace_id: &str) -> bool {
-        self.query_manager.is_leader(org_id, trace_id).await
-    }
-
-    // insert the sender into the query_manager by trace_id
-    pub async fn insert_sender(
+    pub fn register_leader(
         &self,
         org_id: &str,
         trace_id: &str,
-        sender: tokio::sync::oneshot::Sender<()>,
-        query_start: bool,
-    ) -> Result<(), infra::errors::Error> {
-        self.query_manager
-            .insert_sender(org_id, trace_id, sender, query_start)
-            .await
+        info: LeaderInfo<'_>,
+    ) -> QueryGuard {
+        let status = TaskStatus::new_leader(
+            vec![],
+            true,
+            info.user_id.map(str::to_string),
+            Some(org_id.to_string()),
+            Some(info.stream_type.to_string()),
+            Some(info.sql.to_string()),
+            Some(info.start_time),
+            Some(info.end_time),
+            info.search_type,
+            info.search_event_context.cloned(),
+        );
+        self.query_manager.register(org_id, trace_id, status)
+    }
+
+    pub fn register_follower(&self, org_id: &str, trace_id: &str) -> QueryGuard {
+        let status = TaskStatus::new_follower(vec![], false);
+        self.query_manager.register(org_id, trace_id, status)
+    }
+
+    /// Cancels `id` and its `{id}-` sub-queries in `org_id`, returning how many were cancelled.
+    pub fn cancel(&self, org_id: &str, id: &str) -> usize {
+        self.query_manager.cancel(org_id, id)
     }
 
     // get all task status that is leader
     pub async fn get_task_status(&self) -> Vec<proto::cluster_rpc::QueryStatus> {
-        let mut status = self.query_manager.get_task_status().await;
+        let mut status = self.query_manager.get_task_status();
 
         // Enrich dashboard searches submitted without names so query management can display the
         // dashboard and folder instead of only their IDs.
@@ -96,25 +98,6 @@ impl Searcher {
 
         status
     }
-
-    // add file stats
-    pub async fn add_file_stats(&self, org_id: &str, trace_id: &str, scan_stats: &ScanStats) {
-        self.query_manager
-            .add_file_stats(org_id, trace_id, scan_stats)
-            .await;
-    }
-
-    // add work group
-    pub async fn add_work_group(
-        &self,
-        org_id: &str,
-        trace_id: &str,
-        work_group: Option<WorkGroup>,
-    ) {
-        self.query_manager
-            .add_work_group(org_id, trace_id, work_group)
-            .await;
-    }
 }
 
 #[derive(Clone, Debug)]
@@ -125,6 +108,71 @@ pub struct Searcher;
 impl Searcher {
     pub fn new() -> Self {
         Self
+    }
+
+    pub fn register_leader(
+        &self,
+        org_id: &str,
+        trace_id: &str,
+        _info: LeaderInfo<'_>,
+    ) -> QueryGuard {
+        self.register_follower(org_id, trace_id)
+    }
+
+    pub fn register_follower(&self, org_id: &str, trace_id: &str) -> QueryGuard {
+        QueryGuard(QueryHandle {
+            org_id: org_id.to_string(),
+            trace_id: trace_id.to_string(),
+            id: config::ider::generate_query_id(trace_id),
+        })
+    }
+}
+
+/// Without enterprise there is no query manager, so a query only carries its ids.
+#[derive(Debug)]
+#[cfg(not(feature = "enterprise"))]
+pub struct QueryGuard(QueryHandle);
+
+#[cfg(not(feature = "enterprise"))]
+impl QueryGuard {
+    pub fn handle(&self) -> QueryHandle {
+        self.0.clone()
+    }
+
+    pub fn finish(self) -> Option<String> {
+        None
+    }
+}
+
+#[cfg(not(feature = "enterprise"))]
+impl std::ops::Deref for QueryGuard {
+    type Target = QueryHandle;
+
+    fn deref(&self) -> &QueryHandle {
+        &self.0
+    }
+}
+
+#[derive(Clone, Debug)]
+#[cfg(not(feature = "enterprise"))]
+pub struct QueryHandle {
+    org_id: String,
+    trace_id: String,
+    id: String,
+}
+
+#[cfg(not(feature = "enterprise"))]
+impl QueryHandle {
+    pub fn org_id(&self) -> &str {
+        &self.org_id
+    }
+
+    pub fn trace_id(&self) -> &str {
+        &self.trace_id
+    }
+
+    pub fn id(&self) -> &str {
+        &self.id
     }
 }
 

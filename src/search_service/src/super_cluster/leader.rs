@@ -43,7 +43,7 @@ use tracing::{Instrument, info_span};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::{
-    SEARCH_SERVER, SearchResult,
+    QueryHandle, SearchResult,
     datafusion::{
         context::{SearchContextBuilder, register_table},
         optimizer::{
@@ -63,14 +63,14 @@ use crate::{
     fields(org_id = req.org_id)
 )]
 pub async fn search(
-    trace_id: &str,
-    query_id: &str,
+    query_handle: &QueryHandle,
     sql: Arc<Sql>,
     mut req: Request,
     _query: cluster_rpc::SearchQuery,
     req_regions: Vec<String>,
     req_clusters: Vec<String>,
 ) -> Result<SearchResult> {
+    let trace_id = query_handle.trace_id();
     let _start = std::time::Instant::now();
     let cfg = get_config();
     log::info!("[trace_id {trace_id}] super cluster leader: start {sql}");
@@ -130,12 +130,7 @@ pub async fn search(
         }
     });
 
-    let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
-    if SEARCH_SERVER
-        .insert_sender(&sql.org_id, query_id, abort_sender, true)
-        .await
-        .is_err()
-    {
+    let Ok(abort_receiver) = query_handle.on_cancel(true) else {
         log::info!(
             "[trace_id {trace_id}] super cluster leader: search canceled before execution plan"
         );
@@ -144,7 +139,7 @@ pub async fn search(
                 "[trace_id {trace_id}] super cluster leader: search canceled before execution plan"
             )),
         ));
-    }
+    };
 
     let trace_stream_name = json::to_string(
         &sql.stream_names

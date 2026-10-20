@@ -20,12 +20,11 @@ use futures::Stream;
 use infra::errors;
 use opentelemetry::global;
 use promql_service::search as SearchService;
+use search_service::{QueryGuard, SEARCH_SERVER};
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
-#[cfg(feature = "enterprise")]
-use {o2_enterprise::enterprise::search::TaskStatus, search_service::SEARCH_SERVER};
 
 use crate::handler::grpc::{
     MetadataMap,
@@ -53,16 +52,12 @@ impl Metrics for MetricsQuerier {
 
         let req = req.into_inner();
         let (_, trace_id) = query_and_trace_id(&req)?;
-
-        #[cfg_attr(not(feature = "enterprise"), allow(unused_variables))]
-        let (req, trace_id) = register_follower(req, &trace_id).await;
+        let (req, query_guard) = register_follower(req, &trace_id);
 
         let org_id = &req.org_id;
         let stream_type = StreamType::Metrics.as_str();
-        let result = SearchService::grpc::search(&req).await;
-
-        #[cfg(feature = "enterprise")]
-        SEARCH_SERVER.remove(org_id, &trace_id).await;
+        let result = SearchService::grpc::search(&req, &query_guard).await;
+        drop(query_guard);
 
         let result = result.map_err(|err| {
             let time = start.elapsed().as_secs_f64();
@@ -113,19 +108,15 @@ impl Metrics for MetricsQuerier {
             query.query_data = true;
         }
 
-        #[cfg_attr(not(feature = "enterprise"), allow(unused_variables))]
-        let (req, trace_id) = register_follower(req, &trace_id).await;
+        let (req, query_guard) = register_follower(req, &trace_id);
 
         // spawn a task to push streaming responses
         let cap = std::cmp::max(2, config::get_config().limit.cpu_num);
         let (tx, rx) = mpsc::channel::<Result<MetricsQueryResponse, Status>>(cap);
         tokio::task::spawn(async move {
-            if let Err(e) = promql_service::search::grpc::data(&req, tx).await {
+            if let Err(e) = promql_service::search::grpc::data(&req, &query_guard, tx).await {
                 log::error!("[gRPC:metrics:data] get data error: req:{req:?}, error:{e:?}")
             }
-
-            #[cfg(feature = "enterprise")]
-            SEARCH_SERVER.remove(&req.org_id, &trace_id).await;
         });
 
         let out_stream = ReceiverStream::new(rx);
@@ -134,25 +125,16 @@ impl Metrics for MetricsQuerier {
 }
 
 /// Runs the request under its own `{trace_id}-{suffix}` id that a cancel of `trace_id` reaches.
-async fn register_follower(
+fn register_follower(
     mut req: MetricsQueryRequest,
     trace_id: &str,
-) -> (MetricsQueryRequest, String) {
-    // file lists and query-manager entries key on this id, so concurrent requests need their own
-    let follower_id = config::ider::generate_query_id(trace_id);
+) -> (MetricsQueryRequest, QueryGuard) {
+    let query_guard = SEARCH_SERVER.register_follower(&req.org_id, trace_id);
+    // file lists are keyed by this id, so concurrent requests need their own
     if let Some(job) = req.job.as_mut() {
-        job.trace_id = follower_id.clone();
+        job.trace_id = query_guard.id().to_string();
     }
-
-    #[cfg(feature = "enterprise")]
-    SEARCH_SERVER
-        .insert(
-            &req.org_id,
-            follower_id.clone(),
-            TaskStatus::new_follower(vec![], false),
-        )
-        .await;
-    (req, follower_id)
+    (req, query_guard)
 }
 
 fn query_and_trace_id(req: &MetricsQueryRequest) -> Result<(&MetricsQueryStmt, String), Status> {

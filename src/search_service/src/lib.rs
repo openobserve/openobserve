@@ -51,7 +51,7 @@ use usage_reporting::report_request_usage_stats;
 #[cfg(feature = "enterprise")]
 use {
     infra::{client::grpc::make_grpc_search_client, cluster::get_cached_online_query_nodes},
-    o2_enterprise::enterprise::{common::config::get_config as get_o2_config, search::TaskStatus},
+    o2_enterprise::enterprise::common::config::get_config as get_o2_config,
     tracing::info_span,
 };
 
@@ -88,6 +88,7 @@ use ::search::{
     index, inspector, sql, tantivy, utils,
 };
 use searcher::Searcher;
+pub use searcher::{LeaderInfo, QueryGuard, QueryHandle};
 
 /// The result of search in cluster
 /// data, scan_stats, wait_in_queue, is_partial, partial_err
@@ -140,8 +141,6 @@ pub async fn search(
     #[cfg(feature = "enterprise")]
     let req_clusters = in_req.clusters.clone();
 
-    // callers may share one trace_id across concurrent requests, e.g. Grafana via traceparent
-    let query_id = ider::generate_query_id(&trace_id);
     let query: SearchQuery = in_req.query.clone().into();
     let req_query = query.clone();
     let mut request = config::datafusion::request::Request::new(
@@ -166,42 +165,28 @@ pub async fn search(
     request.mark_chat_history_reader();
     let meta = Sql::new_from_req(&request, &query).await?;
 
-    #[cfg(feature = "enterprise")]
-    {
-        let sql = Some(in_req.query.sql.clone());
-        let start_time = Some(in_req.query.start_time);
-        let end_time = Some(in_req.query.end_time);
-        let s_event_type = in_req
-            .search_type
-            .map(|s_event_type| s_event_type.to_string());
-        // set search task
-        SEARCH_SERVER
-            .insert(
-                org_id,
-                query_id.clone(),
-                TaskStatus::new_leader(
-                    vec![],
-                    true,
-                    user_id.clone(),
-                    Some(org_id.to_string()),
-                    Some(stream_type.to_string()),
-                    sql,
-                    start_time,
-                    end_time,
-                    s_event_type,
-                    in_req.search_event_context.clone(),
-                ),
-            )
-            .await;
-    }
+    // callers may share one trace_id across concurrent requests, e.g. Grafana via traceparent
+    let query_guard = SEARCH_SERVER.register_leader(
+        org_id,
+        &trace_id,
+        LeaderInfo {
+            user_id: user_id.as_deref(),
+            stream_type: stream_type.as_str(),
+            sql: &in_req.query.sql,
+            start_time: in_req.query.start_time,
+            end_time: in_req.query.end_time,
+            search_type: in_req.search_type.map(|t| t.to_string()),
+            search_event_context: in_req.search_event_context.as_ref(),
+        },
+    );
 
     let span = tracing::span::Span::current();
-    let search_query_id = query_id.clone();
+    let query_handle = query_guard.handle();
     let handle = tokio::task::spawn(
         async move {
             cluster::http::search(
                 request,
-                &search_query_id,
+                &query_handle,
                 query,
                 req_regions,
                 req_clusters,
@@ -231,16 +216,7 @@ pub async fn search(
         )
     );
 
-    // remove task because task if finished
-    let mut _work_group = None;
-    #[cfg(feature = "enterprise")]
-    {
-        if let Some((_, stat)) = SEARCH_SERVER.remove(org_id, &query_id).await
-            && let Some(wg) = stat.work_group.as_ref()
-        {
-            _work_group = Some(wg.to_string());
-        };
-    }
+    let _work_group = query_guard.finish().map(|wg| wg.to_string());
 
     match res {
         Ok(mut res) => {

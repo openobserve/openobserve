@@ -17,8 +17,6 @@ use std::sync::Arc;
 
 use config::{QUERY_WITH_NO_LIMIT, ider, meta::stream::StreamType};
 use infra::db as infra_db;
-#[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::search::TaskStatus;
 use transform::enrichment::{ENRICHMENT_TABLES, StreamTable};
 
 pub async fn watch() -> Result<(), anyhow::Error> {
@@ -133,29 +131,22 @@ pub async fn get_enrichment_table_data(
 
     log::info!("get enrichment table {org_id}/{name} data req start time: {start_time}");
 
-    #[cfg(feature = "enterprise")]
-    search_service::SEARCH_SERVER
-        .insert(
-            org_id,
-            trace_id.clone(),
-            TaskStatus::new_leader(
-                vec![],
-                true,
-                None,
-                Some(org_id.to_string()),
-                Some(request.stream_type.to_string()),
-                Some(query.sql.clone()),
-                Some(query.start_time),
-                Some(query.end_time),
-                None,
-                None,
-            ),
-        )
-        .await;
-
+    let query_guard = search_service::SEARCH_SERVER.register_leader(
+        org_id,
+        &trace_id,
+        search_service::LeaderInfo {
+            user_id: None,
+            stream_type: request.stream_type.as_str(),
+            sql: &query.sql,
+            start_time: query.start_time,
+            end_time: query.end_time,
+            search_type: None,
+            search_event_context: None,
+        },
+    );
     let result = search_service::cluster::http::search_inner(
         request,
-        &trace_id,
+        &query_guard,
         search_query,
         regions,
         vec![],
@@ -163,11 +154,7 @@ pub async fn get_enrichment_table_data(
         None,
     )
     .await;
-
-    #[cfg(feature = "enterprise")]
-    let _ = search_service::SEARCH_SERVER
-        .remove(org_id, &trace_id)
-        .await;
+    drop(query_guard);
 
     match result {
         Ok((batches, ..)) => {

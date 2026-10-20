@@ -44,13 +44,12 @@ use tracing::{Instrument, info_span};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 #[cfg(feature = "enterprise")]
 use {
-    crate::SEARCH_SERVER,
     o2_enterprise::enterprise::common::config::get_config as get_o2_config,
     o2_enterprise::enterprise::search::{WorkGroup, admission},
 };
 
 use crate::{
-    SearchResult,
+    QueryHandle, SearchResult,
     datafusion::{
         context::{SearchContextBuilder, register_table},
         optimizer::{
@@ -71,11 +70,11 @@ use crate::{
     fields(org_id = req.org_id)
 )]
 pub async fn search(
-    trace_id: &str,
-    query_id: &str,
+    query_handle: &QueryHandle,
     sql: Arc<Sql>,
     mut req: Request,
 ) -> Result<SearchResult> {
+    let trace_id = query_handle.trace_id();
     let mut took_watch = TookWatcher::new();
     let cfg = get_config();
     log::info!("[trace_id {trace_id}] flight->search: start {sql}");
@@ -205,7 +204,7 @@ pub async fn search(
         .inc();
 
     let _lock = crate::work_group::acquire_work_group_lock(
-        query_id,
+        query_handle,
         &req,
         &mut took_watch,
         "logs",
@@ -231,7 +230,8 @@ pub async fn search(
             let elapsed_ms = took_watch.total_millis();
             let remaining_ms = (timeout * 1000).saturating_sub(elapsed_ms);
             let guard = Some(
-                admission::acquire_node_slots(query_id, &nodes, &work_group, remaining_ms).await?,
+                admission::acquire_node_slots(query_handle.id(), &nodes, &work_group, remaining_ms)
+                    .await?,
             );
             let took_wait = start_time.elapsed().as_millis() as usize;
             _took_wait += took_wait;
@@ -276,18 +276,10 @@ pub async fn search(
     );
 
     #[cfg(feature = "enterprise")]
-    SEARCH_SERVER
-        .add_file_stats(&sql.org_id, query_id, &scan_stats)
-        .await;
+    query_handle.add_file_stats(&scan_stats);
 
     #[cfg(feature = "enterprise")]
-    let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
-    #[cfg(feature = "enterprise")]
-    if SEARCH_SERVER
-        .insert_sender(&sql.org_id, query_id, abort_sender, true)
-        .await
-        .is_err()
-    {
+    let Ok(abort_receiver) = query_handle.on_cancel(true) else {
         log::info!(
             "[trace_id {trace_id}] flight->search: search canceled before call flight->search"
         );
@@ -296,7 +288,7 @@ pub async fn search(
                 "[trace_id {trace_id}] flight->search: search canceled before call flight->search"
             )),
         ));
-    }
+    };
 
     let trace_stream_name = json::to_string(
         &sql.stream_names

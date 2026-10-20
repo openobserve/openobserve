@@ -40,7 +40,7 @@ use infra::{
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::{
-    SEARCH_SERVER,
+    QueryHandle,
     cluster::flight::{get_online_querier_nodes, partition_file_list},
     datafusion::{
         distributed_plan::{
@@ -65,7 +65,7 @@ use crate::{
 // 6. execute physical plan to get stream
 #[tracing::instrument(name = "service:search:grpc:flight:follower:search", skip_all)]
 pub async fn search(
-    trace_id: &str,
+    query_handle: &QueryHandle,
     flight_request: &FlightSearchRequest,
 ) -> Result<(
     SessionContext,
@@ -77,7 +77,7 @@ pub async fn search(
 
     let cfg = config::get_config();
     let mut req: Request = (*flight_request).clone().into();
-    let trace_id = trace_id.to_string();
+    let trace_id = query_handle.trace_id().to_string();
 
     // create datafusion context, just used for decode plan, the params can use default
     let mut ctx = DataFusionContextBuilder::new()
@@ -209,7 +209,7 @@ pub async fn search(
 
     // check work group
     let _lock = crate::work_group::acquire_work_group_lock(
-        &trace_id,
+        query_handle,
         &req,
         &mut took_watch,
         "super_cluster_follower",
@@ -257,9 +257,7 @@ pub async fn search(
     );
 
     // update search session scan stats
-    SEARCH_SERVER
-        .add_file_stats(&req.org_id, &trace_id, &scan_stats)
-        .await;
+    query_handle.add_file_stats(&scan_stats);
 
     let search_infos = SearchInfos {
         plan: vec![],

@@ -31,12 +31,14 @@ use itertools::Itertools;
 use proto::cluster_rpc::SearchQuery;
 use vector_enrichment::TableRegistry;
 
-use crate::{SearchResult, cluster::flight, sql::Sql, utils::is_default_query_limit_exceeded};
+use crate::{
+    QueryHandle, SearchResult, cluster::flight, sql::Sql, utils::is_default_query_limit_exceeded,
+};
 
 #[tracing::instrument(name = "service:search:cluster", skip_all)]
 pub async fn search(
     req: Request,
-    query_id: &str,
+    query_handle: &QueryHandle,
     query: SearchQuery,
     _req_regions: Vec<String>,
     _req_clusters: Vec<String>,
@@ -58,7 +60,7 @@ pub async fn search(
     let query_fn = query.query_fn.clone();
     let ret = search_inner(
         req,
-        query_id,
+        query_handle,
         query,
         _req_regions,
         _req_clusters,
@@ -291,17 +293,16 @@ pub async fn search(
 }
 
 // internal search function that return record batches
-// NOTE: careful use it, before enter it, should add query_id to query_manager
+// NOTE: careful use it, before enter it, should register the query in the query_manager
 pub async fn search_inner(
     req: Request,
-    query_id: &str,
+    query_handle: &QueryHandle,
     query: SearchQuery,
     _req_regions: Vec<String>,
     _req_clusters: Vec<String>,
     _need_super_cluster: bool,
     sql: Option<Arc<Sql>>,
 ) -> Result<SearchResult> {
-    let trace_id = req.trace_id.clone();
     let sql = match sql {
         Some(s) => s,
         None => {
@@ -324,8 +325,7 @@ pub async fn search_inner(
         && !local_cluster_search
     {
         super::super::super_cluster::leader::search(
-            &trace_id,
-            query_id,
+            query_handle,
             sql.clone(),
             req,
             query,
@@ -334,10 +334,10 @@ pub async fn search_inner(
         )
         .await
     } else {
-        flight::search(&trace_id, query_id, sql.clone(), req).await
+        flight::search(query_handle, sql.clone(), req).await
     };
     #[cfg(not(feature = "enterprise"))]
-    let ret = flight::search(&trace_id, query_id, sql.clone(), req).await;
+    let ret = flight::search(query_handle, sql.clone(), req).await;
 
     ret
 }
