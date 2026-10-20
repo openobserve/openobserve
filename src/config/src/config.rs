@@ -108,7 +108,7 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 108: create oncall_phone_verifications and org_telephony.
 // 109: add last_run columns to reports.
 // 110: add first_event_at to ai_chat_turns.
-pub const DB_SCHEMA_VERSION: u64 = 110;
+pub const DB_SCHEMA_VERSION: u64 = 111;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -2760,6 +2760,12 @@ pub struct Limit {
         help = "How long unstarred query history entries are kept, in days. Starred entries are kept until deleted. 0 or less keeps every entry forever; it does not stop collection, ZO_QUERY_HISTORY_ENABLED=false does."
     )]
     pub query_history_retention_days: i64,
+    #[env_config(
+        name = "ZO_AI_ACTIONS_RETENTION_DAYS",
+        default = 90,
+        help = "How long rows of the assistant's action ledger (Activity) are kept, in days. Their before/after snapshots are always cleared once the 24 h undo window passes. 0 or less keeps every row."
+    )]
+    pub ai_actions_retention_days: i64,
     #[env_config(name = "ZO_ALERT_SCHEDULE_TIMEOUT", default = 90)] // seconds
     pub alert_schedule_timeout: i64,
     #[env_config(

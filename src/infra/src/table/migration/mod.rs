@@ -225,6 +225,11 @@ mod m20261013_000001_create_oncall_phone_verifications;
 mod m20261013_000002_create_org_telephony;
 mod m20261015_000001_reports_add_last_run_columns;
 mod m20261016_000001_add_first_event_at_to_ai_chat_turns;
+mod m20261020_000001_add_health_to_org_ai_toolsets;
+mod m20261020_000002_create_ai_grants;
+mod m20261020_000003_create_ai_actions;
+mod m20261020_000004_create_ai_access_requests;
+mod m20261020_000005_create_ai_turn_marks;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
 
@@ -579,6 +584,11 @@ impl MigratorTrait for Migrator {
             Box::new(m20261013_000002_create_org_telephony::Migration),
             Box::new(m20261015_000001_reports_add_last_run_columns::Migration),
             Box::new(m20261016_000001_add_first_event_at_to_ai_chat_turns::Migration),
+            Box::new(m20261020_000001_add_health_to_org_ai_toolsets::Migration),
+            Box::new(m20261020_000002_create_ai_grants::Migration),
+            Box::new(m20261020_000003_create_ai_actions::Migration),
+            Box::new(m20261020_000004_create_ai_access_requests::Migration),
+            Box::new(m20261020_000005_create_ai_turn_marks::Migration),
         ]
     }
 }
@@ -648,6 +658,7 @@ mod tests {
         (108, "m20261013_000002_create_org_telephony"),
         (109, "m20261015_000001_reports_add_last_run_columns"),
         (110, "m20261016_000001_add_first_event_at_to_ai_chat_turns"),
+        (111, "m20261020_000005_create_ai_turn_marks"),
     ];
 
     // Two branches that each claim the next version merge cleanly, so a reused number must fail
@@ -785,6 +796,10 @@ mod tests {
             (
                 "m20261007_000001_create_ai_chat_turns",
                 "m20261016_000001_add_first_event_at_to_ai_chat_turns",
+            ),
+            (
+                "m20260414_000002_create_org_ai_toolsets",
+                "m20261020_000001_add_health_to_org_ai_toolsets",
             ),
         ] {
             assert!(

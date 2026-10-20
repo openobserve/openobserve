@@ -24,7 +24,7 @@ use futures_util::StreamExt;
 use openobserve_mcp::{
     MCP_PROTOCOL_VERSION_MODERN, MCP_SUPPORTED_PROTOCOL_VERSIONS, MCPRequest,
     decode_mcp_header_value, handle_mcp_request, handle_mcp_request_stream,
-    is_supported_protocol_version,
+    is_supported_protocol_version, ledger::Origin,
 };
 #[cfg(feature = "enterprise")]
 use openobserve_mcp::{OAuthProtectedResourceMetadata, OAuthServerMetadata};
@@ -230,12 +230,14 @@ pub async fn handle_mcp_post(
         return error_response;
     }
     let modern = mcp_request.is_modern();
+    // o2-ai's session header marks the assistant's calls, whose changes go to the action ledger.
+    let origin = Origin::from_headers(&headers);
 
     // JSON-RPC notifications (no `id`) require HTTP 202, no response body.
     // Process the notification but return 202.
     if mcp_request.id.is_none() && mcp_request.method != "initialize" {
         // Fire-and-forget: process notification asynchronously, don't wait
-        let _ = handle_mcp_request(&org_id, mcp_request, auth_token).await;
+        let _ = handle_mcp_request(&org_id, mcp_request, auth_token, origin.as_ref()).await;
         return Response::builder()
             .status(StatusCode::ACCEPTED)
             .body(Body::empty())
@@ -251,7 +253,8 @@ pub async fn handle_mcp_post(
     // Determine if client wants SSE streaming
     let wants_sse = accept_header.contains("text/event-stream");
 
-    let response = match handle_mcp_request(&org_id, mcp_request, auth_token).await {
+    let response = match handle_mcp_request(&org_id, mcp_request, auth_token, origin.as_ref()).await
+    {
         Ok(r) => r,
         Err(e) => {
             log::error!("MCP handle_mcp_request error: {e}");
@@ -403,16 +406,18 @@ pub async fn handle_mcp_get(
     };
 
     // Handle the request with streaming (returns SSE format)
-    let stream = match handle_mcp_request_stream(&org_id, mcp_request, auth_token).await {
-        Ok(s) => s,
-        Err(e) => {
-            return Response::builder()
-                .status(StatusCode::INTERNAL_SERVER_ERROR)
-                .header(header::CONTENT_TYPE, "application/json")
-                .body(Body::from(format!("{{\"error\": \"MCP error: {}\"}}", e)))
-                .unwrap();
-        }
-    };
+    let origin = Origin::from_headers(&headers);
+    let stream =
+        match handle_mcp_request_stream(&org_id, mcp_request, auth_token, origin.as_ref()).await {
+            Ok(s) => s,
+            Err(e) => {
+                return Response::builder()
+                    .status(StatusCode::INTERNAL_SERVER_ERROR)
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .body(Body::from(format!("{{\"error\": \"MCP error: {}\"}}", e)))
+                    .unwrap();
+            }
+        };
 
     let body_stream = stream.map(|result| result.map_err(|e| std::io::Error::other(e.to_string())));
 

@@ -91,6 +91,9 @@ pub struct Capabilities {
     pub toolsets: Vec<ToolsetSummary>,
     pub toolset_secret_merge: bool,
     pub policy_enforced: bool,
+    /// Set only when the org turned the assistant off; `can_chat` is then false.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gate: Option<Gate>,
 }
 
 impl Capabilities {
@@ -118,8 +121,22 @@ impl Capabilities {
             toolsets,
             toolset_secret_merge: true,
             policy_enforced: facts.policy_enforced,
+            gate: None,
         }
     }
+
+    /// An org that turned the assistant off refuses every turn, so nobody can chat.
+    fn off_for_org(mut self) -> Self {
+        self.can_chat = false;
+        self.gate = Some(Gate::OffForOrg);
+        self
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum Gate {
+    OffForOrg,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, ToSchema)]
@@ -416,13 +433,13 @@ pub async fn get_capabilities(
     } else {
         Vec::new()
     };
-    Json(Capabilities::new(
-        health,
-        permissions,
-        Settings::from_config(),
-        toolsets,
-    ))
-    .into_response()
+    let capabilities = Capabilities::new(health, permissions, Settings::from_config(), toolsets);
+    let capabilities = if super::settings::org_ai(&org_id).await.enabled {
+        capabilities
+    } else {
+        capabilities.off_for_org()
+    };
+    Json(capabilities).into_response()
 }
 
 #[utoipa::path(
@@ -489,7 +506,29 @@ pub(crate) fn note_turn_frame(chunk: &[u8]) {
     }
 }
 
-async fn is_member(org_id: &str, user_id: &str) -> bool {
+/// Whether this deployment lets chats be shared `(in the org, publicly)`.
+pub(crate) fn deployment_sharing() -> (bool, bool) {
+    let settings = Settings::from_config();
+    (settings.persistence, settings.public_links)
+}
+
+/// Whether o2-ai's discovery said it enforces the permission tier and data-sharing level.
+pub(crate) fn policy_enforced(org_id: &str) -> bool {
+    HEALTH.lock().unwrap().snapshot(org_id).1.policy_enforced
+}
+
+/// Whether `user_id` passes the permission check of `method` on `{org_id}/{segments}`.
+pub(crate) async fn may(org_id: &str, user_id: &str, segments: &[&str], method: &str) -> bool {
+    let path: Vec<&str> = std::iter::once(org_id)
+        .chain(segments.iter().copied())
+        .collect();
+    match resolve_permission(&path, method, org_id, "", None) {
+        Some(route) => route_allowed(org_id, user_id, route).await,
+        None => false,
+    }
+}
+
+pub(crate) async fn is_member(org_id: &str, user_id: &str) -> bool {
     is_root_user(user_id)
         || openobserve_core::users::get_user(Some(org_id), user_id)
             .await
@@ -497,7 +536,7 @@ async fn is_member(org_id: &str, user_id: &str) -> bool {
 }
 
 /// The handler-side admin rule of the paid-overage PUT: an org admin or root.
-async fn is_org_admin(org_id: &str, user_id: &str) -> bool {
+pub(crate) async fn is_org_admin(org_id: &str, user_id: &str) -> bool {
     is_root_user(user_id)
         || openobserve_core::users::get_user(Some(org_id), user_id)
             .await
@@ -690,7 +729,7 @@ fn test_result(checked: &Checked, elapsed: Duration) -> TestResult {
 }
 
 /// `Err` carries the wait until both `org_id` and `user_id` may run their next test.
-fn admit_test(
+pub(crate) fn admit_test(
     last: &mut HashMap<String, Instant>,
     org_id: &str,
     user_id: &str,
@@ -718,12 +757,7 @@ async fn toolset_summaries(org_id: &str) -> Vec<ToolsetSummary> {
     match infra::table::org_ai_toolsets::list_names(org_id).await {
         Ok(toolsets) => toolsets
             .into_iter()
-            .map(|(id, name)| ToolsetSummary {
-                id,
-                name,
-                // Every stored toolset is pushed to o2-ai; there is no per-toolset switch yet.
-                enabled: true,
-            })
+            .map(|(id, name, enabled)| ToolsetSummary { id, name, enabled })
             .collect(),
         Err(e) => {
             log::warn!("[org_id:{org_id}] capabilities could not list AI toolsets: {e}");
@@ -974,6 +1008,18 @@ mod tests {
             assert!(!text.contains("http"), "{text}");
             assert!(!text.contains("***"), "{text}");
         }
+    }
+
+    #[tokio::test]
+    async fn an_org_that_is_off_cannot_chat_and_says_so_while_others_carry_no_gate() {
+        let permissions = permissions(Role::Admin).await;
+        let on = Capabilities::new(sample_health(), permissions, sample_settings(), Vec::new());
+        let json = serde_json::to_value(&on).unwrap();
+        assert!(json.get("gate").is_none());
+        let off = serde_json::to_value(on.off_for_org()).unwrap();
+        assert_eq!(off["gate"], "off_for_org");
+        assert_eq!(off["can_chat"], false);
+        assert_eq!(off["can_write"], json["can_write"]);
     }
 
     #[test]

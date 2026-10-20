@@ -536,6 +536,7 @@ pub async fn admit_turn(
     prompt: &str,
     trace_id: &str,
 ) -> Result<AdmittedTurn, Response> {
+    super::settings::refuse_if_off(org_id).await?;
     let Some(session_id) = session_id.and_then(normalize_uuid) else {
         return Err(error::invalid_request(
             "A valid session id is required while chat persistence is enabled",

@@ -569,6 +569,8 @@ pub struct OrganizationSetting {
     #[cfg(feature = "cloud")]
     #[serde(default)]
     pub domain_org_mappings: Vec<DomainOrgMapping>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ai: Option<OrgAiSettings>,
 }
 
 impl Default for OrganizationSetting {
@@ -605,6 +607,7 @@ impl Default for OrganizationSetting {
             org_storage_enabled: false,
             #[cfg(feature = "cloud")]
             domain_org_mappings: Vec::new(),
+            ai: None,
         }
     }
 }
@@ -616,6 +619,77 @@ impl MemorySize for OrganizationSetting {
             + self.span_id_field_name.mem_size()
             + self.light_mode_theme_color.mem_size()
             + self.dark_mode_theme_color.mem_size()
+    }
+}
+
+/// An org's assistant controls; every default is the behaviour before they existed.
+#[derive(Serialize, ToSchema, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[serde(default)]
+pub struct OrgAiSettings {
+    pub enabled: bool,
+    pub permission_tier: AiPermissionTier,
+    /// `None` follows the deployment.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub org_sharing: Option<bool>,
+    /// `None` follows the deployment.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub public_sharing: Option<bool>,
+    pub data_sharing_level: AiDataSharingLevel,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub updated_by: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub updated_at: Option<i64>,
+}
+
+impl Default for OrgAiSettings {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            permission_tier: AiPermissionTier::ActWithApproval,
+            org_sharing: None,
+            public_sharing: None,
+            data_sharing_level: AiDataSharingLevel::Raw,
+            updated_by: None,
+            updated_at: None,
+        }
+    }
+}
+
+#[derive(Serialize, ToSchema, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum AiPermissionTier {
+    Read,
+    Propose,
+    #[default]
+    ActWithApproval,
+}
+
+impl AiPermissionTier {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Read => "read",
+            Self::Propose => "propose",
+            Self::ActWithApproval => "act_with_approval",
+        }
+    }
+}
+
+#[derive(Serialize, ToSchema, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum AiDataSharingLevel {
+    Schema,
+    Aggregates,
+    #[default]
+    Raw,
+}
+
+impl AiDataSharingLevel {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Schema => "schema",
+            Self::Aggregates => "aggregates",
+            Self::Raw => "raw",
+        }
     }
 }
 
@@ -1151,6 +1225,20 @@ mod tests {
     }
 
     #[test]
+    fn stored_settings_without_ai_keep_todays_assistant_behaviour() {
+        let stored: OrganizationSetting =
+            serde_json::from_str(r#"{"scrape_interval":15}"#).unwrap();
+        assert!(stored.ai.is_none());
+        let partial: OrgAiSettings = serde_json::from_str(r#"{"enabled":false}"#).unwrap();
+        assert!(!partial.enabled);
+        assert_eq!(partial.permission_tier, AiPermissionTier::ActWithApproval);
+        assert_eq!(partial.data_sharing_level, AiDataSharingLevel::Raw);
+        assert!(partial.org_sharing.is_none() && partial.public_sharing.is_none());
+        let json = serde_json::to_value(OrganizationSetting::default()).unwrap();
+        assert!(json.get("ai").is_none());
+    }
+
+    #[test]
     fn test_organization_setting_response() {
         let setting = OrganizationSetting::default();
         let response = OrganizationSettingResponse {
@@ -1558,6 +1646,7 @@ mod tests {
             org_storage_enabled: false,
             #[cfg(feature = "cloud")]
             domain_org_mappings: vec![],
+            ai: None,
         };
         let json = serde_json::to_value(&setting).unwrap();
         let obj = json.as_object().unwrap();
@@ -1589,6 +1678,7 @@ mod tests {
             org_storage_enabled: false,
             #[cfg(feature = "cloud")]
             domain_org_mappings: vec![],
+            ai: None,
         };
         let json = serde_json::to_value(&setting).unwrap();
         let obj = json.as_object().unwrap();

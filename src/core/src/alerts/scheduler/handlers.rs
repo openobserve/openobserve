@@ -2225,6 +2225,12 @@ async fn trigger_rca_for_alert_firing(
             return;
         };
 
+        let Some(policy) = crate::ai_policy::rca_policy(&org_id).await else {
+            log::info!("[SCHEDULER trace_id {trace_id}] O2 Assistant is off for {org_id}; no RCA");
+            release_alert_firing_hold(&org_id, &opened).await;
+            return;
+        };
+
         let (email, token) = match crate::organization::get_sre_agent_credentials(&org_id).await {
             Ok(c) => c,
             Err(e) => {
@@ -2277,7 +2283,10 @@ async fn trigger_rca_for_alert_firing(
         let subjects: Vec<config::meta::oncall::SubjectRef> =
             pending.iter().map(|p| p.response.subject.clone()).collect();
 
-        match client.analyze_incident(context, &auth_header).await {
+        match client
+            .analyze_incident(context, &auth_header, &policy)
+            .await
+        {
             Ok(content) if !content.is_empty() => {
                 o2_enterprise::enterprise::alerts::rca_service::save_rca_result_for_records(
                     &org_id, &subjects, &content, None,
