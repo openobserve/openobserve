@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Fleet Manager reads that need the query engine.
+//! Fleet management reads that need the query engine, and the feature flag.
 
 use std::collections::HashSet;
 
@@ -31,6 +31,13 @@ use o2_enterprise::enterprise::common::auditor::AUDIT_STREAM;
 
 /// The engine ignores `step` on an instant query; any positive value works.
 const INSTANT_STEP_MICROS: i64 = 300_000_000;
+
+/// `O2_FLEET_ENABLED`, read once at startup; off stops every fleet job and refuses writes.
+pub fn enabled() -> bool {
+    o2_enterprise::enterprise::common::config::get_config()
+        .opamp
+        .enabled
+}
 
 /// Region-local, because fleet state is region-local too; the queries run as the caller (N7).
 pub async fn get_flow(

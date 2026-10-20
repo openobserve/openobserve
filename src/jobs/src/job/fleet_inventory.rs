@@ -19,12 +19,9 @@ use std::collections::HashSet;
 
 use common::infra::config::ORGANIZATIONS;
 use config::{cluster::LOCAL_NODE, spawn_pausable_job, utils::time::now_micros};
-use o2_enterprise::enterprise::{
-    common::config::get_config as get_o2_config,
-    fleet::{
-        inventory::{self, FLEET_CALLBACKS},
-        rollouts,
-    },
+use o2_enterprise::enterprise::fleet::{
+    inventory::{self, FLEET_CALLBACKS},
+    rollouts,
 };
 
 const FLUSH_INTERVAL_SECS: u64 = 10;
@@ -34,7 +31,7 @@ const RETENTION_INTERVAL_SECS: u64 = 60 * 60;
 const REARM_INTERVAL_SECS: u64 = 60;
 
 pub fn run() {
-    if !get_o2_config().opamp.enabled {
+    if !openobserve_core::fleet::enabled() {
         return;
     }
 

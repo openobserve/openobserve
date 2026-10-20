@@ -651,7 +651,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     }
     // Every node: the validator, which reads the token cache, runs wherever HTTP is served.
     #[cfg(feature = "enterprise")]
-    if get_o2_config().opamp.enabled {
+    if openobserve_core::fleet::enabled() {
         use o2_enterprise::enterprise::fleet::{
             apply_event,
             enrollment::{ENROLLMENT, RECONCILE_INTERVAL_SECS},
@@ -661,7 +661,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         let events = infra::coordinator::fleet::subscribe()
             .await
             .expect("fleet watch failed");
-        // A dropped subscription would silently stop revokes, unenrolls and assignments arriving.
+        // A dropped subscription would silently stop revokes, deletes and assignments arriving.
         tokio::task::spawn(async move {
             let mut events = Some(events);
             loop {
@@ -686,7 +686,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         ENROLLMENT
             .hydrate_with(rw)
             .await
-            .expect("fleet tombstones load failed");
+            .expect("fleet token cache load failed");
         FLEET_CALLBACKS
             .desired()
             .hydrate_with(rw)
@@ -1428,7 +1428,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
     #[cfg(feature = "enterprise")]
     prompt_webhook_delivery::run();
     #[cfg(feature = "enterprise")]
-    o2_enterprise::enterprise::fleet::opamp::run_sweep();
+    if openobserve_core::fleet::enabled() {
+        o2_enterprise::enterprise::fleet::opamp::run_sweep();
+    }
     #[cfg(feature = "enterprise")]
     fleet_inventory::run();
 

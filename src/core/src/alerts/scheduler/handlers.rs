@@ -781,7 +781,11 @@ async fn handle_fleet_rollout_triggers(
 ) -> Result<(), anyhow::Error> {
     use o2_enterprise::enterprise::fleet::rollouts;
 
-    // The tick re-arms or deletes its own job row, fenced by this claim while opamp is enabled.
+    // §17: the flag off freezes rollouts; the unreleased claim lapses and the job comes back later.
+    if !crate::fleet::enabled() {
+        return Ok(());
+    }
+    // The tick re-arms or deletes its own job row, fenced by this claim.
     rollouts::tick(&trigger, config::utils::time::now_micros()).await?;
     Ok(())
 }
