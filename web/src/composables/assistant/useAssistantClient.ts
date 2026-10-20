@@ -44,8 +44,10 @@ export type ClientSendRequest = SendRequest & { transcript?: WireMessage[] };
 export interface FrameSink {
   /** Called before the first frame, so admission is never reduced after a buffered frame. */
   onAdmitted(result: Extract<SendResult, { ok: true }>): void;
-  /** `id` is the last SSE `id:` line, the tail's resume point (B-03). */
+  /** `id` is the last SSE `id:` line: the seq the frame comes after, shared by every frame until the next one (WP-18). */
   onFrame(frame: AssistantFrame, id: string | null): void;
+  /** An id-only message: every frame through seq `id` was sent, so the tail can resume from it (B-03). */
+  onBoundary?(id: string): void;
   onKeepalive(): void;
   /** An unknown frame type, already cut to 32 characters for `ai_frame_unknown`. */
   onUnknown(type: string): void;
@@ -218,6 +220,7 @@ function traceparent(): string {
 function handlersOf(sink: FrameSink) {
   return {
     frame: (frame: AssistantFrame, id: string | null) => sink.onFrame(frame, id),
+    boundary: (id: string) => sink.onBoundary?.(id),
     keepalive: () => sink.onKeepalive(),
     unknown: (type: string) => sink.onUnknown(type),
   };

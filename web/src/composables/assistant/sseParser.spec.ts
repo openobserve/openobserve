@@ -15,6 +15,7 @@
 
 import { describe, expect, it, vi } from "vitest";
 
+import type { AssistantFrame } from "./frames";
 import { reduce, type ReducerCtx, type StreamState } from "./reducer";
 import {
   MAX_LINE_LENGTH,
@@ -159,6 +160,24 @@ function body(chunks: string[], fail?: Error): ReadableStream<Uint8Array> {
 }
 
 describe("createSseParser", () => {
+  it("reports an id-only message as a boundary and gives each frame the id it came with, repeated ids included (WP-18)", () => {
+    const frames: { frame: AssistantFrame; id: string | null }[] = [];
+    const boundaries: string[] = [];
+    const parser = createSseParser({
+      frame: (frame, id) => frames.push({ frame, id }),
+      keepalive: () => undefined,
+      unknown: () => undefined,
+      boundary: (id) => boundaries.push(id),
+    });
+    parser.push(
+      'id: -1\ndata: {"type":"turn_started","turn_id":"t"}\n\nid: -1\ndata: {"type":"status"}\n\n',
+    );
+    parser.push('id: 0\n\nid: 0\ndata: {"type":"message_delta","content":"a"}\n\nid: 0\nda');
+    parser.push('ta: {"type":"message_delta","content":"b"}\n\nid: 1\r\n\r\n: keepalive\n\n');
+    expect(frames.map((f) => f.id)).toEqual(["-1", "-1", "0", "0"]);
+    expect(boundaries).toEqual(["0", "1"]);
+  });
+
   it("reassembles a frame split across chunks, including a cut JSON brace", () => {
     const { parser, frames } = collect();
     parser.push('data: {"type":"message_delta","con');

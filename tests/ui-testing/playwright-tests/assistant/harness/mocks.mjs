@@ -340,6 +340,22 @@ export const SCENARIOS = {
     frames: [f.status(), ...sliced("See the results below.\n\n[x](https://e.com/?" + "&".repeat(2_000) + ")\n\n**Done.**", 500).map(f.delta), f.complete()],
     delayMs: 30,
   },
+  // Follow-up D2: the server's id contract, as the real stack sent it. `turn_started` and `status` carry -1, several frames share a seq's id, and an id-only message marks a seq complete.
+  server_ids: {
+    frames: [
+      { type: "turn_started", turn_id: "turn", sseId: -1 },
+      { ...f.status(), sseId: -1 },
+      { ...f.delta("alpha"), sseId: -1 },
+      { boundary: 0 },
+      { ...f.delta(" beta"), sseId: 0 },
+      { ...f.delta(" gamma."), sseId: 0 },
+      { boundary: 1 },
+      { ...f.delta(" Then a second sentence: delta epsilon."), sseId: 1 },
+      { ...f.complete(), sseId: 1 },
+      { boundary: 2 },
+    ],
+    delayMs: 20,
+  },
   // Round 8 (independent-verify-6 Q7): a broken image whose 19,900-character alt laid out as one run.
   markdown_bomb_alt: {
     frames: [f.status(), ...textBlocks(["Before.\n\n![" + "x".repeat(19_900) + "](data:image/png;base64,AAAA)\n\n**After.**"])],

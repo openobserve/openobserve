@@ -171,6 +171,16 @@ test.describe("assistant honest turns", () => {
   // The engine reads B-03 from a capability the runtime does not wire until WP-18 (`tailEnabled` dep of turnEngine.ts).
   test.fixme("TURN-06 a drop with the tail reconnects, catches up and finishes (B-03, WP-18)", async () => {});
 
+  test("TURN-14 a stream whose ids repeat by design shows the whole answer and ends done (D2, WP-18)", async ({ page }) => {
+    await openOnLogs(page);
+    await ask(page, "server_ids", "Reply with exactly: alpha beta gamma. Then a second sentence: delta epsilon.");
+    await expect(assistant.answer()).toContainText("alpha beta gamma. Then a second sentence: delta epsilon.");
+    await expect(assistant.transcript()).not.toHaveAttribute("aria-busy", "true", { timeout: 30_000 });
+    await expect(assistant.outcome()).toHaveCount(0);
+    await expect(assistant.answer()).not.toContainText(/Connection lost|No response for/);
+    await expect.poll(async () => (await events(page)).find((e) => e.name === "ai_turn_ended")?.properties.outcome).toBe("done");
+  });
+
   test("TURN-07 an empty turn is not an answer", async ({ page }) => {
     await openOnLogs(page);
     await ask(page, "empty_turn");

@@ -165,6 +165,10 @@ interface TurnRecord {
   consentRetried: boolean;
   notSaved: boolean;
   streamEnded: boolean;
+  /** Frames applied up to the resume cursor `turnMeta.lastSeq`: what a tail from the cursor builds on (WP-18). */
+  throughSeq: AssistantFrame[];
+  /** Frames applied since the cursor last moved; a tail from the cursor sends their content again. */
+  sinceSeq: AssistantFrame[];
   cancelConfirmed?: boolean;
   cancelMs: number | null;
   silenceTimer?: ReturnType<typeof setTimeout>;
@@ -297,6 +301,12 @@ export function createTurnEngine(deps: TurnEngineDeps): TurnEngine {
   const sinkFor = (rec: TurnRecord, tail = false): FrameSink => {
     const generation = (rec.generation += 1);
     const current = () => rec.generation === generation && !rec.settled;
+    // A tail's first message proves it delivers; only then is what came since the cursor taken back, so a failed tail keeps the text.
+    let resumed = !tail;
+    const resume = () => {
+      if (!resumed) rollBack(rec);
+      resumed = true;
+    };
     return {
       onAdmitted(result) {
         // A tail resumes an admitted turn; its own 200 is not a second admission (HT-06 caught up).
@@ -306,21 +316,31 @@ export function createTurnEngine(deps: TurnEngineDeps): TurnEngine {
         if (!current()) return;
         // A frame proves admission, whatever order the transport reported them in.
         if (!tail) admit(rec, generation, { ok: true, status: 200, traceId: null });
-        const seq = id === null ? NaN : Number(id);
+        resume();
         const session = sessionOf(rec.sid);
-        // A tail replays from `from_seq`; a frame at or before the last seen seq is already applied (HT-06 AC 2).
-        if (Number.isFinite(seq) && session && (session.turnMeta.lastSeq ?? -1) >= seq) return;
-        if (Number.isFinite(seq) && session) session.turnMeta.lastSeq = seq;
         if (session?.turn.state === "reconnecting") dispatch(rec, { type: "tail_caught_up" });
-        runner.schedule(rec.sid, frameWork(rec, frame));
+        const fresh = session ? cursorFrame(rec, session.turnMeta, frame, id, tail) : frame;
         watchSilence(rec, true);
-        if (frame.type === "complete" || frame.type === "error" || frame.type === "cancelled") {
+        if (!fresh) return;
+        runner.schedule(rec.sid, frameWork(rec, fresh));
+        if (fresh.type === "complete" || fresh.type === "error" || fresh.type === "cancelled") {
           runner.flush(rec.sid);
           settleIfEnded(rec);
         }
       },
       onKeepalive() {
         if (!current()) return;
+        runner.schedule(rec.sid, eventWork(rec, { type: "keepalive" }));
+        watchSilence(rec, false);
+      },
+      onBoundary(id) {
+        if (!current()) return;
+        resume();
+        const meta = sessionOf(rec.sid)?.turnMeta;
+        const seq = Number(id);
+        // Everything through `seq` was sent: the tail resumes from here.
+        if (meta && Number.isFinite(seq) && (meta.lastSeq === null || seq > meta.lastSeq))
+          advance(rec, meta, seq);
         runner.schedule(rec.sid, eventWork(rec, { type: "keepalive" }));
         watchSilence(rec, false);
       },
@@ -341,6 +361,49 @@ export function createTurnEngine(deps: TurnEngineDeps): TurnEngine {
         dispatch(rec, { type: "eof", hasTail: hasTail(rec) });
       },
     };
+  };
+
+  // The SSE id rule (WP-18): a frame tagged N comes after seq N and several frames share N, so a repeated id is never a reason to drop one.
+  const cursorFrame = (
+    rec: TurnRecord,
+    meta: TurnMeta,
+    frame: AssistantFrame,
+    id: string | null,
+    tail: boolean,
+  ): AssistantFrame | null => {
+    const seq = id === null ? NaN : Number(id);
+    // A tail starts at the cursor; content before it was applied in full.
+    if (tail && Number.isFinite(seq) && meta.lastSeq !== null && seq < meta.lastSeq) return null;
+    // A frame tagged N also proves seq N complete; the first ids of a turn (`-1`) come before any boundary.
+    if (Number.isFinite(seq) && (meta.lastSeq === null || seq > meta.lastSeq))
+      advance(rec, meta, seq);
+    rec.sinceSeq.push(frame);
+    return frame;
+  };
+
+  const advance = (rec: TurnRecord, meta: TurnMeta, seq: number) => {
+    meta.lastSeq = seq;
+    rec.throughSeq.push(...rec.sinceSeq);
+    rec.sinceSeq = [];
+  };
+
+  // The tail resends everything past the cursor, merged and without transient frames, so the answer is rebuilt from the frames through the cursor and the tail applies on top (WP-18).
+  const rollBack = (rec: TurnRecord) => {
+    if (!rec.sinceSeq.length) return;
+    rec.sinceSeq = [];
+    runner.flush(rec.sid, (session) => {
+      // The engine's own blocks (the restored marker written at admission) are no frames, so they are kept and put back first, where they were.
+      const kept = session.messages
+        .slice(rec.userIndex + 1)
+        .flatMap((message) => message.contentBlocks ?? [])
+        .filter((block) => block.type === "turn_outcome");
+      session.messages.splice(rec.userIndex + 1);
+      for (const block of kept) appendToAnswer(session, rec, block);
+      rec.stream = freshStream(session.messages);
+      for (const frame of rec.throughSeq) reduce(rec.stream, frame, liveCtx(t));
+      mirrorExtras(session.turnMeta, rec.stream);
+      return { stream: [], turn: [] };
+    });
   };
 
   const hasTail = (rec: TurnRecord) =>
@@ -576,6 +639,8 @@ export function createTurnEngine(deps: TurnEngineDeps): TurnEngine {
       session.messages.splice(rec.userIndex + 1);
       // The replacement turn numbers its frames afresh; an old seq would drop them as replays.
       session.turnMeta.lastSeq = null;
+      rec.throughSeq = [];
+      rec.sinceSeq = [];
       rec.stream = freshStream(session.messages);
       return { stream: [], turn: [] };
     });
@@ -607,7 +672,7 @@ export function createTurnEngine(deps: TurnEngineDeps): TurnEngine {
     if (!controller) return;
     rec.streamEnded = false;
     const turnId = session.turnMeta.serverTurnId ?? rec.turnId;
-    const fromSeq = session.turnMeta.lastSeq ?? 0;
+    const fromSeq = session.turnMeta.lastSeq ?? -1;
     const tail = deps.client.tail(
       rec.org,
       rec.sid,
@@ -845,6 +910,8 @@ function newRecord(
     consentRetried: false,
     notSaved: false,
     streamEnded: false,
+    throughSeq: [],
+    sinceSeq: [],
     cancelMs: null,
     settled: false,
     lingering: false,

@@ -46,6 +46,12 @@
     if (frame.keepalive) return ": keepalive\n\n";
     if (frame.oversized) return `data: {"type":"message_delta","content":"${"x".repeat(1024 * 1024 + 16)}"}\n\n`;
     if (frame.raw) return `${frame.raw}\n\n`;
+    // The server's own ids (WP-18): `boundary` is an id-only message; `sseId` tags a frame with the seq it comes after.
+    if (frame.boundary !== undefined) return `id: ${frame.boundary}\n\n`;
+    if (frame.sseId !== undefined) {
+      const { sseId, ...data } = frame;
+      return `id: ${sseId}\ndata: ${JSON.stringify(data)}\n\n`;
+    }
     const id = mock.knobs.tailEnabled ? `id: ${seq}\n` : "";
     return `${id}data: ${JSON.stringify(frame)}\n\n`;
   };
