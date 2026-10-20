@@ -129,21 +129,6 @@ pub async fn cancel_query_inner(org_id: &str, trace_ids: &[&str]) -> Response {
     }
 }
 
-/// Best-effort cancel of a running query and all of its internal sub-queries
-/// (which share the `trace_id` as a prefix). Unlike [`cancel_query_inner`] this
-/// does not build an HTTP response — it is meant for internal callers such as
-/// the client-disconnect handler. Errors are logged, not returned.
-#[cfg(feature = "enterprise")]
-pub async fn cancel_query_internal(org_id: &str, trace_id: &str) {
-    if trace_id.is_empty() {
-        return;
-    }
-    match cancel_in_cluster(org_id, trace_id).await {
-        Ok(res) => log::info!("[trace_id {trace_id}] query canceled: {res:?}"),
-        Err(e) => log::error!("[trace_id {trace_id}] failed to cancel query: {e}"),
-    }
-}
-
 /// Cancels each trace id in the org it runs in.
 #[cfg(feature = "enterprise")]
 async fn cancel_each(queries: &[(&str, &str)]) -> Response {
@@ -201,6 +186,21 @@ async fn can_cancel_other_orgs(user_id: &str) -> bool {
             false,
         )
         .await
+}
+
+/// Best-effort cancel of a running query and all of its internal sub-queries
+/// (which share the `trace_id` as a prefix). Unlike [`cancel_query_inner`] this
+/// does not build an HTTP response — it is meant for internal callers such as
+/// the client-disconnect handler. Errors are logged, not returned.
+#[cfg(feature = "enterprise")]
+pub async fn cancel_query_internal(org_id: &str, trace_id: &str) {
+    if trace_id.is_empty() {
+        return;
+    }
+    match cancel_in_cluster(org_id, trace_id).await {
+        Ok(res) => log::info!("[trace_id {trace_id}] query canceled: {res:?}"),
+        Err(e) => log::error!("[trace_id {trace_id}] failed to cancel query: {e}"),
+    }
 }
 
 #[cfg(all(test, feature = "enterprise"))]
