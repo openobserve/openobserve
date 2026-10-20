@@ -1,0 +1,187 @@
+<!-- Copyright 2026 OpenObserve Inc.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-->
+
+<template>
+  <OBanner v-if="visible" bar :variant="variant" :icon="icon" data-test="license-search-banner">
+    {{ message }}
+
+    <template #actions>
+      <div class="flex flex-wrap items-center gap-3">
+        <OButton
+          v-if="isPaused && licenseId"
+          variant="banner-dismiss"
+          size="sm"
+          data-test="license-banner-copy"
+          @click="copyLicenseId"
+        >
+          {{ t("about.copyLicenseId") }}
+        </OButton>
+        <OButton
+          v-if="isPaused"
+          variant="banner-dismiss"
+          size="sm"
+          data-test="license-banner-refresh"
+          @click="refreshLicenseLimits()"
+        >
+          {{ t("about.refresh_license_limits") }}
+        </OButton>
+        <OButton
+          v-if="!isPaused"
+          variant="banner-dismiss"
+          size="sm"
+          data-test="license-banner-details"
+          @click="openDetails"
+        >
+          {{ t("about.banner_details") }}
+        </OButton>
+        <OButton
+          variant="banner-dismiss"
+          size="sm"
+          data-test="license-banner-dismiss"
+          @click="dismiss"
+        >
+          {{ t("about.banner_dismiss") }}
+        </OButton>
+      </div>
+    </template>
+  </OBanner>
+</template>
+
+<script setup lang="ts">
+import { computed, onBeforeUnmount, ref, watch } from "vue";
+import { useQuery } from "@tanstack/vue-query";
+import { useRouter } from "vue-router";
+import { useStore } from "vuex";
+import { useLicenseRefresh } from "@/composables/useLicenseRefresh";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import { licenseQuery } from "@/services/license_server.queries";
+import { useI18nTyped } from "@/types/i18n";
+import { copyToClipboard } from "@/utils/clipboard";
+import {
+  activeSearchUnblock,
+  bannerSignature,
+  formatUtc,
+  LICENSE_BANNER_POLL_MS,
+  licenseBannerState,
+  type LicenseWaiverFields,
+} from "@/utils/licenseWaivers";
+
+const DISMISS_KEY = "license_search_banner_dismissed";
+
+const { t, locale } = useI18nTyped();
+const store = useStore();
+const router = useRouter();
+const { refreshLicenseLimits, reloadLicenseState } = useLicenseRefresh();
+
+const readDismissed = (): string | null => {
+  try {
+    return sessionStorage.getItem(DISMISS_KEY);
+  } catch {
+    return null;
+  }
+};
+
+const dismissedSignature = ref<string | null>(readDismissed());
+
+const state = computed(() => licenseBannerState(store.state.zoConfig ?? {}, Date.now() * 1000));
+const isPaused = computed(() => state.value.kind === "paused");
+const visible = computed(
+  () => state.value.kind !== "none" && dismissedSignature.value !== bannerSignature(state.value),
+);
+
+const license = useQuery(() => ({
+  ...licenseQuery(),
+  enabled: state.value.kind !== "none",
+}));
+const licenseData = computed(
+  () =>
+    license.data.value as
+      (LicenseWaiverFields & { license?: { license_id?: string } | null }) | undefined,
+);
+const licenseId = computed(() => licenseData.value?.license?.license_id ?? "");
+
+const variant = computed(() => {
+  if (state.value.kind === "paused") return "error";
+  return state.value.kind === "restored" && state.value.endsSoon ? "warning" : "success";
+});
+const icon = computed(() => {
+  if (state.value.kind === "paused") return "error";
+  return state.value.kind === "restored" && state.value.endsSoon ? "schedule" : "check_circle";
+});
+
+const pausedMessage = computed(() => {
+  const id = licenseId.value;
+  if (!id) return t("about.banner_paused_no_id");
+  const d = licenseData.value?.decision;
+  if (d?.blocks?.includes("usage_over_limit")) {
+    return t("about.banner_paused_usage", {
+      exceeded: d.exceeded_days,
+      allowed: d.allowed_days,
+      licenseId: id,
+    });
+  }
+  return t("about.banner_paused_other", { licenseId: id });
+});
+
+const restoredMessage = computed(() => {
+  const s = state.value;
+  if (s.kind !== "restored") return "";
+  const until = formatUtc(s.untilUs, locale.value, true);
+  if (s.endsSoon) return t("about.banner_ends_soon", { until });
+  const base = t("about.banner_restored", { until });
+  const note = activeSearchUnblock(licenseData.value?.waivers, Date.now() * 1000)?.note;
+  return note ? `${base} ${t("about.banner_restored_note", { note })}` : base;
+});
+
+const message = computed(() => (isPaused.value ? pausedMessage.value : restoredMessage.value));
+
+const dismiss = () => {
+  const signature = bannerSignature(state.value);
+  dismissedSignature.value = signature;
+  try {
+    sessionStorage.setItem(DISMISS_KEY, signature);
+  } catch {
+    // Storage is unavailable, so the dismissal lasts only until the page reloads.
+  }
+};
+
+const copyLicenseId = () => copyToClipboard(licenseId.value, t);
+
+const openDetails = () =>
+  router.push({
+    name: "license",
+    query: { org_identifier: store.state.selectedOrganization?.identifier },
+  });
+
+let pollTimer: ReturnType<typeof setInterval> | undefined;
+
+const stopPolling = () => {
+  if (pollTimer !== undefined) clearInterval(pollTimer);
+  pollTimer = undefined;
+};
+
+watch(
+  isPaused,
+  (paused) => {
+    stopPolling();
+    if (paused) pollTimer = setInterval(reloadLicenseState, LICENSE_BANNER_POLL_MS);
+  },
+  { immediate: true },
+);
+
+onBeforeUnmount(stopPolling);
+</script>
