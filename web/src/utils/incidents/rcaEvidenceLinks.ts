@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// VE-D5: build evidence links from stored query targets, never server- or model-provided URLs.
+// Build evidence links from stored query targets, never server- or model-provided URLs.
 
 import type { RouteLocationRaw } from "vue-router";
 import { buildNavigationRoute } from "@/components/O2AIChat.navigation";
@@ -29,7 +29,7 @@ export interface RcaEvidenceLink {
   route: RouteLocationRaw;
 }
 
-/** The relative range a link uses when the entry has no time range (VE29). */
+/** The relative range a link uses when the entry has no time range. */
 const NO_RANGE_PERIOD = "1h";
 
 /** Signals whose SQL the logs page can run (as its `stream_type`). */
@@ -42,10 +42,15 @@ const SQL_STREAM_TYPE: Partial<Record<RcaEvidenceTarget["signal"], true>> = {
 const hasRange = (link: RcaEvidenceTarget): boolean =>
   typeof link.start_us === "number" && typeof link.end_us === "number";
 
+/** The logs handoff type that runs the query on arrival (`plugins/logs/Index.vue`). */
+const RCA_LOGS_TYPE = "rca_evidence_query";
+
 export function rcaEvidenceLink(link: RcaEvidenceTarget, org: string): RcaEvidenceLink | null {
   const ranged = hasRange(link);
 
-  // Logs handles SQL for all three signals; preserve the source stream type.
+  // Logs handles SQL for all three signals; preserve the source stream type. The
+  // `rca_evidence_query` type makes Logs run the query on arrival; the AI chat's
+  // `ai_chat_query` only re-applies it.
   if (link.sql && SQL_STREAM_TYPE[link.signal]) {
     const route = buildNavigationRoute(
       {
@@ -63,7 +68,9 @@ export function rcaEvidenceLink(link: RcaEvidenceTarget, org: string): RcaEviden
       },
       org,
     );
-    return route ? { page: "logs", route: { path: "/logs", query: route.query } } : null;
+    return route
+      ? { page: "logs", route: { path: "/logs", query: { ...route.query, type: RCA_LOGS_TYPE } } }
+      : null;
   }
 
   // PromQL: the metrics editor runs a `query` parameter on load; its share link writes ms.
@@ -87,8 +94,9 @@ export function rcaEvidenceLink(link: RcaEvidenceTarget, org: string): RcaEviden
     };
   }
 
-  // Traces: the handoff `filter` is plain text; `from`/`to` are µs.
-  if (link.filter !== undefined && link.signal === "traces") {
+  // Traces: the handoff `filter` is plain text; `from`/`to` are µs. An unfiltered
+  // call (stream + range only) hands off an empty filter: all spans in the range.
+  if (link.signal === "traces" && (link.filter !== undefined || link.streams[0])) {
     return {
       page: "traces",
       route: {
@@ -96,7 +104,7 @@ export function rcaEvidenceLink(link: RcaEvidenceTarget, org: string): RcaEviden
         query: {
           org_identifier: org,
           ...(link.streams[0] ? { stream: link.streams[0] } : {}),
-          filter: link.filter,
+          filter: link.filter ?? "",
           ...(ranged
             ? { from: String(link.start_us), to: String(link.end_us) }
             : { period: NO_RANGE_PERIOD }),
@@ -112,7 +120,7 @@ export function rcaEvidenceLink(link: RcaEvidenceTarget, org: string): RcaEviden
 export const rcaEvidenceQuery = (link: RcaEvidenceTarget): string | null =>
   link.sql || link.promql || link.filter || link.command || null;
 
-/** The page a blind spot's button opens (VE37), or null for no button. */
+/** The page a blind spot's button opens, or null for no button. */
 export function rcaBlindSpotRoute(fix: RcaBlindSpotFix, org: string): RouteLocationRaw | null {
   const query = { org_identifier: org };
   switch (fix) {
