@@ -93,10 +93,43 @@ describe("useDownloadAllResults", () => {
     expect(request.org_identifier).toBe("default");
     expect(request.page_type).toBe("logs");
     expect(request.query.query.from).toBe(0);
-    expect(request.query.query.size).toBe(350);
+    expect(request.query.query.size).toBe(10000);
     expect(request.query.query).not.toBe(searchObj.value.data.customDownloadQueryObj.query);
     expect(downloadLogsSpy).toHaveBeenCalledTimes(1);
     expect(downloadLogsSpy).toHaveBeenCalledWith(allRows, "csv");
+  });
+
+  it("pages through until a short page when the total is only a paging lower bound (histogram off)", async () => {
+    searchMock
+      .mockResolvedValueOnce({ data: { hits: rows(10000) } })
+      .mockResolvedValueOnce({ data: { hits: rows(37) } });
+    // "101+" lower bound: rowsPerPage * currentPage + 1 with more rows on the server
+    searchObj.value = buildSearchObj(100, 101);
+
+    const vm = await mountComposable();
+    await vm.downloadAllResults("csv", downloadLogsSpy);
+
+    expect(searchMock).toHaveBeenCalledTimes(2);
+    expect(searchMock.mock.calls[0][0].query.query).toMatchObject({ from: 0, size: 10000 });
+    expect(searchMock.mock.calls[1][0].query.query).toMatchObject({ from: 10000, size: 10000 });
+    expect(downloadLogsSpy).toHaveBeenCalledTimes(1);
+    expect(downloadLogsSpy.mock.calls[0][0]).toHaveLength(10037);
+    expect(downloadLogsSpy.mock.calls[0][1]).toBe("csv");
+  });
+
+  it("follows one size-of-total request with a confirmation page before stopping", async () => {
+    searchMock
+      .mockResolvedValueOnce({ data: { hits: rows(25000) } })
+      .mockResolvedValueOnce({ data: { hits: [] } });
+    searchObj.value = buildSearchObj(100, 25000);
+
+    const vm = await mountComposable();
+    await vm.downloadAllResults("json", downloadLogsSpy);
+
+    expect(searchMock).toHaveBeenCalledTimes(2);
+    expect(searchMock.mock.calls[0][0].query.query).toMatchObject({ from: 0, size: 25000 });
+    expect(searchMock.mock.calls[1][0].query.query).toMatchObject({ from: 25000, size: 10000 });
+    expect(downloadLogsSpy.mock.calls[0][0]).toHaveLength(25000);
   });
 
   it("does not mutate the stored query snapshot", async () => {

@@ -21,6 +21,9 @@ import { searchState } from "./searchState";
 
 export type DownloadFormat = "csv" | "json";
 
+// Matches the largest single export the custom-range dialog offers.
+const DOWNLOAD_PAGE_SIZE = 10000;
+
 export const useDownloadAllResults = () => {
   const { searchObj } = searchState();
   const { t } = useI18nTyped();
@@ -37,8 +40,7 @@ export const useDownloadAllResults = () => {
     const total = searchObj.data.queryResults?.total ?? 0;
     const querySnapshot = searchObj.data.customDownloadQueryObj;
 
-    // A null executed means the hits did not come from a tracked run (search-around view),
-    // so the snapshot belongs to a different query and must not be re-fetched.
+    // Null executed means the hits came from search-around, so the snapshot is for a different query.
     const trackedRun = !!searchObj.meta.executed?.complete;
     if (!trackedRun || !querySnapshot?.query || total <= hits.length) {
       await downloadLogs(hits, format);
@@ -47,20 +49,30 @@ export const useDownloadAllResults = () => {
 
     isDownloadingAll.value = true;
     try {
-      const queryReq = JSON.parse(JSON.stringify(querySnapshot));
-      queryReq.query.from = 0;
-      queryReq.query.size = total;
-      const res = await searchService.search(
-        {
-          org_identifier: searchObj.organizationIdentifier,
-          query: queryReq,
-          page_type: searchObj.data.stream.streamType,
-        },
-        "ui",
-      );
-      const rows = res?.data?.hits ?? [];
-      if (rows.length > 0) {
-        await downloadLogs(rows, format);
+      const allRows: any[] = [];
+      let from = 0;
+      let size = Math.max(DOWNLOAD_PAGE_SIZE, total);
+      // total is a paging lower bound ("51+") when the histogram is off, so only a short page ends the loop.
+      for (;;) {
+        const queryReq = JSON.parse(JSON.stringify(querySnapshot));
+        queryReq.query.from = from;
+        queryReq.query.size = size;
+        const res = await searchService.search(
+          {
+            org_identifier: searchObj.organizationIdentifier,
+            query: queryReq,
+            page_type: searchObj.data.stream.streamType,
+          },
+          "ui",
+        );
+        const page = res?.data?.hits ?? [];
+        allRows.push(...page);
+        if (page.length < size) break;
+        from += size;
+        size = DOWNLOAD_PAGE_SIZE;
+      }
+      if (allRows.length > 0) {
+        await downloadLogs(allRows, format);
       } else {
         toast({
           message: t("logs.searchBar.noDataToDownload"),
