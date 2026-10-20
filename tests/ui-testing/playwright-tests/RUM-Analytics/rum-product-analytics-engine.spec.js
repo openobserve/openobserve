@@ -167,7 +167,9 @@ test.describe('RUM Product Analytics on the real engine', () => {
       const config = await (await page.request.get(`${baseUrl}/config`)).json();
       test.skip(config.build_type === 'opensource', 'Custom roles are enterprise-only');
 
-      const iam = new PageManager(page).iamFormValidation;
+      const pm = new PageManager(page);
+      const iam = pm.iamFormValidation;
+      const roles = pm.rolesPage;
       const role = `pa_${preset}_${facts.appId.slice(-8)}`.replace(/-/g, '_');
       const user = `pa-${preset}-${facts.appId}@e2e.test`;
       const userPassword = 'Preset#12345678';
@@ -187,9 +189,9 @@ test.describe('RUM Product Analytics on the real engine', () => {
         await iam.getRoleStartFromOptionLocator(preset).click();
         await iam.submitRoleForm();
         await expect(page).toHaveURL(new RegExp(`preset=${preset}`), { timeout: 30000 });
-        const saved = page.waitForResponse((r) => r.request().method() === 'PUT' && r.url().includes(`/roles/${role}`));
-        await page.locator('[data-test="edit-role-save-btn"]').click();
-        expect((await saved).ok()).toBe(true);
+        // The preset stages after the URL changes; saving before it sends no PUT.
+        await roles.waitForPresetStaged();
+        expect((await roles.saveAndWaitForPut(role)).ok()).toBe(true);
 
         const made = await root.post(`${baseUrl}/api/${orgId}/users`, {
           data: { email: user, password: userPassword, role: 'user', first_name: 'pa', last_name: preset },

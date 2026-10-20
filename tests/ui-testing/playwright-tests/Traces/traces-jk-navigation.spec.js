@@ -20,6 +20,7 @@ const {
   navigateToBase,
 } = require("../utils/enhanced-baseFixtures.js");
 const { getAuthHeaders } = require("../utils/cloud-auth.js");
+const PageManager = require("../../pages/page-manager.js");
 
 const ORG = `jktraces${Date.now()}`;
 const STREAM = "jk_traces";
@@ -130,6 +131,8 @@ async function openList(page) {
     `/web/traces?org_identifier=${ORG}&stream=${STREAM}&period=1h`,
   );
   await expect(page.locator(listRow(24))).toBeAttached({ timeout: 60000 });
+  // Rows render before the search settles; J pressed while loading is dropped.
+  await new PageManager(page).tracesPage.expectTraceListIdle();
   await page.evaluate(
     () =>
       document.activeElement instanceof HTMLElement &&
@@ -279,6 +282,8 @@ test.describe("Traces J/K navigation (item 4a)", () => {
         "2",
         { timeout: 30000 },
       );
+      // The pager flips to 2 before page 2's rows arrive; J is ignored until then.
+      await new PageManager(page).tracesPage.expectTraceListPageLoaded();
       await expect(activeListRows(page)).toHaveCount(0);
       await page.evaluate(
         () =>

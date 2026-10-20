@@ -265,17 +265,6 @@ impl Pipeline {
         self.kind == PipelineKind::Evaluation
     }
 
-    pub fn get_cache_key(&self) -> String {
-        match &self.source {
-            PipelineSource::Realtime(stream_params) => {
-                format!("{}/{}", self.org, stream_params)
-            }
-            PipelineSource::Scheduled(_) => {
-                format!("{}/{}", self.org, self.id)
-            }
-        }
-    }
-
     pub fn get_derived_stream(&self) -> Option<DerivedStream> {
         match &self.source {
             PipelineSource::Scheduled(derived_stream) => Some(derived_stream.to_owned()),
@@ -511,16 +500,6 @@ impl Pipeline {
         }
     }
 
-    pub fn contains_remote_destination(&self, destination: &str) -> bool {
-        self.nodes.iter().any(|node| {
-            if let NodeData::RemoteStream(dest) = &node.data {
-                dest.destination_name == destination
-            } else {
-                false
-            }
-        })
-    }
-
     pub fn get_metadata_by_stream_params(
         &self,
         other_stream_params: &StreamParams,
@@ -705,43 +684,6 @@ pub fn is_forbidden_destination(source_stream: &str, destination: &str, cross_ty
 mod tests {
     use super::*;
     use crate::meta::alerts::{QueryCondition, TriggerCondition};
-
-    #[test]
-    fn test_pipeline_get_cache_key() {
-        let mut pipeline = Pipeline {
-            id: "test_pipeline".to_string(),
-            version: 1,
-            enabled: true,
-            org: "test_org".to_string(),
-            name: "test_pipeline".to_string(),
-            description: "test description".to_string(),
-            source: PipelineSource::Realtime(StreamParams::new(
-                "test_org",
-                "test_stream",
-                StreamType::Logs,
-            )),
-            kind: PipelineKind::User,
-            nodes: vec![],
-            edges: vec![],
-        };
-
-        let cache_key = pipeline.get_cache_key();
-        assert_eq!(cache_key, "test_org/test_org/test_stream/logs");
-
-        // Test scheduled pipeline
-        let derived_stream = DerivedStream {
-            org_id: "test_org".to_string(),
-            stream_type: StreamType::Logs,
-            query_condition: QueryCondition::default(),
-            trigger_condition: TriggerCondition::default(),
-            tz_offset: 0,
-            delay: None,
-            start_at: None,
-        };
-        pipeline.source = PipelineSource::Scheduled(derived_stream);
-        let cache_key = pipeline.get_cache_key();
-        assert_eq!(cache_key, "test_org/test_pipeline");
-    }
 
     #[test]
     fn test_pipeline_get_derived_stream() {
@@ -1263,38 +1205,6 @@ mod tests {
         assert_eq!(stream_params.org_id, "test_org");
         assert_eq!(stream_params.stream_name, "test_stream");
         assert_eq!(stream_params.stream_type, StreamType::Logs);
-    }
-
-    #[test]
-    fn test_pipeline_contains_remote_destination() {
-        let pipeline = Pipeline {
-            id: "test_pipeline".to_string(),
-            version: 1,
-            enabled: true,
-            org: "test_org".to_string(),
-            name: "test_pipeline".to_string(),
-            description: "test description".to_string(),
-            source: PipelineSource::Realtime(StreamParams::new(
-                "test_org",
-                "test_stream",
-                StreamType::Logs,
-            )),
-            kind: PipelineKind::User,
-            nodes: vec![Node::new(
-                "1".to_string(),
-                NodeData::RemoteStream(crate::meta::stream::RemoteStreamParams {
-                    org_id: "test_org".to_string().into(),
-                    destination_name: "test_destination".to_string().into(),
-                }),
-                100.0,
-                100.0,
-                "input".to_string(),
-            )],
-            edges: vec![],
-        };
-
-        assert!(pipeline.contains_remote_destination("test_destination"));
-        assert!(!pipeline.contains_remote_destination("nonexistent_destination"));
     }
 
     #[test]

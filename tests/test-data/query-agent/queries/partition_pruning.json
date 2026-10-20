@@ -1,0 +1,630 @@
+{
+  "queries": [
+    {
+      "id": "Q1073",
+      "sql": "SELECT count(*) AS c FROM \"{stream}\" WHERE operation_mode IN (SELECT operation_mode FROM \"{stream}\" WHERE facility_zone = 'ZONE-1')",
+      "category": "partition_pruning",
+      "time_offset": {
+        "start_offset": -1000000,
+        "end_offset": 179000000
+      },
+      "expected": {
+        "columns": [
+          "c"
+        ],
+        "results": [
+          [
+            "10"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q1074",
+      "sql": "WITH a AS (SELECT operation_mode FROM \"{stream}\" WHERE facility_zone = 'ZONE-1') SELECT count(*) AS c FROM \"{stream}\" WHERE operation_mode IN (SELECT operation_mode FROM a)",
+      "category": "partition_pruning",
+      "time_offset": {
+        "start_offset": -1000000,
+        "end_offset": 179000000
+      },
+      "expected": {
+        "columns": [
+          "c"
+        ],
+        "results": [
+          [
+            "10"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q1075",
+      "sql": "SELECT count(*) AS c, (SELECT count(*) FROM \"{stream}\" WHERE facility_zone = 'ZONE-1') AS zone_count FROM \"{stream}\"",
+      "category": "partition_pruning",
+      "time_offset": {
+        "start_offset": -1000000,
+        "end_offset": 179000000
+      },
+      "expected": {
+        "columns": [
+          "c",
+          "zone_count"
+        ],
+        "results": [
+          [
+            "14",
+            "4"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q1076",
+      "sql": "SELECT count(*) AS c FROM \"{stream}\" JOIN \"{stream}\" AS p2 ON \"{stream}\".operation_mode = p2.operation_mode WHERE \"{stream}\".facility_zone = 'ZONE-1'",
+      "category": "partition_pruning",
+      "time_offset": {
+        "start_offset": -1000000,
+        "end_offset": 179000000
+      },
+      "expected": {
+        "columns": [
+          "c"
+        ],
+        "results": [
+          [
+            "20"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q1077",
+      "sql": "SELECT count(*) AS c FROM (SELECT operation_mode, max(facility_zone) AS facility_zone FROM \"{stream}\" GROUP BY operation_mode) t WHERE facility_zone = 'ZONE-1'",
+      "category": "partition_pruning",
+      "time_offset": {
+        "start_offset": -1000000,
+        "end_offset": 179000000
+      },
+      "expected": {
+        "columns": [
+          "c"
+        ],
+        "results": [
+          [
+            "0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q1078",
+      "sql": "SELECT count(*) AS c FROM \"{stream}\" WHERE facility_zone = 'ZONE-2' AND operation_mode IN (SELECT operation_mode FROM \"{stream}\" WHERE facility_zone = 'ZONE-1')",
+      "category": "partition_pruning",
+      "time_offset": {
+        "start_offset": -1000000,
+        "end_offset": 179000000
+      },
+      "expected": {
+        "columns": [
+          "c"
+        ],
+        "results": [
+          [
+            "3"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q1079",
+      "sql": "SELECT facility_zone, operation_mode FROM \"{stream}\" WHERE facility_zone = 'ZONE-1' ORDER BY facility_zone, operation_mode",
+      "category": "partition_pruning",
+      "time_offset": {
+        "start_offset": -1000000,
+        "end_offset": 179000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "operation_mode"
+        ],
+        "results": [
+          [
+            "ZONE-1",
+            "auto"
+          ],
+          [
+            "ZONE-1",
+            "auto"
+          ],
+          [
+            "ZONE-1",
+            "manual"
+          ],
+          [
+            "ZONE-1",
+            "manual"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q1080",
+      "sql": "SELECT facility_zone, operation_mode FROM \"{stream}\" WHERE facility_zone IN ('ZONE-1', 'ZONE-2') ORDER BY facility_zone, operation_mode",
+      "category": "partition_pruning",
+      "time_offset": {
+        "start_offset": -1000000,
+        "end_offset": 179000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "operation_mode"
+        ],
+        "results": [
+          [
+            "ZONE-1",
+            "auto"
+          ],
+          [
+            "ZONE-1",
+            "auto"
+          ],
+          [
+            "ZONE-1",
+            "manual"
+          ],
+          [
+            "ZONE-1",
+            "manual"
+          ],
+          [
+            "ZONE-2",
+            "auto"
+          ],
+          [
+            "ZONE-2",
+            "manual"
+          ],
+          [
+            "ZONE-2",
+            "manual"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q1081",
+      "sql": "SELECT facility_zone, operation_mode FROM \"{stream}\" WHERE facility_zone IN (facility_zone) ORDER BY facility_zone, operation_mode",
+      "category": "partition_pruning",
+      "time_offset": {
+        "start_offset": -1000000,
+        "end_offset": 179000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "operation_mode"
+        ],
+        "results": [
+          [
+            "ZONE-1",
+            "auto"
+          ],
+          [
+            "ZONE-1",
+            "auto"
+          ],
+          [
+            "ZONE-1",
+            "manual"
+          ],
+          [
+            "ZONE-1",
+            "manual"
+          ],
+          [
+            "ZONE-2",
+            "auto"
+          ],
+          [
+            "ZONE-2",
+            "manual"
+          ],
+          [
+            "ZONE-2",
+            "manual"
+          ],
+          [
+            "ZONE-3",
+            "hybrid"
+          ],
+          [
+            "ZONE-3",
+            "hybrid"
+          ],
+          [
+            "ZONE-3",
+            "manual"
+          ],
+          [
+            "ZONE-4",
+            "auto"
+          ],
+          [
+            "ZONE-4",
+            "auto"
+          ],
+          [
+            "ZONE-4",
+            "hybrid"
+          ],
+          [
+            "ZONE-4",
+            "hybrid"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q1082",
+      "sql": "SELECT facility_zone, operation_mode FROM \"{stream}\" WHERE facility_zone IN ('ZONE-1', facility_zone) ORDER BY facility_zone, operation_mode",
+      "category": "partition_pruning",
+      "time_offset": {
+        "start_offset": -1000000,
+        "end_offset": 179000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "operation_mode"
+        ],
+        "results": [
+          [
+            "ZONE-1",
+            "auto"
+          ],
+          [
+            "ZONE-1",
+            "auto"
+          ],
+          [
+            "ZONE-1",
+            "manual"
+          ],
+          [
+            "ZONE-1",
+            "manual"
+          ],
+          [
+            "ZONE-2",
+            "auto"
+          ],
+          [
+            "ZONE-2",
+            "manual"
+          ],
+          [
+            "ZONE-2",
+            "manual"
+          ],
+          [
+            "ZONE-3",
+            "hybrid"
+          ],
+          [
+            "ZONE-3",
+            "hybrid"
+          ],
+          [
+            "ZONE-3",
+            "manual"
+          ],
+          [
+            "ZONE-4",
+            "auto"
+          ],
+          [
+            "ZONE-4",
+            "auto"
+          ],
+          [
+            "ZONE-4",
+            "hybrid"
+          ],
+          [
+            "ZONE-4",
+            "hybrid"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q1083",
+      "sql": "SELECT facility_zone, operation_mode FROM \"{stream}\" WHERE \"{stream}\".facility_zone IN ('ZONE-1', \"{stream}\".facility_zone) ORDER BY facility_zone, operation_mode",
+      "category": "partition_pruning",
+      "time_offset": {
+        "start_offset": -1000000,
+        "end_offset": 179000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "operation_mode"
+        ],
+        "results": [
+          [
+            "ZONE-1",
+            "auto"
+          ],
+          [
+            "ZONE-1",
+            "auto"
+          ],
+          [
+            "ZONE-1",
+            "manual"
+          ],
+          [
+            "ZONE-1",
+            "manual"
+          ],
+          [
+            "ZONE-2",
+            "auto"
+          ],
+          [
+            "ZONE-2",
+            "manual"
+          ],
+          [
+            "ZONE-2",
+            "manual"
+          ],
+          [
+            "ZONE-3",
+            "hybrid"
+          ],
+          [
+            "ZONE-3",
+            "hybrid"
+          ],
+          [
+            "ZONE-3",
+            "manual"
+          ],
+          [
+            "ZONE-4",
+            "auto"
+          ],
+          [
+            "ZONE-4",
+            "auto"
+          ],
+          [
+            "ZONE-4",
+            "hybrid"
+          ],
+          [
+            "ZONE-4",
+            "hybrid"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q1084",
+      "sql": "SELECT facility_zone, operation_mode FROM \"{stream}\" WHERE facility_zone IN (upper('zone-1')) ORDER BY facility_zone, operation_mode",
+      "category": "partition_pruning",
+      "time_offset": {
+        "start_offset": -1000000,
+        "end_offset": 179000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "operation_mode"
+        ],
+        "results": [
+          [
+            "ZONE-1",
+            "auto"
+          ],
+          [
+            "ZONE-1",
+            "auto"
+          ],
+          [
+            "ZONE-1",
+            "manual"
+          ],
+          [
+            "ZONE-1",
+            "manual"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q1085",
+      "sql": "SELECT facility_zone, operation_mode FROM \"{stream}\" WHERE facility_zone IN (facility_zone) UNION ALL SELECT facility_zone, operation_mode FROM \"{stream}\" WHERE facility_zone = 'ZONE-1' ORDER BY facility_zone, operation_mode",
+      "category": "partition_pruning",
+      "time_offset": {
+        "start_offset": -1000000,
+        "end_offset": 179000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "operation_mode"
+        ],
+        "results": [
+          [
+            "ZONE-1",
+            "auto"
+          ],
+          [
+            "ZONE-1",
+            "auto"
+          ],
+          [
+            "ZONE-1",
+            "auto"
+          ],
+          [
+            "ZONE-1",
+            "auto"
+          ],
+          [
+            "ZONE-1",
+            "manual"
+          ],
+          [
+            "ZONE-1",
+            "manual"
+          ],
+          [
+            "ZONE-1",
+            "manual"
+          ],
+          [
+            "ZONE-1",
+            "manual"
+          ],
+          [
+            "ZONE-2",
+            "auto"
+          ],
+          [
+            "ZONE-2",
+            "manual"
+          ],
+          [
+            "ZONE-2",
+            "manual"
+          ],
+          [
+            "ZONE-3",
+            "hybrid"
+          ],
+          [
+            "ZONE-3",
+            "hybrid"
+          ],
+          [
+            "ZONE-3",
+            "manual"
+          ],
+          [
+            "ZONE-4",
+            "auto"
+          ],
+          [
+            "ZONE-4",
+            "auto"
+          ],
+          [
+            "ZONE-4",
+            "hybrid"
+          ],
+          [
+            "ZONE-4",
+            "hybrid"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q1086",
+      "sql": "SELECT p.facility_zone, p.operation_mode FROM \"{stream}\" AS p JOIN \"{stream2}\" AS \"{stream}\" ON p.operation_mode = \"{stream}\".operation_mode WHERE \"{stream}\".facility_zone = 'ZONE-1' ORDER BY p.facility_zone, p.operation_mode",
+      "category": "partition_pruning",
+      "time_offset": {
+        "start_offset": -1000000,
+        "end_offset": 179000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "operation_mode"
+        ],
+        "results": [
+          [
+            "ZONE-1",
+            "auto"
+          ],
+          [
+            "ZONE-1",
+            "auto"
+          ],
+          [
+            "ZONE-1",
+            "manual"
+          ],
+          [
+            "ZONE-1",
+            "manual"
+          ],
+          [
+            "ZONE-1",
+            "manual"
+          ],
+          [
+            "ZONE-1",
+            "manual"
+          ],
+          [
+            "ZONE-2",
+            "auto"
+          ],
+          [
+            "ZONE-2",
+            "manual"
+          ],
+          [
+            "ZONE-2",
+            "manual"
+          ],
+          [
+            "ZONE-2",
+            "manual"
+          ],
+          [
+            "ZONE-2",
+            "manual"
+          ],
+          [
+            "ZONE-3",
+            "manual"
+          ],
+          [
+            "ZONE-3",
+            "manual"
+          ],
+          [
+            "ZONE-4",
+            "auto"
+          ],
+          [
+            "ZONE-4",
+            "auto"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    }
+  ]
+}
