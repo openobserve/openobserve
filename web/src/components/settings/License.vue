@@ -229,6 +229,8 @@
             </OCardSection>
           </OCard>
 
+          <LicenseWaiversCard :waivers="licenseData.waivers" />
+
           <OCard v-show="showUpdateForm" class="border-card-glass-border mt-4 border border-solid">
             <OCardSection role="body">
               <div class="mb-2 text-base font-medium">
@@ -489,6 +491,7 @@ import { useStore } from "vuex";
 import DOMPurify from "dompurify";
 import LicensePeriod from "@/enterprise/components/billings/LicensePeriod.vue";
 import LicenseStatusCard from "./LicenseStatusCard.vue";
+import LicenseWaiversCard from "./LicenseWaiversCard.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
@@ -514,6 +517,7 @@ export default defineComponent({
   components: {
     LicensePeriod,
     LicenseStatusCard,
+    LicenseWaiversCard,
     RenderDashboardCharts,
     OButton,
     ODialog,

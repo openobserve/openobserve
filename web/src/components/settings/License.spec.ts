@@ -1102,6 +1102,27 @@ describe("License.vue", () => {
 
       expect(wrapper.find("[data-test=license-status-card]").exists()).toBe(true);
     });
+
+    it("renders the waivers card only when waivers arrive", async () => {
+      vi.mocked(licenseServer.get_license).mockResolvedValue(
+        createAxiosResponse({
+          ...withDecision({}),
+          waivers: [
+            {
+              id: "wv_1",
+              type: "search_unblock",
+              starts_at: 1,
+              ends_at: 4102444800000000,
+              note: "n",
+            },
+          ],
+        }),
+      );
+      wrapper = createWrapper();
+      await flushPromises();
+
+      expect(wrapper.find("[data-test=license-waivers-card]").exists()).toBe(true);
+    });
   });
 
   describe("Component Cleanup", () => {
