@@ -1977,6 +1977,7 @@ CN5lTowpVXP2OIiiNTGa75Fj
             id: id.to_string(),
             org_id: "default".to_string(),
             name: format!("fleet-{id}"),
+            fleet_id: "default".to_string(),
             created_at: 1,
             revoked,
             loaded_at: std::time::Instant::now(),
