@@ -1068,6 +1068,42 @@ describe("License.vue", () => {
     });
   });
 
+  describe("Backend search decision", () => {
+    const decision = {
+      search_allowed: true,
+      blocks: [],
+      exceeded_days: 0,
+      allowed_days: 3,
+      limit_today_gb: 50,
+      used_today_gb: 10,
+      waiver_ids_applied: [],
+    };
+    const withDecision = (over: Record<string, unknown>) => ({
+      ...mockLicenseData,
+      license: { ...mockLicenseData.license, version: 2, limit_breach_allowed_count: 3 },
+      ingestion_exceeded: 4,
+      decision: { ...decision, ...over },
+    });
+
+    it("does not claim features are restricted when the backend allows search", async () => {
+      vi.mocked(licenseServer.get_license).mockResolvedValue(
+        createAxiosResponse(withDecision({ search_allowed: true })),
+      );
+      wrapper = createWrapper();
+      await flushPromises();
+
+      expect(wrapper.html()).not.toContain("some application features may be temporarily");
+    });
+
+    it("renders the status card when the backend sends a decision", async () => {
+      vi.mocked(licenseServer.get_license).mockResolvedValue(createAxiosResponse(withDecision({})));
+      wrapper = createWrapper();
+      await flushPromises();
+
+      expect(wrapper.find("[data-test=license-status-card]").exists()).toBe(true);
+    });
+  });
+
   describe("Component Cleanup", () => {
     it("should cleanup properly on unmount", async () => {
       vi.mocked(licenseServer.get_license).mockResolvedValue(createAxiosResponse(mockLicenseData));

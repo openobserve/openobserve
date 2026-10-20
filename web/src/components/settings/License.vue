@@ -76,6 +76,12 @@
         </div>
 
         <div v-else>
+          <LicenseStatusCard
+            v-if="licenseData.license && licenseData.decision"
+            :decision="licenseData.decision"
+            :base="licenseData.base"
+            :env-key-active="!!licenseData.env_key_active"
+          />
           <OCard class="border-card-glass-border border border-solid">
             <OCardSection role="body">
               <div class="mb-3 text-xl font-semibold">{{ t("about.license_info") }}</div>
@@ -327,10 +333,7 @@
                   <!-- Line 2: Exceeded Status -->
                   <div v-if="!isIngestionUnlimited" class="flex items-center gap-2">
                     <OIcon
-                      v-if="
-                        licenseData?.ingestion_exceeded &&
-                        licenseData?.ingestion_exceeded > limitBreachAllowedCount
-                      "
+                      v-if="licenseData?.ingestion_exceeded && searchPaused"
                       name="warning"
                       size="sm"
                       class="text-status-error-text flex-shrink-0"
@@ -373,7 +376,7 @@
                           "
                         ></span
                         ><span
-                          v-if="licenseData?.ingestion_exceeded > limitBreachAllowedCount"
+                          v-if="searchPaused"
                           class="inline-flex items-center font-semibold text-inherit"
                           v-html="
                             DOMPurify.sanitize(
@@ -393,11 +396,16 @@
                               t(
                                 'about.limit_exceeded_info',
                                 {
-                                  remaining:
+                                  remaining: Math.max(
+                                    0,
                                     limitBreachAllowedCount - licenseData?.ingestion_exceeded,
+                                  ),
                                   max: limitBreachAllowedCount,
                                 },
-                                limitBreachAllowedCount - licenseData?.ingestion_exceeded,
+                                Math.max(
+                                  0,
+                                  limitBreachAllowedCount - licenseData?.ingestion_exceeded,
+                                ),
                               ),
                             )
                           "
@@ -480,6 +488,7 @@ import licenseServer from "@/services/license_server";
 import { useStore } from "vuex";
 import DOMPurify from "dompurify";
 import LicensePeriod from "@/enterprise/components/billings/LicensePeriod.vue";
+import LicenseStatusCard from "./LicenseStatusCard.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
@@ -504,6 +513,7 @@ export default defineComponent({
   name: "License",
   components: {
     LicensePeriod,
+    LicenseStatusCard,
     RenderDashboardCharts,
     OButton,
     ODialog,
@@ -705,11 +715,19 @@ export default defineComponent({
     // For license version >= 2, use limit_breach_allowed_count from the license data.
     // For version < 2 or when version is absent (v1), fall back to 3.
     const limitBreachAllowedCount = computed(() => {
+      const decided = licenseData.value.decision?.allowed_days;
+      if (decided != null) return decided;
       const version = licenseData.value.license?.version;
       if (version !== undefined && version !== null && version >= 2) {
         return licenseData.value.license?.limit_breach_allowed_count ?? 3;
       }
       return 3;
+    });
+
+    const searchPaused = computed(() => {
+      const decision = licenseData.value.decision;
+      if (decision) return !decision.search_allowed;
+      return licenseData.value.ingestion_exceeded > limitBreachAllowedCount.value;
     });
 
     const ingestionUsagePercent = computed(() => {
@@ -1007,6 +1025,7 @@ export default defineComponent({
       ingestionLimitGB,
       generateUsageDashboard,
       limitBreachAllowedCount,
+      searchPaused,
       DOMPurify,
     };
   },
