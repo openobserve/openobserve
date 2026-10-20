@@ -85,9 +85,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ entry.number }}
           </span>
           <OIcon :name="rcaEvidenceKindIcon(entry.kind)" size="sm" class="text-icon-color" />
-          <span class="text-text-muted text-3xs font-mono font-bold uppercase">{{
-            entry.kind
-          }}</span>
+          <span
+            class="text-text-muted text-3xs min-w-0 truncate font-mono font-bold uppercase"
+            :title="entry.kind"
+            >{{ entry.kind }}</span
+          >
           <span class="text-compact min-w-0 truncate">
             {{ rcaEvidenceTitle(entry) }}
             <span class="text-text-secondary">· {{ entry.result_summary }}</span>

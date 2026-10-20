@@ -501,7 +501,8 @@ pub struct EvidenceEntry {
     pub link: EvidenceTarget,
     pub result_summary: String,
     pub duration_ms: u64,
-    /// At least one citation is decisive.
+    /// At least one citation is decisive and the call's signal counts toward the band. A context
+    /// call (incident details, topology, a code read) explains a mechanism but never decides one.
     pub decisive: bool,
     pub citations: Vec<Citation>,
 }
@@ -580,10 +581,11 @@ pub fn build_evidence(
                 link: acc.record.target.clone(),
                 result_summary: acc.record.result_summary.clone(),
                 duration_ms: acc.record.duration_ms,
-                decisive: acc
-                    .citations
-                    .iter()
-                    .any(|c| c.strength == Strength::Decisive),
+                decisive: acc.record.signal.counts()
+                    && acc
+                        .citations
+                        .iter()
+                        .any(|c| c.strength == Strength::Decisive),
                 citations: acc.citations,
             }
         })
@@ -1154,6 +1156,36 @@ mod tests {
         assert_eq!(
             entries.iter().map(|e| e.decisive).collect::<Vec<_>>(),
             [true, false]
+        );
+    }
+
+    /// A context call cited as decisive (a code read, the incident itself) is listed, but not as
+    /// decisive: it never counts toward the band, so the list must not claim it does.
+    #[test]
+    fn a_context_call_cited_as_decisive_is_not_decisive() {
+        let ledger = ledger_of(&[hyp(
+            1,
+            "h1",
+            "root_cause",
+            vec![
+                item("e1", "GetIncident", "inc_1", "supports", "decisive"),
+                item("e2", PROM, "q", "supports", "decisive"),
+            ],
+        )]);
+        let (entries, unverified) = build_evidence(
+            ledger.as_ref(),
+            &[
+                rec("c1", "GetIncident", "inc_1", json!({}), 1, true),
+                prom("c2", "q", 2),
+            ],
+        );
+        assert!(unverified.is_empty());
+        assert_eq!(
+            entries
+                .iter()
+                .map(|e| (e.target, e.decisive))
+                .collect::<Vec<_>>(),
+            [(SignalClass::Context, false), (SignalClass::Metrics, true)]
         );
     }
 

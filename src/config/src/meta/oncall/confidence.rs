@@ -752,16 +752,18 @@ fn impact_outside_evidence<'a>(
     })
 }
 
-/// An `inconclusive` or `blocked` outcome lowers the band to `low`; it never raises it.
+/// An `inconclusive` or `blocked` outcome lowers the band to `low`; it never raises it. A single
+/// cause graded below medium is already `low` and its basis says why (no decisive source), so it
+/// gains no floor: "no confirmed cause" would deny the cause the card shows.
 pub fn apply_outcome(grade: &mut ConfidenceGrade, outcome: RcaOutcome, reason: OutcomeReason) {
     if !matches!(outcome, RcaOutcome::Inconclusive | RcaOutcome::Blocked) {
         return;
     }
     grade.band = Confidence::Low;
-    let reason = if matches!(reason, OutcomeReason::AmbiguousCause) {
-        GradeReason::AmbiguousCause
-    } else {
-        GradeReason::NoConfirmedCause
+    let reason = match reason {
+        OutcomeReason::AmbiguousCause => GradeReason::AmbiguousCause,
+        OutcomeReason::CauseBelowMedium => return,
+        _ => GradeReason::NoConfirmedCause,
     };
     if !grade.reasons.contains(&reason) {
         grade.reasons.push(reason);
@@ -1810,6 +1812,38 @@ mod tests {
         assert_eq!(
             min_band(Confidence::High, Confidence::High),
             Confidence::High
+        );
+    }
+
+    /// One cause with only supporting evidence is inconclusive, and the card still says why the
+    /// evidence is low and what medium needs, instead of "no confirmed cause".
+    #[test]
+    fn a_cause_below_medium_keeps_its_basis() {
+        let low = grade(
+            &[hyp(
+                1,
+                "h1",
+                "root_cause",
+                vec![item("e1", PROM, "pool_active", "supports", "supporting")],
+            )],
+            &named(Confidence::Medium),
+        );
+        assert_eq!(low.band, Confidence::Low);
+        let mut g = low.clone();
+        apply_outcome(
+            &mut g,
+            RcaOutcome::Inconclusive,
+            OutcomeReason::CauseBelowMedium,
+        );
+        assert_eq!(g, low);
+        let breakdown = g.breakdown();
+        assert_eq!(
+            breakdown.evidence_reason,
+            "supporting evidence, none decisive"
+        );
+        assert_eq!(
+            breakdown.next_level.as_deref(),
+            Some("Medium needs a decisive source")
         );
     }
 
