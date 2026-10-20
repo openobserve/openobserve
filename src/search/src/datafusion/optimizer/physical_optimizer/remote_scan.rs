@@ -51,7 +51,6 @@ use crate::{
                     enrichment_broadcast_join_rewrite, should_use_enrichment_broadcast_join,
                 },
             },
-            utils::is_place_holder_or_empty,
         },
     },
     sql::Sql,
@@ -160,8 +159,8 @@ impl PhysicalOptimizerRule for RemoteScanRule {
         plan: Arc<dyn ExecutionPlan>,
         _config: &ConfigOptions,
     ) -> Result<Arc<dyn ExecutionPlan>> {
-        // should not add remote scan for placeholder or emptyplan
-        if is_place_holder_or_empty(&plan) {
+        // only a plan that reads no stream, e.g. `SELECT 1`, can skip remote scans
+        if !plan.exists(|node| Ok(node.name() == "NewEmptyExec"))? {
             return Ok(plan);
         }
 
@@ -235,8 +234,9 @@ impl TreeNodeRewriter for RemoteScanRewriter {
         if node.name() == "RepartitionExec" || node.name() == "CoalescePartitionsExec" {
             let mut visitor = TableNameVisitor::new();
             node.visit(&mut visitor)?;
-            if !visitor.has_remote_scan {
-                let table_name = visitor.table_name.clone().unwrap();
+            if !visitor.has_remote_scan
+                && let Some(table_name) = visitor.table_name.clone()
+            {
                 let input = node.children()[0];
                 let remote_scan_input =
                     wrap_partial_reduce(self.partial_reduce_enabled, input.clone())?;
@@ -261,8 +261,9 @@ impl TreeNodeRewriter for RemoteScanRewriter {
         } else if node.name() == "SortPreservingMergeExec" {
             let mut visitor = TableNameVisitor::new();
             node.visit(&mut visitor)?;
-            if !visitor.has_remote_scan {
-                let table_name = visitor.table_name.clone().unwrap();
+            if !visitor.has_remote_scan
+                && let Some(table_name) = visitor.table_name.clone()
+            {
                 let follow_merge_node = node.clone();
                 let new_input = follow_merge_node.replace_children(
                     vec![node.children()[0].clone()],
@@ -284,14 +285,18 @@ impl TreeNodeRewriter for RemoteScanRewriter {
             let mut visitor = TableNameVisitor::new();
             node.visit(&mut visitor)?;
             // add each remote scan for each child
-            if !visitor.has_remote_scan {
+            if !visitor.has_remote_scan && visitor.table_name.is_some() {
                 let mut new_children: Vec<Arc<dyn ExecutionPlan>> = vec![];
                 for child in node.children() {
                     let mut visitor = TableNameVisitor::new();
                     child.visit(&mut visitor)?;
+                    // a branch that reads no stream, e.g. `SELECT 1`, runs on the leader
+                    let Some(table_name) = visitor.table_name.clone() else {
+                        new_children.push(child.clone());
+                        continue;
+                    };
                     // For sort, we should add a SortPreservingMergeExec
                     if child.name() == "SortExec" {
-                        let table_name = visitor.table_name.clone().unwrap();
                         let sort = child.downcast_ref::<SortExec>().unwrap();
                         let sort_merge = Arc::new(
                             SortPreservingMergeExec::new(
@@ -306,7 +311,6 @@ impl TreeNodeRewriter for RemoteScanRewriter {
                         )?);
                         new_children.push(remote_scan);
                     } else {
-                        let table_name = visitor.table_name.clone().unwrap();
                         let remote_scan = Arc::new(RemoteScanExec::new(
                             child.clone(),
                             self.remote_scan_nodes.get_remote_node(&table_name),
@@ -322,12 +326,19 @@ impl TreeNodeRewriter for RemoteScanRewriter {
                 return Ok(Transformed::yes(new_node));
             }
         } else if node.name() == "HashJoinExec" {
+            let mut visitor = TableNameVisitor::new();
+            node.visit(&mut visitor)?;
+            // marking a join that reads no stream as changed would skip the scan of the rest
+            if !visitor.has_remote_scan && visitor.table_name.is_none() {
+                return Ok(Transformed::no(node));
+            }
             let mut new_children: Vec<Arc<dyn ExecutionPlan>> = vec![];
             for child in node.children() {
                 let mut visitor = TableNameVisitor::new();
                 child.visit(&mut visitor)?;
-                if !visitor.has_remote_scan {
-                    let table_name = visitor.table_name.clone().unwrap();
+                if !visitor.has_remote_scan
+                    && let Some(table_name) = visitor.table_name.clone()
+                {
                     let remote_scan = Arc::new(RemoteScanExec::new(
                         child.clone(),
                         self.remote_scan_nodes.get_remote_node(&table_name),
@@ -1077,5 +1088,85 @@ mod tests {
             Ok(TreeNodeRecursion::Continue)
         })
         .unwrap();
+    }
+
+    fn leaves_sent_without_a_stream(plan: &Arc<dyn ExecutionPlan>) -> usize {
+        let mut count = 0;
+        plan.apply(|node| {
+            if let Some(scan) = node.downcast_ref::<RemoteScanExec>() {
+                scan.children()[0]
+                    .apply(|sent| {
+                        if matches!(sent.name(), "PlaceholderRowExec" | "DataSourceExec") {
+                            count += 1;
+                        }
+                        Ok(TreeNodeRecursion::Continue)
+                    })
+                    .unwrap();
+                return Ok(TreeNodeRecursion::Jump);
+            }
+            Ok(TreeNodeRecursion::Continue)
+        })
+        .unwrap();
+        count
+    }
+
+    fn unscanned_stream_reads(plan: &Arc<dyn ExecutionPlan>) -> usize {
+        let mut count = 0;
+        plan.apply(|node| {
+            if node.downcast_ref::<RemoteScanExec>().is_some() {
+                return Ok(TreeNodeRecursion::Jump);
+            }
+            if node.name() == "NewEmptyExec" {
+                count += 1;
+            }
+            Ok(TreeNodeRecursion::Continue)
+        })
+        .unwrap();
+        count
+    }
+
+    #[tokio::test]
+    async fn test_cluster_branch_without_stream_keeps_the_other_reads() {
+        for sql in [
+            "SELECT count(*) AS c FROM t UNION ALL SELECT 1 AS c",
+            "SELECT count(*) AS c FROM t UNION ALL SELECT count(*) AS c FROM t WHERE 1 = 0",
+            "SELECT event_name FROM t WHERE value > 1 UNION ALL SELECT 'lit' AS event_name",
+            "SELECT value FROM t UNION ALL SELECT x FROM (VALUES (1), (2)) AS v(x)",
+            "SELECT t.event_name FROM t JOIN (SELECT 'n1' AS e) v ON t.event_name = v.e",
+            "SELECT value FROM t UNION ALL SELECT x FROM (VALUES (1), (2), (1)) AS v(x) GROUP BY x",
+            "SELECT value FROM t UNION ALL (SELECT x FROM (VALUES (1), (2), (1)) AS v(x) GROUP BY x ORDER BY x LIMIT 2)",
+        ] {
+            let (ctx, plan) = cluster_plan(sql).await;
+            assert_eq!(unscanned_stream_reads(&plan), 0, "{sql}");
+            // every follower would return the constant rows again
+            assert_eq!(leaves_sent_without_a_stream(&plan), 0, "{sql}");
+            assert!(decode_every_remote_scan(&ctx, &plan) >= 1, "{sql}");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_cluster_subquery_without_stream_keeps_the_other_reads() {
+        for sql in [
+            "SELECT value FROM t WHERE value > (SELECT sum(x) FROM (SELECT x FROM (VALUES (1), (2)) AS a(x) UNION ALL SELECT 3 AS x) v)",
+            "SELECT value FROM t WHERE value > (SELECT max(a.k) FROM (SELECT 1 AS k) a JOIN (SELECT 1 AS k) b ON a.k = b.k)",
+        ] {
+            let (ctx, plan) = cluster_plan(sql).await;
+            assert_eq!(unscanned_stream_reads(&plan), 0, "{sql}");
+            assert!(decode_every_remote_scan(&ctx, &plan) >= 1, "{sql}");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_single_node_branch_without_stream_keeps_the_other_reads() {
+        let sql = "SELECT count(*) AS c FROM t UNION ALL SELECT 1 AS c";
+        let (ctx, plan) = single_node_plan(sql).await;
+        assert_eq!(unscanned_stream_reads(&plan), 0);
+        assert_eq!(decode_every_remote_scan(&ctx, &plan), 1);
+    }
+
+    #[tokio::test]
+    async fn test_plan_without_stream_gets_no_remote_scan() {
+        let (ctx, plan) = cluster_plan("SELECT 1 AS c").await;
+        assert_eq!(decode_every_remote_scan(&ctx, &plan), 0);
     }
 }
