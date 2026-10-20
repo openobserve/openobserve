@@ -343,7 +343,7 @@ where
         }
 
         if common::meta::ingestion_routes::is_opamp(path) {
-            return opamp_extractor(&parts.headers, &method, &org_id, &path_columns, &folder);
+            return opamp_extractor(&parts.headers, &method, &org_id, &folder);
         }
 
         // This is case for ingestion endpoints where we need to check
@@ -510,54 +510,36 @@ fn reject_forged_session_marker(auth: String) -> String {
     }
 }
 
-/// Header only: a cookie here would let any page the user visits drive an OpAMP WebSocket.
+/// §4.2: a fleet token in the header only; a cookie would let any page the user visits drive OpAMP.
 #[cfg(feature = "enterprise")]
 fn opamp_extractor(
     headers: &HeaderMap,
     method: &str,
     org_id: &str,
-    path_columns: &[&str],
     folder: &str,
 ) -> Result<AuthExtractor, AuthExtractorRejection> {
-    use o2_openfga::meta::route_permissions as rp;
-
     let Some(auth) = headers
         .get("Authorization")
         .and_then(|v| v.to_str().ok())
         .map(|v| reject_forged_session_marker(v.to_owned()))
-        .filter(|v| !v.is_empty())
+        .filter(|v| {
+            config::utils::base64::basic_password(v)
+                .is_some_and(|p| p.starts_with(config::meta::fleet::FLEET_TOKEN_PREFIX))
+        })
     else {
         return Err(AuthExtractorRejection::unauthorized("Unauthorized Access"));
     };
     // The token's fixed scope is its authorization; the validator confines it to its org's writes.
-    if config::utils::base64::basic_password(&auth)
-        .is_some_and(|p| p.starts_with(config::meta::fleet::FLEET_TOKEN_PREFIX))
-    {
-        return Ok(AuthExtractor {
-            auth,
-            method: method.to_string(),
-            o2_type: String::new(),
-            org_id: org_id.to_string(),
-            bypass_check: true,
-            parent_id: folder.to_string(),
-            use_all_org: false,
-            use_self_context: false,
-            use_self_parent: false,
-        });
-    }
-    let Some(r) = rp::resolve_permission(path_columns, method, org_id, folder, None) else {
-        return Err(AuthExtractorRejection::unauthorized("Unauthorized Access"));
-    };
     Ok(AuthExtractor {
         auth,
-        method: r.method,
-        o2_type: r.o2_type,
-        org_id: r.org_id,
-        bypass_check: r.bypass_check,
-        parent_id: r.parent_id,
-        use_all_org: r.use_all_org,
-        use_self_context: r.use_self_context,
-        use_self_parent: r.use_self_parent,
+        method: method.to_string(),
+        o2_type: String::new(),
+        org_id: org_id.to_string(),
+        bypass_check: true,
+        parent_id: folder.to_string(),
+        use_all_org: false,
+        use_self_context: false,
+        use_self_parent: false,
     })
 }
 
@@ -1326,15 +1308,14 @@ mod tests {
 
     #[cfg(feature = "enterprise")]
     #[test]
-    fn opamp_extractor_bypasses_fleet_tokens_and_checks_fleet_post_for_logins() {
-        let columns = ["default", "v1", "opamp"];
+    fn opamp_extractor_takes_fleet_tokens_only() {
         let headers = |name: http::header::HeaderName, value: &str| {
             let mut headers = HeaderMap::new();
             headers.insert(name, value.parse().unwrap());
             headers
         };
 
-        // The validator trims the password, so a padded token must not pass as an FGA login.
+        // The validator trims the password, so a padded token is still a fleet token.
         for credentials in [
             "agent:o2ft_x",
             "admin@example.com: o2ft_x",
@@ -1342,27 +1323,31 @@ mod tests {
         ] {
             let fleet_token = headers(http::header::AUTHORIZATION, &basic(credentials));
             for method in ["GET", "POST"] {
-                let ext = opamp_extractor(&fleet_token, method, "default", &columns, "")
+                let ext = opamp_extractor(&fleet_token, method, "default", "")
                     .unwrap_or_else(|_| panic!("{method} rejected"));
                 assert!(ext.bypass_check, "{method} {credentials:?}");
             }
         }
 
-        let login = headers(http::header::AUTHORIZATION, &basic("user@example.com:pw"));
-        for method in ["GET", "POST"] {
-            let ext = opamp_extractor(&login, method, "default", &columns, "")
-                .unwrap_or_else(|_| panic!("{method} rejected"));
-            assert!(!ext.bypass_check, "{method}");
-            assert_eq!(ext.method, "POST", "{method}");
-            assert_eq!(ext.o2_type, "fleet:default", "{method}");
-            assert!(ext.use_all_org, "{method}");
+        for login in [
+            basic("user@example.com:pw"),
+            "Bearer o2ft_x".to_string(),
+            basic("o2ft_x:pw"),
+        ] {
+            let login = headers(http::header::AUTHORIZATION, &login);
+            for method in ["GET", "POST"] {
+                let Err(rejection) = opamp_extractor(&login, method, "default", "") else {
+                    panic!("only a fleet token may connect, {method}");
+                };
+                assert_eq!(rejection.status_code, StatusCode::UNAUTHORIZED);
+            }
         }
 
         let cookie = headers(
             http::header::COOKIE,
             "auth_tokens=eyJhY2Nlc3NfdG9rZW4iOiJ4In0=",
         );
-        let Err(rejection) = opamp_extractor(&cookie, "GET", "default", &columns, "") else {
+        let Err(rejection) = opamp_extractor(&cookie, "GET", "default", "") else {
             panic!("a cookie must never authenticate OpAMP");
         };
         assert_eq!(rejection.status_code, StatusCode::UNAUTHORIZED);

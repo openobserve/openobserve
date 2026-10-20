@@ -388,10 +388,8 @@ async fn fleet_token_response(
     method: &Method,
     path: &str,
 ) -> TokenValidationResponse {
-    let opamp_enabled = o2_enterprise::enterprise::common::config::get_config()
-        .opamp
-        .enabled;
-    fleet_token_response_with(opamp_enabled, user_id, token, path_org, method, path).await
+    let fleet_enabled = openobserve_core::fleet::enabled();
+    fleet_token_response_with(fleet_enabled, user_id, token, path_org, method, path).await
 }
 
 #[cfg(not(feature = "enterprise"))]
@@ -407,7 +405,7 @@ async fn fleet_token_response(
 
 #[cfg(feature = "enterprise")]
 async fn fleet_token_response_with(
-    opamp_enabled: bool,
+    fleet_enabled: bool,
     user_id: &str,
     token: &str,
     path_org: Option<&str>,
@@ -418,7 +416,7 @@ async fn fleet_token_response_with(
 
     let ingestion_write = ingestion_routes::is_ingestion_write(method, path);
     match ENROLLMENT
-        .accept(opamp_enabled, ingestion_write, token, path_org)
+        .accept(fleet_enabled, ingestion_write, token, path_org)
         .await
     {
         Some(t) => TokenValidationResponse {
@@ -513,9 +511,11 @@ pub async fn validate_credentials(
     // stubs are accepted — data-read routes are not in the table. `path` (not
     // the trailing-slash-trimmed `path_columns`) is passed so the ES root ping
     // `GET /{org}/` stays distinguishable from `/organizations` etc.
+    // §4.2: OpAMP accepts fleet tokens only, which returned above.
+    if ingestion_routes::is_opamp(path) {
+        return Ok(TokenValidationResponse::default());
+    }
     let is_ingestion_path = ingestion_routes::is_ingestion_allowed(method, path);
-    // OpAMP manages collectors, so only `o2ft_` tokens and logins may use it.
-    let is_opamp = ingestion_routes::is_opamp(path);
 
     // Check org-level ingestion tokens before user lookup.
     // Org tokens are prefixed with "o2oi_" for fast identification —
@@ -532,7 +532,7 @@ pub async fn validate_credentials(
             if let Some(r) = ORG_INGESTION_TOKENS.get(&cache_key) {
                 let token_name = r.value().clone();
 
-                if !is_ingestion_path || is_opamp {
+                if !is_ingestion_path {
                     return Ok(TokenValidationResponse {
                         is_valid: false,
                         user_email: user_id.to_string(),
@@ -561,7 +561,7 @@ pub async fn validate_credentials(
                     // Populate cache for future fast lookups
                     ORG_INGESTION_TOKENS.insert(cache_key, token_record.name.clone());
 
-                    if !is_ingestion_path || is_opamp {
+                    if !is_ingestion_path {
                         return Ok(TokenValidationResponse {
                             is_valid: false,
                             user_email: user_id.to_string(),
@@ -735,7 +735,7 @@ pub async fn validate_credentials(
     // GHSA-wffq-g8qf-ccmv for user tokens (e.g. `GET .../traces/latest` no
     // longer accepts a user's ingestion token). Service-account tokens, which
     // are valid across the API, are handled earlier and are unaffected.
-    if is_ingestion_path && !is_opamp && user.token.eq(&user_password) {
+    if is_ingestion_path && user.token.eq(&user_password) {
         return Ok(build_token_validation_response(&user));
     }
 
@@ -1948,7 +1948,7 @@ CN5lTowpVXP2OIiiNTGa75Fj
             );
         }
 
-        // OpAMP is an ingestion-write row, yet only `o2ft_` and logins may manage collectors.
+        // OpAMP is an ingestion-write row, yet only `o2ft_` tokens may manage collectors.
         for method in [Method::GET, Method::POST] {
             assert!(
                 !validate_credentials(
@@ -1970,7 +1970,7 @@ CN5lTowpVXP2OIiiNTGa75Fj
 
     #[cfg(feature = "enterprise")]
     #[tokio::test]
-    async fn fleet_token_is_valid_only_on_its_org_writes_while_opamp_is_on() {
+    async fn fleet_token_is_valid_only_on_its_org_writes_while_fleet_is_on() {
         use o2_enterprise::enterprise::fleet::enrollment::{CachedToken, ENROLLMENT, hash_token};
 
         let cached = |id: &str, revoked: bool| CachedToken {
@@ -2246,6 +2246,15 @@ CN5lTowpVXP2OIiiNTGa75Fj
                 .is_valid
         );
         assert!(validate_user(init_user, pwd).await.unwrap().is_valid);
+        for method in [Method::GET, Method::POST] {
+            assert!(
+                !validate_credentials(init_user, pwd, "default/v1/opamp", &method, false)
+                    .await
+                    .unwrap()
+                    .is_valid,
+                "a login must not manage collectors on {method}"
+            );
+        }
         let stored_ext = get_hash(pwd, &config::get_ext_auth_salt());
         for (path, method) in [
             ("default/_bulk", Method::POST),
