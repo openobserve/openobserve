@@ -281,8 +281,11 @@
                     required
                     data-test="ai-experiment-form-user-prompt"
                   />
-                  <!-- The variables a dataset row exposes. Clicking one
-                       appends it, so the reference is also the input method. -->
+                  <!-- The chips are the variables a row's input exposes:
+                       `input`, plus every top-level field the dataset's rows
+                       share. Clicking one appends it, so the reference is also
+                       the input method. `expected_output` feeds scorers only,
+                       so it is shown but cannot be inserted. -->
                   <div class="flex flex-wrap items-center gap-1.5">
                     <span class="text-text-secondary text-xs">
                       {{ t("aiObservability.experiments.form.variablesLabel") }}
@@ -298,7 +301,24 @@
                     >
                       {{ variable.token }}
                     </OButton>
+                    <span
+                      class="text-text-secondary text-xs opacity-60"
+                      data-test="ai-experiment-form-variable-expected_output"
+                    >
+                      {{
+                        t("aiObservability.experiments.form.expectedOutputScorersOnly", {
+                          token: expectedOutputToken,
+                        })
+                      }}
+                    </span>
                   </div>
+                  <p
+                    v-if="usesExpectedOutput"
+                    class="text-status-warning-text text-2xs"
+                    data-test="ai-experiment-form-expected-leak-warning"
+                  >
+                    {{ t("aiObservability.playground.expectedLeakWarning", { token: expectedOutputToken }) }}
+                  </p>
                 </div>
               </template>
 
@@ -600,7 +620,11 @@ import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import llmDatasetsService, { type LlmDataset } from "@/services/llm-datasets.service";
+import llmDatasetsService, {
+  commonInputFields,
+  DATASET_ITEMS_MAX_PAGE_SIZE,
+  type LlmDataset,
+} from "@/services/llm-datasets.service";
 import { type RemoteTask } from "@/services/remote-tasks.service";
 import { chatProviders } from "@/services/llm-playground.service";
 import { remoteTasksListQuery } from "@/services/llm-experiments.queries";
@@ -936,10 +960,42 @@ const scorerOptions = computed(() =>
 
 const scorerApplicability = computed(() => preview.value?.applicability?.scorerApplicability ?? []);
 
-const promptVariables = ["input", "expected_output"].map((name) => ({
-  name,
-  token: raw(`{{ ${name} }}`),
-}));
+const datasetInputFields = ref<string[]>([]);
+const promptVariables = computed(() =>
+  ["input", ...datasetInputFields.value].map((name) => ({ name, token: raw(`{{ ${name} }}`) })),
+);
+const expectedOutputToken = raw("{{ expected_output }}");
+const usesExpectedOutput = computed(() =>
+  /\{\{\s*expected_output\s*\}\}/.test(String(userPrompt.value ?? "")),
+);
+
+/** Bumped per load, so a slow response for a dataset since deselected never
+ *  lands over the newer one. */
+let datasetFieldsRequest = 0;
+
+/** The fields every (source-filtered) row of the dataset's first page shares.
+ *  A suggestion only: preview validation stays the authority, and a failure
+ *  just leaves the `{{ input }}` chip. */
+async function loadDatasetInputFields() {
+  const id = datasetId.value;
+  const request = ++datasetFieldsRequest;
+  if (!id || !orgId.value) {
+    datasetInputFields.value = [];
+    return;
+  }
+  try {
+    const page = await llmDatasetsService.listItems(orgId.value, id, {
+      size: DATASET_ITEMS_MAX_PAGE_SIZE,
+    });
+    if (request !== datasetFieldsRequest) return;
+    const rows = sources.value.length
+      ? page.items.filter((item) => sources.value.includes(item.source))
+      : page.items;
+    datasetInputFields.value = commonInputFields(rows);
+  } catch {
+    if (request === datasetFieldsRequest) datasetInputFields.value = [];
+  }
+}
 
 function goBack() {
   router.push(aiExperimentsRoute(orgId.value));
@@ -1190,6 +1246,7 @@ watch(
 const runPreviewAfterTyping = debounce(runPreview, 500);
 watch([systemPrompt, userPrompt], runPreviewAfterTyping);
 onBeforeUnmount(() => runPreviewAfterTyping.cancel());
+watch([datasetId, sources], loadDatasetInputFields, { deep: true, immediate: true });
 watch([promptId, promptSelectionMode, promptLabel, promptVersion], resolvePromptSelection);
 
 onBeforeRouteLeave((to, _from, next) => {

@@ -70,6 +70,9 @@ export interface PlaygroundSample {
   /** Zero-based position in the dataset, for Prev/Next. */
   index: number;
   total: number;
+  /** Field variables this sample wrote into `vars` (besides `input`), so the next
+   *  sample can drop the ones its row lacks. Absent on drafts saved before it existed. */
+  fields?: string[];
 }
 
 export interface PlaygroundProvenance {
@@ -210,6 +213,20 @@ export function renderTemplate(text: string, vars: Record<string, string>): stri
     if (name === EXPECTED_OUTPUT_TOKEN) return "";
     return vars[name] ?? "";
   });
+}
+
+/** `vars` after loading a dataset row: the previous sample's field variables are
+ *  dropped, the new row's fields set, and `input` set last — so a field literally
+ *  named `input` can never shadow the whole value (same precedence as the runner). */
+export function withSampledVars(
+  vars: Record<string, string>,
+  previousFields: readonly string[],
+  fields: Record<string, string>,
+  input: string,
+): Record<string, string> {
+  const kept = { ...vars };
+  for (const name of previousFields) delete kept[name];
+  return { ...kept, ...fields, input };
 }
 
 // ── labels ────────────────────────────────────────────────────────
