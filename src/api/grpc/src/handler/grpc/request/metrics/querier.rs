@@ -52,15 +52,18 @@ impl Metrics for MetricsQuerier {
         let _ = tracing::Span::current().set_parent(parent_cx);
 
         let req = req.into_inner();
-        #[cfg_attr(not(feature = "enterprise"), allow(unused_variables))]
         let (_, trace_id) = query_and_trace_id(&req)?;
-        #[cfg(feature = "enterprise")]
+
+        #[cfg_attr(not(feature = "enterprise"), allow(unused_variables))]
         let (req, trace_id) = register_follower(req, &trace_id).await;
+
         let org_id = &req.org_id;
         let stream_type = StreamType::Metrics.as_str();
         let result = SearchService::grpc::search(&req).await;
+
         #[cfg(feature = "enterprise")]
         SEARCH_SERVER.remove(org_id, &trace_id).await;
+
         let result = result.map_err(|err| {
             let time = start.elapsed().as_secs_f64();
             metrics::GRPC_RESPONSE_TIME
@@ -93,9 +96,8 @@ impl Metrics for MetricsQuerier {
         &self,
         req: Request<MetricsQueryRequest>,
     ) -> Result<Response<Self::DataStream>, Status> {
-        let cap = std::cmp::max(2, config::get_config().limit.cpu_num);
-        let (tx, rx) = mpsc::channel::<Result<MetricsQueryResponse, Status>>(cap);
         let mut req: MetricsQueryRequest = req.into_inner();
+
         let (query, trace_id) = query_and_trace_id(&req)?;
         log::info!(
             "[trace_id {trace_id}] promql->data->grpc: org_id: {}, use_cache: {}, time_range: [{},{}), step: {}, query: {}, label_selector: {:?}",
@@ -111,17 +113,17 @@ impl Metrics for MetricsQuerier {
             query.query_data = true;
         }
 
-        // Register trace_id in SEARCH_SERVER so selector_load_data_inner can
-        // insert_sender — without this the engine returns SearchCancelQuery
-        // immediately (same registration the `query` handler performs).
-        #[cfg(feature = "enterprise")]
+        #[cfg_attr(not(feature = "enterprise"), allow(unused_variables))]
         let (req, trace_id) = register_follower(req, &trace_id).await;
 
         // spawn a task to push streaming responses
+        let cap = std::cmp::max(2, config::get_config().limit.cpu_num);
+        let (tx, rx) = mpsc::channel::<Result<MetricsQueryResponse, Status>>(cap);
         tokio::task::spawn(async move {
             if let Err(e) = promql_service::search::grpc::data(&req, tx).await {
                 log::error!("[gRPC:metrics:data] get data error: req:{req:?}, error:{e:?}")
             }
+
             #[cfg(feature = "enterprise")]
             SEARCH_SERVER.remove(&req.org_id, &trace_id).await;
         });
@@ -131,17 +133,18 @@ impl Metrics for MetricsQuerier {
     }
 }
 
-/// Registers the request under a `{trace_id}-{suffix}` id that a cancel of `trace_id` reaches.
-#[cfg(feature = "enterprise")]
+/// Runs the request under its own `{trace_id}-{suffix}` id that a cancel of `trace_id` reaches.
 async fn register_follower(
     mut req: MetricsQueryRequest,
     trace_id: &str,
 ) -> (MetricsQueryRequest, String) {
-    // one query sends a request per selector, so concurrent requests must not share an entry
-    let follower_id = format!("{trace_id}-{}", config::ider::generate_span_id());
+    // file lists and query-manager entries key on this id, so concurrent requests need their own
+    let follower_id = config::ider::generate_query_id(trace_id);
     if let Some(job) = req.job.as_mut() {
         job.trace_id = follower_id.clone();
     }
+
+    #[cfg(feature = "enterprise")]
     SEARCH_SERVER
         .insert(
             &req.org_id,

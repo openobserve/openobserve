@@ -64,6 +64,7 @@ use crate::{
 )]
 pub async fn search(
     trace_id: &str,
+    query_id: &str,
     sql: Arc<Sql>,
     mut req: Request,
     _query: cluster_rpc::SearchQuery,
@@ -131,7 +132,7 @@ pub async fn search(
 
     let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
     if SEARCH_SERVER
-        .insert_sender(&sql.org_id, trace_id, abort_sender, true)
+        .insert_sender(&sql.org_id, query_id, abort_sender, true)
         .await
         .is_err()
     {

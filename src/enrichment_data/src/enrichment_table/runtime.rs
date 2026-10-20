@@ -155,6 +155,7 @@ pub async fn get_enrichment_table_data(
 
     let result = search_service::cluster::http::search_inner(
         request,
+        &trace_id,
         search_query,
         regions,
         vec![],

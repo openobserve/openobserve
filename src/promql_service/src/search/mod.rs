@@ -92,6 +92,8 @@ pub async fn search(
 ) -> Result<SearchResponse> {
     let trace_id = search_service::leader_trace_id(trace_id);
     let trace_id = trace_id.as_str();
+    // callers such as Grafana share one trace_id across concurrent requests
+    let query_id = config::ider::generate_query_id(trace_id);
     #[cfg(feature = "enterprise")]
     {
         let query = Some(req.query.clone());
@@ -101,7 +103,7 @@ pub async fn search(
         SEARCH_SERVER
             .insert(
                 org_id,
-                trace_id.to_string(),
+                query_id.clone(),
                 TaskStatus::new_leader(
                     vec![],
                     true,
@@ -166,7 +168,7 @@ pub async fn search(
     // Check work group (OSS uses dist_lock, Enterprise uses WorkGroup::Short)
     #[cfg(not(feature = "enterprise"))]
     let _lock = search_service::work_group::check_work_group(
-        trace_id,
+        &query_id,
         &req.org_id,
         timeout,
         &mut stop_watch,
@@ -178,7 +180,7 @@ pub async fn search(
     // Enterprise: Always use Short workgroup for metrics queries
     #[cfg(feature = "enterprise")]
     let _lock = search_service::work_group::check_work_group(
-        trace_id,
+        &query_id,
         &req.org_id,
         Some(user_email),
         timeout,
@@ -204,7 +206,7 @@ pub async fn search(
             let remaining_ms = (timeout * 1000).saturating_sub(elapsed_ms);
             let guard = Some(
                 o2_enterprise::enterprise::search::admission::acquire_node_slots(
-                    trace_id,
+                    &query_id,
                     &nodes,
                     &WorkGroup::Short,
                     remaining_ms,
@@ -228,7 +230,7 @@ pub async fn search(
     let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
     #[cfg(feature = "enterprise")]
     if SEARCH_SERVER
-        .insert_sender(org_id, trace_id, abort_sender, true)
+        .insert_sender(org_id, &query_id, abort_sender, true)
         .await
         .is_err()
     {
@@ -280,7 +282,7 @@ pub async fn search(
 
     // Clean up task record before returning
     #[cfg(feature = "enterprise")]
-    SEARCH_SERVER.remove(org_id, trace_id).await;
+    SEARCH_SERVER.remove(org_id, &query_id).await;
 
     match task {
         Ok(Ok(ret)) => Ok(ret),

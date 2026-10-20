@@ -140,6 +140,8 @@ pub async fn search(
     #[cfg(feature = "enterprise")]
     let req_clusters = in_req.clusters.clone();
 
+    // callers may share one trace_id across concurrent requests, e.g. Grafana via traceparent
+    let query_id = ider::generate_query_id(&trace_id);
     let query: SearchQuery = in_req.query.clone().into();
     let req_query = query.clone();
     let mut request = config::datafusion::request::Request::new(
@@ -176,7 +178,7 @@ pub async fn search(
         SEARCH_SERVER
             .insert(
                 org_id,
-                trace_id.clone(),
+                query_id.clone(),
                 TaskStatus::new_leader(
                     vec![],
                     true,
@@ -194,9 +196,20 @@ pub async fn search(
     }
 
     let span = tracing::span::Span::current();
+    let search_query_id = query_id.clone();
     let handle = tokio::task::spawn(
-        async move { cluster::http::search(request, query, req_regions, req_clusters, true).await }
-            .instrument(span),
+        async move {
+            cluster::http::search(
+                request,
+                &search_query_id,
+                query,
+                req_regions,
+                req_clusters,
+                true,
+            )
+            .await
+        }
+        .instrument(span),
     );
     let res = match handle.await {
         Ok(Ok(res)) => Ok(res),
@@ -222,7 +235,7 @@ pub async fn search(
     let mut _work_group = None;
     #[cfg(feature = "enterprise")]
     {
-        if let Some((_, stat)) = SEARCH_SERVER.remove(org_id, &trace_id).await
+        if let Some((_, stat)) = SEARCH_SERVER.remove(org_id, &query_id).await
             && let Some(wg) = stat.work_group.as_ref()
         {
             _work_group = Some(wg.to_string());
