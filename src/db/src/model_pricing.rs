@@ -20,7 +20,7 @@
 //! - `cache()` loads all entries from DB at startup.
 //! - `watch()` subscribes to coordinator events and updates the cache on every node.
 //! - Write operations emit coordinator events so all nodes stay in sync. User-defined models take
-//!   priority over built-in models during cost calculation, among matches of the same kind (see
+//!   priority over built-in models during cost calculation whenever they match (see
 //!   `find_pricing_sync_at`).
 
 use std::{
@@ -244,15 +244,15 @@ pub struct DefinitionMatch {
 ///
 /// When `span_ts_micros` is Some, only definitions where `valid_from <= span_ts` are
 /// considered. Selection priority:
-///   1. Match kind: a pattern covering the whole model name (`Exact`) beats one that matches only
-///      part of it (`Approximate`), whatever their sources. An approximate match is a substring
-///      accident — `gpt-5\.4` matching `gpt-5.4-mini` — so letting a higher-priority source win
-///      with one would bill a different model's price. A deliberate org/meta catch-all written
-///      to cover the whole name (`(?i)gpt-5.*`) is exact and keeps its source priority below.
-///   2. Source priority: Org > MetaOrg > BuiltIn.
-///   3. Within the same source, the greatest `valid_from` (most recent) wins.
-///   4. Otherwise the merge-order position (sort_order then name) is the final tiebreaker —
-///      earlier in the list wins.
+///   1. Source priority: Org > MetaOrg > BuiltIn. An org or meta-org definition is an explicit
+///      override, so it wins whenever it matches, even only partly (`(?i)^gpt-4o` on
+///      `gpt-4o-2024-08-06`).
+///   2. Within the same source, match kind: a pattern covering the whole model name (`Exact`) beats
+///      one that matches only part of it (`Approximate`). An approximate match is a substring
+///      accident — `gpt-5\.4` matching `gpt-5.4-mini` — that would bill a different model's price.
+///   3. Then the greatest `valid_from` (most recent) wins.
+///   4. Otherwise the merge-order position (sort_order then name) is the final tiebreaker — earlier
+///      in the list wins.
 pub fn find_pricing_sync_at(
     entries: &[CachedModelPricing],
     model_name: &str,
@@ -263,8 +263,8 @@ pub fn find_pricing_sync_at(
     // entry with an explicit valid_from is preferred when available.
     let rank = |entry: &CachedModelPricing, kind: MatchKind| {
         (
-            kind,
             std::cmp::Reverse(source_priority(&entry.definition.source)),
+            kind,
             entry.definition.valid_from.unwrap_or(i64::MIN),
         )
     };
@@ -1691,25 +1691,49 @@ mod tests {
     }
 
     #[test]
-    fn test_exact_match_beats_approximate_across_sources() {
-        // An org pattern that only partly covers the name loses to an exact built-in one.
+    fn test_source_priority_beats_match_kind() {
+        // An org pattern that only partly covers the name is an explicit override: it beats an
+        // exact built-in one.
         let entries = vec![
-            pattern_entry("org-gpt-5.4", r"(?i)gpt-5\.4", PricingSource::Org),
-            pattern_entry("builtin-mini", r"(?i)^gpt-5\.4-mini$", PricingSource::BuiltIn),
+            pattern_entry(
+                "builtin-dated",
+                r"(?i)^gpt-4o(-\d{4}-\d{2}-\d{2})?$",
+                PricingSource::BuiltIn,
+            ),
+            pattern_entry("org-gpt-4o", r"(?i)^gpt-4o", PricingSource::Org),
         ];
         assert_eq!(
-            best(&entries, "gpt-5.4-mini"),
-            ("builtin-mini".to_string(), MatchKind::Exact)
+            best(&entries, "gpt-4o-2024-08-06"),
+            ("org-gpt-4o".to_string(), MatchKind::Approximate)
         );
 
-        // An org catch-all written to cover the whole name is exact and keeps priority.
+        // Same for meta-org over built-in.
         let entries = vec![
-            pattern_entry("org-catch-all", r"(?i)gpt-5.*", PricingSource::Org),
-            pattern_entry("builtin-mini", r"(?i)^gpt-5\.4-mini$", PricingSource::BuiltIn),
+            pattern_entry(
+                "builtin-mini",
+                r"(?i)^gpt-5\.4-mini$",
+                PricingSource::BuiltIn,
+            ),
+            pattern_entry("meta-gpt-5.4", r"(?i)gpt-5\.4", PricingSource::MetaOrg),
         ];
         assert_eq!(
             best(&entries, "gpt-5.4-mini"),
-            ("org-catch-all".to_string(), MatchKind::Exact)
+            ("meta-gpt-5.4".to_string(), MatchKind::Approximate)
+        );
+
+        // Within the org source, exact still beats approximate.
+        let entries = vec![
+            pattern_entry("org-gpt-5.4", r"(?i)gpt-5\.4", PricingSource::Org),
+            pattern_entry("org-mini", r"(?i)^gpt-5\.4-mini$", PricingSource::Org),
+            pattern_entry(
+                "builtin-mini",
+                r"(?i)^gpt-5\.4-mini$",
+                PricingSource::BuiltIn,
+            ),
+        ];
+        assert_eq!(
+            best(&entries, "gpt-5.4-mini"),
+            ("org-mini".to_string(), MatchKind::Exact)
         );
     }
 

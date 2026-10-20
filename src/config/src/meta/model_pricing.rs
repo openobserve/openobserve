@@ -86,7 +86,8 @@ impl From<&str> for PricingSource {
 
 /// How a pricing pattern matched a model name.
 ///
-/// Ordered so that `Exact > Approximate`: when several patterns match, an exact match wins.
+/// Ordered so that `Exact > Approximate`: when several patterns of the same source match, an exact
+/// match wins.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum MatchKind {
@@ -116,8 +117,9 @@ impl MatchKind {
 }
 
 /// A user-defined model pricing definition that maps model names (via regex) to pricing tiers.
-/// These definitions take priority over the compiled-in pricing in `pricing.rs` unless only the
-/// compiled-in table matches the model name exactly (see [`MatchKind`]).
+/// Org and meta-org definitions always take priority over the compiled-in pricing in
+/// `pricing.rs`; built-in definitions do too, unless only the compiled-in table matches the model
+/// name exactly (see [`MatchKind`]).
 #[derive(Clone, Debug, Serialize, Deserialize, Default, ToSchema)]
 #[serde(default)]
 pub struct ModelPricingDefinition {

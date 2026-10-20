@@ -59,10 +59,12 @@ pub struct PricingResolution {
 /// Resolve the price for `model_name`. Every cost calculation goes through this one resolver.
 ///
 /// `entries` are the org's effective pricing definitions (`get_org_pricing_entries`); they are
-/// ranked by `find_pricing_sync_at` (exact before approximate, then org > meta-org > built-in,
-/// then `valid_from`, then order). The compiled-in [`MODEL_PRICING`] table is the lowest-priority
-/// source below them, under the same rule: an exact compiled-in match beats an approximate
-/// definition match, and between equal match kinds the definition wins.
+/// ranked by `find_pricing_sync_at` (org > meta-org > built-in, then exact before approximate
+/// within a source, then `valid_from`, then order). Org and meta-org definitions are explicit
+/// overrides and always beat the compiled-in [`MODEL_PRICING`] table. The compiled-in table
+/// ships with OpenObserve like the built-in definitions, so it competes with them as one source:
+/// an exact compiled-in match beats an approximate built-in one, and between equal match kinds
+/// the built-in definition wins.
 ///
 /// `span_ts_micros` filters definitions by `valid_from`; `None` means the time is unknown.
 pub fn resolve_pricing(
@@ -71,9 +73,14 @@ pub fn resolve_pricing(
     span_ts_micros: Option<i64>,
 ) -> Option<PricingResolution> {
     let definition = find_pricing_sync_at(entries, model_name, span_ts_micros);
-    // An exact definition cannot be beaten; skip scanning the compiled-in table.
+    // An override or an exact built-in definition cannot be beaten; skip the compiled-in table.
     let compiled = match &definition {
-        Some(d) if d.match_kind == MatchKind::Exact => None,
+        Some(d)
+            if d.definition.source != PricingSource::BuiltIn
+                || d.match_kind == MatchKind::Exact =>
+        {
+            None
+        }
         _ => find_compiled(&MODEL_PRICING, model_name),
     };
     match definition {
@@ -943,11 +950,12 @@ mod tests {
         assert_eq!(kind_of("o3"), None);
     }
 
-    fn definition_entry(name: &str, pattern: &str) -> CachedModelPricing {
+    fn definition_entry(name: &str, pattern: &str, source: PricingSource) -> CachedModelPricing {
         CachedModelPricing {
             definition: ModelPricingDefinition {
                 name: name.to_string(),
                 match_pattern: pattern.to_string(),
+                source,
                 ..Default::default()
             },
             compiled_regex: Regex::new(pattern).unwrap(),
@@ -966,28 +974,39 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_pricing_definition_wins_between_equal_kinds() {
+    fn test_resolve_pricing_built_in_definition_wins_between_equal_kinds() {
         // Both exact.
-        let entries = vec![definition_entry("org-gpt-4o", "(?i)^gpt-4o$")];
+        let entries = vec![definition_entry("bi-gpt-4o", "(?i)^gpt-4o$", PricingSource::BuiltIn)];
         assert_eq!(
             resolved(&entries, "gpt-4o"),
-            Some(("org-gpt-4o".to_string(), MatchKind::Exact))
+            Some(("bi-gpt-4o".to_string(), MatchKind::Exact))
         );
         // Both approximate.
-        let entries = vec![definition_entry("org-gpt-4o", "(?i)gpt-4o")];
+        let entries = vec![definition_entry("bi-gpt-4o", "(?i)gpt-4o", PricingSource::BuiltIn)];
         assert_eq!(
             resolved(&entries, "gpt-4o-2024-08-06"),
-            Some(("org-gpt-4o".to_string(), MatchKind::Approximate))
+            Some(("bi-gpt-4o".to_string(), MatchKind::Approximate))
         );
     }
 
     #[test]
-    fn test_resolve_pricing_compiled_exact_beats_definition_approximate() {
-        let entries = vec![definition_entry("org-gpt-4", "(?i)gpt-4")];
+    fn test_resolve_pricing_compiled_exact_beats_built_in_approximate() {
+        let entries = vec![definition_entry("bi-gpt-4", "(?i)gpt-4", PricingSource::BuiltIn)];
         assert_eq!(
             resolved(&entries, "gpt-4o"),
             Some(("compiled:gpt-4o".to_string(), MatchKind::Exact))
         );
+    }
+
+    #[test]
+    fn test_resolve_pricing_override_beats_compiled_exact() {
+        for source in [PricingSource::Org, PricingSource::MetaOrg] {
+            let entries = vec![definition_entry("override", "(?i)gpt-4", source)];
+            assert_eq!(
+                resolved(&entries, "gpt-4o"),
+                Some(("override".to_string(), MatchKind::Approximate))
+            );
+        }
     }
 
     #[test]
