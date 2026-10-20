@@ -1,0 +1,29 @@
+{
+  "feature_slug": "billing-plans-pricing",
+  "feature_title": "Enterprise Billing Plans Pricing Cards",
+  "area": "Management",
+  "edition": "enterprise",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "billingPlansPricing.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Management/billingPlansPricing.spec.js",
+  "playwright_group": "Management",
+  "source_files": [
+    "web/src/enterprise/components/billings/plans.vue",
+    "web/src/enterprise/components/billings/proPlan.vue",
+    "web/src/enterprise/components/billings/enterprisePlan.vue",
+    "web/src/locales/languages/en-US.json",
+    "web/src/constants/config.ts"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "The complete changed-files list shows every substantive change lives under web/src/enterprise/components/billings/ (plans.vue, proPlan.vue, enterprisePlan.vue plus their .spec.ts files). Only web/src/constants/config.ts (a comment-only addition) and the shared web/src/locales/languages/en-US.json strings sit outside that enterprise directory, and they exist solely to serve the enterprise billing feature. Enterprise-owned paths dominate, so the edition is enterprise.",
+    "skip": "Not skipped. The diff alters a user-facing UI flow (the billing/subscription plans page) with no docs/CI-only opt-out, and both feature_hint.txt and trigger_comment.txt are empty, so no explicit skip marker or tests-added label was present.",
+    "e2e": "E2E is warranted. plans.vue now maps pricing.json into per-plan price blocks, proPlan.vue renders pay-as-you-go vs annual-contract pricing tiles with a contact-sales action, enterprisePlan.vue renders a new price line, and the AI-credits card was redesigned — all user-visible behaviors worth verifying in the browser.",
+    "area": "Billing/subscription is an enterprise settings/admin page, and the closest existing test folder is Management, which already holds sibling enterprise settings specs (logoManagement.spec.js, cipherKeys.spec.js, model-pricing.spec.js). There is no Billing folder, so Management is the nearest fit.",
+    "group": "The Management testfolder shard is the closest existing matrix group for enterprise settings/admin specs; billingPlansPricing.spec.js should join it. If billing grows into its own shard later, the Engineer can split a Billing group, but Management is the correct home today.",
+    "existing_tests": "No Playwright E2E specs are in the diff. The only test files changed are Vitest unit specs (web/src/enterprise/components/billings/*.spec.ts and usage/UsageView.spec.ts), which are not E2E coverage and do not set existing_tests_in_diff. No tests/ui-testing/playwright-tests/ path is touched."
+  }
+}
