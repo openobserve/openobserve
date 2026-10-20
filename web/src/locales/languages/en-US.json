@@ -25428,7 +25428,6 @@
       "publishedVersion": "Published version",
       "createdConfig": "Created configuration",
       "deletedConfig": "Deleted configuration",
-      "unenrolledCollector": "Unenrolled collector",
       "updatedSettings": "Changed fleet settings",
       "setDesired": "Changed version",
       "autoRevert": "Reverted automatically",
@@ -25437,7 +25436,16 @@
       "assignedFleetConfig": "Assigned the fleet's configuration",
       "createdFleet": "Created fleet",
       "renamedFleet": "Renamed fleet",
-      "deletedFleet": "Deleted fleet"
+      "deletedFleet": "Deleted fleet",
+      "removedCollector": "Removed collector",
+      "renamedCollector": "Renamed collector",
+      "restartedCollector": "Restarted collector",
+      "redeliveredCollector": "Redelivered configuration",
+      "updatedFleetSettings": "Changed a fleet's settings",
+      "resumedRollout": "Resumed rollout",
+      "skippedInRollout": "Skipped collectors in rollout",
+      "revertedRollout": "Reverted rollout",
+      "movedByToken": "Moved by enrollment token"
     },
     "editor": {
       "pageTitle": "Configuration editor",

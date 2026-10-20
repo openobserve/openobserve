@@ -185,7 +185,7 @@ function seed(): Store {
     id: "a0",
     at: NOW - DAY,
     actor: "root@example.com",
-    action: "fleet.audit.rolloutStarted",
+    action: "fleet.audit.setDesired",
     target: "prod-linux",
     outcome: "success",
   });
@@ -524,7 +524,7 @@ function startRollout(fleetId: string, body: FleetSetDesiredRequest): FleetRollo
     if (!eligible) state.stable = state.desired;
     state.rollout = { id: rollout.id, status: rollout.status };
   }
-  audit("fleet.audit.rolloutStarted", fleetId);
+  audit("fleet.audit.setDesired", fleetId);
   return rollout;
 }
 
@@ -723,7 +723,7 @@ export const fleetMock: FleetApi = {
     const fleet = fleetOf(`f-${store.seq++}`, null, null);
     fleet.name = name;
     store.fleets.push(fleet);
-    audit("fleet.audit.fleetCreated", name);
+    audit("fleet.audit.createdFleet", name);
     return reply(fleet);
   },
   renameFleet: (_org, id, name) => {
