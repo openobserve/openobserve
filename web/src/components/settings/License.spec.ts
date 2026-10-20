@@ -1121,6 +1121,33 @@ describe("License.vue", () => {
       expect(wrapper.vm.limitBreachAllowedCount).toBe(3);
     });
 
+    it("disables Add New License Key and explains why while the env key is active", async () => {
+      vi.mocked(licenseServer.get_license).mockResolvedValue(
+        createAxiosResponse({ ...withDecision({}), env_key_active: true }),
+      );
+      wrapper = createWrapper();
+      await flushPromises();
+
+      const btn = wrapper.find("[data-test=add-license-key-btn]");
+      expect(btn.attributes("aria-disabled")).toBe("true");
+      expect(btn.text()).toContain("O2_LICENSE_KEY");
+      await btn.trigger("click");
+      expect(wrapper.vm.showUpdateForm).toBe(false);
+    });
+
+    it("keeps Add New License Key enabled without the env key", async () => {
+      vi.mocked(licenseServer.get_license).mockResolvedValue(
+        createAxiosResponse({ ...withDecision({}), env_key_active: false }),
+      );
+      wrapper = createWrapper();
+      await flushPromises();
+
+      const btn = wrapper.find("[data-test=add-license-key-btn]");
+      expect(btn.attributes("aria-disabled")).toBeUndefined();
+      await btn.trigger("click");
+      expect(wrapper.vm.showUpdateForm).toBe(true);
+    });
+
     it("renders the waivers card only when waivers arrive", async () => {
       vi.mocked(licenseServer.get_license).mockResolvedValue(
         createAxiosResponse({

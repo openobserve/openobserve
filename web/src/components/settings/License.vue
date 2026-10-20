@@ -213,9 +213,16 @@
                   data-test="add-license-key-btn"
                   variant="primary"
                   size="sm-action"
+                  :disabled="!!licenseData.env_key_active"
+                  focusable-unavailable
                   @click="showUpdateFormAndFocus"
                 >
+                  <OTooltip
+                    v-if="licenseData.env_key_active"
+                    :content="t('about.license_status_env_key')"
+                  />
                   {{ t("about.add_new_license_key") }}
+                  <template #unavailable-reason>{{ t("about.license_status_env_key") }}</template>
                 </OButton>
                 <OButton
                   data-test="refresh-license-limits-btn"
@@ -496,6 +503,7 @@ import LicenseWaiversCard from "./LicenseWaiversCard.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OTextarea from "@/lib/forms/Input/OTextarea.vue";
@@ -522,6 +530,7 @@ export default defineComponent({
     RenderDashboardCharts,
     OButton,
     ODialog,
+    OTooltip,
     OSpinner,
     OIcon,
     OBadge,
