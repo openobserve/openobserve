@@ -46,16 +46,21 @@ pub async fn cancel_query(
         Ok(v) => v,
         Err(e) => return MetaHttpResponse::bad_request(e),
     };
-    let queries = queries
-        .iter()
-        .map(|query| (query.trace_id.as_str(), query.org_id.as_str()))
-        .collect::<Vec<_>>();
-
-    let other_org = queries.iter().any(|(_, query_org)| *query_org != org_id);
+    if queries.is_empty() {
+        return (StatusCode::BAD_REQUEST, Json("Invalid trace_id")).into_response();
+    }
+    let other_org = queries.iter().any(|query| query.org_id != org_id);
     if other_org && !(org_id == META_ORG_ID && can_cancel_other_orgs(user_id).await) {
         return MetaHttpResponse::forbidden("Not allowed to cancel other organizations' queries");
     }
-    cancel_each(&queries).await
+    let mut res = Vec::with_capacity(queries.len());
+    for query in queries.iter().filter(|query| !query.trace_id.is_empty()) {
+        match cancel_in_cluster(&query.org_id, &query.trace_id).await {
+            Ok(status) => res.push(status),
+            Err(e) => return MetaHttpResponse::bad_request(e),
+        }
+    }
+    Json(res).into_response()
 }
 
 pub async fn query_status(Path(org_id): Path<String>) -> Response {
@@ -69,21 +74,6 @@ pub async fn query_status(Path(org_id): Path<String>) -> Response {
         Ok(res) => Json(res).into_response(),
         Err(e) => MetaHttpResponse::bad_request(e),
     }
-}
-
-/// Cancels each trace id in the org it runs in.
-async fn cancel_each(queries: &[(&str, &str)]) -> Response {
-    if queries.is_empty() {
-        return (StatusCode::BAD_REQUEST, Json("Invalid trace_id")).into_response();
-    }
-    let mut res = Vec::with_capacity(queries.len());
-    for (trace_id, org_id) in queries.iter().filter(|(id, _)| !id.is_empty()) {
-        match cancel_in_cluster(org_id, trace_id).await {
-            Ok(status) => res.push(status),
-            Err(e) => return MetaHttpResponse::bad_request(e),
-        }
-    }
-    Json(res).into_response()
 }
 
 /// Cancels `trace_id` and its `{trace_id}-` sub-queries in `org_id` on every node or region.
