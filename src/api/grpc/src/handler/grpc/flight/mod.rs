@@ -375,7 +375,7 @@ async fn register_follower_task_status(
     org_id: &str,
     trace_id: &str,
 ) -> Option<AsyncDefer> {
-    if !is_super_cluster || SEARCH_SERVER.contain_key(org_id, trace_id).await {
+    if !is_super_cluster {
         return None;
     }
     SEARCH_SERVER
