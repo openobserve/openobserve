@@ -364,7 +364,8 @@ impl Search for Searcher {
                 last_usage_response: o2_enterprise::enterprise::license::get_usage_resp_string()
                     .await,
                 ingestion_history,
-                license_status_json: String::new(),
+                license_status_json: o2_enterprise::enterprise::license::license_status_json()
+                    .await,
             }
         };
         Ok(Response::new(res))
@@ -525,6 +526,22 @@ mod tests {
             .into_inner();
         assert!(res.search_allowed);
         assert!(res.license_status_json.is_empty());
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_license_usage_info_carries_the_license_status() {
+        let res = Searcher::new()
+            .get_license_usage_info(Request::new(GetLicenseUsageRequest {}))
+            .await
+            .unwrap()
+            .into_inner();
+        let status: o2_enterprise::enterprise::license::LicenseStatus =
+            config::utils::json::from_str(&res.license_status_json).unwrap();
+        assert_eq!(
+            status.decision.search_allowed,
+            o2_enterprise::enterprise::license::search_allowed()
+        );
     }
 
     #[cfg(feature = "enterprise")]
