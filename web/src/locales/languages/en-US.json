@@ -8111,6 +8111,7 @@
       "errorOccurred": "An error occurred",
       "actionCancelledByUser": "Action cancelled by user",
       "serverResponseError": "Error: Unable to get response from the server. Please try again later.",
+      "requestFailed": "Error: Could not reach the AI service. Check your connection and try again.",
       "navigateConfirmQuestion": "Allow O2 Assistant to navigate?",
       "confirmToolExecution": "Confirm execution of {tool}?",
       "serverErrorStatus": "Server error ({status})",

@@ -1042,6 +1042,12 @@ export function useChatStream(options: UseChatStreamOptions) {
         throw err;
       }
 
+      // fetchAiChat returns null when the request never got a response (network down, CORS
+      // refusal); reading `.body` of it would surface as a TypeError.
+      if (!response) {
+        throw new Error(t("aiAssistant.aiChat.requestFailed"));
+      }
+
       // Announce before content arrives; silence hides that earlier tool results and file state were lost.
       if (reseedNotice) {
         reseedNotice = false;
