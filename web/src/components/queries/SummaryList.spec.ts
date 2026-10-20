@@ -158,21 +158,21 @@ describe("SummaryList.vue", () => {
   });
 
   // Test 14: Test confirmDeleteAction function
-  it("should emit delete:queries with trace_ids when confirmDeleteAction is called", () => {
-    const mockProps = {
-      row: {
-        trace_ids: ["trace1", "trace2"],
-      },
-    };
+  it("should emit delete:queries with the row queries when confirmDeleteAction is called", () => {
+    const queries = [
+      { trace_id: "trace1", org_id: "org1" },
+      { trace_id: "trace2", org_id: "org2" },
+    ];
+    const mockProps = { row: { queries } };
 
     wrapper.vm.confirmDeleteAction(mockProps);
 
     expect(wrapper.emitted("delete:queries")).toBeTruthy();
-    expect(wrapper.emitted("delete:queries")[0]).toEqual([["trace1", "trace2"]]);
+    expect(wrapper.emitted("delete:queries")[0]).toEqual([queries]);
   });
 
   // Test 15: Test confirmDeleteAction with empty trace_ids
-  it("should emit empty array when trace_ids is undefined", () => {
+  it("should emit empty array when queries is undefined", () => {
     const mockProps = {
       row: {},
     };
