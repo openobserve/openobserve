@@ -13,12 +13,14 @@
 
 const { test, expect, navigateToBase } = require("../utils/enhanced-baseFixtures.js");
 const { ingestRows, waitForSearchable } = require("../utils/auto-run-helpers.js");
+const { getAuthHeaders } = require("../utils/cloud-auth.js");
 const testLogger = require("../utils/test-logger.js");
 const PageManager = require("../../pages/page-manager.js");
 
 const ORG = `kbd${Date.now()}`;
 const STREAM = "kbd_logs";
 const TOTAL = 5;
+const API_BASE = (process.env.INGESTION_URL || process.env.ZO_BASE_URL).replace(/\/$/, "");
 
 const LOGS_URL =
   `/web/logs?org_identifier=${ORG}&stream=${STREAM}&stream_type=logs&period=15m&refresh=0` +
@@ -42,6 +44,13 @@ test.describe("Query Editor Keyboard Accessibility testcases", () => {
     // Gate on the stream being searchable before any test navigates, otherwise a
     // freshly-ingested stream can answer the entry search with zero rows.
     await waitForSearchable(request, ORG, STREAM, 1);
+  });
+
+  // Remove the fresh kbd<ts> org this spec seeds — the shared-org sweep never lists it.
+  test.afterAll(async ({ request }) => {
+    await request
+      .delete(`${API_BASE}/api/organizations/${ORG}`, { headers: getAuthHeaders() })
+      .catch(() => {});
   });
 
   test.beforeEach(async ({ page }, testInfo) => {

@@ -395,7 +395,6 @@ test.describe("Pre-Test Cleanup", () => {
         /^e2e_backfill_dest_\d+$/,                     // e2e_backfill_dest_<timestamp> (pipeline-backfill.spec.js)
         /^e2e_time_test_\d+$/,                      // e2e_time_test_<timestamp>
         /^pw_lib_(ready|absent)_/,                  // alert-library.spec.js (Alert Library e2e readiness streams)
-        /^kbd_logs$/,                               // logs-query-editor-keyboard.spec.js (seeded stream)
       ],
       // Protected streams to never delete
       ['default', 'sensitive', 'important', 'critical', 'production', 'staging', 'automation', 'e2e_automate', 'k8s_json']
