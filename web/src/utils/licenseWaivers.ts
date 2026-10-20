@@ -39,6 +39,8 @@ export interface LicenseWaiverFields {
   waivers?: LicenseWaiver[];
   decision?: LicenseDecision;
   base?: LicenseDecision;
+  /** 0 until the backend has evaluated the licence itself; its decision then holds only search state. */
+  evaluated_at?: number;
   env_key_active?: boolean;
 }
 

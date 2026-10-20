@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ limitText }}
             </td>
           </tr>
-          <tr v-if="decision.limit_today_gb != null" data-test="license-status-days">
+          <tr v-if="evaluated && decision.limit_today_gb != null" data-test="license-status-days">
             <td
               class="border-table-row-divider border-e border-solid px-3 py-2 leading-[1.2] font-bold"
             >
@@ -96,9 +96,12 @@ const props = defineProps<{
   decision: LicenseDecision;
   base?: LicenseDecision;
   envKeyActive: boolean;
+  evaluatedAt?: number;
 }>();
 
 const { t } = useI18nTyped();
+
+const evaluated = computed(() => props.evaluatedAt !== 0);
 
 const restoredByWaiver = computed(
   () => props.decision.search_allowed && !!props.base && !props.base.search_allowed,
@@ -143,6 +146,7 @@ const daysText = computed(() => {
 
 const limitText = computed(() => {
   const d = props.decision;
+  if (!evaluated.value) return "—";
   if (d.limit_today_gb == null) return t("about.license_status_unlimited");
   const percent = quotaPercent(d) ?? 0;
   return t("about.license_status_limit_value", { limit: d.limit_today_gb, percent });

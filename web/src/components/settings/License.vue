@@ -81,6 +81,7 @@
             :decision="licenseData.decision"
             :base="licenseData.base"
             :env-key-active="!!licenseData.env_key_active"
+            :evaluated-at="licenseData.evaluated_at"
           />
           <OCard class="border-card-glass-border border border-solid">
             <OCardSection role="body">
@@ -720,7 +721,7 @@ export default defineComponent({
     // For version < 2 or when version is absent (v1), fall back to 3.
     const limitBreachAllowedCount = computed(() => {
       const decided = licenseData.value.decision?.allowed_days;
-      if (decided != null) return decided;
+      if (decided != null && licenseData.value.evaluated_at !== 0) return decided;
       const version = licenseData.value.license?.version;
       if (version !== undefined && version !== null && version >= 2) {
         return licenseData.value.license?.limit_breach_allowed_count ?? 3;

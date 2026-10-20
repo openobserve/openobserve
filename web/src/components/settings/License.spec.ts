@@ -1103,6 +1103,24 @@ describe("License.vue", () => {
       expect(wrapper.find("[data-test=license-status-card]").exists()).toBe(true);
     });
 
+    it("uses the licence grace count until the backend has evaluated", async () => {
+      const synthesised = withDecision({ allowed_days: 3 });
+      synthesised.license.limit_breach_allowed_count = 5;
+      vi.mocked(licenseServer.get_license).mockResolvedValue(
+        createAxiosResponse({ ...synthesised, evaluated_at: 0 }),
+      );
+      wrapper = createWrapper();
+      await flushPromises();
+      expect(wrapper.vm.limitBreachAllowedCount).toBe(5);
+
+      vi.mocked(licenseServer.get_license).mockResolvedValue(
+        createAxiosResponse({ ...synthesised, evaluated_at: 1792000000000000 }),
+      );
+      wrapper = createWrapper();
+      await flushPromises();
+      expect(wrapper.vm.limitBreachAllowedCount).toBe(3);
+    });
+
     it("renders the waivers card only when waivers arrive", async () => {
       vi.mocked(licenseServer.get_license).mockResolvedValue(
         createAxiosResponse({

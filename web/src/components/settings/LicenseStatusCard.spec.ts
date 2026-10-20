@@ -93,6 +93,20 @@ describe("LicenseStatusCard", () => {
     expect(w.html()).not.toMatch(/NaN|Infinity/);
   });
 
+  it("before the first evaluation claims no limit and hides the days row", () => {
+    const w = mountCard({ evaluatedAt: 0, decision: decision({ limit_today_gb: null }) });
+    const text = w.find("[data-test=license-status-limit]").text();
+    expect(text).toBe("—");
+    expect(text).not.toContain("Unlimited");
+    expect(w.find("[data-test=license-status-days]").exists()).toBe(false);
+  });
+
+  it("an evaluated status shows its limit and days", () => {
+    const w = mountCard({ evaluatedAt: 1792000000000000 });
+    expect(w.find("[data-test=license-status-limit]").text()).toContain("200 GB/day");
+    expect(w.find("[data-test=license-status-days]").exists()).toBe(true);
+  });
+
   it("env key notice shows only when the env key is active", () => {
     const on = mountCard({ envKeyActive: true });
     expect(on.find("[data-test=license-status-env-key]").text()).toContain("O2_LICENSE_KEY");

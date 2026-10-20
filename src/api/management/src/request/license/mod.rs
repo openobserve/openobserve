@@ -42,6 +42,7 @@ struct LicenseResponse {
     waivers: Vec<Waiver>,
     decision: LicenseDecision,
     base: LicenseDecision,
+    evaluated_at: i64,
     env_key_active: bool,
 }
 
@@ -140,12 +141,12 @@ fn viewer_license_fields(
 fn license_status_fields(
     status: LicenseStatus,
     is_root: bool,
-) -> (Vec<Waiver>, LicenseDecision, LicenseDecision) {
+) -> (Vec<Waiver>, LicenseDecision, LicenseDecision, i64) {
     let mut waivers = status.waivers;
     if !is_root {
         hide_waiver_installations(&mut waivers);
     }
-    (waivers, status.decision, status.base)
+    (waivers, status.decision, status.base, status.evaluated_at)
 }
 
 // a scoped waiver names an installation id, which on token-less installs is the grpc token
@@ -183,7 +184,8 @@ pub async fn get_license_info(Headers(email): Headers<UserEmail>) -> Response {
         license,
     );
 
-    let (waivers, decision, base) = license_status_fields(license_status().await, is_root);
+    let (waivers, decision, base, evaluated_at) =
+        license_status_fields(license_status().await, is_root);
 
     let res = LicenseResponse {
         key,
@@ -195,6 +197,7 @@ pub async fn get_license_info(Headers(email): Headers<UserEmail>) -> Response {
         waivers,
         decision,
         base,
+        evaluated_at,
         env_key_active: !o2_cfg.common.license_key.trim().is_empty(),
     };
     MetaHttpResponse::json(res)
@@ -316,7 +319,7 @@ mod tests {
         );
         let mut status = status_fixture();
         status.waivers[0].installation_id = Some(INSTANCE_ID.into());
-        let (waivers, decision, base) = license_status_fields(status, is_root);
+        let (waivers, decision, base, evaluated_at) = license_status_fields(status, is_root);
         json::to_string(&LicenseResponse {
             key,
             license,
@@ -327,6 +330,7 @@ mod tests {
             waivers,
             decision,
             base,
+            evaluated_at,
             env_key_active: false,
         })
         .unwrap()
@@ -467,7 +471,9 @@ mod tests {
 
     #[test]
     fn test_license_response_carries_decision_and_waivers() {
-        let (waivers, decision, base) = license_status_fields(status_fixture(), false);
+        let mut status = status_fixture();
+        status.evaluated_at = 1_792_000_000_000_000;
+        let (waivers, decision, base, evaluated_at) = license_status_fields(status, false);
         let json = json::to_value(&LicenseResponse {
             key: None,
             license: None,
@@ -478,9 +484,11 @@ mod tests {
             waivers,
             decision,
             base,
+            evaluated_at,
             env_key_active: false,
         })
         .unwrap();
+        assert_eq!(json["evaluated_at"], 1_792_000_000_000_000_i64);
         assert_eq!(json["decision"]["search_allowed"], true);
         assert_eq!(json["decision"]["exceeded_days"], 4);
         assert_eq!(json["decision"]["allowed_days"], 3);
@@ -522,6 +530,7 @@ mod tests {
             waivers: Vec::new(),
             decision: LicenseDecision::default(),
             base: LicenseDecision::default(),
+            evaluated_at: 0,
             env_key_active: true,
         })
         .unwrap();
