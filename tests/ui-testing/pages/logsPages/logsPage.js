@@ -1097,7 +1097,7 @@ export class LogsPage {
         throw new Error(`selectStream: Failed to find stream "${stream}" after ${maxRetries} attempts`);
     }
 
-    /** Wait until the Logs query editor's completion props know the selected stream's fields (and optionally a server function). */
+    /** Wait until the Logs search bar's completion lists (what it feeds the query editor) know the stream's fields and optionally a server function. */
     async waitForStreamFieldsLoaded(fieldName = 'level', functionName = null, timeout = 30000) {
         testLogger.info(`waitForStreamFieldsLoaded: waiting for field "${fieldName}"${functionName ? ` and function "${functionName}"` : ''} in the query editor`);
         // Each check walks the whole vnode tree, so poll on an interval rather than every animation frame.
@@ -1105,28 +1105,29 @@ export class LogsPage {
             const app = document.querySelector('#app');
             if (!app?._vnode) return false;
             const visited = new Set();
-            let editor = null;
+            let searchBar = null;
             const walk = (node, depth) => {
-                if (!node || depth > 80 || visited.has(node) || editor) return;
+                if (!node || depth > 80 || visited.has(node) || searchBar) return;
                 visited.add(node);
-                if (node.component && node.props?.['data-test'] === 'logs-search-bar-query-editor') {
-                    editor = node.component.props;
+                // The editor's own component props read back empty in prod builds; SearchBar's setupState holds the same lists.
+                if (node.component?.setupState && 'effectiveKeywords' in node.component.setupState) {
+                    searchBar = node.component.setupState;
                     return;
                 }
                 if (node.component?.subTree) walk(node.component.subTree, depth + 1);
                 if (Array.isArray(node.children)) {
                     for (const c of node.children) {
                         if (c && typeof c === 'object') walk(c, depth + 1);
-                        if (editor) return;
+                        if (searchBar) return;
                     }
                 }
             };
             walk(app._vnode, 0);
-            if (!editor) return false;
-            const keywords = Array.isArray(editor.keywords) ? editor.keywords : [];
+            if (!searchBar) return false;
+            const keywords = Array.isArray(searchBar.effectiveKeywords) ? searchBar.effectiveKeywords : [];
             const hasField = keywords.some((k) => k?.kind === 'Field' && k?.name === field);
             if (!fn) return hasField;
-            const suggestions = Array.isArray(editor.suggestions) ? editor.suggestions : [];
+            const suggestions = Array.isArray(searchBar.effectiveSuggestions) ? searchBar.effectiveSuggestions : [];
             return hasField && suggestions.some((s) => (s?.name ?? s?.label) === fn);
         }, { field: fieldName, fn: functionName }, { timeout, polling: 250 });
     }
