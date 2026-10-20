@@ -75,6 +75,7 @@ pub mod error_utils;
 pub mod multi_streams;
 pub mod patterns;
 pub mod query_functions;
+#[cfg(feature = "enterprise")]
 pub mod query_manager;
 pub mod saved_view;
 #[cfg(feature = "enterprise")]
