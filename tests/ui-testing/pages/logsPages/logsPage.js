@@ -1097,6 +1097,86 @@ export class LogsPage {
         throw new Error(`selectStream: Failed to find stream "${stream}" after ${maxRetries} attempts`);
     }
 
+    /** Wait until the Logs query editor's completion props know the selected stream's fields (and optionally a server function). */
+    async waitForStreamFieldsLoaded(fieldName = 'level', functionName = null, timeout = 30000) {
+        testLogger.info(`waitForStreamFieldsLoaded: waiting for field "${fieldName}"${functionName ? ` and function "${functionName}"` : ''} in the query editor`);
+        await this.page.waitForFunction(({ field, fn }) => {
+            const app = document.querySelector('#app');
+            if (!app?._vnode) return false;
+            const visited = new Set();
+            let editor = null;
+            const walk = (node, depth) => {
+                if (!node || depth > 80 || visited.has(node) || editor) return;
+                visited.add(node);
+                if (node.component && node.props?.['data-test'] === 'logs-search-bar-query-editor') {
+                    editor = node.component.props;
+                    return;
+                }
+                if (node.component?.subTree) walk(node.component.subTree, depth + 1);
+                if (Array.isArray(node.children)) {
+                    for (const c of node.children) {
+                        if (c && typeof c === 'object') walk(c, depth + 1);
+                        if (editor) return;
+                    }
+                }
+            };
+            walk(app._vnode, 0);
+            if (!editor) return false;
+            const keywords = Array.isArray(editor.keywords) ? editor.keywords : [];
+            const hasField = keywords.some((k) => k?.kind === 'Field' && k?.name === field);
+            if (!fn) return hasField;
+            const suggestions = Array.isArray(editor.suggestions) ? editor.suggestions : [];
+            return hasField && suggestions.some((s) => (s?.name ?? s?.label) === fn);
+        }, { field: fieldName, fn: functionName }, { timeout });
+    }
+
+    /** Read one o2FieldValues record by its "org|streamType|streamName|fieldName" key; null until the app has written it. */
+    async readFieldValueRecord(key) {
+        return await this.page.evaluate((searchKey) => new Promise((resolve, reject) => {
+            const req = indexedDB.open('o2FieldValues', 1);
+            let aborted = false;
+            // A reader that creates the DB leaves it without the app's store, and the app never writes again.
+            req.onupgradeneeded = () => { aborted = true; req.transaction.abort(); resolve(null); };
+            req.onerror = () => (aborted ? resolve(null) : reject(req.error));
+            req.onsuccess = () => {
+                const db = req.result;
+                if (!db.objectStoreNames.contains('fieldValues')) { db.close(); resolve(null); return; }
+                const getReq = db.transaction('fieldValues', 'readonly').objectStore('fieldValues').get(searchKey);
+                getReq.onsuccess = () => { db.close(); resolve(getReq.result || null); };
+                getReq.onerror = () => { db.close(); reject(getReq.error); };
+            };
+        }), key);
+    }
+
+    /** Read every o2FieldValues record; [] until the app has created the DB. */
+    async readAllFieldValueRecords() {
+        return await this.page.evaluate(() => new Promise((resolve, reject) => {
+            const req = indexedDB.open('o2FieldValues', 1);
+            let aborted = false;
+            // A reader that creates the DB leaves it without the app's store, and the app never writes again.
+            req.onupgradeneeded = () => { aborted = true; req.transaction.abort(); resolve([]); };
+            req.onerror = () => (aborted ? resolve([]) : reject(req.error));
+            req.onsuccess = () => {
+                const db = req.result;
+                if (!db.objectStoreNames.contains('fieldValues')) { db.close(); resolve([]); return; }
+                const getAllReq = db.transaction('fieldValues', 'readonly').objectStore('fieldValues').getAll();
+                getAllReq.onsuccess = () => { db.close(); resolve(getAllReq.result || []); };
+                getAllReq.onerror = () => { db.close(); reject(getAllReq.error); };
+            };
+        }));
+    }
+
+    /** Delete the o2FieldValues DB and resolve once the delete has completed. */
+    async clearFieldValueDB() {
+        await this.page.evaluate(() => new Promise((resolve, reject) => {
+            const req = indexedDB.deleteDatabase('o2FieldValues');
+            // onblocked is not completion: the app closes its connection on versionchange, then onsuccess fires.
+            req.onsuccess = () => resolve();
+            req.onerror = () => reject(req.error);
+        }));
+        testLogger.info('Cleared IndexedDB o2FieldValues database');
+    }
+
     async deselectStream(streamName) {
         testLogger.info(`Deselecting stream: ${streamName}`);
         // Legacy select used `log-search-index-list-stream-toggle-<name> div`;
