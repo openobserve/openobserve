@@ -56,6 +56,7 @@ const TEST_FAILED: &str = "The toolset's server did not list its tools";
 const TEST_INVALID: &str = "The toolset's configuration is not valid";
 const URL_REFUSED: &str = "The toolset URL must not reach a loopback, private, link-local or \
                            metadata address unless the operator allows it";
+const URL_UNRESOLVED: &str = "The toolset URL's host can't be resolved";
 
 static LAST_TEST: LazyLock<Mutex<HashMap<String, Instant>>> = LazyLock::new(Mutex::default);
 static LAST_HEALTH: LazyLock<Mutex<HealthWrites>> = LazyLock::new(Mutex::default);
@@ -630,8 +631,19 @@ async fn admit_url(kind: ToolsetKind, data: Option<&serde_json::Value>) -> Resul
         .await
         .map_err(|e| {
             log::info!("[toolset] URL refused: {e}");
-            error::invalid_request(URL_REFUSED)
+            error::invalid_request(refusal_sentence(&e))
         })
+}
+
+/// The fixed sentence for a guard refusal: a host that does not resolve is not a private address.
+fn refusal_sentence(guard_error: &str) -> &'static str {
+    if guard_error.starts_with("Failed to resolve host")
+        || guard_error.ends_with("resolved to no addresses")
+    {
+        URL_UNRESOLVED
+    } else {
+        URL_REFUSED
+    }
 }
 
 /// Stores one call's outcome unless the same state was written moments ago.
@@ -999,6 +1011,31 @@ mod tests {
         let public = json!({"url": "https://8.8.8.8/mcp", "headers": {}});
         assert!(admit_url(ToolsetKind::Mcp, Some(&public)).await.is_ok());
         assert!(admit_url(ToolsetKind::Mcp, None).await.is_ok());
+    }
+
+    #[tokio::test]
+    async fn an_unresolvable_host_is_refused_with_its_own_sentence() {
+        let message = |response: Response| async move {
+            let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+                .await
+                .unwrap();
+            let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+            json["message"].as_str().unwrap_or_default().to_string()
+        };
+        let unresolvable = json!({"url": "https://no-such-host.invalid/mcp", "headers": {}});
+        let refusal = admit_url(ToolsetKind::Mcp, Some(&unresolvable))
+            .await
+            .unwrap_err();
+        assert_eq!(message(refusal).await, URL_UNRESOLVED);
+        let private = json!({"url": "http://10.0.0.5/mcp", "headers": {}});
+        let refusal = admit_url(ToolsetKind::Mcp, Some(&private))
+            .await
+            .unwrap_err();
+        assert_eq!(message(refusal).await, URL_REFUSED);
+        assert_eq!(
+            refusal_sentence("Host x resolved to no addresses"),
+            URL_UNRESOLVED
+        );
     }
 
     #[tokio::test]

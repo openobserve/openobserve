@@ -368,11 +368,11 @@ pub async fn read_committed_prefix(
     })
 }
 
-/// Chats whose newest turn (given with its start time) stored a delete awaiting confirmation.
+/// Chats whose newest turn asked to confirm a delete: the last call id and how many it asked.
 pub async fn pending_confirmations(
     org_id: &str,
     chats: &[(&ai_chat_sessions::Model, &str, i64)],
-) -> std::result::Result<HashMap<String, String>, ReadError> {
+) -> std::result::Result<HashMap<String, (String, usize)>, ReadError> {
     let newest: Vec<(&ai_chat_sessions::Model, &str, i64)> = chats
         .iter()
         .filter(|(c, ..)| c.last_committed_seq > NO_SEQ && c.last_event_at.is_some())
@@ -400,7 +400,7 @@ pub async fn pending_confirmations(
         quoted(newest.iter().map(|(_, turn, _)| *turn).collect()),
     );
     let rows = search_rows(org_id, sql, start, end).await?;
-    let mut pending = HashMap::new();
+    let mut pending: HashMap<String, (String, HashSet<String>)> = HashMap::new();
     for row in rows {
         let Some((chat, ..)) = newest
             .iter()
@@ -417,10 +417,21 @@ pub async fn pending_confirmations(
             Err(_) => Some(String::new()),
         };
         if let Some(call) = call {
-            pending.insert(row.session_id, call);
+            // One request is one call id; an unreadable one counts once per event.
+            let key = if call.is_empty() {
+                format!("#{}", row.seq)
+            } else {
+                call.clone()
+            };
+            let entry = pending.entry(row.session_id).or_default();
+            entry.0 = call;
+            entry.1.insert(key);
         }
     }
-    Ok(pending)
+    Ok(pending
+        .into_iter()
+        .map(|(session, (call, asked))| (session, (call, asked.len())))
+        .collect())
 }
 
 /// Rewrites committed rows with fresh timestamps (caller holds the lease); returns how many.

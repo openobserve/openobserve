@@ -76,6 +76,9 @@ const UPSTREAM_CANCEL_WAIT: std::time::Duration = std::time::Duration::from_secs
 /// How long a turn may keep settling after o2-ai accepted its abort.
 #[cfg(feature = "enterprise")]
 const CANCEL_GRACE: std::time::Duration = std::time::Duration::from_secs(15);
+// With o2-ai's health unknown, a turn waits this long at most for a replacement owner.
+#[cfg(feature = "enterprise")]
+const UNKNOWN_HEALTH_OWNER_WAIT: std::time::Duration = std::time::Duration::from_secs(10);
 
 /// The RCA agent's context contract (`RcaContext`, `is_reanalysis`); o2-ai routes on key presence.
 #[cfg(feature = "enterprise")]
@@ -1950,6 +1953,8 @@ pub async fn confirm_action(
                         &answer,
                     )
                     .await;
+                    // The chat index stops reporting the confirmation as pending.
+                    super::turn_marks::mark_answered(&org_id, &session_id, caller).await;
                     (StatusCode::OK, axum::Json(answer)).into_response()
                 } else {
                     log::error!(
@@ -2079,6 +2084,9 @@ async fn chat_turn(
             return not_enabled_error();
         }
         if let Err(refusal) = super::settings::refuse_if_off(org_id_str).await {
+            return refusal;
+        }
+        if let Err(refusal) = refuse_if_unreachable(org_id_str) {
             return refusal;
         }
 
@@ -2470,6 +2478,15 @@ async fn stream_turn(
                 .await;
             return refusal;
         }
+        if let Err(refusal) = refuse_if_unreachable(&org_id_str) {
+            audit
+                .report(
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    Some("O2 Assistant is known to be unreachable"),
+                )
+                .await;
+            return refusal;
+        }
         let model = Ai::model_override(&prompt_body.model).map(str::to_string);
         if !get_o2_config()
             .ai
@@ -2745,7 +2762,11 @@ async fn persisted_turn(turn: StreamTurn) -> Response {
     let toolset_use = super::toolsets::ToolsetUse::load(&org_id).await;
     let turn_mark = super::turn_marks::mark_turn(&org_id, &session_id, &user_id).await;
     let confirmations = super::turn_marks::ConfirmationWatch::new(&org_id, &session_id, &user_id);
-    let settings = PersistSettings::from_config();
+    let mut settings = PersistSettings::from_config();
+    settings.owner_wait = owner_wait_for(
+        super::capabilities::cached_health(&org_id),
+        settings.owner_wait,
+    );
     let store = std::sync::Arc::new(openobserve_core::ai_chat::StreamChatStore::new(
         settings.retention_days,
     ));
@@ -2785,6 +2806,37 @@ async fn persisted_turn(turn: StreamTurn) -> Response {
     });
     let (body, _metering) = meter_persisted_turn(frames, meter, stop);
     sse_response(Body::from_stream(body))
+}
+
+/// A turn is refused at once while the health cache knows o2-ai is unreachable; nothing is charged.
+#[cfg(feature = "enterprise")]
+fn refuse_if_unreachable(org_id: &str) -> Result<(), Response> {
+    admit_with_health(super::capabilities::cached_health(org_id))
+}
+
+/// See [`refuse_if_unreachable`]: only a known outage refuses; unknown and ok health admit.
+#[cfg(feature = "enterprise")]
+fn admit_with_health(health: super::capabilities::HealthStatus) -> Result<(), Response> {
+    if health == super::capabilities::HealthStatus::Unreachable {
+        return Err(AiErrorEnvelope::new(
+            AiErrorCode::AgentUnavailable,
+            "The AI assistant is unavailable right now; please retry",
+        )
+        .into_response());
+    }
+    Ok(())
+}
+
+/// The wait for a replacement o2-ai owner: configured while health is ok, short while unknown.
+#[cfg(feature = "enterprise")]
+fn owner_wait_for(
+    health: super::capabilities::HealthStatus,
+    configured: std::time::Duration,
+) -> std::time::Duration {
+    match health {
+        super::capabilities::HealthStatus::Ok => configured,
+        _ => configured.min(UNKNOWN_HEALTH_OWNER_WAIT),
+    }
 }
 
 /// The persisted turn task's end: it, not the browser's stream, ends the span and drops the mark.
@@ -4748,5 +4800,41 @@ mod tests {
         assert!(body.contains("on_end: Some(turn_end(span, turn_mark))"));
         let inspect = &body[body.find(".inspect(").unwrap()..];
         assert!(!inspect[..inspect.find("});").unwrap()].contains("turn_mark"));
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn an_unknown_health_waits_briefly_for_an_owner_and_a_good_one_as_configured() {
+        use super::super::capabilities::HealthStatus;
+
+        let configured = std::time::Duration::from_secs(45);
+        assert_eq!(owner_wait_for(HealthStatus::Ok, configured), configured);
+        assert_eq!(
+            owner_wait_for(HealthStatus::Unknown, configured),
+            UNKNOWN_HEALTH_OWNER_WAIT
+        );
+        assert_eq!(
+            owner_wait_for(HealthStatus::Unknown, std::time::Duration::from_secs(2)),
+            std::time::Duration::from_secs(2)
+        );
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn a_known_outage_refuses_the_turn_at_once_with_agent_unavailable() {
+        use super::super::capabilities::HealthStatus;
+
+        assert!(admit_with_health(HealthStatus::Ok).is_ok());
+        assert!(admit_with_health(HealthStatus::Unknown).is_ok());
+        let refusal = admit_with_health(HealthStatus::Unreachable).unwrap_err();
+        assert_eq!(refusal.status(), StatusCode::SERVICE_UNAVAILABLE);
+        let bytes = axum::body::to_bytes(refusal.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let json: Value = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(
+            (json["code"].as_str(), json["action"].as_str()),
+            (Some("agent_unavailable"), Some("retry"))
+        );
     }
 }

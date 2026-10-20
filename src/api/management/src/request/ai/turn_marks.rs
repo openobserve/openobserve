@@ -15,8 +15,10 @@
 
 //! Cluster-visible marks of a turn: whose turn runs a session, and what it asked to confirm.
 
+use std::collections::HashMap;
+
 use config::utils::time::now_micros;
-use infra::table::ai_turn_marks::{self, KIND_CONFIRMATION, KIND_TURN, NewMark};
+use infra::table::ai_turn_marks::{self, KIND_ANSWERED, KIND_CONFIRMATION, KIND_TURN, NewMark};
 use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
 use serde_json::Value;
 
@@ -24,6 +26,8 @@ const MICROS_PER_SEC: i64 = 1_000_000;
 const TURN_GRACE_SECS: i64 = 60;
 // A pending delete outlives its turn in o2-ai, so its confirmation may come this much later.
 const CONFIRMATION_TTL_SECS: i64 = 3600;
+// Outlives the 24 h a chat's newest turn may report a pending approval.
+const ANSWERED_TTL_SECS: i64 = 25 * 3600;
 const CONFIRMATION_REQUIRED: &str = "confirmation_required";
 
 /// The mark of one running turn; dropping it at the turn's end removes the mark.
@@ -116,6 +120,52 @@ pub(crate) async fn mark_turn(org_id: &str, session_id: &str, user_email: &str) 
             TurnMark::unwritten()
         }
     }
+}
+
+/// Notes that `user_email` answered the session's pending confirmation now; best effort.
+pub(crate) async fn mark_answered(org_id: &str, session_id: &str, user_email: &str) {
+    let now = now_micros();
+    let mark = NewMark {
+        org_id,
+        session_id,
+        user_email,
+        kind: KIND_ANSWERED,
+        value: None,
+        expires_at: now + ANSWERED_TTL_SECS * MICROS_PER_SEC,
+    };
+    if let Err(e) = ai_turn_marks::insert(&mark, now).await {
+        log::warn!("[org_id:{org_id}] answer to the confirmation of {session_id} not noted: {e}");
+    }
+}
+
+/// Confirmations `user_email` answered per session since its `since` time; 0 when unreadable.
+pub(crate) async fn answers_since(
+    org_id: &str,
+    user_email: &str,
+    sessions: &[(String, i64)],
+) -> HashMap<String, usize> {
+    let session_ids: Vec<String> = sessions.iter().map(|(id, _)| id.clone()).collect();
+    let created = ai_turn_marks::created_per_session(
+        org_id,
+        user_email,
+        KIND_ANSWERED,
+        &session_ids,
+        now_micros(),
+    )
+    .await
+    .unwrap_or_else(|e| {
+        log::warn!("[org_id:{org_id}] answered confirmations unreadable: {e}");
+        HashMap::new()
+    });
+    sessions
+        .iter()
+        .map(|(id, since)| {
+            let answers = created
+                .get(id)
+                .map_or(0, |times| times.iter().filter(|at| *at >= since).count());
+            (id.clone(), answers)
+        })
+        .collect()
 }
 
 /// Whether a turn of `user_email` runs `session_id` on any node.

@@ -15,6 +15,8 @@
 
 //! Service layer for `ai_turn_marks`: cluster-visible facts about a running assistant turn.
 
+use std::collections::HashMap;
+
 use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, Set};
 
 pub use super::entity::ai_turn_marks::Model;
@@ -28,6 +30,8 @@ use crate::{
 pub const KIND_TURN: &str = "turn";
 /// The turn asked `user_email` to confirm a call of the tool in `value`.
 pub const KIND_CONFIRMATION: &str = "confirmation";
+/// `user_email` answered the session's pending confirmation at `created_at`.
+pub const KIND_ANSWERED: &str = "answered";
 
 /// One mark to store; the id and time are filled in.
 #[derive(Debug, Clone, Copy)]
@@ -153,6 +157,56 @@ pub async fn delete_with<C: ConnectionTrait>(conn: &C, id: &str) -> Result<(), e
     Ok(())
 }
 
+/// The creation times of the unexpired marks of `kind` per listed session of `user_email`.
+pub async fn created_per_session(
+    org_id: &str,
+    user_email: &str,
+    kind: &str,
+    session_ids: &[String],
+    now: i64,
+) -> Result<HashMap<String, Vec<i64>>, errors::Error> {
+    created_per_session_with(
+        get_orm_client_ro().await,
+        (org_id, user_email),
+        kind,
+        session_ids,
+        now,
+    )
+    .await
+}
+
+pub async fn created_per_session_with<C: ConnectionTrait>(
+    conn: &C,
+    (org_id, user_email): (&str, &str),
+    kind: &str,
+    session_ids: &[String],
+    now: i64,
+) -> Result<HashMap<String, Vec<i64>>, errors::Error> {
+    if session_ids.is_empty() {
+        return Ok(HashMap::new());
+    }
+    let rows = Entity::find()
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::UserEmail.eq(user_email))
+        .filter(Column::Kind.eq(kind))
+        .filter(Column::SessionId.is_in(session_ids.iter().map(String::as_str)))
+        .filter(Column::ExpiresAt.gt(now))
+        .all(conn)
+        .await
+        .map_err(db_err)?;
+    let mut created: HashMap<String, Vec<i64>> = HashMap::new();
+    for row in rows {
+        created
+            .entry(row.session_id)
+            .or_default()
+            .push(row.created_at);
+    }
+    for times in created.values_mut() {
+        times.sort_unstable();
+    }
+    Ok(created)
+}
+
 /// Removes every expired mark, e.g. of a node that died mid-turn.
 pub async fn delete_expired(now: i64) -> Result<u64, errors::Error> {
     delete_expired_with(get_orm_client_rw().await, now).await
@@ -245,5 +299,33 @@ mod tests {
         assert!(!take("UpdateDashboard").await.unwrap());
         insert_with(&db, &mark(KIND_TURN, None), 1).await.unwrap();
         assert_eq!(delete_expired_with(&db, 100).await.unwrap(), 1);
+    }
+
+    #[tokio::test]
+    async fn every_answer_of_each_listed_session_is_read() {
+        let db = db().await;
+        for at in [5, 9] {
+            insert_with(&db, &mark(KIND_ANSWERED, None), at)
+                .await
+                .unwrap();
+        }
+        let other = NewMark {
+            session_id: "t",
+            ..mark(KIND_ANSWERED, None)
+        };
+        insert_with(&db, &other, 7).await.unwrap();
+        let sessions = ["s".to_string(), "t".to_string(), "u".to_string()];
+        let created = created_per_session_with(&db, ("o", "a@x"), KIND_ANSWERED, &sessions, 50)
+            .await
+            .unwrap();
+        assert_eq!(
+            created,
+            HashMap::from([("s".to_string(), vec![5, 9]), ("t".to_string(), vec![7])])
+        );
+        let someone_else =
+            created_per_session_with(&db, ("o", "m@x"), KIND_ANSWERED, &sessions, 50)
+                .await
+                .unwrap();
+        assert!(someone_else.is_empty());
     }
 }
