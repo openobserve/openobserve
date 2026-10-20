@@ -4,7 +4,8 @@
 export function isUnnamedIconOnly(el: Element): boolean {
   if (el.hasAttribute("aria-label") || el.hasAttribute("aria-labelledby")) return false;
   const clone = el.cloneNode(true) as Element;
-  clone.querySelectorAll(".sr-only, [aria-hidden='true']").forEach((n) => n.remove());
+  clone.querySelectorAll("[aria-hidden='true']").forEach((n) => n.remove());
+  if (clone.querySelector('img[alt]:not([alt=""]), [aria-label]')) return false;
   return !clone.textContent?.trim();
 }
 

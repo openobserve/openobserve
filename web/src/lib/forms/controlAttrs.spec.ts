@@ -1,12 +1,12 @@
 // Copyright 2026 OpenObserve Inc.
 
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
 import OSelect from "./Select/OSelect.vue";
 import OInput from "./Input/OInput.vue";
 import OSwitch from "./Switch/OSwitch.vue";
 import OSearchInput from "./SearchInput/OSearchInput.vue";
-import { splitControlAttrs } from "./controlAttrs";
+import { splitControlAttrs, warnIfUnlabelled } from "./controlAttrs";
 
 describe("splitControlAttrs", () => {
   it("routes aria attrs to the control and the rest to the wrapper", () => {
@@ -58,5 +58,36 @@ describe("aria attribute forwarding", () => {
   it("OSearchInput puts aria-label on the input", () => {
     wrapper = mount(OSearchInput, { attrs: { "aria-label": "Search streams" } });
     expect(wrapper.find("input").attributes("aria-label")).toBe("Search streams");
+  });
+});
+
+describe("warnIfUnlabelled", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
+  it("warns in development when a control has no name", () => {
+    vi.stubEnv("MODE", "development");
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    warnIfUnlabelled("OSelect", false);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("OSelect"));
+  });
+
+  it("stays quiet for a named control and under test", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.stubEnv("MODE", "development");
+    warnIfUnlabelled("OSelect", true);
+    vi.stubEnv("MODE", "test");
+    warnIfUnlabelled("OSelect", false);
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it("OSelect warns when mounted without a label or aria name", () => {
+    vi.stubEnv("MODE", "development");
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    mount(OSelect).unmount();
+    mount(OSelect, { props: { label: "Country" } }).unmount();
+    expect(warn).toHaveBeenCalledTimes(1);
   });
 });

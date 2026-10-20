@@ -78,6 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :ripple="false"
           @click="toggleAIChat"
           data-test="menu-link-ai-item"
+          :aria-label="t('menu.aiAssistant')"
           variant="ghost"
           size="icon-toolbar"
           class="group hover:shadow-ai-accent/35 transition-[background,box-shadow] duration-300 ease-[ease] [background:var(--color-gradient-ai-subtle)]! hover:shadow-md hover:[background:var(--color-gradient-ai)]!"

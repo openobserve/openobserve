@@ -65,12 +65,16 @@ const props = defineProps<{
 
 const { t } = useI18nTyped();
 const selectLabel = computed(() => {
-  const named = props.row
-    .getVisibleCells()
-    .map((c) => c.getValue())
-    .find((v) => (typeof v === "string" && v.trim()) || typeof v === "number");
+  let named: unknown;
+  for (const cell of props.row.getVisibleCells()) {
+    const value = cell.getValue();
+    if ((typeof value === "string" && value.trim()) || typeof value === "number") {
+      named = value;
+      break;
+    }
+  }
   return t("components.table.selectRow", {
-    name: raw(String(named ?? props.row.index + 1)),
+    name: raw(String(named ?? props.row.index + 1).slice(0, 80)),
   });
 });
 

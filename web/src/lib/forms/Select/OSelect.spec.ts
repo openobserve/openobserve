@@ -402,6 +402,33 @@ describe("OSelect", () => {
     });
   });
 
+  describe("accessible name", () => {
+    const options = [{ label: "Option A", value: "a" }];
+
+    it("points the popover trigger at the outside label", () => {
+      wrapper = mount(OSelect, { props: { label: "Country", options } });
+      const label = wrapper.find("label");
+      const trigger = wrapper.find('button[role="combobox"]');
+      expect(label.attributes("id")).toBeTruthy();
+      expect(trigger.attributes("aria-labelledby")).toBe(label.attributes("id"));
+    });
+
+    it("lets an explicit aria-label stand instead of the label", () => {
+      wrapper = mount(OSelect, {
+        props: { label: "Country", options },
+        attrs: { "aria-label": "Pick a country" },
+      });
+      const trigger = wrapper.find('button[role="combobox"]');
+      expect(trigger.attributes("aria-label")).toBe("Pick a country");
+      expect(trigger.attributes("aria-labelledby")).toBeUndefined();
+    });
+
+    it("adds no labelledby without an outside label", () => {
+      wrapper = mount(OSelect, { props: { options } });
+      expect(wrapper.find('button[role="combobox"]').attributes("aria-labelledby")).toBeUndefined();
+    });
+  });
+
   describe("cut-off text", () => {
     const OPTIONS = [
       { label: "payment-service-production-eu-west-1", value: "a" },

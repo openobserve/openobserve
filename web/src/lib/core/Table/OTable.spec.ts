@@ -331,16 +331,21 @@ describe("OTable", () => {
         },
       });
 
-      for (const id of ["first", "prev", "next", "last"]) {
-        const label = wrapper
-          .find(`[data-test="o2-table-${id}-page-btn"]`)
-          .attributes("aria-label");
-        expect(label).toBeTruthy();
+      const names = {
+        first: "First page",
+        prev: "Previous page",
+        next: "Next page",
+        last: "Last page",
+      };
+      for (const [id, name] of Object.entries(names)) {
+        expect(wrapper.find(`[data-test="o2-table-${id}-page-btn"]`).attributes("aria-label")).toBe(
+          name,
+        );
       }
       expect(wrapper.find("nav[aria-label]").exists()).toBe(true);
       expect(
         wrapper.find('[data-test="o2-table-page-size-select-trigger"]').attributes("aria-label"),
-      ).toBeTruthy();
+      ).toBe("Records per page");
     });
 
     it("should reflect a pageSize prop change in the footer", async () => {
@@ -918,10 +923,8 @@ describe("OTable", () => {
       });
       const all = wrapper.find('[data-test="o2-table-select-all"] [role="checkbox"]');
       expect(all.attributes("aria-label")).toBe("Select all rows");
-      const row = wrapper.find('[data-test="o2-table-select-0"]');
-      expect(
-        row.attributes("aria-label") ?? row.find("[aria-label]").attributes("aria-label"),
-      ).toMatch(/^Select row /);
+      const row = wrapper.find('[data-test="o2-table-select-0"] [role="checkbox"]');
+      expect(row.attributes("aria-label")).toMatch(/^Select row /);
     });
 
     it("does not render checkbox column when selection is none", () => {

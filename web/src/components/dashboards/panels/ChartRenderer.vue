@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="chart-renderer"
     ref="chartRef"
     :id="chartId"
-    role="img"
+    :role="label ? 'img' : undefined"
     :aria-label="label || undefined"
     class="chart-container h-full w-full"
     @mouseover="
@@ -83,7 +83,9 @@ import {
   onActivated,
   onDeactivated,
   inject,
+  type PropType,
 } from "vue";
+import type { I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import useBreakpoint from "@/composables/useBreakpoint";
 import { useTheme } from "@/composables/useTheme";
@@ -223,8 +225,8 @@ export default defineComponent({
     },
     /** Accessible name of the chart, normally the panel title. */
     label: {
-      type: String,
-      default: "",
+      type: String as unknown as PropType<I18nText | undefined>,
+      default: undefined,
     },
     /** Name the line under a right-click that hit no symbol, so the alert can tell which query was meant. */
     findLineOnContextMenu: {
@@ -382,7 +384,10 @@ export default defineComponent({
 
     const chartOptions = (options: Record<string, unknown>) =>
       withChartFont(
-        withLineStrokeEvents({ aria: { enabled: true }, ...options }, props.findLineOnContextMenu),
+        withLineStrokeEvents(
+          { aria: { enabled: !props.label }, ...options },
+          props.findLineOnContextMenu,
+        ),
       );
 
     // The data point nearest the cursor along x, for a right-click on a line's stroke between points.

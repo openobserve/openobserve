@@ -153,6 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OTabs>
         </div>
         <OButton
+          :aria-label="t('dashboard.newTab')"
           variant="ghost"
           size="icon"
           @click.stop="addTab"
@@ -188,6 +189,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="logs-search-bar-show-query-toggle-btn"
           v-model="dashboardPanelData.layout.vrlFunctionToggle"
           :title="t('dashboard.toggleFunctionEditor')"
+          :aria-label="t('dashboard.toggleFunctionEditor')"
           @update:model-value="onFunctionToggle"
           :disabled="promqlMode"
           size="lg"

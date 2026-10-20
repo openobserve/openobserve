@@ -102,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OFormInput>
                 </div>
                 <OSelect
-                  :aria-label="t('alerts.summary.pendingPeriod')"
+                  :aria-label="t('common.timeUnit')"
                   class="max-w-25 min-w-20"
                   :model-value="pendingPeriodUnit"
                   :options="pendingPeriodUnitOptions"
@@ -259,7 +259,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OFormInput>
                 </div>
                 <OSelect
-                  :aria-label="t('alerts.summary.pendingPeriod')"
+                  :aria-label="t('common.timeUnit')"
                   class="max-w-25 min-w-20"
                   :model-value="pendingPeriodUnit"
                   :options="pendingPeriodUnitOptions"

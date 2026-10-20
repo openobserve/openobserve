@@ -3,7 +3,7 @@
 
 import type { InputProps, InputEmits, InputSlots } from "./OInput.types";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import { splitControlAttrs, warnIfUnlabelled } from "@/lib/forms/controlAttrs";
+import { mergeDescribedBy, splitControlAttrs, warnIfUnlabelled } from "@/lib/forms/controlAttrs";
 import { useI18nTyped } from "@/types/i18n";
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, useAttrs, useId, watch } from "vue";
 
@@ -26,7 +26,8 @@ const controlAttrs = computed(() => split.value.controlAttrs);
 onMounted(() =>
   warnIfUnlabelled(
     "OInput",
-    Boolean(props.label || $attrs["aria-label"] || $attrs["aria-labelledby"]),
+    Boolean(props.label || props.placeholder || $attrs["aria-label"] || $attrs["aria-labelledby"]),
+    inputId.value,
   ),
 );
 
@@ -338,13 +339,13 @@ const wrapperClasses = computed(() => [
         :readonly="readonly"
         :aria-required="required || undefined"
         :aria-invalid="hasError || undefined"
-        :aria-describedby="describedBy"
         :autofocus="autofocus"
         :maxlength="maxlength"
         :rows="autogrow ? 1 : rows"
         :autocomplete="autocomplete"
         :tabindex="inputTabindex"
         v-bind="controlAttrs"
+        :aria-describedby="mergeDescribedBy(describedBy, controlAttrs)"
         :style="autogrow ? { overflow: 'hidden' } : undefined"
         :class="[
           'min-w-0 flex-1 rounded-[inherit] bg-transparent outline-none',
@@ -388,8 +389,8 @@ const wrapperClasses = computed(() => [
         :autocomplete="autocomplete"
         :tabindex="inputTabindex"
         :aria-invalid="hasError || undefined"
-        :aria-describedby="describedBy"
         v-bind="controlAttrs"
+        :aria-describedby="mergeDescribedBy(describedBy, controlAttrs)"
         :class="[
           'min-w-0 flex-1 rounded-[inherit] bg-transparent outline-none',
           'text-input-text placeholder:text-input-placeholder',

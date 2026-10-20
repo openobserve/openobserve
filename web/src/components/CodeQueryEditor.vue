@@ -250,19 +250,6 @@ const defineEditorThemes = (monaco: any): void => {
   });
 };
 
-// Tab is bound to indentation and suggestion accept, so Escape is the keyboard exit.
-const focusControlAfter = (container: HTMLElement) => {
-  const tabbables = Array.from(
-    document.querySelectorAll<HTMLElement>(
-      'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
-    ),
-  ).filter((el) => !container.contains(el) && el.offsetParent !== null);
-  const next = tabbables.find(
-    (el) => container.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING,
-  );
-  (next ?? (document.activeElement as HTMLElement | null))?.focus();
-};
-
 // Per editor: the latest value request, and the lookup that already refilled a still-loading menu.
 const valueRefills = new WeakMap<object, { seq: number; refilled: string | null }>();
 
@@ -377,6 +364,7 @@ import useNotifications from "@/composables/useNotifications";
 import { getImageURL } from "@/utils/zincutils";
 import { isAuthError } from "@/utils/authErrors";
 import { getFontMono } from "@/utils/fonts";
+import { escapeEditor } from "@/utils/focusNextControl";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -980,11 +968,11 @@ export default defineComponent({
       valueQuoteKey = editorObj.createContextKey(VALUE_QUOTE_CONTEXT_KEY, false);
       editorObj.addAction?.({
         id: "o2.editor.escapeToNextControl",
-        label: t("common.queryEditorAriaLabel"),
+        label: t("common.queryEditorEscapeAction"),
         keybindings: [monaco.KeyCode.Escape],
         precondition:
-          "textInputFocus && !suggestWidgetVisible && !findWidgetVisible && !parameterHintsVisible && !editorHasSelection",
-        run: () => focusControlAfter(editorElement as HTMLElement),
+          "textInputFocus && !suggestWidgetVisible && !findWidgetVisible && !parameterHintsVisible && !editorHasSelection && !editorHasMultipleSelections && !inSnippetMode && !inlineSuggestionVisible && !renameInputVisible",
+        run: () => escapeEditor(editorElement as HTMLElement),
       });
       editorObj.addAction?.({
         id: "o2.suggest.closeValueQuote",

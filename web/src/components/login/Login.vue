@@ -183,7 +183,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <p
               v-if="loginError"
               role="alert"
-              class="text-error text-sm"
+              class="text-input-error-text text-sm"
               data-test="login-error-message"
             >
               {{ loginError }}

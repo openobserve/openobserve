@@ -13,8 +13,15 @@ export function splitControlAttrs(attrs: Record<string, unknown>) {
   return { controlAttrs, wrapperAttrs };
 }
 
+/** Joins the control's own description id with one the caller passed, so neither replaces the other. */
+export function mergeDescribedBy(own: string | undefined, controlAttrs: Record<string, unknown>) {
+  const joined = [own, controlAttrs["aria-describedby"]].filter(Boolean).join(" ");
+  return joined || undefined;
+}
+
 /** Dev-only nudge when a form control has no accessible name. */
-export function warnIfUnlabelled(component: string, named: boolean) {
+export function warnIfUnlabelled(component: string, named: boolean, id?: string) {
   if (named || !import.meta.env.DEV || import.meta.env.MODE === "test") return;
+  if (id && document.querySelector(`label[for="${CSS.escape(id)}"]`)) return;
   console.warn(`[${component}] rendered without label, aria-label or aria-labelledby`);
 }

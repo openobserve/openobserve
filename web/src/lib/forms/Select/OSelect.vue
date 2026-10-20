@@ -52,7 +52,7 @@ import {
   watchEffect,
 } from "vue";
 import useBreakpoint from "@/composables/useBreakpoint";
-import { splitControlAttrs, warnIfUnlabelled } from "@/lib/forms/controlAttrs";
+import { mergeDescribedBy, splitControlAttrs, warnIfUnlabelled } from "@/lib/forms/controlAttrs";
 import {
   O_DROPDOWN_NESTED_KEY,
   setActiveOverlay,
@@ -157,6 +157,16 @@ defineSlots<SelectSlots>();
 const _fallbackId = useId();
 const inputId = computed(() => props.id ?? _fallbackId);
 const errorId = computed(() => `${inputId.value}-error`);
+const labelId = computed(() => `${inputId.value}-label`);
+// The popover trigger keeps Reka's own id, so `<label for>` cannot reach it.
+const outsideLabelId = computed(() =>
+  props.label &&
+  props.labelPosition !== "inside" &&
+  !$attrs["aria-label"] &&
+  !$attrs["aria-labelledby"]
+    ? labelId.value
+    : undefined,
+);
 
 // Dev-time warning: slot-based options with multiple/searchable require listbox
 // mode, but listboxModeEnabled requires options prop. Guide the developer early.
@@ -1219,6 +1229,7 @@ const fieldWidthClass = computed(() => {
     <!-- Label -->
     <label
       v-if="(label || $slots.tooltip) && labelPosition !== 'inside'"
+      :id="labelId"
       :for="inputId"
       :class="[
         'o-input-label text-compact flex items-center gap-1 leading-tight',
@@ -1251,9 +1262,10 @@ const fieldWidthClass = computed(() => {
             role="combobox"
             :aria-expanded="popoverOpen"
             :aria-invalid="hasError || undefined"
-            :aria-describedby="errorDescribedBy"
             :aria-label="insideLabelName"
+            :aria-labelledby="outsideLabelId"
             v-bind="controlAttrs"
+            :aria-describedby="mergeDescribedBy(errorDescribedBy, controlAttrs)"
             @keydown="handleTriggerKeydown"
             :data-test="parentDataTest ? `${parentDataTest}-trigger` : undefined"
             :data-test-selected-value="
@@ -1482,13 +1494,7 @@ const fieldWidthClass = computed(() => {
                   @keydown="handleDropdownKeydown"
                 />
 
-                <!--
-                Select-all master row. Indeterminate (dash) when only some
-                options are checked, full check when all are. Toggles the
-                whole selection. Rendered as a plain button so it sits
-                outside the listbox's keyboard navigation while remaining
-                focusable.
-              -->
+                <!-- Select-all row: outside the listbox keyboard navigation but still focusable. -->
                 <div
                   v-if="selectAll && multiple && selectableOptions.length > 0"
                   role="checkbox"
@@ -1902,9 +1908,9 @@ const fieldWidthClass = computed(() => {
           :id="inputId"
           :tabindex="inputTabindex"
           :aria-invalid="hasError || undefined"
-          :aria-describedby="errorDescribedBy"
           :aria-label="insideLabelName"
           v-bind="controlAttrs"
+          :aria-describedby="mergeDescribedBy(errorDescribedBy, controlAttrs)"
           :data-test="parentDataTest ? `${parentDataTest}-trigger` : undefined"
           :class="
             isInlineAppearance

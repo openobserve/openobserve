@@ -27,6 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-if="position === 'top' && pageTitle" class="flex items-center font-bold">
       <OButton
         v-if="collapsibleIcon === 'show' && searchCollapseImage == 'collapse_sidebar_icon'"
+        :aria-label="t('common.collapse')"
         variant="ghost"
         size="icon"
         class="me-2"
@@ -41,6 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OButton>
       <OButton
         v-if="collapsibleIcon === 'show' && searchCollapseImage == 'expand_sidebar_icon'"
+        :aria-label="t('common.expand')"
         variant="ghost"
         size="icon"
         class="me-2"
