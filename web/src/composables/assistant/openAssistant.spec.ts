@@ -288,12 +288,48 @@ describe("intent × thread", () => {
     expect(page).toMatchObject({ container: "sidebar", sid: sidebar });
   });
 
+  it("a send door staged into a chat in use keeps that chat's title; a new thread takes the door's (F9)", async () => {
+    const { open, store } = setup();
+    const { sid } = ok(await open(explain()));
+    await store.send(sid);
+    const before = store.state.sessions[sid].title;
+    const titled = (thread: "current" | "new") =>
+      explain({
+        intent: "stage",
+        thread,
+        payload: { chips: [chip("d1")], text: "Fix this", title: raw("Database · orders-db") },
+      });
+    const staged = ok(await open(titled("current")));
+    expect(staged.sid).toBe(sid);
+    expect(store.state.sessions[sid].title).toEqual(before);
+    const fresh = ok(await open(titled("new")));
+    expect(fresh.sid).not.toBe(sid);
+    expect(String(store.state.sessions[fresh.sid].title)).toBe("Database · orders-db");
+  });
+
   it("send + auto with a stale chat starts a new one", async () => {
     const { open, clock, store } = setup();
     const { sid } = ok(await open(explain()));
     await store.send(sid);
     clock.now += THREAD_APPEND_WINDOW_MS + 1;
     expect(ok(await open(explain({ thread: "auto" }))).sid).not.toBe(sid);
+  });
+});
+
+describe("add to chat while hidden (WP-07 U11)", () => {
+  it("stages into the current chat without opening a container", async () => {
+    const { store, open } = setup();
+    const result = ok(await open(addToChat()));
+    expect(result).toMatchObject({ staged: 1, sent: false });
+    expect(store.state.shell.placement.kind).toBe("hidden");
+    expect(store.state.shell.activeSid).toBe(result.sid);
+    expect(store.state.sessions[result.sid].composer.chips).toHaveLength(1);
+  });
+
+  it("still opens for a send door", async () => {
+    const { store, open } = setup();
+    ok(await open(explain()));
+    expect(store.state.shell.placement.kind).not.toBe("hidden");
   });
 });
 

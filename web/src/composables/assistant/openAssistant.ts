@@ -168,9 +168,16 @@ function runDoor(env: OpenAssistantEnv, args: OpenAssistantCall): OpenAssistantR
   const plan = planDoor(env, args);
   trackAssistant("ai_entry_clicked", entryProps(args, plan, gate));
   const container = containerOf(plan.target, env.lgUp()) ?? "sidebar";
+  // A door names only a thread it starts; staging into a chat already in use keeps that chat's title.
+  const fresh = !plan.session || isBlank(plan.session);
   const sid = plan.session?.sid ?? createSession(store, args, container);
-  const staged = stagePayload(store, sid, args, plan);
+  const staged = stagePayload(store, sid, args, plan, fresh);
   const wasVisible = store.state.shell.placement.kind !== "hidden";
+  // Add to chat is non-destructive: it never opens a hidden container over the page; the door offers Open.
+  if (!wasVisible && args.intent === "stage" && args.entryVerb === "add_to_chat") {
+    store.setActive(sid);
+    return { ok: true, sid, container, staged, sent: false, queued: false };
+  }
   // A send into a visible container leaves focus on the source page (`95` §4).
   const focus = plan.sends && wasVisible ? "none" : "composer";
   store.open(plan.target, { sid, focus, invoker: args.invoker, forcePinned: plan.forcePinned });
@@ -309,6 +316,7 @@ function stagePayload(
   sid: Sid,
   args: OpenAssistantCall,
   plan: DoorPlan,
+  fresh: boolean,
 ): number {
   const payload = args.payload;
   if (!payload) return 0;
@@ -321,7 +329,7 @@ function stagePayload(
     text: payload.text,
     mode: empty ? "replace" : "append",
   });
-  if (payload.title) store.setTitle(sid, payload.title, "object");
+  if (payload.title && fresh) store.setTitle(sid, payload.title, "object");
   const staged = store.state.sessions[sid].composer.chips.length - before;
   // A repeated prompt the store skipped adds nothing, so the helper line would claim a change that did not happen.
   const changed = staged > 0 || store.state.sessions[sid].composer.text !== textBefore;

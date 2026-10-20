@@ -22,6 +22,7 @@ export {
 export { assistantStore } from "./runtime";
 export { useAssistantCapability } from "./useAssistantCapability";
 export { openAssistant, type OpenAssistantCall } from "./openAssistant";
+export { useDeepLinkDoor } from "./useDeepLinkDoor";
 export { isAssistantV2 } from "./flags";
 export { useAssistantName } from "./useAssistantName";
 export { useAssistantClient } from "./useAssistantClient";

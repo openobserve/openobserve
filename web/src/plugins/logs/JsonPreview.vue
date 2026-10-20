@@ -144,8 +144,15 @@
               {{ crossLink.name }}
             </ODropdownItem>
           </template>
+          <template v-if="assistantV2">
+            <AiEntryButton v-bind="fieldDoor(key, value[key], 'explain')" appearance="menu-item" />
+            <AiEntryButton
+              v-bind="fieldDoor(key, value[key], 'add_to_chat')"
+              appearance="menu-item"
+            />
+          </template>
           <ODropdownItem
-            v-if="store.state.zoConfig.ai_enabled"
+            v-else-if="store.state.zoConfig.ai_enabled"
             data-test="send-to-ai-chat-btn"
             @select.stop="sendToAiChat(JSON.stringify({ [key]: value[key] }))"
           >
@@ -263,7 +270,10 @@ import { useRouter } from "vue-router";
 import AppTabs from "@/components/common/AppTabs.vue";
 import searchService from "@/services/search";
 import { generateTraceContext } from "@/utils/zincutils";
-import { defineAsyncComponent } from "vue";
+import { defineAsyncComponent, type PropType } from "vue";
+import { isAssistantV2 } from "@/composables/assistant/flags";
+import { useLoadedOrg } from "@/utils/assistant/doorBinding";
+import { logFieldBuild, logsDoorBase, rowKeyOf, type LogsDoorBase } from "@/plugins/logs/logsDoors";
 import config from "@/aws-exports";
 import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 import { checkFeatureAccess, buildFeatureGateContext } from "@/utils/enterpriseFeatures";
@@ -291,6 +301,11 @@ import { isFilterableLogField, STREAM_NAME_FIELD } from "@/utils/logs/streamName
 export default {
   name: "JsonPreview",
   props: {
+    /** The org the host loaded this row under; its doors carry it so a stale row is refused. */
+    boundOrg: {
+      type: String,
+      default: undefined,
+    },
     value: {
       type: Object,
       required: true,
@@ -338,8 +353,16 @@ export default {
       type: Boolean,
       default: false,
     },
+    /** The page a field door describes; defaults to the Logs search and this row. */
+    doorContext: {
+      type: Function as PropType<() => LogsDoorBase>,
+      default: undefined,
+    },
   },
   components: {
+    AiEntryButton: defineAsyncComponent(
+      () => import("@/components/ai-assistant/entry/AiEntryButton.vue"),
+    ),
     NotEqualIcon,
     EqualIcon,
     AppTabs,
@@ -777,6 +800,37 @@ export default {
       return t("common.addFieldToTable");
     };
 
+    const assistantV2 = isAssistantV2();
+    // The org the door's object was loaded under, so a door left on screen after an org switch is refused.
+    const loadedOrg = assistantV2
+      ? useLoadedOrg(
+          () => props.value,
+          () => store.state.selectedOrganization?.identifier ?? "",
+        )
+      : null;
+    const fieldDoorBase = (): LogsDoorBase => {
+      if (props.doorContext) return props.doorContext();
+      const base = logsDoorBase(searchObj, store.state, props.value);
+      return props.streamName ? { ...base, stream: props.streamName } : base;
+    };
+    // The drawer stays open on Add: nothing here emits closeTable.
+    const fieldDoor = (key: string, fieldValue: unknown, verb: "explain" | "add_to_chat") => ({
+      verb,
+      entryKind: "object_verb" as const,
+      boundOrg: props.boundOrg ?? loadedOrg?.value,
+      objectKind: "log_field" as const,
+      label: t(verb === "explain" ? "assistant.entry.explainField" : "assistant.entry.addField"),
+      tooltip: t(
+        verb === "explain" ? "assistant.entry.tooltip.explainField" : "assistant.entry.tooltip.add",
+      ),
+      dataTest:
+        verb === "explain"
+          ? ("ai-entry-log-field-explain" as const)
+          : ("ai-entry-log-field-add" as const),
+      build: logFieldBuild(fieldDoorBase, key, fieldValue, props.value),
+      objectKey: `${rowKeyOf(props.value)}:${key}`,
+    });
+
     const sendToAiChat = (value: string, append: boolean = true) => {
       if (!aiAssistantAccess.value.allowed) {
         openUpgradeDialog();
@@ -939,6 +993,8 @@ export default {
       getOriginalData,
       getTracesStreams,
       addOrRemoveLabel,
+      assistantV2,
+      fieldDoor,
       sendToAiChat,
       getBtnLogo,
       config,

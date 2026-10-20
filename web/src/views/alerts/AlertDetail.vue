@@ -231,6 +231,7 @@
           <OTabPanel v-if="isMultiAlert" name="groups" stretch>
             <AlertGroupsTable
               :groups="groupData?.list || []"
+              :alert="alert ?? undefined"
               :loading="loadingGroups"
               @refresh="fetchGroups"
               @show-history="openGroupHistory"

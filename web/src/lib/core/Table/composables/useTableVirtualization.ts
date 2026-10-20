@@ -14,7 +14,8 @@ export interface VirtualizationOptions {
    */
   scrollEl?: MaybeRefOrGetter<HTMLElement | null>;
   scrollMargin?: number;
-  rowHeight?: number;
+  /** A getter, so a table whose rows grow on touch re-estimates them. */
+  rowHeight?: MaybeRefOrGetter<number>;
   /** Custom height estimator for expanded rows */
   expandedRowHeights?: Ref<Record<number, number>>;
   overscan?: number;
@@ -74,6 +75,7 @@ export function useTableVirtualization(options: VirtualizationOptions) {
     // Resolve inside the computed body so it is tracked: when the element flips
     // from null to real after mount, the virtualizer rebinds its scroll listener.
     const resolvedScrollEl = (toValue(scrollEl) as HTMLElement | null) ?? parentRef.value;
+    const estimate = toValue(rowHeight);
     return {
       count: toValue(totalCount) ?? rows.value.length,
       getScrollElement: () => resolvedScrollEl,
@@ -84,7 +86,7 @@ export function useTableVirtualization(options: VirtualizationOptions) {
         if ((row?.original as any)?.isExpandedRow) {
           return expandedRowHeights?.value?.[index] ?? 300;
         }
-        return rowHeight;
+        return estimate;
       },
       overscan,
       // Reads the element's `data-index` and returns its measured height for
@@ -103,7 +105,7 @@ export function useTableVirtualization(options: VirtualizationOptions) {
                 }
                 return height;
               }
-              return rowHeight;
+              return estimate;
             }
           : undefined,
     };

@@ -50,6 +50,7 @@ const SAMPLES: { [N in AiEventName]: AiEventProps[N] } = {
     host: "logs",
     language: "sql",
     text_len_bucket: "1_20",
+    error: false,
   },
   ai_gate_blocked: { reason: "no_permission", cta: "ask_admin" },
   ai_container_opened: {
@@ -180,6 +181,7 @@ const CATALOGUE: Record<AiEventName, string[]> = {
     "host",
     "language",
     "text_len_bucket",
+    "error",
   ],
   ai_gate_blocked: ["reason", "cta"],
   ai_container_opened: ["from", "placement_mode", "turn_running", "latency_ms"],

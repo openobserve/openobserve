@@ -52,6 +52,30 @@ test.describe("assistant shell", () => {
     ).toEqual(expect.arrayContaining(["open"]));
   });
 
+  test("SHELL-02 row-door variant: Escape hands focus back to the cell whose toolbar holds the door", async ({
+    page,
+  }) => {
+    await page.goto(`${logsUrl()}&period=1d`, { waitUntil: "domcontentloaded" });
+    await expect(assistant.headerButton).toHaveAttribute("data-state", "idle", { timeout: 30_000 });
+    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click().catch(() => undefined);
+    const cell = page.locator('[data-test="logs-search-result-logs-table"] td[data-o2-focus-cell]').first();
+    await expect(cell).toBeVisible({ timeout: 30_000 });
+    await cell.focus();
+    const toolbar = page.locator(".o2-table-cell-hover-actions");
+    await expect(toolbar).toBeVisible();
+    for (let i = 0; i < 12; i += 1) {
+      await page.keyboard.press("Tab");
+      if ((await page.evaluate(() => document.activeElement?.getAttribute("data-test"))) === "ai-entry-log-row-explain") break;
+    }
+    await page.keyboard.press("Enter");
+    await expect(assistant.sidebar).toBeVisible();
+    await assistant.composer().focus();
+    await page.keyboard.press("Escape");
+    await expect(assistant.sidebar).toBeHidden();
+    await expect(cell).toBeFocused();
+    await expect(toolbar.locator('[data-test="ai-entry-log-row-explain"]')).toBeVisible();
+  });
+
   test("SHELL-02 Escape closes the menu first, then the container, and focus returns to the button", async ({
     page,
   }) => {

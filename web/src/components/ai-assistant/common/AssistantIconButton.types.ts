@@ -32,7 +32,16 @@ export interface AssistantIconButtonProps {
   disabled?: boolean;
   /** Shown as the tooltip and `aria-describedby`; keeps the disabled button focusable so the reason can be read. */
   disabledReason?: I18nText;
+  /** A small state glyph at the icon's corner (a locked door keeps its verb glyph). */
+  badge?: IconName;
+  /** Touch has no hover: a tooltip opened by a tap would stay over the page. */
+  noTooltip?: boolean;
   dataTest: string;
+}
+
+export interface AssistantIconButtonSlots {
+  /** Tooltip content that says more than the name, such as what a door sends; the name stays `label`. */
+  tooltip?: () => unknown;
 }
 
 export interface AssistantIconButtonEmits {

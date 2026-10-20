@@ -249,6 +249,26 @@ describe("access without B-06 (00 §9)", () => {
 });
 
 describe("B-06 capabilities", () => {
+  it("reads a server gate of off_for_org as that gate, so the copy is the off-for-org one (D5)", async () => {
+    const { handle } = setup({ b06: { can_chat: true, gate: "off_for_org" } });
+    await flushPromises();
+    expect(handle.gate.value).toBe("off_for_org");
+    expect(cap(handle).reasonCode).toBe("off_for_org");
+  });
+
+  it("drops a late answer for the previous org, so its off_for_org never sticks to the new one (V11)", async () => {
+    const { handle, deps } = setup({ b06: { can_chat: true } });
+    await flushPromises();
+    const previousOrg = vi.mocked(deps.watchCapabilities).mock.calls.at(-1)![1];
+    handle.setIdentity({ userOrgKey: "k2", org: "org2" });
+    previousOrg(
+      { can_chat: true, gate: "off_for_org" } as AssistantCapabilitiesResponse,
+      Date.now(),
+    );
+    await flushPromises();
+    expect(handle.gate.value).not.toBe("off_for_org");
+  });
+
   it("overrides the heuristic and the cached denial", async () => {
     const admin = setup({ b06: { can_chat: false, can_share: false } });
     await flushPromises();
