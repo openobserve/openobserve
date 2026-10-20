@@ -336,6 +336,7 @@ impl Search for Searcher {
             days_since_last_report: 0,
             last_usage_response: "".into(),
             ingestion_history: Vec::new(),
+            license_status_json: String::new(),
         };
 
         #[cfg(feature = "enterprise")]
@@ -363,6 +364,7 @@ impl Search for Searcher {
                 last_usage_response: o2_enterprise::enterprise::license::get_usage_resp_string()
                     .await,
                 ingestion_history,
+                license_status_json: String::new(),
             }
         };
         Ok(Response::new(res))
@@ -512,6 +514,18 @@ impl Search for Searcher {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(not(feature = "enterprise"))]
+    #[tokio::test]
+    async fn test_license_usage_info_sends_no_status_json_in_oss() {
+        let res = Searcher::new()
+            .get_license_usage_info(Request::new(GetLicenseUsageRequest {}))
+            .await
+            .unwrap()
+            .into_inner();
+        assert!(res.search_allowed);
+        assert!(res.license_status_json.is_empty());
+    }
 
     #[cfg(feature = "enterprise")]
     async fn cancel_in(searcher: &Searcher, trace_id: &str, org_id: &str) -> bool {
