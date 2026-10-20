@@ -1,0 +1,9 @@
+{
+  "action": "new",
+  "target_spec": "tests/ui-testing/playwright-tests/Management/model-pricing-attribute-rules.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/Management/model-pricing.spec.js"
+  ],
+  "needs_registration": true,
+  "rationale": "The existing Management spec model-pricing.spec.js covers list/tabs/search, create+form validation, edit/cancel/delete, duplicate/clone, bulk, toggle, test-match (name-only, no attribute rows), import, multi-tier/template/examples, pricing drawer, empty state, and cost verification — but it has zero coverage of the new 'attribute rules' restriction type (per-tier key/operator/values rows, rule validation, values-vs-threshold swap, ambiguous/unreachable warnings, and test-match attribute matching). Attribute rules are a distinct, self-contained feature area with its own selector set, so a dedicated spec is warranted rather than bloating the already-1070-line model-pricing.spec.js. The run-context spec_path already names this new file, and the triage confirms the attribute-rules spec joins the Management playwright group. Registration note: model-pricing.spec.js is NOT in the OSS tests/ui-testing/ci-matrix/ci_matrix.json Management shard — it lives in the enterprise overlay ci_matrix.ent.json ('append' -> Management) in the o2-enterprise sibling repo. The Engineer must register model-pricing-attribute-rules.spec.js in that same enterprise Management shard, not the OSS matrix."
+}

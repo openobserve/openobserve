@@ -1,0 +1,8 @@
+[
+  { "title": "Create a model with an attribute-rule tier, save persists it, and the drawer renders the rule", "action": "new", "verifies": "the editor builds a rule on a non-default tier, save round-trips it through the API, and the pricing drawer renders the rule line" },
+  { "title": "Test-Match resolves a winning rule tier from span attributes", "action": "new", "verifies": "the Test-Match dialog sends span attributes to /llm/models/test and shows the winning rule tier's rule line" },
+  { "title": "Saved rules prefill, operator swap flips values to threshold, and re-save persists", "action": "new", "verifies": "saved rules hydrate into the editor, a numeric operator swaps the values input for the threshold input, and re-save persists the changed rule" },
+  { "title": "Rule validation blocks save: empty keys required and presence-op-on-usage forbidden", "action": "new", "verifies": "empty rule keys surface a required error and a presence operator on a usage. key surfaces the forbidden error, both blocking save" },
+  { "title": "Two identical rule tiers with equal priority show the ambiguous-tier warning", "action": "new", "verifies": "two non-default tiers with identical rules and equal priority render the ambiguous-tier tie warning" },
+  { "title": "Add-rule button is disabled at the 8-rule cap", "action": "new", "verifies": "the add-rule button becomes disabled once a tier holds 8 rules" }
+]
