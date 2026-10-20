@@ -622,7 +622,14 @@ export default defineComponent({
     };
 
     const deleteQuery = () => {
-      SearchService.delete_running_queries(store.state.zoConfig.meta_org, deleteDialog.value.data)
+      const metaOrg = store.state.zoConfig.meta_org;
+      const orgOf = new Map(queries.value.map((query: any) => [query.trace_id, query.org_id]));
+      // a query no longer listed has ended, so cancelling it in _meta is a harmless no-op
+      const targets = (deleteDialog.value.data ?? []).map((trace_id: string) => ({
+        trace_id,
+        org_id: orgOf.get(trace_id) ?? metaOrg,
+      }));
+      SearchService.cancel_running_queries(metaOrg, targets)
         .then(() => {
           selectedRow.value[selectedQueryTypeTab.value] = [];
 

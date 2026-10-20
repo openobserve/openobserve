@@ -27,6 +27,7 @@ vi.mock("@/services/search", async (importOriginal) => {
     default: {
       get_running_queries: vi.fn(),
       delete_running_queries: vi.fn(),
+      cancel_running_queries: vi.fn(),
     },
   });
 });
@@ -372,21 +373,37 @@ describe("RunningQueries", () => {
 
   // Test 20: deleteQuery success
   it("should delete query successfully", async () => {
+    wrapper.vm.queries = [{ trace_id: "trace-1", org_id: "org-1" }];
     wrapper.vm.deleteDialog.data = ["trace-1"];
     wrapper.vm.selectedQueryTypeTab = "all";
-    (SearchService.delete_running_queries as any).mockResolvedValue({});
+    (SearchService.cancel_running_queries as any).mockResolvedValue({});
 
     await wrapper.vm.deleteQuery();
 
-    expect(SearchService.delete_running_queries).toHaveBeenCalledWith("test-org", ["trace-1"]);
+    expect(SearchService.cancel_running_queries).toHaveBeenCalledWith("test-org", [
+      { trace_id: "trace-1", org_id: "org-1" },
+    ]);
     expect(wrapper.vm.selectedRow.all).toEqual([]);
     expect(wrapper.vm.deleteDialog.show).toBe(false);
+  });
+
+  it("should cancel a trace id that is no longer listed in the meta org", async () => {
+    wrapper.vm.queries = [{ trace_id: "trace-1", org_id: "org-1" }];
+    wrapper.vm.deleteDialog.data = ["trace-1", "gone"];
+    (SearchService.cancel_running_queries as any).mockResolvedValue({});
+
+    await wrapper.vm.deleteQuery();
+
+    expect(SearchService.cancel_running_queries).toHaveBeenCalledWith("test-org", [
+      { trace_id: "trace-1", org_id: "org-1" },
+      { trace_id: "gone", org_id: "test-org" },
+    ]);
   });
 
   // Test 21: deleteQuery error handling
   it("should handle deleteQuery error", async () => {
     wrapper.vm.deleteDialog.data = ["trace-1"];
-    (SearchService.delete_running_queries as any).mockRejectedValue({
+    (SearchService.cancel_running_queries as any).mockRejectedValue({
       response: { data: { message: "Delete Error" } },
     });
 
