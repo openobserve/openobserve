@@ -91,6 +91,10 @@ pub mod openapi;
 
 use common::meta::http::ERROR_HEADER;
 
+/// How long a refused agent waits before reconnecting while fleet management is off.
+#[cfg(feature = "enterprise")]
+const FLEET_RETRY_AFTER_SECS: &str = "60";
+
 /// Create CORS layer for axum
 pub fn cors_layer() -> CorsLayer {
     CorsLayer::new()
@@ -1581,7 +1585,7 @@ pub fn service_routes() -> Router {
 
     #[cfg(feature = "enterprise")]
     {
-        router = opamp_routes(router)
+        router = fleet_routes(router)
             // Search jobs
             .route("/{org_id}/search_jobs", get(search::search_job::list_status).post(search::search_job::submit_job))
             .route("/{org_id}/search_jobs/{job_id}", get(search::search_job::get_status).delete(search::search_job::delete_job))
@@ -2235,24 +2239,47 @@ fn oncall_routes(router: Router) -> Router {
 
 // Private and before the next `pub fn`, so the ROUTE_PERMISSIONS router scrape still reads it.
 #[cfg(feature = "enterprise")]
-fn opamp_routes(router: Router) -> Router {
-    if !get_o2_config().opamp.enabled {
-        return router;
-    }
-    router
+fn fleet_routes(router: Router) -> Router {
+    let fleet = Router::new()
         .route("/{org_id}/v1/opamp", get(opamp::serve).post(opamp::serve))
         .route("/{org_id}/fleet/collectors", get(fleet::list_collectors))
         .route(
             "/{org_id}/fleet/collectors/{id}",
-            get(fleet::get_collector).delete(fleet::unenroll_collector),
+            get(fleet::get_collector)
+                .patch(fleet::rename_collector)
+                .delete(fleet::delete_collector),
         )
-        .route("/{org_id}/fleet/summary", get(fleet::summary))
-        .route("/{org_id}/fleet/fleets", get(fleet::list_fleets))
+        .route(
+            "/{org_id}/fleet/collectors/{id}/restart",
+            post(fleet::restart_collector),
+        )
+        .route(
+            "/{org_id}/fleet/collectors/{id}/redeliver",
+            post(fleet::redeliver_collector),
+        )
+        .route(
+            "/{org_id}/fleet/fleets",
+            get(fleet::list_fleets).post(fleet::create_fleet),
+        )
+        .route("/{org_id}/fleet/fleets/move", post(fleet::move_collectors))
+        .route(
+            "/{org_id}/fleet/fleets/{fleet_id}",
+            get(fleet::get_fleet)
+                .patch(fleet::rename_fleet)
+                .delete(fleet::delete_fleet),
+        )
+        .route(
+            "/{org_id}/fleet/fleets/{fleet_id}/settings",
+            get(fleet::get_fleet_settings).put(fleet::put_fleet_settings),
+        )
         .route(
             "/{org_id}/fleet/fleets/{fleet_id}/desired",
             put(fleet::set_desired),
         )
-        .route("/v2/{org_id}/fleets/move", patch(fleet::move_collectors))
+        .route(
+            "/{org_id}/fleet/fleets/{fleet_id}/desired/preview",
+            post(fleet::preview_desired),
+        )
         .route(
             "/{org_id}/fleet/tokens",
             get(fleet::list_tokens).post(fleet::create_token),
@@ -2285,14 +2312,59 @@ fn opamp_routes(router: Router) -> Router {
             "/{org_id}/fleet/configs/{id}/versions/{version}",
             get(fleet::get_config_version),
         )
+        .route("/{org_id}/fleet/rollouts", get(fleet::list_rollouts))
+        .route("/{org_id}/fleet/rollouts/{id}", get(fleet::get_rollout))
+        .route(
+            "/{org_id}/fleet/rollouts/{id}/resume",
+            post(fleet::resume_rollout),
+        )
+        .route(
+            "/{org_id}/fleet/rollouts/{id}/skip",
+            post(fleet::skip_rollout),
+        )
+        .route(
+            "/{org_id}/fleet/rollouts/{id}/revert",
+            post(fleet::revert_rollout),
+        )
+        .route("/{org_id}/fleet/summary", get(fleet::summary))
+        .route("/{org_id}/fleet/pipelines", get(fleet::get_pipelines))
         .route("/{org_id}/fleet/audit", get(fleet::list_audit))
         .route(
             "/{org_id}/fleet/settings",
             get(fleet::get_settings).put(fleet::update_settings),
         )
-        .route("/{org_id}/fleet/rollouts", get(fleet::list_rollouts))
-        .route("/{org_id}/fleet/rollouts/{id}", get(fleet::get_rollout))
-        .route("/{org_id}/fleet/flow", get(fleet::get_flow))
+        .route_layer(middleware::from_fn(fleet_gate));
+    router.merge(fleet)
+}
+
+/// §17: with `O2_FLEET_ENABLED` off, OpAMP answers 503 and management reads work but writes do not.
+#[cfg(feature = "enterprise")]
+async fn fleet_gate(request: Request, next: Next) -> Response {
+    if openobserve_core::fleet::enabled() || request.method() == Method::GET && !is_opamp(&request)
+    {
+        return next.run(request).await;
+    }
+    let mut response = (
+        StatusCode::SERVICE_UNAVAILABLE,
+        "fleet management is disabled",
+    )
+        .into_response();
+    if is_opamp(&request) {
+        response.headers_mut().insert(
+            header::RETRY_AFTER,
+            header::HeaderValue::from_static(FLEET_RETRY_AFTER_SECS),
+        );
+    }
+    response
+}
+
+#[cfg(feature = "enterprise")]
+fn is_opamp(request: &Request) -> bool {
+    request
+        .uri()
+        .path()
+        .trim_end_matches('/')
+        .ends_with("/v1/opamp")
 }
 
 /// Create other service routes (AWS, GCP, RUM)
