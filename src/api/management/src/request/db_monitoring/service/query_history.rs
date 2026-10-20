@@ -229,10 +229,10 @@ pub(crate) async fn read_query_history_response(
     // The search-layer spelling of the caller: the `run_*_search` helpers
     // take an `Option`, while the auth gates take the plain `&str` param.
     let search_user = Some(user_id);
-    let (start_time, end_time) = resolve_range(q.start_time, q.end_time);
-    if start_time >= end_time {
-        return MetaHttpResponse::bad_request("start_time must be before end_time");
-    }
+    let (start_time, end_time) = match resolve_range(q.start_time, q.end_time) {
+        Ok(range) => range,
+        Err(resp) => return resp,
+    };
     let filters = ScopeFilters {
         system: q.system.clone(),
         instance: q.instance.clone(),

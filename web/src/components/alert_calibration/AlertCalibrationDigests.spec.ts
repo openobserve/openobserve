@@ -60,7 +60,6 @@ const run = (windowEnd: number, emittedAt: number, findings: number): RunRow => 
   coverage_error_clusters_truncated: false,
   coverage_error_clusters_unattributed: 0,
   coverage_stream_substrate_empty: false,
-  coverage_meta_fallback_used: false,
 });
 
 const mountPage = async () => {

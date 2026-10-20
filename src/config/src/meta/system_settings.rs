@@ -365,16 +365,6 @@ fn default_include_defaults() -> bool {
     true
 }
 
-/// Response containing resolved settings
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-pub struct ResolvedSettings {
-    /// The resolved settings (most specific value for each key)
-    pub settings: std::collections::HashMap<String, serde_json::Value>,
-    /// Source information for each setting (which level it came from)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub sources: Option<std::collections::HashMap<String, SettingScope>>,
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -641,30 +631,6 @@ mod tests {
         let obj = json.as_object().unwrap();
         assert!(obj.contains_key("setting_category"));
         assert!(obj.contains_key("description"));
-    }
-
-    #[test]
-    fn test_resolved_settings_sources_skip_serializing_if() {
-        let mut settings = std::collections::HashMap::new();
-        settings.insert("key1".to_string(), serde_json::json!("val"));
-
-        let no_sources = ResolvedSettings {
-            settings: settings.clone(),
-            sources: None,
-        };
-        let json = serde_json::to_value(&no_sources).unwrap();
-        assert!(!json.as_object().unwrap().contains_key("sources"));
-
-        let with_sources = ResolvedSettings {
-            settings,
-            sources: Some({
-                let mut m = std::collections::HashMap::new();
-                m.insert("key1".to_string(), SettingScope::System);
-                m
-            }),
-        };
-        let json = serde_json::to_value(&with_sources).unwrap();
-        assert!(json.as_object().unwrap().contains_key("sources"));
     }
 
     #[test]

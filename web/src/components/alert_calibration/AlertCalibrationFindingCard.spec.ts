@@ -37,7 +37,6 @@ const finding = (overrides: Partial<FindingRecord> = {}): FindingRecord => ({
   coverage_error_clusters_truncated: false,
   coverage_error_clusters_unattributed: 0,
   coverage_stream_substrate_empty: false,
-  coverage_meta_fallback_used: false,
   rule_id: "scheduler_health",
   severity: "Medium",
   confidence: "High",

@@ -36,7 +36,6 @@ use config::{
         triggers::ScheduledTriggerData,
     },
     utils::{
-        flatten,
         json::{self, *},
         schema::format_partition_key,
         time::{DAY_MICRO_SECS, HOUR_MICRO_SECS},
@@ -744,66 +743,6 @@ pub async fn check_ingestion_allowed(
 /// Whether a write must look its stream up to see if it is new; Cloud reports every new stream.
 pub fn checks_for_new_stream(org_id: &str) -> bool {
     cfg!(feature = "cloud") || !infra::schema::org_has_user_stream(org_id)
-}
-
-pub fn get_val_for_attr(attr_val: &Value) -> Value {
-    let local_val = attr_val.as_object().unwrap();
-    if let Some((key, value)) = local_val.into_iter().next() {
-        match key.as_str() {
-            "stringValue" | "string_value" => {
-                return json!(get_string_value(value));
-            }
-            "boolValue" | "bool_value" => {
-                return json!(value.as_bool().unwrap_or(false).to_string());
-            }
-            "intValue" | "int_value" => {
-                return json!(get_int_value(value).to_string());
-            }
-            "doubleValue" | "double_value" => {
-                return json!(get_float_value(value).to_string());
-            }
-
-            "bytesValue" | "bytes_value" => {
-                return json!(value.as_str().unwrap_or("").to_string());
-            }
-
-            "arrayValue" | "array_value" => {
-                let mut vals = vec![];
-                for item in value
-                    .get("values")
-                    .unwrap()
-                    .as_array()
-                    .unwrap_or(&vec![])
-                    .iter()
-                {
-                    vals.push(get_val_for_attr(item));
-                }
-                return json!(vals);
-            }
-
-            "kvlistValue" | "kvlist_value" => {
-                let mut vals = Map::new();
-                for item in value
-                    .get("values")
-                    .unwrap()
-                    .as_array()
-                    .unwrap_or(&vec![])
-                    .iter()
-                {
-                    let mut key = item.get("key").unwrap().as_str().unwrap_or("").to_string();
-                    flatten::format_key(&mut key);
-                    let value = item.get("value").unwrap().clone();
-                    vals.insert(key, get_val_for_attr(&value));
-                }
-                return json!(vals);
-            }
-
-            _ => {
-                return json!(get_string_value(value));
-            }
-        }
-    };
-    attr_val.clone()
 }
 
 pub fn get_val_with_type_retained(val: &Value) -> Value {
@@ -1622,87 +1561,6 @@ mod tests {
     fn test_get_val_with_type_retained_array() {
         let arr = Value::Array(vec![json!(1), json!(2)]);
         assert_eq!(get_val_with_type_retained(&arr), json!([1, 2]));
-    }
-
-    #[test]
-    fn test_get_val_for_attr_string_value() {
-        let attr = json!({"stringValue": "hello"});
-        assert_eq!(get_val_for_attr(&attr), json!("hello"));
-    }
-
-    #[test]
-    fn test_get_val_for_attr_int_value() {
-        let attr = json!({"intValue": "42"});
-        let result = get_val_for_attr(&attr);
-        assert_eq!(result.as_str().unwrap(), "42");
-    }
-
-    #[test]
-    fn test_get_val_for_attr_bool_value() {
-        let attr = json!({"boolValue": true});
-        let result = get_val_for_attr(&attr);
-        assert_eq!(result.as_str().unwrap(), "true");
-    }
-
-    #[test]
-    fn test_get_val_for_attr_double_value() {
-        let attr = json!({"doubleValue": 3.25});
-        let result = get_val_for_attr(&attr);
-        assert_eq!(result.as_str().unwrap(), "3.25");
-    }
-
-    #[test]
-    fn test_get_val_for_attr_bytes_value() {
-        let attr = json!({"bytesValue": "aGVsbG8="});
-        let result = get_val_for_attr(&attr);
-        assert_eq!(result.as_str().unwrap(), "aGVsbG8=");
-    }
-
-    #[test]
-    fn test_get_val_for_attr_array_value() {
-        let attr = json!({
-            "arrayValue": {
-                "values": [
-                    {"stringValue": "hello"},
-                    {"intValue": "42"}
-                ]
-            }
-        });
-        let result = get_val_for_attr(&attr);
-        let arr = result.as_array().unwrap();
-        assert_eq!(arr.len(), 2);
-        assert_eq!(arr[0].as_str().unwrap(), "hello");
-        assert_eq!(arr[1].as_str().unwrap(), "42");
-    }
-
-    #[test]
-    fn test_get_val_for_attr_kvlist_value() {
-        let attr = json!({
-            "kvlistValue": {
-                "values": [
-                    {"key": "my_key", "value": {"stringValue": "my_val"}}
-                ]
-            }
-        });
-        let result = get_val_for_attr(&attr);
-        let obj = result.as_object().unwrap();
-        assert!(obj.contains_key("my_key"));
-        assert_eq!(obj["my_key"].as_str().unwrap(), "my_val");
-    }
-
-    #[test]
-    fn test_get_val_for_attr_unknown_key_returns_string() {
-        // Unknown keys fall through to the default case which calls get_string_value
-        let attr = json!({"unknownKey": "somevalue"});
-        let result = get_val_for_attr(&attr);
-        assert_eq!(result.as_str().unwrap(), "somevalue");
-    }
-
-    #[test]
-    fn test_get_val_for_attr_snake_case_string_value() {
-        let attr = json!({"string_value": "hello_snake"});
-        let result = get_val_for_attr(&attr);
-        assert_eq!(result.as_str().unwrap(), "hello_snake");
     }
 
     #[test]

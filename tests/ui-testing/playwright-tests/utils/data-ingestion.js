@@ -11,9 +11,10 @@ const lastSharedIngest = new Map();
  * Ingest test data into a stream via API using Node.js context (secure)
  * @param {import('@playwright/test').Page} page - Playwright page object
  * @param {string} streamName - Name of the stream to ingest data into (default: "e2e_automate")
+ * @param {{ force?: boolean }} [options] - `force` posts even if the shared stream was refreshed recently (use after a stream settings change)
  * @returns {Promise<object>} - API response, or `{ skipped: true }` when this worker refreshed the shared stream within the last 5 min
  */
-async function ingestTestData(page, streamName = "e2e_automate") {
+async function ingestTestData(page, streamName = "e2e_automate", { force = false } = {}) {
   const orgId = getOrgIdentifier();
   const headers = getHeaders();
   const baseUrl = process.env.INGESTION_URL.endsWith('/')
@@ -22,8 +23,8 @@ async function ingestTestData(page, streamName = "e2e_automate") {
 
   const sharedKey = `${orgId}:${streamName}`;
   const lastIngest = streamName === SHARED_STREAM ? lastSharedIngest.get(sharedKey) : undefined;
-  if (lastIngest && Date.now() - lastIngest < SHARED_STREAM_REFRESH_MS) {
-    testLogger.debug('Test data ingestion skipped — this worker refreshed the shared stream recently', { streamName, ageMs: Date.now() - lastIngest });
+  if (!force && lastIngest && Date.now() - lastIngest < SHARED_STREAM_REFRESH_MS) {
+    testLogger.info('Test data ingestion skipped — this worker refreshed the shared stream recently', { streamName, ageMs: Date.now() - lastIngest });
     return { skipped: true };
   }
 

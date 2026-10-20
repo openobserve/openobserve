@@ -468,6 +468,23 @@ export class RolesPage {
         await this.page.waitForTimeout(2500);
     }
 
+    /** Waits for a start-from preset's grants, which EditRole stages only after its permissions and streams fetches return. */
+    async waitForPresetStaged({ timeout = 30000 } = {}) {
+        await expect(this.unsavedCount).toHaveText(/[1-9]/, { timeout });
+    }
+
+    /** Clicks Save and resolves with the role's PUT response; the listener is armed before the click. */
+    async saveAndWaitForPut(roleName, { timeout = 45000 } = {}) {
+        const put = this.page.waitForResponse(
+            (r) =>
+                r.request().method() === 'PUT' &&
+                new URL(r.url()).pathname.endsWith(`/roles/${roleName}`),
+            { timeout },
+        );
+        await this.saveButton.click();
+        return put;
+    }
+
     async openDrawer() {
         await this.reviewChangesButton.click();
         await expect(this.drawer).toBeVisible({ timeout: 10000 });

@@ -51,14 +51,29 @@ use crate::{
             http::HttpResponse as MetaHttpResponse,
             organization::OrgRoleMapping,
             service_account::ServiceAccountCreateResponse,
-            user::{
-                UpdateUser, UserList, UserOrgRole, UserRequest, UserResponse, UserUpdateMode,
-                get_default_user_org,
-            },
+            user::{UpdateUser, UserList, UserOrgRole, UserRequest, UserResponse, UserUpdateMode},
         },
     },
     organization,
 };
+
+/// The account kind a removal endpoint acts on; any other membership answers as not found.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RemovalTarget {
+    User,
+    ServiceAccount,
+    Any,
+}
+
+impl RemovalTarget {
+    fn matches(self, role: &UserRole) -> bool {
+        match self {
+            Self::User => !role.is_service_account(),
+            Self::ServiceAccount => role.is_service_account(),
+            Self::Any => true,
+        }
+    }
+}
 
 fn redact_token(token: &str) -> String {
     if token.is_empty() {
@@ -1023,6 +1038,7 @@ pub async fn remove_user_from_org(
     org_id: &str,
     email_id: &str,
     initiator_id: &str,
+    target: RemovalTarget,
 ) -> Result<Response, Error> {
     let initiating_user = if is_root_user(initiator_id) {
         ROOT_USER.get("root").unwrap().to_owned()
@@ -1048,180 +1064,87 @@ pub async fn remove_user_from_org(
     } else {
         is_allowed
     };
+    if !is_allowed {
+        return Ok(MetaHttpResponse::unauthorized("Not Allowed"));
+    }
 
-    if is_allowed {
-        let ret_user = db::user::get_db_user(email_id).await;
-        match ret_user {
-            Ok(mut user) => {
-                if is_root_user(user.email.as_str()) {
-                    return Ok(MetaHttpResponse::forbidden("Not Allowed"));
-                }
+    let not_found = || MetaHttpResponse::not_found("User for the organization not found");
+    let Ok(user) = db::user::get_db_user(email_id).await else {
+        return Ok(not_found());
+    };
+    let Some(membership) = user
+        .organizations
+        .iter()
+        .find(|o| o.name == org_id && target.matches(&o.role))
+        .cloned()
+    else {
+        #[cfg(feature = "cloud")]
+        if let Some(resp) = delete_cloud_invites(org_id, email_id).await {
+            return Ok(resp);
+        }
+        return Ok(not_found());
+    };
 
-                if initiating_user.email == email_id {
-                    return Ok(MetaHttpResponse::forbidden("Not Allowed"));
-                }
-                // Resolved now: the users row may be gone by the time shares are revoked.
-                let user_id = match infra::table::users::get_id_by_email(email_id).await {
-                    Ok(id) => id,
-                    Err(e) => {
-                        log::error!("error resolving the id of {email_id}: {e}");
-                        None
-                    }
-                };
+    if is_root_user(user.email.as_str()) || initiating_user.email == email_id {
+        return Ok(MetaHttpResponse::forbidden("Not Allowed"));
+    }
+    // Resolved now: the users row may be gone by the time shares are revoked.
+    let user_id = match infra::table::users::get_id_by_email(email_id).await {
+        Ok(id) => id,
+        Err(e) => {
+            log::error!("error resolving the id of {email_id}: {e}");
+            None
+        }
+    };
 
-                if user
-                    .organizations
-                    .iter()
-                    .any(|o| o.role == UserRole::SreAgent)
-                    || crate::organization::is_system_service_account(&user.email)
-                {
-                    return Ok(MetaHttpResponse::forbidden(
-                        "System service accounts cannot be deleted",
-                    ));
-                }
+    if user
+        .organizations
+        .iter()
+        .any(|o| o.role == UserRole::SreAgent)
+        || crate::organization::is_system_service_account(&user.email)
+    {
+        return Ok(MetaHttpResponse::forbidden(
+            "System service accounts cannot be deleted",
+        ));
+    }
 
-                #[cfg(feature = "cloud")]
-                {
-                    use o2_enterprise::enterprise::cloud::org_invites;
+    #[cfg(feature = "cloud")]
+    if let Some(resp) = delete_cloud_invites(org_id, email_id).await {
+        return Ok(resp);
+    }
 
-                    if let Err(e) = org_invites::delete_invites_for_user(org_id, email_id).await {
-                        log::error!(
-                            "error deleting invites when deleting user {email_id} from org {org_id} : {e}"
-                        );
-                        return Ok(MetaHttpResponse::internal_error(
-                            "error deleting user invites",
-                        ));
-                    }
-                }
-
-                if !user.organizations.is_empty() {
-                    let orgs = &mut user.organizations;
-                    if orgs.len() == 1 {
-                        if orgs[0].role.eq(&UserRole::ServiceAccount) && user.is_external {
-                            return Ok(MetaHttpResponse::forbidden("Not Allowed"));
-                        }
-                        // The user row goes with the last org; their chats must not outlive it.
-                        #[cfg(feature = "enterprise")]
-                        delete_ai_chats(&[org_id.to_string()], email_id).await;
-                        if let Err(e) = db::user::delete(email_id).await {
-                            log::error!("error deleting user from db : {e}");
-                            return Ok(MetaHttpResponse::internal_error(e.to_string()));
-                        }
-                        #[cfg(feature = "enterprise")]
-                        {
-                            use o2_openfga::authorizer::authz::delete_user_from_org;
-                            let user_role = &orgs[0].role;
-                            let user_fga_role = if user_role.eq(&UserRole::ServiceAccount)
-                                || user_role.eq(&UserRole::User)
-                            {
-                                "allowed_user".to_string()
-                            } else {
-                                user_role.to_string()
-                            };
-                            if get_openfga_config().enabled {
-                                log::debug!("delete user single org, role: {user_fga_role}");
-                                delete_user_from_org(org_id, email_id, &user_fga_role).await;
-                                if user_role.eq(&UserRole::ServiceAccount) {
-                                    delete_service_account_from_org(org_id, email_id).await;
-                                }
-                            }
-                        }
-                    } else {
-                        let mut _user_fga_role: Option<String> = None;
-                        #[cfg(feature = "enterprise")]
-                        let mut is_service_account = false;
-                        #[cfg(feature = "enterprise")]
-                        for org in orgs.iter() {
-                            if org.role.eq(&UserRole::ServiceAccount) && user.is_external {
-                                return Ok(MetaHttpResponse::forbidden("Not Allowed"));
-                            }
-                            if org.name.eq(org_id) {
-                                let user_role = &org.role;
-                                is_service_account = user_role.eq(&UserRole::ServiceAccount);
-                                _user_fga_role =
-                                    if is_service_account || user_role.eq(&UserRole::User) {
-                                        Some("allowed_user".to_string())
-                                    } else {
-                                        Some(user_role.to_string())
-                                    };
-                            }
-                        }
-                        orgs.retain(|x| !x.name.eq(org_id));
-                        let resp = db::org_users::remove(org_id, email_id).await;
-                        // special case as we cache flattened user struct
-                        match resp {
-                            Ok(_) => {
-                                #[cfg(feature = "enterprise")]
-                                {
-                                    use o2_openfga::authorizer::authz::delete_user_from_org;
-                                    log::debug!(
-                                        "user_fga_role, multi org: {}",
-                                        _user_fga_role.as_ref().unwrap()
-                                    );
-                                    if get_openfga_config().enabled
-                                        && let Some(_user_fga_role) = _user_fga_role
-                                    {
-                                        delete_user_from_org(
-                                            org_id,
-                                            email_id,
-                                            _user_fga_role.as_str(),
-                                        )
-                                        .await;
-                                        if is_service_account {
-                                            delete_service_account_from_org(org_id, email_id).await;
-                                        }
-                                    }
-                                }
-                            }
-                            Err(e) => {
-                                log::error!("error deleting user {email_id} from {org_id} : {e}");
-                                return Ok(MetaHttpResponse::internal_error(e.to_string()));
-                            }
-                        }
-                    }
-                    // After the membership is gone: on-call rosters derive from it, so earlier is
-                    // racy.
-                    #[cfg(feature = "enterprise")]
-                    {
-                        use o2_enterprise::enterprise::oncall::service as oncall_service;
-                        match oncall_service::offboard_member(
-                            org_id,
-                            email_id,
-                            config::utils::time::now_micros(),
-                        )
-                        .await
-                        {
-                            Ok(report) if report.needs_attention() => {
-                                for warning in report.warnings() {
-                                    log::warn!("[ONCALL] {email_id} left {org_id}: {warning}");
-                                }
-                            }
-                            Ok(_) => {}
-                            Err(e) => log::error!(
-                                "[ONCALL] {email_id} was removed from {org_id} but their on-call membership could not be cleaned up, so they may still be paged: {e}"
-                            ),
-                        }
-                    }
-                    if let Err(e) =
-                        infra::table::query_history::delete_by_user(org_id, email_id).await
-                    {
-                        log::error!("error deleting query history of {email_id} in {org_id}: {e}");
-                    }
-                    revoke_ai_chat_shares(org_id, email_id, user_id.as_deref()).await;
-                    Ok(MetaHttpResponse::ok("User removed from organization"))
-                } else {
-                    Ok(MetaHttpResponse::not_found(
-                        "User for the organization not found",
-                    ))
+    let removal =
+        if user.organizations.len() == 1 && is_sole_membership(&membership, email_id).await {
+            remove_user_with_last_membership(&user, &membership).await
+        } else {
+            remove_one_membership(&user, &membership).await
+        };
+    if let Some(resp) = removal {
+        return Ok(resp);
+    }
+    // After the membership is gone: on-call rosters derive from it, so earlier is racy.
+    #[cfg(feature = "enterprise")]
+    {
+        use o2_enterprise::enterprise::oncall::service as oncall_service;
+        match oncall_service::offboard_member(org_id, email_id, config::utils::time::now_micros())
+            .await
+        {
+            Ok(report) if report.needs_attention() => {
+                for warning in report.warnings() {
+                    log::warn!("[ONCALL] {email_id} left {org_id}: {warning}");
                 }
             }
-            Err(_) => Ok(MetaHttpResponse::not_found(
-                "User for the organization not found",
-            )),
+            Ok(_) => {}
+            Err(e) => log::error!(
+                "[ONCALL] {email_id} was removed from {org_id} but their on-call membership could not be cleaned up, so they may still be paged: {e}"
+            ),
         }
-    } else {
-        Ok(MetaHttpResponse::unauthorized("Not Allowed"))
     }
+    if let Err(e) = infra::table::query_history::delete_by_user(org_id, email_id).await {
+        log::error!("error deleting query history of {email_id} in {org_id}: {e}");
+    }
+    revoke_ai_chat_shares(org_id, email_id, user_id.as_deref()).await;
+    Ok(MetaHttpResponse::ok("User removed from organization"))
 }
 
 pub async fn delete_user(email_id: &str) -> Result<Response, Error> {
@@ -1255,20 +1178,6 @@ pub async fn root_user_exists() -> bool {
         local_users.is_empty()
     } else {
         db::user::root_user_exists().await
-    }
-}
-
-pub fn is_user_from_org(orgs: Vec<UserOrg>, org_id: &str) -> (bool, UserOrg) {
-    if orgs.is_empty() {
-        (false, get_default_user_org())
-    } else {
-        let mut local_orgs = orgs;
-        local_orgs.retain(|org| !org.name.eq(org_id));
-        if local_orgs.is_empty() {
-            (false, get_default_user_org())
-        } else {
-            (true, local_orgs.first().unwrap().clone())
-        }
     }
 }
 
@@ -1457,6 +1366,103 @@ async fn revoke_ai_chat_shares(org_id: &str, email_id: &str, user_id: Option<&st
     }
 }
 
+/// Re-reads the stored memberships, so a membership added since the first read is not deleted.
+async fn is_sole_membership(membership: &UserOrg, email_id: &str) -> bool {
+    match infra::table::org_users::list_org_ids_by_user_on_writer(email_id).await {
+        Ok(org_ids) => matches!(org_ids.as_slice(), [only] if *only == membership.name),
+        Err(e) => {
+            log::error!("error re-reading the memberships of {email_id}: {e}");
+            false
+        }
+    }
+}
+
+/// Deletes the user row together with its only membership; `Some` is the refusal or error.
+async fn remove_user_with_last_membership(user: &DBUser, membership: &UserOrg) -> Option<Response> {
+    if membership.role.eq(&UserRole::ServiceAccount) && user.is_external {
+        return Some(MetaHttpResponse::forbidden("Not Allowed"));
+    }
+    // The user row goes with the last org; their chats must not outlive it.
+    #[cfg(feature = "enterprise")]
+    delete_ai_chats(std::slice::from_ref(&membership.name), &user.email).await;
+    if let Err(e) = db::user::delete(&user.email).await {
+        log::error!("error deleting user from db : {e}");
+        return Some(MetaHttpResponse::internal_error(e.to_string()));
+    }
+    #[cfg(feature = "enterprise")]
+    if get_openfga_config().enabled {
+        let fga_role = fga_member_role(&membership.role);
+        log::debug!("delete user single org, role: {fga_role}");
+        o2_openfga::authorizer::authz::delete_user_from_org(
+            &membership.name,
+            &user.email,
+            &fga_role,
+        )
+        .await;
+        if membership.role.eq(&UserRole::ServiceAccount) {
+            delete_service_account_from_org(&membership.name, &user.email).await;
+        }
+    }
+    None
+}
+
+/// Removes one membership and keeps the user row; `Some` is the refusal or error.
+async fn remove_one_membership(user: &DBUser, membership: &UserOrg) -> Option<Response> {
+    #[cfg(feature = "enterprise")]
+    if user
+        .organizations
+        .iter()
+        .any(|org| org.role.eq(&UserRole::ServiceAccount) && user.is_external)
+    {
+        return Some(MetaHttpResponse::forbidden("Not Allowed"));
+    }
+    if let Err(e) = db::org_users::remove(&membership.name, &user.email).await {
+        log::error!(
+            "error deleting user {} from {} : {e}",
+            user.email,
+            membership.name
+        );
+        return Some(MetaHttpResponse::internal_error(e.to_string()));
+    }
+    #[cfg(feature = "enterprise")]
+    if get_openfga_config().enabled {
+        let fga_role = fga_member_role(&membership.role);
+        log::debug!("user_fga_role, multi org: {fga_role}");
+        o2_openfga::authorizer::authz::delete_user_from_org(
+            &membership.name,
+            &user.email,
+            &fga_role,
+        )
+        .await;
+        if membership.role.eq(&UserRole::ServiceAccount) {
+            delete_service_account_from_org(&membership.name, &user.email).await;
+        }
+    }
+    None
+}
+
+#[cfg(feature = "enterprise")]
+fn fga_member_role(role: &UserRole) -> String {
+    if role.eq(&UserRole::ServiceAccount) || role.eq(&UserRole::User) {
+        "allowed_user".to_string()
+    } else {
+        role.to_string()
+    }
+}
+
+#[cfg(feature = "cloud")]
+async fn delete_cloud_invites(org_id: &str, email_id: &str) -> Option<Response> {
+    use o2_enterprise::enterprise::cloud::org_invites;
+
+    let Err(e) = org_invites::delete_invites_for_user(org_id, email_id).await else {
+        return None;
+    };
+    log::error!("error deleting invites when deleting user {email_id} from org {org_id} : {e}");
+    Some(MetaHttpResponse::internal_error(
+        "error deleting user invites",
+    ))
+}
+
 /// Deletes the user's chats in `orgs` while their `users.id` still resolves (replicas: the sweep).
 #[cfg(feature = "enterprise")]
 async fn delete_ai_chats(orgs: &[String], email_id: &str) {
@@ -1521,7 +1527,7 @@ pub async fn create_service_account_if_not_exists(email: &str) -> Result<(), any
 
 #[cfg(test)]
 mod tests {
-    use common::{infra::config::USERS, meta::user::get_default_user_role};
+    use common::infra::config::USERS;
     use config::meta::user::{UserRole, UserType};
     use infra::{
         db::{self as infra_db, get_orm_client_rw},
@@ -1537,12 +1543,6 @@ mod tests {
     static TEST_SETUP_LOCK: tokio::sync::OnceCell<Mutex<()>> = tokio::sync::OnceCell::const_new();
 
     #[test]
-    fn test_redact_token_normal() {
-        // output is always 12 chars: first 4 visible, rest padded with '*'
-        assert_eq!(redact_token("abcd1234567890ef"), "abcd********");
-    }
-
-    #[test]
     fn test_redact_token_exactly_four_chars() {
         // 4 visible chars + 8 stars = 12 total
         assert_eq!(redact_token("abcd"), "abcd********");
@@ -1554,46 +1554,6 @@ mod tests {
         assert_eq!(redact_token("ab"), "************");
         assert_eq!(redact_token("x"), "************");
         assert_eq!(redact_token(""), "");
-    }
-
-    #[test]
-    fn test_redact_token_five_chars() {
-        // still shows first 4, pads to 12 total
-        assert_eq!(redact_token("abcde"), "abcd********");
-    }
-
-    #[test]
-    fn test_is_user_from_org() {
-        let target_org = "org1".to_string();
-
-        let user_org = UserOrg {
-            name: "org2".to_string(),
-            org_name: "Organization 2".to_string(),
-            token: "token2".to_string(),
-            rum_token: Some("rum2".to_string()),
-            role: get_default_user_role(),
-        };
-
-        let matched_org = UserOrg {
-            name: target_org.clone(),
-            org_name: "Organization 1".to_string(),
-            token: "token1".to_string(),
-            rum_token: Some("rum1".to_string()),
-            role: get_default_user_role(),
-        };
-
-        let (found, org) = is_user_from_org(vec![], &target_org);
-        assert!(!found);
-        assert_eq!(org.name, "");
-
-        let (found, org) = is_user_from_org(vec![matched_org.clone()], &target_org);
-        assert!(!found);
-        assert_eq!(org.name, "");
-
-        let (found, org) =
-            is_user_from_org(vec![matched_org.clone(), user_org.clone()], &target_org);
-        assert!(found);
-        assert_eq!(org.name, "org2");
     }
 
     /// Returned guard must be held for the whole test: `set_up` truncates the
@@ -1777,7 +1737,13 @@ mod tests {
 
         assert!(resp.is_ok());
 
-        let resp = remove_user_from_org("dummy", "user2@example.com", "admin@zo.dev").await;
+        let resp = remove_user_from_org(
+            "dummy",
+            "user2@example.com",
+            "admin@zo.dev",
+            RemovalTarget::User,
+        )
+        .await;
 
         assert!(resp.is_ok());
     }
@@ -1892,7 +1858,7 @@ mod tests {
         let email = "history-leaver@example.com";
         create_user_with_history(email).await;
 
-        let resp = remove_user_from_org("dummy", email, "admin@zo.dev")
+        let resp = remove_user_from_org("dummy", email, "admin@zo.dev", RemovalTarget::User)
             .await
             .unwrap();
         assert_eq!(resp.status(), http::StatusCode::OK);
@@ -1934,7 +1900,8 @@ mod tests {
                 .is_err()
         );
 
-        let removed = remove_user_from_org("dummy", email, "admin@zo.dev").await;
+        let removed =
+            remove_user_from_org("dummy", email, "admin@zo.dev", RemovalTarget::User).await;
         let deleted = delete_user(email).await;
         create_query_history_table().await;
 
@@ -1942,6 +1909,132 @@ mod tests {
         assert!(infra_table::org_users::get("dummy", email).await.is_err());
         assert_eq!(deleted.unwrap().status(), http::StatusCode::OK);
         assert!(infra_table::users::get(email).await.is_err());
+    }
+
+    async fn create_member(email: &str, memberships: &[(&str, UserRole)]) {
+        for (org, _) in memberships.iter().filter(|(org, _)| *org != "dummy") {
+            organization::check_and_create_org_without_ofga(org)
+                .await
+                .unwrap();
+        }
+        let user = DBUser {
+            email: email.to_string(),
+            password: "".to_string(),
+            salt: "".to_string(),
+            first_name: "Member".to_string(),
+            last_name: "User".to_string(),
+            password_ext: None,
+            is_external: false,
+            organizations: memberships
+                .iter()
+                .map(|(org, role)| UserOrg {
+                    name: org.to_string(),
+                    org_name: org.to_string(),
+                    token: "".to_string(),
+                    rum_token: None,
+                    role: role.clone(),
+                })
+                .collect(),
+        };
+        create_new_user(user).await.unwrap();
+    }
+
+    async fn membership_orgs(email: &str) -> Vec<String> {
+        let mut orgs: Vec<String> = db::user::get_db_user(email)
+            .await
+            .unwrap()
+            .organizations
+            .into_iter()
+            .map(|o| o.name)
+            .collect();
+        orgs.sort();
+        orgs
+    }
+
+    #[tokio::test]
+    async fn test_removal_from_an_org_the_user_is_not_in_keeps_the_user() {
+        let _guard = set_up().await;
+        let email = "member-of-other@example.com";
+        create_member(email, &[("other", UserRole::Admin)]).await;
+
+        let resp = remove_user_from_org("dummy", email, "admin@zo.dev", RemovalTarget::User)
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), http::StatusCode::NOT_FOUND);
+        assert!(infra_table::users::get(email).await.is_ok());
+        assert_eq!(membership_orgs(email).await, vec!["other".to_string()]);
+    }
+
+    #[tokio::test]
+    async fn test_removal_from_an_org_the_user_is_not_in_answers_not_found_for_any_org_count() {
+        let _guard = set_up().await;
+        let email = "member-of-two@example.com";
+        create_member(
+            email,
+            &[("other1", UserRole::Admin), ("other2", UserRole::User)],
+        )
+        .await;
+        // At debug level, the membership-only path must not need a path-org role to log.
+        let level = log::max_level();
+        log::set_max_level(log::LevelFilter::Debug);
+        let resp = remove_user_from_org("dummy", email, "admin@zo.dev", RemovalTarget::User).await;
+        log::set_max_level(level);
+
+        assert_eq!(resp.unwrap().status(), http::StatusCode::NOT_FOUND);
+        assert_eq!(
+            membership_orgs(email).await,
+            vec!["other1".to_string(), "other2".to_string()]
+        );
+    }
+
+    #[tokio::test]
+    async fn test_each_removal_endpoint_acts_only_on_its_own_account_kind() {
+        let _guard = set_up().await;
+        let user = "kind-user@example.com";
+        let service_account = "kind-sa@example.com";
+        create_member(user, &[("dummy", UserRole::User)]).await;
+        create_member(service_account, &[("dummy", UserRole::ServiceAccount)]).await;
+
+        for (email, target) in [
+            (user, RemovalTarget::ServiceAccount),
+            (service_account, RemovalTarget::User),
+        ] {
+            let resp = remove_user_from_org("dummy", email, "admin@zo.dev", target)
+                .await
+                .unwrap();
+            assert_eq!(resp.status(), http::StatusCode::NOT_FOUND, "{email}");
+            assert_eq!(membership_orgs(email).await, vec!["dummy".to_string()]);
+        }
+        for (email, target) in [
+            (user, RemovalTarget::User),
+            (service_account, RemovalTarget::ServiceAccount),
+        ] {
+            let resp = remove_user_from_org("dummy", email, "admin@zo.dev", target)
+                .await
+                .unwrap();
+            assert_eq!(resp.status(), http::StatusCode::OK, "{email}");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_a_membership_added_after_the_first_read_keeps_the_user_row() {
+        let _guard = set_up().await;
+        let email = "late-member@example.com";
+        create_member(email, &[("dummy", UserRole::User)]).await;
+        let membership = db::user::get_db_user(email)
+            .await
+            .unwrap()
+            .organizations
+            .remove(0);
+        assert!(is_sole_membership(&membership, email).await);
+
+        organization::check_and_create_org_without_ofga("late-other")
+            .await
+            .unwrap();
+        infra_table::org_users::add("late-other", email, UserRole::User, "", None)
+            .await
+            .unwrap();
+        assert!(!is_sole_membership(&membership, email).await);
     }
 
     #[tokio::test]

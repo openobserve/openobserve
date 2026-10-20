@@ -798,6 +798,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
     if let Err(e) = alerts::notifications::org_default::backfill_org_default_templates().await {
         log::error!("[TEMPLATES] default_alert_template backfill failed: {e}");
     }
+    #[cfg(feature = "enterprise")]
+    if let Err(e) = alerts::alert_calibration::backfill_org_configs().await {
+        log::error!("[alert_calibration] default config backfill failed: {e}");
+    }
 
     // cache alerts (this will include the system templates we just created)
     db::alerts::templates::cache()
@@ -1132,6 +1136,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
                     &definition,
                     &usage,
                     Some(timestamp),
+                    &config::meta::model_pricing::PricingContext::default(),
                 )
                 .cost
                 .get("total")

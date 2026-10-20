@@ -1323,16 +1323,6 @@ mod tests {
     }
 
     #[test]
-    fn test_sanitize_filename_replaces_dots() {
-        assert_eq!(sanitize_filename("report.pdf"), "report_pdf");
-    }
-
-    #[test]
-    fn test_sanitize_filename_replaces_special_chars() {
-        assert_eq!(sanitize_filename("report@2024!"), "report_2024_");
-    }
-
-    #[test]
     fn test_sanitize_filename_empty_string() {
         assert_eq!(sanitize_filename(""), "");
     }

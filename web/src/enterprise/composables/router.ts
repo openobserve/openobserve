@@ -14,18 +14,18 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import type { RouteLocationNormalized } from "vue-router";
-import Billing from "@/enterprise/components/billings/Billing.vue";
-import Plans from "@/enterprise/components/billings/plans.vue";
-import InvoiceHistory from "@/enterprise/components/billings/invoiceHistory.vue";
-import Usage from "@/enterprise/components/billings/usage.vue";
-import BillingGroup from "@/enterprise/components/billings/BillingGroup.vue";
-import AzureMarketplaceSetup from "@/views/AzureMarketplaceSetup.vue";
-import AwsMarketplaceSetup from "@/views/AwsMarketplaceSetup.vue";
-import { routeGuard } from "@/utils/zincutils";
 import {
   useAIObservabilityShellRoute,
   useAIObservabilityExtraRoutes,
 } from "@/composables/shared/useAIObservabilityRoutes";
+
+const Billing = () => import("@/enterprise/components/billings/Billing.vue");
+const Plans = () => import("@/enterprise/components/billings/plans.vue");
+const InvoiceHistory = () => import("@/enterprise/components/billings/invoiceHistory.vue");
+const Usage = () => import("@/enterprise/components/billings/usage/UsageView.vue");
+const BillingGroup = () => import("@/enterprise/components/billings/BillingGroup.vue");
+const AzureMarketplaceSetup = () => import("@/views/AzureMarketplaceSetup.vue");
+const AwsMarketplaceSetup = () => import("@/views/AwsMarketplaceSetup.vue");
 
 const useEnvRoutes = () => {
   // Note: AWS Marketplace registration is handled by backend at POST /api/aws-marketplace/register

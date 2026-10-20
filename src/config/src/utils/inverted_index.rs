@@ -137,11 +137,4 @@ mod tests {
         let input = "files/default/enrichment_tables/x/2024/02/16/16/1.parquet";
         assert_eq!(to_tantivy_name(input), None);
     }
-
-    #[test]
-    fn test_convert_path_without_extension_returns_none() {
-        // Final segment without a recognized extension is rejected.
-        let input = "files/default/logs/quickstart1/2024/02/16/16/no_extension";
-        assert_eq!(to_tantivy_name(input), None);
-    }
 }

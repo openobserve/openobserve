@@ -117,8 +117,12 @@ impl FlightService for FlightServiceImpl {
         let trace_id_move = trace_id.clone();
         let result = async move {
             #[cfg(feature = "enterprise")]
-            let _task_status =
-                register_follower_task_status(is_super_cluster, &trace_id_move).await;
+            let _task_status = register_follower_task_status(
+                is_super_cluster,
+                &req_move.query_identifier.org_id,
+                &trace_id_move,
+            )
+            .await;
             get_ctx_and_physical_plan(&trace_id_move, &req_move).await
         }
         .instrument(span.clone())
@@ -368,20 +372,23 @@ async fn get_ctx_and_physical_plan(
 #[cfg(feature = "enterprise")]
 async fn register_follower_task_status(
     is_super_cluster: bool,
+    org_id: &str,
     trace_id: &str,
 ) -> Option<AsyncDefer> {
-    if !is_super_cluster || SEARCH_SERVER.contain_key(trace_id).await {
+    if !is_super_cluster {
         return None;
     }
     SEARCH_SERVER
         .insert(
+            org_id,
             trace_id.to_string(),
             TaskStatus::new_follower(vec![], false),
         )
         .await;
+    let org_id = org_id.to_string();
     let trace_id = trace_id.to_string();
     Some(AsyncDefer::new(async move {
-        SEARCH_SERVER.remove(&trace_id, false).await;
+        SEARCH_SERVER.remove(&org_id, &trace_id).await;
     }))
 }
 

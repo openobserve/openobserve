@@ -87,6 +87,11 @@ async function openResults(page) {
   const searches = trackSearches(page);
   await page.goto(urlFor());
   await page.locator(editor).first().waitFor({ timeout: 60000 });
+  // The stream URL runs its own search on entry; clicking the shared run/cancel button mid-flight cancels it.
+  await expect
+    .poll(() => searches.hits().length, { timeout: 30000 })
+    .toBeGreaterThan(0);
+  await new PageManager(page).logsPage.waitForRunQueryButton();
   const before = searches.hits().length;
   await page.locator(runBtn).click();
   await expect
@@ -543,6 +548,8 @@ test.describe("Logs J/K navigation (item 4a)", () => {
       ).toHaveCount(0, {
         timeout: 60000,
       });
+      // J is ignored until the refreshed hits settle, and the progress bar can be absent before they start.
+      await logs.waitForRunQueryButton();
       await page.evaluate(
         () =>
           document.activeElement instanceof HTMLElement &&

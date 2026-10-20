@@ -282,6 +282,7 @@ const openLabel = computed(() => {
   const type = result.value?.streamType;
   if (type === "metrics") return t("ingestion.firstEvent.openInMetrics");
   if (type === "traces") return t("ingestion.firstEvent.openInTraces");
+  if (type === "profiles") return t("ingestion.firstEvent.openInProfiles");
   return t("ingestion.firstEvent.openInLogs");
 });
 

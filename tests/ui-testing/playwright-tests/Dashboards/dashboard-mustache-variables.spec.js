@@ -423,6 +423,7 @@ test.describe(
         const sqlQuery = `SELECT histogram(_timestamp) as "x_axis_1", count(*) as "y_axis_1" FROM "e2e_automate" WHERE kubernetes_container_name = '{{variablename}}' GROUP BY x_axis_1 ORDER BY x_axis_1`;
 
         await pm.chartTypeSelector.enterCustomSQL(sqlQuery);
+        await pm.chartTypeSelector.waitForCustomQueryAxes("x_axis_1", "y_axis_1");
 
         // Apply the query
         await pm.dashboardPanelActions.applyDashboardBtn();
@@ -844,6 +845,7 @@ test.describe(
         const sqlQuery = `SELECT histogram(_timestamp) as "x_axis_1", count(*) as "y_axis_1" FROM "e2e_automate" WHERE kubernetes_container_name = '{{ variablename }}' GROUP BY x_axis_1 ORDER BY x_axis_1`;
 
         await pm.chartTypeSelector.enterCustomSQL(sqlQuery);
+        await pm.chartTypeSelector.waitForCustomQueryAxes("x_axis_1", "y_axis_1");
 
         // Apply the query
         await pm.dashboardPanelActions.applyDashboardBtn();

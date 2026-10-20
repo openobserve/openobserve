@@ -213,7 +213,7 @@ pub async fn work_group_checking(
 ) -> Result<()> {
     let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
     if let Err(err) = SEARCH_SERVER
-        .insert_sender(trace_id, abort_sender, false)
+        .insert_sender(org_id, trace_id, abort_sender, false)
         .await
     {
         metrics::QUERY_PENDING_NUMS
@@ -366,7 +366,7 @@ pub async fn acquire_work_group_lock(
     );
 
     SEARCH_SERVER
-        .add_work_group(trace_id, Some(work_group.clone()))
+        .add_work_group(&req.org_id, trace_id, Some(work_group.clone()))
         .await;
 
     let user_id = req.user_id.as_deref();

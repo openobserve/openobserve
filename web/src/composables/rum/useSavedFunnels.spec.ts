@@ -219,3 +219,52 @@ describe("useSavedFunnels (AC-67 to AC-70)", () => {
     expect(await sf.fetchOne("org", "web", row.id)).toBe("failed");
   });
 });
+
+describe("pa gap fixes: funnel save on an old node (P6)", () => {
+  const HASH = "0123456789abcdef";
+  beforeEach(() => {
+    api.reset();
+    mockToast.mockClear();
+    resetSavedFunnels();
+  });
+
+  it("P6-R9: a 400 on create retries once without rules_hash", async () => {
+    api.failNext("createFunnel", 400);
+    const sf = useSavedFunnels();
+    const f = saved(await sf.save("org", "web", { ...draft("Signup"), rulesHash: HASH }));
+    const bodies = api.bodies("createFunnel");
+    expect(bodies).toHaveLength(2);
+    expect(bodies[0].rules_hash).toBe(HASH);
+    expect(bodies[1]).not.toHaveProperty("rules_hash");
+    expect(f.name).toBe("Signup");
+  });
+
+  it("P6-R9: a 400 on update retries once without rules_hash", async () => {
+    const row = api.seedFunnel("web", "Signup", PARAM);
+    api.failNext("updateFunnel", 400);
+    const sf = useSavedFunnels();
+    saved(
+      await sf.save(
+        "org",
+        "web",
+        { ...draft("Signup"), rulesHash: HASH },
+        {
+          id: row.id,
+          version: row.version,
+        },
+      ),
+    );
+    const bodies = api.bodies("updateFunnel");
+    expect(bodies).toHaveLength(2);
+    expect(bodies[0].rules_hash).toBe(HASH);
+    expect(bodies[1]).not.toHaveProperty("rules_hash");
+  });
+
+  it("P6-R9: the retry happens only once", async () => {
+    api.failNext("createFunnel", 400);
+    api.failNext("createFunnel", 400);
+    const sf = useSavedFunnels();
+    await sf.save("org", "web", { ...draft("Signup"), rulesHash: HASH }).catch(() => undefined);
+    expect(api.service.createFunnel).toHaveBeenCalledTimes(2);
+  });
+});

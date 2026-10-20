@@ -170,7 +170,7 @@ fn build_tantivy_schema(
                 .set_tokenizer("raw")
                 .set_fieldnorms(false),
         )
-        .set_fast(None);
+        .set_fast(tantivy::tokenizer::RAW_TOKENIZER_NAME);
     for field in index_fields_filtered.iter() {
         if field == TIMESTAMP_COL_NAME {
             continue;

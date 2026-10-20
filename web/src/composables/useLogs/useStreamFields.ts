@@ -118,6 +118,7 @@ export const useStreamFields = () => {
     searchObj,
     searchObjDebug,
     fieldValues,
+    clearFieldValues,
     notificationMsg,
     streamSchemaFieldsIndexMapping,
     schemaRequestToken,
@@ -169,7 +170,7 @@ export const useStreamFields = () => {
         // Object.keys(item).forEach((key) => {
         for (const key of Object.keys(item)) {
           if (excludedFields.includes(key)) {
-            return;
+            continue;
           }
 
           if (fieldValues.value === undefined) {
@@ -1050,7 +1051,7 @@ export const useStreamFields = () => {
   };
 
   const resetFieldValues = () => {
-    fieldValues.value = {};
+    clearFieldValues();
   };
 
   const hasInterestingFieldsInLocal = (streamName: string) => {

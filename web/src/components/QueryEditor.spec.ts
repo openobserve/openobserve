@@ -66,6 +66,7 @@ const codeQueryEditorStub = {
     "debounceTime",
     "showAutoComplete",
     "editorId",
+    "valuesTimeRange",
   ],
   emits: [
     "update:query",
@@ -564,6 +565,19 @@ describe("QueryEditor", () => {
       // Assert — called with the actual new value
       expect(mockSetValue).toHaveBeenCalledOnce();
       expect(mockSetValue).toHaveBeenCalledWith("SELECT 2");
+    });
+  });
+
+  describe("values time range", () => {
+    it("forwards the range to the code editor", () => {
+      const range = { startTime: 1, endTime: 2 };
+      wrapper = mountQueryEditor({ valuesTimeRange: range });
+      expect(wrapper.findComponent(codeQueryEditorStub).props("valuesTimeRange")).toEqual(range);
+    });
+
+    it("forwards null when no range is given", () => {
+      wrapper = mountQueryEditor();
+      expect(wrapper.findComponent(codeQueryEditorStub).props("valuesTimeRange")).toBeNull();
     });
   });
 });

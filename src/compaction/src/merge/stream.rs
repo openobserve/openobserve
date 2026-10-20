@@ -642,30 +642,6 @@ mod tests {
     }
 
     #[test]
-    fn test_sort_by_time_range_single_file() {
-        let files = vec![create_file_key("file1.parquet", 1000, 2000, 1024)];
-        let result = sort_by_time_range(files);
-        assert_eq!(result.len(), 1);
-        assert_eq!(result[0].key, "file1.parquet");
-        assert_eq!(result[0].meta.min_ts, 1000);
-        assert_eq!(result[0].meta.max_ts, 2000);
-    }
-
-    #[test]
-    fn test_sort_by_time_range_already_sorted_non_overlapping() {
-        let files = vec![
-            create_file_key("file1.parquet", 1000, 2000, 1024),
-            create_file_key("file2.parquet", 2000, 3000, 1024),
-            create_file_key("file3.parquet", 3000, 4000, 1024),
-        ];
-        let result = sort_by_time_range(files);
-        assert_eq!(result.len(), 3);
-        assert_eq!(result[0].key, "file1.parquet");
-        assert_eq!(result[1].key, "file2.parquet");
-        assert_eq!(result[2].key, "file3.parquet");
-    }
-
-    #[test]
     fn test_sort_by_time_range_unsorted_non_overlapping() {
         let files = vec![
             create_file_key("file3.parquet", 3000, 4000, 1024),

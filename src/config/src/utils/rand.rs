@@ -38,12 +38,6 @@ pub fn get_rand_num_within(min: u64, max: u64) -> u64 {
     min + buf[0] as u64 % (max - min)
 }
 
-pub fn get_rand_u128() -> u128 {
-    let mut buf = [0u8; 16];
-    rand::rng().fill(&mut buf);
-    u128::from_le_bytes(buf)
-}
-
 /// Generate `n` cryptographically random bytes.
 ///
 /// Intended for generating cryptographic key material (e.g. DEKs).
@@ -91,20 +85,6 @@ mod tests {
     fn test_get_rand_num_within_same_range() {
         let num = get_rand_num_within(5, 5);
         assert_eq!(num, 5);
-    }
-
-    #[test]
-    fn test_get_rand_u128() {
-        let num = get_rand_u128();
-        assert!(num > 0);
-    }
-
-    #[test]
-    fn test_random_distribution() {
-        // Test that we get different values on multiple calls
-        let values: HashSet<u128> = HashSet::from_iter((0..100).map(|_| get_rand_u128()));
-        // We should have at least 90 different values out of 100 calls
-        assert!(values.len() > 90);
     }
 
     // -----------------------------------------------------------------------

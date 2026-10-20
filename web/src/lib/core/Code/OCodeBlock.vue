@@ -24,19 +24,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <script setup lang="ts">
 import { computed, ref, type CSSProperties } from "vue";
-import hljs from "highlight.js";
+import hljs from "./highlighter";
 import { copyToClipboard } from "@/utils/clipboard";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useI18nTyped } from "@/types/i18n";
-import { hclLanguage } from "./hclLanguage";
 import type { CodeBlockProps, CodeBlockEmits, CodeBlockSlots } from "./OCodeBlock.types";
-
-// highlight.js has no HCL grammar of its own, so `lang="hcl"` is registered here
-// — once per module, not per instance — and behaves like a built-in from then on.
-if (!hljs.getLanguage("hcl")) hljs.registerLanguage("hcl", hclLanguage);
 
 const { t } = useI18nTyped();
 
