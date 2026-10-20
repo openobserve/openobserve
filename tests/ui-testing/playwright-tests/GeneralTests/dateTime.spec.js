@@ -143,7 +143,7 @@ test.describe("Date-Time Picker Forward Shift Cap testcases", () => {
   });
 
   // TC-05
-  test("forward shift is disabled when the window end is at or past the present", {
+  test("forward shift is disabled when the window end is past the present", {
     tag: ['@date-time-next-shift-cap', '@all', '@P1']
   }, async ({ page }) => {
     testLogger.info('Verifying Next is disabled for a window ending past the present');
