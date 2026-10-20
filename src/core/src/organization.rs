@@ -1285,6 +1285,13 @@ fn sre_agent_email(org_id: &str) -> String {
     format!("{O2_SRE_AGENT_EMAIL_PREFIX}{org_id}{O2_SRE_AGENT_EMAIL_SUFFIX}").to_lowercase()
 }
 
+/// Serializes [ensure_sys_rca_agent] on this node. Concurrent first analyses of a new org would
+/// otherwise both take the not-found branch, and one would delete the account the other was
+/// creating, failing its run with "SysRcaAgent SA not found".
+#[cfg(feature = "enterprise")]
+static ENSURE_SYS_RCA_AGENT: std::sync::LazyLock<tokio::sync::Mutex<()>> =
+    std::sync::LazyLock::new(|| tokio::sync::Mutex::new(()));
+
 /// Ensures the SysRcaAgent service account exists for the given org, creating it if needed.
 /// Idempotent: returns Ok(()) immediately if the account already exists.
 #[cfg(feature = "enterprise")]
@@ -1295,6 +1302,7 @@ pub async fn ensure_sys_rca_agent(org_id: &str) -> Result<(), anyhow::Error> {
     use crate::users::create_service_account_if_not_exists;
 
     let email = sre_agent_email(org_id);
+    let _serial = ENSURE_SYS_RCA_AGENT.lock().await;
 
     // Only create the DB record if the account doesn't exist yet.
     match db::org_users::get(org_id, &email).await {
@@ -1305,14 +1313,17 @@ pub async fn ensure_sys_rca_agent(org_id: &str) -> Result<(), anyhow::Error> {
             // Only treat genuine "not found" errors as missing accounts
             // Other DB errors should bubble up rather than triggering creation
             if err.to_string().contains("User not found") {
-                // Drop any orphaned mixed-case row in `users` left over from a
-                // pre-fix run. `db::user::delete` is case-insensitive at the
-                // table layer and also fans out a cluster-wide invalidation so
-                // the in-mem user cache (and super_cluster) drop the stale row
-                // — `table::users::remove` would skip both. Safe: no `org_users` row means it is
-                // unreferenced. Only when the row exists: the async delete event
-                // can land after the create and evict it.
-                if db::user::get_user_record(&email).await.is_ok() {
+                // Drop an orphaned mixed-case row in `users` left over from a pre-fix run.
+                // `db::user::delete` is case-insensitive at the table layer and also fans out
+                // a cluster-wide invalidation so the in-mem user cache (and super_cluster) drop
+                // the stale row — `table::users::remove` would skip both. Only a row whose
+                // stored email differs in case is such an orphan: a lowercase row is this
+                // account, possibly being created by a concurrent call on another node, and
+                // deleting it (with its memberships) would break that call.
+                if db::user::get_user_record(&email)
+                    .await
+                    .is_ok_and(|user| user.email != email)
+                {
                     db::user::delete(&email).await?;
                 }
                 create_service_account_if_not_exists(&email).await?;
