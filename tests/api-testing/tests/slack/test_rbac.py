@@ -194,3 +194,31 @@ def test_sql_tables_are_authorized_under_the_type_the_sql_names(client: OpenObse
     assert allowed.status_code == 200, allowed.text
     assert allowed.json()["hits"], allowed.text
 
+
+def test_promql_range_exemplars_and_series_check_the_metric_for_every_user(client: OpenObserveClient) -> None:
+    org = rbac_org(client)
+    hidden, granted = f"rbac_hidden_m_{uuid.uuid4().hex[:6]}", f"rbac_granted_m_{uuid.uuid4().hex[:6]}"
+    now = int(time.time())
+    rows = [
+        {"__name__": name, "__type__": "gauge", "host": "h1", "_timestamp": (now - 120 + i * 10) * 1000, "value": float(i)}
+        for name in (hidden, granted)
+        for i in range(6)
+    ]
+    resp = client.post("ingest/metrics/_json", json=rows, org=org)
+    assert resp.status_code == 200, resp.text
+    user = role_user(client, org, [(f"metrics:{granted}", "AllowAll")])
+    window = {"start": now - 600, "end": now + 60, "step": "15s"}
+
+    for name, want in ((hidden, 403), (granted, 200)):
+        calls = [
+            ("query", {"query": name, "time": now}),
+            ("query_range", {"query": name, **window}),
+            ("query_exemplars", {"query": name, **window}),
+            ("series", {"match[]": name, "start": window["start"], "end": window["end"]}),
+        ]
+        for route, params in calls:
+            got = user.get(f"prometheus/api/v1/{route}", params=params, org=org)
+            assert got.status_code == want, f"{route} {name}: {got.status_code} {got.text[:300]}"
+            if want == 403:
+                assert "h1" not in got.text, f"{route} {name}: {got.text[:300]}"
+
