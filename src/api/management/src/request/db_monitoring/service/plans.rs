@@ -374,12 +374,7 @@ pub(crate) async fn read_plans_body(
             return Err(unauthorized_response());
         }
     }
-    let (start_time, end_time) = resolve_range(q.start_time, q.end_time);
-    if start_time >= end_time {
-        return Err(MetaHttpResponse::bad_request(
-            "start_time must be before end_time",
-        ));
-    }
+    let (start_time, end_time) = resolve_range(q.start_time, q.end_time)?;
 
     // Same rule as `read_deadlocks_body`: a failed schema read is reported,
     // never absorbed into an empty set. See `present_dbm_columns`.
