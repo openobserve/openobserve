@@ -136,7 +136,6 @@ pub async fn get_enrichment_table_data(
     #[cfg(feature = "enterprise")]
     search_service::SEARCH_SERVER
         .insert(
-            org_id,
             trace_id.clone(),
             TaskStatus::new_leader(
                 vec![],
@@ -164,9 +163,7 @@ pub async fn get_enrichment_table_data(
     .await;
 
     #[cfg(feature = "enterprise")]
-    let _ = search_service::SEARCH_SERVER
-        .remove(org_id, &trace_id)
-        .await;
+    let _ = search_service::SEARCH_SERVER.remove(&trace_id).await;
 
     match result {
         Ok((batches, ..)) => {

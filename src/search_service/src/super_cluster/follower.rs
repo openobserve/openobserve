@@ -257,9 +257,7 @@ pub async fn search(
     );
 
     // update search session scan stats
-    SEARCH_SERVER
-        .add_file_stats(&req.org_id, &trace_id, &scan_stats)
-        .await;
+    SEARCH_SERVER.add_file_stats(&trace_id, &scan_stats).await;
 
     let search_infos = SearchInfos {
         plan: vec![],

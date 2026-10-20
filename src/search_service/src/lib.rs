@@ -175,7 +175,6 @@ pub async fn search(
         // set search task
         SEARCH_SERVER
             .insert(
-                org_id,
                 trace_id.clone(),
                 TaskStatus::new_leader(
                     vec![],
@@ -222,7 +221,7 @@ pub async fn search(
     let mut _work_group = None;
     #[cfg(feature = "enterprise")]
     {
-        if let Some((_, stat)) = SEARCH_SERVER.remove(org_id, &trace_id).await
+        if let Some((_, stat)) = SEARCH_SERVER.remove(&trace_id).await
             && let Some(wg) = stat.work_group.as_ref()
         {
             _work_group = Some(wg.to_string());

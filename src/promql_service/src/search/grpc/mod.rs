@@ -58,8 +58,6 @@ struct GroupPlan {
 
 struct StorageProvider {
     trace_id: String,
-    #[cfg(feature = "enterprise")]
-    org_id: String,
     need_wal: bool,
 }
 
@@ -118,7 +116,7 @@ impl TableProvider for StorageProvider {
     ) -> datafusion::error::Result<Option<tokio::sync::oneshot::Receiver<()>>> {
         let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
         if search_service::SEARCH_SERVER
-            .insert_sender(&self.org_id, trace_id, abort_sender, true)
+            .insert_sender(trace_id, abort_sender, true)
             .await
             .is_err()
         {
@@ -431,8 +429,6 @@ pub async fn search_inner(
         query_ctx,
         StorageProvider {
             trace_id: trace_id.to_string(),
-            #[cfg(feature = "enterprise")]
-            org_id: org_id.to_string(),
             need_wal: req.need_wal,
         },
         query.label_selector.clone(),

@@ -33,16 +33,19 @@ impl Searcher {
         }
     }
 
-    /// Registers a task unless the org already runs one under the same id; true when inserted.
-    pub async fn insert(&self, org_id: &str, trace_id: String, task_status: TaskStatus) -> bool {
-        self.query_manager
-            .insert(org_id, trace_id, task_status)
-            .await
+    // check is the trace_id in the query_manager
+    pub async fn contain_key(&self, trace_id: &str) -> bool {
+        self.query_manager.contain_key(trace_id).await
+    }
+
+    // insert the trace_id and task_status into the query_manager
+    pub async fn insert(&self, trace_id: String, task_status: TaskStatus) {
+        self.query_manager.insert(trace_id, task_status).await;
     }
 
     // remove the trace_id from the query_manager
-    pub async fn remove(&self, org_id: &str, trace_id: &str) -> Option<(String, TaskStatus)> {
-        self.query_manager.remove(org_id, trace_id).await
+    pub async fn remove(&self, trace_id: &str) -> Option<(String, TaskStatus)> {
+        self.query_manager.remove(trace_id).await
     }
 
     /// Removes `trace_id` and its `{trace_id}-` sub-tasks in `org_id`, or in every org for `None`.
@@ -54,16 +57,20 @@ impl Searcher {
         self.query_manager.cancel(org_id, trace_id).await
     }
 
+    // check is the trace_id in the query_manager and is_leader
+    pub async fn is_leader(&self, trace_id: &str) -> bool {
+        self.query_manager.is_leader(trace_id).await
+    }
+
     // insert the sender into the query_manager by trace_id
     pub async fn insert_sender(
         &self,
-        org_id: &str,
         trace_id: &str,
         sender: tokio::sync::oneshot::Sender<()>,
         query_start: bool,
     ) -> Result<(), infra::errors::Error> {
         self.query_manager
-            .insert_sender(org_id, trace_id, sender, query_start)
+            .insert_sender(trace_id, sender, query_start)
             .await
     }
 
@@ -92,21 +99,16 @@ impl Searcher {
     }
 
     // add file stats
-    pub async fn add_file_stats(&self, org_id: &str, trace_id: &str, scan_stats: &ScanStats) {
+    pub async fn add_file_stats(&self, trace_id: &str, scan_stats: &ScanStats) {
         self.query_manager
-            .add_file_stats(org_id, trace_id, scan_stats)
+            .add_file_stats(trace_id, scan_stats)
             .await;
     }
 
     // add work group
-    pub async fn add_work_group(
-        &self,
-        org_id: &str,
-        trace_id: &str,
-        work_group: Option<WorkGroup>,
-    ) {
+    pub async fn add_work_group(&self, trace_id: &str, work_group: Option<WorkGroup>) {
         self.query_manager
-            .add_work_group(org_id, trace_id, work_group)
+            .add_work_group(trace_id, work_group)
             .await;
     }
 }
