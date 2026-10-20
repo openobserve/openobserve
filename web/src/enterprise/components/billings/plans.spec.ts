@@ -920,6 +920,9 @@ describe("Plans Component", () => {
       await flushPromises();
       await wrapper.findComponent({ name: "ProPlan" }).vm.$emit("contact-sales");
       expect(open).toHaveBeenCalledWith(siteURL.contactSales, "_blank");
+      expect(analytics.track).toHaveBeenCalledWith("billing_contact_sales_clicked", {
+        plan: "annual-contract",
+      });
       open.mockRestore();
     });
 

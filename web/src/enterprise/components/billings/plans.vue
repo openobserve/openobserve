@@ -164,7 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :additionalInfo="proPlanAdditionalInfo"
           :pricingError="pricingError"
           @retry-pricing="fetchPricingData"
-          @contact-sales="contactSales"
+          @contact-sales="contactSalesForAnnual"
           @update:proSubscription="onLoadSubscription(config.paidPlan)"
           @update:cancelSubscription="onUnsubscribe"
         ></ProPlan>
@@ -265,6 +265,10 @@ export default defineComponent({
     contactSales() {
       window.open(siteURL.contactSales, "_blank");
     },
+    contactSalesForAnnual() {
+      analytics.track("billing_contact_sales_clicked", { plan: "annual-contract" });
+      this.contactSales();
+    },
     async fetchPricingData() {
       this.pricingError = false;
       try {
@@ -297,13 +301,15 @@ export default defineComponent({
           : [];
         // Production JSON already has a plan price, so only pricingOptions opts into the price block.
         const hasPriceBlock = pricingOptions.length > 0;
-        const visibleFeatures = (plan: any) =>
-          (plan?.features ?? []).filter((f: any) => !(hasPriceBlock && f.inPriceBlock));
+        const proFeatures = payAsYouGo?.features ?? [];
 
-        this.proPlanFeatures = mapFeatures(visibleFeatures(payAsYouGo));
-        this.enterprisePlanFeatures = mapFeatures(visibleFeatures(enterprise));
+        this.proPlanFeatures = mapFeatures(
+          hasPriceBlock ? proFeatures.filter((f: any) => !f.inPriceBlock) : proFeatures,
+        );
+        this.enterprisePlanFeatures = mapFeatures(enterprise?.features ?? []);
         this.proPlanPricingOptions = pricingOptions;
         this.proPlanAdditionalInfo = payAsYouGo?.additionalInfo ?? "";
+        // Both cards show a price block or neither, so their feature lists stay aligned.
         this.enterprisePlanPrice =
           hasPriceBlock && enterprise?.price
             ? { price: enterprise.price, note: enterprise.priceNote ?? "" }
