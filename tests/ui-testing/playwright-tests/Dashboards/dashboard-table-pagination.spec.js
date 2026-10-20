@@ -1066,7 +1066,7 @@ test.describe("Dashboard Table Chart Pagination Feature - PromQL Tables", () => 
     await deleteDashboard(page, dashboardName);
   });
 
-  test("should display pagination controls in PromQL table with legend filter", async ({
+  test("should render the pagination footer in PromQL table with legend filter", async ({
     page,
   }) => {
     const dashboardName = generateUniqueDashboardName();
@@ -1157,7 +1157,7 @@ test.describe("Dashboard Table Chart Pagination Feature - PromQL Tables", () => 
     const paginationInfo = pm.dashboardPanelConfigs.tableRowCount;
     await expect(paginationInfo).toHaveText(/^\s*\d+-\d+\s+of\s+\d+\s*$/, { timeout: 15000 });
 
-    // Verify pagination shows correct format (e.g., "1-10 of X" or "1-N of N" if fewer records)
+    // Only the footer's presence and range shape are checked; the page-size count is wrong today (#15544) and its fix adds the exact assertion.
     const paginationText = await paginationInfo.textContent();
     expect(paginationText.trim()).toMatch(/^\d+-\d+\s+of\s+\d+$/);
 
