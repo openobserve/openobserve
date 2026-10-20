@@ -19,6 +19,7 @@ export interface ProgressBarProps {
   start?: number;
   /** Semantic color state. Default: "default" */
   variant?: ProgressBarVariant;
+  color?: string;
   /** Track height. Default: "sm" */
   size?: ProgressBarSize;
 }

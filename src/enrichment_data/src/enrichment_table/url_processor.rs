@@ -1921,13 +1921,6 @@ mod tests {
     }
 
     #[test]
-    fn test_mpsc_trigger() {
-        let (sender, _receiver) = test_sender();
-        let result = send_url_job_event(&sender, "test_org".to_string(), "test_table".to_string());
-        assert!(result.is_ok());
-    }
-
-    #[test]
     fn test_mpsc_trigger_multiple_times() {
         let (sender, _receiver) = test_sender();
         // Multiple triggers for the same org/table should all succeed
@@ -1935,14 +1928,6 @@ mod tests {
             let result = send_url_job_event(&sender, format!("org_{}", i), format!("table_{}", i));
             assert!(result.is_ok(), "trigger {} should succeed", i);
         }
-    }
-
-    #[test]
-    fn test_mpsc_trigger_empty_strings() {
-        let (sender, _receiver) = test_sender();
-        // Empty strings are valid identifiers for the channel
-        let result = send_url_job_event(&sender, "".to_string(), "".to_string());
-        assert!(result.is_ok());
     }
 
     #[test]

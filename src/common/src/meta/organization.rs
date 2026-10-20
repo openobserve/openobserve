@@ -490,6 +490,14 @@ pub struct DomainOrgMapping {
     pub create_missing_roles: bool,
 }
 
+#[derive(Deserialize, Serialize, Debug, Clone, ToSchema)]
+pub struct BudgetNotificationConfiguration {
+    pub org_id: String,
+    pub total_budget_amount: f64,
+    pub warn_at_amount: f64,
+    pub paused: bool,
+}
+
 #[derive(Serialize, ToSchema, Deserialize, Debug, Clone)]
 pub struct OrganizationSettingPayload {
     /// Ideally this should be the same as prometheus-scrape-interval (in
@@ -525,6 +533,8 @@ pub struct OrganizationSettingPayload {
     pub cross_links: Option<Vec<config::meta::stream::CrossLink>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub domain_org_mappings: Option<Vec<DomainOrgMapping>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub budget_config: Option<Vec<BudgetNotificationConfiguration>>,
 }
 
 #[derive(Serialize, ToSchema, Deserialize, Debug, Clone)]
@@ -569,6 +579,9 @@ pub struct OrganizationSetting {
     #[cfg(feature = "cloud")]
     #[serde(default)]
     pub domain_org_mappings: Vec<DomainOrgMapping>,
+    #[cfg(feature = "cloud")]
+    #[serde(default)]
+    pub budget_config: Vec<BudgetNotificationConfiguration>,
 }
 
 impl Default for OrganizationSetting {
@@ -605,6 +618,8 @@ impl Default for OrganizationSetting {
             org_storage_enabled: false,
             #[cfg(feature = "cloud")]
             domain_org_mappings: Vec::new(),
+            #[cfg(feature = "cloud")]
+            budget_config: Vec::new(),
         }
     }
 }
@@ -677,13 +692,6 @@ impl NodeListResponse {
 
         cluster_entry.push(node);
     }
-
-    /// Adds multiple nodes to the response structure
-    pub fn add_nodes(&mut self, nodes: Vec<(Node, String, String)>) {
-        for (node, region, cluster) in nodes {
-            self.add_node(node, region, cluster);
-        }
-    }
 }
 
 #[derive(Serialize, Deserialize, Default, Clone, Debug, ToSchema)]
@@ -754,33 +762,6 @@ mod tests {
             .unwrap();
         assert_eq!(nodes.len(), 1);
         assert_eq!(nodes[0].name, "node-1");
-    }
-
-    #[test]
-    fn test_node_list_response_add_nodes() {
-        let node1 = Node {
-            name: "node-1".into(),
-            ..Default::default()
-        };
-        let node2 = Node {
-            name: "node-2".into(),
-            ..Default::default()
-        };
-
-        let mut response = NodeListResponse::new();
-        response.add_nodes(vec![
-            (node1.clone(), "us-west".into(), "cluster-x".into()),
-            (node2.clone(), "us-west".into(), "cluster-x".into()),
-        ]);
-
-        let nodes = &response
-            .regions
-            .get("us-west")
-            .unwrap()
-            .clusters
-            .get("cluster-x")
-            .unwrap();
-        assert_eq!(nodes.len(), 2);
     }
 
     #[test]
@@ -1478,6 +1459,7 @@ mod tests {
             claim_parser_function: None,
             cross_links: None,
             domain_org_mappings: None,
+            budget_config: None,
         };
         let json = serde_json::to_value(&payload).unwrap();
         let obj = json.as_object().unwrap();
@@ -1558,6 +1540,8 @@ mod tests {
             org_storage_enabled: false,
             #[cfg(feature = "cloud")]
             domain_org_mappings: vec![],
+            #[cfg(feature = "cloud")]
+            budget_config: vec![],
         };
         let json = serde_json::to_value(&setting).unwrap();
         let obj = json.as_object().unwrap();
@@ -1589,6 +1573,8 @@ mod tests {
             org_storage_enabled: false,
             #[cfg(feature = "cloud")]
             domain_org_mappings: vec![],
+            #[cfg(feature = "cloud")]
+            budget_config: vec![],
         };
         let json = serde_json::to_value(&setting).unwrap();
         let obj = json.as_object().unwrap();

@@ -227,8 +227,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </OStep>
 
-      <OStep :name="4" :title="t('alert_library.install.stepTune')" icon="tune" :done="step > 4">
+      <!-- Frequency and silence are scheduled-alert fields; an anomaly-only batch skips the step. -->
+      <OStep
+        v-if="batchHasScheduled"
+        :name="4"
+        :title="t('alert_library.install.stepTune')"
+        icon="tune"
+        :done="step > 4"
+      >
         <div class="flex flex-col gap-3 pt-2" data-test="alert-library-install-tune-step">
+          <p
+            v-if="batchHasAnomaly"
+            class="text-text-secondary text-sm"
+            data-test="alert-library-install-tune-threshold-only"
+          >
+            {{ t("alert_library.install.tuneThresholdOnly") }}
+          </p>
           <!-- The two settings are named from their own field labels: the fields
                themselves are hidden until the toggle below is ticked. -->
           <p class="text-text-secondary text-sm" data-test="alert-library-install-tune-hint">
@@ -283,9 +297,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <dd class="text-text-heading">{{ folderLabel }}</dd>
             <dt class="text-text-secondary">{{ t("alert_library.install.stepAlerts") }}</dt>
             <dd class="text-text-heading">{{ selectedIds.length }}</dd>
-            <dt class="text-text-secondary">{{ t("alert_library.install.stepTune") }}</dt>
-            <dd class="text-text-heading">{{ tuningSummary }}</dd>
+            <template v-if="batchHasScheduled">
+              <dt class="text-text-secondary">{{ t("alert_library.install.stepTune") }}</dt>
+              <dd class="text-text-heading">{{ tuningSummary }}</dd>
+            </template>
           </dl>
+
+          <OBanner
+            v-if="anomalyInstalled"
+            variant="info"
+            icon="query-stats"
+            dense
+            :content="t('alert_library.install.anomalyTrainingNote')"
+            data-test="alert-library-install-anomaly-note"
+          />
 
           <!-- Select-all-in-view is one click, so the biggest runs are made deliberate. -->
           <OCheckbox
@@ -350,7 +375,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="sm-action"
           :disabled="isInstalling"
           data-test="alert-library-install-back"
-          @click="step -= 1"
+          @click="goBack"
         >
           {{ t("alert_library.install.back") }}
         </OButton>
@@ -369,7 +394,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="primary"
           size="sm-action"
           :loading="isInstalling"
-          :disabled="needsLargeBatchConfirm && !largeBatchConfirmed"
+          :disabled="selectedIds.length === 0 || (needsLargeBatchConfirm && !largeBatchConfirmed)"
           data-test="alert-library-install-run"
           @click="install(selectedIds)"
         >
@@ -409,7 +434,7 @@ import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 
 import SelectFolderDropDown from "@/components/common/sidebar/SelectFolderDropDown.vue";
-import { useAlertLibrary } from "@/composables/alerts/useAlertLibrary";
+import { useAlertLibrary, useAnomalyLibraryAccess } from "@/composables/alerts/useAlertLibrary";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -424,6 +449,8 @@ import OStep from "@/lib/navigation/Stepper/OStep.vue";
 import OStepper from "@/lib/navigation/Stepper/OStepper.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import { saveAlertMutation } from "@/services/alerts.queries";
+import { alertKeys } from "@/services/alerts.querykeys";
+import { saveAnomalyConfigMutation } from "@/services/anomaly_detection.queries";
 import { useMutation } from "@tanstack/vue-query";
 import destinationService from "@/services/alert_destination";
 import analytics from "@/services/product_analytics";
@@ -431,8 +458,13 @@ import type { AlertLibraryEntry, AlertLibraryFile } from "@/types/alertLibrary";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { getFoldersListByType } from "@/utils/commons";
 
-import { severityBadgeValue, severityLabel } from "./libraryFacets";
-import { buildInstallPayload, InstallPayloadError, type InstallOverrides } from "./libraryInstall";
+import { alertTypeOf, severityBadgeValue, severityLabel } from "./libraryFacets";
+import {
+  buildAnomalyInstallPayload,
+  buildInstallPayload,
+  InstallPayloadError,
+  type InstallOverrides,
+} from "./libraryInstall";
 import { coerceTunable, readTunables, DEFAULT_TUNABLES } from "./libraryTunables";
 
 const props = defineProps<{
@@ -465,6 +497,7 @@ const { t } = useI18nTyped();
 const store = useStore();
 const router = useRouter();
 const { loadAlertFile } = useAlertLibrary();
+const anomalyAccess = useAnomalyLibraryAccess();
 
 /** Optional-chained: a missing organization must not throw out of a click handler. */
 const orgIdentifier = (): string => store.state.selectedOrganization?.identifier ?? "";
@@ -509,6 +542,11 @@ const roster = ref<AlertLibraryEntry[]>([]);
 const results = ref<InstallResult[]>([]);
 const isInstalling = ref(false);
 const hasRun = ref(false);
+const anomalyInstalled = ref(false);
+
+// Locked anomaly cards reach `entries` too, since the gallery shows them; this keeps them out of the batch.
+const canInstallKind = (entry: AlertLibraryEntry): boolean =>
+  alertTypeOf(entry) !== "anomaly" || anomalyAccess.value === "enabled";
 
 const minutesSuffix = computed(() => t("alert_library.install.minutes"));
 
@@ -532,11 +570,30 @@ const candidates = computed<AlertLibraryEntry[]>(() => {
   // entry would create that alert twice.
   const seen = new Set<string>();
   return offered.filter((entry) => {
+    if (!canInstallKind(entry)) return false;
     if (seen.has(entry.id)) return false;
     seen.add(entry.id);
     return true;
   });
 });
+
+// Anomaly access can turn off while the dialog is open; a selection it no longer offers must not be counted.
+watch(candidates, (offered) => {
+  const eligible = new Set(offered.map((entry) => entry.id));
+  if (selectedIds.value.some((id) => !eligible.has(id))) {
+    selectedIds.value = selectedIds.value.filter((id) => eligible.has(id));
+  }
+});
+
+const selectedEntries = computed(() =>
+  candidates.value.filter((entry) => selectedIds.value.includes(entry.id)),
+);
+const batchHasScheduled = computed(() =>
+  selectedEntries.value.some((entry) => alertTypeOf(entry) === "scheduled"),
+);
+const batchHasAnomaly = computed(() =>
+  selectedEntries.value.some((entry) => alertTypeOf(entry) === "anomaly"),
+);
 
 const destinationOptions = computed(() =>
   existingDestinations.value.map((name) => ({ label: raw(name), value: name })),
@@ -601,8 +658,10 @@ const reset = () => {
   roster.value = [];
   hasRun.value = false;
   isInstalling.value = false;
+  anomalyInstalled.value = false;
 
-  selectedIds.value = props.seed ? [props.seed.entry.id] : props.preselect.map((entry) => entry.id);
+  const opened = props.seed ? [props.seed.entry] : props.preselect;
+  selectedIds.value = opened.filter(canInstallKind).map((entry) => entry.id);
   largeBatchConfirmed.value = false;
   // Seed the bulk pair from the alert the user was just looking at, so the
   // fields open on values that mean something rather than on a global default.
@@ -696,7 +755,9 @@ const errorText = (error: unknown): I18nText => {
   // Resolving it here is what keeps that refusal translatable instead of
   // showing the user the literal string "unreadable_conditions".
   if (error instanceof InstallPayloadError) {
-    return t("alert_library.install.unreadableConditions");
+    return error.code === "anomaly_unavailable"
+      ? t("alert_library.install.anomalyUnavailable")
+      : t("alert_library.install.unreadableConditions");
   }
   const response = (error as { response?: { data?: { message?: string } } })?.response;
   return (
@@ -718,7 +779,11 @@ const openDestinationsPage = () => {
 };
 
 const goNext = () => {
-  step.value += 1;
+  step.value = step.value === 3 && !batchHasScheduled.value ? 5 : step.value + 1;
+};
+
+const goBack = () => {
+  step.value = step.value === 5 && !batchHasScheduled.value ? 3 : step.value - 1;
 };
 
 // ── alerts step ────────────────────────────────────────────────────────────
@@ -767,6 +832,51 @@ const setResult = (id: string, patch: Partial<InstallResult>) => {
 
 // Each create drops the scope itself, so nothing refreshes after the batch.
 const installAlert = useMutation(() => saveAlertMutation(orgIdentifier(), () => false));
+// The Alerts list shows anomaly configs too, and the shared mutation drops only the anomaly scope.
+const installAnomaly = useMutation(() => {
+  const options = saveAnomalyConfigMutation(orgIdentifier(), () => undefined);
+  return {
+    ...options,
+    meta: {
+      ...options.meta,
+      invalidates: [...(options.meta?.invalidates ?? []), alertKeys.all(orgIdentifier())],
+    },
+  };
+});
+
+const installOne = async (
+  entry: AlertLibraryEntry,
+  overrides: InstallOverrides | undefined,
+): Promise<boolean> => {
+  const file =
+    props.seed && props.seed.entry.id === entry.id ? props.seed.file : await loadAlertFile(entry);
+
+  // The file is checked too: on OSS an anomaly body is stored as a broken scheduled alert.
+  const isAnomaly = alertTypeOf(entry) === "anomaly" || file.alert_type === "anomaly_detection";
+  if (isAnomaly) {
+    if (anomalyAccess.value !== "enabled") throw new InstallPayloadError("anomaly_unavailable");
+    const payload = buildAnomalyInstallPayload({
+      entry,
+      file,
+      folderId: folderId.value,
+      destination: chosenDestination.value,
+    });
+    await installAnomaly.mutateAsync({ payload, folderId: folderId.value });
+    return true;
+  }
+
+  const payload = buildInstallPayload({
+    entry,
+    file,
+    folderId: folderId.value,
+    destination: chosenDestination.value,
+    owner: store.state.userInfo?.email ?? "",
+    timezone: store.state.timezone,
+    overrides,
+  });
+  await installAlert.mutateAsync({ payload, folderId: folderId.value });
+  return false;
+};
 
 const install = async (ids: string[]) => {
   if (isInstalling.value) return;
@@ -800,6 +910,7 @@ const install = async (ids: string[]) => {
   // Only what this pass created. Re-announcing everything in `results` would
   // make a retry repeat ids the parent already counted.
   const installedNow: string[] = [];
+  let anomalyNow = 0;
 
   // Sequential on purpose: one rejected create must not take the rest of the
   // batch with it, and a burst of parallel POSTs is what rate limits.
@@ -807,22 +918,7 @@ const install = async (ids: string[]) => {
     for (const entry of batch) {
       setResult(entry.id, { status: "running", message: undefined });
       try {
-        const file =
-          props.seed && props.seed.entry.id === entry.id
-            ? props.seed.file
-            : await loadAlertFile(entry);
-
-        const payload = buildInstallPayload({
-          entry,
-          file,
-          folderId: folderId.value,
-          destination: chosenDestination.value,
-          owner: store.state.userInfo?.email ?? "",
-          timezone: store.state.timezone,
-          overrides: batchOverrides,
-        });
-
-        await installAlert.mutateAsync({ payload, folderId: folderId.value });
+        if (await installOne(entry, batchOverrides)) anomalyNow += 1;
         setResult(entry.id, { status: "installed" });
         installedNow.push(entry.id);
       } catch (error) {
@@ -835,9 +931,13 @@ const install = async (ids: string[]) => {
     isInstalling.value = false;
   }
 
+  if (anomalyNow > 0) anomalyInstalled.value = true;
   if (installedNow.length > 0) {
     emit("installed", { entryIds: installedNow });
-    analytics.track("library_alert_installed", { count: installedNow.length });
+    analytics.track("library_alert_installed", {
+      count: installedNow.length,
+      anomaly_count: anomalyNow,
+    });
   }
 
   const failed = failedIds.value.length;

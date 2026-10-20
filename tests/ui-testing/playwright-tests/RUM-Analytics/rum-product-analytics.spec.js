@@ -297,15 +297,17 @@ test.describe('RUM Product Analytics', () => {
     await pa.rowAction('pages', row, 'funnel-btn');
     await expect(page).toHaveURL(/\/product-analytics\/funnels/);
     await expect(pa.step(0)).toContainText('/web/a');
+    await pa.openAddStep();
     await expect(pa.suggestion('b-btn').first()).toBeVisible({ timeout: 30000 });
     await waitForNetworkQuiet(page);
     expect(scopeLoads(), 'Build funnel must not reload the scope (F18)').toEqual([]);
     expect(await page.locator('[data-test^="rum-analytics-funnel-suggestion-"]').count()).toBeLessThanOrEqual(5);
     await pa.suggestion('b-btn').first().click();
+    await pa.openAddStep();
     await expect(pa.suggestion('/web/c').first()).toBeVisible({ timeout: 30000 });
     await pa.suggestion('/web/c').first().click();
     await pa.expectFunnelCounts([6, 3, 1]);
-    await expect(pa.funnelOrderLabel).toContainText('In order (other events allowed between)');
+    await expect(pa.funnelOrderLabel).toHaveAttribute('aria-label', 'In order (other events allowed between)');
   });
 
   test('steps are picked, removed and reordered; the funnel recomputes each time (AC-13)', {
@@ -317,14 +319,14 @@ test.describe('RUM Product Analytics', () => {
     await pa.expectFunnelCounts([6, 3]);
     await expect(page.getByRole('button', { name: /^Run$/ })).toHaveCount(0);
 
-    await pa.pickOption('rum-analytics-funnel-add-step-select', { label: '/web/c', search: '/web/c' });
+    await pa.addStep('/web/c');
     await pa.expectFunnelCounts([6, 3, 1]);
 
-    await page.locator('[data-test="rum-analytics-funnel-step-1-move-down"]').click();
+    await pa.dragStep(1, 2);
     await expect(pa.step(1)).toContainText('/web/c');
     await pa.expectFunnelCounts([6, 1, 0]);
 
-    await page.locator('[data-test="rum-analytics-funnel-step-2-move-up"]').click();
+    await pa.dragStep(2, 1);
     await expect(pa.step(1)).toContainText('b-btn');
     await pa.expectFunnelCounts([6, 3, 1]);
 
@@ -411,7 +413,10 @@ test.describe('RUM Product Analytics', () => {
     await page.locator('[data-test="rum-analytics-dropoff-paths-btn"]').click();
     await expect(page).toHaveURL(/\/product-analytics\/paths/);
     await expect(pa.pathsSessionFilter).toBeVisible({ timeout: 30000 });
-    await expect(pa.pathsSessionFilter).toContainText('3');
+    await expect(pa.pathsSessionFilter).toContainText('/web/a');
+    await pa.pathsSessionFilter.click();
+    await expect(pa.pathsCohortPopover).toContainText('3', { timeout: 30000 });
+    await pa.closePopovers();
     await expect(pa.pathsFlow).toBeVisible({ timeout: 30000 });
     await waitForNetworkQuiet(page);
     expect(scopeLoads(), 'See paths must not reload the scope (F18)').toEqual([]);
@@ -553,12 +558,12 @@ test.describe('RUM Product Analytics', () => {
       await expect(page.locator('[data-test="rum-analytics-overview-features-table-row-0-users"]')).toHaveText(String(pageUsers));
 
       await pa.newFunnel();
-      await page.locator('[data-test="rum-analytics-funnel-first-step-select-trigger"], [data-test="rum-analytics-funnel-add-step-select-trigger"]').first().click();
-      const firstOption = page.locator('[data-test$="-step-select-option"]').first();
+      await page.locator('[data-test="rum-analytics-funnel-first-step-select-trigger"]').click();
+      const firstOption = page.locator('[data-test="rum-analytics-funnel-first-step-select-option"]').first();
       await expect(firstOption).toContainText(name, { timeout: 20000 });
       await firstOption.click();
       await expect(pa.step(0)).toContainText(name);
-      await pa.pickOption('rum-analytics-funnel-add-step-select', { label: 'b-btn', search: 'b-btn' });
+      await pa.addStep('b-btn');
       await pa.expectFunnelCounts([6, 3]);
 
       // A reload is a first open; the slowed named-events list widens the window in which a failure banner could flash.
@@ -934,9 +939,11 @@ test.describe('RUM Product Analytics', () => {
     expect(await page.locator('[data-test^="rum-analytics-funnel-entry-start-"]').count()).toBeLessThanOrEqual(5);
     await entry.click();
     await expect(pa.step(0)).toContainText('/web/a');
+    await pa.openAddStep();
     await pa.suggestion('b-btn').first().click();
     await pa.expectFunnelCounts([6, 3]);
 
+    await page.locator('[data-test="rum-analytics-funnel-saved-menu-btn"]').click();
     await page.locator('[data-test="rum-analytics-funnel-clear-btn"]').click();
     await expect(pa.funnelCold).toBeVisible();
     const recent = page.locator('[data-test="rum-analytics-funnel-recent-0"]');
@@ -1072,7 +1079,7 @@ test.describe('RUM Product Analytics', () => {
     }
   });
 
-  test('the named-event editor offers three page operators, previews matches, caps rules at 10 and asks before discarding', {
+  test('the named-event editor offers five page operators, previews matches, caps rules at 10 and asks before discarding', {
     tag: PA_TAGS('@P1'),
   }, async ({ page }) => {
     const pa = new PageManager(page).rumProductAnalyticsPage;
@@ -1081,7 +1088,7 @@ test.describe('RUM Product Analytics', () => {
     try {
       await pa.goto('overview', { app: facts.appId, period: '7d' });
       await pa.openNewEventEditor();
-      expect(await pa.ruleOpOptionLabels(0)).toEqual(['Equals', 'Starts with', 'Matches regex']);
+      expect(await pa.ruleOpOptionLabels(0)).toEqual(['Equals', 'Starts with', 'Matches regex', 'URL parameter', 'Referrer host']);
       await pa.setRuleOp(0, 'eq');
       await pa.fillRuleValue(0, facts.funnel.a);
       // s1..s6 view /web/a; no other seeded session does.
@@ -1215,7 +1222,7 @@ test.describe('RUM Product Analytics', () => {
     await pa.goto('funnels', { app: facts.appId, period: '7d', funnel: funnelParam([['p', facts.funnel.a]]) });
     await expect(pa.step(0)).toContainText(facts.funnel.a, { timeout: 30000 });
     await expect(pa.funnelAlertBtn).toBeDisabled();
-    await expect(pa.funnelAlertBtn).toHaveAttribute('aria-label', 'Build a funnel of two or more steps to alert on it');
+    await expect(await pa.tooltipOf(pa.funnelAlertBtn)).toContainText('Build a funnel of two or more steps to alert on it');
 
     await pa.goto('funnels', { app: facts.appId, period: '7d', funnel: funnelParam([['p', facts.funnel.a], ['c', facts.funnel.b]]) });
     await pa.expectFunnelCounts([6, 3]);
@@ -1236,12 +1243,12 @@ test.describe('RUM Product Analytics', () => {
     await expect(pa.breakdown).toBeVisible({ timeout: 30000 });
     expect(pa.funnelFromUrl()?.b).toBe('browser');
     await expect(pa.funnelAddDashboardBtn).toBeDisabled();
-    await expect(pa.funnelAddDashboardBtn).toHaveAttribute('aria-label', reason);
+    await expect(await pa.tooltipOf(pa.funnelAddDashboardBtn)).toContainText(reason);
 
     await pa.goto('funnels', { app: facts.appId, period: '7d', funnel: funnelParam(steps, { u: 'users' }) });
     await expect(pa.countBy('users')).toHaveAttribute('data-state', 'on', { timeout: 30000 });
     await expect(pa.funnelAddDashboardBtn).toBeDisabled();
-    await expect(pa.funnelAddDashboardBtn).toHaveAttribute('aria-label', reason);
+    await expect(await pa.tooltipOf(pa.funnelAddDashboardBtn)).toContainText(reason);
   });
 
   test('a malformed link resets with a banner; a link naming a deleted event drops that step with a notice', {
@@ -1277,6 +1284,7 @@ test.describe('RUM Product Analytics', () => {
     await page.route(SEARCH, failNextSteps);
     try {
       await pa.goto('funnels', { app: facts.appId, period: '7d', funnel: funnelParam([['p', facts.funnel.a]]) });
+      await pa.openAddStep();
       await expect(pa.funnelSuggestionsError).toBeVisible({ timeout: 30000 });
       await expect(pa.suggestion(facts.funnel.b)).toHaveCount(0);
 
@@ -1328,6 +1336,7 @@ test.describe('RUM Product Analytics', () => {
       const pa = new PageManager(page).rumProductAnalyticsPage;
       const mix = await seedBuilt(page, buildSyntheticMixSeed(`${facts.appId}-syn`, Date.now()));
       await pa.goto('overview', { app: mix.appId, period: '7d' });
+      await pa.openExclusions();
       await expect(pa.syntheticExcluded).toContainText(String(mix.synthetic), { timeout: 30000 });
       await expect(pa.kpiSessions).toContainText(new RegExp(`\\b${mix.real}\\b`), { timeout: 30000 });
       await expect(pa.kpiSessions).not.toContainText(new RegExp(`\\b${mix.real + mix.synthetic}\\b`));

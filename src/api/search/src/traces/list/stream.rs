@@ -293,7 +293,6 @@ async fn run(
             (p_start, p_end),
             &base_req,
             &sender,
-            &format!("partition [{p_start},{p_end}]"),
         )
         .await
         else {
@@ -310,7 +309,7 @@ async fn run(
 
         let mut results = config::meta::search::Response::default();
         for h in deliverable {
-            results.add_hit(&h);
+            results.add_hit(h);
         }
         results.set_total(total_across_partitions);
         if !range_error.is_empty() && !range_error_sent {
@@ -362,7 +361,6 @@ async fn run(
             (start_time, end_time),
             &base_req,
             &sender,
-            "non-ts",
         )
         .await
         else {
@@ -377,7 +375,7 @@ async fn run(
 
         let mut results = config::meta::search::Response::default();
         for h in deliverable {
-            results.add_hit(&h);
+            results.add_hit(h);
         }
         results.set_total(total_across_partitions);
         if !range_error.is_empty() {
@@ -409,13 +407,12 @@ async fn load_batch(
     range: (i64, i64),
     base_request: &Request,
     sender: &mpsc::Sender<Result<StreamResponses, infra::errors::Error>>,
-    log_ctx: &str,
 ) -> Option<TraceBatch> {
     let hits = match ctx.summarize_traces(plan, base_request, hits, range).await {
         Ok(hits) => hits,
         Err(error) => {
             log::error!(
-                "[TRACES_STREAM trace_id {}] Q2a error ({log_ctx}): {error}",
+                "[TRACES_STREAM trace_id {}] Q2a error ({range:?}): {error}",
                 ctx.trace_id
             );
             let _ = sender.send(Err(error)).await;
@@ -432,7 +429,7 @@ async fn load_batch(
         .await
     {
         log::error!(
-            "[TRACES_STREAM trace_id {}] Q2b error ({log_ctx}): {error}",
+            "[TRACES_STREAM trace_id {}] Q2b error ({range:?}): {error}",
             ctx.trace_id
         );
         let _ = sender.send(Err(error)).await;

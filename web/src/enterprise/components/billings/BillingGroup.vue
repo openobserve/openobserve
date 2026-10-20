@@ -596,7 +596,6 @@ export default defineComponent({
     const headerInvite = inject<{
       trigger: number;
       canInvite: boolean;
-      refreshMembers?: () => void;
     }>("orgGroupInvite", undefined as any);
     watch(
       () => headerInvite?.trigger,
@@ -913,7 +912,6 @@ export default defineComponent({
         removeTarget.value = null;
       }
       await loadAll();
-      headerInvite?.refreshMembers?.();
     };
 
     const leaveGroup = async () => {
@@ -937,7 +935,6 @@ export default defineComponent({
         showLeaveDialog.value = false;
       }
       await loadAll();
-      headerInvite?.refreshMembers?.();
     };
 
     onMounted(loadAll);

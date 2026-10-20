@@ -99,10 +99,10 @@ pub(crate) async fn read_query_endpoints_response(
     {
         return unauthorized_response();
     }
-    let (start_time, end_time) = resolve_range(q.start_time, q.end_time);
-    if start_time >= end_time {
-        return MetaHttpResponse::bad_request("start_time must be before end_time");
-    }
+    let (start_time, end_time) = match resolve_range(q.start_time, q.end_time) {
+        Ok(range) => range,
+        Err(resp) => return resp,
+    };
     let limit = q
         .limit
         .unwrap_or(DEFAULT_ENDPOINTS_LIMIT)
@@ -127,7 +127,7 @@ pub(crate) async fn read_query_endpoints_response(
         Ok(hits) => MetaHttpResponse::json(json!({ "hits": hits })),
         Err(e) => {
             log::error!("[DbMonitoring] endpoints query failed for {org_id}/{stream}: {e}");
-            MetaHttpResponse::internal_error(e)
+            search_error_response(e)
         }
     }
 }
@@ -214,6 +214,25 @@ mod tests {
         let sql = build_endpoints_sql("s\"x", "fp' OR '1'='1", "", 10);
         assert!(sql.contains("FROM \"s\"\"x\" AS dbspan"));
         assert!(sql.contains("o2_db_fingerprint = 'fp'' OR ''1''=''1'"));
+    }
+
+    // The schemathesis request: a non-positive start must 400 before any search runs.
+    #[tokio::test]
+    async fn test_endpoints_rejects_a_non_positive_range_before_searching() {
+        let q: EndpointsQuery = serde_json::from_value(json!({
+            "fingerprint": "fp",
+            "stream": "no_such_stream",
+            "start_time": -12199442,
+            "end_time": 21415522,
+            "limit": 254311,
+        }))
+        .unwrap();
+        let resp = read_query_endpoints_response("default", "a@a.com", &q).await;
+        assert_eq!(resp.status(), axum::http::StatusCode::BAD_REQUEST);
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        assert!(String::from_utf8_lossy(&body).contains("must be positive"));
     }
 
     /// The section's cap is the standalone endpoint's cap, under the same

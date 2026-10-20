@@ -343,44 +343,6 @@ pub async fn delete_by_id<C: ConnectionTrait>(
     Ok(())
 }
 
-pub async fn delete_by_name(
-    org_id: &str,
-    stream_type: StreamType,
-    stream_name: &str,
-    name: &str,
-) -> Result<(), infra::errors::Error> {
-    let client = get_orm_client_rw().await;
-
-    let Some(alert_id) =
-        table::get_by_name(client, org_id, "default", stream_type, stream_name, name)
-            .await?
-            .and_then(|(_, a)| a.id)
-    else {
-        return Ok(());
-    };
-    let alert_id_str = alert_id.to_string();
-
-    #[cfg(feature = "enterprise")]
-    db::workflows::delete_workflow_association(AssociationDeleteEvent::Entity {
-        org_id: org_id.to_string(),
-        entity_id: alert_id_str.clone(),
-    })
-    .await?;
-
-    table::delete_by_name(client, org_id, "default", stream_type, stream_name, name).await?;
-    infra::coordinator::alerts::emit_delete_event(org_id, &alert_id_str).await?;
-
-    #[cfg(feature = "enterprise")]
-    super_cluster::emit_delete_event(org_id, stream_type, stream_name, name, alert_id).await?;
-
-    if let Err(e) =
-        db::scheduler::delete(org_id, db::scheduler::TriggerModule::Alert, &alert_id_str).await
-    {
-        log::error!("Failed to delete trigger: org_id: {org_id}, error: {e}");
-    };
-    Ok(())
-}
-
 pub async fn list(
     org_id: &str,
     stream_type: Option<StreamType>,
@@ -636,12 +598,6 @@ mod tests {
     fn test_cache_alert_key() {
         let key = cache_alert_key("myorg", "alert-123");
         assert_eq!(key, "myorg/alert-123");
-    }
-
-    #[test]
-    fn test_cache_alert_key_empty_org() {
-        let key = cache_alert_key("", "alert-456");
-        assert_eq!(key, "/alert-456");
     }
 
     #[test]

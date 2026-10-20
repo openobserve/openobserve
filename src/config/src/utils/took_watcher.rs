@@ -50,11 +50,6 @@ impl TookWatcher {
         self.total_elapsed().as_millis() as u64
     }
 
-    /// Convenience method to get total time as f64 seconds
-    pub fn total_secs_f64(&self) -> f64 {
-        self.total_elapsed().as_secs_f64()
-    }
-
     /// Get elapsed time since last split WITHOUT recording a new split.
     /// This is safe to call in loops for timeout checking.
     pub fn split_elapsed(&self) -> Duration {
@@ -67,11 +62,6 @@ impl TookWatcher {
     /// Convenience method to get elapsed time in milliseconds without mutating
     pub fn split_elapsed_millis(&self) -> u64 {
         self.split_elapsed().as_millis() as u64
-    }
-
-    /// Convenience method to get elapsed time as f64 seconds without mutating
-    pub fn split_elapsed_secs_f64(&self) -> f64 {
-        self.split_elapsed().as_secs_f64()
     }
 
     /// Record a named split and return the duration since last split
@@ -88,6 +78,7 @@ impl TookWatcher {
     }
 
     /// Get all recorded splits
+    #[cfg(test)]
     pub fn get_splits(&self) -> &[Split] {
         &self.splits
     }
@@ -198,15 +189,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_took_watcher_total_secs_f64() {
-        let watcher = TookWatcher::new();
-        tokio::time::sleep(Duration::from_millis(100)).await;
-
-        let secs = watcher.total_secs_f64();
-        assert!(secs >= 0.1);
-    }
-
-    #[tokio::test]
     async fn test_took_watcher_split_elapsed() {
         let watcher = TookWatcher::new();
         tokio::time::sleep(Duration::from_millis(10)).await;
@@ -222,15 +204,6 @@ mod tests {
 
         let millis = watcher.split_elapsed_millis();
         assert!(millis >= 10);
-    }
-
-    #[tokio::test]
-    async fn test_took_watcher_split_elapsed_secs_f64() {
-        let watcher = TookWatcher::new();
-        tokio::time::sleep(Duration::from_millis(100)).await;
-
-        let secs = watcher.split_elapsed_secs_f64();
-        assert!(secs >= 0.1);
     }
 
     #[tokio::test]

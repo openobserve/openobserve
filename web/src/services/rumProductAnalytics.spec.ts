@@ -74,3 +74,17 @@ describe("rumProductAnalytics service (AC-44, AC-67)", () => {
     expect(client.get.mock.calls[0][0]).toBe("/api/a%2Fb/rum/analytics/named_events/x%231");
   });
 });
+
+describe("pa gap fixes: app settings service (P6)", () => {
+  beforeEach(() => {
+    for (const f of Object.values(client)) f.mockReset().mockResolvedValue({ data: {} });
+  });
+
+  it("P6-R5: reads and writes an app's settings with the app in the query", async () => {
+    const body = { bots: true, sessions: [], pages: [], version: 0 };
+    await api.getAppSettings("org1", "web/app");
+    await api.putAppSettings("org1", "web/app", body);
+    expect(client.get.mock.calls).toEqual([[`${BASE}/settings`, app]]);
+    expect(client.put.mock.calls).toEqual([[`${BASE}/settings`, body, app]]);
+  });
+});

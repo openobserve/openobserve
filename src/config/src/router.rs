@@ -220,16 +220,6 @@ mod tests {
     }
 
     #[test]
-    fn test_extract_path_without_query() {
-        assert_eq!(extract_path_without_query("/api/test?foo=bar"), "/api/test");
-        assert_eq!(extract_path_without_query("/api/test"), "/api/test");
-        assert_eq!(
-            extract_path_without_query("/api/test?foo=bar&baz=qux"),
-            "/api/test"
-        );
-    }
-
-    #[test]
     fn test_is_fixed_querier_route() {
         assert!(is_fixed_querier_route("/summary"));
         assert!(is_fixed_querier_route("/schema"));

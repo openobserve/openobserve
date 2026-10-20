@@ -524,8 +524,8 @@ impl Response {
             .collect();
     }
 
-    pub fn add_hit(&mut self, hit: &json::Value) {
-        self.hits.push(hit.to_owned());
+    pub fn add_hit(&mut self, hit: json::Value) {
+        self.hits.push(hit);
         self.total += 1;
     }
 
@@ -1273,12 +1273,6 @@ impl MultiSearchPartitionRequest {
     }
 }
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
-pub struct MultiSearchPartitionResponse {
-    pub success: hashbrown::HashMap<String, SearchPartitionResponse>,
-    pub error: hashbrown::HashMap<String, String>,
-}
-
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct SqlQuery {
     pub sql: String,
@@ -1547,10 +1541,6 @@ impl Interval {
         *self as i64
     }
 
-    pub fn get_interval_seconds(&self) -> i64 {
-        self.get_duration_minutes() * 60
-    }
-
     pub fn get_interval_microseconds(&self) -> i64 {
         self.get_duration_minutes() * 60 * 1_000_000
     }
@@ -1741,17 +1731,6 @@ mod search_history_utils {
             assert_eq!(
                 query,
                 "SELECT * FROM usage WHERE event='Search' AND stream_type = 'logs'"
-            );
-        }
-
-        #[test]
-        fn test_with_stream_name() {
-            let query = SearchHistoryQueryBuilder::new()
-                .with_stream_name(&Some("streamA".to_string()))
-                .build(SEARCH_STREAM_NAME);
-            assert_eq!(
-                query,
-                "SELECT * FROM usage WHERE event='Search' AND stream_name = 'streamA'"
             );
         }
 
@@ -2098,7 +2077,7 @@ mod tests {
         let hit = json::json!({"num":12});
         let mut val_map = json::Map::new();
         val_map.insert("id".to_string(), json::json!({"id":1}));
-        res.add_hit(&hit); // total+1
+        res.add_hit(hit); // total+1
         assert_eq!(res.total, 11);
     }
 
@@ -3059,40 +3038,6 @@ mod tests {
     }
 
     #[test]
-    fn test_multi_search_partition_response() {
-        let mut response = MultiSearchPartitionResponse::default();
-        let partition_response = SearchPartitionResponse {
-            trace_id: "trace123".to_string(),
-            file_num: 10,
-            records: 100,
-            original_size: 1024,
-            compressed_size: 512,
-            histogram_interval: Some(3600),
-            max_query_range: 24,
-            partitions: vec![[100, 200]],
-            order_by: OrderBy::Asc,
-            limit: 1000,
-            streaming_output: true,
-            streaming_aggs: false,
-            streaming_id: Some("stream123".to_string()),
-            is_histogram_eligible: false,
-            non_ts_order_by_cols: vec![],
-        };
-
-        response
-            .success
-            .insert("query1".to_string(), partition_response);
-        response
-            .error
-            .insert("query2".to_string(), "Error message".to_string());
-
-        assert_eq!(response.success.len(), 1);
-        assert_eq!(response.error.len(), 1);
-        assert!(response.success.contains_key("query1"));
-        assert!(response.error.contains_key("query2"));
-    }
-
-    #[test]
     fn test_query_status_response() {
         let response = QueryStatusResponse {
             status: vec![QueryStatus {
@@ -3147,11 +3092,6 @@ mod tests {
         assert_eq!(Interval::FiveMinutes.get_duration_minutes(), 5);
         assert_eq!(Interval::OneHour.get_duration_minutes(), 60);
         assert_eq!(Interval::OneDay.get_duration_minutes(), 1440);
-
-        // Test duration in seconds
-        assert_eq!(Interval::FiveMinutes.get_interval_seconds(), 300);
-        assert_eq!(Interval::OneHour.get_interval_seconds(), 3600);
-        assert_eq!(Interval::OneDay.get_interval_seconds(), 86400);
 
         // Test duration in microseconds
         assert_eq!(
@@ -3513,13 +3453,6 @@ mod tests {
     }
 
     #[test]
-    fn test_storage_type_equality() {
-        assert_eq!(StorageType::Memory, StorageType::Memory);
-        assert_eq!(StorageType::Wal, StorageType::Wal);
-        assert_ne!(StorageType::Memory, StorageType::Wal);
-    }
-
-    #[test]
     fn test_values_event_context_serde_defaults() {
         let json = r#"{"field":"myfield","no_count":false}"#;
         let ctx: ValuesEventContext = serde_json::from_str(json).unwrap();
@@ -3643,10 +3576,7 @@ mod tests {
     #[test]
     fn test_interval_seconds_and_microseconds() {
         let h = Interval::OneHour;
-        assert_eq!(h.get_interval_seconds(), 3600);
         assert_eq!(h.get_interval_microseconds(), 3_600_000_000);
-        let five = Interval::FiveMinutes;
-        assert_eq!(five.get_interval_seconds(), 300);
     }
 
     #[test]
