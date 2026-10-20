@@ -300,7 +300,7 @@ export function buildTrendsChartOption(opts: {
   const low = f ? path(f.low) : [];
   const high = f ? path(f.high) : [];
 
-  const accent = chartColor("--color-primary-500");
+  const accent = chartColor("--color-accent");
   const muted = chartTextColor();
   const bars = meters.map((def) => ({
     name: opts.meterLabel(def.key),
