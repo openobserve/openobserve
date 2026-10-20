@@ -19,7 +19,7 @@ const notes = {
   'search-scheduler-create-new-btn': EDITED_NOTE,
   'logs-search-bar-menu-create-saved-view-btn': EDITED_NOTE,
   'logs-search-bar-saved-views-menu-create': EDITED_NOTE,
-  'search-download-submenu-trigger': 'Downloads the shown results, not your edit',
+  'search-download-submenu-trigger': 'Downloads every row of your last run, not your edit',
   'logs-search-bar-download-custom-range-btn': 'Uses the query that last ran, not your edit',
 };
 const baseAxeNodes = [
