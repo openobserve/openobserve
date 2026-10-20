@@ -427,10 +427,21 @@ describe("LibraryDrawer", () => {
       const wrapper = await mountDrawer({ entry: anomalyEntry });
       expect(wrapper.findComponent(AlertQueryPreview).props("query")).toContain("histogram");
       expect(wrapper.find('[data-test="alert-library-drawer-detection"]').text()).toBe(
-        "avg(error_ratio) · 5m · above",
+        "avg(error_ratio) · 5m · Above only",
       );
       expect(wrapper.find('[data-test="alert-library-drawer-threshold"]').exists()).toBe(false);
       expect(wrapper.find('[data-test="preview-alert"]').exists()).toBe(false);
+    });
+
+    it("shows an unknown direction as published", async () => {
+      mocks.loadAlertFile.mockResolvedValue({
+        ...anomalyFile(),
+        anomaly_config: { ...anomalyFile().anomaly_config, alert_direction: "sideways" },
+      });
+      const wrapper = await mountDrawer({ entry: anomalyEntry });
+      expect(wrapper.find('[data-test="alert-library-drawer-detection"]').text()).toBe(
+        "avg(error_ratio) · 5m · sideways",
+      );
     });
 
     it("offers no editor prefill, which speaks the scheduled shape only", async () => {

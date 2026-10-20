@@ -238,6 +238,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, nextTick, ref, watch } from "vue";
 
 import AlertQueryPreview from "@/components/alerts/AlertQueryPreview.vue";
+import { ANOMALY_DIRECTION_KEYS } from "@/components/anomaly_detection/steps/AnomalyDetectionConfig.schema";
 import PreviewAlert from "@/components/alerts/PreviewAlert.vue";
 import { useAlertCreation } from "@/composables/alerts/useAlertCreation";
 import { useAlertLibrary } from "@/composables/alerts/useAlertLibrary";
@@ -250,7 +251,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import type { AlertLibraryEntry, AlertLibraryFile, StreamDataState } from "@/types/alertLibrary";
 import { formatDistanceToNowStrict } from "date-fns";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nKey } from "@/types/i18n";
 import { buildPrefillFromLibrary } from "@/utils/alerts/prefill/fromLibrary";
 
 import {
@@ -373,8 +374,12 @@ const anomalyDetectionText = computed(() => {
   const { histogram_interval: interval, alert_direction: direction } = anomalyConfig.value;
   const head =
     typeof fn === "string" ? `${fn}${typeof field === "string" ? `(${field})` : ""}` : "";
+  const directionText =
+    typeof direction === "string" && Object.hasOwn(ANOMALY_DIRECTION_KEYS, direction)
+      ? t(ANOMALY_DIRECTION_KEYS[direction] as I18nKey)
+      : direction;
   return raw(
-    [head, interval, direction]
+    [head, interval, directionText]
       .filter((part): part is string => typeof part === "string" && part !== "")
       .join(" · "),
   );
