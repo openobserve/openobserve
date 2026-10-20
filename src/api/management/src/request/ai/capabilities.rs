@@ -51,6 +51,8 @@ use super::error::{self, AiErrorCode, AiErrorEnvelope};
 
 const HEALTH_TTL: Duration = Duration::from_secs(30);
 const TEST_INTERVAL: Duration = Duration::from_secs(10);
+// A chat refused as unreachable re-checks o2-ai this often, so a retry after recovery passes.
+const UNREACHABLE_RECHECK: Duration = Duration::from_secs(5);
 // Stands in for the id segment of a route; resolution never reads it.
 const PROBE_ID: &str = "00000000-0000-0000-0000-000000000000";
 const UNREACHABLE: &str = "O2 Assistant did not answer its health check";
@@ -301,6 +303,20 @@ impl HealthCache {
         self.record(now, &Checked::unreachable(at, CHAT_UNREACHABLE));
     }
 
+    /// The status of a check younger than the TTL; `Unknown` without one.
+    fn status_at(&self, now: Instant) -> HealthStatus {
+        match self.latest {
+            Some((at, status, _)) if now.saturating_duration_since(at) < HEALTH_TTL => status,
+            _ => HealthStatus::Unknown,
+        }
+    }
+
+    /// Whether the last check is old enough to repeat for a chat refused as unreachable.
+    fn recheck_due(&self, now: Instant) -> bool {
+        self.latest
+            .is_none_or(|(at, ..)| now.saturating_duration_since(at) >= UNREACHABLE_RECHECK)
+    }
+
     /// `org_id`'s facts from a member's credential win over the server's own, which no org shapes.
     fn snapshot(&self, org_id: &str) -> (Health, AgentFacts) {
         let (status, checked_at) = self
@@ -497,6 +513,27 @@ pub(crate) fn mark_unreachable() {
         .lock()
         .unwrap()
         .mark_unreachable(Instant::now(), Utc::now());
+}
+
+/// This node's cached view of o2-ai; a known outage is re-checked in the background.
+pub(crate) fn cached_health(org_id: &str) -> HealthStatus {
+    let (status, due) = {
+        let cache = HEALTH.lock().unwrap();
+        let now = Instant::now();
+        (cache.status_at(now), cache.recheck_due(now))
+    };
+    if status == HealthStatus::Unreachable
+        && due
+        && let Some(refresh) = RefreshGuard::begin(&REFRESHING)
+    {
+        let org = org_id.to_string();
+        tokio::spawn(async move {
+            let checked = check_agent(&org, None).await;
+            HEALTH.lock().unwrap().record(Instant::now(), &checked);
+            drop(refresh);
+        });
+    }
+    status
 }
 
 /// A persisted turn that could not reach o2-ai marks health as a direct chat does.
@@ -1146,6 +1183,30 @@ mod tests {
             cache
                 .fresh(start + Duration::from_secs(1), ORG, true)
                 .is_some()
+        );
+    }
+
+    #[test]
+    fn a_known_outage_is_unreachable_until_it_ages_out_and_is_rechecked_soon() {
+        let mut cache = HealthCache::default();
+        let start = Instant::now();
+        assert_eq!(cache.status_at(start), HealthStatus::Unknown);
+        assert!(cache.recheck_due(start));
+        cache.mark_unreachable(start, Utc::now());
+        assert_eq!(
+            cache.status_at(start + Duration::from_secs(1)),
+            HealthStatus::Unreachable
+        );
+        assert!(!cache.recheck_due(start + Duration::from_secs(1)));
+        assert!(cache.recheck_due(start + UNREACHABLE_RECHECK));
+        assert_eq!(cache.status_at(start + HEALTH_TTL), HealthStatus::Unknown);
+        cache.record(
+            start + Duration::from_secs(2),
+            &checked(HealthStatus::Ok, answered()),
+        );
+        assert_eq!(
+            cache.status_at(start + Duration::from_secs(3)),
+            HealthStatus::Ok
         );
     }
 
