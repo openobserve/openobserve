@@ -130,7 +130,7 @@ pub struct ChatSummary {
     pub active_turn: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub active_turn_id: Option<String>,
-    /// A hint until approvals are stored: the newest turn stored a confirmation request.
+    /// A hint: the newest turn stored a confirmation request the caller has not answered.
     pub pending_approval: bool,
     /// The call id of that request, when it could be read.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -536,6 +536,7 @@ pub async fn admit_turn(
     prompt: &str,
     trace_id: &str,
 ) -> Result<AdmittedTurn, Response> {
+    super::settings::refuse_if_off(org_id).await?;
     let Some(session_id) = session_id.and_then(normalize_uuid) else {
         return Err(error::invalid_request(
             "A valid session id is required while chat persistence is enabled",
@@ -736,9 +737,9 @@ pub(super) fn lease_busy(active_turn_id: Option<String>) -> AiErrorEnvelope {
                    recently active first, keyset-paginated. Each carries `active_turn` (and \
                    `active_turn_id`) while one of its turns runs on any node, and \
                    `pending_approval` (and `pending_approval_id`) when its newest turn, started \
-                   in the last 24 hours, stored a request for confirmation; the latter is a \
-                   hint, since a decision is not yet stored, so re-read the conversation before \
-                   acting on it.",
+                   in the last 24 hours, stored a request for confirmation that the caller has \
+                   not yet answered through `/confirm`; the latter is a hint, so re-read the \
+                   conversation before acting on it.",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
@@ -795,7 +796,7 @@ pub async fn list(
     } else {
         None
     };
-    let (running, pending) = list_markers(&org_id, &rows, running_since).await;
+    let (running, pending) = list_markers(&org_id, &user_email, &rows, running_since).await;
     let chats = rows
         .into_iter()
         .map(|row| {
@@ -866,8 +867,12 @@ pub async fn get(
         .known_version
         .as_deref()
         .and_then(StateVersion::parse);
+    let answers = answers_in_newest(&org_id, &user_email, &row.session_id, records.last()).await;
+    // An answer since the copy may leave another request pending; only a full read can count.
     if params.known_seq == Some(row.last_committed_seq)
-        && let Some(known) = known.filter(|k| k.current_with(&version))
+        && let Some(known) = known
+            .filter(|k| k.current_with(&version))
+            .filter(|k| !(k.pending && answers > 0))
     {
         // The copy's id stays with the copy; only the flag is repeated, and only while it holds.
         version.pending = still_pending(known.pending, records.last(), now);
@@ -887,7 +892,9 @@ pub async fn get(
         Ok(events) => events,
         Err(resp) => return resp,
     };
-    let pending = pending_approval_in(&events, records.last().filter(|r| recent_turn(r, now)));
+    let newest = records.last().filter(|r| recent_turn(r, now));
+    let pending = pending_approval_in(&events, newest)
+        .filter(|_| unanswered(confirmations_in(&events, newest), answers));
     version.pending = pending.is_some();
     let turns = project_turns(&events);
     // Incremental only from a copy older than the watermark whose version we can read.
@@ -1371,13 +1378,14 @@ fn project_turns(events: &[DurableEvent]) -> Vec<Value> {
 /// Each listed chat's running turn and pending approval: one query and one search for the page.
 async fn list_markers(
     org_id: &str,
+    user_email: &str,
     rows: &[Model],
     running_since: i64,
 ) -> (HashMap<String, TurnRecord>, HashMap<String, String>) {
     let session_ids: Vec<String> = rows.iter().map(|r| r.session_id.clone()).collect();
     let (running, pending) = tokio::join!(
         ai_chat_turns::running_for_sessions(org_id, &session_ids, running_since),
-        list_pending(org_id, rows),
+        list_pending(org_id, user_email, rows),
     );
     // Markers annotate the list; an unreadable marker leaves it unset instead of failing the list.
     let running = running
@@ -1398,6 +1406,7 @@ async fn list_markers(
 /// The pending approvals of listed chats, searched from their newest turns' starts on.
 async fn list_pending(
     org_id: &str,
+    user_email: &str,
     rows: &[Model],
 ) -> Result<HashMap<String, String>, openobserve_core::ai_chat::ReadError> {
     let keys: Vec<(String, String)> = rows
@@ -1416,7 +1425,70 @@ async fn list_pending(
             Some((row, turn.turn_id.as_str(), turn.started_at))
         })
         .collect();
-    openobserve_core::ai_chat::pending_confirmations(org_id, &chats).await
+    let sessions: Vec<(String, i64)> = chats
+        .iter()
+        .map(|(r, _, started)| (r.session_id.clone(), *started))
+        .collect();
+    let (pending, answers) = tokio::join!(
+        openobserve_core::ai_chat::pending_confirmations(org_id, &chats),
+        super::turn_marks::answers_since(org_id, user_email, &sessions),
+    );
+    Ok(pending?
+        .into_iter()
+        .filter(|(session_id, (_, asked))| {
+            unanswered(*asked, answers.get(session_id).copied().unwrap_or(0))
+        })
+        .map(|(session_id, (call, _))| (session_id, call))
+        .collect())
+}
+
+/// The newest turn still waits while it asked more confirmations than the member has answered.
+fn unanswered(asked: usize, answered: usize) -> bool {
+    asked > answered
+}
+
+/// How many confirmations the member answered in this chat since its newest turn started.
+async fn answers_in_newest(
+    org_id: &str,
+    user_email: &str,
+    session_id: &str,
+    newest: Option<&TurnRecord>,
+) -> usize {
+    let Some(newest) = newest else {
+        return 0;
+    };
+    let sessions = [(session_id.to_string(), newest.started_at)];
+    super::turn_marks::answers_since(org_id, user_email, &sessions)
+        .await
+        .remove(session_id)
+        .unwrap_or(0)
+}
+
+/// The newest turn's confirmation requests: one per call id, or per event without one.
+fn confirmations_in(events: &[DurableEvent], newest: Option<&TurnRecord>) -> usize {
+    let Some(newest) = newest else {
+        return 0;
+    };
+    let Some(start) = newest.start_seq else {
+        return 0;
+    };
+    let end = newest.end_seq.unwrap_or(i64::MAX);
+    let asked: std::collections::HashSet<String> = events
+        .iter()
+        .filter(|e| (start..=end).contains(&e.seq))
+        .filter_map(|e| {
+            let call = openobserve_core::ai_chat::projection::delete_confirmation_call(
+                &e.event_type,
+                &e.data,
+            )?;
+            Some(if call.is_empty() {
+                format!("#{}", e.seq)
+            } else {
+                call
+            })
+        })
+        .collect();
+    asked.len()
 }
 
 /// A current copy's pending flag: its own, until the newest turn ages out of the window.
@@ -2638,6 +2710,22 @@ mod tests {
         let body: Value = serde_json::from_str(&text).unwrap();
         assert_eq!(body["active_turn_id"], "t-run");
         assert_eq!(body["pending_approval"], false);
+    }
+
+    #[test]
+    fn a_second_request_in_the_same_turn_stays_pending_after_the_first_is_answered() {
+        let mut events = answer_turn();
+        events.push(delete_request(6, "call_1"));
+        let newest = turn_record(0, Some(9), TURN_COMPLETED);
+        assert_eq!(confirmations_in(&events, Some(&newest)), 1);
+        assert!(!unanswered(confirmations_in(&events, Some(&newest)), 1));
+        // The turn resumed and asked again; one answer covers only the first request.
+        events.push(delete_request(7, "call_2"));
+        events.push(delete_request(8, "call_2"));
+        assert_eq!(confirmations_in(&events, Some(&newest)), 2);
+        assert!(unanswered(confirmations_in(&events, Some(&newest)), 1));
+        assert!(!unanswered(confirmations_in(&events, Some(&newest)), 2));
+        assert_eq!(confirmations_in(&events, None), 0);
     }
 
     #[test]

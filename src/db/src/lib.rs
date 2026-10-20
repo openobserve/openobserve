@@ -145,6 +145,46 @@ pub async fn delete_if_exists(key: &str, with_prefix: bool, need_watch: bool) ->
     db.delete_if_exists(key, with_prefix, need_watch).await
 }
 
+/// Read-modify-write of `key` under the store's lock, replicated like [`put`]; the value written.
+pub async fn update(
+    key: &str,
+    need_watch: bool,
+    edit: impl FnOnce(Option<Bytes>) -> Result<Bytes> + Send + 'static,
+) -> Result<Bytes> {
+    let written = std::sync::Arc::new(std::sync::Mutex::new(None));
+    let out = written.clone();
+    infra_db::get_db()
+        .await
+        .get_for_update(
+            key,
+            need_watch,
+            None,
+            Box::new(move |current| {
+                let value = edit(current)?;
+                *out.lock().unwrap() = Some(value.clone());
+                Ok(Some((Some(value), None)))
+            }),
+        )
+        .await?;
+    let written = written
+        .lock()
+        .unwrap()
+        .take()
+        .ok_or_else(|| infra::errors::Error::Message(format!("{key} was not written")))?;
+    #[cfg(feature = "enterprise")]
+    if get_o2_config().super_cluster.enabled {
+        o2_enterprise::enterprise::super_cluster::queue::put(
+            key,
+            written.clone(),
+            need_watch,
+            None,
+        )
+        .await
+        .map_err(|e| Error::Message(e.to_string()))?;
+    }
+    Ok(written)
+}
+
 #[inline]
 pub async fn list(prefix: &str) -> Result<HashMap<String, Bytes>> {
     let db = infra_db::get_db().await;

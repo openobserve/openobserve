@@ -2619,7 +2619,9 @@ pub async fn rca_will_run(org_id: &str, incident_id: &str) -> bool {
     use o2_enterprise::enterprise::{alerts::rca_service, common::config::get_config};
 
     let cfg = get_config();
-    let will_run = cfg.incidents.enabled
+    // The org switch comes first, so an org that is off is never charged and gets no Begin.
+    let will_run = crate::ai_policy::rca_policy(org_id).await.is_some()
+        && cfg.incidents.enabled
         && cfg.incidents.rca_enabled
         && cfg.ai.has_agent_target()
         && !rca_service::l0_off_for_incident(org_id, incident_id).await;
@@ -2735,6 +2737,22 @@ pub async fn trigger_rca_for_incident(
         }
     }
 
+    let Some(policy) = crate::ai_policy::rca_policy(&org_id).await else {
+        // A caller that already emitted Begin ends the lifecycle from this error.
+        if begin_already_emitted {
+            return Err(anyhow::anyhow!(
+                "O2 Assistant is turned off for this organization"
+            ));
+        }
+        log::info!("[INCIDENTS::RCA] O2 Assistant is off for {org_id}; {incident_id} not analysed");
+        o2_enterprise::enterprise::alerts::rca_service::skip_analysis_for_incident(
+            &org_id,
+            &incident_id,
+        )
+        .await;
+        return Ok(());
+    };
+
     // Get incident from database
     let incident = match infra::table::alert_incidents::get(&org_id, &incident_id).await? {
         Some(inc) => inc,
@@ -2837,7 +2855,10 @@ pub async fn trigger_rca_for_incident(
         previous_analysis,
     )
     .await;
-    match client.analyze_incident(context, &auth_header).await {
+    match client
+        .analyze_incident(context, &auth_header, &policy)
+        .await
+    {
         Ok(rca_result) => {
             log::info!(
                 "[INCIDENTS::RCA] RCA completed for {incident_id}: {} chars",

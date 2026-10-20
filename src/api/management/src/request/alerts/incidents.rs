@@ -469,6 +469,10 @@ pub async fn trigger_incident_rca(
     if !o2_cfg.incidents.enabled || !o2_cfg.incidents.rca_enabled {
         return MetaHttpResponse::bad_request("RCA is not enabled");
     }
+    // Refused before the quota is charged or the lifecycle starts.
+    let Some(policy) = openobserve_core::ai_policy::rca_policy(&org_id).await else {
+        return crate::request::ai::settings::off_for_org();
+    };
 
     if !o2_cfg.ai.has_agent_target() {
         return axum::response::Response::builder()
@@ -692,6 +696,7 @@ pub async fn trigger_incident_rca(
             (*client).clone(),
             context,
             auth_header.clone(),
+            &policy,
             openobserve_core::incidents::append_event_send,
         )
         .await
@@ -722,7 +727,9 @@ pub async fn trigger_incident_rca(
     } else {
         // Perform RCA analysis (non-streaming)
         let rca_content =
-            match rca_service::analyze_incident((*client).clone(), context, &auth_header).await {
+            match rca_service::analyze_incident((*client).clone(), context, &auth_header, &policy)
+                .await
+            {
                 Ok(content) => content,
                 Err(e) => {
                     let _ = openobserve_core::incidents::append_event(

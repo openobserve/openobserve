@@ -24,7 +24,7 @@ use axum::{
     routing::{delete, get, patch, post, put},
 };
 use config::get_config;
-use openobserve_api_common::X_O2_ASSISTANT_SESSION_ID;
+use openobserve_api_common::{X_O2_ASSISTANT_SESSION_ID, X_O2_ASSISTANT_TURN_ID};
 use openobserve_api_ingest::request::{clusters, logs, metrics, profiles, rum};
 #[cfg(feature = "profiling")]
 use openobserve_api_management::request::profiling;
@@ -118,7 +118,9 @@ pub fn cors_layer() -> CorsLayer {
             header::HeaderName::from_static("x-openobserve-origin"),
             header::HeaderName::from_static("x-openobserve-parent-id"),
             header::HeaderName::from_static("x-openobserve-sampling-priority"),
+            // Every `x-o2-assistant-*` header the browser sends; a missing one fails each turn.
             X_O2_ASSISTANT_SESSION_ID,
+            X_O2_ASSISTANT_TURN_ID,
         ])
         // Restrict CORS to the configured web_url origin, plus any extra origins in
         // ZO_CORS_ALLOWED_ORIGINS (comma-separated).  mirror_request() + allow_credentials(true)
@@ -930,6 +932,21 @@ fn ai_chat_routes(router: Router) -> Router {
         )
         .route("/{org_id}/ai/shared/{token}", get(ai::shares::get_shared))
         .route("/{org_id}/ai/shared/{token}/fork", post(ai::shares::fork))
+        .route(
+            "/{org_id}/ai/settings",
+            get(ai::settings::get_settings).put(ai::settings::put_settings),
+        )
+        .route("/{org_id}/ai/grants", get(ai::grants::list_grants))
+        .route("/{org_id}/ai/grants/{id}", delete(ai::grants::delete_grant))
+        .route("/{org_id}/ai/activity", get(ai::activity::list_activity))
+        .route(
+            "/{org_id}/ai/activity/{id}/undo",
+            post(ai::activity::undo_action),
+        )
+        .route(
+            "/{org_id}/ai/access_requests",
+            post(ai::access_requests::create_access_request),
+        )
 }
 
 #[cfg(feature = "enterprise")]
@@ -1593,7 +1610,8 @@ pub fn service_routes() -> Router {
 
             // AI
             .route("/{org_id}/ai/toolsets", get(ai::toolsets::list).post(ai::toolsets::create))
-            .route("/{org_id}/ai/toolsets/{id}", get(ai::toolsets::get).put(ai::toolsets::update).delete(ai::toolsets::delete))
+            .route("/{org_id}/ai/toolsets/{id}", get(ai::toolsets::get).put(ai::toolsets::update).patch(ai::toolsets::patch).delete(ai::toolsets::delete))
+            .route("/{org_id}/ai/toolsets/{id}/test", post(ai::toolsets::test))
 
             // RE patterns
             .route("/{org_id}/re_patterns", get(re_pattern::list).post(re_pattern::save))
@@ -3622,6 +3640,41 @@ mod tests {
             .expect("rewriter alias must be present");
         assert!(!alias["doc"].as_str().unwrap_or("").is_empty());
         assert_eq!(alias["deprecated"], Value::Bool(true));
+    }
+
+    #[tokio::test]
+    async fn a_cross_origin_turn_may_send_the_assistant_headers() {
+        let cfg = config::get_config();
+        let web_url = cfg.common.web_url.trim_end_matches('/');
+        let origin = if web_url.is_empty() {
+            "http://localhost:5080"
+        } else {
+            web_url
+        };
+        let app = axum::Router::new()
+            .route("/x", axum::routing::post(|| async { "ok" }))
+            .layer(cors_layer());
+        let req = Request::builder()
+            .method(Method::OPTIONS)
+            .uri("/x")
+            .header(header::ORIGIN, origin)
+            .header(header::ACCESS_CONTROL_REQUEST_METHOD, "POST")
+            .header(
+                header::ACCESS_CONTROL_REQUEST_HEADERS,
+                "x-o2-assistant-session-id,x-o2-assistant-turn-id",
+            )
+            .body(Body::empty())
+            .unwrap();
+        let response = app.oneshot(req).await.unwrap();
+        let allowed = response
+            .headers()
+            .get(header::ACCESS_CONTROL_ALLOW_HEADERS)
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or_default()
+            .to_ascii_lowercase();
+        for name in ["x-o2-assistant-session-id", "x-o2-assistant-turn-id"] {
+            assert!(allowed.contains(name), "{name} not in {allowed}");
+        }
     }
 
     // ── is_origin_allowed unit tests ──────────────────────────────────────────

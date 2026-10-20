@@ -25,3 +25,7 @@ pub mod request;
 /// Custom header name for O2 Assistant session tracking (UUID v7).
 pub const X_O2_ASSISTANT_SESSION_ID: axum::http::HeaderName =
     axum::http::HeaderName::from_static("x-o2-assistant-session-id");
+
+/// The browser's id for one assistant turn, sent with every turn request.
+pub const X_O2_ASSISTANT_TURN_ID: axum::http::HeaderName =
+    axum::http::HeaderName::from_static("x-o2-assistant-turn-id");

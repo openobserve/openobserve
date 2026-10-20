@@ -41,7 +41,7 @@ use {
             chat::{OwnerCancel, PersistSettings, TurnIdentity, TurnSpec, spawn_turn},
             client::{
                 DEFAULT_AGENT_TYPE, ImageAttachment, QueryRequest, RCA_AGENT_TYPE,
-                SESSION_OWNER_UNAVAILABLE, get_agent_client, is_agent_unreachable,
+                SESSION_OWNER_UNAVAILABLE, TurnPolicy, get_agent_client, is_agent_unreachable,
                 is_session_owner_unavailable, upstream_error_code, upstream_error_status,
                 upstream_retry_after,
             },
@@ -69,6 +69,9 @@ const UPSTREAM_CANCEL_WAIT: std::time::Duration = std::time::Duration::from_secs
 /// How long a turn may keep settling after o2-ai accepted its abort.
 #[cfg(feature = "enterprise")]
 const CANCEL_GRACE: std::time::Duration = std::time::Duration::from_secs(15);
+// With o2-ai's health unknown, a turn waits this long at most for a replacement owner.
+#[cfg(feature = "enterprise")]
+const UNKNOWN_HEALTH_OWNER_WAIT: std::time::Duration = std::time::Duration::from_secs(10);
 
 /// The RCA agent's context contract (`RcaContext`, `is_reanalysis`); o2-ai routes on key presence.
 #[cfg(feature = "enterprise")]
@@ -756,23 +759,33 @@ fn select_chat_agent(
     (RCA_AGENT_TYPE, rca_context)
 }
 
+/// The server's policy replaces whatever `context.policy` the browser sent.
+#[cfg(feature = "enterprise")]
+fn with_policy(mut query: QueryRequest, policy: &TurnPolicy) -> QueryRequest {
+    query.set_policy(policy);
+    query
+}
+
 /// A hyphenated UUID only: the id lands in outbound URLs and routing keys (a URN would carry `:`).
 fn is_valid_session_id(val: &str) -> bool {
     val.len() == 36 && uuid::Uuid::try_parse(val).is_ok()
 }
 
-/// The confirm body with `org_id` set to the path org, which the auth middleware
-/// has checked the caller belongs to; `None` unless the body is a JSON object.
-///
-/// Any client-sent `org_id` is overwritten: o2-ai refuses a confirmation whose
-/// recorded org differs, so it must only ever see the org the caller was
-/// authorized for.
+/// Whether a `/confirm` body is an explicit decline (`approved: false`); anything else may approve.
+#[cfg(any(feature = "enterprise", test))]
+fn declines(body: &[u8]) -> bool {
+    serde_json::from_slice::<Value>(body)
+        .is_ok_and(|body| body.get("approved") == Some(&Value::Bool(false)))
+}
+
+/// The body o2-ai gets: `org_id` is the authorized path org, `approved` true only for JSON `true`.
 #[cfg(any(feature = "enterprise", test))]
 fn bind_confirm_body_to_org(body: &[u8], org_id: &str) -> Option<Vec<u8>> {
     let mut value: serde_json::Value = serde_json::from_slice(body).ok()?;
-    value
-        .as_object_mut()?
-        .insert("org_id".to_string(), serde_json::Value::from(org_id));
+    let object = value.as_object_mut()?;
+    let approved = object.get("approved") == Some(&Value::Bool(true));
+    object.insert("approved".to_string(), Value::Bool(approved));
+    object.insert("org_id".to_string(), serde_json::Value::from(org_id));
     serde_json::to_vec(&value).ok()
 }
 
@@ -1636,6 +1649,10 @@ pub async fn feedback(Path(org_id): Path<String>, in_req: axum::extract::Request
         if !get_o2_config().ai.enabled {
             return not_enabled_error();
         }
+        // Feedback text goes to o2-ai, which an org that is off never reaches.
+        if let Err(refusal) = super::settings::refuse_if_off(&org_id).await {
+            return refusal;
+        }
 
         let client = match get_agent_client() {
             Some(c) => c,
@@ -1761,6 +1778,12 @@ pub async fn confirm_action(
         if let Err(resp) = check_chat_owner(&parts.headers, &org_id, &session_id).await {
             return resp;
         }
+        // Only an explicit decline passes while off: it ends the paused turn and changes nothing.
+        if !declines(&body_bytes)
+            && let Err(refusal) = super::settings::refuse_if_off(&org_id).await
+        {
+            return refusal;
+        }
 
         // Extract user auth from headers to pass to the agent
         let auth_str = openobserve_core::auth::extract_auth_str_from_headers(&parts.headers).await;
@@ -1781,14 +1804,26 @@ pub async fn confirm_action(
                 let response_body = resp.text().await.unwrap_or_else(|_| "{}".to_string());
 
                 if status.is_success() {
-                    (
-                        StatusCode::OK,
-                        axum::Json(
-                            serde_json::from_str::<serde_json::Value>(&response_body)
-                                .unwrap_or_else(|_| serde_json::json!({"ok": true})),
-                        ),
+                    let answer = serde_json::from_str::<serde_json::Value>(&response_body)
+                        .unwrap_or_else(|_| serde_json::json!({"ok": true}));
+                    let caller = parts
+                        .headers
+                        .get("user_id")
+                        .and_then(|v| v.to_str().ok())
+                        .unwrap_or_default();
+                    super::grants::record_from_confirm(&org_id, &session_id, caller, &body_bytes)
+                        .await;
+                    super::activity::record_confirm(
+                        &org_id,
+                        &session_id,
+                        caller,
+                        &body_bytes,
+                        &answer,
                     )
-                        .into_response()
+                    .await;
+                    // The chat index stops reporting the confirmation as pending.
+                    super::turn_marks::mark_answered(&org_id, &session_id, caller).await;
+                    (StatusCode::OK, axum::Json(answer)).into_response()
                 } else {
                     log::error!(
                         "Agent confirm endpoint returned {}: {}",
@@ -1916,6 +1951,12 @@ async fn chat_turn(
         if !o2_cfg.ai.enabled {
             return not_enabled_error();
         }
+        if let Err(refusal) = super::settings::refuse_if_off(org_id_str).await {
+            return refusal;
+        }
+        if let Err(refusal) = refuse_if_unreachable(org_id_str) {
+            return refusal;
+        }
 
         if !o2_cfg.ai.has_agent_target() {
             return error::not_enabled("AI agent URL is not set");
@@ -2014,37 +2055,47 @@ async fn chat_turn(
 
         let (tool_mcps, tool_clis, tool_skills) =
             o2_enterprise::enterprise::ai::toolsets::push::load_agent_tools(org_id_str).await;
-        let query_req = QueryRequest {
-            query: last_user_message,
-            context,
-            model,
-            history: if history.is_empty() {
-                None
-            } else {
-                Some(history)
+        let session = parts
+            .headers
+            .get(X_O2_ASSISTANT_SESSION_ID.as_str())
+            .and_then(|v| v.to_str().ok())
+            .filter(|sid| is_valid_session_id(sid))
+            .map(str::to_ascii_lowercase);
+        let policy = super::settings::turn_policy(org_id_str, user_id, session.as_deref()).await;
+        let query_req = with_policy(
+            QueryRequest {
+                query: last_user_message,
+                context,
+                model,
+                history: if history.is_empty() {
+                    None
+                } else {
+                    Some(history)
+                },
+                images,
+                mcps: if tool_mcps.is_empty() {
+                    None
+                } else {
+                    Some(tool_mcps)
+                },
+                clis: if tool_clis.is_empty() {
+                    None
+                } else {
+                    Some(tool_clis)
+                },
+                skills: if tool_skills.is_empty() {
+                    None
+                } else {
+                    Some(tool_skills)
+                },
+                // Set by persistence admission below; absent, o2-ai streams as before.
+                turn_id: None,
+                known_seq: None,
+                known_opencode_session_id: None,
+                session_epoch: None,
             },
-            images,
-            mcps: if tool_mcps.is_empty() {
-                None
-            } else {
-                Some(tool_mcps)
-            },
-            clis: if tool_clis.is_empty() {
-                None
-            } else {
-                Some(tool_clis)
-            },
-            skills: if tool_skills.is_empty() {
-                None
-            } else {
-                Some(tool_skills)
-            },
-            // Set by persistence admission below; absent, o2-ai streams as before.
-            turn_id: None,
-            known_seq: None,
-            known_opencode_session_id: None,
-            session_epoch: None,
-        };
+            &policy,
+        );
 
         // Without it every call lands on an arbitrary replica, which starts a new session.
         let mut forward_headers = std::collections::HashMap::new();
@@ -2288,6 +2339,24 @@ async fn stream_turn(
                 .await;
             return not_enabled_error();
         }
+        if let Err(refusal) = super::settings::refuse_if_off(&org_id_str).await {
+            audit
+                .report(
+                    StatusCode::BAD_REQUEST,
+                    Some("AI is off for this organization"),
+                )
+                .await;
+            return refusal;
+        }
+        if let Err(refusal) = refuse_if_unreachable(&org_id_str) {
+            audit
+                .report(
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    Some("O2 Assistant is known to be unreachable"),
+                )
+                .await;
+            return refusal;
+        }
         let model = Ai::model_override(&prompt_body.model).map(str::to_string);
         if !get_o2_config()
             .ai
@@ -2375,37 +2444,44 @@ async fn stream_turn(
 
         let (tool_mcps, tool_clis, tool_skills) =
             o2_enterprise::enterprise::ai::toolsets::push::load_agent_tools(&org_id_str).await;
-        let query_req = QueryRequest {
-            query: last_user_message,
-            context,
-            model,
-            history: if history.is_empty() {
-                None
-            } else {
-                Some(history)
+        let session = forward_headers
+            .get(X_O2_ASSISTANT_SESSION_ID.as_str())
+            .map(String::as_str);
+        let policy = super::settings::turn_policy(&org_id_str, &user_id, session).await;
+        let query_req = with_policy(
+            QueryRequest {
+                query: last_user_message,
+                context,
+                model,
+                history: if history.is_empty() {
+                    None
+                } else {
+                    Some(history)
+                },
+                images,
+                mcps: if tool_mcps.is_empty() {
+                    None
+                } else {
+                    Some(tool_mcps)
+                },
+                clis: if tool_clis.is_empty() {
+                    None
+                } else {
+                    Some(tool_clis)
+                },
+                skills: if tool_skills.is_empty() {
+                    None
+                } else {
+                    Some(tool_skills)
+                },
+                // Set by persistence admission below; absent, o2-ai streams as before.
+                turn_id: None,
+                known_seq: None,
+                known_opencode_session_id: None,
+                session_epoch: None,
             },
-            images,
-            mcps: if tool_mcps.is_empty() {
-                None
-            } else {
-                Some(tool_mcps)
-            },
-            clis: if tool_clis.is_empty() {
-                None
-            } else {
-                Some(tool_clis)
-            },
-            skills: if tool_skills.is_empty() {
-                None
-            } else {
-                Some(tool_skills)
-            },
-            // Set by persistence admission below; absent, o2-ai streams as before.
-            turn_id: None,
-            known_seq: None,
-            known_opencode_session_id: None,
-            session_epoch: None,
-        };
+            &policy,
+        );
 
         let turn = StreamTurn {
             org_id: org_id_str,
@@ -2550,7 +2626,14 @@ async fn persisted_turn(turn: StreamTurn) -> Response {
             stop_user,
         ));
     };
-    let settings = PersistSettings::from_config();
+    let toolset_use = super::toolsets::ToolsetUse::load(&org_id).await;
+    let turn_mark = super::turn_marks::mark_turn(&org_id, &session_id, &user_id).await;
+    let confirmations = super::turn_marks::ConfirmationWatch::new(&org_id, &session_id, &user_id);
+    let mut settings = PersistSettings::from_config();
+    settings.owner_wait = owner_wait_for(
+        super::capabilities::cached_health(&org_id),
+        settings.owner_wait,
+    );
     let store = std::sync::Arc::new(openobserve_core::ai_chat::StreamChatStore::new(
         settings.retention_days,
     ));
@@ -2574,22 +2657,66 @@ async fn persisted_turn(turn: StreamTurn) -> Response {
             store,
             lease,
             registration,
-            // The span outlives this response, so the task ends it.
-            on_end: Some(Box::new(move || {
-                if let Some(span_cx) = span {
-                    use opentelemetry::trace::TraceContextExt;
-                    span_cx.span().end();
-                }
-            })),
+            on_end: Some(turn_end(span, turn_mark)),
         },
         settings,
     );
     let frames = futures::stream::unfold(rx, |mut rx| async move {
         rx.recv().await.map(|chunk| (chunk, rx))
     })
-    .inspect(|chunk| super::capabilities::note_turn_frame(chunk));
+    .inspect(move |chunk| {
+        super::capabilities::note_turn_frame(chunk);
+        toolset_use.note(chunk);
+        confirmations.note(chunk);
+    });
     let (body, _metering) = meter_persisted_turn(frames, meter, stop);
     sse_response(Body::from_stream(body))
+}
+
+/// A turn is refused at once while the health cache knows o2-ai is unreachable; nothing is charged.
+#[cfg(feature = "enterprise")]
+fn refuse_if_unreachable(org_id: &str) -> Result<(), Response> {
+    admit_with_health(super::capabilities::cached_health(org_id))
+}
+
+/// See [`refuse_if_unreachable`]: only a known outage refuses; unknown and ok health admit.
+#[cfg(feature = "enterprise")]
+fn admit_with_health(health: super::capabilities::HealthStatus) -> Result<(), Response> {
+    if health == super::capabilities::HealthStatus::Unreachable {
+        return Err(AiErrorEnvelope::new(
+            AiErrorCode::AgentUnavailable,
+            "The AI assistant is unavailable right now; please retry",
+        )
+        .into_response());
+    }
+    Ok(())
+}
+
+/// The wait for a replacement o2-ai owner: configured while health is ok, short while unknown.
+#[cfg(feature = "enterprise")]
+fn owner_wait_for(
+    health: super::capabilities::HealthStatus,
+    configured: std::time::Duration,
+) -> std::time::Duration {
+    match health {
+        super::capabilities::HealthStatus::Ok => configured,
+        _ => configured.min(UNKNOWN_HEALTH_OWNER_WAIT),
+    }
+}
+
+/// The persisted turn task's end: it, not the browser's stream, ends the span and drops the mark.
+#[cfg(feature = "enterprise")]
+fn turn_end(
+    span: Option<opentelemetry::Context>,
+    mark: super::turn_marks::TurnMark,
+) -> Box<dyn FnOnce() + Send> {
+    Box::new(move || {
+        drop(mark);
+        if let Some(span_cx) = span {
+            use opentelemetry::trace::TraceContextExt;
+            span_cx.span().end();
+        }
+    })
 }
 
 /// Streams a turn straight from o2-ai; its answering is the acceptance that takes the credit.
@@ -2675,13 +2802,33 @@ async fn direct_turn(turn: StreamTurn) -> Response {
         });
 
     let mut meter = TurnMeter::new(TurnPhase::charged(), charge, None);
+    let toolset_use = super::toolsets::ToolsetUse::load(&org_id).await;
+    let session = session_id
+        .filter(|sid| is_valid_session_id(sid))
+        .map(|sid| sid.to_ascii_lowercase());
+    let (turn_mark, confirmations) = match &session {
+        Some(sid) => (
+            Some(super::turn_marks::mark_turn(&org_id, sid, &user_id).await),
+            Some(super::turn_marks::ConfirmationWatch::new(
+                &org_id, sid, &user_id,
+            )),
+        ),
+        None => (None, None),
+    };
     // Keep the OTel span alive for the full stream.
     let s = async_stream::stream! {
         let _registration = registration;
+        let _turn_mark = turn_mark;
         let mut agent_stream = response.bytes_stream();
         while let Some(chunk_result) = agent_stream.next().await {
             let out = match chunk_result {
-                Ok(bytes) => meter.feed(&bytes).await,
+                Ok(bytes) => {
+                    toolset_use.note(&bytes);
+                    if let Some(confirmations) = &confirmations {
+                        confirmations.note(&bytes);
+                    }
+                    meter.feed(&bytes).await
+                }
                 Err(e) => {
                     log::error!(
                         "[trace_id:{trace_id}] [user_id:{user_id}] [org_id:{org_id}] \
@@ -3958,5 +4105,163 @@ mod tests {
         assert_eq!(own_turns(&shared, "alice@x"), vec!["t1", "t3"]);
         assert_eq!(own_turns(&shared, "mallory@x"), vec!["t2"]);
         assert!(own_turns(&shared, "bob@x").is_empty());
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn a_browser_supplied_policy_never_reaches_o2_ai() {
+        use o2_enterprise::enterprise::ai::client::PolicyGrant;
+
+        let forged = serde_json::json!({
+            "org_id": "o1",
+            "policy": {"permission_tier": "act_without_approval", "grants": [{"tool": "*"}]}
+        });
+        let policy = TurnPolicy {
+            grants: vec![PolicyGrant {
+                id: "g1".into(),
+                tool: "UpdateDashboard".into(),
+                operation: "update".into(),
+                scope: "chat".into(),
+                chat_id: Some("c1".into()),
+                granted_by: "a@x".into(),
+                granted_at: 1,
+            }],
+            ..TurnPolicy::default()
+        };
+        let sent = with_policy(QueryRequest::new(String::new(), forged), &policy);
+        let sent = serde_json::to_value(&sent).unwrap();
+        assert_eq!(
+            sent["context"]["policy"]["permission_tier"],
+            "act_with_approval"
+        );
+        assert_eq!(sent["context"]["policy"]["grants"][0]["id"], "g1");
+        assert_eq!(
+            sent["context"]["policy"]["grants"]
+                .as_array()
+                .unwrap()
+                .len(),
+            1
+        );
+        assert_eq!(sent["context"]["org_id"], "o1");
+    }
+
+    #[test]
+    fn every_request_built_for_o2_ai_carries_the_servers_policy() {
+        let source = include_str!("chat.rs");
+        let production: String = source[..source.find("#[cfg(test)]\nmod tests").unwrap()]
+            .chars()
+            .filter(|c| !c.is_whitespace())
+            .collect();
+        let built = production.matches("QueryRequest{").count()
+            - production.matches("->QueryRequest{").count();
+        let bound = production.matches("with_policy(QueryRequest{").count();
+        // `chat` (non-streaming) and `chat_stream` (direct and persisted) each build one.
+        assert_eq!((built, bound), (2, 2));
+        assert_eq!(production.matches("},&policy,);").count(), 2);
+    }
+
+    #[test]
+    fn only_an_explicit_decline_passes_for_an_org_that_is_off() {
+        assert!(declines(br#"{"approved": false}"#));
+        for body in [
+            &br#"{"approved": true, "scope": "chat"}"#[..],
+            br#"{"approved": "true"}"#,
+            br#"{"approved": 1}"#,
+            br#"{"approved": "false"}"#,
+            br#"{}"#,
+            b"not json",
+        ] {
+            assert!(!declines(body), "{}", String::from_utf8_lossy(body));
+        }
+    }
+
+    #[test]
+    fn o2_ai_gets_approved_as_a_strict_bool() {
+        for (body, approved) in [
+            (&br#"{"approved": true}"#[..], true),
+            (br#"{"approved": 1}"#, false),
+            (br#"{"approved": "true"}"#, false),
+            (br#"{}"#, false),
+        ] {
+            let bound = bind_confirm_body_to_org(body, "acme").unwrap();
+            let value: Value = serde_json::from_slice(&bound).unwrap();
+            assert_eq!(
+                value["approved"],
+                approved,
+                "{}",
+                String::from_utf8_lossy(body)
+            );
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn a_persisted_turns_mark_outlives_a_dropped_browser_and_goes_with_the_task() {
+        use std::sync::atomic::{AtomicBool, Ordering};
+
+        let released = Arc::new(AtomicBool::new(false));
+        let flag = released.clone();
+        let mark =
+            super::super::turn_marks::TurnMark::new(move || flag.store(true, Ordering::SeqCst));
+        let on_end = turn_end(None, mark);
+        // The browser's body, as `persisted_turn` builds it, holds no mark.
+        let (tx, rx) = tokio::sync::mpsc::unbounded_channel::<Bytes>();
+        let frames = futures::stream::unfold(rx, |mut rx| async move {
+            rx.recv().await.map(|chunk| (chunk, rx))
+        })
+        .inspect(|chunk| super::super::capabilities::note_turn_frame(chunk));
+        tx.send(Bytes::from_static(b"data: {\"type\":\"status\"}\n\n"))
+            .unwrap();
+        drop(frames);
+        assert!(!released.load(Ordering::SeqCst), "the turn still runs");
+        on_end();
+        assert!(released.load(Ordering::SeqCst));
+    }
+
+    #[test]
+    fn the_persisted_turns_mark_is_owned_by_its_task_not_its_frames() {
+        let source = include_str!("chat.rs");
+        let production = &source[..source.find("#[cfg(test)]\nmod tests").unwrap()];
+        let start = production.find("async fn persisted_turn(").unwrap();
+        let body = &production[start..start + production[start..].find("\n}\n").unwrap()];
+        assert!(body.contains("on_end: Some(turn_end(span, turn_mark))"));
+        let inspect = &body[body.find(".inspect(").unwrap()..];
+        assert!(!inspect[..inspect.find("});").unwrap()].contains("turn_mark"));
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn an_unknown_health_waits_briefly_for_an_owner_and_a_good_one_as_configured() {
+        use super::super::capabilities::HealthStatus;
+
+        let configured = std::time::Duration::from_secs(45);
+        assert_eq!(owner_wait_for(HealthStatus::Ok, configured), configured);
+        assert_eq!(
+            owner_wait_for(HealthStatus::Unknown, configured),
+            UNKNOWN_HEALTH_OWNER_WAIT
+        );
+        assert_eq!(
+            owner_wait_for(HealthStatus::Unknown, std::time::Duration::from_secs(2)),
+            std::time::Duration::from_secs(2)
+        );
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn a_known_outage_refuses_the_turn_at_once_with_agent_unavailable() {
+        use super::super::capabilities::HealthStatus;
+
+        assert!(admit_with_health(HealthStatus::Ok).is_ok());
+        assert!(admit_with_health(HealthStatus::Unknown).is_ok());
+        let refusal = admit_with_health(HealthStatus::Unreachable).unwrap_err();
+        assert_eq!(refusal.status(), StatusCode::SERVICE_UNAVAILABLE);
+        let bytes = axum::body::to_bytes(refusal.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let json: Value = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(
+            (json["code"].as_str(), json["action"].as_str()),
+            (Some("agent_unavailable"), Some("retry"))
+        );
     }
 }
