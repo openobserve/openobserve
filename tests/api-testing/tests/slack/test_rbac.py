@@ -1,6 +1,7 @@
 """AC-5.3, AC-5.4 and AC-5.5: who may change Slack, with OpenFGA off (section 7 permission rule); row 24 with it on."""
 from __future__ import annotations
 
+import time
 import uuid
 
 import pytest
@@ -12,6 +13,7 @@ from .slack_helpers import (
     SlackMock,
     add_to_org,
     connect_with_proof,
+    make_org,
     make_slack_org,
     make_user,
     new_team,
@@ -126,3 +128,69 @@ def test_org_access_route_rows_follow_the_openfga_grant(
         assert allowed.status_code == 200, allowed.text
     finally:
         client.delete(f"slack/installations/{inst['id']}", org=META)
+
+
+def rbac_org(client: OpenObserveClient) -> str:
+    if not rbac_enabled(client):
+        pytest.skip("run against a server with O2_OPENFGA_ENABLED=true")
+    return make_org(client)
+
+
+def role_user(client: OpenObserveClient, org: str, grants: list[tuple[str, str]]) -> OpenObserveClient:
+    """An ``org`` member (role ``user``) holding only a custom role with ``grants`` as (object, permission)."""
+    email, user = make_user(client, org, "user")
+    role = f"rbac_{uuid.uuid4().hex[:8]}"
+    created = client.post("roles", json={"role": role}, org=org)
+    assert created.status_code in (200, 201), created.text
+    body = {
+        "add": [{"object": o, "permission": p} for o, p in grants],
+        "remove": [],
+        "add_users": [email],
+        "remove_users": [],
+    }
+    granted = client.put(f"roles/{role}", json=body, org=org)
+    assert granted.status_code == 200, granted.text
+    # OpenFGA tuple writes are not read-your-writes.
+    time.sleep(2)
+    return user
+
+
+def ingest_logs(client: OpenObserveClient, org: str, stream: str, row: dict) -> None:
+    resp = client.post(f"{stream}/_json", json=[row] * 3, org=org)
+    assert resp.status_code == 200, resp.text
+
+
+def search_body(sql: str) -> dict:
+    end = int(time.time() * 1_000_000) + 60_000_000
+    return {"query": {"sql": sql, "start_time": end - 3_600_000_000, "end_time": end, "from": 0, "size": 10}}
+
+
+def wait_for_rows(client: OpenObserveClient, org: str, stream: str) -> None:
+    for _ in range(30):
+        resp = client.post("_search?type=logs", json=search_body(f'SELECT * FROM "{stream}"'), org=org)
+        if resp.status_code == 200 and resp.json().get("hits"):
+            return
+        time.sleep(1)
+    raise AssertionError(f"{stream} never became searchable")
+
+
+def test_sql_tables_are_authorized_under_the_type_the_sql_names(client: OpenObserveClient) -> None:
+    org = rbac_org(client)
+    hidden, shared = f"rbac_hidden_{uuid.uuid4().hex[:6]}", f"rbac_shared_{uuid.uuid4().hex[:6]}"
+    ingest_logs(client, org, hidden, {"hidden_marker": "h"})
+    ingest_logs(client, org, shared, {"shared_marker": "s"})
+    wait_for_rows(client, org, hidden)
+    wait_for_rows(client, org, shared)
+    user = role_user(client, org, [(f"metrics:_all_{org}", "AllowAll"), (f"logs:{shared}", "AllowAll")])
+
+    for path in ("_search?type=metrics", "_search_stream?type=metrics", "_search?type=logs"):
+        refused = user.post(path, json=search_body(f'SELECT * FROM "logs"."{hidden}"'), org=org)
+        assert refused.status_code == 403, f"{path}: {refused.status_code} {refused.text[:300]}"
+        assert "hidden_marker" not in refused.text
+    joined = f'SELECT a.* FROM "logs"."{shared}" a JOIN "logs"."{hidden}" b ON a._timestamp = b._timestamp'
+    assert user.post("_search?type=metrics", json=search_body(joined), org=org).status_code == 403
+
+    allowed = user.post("_search?type=metrics", json=search_body(f'SELECT * FROM "logs"."{shared}"'), org=org)
+    assert allowed.status_code == 200, allowed.text
+    assert allowed.json()["hits"], allowed.text
+

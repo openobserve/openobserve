@@ -285,44 +285,19 @@ pub async fn search_multi(
             return map_error_to_http_response(&e, Some(trace_id));
         }
 
-        // Check permissions on stream
         #[cfg(feature = "enterprise")]
         {
-            use o2_openfga::meta::mapping::OFGA_MODELS;
-
-            use crate::service::{auth::AuthExtractor, users::get_user};
-
-            if !db::user::is_root_user(user_id) {
-                let user: config::meta::user::User =
-                    get_user(Some(&org_id), user_id).await.unwrap();
-                let stream_type_str = stream_type.as_str();
-
-                if !openobserve_core::authz::check_permissions(
-                    user_id,
-                    AuthExtractor {
-                        auth: "".to_string(),
-                        method: "GET".to_string(),
-                        o2_type: format!(
-                            "{}:{}",
-                            OFGA_MODELS
-                                .get(stream_type_str)
-                                .map_or(stream_type_str, |model| model.key),
-                            openobserve_core::auth::into_ofga_supported_format(&stream_name)
-                        ),
-                        org_id: org_id.clone(),
-                        bypass_check: false,
-                        parent_id: "".to_string(),
-                        use_all_org: false,
-                        use_self_context: false,
-                        use_self_parent: true,
-                    },
-                    user.role,
-                    user.is_external,
-                )
-                .await
-                {
-                    return MetaHttpResponse::forbidden("Unauthorized Access");
-                }
+            if let Some(res) = super::check_sql_stream_permissions(
+                &req.query.sql,
+                &org_id,
+                user_id,
+                stream_type,
+                crate::search::utils::StreamPermissionResourceType::Search,
+                &trace_id,
+            )
+            .await
+            {
+                return res;
             }
 
             if let Some(res) = check_cipher_key_permissions(&org_id, user_id, &req.query.sql).await
@@ -770,8 +745,15 @@ pub async fn _search_partition_multi(
 
     #[cfg(feature = "enterprise")]
     for sql in &req.sql {
-        if let Some(res) =
-            super::check_sql_stream_permissions(sql, &org_id, user_id, stream_type, &trace_id).await
+        if let Some(res) = super::check_sql_stream_permissions(
+            sql,
+            &org_id,
+            user_id,
+            stream_type,
+            crate::search::utils::StreamPermissionResourceType::Search,
+            &trace_id,
+        )
+        .await
         {
             return res;
         }
@@ -1273,108 +1255,40 @@ pub async fn search_multi_stream(
         }
     };
 
-    // Check permissions for all streams upfront before processing queries
-    // Extract stream names from SQL queries and check permissions
     #[cfg(feature = "enterprise")]
-    {
-        use o2_openfga::meta::mapping::OFGA_MODELS;
-
-        use crate::service::{auth::AuthExtractor, users::get_user};
-
-        if !db::user::is_root_user(&user_id) {
-            let user: config::meta::user::User = get_user(Some(&org_id), &user_id).await.unwrap();
-            let stream_type_str = stream_type.as_str();
-            let user_role = user.role.clone();
-            let user_is_external = user.is_external;
-
-            // Extract all stream names from SQL queries
-            let mut stream_names = hashbrown::HashSet::new();
-            for sql_query in &multi_req.sql {
-                match resolve_stream_names(&sql_query.sql) {
-                    Ok(streams) => {
-                        for stream in streams {
-                            stream_names.insert(stream);
-                        }
-                    }
-                    Err(e) => {
-                        #[cfg(feature = "enterprise")]
-                        let error_message = format!("Failed to parse SQL: {e}");
-
-                        let http_response =
-                            map_error_to_http_response(&(e.into()), Some(trace_id.clone()));
-
-                        #[cfg(feature = "enterprise")]
-                        {
-                            report_to_audit(
-                                user_id.clone(),
-                                org_id.clone(),
-                                trace_id.clone(),
-                                http_response.status().into(),
-                                Some(error_message),
-                                "POST".to_string(),
-                                format!("/api/{}/_search_multi_stream", org_id),
-                                query
-                                    .iter()
-                                    .map(|(k, v)| format!("{}={}", k, v))
-                                    .collect::<Vec<_>>()
-                                    .join("&"),
-                                body_bytes.clone(),
-                            )
-                            .await;
-                        }
-                        return http_response;
-                    }
-                }
-            }
-
-            // Check permissions for each unique stream
-            for stream_name in stream_names {
-                if !openobserve_core::authz::check_permissions(
-                    &user_id,
-                    AuthExtractor {
-                        auth: "".to_string(),
-                        method: "GET".to_string(),
-                        o2_type: format!(
-                            "{}:{}",
-                            OFGA_MODELS
-                                .get(stream_type_str)
-                                .map_or(stream_type_str, |model| model.key),
-                            openobserve_core::auth::into_ofga_supported_format(&stream_name)
-                        ),
-                        org_id: org_id.clone(),
-                        bypass_check: false,
-                        parent_id: "".to_string(),
-                        use_all_org: false,
-                        use_self_context: false,
-                        use_self_parent: true,
-                    },
-                    user_role.clone(),
-                    user_is_external,
-                )
-                .await
-                {
-                    #[cfg(feature = "enterprise")]
-                    {
-                        report_to_audit(
-                            user_id.clone(),
-                            org_id.clone(),
-                            trace_id.clone(),
-                            403,
-                            Some(format!("Unauthorized Access to stream: {stream_name}")),
-                            "POST".to_string(),
-                            format!("/api/{}/_search_multi_stream", org_id),
-                            query
-                                .iter()
-                                .map(|(k, v)| format!("{}={}", k, v))
-                                .collect::<Vec<_>>()
-                                .join("&"),
-                            body_bytes.clone(),
-                        )
-                        .await;
-                    }
-                    return MetaHttpResponse::forbidden("Unauthorized Access");
-                }
-            }
+    for sql_query in &multi_req.sql {
+        if let Some(res) = super::check_sql_stream_permissions(
+            &sql_query.sql,
+            &org_id,
+            &user_id,
+            stream_type,
+            crate::search::utils::StreamPermissionResourceType::Search,
+            &trace_id,
+        )
+        .await
+        {
+            let reason = if res.status() == StatusCode::FORBIDDEN {
+                "Unauthorized Access"
+            } else {
+                "Failed to parse SQL"
+            };
+            report_to_audit(
+                user_id.clone(),
+                org_id.clone(),
+                trace_id.clone(),
+                res.status().into(),
+                Some(reason.to_string()),
+                "POST".to_string(),
+                format!("/api/{}/_search_multi_stream", org_id),
+                query
+                    .iter()
+                    .map(|(k, v)| format!("{}={}", k, v))
+                    .collect::<Vec<_>>()
+                    .join("&"),
+                body_bytes.clone(),
+            )
+            .await;
+            return res;
         }
     }
 
