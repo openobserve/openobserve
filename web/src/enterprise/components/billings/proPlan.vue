@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <OCard
-    class="border-card-glass-border bg-card-glass-bg rounded-default dark:bg-surface-base dark:border-border-default row-span-7 grid h-full w-full grid-rows-subgrid gap-0 border shadow-none max-lg:row-span-1 max-lg:flex"
+    class="border-card-glass-border bg-card-glass-bg rounded-default dark:bg-surface-base dark:border-border-default row-span-7 grid! h-full w-full grid-rows-subgrid gap-0 border shadow-none max-lg:row-span-1 max-lg:flex!"
   >
     <div class="flex items-start justify-between gap-3 px-4 py-3">
       <div>
@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="index !== 0"
               variant="ghost-primary"
               size="xs"
-              class="ms-auto -me-2.5"
+              class="ms-auto"
               data-test="billing-plans-pro-contact-sales-btn"
               @click="$emit('contact-sales')"
             >
