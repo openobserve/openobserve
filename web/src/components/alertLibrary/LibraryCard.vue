@@ -94,6 +94,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="queryTypeLabelText"
           data-test="alert-library-card-query-type"
         />
+        <OTag
+          v-if="isAnomaly"
+          type="alertType"
+          value="anomaly_detection"
+          :label="t('alert_library.alertTypeAnomaly')"
+          data-test="alert-library-card-anomaly"
+        />
+        <OTag
+          v-if="locked"
+          variant="default-soft"
+          icon="lock"
+          :label="t('alert_library.enterprise')"
+          :title="t('alert_library.enterpriseHint')"
+          data-test="alert-library-card-enterprise"
+        />
 
         <!-- Available: the stream is quiet provenance, tucked opposite the tag. -->
         <OTruncatedText
@@ -146,7 +161,7 @@ import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import type { AlertLibraryEntry } from "@/types/alertLibrary";
 import { useI18nTyped } from "@/types/i18n";
 
-import { queryTypeLabel, severityBadgeValue, severityLabel } from "./libraryFacets";
+import { alertTypeOf, queryTypeLabel, severityBadgeValue, severityLabel } from "./libraryFacets";
 
 const props = defineProps<{
   entry: AlertLibraryEntry;
@@ -154,6 +169,8 @@ const props = defineProps<{
   ready: boolean;
   /** Selection lives in the gallery; the card only renders and reports it. */
   selected?: boolean;
+  /** An anomaly alert this build is not entitled to; the gallery turns its clicks into the upsell. */
+  locked?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -167,4 +184,5 @@ const severityValue = computed(() => severityBadgeValue(props.entry.severity));
 const severityText = computed(() => severityLabel(t, props.entry.severity));
 // A query language, not prose — one correct form worldwide.
 const queryTypeLabelText = computed(() => queryTypeLabel(props.entry.query_type));
+const isAnomaly = computed(() => alertTypeOf(props.entry) === "anomaly");
 </script>

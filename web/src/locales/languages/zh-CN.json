@@ -10714,6 +10714,12 @@
     "selectionOffscreen": "{count} 个不在视图内 | {count} 个不在视图内",
     "clearSelection": "清除选择",
     "addSelected": "添加 {count} 个告警 | 添加 {count} 个告警",
+    "alertType": "告警类型",
+    "alertTypeAll": "全部",
+    "alertTypeThreshold": "阈值",
+    "alertTypeAnomaly": "异常",
+    "enterprise": "Enterprise",
+    "enterpriseHint": "异常检测告警需要 OpenObserve Enterprise。",
     "drawer": {
       "dataAvailable": "数据可用",
       "streamNotFound": "未找到流",
@@ -10738,6 +10744,8 @@
       "neverIngestedCallout": "{stream} 存在但从未接收过数据，因此此告警没有可触发的内容。",
       "lastData": "最后数据 {when}",
       "staleCallout": "{stream} 上次接收数据是在 {when}。在数据摄取恢复之前，此告警将保持静默。",
+      "anomalyTrainingNote": "此告警从数据流自身的历史中学习，在数据足以训练之前保持静默：根据其间隔，需要几小时到大约一天。完整的工作日与周末模型需要覆盖一个周末的时间段。",
+      "detection": "检测",
       "unknownTime": "在未知时间"
     },
     "install": {
@@ -10776,6 +10784,9 @@
       "cancel": "取消",
       "done": "完成",
       "confirmLarge": "我了解此操作会在 {folder} 中创建 {count} 个告警，每个都通知 {destination}。",
+      "tuneThresholdOnly": "仅适用于阈值告警。",
+      "anomalyTrainingNote": "异常告警在基于足够的数据流历史完成训练后才开始告警。",
+      "anomalyUnavailable": "异常告警需要启用了异常检测的 OpenObserve Enterprise，因此已跳过此告警。",
       "confirmLargeNoDestination": "我明白这将在 {folder} 中创建 {count} 个告警，且它们暂不通知任何目标。"
     },
     "error": {

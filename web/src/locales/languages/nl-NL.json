@@ -10714,6 +10714,12 @@
     "selectionOffscreen": "{count} niet in beeld | {count} niet in beeld",
     "clearSelection": "Selectie wissen",
     "addSelected": "{count} melding toevoegen | {count} meldingen toevoegen",
+    "alertType": "Alerttype",
+    "alertTypeAll": "Alle",
+    "alertTypeThreshold": "Drempel",
+    "alertTypeAnomaly": "Anomalie",
+    "enterprise": "Enterprise",
+    "enterpriseHint": "Alerts voor anomaliedetectie vereisen OpenObserve Enterprise.",
     "drawer": {
       "dataAvailable": "Gegevens beschikbaar",
       "streamNotFound": "Stream niet gevonden",
@@ -10738,6 +10744,8 @@
       "neverIngestedCallout": "{stream} bestaat maar heeft nooit gegevens ontvangen, dus deze alert heeft niets om op af te gaan.",
       "lastData": "Laatste gegevens {when}",
       "staleCallout": "{stream} ontving voor het laatst gegevens {when}. Deze alert blijft stil totdat de opname wordt hervat.",
+      "anomalyTrainingNote": "Deze alert leert van de eigen geschiedenis van de stream en blijft stil tot er genoeg is om te trainen: enkele uren tot ongeveer een dag, afhankelijk van het interval. Het volledige model voor werkdagen en weekend heeft een periode nodig die een weekend omvat.",
+      "detection": "Detectie",
       "unknownTime": "op een onbekend tijdstip"
     },
     "install": {
@@ -10776,6 +10784,9 @@
       "cancel": "Annuleren",
       "done": "Klaar",
       "confirmLarge": "Ik begrijp dat dit {count} meldingen aanmaakt in {folder}, die elk {destination} waarschuwen.",
+      "tuneThresholdOnly": "Geldt alleen voor drempelalerts.",
+      "anomalyTrainingNote": "Anomalie-alerts gaan pas af nadat ze op genoeg geschiedenis van de stream zijn getraind.",
+      "anomalyUnavailable": "Anomalie-alerts vereisen OpenObserve Enterprise met anomaliedetectie ingeschakeld, dus deze is overgeslagen.",
       "confirmLargeNoDestination": "Ik begrijp dat hiermee {count} alarmen worden aangemaakt in {folder}, waarvan geen enkele nog een bestemming op de hoogte stelt."
     },
     "error": {
