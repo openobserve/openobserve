@@ -20,15 +20,12 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
 };
-#[cfg(any(feature = "enterprise", test))]
-use config::meta::search;
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
 use openobserve_api_common::extractors::Headers;
 use openobserve_core::auth::UserEmail;
-#[cfg(feature = "enterprise")]
-use {
-    common::meta::http::HttpResponse as MetaHttpResponse,
-    o2_enterprise::enterprise::common::config::get_config as get_o2_config,
-};
+#[cfg(any(feature = "enterprise", test))]
+use {common::meta::http::HttpResponse as MetaHttpResponse, config::meta::search};
 
 pub async fn cancel_query(
     Headers(user_email): Headers<UserEmail>,
@@ -39,6 +36,9 @@ pub async fn cancel_query(
         let (org_id, trace_id) = params;
         let trace_ids = trace_id.split(',').collect::<Vec<&str>>();
         let scope = cancel_scope(&org_id, &user_email.user_id).await;
+        if let Some(refusal) = refuse_foreign_cancel(&org_id, scope, &trace_ids).await {
+            return refusal;
+        }
         cancel_query_inner(scope, &trace_ids).await
     }
 
@@ -66,6 +66,9 @@ pub async fn cancel_multiple_query(
         };
         let trace_ids = trace_ids.iter().map(|s| s.as_str()).collect::<Vec<&str>>();
         let scope = cancel_scope(&org_id, &user_email.user_id).await;
+        if let Some(refusal) = refuse_foreign_cancel(&org_id, scope, &trace_ids).await {
+            return refusal;
+        }
         cancel_query_inner(scope, &trace_ids).await
     }
 
@@ -162,6 +165,24 @@ async fn cancel_scope<'a>(org_id: &'a str, user_id: &str) -> Option<&'a str> {
     (org_id != config::META_ORG_ID || !may_cancel_in_every_org(user_id).await).then_some(org_id)
 }
 
+/// A `_meta` cancel narrowed to `_meta` is refused when an id names only other orgs' queries.
+#[cfg(feature = "enterprise")]
+async fn refuse_foreign_cancel(
+    org_id: &str,
+    scope: Option<&str>,
+    trace_ids: &[&str],
+) -> Option<Response> {
+    let scope = scope.filter(|_| org_id == config::META_ORG_ID)?;
+    let rows = match search_service::query_status().await {
+        Ok(res) => res.status,
+        Err(e) => {
+            log::warn!("cancel: running queries could not be listed: {e}");
+            return None;
+        }
+    };
+    foreign_cancel_refusal(scope, trace_ids, &rows)
+}
+
 /// Root, a `_meta` Admin or Editor, or an enforced `settings` write grant in `_meta`.
 #[cfg(feature = "enterprise")]
 async fn may_cancel_in_every_org(user_id: &str) -> bool {
@@ -193,6 +214,40 @@ async fn may_cancel_in_every_org(user_id: &str) -> bool {
             false,
         )
         .await
+}
+
+/// 403 when a requested id matches (itself or `{id}-…`) only queries of orgs other than `scope`.
+#[cfg(any(feature = "enterprise", test))]
+fn foreign_cancel_refusal(
+    scope: &str,
+    trace_ids: &[&str],
+    rows: &[search::QueryStatus],
+) -> Option<Response> {
+    let only_foreign = |id: &str| {
+        let owners = rows
+            .iter()
+            .filter(|row| {
+                row.trace_id == id
+                    || row
+                        .trace_id
+                        .strip_prefix(id)
+                        .is_some_and(|rest| rest.starts_with('-'))
+            })
+            .filter_map(|row| row.org_id.as_deref());
+        let (mut foreign, mut own) = (false, false);
+        for owner in owners {
+            if owner == scope {
+                own = true;
+            } else {
+                foreign = true;
+            }
+        }
+        foreign && !own
+    };
+    trace_ids
+        .iter()
+        .any(|id| only_foreign(id))
+        .then(|| MetaHttpResponse::forbidden("Not allowed to cancel other organizations' queries"))
 }
 
 /// The running queries an org may see: its own, or every org's from `_meta`.
@@ -227,6 +282,31 @@ mod tests {
         let rows = vec![row("a1", Some("a")), row("b1", Some("b")), row("n1", None)];
         assert_eq!(trace_ids(visible_to("a", rows.clone())), vec!["a1"]);
         assert!(visible_to("c", rows).is_empty());
+    }
+
+    #[test]
+    fn a_narrowed_cancel_naming_another_orgs_query_is_forbidden() {
+        let meta = config::META_ORG_ID;
+        let rows = vec![row("a1", Some("a")), row("m1", Some(meta)), row("n1", None)];
+        let refusal = foreign_cancel_refusal(meta, &["m1", "a1"], &rows).unwrap();
+        assert_eq!(refusal.status(), StatusCode::FORBIDDEN);
+        assert!(foreign_cancel_refusal(meta, &["m1"], &rows).is_none());
+        assert!(foreign_cancel_refusal(meta, &["n1", "gone"], &rows).is_none());
+    }
+
+    #[test]
+    fn a_narrowed_cancel_of_a_parent_id_with_another_orgs_sub_queries_is_forbidden() {
+        let meta = config::META_ORG_ID;
+        let rows = vec![
+            row("t-0", Some("a")),
+            row("t-q0", Some("a")),
+            row("m-0", Some(meta)),
+            row("tx", Some("a")),
+        ];
+        let refusal = foreign_cancel_refusal(meta, &["t"], &rows).unwrap();
+        assert_eq!(refusal.status(), StatusCode::FORBIDDEN);
+        assert!(foreign_cancel_refusal(meta, &["m"], &rows).is_none());
+        assert!(foreign_cancel_refusal(meta, &["t-1"], &rows).is_none());
     }
 
     #[test]

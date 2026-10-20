@@ -57,11 +57,12 @@ impl Metrics for MetricsQuerier {
         let org_id = &req.org_id;
         let stream_type = StreamType::Metrics.as_str();
         #[cfg(feature = "enterprise")]
-        if !SEARCH_SERVER.contain_key(&trace_id).await {
+        if !SEARCH_SERVER.contain_key(org_id, &trace_id).await {
             SEARCH_SERVER
                 .insert(
+                    org_id,
                     trace_id.to_string(),
-                    TaskStatus::new_follower(vec![], false, Some(org_id.to_string())),
+                    TaskStatus::new_follower(vec![], false),
                 )
                 .await;
         }
@@ -91,8 +92,8 @@ impl Metrics for MetricsQuerier {
 
         // Clean up task record before returning
         #[cfg(feature = "enterprise")]
-        if !SEARCH_SERVER.is_leader(&trace_id).await {
-            SEARCH_SERVER.remove(&trace_id).await;
+        if !SEARCH_SERVER.is_leader(org_id, &trace_id).await {
+            SEARCH_SERVER.remove(org_id, &trace_id).await;
         }
 
         Ok(Response::new(result))
@@ -125,11 +126,12 @@ impl Metrics for MetricsQuerier {
         // insert_sender — without this the engine returns SearchCancelQuery
         // immediately (same registration the `query` handler performs).
         #[cfg(feature = "enterprise")]
-        if !SEARCH_SERVER.contain_key(&trace_id).await {
+        if !SEARCH_SERVER.contain_key(&req.org_id, &trace_id).await {
             SEARCH_SERVER
                 .insert(
+                    &req.org_id,
                     trace_id.clone(),
-                    TaskStatus::new_follower(vec![], false, Some(req.org_id.clone())),
+                    TaskStatus::new_follower(vec![], false),
                 )
                 .await;
         }
@@ -140,8 +142,8 @@ impl Metrics for MetricsQuerier {
                 log::error!("[gRPC:metrics:data] get data error: req:{req:?}, error:{e:?}")
             }
             #[cfg(feature = "enterprise")]
-            if !SEARCH_SERVER.is_leader(&trace_id).await {
-                SEARCH_SERVER.remove(&trace_id).await;
+            if !SEARCH_SERVER.is_leader(&req.org_id, &trace_id).await {
+                SEARCH_SERVER.remove(&req.org_id, &trace_id).await;
             }
         });
 

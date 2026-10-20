@@ -531,50 +531,72 @@ mod tests {
     }
 
     #[cfg(feature = "enterprise")]
-    fn task_in(org_id: &str, is_leader: bool) -> o2_enterprise::enterprise::search::TaskStatus {
-        o2_enterprise::enterprise::search::TaskStatus::new_follower(
-            vec![],
-            is_leader,
-            Some(org_id.to_string()),
-        )
-    }
-
-    #[cfg(feature = "enterprise")]
     #[tokio::test]
     async fn test_cancel_scoped_to_one_org_keeps_another_orgs_query() {
+        use o2_enterprise::enterprise::search::TaskStatus;
+
         let searcher = Searcher::new();
-        searcher.insert("t1".to_string(), task_in("b", true)).await;
+        let leader = || TaskStatus::new_follower(vec![], true);
+        searcher.insert("b", "t1".to_string(), leader()).await;
 
         assert!(!cancel_in(&searcher, "t1", Some("a")).await);
-        assert!(searcher.contain_key("t1").await);
+        assert!(searcher.contain_key("b", "t1").await);
         assert!(cancel_in(&searcher, "t1", Some("b")).await);
-        assert!(!searcher.contain_key("t1").await);
+        assert!(!searcher.contain_key("b", "t1").await);
 
-        searcher.insert("t2".to_string(), task_in("b", true)).await;
+        searcher.insert("b", "t2".to_string(), leader()).await;
         assert!(cancel_in(&searcher, "t2", None).await);
-        assert!(!searcher.contain_key("t2").await);
+        assert!(!searcher.contain_key("b", "t2").await);
         assert!(!cancel_in(&searcher, "t2", None).await);
     }
 
     #[cfg(feature = "enterprise")]
     #[tokio::test]
-    async fn test_cancel_scoped_to_one_org_keeps_another_orgs_sub_tasks() {
+    async fn test_one_trace_id_runs_and_cancels_in_two_orgs_independently() {
+        use o2_enterprise::enterprise::search::TaskStatus;
+
         let searcher = Searcher::new();
-        searcher.insert("t".to_string(), task_in("a", true)).await;
-        searcher
-            .insert("t-1".to_string(), task_in("b", false))
-            .await;
-        searcher
-            .insert("t-2".to_string(), task_in("a", false))
-            .await;
+        let status = |is_leader| TaskStatus::new_follower(vec![], is_leader);
+        searcher.insert("a", "t".to_string(), status(true)).await;
+        searcher.insert("b", "t".to_string(), status(true)).await;
+        searcher.insert("b", "t-1".to_string(), status(false)).await;
 
         assert!(cancel_in(&searcher, "t", Some("a")).await);
-        assert!(!searcher.contain_key("t").await);
-        assert!(!searcher.contain_key("t-2").await);
-        assert!(searcher.contain_key("t-1").await);
+        assert!(!searcher.contain_key("a", "t").await);
+        assert!(searcher.is_leader("b", "t").await);
+        assert!(searcher.contain_key("b", "t-1").await);
 
+        searcher.insert("a", "t".to_string(), status(true)).await;
         assert!(cancel_in(&searcher, "t", None).await);
-        assert!(!searcher.contain_key("t-1").await);
+        for (org, trace_id) in [("a", "t"), ("b", "t"), ("b", "t-1")] {
+            assert!(
+                !searcher.contain_key(org, trace_id).await,
+                "{org}/{trace_id}"
+            );
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_completion_after_a_cancel_keeps_the_next_orgs_entry() {
+        use o2_enterprise::enterprise::search::TaskStatus;
+
+        let searcher = Searcher::new();
+        let leader = || TaskStatus::new_follower(vec![], true);
+        searcher.insert("a", "t".to_string(), leader()).await;
+        assert!(cancel_in(&searcher, "t", Some("a")).await);
+        searcher.insert("b", "t".to_string(), leader()).await;
+
+        assert!(searcher.remove("a", "t").await.is_none());
+        let (sender, _receiver) = tokio::sync::oneshot::channel();
+        assert!(
+            searcher
+                .insert_sender("a", "t", sender, true)
+                .await
+                .is_err()
+        );
+        assert!(searcher.contain_key("b", "t").await);
+        assert!(cancel_in(&searcher, "t", Some("b")).await);
     }
 
     #[tokio::test]

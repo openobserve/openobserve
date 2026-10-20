@@ -375,18 +375,20 @@ async fn register_follower_task_status(
     org_id: &str,
     trace_id: &str,
 ) -> Option<AsyncDefer> {
-    if !is_super_cluster || SEARCH_SERVER.contain_key(trace_id).await {
+    if !is_super_cluster || SEARCH_SERVER.contain_key(org_id, trace_id).await {
         return None;
     }
     SEARCH_SERVER
         .insert(
+            org_id,
             trace_id.to_string(),
-            TaskStatus::new_follower(vec![], false, Some(org_id.to_string())),
+            TaskStatus::new_follower(vec![], false),
         )
         .await;
+    let org_id = org_id.to_string();
     let trace_id = trace_id.to_string();
     Some(AsyncDefer::new(async move {
-        SEARCH_SERVER.remove(&trace_id).await;
+        SEARCH_SERVER.remove(&org_id, &trace_id).await;
     }))
 }
 

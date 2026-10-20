@@ -100,6 +100,7 @@ pub async fn search(
 
         SEARCH_SERVER
             .insert(
+                org_id,
                 trace_id.to_string(),
                 TaskStatus::new_leader(
                     vec![],
@@ -227,7 +228,7 @@ pub async fn search(
     let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
     #[cfg(feature = "enterprise")]
     if SEARCH_SERVER
-        .insert_sender(trace_id, abort_sender, true)
+        .insert_sender(org_id, trace_id, abort_sender, true)
         .await
         .is_err()
     {
@@ -279,7 +280,7 @@ pub async fn search(
 
     // Clean up task record before returning
     #[cfg(feature = "enterprise")]
-    SEARCH_SERVER.remove(trace_id).await;
+    SEARCH_SERVER.remove(org_id, trace_id).await;
 
     match task {
         Ok(Ok(ret)) => Ok(ret),
