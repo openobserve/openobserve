@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { effectScope } from "vue";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LICENSE_REFRESH_SETTLE_MS } from "@/utils/licenseWaivers";
 
@@ -102,5 +103,36 @@ describe("useLicenseRefresh", () => {
     expect(arg.message).toContain("boom");
     await vi.advanceTimersByTimeAsync(LICENSE_REFRESH_SETTLE_MS * 2);
     expect(dispatch).not.toHaveBeenCalled();
+  });
+
+  it("a double click schedules exactly one reload", async () => {
+    vi.mocked(licenseServer.refresh_license_limits).mockResolvedValue({} as never);
+    const { refreshLicenseLimits } = useLicenseRefresh();
+    await refreshLicenseLimits();
+    await vi.advanceTimersByTimeAsync(5_000);
+    await refreshLicenseLimits();
+    await vi.advanceTimersByTimeAsync(LICENSE_REFRESH_SETTLE_MS);
+    expect(dispatch).toHaveBeenCalledTimes(1);
+  });
+
+  it("no reload fires after the owning scope is disposed", async () => {
+    vi.mocked(licenseServer.refresh_license_limits).mockResolvedValue({} as never);
+    const scope = effectScope();
+    const { refreshLicenseLimits } = scope.run(() => useLicenseRefresh())!;
+    await refreshLicenseLimits();
+    await vi.advanceTimersByTimeAsync(5_000);
+    scope.stop();
+    await vi.advanceTimersByTimeAsync(LICENSE_REFRESH_SETTLE_MS * 2);
+    expect(dispatch).not.toHaveBeenCalled();
+  });
+
+  it("runs the page callback once the reload settles", async () => {
+    vi.mocked(licenseServer.refresh_license_limits).mockResolvedValue({} as never);
+    const onSettled = vi.fn();
+    await useLicenseRefresh().refreshLicenseLimits(onSettled);
+    await vi.advanceTimersByTimeAsync(LICENSE_REFRESH_SETTLE_MS - 1);
+    expect(onSettled).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(onSettled).toHaveBeenCalledTimes(1);
   });
 });

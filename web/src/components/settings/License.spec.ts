@@ -482,6 +482,31 @@ describe("License.vue", () => {
       expect(setConfig).toHaveBeenCalledTimes(1);
     });
 
+    it("the page data reloads when the settle delay elapses", async () => {
+      vi.mocked(licenseServer.update_license).mockResolvedValue(
+        createAxiosResponse({ success: true }),
+      );
+      wrapper.vm.licenseKey = "new-license-key";
+      await wrapper.vm.updateLicense();
+      await flushPromises();
+      const before = vi.mocked(licenseServer.get_license).mock.calls.length;
+      await vi.advanceTimersByTimeAsync(LICENSE_REFRESH_SETTLE_MS);
+      await flushPromises();
+      expect(vi.mocked(licenseServer.get_license).mock.calls.length).toBe(before + 1);
+    });
+
+    it("unmounting before the delay cancels the reload", async () => {
+      vi.mocked(licenseServer.update_license).mockResolvedValue(
+        createAxiosResponse({ success: true }),
+      );
+      wrapper.vm.licenseKey = "new-license-key";
+      await wrapper.vm.updateLicense();
+      await flushPromises();
+      wrapper.unmount();
+      await vi.advanceTimersByTimeAsync(LICENSE_REFRESH_SETTLE_MS * 2);
+      expect(setConfig).not.toHaveBeenCalled();
+    });
+
     it("a 409 from the env key shows the server message", async () => {
       vi.mocked(licenseServer.update_license).mockRejectedValue({
         response: { status: 409, data: { message: "Remove O2_LICENSE_KEY first" } },

@@ -494,7 +494,6 @@ import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import { copyToClipboard } from "@/utils/clipboard";
 import { useLicenseRefresh } from "@/composables/useLicenseRefresh";
-import { LICENSE_REFRESH_SETTLE_MS } from "@/utils/licenseWaivers";
 import { makeLicenseSchema, type LicenseForm } from "./License.schema";
 
 const RenderDashboardCharts = defineAsyncComponent(
@@ -527,7 +526,7 @@ export default defineComponent({
     const showLicenseKeyModal = ref(false);
     const isLicenseKeyAutoFilled = ref(false);
     const store = useStore();
-    const { refreshLicenseLimits, reloadLicenseState } = useLicenseRefresh();
+    const { refreshLicenseLimits, scheduleReload } = useLicenseRefresh();
     const usageDashboardData = ref<any>(null);
     const dashboardRenderKey = ref(0);
 
@@ -591,7 +590,7 @@ export default defineComponent({
         window.history.replaceState({}, document.title, url.toString());
 
         await loadLicenseData();
-        setTimeout(reloadLicenseState, LICENSE_REFRESH_SETTLE_MS);
+        scheduleReload(loadLicenseData);
       } catch (error) {
         const e = error as { response?: { data?: { message?: string } } };
         console.error("Error updating license:", error);
@@ -623,7 +622,7 @@ export default defineComponent({
     };
 
     const triggerLimitRefresh = async () => {
-      if (await refreshLicenseLimits()) await loadLicenseData();
+      if (await refreshLicenseLimits(loadLicenseData)) await loadLicenseData();
     };
 
     const maskKey = (key: string) => {

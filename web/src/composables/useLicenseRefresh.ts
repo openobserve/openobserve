@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { getCurrentScope, onScopeDispose } from "vue";
 import { useStore } from "vuex";
 import { queryClient } from "@/composables/query/queryClient";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -46,11 +47,30 @@ export function useLicenseRefresh() {
     }
   };
 
-  const refreshLicenseLimits = async (): Promise<boolean> => {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+
+  const clearTimer = () => {
+    if (timer !== undefined) clearTimeout(timer);
+    timer = undefined;
+  };
+
+  // Clears the pending timer so repeated clicks collapse into one reload.
+  const scheduleReload = (onSettled?: () => Promise<void> | void) => {
+    clearTimer();
+    timer = setTimeout(async () => {
+      timer = undefined;
+      await reloadLicenseState();
+      await onSettled?.();
+    }, LICENSE_REFRESH_SETTLE_MS);
+  };
+
+  if (getCurrentScope()) onScopeDispose(clearTimer);
+
+  const refreshLicenseLimits = async (onSettled?: () => Promise<void> | void): Promise<boolean> => {
     try {
       await licenseServer.refresh_license_limits();
       toast({ variant: "success", message: t("about.license_refresh_success") });
-      setTimeout(reloadLicenseState, LICENSE_REFRESH_SETTLE_MS);
+      scheduleReload(onSettled);
       return true;
     } catch (error) {
       const e = error as { response?: { status?: number; data?: { message?: string } } };
@@ -68,5 +88,5 @@ export function useLicenseRefresh() {
     }
   };
 
-  return { refreshLicenseLimits, reloadLicenseState };
+  return { refreshLicenseLimits, reloadLicenseState, scheduleReload };
 }
