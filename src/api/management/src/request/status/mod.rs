@@ -215,13 +215,8 @@ struct ConfigResponse<'a> {
     dashboard_show_field_as_json_enabled: bool,
     ingest_flatten_level: u32,
     #[cfg(feature = "enterprise")]
-    license_expiry: i64,
-    #[cfg(feature = "enterprise")]
-    license_server_url: String,
-    #[cfg(feature = "enterprise")]
-    ingestion_quota_used: f64,
-    #[cfg(feature = "enterprise")]
-    ingestion_history: Vec<o2_enterprise::enterprise::license::UsageResult>,
+    #[serde(flatten)]
+    license: LicenseConfig,
     log_page_default_field_list: String,
     query_values_default_num: i64,
     alert_preview_timerange_minutes: i64,
@@ -263,6 +258,17 @@ struct ConfigResponse<'a> {
     billing_group_allowed_orgs: String,
     #[cfg(feature = "enterprise")]
     workflows_enabled: bool,
+}
+
+#[cfg(feature = "enterprise")]
+#[derive(Serialize)]
+struct LicenseConfig {
+    license_expiry: i64,
+    license_server_url: String,
+    ingestion_quota_used: f64,
+    ingestion_history: Vec<o2_enterprise::enterprise::license::UsageResult>,
+    license_search_allowed: bool,
+    license_waiver_until: Option<i64>,
 }
 
 /// Unauthenticated `GET /config`: every field is public, so only what the login page consumes, plus
@@ -382,6 +388,19 @@ pub async fn schedulez() -> impl IntoResponse {
             status: status.to_string(),
         }),
     )
+}
+
+#[cfg(feature = "enterprise")]
+async fn license_config(license_server_url: String) -> LicenseConfig {
+    let status = o2_enterprise::enterprise::license::license_status().await;
+    LicenseConfig {
+        license_expiry: o2_enterprise::enterprise::license::get_expiry_time().await,
+        license_server_url,
+        ingestion_quota_used: o2_enterprise::enterprise::license::ingestion_used() * 100.0,
+        ingestion_history: o2_enterprise::enterprise::license::get_ingestion_history().await,
+        license_search_allowed: status.decision.search_allowed,
+        license_waiver_until: status.search_unblock_until(now_micros()),
+    }
 }
 
 /// Unauthenticated login-page bootstrap; the full config is served by [`zo_config`].
@@ -518,13 +537,7 @@ pub async fn zo_config(
     let build_type = "opensource";
 
     #[cfg(feature = "enterprise")]
-    let expiry_time = o2_enterprise::enterprise::license::get_expiry_time().await;
-    #[cfg(feature = "enterprise")]
-    let license_server_url = o2cfg.common.license_server_url.to_string();
-    #[cfg(feature = "enterprise")]
-    let ingestion_quota_used = o2_enterprise::enterprise::license::ingestion_used() * 100.0;
-    #[cfg(feature = "enterprise")]
-    let ingestion_history = o2_enterprise::enterprise::license::get_ingestion_history().await;
+    let license = license_config(o2cfg.common.license_server_url.to_string()).await;
     #[cfg(feature = "enterprise")]
     let last_usage_report_ts = last_reported_timestamp().await;
 
@@ -611,15 +624,9 @@ pub async fn zo_config(
         dashboard_show_symbol_enabled: cfg.common.dashboard_show_symbol_enabled,
         dashboard_show_field_as_json_enabled: cfg.common.dashboard_show_field_as_json_enabled,
         ingest_flatten_level: cfg.limit.ingest_flatten_level,
-        #[cfg(feature = "enterprise")]
-        license_expiry: expiry_time,
         log_page_default_field_list: cfg.common.log_page_default_field_list.clone(),
         #[cfg(feature = "enterprise")]
-        license_server_url,
-        #[cfg(feature = "enterprise")]
-        ingestion_quota_used,
-        #[cfg(feature = "enterprise")]
-        ingestion_history,
+        license,
         query_values_default_num: cfg.limit.query_values_default_num,
         alert_preview_timerange_minutes: cfg.limit.alert_preview_timerange_minutes,
         incidents_enabled,
@@ -2520,20 +2527,56 @@ mod tests {
         }
     }
 
-    #[cfg(feature = "enterprise")]
-    #[tokio::test]
-    async fn test_zo_config_serves_incidents_rca_enabled() {
-        let o2cfg = o2_enterprise::enterprise::common::config::get_config();
+    async fn zo_config_json() -> serde_json::Value {
         let response = zo_config(Path("default".to_string()), None)
             .await
             .into_response();
         let body = axum::body::to_bytes(response.into_body(), usize::MAX)
             .await
             .unwrap();
-        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        serde_json::from_slice(&body).unwrap()
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_zo_config_serves_incidents_rca_enabled() {
+        let o2cfg = o2_enterprise::enterprise::common::config::get_config();
+        let json = zo_config_json().await;
         assert_eq!(
             json["incidents_rca_enabled"],
             o2cfg.incidents.enabled && o2cfg.incidents.rca_enabled && o2cfg.ai.has_agent_target()
         );
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    #[tokio::test]
+    async fn test_zo_config_has_no_license_fields_in_oss() {
+        let json = zo_config_json().await;
+        for k in [
+            "license_search_allowed",
+            "license_waiver_until",
+            "ingestion_quota_used",
+        ] {
+            assert!(json.get(k).is_none(), "{k}");
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_zo_config_serves_license_search_state() {
+        let json = zo_config_json().await;
+        assert_eq!(
+            json["license_search_allowed"],
+            serde_json::Value::Bool(o2_enterprise::enterprise::license::search_allowed())
+        );
+        assert!(json.get("license_waiver_until").is_some());
+        for k in [
+            "license_expiry",
+            "license_server_url",
+            "ingestion_quota_used",
+            "ingestion_history",
+        ] {
+            assert!(json.get(k).is_some(), "flatten must keep {k}");
+        }
     }
 }
