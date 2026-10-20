@@ -16152,7 +16152,6 @@
       "draft": "ドラフト",
       "active": "アクティブ",
       "paused": "一時停止",
-      "degraded": "劣化しました",
       "archived": "アーカイブ済み"
     },
     "summaryAll": "すべて",
@@ -16623,6 +16622,11 @@
         "scorers": "スコアラー",
         "created": "作成日",
         "actions": "操作"
+      },
+      "health": {
+        "degraded": "劣化しました",
+        "since": "{time}にこの状態になりました",
+        "checked": "最終確認: {time}"
       },
       "empty": {
         "title": "まだ評価ジョブがありません"

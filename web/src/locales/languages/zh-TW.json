@@ -16147,7 +16147,6 @@
       "draft": "草稿",
       "active": "使用中",
       "paused": "已暫停",
-      "degraded": "已降級",
       "archived": "已封存"
     },
     "summaryAll": "全部",
@@ -16618,6 +16617,11 @@
         "scorers": "評分器",
         "created": "建立時間",
         "actions": "動作"
+      },
+      "health": {
+        "degraded": "已降級",
+        "since": "{time}進入此狀態",
+        "checked": "上次檢查：{time}"
       },
       "empty": {
         "title": "尚無評估作業"

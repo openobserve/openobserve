@@ -16152,7 +16152,6 @@
       "draft": "Szkic",
       "active": "Aktywny",
       "paused": "Wstrzymany",
-      "degraded": "Obniżony",
       "archived": "Zarchiwizowany"
     },
     "summaryAll": "Wszystkie",
@@ -16623,6 +16622,11 @@
         "scorers": "Ewaluatory",
         "created": "Utworzono",
         "actions": "Akcje"
+      },
+      "health": {
+        "degraded": "Obniżony",
+        "since": "Przeszedł w ten stan {time}",
+        "checked": "Ostatnio sprawdzono {time}"
       },
       "empty": {
         "title": "Brak zadań ewaluacji"

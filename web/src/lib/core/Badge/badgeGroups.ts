@@ -400,13 +400,10 @@ export const BADGE_GROUPS = {
       active: { variant: "success-soft" },
       draft: { variant: "default-soft" },
       paused: { variant: "warning-soft" },
-      degraded: { variant: "orange-soft" },
       archived: { variant: "default-soft" },
     },
   },
 
-  // Online-eval job health (read-time overlay from `_evaluator`) — dot.
-  // `degraded` shares evalStatus.degraded's tone so both read as one state.
   // No labelKeys: EvalJobList always passes the translated `label`.
   evalJobHealth: {
     mode: "dot",

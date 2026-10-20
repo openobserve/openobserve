@@ -18,19 +18,15 @@ use axum::{
     response::Response,
 };
 #[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::llm_evaluations::eval_jobs::health::{self, JobHealthError};
-#[cfg(feature = "enterprise")]
 use openobserve_api_common::extractors::Headers;
 #[cfg(feature = "enterprise")]
-use openobserve_core::auth::{UserEmail, is_ofga_object_visible};
+use openobserve_core::auth::UserEmail;
 #[cfg(test)]
 use openobserve_core::llm_evaluations::eval_jobs::EvalJobError;
 use openobserve_core::llm_evaluations::eval_jobs::{
     self, ManualEvalJobRequestBody, ManualEvalJobResponseBody,
 };
 
-#[cfg(feature = "enterprise")]
-use crate::models::eval_jobs::{EvalJobsHealthRequestBody, EvalJobsHealthResponseBody};
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
     models::eval_jobs::{
@@ -51,7 +47,7 @@ use crate::{
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ("status" = Option<String>, Query, description = "Filter by status (draft, active, paused, degraded, archived)"),
+        ("status" = Option<String>, Query, description = "Filter by status (draft, active, paused, archived)"),
     ),
     responses(
         (status = 200, body = inline(ListEvalJobsResponseBody)),
@@ -84,64 +80,11 @@ pub async fn list_eval_jobs(
 
     match eval_jobs::list_jobs(&org_id, query.status.as_deref(), permitted_objects).await {
         Ok(list) => {
-            let body: ListEvalJobsResponseBody = list.into();
+            let mut body: ListEvalJobsResponseBody = list.into();
+            enrich_with_health(&mut body.list).await;
             MetaHttpResponse::json(body)
         }
         Err(err) => err.into(),
-    }
-}
-
-/// GetEvalJobsHealth
-#[cfg(feature = "enterprise")]
-#[utoipa::path(
-    post,
-    path = "/{org_id}/eval_jobs/health",
-    context_path = "/api",
-    tag = "EvalJobs",
-    operation_id = "GetEvalJobsHealth",
-    summary = "Get health of online eval jobs",
-    description = "Reports health for a batch of online eval jobs (at most 500) from their scorer spans in `_evaluator`: \
-                   the error ratio over the last 15 minutes, and the last error and last success over the last 24 hours. \
-                   Health is read-only and never changes a job's status. Jobs the caller cannot see are omitted.",
-    security(("Authorization" = [])),
-    params(("org_id" = String, Path, description = "Organization name")),
-    request_body(content = inline(EvalJobsHealthRequestBody), description = "Job ids to report on"),
-    responses(
-        (status = 200, body = inline(EvalJobsHealthResponseBody)),
-        (status = 400, description = "Bad Request", body = ()),
-    ),
-    extensions(
-        ("x-o2-ratelimit" = json!({"module": "EvalJobs", "operation": "list"})),
-    ),
-)]
-pub async fn get_eval_jobs_health(
-    Path(org_id): Path<String>,
-    Headers(user_email): Headers<UserEmail>,
-    axum::Json(body): axum::Json<EvalJobsHealthRequestBody>,
-) -> Response {
-    let permitted_objects = match openobserve_api_common::auth::validator::list_objects_for_user(
-        &org_id,
-        &user_email.user_id,
-        "GET",
-        "eval_job",
-    )
-    .await
-    {
-        Ok(list) => list,
-        Err(e) => return MetaHttpResponse::forbidden(e.to_string()),
-    };
-    let job_ids: Vec<String> = body
-        .job_ids
-        .into_iter()
-        .filter(|id| is_ofga_object_visible(&org_id, "eval_job", id, permitted_objects.as_deref()))
-        .collect();
-
-    match health::get(&org_id, &job_ids).await {
-        Ok(items) => MetaHttpResponse::json(EvalJobsHealthResponseBody {
-            items: items.into_iter().map(Into::into).collect(),
-        }),
-        Err(err @ JobHealthError::TooManyJobs(_)) => MetaHttpResponse::bad_request(err),
-        Err(err) => MetaHttpResponse::internal_error(err),
     }
 }
 
@@ -320,7 +263,7 @@ pub async fn delete_eval_job(Path((org_id, job_id)): Path<(String, String)>) -> 
     tag = "EvalJobs",
     operation_id = "ActivateEvalJob",
     summary = "Activate eval job",
-    description = "Transitions an eval job to the active state. Allowed from draft, paused or degraded.",
+    description = "Transitions an eval job to the active state. Allowed from draft or paused.",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
@@ -360,7 +303,7 @@ pub async fn activate_eval_job(
     tag = "EvalJobs",
     operation_id = "PauseEvalJob",
     summary = "Pause eval job",
-    description = "Transitions an active or degraded eval job to the paused state.",
+    description = "Transitions an active eval job to the paused state.",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
@@ -393,7 +336,7 @@ pub async fn pause_eval_job(Path((org_id, job_id)): Path<(String, String)>) -> R
     tag = "EvalJobs",
     operation_id = "ResumeEvalJob",
     summary = "Resume eval job",
-    description = "Resumes a paused or degraded eval job by transitioning it back to active.",
+    description = "Resumes a paused eval job by transitioning it back to active.",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
@@ -498,6 +441,33 @@ pub async fn manual_eval_job(
     match eval_jobs::manual_evaluate(&org_id, &job_id, body, author).await {
         Ok(resp) => MetaHttpResponse::json(resp),
         Err(err) => err.into(),
+    }
+}
+
+/// Best-effort: a health lookup failure must not take down the jobs list.
+async fn enrich_with_health(list: &mut [EvalJobResponseBody]) {
+    // Archived jobs are no longer measured, so their last row would read as current.
+    let ids: Vec<String> = list
+        .iter()
+        .filter(|job| matches!(job.status.as_str(), "active" | "paused"))
+        .map(|job| job.id.clone())
+        .collect();
+    if ids.is_empty() {
+        return;
+    }
+    let states = match infra::table::eval_job_states::get_many(&ids).await {
+        Ok(states) => states,
+        Err(e) => {
+            log::warn!("[EvalJobHealth] failed to load eval job health for list: {e}");
+            return;
+        }
+    };
+    let mut by_id: std::collections::HashMap<String, _> = states
+        .into_iter()
+        .map(|state| (state.job_id.clone(), state))
+        .collect();
+    for job in list.iter_mut() {
+        job.health = by_id.remove(&job.id).map(Into::into);
     }
 }
 

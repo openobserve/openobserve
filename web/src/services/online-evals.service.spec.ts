@@ -169,14 +169,6 @@ describe("URL construction", () => {
     await onlineEvalsService.jobs.list("acme", "paused");
     expect(mockGet).toHaveBeenCalledWith("/api/acme/eval_jobs?status=paused");
   });
-
-  it("jobs.health posts the job ids and unwraps the items", async () => {
-    const item = { jobId: "j1", health: "degraded" };
-    mockPost.mockResolvedValue({ data: { items: [item] } });
-    const result = await onlineEvalsService.jobs.health("acme", ["j1"]);
-    expect(mockPost).toHaveBeenCalledWith("/api/acme/eval_jobs/health", { jobIds: ["j1"] });
-    expect(result).toEqual([item]);
-  });
 });
 
 describe("mutation endpoints return response.data directly", () => {

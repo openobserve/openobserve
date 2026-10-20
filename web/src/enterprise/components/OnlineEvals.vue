@@ -250,7 +250,6 @@ the Free Software Foundation, either version 3 of the License, or
             v-else-if="activeTab === 'jobs'"
             :forbidden="jobsForbidden"
             :rows="filteredRows as EvalJob[]"
-            :health-by-id="jobHealthById"
             :search="filterQuery"
             :loading="isLoading"
             :action-loading="jobsBulkDeleting"
@@ -396,7 +395,6 @@ import {
   type ScorerType,
 } from "@/services/online-evals.service";
 import { useOnlineEvalsData } from "./onlineEvals/composables/useOnlineEvalsData";
-import { useEvalJobHealth } from "./onlineEvals/composables/useEvalJobHealth";
 import { entityId } from "./onlineEvals/utils/evalEntity";
 import { showError } from "./onlineEvals/utils/evalFormat";
 import {
@@ -530,7 +528,6 @@ const {
   loadProviders,
   ensureScoreConfigVersions,
 } = useOnlineEvalsData();
-const { healthById: jobHealthById, loadHealth: loadJobHealth } = useEvalJobHealth();
 
 // The three list tabs load together, so one stamp serves all of them. Read back
 // from the cache, not `Date.now()`: a cached read leaves the rows as old as the
@@ -547,9 +544,6 @@ const reloadLists = async (force = true) => {
     listsRefreshing.value = false;
   }
   const org = orgId.value;
-  // Health is an overlay read after the rows are on screen; not awaited, and
-  // its failure only blanks the health columns.
-  void loadJobHealth(org, jobs.value);
   const times = [
     onlineEvalKeys.scoreConfigs(org),
     onlineEvalKeys.scorers(org),

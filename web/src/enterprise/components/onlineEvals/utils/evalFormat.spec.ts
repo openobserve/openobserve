@@ -206,8 +206,8 @@ describe("statusClass", () => {
     }
   });
 
-  it("maps draft / paused / degraded statuses to is-warn", () => {
-    for (const s of ["draft", "paused", "degraded"]) {
+  it("maps draft / paused statuses to is-warn", () => {
+    for (const s of ["draft", "paused"]) {
       expect(statusClass(s)).toEqual({ "is-good": false, "is-warn": true, "is-muted": false });
     }
   });

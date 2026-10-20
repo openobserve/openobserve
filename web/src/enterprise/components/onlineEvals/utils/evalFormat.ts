@@ -89,7 +89,7 @@ export function relativeTime(timestampMs: number, t: TranslateFn): string {
 export function statusClass(status: string) {
   return {
     "is-good": ["active", "default", "configured"].includes(status),
-    "is-warn": ["draft", "paused", "degraded"].includes(status),
+    "is-warn": ["draft", "paused"].includes(status),
     "is-muted": ["archived", "inactive"].includes(status),
   };
 }

@@ -13,12 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::meta::pipeline::components::ScorerRef;
+use config::meta::{
+    eval_job_health::{EvalJobHealth, EvalJobState},
+    pipeline::components::ScorerRef,
+};
 use infra::table::online_eval_jobs::{
     JobInputMapping, SamplingMode, SessionEvalConfig, SpanSelector, SpanSelectorBindings,
     TargetScope, TraceEvalConfig,
 };
-use o2_enterprise::enterprise::llm_evaluations::eval_jobs::health::{JobHealth, JobHealthState};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -86,6 +88,9 @@ pub struct EvalJobResponseBody {
     pub pipeline_id: Option<String>,
     pub created_at: i64,
     pub updated_at: i64,
+    /// Measured health; absent for jobs that are not active or paused, or not yet measured.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub health: Option<EvalJobHealthBody>,
 }
 
 /// HTTP response body for listing Online Eval Jobs.
@@ -113,32 +118,17 @@ pub struct EvalJobStatusActionResponseBody {
     pub updated_at: i64,
 }
 
-/// HTTP request body for reading the health of a batch of eval jobs.
-#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct EvalJobsHealthRequestBody {
-    /// Ids of the jobs to report on, at most 500.
-    pub job_ids: Vec<String>,
-}
-
-/// HTTP response body for eval job health, one item per visible requested job.
-#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct EvalJobsHealthResponseBody {
-    pub items: Vec<EvalJobHealthBody>,
-}
-
-/// Health of one eval job, computed from its `_evaluator` scorer spans.
+/// Run state measured from `_evaluator` scorer spans; never changes the job's `status`.
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct EvalJobHealthBody {
-    pub job_id: String,
-    /// `healthy`, `degraded` (more than 20% of at least 5 runs in the last 15
-    /// minutes failed), `waiting_for_credentials` (the newest outcome is a
-    /// `provider_auth` error) or `no_recent_runs` (nothing in the last 15
-    /// minutes).
+    /// `healthy`, `degraded`, `waiting_for_credentials` or `no_recent_runs`.
     #[schema(value_type = String)]
-    pub health: JobHealthState,
+    pub state: EvalJobHealth,
+    /// When `state` last changed, in microseconds.
+    pub since: i64,
+    /// When the job was last measured, in microseconds.
+    pub evaluated_at: i64,
     /// Scorer runs in the last 15 minutes.
     pub recent_runs: u64,
     /// Failed scorer runs in the last 15 minutes.
@@ -154,20 +144,19 @@ pub struct EvalJobHealthBody {
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct EvalJobLastErrorBody {
-    /// Error kind, e.g. `provider_auth`, `rate_limited`, `timeout`,
-    /// `provider_5xx`, `parse_error`, `mapping_error`, `scorer_missing`,
-    /// `execution_error`.
+    /// e.g. `provider_auth`, `rate_limited`, `timeout`, `provider_5xx`, `parse_error`.
     pub kind: String,
     pub message: String,
     /// When the error happened, in microseconds.
     pub at: i64,
 }
 
-impl From<JobHealth> for EvalJobHealthBody {
-    fn from(value: JobHealth) -> Self {
+impl From<EvalJobState> for EvalJobHealthBody {
+    fn from(value: EvalJobState) -> Self {
         Self {
-            job_id: value.job_id,
-            health: value.health,
+            state: value.health,
+            since: value.since,
+            evaluated_at: value.evaluated_at,
             recent_runs: value.recent_runs,
             recent_errors: value.recent_errors,
             scores_24h: value.scores_24h,
@@ -258,6 +247,7 @@ impl From<infra::table::online_eval_jobs::OnlineEvalJob> for EvalJobResponseBody
             pipeline_id: value.pipeline_id,
             created_at: value.created_at,
             updated_at: value.updated_at,
+            health: None,
         }
     }
 }
@@ -823,5 +813,47 @@ mod tests {
         let err = infra::table::online_eval_jobs::OnlineEvalJob::try_from(body).unwrap_err();
 
         assert_eq!(err, "Invalid target scope");
+    }
+
+    #[test]
+    fn test_job_health_serializes_in_the_shape_the_ui_reads() {
+        use config::meta::eval_job_health::EvalJobLastError;
+
+        let mut body = EvalJobResponseBody::from(sample_job());
+        let unmeasured = serde_json::to_value(&body).unwrap();
+        assert!(unmeasured.get("health").is_none());
+
+        body.health = Some(
+            EvalJobState {
+                job_id: "job-1".to_string(),
+                org_id: "org1".to_string(),
+                health: EvalJobHealth::WaitingForCredentials,
+                since: 10,
+                evaluated_at: 20,
+                recent_runs: 3,
+                recent_errors: 2,
+                scores_24h: 1,
+                last_success_at: Some(5),
+                last_error: Some(EvalJobLastError {
+                    kind: "provider_auth".to_string(),
+                    message: "401".to_string(),
+                    at: 15,
+                }),
+            }
+            .into(),
+        );
+        assert_eq!(
+            serde_json::to_value(&body).unwrap()["health"],
+            serde_json::json!({
+                "state": "waiting_for_credentials",
+                "since": 10,
+                "evaluatedAt": 20,
+                "recentRuns": 3,
+                "recentErrors": 2,
+                "scores24h": 1,
+                "lastSuccessAt": 5,
+                "lastError": {"kind": "provider_auth", "message": "401", "at": 15},
+            })
+        );
     }
 }

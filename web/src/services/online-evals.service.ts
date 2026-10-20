@@ -8,7 +8,7 @@
 import http from "@/services/http";
 import analytics from "./product_analytics";
 
-export type EvalJobStatus = "draft" | "active" | "paused" | "degraded" | "archived";
+export type EvalJobStatus = "draft" | "active" | "paused" | "archived";
 export type EvalTargetScope = "span" | "trace" | "session";
 export type SamplingMode = "rate" | "all" | "count";
 export type ConfigurableSamplingMode = "rate" | "all";
@@ -154,6 +154,8 @@ export interface EvalJob {
   created_at?: number;
   updatedAt?: number;
   updated_at?: number;
+  /** Persisted health state; absent until the backend first evaluates the job. */
+  health?: EvalJobHealth | null;
 }
 
 export interface ExtraMetadataField {
@@ -269,10 +271,13 @@ export interface EvalJobLastError {
   at: number;
 }
 
-/** Read-time health overlay for one job; never changes the job's status. */
+/** Persisted health state for one job; never changes the job's status. */
 export interface EvalJobHealth {
-  jobId: string;
-  health: EvalJobHealthState;
+  state: EvalJobHealthState;
+  /** When `state` last changed, microseconds since epoch. */
+  since: number;
+  /** When the backend last measured this job, microseconds since epoch. */
+  evaluatedAt: number;
   recentRuns: number;
   recentErrors: number;
   scores24h: number;
@@ -408,12 +413,6 @@ const onlineEvalsService = {
       payload: ManualEvalJobPayload,
     ): Promise<ManualEvalJobResult> =>
       (await http().post(`/api/${orgId}/eval_jobs/${jobId}/manual_eval`, payload)).data,
-    /** Health for up to 500 jobs in one request; jobs the caller cannot see are omitted. */
-    health: async (orgId: string, jobIds: string[]): Promise<EvalJobHealth[]> =>
-      unwrapList<EvalJobHealth>(
-        await http().post(`/api/${orgId}/eval_jobs/health`, { jobIds }),
-        "items",
-      ),
   },
 };
 

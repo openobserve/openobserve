@@ -1025,10 +1025,12 @@ pub async fn init() -> Result<(), anyhow::Error> {
         );
 
         o2_enterprise::enterprise::llm_evaluations::eval_jobs::search::register_executor(
-            |request| {
+            |request, scope| {
                 Box::pin(async move {
                     let stream_type =
                         config::meta::stream::StreamType::from(request.stream_type.as_str());
+                    let local = scope
+                        == o2_enterprise::enterprise::llm_evaluations::eval_jobs::search::SearchScope::LocalCluster;
                     let req = config::meta::search::Request {
                         query: config::meta::search::Query {
                             sql: request.sql,
@@ -1040,6 +1042,17 @@ pub async fn init() -> Result<(), anyhow::Error> {
                             ..Default::default()
                         },
                         use_cache: false,
+                        // `local` is what the super-cluster router reads as "this cluster only".
+                        regions: if local {
+                            vec!["local".to_string()]
+                        } else {
+                            vec![]
+                        },
+                        clusters: if local {
+                            vec!["local".to_string()]
+                        } else {
+                            vec![]
+                        },
                         ..Default::default()
                     };
                     search_service::search(

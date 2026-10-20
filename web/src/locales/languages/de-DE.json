@@ -16152,7 +16152,6 @@
       "draft": "Entwurf",
       "active": "Aktiv",
       "paused": "Pausiert",
-      "degraded": "Degradiert",
       "archived": "Archiviert"
     },
     "summaryAll": "Alle",
@@ -16623,6 +16622,11 @@
         "scorers": "Scorer",
         "created": "Erstellt",
         "actions": "Aktionen"
+      },
+      "health": {
+        "degraded": "Degradiert",
+        "since": "In diesen Zustand gewechselt: {time}",
+        "checked": "Zuletzt geprüft: {time}"
       },
       "empty": {
         "title": "Noch keine Bewertungsaufträge"

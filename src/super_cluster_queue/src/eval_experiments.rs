@@ -467,7 +467,10 @@ mod tests {
         incoming.status = "running".to_string();
         incoming.lifecycle_version = 3;
         let error = revision(current, &incoming).unwrap_err();
-        assert!(error.to_string().contains("Invalid Experiment lifecycle"), "{error}");
+        assert!(
+            error.to_string().contains("Invalid Experiment lifecycle"),
+            "{error}"
+        );
 
         // Deletion is terminal: nothing newer revives the head.
         let mut deleted = head("cancelled", 4);

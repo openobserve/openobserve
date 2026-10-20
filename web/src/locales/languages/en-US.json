@@ -16152,7 +16152,6 @@
       "draft": "Draft",
       "active": "Active",
       "paused": "Paused",
-      "degraded": "Degraded",
       "archived": "Archived"
     },
     "summaryAll": "All",
@@ -16628,9 +16627,12 @@
       },
       "health": {
         "healthy": "Healthy",
+        "degraded": "Degraded",
         "waitingForCredentials": "Waiting for credentials",
         "noRecentRuns": "No recent runs",
-        "summary": "{errors} of {runs} runs failed in the last 15 minutes"
+        "summary": "{errors} of {runs} runs failed in the last 15 minutes",
+        "since": "Entered this state {time}",
+        "checked": "Last checked {time}"
       },
       "errorKinds": {
         "providerAuth": "Provider auth",

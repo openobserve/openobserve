@@ -16152,7 +16152,6 @@
       "draft": "草稿",
       "active": "活跃",
       "paused": "已暂停",
-      "degraded": "已降级",
       "archived": "已存档"
     },
     "summaryAll": "全部",
@@ -16623,6 +16622,11 @@
         "scorers": "评分器",
         "created": "创建于",
         "actions": "操作"
+      },
+      "health": {
+        "degraded": "已降级",
+        "since": "{time}进入此状态",
+        "checked": "上次检查：{time}"
       },
       "empty": {
         "title": "尚无评估任务"

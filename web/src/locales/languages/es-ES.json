@@ -16152,7 +16152,6 @@
       "draft": "Borrador",
       "active": "Activo",
       "paused": "En pausa",
-      "degraded": "Degradado",
       "archived": "Archivado"
     },
     "summaryAll": "Todos",
@@ -16623,6 +16622,11 @@
         "scorers": "Evaluadores",
         "created": "Creado",
         "actions": "Acciones"
+      },
+      "health": {
+        "degraded": "Degradado",
+        "since": "Entró en este estado {time}",
+        "checked": "Última comprobación: {time}"
       },
       "empty": {
         "title": "Aún no hay trabajos de evaluación"

@@ -95,8 +95,14 @@
         <template #cell-health="{ row }">
           <span v-if="!healthOf(row)" class="text-text-secondary">—</span>
           <span v-else class="inline-flex">
-            <OTag type="evalJobHealth" :value="healthOf(row)?.health" :label="healthLabel(row)" />
-            <OTooltip v-if="healthOf(row)?.recentRuns" :content="healthSummary(row)" />
+            <OTag type="evalJobHealth" :value="healthOf(row)?.state" :label="healthLabel(row)" />
+            <OTooltip>
+              <template #content>
+                <div v-if="healthOf(row)?.recentRuns">{{ healthSummary(row) }}</div>
+                <div>{{ healthSince(row) }}</div>
+                <div>{{ healthChecked(row) }}</div>
+              </template>
+            </OTooltip>
           </span>
         </template>
 
@@ -269,8 +275,6 @@ const props = defineProps<{
   lastRunAt?: number | null;
   /** A reload is in flight — spins the refresh button and blocks a second click. */
   refreshing?: boolean;
-  /** Read-time health by job id; a job without an entry renders "—". */
-  healthById?: Record<string, EvalJobHealth>;
 }>();
 
 const emit = defineEmits<{
@@ -286,11 +290,11 @@ const emit = defineEmits<{
 }>();
 
 function canActivate(status: EvalJobStatus): boolean {
-  return status === "draft" || status === "paused" || status === "degraded";
+  return status === "draft" || status === "paused";
 }
 
 function canPause(status: EvalJobStatus): boolean {
-  return status === "active" || status === "degraded";
+  return status === "active";
 }
 
 const { t } = useI18nTyped();
@@ -372,7 +376,7 @@ const columns = computed(() =>
       id: "health",
       header: t("onlineEvals.job.columns.health"),
       // Sorts worst-first when descending: waiting > degraded > healthy > idle.
-      accessorFn: (row: EvalJob) => HEALTH_SEVERITY[healthOf(row)?.health ?? "none"],
+      accessorFn: (row: EvalJob) => HEALTH_SEVERITY[healthOf(row)?.state ?? "none"],
       sortable: true,
       size: 190,
       meta: { align: "left" },
@@ -435,13 +439,7 @@ const statusCounts = computed(() => {
   }
   return { active, paused, draft, total: rows.length };
 });
-// The strip is the ONLY status filter (the redundant dropdown was removed), so it
-// carries every status the UI can actually produce. "degraded" and "archived"
-// are both excluded on purpose: nothing in the product currently transitions a
-// job into either status (no health-check sets degraded; there's no archive
-// action in the UI), so their tiles would always read zero. Attention-first
-// order (paused, active, then the inert draft), "All" last — matching the
-// Alerts / Incidents strip.
+// "archived" has no tile: nothing in the UI archives a job, so it would always read zero.
 const summaryStats = computed<StatItem[]>(() => {
   const c = statusCounts.value;
   const has = c.total > 0;
@@ -493,17 +491,11 @@ function onStatSelect(key: string) {
   statusFilter.value = key === "all" || statusFilter.value === key ? null : (key as EvalJobStatus);
 }
 
-// Extreme-left status rail (mirrors the Incidents rail) — reads "does this job
-// need attention?": degraded=orange, paused=amber, active=green, and the inert
-// states (draft/archived) a quiet grey. Tones match the status tiles + chip.
-// An active job whose read-time health is degraded or waiting for credentials
-// takes the degraded rail too; health never changes the persisted status.
+// Health drives the rail only for active jobs; it never changes the persisted status.
 function needsAttention(row: EvalJob): boolean {
-  const health = healthOf(row)?.health;
+  const health = healthOf(row)?.state;
   return (
-    statusOf(row) === "degraded" ||
-    (statusOf(row) === "active" &&
-      (health === "degraded" || health === "waiting_for_credentials"))
+    statusOf(row) === "active" && (health === "degraded" || health === "waiting_for_credentials")
   );
 }
 
@@ -574,8 +566,7 @@ const HEALTH_SEVERITY: Record<EvalJobHealthState | "none", number> = {
 
 const HEALTH_LABELS: Record<EvalJobHealthState, I18nKey> = {
   healthy: "onlineEvals.job.health.healthy",
-  // Same wording as the Degraded job status — one state, one word.
-  degraded: "onlineEvals.jobStatus.degraded",
+  degraded: "onlineEvals.job.health.degraded",
   waiting_for_credentials: "onlineEvals.job.health.waitingForCredentials",
   no_recent_runs: "onlineEvals.job.health.noRecentRuns",
 };
@@ -592,7 +583,7 @@ const ERROR_KIND_LABELS: Record<string, I18nKey> = {
 };
 
 function healthOf(row: EvalJob): EvalJobHealth | undefined {
-  return props.healthById?.[row.id];
+  return row.health ?? undefined;
 }
 
 function lastErrorOf(row: EvalJob): EvalJobLastError | undefined {
@@ -601,7 +592,7 @@ function lastErrorOf(row: EvalJob): EvalJobLastError | undefined {
 
 function healthLabel(row: EvalJob): I18nText {
   const health = healthOf(row);
-  return health ? t(HEALTH_LABELS[health.health]) : raw("—");
+  return health ? t(HEALTH_LABELS[health.state]) : raw("—");
 }
 
 function healthSummary(row: EvalJob): I18nText {
@@ -610,6 +601,18 @@ function healthSummary(row: EvalJob): I18nText {
     errors: health?.recentErrors ?? 0,
     runs: health?.recentRuns ?? 0,
   });
+}
+
+function healthSince(row: EvalJob): I18nText {
+  return t("onlineEvals.job.health.since", { time: microsAgo(healthOf(row)?.since) });
+}
+
+function healthChecked(row: EvalJob): I18nText {
+  return t("onlineEvals.job.health.checked", { time: microsAgo(healthOf(row)?.evaluatedAt) });
+}
+
+function microsAgo(micros: number | null | undefined): string {
+  return micros ? relativeTime(micros / 1000, t) : "—";
 }
 
 /** Known kinds get a translated label; a kind from a newer server shows as-is. */

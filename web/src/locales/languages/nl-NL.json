@@ -16152,7 +16152,6 @@
       "draft": "Ontwerp",
       "active": "Actief",
       "paused": "Gepauzeerd",
-      "degraded": "Gedegradeerd",
       "archived": "Gearchiveerd"
     },
     "summaryAll": "Alles",
@@ -16623,6 +16622,11 @@
         "scorers": "Scorers",
         "created": "Aangemaakt",
         "actions": "Acties"
+      },
+      "health": {
+        "degraded": "Gedegradeerd",
+        "since": "In deze status gekomen {time}",
+        "checked": "Laatst gecontroleerd {time}"
       },
       "empty": {
         "title": "Nog geen evaluatietaken"

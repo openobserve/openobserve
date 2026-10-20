@@ -16152,7 +16152,6 @@
       "draft": "Bản nháp",
       "active": "Hoạt động",
       "paused": "Tạm dừng",
-      "degraded": "Suy giảm",
       "archived": "Đã lưu trữ"
     },
     "summaryAll": "Tất cả",
@@ -16623,6 +16622,11 @@
         "scorers": "Bộ chấm điểm",
         "created": "Đã tạo",
         "actions": "Hành động"
+      },
+      "health": {
+        "degraded": "Suy giảm",
+        "since": "Chuyển sang trạng thái này {time}",
+        "checked": "Kiểm tra lần cuối {time}"
       },
       "empty": {
         "title": "Chưa có tác vụ đánh giá nào"

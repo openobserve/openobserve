@@ -16152,7 +16152,6 @@
       "draft": "초안",
       "active": "활성",
       "paused": "일시 중지됨",
-      "degraded": "저하됨",
       "archived": "보관됨"
     },
     "summaryAll": "모두",
@@ -16623,6 +16622,11 @@
         "scorers": "스코어러",
         "created": "생성됨",
         "actions": "작업"
+      },
+      "health": {
+        "degraded": "저하됨",
+        "since": "{time}에 이 상태가 되었습니다",
+        "checked": "마지막 확인: {time}"
       },
       "empty": {
         "title": "아직 평가 작업이 없습니다"
