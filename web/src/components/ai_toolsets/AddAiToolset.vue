@@ -119,7 +119,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                 </template>
               </OFormInput>
-              <OButton variant="ghost-destructive" size="icon-xs-sq" @click="removeHeader(idx)">
+              <OButton
+                :aria-label="t('common.delete')"
+                variant="ghost-destructive"
+                size="icon-xs-sq"
+                @click="removeHeader(idx)"
+              >
                 <OIcon name="delete" size="xs" />
               </OButton>
             </div>
@@ -222,7 +227,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                 </template>
               </OFormInput>
-              <OButton variant="ghost-destructive" size="icon-xs-sq" @click="removeEnvVar(idx)">
+              <OButton
+                :aria-label="t('common.delete')"
+                variant="ghost-destructive"
+                size="icon-xs-sq"
+                @click="removeEnvVar(idx)"
+              >
                 <OIcon name="delete" size="xs" />
               </OButton>
             </div>

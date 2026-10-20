@@ -581,6 +581,14 @@
     }
   },
   "common": {
+    "moreActions": "More actions",
+    "moreOptions": "More options",
+    "clear": "Clear",
+    "addFilter": "Add filter",
+    "view": "View",
+    "compare": "Compare",
+    "openInNewTab": "Open in new tab",
+    "send": "Send",
     "copiedToClipboard": "Copied to clipboard",
     "customLogoAlt": "Organization logo",
     "dragToReorder": "Drag to reorder",
@@ -17241,6 +17249,7 @@
   },
   "synthetics": {
     "variables": {
+      "promote": "Promote",
       "newButton": "New Variable",
       "createTitle": "Add Variable",
       "created": "Variable {name} created",

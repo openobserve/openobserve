@@ -29,6 +29,9 @@
               {{ groupName }} ({{ groupFieldCount[row.group] ?? 0 }})
             </OTruncatedText>
             <OButton
+              :aria-label="
+                expandGroupRows[row.group] !== false ? t('common.collapse') : t('common.expand')
+              "
               v-if="(groupFieldCount[row.group] ?? 0) > 0"
               variant="ghost"
               size="icon"
@@ -57,6 +60,7 @@
             <OFieldLabel :field="row" />
             <template #actions>
               <OButton
+                :aria-label="t('common.addFilter')"
                 v-if="!hideAddSearchTerm"
                 variant="ghost-neutral"
                 size="icon"
@@ -165,6 +169,7 @@
               :content="t('common.totalFields', { count: bottomProps.totalRows })"
             />
             <OButton
+              :aria-label="t('search.firstPage')"
               variant="ghost-primary"
               size="icon-panel"
               :disabled="bottomProps.isFirstPage"
@@ -183,6 +188,7 @@
               >
             </template>
             <OButton
+              :aria-label="t('search.lastPage')"
               variant="ghost-primary"
               size="icon-panel"
               :disabled="bottomProps.isLastPage"

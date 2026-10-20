@@ -42,6 +42,7 @@
               <ODropdown>
                 <template #trigger>
                   <OButton
+                    :aria-label="t('common.moreOptions')"
                     variant="ghost"
                     size="chip-12"
                     class="!ps-1 !pe-1"
@@ -122,6 +123,7 @@
                 </div>
               </ODropdown>
               <OButton
+                :aria-label="t('common.remove')"
                 variant="ghost"
                 size="icon-chip"
                 class="!w-4"

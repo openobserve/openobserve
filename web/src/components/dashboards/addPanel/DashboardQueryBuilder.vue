@@ -104,6 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <ODropdown>
                   <template #trigger>
                     <OButton
+                      :aria-label="t('common.moreOptions')"
                       variant="ghost"
                       size="chip-12"
                       class="!ps-1 !pe-1"
@@ -274,6 +275,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <ODropdown>
                   <template #trigger>
                     <OButton
+                      :aria-label="t('common.moreOptions')"
                       variant="ghost"
                       size="chip-12"
                       class="!ps-1 !pe-1"
@@ -411,6 +413,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <ODropdown>
               <template #trigger>
                 <OButton
+                  :aria-label="t('common.moreOptions')"
                   variant="ghost"
                   size="chip-12"
                   class="!ps-1 !pe-1"
@@ -547,6 +550,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <ODropdown>
                 <template #trigger>
                   <OButton
+                    :aria-label="t('common.moreOptions')"
                     variant="ghost"
                     size="chip-12"
                     class="!ps-1 !pe-1"

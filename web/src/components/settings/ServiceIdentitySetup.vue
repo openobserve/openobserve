@@ -251,6 +251,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       side="top"
                     />
                     <OButton
+                      :aria-label="t('common.remove')"
                       variant="ghost"
                       size="icon-xs-sq"
                       @click="removeFieldByIdFromEnv(envKey, fieldId)"
@@ -289,6 +290,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @update:model-value="onAddFieldToEnv(envKey, $event)"
                     />
                     <OButton
+                      :aria-label="t('common.cancel')"
                       variant="ghost"
                       size="icon-xs-sq"
                       @click="
@@ -351,6 +353,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @update:model-value="onAddFieldToEnv(addingToEnv, $event)"
                   />
                   <OButton
+                    :aria-label="t('common.cancel')"
                     variant="ghost"
                     size="icon-xs-sq"
                     @click="
@@ -469,6 +472,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <span>{{ alias.label }}</span>
                   <OButton
+                    :aria-label="t('common.remove')"
                     variant="ghost"
                     size="icon-xs-sq"
                     @click="trackedAliasIds = trackedAliasIds.filter((id) => id !== alias.id)"
@@ -505,6 +509,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @update:model-value="onAddTrackedAlias($event)"
                   />
                   <OButton
+                    :aria-label="t('common.cancel')"
                     variant="ghost"
                     size="icon-xs-sq"
                     @click="
@@ -743,6 +748,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("settings.serviceIdentitySetup.apply") }}
             </OButton>
             <OButton
+              :aria-label="t('common.cancel')"
               variant="ghost"
               size="icon"
               class="opacity-40 hover:opacity-100"

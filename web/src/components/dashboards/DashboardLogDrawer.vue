@@ -1142,6 +1142,7 @@ function openInLogs() {
                       >
                       <!-- Open in Logs -->
                       <OButton
+                        :aria-label="t('common.openInNewTab')"
                         size="sm"
                         variant="ghost"
                         icon-left="open-in-new"

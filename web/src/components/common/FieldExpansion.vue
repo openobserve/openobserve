@@ -57,6 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <template #actions>
           <OButton
+            :aria-label="t('common.addFilter')"
             v-if="field.isSchemaField && showFilterIcon"
             :data-test="`log-search-index-list-filter-${field.name}-field-btn`"
             variant="ghost-neutral"
@@ -66,6 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon name="add" size="sm" />
           </OButton>
           <OButton
+            :aria-label="t('common.addFieldToTable')"
             :data-test="`log-search-index-list-add-${field.name}-field-btn`"
             v-if="showVisibilityToggle && !isFieldSelected"
             variant="ghost-neutral"
@@ -76,6 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon name="visibility" size="sm" />
           </OButton>
           <OButton
+            :aria-label="t('common.removeFieldFromTable')"
             :data-test="`log-search-index-list-remove-${field.name}-field-btn`"
             v-if="showVisibilityToggle && isFieldSelected"
             variant="ghost-neutral"

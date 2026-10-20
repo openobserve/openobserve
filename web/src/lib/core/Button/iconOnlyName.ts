@@ -2,12 +2,20 @@
 
 /** True when a button has no visible text and no aria name, so assistive tech announces just "button". */
 export function isUnnamedIconOnly(el: Element): boolean {
-  if (el.hasAttribute("aria-label") || el.hasAttribute("aria-labelledby")) return false;
+  if (
+    el.hasAttribute("aria-label") ||
+    el.hasAttribute("aria-labelledby") ||
+    el.hasAttribute("title")
+  ) {
+    return false;
+  }
   const clone = el.cloneNode(true) as Element;
   clone.querySelectorAll("[aria-hidden='true']").forEach((n) => n.remove());
   if (clone.querySelector('img[alt]:not([alt=""]), [aria-label]')) return false;
   return !clone.textContent?.trim();
 }
+
+export const UNNAMED_ICON_ONLY_DELAY_MS = 1000;
 
 /** Dev-only nudge for an icon-only button that nothing names. */
 export function warnIfUnnamedIconOnly(el: Element | null | undefined) {

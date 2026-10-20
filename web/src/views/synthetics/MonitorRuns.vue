@@ -708,6 +708,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OBadge variant="error" size="sm" class="gap-1">
                   {{ errorFilter }}
                   <OButton
+                    :aria-label="t('common.clear')"
                     variant="ghost"
                     size="icon-xs"
                     class="text-inherit"
