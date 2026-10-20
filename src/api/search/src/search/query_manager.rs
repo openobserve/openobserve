@@ -38,20 +38,10 @@ struct QueryToCancel {
 
 pub async fn cancel_query(
     Headers(user_email): Headers<UserEmail>,
-    Path((org_id, trace_ids)): Path<(String, String)>,
-) -> Response {
-    let queries = trace_ids
-        .split(',')
-        .map(|id| (id, org_id.as_str()))
-        .collect::<Vec<_>>();
-    cancel_in_org(&org_id, &user_email.user_id, &queries).await
-}
-
-pub async fn cancel_multiple_query(
-    Headers(user_email): Headers<UserEmail>,
     Path(org_id): Path<String>,
     body: Bytes,
 ) -> Response {
+    let user_id = &user_email.user_id;
     let queries: Vec<QueryToCancel> = match config::utils::json::from_slice(&body) {
         Ok(v) => v,
         Err(e) => return MetaHttpResponse::bad_request(e),
@@ -60,7 +50,12 @@ pub async fn cancel_multiple_query(
         .iter()
         .map(|query| (query.trace_id.as_str(), query.org_id.as_str()))
         .collect::<Vec<_>>();
-    cancel_in_org(&org_id, &user_email.user_id, &queries).await
+
+    let other_org = queries.iter().any(|(_, query_org)| *query_org != org_id);
+    if other_org && !(org_id == META_ORG_ID && can_cancel_other_orgs(user_id).await) {
+        return MetaHttpResponse::forbidden("Not allowed to cancel other organizations' queries");
+    }
+    cancel_each(&queries).await
 }
 
 pub async fn query_status(Path(org_id): Path<String>) -> Response {
@@ -74,21 +69,6 @@ pub async fn query_status(Path(org_id): Path<String>) -> Response {
         Ok(res) => Json(res).into_response(),
         Err(e) => MetaHttpResponse::bad_request(e),
     }
-}
-
-/// Cancels each query in its own org; another org's query needs a `_meta` caller allowed to.
-async fn cancel_in_org(org_id: &str, user_id: &str, queries: &[(&str, &str)]) -> Response {
-    let other_org = queries.iter().any(|(_, query_org)| *query_org != org_id);
-    if other_org && !(org_id == META_ORG_ID && can_cancel_other_orgs(user_id).await) {
-        return MetaHttpResponse::forbidden("Not allowed to cancel other organizations' queries");
-    }
-    cancel_each(queries).await
-}
-
-/// Cancels each trace id in `org_id`.
-pub async fn cancel_query_inner(org_id: &str, trace_ids: &[&str]) -> Response {
-    let queries = trace_ids.iter().map(|id| (*id, org_id)).collect::<Vec<_>>();
-    cancel_each(&queries).await
 }
 
 /// Cancels each trace id in the org it runs in.
@@ -106,7 +86,8 @@ async fn cancel_each(queries: &[(&str, &str)]) -> Response {
     Json(res).into_response()
 }
 
-async fn cancel_in_cluster(
+/// Cancels `trace_id` and its `{trace_id}-` sub-queries in `org_id` on every node or region.
+pub async fn cancel_in_cluster(
     org_id: &str,
     trace_id: &str,
 ) -> Result<search::CancelQueryResponse, infra::errors::Error> {
@@ -145,20 +126,6 @@ async fn can_cancel_other_orgs(user_id: &str) -> bool {
             false,
         )
         .await
-}
-
-/// Best-effort cancel of a running query and all of its internal sub-queries
-/// (which share the `trace_id` as a prefix). Unlike [`cancel_query_inner`] this
-/// does not build an HTTP response — it is meant for internal callers such as
-/// the client-disconnect handler. Errors are logged, not returned.
-pub async fn cancel_query_internal(org_id: &str, trace_id: &str) {
-    if trace_id.is_empty() {
-        return;
-    }
-    match cancel_in_cluster(org_id, trace_id).await {
-        Ok(res) => log::info!("[trace_id {trace_id}] query canceled: {res:?}"),
-        Err(e) => log::error!("[trace_id {trace_id}] failed to cancel query: {e}"),
-    }
 }
 
 #[cfg(test)]
