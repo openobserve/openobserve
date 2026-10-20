@@ -193,6 +193,19 @@ export const BADGE_GROUPS = {
     },
   },
 
+  licenseWaiverStatus: {
+    mode: "dot",
+    shape: "pill",
+    values: {
+      scheduled: {
+        variant: "blue-soft",
+        labelKey: "components.badge.licenseWaiverStatus.scheduled",
+      },
+      active: { variant: "success-soft", labelKey: "components.badge.licenseWaiverStatus.active" },
+      past: { variant: "default-soft", labelKey: "components.badge.licenseWaiverStatus.past" },
+    },
+  },
+
   // Alert PRIORITY (Feature 2, PT-3) — how much humans care about this alert,
   // set at configuration time.
   //

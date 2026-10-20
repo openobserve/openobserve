@@ -1,0 +1,134 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+import { describe, it, expect } from "vitest";
+import {
+  DAY_US,
+  activeSearchUnblock,
+  bannerSignature,
+  formatUtc,
+  knownWaivers,
+  lastCoveredDayUs,
+  licenseBannerState,
+  quotaPercent,
+  waiverStatus,
+  type LicenseDecision,
+} from "./licenseWaivers";
+
+const us = (y: number, m: number, d: number, h = 0, min = 0) => Date.UTC(y, m, d, h, min) * 1000;
+const unblock = {
+  id: "wv_1",
+  type: "search_unblock",
+  starts_at: us(2026, 9, 20),
+  ends_at: us(2026, 9, 27),
+  note: "n",
+};
+const raise = {
+  id: "wv_2",
+  type: "ingestion_limit",
+  limit: { typ: "PerDayCount" as const, value: 400 },
+  starts_at: us(2026, 10, 1),
+  ends_at: us(2026, 10, 15),
+  note: "",
+};
+
+describe("licenseWaivers", () => {
+  it("waiverStatus honours inclusive start and exclusive end", () => {
+    expect(waiverStatus(unblock, us(2026, 9, 19))).toBe("scheduled");
+    expect(waiverStatus(unblock, unblock.starts_at)).toBe("active");
+    expect(waiverStatus(unblock, unblock.ends_at)).toBe("past");
+  });
+
+  it("knownWaivers drops kinds this release does not know", () => {
+    expect(
+      knownWaivers([
+        unblock,
+        { ...unblock, id: "x", type: "breach_days" },
+        { ...unblock, id: "y", type: "unknown" },
+      ]).map((w) => w.id),
+    ).toEqual(["wv_1"]);
+    expect(knownWaivers(undefined)).toEqual([]);
+  });
+
+  it("formatUtc is UTC whatever the browser zone", () => {
+    expect(formatUtc(us(2026, 9, 27), "en-US", true)).toBe("Oct 27, 00:00");
+    expect(formatUtc(us(2026, 9, 26, 23, 30), "en-US", true)).toBe("Oct 26, 23:30");
+  });
+
+  it("a day kind's last covered day is the day before ends_at", () => {
+    expect(formatUtc(lastCoveredDayUs(raise), "en-US", false)).toBe("Nov 14");
+  });
+
+  it("quotaPercent is null for Unlimited and a zero limit", () => {
+    const d = { limit_today_gb: 200, used_today_gb: 122 } as LicenseDecision;
+    expect(quotaPercent(d)).toBe(61);
+    expect(quotaPercent({ ...d, limit_today_gb: null })).toBeNull();
+    expect(quotaPercent({ ...d, limit_today_gb: 0 })).toBeNull();
+  });
+
+  it("licenseBannerState", () => {
+    const now = us(2026, 9, 25);
+    expect(licenseBannerState({}, now)).toEqual({ kind: "none" });
+    expect(licenseBannerState({ license_search_allowed: false }, now)).toEqual({ kind: "paused" });
+    expect(
+      licenseBannerState(
+        { license_search_allowed: true, license_waiver_until: now + 2 * DAY_US },
+        now,
+      ),
+    ).toEqual({ kind: "restored", untilUs: now + 2 * DAY_US, endsSoon: false });
+    expect(
+      licenseBannerState(
+        { license_search_allowed: true, license_waiver_until: now + DAY_US - 1 },
+        now,
+      ),
+    ).toMatchObject({ endsSoon: true });
+    expect(
+      licenseBannerState({ license_search_allowed: true, license_waiver_until: null }, now),
+    ).toEqual({ kind: "none" });
+    expect(
+      licenseBannerState({ license_search_allowed: true, license_waiver_until: now }, now),
+    ).toEqual({ kind: "none" });
+  });
+
+  it("bannerSignature changes with the state", () => {
+    expect(bannerSignature({ kind: "paused" })).not.toBe(
+      bannerSignature({ kind: "restored", untilUs: 1, endsSoon: false }),
+    );
+    expect(bannerSignature({ kind: "restored", untilUs: 1, endsSoon: false })).not.toBe(
+      bannerSignature({ kind: "restored", untilUs: 2, endsSoon: false }),
+    );
+  });
+
+  it("activeSearchUnblock picks the active unblock with the latest end", () => {
+    const later = { ...unblock, id: "wv_3", ends_at: us(2026, 9, 30) };
+    const now = us(2026, 9, 25);
+    expect(activeSearchUnblock([unblock, later, raise], now)?.id).toBe("wv_3");
+    expect(activeSearchUnblock([raise], now)).toBeUndefined();
+    expect(activeSearchUnblock(undefined, now)).toBeUndefined();
+  });
+
+  it("tolerates the unknown block in a decision", () => {
+    const d: LicenseDecision = {
+      search_allowed: false,
+      blocks: ["unknown"],
+      exceeded_days: 0,
+      allowed_days: 0,
+      limit_today_gb: 10,
+      used_today_gb: 5,
+      waiver_ids_applied: [],
+    };
+    expect(quotaPercent(d)).toBe(50);
+  });
+});

@@ -20048,6 +20048,11 @@
         "ended": "Ended",
         "cancelled": "Cancelled",
         "endedEarly": "Ended early"
+      },
+      "licenseWaiverStatus": {
+        "scheduled": "Scheduled",
+        "active": "Active",
+        "past": "Past days"
       }
     }
   },
