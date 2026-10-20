@@ -203,7 +203,10 @@ export function createAssistantCapability(deps: CapabilityDeps): AssistantCapabi
       ([id, ready], _old, onCleanup) => {
         if (!id || !ready) return;
         deps.invalidateCapabilities(id.org);
+        const asked = generation;
         const stop = deps.watchCapabilities(id.org, (data, at) => {
+          // An answer for the org before a switch would otherwise land on the new org's state.
+          if (asked !== generation) return;
           b06Settled.value = true;
           if (!data) return;
           b06.value = data;
@@ -329,6 +332,8 @@ function gateOf(input: CapabilityInput, canChat: Tri): GateCode {
   const access = checkFeatureAccess("aiAssistant", { ...input.edition, rbac: config.rbacEnabled });
   if (!access.allowed) return "not_entitled";
   if (!config.aiEnabled) return "not_configured";
+  // The org setting is the server's call; without this a reload showed the generic copy.
+  if (input.b06?.gate === "off_for_org") return "off_for_org";
   if (input.health === "down") return "unhealthy";
   return canChat === "no" ? "no_permission" : "available";
 }

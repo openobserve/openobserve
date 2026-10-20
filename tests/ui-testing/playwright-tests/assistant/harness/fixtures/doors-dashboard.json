@@ -1,0 +1,67 @@
+{
+  "version": 5,
+  "title": "WP-07 doors",
+  "description": "",
+  "tabs": [
+    {
+      "tabId": "default",
+      "name": "Default",
+      "panels": [
+        {
+          "id": "Panel_ID_doors_1",
+          "type": "table",
+          "title": "Codes by count",
+          "description": "",
+          "config": {
+            "show_legends": true
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT code, count(*) AS total FROM \"e2e_automate\" GROUP BY code ORDER BY total DESC LIMIT 10",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "e2e_automate",
+                "stream_type": "logs",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "",
+                "limit": 0,
+                "min": 0,
+                "max": 0
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 0,
+            "w": 48,
+            "h": 14,
+            "i": 1
+          },
+          "htmlContent": "",
+          "markdownContent": ""
+        }
+      ]
+    }
+  ],
+  "variables": {
+    "list": []
+  },
+  "defaultDatetimeDuration": {
+    "type": "relative",
+    "relativeTimePeriod": "1d",
+    "startTime": 0,
+    "endTime": 0
+  }
+}

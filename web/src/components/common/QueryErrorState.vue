@@ -178,8 +178,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ copied ? t("queryError.copied") : t("queryError.copyError") }}
         </OButton>
+        <slot v-if="assistantV2 && showAiDoor" name="ai-door" />
         <OButton
-          v-if="aiEnabled && (isQueryError || errorCode === 0)"
+          v-else-if="showAiDoor"
           variant="ghost"
           size="sm"
           class="group text-ai-accent! hover:shadow-ai-accent/35 dark:shadow-ai-accent/20 dark:hover:shadow-ai-accent/35 [background:var(--color-gradient-ai-subtle)]! [transition:background_0.3s_ease,box-shadow_0.3s_ease,color_0.3s_ease] hover:text-white! hover:shadow-md hover:[background:var(--color-gradient-ai)]! dark:text-white! dark:shadow-md dark:hover:shadow-md"
@@ -199,11 +200,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- AI button when there's nothing to show in the detail panel -->
-    <div
-      v-else-if="aiEnabled && (isQueryError || errorCode === 0)"
-      class="mt-2 flex justify-center"
-    >
+    <div v-else-if="showAiDoor" class="mt-2 flex justify-center">
+      <slot v-if="assistantV2" name="ai-door" />
       <OButton
+        v-else
         variant="ghost"
         size="sm"
         icon-left="bolt"
@@ -311,8 +311,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         {{ copied ? t("queryError.copied") : t("queryError.copyError") }}
       </OButton>
+      <slot v-if="assistantV2 && showAiDoor" name="ai-door" />
       <OButton
-        v-if="aiEnabled && (isQueryError || errorCode === 0)"
+        v-else-if="showAiDoor"
         variant="ghost"
         size="sm"
         icon-left="bolt"
@@ -328,9 +329,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
-import { computed, ref } from "vue";
+import { computed, ref, useSlots } from "vue";
 import { useI18nTyped, raw, type I18nText } from "@/types/i18n";
 import { useAiIcon } from "@/composables/useAiIcon";
+import { isAssistantV2 } from "@/composables/assistant/flags";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -404,6 +406,15 @@ const {
   errorMsg: () => props.errorMsg,
   errorDetail: () => props.errorDetail,
 });
+
+const assistantV2 = isAssistantV2();
+const slots = useSlots();
+// With the assistant on the host's door gates itself; the legacy button keeps `aiEnabled`.
+const showAiDoor = computed(
+  () =>
+    (assistantV2 ? !!slots["ai-door"] : props.aiEnabled) &&
+    (isQueryError.value || errorCode.value === 0),
+);
 
 // ── Resolved copy ──────────────────────────────────────────────────────────
 

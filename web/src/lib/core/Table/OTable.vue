@@ -28,6 +28,7 @@ import {
   TABLE_CHECKBOX_COL_SIZE,
   TABLE_CELL_CLIP_ATTR,
   OTableCellActionsKey,
+  OTableFocusToolbarKey,
   OTableOverflowTooltipKey,
   ROW_RAIL_TONE_CLASS,
   ROW_TONE_CLASS,
@@ -136,6 +137,20 @@ const resolvedRowClass = computed(() => {
 
 // < md columns scroll within the table rather than being crushed down to the name column.
 const { isMobile: isMobileViewport } = useBreakpoint();
+// A focus-toolbar table carries a row kebab, so on touch its rows grow to a 2.75 rem target.
+const touchRowPx = 44;
+const coarseQuery =
+  typeof window !== "undefined" ? (window.matchMedia?.("(pointer: coarse)") ?? null) : null;
+const coarsePointer = ref(!!coarseQuery?.matches);
+const onPointerChange = (e: MediaQueryListEvent) => (coarsePointer.value = e.matches);
+coarseQuery?.addEventListener?.("change", onPointerChange);
+onBeforeUnmount(() => coarseQuery?.removeEventListener?.("change", onPointerChange));
+const touchRows = computed(
+  () => !!props.focusToolbar && (isMobileViewport.value || coarsePointer.value),
+);
+const effectiveRowHeight = computed(() =>
+  touchRows.value ? Math.max(props.rowHeight ?? touchRowPx, touchRowPx) : props.rowHeight,
+);
 const horizontalScrollOn = computed(() => !!props.horizontalScroll || isMobileViewport.value);
 
 const showColumnToggle = computed(
@@ -336,6 +351,25 @@ function setActiveCell(key: string | null): void {
 onBeforeUnmount(() => {
   if (cellActionTimer) clearTimeout(cellActionTimer);
 });
+const focusFallback = ref<string | null>(null);
+let focusRefreshQueued = false;
+function focusCtxRefresh(table: Element | null): void {
+  if (focusRefreshQueued) return;
+  focusRefreshQueued = true;
+  // Rows mount and unmount in batches under virtual scroll; one read per batch is enough.
+  queueMicrotask(() => {
+    focusRefreshQueued = false;
+    const first = table?.querySelector<HTMLElement>("tbody td[data-o2-row-first]");
+    focusFallback.value = first?.dataset.o2CellId ?? null;
+  });
+}
+provide(OTableFocusToolbarKey, {
+  enabled: computed(() => !!props.focusToolbar && !!slots["cell-hover-actions"]),
+  current: ref<string | null>(null),
+  fallback: focusFallback,
+  refresh: focusCtxRefresh,
+  positionOf: (rowId: string) => rowPositions.value.get(rowId),
+});
 provide(OTableCellActionsKey, {
   activeCellKey,
   setActiveCell,
@@ -512,7 +546,7 @@ const {
     getSubRows: props.getSubRows,
     pagination: props.pagination,
     sorting: props.sorting,
-    rowHeight: props.rowHeight,
+    rowHeight: effectiveRowHeight.value,
     filterMode: props.filterMode,
     get horizontalScroll() {
       return props.horizontalScroll;
@@ -654,6 +688,27 @@ const columnMgmt = useTableColumnManagement(
 const displayRows = computed(() => {
   return table.getRowModel().rows;
 });
+
+// The page offset keeps checkbox names continuous across pages; one map per row model, not one scan per row.
+const rowPositions = computed(() => {
+  const page = table.getState().pagination;
+  const offset =
+    props.pagination === "server"
+      ? Math.max(((props.currentPage ?? 1) - 1) * (props.pageSize ?? 0), 0)
+      : props.pagination === "client"
+        ? page.pageIndex * page.pageSize
+        : 0;
+  return new Map(displayRows.value.map((row, i) => [row.id, offset + i]));
+});
+
+// A sort or filter reorders rows without remounting cells, so the fallback tab stop is re-read after each.
+watch(
+  () => (props.focusToolbar ? displayRows.value.map((row) => row.id).join("|") : ""),
+  () => {
+    if (!props.focusToolbar) return;
+    void nextTick(() => focusCtxRefresh(scrollContainerRef.value as Element | null));
+  },
+);
 
 // ── Body sections ───────────────────────────────────────────────
 /**
@@ -808,7 +863,7 @@ const {
   scrollMargin: props.scrollMargin ?? 0,
   // Keep this in sync with the --table-row-height-* tokens (dense = 38px) so the
   // virtualizer's measured height matches the actual rendered row height.
-  rowHeight: props.rowHeight ?? (props.compact ? 25 : props.dense ? 38 : 54),
+  rowHeight: () => effectiveRowHeight.value ?? (props.compact ? 25 : props.dense ? 38 : 54),
   overscan: props.overscan ?? 100,
   dynamicRowHeight: () => useDynamicRowHeight.value,
   // A delegated scroller can contain a histogram or other content before this
@@ -1508,8 +1563,8 @@ defineExpose({
             ...(computedTableWidth ? { width: computedTableWidth } : {}),
             ...(minTableWidth ? { minWidth: minTableWidth } : {}),
             '--table-row-height':
-              props.rowHeight != null
-                ? `${props.rowHeight}px`
+              effectiveRowHeight != null
+                ? `${effectiveRowHeight}px`
                 : props.compact
                   ? 'var(--table-row-height-compact, 1.5625rem)'
                   : props.dense
@@ -1683,6 +1738,7 @@ defineExpose({
                 :column="caProps.column"
                 :value="caProps.value"
                 :active="caProps.active"
+                :menu="caProps.menu"
               />
             </template>
 

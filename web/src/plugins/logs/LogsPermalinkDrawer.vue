@@ -16,6 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <ODrawer
+    :inset-beside="assistantV2"
     bleed
     lazy
     data-test="logs-permalink-detail-dialog"
@@ -39,6 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @closeTable="clearPermalink"
       @view-trace="onViewTrace"
       @sendToAiChat="onSendToAiChat"
+      v-bind="assistantV2 ? { doorContext: permalinkDoorBase } : {}"
     />
   </ODrawer>
 </template>
@@ -52,7 +54,10 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import DetailTable from "@/plugins/logs/DetailTable.vue";
 import { searchState } from "@/composables/useLogs/searchState";
 import { traceDetailsLocation } from "@/composables/useLogs/useViewTraceAction";
+import { isAssistantV2 } from "@/composables/assistant/flags";
+import { logsDoorBase, type LogsDoorBase } from "@/plugins/logs/logsDoors";
 import {
+  activePermalink,
   clearPermalink,
   searchResultMounts,
   sharedLineRecord,
@@ -93,4 +98,11 @@ const onViewTrace = () => {
 };
 
 const onSendToAiChat = (value: unknown, append?: boolean) => emit("send-to-ai-chat", value, append);
+
+// The shared line's record doors describe the linked row in the link's org, not whatever the grid shows.
+const assistantV2 = isAssistantV2();
+const permalinkDoorBase = (): LogsDoorBase => {
+  const base = logsDoorBase(searchObj, store.state, record.value ?? undefined);
+  return activePermalink.value ? { ...base, org: activePermalink.value.org } : base;
+};
 </script>

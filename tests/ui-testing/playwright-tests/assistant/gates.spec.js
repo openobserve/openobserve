@@ -60,6 +60,8 @@ test.describe("assistant gates", () => {
       "O2 Assistant, Enterprise and Cloud feature",
     );
     await expect(assistant.v2Ids()).toHaveCount(0);
+    // WP-07: no object door renders on OSS, only the locked header button.
+    await expect(page.locator('[data-test^="ai-entry-"]')).toHaveCount(0);
     await page.keyboard.press("ControlOrMeta+i");
     await expect(page.locator("[data-assistant-root]")).toHaveCount(0);
     await assistant.headerButton.click();
@@ -141,6 +143,38 @@ test.describe("assistant gates", () => {
     await assistant.headerButton.click();
     await sheet.locator('[data-test="assistant-header-gate-sheet-close"]').click();
     await expect(sheet).toHaveCount(0);
+  });
+
+  test("GATE-03 a viewer's row door is locked, focusable and opens the reason, nothing else", async ({
+    context,
+    page,
+  }) => {
+    await start(context, page, () => member({ role: "viewer" }));
+    await page.goto(
+      `${harness.ENV.appUrl}/logs?org_identifier=${harness.ENV.org}&stream=e2e_automate&stream_type=logs&period=1d`,
+      { waitUntil: "domcontentloaded" },
+    );
+    await expect(assistant.headerButton).toHaveAttribute("data-state", "locked", { timeout: 30_000 });
+    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click().catch(() => undefined);
+    const cell = page.locator('[data-test="logs-search-result-logs-table"] td[data-o2-focus-cell]').first();
+    await expect(cell).toBeVisible({ timeout: 30_000 });
+    await cell.focus();
+    const door = page.locator('.o2-table-cell-hover-actions [data-test="ai-entry-log-row-explain"]');
+    await expect(door).toHaveAttribute("aria-disabled", "true");
+    await expect(door).toHaveAttribute("aria-label", "Explain this log row, locked: ask an admin for AI access");
+    await door.focus();
+    await page.keyboard.press("Enter");
+    const reason = page.locator('[data-test="assistant-gate-state"][data-size="popover"]');
+    await expect(reason).toBeVisible();
+    // The reason must outlive the focus move into it, not flash for one frame (U2).
+    await page.waitForTimeout(500);
+    await expect(reason).toBeVisible();
+    await expect(page.locator("[data-assistant-root]").filter({ visible: true })).toHaveCount(0);
+    const events = await harness.captureTelemetry(page);
+    expect(events.filter((e) => e.name === "ai_entry_clicked").at(-1)?.properties).toMatchObject({
+      sends: false,
+      gate: "no_permission",
+    });
   });
 
   test("GATE-03 a viewer is locked before the first keystroke and can ask an admin", async ({
