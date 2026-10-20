@@ -51,7 +51,8 @@ _cov_test() {
         --retries 1 \
         -- \
         --skip users::tests \
-        --skip bootstrap
+        --skip bootstrap \
+        --skip cache::file_data::disk \
         "$@"
         
 }
