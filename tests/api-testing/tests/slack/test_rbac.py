@@ -222,3 +222,23 @@ def test_promql_range_exemplars_and_series_check_the_metric_for_every_user(clien
             if want == 403:
                 assert "h1" not in got.text, f"{route} {name}: {got.text[:300]}"
 
+
+def test_stream_list_with_schema_omits_fields_of_streams_the_caller_cannot_read(client: OpenObserveClient) -> None:
+    org = rbac_org(client)
+    hidden, readable = f"rbac_hidden_l_{uuid.uuid4().hex[:6]}", f"rbac_readable_l_{uuid.uuid4().hex[:6]}"
+    ingest_logs(client, org, hidden, {"hidden_card_bin": "4111"})
+    ingest_logs(client, org, readable, {"readable_field": "r"})
+    user = role_user(client, org, [(f"logs:_all_{org}", "AllowList"), (f"logs:{readable}", "AllowAll")])
+    assert user.get(f"streams/{hidden}/schema", params={"type": "logs"}, org=org).status_code == 403
+
+    full = user.get("streams", params={"type": "logs", "fetchSchema": "true"}, org=org)
+    assert full.status_code == 200, full.text
+    assert "hidden_card_bin" not in full.text
+    plain = user.get("streams", params={"type": "logs"}, org=org)
+    assert plain.status_code == 200, plain.text
+    with_schema = {s["name"]: s for s in full.json()["list"]}
+    without = {s["name"]: s for s in plain.json()["list"]}
+    assert set(with_schema) == set(without), "fetchSchema must not change which streams are listed"
+    assert with_schema[hidden]["schema"] == without[hidden]["schema"] == []
+    assert with_schema[hidden]["total_fields"] == without[hidden]["total_fields"] == 0
+    assert "readable_field" in {f["name"] for f in with_schema[readable]["schema"]}

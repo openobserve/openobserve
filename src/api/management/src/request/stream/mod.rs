@@ -585,6 +585,26 @@ pub async fn list(
         indices.drain(..offset);
     }
 
+    #[cfg(feature = "enterprise")]
+    if fetch_schema && openobserve_core::authz::rbac_enforced().await {
+        let (org_id, user_id) = (org_id.as_str(), _user_email.user_id.as_str());
+        hide_unreadable_schemas(&mut indices, |s| {
+            let (name, stream_type) = (s.name.clone(), s.stream_type);
+            async move {
+                openobserve_core::authz::check_stream_permissions(
+                    &name,
+                    org_id,
+                    user_id,
+                    &stream_type,
+                    openobserve_core::authz::StreamPermissionResourceType::Search,
+                )
+                .await
+                .is_none()
+            }
+        })
+        .await;
+    }
+
     (
         StatusCode::OK,
         Json(ListStream {
@@ -593,6 +613,27 @@ pub async fn list(
         }),
     )
         .into_response()
+}
+
+/// Strips the fields of each stream `can_read` refuses, so it lists as without `fetchSchema`.
+#[cfg(any(feature = "enterprise", test))]
+async fn hide_unreadable_schemas<F, Fut>(streams: &mut [meta::stream::Stream], can_read: F)
+where
+    F: Fn(&meta::stream::Stream) -> Fut,
+    Fut: std::future::Future<Output = bool>,
+{
+    use futures::StreamExt;
+
+    let readable: Vec<bool> = futures::stream::iter(streams.iter().map(&can_read))
+        .buffered(16)
+        .collect()
+        .await;
+    for (stream, readable) in streams.iter_mut().zip(readable) {
+        if !readable {
+            stream.schema.clear();
+            stream.total_fields = 0;
+        }
+    }
 }
 
 /// Compares two streams for sorting based on the field and ASC/DESC
@@ -1056,6 +1097,42 @@ mod tests {
             pattern_associations: vec![],
             is_derived: None,
         }
+    }
+
+    #[tokio::test]
+    async fn listing_drops_the_fields_of_streams_the_caller_cannot_read() {
+        let field = config::meta::stream::StreamField {
+            name: "card_bin".to_string(),
+            r#type: "Utf8".to_string(),
+        };
+        let mut streams = vec![
+            make_stream("hidden", 3, 1.0, 1.0, 0.0),
+            make_stream("readable", 3, 1.0, 1.0, 0.0),
+        ];
+        for s in streams.iter_mut() {
+            s.schema = vec![field.clone()];
+            s.total_fields = 1;
+        }
+        hide_unreadable_schemas(&mut streams, |s| {
+            let readable = s.name == "readable";
+            async move { readable }
+        })
+        .await;
+        assert_eq!(streams[0].name, "hidden");
+        assert!(streams[0].schema.is_empty());
+        assert_eq!(streams[0].total_fields, 0);
+        assert_eq!(streams[0].stats.doc_num, 3);
+        assert_eq!(streams[1].schema.len(), 1);
+        assert_eq!(streams[1].total_fields, 1);
+    }
+
+    #[test]
+    fn stream_list_checks_read_permission_before_returning_schemas() {
+        let text = include_str!("mod.rs");
+        let start = text.find("pub async fn list(").expect("list handler");
+        let body = &text[start..];
+        let body = &body[..body.find("\n}\n").expect("handler end")];
+        assert!(body.contains("hide_unreadable_schemas("));
     }
 
     #[test]
