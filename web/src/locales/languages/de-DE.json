@@ -583,7 +583,11 @@
   "common": {
     "copiedToClipboard": "In die Zwischenablage kopiert",
     "customLogoAlt": "Organisationslogo",
+    "dragToReorder": "Zum Neuanordnen ziehen",
+    "timeAmount": "Zeitdauer",
+    "timeUnit": "Zeiteinheit",
     "queryEditorAriaLabel": "Abfrage-Editor. Drücken Sie Escape, um zum nächsten Steuerelement zu wechseln.",
+    "queryEditorEscapeAction": "Fokus zum nächsten Steuerelement verschieben",
     "inlineEdit": {
       "autoHint": "Zum Umbenennen klicken. Bis du das tust, wird dieser Name aus deiner Konfiguration generiert und passt sich bei Änderungen an."
     },
@@ -6077,6 +6081,11 @@
     "gpuExporter": "GPU-Exporter"
   },
   "dashboard": {
+    "sortByClear": "Sortierung aufheben",
+    "sortByAsc": "Aufsteigend sortieren",
+    "sortByDesc": "Absteigend sortieren",
+    "panelError": "Panel-Fehler: {message}",
+    "panelWarning": "Panel-Warnung",
     "saveConflict": {
       "notSaved": "Nicht gespeichert: Jemand anderes hat dieses Dashboard zuerst gespeichert.",
       "notSavedChange": "Nicht gespeichert: {change}. Jemand anderes hat dieses Dashboard zuerst gespeichert.",
@@ -8151,16 +8160,14 @@
     "invoiceHistoryLabel": "Rechnungshistorie",
     "upgradeNow": "Jetzt upgraden",
     "subscribe": "Abonnieren",
-    "features": "FUNKTIONEN",
-    "included": "Was ist enthalten?",
     "proPlanSubtitle": "Maßgeschneiderte Lösungen für kleine Teams",
     "unlimitedNote": "Unbegrenzte Benutzer, Logs, Metriken, Traces und mehr.",
     "paymentNote": "Die Zahlung wird nach Nutzung am Ende des monatlichen Abrechnungszeitraums berechnet.",
     "proPlanLabel": "Bezahlen Sie nach Bedarf",
     "contactLabel": "Vertrieb kontaktieren",
-    "enterpriseLabel": "Plan für Unternehmen",
+    "enterpriseLabel": "Enterprise-Plan",
     "enterpriseSubtitle": "Erweiterte Funktionen und Unterstützung für Unternehmensanforderungen",
-    "discountTag": "Im Rabatt",
+    "discountTag": "Rabattiert",
     "enterpriseNote": "Sie benötigen ein hohes Volumen? Lassen Sie uns über Skalierung sprechen! Kontaktieren Sie uns für maßgeschneiderte Lösungen.",
     "contactSupport": "Support kontaktieren",
     "usageTrends": {
@@ -8797,6 +8804,7 @@
     }
   },
   "alerts": {
+    "moreActions": "Weitere Aktionen",
     "promRuleMode": "Regelmodus",
     "promRulePreview": "{count} zurückgegebene Zeitreihen stimmen jetzt überein. Jede Zeitreihe muss den ausstehenden Zeitraum abschließen, bevor sie ausgelöst wird.",
     "promRuleModeDescription": "Trifft zu, wenn der Ausdruck eine beliebige Zeitreihe zurückgibt. Wählen Sie Einzel- oder Multi-Alarm, wenn der ausstehende Zeitraum null ist; ein ausstehender Zeitraum aktiviert Multi-Alarm automatisch. Lassen Sie den Stream leer, um einen referenzierten Metriken-Stream abzuleiten.",

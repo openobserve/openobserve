@@ -583,7 +583,11 @@
   "common": {
     "copiedToClipboard": "Copiado al portapapeles",
     "customLogoAlt": "Logotipo de la organización",
+    "dragToReorder": "Arrastra para reordenar",
+    "timeAmount": "Cantidad de tiempo",
+    "timeUnit": "Unidad de tiempo",
     "queryEditorAriaLabel": "Editor de consultas. Pulse Escape para pasar al siguiente control.",
+    "queryEditorEscapeAction": "Mover el foco al siguiente control",
     "inlineEdit": {
       "autoHint": "Haz clic para renombrar. Hasta que lo hagas, este nombre se genera a partir de tu configuración y se actualiza a medida que la cambias."
     },
@@ -6077,6 +6081,11 @@
     "gpuExporter": "Exportador de GPU"
   },
   "dashboard": {
+    "sortByClear": "Quitar ordenación",
+    "sortByAsc": "Ordenar ascendente",
+    "sortByDesc": "Ordenar descendente",
+    "panelError": "Error del panel: {message}",
+    "panelWarning": "Advertencia del panel",
     "saveConflict": {
       "notSaved": "Sin guardar: otra persona guardó este panel de control antes.",
       "notSavedChange": "Sin guardar: {change}. Otra persona guardó este panel de control antes.",
@@ -8151,13 +8160,11 @@
     "invoiceHistoryLabel": "Historial de facturas",
     "upgradeNow": "Actualiza ahora",
     "subscribe": "Suscríbase",
-    "features": "CARACTERÍSTICAS",
-    "included": "¿Qué está incluido?",
     "proPlanSubtitle": "Soluciones personalizadas para equipos pequeños",
     "unlimitedNote": "Usuarios ilimitados, logs, métricas, trazas y más.",
     "paymentNote": "El pago se calcula según el uso al final del ciclo de facturación mensual.",
     "proPlanLabel": "Paga sobre la marcha",
-    "contactLabel": "Póngase en contacto con Ventas",
+    "contactLabel": "Contactar con ventas",
     "enterpriseLabel": "Plan empresarial",
     "enterpriseSubtitle": "Funcionalidad y soporte avanzados para las demandas empresariales",
     "discountTag": "Con descuento",
@@ -8797,6 +8804,7 @@
     }
   },
   "alerts": {
+    "moreActions": "Más acciones",
     "promRuleMode": "Modo de regla",
     "promRulePreview": "{count} series devueltas coinciden ahora. Cada serie debe completar el período pendiente antes de dispararse.",
     "promRuleModeDescription": "Coincide cuando la expresión devuelve alguna serie. Elige alerta Única o Múltiple cuando el período pendiente sea cero; un período pendiente habilita la alerta Múltiple automáticamente. Deja el stream vacío para inferir un stream de métricas referenciado.",

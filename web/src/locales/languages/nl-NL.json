@@ -583,7 +583,11 @@
   "common": {
     "copiedToClipboard": "Gekopieerd naar klembord",
     "customLogoAlt": "Logo van de organisatie",
+    "dragToReorder": "Sleep om te herordenen",
+    "timeAmount": "Tijdshoeveelheid",
+    "timeUnit": "Tijdseenheid",
     "queryEditorAriaLabel": "Query-editor. Druk op Escape om naar het volgende besturingselement te gaan.",
+    "queryEditorEscapeAction": "Verplaats de focus naar het volgende besturingselement",
     "inlineEdit": {
       "autoHint": "Klik om te hernoemen. Tot je dat doet, wordt deze naam gegenereerd uit je configuratie en volgt deze je wijzigingen."
     },
@@ -6077,6 +6081,11 @@
     "gpuExporter": "GPU-exporter"
   },
   "dashboard": {
+    "sortByClear": "Sortering wissen",
+    "sortByAsc": "Oplopend sorteren",
+    "sortByDesc": "Aflopend sorteren",
+    "panelError": "Paneelfout: {message}",
+    "panelWarning": "Paneelwaarschuwing",
     "saveConflict": {
       "notSaved": "Niet opgeslagen: iemand anders heeft dit dashboard eerst opgeslagen.",
       "notSavedChange": "Niet opgeslagen: {change}. Iemand anders heeft dit dashboard eerst opgeslagen.",
@@ -8151,13 +8160,11 @@
     "invoiceHistoryLabel": "Factuurgeschiedenis",
     "upgradeNow": "Nu upgraden",
     "subscribe": "Abonneer",
-    "features": "FUNCTIES",
-    "included": "Wat is inbegrepen?",
     "proPlanSubtitle": "Oplossingen op maat voor kleine teams",
     "unlimitedNote": "Onbeperkte gebruikers, logboeken, metrieken, traces en meer.",
     "paymentNote": "De betaling wordt berekend op basis van het verbruik aan het einde van de maandelijkse factureringscyclus.",
     "proPlanLabel": "Betaal terwijl je onderweg bent",
-    "contactLabel": "Neem contact op met Sales",
+    "contactLabel": "Neem contact op met verkoop",
     "enterpriseLabel": "Enterprise-abonnement",
     "enterpriseSubtitle": "Geavanceerde functionaliteit en ondersteuning voor zakelijke behoeften",
     "discountTag": "Met korting",
@@ -8797,6 +8804,7 @@
     }
   },
   "alerts": {
+    "moreActions": "Meer acties",
     "promRuleMode": "Regelmodus",
     "promRulePreview": "{count} geretourneerde reeksen komen nu overeen. Elke reeks moet de wachtperiode voltooien voordat deze afgaat.",
     "promRuleModeDescription": "Komt overeen wanneer de expressie een willekeurige reeks retourneert. Kies Enkel of Multi-alarm wanneer de wachtperiode nul is; een wachtperiode schakelt automatisch Multi-alarm in. Laat de stream leeg om een gerefereerde metriekenstream af te leiden.",

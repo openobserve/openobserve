@@ -583,7 +583,11 @@
   "common": {
     "copiedToClipboard": "已複製到剪貼簿",
     "customLogoAlt": "組織標誌",
+    "dragToReorder": "拖曳以重新排序",
+    "timeAmount": "時間量",
+    "timeUnit": "時間單位",
     "queryEditorAriaLabel": "查詢編輯器。按 Escape 移至下一個控制項。",
+    "queryEditorEscapeAction": "將焦點移至下一個控制項",
     "inlineEdit": {
       "autoHint": "按一下以重新命名。在您重新命名前，此名稱會根據您的組態產生，並在您變更時更新。"
     },
@@ -6077,6 +6081,11 @@
     "gpuExporter": "GPU 匯出器"
   },
   "dashboard": {
+    "sortByClear": "清除排序",
+    "sortByAsc": "升冪排序",
+    "sortByDesc": "降冪排序",
+    "panelError": "面板錯誤：{message}",
+    "panelWarning": "面板警告",
     "saveConflict": {
       "notSaved": "未儲存：其他人先儲存了此儀表板。",
       "notSavedChange": "未儲存：{change}。其他人先儲存了此儀表板。",
@@ -8146,16 +8155,14 @@
     "invoiceHistoryLabel": "發票歷史紀錄",
     "upgradeNow": "立即升級",
     "subscribe": "訂閱",
-    "features": "功能",
-    "included": "包含哪些功能？",
     "proPlanSubtitle": "為小型團隊設計的自訂方案",
     "unlimitedNote": "不限使用者數、日誌、指標、追蹤及更多。",
     "paymentNote": "費用按月計費週期結束時的使用量計算。",
     "proPlanLabel": "用多少付多少",
-    "contactLabel": "聯絡銷售",
+    "contactLabel": "聯絡業務",
     "enterpriseLabel": "企業方案",
     "enterpriseSubtitle": "為企業需求提供進階功能和支援",
-    "discountTag": "優惠中",
+    "discountTag": "折扣中",
     "enterpriseNote": "大量需求？讓我們談談規模吧！聯絡我們取得量身打造的方案。",
     "contactSupport": "聯絡支援",
     "usageTrends": {
@@ -8792,6 +8799,7 @@
     }
   },
   "alerts": {
+    "moreActions": "更多動作",
     "promRuleMode": "規則模式",
     "promRulePreview": "目前符合 {count} 個傳回的序列。每個序列都必須完成待定期間才會觸發。",
     "promRuleModeDescription": "當運算式傳回任何序列時即符合。待定期間為零時，請選擇單一或多重警示；有待定期間會自動啟用多重警示。將串流留空以推斷所參照的指標串流。",
