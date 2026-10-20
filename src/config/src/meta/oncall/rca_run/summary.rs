@@ -40,7 +40,7 @@ pub struct RcaRunSummary {
     pub state: RunState,
     pub state_version: String,
     pub not_modified: bool,
-    /// A finished run with no stored record (VE42): only the report shows.
+    /// A finished run with no stored record: only the report shows.
     pub legacy: bool,
     pub card: SummaryCard,
     #[serde(default)]
@@ -55,7 +55,7 @@ pub struct RcaRunSummary {
     pub blind_spots: Vec<BlindSpot>,
 }
 
-/// The verdict card (VE32).
+/// The verdict card.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct SummaryCard {
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -67,22 +67,22 @@ pub struct SummaryCard {
     /// Live only.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub leading: Option<LeadingEntry>,
-    /// Live only (VE21).
+    /// Live only.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub verdict_so_far: Option<VerdictSoFar>,
-    /// Graded runs only (VE33).
+    /// Graded runs only.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub band: Option<Confidence>,
-    /// Why the band is what it is (CG §5.3.4); graded runs only.
+    /// Why the band is what it is; graded runs only.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub confidence: Option<ConfidenceBreakdown>,
-    /// Completed runs only (VE35).
+    /// Completed runs only.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub suspect_change: Option<SummarySuspectChange>,
     /// Completed runs only.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub impact: Option<Impact>,
-    /// Blocked runs: the title of the first blind spot with a fix (VE32, VE44).
+    /// Blocked runs: the title of the first blind spot with a fix.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub needs: Option<String>,
 }
@@ -94,7 +94,7 @@ pub enum VerdictSoFarLabel {
     Revised,
 }
 
-/// "Verdict so far" of a live run (VE21).
+/// "Verdict so far" of a live run.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct VerdictSoFar {
     pub label: VerdictSoFarLabel,
@@ -103,14 +103,12 @@ pub struct VerdictSoFar {
     pub was: Option<String>,
 }
 
-/// The suspect change as code reads it (VE35).
+/// The suspect change as code reads it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ShownChangeState {
     /// A verified change item supports a root_cause or contributing hypothesis.
     Confirmed,
-    /// The run waits for an answer.
-    UnderTest,
     /// The diff was not read by a tool.
     NotRead,
 }
@@ -124,12 +122,12 @@ pub struct SummarySuspectChange {
     /// Microseconds.
     pub occurred_at: i64,
     pub shown_state: ShownChangeState,
-    /// The email of the author of the subject hypothesis' first steering lead (SG36).
+    /// The email of the author of the subject hypothesis' first steering lead.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub lead_author: Option<String>,
 }
 
-/// How a timeline entry shows (VE31).
+/// How a timeline entry shows.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum TimelineView {
@@ -159,13 +157,12 @@ pub struct SummaryHypothesis {
     /// Numbers of the evidence entries that cite this hypothesis.
     #[serde(default)]
     pub evidence_numbers: Vec<u32>,
-    /// Evidence ids of this hypothesis that did not verify (VE30).
+    /// Evidence ids of this hypothesis that did not verify.
     #[serde(default)]
     pub unverified_ids: Vec<String>,
     #[serde(default)]
     pub lead_ids: Vec<String>,
     pub first_seen_seq: i64,
-    /// VE11.
     #[serde(default)]
     pub history: Vec<SummaryStatusChange>,
 }
@@ -194,7 +191,7 @@ fn numbers_of<'a>(
         .collect()
 }
 
-/// VE31: confirmed/refuted require verified evidence; otherwise show unverified.
+/// Confirmed/refuted require verified evidence; otherwise show unverified.
 pub(super) fn timeline_view(
     timeline: &[TimelineEntry],
     evidence: &[EvidenceEntry],
@@ -222,7 +219,7 @@ pub(super) fn timeline_view(
     view
 }
 
-/// Ranked by VE12 and `first_seen_seq`, then `symptom`, then `ruled_out` (VE36).
+/// Ranked by status rank and `first_seen_seq`, then `symptom`, then `ruled_out`.
 fn hypotheses_view(
     ledger: &EvidenceLedger,
     evidence: &[EvidenceEntry],
@@ -278,11 +275,8 @@ fn hypotheses_view(
         .collect()
 }
 
-fn shown_change_state(
-    state: RunState,
-    ledger: &EvidenceLedger,
-    evidence: &[EvidenceEntry],
-) -> ShownChangeState {
+// A waiting run has no stored verdict, so a shown change is either read or not read.
+fn shown_change_state(ledger: &EvidenceLedger, evidence: &[EvidenceEntry]) -> ShownChangeState {
     let cause = |id: &str| {
         ledger.hypotheses.iter().any(|h| {
             h.id == id
@@ -299,14 +293,12 @@ fn shown_change_state(
         .any(|c| c.polarity == Polarity::Supports && cause(&c.hypothesis_id));
     if read {
         ShownChangeState::Confirmed
-    } else if state == RunState::WaitingInput {
-        ShownChangeState::UnderTest
     } else {
         ShownChangeState::NotRead
     }
 }
 
-/// The title of the first blind spot with a fix (VE32, VE44).
+/// The title of the first blind spot with a fix.
 pub(super) fn needs_title(blind_spots: &[BlindSpot]) -> Option<&str> {
     blind_spots
         .iter()
@@ -353,7 +345,7 @@ pub fn summary_from_record(
             reference: c.reference.clone(),
             author: c.author.clone(),
             occurred_at: c.occurred_at,
-            shown_state: shown_change_state(state, ledger, &record.evidence),
+            shown_state: shown_change_state(ledger, &record.evidence),
             lead_author: steering_lead(ledger, &record.steer_authors),
         });
     let card = SummaryCard {
@@ -369,7 +361,10 @@ pub fn summary_from_record(
         needs: (record.outcome == Some(RcaOutcome::Blocked))
             .then(|| {
                 if record.outcome_reason == Some(OutcomeReason::AnswerDeadline) {
-                    record.answer_deadline_need.clone()
+                    record
+                        .answer_deadline_need
+                        .clone()
+                        .or_else(|| needs_title(&record.blind_spots).map(str::to_string))
                 } else {
                     needs_title(&record.blind_spots).map(str::to_string)
                 }
@@ -404,7 +399,7 @@ pub fn summary_live(
     tool_log: &[ToolCallRecord],
     steer_authors: &BTreeMap<String, String>,
 ) -> RcaRunSummary {
-    let (ledger, blind_spots, _) = build_ledger(calls, false);
+    let (ledger, blind_spots, _) = build_ledger(calls, None);
     let ledger = ledger.unwrap_or_default();
     let (evidence, unverified) = build_evidence(Some(&ledger), tool_log);
     let lead = leading(&ledger).map(|h| LeadingEntry {
@@ -443,7 +438,7 @@ pub fn summary_live(
     }
 }
 
-/// The summary of a finished run with no stored record (VE42).
+/// The summary of a finished run with no stored record.
 pub fn summary_legacy(run_id: &str, state: RunState, state_version: String) -> RcaRunSummary {
     RcaRunSummary {
         run_id: run_id.to_string(),
@@ -491,7 +486,7 @@ mod tests {
         record_steered(calls, verdict, completed, &BTreeMap::new())
     }
 
-    /// [record] with the run's steer id → author email map (SG36).
+    /// [record] with the run's steer id → author email map.
     fn record_steered(
         calls: &[LedgerCall],
         verdict: Option<crate::meta::oncall::rca_run::SubmittedVerdict>,
@@ -508,6 +503,7 @@ mod tests {
             ended_by: EndedBy::Agent,
             completed,
             steer_authors,
+            ended_at_us: crate::meta::oncall::rca_run::fixtures::RUN_END_US,
         })
         .record
     }
@@ -520,7 +516,7 @@ mod tests {
         hyp(seq, id, status, vec![])
     }
 
-    /// VE17: an inconclusive card shows the subject statement; with no subject, none.
+    /// An inconclusive card shows the subject statement; with no subject, none.
     #[test]
     fn an_inconclusive_headline_is_the_subject_statement() {
         let r = record(
@@ -540,11 +536,11 @@ mod tests {
         );
         let s = summary_from_record("r", RunState::Completed, "v".into(), &r);
         assert_eq!(s.card.headline, None);
-        // The agent claimed high; the floor holds the evidence at low.
+        // The agent claimed high; with no ledger the floor names the missing hypotheses.
         let c = s.card.confidence.expect("graded");
         assert_eq!(
             (c.claimed, c.evidence, c.evidence_reason.as_str()),
-            (Confidence::High, Confidence::Low, "no confirmed cause")
+            (Confidence::High, Confidence::Low, "no hypotheses recorded")
         );
     }
 
@@ -606,13 +602,13 @@ mod tests {
                 },
             ]
         );
-        // SG36: a steer id with no known author names nobody.
+        // A steer id with no known author names nobody.
         let r = record(&calls, Some(submitted("pool", Confidence::High)), true);
         let s = summary_from_record("r", RunState::Completed, "v".into(), &r);
         assert_eq!(s.hypotheses[0].history[1].steered_by, None);
     }
 
-    /// VE21/VE22: the live card has the leading statement and the label, no band.
+    /// The live card has the leading statement and the label, no band.
     #[test]
     fn the_live_card_shows_the_leading_hypothesis_and_no_band() {
         let pool = "Pool too small for the load after deploy 4f2c1e";
@@ -689,7 +685,7 @@ mod tests {
         assert_eq!(s.blind_spots.len(), 1);
     }
 
-    /// VE35: the shown state of the suspect change is code-derived; the claim is ignored.
+    /// The shown state of the suspect change is code-derived; the claim is ignored.
     #[test]
     fn the_suspect_change_state_is_derived() {
         let shown_with = |evidence: Vec<serde_json::Value>,
@@ -728,7 +724,7 @@ mod tests {
             .shown_state,
             ShownChangeState::Confirmed
         );
-        // Frame C: the diff call failed (403), the claim says confirmed.
+        // The diff call failed (403), the claim says confirmed.
         assert_eq!(
             shown(vec![diff("gh pr diff 900", "supports")], "root_cause", &[]).shown_state,
             ShownChangeState::NotRead
@@ -758,7 +754,7 @@ mod tests {
         );
     }
 
-    /// VE16/VE33/VE42: a cancelled run's card has no outcome or band; a legacy run is legacy.
+    /// A cancelled run's card has no outcome or band; a legacy run is legacy.
     #[test]
     fn cancelled_and_legacy_runs_have_no_band() {
         let calls = [
@@ -791,7 +787,7 @@ mod tests {
         assert_eq!(json["card"], json!({}));
     }
 
-    /// VE30/VE32: unverified ids per hypothesis and the blocked `needs` title.
+    /// Unverified ids per hypothesis and the blocked `needs` title.
     #[test]
     fn blocked_cards_name_the_need_and_hypotheses_list_unverified_ids() {
         let calls = [
@@ -813,5 +809,15 @@ mod tests {
         assert_eq!(s.card.needs.as_deref(), Some("Change history"));
         assert_eq!(s.hypotheses[0].unverified_ids, ["e7"]);
         assert_eq!(s.hypotheses[0].evidence_numbers, [1]);
+
+        // A deadline-blocked run with no question need falls back to the blind spot.
+        let mut r = r;
+        r.outcome_reason = Some(OutcomeReason::AnswerDeadline);
+        r.answer_deadline_need = None;
+        let s = summary_from_record("r", RunState::Completed, "v".into(), &r);
+        assert_eq!(s.card.needs.as_deref(), Some("Change history"));
+        r.answer_deadline_need = Some("Owner of the pool change".into());
+        let s = summary_from_record("r", RunState::Completed, "v".into(), &r);
+        assert_eq!(s.card.needs.as_deref(), Some("Owner of the pool change"));
     }
 }

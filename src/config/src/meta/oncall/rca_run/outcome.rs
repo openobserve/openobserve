@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! The outcome label of a completed run (03 VE14).
+//! The outcome label of a completed run.
 
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -21,17 +21,15 @@ use utoipa::ToSchema;
 use super::{EvidenceLedger, HypothesisStatus, RcaOutcome, SubmittedVerdict, leading};
 use crate::meta::oncall::{agent::Confidence, confidence::ConfidenceGrade};
 
-/// What ended the run's last turn.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum EndedBy {
-    /// The agent submitted, or the turn ended on its own.
     Agent,
-    /// The answer deadline of a paused run closed it (04).
+    /// The answer deadline of a paused run closed it.
     AnswerDeadline,
 }
 
-/// The VE14 rule that set the outcome.
+/// The rule that set the outcome.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum OutcomeReason {
@@ -46,7 +44,6 @@ pub enum OutcomeReason {
 }
 
 impl OutcomeReason {
-    /// Stable wire value.
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::AnswerDeadline => "answer_deadline",
@@ -61,12 +58,11 @@ impl OutcomeReason {
     }
 }
 
-/// `"cause unknown"`, trimmed, in any case.
 pub(super) fn is_cause_unknown(probable_cause: &str) -> bool {
     probable_cause.trim().eq_ignore_ascii_case("cause unknown")
 }
 
-/// The VE14 table; the first rule that matches wins.
+/// The first matching rule wins.
 pub fn derive_outcome(
     ledger: Option<&EvidenceLedger>,
     grade: &ConfidenceGrade,

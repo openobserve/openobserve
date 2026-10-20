@@ -1356,7 +1356,7 @@ pub fn service_routes() -> Router {
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/feedback", put(alerts::incidents::put_incident_rca_feedback).get(alerts::incidents::get_incident_rca_feedback).delete(alerts::incidents::delete_incident_rca_feedback))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/resume", post(alerts::incidents::resume_incident_rca_run))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/summary", get(alerts::incidents::get_incident_rca_summary))
-        .route("/{org_id}/alerts/incidents/rca/backtest", post(alerts::incidents::run_incident_rca_backtest))
+        .route("/v2/{org_id}/alerts/incidents/rca/backtest", post(alerts::incidents::run_incident_rca_backtest))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/update", patch(alerts::incidents::update_incident))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/events", get(alerts::incidents::get_incident_events))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/events/comment", post(alerts::incidents::post_incident_comment))
@@ -4453,8 +4453,6 @@ mod tests {
         assert_eq!(post.status(), StatusCode::METHOD_NOT_ALLOWED);
     }
 
-    /// SG2: no route edits or deletes a steering row. The steer path is registered for POST
-    /// only, and a router carrying that registration answers PUT and DELETE with 405.
     #[tokio::test]
     async fn rca_steer_route_refuses_put_and_delete() {
         const STEER_PATH: &str =
@@ -4486,8 +4484,6 @@ mod tests {
         }
     }
 
-    /// J2, J7: the feedback path takes PUT, GET and DELETE and nothing else; the resume
-    /// path takes POST only, so no GET or DELETE can start or cancel a run through it.
     #[tokio::test]
     async fn rca_feedback_and_resume_routes_take_only_their_methods() {
         const FEEDBACK_PATH: &str =

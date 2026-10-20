@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// TH28/RR-40: finalize lost turns and expire runs that never started a turn.
+// Finalize lost turns and expire runs that never started a turn.
 
 use config::{cluster::LOCAL_NODE, spawn_pausable_job};
 

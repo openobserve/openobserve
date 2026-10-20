@@ -71,7 +71,7 @@ macro_rules! string_enum {
 pub(super) use string_enum;
 
 string_enum! {
-    /// State of one analysis run (README §6.1). `stale` is computed, not a state.
+    /// State of one analysis run. `stale` is computed, not a state.
     RunState {
         Running => "running",
         WaitingInput => "waiting_input",
@@ -142,8 +142,7 @@ string_enum! {
 }
 
 string_enum! {
-    /// Where a run's report lives: `v1` in `topology_context` from before runs existed,
-    /// `v2` in an `rca_runs` row.
+    /// Where a report lives: `v1` in pre-run `topology_context`, `v2` in an `rca_runs` row.
     ReportFormat {
         V1 => "v1",
         V2 => "v2",
@@ -161,7 +160,7 @@ pub struct RunError {
     pub trigger_type: Option<String>,
 }
 
-/// `rca_runs.stats`. Phase 1 writes `duration_ms` only.
+/// `rca_runs.stats`.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, ToSchema)]
 pub struct RunStats {
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -176,12 +175,12 @@ pub struct RunStats {
     pub credits: Option<f64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub steered: Option<u32>,
-    /// Acks after the first for the same steering row (SG23).
+    /// Acks after the first for the same steering row.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ignored_acks: Option<u32>,
 }
 
-/// The newest usable result of an earlier run (RR-41).
+/// The newest usable result of an earlier run.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, ToSchema)]
 pub struct PreviousResult {
     pub run_id: String,
@@ -204,7 +203,7 @@ pub struct RunSummaryFields {
     /// Up to three users who steered the latest run, newest first.
     pub steered_by: Vec<String>,
     pub unblocked_by: Option<String>,
-    /// One short line for the list cell (the failure reason in Phase 1).
+    /// One short line for the list cell (the failure reason).
     pub detail: Option<String>,
     /// Answer deadline of a `waiting_input` run, µs.
     pub deadline_at: Option<i64>,
@@ -231,25 +230,25 @@ impl Default for RunSummaryFields {
     }
 }
 
-/// Run summary of an incident's latest run (01 §11.1).
+/// Run summary of an incident's latest run.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, ToSchema)]
 pub struct RcaSummary {
     pub run_id: String,
     pub report_format: ReportFormat,
     pub state: RunState,
-    /// Computed by the server (RR-9).
+    /// Computed by the server.
     pub stale: bool,
     pub started_at: i64,
     pub updated_at: i64,
     pub outcome: Option<String>,
     pub confidence: Option<String>,
     pub summary: RunSummaryFields,
-    /// Filled by the detail endpoint only (RR-29).
+    /// Filled by the detail endpoint only.
     #[serde(flatten, default, skip_serializing_if = "Option::is_none")]
     pub detail: Option<RcaDetailFields>,
 }
 
-/// The detail endpoint's run fields (RR-29).
+/// The detail endpoint's run fields.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, ToSchema)]
 pub struct RcaDetailFields {
     /// The latest run, without its report.
@@ -278,6 +277,9 @@ pub struct RcaRunItem {
     pub cancelled_by: Option<String>,
     /// `error.reason` of a failed run.
     pub error_reason: Option<String>,
+    /// The run stored a record, so a cancelled or failed run's partial ledger still opens.
+    #[serde(default)]
+    pub has_record: bool,
 }
 
 /// One analysis run (`rca_runs` row).
@@ -299,7 +301,7 @@ pub struct RcaRun {
     pub cancelled_by: Option<String>,
     pub outcome: Option<String>,
     pub confidence: Option<String>,
-    /// Absent rather than null while the run has no report (RR-29).
+    /// Absent rather than null while the run has no report.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub report: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -327,10 +329,10 @@ pub struct RcaRun {
     /// `callID` of the open question of a `waiting_input` run.
     #[serde(default)]
     pub pending_question_id: Option<String>,
-    /// Questions the run asked (SG25, SG26).
+    /// Questions the run asked.
     #[serde(default)]
     pub questions_asked: i32,
-    /// When the sweeper closed the answer deadline, µs (SG27).
+    /// When the sweeper closed the answer deadline, µs.
     #[serde(default)]
     pub deadline_closed_at: Option<i64>,
 }
@@ -367,6 +369,7 @@ impl V1Report {
             confidence: None,
             cancelled_by: None,
             error_reason: None,
+            has_record: false,
         }
     }
 
@@ -422,7 +425,7 @@ impl V1Report {
     }
 }
 
-/// `(timeout + 120 s)` in µs: a `running` run with no write for longer is stale (RR-9).
+/// `(timeout + 120 s)` in µs: a `running` run with no write for longer is stale.
 pub fn stale_threshold_us(rca_timeout_secs: u64) -> i64 {
     let secs = rca_timeout_secs.saturating_add(STALE_GRACE_SECS);
     i64::try_from(secs)
@@ -430,13 +433,13 @@ pub fn stale_threshold_us(rca_timeout_secs: u64) -> i64 {
         .saturating_mul(1_000_000)
 }
 
-/// A `running` run whose last write is older than the stale threshold (RR-9).
+/// A `running` run whose last write is older than the stale threshold.
 pub fn is_stale(state: RunState, updated_at_us: i64, now_us: i64, rca_timeout_secs: u64) -> bool {
     state == RunState::Running
         && now_us.saturating_sub(updated_at_us) > stale_threshold_us(rca_timeout_secs)
 }
 
-/// The latest run blocks a new run: `running` and not stale, or `waiting_input` (RR-9).
+/// The latest run blocks a new run: `running` and not stale, or `waiting_input`.
 pub fn is_live_blocking(
     state: RunState,
     updated_at_us: i64,
@@ -479,8 +482,7 @@ pub fn has_v1_reports(topology: &serde_json::Value) -> bool {
     v1_entries(topology).next().is_some()
 }
 
-/// The pre-run reports of `topology_context`, newest first. `completed_at` holds the
-/// `AIAnalysisComplete` times from before the incident's first run, newest first.
+/// Pre-run reports, newest first; `completed_at` is the pre-first-run `AIAnalysisComplete` times.
 pub fn v1_reports(
     topology: &serde_json::Value,
     completed_at: &[i64],
@@ -570,7 +572,7 @@ mod tests {
         }
     }
 
-    /// RR-9: stale means strictly older than the threshold, and only for `running`.
+    /// Stale means strictly older than the threshold, and only for `running`.
     #[test]
     fn rr9_stale_boundary() {
         assert!(!is_stale(RunState::Running, NOW - 720 * SEC, NOW, TIMEOUT));
@@ -725,7 +727,7 @@ mod tests {
         assert_eq!(user_local_part("system"), "system");
     }
 
-    /// D6: the list form has no detail keys; the detail form flattens them.
+    /// The list form has no detail keys; the detail form flattens them.
     #[test]
     fn rca_summary_detail_is_flattened_and_skipped_when_none() {
         let mut summary = RcaSummary {
@@ -774,8 +776,7 @@ mod tests {
             .iter()
             .map(|r| (r.run_id.as_str(), r.report.as_str(), r.at))
             .collect();
-        // Blank and content-less entries are skipped; the oldest has no archive to read its
-        // time from, so it pairs with the third `AIAnalysisComplete`.
+        // Blank entries are skipped; the oldest has no archive time, so it pairs with the third.
         assert_eq!(
             got,
             vec![

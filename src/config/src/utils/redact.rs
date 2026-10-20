@@ -37,11 +37,11 @@ static INTERNAL_PATTERNS: LazyLock<Vec<(Regex, &'static str)>> = LazyLock::new(|
         (r"(?i)\bbubblewrap\b", "the sandbox"),
         (r"(?i)\bbwrap\b", "the sandbox"),
         (r"(?i)\bappuser\b", "the service account"),
-        (r"(?i)\bDataFusion\b", "the query engine"),
         (
-            r"\b(?:arrow_schema|sqlparser|datafusion)::[\w:]+",
+            r"\b(?:arrow_schema|sqlparser|datafusion)(?:::\w+)+",
             "the query engine",
         ),
+        (r"(?i)\bDataFusion\b", "the query engine"),
     ]
     .into_iter()
     .map(|(pattern, replacement)| (Regex::new(pattern).expect("valid pattern"), replacement))
@@ -96,6 +96,10 @@ mod tests {
         assert_eq!(
             redact_internal_details("DataFusion error in bwrap: sqlparser::parser::ParserError"),
             "the query engine error in the sandbox: the query engine"
+        );
+        assert_eq!(
+            redact_internal_details("datafusion::common::DataFusionError: bad plan"),
+            "the query engine: bad plan"
         );
         assert_eq!(
             redact_internal_details("no internal detail here"),

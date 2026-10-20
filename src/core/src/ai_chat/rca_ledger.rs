@@ -23,7 +23,8 @@ use config::{
         oncall::{
             confidence::{ToolCallRecord, signal_class, stream_type},
             rca_run::{
-                LedgerCall, LedgerTool, RcaSubmit, evidence_target, parse_submit, summarize_result,
+                LedgerCall, LedgerTool, RcaSubmit, evidence_target, observed_window, parse_submit,
+                summarize_result,
             },
         },
     },
@@ -53,19 +54,19 @@ pub struct RunTranscript {
     pub tool_log: Vec<ToolCallRecord>,
     /// The stages of the run's `record_step` calls, each once, in order.
     pub stages_run: Vec<String>,
-    /// The input of the last completed `submit_report` that parses (TH19, E3).
+    /// The input of the last completed `submit_report` that parses.
     pub submit: Option<RcaSubmit>,
-    /// The steering messages in the session, in message order (SG19, SG20).
+    /// The steering messages in the session, in message order.
     pub steers: Vec<TranscriptSteer>,
-    /// Completed `acknowledge_steering` calls, in seq order; the first per steer id counts (SG21).
+    /// Completed `acknowledge_steering` calls, in seq order; the first per steer id counts.
     pub acks: Vec<TranscriptAck>,
-    /// Completed `ask_responders` calls, in seq order (SG25).
+    /// Completed `ask_responders` calls, in seq order.
     pub questions: Vec<TranscriptQuestion>,
-    /// SG26: the last completed sentinel is an unanswered ask_responders call.
+    /// The last completed sentinel is an unanswered ask_responders call.
     pub open_question: Option<TranscriptQuestion>,
 }
 
-/// A steering message the session holds (§10.3).
+/// A steering message the session holds.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TranscriptSteer {
     pub steer_id: String,
@@ -76,7 +77,7 @@ pub struct TranscriptSteer {
     pub read_at_us: Option<i64>,
 }
 
-/// One completed `acknowledge_steering` call (SG21).
+/// One completed `acknowledge_steering` call.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TranscriptAck {
     pub steer_id: String,
@@ -88,7 +89,7 @@ pub struct TranscriptAck {
     pub acted_at_us: i64,
 }
 
-/// One completed `ask_responders` call (SG25).
+/// One completed `ask_responders` call.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TranscriptQuestion {
     /// The call's `callID`.
@@ -107,7 +108,7 @@ pub(crate) struct SteerBlock {
     pub(crate) text: String,
 }
 
-/// SG19: only server headers at message boundaries split responder text into steering blocks.
+/// Only server headers at message boundaries split responder text into steering blocks.
 pub(crate) fn split_steers(text: &str) -> (String, Vec<SteerBlock>) {
     let mut preamble: Vec<&str> = Vec::new();
     let mut blocks: Vec<(SteerHeader, Vec<&str>)> = Vec::new();
@@ -223,7 +224,7 @@ pub fn decode_run(events: &[DurableEvent]) -> RunTranscript {
     let mut submits: Vec<(i64, Value)> = Vec::new();
     let mut acks: Vec<(i64, TranscriptAck)> = Vec::new();
     let mut questions: Vec<(i64, TranscriptQuestion)> = Vec::new();
-    // SG20: steers not read yet; the next assistant message reads them all.
+    // Steers not read yet; the next assistant message reads them all.
     let mut unread: Vec<usize> = Vec::new();
     let mut unanswered_user: Option<usize> = None;
     let mut last_read_user: Option<usize> = None;
@@ -339,7 +340,7 @@ pub fn decode_run(events: &[DurableEvent]) -> RunTranscript {
     transcript
 }
 
-/// The tool log entry of a visible tool part that completed or failed (confidence §5.2).
+/// The tool log entry of a visible tool part that completed or failed.
 fn tool_record(call: &ToolPart<'_>) -> Option<ToolCallRecord> {
     let success = match call.status {
         "completed" => true,
@@ -349,13 +350,25 @@ fn tool_record(call: &ToolPart<'_>) -> Option<ToolCallRecord> {
     let args = call.args();
     let key_arg = key_arg(call.tool, &args).unwrap_or_default();
     let input = Value::Object(args);
+    let target = evidence_target(call.tool, &input);
     let empty = Map::new();
     let state = call.state.unwrap_or(&empty);
-    let (result_summary, result_count, error_type) = if success {
-        let (summary, count) = summarize_result(call.tool, &tool_body(state));
-        (summary, count, None)
+    let (result_summary, result_count, error_type, observed) = if success {
+        let body = tool_body(state);
+        let (summary, count) = summarize_result(call.tool, &body);
+        (
+            summary,
+            count,
+            None,
+            observed_window(call.tool, &body, &target),
+        )
     } else {
-        (String::new(), None, Some(error_text(state.get("error"))))
+        (
+            String::new(),
+            None,
+            Some(error_text(state.get("error"))),
+            None,
+        )
     };
     let started_at = call.started_at();
     let duration_ms = started_at.zip(call.ended_at()).map_or(0, |(start, end)| {
@@ -372,7 +385,8 @@ fn tool_record(call: &ToolPart<'_>) -> Option<ToolCallRecord> {
         duration_ms,
         error_type,
         signal: signal_class(call.tool, &input),
-        target: evidence_target(call.tool, &input),
+        target,
+        observed,
         result_summary,
     })
 }
@@ -753,6 +767,101 @@ pub(crate) mod tests {
         );
     }
 
+    /// Impact-window cap: a finished search records the span of data timestamps its rows showed.
+    #[test]
+    fn a_tool_record_keeps_the_span_of_data_its_rows_showed() {
+        use config::meta::oncall::rca_run::TimeWindow;
+
+        // Queried 19:05–19:50; the rows end at 19:35:08.
+        let input = json!({"type": "logs", "request_body": {"query": {
+            "sql": SQL_ERRORS, "start_time": 1_792_177_500_000_000_i64, "end_time": 1_792_180_200_000_000_i64}}});
+        let rows = json!({"took": 3, "total": 2, "hits": [
+            {"_timestamp": 1_792_178_590_943_220_i64, "status": 503},
+            {"_timestamp": 1_792_179_308_166_386_i64, "status": 503},
+        ]});
+        let mut s = Session::new();
+        s.message("msg_u1", "user", json!({"created": T}));
+        s.message("msg_a1", "assistant", json!({"created": T + 100}));
+        s.tool(
+            "msg_a1",
+            "prt_t1",
+            "o2_SearchSQL",
+            "completed",
+            input.clone(),
+            json!({"output": rows.to_string()}),
+            1_100,
+            1_142,
+        );
+        s.tool(
+            "msg_a1",
+            "prt_t2",
+            "o2_SearchSQL",
+            "error",
+            input,
+            json!({"error": "connection refused"}),
+            1_200,
+            1_210,
+        );
+        let run = decode_run(&s.events);
+
+        assert_eq!(
+            run.tool_log[0].observed,
+            Some(TimeWindow {
+                start: 1_792_178_590_943_220,
+                end: 1_792_179_308_166_386
+            })
+        );
+        assert_eq!(run.tool_log[1].observed, None);
+    }
+
+    /// An org AI Toolset call keeps opencode's `<server>_<tool>` name in the tool log.
+    #[test]
+    fn toolset_calls_are_recorded_with_their_server_and_cited_by_their_tool() {
+        use config::meta::oncall::confidence::match_citation;
+
+        let mut s = Session::new();
+        s.message("msg_u1", "user", json!({"created": T}));
+        s.message("msg_a1", "assistant", json!({"created": T + 100}));
+        s.tool(
+            "msg_a1",
+            "prt_c1",
+            "orca-demo-code_read_file",
+            "completed",
+            json!({"path": "src/payment/charge.js"}),
+            json!({"output": "module.exports.charge = ..."}),
+            1_100,
+            1_112,
+        );
+        s.tool(
+            "msg_a1",
+            "prt_c2",
+            "orca-demo-code_git_show",
+            "completed",
+            json!({"sha": "4f2c1e"}),
+            json!({"output": "diff --git a/src/payment/charge.js"}),
+            1_200,
+            1_220,
+        );
+        let run = decode_run(&s.events);
+
+        let (read, show) = (&run.tool_log[0], &run.tool_log[1]);
+        assert_eq!(read.tool, "orca-demo-code_read_file");
+        assert_eq!(read.signal, SignalClass::Context);
+        assert_eq!(show.tool, "orca-demo-code_git_show");
+        assert_eq!(show.signal, SignalClass::Change);
+        for cited in ["read_file", "orca-demo-code_read_file"] {
+            let matched =
+                match_citation(cited, r#"{"path":"src/payment/charge.js"}"#, &run.tool_log);
+            assert_eq!(
+                matched.map(|r| r.call_id.as_str()),
+                Ok("call_prt_c1"),
+                "{cited}"
+            );
+        }
+        let matched = match_citation("git_show", r#"{"sha":"4f2c1e"}"#, &run.tool_log);
+        assert_eq!(matched.map(|r| r.call_id.as_str()), Ok("call_prt_c2"));
+    }
+
     #[test]
     fn stages_run_once_each_and_the_last_completed_report_is_the_submit() {
         let mut s = ledger_session(&["context", "topology", "context", "gather", "changes"]);
@@ -833,14 +942,14 @@ pub(crate) mod tests {
         assert_eq!(run.tool_log[0].signal, SignalClass::Infra);
     }
 
-    // ---- SG19–SG21, SG25, SG26: steering and questions in the transcript ----
+    // ---- steering and questions in the transcript ----
 
     pub(crate) const RESPONDER: &str = "a.rao@acme.io";
     pub(crate) const S1: &str = "stg_2NjLm8W3pXyZqR7tVbK9cDfGhJ1";
     pub(crate) const S2: &str = "stg_2NjLm8W3pXyZqR7tVbK9cDfGhJ2";
     pub(crate) const S3: &str = "stg_2NjLm8W3pXyZqR7tVbK9cDfGhJ3";
 
-    /// A steering message of [RESPONDER] as the relay sends it (§10.3).
+    /// A steering message of [RESPONDER] as the relay sends it.
     pub(crate) fn steer_message(
         steer_id: &str,
         kind: SteerKind,
@@ -1106,7 +1215,7 @@ pub(crate) mod tests {
         assert!(run.tool_log.is_empty(), "an ack is no tool row");
     }
 
-    /// SG25: each completed `ask_responders` is a question whose id is the call's `callID`.
+    /// Each completed `ask_responders` is a question whose id is the call's `callID`.
     #[test]
     fn sg25_questions_carry_the_call_id() {
         let mut s = Session::new();

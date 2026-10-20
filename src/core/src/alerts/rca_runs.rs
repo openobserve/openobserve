@@ -51,31 +51,31 @@ pub const CREDENTIALS_REASON: &str = "Credentials failed";
 pub const ERROR_AGENT_UNAVAILABLE: &str = "agent_unavailable";
 /// `error.reason` of an `agent_unavailable` run.
 pub const AGENT_UNAVAILABLE_REASON: &str = "Agent unavailable";
-/// `error.code` of a run whose agent failed or answered with an error (TH24).
+/// `error.code` of a run whose agent failed or answered with an error.
 pub const ERROR_AGENT_ERROR: &str = "agent_error";
 /// `error.reason` of an `agent_error` run.
 pub const AGENT_ERROR_REASON: &str = "The agent failed";
-/// `error.code` of a run whose agent ended without submitting a report (RR-18, TH24).
+/// `error.code` of a run whose agent ended without submitting a report.
 pub const ERROR_NO_REPORT: &str = "no_report";
 /// `error.reason` of a `no_report` run.
 pub const NO_REPORT_REASON: &str = "The analysis returned no report";
-/// `error.code` of a run whose turn reached the RCA deadline (TH11, TH24).
+/// `error.code` of a run whose turn reached the RCA deadline.
 pub const ERROR_TIMEOUT: &str = "timeout";
 /// `error.reason` of a `timeout` run.
 pub const TIMEOUT_REASON: &str = "The analysis timed out";
-/// `error.code` of a run whose turn stopped again after its continuation (TH25).
+/// `error.code` of a run whose turn stopped again after its continuation.
 pub const ERROR_INTERRUPTED: &str = "interrupted";
 /// `error.reason` of an `interrupted` run.
 pub const INTERRUPTED_REASON: &str = "The analysis was interrupted";
-/// `error.code` of a run whose transcript could not be stored (TH24).
+/// `error.code` of a run whose transcript could not be stored.
 pub const ERROR_PERSISTENCE_FAILED: &str = "persistence_failed";
 /// `error.reason` of a `persistence_failed` run.
 pub const PERSISTENCE_FAILED_REASON: &str = "The analysis transcript could not be saved";
-/// `error.code` of a run whose chat session was deleted under its turn (TH24).
+/// `error.code` of a run whose chat session was deleted under its turn.
 pub const ERROR_TRANSCRIPT_DELETED: &str = "transcript_deleted";
 /// `error.reason` of a `transcript_deleted` run.
 pub const TRANSCRIPT_DELETED_REASON: &str = "The analysis transcript was deleted";
-/// `error.code` of a run whose result could not be saved (RR-13).
+/// `error.code` of a run whose result could not be saved.
 pub const ERROR_SAVE_FAILED: &str = "save_failed";
 /// `error.reason` of a `save_failed` run.
 pub const SAVE_FAILED_REASON: &str = "The analysis result could not be saved";
@@ -83,7 +83,7 @@ pub const SAVE_FAILED_REASON: &str = "The analysis result could not be saved";
 pub const ERROR_USAGE_DENIED: &str = "usage_denied";
 /// `error.reason` of a `usage_denied` run.
 pub const USAGE_DENIED_REASON: &str = "AI usage was not authorized";
-/// `error.code` of a resumed run whose source session could not be copied (J8).
+/// `error.code` of a resumed run whose source session could not be copied.
 pub const ERROR_RESUME_FAILED: &str = "resume_failed";
 /// `error.reason` of a `resume_failed` run.
 pub const RESUME_FAILED_REASON: &str = "The earlier steps could not be reused";
@@ -107,11 +107,11 @@ pub struct StartRun {
     pub mode: RunMode,
     pub started_by: String,
     pub guidance: Option<String>,
-    /// User-started runs skip the reanalysis cooldown (RR-8).
+    /// User-started runs skip the reanalysis cooldown.
     pub skip_cooldown: bool,
     /// Serialized `Vec<SubjectRef>`: the pending on-call records of an alert run.
     pub oncall_subjects: Option<serde_json::Value>,
-    /// `context_used` stored with the row: a resumed run's `{resumed_from}` (J8, M1).
+    /// `context_used` stored with the row: a resumed run's `{resumed_from}`.
     pub context_used: Option<serde_json::Value>,
 }
 
@@ -120,14 +120,29 @@ pub enum StartOutcome {
     Started {
         run_id: String,
     },
-    /// A live run already holds the subject (RR-5, RR-9).
+    /// A live run already holds the subject.
     InFlight,
-    /// A run completed within the reanalysis cooldown (RR-8).
+    /// A run completed within the reanalysis cooldown.
     CoolingDown,
 }
 
 /// Commit the run and Begin event atomically; dispatch workflows only after commit.
 pub async fn start_run(req: StartRun) -> anyhow::Result<StartOutcome> {
+    start_run_after(req, None).await
+}
+
+/// [start_run] for a decision made on the incident's latest run: any start since then wins.
+pub async fn start_run_if_latest(
+    req: StartRun,
+    latest_run_id: &str,
+) -> anyhow::Result<StartOutcome> {
+    start_run_after(req, Some(latest_run_id)).await
+}
+
+async fn start_run_after(
+    req: StartRun,
+    latest_run_id: Option<&str>,
+) -> anyhow::Result<StartOutcome> {
     let StartRun {
         org_id,
         subject,
@@ -156,7 +171,7 @@ pub async fn start_run(req: StartRun) -> anyhow::Result<StartOutcome> {
 
     let run_id = runs_table::new_run_id();
     let now_us = now_micros();
-    // SG33: a run started with guidance commits its `guidance` row with the start.
+    // A run started with guidance commits its `guidance` row with the start.
     let guidance_row = match (incident_id.as_deref(), guidance.as_deref()) {
         (Some(incident_id), Some(text)) if subject_type == RunSubjectType::Incident => {
             Some(super::rca_steering::guidance_row(
@@ -189,6 +204,7 @@ pub async fn start_run(req: StartRun) -> anyhow::Result<StartOutcome> {
         cooldown_us: (!skip_cooldown)
             .then(|| minutes_to_us(cfg.incidents.reanalysis_cooldown_minutes)),
         history_limit: cfg.incidents.rca_history_limit,
+        latest_run_id,
     };
 
     match runs_table::start_run(new, guards, begin_event.clone(), guidance_row).await? {
@@ -197,7 +213,7 @@ pub async fn start_run(req: StartRun) -> anyhow::Result<StartOutcome> {
             replaced_stale,
             replaced_run_id,
         } => {
-            // TH44: the stale run this start replaced ended `failed`/`stale` here.
+            // The stale run this start replaced ended `failed`/`stale` here.
             if let Some(stale_trigger) = replaced_stale {
                 count_run_end(
                     &org_id,
@@ -206,7 +222,7 @@ pub async fn start_run(req: StartRun) -> anyhow::Result<StartOutcome> {
                     runs_table::STALE_ERROR_CODE,
                 );
             }
-            // SG23: its unread steering rows end with it.
+            // Its unread steering rows end with it.
             if let Some(stale_run_id) = replaced_run_id {
                 super::rca_steering::close_unread(&org_id, &stale_run_id, RunState::Failed).await;
             }
@@ -297,14 +313,14 @@ pub async fn complete_run(
     update_run(org_id, run_id, patch).await
 }
 
-/// TH44: `rca_runs_total`, once for each run that reaches a terminal state.
+/// `rca_runs_total`, once for each run that reaches a terminal state.
 pub(crate) fn count_run_end(org_id: &str, trigger: RunTrigger, state: RunState, error_code: &str) {
     config::metrics::RCA_RUNS_TOTAL
         .with_label_values(&[org_id, trigger.as_str(), state.as_str(), error_code])
         .inc();
 }
 
-/// Input of "Build on previous" (RR-27): the newest completed report, else the newest pre-run one.
+/// Input of "Build on previous": the newest completed report, else the newest pre-run one.
 pub async fn newest_completed_report(
     org_id: &str,
     incident_id: &str,
@@ -323,7 +339,7 @@ pub async fn newest_completed_report(
         .map(|report| report.report))
 }
 
-/// RR-29: metadata and history without report text; pre-run reports follow the stored runs.
+/// Metadata and history without report text; pre-run reports follow the stored runs.
 pub async fn rca_detail(
     org_id: &str,
     incident: &alert_incidents::Model,
@@ -421,7 +437,7 @@ async fn stored_detail(
     latest_run_id: &str,
 ) -> anyhow::Result<RcaDetailFields> {
     let cfg = get_o2_config();
-    // Pruning keeps the newest `limit + 1` runs and the newest completed one (RR-25).
+    // Pruning keeps the newest `limit + 1` runs and the newest completed one.
     let limit = (cfg.incidents.rca_history_limit as u64).saturating_add(2);
     let (runs, _) = runs_table::list_for_incident(org_id, incident_id, limit, None).await?;
     let history: Vec<_> = runs.iter().map(runs_table::to_item).collect();
@@ -431,6 +447,8 @@ async fn stored_detail(
             .await?
             .map(|run| runs_table::to_item(&run)),
     };
+    let resume_run_id =
+        super::rca_resume::resumable_run_id(org_id, incident_id, latest_run_id, &runs).await;
     let current_run = runs.into_iter().next().map(|run| {
         let mut run = runs_table::to_run(run);
         run.report = None;
@@ -441,8 +459,7 @@ async fn stored_detail(
         current_run,
         report_run,
         history,
-        resume_run_id: super::rca_resume::resumable_run_id(org_id, incident_id, latest_run_id)
-            .await,
+        resume_run_id,
     })
 }
 
@@ -453,7 +470,7 @@ async fn write_run(
     mut patch: RunUpdate,
     incident_id: Option<&str>,
 ) -> anyhow::Result<bool> {
-    // RR-47: no internal host, path or agent URL reaches a reader.
+    // No internal host, path or agent URL reaches a reader.
     if let Some(details) = patch.error.as_mut().and_then(|e| e.details.as_mut()) {
         *details = redact_details(details);
     }
@@ -472,7 +489,7 @@ async fn write_run(
     {
         *details = redact_details(details);
     }
-    // RR-23: a cancel keeps today's behavior and starts no workflow.
+    // A cancel starts no workflow.
     let notify = patch
         .event
         .as_ref()
@@ -525,7 +542,7 @@ fn incident_subject(subject_type: &RunSubjectType, subject_id: &str) -> Option<S
     matches!(subject_type, RunSubjectType::Incident).then(|| subject_id.to_string())
 }
 
-/// RR-47: redact credentials and internal authorities before truncating details.
+/// Redact credentials and internal authorities before truncating details.
 fn redact_details(text: &str) -> String {
     redact_rca_details(text, &get_o2_config().ai.agent_url)
 }
@@ -811,7 +828,7 @@ pub(crate) mod tests {
         }
     }
 
-    /// RR-12: a write the run's state no longer allows changes nothing and appends nothing.
+    /// A write the run's state no longer allows changes nothing and appends nothing.
     #[tokio::test]
     async fn a_write_the_run_no_longer_allows_returns_false_and_appends_nothing() {
         let _db = db().await;
@@ -849,7 +866,7 @@ pub(crate) mod tests {
         assert_eq!(completes(&timeline(&org, &inc).await), 0);
     }
 
-    /// RR-14: the failure keeps the event's reason, details and trigger type and adds a code.
+    /// The failure keeps the event's reason, details and trigger type and adds a code.
     #[tokio::test]
     async fn a_failure_stores_its_error_and_appends_one_failed_event() {
         let _db = db().await;
@@ -912,7 +929,7 @@ pub(crate) mod tests {
         );
     }
 
-    /// RR-15: two writers fail the same run; only the first counts.
+    /// Two writers fail the same run; only the first counts.
     #[tokio::test]
     async fn a_second_failure_of_the_same_run_is_a_no_op() {
         let _db = db().await;
@@ -977,7 +994,7 @@ pub(crate) mod tests {
         );
     }
 
-    /// RR-46: a failed later run keeps the earlier completed run as the report run.
+    /// A failed later run keeps the earlier completed run as the report run.
     #[tokio::test]
     async fn a_failed_run_keeps_the_earlier_report_run() {
         let _db = db().await;
@@ -1020,7 +1037,7 @@ pub(crate) mod tests {
         );
     }
 
-    /// RR-27: "Build on previous" reads the newest completed report.
+    /// "Build on previous" reads the newest completed report.
     #[tokio::test]
     async fn build_on_previous_reads_the_newest_completed_report() {
         let _db = db().await;
@@ -1096,8 +1113,7 @@ pub(crate) mod tests {
         );
         let detail = summary.detail.unwrap();
         assert_eq!(ids(&detail), ["v1-0", "v1-1"]);
-        // The current report was written when it archived the older one; the oldest pairs with
-        // the second-newest pre-run `AIAnalysisComplete`.
+        // The oldest report pairs with the second-newest pre-run `AIAnalysisComplete`.
         let times: Vec<_> = detail.history.iter().map(|run| run.started_at).collect();
         assert_eq!(times, [200, 100]);
         assert_eq!(detail.report_run.unwrap().run_id, "v1-0");
@@ -1195,7 +1211,7 @@ pub(crate) mod tests {
         assert_eq!(v1, ["current report", "older report"]);
     }
 
-    /// RR-29: the detail names the runs and carries no report text; never analyzed is `None`.
+    /// The detail names the runs and carries no report text; never analyzed is `None`.
     #[tokio::test]
     async fn the_detail_carries_the_runs_but_no_report_text() {
         let _db = db().await;
@@ -1258,7 +1274,7 @@ pub(crate) mod tests {
         assert!(value["history"].is_array());
     }
 
-    /// RR-47: no agent URL or internal host name reaches a reader through the details.
+    /// No agent URL or internal host name reaches a reader through the details.
     #[tokio::test]
     async fn an_agent_url_in_the_details_is_stored_redacted() {
         let _db = db().await;
@@ -1290,7 +1306,7 @@ pub(crate) mod tests {
         );
     }
 
-    /// RR-38: an alert run completes or fails without an incident and without a timeline.
+    /// An alert run completes or fails without an incident and without a timeline.
     #[tokio::test]
     async fn an_alert_run_completes_or_fails_without_an_incident() {
         let _db = db().await;
@@ -1351,7 +1367,7 @@ pub(crate) mod tests {
         assert_eq!(run.incident_id, None);
     }
 
-    /// RR-8: automatic runs wait out the cooldown after a completed run; user runs do not.
+    /// Automatic runs wait out the cooldown after a completed run; user runs do not.
     #[tokio::test]
     async fn an_automatic_start_in_the_cooldown_starts_nothing_and_a_user_start_does() {
         let _db = db().await;
@@ -1376,7 +1392,7 @@ pub(crate) mod tests {
         start(&org, &inc, RunTrigger::Reanalyze).await;
     }
 
-    /// RR-5, RR-9: a live run holds the incident against every new start.
+    /// A live run holds the incident against every new start.
     #[tokio::test]
     async fn a_live_run_holds_the_incident() {
         let _db = db().await;
@@ -1394,7 +1410,7 @@ pub(crate) mod tests {
         );
     }
 
-    /// D2, RR-45: a user-started run never consults `rca_off_reason`.
+    /// A user-started run never consults `rca_off_reason`.
     #[tokio::test]
     async fn a_user_start_ignores_l0_off() {
         let _db = db().await;
@@ -1504,7 +1520,7 @@ pub(crate) mod tests {
         assert_eq!(timeline(&org, &inc).await.len(), events);
     }
 
-    /// TH24, TH27: a failure writes the run's final counts in the same write.
+    /// A failure writes the run's final counts in the same write.
     #[tokio::test]
     async fn a_failure_with_counts_stores_them() {
         let _db = db().await;
@@ -1593,7 +1609,7 @@ pub(crate) mod tests {
         assert_eq!(summary["tool_calls"], 5);
     }
 
-    /// TH28: the sweep reads `running` runs only, least recently written first.
+    /// The sweep reads `running` runs only, least recently written first.
     #[tokio::test]
     async fn list_running_returns_running_runs_oldest_write_first() {
         let _db = db().await;

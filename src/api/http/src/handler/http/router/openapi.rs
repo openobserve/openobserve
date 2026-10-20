@@ -1653,8 +1653,6 @@ mod tests {
         assert!(!tags.contains(&"RUM"), "{tags:?}");
     }
 
-    /// J2, J7: the feedback and resume operations are published with their ids and rate
-    /// limit operations; with enterprise features each documents the statuses it answers.
     #[test]
     fn rca_feedback_and_resume_paths_are_documented() {
         let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();

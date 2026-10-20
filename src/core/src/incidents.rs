@@ -20,14 +20,14 @@ use db::workflows::WorkflowTriggerType;
 use infra::table::workflows::get_all_associations_for_trigger_type;
 use serde_json::Value;
 
-use crate::{alerts::incidents::get_incident_with_alerts, workflows::send_workflow_trigger};
+use crate::{alerts::incidents::get_incident_with_triggers, workflows::send_workflow_trigger};
 
 async fn get_event_metadata(
     org_id: &str,
     incident_id: &str,
     event: IncidentEvent,
 ) -> Result<HashMap<String, Value>, anyhow::Error> {
-    let incident = get_incident_with_alerts(org_id, incident_id)
+    let incident = get_incident_with_triggers(org_id, incident_id)
         .await?
         .ok_or_else(|| anyhow::anyhow!("incident with given id not found"))?;
 

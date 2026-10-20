@@ -195,8 +195,7 @@ pub async fn get_org_setting_red_insights_enabled(org_id: &str) -> Result<bool, 
     Ok(red_insights_enabled)
 }
 
-/// Whether incident investigation threads show raw tool input and output; absent settings mean
-/// off.
+/// Whether investigation threads show raw tool input and output; absent settings mean off.
 pub async fn get_org_setting_ai_rca_thread_tool_output(org_id: &str) -> Result<bool, Error> {
     let key = format!("{ORG_SETTINGS_KEY_PREFIX}/{org_id}");
     if let Some(v) = ORGANIZATION_SETTING.read().await.get(&key) {

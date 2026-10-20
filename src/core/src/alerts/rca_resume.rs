@@ -13,7 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! J7: validate a stopped run and prepare its immutable transcript prefix for a new fork.
+//! Validate a stopped run and prepare its immutable transcript prefix for a new fork.
+
+use std::borrow::Cow;
 
 use config::meta::alerts::rca_runs::{RunMode, RunState, RunSubjectType, RunTrigger};
 use infra::table::{
@@ -22,6 +24,7 @@ use infra::table::{
     rca_runs::{self as runs_table, Model as RunRow},
 };
 use o2_enterprise::enterprise::ai::chat::batcher::DurableEvent;
+use sea_orm::ConnectionTrait;
 use serde::Serialize;
 use serde_json::{Value, json};
 use utoipa::ToSchema;
@@ -52,7 +55,7 @@ const NOT_RESUMABLE_CODES: [&str; 6] = [
 /// A step of the source run, as the thread names it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 pub struct ResumeStep {
-    /// 1-based, counted over the run's `record_step` calls.
+    /// 1-based, as the thread numbers the run's steps.
     pub index: u32,
     /// One of the seven stages; empty when the step named none.
     pub stage: String,
@@ -73,6 +76,8 @@ pub struct ResumeSeed {
     pub from_step: ResumeStep,
     /// The source run's mode.
     pub mode: RunMode,
+    /// The incident's latest run at this check; the start refuses once another run came since.
+    pub latest_run_id: String,
 }
 
 impl ResumeSeed {
@@ -103,7 +108,7 @@ pub enum ResumeError {
     Internal(String),
 }
 
-/// J7: validate eligibility and read one bounded immutable transcript prefix; do not write.
+/// Validate eligibility and read one bounded immutable transcript prefix; do not write.
 pub async fn prepare_resume(
     org_id: &str,
     incident_id: &str,
@@ -118,36 +123,73 @@ pub async fn prepare_resume(
     .await
 }
 
-pub async fn resumable_run_id(org_id: &str, incident_id: &str, latest_id: &str) -> Option<String> {
-    let latest = runs_table::get_rw(org_id, latest_id).await.ok().flatten()?;
-    if !matches!(
-        runs_table::to_item(&latest).state,
-        RunState::Failed | RunState::Cancelled
-    ) {
-        return None;
-    }
-    let source_id = latest
-        .context_used
-        .as_ref()
-        .and_then(|context| context["resumed_from"]["run_id"].as_str());
-    let candidate = match source_id {
-        Some(source)
-            if is_transparent_resume_of(org_id, latest_id, source)
-                .await
-                .ok()? =>
-        {
-            source
-        }
-        _ => latest_id,
-    };
-    match prepare_resume(org_id, incident_id, candidate).await {
-        Ok(_) => Some(candidate.to_string()),
-        Err(ResumeError::Unavailable(error) | ResumeError::Internal(error)) => {
-            log::warn!("[RCA_RESUME] cannot read eligibility of {candidate}: {error}");
+/// The run a Resume starts from, judged on stored rows; the route re-reads the transcript.
+pub async fn resumable_run_id(
+    org_id: &str,
+    incident_id: &str,
+    latest_id: &str,
+    runs: &[RunRow],
+) -> Option<String> {
+    match resumable_from_rows(org_id, incident_id, latest_id, runs).await {
+        Ok(run_id) => run_id,
+        Err(e) => {
+            log::warn!("[RCA_RESUME] cannot read the resume eligibility of {latest_id}: {e:?}");
             None
         }
-        Err(_) => None,
     }
+}
+
+async fn resumable_from_rows(
+    org_id: &str,
+    incident_id: &str,
+    latest_id: &str,
+    runs: &[RunRow],
+) -> Result<Option<String>, ResumeError> {
+    // Every incident read asks; the replica is enough for a hint the route re-checks.
+    let replica = infra::db::get_orm_client_ro().await;
+    let Some(latest) = listed_or_read(org_id, latest_id, runs).await? else {
+        return Ok(None);
+    };
+    if !is_stopped(&latest) {
+        return Ok(None);
+    }
+    let candidate = match resumed_source(&latest) {
+        Some(source) if is_transparent_resume(replica, org_id, &latest, source).await? => {
+            match listed_or_read(org_id, source, runs).await? {
+                Some(source) => source,
+                None => return Ok(None),
+            }
+        }
+        _ => latest,
+    };
+    if candidate.incident_id.as_deref() != Some(incident_id) {
+        return Ok(None);
+    }
+    let Ok((session_id, _)) = check_resumable(true, &candidate) else {
+        return Ok(None);
+    };
+    let committed = ai_chat_sessions::get_with(replica, org_id, session_id)
+        .await
+        .map_err(internal)?
+        .is_some_and(|session| {
+            session.status == STATUS_ACTIVE && session.last_committed_seq != NO_SEQ
+        });
+    Ok(committed.then(|| candidate.run_id.clone()))
+}
+
+/// `run_id` from the incident's listed runs, else read.
+async fn listed_or_read<'a>(
+    org_id: &str,
+    run_id: &str,
+    runs: &'a [RunRow],
+) -> Result<Option<Cow<'a, RunRow>>, ResumeError> {
+    if let Some(run) = runs.iter().find(|run| run.run_id == run_id) {
+        return Ok(Some(Cow::Borrowed(run)));
+    }
+    Ok(runs_table::get(org_id, run_id)
+        .await
+        .map_err(internal)?
+        .map(Cow::Owned))
 }
 
 /// [prepare_resume] reading the source's committed events with `read_events`.
@@ -161,6 +203,7 @@ where
     R: AsyncFnOnce(&ai_chat_sessions::Model) -> Result<Vec<DurableEvent>, ReadError>,
 {
     // The primary: the run may have ended just now.
+    let primary = infra::db::get_orm_client_rw().await;
     let incident = alert_incidents::get_rw(org_id, incident_id)
         .await
         .map_err(internal)?
@@ -170,14 +213,18 @@ where
         .map_err(internal)?
         .filter(|run| run.incident_id.as_deref() == Some(incident_id))
         .ok_or(ResumeError::NotFound)?;
-    let latest = match incident.rca_run_id.as_deref() {
+    let latest_id = incident.rca_run_id.as_deref();
+    let latest = match latest_id {
         Some(latest) if latest == run_id => true,
-        Some(latest) => is_transparent_resume_of(org_id, latest, run_id).await?,
+        Some(latest) => match runs_table::get_rw(org_id, latest).await.map_err(internal)? {
+            Some(latest) => is_transparent_resume(primary, org_id, &latest, run_id).await?,
+            None => false,
+        },
         None => false,
     };
     let (session_id, mode) = check_resumable(latest, &run)?;
 
-    let source = match ai_chat_sessions::get(org_id, session_id)
+    let source = match ai_chat_sessions::get_with(primary, org_id, session_id)
         .await
         .map_err(internal)?
     {
@@ -215,51 +262,52 @@ where
             title: plan.from_step.title,
         },
         mode,
+        latest_run_id: latest_id.unwrap_or_default().to_string(),
     })
 }
 
-/// A resume that never ran a turn must not hide its still-reusable source.
-async fn is_transparent_resume_of(
-    org_id: &str,
-    latest_id: &str,
-    run_id: &str,
-) -> Result<bool, ResumeError> {
-    let Some(latest) = runs_table::get_rw(org_id, latest_id)
-        .await
-        .map_err(internal)?
-    else {
-        return Ok(false);
-    };
-    let item = runs_table::to_item(&latest);
-    let resumes_run = latest
-        .context_used
+fn is_stopped(run: &RunRow) -> bool {
+    matches!(
+        runs_table::to_item(run).state,
+        RunState::Failed | RunState::Cancelled
+    )
+}
+
+/// The run a Resume's lineage names.
+fn resumed_source(run: &RunRow) -> Option<&str> {
+    run.context_used
         .as_ref()
         .and_then(|used| used["resumed_from"]["run_id"].as_str())
-        == Some(run_id);
+}
+
+/// A resume that never ran a turn must not hide its still-reusable source.
+async fn is_transparent_resume<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    latest: &RunRow,
+    run_id: &str,
+) -> Result<bool, ResumeError> {
+    let item = runs_table::to_item(latest);
     if item.trigger != RunTrigger::Resume
         || !matches!(item.state, RunState::Failed | RunState::Cancelled)
-        || !resumes_run
+        || resumed_source(latest) != Some(run_id)
     {
         return Ok(false);
     }
-    // A cancel carries no error code; only a failed launch names why no turn ran.
-    if item.state == RunState::Failed
-        && error_code(&latest)
-            .is_some_and(|code| code == ERROR_RESUME_FAILED || RcaTurnError::is_start_code(code))
-    {
+    // Only a failed fork is sure to have run no turn; any other end is judged by its turns.
+    if error_code(latest) == Some(ERROR_RESUME_FAILED) {
         return Ok(true);
     }
     let Some(session_id) = latest.session_id.as_deref() else {
         return Ok(true);
     };
-    let primary = infra::db::get_orm_client_rw().await;
-    let Some(session) = ai_chat_sessions::get_with(primary, org_id, session_id)
+    let Some(session) = ai_chat_sessions::get_with(conn, org_id, session_id)
         .await
         .map_err(internal)?
     else {
         return Ok(true);
     };
-    let turns = ai_chat_turns::list_for_session_with(primary, org_id, session_id)
+    let turns = ai_chat_turns::list_for_session_with(conn, org_id, session_id)
         .await
         .map_err(internal)?;
     // The fork's first turn was admitted right after the copied events.
@@ -269,7 +317,7 @@ async fn is_transparent_resume_of(
     })
 }
 
-/// J7 on the run row alone: the session id and mode of a run that may be resumed.
+/// The session id and mode of a run that may be resumed, judged on the run row alone.
 fn check_resumable(latest: bool, run: &RunRow) -> Result<(&str, RunMode), ResumeError> {
     let item = runs_table::to_item(run);
     if item.subject_type != RunSubjectType::Incident || !latest {
@@ -665,6 +713,63 @@ pub(crate) mod tests {
         assert_eq!(result.unwrap_err(), ResumeError::NothingToResume);
     }
 
+    async fn detail_resume_run_id(org_id: &str, incident_id: &str) -> Option<String> {
+        let incident = alert_incidents::get_rw(org_id, incident_id)
+            .await
+            .unwrap()
+            .unwrap();
+        rca_runs::rca_detail(org_id, &incident)
+            .await
+            .unwrap()
+            .unwrap()
+            .detail
+            .unwrap()
+            .resume_run_id
+    }
+
+    #[tokio::test]
+    async fn the_incident_detail_names_the_run_a_resume_starts_from() {
+        let _db = db().await;
+        let (org, inc) = new_incident(None).await;
+        let source = stopped(&org, &inc, Some(ERROR_TIMEOUT)).await;
+        assert_eq!(detail_resume_run_id(&org, &inc).await, Some(source.clone()));
+
+        let resumed = start_with(&org, &inc, RunTrigger::Resume, RunMode::BuildOnPrevious).await;
+        let lineage = RunUpdate {
+            context_used: Some(json!({"resumed_from": {"run_id": source, "steps": 2}})),
+            ..Default::default()
+        };
+        assert!(rca_runs::update_run(&org, &resumed, lineage).await.unwrap());
+        assert_eq!(
+            detail_resume_run_id(&org, &inc).await,
+            None,
+            "not while it runs"
+        );
+        stop(
+            &org,
+            &resumed,
+            RunTrigger::Resume,
+            Some(ERROR_RESUME_FAILED),
+        )
+        .await;
+        assert_eq!(
+            detail_resume_run_id(&org, &inc).await,
+            Some(source),
+            "a resume that ran no turn names its source"
+        );
+
+        let (org, inc) = new_incident(None).await;
+        let done = start_with(&org, &inc, RunTrigger::Manual, RunMode::Fresh).await;
+        with_session(&org, &done, "ses-done").await;
+        add_session(session_row(&org, "ses-done", 17, STATUS_ACTIVE)).await;
+        assert!(
+            complete_run(&org, &done, "## Root cause", RunUpdate::default())
+                .await
+                .unwrap()
+        );
+        assert_eq!(detail_resume_run_id(&org, &inc).await, None);
+    }
+
     #[tokio::test]
     async fn a_resume_that_failed_to_launch_leaves_its_source_resumable() {
         let _db = db().await;
@@ -748,7 +853,7 @@ pub(crate) mod tests {
             Option<Option<&'a str>>,
             bool,
         );
-        let cases: [Case; 12] = [
+        let cases: [Case; 13] = [
             (
                 "failed: launch failed",
                 resume,
@@ -787,6 +892,14 @@ pub(crate) mod tests {
                 true,
                 Fork::Committed,
                 Some(Some(ERROR_TIMEOUT)),
+                false,
+            ),
+            (
+                "failed: start code after its turn committed",
+                resume,
+                true,
+                Fork::Committed,
+                Some(Some(ERROR_AGENT_UNAVAILABLE)),
                 false,
             ),
             (

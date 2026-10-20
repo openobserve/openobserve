@@ -485,7 +485,7 @@ pub async fn zo_config(
         o2cfg.ai.enabled && o2cfg.ai.has_agent_target() && o2cfg.ai.chat_persistence_enabled
     );
     let incidents_enabled = enterprise_value!(false, o2cfg.incidents.enabled);
-    // Incident analysis needs RCA on and an agent to answer (RR-43).
+    // Incident analysis needs RCA on and an agent to answer.
     let incidents_rca_enabled = enterprise_value!(
         false,
         o2cfg.incidents.enabled && o2cfg.incidents.rca_enabled && o2cfg.ai.has_agent_target()
@@ -2520,7 +2520,6 @@ mod tests {
         }
     }
 
-    /// RR-43: `/config` says whether incident analysis can run at all.
     #[cfg(feature = "enterprise")]
     #[tokio::test]
     async fn test_zo_config_serves_incidents_rca_enabled() {

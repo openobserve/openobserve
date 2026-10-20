@@ -13,8 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Evidence-graded confidence (CG §5.2–§5.4): code grades the band of an RCA
-//! verdict from the evidence the agent recorded and the tool calls that ran.
+//! Code grades an RCA verdict's confidence band from recorded evidence and the tool calls that ran.
 
 use std::collections::BTreeMap;
 
@@ -25,7 +24,7 @@ use super::{
     agent::Confidence,
     rca_run::{
         BlindSpot, BlindSpotAxis, EvidenceLedger, EvidenceTarget, HypothesisStatus, OutcomeReason,
-        Polarity, RcaOutcome, Strength, SubmittedVerdict, subject,
+        Polarity, RcaOutcome, Strength, SubmittedVerdict, TimeWindow, subject,
     },
 };
 use crate::meta::alerts::rca_steering::STEER_ID_PREFIX;
@@ -33,7 +32,10 @@ use crate::meta::alerts::rca_steering::STEER_ID_PREFIX;
 /// Statements of ruled-out hypotheses in a grade are cut to this many chars.
 const RULED_OUT_MAX_CHARS: usize = 80;
 
-/// The tools whose signal class comes from their `type` argument (CG §5.3.2).
+/// Slack for `impact.window` past the observed data: one minute of rounding and sample spacing.
+const IMPACT_WINDOW_SLACK_US: i64 = 60_000_000;
+
+/// The tools whose signal class comes from their `type` argument.
 const SEARCH_TOOLS: [&str; 4] = [
     "SearchSQL",
     "SearchAround",
@@ -41,7 +43,14 @@ const SEARCH_TOOLS: [&str; 4] = [
     "SearchValues",
 ];
 
-/// Tools that give context but never count toward the band (CG §5.3.2).
+/// The PromQL query tools; the other `Prometheus*` tools read metadata, not metrics.
+const PROMETHEUS_TOOLS: [&str; 3] = [
+    "PrometheusQuery",
+    "PrometheusRangeQuery",
+    "PrometheusSeries",
+];
+
+/// Tools that give context but never count toward the band.
 const CONTEXT_TOOLS: [&str; 9] = [
     "GetIncident",
     "GetAlert",
@@ -54,7 +63,18 @@ const CONTEXT_TOOLS: [&str; 9] = [
     "get_dimension_analytics",
 ];
 
-/// The kind of signal a tool call read (CG §5.3.2).
+/// Tool-name prefixes that are not an org AI Toolset MCP server (first-party and shell toolsets).
+const NOT_TOOLSET_SERVERS: [&str; 3] = ["o2", "cli", "custom"];
+
+/// Code toolset tools that return a diff; like `git show`, a diff is evidence of a change.
+const TOOLSET_DIFF_TOOLS: [&str; 2] = ["git_show", "git_diff"];
+
+/// Code reads explain a mechanism but are not evidence a change happened, so they are context.
+const TOOLSET_CODE_TOOLS: [&str; 4] = ["read_file", "search_code", "list_files", "git_log"];
+
+/// The longest key argument a tool record keeps; citations are cut the same way.
+pub const KEY_ARG_MAX_BYTES: usize = 4 * 1024;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum SignalClass {
@@ -76,7 +96,6 @@ impl SignalClass {
         )
     }
 
-    /// Stable wire and display value.
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Logs => "logs",
@@ -90,96 +109,10 @@ impl SignalClass {
     }
 }
 
-/// The `type` argument of the SearchSQL family; `None` for every other tool.
-pub fn stream_type(tool: &str, input: &serde_json::Value) -> Option<String> {
-    if !SEARCH_TOOLS.contains(&tool) {
-        return None;
-    }
-    input
-        .get("type")
-        .and_then(serde_json::Value::as_str)
-        .map(str::to_string)
-}
-
-/// The signal class of one tool call, from the bare tool name and its
-/// unwrapped input (CG §5.3.2). Never from the ledger.
-pub fn signal_class(tool: &str, input: &serde_json::Value) -> SignalClass {
-    if SEARCH_TOOLS.contains(&tool) {
-        return match input.get("type").and_then(serde_json::Value::as_str) {
-            Some("metrics") => SignalClass::Metrics,
-            Some("traces") => SignalClass::Traces,
-            _ => SignalClass::Logs,
-        };
-    }
-    if tool.starts_with("Prometheus") {
-        return SignalClass::Metrics;
-    }
-    if tool == "GetLatestTraces" {
-        return SignalClass::Traces;
-    }
-    if CONTEXT_TOOLS.contains(&tool) {
-        return SignalClass::Context;
-    }
-    if tool == "ExecuteCode" || tool.starts_with("custom_") {
-        return SignalClass::Unclassified;
-    }
-    let command = ["command", "cmd"]
-        .iter()
-        .find_map(|k| input.get(*k).and_then(serde_json::Value::as_str));
-    if command.is_some_and(reads_diff) {
-        return SignalClass::Change;
-    }
-    if tool.starts_with("cli_") {
-        return SignalClass::Infra;
-    }
-    SignalClass::Unclassified
-}
-
-/// A shell command that reads a diff: `gh pr diff`, `gh api …/commits/<sha>`,
-/// `git show`, `git diff`. A commit list (`gh pr list`, `git log`) is not one.
-fn reads_diff(command: &str) -> bool {
-    command
-        .split(['\n', ';', '|', '&'])
-        .any(|segment| segment_reads_diff(&segment.split_whitespace().collect::<Vec<_>>()))
-}
-
-fn segment_reads_diff(tokens: &[&str]) -> bool {
-    tokens.iter().enumerate().any(|(i, t)| match *t {
-        "git" => git_subcommand(&tokens[i + 1..]).is_some_and(|s| s == "show" || s == "diff"),
-        "gh" => match tokens.get(i + 1).copied() {
-            Some("pr") => tokens.get(i + 2) == Some(&"diff"),
-            Some("api") => tokens[i + 2..].iter().any(|a| {
-                a.split_once("/commits/").is_some_and(|(_, sha)| {
-                    !sha.trim_matches(|c| c == '/' || c == '"' || c == '\'')
-                        .is_empty()
-                })
-            }),
-            _ => false,
-        },
-        _ => false,
-    })
-}
-
-/// The first non-option token after `git`; `-C <path>` and `-c <k=v>` take an argument.
-fn git_subcommand<'a>(args: &[&'a str]) -> Option<&'a str> {
-    let mut iter = args.iter();
-    while let Some(a) = iter.next() {
-        match *a {
-            "-C" | "-c" => {
-                iter.next();
-            }
-            a if a.starts_with('-') => {}
-            a => return Some(a),
-        }
-    }
-    None
-}
-
-/// One visible tool call of the run (CG §5.2, VE26, VE27).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct ToolCallRecord {
     pub call_id: String,
-    /// Bare name: `o2_` prefix stripped, `tools_call` unwrapped.
+    /// `o2_` stripped and `tools_call` unwrapped; toolset calls keep the `<server>_` prefix.
     pub tool: String,
     /// The same key argument as the thread's, max 4 KB.
     pub key_arg: String,
@@ -196,10 +129,12 @@ pub struct ToolCallRecord {
     pub error_type: Option<String>,
     pub signal: SignalClass,
     pub target: EvidenceTarget,
+    /// Data timestamps the result showed inside `target`'s range; `None` when none or no range.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub observed: Option<TimeWindow>,
     pub result_summary: String,
 }
 
-/// Why a cited evidence item did not verify (CG §5.3.1).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum UnverifiedReason {
@@ -210,7 +145,6 @@ pub enum UnverifiedReason {
 }
 
 impl UnverifiedReason {
-    /// Stable wire and metric-label value.
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::NotRun => "not_run",
@@ -229,7 +163,7 @@ pub struct UnverifiedCitation {
     pub reason: UnverifiedReason,
 }
 
-/// A grading rule that fired (CG §5.3.3, VE15).
+/// A grading rule that fired.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum GradeReason {
@@ -244,6 +178,8 @@ pub enum GradeReason {
     ChangeHistoryUnreachable,
     ContradictingEvidence,
     HumanLead,
+    /// `impact.window` reaches past the data the verified runtime evidence showed.
+    ImpactOutsideObservedData,
 }
 
 impl GradeReason {
@@ -258,13 +194,13 @@ impl GradeReason {
         }
     }
 
-    /// The text of a cap; `None` for every other reason. A `human_lead` cap names the
-    /// lead's author by the local part of the email (SG36).
+    /// `None` for non-caps; a `human_lead` cap names the lead's author by email local part.
     fn cap_text(&self, lead_author: Option<&str>) -> Option<String> {
         let text = match self {
             Self::SuspectChangeNotRead => "suspect change not read",
             Self::ChangeHistoryUnreachable => "change history not reachable",
             Self::ContradictingEvidence => "contradicting evidence",
+            Self::ImpactOutsideObservedData => "impact window outside the observed data",
             Self::HumanLead => {
                 return Some(match lead_author {
                     Some(email) => {
@@ -280,10 +216,10 @@ impl GradeReason {
     }
 }
 
-/// The band that code allows for a verdict, and why (CG §5.3).
+/// The band that code allows for a verdict, and why.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct ConfidenceGrade {
-    /// `min(claimed, graded)`, then lowered by the outcome (VE15).
+    /// `min(claimed, graded)`, then lowered by the outcome.
     pub band: Confidence,
     pub claimed: Confidence,
     /// What the rules allow, after caps.
@@ -293,26 +229,22 @@ pub struct ConfidenceGrade {
     pub reasons: Vec<GradeReason>,
     #[serde(default)]
     pub decisive_classes: Vec<SignalClass>,
-    /// Statements of ruled-out hypotheses with a verified `rules_out` or
-    /// `contradicts` item, each cut to 80 chars.
+    /// Ruled-out statements backed by a verified `rules_out`/`contradicts` item, cut to 80 chars.
     #[serde(default)]
     pub ruled_out: Vec<String>,
     #[serde(default)]
     pub unverified: Vec<UnverifiedCitation>,
-    /// The VE13 subject hypothesis.
+    /// The subject hypothesis.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub subject_id: Option<String>,
-    /// The email of the author of the cause hypothesis' first steering lead, which a
-    /// `human_lead` cap names (SG36).
+    /// Author email of the cause's first steering lead, named by a `human_lead` cap.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub lead_author: Option<String>,
 }
 
-/// Why a band is what it is, in the parts a reader checks (CG §5.3.4): the agent's
-/// claim, what the evidence allows and why, and the caps that lowered it.
+/// Claim, evidence level with its reason, and the caps that lowered it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct ConfidenceBreakdown {
-    /// The level the agent claimed for itself.
     pub claimed: Confidence,
     /// The level the evidence rules allow, before any cap.
     pub evidence: Confidence,
@@ -327,12 +259,12 @@ pub struct ConfidenceBreakdown {
 }
 
 impl ConfidenceGrade {
-    /// The first floor that holds the band at `low`, if any (CG §5.3.3).
+    /// The first floor that holds the band at `low`, if any.
     fn floor(&self) -> Option<GradeReason> {
         [
+            GradeReason::NoLedger,
             GradeReason::NoConfirmedCause,
             GradeReason::AmbiguousCause,
-            GradeReason::NoLedger,
             GradeReason::NoVerifiedEvidence,
         ]
         .into_iter()
@@ -355,8 +287,8 @@ impl ConfidenceGrade {
         }
     }
 
-    /// The caps that lowered the band. Every cap sets `medium`, so a cap on a
-    /// `medium` evidence level changed nothing and is left out.
+    /// Every cap sets `medium`, so a cap on a `medium` evidence level changed nothing and is
+    /// omitted.
     fn applied_caps(&self) -> Vec<String> {
         if self.evidence_level() != Confidence::High {
             return Vec::new();
@@ -368,7 +300,7 @@ impl ConfidenceGrade {
             .collect()
     }
 
-    /// The breakdown the verdict card shows (VE33).
+    /// The breakdown the verdict card shows.
     pub fn breakdown(&self) -> ConfidenceBreakdown {
         let evidence = self.evidence_level();
         let floor = self.floor().and_then(|r| r.floor_text());
@@ -402,6 +334,12 @@ impl ConfidenceGrade {
                 if self.reasons.contains(&GradeReason::ContradictingEvidence) {
                     missing.push("no contradicting evidence on the cause");
                 }
+                if self
+                    .reasons
+                    .contains(&GradeReason::ImpactOutsideObservedData)
+                {
+                    missing.push("an impact window inside the observed data");
+                }
                 (!missing.is_empty()).then(|| format!("High needs {}", missing.join(" and ")))
             }
             Confidence::High => None,
@@ -415,7 +353,7 @@ impl ConfidenceGrade {
         }
     }
 
-    /// The reason line (CG §5.3.4), built only from the grade.
+    /// Built only from the grade.
     pub fn reason_line(&self) -> String {
         let mut line = self.band.as_str().to_string();
         if min_band(self.claimed, self.band) != self.claimed {
@@ -423,18 +361,21 @@ impl ConfidenceGrade {
             line.push_str(self.claimed.as_str());
         }
         let floor = self.floor().and_then(|r| r.floor_text());
-        // A low band that only the model's own claim set reads like the band the
-        // rules allowed.
+        // A low band set only by the model's own claim reads like the rules-allowed band.
         let floor_format =
             self.band == Confidence::Low && (floor.is_some() || self.graded == Confidence::Low);
         if floor_format {
             line.push_str(" · ");
             line.push_str(floor.unwrap_or("one class of supporting evidence"));
-            if !self.unverified.is_empty() {
-                line.push_str(&format!(
-                    " · {} citations did not run",
-                    self.unverified.len()
-                ));
+            let not_run = self
+                .unverified
+                .iter()
+                .filter(|c| c.reason == UnverifiedReason::NotRun)
+                .count();
+            match not_run {
+                0 => {}
+                1 => line.push_str(" · 1 citation did not run"),
+                n => line.push_str(&format!(" · {n} citations did not run")),
             }
             return line;
         }
@@ -456,32 +397,7 @@ impl ConfidenceGrade {
     }
 }
 
-/// Collapses whitespace, trims, and drops one trailing `;` (CG §5.3.1).
-pub fn normalize_key_arg(s: &str) -> String {
-    let collapsed = s.split_whitespace().collect::<Vec<_>>().join(" ");
-    match collapsed.strip_suffix(';') {
-        Some(rest) => rest.trim_end().to_string(),
-        None => collapsed,
-    }
-}
-
-/// The longest key argument a tool record keeps (CG §5.2); citations are cut the same way.
-pub const KEY_ARG_MAX_BYTES: usize = 4 * 1024;
-
-/// The longest prefix of `s` within `max` bytes that ends on a char boundary.
-pub fn cut_bytes(s: &str, max: usize) -> &str {
-    if s.len() <= max {
-        return s;
-    }
-    let mut end = max;
-    while !s.is_char_boundary(end) {
-        end -= 1;
-    }
-    &s[..end]
-}
-
-/// A key argument in the form it is compared in: a JSON object or array as a
-/// parsed value (key order and whitespace do not matter), else normalized text.
+/// Key argument as compared: JSON objects/arrays by value, else normalized text.
 #[derive(Debug, Clone, PartialEq)]
 pub enum MatchKey {
     Json(serde_json::Value),
@@ -498,12 +414,92 @@ impl MatchKey {
     }
 }
 
-/// The tool call that verifies a citation (CG §5.3.1): the same bare tool (a
-/// leading `o2_` on the cited tool is ignored) and the same key argument, cut to
-/// [KEY_ARG_MAX_BYTES] and normalized like the record's, compared as JSON when
-/// both sides are JSON objects or arrays. The earliest successful record wins
-/// (`started_at_us`, then `call_id`). Matches that only failed give `Failed`;
-/// none give `NotRun`.
+/// The `type` argument of the SearchSQL family; `None` for every other tool.
+pub fn stream_type(tool: &str, input: &serde_json::Value) -> Option<String> {
+    if !SEARCH_TOOLS.contains(&tool) {
+        return None;
+    }
+    input
+        .get("type")
+        .and_then(serde_json::Value::as_str)
+        .map(str::to_string)
+}
+
+/// From the bare tool name and unwrapped input, never from the ledger.
+pub fn signal_class(tool: &str, input: &serde_json::Value) -> SignalClass {
+    if SEARCH_TOOLS.contains(&tool) {
+        return match input.get("type").and_then(serde_json::Value::as_str) {
+            Some("metrics") => SignalClass::Metrics,
+            Some("traces") => SignalClass::Traces,
+            _ => SignalClass::Logs,
+        };
+    }
+    if is_prometheus_tool(tool) {
+        return SignalClass::Metrics;
+    }
+    if tool == "GetLatestTraces" {
+        return SignalClass::Traces;
+    }
+    if CONTEXT_TOOLS.contains(&tool) {
+        return SignalClass::Context;
+    }
+    if tool == "ExecuteCode" || tool.starts_with("custom_") {
+        return SignalClass::Unclassified;
+    }
+    let command = ["command", "cmd"]
+        .iter()
+        .find_map(|k| input.get(*k).and_then(serde_json::Value::as_str));
+    if command.is_some_and(reads_diff) {
+        return SignalClass::Change;
+    }
+    if tool.starts_with("cli_") {
+        return SignalClass::Infra;
+    }
+    match toolset_tool(tool) {
+        Some(t) if TOOLSET_DIFF_TOOLS.contains(&t) => SignalClass::Change,
+        Some(t) if TOOLSET_CODE_TOOLS.contains(&t) => SignalClass::Context,
+        _ => SignalClass::Unclassified,
+    }
+}
+
+/// Toolset server names are `[a-z0-9-]` only, so the server ends at the first `_`.
+fn toolset_tool(tool: &str) -> Option<&str> {
+    let (server, bare) = tool.split_once('_')?;
+    let is_server = !server.is_empty()
+        && server
+            .bytes()
+            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
+        && !NOT_TOOLSET_SERVERS.contains(&server);
+    (is_server && !bare.is_empty()).then_some(bare)
+}
+
+/// Whether `tool` is one of the three PromQL query tools.
+pub fn is_prometheus_tool(tool: &str) -> bool {
+    PROMETHEUS_TOOLS.contains(&tool)
+}
+
+/// Collapses whitespace, trims, and drops one trailing `;`.
+pub fn normalize_key_arg(s: &str) -> String {
+    let collapsed = s.split_whitespace().collect::<Vec<_>>().join(" ");
+    match collapsed.strip_suffix(';') {
+        Some(rest) => rest.trim_end().to_string(),
+        None => collapsed,
+    }
+}
+
+/// The longest prefix of `s` within `max` bytes that ends on a char boundary.
+pub fn cut_bytes(s: &str, max: usize) -> &str {
+    if s.len() <= max {
+        return s;
+    }
+    let mut end = max;
+    while !s.is_char_boundary(end) {
+        end -= 1;
+    }
+    &s[..end]
+}
+
+/// Same bare tool and normalized, cut key argument; earliest success wins, else `Failed`/`NotRun`.
 pub fn match_citation<'a>(
     tool: &str,
     query: &str,
@@ -513,10 +509,9 @@ pub fn match_citation<'a>(
     let query = MatchKey::of(query);
     let mut matched = false;
     let mut best: Option<&ToolCallRecord> = None;
-    for record in log
-        .iter()
-        .filter(|r| r.tool == tool && MatchKey::of(&r.key_arg) == query)
-    {
+    for record in log.iter().filter(|r| {
+        (r.tool == tool || toolset_tool(&r.tool) == Some(tool)) && MatchKey::of(&r.key_arg) == query
+    }) {
         matched = true;
         if !record.success {
             continue;
@@ -544,9 +539,7 @@ pub fn min_band(a: Confidence, b: Confidence) -> Confidence {
     }
 }
 
-/// Grades the verdict from the ledger and the tool log (CG §5.3.1–§5.3.3).
-/// `ledger: None` means the agent never called `record_hypothesis`. `steer_authors` maps
-/// the run's steer ids to their authors' emails, so a `human_lead` cap names one (SG36).
+/// `ledger: None` means the agent never called `record_hypothesis`.
 pub fn grade_confidence(
     verdict: &SubmittedVerdict,
     ledger: Option<&EvidenceLedger>,
@@ -556,7 +549,7 @@ pub fn grade_confidence(
 ) -> ConfidenceGrade {
     let hypotheses = ledger.map(|l| l.hypotheses.as_slice()).unwrap_or_default();
 
-    // Step 1: verify every item of every hypothesis.
+    // Verify every item of every hypothesis.
     let mut unverified = Vec::new();
     let verified: Vec<Vec<Option<&ToolCallRecord>>> = hypotheses
         .iter()
@@ -599,7 +592,7 @@ pub fn grade_confidence(
         })
         .unwrap_or_default();
 
-    // Step 2: decisive classes.
+    // Decisive classes.
     let mut decisive_classes: Vec<SignalClass> = Vec::new();
     for (polarity, strength, signal) in &cause_items {
         if *polarity == Polarity::Supports
@@ -631,7 +624,7 @@ pub fn grade_confidence(
         .iter()
         .any(|(p, ..)| *p == Polarity::Contradicts);
 
-    // Step 3: floors, then the basis.
+    // Floors, then the basis.
     let cause_unknown = verdict
         .probable_cause
         .trim()
@@ -696,6 +689,10 @@ pub fn grade_confidence(
             ),
             (has_contradiction, GradeReason::ContradictingEvidence),
             (human_lead, GradeReason::HumanLead),
+            (
+                impact_outside_evidence(verdict, verified.iter().flatten().flatten().copied()),
+                GradeReason::ImpactOutsideObservedData,
+            ),
         ];
         for (fired, reason) in caps {
             if fired {
@@ -705,7 +702,7 @@ pub fn grade_confidence(
         }
     }
 
-    // SG36: the first steering lead of the cause whose author is known.
+    // The first steering lead of the cause whose author is known.
     let lead_author = cause.and_then(|i| {
         hypotheses[i]
             .lead_ids
@@ -727,7 +724,35 @@ pub fn grade_confidence(
     }
 }
 
-/// VE15: an `inconclusive` or `blocked` outcome lowers the band to `low`. Only lowers.
+/// Context calls are not observations of the failure, so only runtime evidence bounds the window.
+fn impact_outside_evidence<'a>(
+    verdict: &SubmittedVerdict,
+    verified: impl Iterator<Item = &'a ToolCallRecord>,
+) -> bool {
+    let Some(window) = verdict.impact.as_ref().and_then(|i| i.window) else {
+        return false;
+    };
+    let covered = verified
+        .filter(|r| r.signal.counts())
+        .filter_map(|r| {
+            r.observed
+                .or(match (r.result_count, r.target.start_us, r.target.end_us) {
+                    (Some(0), ..) => None,
+                    (_, Some(start), Some(end)) => Some(TimeWindow { start, end }),
+                    _ => None,
+                })
+        })
+        .reduce(|a, b| TimeWindow {
+            start: a.start.min(b.start),
+            end: a.end.max(b.end),
+        });
+    covered.is_some_and(|c| {
+        window.start < c.start.saturating_sub(IMPACT_WINDOW_SLACK_US)
+            || window.end > c.end.saturating_add(IMPACT_WINDOW_SLACK_US)
+    })
+}
+
+/// An `inconclusive` or `blocked` outcome lowers the band to `low`; it never raises it.
 pub fn apply_outcome(grade: &mut ConfidenceGrade, outcome: RcaOutcome, reason: OutcomeReason) {
     if !matches!(outcome, RcaOutcome::Inconclusive | RcaOutcome::Blocked) {
         return;
@@ -743,6 +768,45 @@ pub fn apply_outcome(grade: &mut ConfidenceGrade, outcome: RcaOutcome, reason: O
     }
 }
 
+/// `gh pr diff`, `gh api …/commits/<sha>`, `git show`, `git diff`; not commit lists.
+fn reads_diff(command: &str) -> bool {
+    command
+        .split(['\n', ';', '|', '&'])
+        .any(|segment| segment_reads_diff(&segment.split_whitespace().collect::<Vec<_>>()))
+}
+
+fn segment_reads_diff(tokens: &[&str]) -> bool {
+    tokens.iter().enumerate().any(|(i, t)| match *t {
+        "git" => git_subcommand(&tokens[i + 1..]).is_some_and(|s| s == "show" || s == "diff"),
+        "gh" => match tokens.get(i + 1).copied() {
+            Some("pr") => tokens.get(i + 2) == Some(&"diff"),
+            Some("api") => tokens[i + 2..].iter().any(|a| {
+                a.split_once("/commits/").is_some_and(|(_, sha)| {
+                    !sha.trim_matches(|c| c == '/' || c == '"' || c == '\'')
+                        .is_empty()
+                })
+            }),
+            _ => false,
+        },
+        _ => false,
+    })
+}
+
+/// The first non-option token after `git`; `-C <path>` and `-c <k=v>` take an argument.
+fn git_subcommand<'a>(args: &[&'a str]) -> Option<&'a str> {
+    let mut iter = args.iter();
+    while let Some(a) = iter.next() {
+        match *a {
+            "-C" | "-c" => {
+                iter.next();
+            }
+            a if a.starts_with('-') => {}
+            a => return Some(a),
+        }
+    }
+    None
+}
+
 #[cfg(test)]
 mod tests {
     use serde_json::json;
@@ -756,7 +820,7 @@ mod tests {
         },
     };
 
-    /// CG §5.3.1: normalization, earliest successful wins, failed vs not run.
+    /// Normalization, earliest successful wins, failed vs not run.
     #[test]
     fn match_citation_follows_the_matching_rule() {
         assert_eq!(
@@ -793,7 +857,7 @@ mod tests {
         );
     }
 
-    /// CG §5.3.1 (P3 contract update): `o2_` prefix, 4 KiB cut, JSON compared as values.
+    /// `o2_` prefix, 4 KiB cut, JSON compared as values.
     #[test]
     fn match_citation_strips_the_prefix_cuts_long_queries_and_compares_json() {
         let log = [prom("c1", "up", 1)];
@@ -829,7 +893,6 @@ mod tests {
         );
     }
 
-    /// CG §5.3.2: the signal class table.
     #[test]
     fn signal_classes_follow_the_table() {
         use SignalClass::*;
@@ -844,6 +907,8 @@ mod tests {
             ("PrometheusQuery", json!({}), Metrics),
             (PROM, json!({}), Metrics),
             ("PrometheusSeries", json!({}), Metrics),
+            ("PrometheusFormatQuery", json!({}), Unclassified),
+            ("PrometheusLabels", json!({}), Unclassified),
             (TRACES, json!({}), Traces),
             (BASH, cmd("gh pr diff 812"), Change),
             (BASH, cmd("gh api repos/o/r/commits/4f2c1e"), Change),
@@ -864,6 +929,29 @@ mod tests {
             ("ExecuteCode", cmd("git diff"), Unclassified),
             ("custom_deploys", json!({}), Unclassified),
             ("SomethingNew", json!({}), Unclassified),
+            // Toolset calls: a diff is a change, a code read is context, anything else counts for
+            // nothing.
+            ("orca-demo-code_git_show", json!({"sha": "4f2c1e"}), Change),
+            (
+                "orca-demo-code_git_diff",
+                json!({"base": "v1", "head": "v2"}),
+                Change,
+            ),
+            (
+                "orca-demo-code_read_file",
+                json!({"path": "src/a.js"}),
+                Context,
+            ),
+            (
+                "orca-demo-code_search_code",
+                json!({"pattern": "x"}),
+                Context,
+            ),
+            ("orca-demo-code_list_files", json!({"path": "src"}), Context),
+            ("orca-demo-code_git_log", json!({"max_count": 20}), Context),
+            ("github_create_issue", json!({}), Unclassified),
+            ("custom_repo_git_show", json!({}), Unclassified),
+            ("Repo_git_show", json!({}), Unclassified),
         ];
         for (tool, input, want) in cases {
             assert_eq!(signal_class(tool, &input), want, "{tool} {input}");
@@ -884,6 +972,151 @@ mod tests {
         }
     }
 
+    /// A citation matches a toolset call with or without the server, never by a partial name.
+    #[test]
+    fn toolset_citations_match_with_or_without_the_server() {
+        let path = r#"{"path":"src/payment/charge.js"}"#;
+        let log = [
+            rec(
+                "c1",
+                "orca-demo-code_read_file",
+                path,
+                json!({"path": "src/payment/charge.js"}),
+                1,
+                true,
+            ),
+            rec(
+                "c2",
+                "orca-demo-code_search_code",
+                r#"{"pattern":"Invalid token"}"#,
+                json!({"pattern": "Invalid token"}),
+                2,
+                true,
+            ),
+            rec(
+                "k1",
+                "cli_kubectl",
+                "kubectl get pods",
+                json!({"command": "kubectl get pods"}),
+                3,
+                true,
+            ),
+        ];
+        for cited in ["read_file", "orca-demo-code_read_file", "o2_read_file"] {
+            assert_eq!(
+                match_citation(cited, r#"{ "path": "src/payment/charge.js" }"#, &log)
+                    .unwrap()
+                    .call_id,
+                "c1",
+                "{cited}"
+            );
+        }
+        // An unrelated tool, a part of the tool name, or another server does not match.
+        for cited in [
+            "file",
+            "code_read_file",
+            "other-code_read_file",
+            "search_code",
+        ] {
+            assert_eq!(
+                match_citation(cited, path, &log),
+                Err(UnverifiedReason::NotRun),
+                "{cited}"
+            );
+        }
+        // A shell toolset prefix is not a server.
+        assert_eq!(
+            match_citation("kubectl", "kubectl get pods", &log),
+            Err(UnverifiedReason::NotRun)
+        );
+    }
+
+    /// A toolset code read verifies but adds no class; a toolset diff is a decisive `change`.
+    #[test]
+    fn toolset_code_reads_verify_and_toolset_diffs_read_the_suspect_change() {
+        let file = r#"{"path":"src/payment/charge.js"}"#;
+        let commit = r#"{"sha":"4f2c1e"}"#;
+        let tool_log = [
+            prom("m1", "pool_active", 1),
+            rec(
+                "f1",
+                "orca-demo-code_read_file",
+                file,
+                json!({"path": "src/payment/charge.js"}),
+                2,
+                true,
+            ),
+            rec(
+                "d1",
+                "orca-demo-code_git_show",
+                commit,
+                json!({"sha": "4f2c1e"}),
+                3,
+                true,
+            ),
+            logs("l1", "SELECT * FROM app", 4),
+        ];
+        let grade_with = |cause_item: serde_json::Value| {
+            let calls = [
+                hyp(
+                    1,
+                    "h1",
+                    "root_cause",
+                    vec![decisive("e1", PROM, "pool_active"), cause_item],
+                ),
+                hyp(
+                    2,
+                    "h2",
+                    "ruled_out",
+                    vec![item(
+                        "e3",
+                        SQL,
+                        "SELECT * FROM app",
+                        "rules_out",
+                        "supporting",
+                    )],
+                ),
+            ];
+            let (ledger, spots, _) = crate::meta::oncall::rca_run::build_ledger(
+                &calls,
+                Some(crate::meta::oncall::rca_run::fixtures::RUN_END_US),
+            );
+            let mut verdict = named(Confidence::High);
+            verdict.suspect_change = Some(suspect(SuspectChangeState::Confirmed));
+            grade_confidence(
+                &verdict,
+                ledger.as_ref(),
+                &spots,
+                &tool_log,
+                &BTreeMap::new(),
+            )
+        };
+
+        let code = grade_with(decisive("e2", "read_file", file));
+        assert!(code.unverified.is_empty(), "{:?}", code.unverified);
+        assert_eq!(code.decisive_classes, vec![SignalClass::Metrics]);
+        assert_eq!(
+            code.reasons,
+            vec![
+                GradeReason::DecisiveClass,
+                GradeReason::SuspectChangeNotRead
+            ]
+        );
+        assert_eq!(code.graded, Confidence::Medium);
+
+        let diff = grade_with(decisive("e2", "git_show", commit));
+        assert!(diff.unverified.is_empty(), "{:?}", diff.unverified);
+        assert_eq!(
+            diff.decisive_classes,
+            vec![SignalClass::Metrics, SignalClass::Change]
+        );
+        assert_eq!(
+            diff.reasons,
+            vec![GradeReason::TwoDecisiveClassesAndRuledOut]
+        );
+        assert_eq!(diff.graded, Confidence::High);
+    }
+
     fn log() -> Vec<ToolCallRecord> {
         vec![
             prom("m1", "pool_active", 1),
@@ -896,7 +1129,10 @@ mod tests {
     }
 
     fn grade(calls: &[LedgerCall], verdict: &SubmittedVerdict) -> ConfidenceGrade {
-        let (ledger, spots, _) = crate::meta::oncall::rca_run::build_ledger(calls, true);
+        let (ledger, spots, _) = crate::meta::oncall::rca_run::build_ledger(
+            calls,
+            Some(crate::meta::oncall::rca_run::fixtures::RUN_END_US),
+        );
         grade_confidence(verdict, ledger.as_ref(), &spots, &log(), &BTreeMap::new())
     }
 
@@ -935,7 +1171,7 @@ mod tests {
         ]
     }
 
-    /// CG §5.3.3: floors, bases, high conditions, caps, min(claimed, graded), same class once.
+    /// Floors, bases, high conditions, caps, min(claimed, graded), same class once.
     #[test]
     fn the_grade_follows_the_table() {
         use Confidence::*;
@@ -1273,8 +1509,7 @@ mod tests {
         assert_eq!(g.subject_id.as_deref(), Some("h1"));
     }
 
-    /// CG §5.3.4: the five example rows, adapted to the contract's texts (no
-    /// "(PR #812 diff)" annotation; the human-lead cap text is fixed).
+    /// The example reason lines, adapted to the contract's texts.
     #[test]
     fn reason_lines_match_the_examples() {
         use Confidence::*;
@@ -1391,7 +1626,7 @@ mod tests {
         for (grade, want) in &cases {
             assert_eq!(grade.reason_line(), *want);
         }
-        // VE33: the card's breakdown of the same grades.
+        // The card's breakdown of the same grades.
         let breakdown = |i: usize| cases[i].0.breakdown();
         let b = |claimed, evidence, reason: &str, next: Option<&str>, caps: &[&str]| {
             ConfidenceBreakdown {
@@ -1477,9 +1712,33 @@ mod tests {
                 text
             );
         }
+        // Failed citations ran, so they are not counted; one not-run citation is singular.
+        let mut mixed = g(
+            Low,
+            Low,
+            Low,
+            vec![GradeReason::NoVerifiedEvidence],
+            vec![],
+            vec![],
+            2,
+        );
+        mixed.unverified[0].reason = UnverifiedReason::Failed;
+        assert_eq!(
+            mixed.reason_line(),
+            "low · no verified evidence · 1 citation did not run"
+        );
+        mixed.unverified[1].reason = UnverifiedReason::Failed;
+        assert_eq!(mixed.reason_line(), "low · no verified evidence");
+        // No ledger also holds no confirmed cause; the line names the missing ledger.
+        let no_ledger = grade_confidence(&named(Low), None, &[], &[], &BTreeMap::new());
+        assert_eq!(no_ledger.reason_line(), "low · no hypotheses recorded");
+        assert_eq!(
+            no_ledger.breakdown().evidence_reason,
+            "no hypotheses recorded"
+        );
     }
 
-    /// VE15: an inconclusive or blocked outcome lowers the band; nothing raises it.
+    /// An inconclusive or blocked outcome lowers the band; nothing raises it.
     #[test]
     fn apply_outcome_only_lowers() {
         let medium = grade(
@@ -1554,8 +1813,7 @@ mod tests {
         );
     }
 
-    /// SG36 / frame G: a cause with decisive change + metrics evidence and a steering lead
-    /// grades medium, and the cap names the lead's author by the local part of the email.
+    /// Decisive change + metrics with a steering lead grades medium; the cap names the author.
     #[test]
     fn sg36_frame_g_human_lead_names_the_author() {
         let steer_id = "stg_2NjLm8W3pXyZqR7tVbK9cDfGhJ1";
@@ -1568,7 +1826,10 @@ mod tests {
                    "evidence": [item("e1", BASH, "gh pr diff 812", "supports", "decisive"),
                                 decisive("e2", PROM, "pool_active")]}),
         );
-        let (ledger, spots, _) = crate::meta::oncall::rca_run::build_ledger(&calls, true);
+        let (ledger, spots, _) = crate::meta::oncall::rca_run::build_ledger(
+            &calls,
+            Some(crate::meta::oncall::rca_run::fixtures::RUN_END_US),
+        );
         let authors = BTreeMap::from([(steer_id.to_string(), "a.rao@acme.io".to_string())]);
         let g = grade_confidence(
             &named(Confidence::High),
@@ -1610,5 +1871,117 @@ mod tests {
             "{}",
             g.reason_line()
         );
+    }
+
+    /// An `impact.window` ending at resolve time, past the last observed data, caps the band.
+    #[test]
+    fn an_impact_window_outside_the_observed_data_is_capped() {
+        use Confidence::*;
+        use GradeReason::ImpactOutsideObservedData;
+
+        use crate::meta::oncall::rca_run::{Impact, build_ledger, fixtures::RUN_END_US};
+
+        const MIN: i64 = 60_000_000;
+        let (first_seen, last_seen) = (5 * MIN, 30 * MIN);
+        // Every call queried 0..60 min and its rows showed data from 5 to 30 min.
+        let ranged = |mut r: ToolCallRecord, observed: Option<TimeWindow>, rows: u64| {
+            r.target.start_us = Some(0);
+            r.target.end_us = Some(60 * MIN);
+            r.observed = observed;
+            r.result_count = Some(rows);
+            r
+        };
+        let seen = Some(TimeWindow {
+            start: first_seen,
+            end: last_seen,
+        });
+        let tool_log = |sql_rows: u64| {
+            vec![
+                ranged(prom("m1", "pool_active", 1), seen, 10),
+                ranged(traces("t1", "slow", 3), seen, 10),
+                // Rows with no timestamp: the call covers the range it queried.
+                ranged(logs("l1", "SELECT * FROM app", 4), None, sql_rows),
+                // The incident's resolve time is context, not an observation of the failure.
+                rec("g1", "GetIncident", "inc", json!({}), 6, true),
+            ]
+        };
+        let verdict = |start: i64, end: i64| {
+            let mut v = named(High);
+            v.impact = Some(Impact {
+                summary: "~55% of checkouts failed".into(),
+                peak: None,
+                window: Some(TimeWindow { start, end }),
+            });
+            v
+        };
+        let graded = |v: &SubmittedVerdict, calls: &[LedgerCall], sql_rows: u64| {
+            let (ledger, spots, _) = build_ledger(calls, Some(RUN_END_US));
+            grade_confidence(
+                v,
+                ledger.as_ref(),
+                &spots,
+                &tool_log(sql_rows),
+                &BTreeMap::new(),
+            )
+        };
+        let resolved_at = last_seen + 11 * MIN;
+
+        // Inside the data, or within the one-minute slack: high, no cap.
+        for (start, end) in [(first_seen, last_seen), (first_seen - MIN, last_seen + MIN)] {
+            let g = graded(&verdict(start, end), &high_calls(), 0);
+            assert_eq!(g.band, High, "{start}..{end}");
+            assert!(!g.reasons.contains(&ImpactOutsideObservedData));
+        }
+        // An end or a start past the observed data: capped to medium, named on the line and card.
+        for (start, end) in [(first_seen, resolved_at), (0, last_seen)] {
+            let g = graded(&verdict(start, end), &high_calls(), 0);
+            assert_eq!(g.band, Medium, "{start}..{end}");
+            assert!(g.reasons.contains(&ImpactOutsideObservedData));
+            assert!(
+                g.reason_line()
+                    .ends_with("capped: impact window outside the observed data"),
+                "{}",
+                g.reason_line()
+            );
+            assert_eq!(
+                g.breakdown().caps,
+                ["impact window outside the observed data"]
+            );
+        }
+        // A call whose rows show no timestamp but returned rows covers its queried range.
+        let g = graded(&verdict(first_seen, resolved_at), &high_calls(), 7);
+        assert_eq!(g.band, High);
+
+        // At a medium evidence level the card says what High needs.
+        let one_class = [hyp(
+            1,
+            "h1",
+            "root_cause",
+            vec![decisive("e1", PROM, "pool_active")],
+        )];
+        let g = graded(&verdict(first_seen, resolved_at), &one_class, 0);
+        assert_eq!(g.band, Medium);
+        assert!(g.reasons.contains(&ImpactOutsideObservedData));
+        assert_eq!(
+            g.breakdown().next_level.as_deref(),
+            Some(
+                "High needs a second decisive source and a ruled-out alternative and an \
+                 impact window inside the observed data"
+            )
+        );
+
+        // No window, or no runtime call with a range: nothing to compare.
+        let mut no_window = verdict(first_seen, resolved_at);
+        no_window.impact = None;
+        assert_eq!(graded(&no_window, &high_calls(), 0).band, High);
+        let (ledger, spots, _) = build_ledger(&high_calls(), Some(RUN_END_US));
+        let g = grade_confidence(
+            &verdict(first_seen, resolved_at),
+            ledger.as_ref(),
+            &spots,
+            &log(),
+            &BTreeMap::new(),
+        );
+        assert!(!g.reasons.contains(&ImpactOutsideObservedData));
     }
 }

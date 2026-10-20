@@ -189,10 +189,8 @@ async fn chat_agent_and_context(
     select_chat_agent(context, rca)
 }
 
-/// J6: a chat keeps the agent its session row was created with. An `sre-rca` row takes the
-/// RCA path above; any other row stays on `o2-ai` with the RCA keys stripped, so an Ask chat
-/// reopened while an incident is in view never turns into an RCA run. A new chat (no row)
-/// picks from its context.
+/// An existing chat keeps its stored agent, so an Ask chat reopened over an incident never becomes
+/// an RCA run.
 #[cfg(feature = "enterprise")]
 async fn session_agent_and_context(
     org_id: &str,
@@ -216,7 +214,6 @@ async fn session_agent_and_context(
     chat_agent_and_context(org_id, user_id, context).await
 }
 
-/// True when an existing session row pins the chat to `o2-ai` (any agent but `sre-rca`).
 #[cfg(feature = "enterprise")]
 fn keeps_default_agent(stored_agent_type: Option<&str>) -> bool {
     stored_agent_type.is_some_and(|agent| agent != RCA_AGENT_TYPE)
@@ -705,9 +702,7 @@ pub async fn chat(Path(org_id): Path<String>, in_req: axum::extract::Request) ->
         let delegated = parts.extensions.get::<DelegatedCaller>().is_some();
         let context = agent_context(&prompt_body.context, org_id_str, delegated);
 
-        // Determine agent type based on context (incident_id -> sre, otherwise o2-ai); an
-        // existing chat keeps its stored agent (J6). Must be done before context is moved
-        // into QueryRequest
+        // An existing chat keeps its stored agent; resolve before context moves into QueryRequest.
         let session_header = parts
             .headers
             .get(X_O2_ASSISTANT_SESSION_ID.as_str())
@@ -1159,9 +1154,7 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
 
         let context = agent_context(&prompt_body.context, &org_id_str, delegated);
 
-        // Determine agent type based on context (incident_id -> sre, otherwise o2-ai); an
-        // existing chat keeps its stored agent (J6). Must be done before context is moved
-        // into QueryRequest
+        // An existing chat keeps its stored agent; resolve before context moves into QueryRequest.
         let (agent_type, context) = session_agent_and_context(
             &org_id_str,
             &user_id,
@@ -2421,12 +2414,11 @@ mod tests {
         );
     }
 
-    /// Passes `can_run_incident_rca` for any incident of any org (a root user).
     #[cfg(feature = "enterprise")]
     const STICKY_ROOT: &str = "root@sticky.chat.test";
 
-    /// The SQLite meta store with the incident and chat tables, incident analysis on, and
-    /// [STICKY_ROOT] as a root user. Refuses any other store.
+    /// The SQLite meta store with incident analysis on and [STICKY_ROOT] as root; refuses other
+    /// stores.
     #[cfg(feature = "enterprise")]
     async fn sticky_tables() -> &'static sea_orm::DatabaseConnection {
         use infra::table::entity::{ai_chat_sessions, alert_incidents};
@@ -2435,8 +2427,8 @@ mod tests {
         static TABLES: tokio::sync::OnceCell<()> = tokio::sync::OnceCell::const_new();
         TABLES
             .get_or_init(|| async {
-                // SAFETY: set once, inside the `OnceCell` initializer, before the refresh
-                // reads them.
+                // SAFETY: set once inside the `OnceCell` initializer, before the refresh reads
+                // them.
                 unsafe {
                     std::env::set_var("O2_INCIDENTS_ENABLED", "true");
                     std::env::set_var("O2_INCIDENTS_RCA_ENABLED", "true");
@@ -2476,7 +2468,6 @@ mod tests {
         infra::db::get_orm_client_rw().await
     }
 
-    /// An open incident `incident_id` of `org_id`.
     #[cfg(feature = "enterprise")]
     async fn sticky_incident(conn: &sea_orm::DatabaseConnection, org_id: &str, incident_id: &str) {
         use infra::table::entity::alert_incidents;
@@ -2517,7 +2508,6 @@ mod tests {
             .unwrap();
     }
 
-    /// A chat row `session_id` of `org_id` created with `agent_type`.
     #[cfg(feature = "enterprise")]
     async fn sticky_session(
         conn: &sea_orm::DatabaseConnection,
@@ -2555,8 +2545,6 @@ mod tests {
             .unwrap();
     }
 
-    /// J6: only an existing row with an agent other than `sre-rca` pins the chat to the
-    /// default agent; a new chat (no row) and an `sre-rca` row do not.
     #[cfg(feature = "enterprise")]
     #[test]
     fn test_only_a_non_rca_row_keeps_the_default_agent() {
@@ -2566,12 +2554,6 @@ mod tests {
         assert!(keeps_default_agent(Some("sre")));
     }
 
-    /// J5, J6: a chat whose row was created as `o2-ai` stays `o2-ai` with every RCA key
-    /// stripped, even when its context names an incident the caller may analyze, and also
-    /// when the session header spells the id in upper case. An `sre-rca` row, a new chat
-    /// (a valid id without a row, or a row of another org) and a turn without a session id
-    /// keep today's selection: the RCA agent with the server-built context. Without
-    /// `incident_id` a new chat is `o2-ai`.
     #[cfg(feature = "enterprise")]
     #[tokio::test]
     async fn test_an_existing_chat_keeps_its_agent_and_a_new_one_picks_from_its_context() {

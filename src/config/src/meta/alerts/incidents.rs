@@ -341,11 +341,11 @@ pub struct Incident {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub muted_by_downtime_id: Option<String>,
 
-    /// Run summary of the latest analysis run, `null` when the incident was never analyzed.
-    /// The detail response also fills its detail fields.
+    /// Latest run summary, `null` when never analyzed; the detail response fills its detail
+    /// fields.
     #[serde(default)]
     pub rca: Option<super::rca_runs::RcaSummary>,
-    /// Why automatic analysis runs never start for this incident (`l0_off`), RR-45.
+    /// Why automatic analysis runs never start for this incident (`l0_off`).
     #[serde(default)]
     pub rca_off_reason: Option<String>,
 }
@@ -668,8 +668,7 @@ pub enum IncidentEventType {
         user_id: Option<String>,
     },
 
-    /// A responder's steering message reached the live run (04 SG5). Never starts a
-    /// reanalysis.
+    /// A responder's steering message reached the live run. Never starts a reanalysis.
     #[serde(rename = "ai_analysis_steered")]
     AiAnalysisSteered {
         run_id: String,
@@ -681,8 +680,7 @@ pub enum IncidentEventType {
         kind: String,
     },
 
-    /// The run asked the responders a question and paused (04 SG42). Never starts a
-    /// reanalysis.
+    /// The run asked the responders a question and paused. Never starts a reanalysis.
     #[serde(rename = "ai_analysis_needs_input")]
     AiAnalysisNeedsInput {
         run_id: String,
@@ -1092,8 +1090,7 @@ mod tests {
         );
     }
 
-    /// SG5 / SG42: the steering and question events serialize with their tag and fields,
-    /// round-trip to their own variant (not `Unknown`), and their tags are known.
+    /// Steering and question events serialize with their tag and round-trip to their own variant.
     #[test]
     fn sg5_sg42_steering_events_round_trip() {
         use crate::meta::alerts::rca_steering::SteerKind;

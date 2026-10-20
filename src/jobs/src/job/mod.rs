@@ -1394,7 +1394,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     // AI chat index rows whose events aged out of the chat-events stream.
     #[cfg(feature = "enterprise")]
     ai_chat_retention::run();
-    // RCA runs that stopped writing end as stale (RR-40).
+    // RCA runs that stopped writing end as stale.
     #[cfg(feature = "enterprise")]
     rca_run_sweeper::run();
     // Early Experiment deletion marks the head and leaves the removal to this

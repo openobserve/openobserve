@@ -191,7 +191,7 @@ fn create_statement() -> TableCreateStatement {
         .to_owned()
 }
 
-/// The rows of one run in send order, and the rate limits (SG10).
+/// The rows of one run in send order, and the rate limits.
 fn run_index() -> IndexCreateStatement {
     Index::create()
         .name("rca_steering_run_idx")
@@ -258,6 +258,62 @@ mod tests {
     #[test]
     fn test_migration_name() {
         assert_eq!(Migration.name(), "m20261018_000001_create_rca_steering");
+    }
+
+    /// The column types, the primary key and both indexes.
+    #[test]
+    fn rca_steering_schema_matches_the_design() {
+        let sql = create_statement().to_string(PostgresQueryBuilder);
+        for want in [
+            "\"org_id\" varchar(256) NOT NULL",
+            "\"steer_id\" varchar(32) NOT NULL",
+            "\"run_id\" varchar(32) NOT NULL",
+            "\"incident_id\" varchar(32) NOT NULL",
+            "\"author_email\" varchar(256) NOT NULL",
+            "\"kind\" varchar(24) NOT NULL",
+            "\"action\" varchar(16) NULL",
+            "\"hypothesis_id\" varchar(64) NULL",
+            "\"question_id\" varchar(64) NULL",
+            "\"text\" text NOT NULL",
+            "\"status\" varchar(16) NOT NULL",
+            "\"status_reason\" varchar(32) NULL",
+            "\"created_at\" bigint NOT NULL",
+            "\"delivered_at\" bigint NULL",
+            "\"read_at\" bigint NULL",
+            "\"acted_at\" bigint NULL",
+            "\"agent_note\" text NULL",
+            "\"opencode_message_id\" varchar(64) NULL",
+            "PRIMARY KEY (\"org_id\", \"steer_id\")",
+        ] {
+            assert!(sql.contains(want), "missing {want} in {sql}");
+        }
+        let run = run_index().to_string(PostgresQueryBuilder);
+        assert!(
+            run.contains("\"rca_steering_run_idx\"")
+                && run.contains("(\"org_id\", \"run_id\", \"created_at\")"),
+            "{run}"
+        );
+        let incident = incident_index().to_string(PostgresQueryBuilder);
+        assert!(
+            incident.contains("\"rca_steering_incident_idx\"")
+                && incident.contains("(\"org_id\", \"incident_id\", \"created_at\")"),
+            "{incident}"
+        );
+        let col = |c| {
+            Table::alter()
+                .table(Alias::new(RCA_RUNS))
+                .add_column(run_column_def(c))
+                .to_owned()
+                .to_string(PostgresQueryBuilder)
+        };
+        assert!(col(RcaRuns::InputDeadlineAt).contains("\"input_deadline_at\" bigint NULL"));
+        assert!(col(RcaRuns::DeadlineClosedAt).contains("\"deadline_closed_at\" bigint NULL"));
+        assert!(
+            col(RcaRuns::PendingQuestionId).contains("\"pending_question_id\" varchar(64) NULL")
+        );
+        assert!(
+            col(RcaRuns::QuestionsAsked).contains("\"questions_asked\" integer NOT NULL DEFAULT 0")
+        );
     }
 
     #[tokio::test]

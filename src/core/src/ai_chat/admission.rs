@@ -13,8 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Admission of one persisted turn (design §8.1): the chat's lease, its registry slot under the
-//! active-turn caps, its turn record and a new ownership epoch.
+//! Admission of one persisted turn: the chat's lease, registry slot under the caps, turn record and
+//! new epoch.
 
 use infra::table::{
     ai_chat_sessions::{self, Model, STATUS_ACTIVE},
@@ -98,10 +98,12 @@ pub fn prompt_title(prompt: &str) -> Option<String> {
     Some(title)
 }
 
-/// A new session's first title: an RCA run's is its whole rendered prompt (TH6), a chat's
-/// the bounded first line of its first prompt.
-fn initial_title(agent_type: &str, prompt: &str) -> Option<String> {
-    if agent_type != RCA_AGENT_TYPE {
+/// A new session's first title: an RCA run's whole rendered prompt, else the bounded first prompt
+/// line.
+fn initial_title(agent_type: &str, user_email: &str, prompt: &str) -> Option<String> {
+    let rca_run =
+        agent_type == RCA_AGENT_TYPE && crate::organization::is_system_service_account(user_email);
+    if !rca_run {
         return prompt_title(prompt);
     }
     let prompt = prompt.trim();
@@ -120,7 +122,7 @@ pub async fn resolve_owner(user_email: &str) -> Result<String, AdmitError> {
     }
 }
 
-/// Admit one persisted turn (design §8.1) under the chat's lease, as a new ownership epoch.
+/// Admit one persisted turn under the chat's lease, as a new ownership epoch.
 #[allow(clippy::too_many_arguments)]
 pub async fn admit_turn(
     org_id: &str,
@@ -210,8 +212,7 @@ pub async fn abandon_turn(admitted: AdmittedTurn, error_code: &str) {
     lease.release().await;
 }
 
-/// Points the agent request at the admitted turn; o2-ai forwards only events past `known_seq`
-/// (restore_required when it holds fewer).
+/// Points the agent request at the admitted turn; o2-ai forwards only events past `known_seq`.
 pub fn apply_admission(request: &mut QueryRequest, admitted: &AdmittedTurn) {
     request.turn_id = Some(admitted.turn_id.clone());
     request.known_seq = Some(admitted.row.last_committed_seq);
@@ -271,7 +272,7 @@ async fn admit_under_lease(turn: &NewTurn<'_>) -> Result<Model, AdmitError> {
         Ok(Admission::AlreadySubmitted) => return Err(AdmitError::AlreadySubmitted),
         Err(e) => return Err(unavailable(&format!("cannot record turn {turn_id} of"), &e)),
     }
-    // Every admitted turn is a new epoch, so a writer of an earlier turn is fenced (contract R3).
+    // Every admitted turn is a new epoch, so a writer of an earlier turn is fenced.
     let epoch = match ai_chat_sessions::bump_epoch(org_id, session_id, row.session_epoch, now).await
     {
         Ok(Some(epoch)) => epoch,
@@ -288,7 +289,7 @@ async fn admit_under_lease(turn: &NewTurn<'_>) -> Result<Model, AdmitError> {
         log::warn!("[AI-CHAT] cannot record the last turn of {session_id}: {e}");
     }
     if row.title_source.is_empty()
-        && let Some(title) = initial_title(turn.agent_type, turn.prompt)
+        && let Some(title) = initial_title(turn.agent_type, turn.user_email, turn.prompt)
         && let Err(e) = ai_chat_sessions::set_prompt_title(org_id, session_id, &title, now).await
     {
         // Cosmetic: the generated title replaces it shortly anyway.
@@ -369,7 +370,7 @@ mod tests {
         assert!(title.ends_with('…'));
     }
 
-    /// TH4: a turn id is a hyphenated UUID in either case; anything else is refused.
+    /// A turn id is a hyphenated UUID in either case; anything else is refused.
     #[test]
     fn only_hyphenated_uuids_are_session_ids() {
         assert!(is_uuid("0195a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b"));
@@ -381,9 +382,8 @@ mod tests {
         assert!(normalize_uuid("../etc").is_none());
     }
 
-    /// Admits one turn of a new session under the lease, as [admit_turn] does after the
-    /// lease and the registry slot, and returns the stored session title.
-    async fn admitted_title(agent_type: &str, prompt: &str) -> String {
+    /// Admits one turn of a new session under the lease and returns the stored session title.
+    async fn admitted_title(agent_type: &str, user_email: &str, prompt: &str) -> String {
         let org_id = format!(
             "adm_{}",
             infra::table::rca_runs::new_run_id().to_lowercase()
@@ -395,7 +395,7 @@ mod tests {
             session_id: &session_id,
             turn_id: &turn_id,
             owner: "owner-1",
-            user_email: "sys@acme.io",
+            user_email,
             agent_type,
             prompt,
             trace_id: "trace",
@@ -408,8 +408,8 @@ mod tests {
             .title
     }
 
-    /// TH6: an RCA session's title is its whole rendered prompt, trimmed; a chat's is still
-    /// the bounded first line.
+    /// An RCA run's session title is its whole rendered prompt, trimmed; any chat's is the bounded
+    /// first line.
     #[tokio::test]
     async fn an_rca_session_is_titled_with_its_whole_prompt() {
         let _db = crate::alerts::rca_runs::tests::db().await;
@@ -418,14 +418,26 @@ mod tests {
             "checkout-api 5xx ".repeat(6)
         );
         assert!(prompt.trim().chars().count() > PROMPT_TITLE_CHARS);
+        let agent = format!(
+            "{}acme{}",
+            config::meta::user::SRE_AGENT_EMAIL_PREFIX,
+            config::meta::user::SRE_AGENT_EMAIL_SUFFIX
+        );
 
-        assert_eq!(admitted_title(RCA_AGENT_TYPE, &prompt).await, prompt.trim());
         assert_eq!(
-            admitted_title("o2-ai", &prompt).await,
+            admitted_title(RCA_AGENT_TYPE, &agent, &prompt).await,
+            prompt.trim()
+        );
+        assert_eq!(
+            admitted_title(RCA_AGENT_TYPE, "dana@acme.io", &prompt).await,
             prompt_title(&prompt).unwrap()
         );
         assert_eq!(
-            admitted_title("o2-ai", "\n  why is p99 up?\nmore").await,
+            admitted_title("o2-ai", &agent, &prompt).await,
+            prompt_title(&prompt).unwrap()
+        );
+        assert_eq!(
+            admitted_title("o2-ai", "dana@acme.io", "\n  why is p99 up?\nmore").await,
             "why is p99 up?"
         );
     }

@@ -1281,7 +1281,7 @@ pub fn is_system_service_account(email: &str) -> bool {
 /// `org_users` insert hits a foreign-key violation. This bites any org whose
 /// identifier is a ksuid (mixed case by design).
 #[cfg(feature = "enterprise")]
-pub fn sre_agent_email(org_id: &str) -> String {
+fn sre_agent_email(org_id: &str) -> String {
     format!("{O2_SRE_AGENT_EMAIL_PREFIX}{org_id}{O2_SRE_AGENT_EMAIL_SUFFIX}").to_lowercase()
 }
 
@@ -1309,11 +1309,12 @@ pub async fn ensure_sys_rca_agent(org_id: &str) -> Result<(), anyhow::Error> {
                 // pre-fix run. `db::user::delete` is case-insensitive at the
                 // table layer and also fans out a cluster-wide invalidation so
                 // the in-mem user cache (and super_cluster) drop the stale row
-                // — `table::users::remove` would skip both. Safe to call
-                // unconditionally: we only reach this branch when there's no
-                // `org_users` row, meaning any matching `users` row is
-                // unreferenced.
-                db::user::delete(&email).await?;
+                // — `table::users::remove` would skip both. Safe: no `org_users` row means it is
+                // unreferenced. Only when the row exists: the async delete event
+                // can land after the create and evict it.
+                if db::user::get_user_record(&email).await.is_ok() {
+                    db::user::delete(&email).await?;
+                }
                 create_service_account_if_not_exists(&email).await?;
 
                 let token = generate_random_string(32);

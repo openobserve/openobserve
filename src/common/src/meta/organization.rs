@@ -571,7 +571,7 @@ pub struct OrganizationSetting {
     pub usage_stream_enabled: bool,
     #[serde(default)]
     pub red_insights_enabled: bool,
-    /// Show raw tool input and output in incident investigation threads (TH34).
+    /// Show raw tool input and output in incident investigation threads.
     #[serde(default)]
     pub ai_rca_thread_tool_output: bool,
     #[cfg(feature = "enterprise")]

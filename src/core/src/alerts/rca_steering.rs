@@ -37,7 +37,7 @@ use config::{
 use infra::table::{
     ai_chat_sessions, ai_chat_turns, alert_incidents,
     rca_runs::{self as runs_table, Model as RunRow, RunSummaryPatch, RunUpdate},
-    rca_steering::{self as steering_table, SteerPatch},
+    rca_steering::{self as steering_table, RateCounts, SteerPatch},
 };
 use o2_enterprise::enterprise::{
     ai::client::{SteerRelay, SteerRelayResult, get_agent_client},
@@ -55,11 +55,11 @@ use crate::ai_chat::{
     read_committed_events,
 };
 
-/// SG17: a `no_active_turn` relay is retried this often…
+/// A `no_active_turn` relay is retried this often…
 const RELAY_RETRY_INTERVAL: Duration = Duration::from_secs(1);
 /// Retry only while the next turn is connecting, for at most this long.
 const TURN_CONNECT_WINDOW_US: i64 = 15_000_000;
-/// SG41: `rca_summary.detail` of a paused run that a resolve cancelled.
+/// `rca_summary.detail` of a paused run that a resolve cancelled.
 const RESOLVED_DETAIL: &str = "Stopped: incident resolved";
 
 /// Keep kind/action as strings so invalid values use domain error codes, not extractor errors.
@@ -71,14 +71,14 @@ pub struct SteerRequest {
     pub hypothesis_id: Option<String>,
 }
 
-/// The steer route's 201 body (§9.1); `steer.status` may be `rejected`.
+/// The steer route's 201 body; `steer.status` may be `rejected`.
 #[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct SteerOutcome {
     pub steer: SteerRecord,
     pub run_state: RunState,
 }
 
-/// The question a paused run waits on (SG26, SG39).
+/// The question a paused run waits on.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 pub struct OpenQuestion {
     pub question_id: String,
@@ -89,17 +89,17 @@ pub struct OpenQuestion {
     pub deadline_at: Option<i64>,
 }
 
-/// The steering route's body (§9.2, SG22, SG37).
+/// The steering route's body.
 #[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct SteeringView {
     /// The run's rows in `created_at` order, merged with what the transcript shows.
     pub items: Vec<SteerRecord>,
     pub open_question: Option<OpenQuestion>,
-    /// The run takes messages (SG9) and the user may send them (SG7).
+    /// The run takes messages and the user may send them.
     pub can_steer: bool,
 }
 
-/// A refused steer, with the HTTP status and `code` of §9.1.
+/// A refused steer, with the HTTP status and `code`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SteerError {
     BadRequest {
@@ -181,7 +181,7 @@ fn internal(e: impl fmt::Display) -> SteerError {
     SteerError::Internal(e.to_string())
 }
 
-/// SG8: 1 to [MAX_STEER_CHARS] Unicode scalar values after trimming.
+/// 1 to [MAX_STEER_CHARS] Unicode scalar values after trimming.
 fn trimmed_text(text: &str) -> Option<String> {
     let text = text.trim();
     (1..=MAX_STEER_CHARS)
@@ -189,7 +189,7 @@ fn trimmed_text(text: &str) -> Option<String> {
         .then(|| text.to_string())
 }
 
-/// SG33: guidance follows SG8 for its length; returns the trimmed text.
+/// Guidance follows the steer length rule; returns the trimmed text.
 pub fn validate_guidance(text: &str) -> Result<String, SteerError> {
     trimmed_text(text).ok_or_else(|| {
         bad(
@@ -199,7 +199,7 @@ pub fn validate_guidance(text: &str) -> Result<String, SteerError> {
     })
 }
 
-/// What a valid request asks for (SG8).
+/// What a valid request asks for.
 enum Ask {
     Message(String),
     Action {
@@ -295,7 +295,7 @@ pub(crate) trait SteerDeps: Sync {
         run: &RunRow,
     ) -> impl Future<Output = anyhow::Result<Option<RunTranscript>>> + Send;
 
-    /// SG12: one relay of a rendered message into the session's live turn.
+    /// One relay of a rendered message into the session's live turn.
     fn relay(
         &self,
         session_id: &str,
@@ -304,7 +304,7 @@ pub(crate) trait SteerDeps: Sync {
         body: &SteerRelay,
     ) -> impl Future<Output = SteerRelayResult> + Send;
 
-    /// SG18: start the turn of a paused run that an answer resumed.
+    /// Start the turn of a paused run that an answer resumed.
     fn start_turn(
         &self,
         run: &RunRow,
@@ -357,7 +357,7 @@ impl SteerDeps for LiveDeps {
     }
 }
 
-/// SG31: the server-written text of a hypothesis action on the run's ledger.
+/// The server-written text of a hypothesis action on the run's ledger.
 async fn hypothesis_text(
     deps: &impl SteerDeps,
     org_id: &str,
@@ -366,7 +366,7 @@ async fn hypothesis_text(
     hypothesis_id: &str,
 ) -> Result<String, SteerError> {
     let transcript = deps.transcript(org_id, run).await.map_err(internal)?;
-    let ledger = transcript.and_then(|t| build_ledger(&t.calls, false).0);
+    let ledger = transcript.and_then(|t| build_ledger(&t.calls, None).0);
     let Some(hypothesis) = ledger
         .as_ref()
         .and_then(|ledger| ledger.hypotheses.iter().find(|h| h.id == hypothesis_id))
@@ -388,21 +388,13 @@ async fn hypothesis_text(
     Ok(hypothesis_action_text(action, &hypothesis.statement))
 }
 
-/// SG10: the per-author and per-run limits and the duplicate pending action, from the table.
-async fn check_limits(
-    org_id: &str,
-    run_id: &str,
-    author_email: &str,
-    ask: &Ask,
-    now: i64,
-) -> Result<(), SteerError> {
+/// The per-author and per-run limits and the duplicate pending action.
+fn check_limits(ask: &Ask, counts: RateCounts, pending: bool, now: i64) -> Result<(), SteerError> {
     if let Ask::Action {
         action,
         hypothesis_id,
     } = ask
-        && steering_table::pending_action_exists(org_id, run_id, hypothesis_id, *action)
-            .await
-            .map_err(internal)?
+        && pending
     {
         return Err(conflict(
             "duplicate_action",
@@ -410,9 +402,6 @@ async fn check_limits(
         ));
     }
     let interval_us = AUTHOR_INTERVAL_SECS * 1_000_000;
-    let counts = steering_table::rate_window(org_id, run_id, author_email, now - interval_us)
-        .await
-        .map_err(internal)?;
     if counts.author_total >= MAX_AUTHOR_MESSAGES_PER_RUN {
         return Err(SteerError::RateLimited {
             retry_after_secs: None,
@@ -441,7 +430,7 @@ async fn check_limits(
     Ok(())
 }
 
-/// SG1: persist queued before relay; relay rejection still returns the persisted row.
+/// Persist queued before relay; relay rejection still returns the persisted row.
 pub async fn steer(
     org_id: &str,
     incident_id: &str,
@@ -487,7 +476,6 @@ pub(crate) async fn steer_with(
         ),
     };
     let now = now_micros();
-    check_limits(org_id, run_id, author_email, &ask, now).await?;
 
     let mut row = SteerRecord {
         org_id: org_id.to_string(),
@@ -509,7 +497,13 @@ pub(crate) async fn steer_with(
         agent_note: None,
         opencode_message_id: None,
     };
-    steering_table::insert(&row).await.map_err(internal)?;
+    // The check and the insert share one transaction, so concurrent sends count each other.
+    let since = now - AUTHOR_INTERVAL_SECS * 1_000_000;
+    steering_table::insert_within_limits(&row, since, |counts, pending| {
+        check_limits(&ask, counts, pending, now)
+    })
+    .await
+    .map_err(internal)??;
 
     if runs_table::to_item(&run).state == RunState::WaitingInput {
         if runs_table::resume_waiting(org_id, run_id)
@@ -518,7 +512,7 @@ pub(crate) async fn steer_with(
         {
             resume_with_queued(deps, &run, &mut row).await;
         } else {
-            // SG18 loser: the winner's turn is connecting; SG17 retries until it does.
+            // Resume loser: the winner's turn is connecting; the relay retries until it does.
             relay(deps, &mut row).await;
         }
     } else {
@@ -540,7 +534,7 @@ pub(crate) async fn steer_with(
     })
 }
 
-/// The text the agent receives for a row: its header, the notice line and the text (§10.3).
+/// The text the agent receives for a row: its header, the notice line and the text.
 pub(crate) fn render_row(row: &SteerRecord) -> String {
     let header = SteerHeader {
         steer_id: row.steer_id.clone(),
@@ -552,7 +546,7 @@ pub(crate) fn render_row(row: &SteerRecord) -> String {
     render_steer_message(&header, &row.text)
 }
 
-/// SG3: one guarded status write.
+/// One guarded status write.
 async fn transition(row: &mut SteerRecord, to: SteerStatus, patch: SteerPatch) -> bool {
     match steering_table::set_status(&row.org_id, &row.steer_id, to, patch.clone()).await {
         Ok(true) => {
@@ -665,7 +659,9 @@ async fn on_delivered(row: &SteerRecord) {
                 None
             }
         };
+        // Stats-only: the reconcile delivers rows after the run paused or ended.
         let patch = RunUpdate {
+            final_stats_only: true,
             steered_by_add: Some(row.author_email.clone()),
             stats: steered.map(|steered| RunStats {
                 steered: Some(steered),
@@ -705,7 +701,7 @@ async fn sys_rca_auth(org_id: &str) -> String {
     }
 }
 
-/// SG17: retry no_active_turn only during bounded initial/resumed/continuation admission.
+/// Retry no_active_turn only during bounded initial/resumed/continuation admission.
 async fn turn_connecting(run: &RunRow) -> bool {
     if runs_table::to_item(run).state != RunState::Running {
         return false;
@@ -735,7 +731,7 @@ async fn turn_connecting(run: &RunRow) -> bool {
     }
 }
 
-/// SG17: retry only no_active_turn; a timeout remains queued because delivery may have succeeded.
+/// Retry only no_active_turn; a timeout remains queued because delivery may have succeeded.
 async fn relay(deps: &impl SteerDeps, row: &mut SteerRecord) {
     if !deps.can_relay() {
         reject(row, SteerStatusReason::AgentUnreachable).await;
@@ -748,6 +744,7 @@ async fn relay(deps: &impl SteerDeps, row: &mut SteerRecord) {
     };
     // µs of the first `no_active_turn` answer; the retries end 15 s after it.
     let mut first_no_turn: Option<i64> = None;
+    let mut no_turn = false;
     loop {
         match steering_table::get_rw(&row.org_id, &row.steer_id).await {
             Ok(Some(current)) => *row = current,
@@ -772,9 +769,16 @@ async fn relay(deps: &impl SteerDeps, row: &mut SteerRecord) {
                 return;
             }
         };
-        if runs_table::to_item(&run).state == RunState::WaitingInput
-            && run.deadline_closed_at.is_none()
-        {
+        // Re-read after the last refusal too: a run that ended meanwhile does not reject the row.
+        if let Some(reason) = unread_reason(&run) {
+            not_read(row, reason).await;
+            return;
+        }
+        if no_turn {
+            reject(row, SteerStatusReason::NoActiveTurn).await;
+            return;
+        }
+        if runs_table::to_item(&run).state == RunState::WaitingInput {
             match runs_table::resume_waiting(&row.org_id, &row.run_id).await {
                 Ok(true) => {
                     resume_with_queued(deps, &run, row).await;
@@ -818,19 +822,34 @@ async fn relay(deps: &impl SteerDeps, row: &mut SteerRecord) {
             SteerRelayResult::NoActiveTurn => {
                 let now = now_micros();
                 let first = *first_no_turn.get_or_insert(now);
-                if now.saturating_sub(first) >= TURN_CONNECT_WINDOW_US
-                    || !turn_connecting(&run).await
-                {
-                    reject(row, SteerStatusReason::NoActiveTurn).await;
-                    return;
+                no_turn = now.saturating_sub(first) >= TURN_CONNECT_WINDOW_US
+                    || !turn_connecting(&run).await;
+                if !no_turn {
+                    tokio::time::sleep(RELAY_RETRY_INTERVAL).await;
                 }
-                tokio::time::sleep(RELAY_RETRY_INTERVAL).await;
             }
         }
     }
 }
 
-/// SG18: only the resume CAS winner claims queued messages for the next prompt.
+/// The run ended, or only a closed deadline's finalize turn is left: a new row goes unread.
+fn unread_reason(run: &RunRow) -> Option<SteerStatusReason> {
+    end_reason(runs_table::to_item(run).state).or_else(|| {
+        run.deadline_closed_at
+            .is_some()
+            .then_some(SteerStatusReason::RunCompleted)
+    })
+}
+
+async fn not_read(row: &mut SteerRecord, reason: SteerStatusReason) {
+    let patch = SteerPatch {
+        status_reason: Some(reason),
+        ..Default::default()
+    };
+    transition(row, SteerStatus::NotRead, patch).await;
+}
+
+/// Only the resume CAS winner claims queued messages for the next prompt.
 async fn resume_with_queued(deps: &impl SteerDeps, run: &RunRow, own: &mut SteerRecord) {
     rca_turn::count_question_end(&run.org_id, "answered", run);
 
@@ -898,19 +917,20 @@ async fn resume_with_queued(deps: &impl SteerDeps, run: &RunRow, own: &mut Steer
 
 async fn fail_resumed(run: &RunRow, error: RcaTurnError, claimed: &mut [SteerRecord]) {
     let item = runs_table::to_item(run);
-    let (reason, details) = super::incidents::rca_turn_failure(&error);
     log::warn!(
         "[RCA_STEERING] run {} could not resume: {}",
         run.run_id,
         error.error_code()
     );
+    // The run's earlier turns stay resumable; the start code goes to the details.
+    let (code, reason, details) = rca_turn::continuation_start_failure(&error);
     let ended = match rca_runs::fail_run(
         &run.org_id,
         &run.run_id,
         item.trigger,
-        error.error_code(),
+        code,
         reason,
-        details,
+        Some(details),
     )
     .await
     {
@@ -931,11 +951,7 @@ async fn fail_resumed(run: &RunRow, error: RcaTurnError, claimed: &mut [SteerRec
     };
     let reason = end_reason(state).unwrap_or(SteerStatusReason::RunFailed);
     for row in claimed.iter_mut() {
-        let patch = SteerPatch {
-            status_reason: Some(reason),
-            ..Default::default()
-        };
-        transition(row, SteerStatus::NotRead, patch).await;
+        not_read(row, reason).await;
     }
 
     if ended {
@@ -946,7 +962,7 @@ async fn fail_resumed(run: &RunRow, error: RcaTurnError, claimed: &mut [SteerRec
     }
 }
 
-/// The first `acknowledge_steering` call for each steer id (SG21).
+/// The first `acknowledge_steering` call for each steer id.
 fn first_acks(transcript: Option<&RunTranscript>) -> HashMap<&str, &TranscriptAck> {
     let mut acks = HashMap::new();
     for ack in transcript.into_iter().flat_map(|t| t.acks.iter()) {
@@ -1079,7 +1095,7 @@ async fn fill_missing(row: &mut SteerRecord, target: &SteerRecord) {
     }
 }
 
-/// The `not_read` reason of a run that ended in `state` (SG23).
+/// The `not_read` reason of a run that ended in `state`.
 fn end_reason(state: RunState) -> Option<SteerStatusReason> {
     match state {
         RunState::Completed => Some(SteerStatusReason::RunCompleted),
@@ -1122,11 +1138,7 @@ pub async fn reconcile_steering(
 
     if let Some(reason) = terminal.and_then(end_reason) {
         for row in rows.iter_mut().filter(|r| r.status.is_unread()) {
-            let patch = SteerPatch {
-                status_reason: Some(reason),
-                ..Default::default()
-            };
-            transition(row, SteerStatus::NotRead, patch).await;
+            not_read(row, reason).await;
         }
     }
 
@@ -1137,7 +1149,7 @@ pub async fn reconcile_steering(
     }
 }
 
-/// `stats.steered`, `stats.ignored_acks` (SG21) and `rca_summary.unblocked_by` (SG23).
+/// `stats.steered`, `stats.ignored_acks` and `rca_summary.unblocked_by`.
 async fn write_run_fields(
     org_id: &str,
     run: &RunRow,
@@ -1184,7 +1196,7 @@ async fn write_run_fields(
     }
 }
 
-/// H15: once per row at run end, its final status, the read latency and the ack outcome.
+/// Once per row at run end, its final status, the read latency and the ack outcome.
 fn observe_run_end(org_id: &str, rows: &[SteerRecord]) {
     for row in rows {
         RCA_STEERING_MESSAGES_TOTAL
@@ -1383,15 +1395,15 @@ async fn cancel_waiting_run(
         run.started_at,
         progress.as_ref(),
     );
-    // SG24: no turn runs, so the queued rows end here.
+    // No turn runs, so the queued rows end here.
     reconcile_steering(org_id, &run, None, Some(RunState::Cancelled)).await;
-    // §6: no verdict is coming, so nothing may go on holding a page for one.
+    // No verdict is coming, so nothing may go on holding a page for one.
     rca_service::skip_analysis_for_incident(org_id, incident_id).await;
     log::info!("[RCA_STEERING] resolve of incident {incident_id} cancelled paused run {run_id}");
     Ok(Some(run_id))
 }
 
-/// SG33: the `guidance` row a re-analysis with guidance writes in its start transaction.
+/// The `guidance` row a re-analysis with guidance writes in its start transaction.
 pub(crate) fn guidance_row(
     org_id: &str,
     run_id: &str,
@@ -1422,7 +1434,7 @@ pub(crate) fn guidance_row(
     }
 }
 
-/// SG33: the run's queued guidance row, which the first turn's prompt carries.
+/// The run's queued guidance row, which the first turn's prompt carries.
 pub(crate) async fn queued_guidance(org_id: &str, run_id: &str) -> Option<SteerRecord> {
     match steering_table::list_for_run_rw(org_id, run_id).await {
         Ok(rows) => rows
@@ -1435,12 +1447,12 @@ pub(crate) async fn queued_guidance(org_id: &str, run_id: &str) -> Option<SteerR
     }
 }
 
-/// SG33: the guidance row is `delivered` once the first turn is admitted.
+/// The guidance row is `delivered` once the first turn is admitted.
 pub(crate) async fn guidance_admitted(mut row: SteerRecord) {
     mark_delivered(&mut row, now_micros(), None).await;
 }
 
-/// The rows of a run that ended before its first turn started become `not_read` (SG23).
+/// The rows of a run that ended before its first turn started become `not_read`.
 pub(crate) async fn close_unread(org_id: &str, run_id: &str, state: RunState) {
     let Some(reason) = end_reason(state) else {
         return;
@@ -1620,7 +1632,7 @@ mod tests {
         }
     }
 
-    /// A responder of its own, so SG10's per-author interval never refuses the request.
+    /// A responder of its own, so the per-author interval never refuses the request.
     fn responder(i: usize) -> String {
         format!("r{i}@acme.io")
     }
@@ -1637,7 +1649,7 @@ mod tests {
         (org, inc, run_id)
     }
 
-    /// Pause the run on [QUESTION] as the finalizer's SG26 write does.
+    /// Pause the run on [QUESTION] as the finalizer's write does.
     async fn pause(org: &str, run_id: &str) -> i64 {
         let deadline = now_micros() + 30 * 60_000_000;
         let patch = RunUpdate {
@@ -1706,7 +1718,7 @@ mod tests {
         run.stats.as_ref().and_then(|s| s.steered)
     }
 
-    /// A ledger with `h1` testing and `h2` ruled out (SG31).
+    /// A ledger with `h1` testing and `h2` ruled out.
     fn ledger_transcript() -> RunTranscript {
         let mut s = Session::new();
         user_message(
@@ -1754,7 +1766,7 @@ mod tests {
         }
     }
 
-    // ---- SG8–SG11, SG31: what the route accepts ----
+    // ---- what the route accepts ----
 
     #[tokio::test]
     async fn sg8_the_route_validates_text_kind_and_action() {
@@ -2046,7 +2058,7 @@ mod tests {
         );
     }
 
-    // ---- SG5, SG6, SG17: the relay into a running run ----
+    // ---- the relay into a running run ----
 
     #[tokio::test]
     async fn sg17_each_relay_answer_maps_to_the_row() {
@@ -2166,9 +2178,9 @@ mod tests {
         assert_eq!(offline.relays(), 0);
     }
 
-    // ---- SG18: steering a paused run ----
+    // ---- steering a paused run ----
 
-    /// SG18: two responders answer a paused run at the same moment.
+    /// Two responders answer a paused run at the same moment.
     #[tokio::test]
     async fn sg18_two_concurrent_answers_start_one_continuation() {
         let _db = db().await;
@@ -2260,7 +2272,7 @@ mod tests {
         );
     }
 
-    /// SG18, SG23: a resumed run whose turn cannot start fails, and its queued rows end `not_read`.
+    /// A resumed run whose turn cannot start fails, and its queued rows end `not_read`.
     #[tokio::test]
     async fn sg18_a_resume_whose_turn_cannot_start_fails_the_run() {
         let _db = db().await;
@@ -2276,9 +2288,18 @@ mod tests {
             .unwrap();
 
         assert_eq!(outcome.run_state, RunState::Failed);
+        let error = stored(&org, &run_id).await.error.unwrap();
         assert_eq!(
-            stored(&org, &run_id).await.error.unwrap().code,
-            "turn_limit"
+            error.code,
+            rca_runs::ERROR_INTERRUPTED,
+            "its earlier turns stay resumable"
+        );
+        assert!(
+            error
+                .details
+                .as_deref()
+                .is_some_and(|details| details.contains("turn_limit")),
+            "{error:?}"
         );
         assert!(steered_events(&org, &inc).await.is_empty());
         let saved = current(&org, &outcome.steer.steer_id).await;
@@ -2290,7 +2311,7 @@ mod tests {
         assert_eq!(outcome.steer, saved, "§9.1: the 201 body is the stored row");
     }
 
-    // ---- SG20–SG24, H15: the reconcile ----
+    // ---- the reconcile ----
 
     fn row(org: &str, inc: &str, run_id: &str, author: &str, kind: SteerKind) -> SteerRecord {
         let mut row = guidance_row(org, run_id, inc, author, "Check the deploy", now_micros());
@@ -2530,7 +2551,89 @@ mod tests {
         assert_eq!(row.opencode_message_id.as_deref(), Some("msg_03"));
     }
 
-    /// SG23: the `not_read` reason names how the run ended.
+    #[tokio::test]
+    async fn sg23_a_row_the_reconcile_delivers_at_run_end_names_its_author() {
+        let _db = db().await;
+        let (org, inc, run_id) = live_run().await;
+        let queued = insert(
+            row(&org, &inc, &run_id, AUTHOR, SteerKind::Message),
+            SteerStatus::Queued,
+        )
+        .await;
+        let mut s = Session::new();
+        user_message(
+            &mut s,
+            "msg_01",
+            "Analyze incident inc_1. Trigger: manual.",
+            0,
+        );
+        s.message("msg_02", "assistant", json!({"created": T + 100}));
+        user_message(&mut s, "msg_03", &render_row(&queued), 500);
+        // The finalizer ends the run, then reconciles with the row it read before.
+        let live = runs_table::get_rw(&org, &run_id).await.unwrap().unwrap();
+        assert!(
+            complete_run(&org, &run_id, "## Root cause", RunUpdate::default())
+                .await
+                .unwrap()
+        );
+
+        reconcile_steering(
+            &org,
+            &live,
+            Some(&decode_run(&s.events)),
+            Some(RunState::Completed),
+        )
+        .await;
+
+        assert_eq!(steered_by(&org, &inc).await, [AUTHOR]);
+    }
+
+    #[tokio::test]
+    async fn sg40_a_message_that_reaches_a_closing_or_ended_run_is_not_read() {
+        let _db = db().await;
+        // The sweeper closed the answer deadline between the route's check and the relay.
+        let (org, inc, run_id) = live_run().await;
+        let deadline = pause(&org, &run_id).await;
+        assert!(
+            runs_table::close_deadline(&org, &run_id, deadline)
+                .await
+                .unwrap()
+        );
+        let fake = Fake::answering([delivered(7)]);
+        let mut sent = insert(
+            row(&org, &inc, &run_id, AUTHOR, SteerKind::Message),
+            SteerStatus::Queued,
+        )
+        .await;
+        relay(&fake, &mut sent).await;
+        assert_eq!(fake.relays(), 0, "the finalize turn gets nothing");
+        assert_eq!(
+            (sent.status, sent.status_reason),
+            (SteerStatus::NotRead, Some(SteerStatusReason::RunCompleted))
+        );
+
+        // The run ended between the route's check and the relay.
+        let (org, inc, run_id) = live_run().await;
+        assert!(
+            complete_run(&org, &run_id, "## Root cause", RunUpdate::default())
+                .await
+                .unwrap()
+        );
+        let fake = Fake::new();
+        let mut late = insert(
+            row(&org, &inc, &run_id, AUTHOR, SteerKind::Message),
+            SteerStatus::Queued,
+        )
+        .await;
+        relay(&fake, &mut late).await;
+        assert_eq!(fake.relays(), 0);
+        assert_eq!(
+            (late.status, late.status_reason),
+            (SteerStatus::NotRead, Some(SteerStatusReason::RunCompleted))
+        );
+    }
+
+    /// The `not_read` reason names how the run ended.
     #[tokio::test]
     async fn sg23_unread_rows_of_an_ended_run_name_its_end() {
         let _db = db().await;
@@ -2601,7 +2704,7 @@ mod tests {
         assert!(summary["deadline_at"].is_null() && summary["detail"].is_null());
     }
 
-    // ---- SG41: resolve ----
+    // ---- resolve ----
 
     #[tokio::test]
     async fn sg41_a_resolve_cancels_only_a_paused_run() {
@@ -2680,7 +2783,7 @@ mod tests {
         assert_eq!(timeline(&org, &inc).await.len(), before.len());
     }
 
-    // ---- SG33, H13: guidance ----
+    // ---- guidance ----
 
     fn subject(inc: &str) -> RcaPromptSubject {
         RcaPromptSubject::Incident {
@@ -2818,7 +2921,7 @@ mod tests {
         );
     }
 
-    // ---- SG22, SG37: the steering view ----
+    // ---- the steering view ----
 
     #[tokio::test]
     async fn sg22_the_view_merges_the_transcript_and_writes_nothing() {
@@ -2906,7 +3009,7 @@ mod tests {
         assert!(!ended.can_steer && ended.open_question.is_none());
     }
 
-    // ---- Fix-up: SG18 claims, SG5/SG6 on the stored row, SG23 fill, H15 latency ----
+    // ---- fix-up: resume claims, stored-row status, not_read fill, read latency ----
 
     #[tokio::test]
     async fn sg18_a_loser_whose_row_was_claimed_returns_it_without_relaying() {
@@ -3130,7 +3233,7 @@ mod tests {
         );
     }
 
-    /// H15: the read latency counts from delivery to read, not from creation.
+    /// The read latency counts from delivery to read, not from creation.
     #[tokio::test]
     async fn h15_read_latency_counts_from_delivery() {
         let _db = db().await;

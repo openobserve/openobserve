@@ -696,7 +696,7 @@ pub async fn correlate_alert_to_incident(
     .await?;
     let outcome = correlation.outcome;
 
-    // The on-call record routing opened, whose team decides L0 for the incident (RR-45).
+    // The on-call record routing opened; its team decides L0 for the incident.
     #[cfg(feature = "enterprise")]
     let mut routed_origin: Option<config::meta::oncall::Response> = None;
     // Only on creation: an alert joining an existing incident must not open a second record.
@@ -789,9 +789,7 @@ pub async fn correlate_alert_to_incident(
         }
     }
 
-    // The analysis starts once routing has decided L0 for the incident (RR-45).
-    // A creation decides `rca_off_reason`; an un-mute decides it only when the
-    // incident was never routed, and otherwise keeps the stored decision.
+    // Starts after routing decides L0; an un-mute keeps an already stored off decision.
     #[cfg(feature = "enterprise")]
     if let IncidentCorrelationOutcome::NewIncidentCreated { incident_id, .. } = &outcome
         && downtime.is_none()
@@ -936,7 +934,7 @@ pub async fn correlate_external_event(
     )
     .await?;
 
-    // No on-call routing on this path, so nothing decides L0 and the run starts (D3).
+    // No on-call routing on this path, so nothing decides L0 and the run starts.
     #[cfg(feature = "enterprise")]
     if let IncidentCorrelationOutcome::NewIncidentCreated { incident_id, .. } = &outcome {
         start_automatic_rca(
@@ -1361,9 +1359,7 @@ async fn retarget_mute(org_id: &str, incident_id: &str, from: &str, to: &str) {
     }
 }
 
-/// An un-muted incident runs as a fresh one: workflows, then the page and "opened".
-/// The analysis starts after on-call routing (RR-45), in the correlation caller,
-/// which keeps any L0 decision already made for the incident.
+/// An un-muted incident runs as a fresh one; its analysis starts in the correlation caller.
 async fn reopened_after_mute(
     org_id: &str,
     incident_id: String,
@@ -1527,7 +1523,7 @@ async fn create_new_incident(
         triggered_at,
     );
 
-    // The analysis starts after on-call routing (RR-45), in the correlation caller.
+    // The analysis starts after on-call routing, in the correlation caller.
 
     Ok(IncidentCorrelationOutcome::NewIncidentCreated {
         incident_id: incident.id,
@@ -1611,9 +1607,8 @@ fn firing_is_muted(
     muted_by.is_some() || (incident.muted_by_downtime_id.is_some() && !reopened)
 }
 
-/// What correlation did. An un-muted incident surfaces as `NewIncidentCreated`
-/// too; `created` tells a true creation, which always decides `rca_off_reason`,
-/// from an un-mute, which keeps any decision already made (RR-45).
+/// What correlation did; `created` tells a true creation from an un-mute, which keeps a stored L0
+/// decision.
 struct Correlation {
     outcome: IncidentCorrelationOutcome,
     #[cfg_attr(not(feature = "enterprise"), allow(dead_code))]
@@ -1903,7 +1898,7 @@ async fn find_or_create_incident(
             }
 
             if is_new_alert_type {
-                // A new alert type changes the picture: a fresh automatic run (RR-7).
+                // A new alert type changes the picture: a fresh automatic run.
                 #[cfg(feature = "enterprise")]
                 if muted_by.is_none() {
                     start_automatic_rca(
@@ -1948,10 +1943,26 @@ async fn find_or_create_incident(
     })
 }
 
-/// Get incident with its alerts for detail view
+/// Get incident with its alerts and RCA runs for the detail view.
 pub async fn get_incident_with_alerts(
     org_id: &str,
     incident_id: &str,
+) -> Result<Option<IncidentWithAlerts>, anyhow::Error> {
+    incident_with_alerts(org_id, incident_id, true).await
+}
+
+/// [get_incident_with_alerts] without the RCA runs, for callers that never read them.
+pub async fn get_incident_with_triggers(
+    org_id: &str,
+    incident_id: &str,
+) -> Result<Option<IncidentWithAlerts>, anyhow::Error> {
+    incident_with_alerts(org_id, incident_id, false).await
+}
+
+async fn incident_with_alerts(
+    org_id: &str,
+    incident_id: &str,
+    with_rca_runs: bool,
 ) -> Result<Option<IncidentWithAlerts>, anyhow::Error> {
     let incident = match infra::table::alert_incidents::get(org_id, incident_id).await? {
         Some(i) => i,
@@ -1963,14 +1974,17 @@ pub async fn get_incident_with_alerts(
     // Store org_id before moving incident
     let incident_org_id = incident.org_id.clone();
 
-    // The run summary plus the current run, the report run and the history (RR-29).
-    // Without the runs the detail still carries the summary.
-    let rca = match super::rca_runs::rca_detail(org_id, &incident).await {
-        Ok(rca) => Some(rca),
-        Err(e) => {
-            log::warn!("[incidents] Failed to read RCA runs for {org_id}/{incident_id}: {e}");
-            None
+    // Without the runs the detail still carries the run summary.
+    let rca = if with_rca_runs {
+        match super::rca_runs::rca_detail(org_id, &incident).await {
+            Ok(rca) => Some(rca),
+            Err(e) => {
+                log::warn!("[incidents] Failed to read RCA runs for {org_id}/{incident_id}: {e}");
+                None
+            }
         }
+    } else {
+        None
     };
 
     // Convert to config types
@@ -2360,7 +2374,7 @@ pub async fn rca_will_run(org_id: &str, incident_id: &str) -> bool {
 #[cfg(feature = "enterprise")]
 const SYSTEM_USER_EMAIL: &str = "system@openobserve.ai";
 
-/// The one start path of automatic runs (RR-7, RR-39, RR-45).
+/// The one start path of automatic runs.
 #[cfg(feature = "enterprise")]
 async fn start_automatic_rca(
     org_id: &str,
@@ -2407,7 +2421,7 @@ async fn start_automatic_rca(
             "[INCIDENTS::RCA] Incident {incident_id} retained without {} analysis: {error}",
             trigger.as_str()
         );
-        // §6: no verdict is coming, so nothing may go on holding a page for one.
+        // No verdict is coming, so nothing may go on holding a page for one.
         rca_service::skip_analysis_for_incident(org_id, incident_id).await;
         return;
     }
@@ -2481,7 +2495,7 @@ async fn start_automatic_rca(
     });
 }
 
-/// A new incident's first analysis, decided after on-call routing (RR-45).
+/// A new incident's first analysis, decided after on-call routing.
 #[cfg(feature = "enterprise")]
 async fn start_new_incident_rca(
     org_id: &str,
@@ -2499,7 +2513,7 @@ async fn start_new_incident_rca(
                 "[INCIDENTS::RCA] Could not record that L0 is off for {org_id}/{incident_id}: {e}"
             );
         }
-        // §6: no verdict is coming, so nothing may go on holding a page for one.
+        // No verdict is coming, so nothing may go on holding a page for one.
         o2_enterprise::enterprise::alerts::rca_service::skip_analysis_for_incident(
             org_id,
             incident_id,
@@ -2515,7 +2529,7 @@ async fn start_new_incident_rca(
     .await;
 }
 
-/// An un-muted incident's analysis (RR-45).
+/// An un-muted incident's analysis.
 #[cfg(feature = "enterprise")]
 async fn start_unmuted_incident_rca(
     org_id: &str,
@@ -2524,7 +2538,7 @@ async fn start_unmuted_incident_rca(
 ) {
     // The primary: the un-mute just committed, and a replica may not show it yet.
     let undecided = match infra::table::alert_incidents::get_rw(org_id, incident_id).await {
-        Ok(Some(incident)) => incident.rca_run_id.is_none() && incident.rca_off_reason.is_none(),
+        Ok(Some(incident)) => l0_undecided(&incident),
         Ok(None) => false,
         Err(e) => {
             log::error!("[INCIDENTS::RCA] Could not read incident {org_id}/{incident_id}: {e}");
@@ -2541,6 +2555,12 @@ async fn start_unmuted_incident_rca(
         )
         .await;
     }
+}
+
+/// A manual run does not decide L0, so only a stored off reason skips the un-mute decision.
+#[cfg(feature = "enterprise")]
+fn l0_undecided(incident: &infra::table::entity::alert_incidents::Model) -> bool {
+    incident.rca_off_reason.is_none()
 }
 
 /// The run's `error.reason` and `error.details` for a turn that could not start.
@@ -2574,7 +2594,7 @@ pub struct RcaLaunch {
     pub trigger: config::meta::alerts::rca_runs::RunTrigger,
     /// Email of the user who triggered the analysis, used for AI usage tracking.
     pub user_email: String,
-    /// When true, the newest completed report is sent so the agent extends it (RR-27).
+    /// When true, the newest completed report is sent so the agent extends it.
     pub build_on_previous: bool,
     /// None authorizes immediately before first-turn launch.
     pub usage_permit: Option<crate::AiUsagePermit>,
@@ -2617,13 +2637,13 @@ pub async fn trigger_rca_for_incident(
         },
     };
 
-    // Ends the run as failed and releases any triage hold: no verdict is coming (§6).
+    // Ends the run as failed and releases any triage hold: no verdict is coming.
     let has_guidance = guidance.is_some();
     let end_failed = async |code: &str, reason: &str, details: Option<String>| {
         if let Err(e) = fail_run(&org_id, &run_id, trigger, code, reason, details).await {
             log::error!("[INCIDENTS::RCA] Could not end run {run_id} as failed: {e}");
         }
-        // SG23: the guidance no turn read ends `not_read`.
+        // The guidance no turn read ends `not_read`.
         if has_guidance {
             super::rca_steering::close_unread(
                 &org_id,
@@ -2663,14 +2683,14 @@ pub async fn trigger_rca_for_incident(
         return Ok(());
     }
 
-    // I20: the run must be refused before the billable turn.
+    // The run must be refused before the billable turn.
     if !trigger.is_user_started() && rca_service::l0_off_for_incident(&org_id, &incident_id).await {
         log::debug!("[INCIDENTS::RCA] L0 is off for {incident_id}'s priority, ending run {run_id}");
         end_failed(ERROR_L0_OFF, L0_OFF_REASON, None).await;
         return Ok(());
     }
 
-    // The prompt names the incident (TH6); the primary, since the run just started.
+    // The primary, since the run just started.
     let incident = match infra::table::alert_incidents::get_rw(&org_id, &incident_id).await {
         Ok(Some(incident)) => incident,
         Ok(None) => {
@@ -2773,7 +2793,7 @@ pub async fn trigger_rca_for_incident(
         None => (RunMode::Fresh, None),
     };
 
-    // SG33: the guidance goes after the initial prompt, with its header.
+    // The guidance goes after the initial prompt, with its header.
     let guidance_row = if has_guidance {
         let row = super::rca_steering::queued_guidance(&org_id, &run_id).await;
         if row.is_none() {
@@ -2820,7 +2840,7 @@ pub async fn trigger_rca_for_incident(
                 started.turn_id,
                 started.session_id
             );
-            // SG33: the guidance row is delivered once the turn is admitted.
+            // The guidance row is delivered once the turn is admitted.
             if let Some(row) = guidance_row {
                 super::rca_steering::guidance_admitted(row).await;
             }
@@ -2935,7 +2955,7 @@ fn model_to_incident_with_topology(
     db_model: infra::table::entity::alert_incidents::Model,
     topology_context: Option<IncidentTopology>,
 ) -> Incident {
-    // The run summary columns only; the detail view adds the runs (RR-28, RR-29).
+    // The run summary columns only; the detail view adds the runs.
     let rca = infra::table::rca_runs::summary_from_incident(
         &db_model,
         config::utils::time::now_micros(),
@@ -3062,7 +3082,7 @@ pub async fn update_status_as(
         log::error!("[Incidents] Failed to record status event: org_id: {org_id}, error: {e}");
     }
 
-    // SG41: a resolve cancels a run that waits for an answer; a working run finishes (RR-44).
+    // A resolve cancels a run that waits for an answer; a working run finishes.
     #[cfg(feature = "enterprise")]
     if status == "resolved"
         && let Err(e) =
@@ -3073,7 +3093,7 @@ pub async fn update_status_as(
         );
     }
 
-    // A reopened incident gets a fresh automatic run (RR-7).
+    // A reopened incident gets a fresh automatic run.
     #[cfg(feature = "enterprise")]
     if status == "open" && !muted {
         start_automatic_rca(
@@ -3570,6 +3590,16 @@ mod tests {
         assert!(!unmute_for_firing("default", &incident(None), None).await);
     }
 
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn an_unmuted_incident_with_a_manual_run_still_decides_l0() {
+        let mut manual = incident(None);
+        manual.rca_run_id = Some("run_manual".to_string());
+        assert!(l0_undecided(&manual));
+        manual.rca_off_reason = Some("l0_off".to_string());
+        assert!(!l0_undecided(&manual));
+    }
+
     #[tokio::test]
     async fn a_muted_auto_resolve_whose_event_append_fails_still_clears_the_mute() {
         use infra::table::entity::alert_incidents;
@@ -3693,7 +3723,7 @@ mod tests {
         assert_eq!(paged, 1, "the delayed opened message goes out once");
     }
 
-    /// RR-13: a run whose RCA setting went off after the start ends `failed`, not `running`.
+    /// A run whose RCA setting went off after the start ends `failed`, not `running`.
     #[cfg(feature = "enterprise")]
     #[tokio::test]
     async fn a_run_started_while_rca_is_off_ends_rca_disabled() {
@@ -3732,8 +3762,7 @@ mod tests {
         assert_eq!(failures(&timeline(&org, &inc).await).len(), 1);
     }
 
-    /// A seed of `source_run` over [three_steps](crate::ai_chat::fork::tests::three_steps),
-    /// as `prepare_resume` makes it.
+    /// A seed of `source_run` over `three_steps`, as `prepare_resume` makes it.
     #[cfg(feature = "enterprise")]
     fn resume_seed(org_id: &str, source_run: &str) -> super::super::rca_resume::ResumeSeed {
         use config::meta::alerts::rca_runs::RunMode;
@@ -3758,13 +3787,12 @@ mod tests {
                 title: plan.from_step.title,
             },
             mode: RunMode::BuildOnPrevious,
+            latest_run_id: source_run.to_string(),
         }
     }
 
-    /// J8: a resumed run copies the source's session and goes on from it: the source's
-    /// events, owner and run reach the copy; the first turn runs on the fork in the
-    /// source's mode, with the lineage and the copied steps' counts and stage on the run;
-    /// a continuation of the run (TH25, SG18) stays on the fork.
+    /// A resumed run copies the source's session, and the run and its continuation stay on the
+    /// fork.
     #[cfg(feature = "enterprise")]
     #[tokio::test]
     async fn a_resumed_run_goes_on_from_the_fork_with_the_copied_counts() {
@@ -3855,8 +3883,7 @@ mod tests {
         assert_eq!(mode, RunMode::BuildOnPrevious);
         assert_eq!(fork.session_id, fork_session);
 
-        // No agent here: the turn stops at its credentials. What it wrote on the run before
-        // is under test.
+        // No agent here: the turn stops at its credentials; its earlier run writes are under test.
         let turn = RcaTurnRun {
             org_id: org.clone(),
             run_id: run_id.clone(),
@@ -3908,7 +3935,7 @@ mod tests {
         );
     }
 
-    /// J8: a resume launch ends on the same guards as any run, before anything is copied.
+    /// A resume launch ends on the same guards as any run, before anything is copied.
     #[cfg(feature = "enterprise")]
     #[tokio::test]
     async fn a_resume_refused_by_a_guard_copies_nothing() {
@@ -3981,7 +4008,7 @@ mod tests {
         assert!(sessions.is_empty(), "no copy was made");
     }
 
-    /// RR-19, RR-20, TH41: a stale live run can be cancelled; the user is recorded.
+    /// A stale live run can be cancelled; the user is recorded.
     #[cfg(feature = "enterprise")]
     #[tokio::test]
     async fn a_stale_run_on_another_node_is_cancelled_by_the_user() {
@@ -4028,7 +4055,7 @@ mod tests {
         assert_eq!(cancels, [Some("a.rao@acme.io".to_string())]);
     }
 
-    /// RR-19: with no live run there is nothing to cancel.
+    /// With no live run there is nothing to cancel.
     #[cfg(feature = "enterprise")]
     #[tokio::test]
     async fn a_cancel_of_an_ended_or_absent_run_returns_none() {
@@ -4065,7 +4092,7 @@ mod tests {
         assert_eq!(run.cancelled_by, None);
     }
 
-    /// RR-28: each listed incident carries its run summary, or `rca: null` when never analyzed.
+    /// Each listed incident carries its run summary, or `rca: null` when never analyzed.
     #[cfg(feature = "enterprise")]
     #[tokio::test]
     async fn the_list_carries_each_incidents_run_summary() {
@@ -4104,8 +4131,7 @@ mod tests {
         assert!(json_of(&never).as_object().unwrap().contains_key("rca"));
     }
 
-    /// TH24: a turn that could not start fails its run with the turn's code and a reason
-    /// a reader can act on; details only where the error carries them.
+    /// A turn that could not start fails its run with the turn's code and an actionable reason.
     #[cfg(feature = "enterprise")]
     #[test]
     fn a_turn_that_could_not_start_names_its_code_and_reason() {
@@ -4145,8 +4171,8 @@ mod tests {
         }
     }
 
-    /// TH10: the cap and a busy session are their own codes; a missing SysRcaAgent user is a
-    /// credentials failure; every other refusal is an agent error.
+    /// The cap, a busy session and a missing SysRcaAgent user get their own codes; the rest are
+    /// agent errors.
     #[cfg(feature = "enterprise")]
     #[test]
     fn an_admission_refusal_maps_to_a_turn_error() {
