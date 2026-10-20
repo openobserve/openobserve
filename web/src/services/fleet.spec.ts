@@ -172,10 +172,7 @@ describe("fleet service", () => {
       auto_revert: false,
     };
     fleet.previewDesired("acme", "f1", body);
-    expect(mockClient.post).toHaveBeenCalledWith(
-      "/api/acme/fleet/fleets/f1/desired/preview",
-      body,
-    );
+    expect(mockClient.post).toHaveBeenCalledWith("/api/acme/fleet/fleets/f1/desired/preview", body);
   });
 
   it("posts each rollout exit to its own path", () => {

@@ -274,8 +274,8 @@ describe("toCollectorDetail", () => {
     };
     expect(toCollectorDetail(apiDetail({ health })).components[0].status).toBe("healthy");
     expect(
-      toCollectorDetail(apiDetail({ ...apiCollector({ status: "offline" }), health }))
-        .components[0].status,
+      toCollectorDetail(apiDetail({ ...apiCollector({ status: "offline" }), health })).components[0]
+        .status,
     ).toBe("unknown");
   });
 });

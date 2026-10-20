@@ -234,9 +234,7 @@ describe("FleetTokens", () => {
 
   it("shows enrollments and the collectors in use, split online and offline", async () => {
     wrapper = await mountTokens();
-    expect(wrapper.find('[data-test="fleet-tokens-in-use-t1"]').text()).toBe(
-      "1 online, 1 offline",
-    );
+    expect(wrapper.find('[data-test="fleet-tokens-in-use-t1"]').text()).toBe("1 online, 1 offline");
     expect(wrapper.find('[data-test="fleet-tokens-in-use-t4"]').text()).toBe("—");
   });
 
@@ -245,10 +243,11 @@ describe("FleetTokens", () => {
     wrapper = await mountTokens();
     await startRevoke();
     expect(revokeDialog().props("open")).toBe(true);
-    expect(revokeDialog().props("affected").map((c: { id: string }) => c.id)).toEqual([
-      "c1",
-      "c2",
-    ]);
+    expect(
+      revokeDialog()
+        .props("affected")
+        .map((c: { id: string }) => c.id),
+    ).toEqual(["c1", "c2"]);
     expect(fleet.revokeToken).not.toHaveBeenCalled();
     revokeDialog().vm.$emit("confirm", revokeDialog().props("token"));
     await settle();
@@ -580,7 +579,9 @@ describe("FleetTokens", () => {
     const dialog = revokeDialog().findComponent({ name: "ODialog" });
     expect(dialog.props("primaryButtonVariant")).toBe("destructive");
     expect(dialog.props("primaryButtonDisabled")).toBe(true);
-    await revokeDialog().findComponent({ name: "OInput" }).vm.$emit("update:modelValue", "k8s-helm");
+    await revokeDialog()
+      .findComponent({ name: "OInput" })
+      .vm.$emit("update:modelValue", "k8s-helm");
     await flushPromises();
     expect(dialog.props("primaryButtonDisabled")).toBe(false);
   });

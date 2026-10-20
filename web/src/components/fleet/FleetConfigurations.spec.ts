@@ -110,6 +110,17 @@ describe("FleetConfigurations", () => {
     expect(wrapper.text()).not.toContain("Groups");
   });
 
+  it("counts the referencing fleets the viewer cannot see", async () => {
+    vi.mocked(fleet.listConfigs).mockResolvedValue({
+      data: { items: [config({ fleets: [{ id: "f1", name: "edge" }], fleets_hidden: 2 })] },
+    } as any);
+    wrapper = await mountList();
+    expect(
+      wrapper.find('[data-test="fleet-configurations-fleets-hidden-edge-minimal"]').text(),
+    ).toBe("+2 you cannot view");
+    expect(wrapper.text()).toContain("Used by fleets");
+  });
+
   it("renders the rows the API returns", async () => {
     wrapper = await mountList();
     expect(fleet.listConfigs).toHaveBeenCalledWith(store.state.selectedOrganization.identifier);

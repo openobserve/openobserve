@@ -75,7 +75,9 @@ describe("FleetSettings", () => {
   });
 
   async function mountSettings() {
-    wrapper = mount(FleetSettings, { attachTo: document.body, global: { plugins: [i18n, store], stubs: { FleetCollectorVersions: true } },
+    wrapper = mount(FleetSettings, {
+      attachTo: document.body,
+      global: { plugins: [i18n, store], stubs: { FleetCollectorVersions: true } },
     });
     await settle();
     return wrapper;
@@ -203,7 +205,10 @@ describe("FleetSettings", () => {
   });
 
   it("saves an added component and a target as one full body", async () => {
-    const body = { restricted_components: ["debug", "file", "kafka"], target_collector_version: "0.170.0" };
+    const body = {
+      restricted_components: ["debug", "file", "kafka"],
+      target_collector_version: "0.170.0",
+    };
     vi.mocked(fleet.updateSettings).mockResolvedValue({ data: body } as any);
     await mountSettings();
     await edit("kafka", "0.170.0");
@@ -461,16 +466,21 @@ describe("FleetSettings", () => {
     it("shows the defaults in minutes where the API stores seconds", async () => {
       await mountSettings();
       const field = (n: string) =>
-        wrapper.find(`[data-test="fleet-settings-defaults-form-${n}-field"]`).element as HTMLInputElement;
+        wrapper.find(`[data-test="fleet-settings-defaults-form-${n}-field"]`)
+          .element as HTMLInputElement;
       expect(field("heartbeat").value).toBe("30");
       expect(field("phaseTimeoutMin").value).toBe("30");
       expect(field("observeMin").value).toBe("10");
     });
 
     it("saves changed defaults inside the full settings body", async () => {
-      vi.mocked(fleet.updateSettings).mockImplementation(async (_o, body) => ({ data: body }) as any);
+      vi.mocked(fleet.updateSettings).mockImplementation(
+        async (_o, body) => ({ data: body }) as any,
+      );
       await mountSettings();
-      await wrapper.find('[data-test="fleet-settings-defaults-form-heartbeat-field"]').setValue("15");
+      await wrapper
+        .find('[data-test="fleet-settings-defaults-form-heartbeat-field"]')
+        .setValue("15");
       await wrapper.find('[data-test="fleet-settings-defaults-form-save"]').trigger("click");
       await settle();
       expect(fleet.updateSettings).toHaveBeenCalledWith(org(), {
@@ -489,4 +499,3 @@ describe("FleetSettings", () => {
     });
   });
 });
-

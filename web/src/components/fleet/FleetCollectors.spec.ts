@@ -461,8 +461,6 @@ describe("FleetCollectors", () => {
     }
   });
 
-  const moveDialog = (w: VueWrapper) => w.findComponent({ name: "MoveAcrossFolders" });
-
   it.each<[string, (w: VueWrapper) => Promise<unknown>]>([
     ["search", (w) => w.find('[data-test="fleet-collectors-search"] input').setValue("prod")],
     ["status", (w) => w.find('[data-test="fleet-collectors-stat-offline"]').trigger("click")],

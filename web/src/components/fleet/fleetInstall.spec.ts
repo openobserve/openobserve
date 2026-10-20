@@ -56,7 +56,9 @@ describe("installCommand", () => {
 
   it("runs the PowerShell script on Windows", () => {
     const cmd = installCommand("windows", target);
-    expect(cmd).toContain("irm https://raw.githubusercontent.com/openobserve/agents/main/windows/install.ps1");
+    expect(cmd).toContain(
+      "irm https://raw.githubusercontent.com/openobserve/agents/main/windows/install.ps1",
+    );
     expect(cmd).toContain("-Token 'o2ft_abc123'");
   });
 
