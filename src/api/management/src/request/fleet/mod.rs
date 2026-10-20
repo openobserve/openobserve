@@ -164,7 +164,7 @@ pub async fn get_collector(
     ),
     request_body(content = RenameCollectorRequest, content_type = "application/json"),
     responses(
-        (status = 200, description = "The renamed collector", content_type = "application/json", body = config::meta::fleet::CollectorDetail),
+        (status = 200, description = "The renamed collector", content_type = "application/json", body = config::meta::fleet::Collector),
         (status = 400, description = "Invalid", content_type = "application/json", body = Object),
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
@@ -1162,7 +1162,7 @@ pub async fn get_config(
         (status = 204, description = "Deleted"),
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
-        (status = 409, description = "Referenced by a fleet, a collector or an active rollout", content_type = "application/json", body = Object),
+        (status = 409, description = "Referenced; the body's `references` holds the counts", content_type = "application/json", body = Object),
     ),
 )]
 pub async fn delete_config(
@@ -2068,6 +2068,14 @@ fn to_response(e: anyhow::Error) -> Response {
             };
             (StatusCode::UNPROCESSABLE_ENTITY, axum::Json(body)).into_response()
         }
+        Some(FleetError::ConfigInUse(_, references)) => {
+            let body = serde_json::json!({
+                "code": StatusCode::CONFLICT.as_u16(),
+                "message": e.to_string(),
+                "references": references,
+            });
+            (StatusCode::CONFLICT, axum::Json(body)).into_response()
+        }
         Some(err) => MetaHttpResponse::error(err.status_code(), e.to_string()).into_response(),
         None => {
             log::error!("[fleet] {e}");
@@ -2229,7 +2237,11 @@ mod tests {
                 StatusCode::CONFLICT,
             ),
             (FleetError::Conflict("edge".into()), StatusCode::CONFLICT),
-            (FleetError::ConfigInUse("edge".into()), StatusCode::CONFLICT),
+            (
+                FleetError::ConfigInUse("edge".into(), Default::default()),
+                StatusCode::CONFLICT,
+            ),
+            (FleetError::Disabled, StatusCode::SERVICE_UNAVAILABLE),
             (FleetError::ClusterUpgrading, StatusCode::CONFLICT),
             (FleetError::Moved("c1".into()), StatusCode::CONFLICT),
             (
@@ -2259,6 +2271,13 @@ mod tests {
         )]);
         let res = to_response(FleetError::ValidationFailed(issues).into());
         assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
+        let references = config::meta::fleet::References {
+            fleets: 2,
+            ..Default::default()
+        };
+        let res = to_response(FleetError::ConfigInUse("edge".into(), references).into());
+        assert_eq!(res.status(), StatusCode::CONFLICT);
+        assert!(body_text(res).await.contains(r#""fleets":2"#));
         let other = to_response(anyhow::anyhow!("SELECT secret FROM x"));
         assert_eq!(other.status(), StatusCode::INTERNAL_SERVER_ERROR);
         assert!(!body_text(other).await.contains("SELECT secret"));
