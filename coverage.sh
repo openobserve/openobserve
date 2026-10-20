@@ -28,6 +28,19 @@ _cov_test() {
     cargo llvm-cov --version >/dev/null || cargo install cargo-llvm-cov
     cargo nextest --version >/dev/null || cargo install cargo-nextest
     cargo run -- init-db
+
+    cargo llvm-cov nextest \
+        --workspace \
+        --verbose \
+        --no-cfg-coverage \
+        --no-cfg-coverage-nightly \
+        --no-report \
+        --ignore-filename-regex 'job|.*generated.*' \
+        --test-threads=1 \
+        --no-fail-fast \
+        --retries 1 \
+        users::tests bootstrap cache::file_data::disk
+
     cargo llvm-cov nextest \
         --workspace \
         --verbose \
@@ -36,7 +49,11 @@ _cov_test() {
         --ignore-filename-regex 'job|.*generated.*' \
         --no-fail-fast \
         --retries 1 \
+        -- \
+        --skip users::tests \
+        --skip bootstrap
         "$@"
+        
 }
 
 cmd_html() {
