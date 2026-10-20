@@ -120,6 +120,7 @@ fn viewer_license_fields(
     if !is_root && let Some(license) = license.as_mut() {
         license.installation_id.clear();
         license.validator_auth.clear();
+        hide_waiver_installations(&mut license.waivers);
     }
     let key = if redact_key || !is_root {
         key.map(|v| mask_license_key(&v))
@@ -136,8 +137,22 @@ fn viewer_license_fields(
     (key, license, installation_id)
 }
 
-fn license_status_fields(status: LicenseStatus) -> (Vec<Waiver>, LicenseDecision, LicenseDecision) {
-    (status.waivers, status.decision, status.base)
+fn license_status_fields(
+    status: LicenseStatus,
+    is_root: bool,
+) -> (Vec<Waiver>, LicenseDecision, LicenseDecision) {
+    let mut waivers = status.waivers;
+    if !is_root {
+        hide_waiver_installations(&mut waivers);
+    }
+    (waivers, status.decision, status.base)
+}
+
+// a scoped waiver names an installation id, which on token-less installs is the grpc token
+fn hide_waiver_installations(waivers: &mut [Waiver]) {
+    for w in waivers {
+        w.installation_id = None;
+    }
 }
 
 fn env_key_conflict(env_key: &str, pasted: &str) -> bool {
@@ -168,7 +183,7 @@ pub async fn get_license_info(Headers(email): Headers<UserEmail>) -> Response {
         license,
     );
 
-    let (waivers, decision, base) = license_status_fields(license_status().await);
+    let (waivers, decision, base) = license_status_fields(license_status().await, is_root);
 
     let res = LicenseResponse {
         key,
@@ -241,6 +256,18 @@ mod tests {
 
     const INSTANCE_ID: &str = "license-instance-7f3a";
     const VALIDATOR_AUTH: &str = "dmFsaWRhdG9yOnMzY3JldA-auth";
+    const OTHER_INSTANCE_ID: &str = "license-instance-other-9c1d";
+
+    fn scoped_waiver_json(id: &str, installation_id: &str) -> json::Value {
+        json::json!({
+            "id": id,
+            "type": "search_unblock",
+            "starts_at": 0,
+            "ends_at": 1000,
+            "installation_id": installation_id,
+            "note": "",
+        })
+    }
 
     fn stored_license() -> (String, License) {
         let payload = json::json!({
@@ -259,6 +286,10 @@ mod tests {
             "limits": {},
             "validator_url": "https://validator.example",
             "validator_auth": VALIDATOR_AUTH,
+            "waivers": [
+                scoped_waiver_json("wv_here", INSTANCE_ID),
+                scoped_waiver_json("wv_other", OTHER_INSTANCE_ID),
+            ],
         });
         let segment = base64::encode(&payload.to_string())
             .replace('+', "-")
@@ -283,6 +314,9 @@ mod tests {
             Some(key),
             Some(license),
         );
+        let mut status = status_fixture();
+        status.waivers[0].installation_id = Some(INSTANCE_ID.into());
+        let (waivers, decision, base) = license_status_fields(status, is_root);
         json::to_string(&LicenseResponse {
             key,
             license,
@@ -290,12 +324,21 @@ mod tests {
             expired: false,
             ingestion_used: 0.0,
             ingestion_exceeded: 0,
-            waivers: Vec::new(),
-            decision: LicenseDecision::default(),
-            base: LicenseDecision::default(),
+            waivers,
+            decision,
+            base,
             env_key_active: false,
         })
         .unwrap()
+    }
+
+    fn waiver_installation_ids(response: &str) -> Vec<json::Value> {
+        let response: json::Value = json::from_str(response).unwrap();
+        [&response["waivers"], &response["license"]["waivers"]]
+            .into_iter()
+            .flat_map(|ws| ws.as_array().cloned().unwrap_or_default())
+            .map(|w| w["installation_id"].clone())
+            .collect()
     }
 
     fn status_fixture() -> LicenseStatus {
@@ -362,6 +405,28 @@ mod tests {
     }
 
     #[test]
+    fn test_waiver_installation_ids_are_visible_to_root_only() {
+        for (is_license_admin, token) in
+            [(false, "cluster-token-distinct"), (true, ""), (true, "x")]
+        {
+            let viewer = response_json_with_token(false, is_license_admin, token);
+            let ids = waiver_installation_ids(&viewer);
+            assert_eq!(ids.len(), 3, "{viewer}");
+            assert!(ids.iter().all(|id| id.is_null()), "{viewer}");
+            assert!(!viewer.contains(OTHER_INSTANCE_ID), "{viewer}");
+        }
+        let root = response_json(true, true);
+        assert_eq!(
+            waiver_installation_ids(&root),
+            vec![
+                json::json!(INSTANCE_ID),
+                json::json!(INSTANCE_ID),
+                json::json!(OTHER_INSTANCE_ID)
+            ]
+        );
+    }
+
+    #[test]
     fn test_license_admins_never_get_an_installation_id_that_is_the_grpc_token() {
         for token in ["", INSTANCE_ID] {
             let admin = response_json_with_token(false, true, token);
@@ -402,7 +467,7 @@ mod tests {
 
     #[test]
     fn test_license_response_carries_decision_and_waivers() {
-        let (waivers, decision, base) = license_status_fields(status_fixture());
+        let (waivers, decision, base) = license_status_fields(status_fixture(), false);
         let json = json::to_value(&LicenseResponse {
             key: None,
             license: None,
@@ -432,7 +497,7 @@ mod tests {
         s.decision.search_allowed = false;
         s.decision.blocks = vec![Block::UsageOverLimit];
         s.decision.limit_today_gb = None;
-        let d = json::to_value(license_status_fields(s).1).unwrap();
+        let d = json::to_value(license_status_fields(s, false).1).unwrap();
         assert_eq!(d["blocks"][0], "usage_over_limit");
         assert!(d["limit_today_gb"].is_null());
     }
