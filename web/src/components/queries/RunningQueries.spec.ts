@@ -304,11 +304,11 @@ describe("RunningQueries", () => {
 
   // Test 12: confirmDeleteAction function
   it("should show delete dialog with correct data", () => {
-    const row = { trace_id: "test-trace-id" };
+    const row = { trace_id: "test-trace-id", org_id: "org-1" };
     wrapper.vm.confirmDeleteAction(row);
 
     expect(wrapper.vm.deleteDialog.show).toBe(true);
-    expect(wrapper.vm.deleteDialog.data).toEqual(["test-trace-id"]);
+    expect(wrapper.vm.deleteDialog.data).toEqual([{ trace_id: "test-trace-id", org_id: "org-1" }]);
   });
 
   // Test 13: onChangeQueryTab function
@@ -354,12 +354,24 @@ describe("RunningQueries", () => {
 
   // Test 17: handleMultiQueryCancel function without traceIds
   it("should handle multi query cancel without traceIds", () => {
-    wrapper.vm.selectedRow.summary = [{ trace_id: "trace1" }, { trace_ids: ["trace2", "trace3"] }];
+    wrapper.vm.selectedRow.summary = [
+      { trace_id: "trace1", org_id: "a" },
+      {
+        queries: [
+          { trace_id: "trace2", org_id: "b" },
+          { trace_id: "trace3", org_id: "c" },
+        ],
+      },
+    ];
     wrapper.vm.selectedQueryTypeTab = "summary";
     wrapper.vm.handleMultiQueryCancel();
 
     expect(wrapper.vm.deleteDialog.show).toBe(true);
-    expect(wrapper.vm.deleteDialog.data).toContain("trace1");
+    expect(wrapper.vm.deleteDialog.data).toEqual([
+      { trace_id: "trace1", org_id: "a" },
+      { trace_id: "trace2", org_id: "b" },
+      { trace_id: "trace3", org_id: "c" },
+    ]);
   });
 
   // Test 18: getRunningQueries success
@@ -373,8 +385,7 @@ describe("RunningQueries", () => {
 
   // Test 20: deleteQuery success
   it("should delete query successfully", async () => {
-    wrapper.vm.queries = [{ trace_id: "trace-1", org_id: "org-1" }];
-    wrapper.vm.deleteDialog.data = ["trace-1"];
+    wrapper.vm.deleteDialog.data = [{ trace_id: "trace-1", org_id: "org-1" }];
     wrapper.vm.selectedQueryTypeTab = "all";
     (SearchService.cancel_running_queries as any).mockResolvedValue({});
 
@@ -387,22 +398,20 @@ describe("RunningQueries", () => {
     expect(wrapper.vm.deleteDialog.show).toBe(false);
   });
 
-  it("should cancel a trace id that is no longer listed in the meta org", async () => {
-    wrapper.vm.queries = [{ trace_id: "trace-1", org_id: "org-1" }];
-    wrapper.vm.deleteDialog.data = ["trace-1", "gone"];
+  it("should cancel a trace id shared by two orgs only in the org of the chosen row", async () => {
     (SearchService.cancel_running_queries as any).mockResolvedValue({});
 
+    wrapper.vm.confirmDeleteAction({ trace_id: "t", org_id: "org-a" });
     await wrapper.vm.deleteQuery();
 
     expect(SearchService.cancel_running_queries).toHaveBeenCalledWith("test-org", [
-      { trace_id: "trace-1", org_id: "org-1" },
-      { trace_id: "gone", org_id: "test-org" },
+      { trace_id: "t", org_id: "org-a" },
     ]);
   });
 
   // Test 21: deleteQuery error handling
   it("should handle deleteQuery error", async () => {
-    wrapper.vm.deleteDialog.data = ["trace-1"];
+    wrapper.vm.deleteDialog.data = [{ trace_id: "trace-1", org_id: "org-1" }];
     (SearchService.cancel_running_queries as any).mockRejectedValue({
       response: { data: { message: "Delete Error" } },
     });
@@ -744,6 +753,7 @@ describe("RunningQueries", () => {
     const complexQueries = [
       {
         trace_id: "trace-1",
+        org_id: "org-a",
         user_id: "same_user@example.com",
         search_type: "dashboards",
         search_type_label: "dashboards",
@@ -752,6 +762,7 @@ describe("RunningQueries", () => {
       },
       {
         trace_id: "trace-2",
+        org_id: "org-b",
         user_id: "same_user@example.com",
         search_type: "dashboards",
         search_type_label: "dashboards",
@@ -765,6 +776,9 @@ describe("RunningQueries", () => {
 
     expect(summary.length).toBe(1);
     expect(summary[0].numOfQueries).toBe(2);
-    expect(summary[0].trace_ids).toEqual(["trace-1", "trace-2"]);
+    expect(summary[0].queries).toEqual([
+      { trace_id: "trace-1", org_id: "org-a" },
+      { trace_id: "trace-2", org_id: "org-b" },
+    ]);
   });
 });
