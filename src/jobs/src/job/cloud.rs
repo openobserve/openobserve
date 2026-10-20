@@ -27,7 +27,10 @@ use config::{
         time::{hour_micros, now_micros},
     },
 };
-use db::{org_users::list_users_by_org, organization::get_org_setting};
+use db::{
+    org_users::list_users_by_org,
+    organization::{self, get_org_setting},
+};
 use hashbrown::HashSet;
 use infra::table::org_users::get_admin;
 use o2_enterprise::enterprise::cloud::billings::{MeteringDetail, MeteringProvider};
@@ -888,19 +891,35 @@ async fn send_warning_email(
 
     let email = Email { recipients: admins };
 
-    let subject = format!(
-        "Openobserve Cloud: Budget Warning notification for {} org",
-        child_org.unwrap_or(org_id)
-    );
+    let considered_org_id = child_org.unwrap_or(org_id);
+
+    let parent_name_id_pair = match organization::get_org(org_id).await {
+        Ok(v) => format!("{} ({org_id})", v.name),
+        Err(e) => {
+            log::error!("error in getting org record for {org_id} for budget email : {e}");
+            org_id.to_string()
+        }
+    };
+
+    let name_id_pair = match organization::get_org(considered_org_id).await {
+        Ok(v) => format!("{} ({considered_org_id})", v.name),
+        Err(e) => {
+            log::error!(
+                "error in getting org record for {considered_org_id} for budget email : {e}"
+            );
+            considered_org_id.to_string()
+        }
+    };
+
+    let subject = format!("Openobserve Cloud: Budget Warning notification for {name_id_pair} org",);
 
     let info_line = if is_total_config {
         format!(
-            "This is a notification email based on configured total cost budget for org id <b>{org_id}</b>"
+            "This is a notification email based on configured total cost budget for org id <b>{parent_name_id_pair}</b>"
         )
     } else {
         format!(
-            "This is a notification email based on configured cost budget for org id <b>{}</b>.",
-            child_org.unwrap_or(org_id)
+            "This is a notification email based on configured cost budget for org id <b>{name_id_pair}</b>."
         )
     };
 
@@ -913,7 +932,8 @@ async fn send_warning_email(
     <br/>
     These notifications will now continue till end of the cycle, and you can pause them from the Budget tab of the Usage section in Openobserve Cloud.<br/>
     <br/>
-    Regards."#,
+    Regards,<br/>
+    The Openobserve Team"#,
         total,
         warn,
         (warn / total) * 100.0,
