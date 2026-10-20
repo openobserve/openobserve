@@ -403,7 +403,11 @@ describe("foldTurns: replay phase", () => {
         status: "completed",
       }),
     ]);
-    expect(answer.contentBlocks).toEqual([{ type: "text", text: "done" }]);
+    // The footer block is the turn's own data (trace, usage), not an outcome marker.
+    expect(answer.contentBlocks).toEqual([
+      { type: "text", text: "done" },
+      { type: "footer", footer: {} },
+    ]);
     const running = replay([
       turn("q", [{ type: "message_delta", content: "x" }], { status: "running" }),
     ]);

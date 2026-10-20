@@ -75,8 +75,12 @@ export interface FeedbackBody {
   feedback_type: string;
   query_index: number;
   trace_id?: string;
+  /** The turn the vote is about; o2-ai ignores it until it stores votes with the turn. */
+  turn_id?: string;
   comment?: string;
   rating?: string;
+  /** 1–5 for `feedback_type: "rating"`. */
+  value?: number;
 }
 
 export const PROBE_TIMEOUT_MS = 5_000;

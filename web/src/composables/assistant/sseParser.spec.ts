@@ -342,6 +342,7 @@ describe("the final-chunk gap is closed for the new path", () => {
       },
     );
     const blocks = s.messages[0].contentBlocks ?? [];
-    expect(blocks.some((b) => b.pendingConfirmation)).toBe(true);
+    // A navigation is a link card now; a confirmation is still a pending card.
+    expect(blocks.some((b) => b.pendingConfirmation || b.type === "link")).toBe(true);
   });
 });

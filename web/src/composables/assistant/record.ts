@@ -13,11 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { generateNavigationFromToolResult } from "@/components/O2AIChat.navigation";
 import type { ChatMessage, ContentBlock, ImageAttachment, TurnSpan } from "@/ts/interfaces/chat";
 import { raw, type TranslateFn } from "@/types/i18n";
 
 import { toAssistantError } from "./assistantErrors";
+import { generateNavigationFromToolResult } from "./navigationRoutes";
 import { interruptSteps, reduce, type ReducerCtx, type StreamState } from "./reducer";
 
 export type { TurnSpan };

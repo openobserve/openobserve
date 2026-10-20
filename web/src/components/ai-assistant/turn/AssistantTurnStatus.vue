@@ -66,6 +66,8 @@ export interface AssistantTurnStatusProps {
   /** `block` under the running message (no Stop: the composer owns it); `line` the helper, `card` the RCA drawer. */
   variant: "block" | "line" | "card";
   ownedByThisTab: boolean;
+  /** The answer's trail already shows the running tool as a row. */
+  trailShown?: boolean;
   /** Injected by specs; elapsed is computed from it, never from a counter. */
   now?: () => number;
 }
@@ -82,7 +84,7 @@ export const STATUS_TICK_MS = 1_000;
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 
 import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
-import { isTerminal, turnStatusText } from "@/composables/assistant/pure";
+import { isTerminal, stepLabel, turnStatusText } from "@/composables/assistant/pure";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -90,7 +92,10 @@ import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { useI18nTyped } from "@/types/i18n";
 
-const props = withDefaults(defineProps<AssistantTurnStatusProps>(), { now: undefined });
+const props = withDefaults(defineProps<AssistantTurnStatusProps>(), {
+  trailShown: false,
+  now: undefined,
+});
 
 const emit = defineEmits<AssistantTurnStatusEmits>();
 
@@ -110,7 +115,14 @@ const status = computed(() => {
   if (!live.value) return null;
   if (!props.ownedByThisTab)
     return { line: t("assistant.turn.elsewhere"), tone: "neutral" as const };
-  return turnStatusText(props.turn, props.meta, t, clock());
+  const text = turnStatusText(props.turn, props.meta, t, clock());
+  // A tool with no label of its own would only read "Running {tool}" beside the trail's real row.
+  const repeatsTrail =
+    props.variant === "block" &&
+    props.trailShown &&
+    props.turn.state === "running_tool" &&
+    stepLabel(props.turn.tool, props.turn.target).key === "assistant.step.fallback";
+  return repeatsTrail && !text?.second ? null : text;
 });
 
 // No motion while the turn waits on the user, and a static glyph under reduced motion (HT-01 AC 4, AC 11).

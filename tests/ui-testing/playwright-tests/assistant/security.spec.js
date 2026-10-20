@@ -53,7 +53,8 @@ test.describe("assistant security", () => {
 
   test("SEC-02 unsafe links render as text and external links open in a new tab", async ({ page }) => {
     const answer = await payloadAnswer(page);
-    const hrefs = await answer.locator("a").evaluateAll((links) =>
+    // Link cards are typed routes of their own; the rendered Markdown is what may hold only external links.
+    const hrefs = await answer.locator('[data-test="assistant-block-text"] a').evaluateAll((links) =>
       links.map((a) => ({ href: a.getAttribute("href"), target: a.target, rel: a.rel })),
     );
     expect(hrefs).toEqual([
@@ -63,7 +64,7 @@ test.describe("assistant security", () => {
     await expect(answer.locator('a[href*="logout"], a[href*="shared"], a[href^="javascript"], a[href^="data"]')).toHaveCount(0);
   });
 
-  test("SEC-03 a navigation frame from the agent never navigates or becomes a link", async ({ page }) => {
+  test("SEC-03 a navigation frame from the agent never navigates; it is offered as one link card", async ({ page }) => {
     await openOnLogs(page);
     // The logs page writes its own time range into the URL once it loads; only a change after that is the agent's.
     await expect.poll(() => page.url(), { timeout: 15_000 }).not.toContain("from=NaN");
@@ -72,7 +73,9 @@ test.describe("assistant security", () => {
     await assistant.send("open logs");
     await page.waitForTimeout(2_000);
     expect(page.url()).toBe(before);
-    await expect(assistant.transcript().locator('[data-test="assistant-link-card"]')).toHaveCount(0);
+    // The frame renders a link card (no "Allow" prompt), which opens only on its own click.
+    await expect(assistant.transcript().locator('[data-test="assistant-link-card"]')).toHaveCount(1);
+    await expect(assistant.transcript().getByText("Always allow")).toHaveCount(0);
   });
 
   test("SEC-04 raw HTML in an answer is stripped to its text and its handler never runs", async ({ page }) => {

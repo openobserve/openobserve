@@ -42,7 +42,11 @@ export interface ContentBlock {
     | "status"
     | "turn_outcome"
     | "attachment"
-    | "trail";
+    | "trail"
+    | "query"
+    | "link"
+    | "findings"
+    | "footer";
   // For tool_call type:
   tool?: string;
   message?: I18nText;
@@ -125,6 +129,10 @@ export interface ChatMessage {
   chips?: ContextChip[];
   /** 1-based number of the user message an edit-and-resend came from. */
   editedFrom?: number;
+  /** The window a "Re-run for now" prompt evaluates, epoch ms. */
+  rerunFor?: { from: number; to: number };
+  /** The page's absolute time window when the prompt was sent, epoch ms. */
+  sentWindow?: { from: number; to: number };
 }
 
 /** Where one stored turn's messages sit in a folded message list, for incremental merges. */

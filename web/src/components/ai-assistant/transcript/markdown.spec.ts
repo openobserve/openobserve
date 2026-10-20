@@ -264,6 +264,28 @@ describe("markdown.ts strict profile", () => {
     expect(htmlOf(render("Cart failed [^cal", "open").parts)).not.toContain("[^cal");
   });
 
+  it("leaves an empty slot against the cited word, never a space before punctuation", () => {
+    const done = render("Cart returned 502 [^call_3], then [^call_1].");
+    const html = htmlOf(done.parts);
+    expect(html).toContain('502<wbr data-claim="0">, then<wbr data-claim="1">.');
+    const wrapper = mountHtml(html);
+    const slots = Array.from(wrapper.element.querySelectorAll("[data-claim]"));
+    expect(slots.map((slot) => [slot.tagName, slot.getAttribute("data-claim")])).toEqual([
+      ["SPAN", "0"],
+      ["SPAN", "1"],
+    ]);
+    expect(slots.every((slot) => slot.childNodes.length === 0)).toBe(true);
+    expect(markdownToPlainText("Rose [^c1].")).toBe("Rose.");
+  });
+
+  it("gives the model's own slot characters no slot, and a non-numeric slot no attribute", () => {
+    expect(htmlOf(render("A \uE0000\uE001 b").parts)).not.toContain("data-claim");
+    const table = render("| a |\n| - |\n| `\uE0000\uE001` ![\uE0000\uE001](x) [^c1] |");
+    expect(htmlOf(table.parts).match(/data-claim/g)).toHaveLength(1);
+    const wrapper = mountHtml('<p>x<wbr data-claim="a">y<span data-claim="0">z</span></p>');
+    expect(wrapper.element.querySelectorAll("[data-claim]")).toHaveLength(0);
+  });
+
   it("never serves another text of the same block id and length from the memo (F1)", () => {
     const first = renderMarkdown("m0:v1:0", "Answer from chat A", "closed");
     const second = renderMarkdown("m0:v1:0", "Answer from chat B", "closed");
@@ -1411,6 +1433,6 @@ describe("markdown.ts strict profile", () => {
       markdownToPlainText(
         "## Title\n\nSome **bold** and `code` [link](https://x.io) [^call_1].\n\n- a\n- b",
       ),
-    ).toBe("Title\n\nSome bold and code link .\n\n- a\n- b");
+    ).toBe("Title\n\nSome bold and code link.\n\n- a\n- b");
   });
 });

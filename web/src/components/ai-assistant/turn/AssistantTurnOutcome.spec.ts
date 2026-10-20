@@ -198,6 +198,25 @@ describe("AssistantTurnOutcome", () => {
     },
   );
 
+  it("offers Open in Logs instead on a provider failure with a query, and emits it", async () => {
+    const manualRoute = { language: "sql" as const, text: "SELECT 1", stream: "default", org: "o" };
+    const wrapper = mountOutcome({ kind: "failed", error: error("provider_error"), manualRoute });
+    const manual = wrapper.get('[data-test="assistant-turn-outcome-manual"]');
+    expect(manual.text()).toBe("Open in Logs instead");
+    await manual.trigger("click");
+    expect(wrapper.emitted("manual")?.[0]).toEqual([manualRoute]);
+    expect(
+      mountOutcome({ kind: "failed", error: error("rate_limited"), manualRoute })
+        .find('[data-test="assistant-turn-outcome-manual"]')
+        .exists(),
+    ).toBe(false);
+    expect(
+      mountOutcome({ kind: "failed", error: error("provider_error") })
+        .find('[data-test="assistant-turn-outcome-manual"]')
+        .exists(),
+    ).toBe(false);
+  });
+
   it("uses the Calm Signal looks and suppresses the banner's own role (`30` §4.2, `95` §2.3)", () => {
     const failed = mountOutcome({ kind: "failed", error: error("unknown") });
     expect(failed.attributes("role")).toBe("presentation");

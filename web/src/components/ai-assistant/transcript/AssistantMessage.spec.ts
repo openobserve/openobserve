@@ -13,13 +13,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { mount } from "@vue/test-utils";
+import { flushPromises, mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { defineComponent, h } from "vue";
 
 import type { ChatMessage } from "@/ts/interfaces/chat";
 import { raw } from "@/types/i18n";
 
+import { fakeEvidence } from "../__tests__/fakeEvidence";
+import { fakeRouter } from "../__tests__/fakeAssistant";
 import AssistantMessage, {
   registerBlockRenderer,
   resetBlockRenderersForTests,
@@ -176,9 +178,18 @@ describe("AssistantMessage", () => {
     expect(wrapper.find('[data-test="assistant-mark"]').exists()).toBe(true);
     expect(wrapper.get("h2").text()).toBe("Checkout 5xx spike");
     expect(wrapper.element.querySelector("img")).toBeNull();
-    const code = wrapper.get('[data-test="assistant-code-block"]');
-    expect(code.attributes("aria-label")).toBe("Code, SQL");
-    expect(code.attributes("data-query")).toBe("");
+    // A closed SQL fence is a runnable query block, never a code block with a Retry.
+    const block = wrapper.get('[data-test="assistant-query-block"]');
+    expect(block.attributes("role")).toBe("group");
+    expect(block.get('[data-test="assistant-query-language"]').text()).toBe("SQL");
+    expect(wrapper.find('[data-test="assistant-code-block"]').exists()).toBe(false);
+  });
+
+  it("keeps a closed non-query fence as a copyable code block", () => {
+    const wrapper = mountMessage(answer([{ type: "text", text: "```bash\nls\n```" }]));
+    expect(wrapper.get('[data-test="assistant-code-block"]').attributes("aria-label")).toBe(
+      "Code, Bash",
+    );
   });
 
   it("is aria-busy and streams only its last text block while live (HT-10 AC 3, EB-01 AC 4)", async () => {
@@ -234,5 +245,122 @@ describe("AssistantMessage", () => {
   it("renders nothing for an outcome block; the transcript places it after the message", () => {
     const wrapper = mountMessage(answer([{ type: "turn_outcome", outcome: { kind: "stopped" } }]));
     expect(wrapper.find('[data-test="assistant-mark"]').exists()).toBe(false);
+  });
+
+  it("captions a Re-run prompt with the window it evaluates", () => {
+    const from = Date.UTC(2026, 9, 14, 8, 40);
+    const wrapper = mountMessage(user({ rerunFor: { from, to: from + 15 * 60_000 } }));
+    expect(wrapper.get('[data-test="assistant-message-rerun"]').text()).toMatch(
+      /^Re-run for \d\d:\d\d–\d\d:\d\d \S+$/,
+    );
+  });
+
+  describe("evidence", () => {
+    const routes = [
+      { path: "/dashboards/view", name: "viewDashboard", component: { render: () => null } },
+      { path: "/logout", name: "logout", component: { render: () => null } },
+    ];
+    const steps: NonNullable<ChatMessage["contentBlocks"]> = [
+      { type: "tool_call", tool: "StreamList", call_id: "call_1", stepState: "done" },
+      {
+        type: "tool_call",
+        tool: "SearchSQL",
+        call_id: "call_3",
+        stepState: "done",
+        context: { stream_name: "default" },
+      },
+    ];
+    const mountLive = (
+      blocks: NonNullable<ChatMessage["contentBlocks"]>,
+      turn: Record<string, unknown> = {},
+    ) => {
+      const evidence = fakeEvidence();
+      return mount(AssistantMessage, {
+        props: { message: answer(blocks), turnId: "t1", turn: evidence.turn(turn) },
+        attachTo: document.body,
+        global: { plugins: [fakeRouter(routes)], provide: evidence.provide },
+      });
+    };
+
+    it("puts the trail first, before the text it explains", () => {
+      const wrapper = mountLive([
+        { type: "text", text: "before" },
+        ...steps,
+        { type: "text", text: "after" },
+      ]);
+      const order = Array.from(
+        wrapper.element.querySelectorAll(
+          '[data-test="assistant-steps"], [data-test="assistant-block-text"]',
+        ),
+      ).map((el) => el.getAttribute("data-test"));
+      expect(order).toEqual(["assistant-steps", "assistant-block-text", "assistant-block-text"]);
+    });
+
+    it("renders claim markers as numbered chips inside the sentence, never the raw marker", async () => {
+      const wrapper = mountLive([
+        ...steps,
+        { type: "text", text: "Reset by peer [^call_3] and [^call_3], see [^call_1]." },
+      ]);
+      await flushPromises();
+      const root = wrapper.element as HTMLElement;
+      expect(root.textContent).not.toContain("[^");
+      const chips = Array.from(
+        root.querySelectorAll<HTMLElement>('[data-test^="assistant-claim-"]'),
+      );
+      expect(chips.map((chip) => [chip.dataset.test, chip.dataset.callId])).toEqual([
+        ["assistant-claim-1", "call_3"],
+        ["assistant-claim-1", "call_3"],
+        ["assistant-claim-2", "call_1"],
+      ]);
+      expect(chips.every((chip) => chip.closest("p span[data-claim]"))).toBe(true);
+      expect(root.querySelector("p")?.textContent?.replace(/\s+/g, " ")).toBe(
+        "Reset by peer1 and1, see2.",
+      );
+    });
+
+    it("turns a navigation frame into one link card, deduped against the same Markdown link", () => {
+      const wrapper = mountLive([
+        {
+          type: "link",
+          link: {
+            resourceType: "dashboard",
+            action: "navigate_direct",
+            target: { dashboard_id: "checkout", folder: "default" },
+          },
+        },
+        {
+          type: "text",
+          text: "See [it](/dashboards/view?dashboard=checkout&folder=default) and [out](/logout).",
+        },
+      ]);
+      const cards = wrapper.findAll('[data-test="assistant-link-card"]');
+      expect(cards).toHaveLength(1);
+      expect(cards[0].attributes("data-source")).toBe("navigation");
+    });
+
+    it("offers an allowlisted Markdown link as a captioned card and the rest as text", () => {
+      const wrapper = mountLive([
+        { type: "text", text: "See [it](/dashboards/view?dashboard=checkout) and [out](/logout)." },
+      ]);
+      const card = wrapper.get('[data-test="assistant-link-card"]');
+      expect(card.attributes("data-source")).toBe("markdown");
+      expect(card.text()).toContain("Link in the answer");
+      expect(wrapper.findAll('[data-test="assistant-link-card"]')).toHaveLength(1);
+      expect(wrapper.find('a[href*="logout"]').exists()).toBe(false);
+    });
+
+    it("adds the footer and feedback only once the turn is done", () => {
+      const blocks = [
+        ...steps,
+        { type: "text" as const, text: "x" },
+        { type: "footer" as const, footer: { traceId: "t" } },
+      ];
+      const done = mountLive(blocks);
+      expect(done.find('[data-test="assistant-feedback"]').exists()).toBe(true);
+      expect(done.find('[data-test="assistant-turn-footer"]').exists()).toBe(true);
+      const live = mountLive(blocks, { outcome: "live" });
+      expect(live.find('[data-test="assistant-feedback"]').exists()).toBe(false);
+      expect(live.find('[data-test="assistant-turn-footer"]').exists()).toBe(false);
+    });
   });
 });

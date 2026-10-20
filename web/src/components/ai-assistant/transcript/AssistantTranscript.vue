@@ -96,6 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :turn="session!.turn"
           :meta="session!.turnMeta"
           :owned-by-this-tab="session!.turnMeta.ownedByThisTab"
+          :trail-shown="stepsOf(turn.answer, session?.org ?? '').length > 0"
         />
       </div>
       <article
@@ -112,6 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :live="turn.live"
           :readonly="readonly"
           :density="density"
+          :turn="views.get(turn.turnId)"
         >
           <template v-if="turn.version.count > 1" #versions>
             <AssistantVersionPicker
@@ -137,7 +139,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :elapsed-ms="outcome.record.elapsedMs"
               :online="online"
               :persistence="persistence"
+              :manual-route="manualRouteFor(turn) ?? undefined"
               @action="(action) => onOutcome(action, outcome.record)"
+              @manual="(query: QueryRef) => onManualRoute(query, turn.turnId)"
             />
           </template>
           <template v-if="answerActionsFor(turn)" #actions>
@@ -160,7 +164,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import type { AssistantError, AssistantSession, Sid } from "@/composables/assistant/pure";
+import type {
+  AssistantError,
+  AssistantSession,
+  AssistantTurnView,
+  QueryRef,
+  Sid,
+} from "@/composables/assistant/pure";
 import type { ChatMessage, ContentBlock, TurnOutcomeRecord } from "@/ts/interfaces/chat";
 import type { I18nText } from "@/types/i18n";
 
@@ -170,6 +180,8 @@ export interface AssistantTranscriptProps {
   /** Readonly: a shared page's record, with no store behind it. */
   messages?: ChatMessage[];
   readonly?: boolean;
+  /** False on a readonly page with no explorer behind it: evidence offers no Open. */
+  openable?: boolean;
   density?: "compact" | "roomy";
   /** The shared page names it "Shared conversation with {product}" (IW-10 AC 11). */
   label?: I18nText;
@@ -279,15 +291,21 @@ import AssistantTurnOutcome, {
 } from "@/components/ai-assistant/turn/AssistantTurnOutcome.vue";
 import AssistantTurnStatus from "@/components/ai-assistant/turn/AssistantTurnStatus.vue";
 import {
+  assistantEvidenceHostKey,
   assistantSessionSourceKey,
   assistantTranscriptHostKey,
+  manualRouteOf,
   outcomeError,
+  promptRange,
+  stepsOf,
+  turnAnnotationKey,
   useAssistantName,
 } from "@/composables/assistant/pure";
+import { explorerOf } from "@/utils/assistant/explorerRoutes";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import { trackAssistant } from "@/services/assistantAnalytics";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 
 import AssistantMessage from "./AssistantMessage.vue";
 import AssistantVersionPicker from "./AssistantVersionPicker.vue";
@@ -300,6 +318,7 @@ const props = withDefaults(defineProps<AssistantTranscriptProps>(), {
   sid: undefined,
   messages: undefined,
   readonly: false,
+  openable: true,
   density: "compact",
   label: undefined,
 });
@@ -312,6 +331,7 @@ const { t } = useI18nTyped();
 const { product } = useAssistantName();
 const source = inject(assistantSessionSourceKey, null);
 const live = props.readonly || props.messages ? null : inject(assistantTranscriptHostKey, null);
+const evidence = live ? inject(assistantEvidenceHostKey, null) : null;
 
 const root = ref<HTMLElement | null>(null);
 const editing = ref<string | null>(null);
@@ -363,6 +383,8 @@ const turns = computed<TranscriptTurn[]>(() => {
     };
   });
 });
+
+const views = computed(() => new Map(turns.value.map((turn) => [turn.turnId, turnView(turn)])));
 
 const blockCount = computed(() =>
   messages.value.reduce((sum, message) => sum + (message.contentBlocks?.length ?? 1), 0),
@@ -432,6 +454,58 @@ function selectVersion(turnId: string, n: number, count: number): void {
   live.selectVersion(props.sid, turnId, n);
   announceComposer(props.sid, t("assistant.message.versionName", { n, count }));
   trackAssistant("ai_thread_action", { action: "version_switch" });
+}
+
+// The answer's turn as its evidence blocks read it; a shared page has no session and no org of its own.
+function turnView(turn: TranscriptTurn): AssistantTurnView {
+  const kinds = turn.outcomes.map((outcome) => outcome.record.kind);
+  const outcome: AssistantTurnView["outcome"] = turn.live
+    ? "live"
+    : kinds.includes("failed") || kinds.includes("cancelledElsewhere") || kinds.includes("expired")
+      ? "failed"
+      : kinds.includes("stopped")
+        ? "stopped"
+        : kinds.includes("doneNotSaved")
+          ? "done_not_saved"
+          : "done";
+  return {
+    sid: props.sid ?? null,
+    turnId: turn.turnId,
+    org: session.value?.org ?? "",
+    prompt: turn.user,
+    askedWindow: askedWindowOf(turn.turnId),
+    openable: props.openable,
+    outcome,
+    isLast: turn.isLast,
+    startedAt: turn.live ? (session.value?.turnMeta.startedAt ?? null) : null,
+  };
+}
+
+function askedWindowOf(turnId: string): { from: number; to: number } | null {
+  return session.value?.annotations?.[turnAnnotationKey(turnId, "window")]?.window ?? null;
+}
+
+function manualRouteFor(turn: TranscriptTurn): QueryRef | null {
+  const range = promptRange(turn.user, askedWindowOf(turn.turnId));
+  return manualRouteOf(turn.answer, range, session.value?.org ?? "");
+}
+
+// "Open in Logs instead" is the non-AI path; it opens through the explorer applier.
+async function onManualRoute(query: QueryRef, turnId: string): Promise<void> {
+  if (!props.sid || !evidence) return;
+  const sid = props.sid;
+  const result = await evidence.dispatch(sid, {
+    kind: "open_in_explorer",
+    query,
+    explorer: explorerOf(query),
+  });
+  if (!result.ok && result.reason === "other_org")
+    evidence.announce(sid, t("assistant.evidence.otherOrg", { org: raw(query.org) }));
+  trackAssistant(
+    "ai_turn_recovered",
+    { action: "manual_route", succeeded: result.ok },
+    { sid, turnId },
+  );
 }
 
 function onOutcome(action: OutcomeAction, record: TurnOutcomeRecord): void {

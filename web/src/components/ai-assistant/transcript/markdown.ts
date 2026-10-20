@@ -129,8 +129,10 @@ const PURIFY = {
     "ul",
     "wbr",
   ],
-  ALLOWED_ATTR: ["href", "target", "rel", "class", "alt", "src", "start"],
+  ALLOWED_ATTR: ["href", "target", "rel", "class", "alt", "src", "start", "data-claim"],
   ALLOW_DATA_ATTR: false,
+  // A slot's value is an index, not a URL, so the URL rule must not drop it.
+  ADD_URI_SAFE_ATTR: ["data-claim"],
   ALLOW_ARIA_ATTR: false,
   ALLOWED_URI_REGEXP: /^(?:https?:|data:image\/(?:png|jpe?g|gif|webp);base64,)/i,
 };
@@ -227,6 +229,8 @@ export interface RenderedBlock {
   parts: MarkdownPart[];
   /** `[^call_id]` markers in order of first citation; WP-08 renders them as claim chips (EB-05). */
   claims: string[];
+  /** Same-origin link targets the answer named; link cards only for allowlisted routes. */
+  links: string[];
   /** A completed block shown as text for good: its shape or output was rejected, or it ran out of time twice. */
   plain: boolean;
 }
@@ -629,7 +633,7 @@ function placeholder(job: Job): RenderedBlock {
   const cached = placeholders.get(job.blockId);
   if (cached?.key === job.key) return cached.block;
   const parts = plainResult(job.blockId, job.text).parts;
-  const block = { blockId: job.blockId, parts, claims: [], plain: false };
+  const block = { blockId: job.blockId, parts, claims: [], links: [], plain: false };
   placeholders.delete(job.blockId);
   placeholders.set(job.blockId, { key: job.key, block });
   if (placeholders.size > MEMO_LIMIT)
@@ -779,7 +783,13 @@ function store(
     const before = previous?.parts[index];
     return before && samePart(before, part) ? before : part;
   });
-  const rendered = { blockId: job.blockId, parts, claims: result.claims, plain: opts.final };
+  const rendered = {
+    blockId: job.blockId,
+    parts,
+    claims: result.claims,
+    links: result.links ?? [],
+    plain: opts.final,
+  };
   plainCache.set(plainKey(job.text), result.plain);
   if (plainCache.size > MEMO_LIMIT) plainCache.delete(plainCache.keys().next().value as string);
   for (const resolve of waiters.get(plainKey(job.text)) ?? []) resolve(result.plain);
@@ -843,6 +853,17 @@ function sanitize(html: string): DocumentFragment {
     }
     link.setAttribute("target", "_blank");
     link.setAttribute("rel", EXTERNAL_REL);
+  });
+  // A claim slot becomes an empty inert span the message mounts its chip into; any other carrier loses the attribute.
+  fragment.querySelectorAll("[data-claim]").forEach((node) => {
+    const index = node.getAttribute("data-claim") ?? "";
+    if (node.tagName !== "WBR" || !/^\d{1,3}$/.test(index)) {
+      node.removeAttribute("data-claim");
+      return;
+    }
+    const slot = document.createElement("span");
+    slot.setAttribute("data-claim", index);
+    node.replaceWith(slot);
   });
   fragment.querySelectorAll("img").forEach((img) => {
     if (!SAFE_DATA_IMAGE.test(img.getAttribute("src") ?? "")) img.remove();

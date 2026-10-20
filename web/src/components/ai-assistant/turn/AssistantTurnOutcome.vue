@@ -112,6 +112,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTooltip v-if="disabledReason" :content="disabledReason" />
       </OButton>
     </div>
+    <OButton
+      v-if="manualShown"
+      variant="ghost-primary"
+      size="sm"
+      class="self-start max-md:min-h-11 pointer-coarse:min-h-11"
+      data-test="assistant-turn-outcome-manual"
+      @click="emit('manual', manualRoute!)"
+    >
+      {{ manualLabel }}
+    </OButton>
     <AssistantErrorDetails
       v-if="error && showsDetails"
       class="pt-1"
@@ -140,7 +150,7 @@ export interface AssistantTurnOutcomeProps {
   error?: AssistantError;
   steps?: number;
   role: "admin" | "member";
-  /** The non-AI path (`80` §2.6); hidden until WP-08 registers the explorer applier. */
+  /** The non-AI path: the turn's last query, opened through the explorer applier. */
   manualRoute?: QueryRef;
   readonly?: boolean;
   retrySnapshotAvailable: boolean;
@@ -165,9 +175,21 @@ export interface AssistantTurnOutcomeProps {
 export interface AssistantTurnOutcomeEmits {
   (e: "action", action: OutcomeAction): void;
   (e: "open-here"): void;
+  /** "Open in Logs instead": the host opens it through the explorer applier. */
+  (e: "manual", query: QueryRef): void;
   /** A `retry_after` countdown reached zero; the host's region says it once (`80` §2.4). */
   (e: "retry-ready"): void;
 }
+
+/** The codes whose block offers the explorer as the way forward without the assistant. */
+const MANUAL_ROUTE_CODES: ReadonlySet<string> = new Set([
+  "credits_exhausted",
+  "subscription_required",
+  "agent_unavailable",
+  "provider_error",
+  "stream_dropped",
+  "stream_oversized",
+]);
 
 /** Above this the countdown says "Try again later" instead of counting (`80` §2.4). */
 export const COUNTDOWN_MAX_MS = 600_000;
@@ -261,6 +283,7 @@ import { computed, defineAsyncComponent, onBeforeUnmount, ref, watch } from "vue
 import AssistantErrorDetails, {
   ASSISTANT_SETUP_DOCS_URL,
 } from "@/components/ai-assistant/common/AssistantErrorDetails.vue";
+import { explorerLabel } from "@/components/ai-assistant/evidence/evidenceText";
 import { errorTitle, useAssistantName } from "@/composables/assistant/pure";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -268,6 +291,7 @@ import OText from "@/lib/core/Typography/OText.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useI18nTyped } from "@/types/i18n";
+import { explorerOf } from "@/utils/assistant/explorerRoutes";
 
 // The request flow reads the org's members, so it loads only when a block offers Ask an admin.
 const AssistantAskAdminPopover = defineAsyncComponent(
@@ -300,6 +324,19 @@ const titleId = `assistant-turn-outcome-${outcomeSeq}`;
 const now = () => (props.now ?? Date.now)();
 
 const code = computed(() => props.error?.code);
+
+const manualShown = computed(
+  () =>
+    !props.readonly &&
+    !!props.manualRoute &&
+    !!props.manualRoute.text &&
+    MANUAL_ROUTE_CODES.has(code.value ?? ""),
+);
+
+const manualLabel = computed(() => {
+  const explorer = props.manualRoute ? explorerOf(props.manualRoute) : "logs";
+  return t("assistant.outcome.manualRoute", { explorer: explorerLabel(explorer, t) });
+});
 const look = computed(() => LOOKS[props.kind]);
 const askKind = computed<AskAdminKind>(() => ROLE_SPLIT_KINDS[code.value ?? ""] ?? "access");
 
