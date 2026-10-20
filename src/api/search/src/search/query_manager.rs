@@ -20,20 +20,19 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
 };
-#[cfg(any(feature = "enterprise", test))]
-use config::meta::search;
 use openobserve_api_common::extractors::Headers;
 use openobserve_core::auth::UserEmail;
 #[cfg(feature = "enterprise")]
 use {
     common::meta::http::HttpResponse as MetaHttpResponse,
+    config::{META_ORG_ID, meta::search, meta::user::UserRole},
     o2_enterprise::enterprise::common::config::get_config as get_o2_config,
 };
 
 /// A query to cancel and the org it runs in.
 #[cfg(feature = "enterprise")]
 #[derive(serde::Deserialize)]
-struct CancelTarget {
+struct QueryToCancel {
     trace_id: String,
     org_id: String,
 }
@@ -45,16 +44,16 @@ pub async fn cancel_query(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        let targets = trace_ids
+        let queries = trace_ids
             .split(',')
             .map(|id| (id, org_id.as_str()))
             .collect::<Vec<_>>();
-        cancel_in_org(&org_id, &user_email.user_id, &targets).await
+        cancel_in_org(&org_id, &user_email.user_id, &queries).await
     }
 
     #[cfg(not(feature = "enterprise"))]
     {
-        not_supported()
+        (StatusCode::FORBIDDEN, Json("Not Supported")).into_response()
     }
 }
 
@@ -66,20 +65,20 @@ pub async fn cancel_multiple_query(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        let targets: Vec<CancelTarget> = match config::utils::json::from_slice(&body) {
+        let queries: Vec<QueryToCancel> = match config::utils::json::from_slice(&body) {
             Ok(v) => v,
             Err(e) => return MetaHttpResponse::bad_request(e),
         };
-        let targets = targets
+        let queries = queries
             .iter()
-            .map(|target| (target.trace_id.as_str(), target.org_id.as_str()))
+            .map(|query| (query.trace_id.as_str(), query.org_id.as_str()))
             .collect::<Vec<_>>();
-        cancel_in_org(&org_id, &user_email.user_id, &targets).await
+        cancel_in_org(&org_id, &user_email.user_id, &queries).await
     }
 
     #[cfg(not(feature = "enterprise"))]
     {
-        not_supported()
+        (StatusCode::FORBIDDEN, Json("Not Supported")).into_response()
     }
 }
 
@@ -87,46 +86,46 @@ pub async fn cancel_multiple_query(
 pub async fn query_status(Path(org_id): Path<String>) -> Response {
     #[cfg(feature = "enterprise")]
     {
+        // only the _meta Query Management page lists running queries, and it lists every org's
+        if org_id != META_ORG_ID {
+            return MetaHttpResponse::forbidden(
+                "Query status is only available in the _meta organization",
+            );
+        }
         match search_service::query_status().await {
-            Ok(res) => Json(search::QueryStatusResponse {
-                status: visible_to(&org_id, res.status),
-            })
-            .into_response(),
+            Ok(res) => Json(res).into_response(),
             Err(e) => MetaHttpResponse::bad_request(e),
         }
     }
 
     #[cfg(not(feature = "enterprise"))]
     {
-        not_supported()
+        (StatusCode::FORBIDDEN, Json("Not Supported")).into_response()
     }
 }
 
 /// Cancels each query in its own org; another org's query needs a `_meta` caller allowed to.
 #[cfg(feature = "enterprise")]
-async fn cancel_in_org(org_id: &str, user_id: &str, targets: &[(&str, &str)]) -> Response {
-    let other_org = targets.iter().any(|(_, target_org)| *target_org != org_id);
-    if other_org && !(org_id == config::META_ORG_ID && may_cancel_in_every_org(user_id).await) {
+async fn cancel_in_org(org_id: &str, user_id: &str, queries: &[(&str, &str)]) -> Response {
+    let other_org = queries.iter().any(|(_, query_org)| *query_org != org_id);
+    if other_org && !(org_id == META_ORG_ID && can_cancel_other_orgs(user_id).await) {
         return MetaHttpResponse::forbidden("Not allowed to cancel other organizations' queries");
     }
-    let targets = targets
-        .iter()
-        .map(|(trace_id, target_org)| (*trace_id, Some(*target_org)))
-        .collect();
-    cancel_each(targets).await
+    cancel_each(queries).await
 }
 
-/// Cancels each trace id; `Some(org)` limits the cancel to that org's queries.
+/// Cancels each trace id in `org_id`.
 #[cfg_attr(not(feature = "enterprise"), allow(unused_variables))]
-pub async fn cancel_query_inner(scope: Option<&str>, trace_ids: &[&str]) -> Response {
+pub async fn cancel_query_inner(org_id: &str, trace_ids: &[&str]) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        cancel_each(trace_ids.iter().map(|id| (*id, scope)).collect()).await
+        let queries = trace_ids.iter().map(|id| (*id, org_id)).collect::<Vec<_>>();
+        cancel_each(&queries).await
     }
 
     #[cfg(not(feature = "enterprise"))]
     {
-        not_supported()
+        (StatusCode::FORBIDDEN, Json("Not Supported")).into_response()
     }
 }
 
@@ -139,21 +138,21 @@ pub async fn cancel_query_internal(org_id: &str, trace_id: &str) {
     if trace_id.is_empty() {
         return;
     }
-    match cancel_in_cluster(Some(org_id), trace_id).await {
+    match cancel_in_cluster(org_id, trace_id).await {
         Ok(res) => log::info!("[trace_id {trace_id}] query canceled: {res:?}"),
         Err(e) => log::error!("[trace_id {trace_id}] failed to cancel query: {e}"),
     }
 }
 
-/// Cancels each trace id in its scope: `Some(org)` for that org's queries, `None` for every org's.
+/// Cancels each trace id in the org it runs in.
 #[cfg(feature = "enterprise")]
-async fn cancel_each(targets: Vec<(&str, Option<&str>)>) -> Response {
-    if targets.is_empty() {
+async fn cancel_each(queries: &[(&str, &str)]) -> Response {
+    if queries.is_empty() {
         return (StatusCode::BAD_REQUEST, Json("Invalid trace_id")).into_response();
     }
-    let mut res = Vec::with_capacity(targets.len());
-    for (trace_id, scope) in targets.into_iter().filter(|(id, _)| !id.is_empty()) {
-        match cancel_in_cluster(scope, trace_id).await {
+    let mut res = Vec::with_capacity(queries.len());
+    for (trace_id, org_id) in queries.iter().filter(|(id, _)| !id.is_empty()) {
+        match cancel_in_cluster(org_id, trace_id).await {
             Ok(status) => res.push(status),
             Err(e) => return MetaHttpResponse::bad_request(e),
         }
@@ -163,21 +162,19 @@ async fn cancel_each(targets: Vec<(&str, Option<&str>)>) -> Response {
 
 #[cfg(feature = "enterprise")]
 async fn cancel_in_cluster(
-    scope: Option<&str>,
+    org_id: &str,
     trace_id: &str,
 ) -> Result<search::CancelQueryResponse, infra::errors::Error> {
     if get_o2_config().super_cluster.enabled {
-        o2_enterprise::enterprise::super_cluster::search::cancel_query(scope, trace_id).await
+        o2_enterprise::enterprise::super_cluster::search::cancel_query(org_id, trace_id).await
     } else {
-        search_service::cancel_query(scope, trace_id).await
+        search_service::cancel_query(org_id, trace_id).await
     }
 }
 
 /// Root, a `_meta` Admin or Editor, or an enforced `settings` write grant in `_meta`.
 #[cfg(feature = "enterprise")]
-async fn may_cancel_in_every_org(user_id: &str) -> bool {
-    use config::{META_ORG_ID, meta::user::UserRole};
-
+async fn can_cancel_other_orgs(user_id: &str) -> bool {
     if db::user::is_root_user(user_id) {
         return true;
     }
@@ -206,68 +203,23 @@ async fn may_cancel_in_every_org(user_id: &str) -> bool {
         .await
 }
 
-#[cfg(not(feature = "enterprise"))]
-fn not_supported() -> Response {
-    (StatusCode::FORBIDDEN, Json("Not Supported")).into_response()
-}
-
-/// The running queries an org may see: its own, or every org's from `_meta`.
-#[cfg(any(feature = "enterprise", test))]
-fn visible_to(org: &str, rows: Vec<search::QueryStatus>) -> Vec<search::QueryStatus> {
-    if org == config::META_ORG_ID {
-        return rows;
-    }
-    rows.into_iter()
-        .filter(|row| row.org_id.as_deref() == Some(org))
-        .collect()
-}
-
-#[cfg(test)]
+#[cfg(all(test, feature = "enterprise"))]
 mod tests {
     use super::*;
 
-    fn row(trace_id: &str, org_id: Option<&str>) -> search::QueryStatus {
-        search::QueryStatus {
-            trace_id: trace_id.to_string(),
-            org_id: org_id.map(str::to_string),
-            ..Default::default()
-        }
-    }
-
-    fn trace_ids(rows: Vec<search::QueryStatus>) -> Vec<String> {
-        rows.into_iter().map(|row| row.trace_id).collect()
-    }
-
-    #[test]
-    fn an_org_sees_only_its_own_running_queries() {
-        let rows = vec![row("a1", Some("a")), row("b1", Some("b")), row("n1", None)];
-        assert_eq!(trace_ids(visible_to("a", rows.clone())), vec!["a1"]);
-        assert!(visible_to("c", rows).is_empty());
-    }
-
-    #[cfg(feature = "enterprise")]
     #[test]
     fn cancel_body_needs_the_org_of_each_query() {
         let body = br#"[{"trace_id": "t1", "org_id": "a"}]"#;
-        let targets: Vec<CancelTarget> = config::utils::json::from_slice(body).unwrap();
+        let queries: Vec<QueryToCancel> = config::utils::json::from_slice(body).unwrap();
         assert_eq!(
-            (targets[0].trace_id.as_str(), targets[0].org_id.as_str()),
+            (queries[0].trace_id.as_str(), queries[0].org_id.as_str()),
             ("t1", "a")
         );
 
-        let bare = config::utils::json::from_slice::<Vec<CancelTarget>>(br#"["t1"]"#);
+        let bare = config::utils::json::from_slice::<Vec<QueryToCancel>>(br#"["t1"]"#);
         assert!(bare.is_err());
         let no_org =
-            config::utils::json::from_slice::<Vec<CancelTarget>>(br#"[{"trace_id": "t1"}]"#);
+            config::utils::json::from_slice::<Vec<QueryToCancel>>(br#"[{"trace_id": "t1"}]"#);
         assert!(no_org.is_err());
-    }
-
-    #[test]
-    fn meta_sees_every_running_query() {
-        let rows = vec![row("a1", Some("a")), row("b1", Some("b")), row("n1", None)];
-        assert_eq!(
-            trace_ids(visible_to(config::META_ORG_ID, rows)),
-            vec!["a1", "b1", "n1"]
-        );
     }
 }

@@ -787,10 +787,10 @@ pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
     Ok(search::QueryStatusResponse { status })
 }
 
-/// Cancels `trace_id` on every querier; `Some(org)` limits each node to that org's queries.
+/// Cancels `trace_id` in `org_id` on every querier.
 #[cfg(feature = "enterprise")]
 pub async fn cancel_query(
-    scope: Option<&str>,
+    org_id: &str,
     trace_id: &str,
 ) -> Result<search::CancelQueryResponse, Error> {
     // get nodes from cluster
@@ -816,7 +816,7 @@ pub async fn cancel_query(
         );
 
         let trace_id = trace_id.to_string();
-        let org_id = scope.map(str::to_string);
+        let org_id = org_id.to_string();
         let task = tokio::task::spawn(
             async move {
                 let mut request = tonic::Request::new(proto::cluster_rpc::CancelQueryRequest {

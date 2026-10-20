@@ -50,12 +50,8 @@ impl Searcher {
         self.query_manager.remove(org_id, trace_id).await
     }
 
-    /// Removes `trace_id` and its `{trace_id}-` sub-tasks in `org_id`, or in every org for `None`.
-    pub async fn cancel(
-        &self,
-        org_id: Option<&str>,
-        trace_id: &str,
-    ) -> Option<Vec<(String, TaskStatus)>> {
+    /// Removes `trace_id` and its `{trace_id}-` sub-tasks in `org_id`.
+    pub async fn cancel(&self, org_id: &str, trace_id: &str) -> Option<Vec<(String, TaskStatus)>> {
         self.query_manager.cancel(org_id, trace_id).await
     }
 
