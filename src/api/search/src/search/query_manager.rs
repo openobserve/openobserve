@@ -20,92 +20,63 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
 };
+use common::meta::http::HttpResponse as MetaHttpResponse;
+use config::{
+    META_ORG_ID,
+    meta::{search, user::UserRole},
+};
+use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
 use openobserve_api_common::extractors::Headers;
 use openobserve_core::auth::UserEmail;
-#[cfg(feature = "enterprise")]
-use {
-    common::meta::http::HttpResponse as MetaHttpResponse,
-    config::{META_ORG_ID, meta::search, meta::user::UserRole},
-    o2_enterprise::enterprise::common::config::get_config as get_o2_config,
-};
 
 /// A query to cancel and the org it runs in.
-#[cfg(feature = "enterprise")]
 #[derive(serde::Deserialize)]
 struct QueryToCancel {
     trace_id: String,
     org_id: String,
 }
 
-#[cfg_attr(not(feature = "enterprise"), allow(unused_variables))]
 pub async fn cancel_query(
     Headers(user_email): Headers<UserEmail>,
     Path((org_id, trace_ids)): Path<(String, String)>,
 ) -> Response {
-    #[cfg(feature = "enterprise")]
-    {
-        let queries = trace_ids
-            .split(',')
-            .map(|id| (id, org_id.as_str()))
-            .collect::<Vec<_>>();
-        cancel_in_org(&org_id, &user_email.user_id, &queries).await
-    }
-
-    #[cfg(not(feature = "enterprise"))]
-    {
-        (StatusCode::FORBIDDEN, Json("Not Supported")).into_response()
-    }
+    let queries = trace_ids
+        .split(',')
+        .map(|id| (id, org_id.as_str()))
+        .collect::<Vec<_>>();
+    cancel_in_org(&org_id, &user_email.user_id, &queries).await
 }
 
-#[cfg_attr(not(feature = "enterprise"), allow(unused_variables))]
 pub async fn cancel_multiple_query(
     Headers(user_email): Headers<UserEmail>,
     Path(org_id): Path<String>,
     body: Bytes,
 ) -> Response {
-    #[cfg(feature = "enterprise")]
-    {
-        let queries: Vec<QueryToCancel> = match config::utils::json::from_slice(&body) {
-            Ok(v) => v,
-            Err(e) => return MetaHttpResponse::bad_request(e),
-        };
-        let queries = queries
-            .iter()
-            .map(|query| (query.trace_id.as_str(), query.org_id.as_str()))
-            .collect::<Vec<_>>();
-        cancel_in_org(&org_id, &user_email.user_id, &queries).await
-    }
-
-    #[cfg(not(feature = "enterprise"))]
-    {
-        (StatusCode::FORBIDDEN, Json("Not Supported")).into_response()
-    }
+    let queries: Vec<QueryToCancel> = match config::utils::json::from_slice(&body) {
+        Ok(v) => v,
+        Err(e) => return MetaHttpResponse::bad_request(e),
+    };
+    let queries = queries
+        .iter()
+        .map(|query| (query.trace_id.as_str(), query.org_id.as_str()))
+        .collect::<Vec<_>>();
+    cancel_in_org(&org_id, &user_email.user_id, &queries).await
 }
 
-#[cfg_attr(not(feature = "enterprise"), allow(unused_variables))]
 pub async fn query_status(Path(org_id): Path<String>) -> Response {
-    #[cfg(feature = "enterprise")]
-    {
-        // only the _meta Query Management page lists running queries, and it lists every org's
-        if org_id != META_ORG_ID {
-            return MetaHttpResponse::forbidden(
-                "Query status is only available in the _meta organization",
-            );
-        }
-        match search_service::query_status().await {
-            Ok(res) => Json(res).into_response(),
-            Err(e) => MetaHttpResponse::bad_request(e),
-        }
+    // only the _meta Query Management page lists running queries, and it lists every org's
+    if org_id != META_ORG_ID {
+        return MetaHttpResponse::forbidden(
+            "Query status is only available in the _meta organization",
+        );
     }
-
-    #[cfg(not(feature = "enterprise"))]
-    {
-        (StatusCode::FORBIDDEN, Json("Not Supported")).into_response()
+    match search_service::query_status().await {
+        Ok(res) => Json(res).into_response(),
+        Err(e) => MetaHttpResponse::bad_request(e),
     }
 }
 
 /// Cancels each query in its own org; another org's query needs a `_meta` caller allowed to.
-#[cfg(feature = "enterprise")]
 async fn cancel_in_org(org_id: &str, user_id: &str, queries: &[(&str, &str)]) -> Response {
     let other_org = queries.iter().any(|(_, query_org)| *query_org != org_id);
     if other_org && !(org_id == META_ORG_ID && can_cancel_other_orgs(user_id).await) {
@@ -115,22 +86,12 @@ async fn cancel_in_org(org_id: &str, user_id: &str, queries: &[(&str, &str)]) ->
 }
 
 /// Cancels each trace id in `org_id`.
-#[cfg_attr(not(feature = "enterprise"), allow(unused_variables))]
 pub async fn cancel_query_inner(org_id: &str, trace_ids: &[&str]) -> Response {
-    #[cfg(feature = "enterprise")]
-    {
-        let queries = trace_ids.iter().map(|id| (*id, org_id)).collect::<Vec<_>>();
-        cancel_each(&queries).await
-    }
-
-    #[cfg(not(feature = "enterprise"))]
-    {
-        (StatusCode::FORBIDDEN, Json("Not Supported")).into_response()
-    }
+    let queries = trace_ids.iter().map(|id| (*id, org_id)).collect::<Vec<_>>();
+    cancel_each(&queries).await
 }
 
 /// Cancels each trace id in the org it runs in.
-#[cfg(feature = "enterprise")]
 async fn cancel_each(queries: &[(&str, &str)]) -> Response {
     if queries.is_empty() {
         return (StatusCode::BAD_REQUEST, Json("Invalid trace_id")).into_response();
@@ -145,7 +106,6 @@ async fn cancel_each(queries: &[(&str, &str)]) -> Response {
     Json(res).into_response()
 }
 
-#[cfg(feature = "enterprise")]
 async fn cancel_in_cluster(
     org_id: &str,
     trace_id: &str,
@@ -158,7 +118,6 @@ async fn cancel_in_cluster(
 }
 
 /// Root, a `_meta` Admin or Editor, or an enforced `settings` write grant in `_meta`.
-#[cfg(feature = "enterprise")]
 async fn can_cancel_other_orgs(user_id: &str) -> bool {
     if db::user::is_root_user(user_id) {
         return true;
@@ -192,7 +151,6 @@ async fn can_cancel_other_orgs(user_id: &str) -> bool {
 /// (which share the `trace_id` as a prefix). Unlike [`cancel_query_inner`] this
 /// does not build an HTTP response — it is meant for internal callers such as
 /// the client-disconnect handler. Errors are logged, not returned.
-#[cfg(feature = "enterprise")]
 pub async fn cancel_query_internal(org_id: &str, trace_id: &str) {
     if trace_id.is_empty() {
         return;
@@ -203,7 +161,7 @@ pub async fn cancel_query_internal(org_id: &str, trace_id: &str) {
     }
 }
 
-#[cfg(all(test, feature = "enterprise"))]
+#[cfg(test)]
 mod tests {
     use super::*;
 
