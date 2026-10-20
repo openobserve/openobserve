@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="border-button-outline-border h-auto! rounded-e-none! border-e!"
         icon-left="chevron-left"
         :aria-label="t('common.previous')"
-        :disabled="disable"
+        :disabled="disable || disablePrevShift"
         @click.prevent.stop="shiftTimeRange('prev')"
       />
     </OTooltip>
@@ -457,6 +457,11 @@ export default defineComponent({
       default: false,
     },
     hideRangeShift: {
+      type: Boolean,
+      default: false,
+    },
+    /** Turns off the ‹ shift, for a parent that knows there is nothing earlier to show. */
+    disablePrevShift: {
       type: Boolean,
       default: false,
     },

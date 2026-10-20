@@ -2167,21 +2167,6 @@ mod slo_source_guard_tests {
     }
 }
 
-pub async fn delete_by_name(
-    org_id: &str,
-    stream_type: StreamType,
-    stream_name: &str,
-    name: &str,
-) -> Result<(), AlertError> {
-    let alert = db::alerts::alert::get_by_name(org_id, stream_type, stream_name, name)
-        .await
-        .map_err(|_| AlertError::AlertNotFound)?
-        .ok_or(AlertError::AlertNotFound)?;
-    let alert_id = alert.id.ok_or(AlertError::AlertNotFound)?;
-    let client = infra::db::get_orm_client_rw().await;
-    delete_by_id_user(client, org_id, alert_id).await
-}
-
 /// Enables an alert.
 pub async fn enable_by_id<C: ConnectionTrait + TransactionTrait>(
     conn: &C,

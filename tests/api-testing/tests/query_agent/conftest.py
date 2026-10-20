@@ -329,6 +329,22 @@ def ingest_query_agent_data():
 
     client = OpenObserveClient()
 
+    resp = client.post(f"streams/{STREAM}?type=logs", json={
+        "fields": [{"name": "facility_zone", "type": "Utf8"}],
+        "settings": {"partition_keys": [{"field": "facility_zone", "types": "value"}]},
+    })
+    # A rerun against the same server finds the stream already created; the readiness check below still guards it.
+    stream_exists = resp.status_code == 400 and "already exists" in resp.text
+    assert resp.status_code == 200 or stream_exists, \
+        f"Partitioned stream creation failed: {resp.text[:300]}"
+
+    def _partition_key_ready():
+        settings = client.streams.schema(STREAM).get("settings", {})
+        return any(key.get("field") == "facility_zone" for key in settings.get("partition_keys", {}).values())
+
+    wait_until(_partition_key_ready, timeout=30, interval=0.5,
+               msg="Query-agent partition key not ready before ingestion")
+
     # Stream 1 (primary)
     records1 = build_dataset()
     data1 = json.dumps(records1)

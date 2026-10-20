@@ -95,6 +95,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OSkeleton type="rect" class="rounded-default h-32 w-full" />
       </div>
 
+      <!-- Anomaly alerts have no threshold to tune and nothing to preview before they train. -->
+      <template v-else-if="file && isAnomaly">
+        <OBanner
+          variant="info"
+          icon="query-stats"
+          dense
+          :content="t('alert_library.drawer.anomalyTrainingNote')"
+          data-test="alert-library-drawer-anomaly-note"
+        />
+        <section>
+          <template v-if="anomalySql">
+            <h3 class="text-text-secondary flex items-center gap-1.5 pb-2 text-xs font-semibold">
+              <OIcon name="code" size="xs" />
+              <span>{{ t("alert_library.drawer.query") }}</span>
+            </h3>
+            <AlertQueryPreview
+              :query="anomalySql"
+              language="sql"
+              data-test="alert-library-drawer-query"
+            />
+          </template>
+          <dl
+            class="mt-3 grid grid-cols-[9rem_1fr] gap-x-3 gap-y-1.5 text-xs"
+            data-test="alert-library-drawer-kv"
+          >
+            <dt class="text-text-secondary">{{ t("alert_library.drawer.stream") }}</dt>
+            <dd class="text-text-body font-mono break-all">{{ streamName }}</dd>
+
+            <dt class="text-text-secondary">{{ t("alert_library.drawer.streamType") }}</dt>
+            <dd class="text-text-body font-mono">{{ streamType }}</dd>
+
+            <dt class="text-text-secondary">{{ t("alert_library.drawer.detection") }}</dt>
+            <dd class="text-text-body font-mono" data-test="alert-library-drawer-detection">
+              {{ anomalyDetectionText }}
+            </dd>
+          </dl>
+        </section>
+      </template>
+
       <template v-else-if="file">
         <section>
           <h3 class="text-text-secondary flex items-center gap-1.5 pb-2 text-xs font-semibold">
@@ -167,7 +206,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <template #footer>
       <div class="flex w-full justify-end gap-2">
+        <!-- The editor prefill speaks the scheduled alert shape only. -->
         <OButton
+          v-if="!isAnomaly"
           variant="outline"
           size="sm-action"
           icon-left="edit"
@@ -197,6 +238,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, nextTick, ref, watch } from "vue";
 
 import AlertQueryPreview from "@/components/alerts/AlertQueryPreview.vue";
+import { ANOMALY_DIRECTION_KEYS } from "@/components/anomaly_detection/steps/AnomalyDetectionConfig.schema";
 import PreviewAlert from "@/components/alerts/PreviewAlert.vue";
 import { useAlertCreation } from "@/composables/alerts/useAlertCreation";
 import { useAlertLibrary } from "@/composables/alerts/useAlertLibrary";
@@ -209,10 +251,11 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import type { AlertLibraryEntry, AlertLibraryFile, StreamDataState } from "@/types/alertLibrary";
 import { formatDistanceToNowStrict } from "date-fns";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nKey } from "@/types/i18n";
 import { buildPrefillFromLibrary } from "@/utils/alerts/prefill/fromLibrary";
 
 import {
+  alertTypeOf,
   categoryLabel,
   packLabel,
   queryTypeLabel,
@@ -316,6 +359,31 @@ const asRecord = (value: unknown): Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : {};
+
+const isAnomaly = computed(
+  () =>
+    (!!props.entry && alertTypeOf(props.entry) === "anomaly") ||
+    file.value?.alert_type === "anomaly_detection",
+);
+const anomalyConfig = computed(() => asRecord(file.value?.anomaly_config));
+const anomalySql = computed(() =>
+  typeof anomalyConfig.value.custom_sql === "string" ? anomalyConfig.value.custom_sql : "",
+);
+const anomalyDetectionText = computed(() => {
+  const { detection_function: fn, detection_function_field: field } = anomalyConfig.value;
+  const { histogram_interval: interval, alert_direction: direction } = anomalyConfig.value;
+  const head =
+    typeof fn === "string" ? `${fn}${typeof field === "string" ? `(${field})` : ""}` : "";
+  const directionText =
+    typeof direction === "string" && Object.hasOwn(ANOMALY_DIRECTION_KEYS, direction)
+      ? t(ANOMALY_DIRECTION_KEYS[direction] as I18nKey)
+      : direction;
+  return raw(
+    [head, interval, directionText]
+      .filter((part): part is string => typeof part === "string" && part !== "")
+      .join(" · "),
+  );
+});
 
 const queryCondition = computed(() => asRecord(file.value?.query_condition));
 const triggerCondition = computed(() => asRecord(file.value?.trigger_condition));
@@ -494,7 +562,13 @@ const customize = () => {
 };
 
 const install = () => {
-  if (!props.entry || !tunedFile.value) return;
+  if (!props.entry || !file.value) return;
+  // The threshold floors would write a trigger_condition into a body that must not have one.
+  if (isAnomaly.value) {
+    emit("install", { entry: props.entry, file: file.value });
+    return;
+  }
+  if (!tunedFile.value) return;
   emit("install", { entry: props.entry, file: tunedFile.value });
 };
 </script>

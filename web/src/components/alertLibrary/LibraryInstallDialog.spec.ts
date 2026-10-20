@@ -20,11 +20,16 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import type { AlertLibraryEntry, AlertLibraryFile } from "@/types/alertLibrary";
 import analytics from "@/services/product_analytics";
+import config from "@/aws-exports";
+import { queryClient } from "@/composables/query/queryClient";
+import { alertKeys } from "@/services/alerts.querykeys";
+import { anomalyKeys } from "@/services/anomaly_detection.querykeys";
 
 const mocks = vi.hoisted(() => ({
   loadAlertFile: vi.fn(),
   listDestinations: vi.fn(),
   createAlert: vi.fn(),
+  createAnomaly: vi.fn(),
   getFoldersListByType: vi.fn(),
   validateCredentials: vi.fn(() => ({ isValid: true, errors: {} })),
   testDestination: vi.fn(),
@@ -67,6 +72,13 @@ vi.mock("@/services/alert_destination", async () => {
 vi.mock("@/services/alerts", async () => {
   const actual = await vi.importActual<{ default: Record<string, unknown> }>("@/services/alerts");
   return { ...actual, default: { ...actual.default, create_by_alert_id: mocks.createAlert } };
+});
+
+vi.mock("@/services/anomaly_detection", async () => {
+  const actual = await vi.importActual<{ default: Record<string, unknown> }>(
+    "@/services/anomaly_detection",
+  );
+  return { ...actual, default: { ...actual.default, create: mocks.createAnomaly } };
 });
 
 vi.mock("@/utils/commons", async () => {
@@ -947,7 +959,10 @@ describe("LibraryInstallDialog", () => {
       await click(wrapper, "alert-library-install-run");
 
       expect(analytics.track).toHaveBeenCalledTimes(1);
-      expect(analytics.track).toHaveBeenCalledWith("library_alert_installed", { count: 2 });
+      expect(analytics.track).toHaveBeenCalledWith("library_alert_installed", {
+        count: 2,
+        anomaly_count: 0,
+      });
     });
 
     it("does not track library_alert_installed when every install fails", async () => {
@@ -1596,6 +1611,250 @@ describe("LibraryInstallDialog", () => {
       expect(
         wrapper.find('[data-test="alert-library-install-count"]').attributes("data-selected"),
       ).toBe("100");
+    });
+  });
+
+  describe("anomaly alerts", () => {
+    const anomalyEntry = () =>
+      entry({
+        id: "apm/traces_server_error_ratio_anomaly",
+        name: "traces_server_error_ratio_anomaly",
+        pack: "apm",
+        category: "traces",
+        title: "Server error ratio is unusually high",
+        severity: "warning",
+        stream: "default",
+        stream_type: "traces",
+        query_type: "sql",
+        required_streams: ["default"],
+        content_hash: "hash-a",
+        alert_type: "anomaly_detection",
+      });
+
+    const anomalyFile = (): AlertLibraryFile => ({
+      name: "traces_server_error_ratio_anomaly",
+      title: "Server error ratio is unusually high",
+      severity: "warning",
+      source: { project: "openobserve" },
+      alert_type: "anomaly_detection",
+      stream_type: "traces",
+      stream_name: "default",
+      enabled: true,
+      anomaly_config: {
+        query_mode: "filters",
+        filters: [{ field: "span_kind", operator: "=", value: "2" }],
+        detection_function: "p95",
+        detection_function_field: "duration",
+        histogram_interval: "5m",
+        schedule_interval: "5m",
+        detection_window_seconds: 900,
+        training_window_days: 28,
+        retrain_interval_days: 7,
+        alert_direction: "above",
+        alert_window_buckets: 3,
+        alert_window_fire_pct: 60,
+        alert_window_recover_pct: 34,
+      },
+    });
+
+    const original = { isEnterprise: config.isEnterprise, zoConfig: store.state.zoConfig };
+
+    const setAccess = (isEnterprise: string, enabled: boolean) => {
+      (config as { isEnterprise: string }).isEnterprise = isEnterprise;
+      store.state.zoConfig = {
+        ...original.zoConfig,
+        build_type: "enterprise",
+        anomaly_detection_enabled: enabled,
+      } as typeof original.zoConfig;
+    };
+
+    const anomalyPayload = () => mocks.createAnomaly.mock.calls[0]?.[1] as Record<string, any>;
+
+    beforeEach(() => {
+      setAccess("true", true);
+      mocks.createAnomaly.mockResolvedValue({ data: {} });
+      mocks.loadAlertFile.mockImplementation((e: AlertLibraryEntry) =>
+        Promise.resolve(e.alert_type === "anomaly_detection" ? anomalyFile() : libraryFile(e.name)),
+      );
+    });
+
+    afterEach(() => {
+      (config as { isEnterprise: string }).isEnterprise = original.isEnterprise;
+      store.state.zoConfig = original.zoConfig;
+    });
+
+    it("sends each kind of a mixed batch through its own create", async () => {
+      const wrapper = await mountDialog({
+        seed: null,
+        entries: [seedEntry(), anomalyEntry()],
+        preselect: [seedEntry(), anomalyEntry()],
+      });
+      await advanceToInstall(wrapper);
+      await click(wrapper, "alert-library-install-run");
+
+      expect(mocks.createAlert).toHaveBeenCalledTimes(1);
+      expect(payloadFor("pod-oom-killed").alert_type).toBeUndefined();
+      expect(mocks.createAnomaly).toHaveBeenCalledTimes(1);
+      expect(mocks.createAnomaly.mock.calls[0][2]).toBe("default");
+      expect(anomalyPayload()).toMatchObject({
+        alert_type: "anomaly_detection",
+        enabled: true,
+        destinations: ["ops-slack"],
+        folder_id: "default",
+        priority: 3,
+      });
+      expect(anomalyPayload().anomaly_config).toEqual(anomalyFile().anomaly_config);
+      expect(anomalyPayload()).not.toHaveProperty("trigger_condition");
+      expect(anomalyPayload()).not.toHaveProperty("title");
+      expect(statusOf(wrapper, "apm/traces_server_error_ratio_anomaly")).toBe("installed");
+      expect(analytics.track).toHaveBeenCalledWith("library_alert_installed", {
+        count: 2,
+        anomaly_count: 1,
+      });
+    });
+
+    it("refreshes the Alerts list as well as the anomaly lists after an anomaly create", async () => {
+      const invalidate = vi.spyOn(queryClient, "invalidateQueries");
+      const wrapper = await mountDialog({
+        seed: { entry: anomalyEntry(), file: anomalyFile() },
+        entries: [anomalyEntry()],
+      });
+      await click(wrapper, "alert-library-install-next");
+      await click(wrapper, "alert-library-install-next");
+      await click(wrapper, "alert-library-install-next");
+      await click(wrapper, "alert-library-install-run");
+
+      expect(invalidate).toHaveBeenCalledWith({ queryKey: anomalyKeys.all("default") });
+      expect(invalidate).toHaveBeenCalledWith({ queryKey: alertKeys.all("default") });
+      invalidate.mockRestore();
+    });
+
+    it("drops anomaly alerts from the batch when the feature turns off mid-dialog", async () => {
+      const wrapper = await mountDialog({
+        seed: null,
+        entries: [seedEntry(), anomalyEntry()],
+        preselect: [seedEntry(), anomalyEntry()],
+      });
+      const count = () =>
+        wrapper.find('[data-test="alert-library-install-count"]').attributes("data-selected");
+      await wrapper.find('[data-test="alert-library-install-destination"]').setValue("ops-slack");
+      await click(wrapper, "alert-library-install-next");
+      expect(count()).toBe("2");
+
+      setAccess("true", false);
+      await flushPromises();
+      expect(count()).toBe("1");
+
+      await click(wrapper, "alert-library-install-next");
+      await click(wrapper, "alert-library-install-next");
+      await click(wrapper, "alert-library-install-next");
+      await click(wrapper, "alert-library-install-run");
+      expect(mocks.createAnomaly).not.toHaveBeenCalled();
+      expect(mocks.createAlert).toHaveBeenCalledTimes(1);
+    });
+
+    it("disables Run when the feature turns off under an anomaly-only batch", async () => {
+      const wrapper = await mountDialog({
+        seed: { entry: anomalyEntry(), file: anomalyFile() },
+        entries: [anomalyEntry()],
+      });
+      await click(wrapper, "alert-library-install-next");
+      await click(wrapper, "alert-library-install-next");
+      await click(wrapper, "alert-library-install-next");
+
+      setAccess("true", false);
+      await flushPromises();
+
+      const run = wrapper.find('[data-test="alert-library-install-run"]');
+      expect(run.attributes("disabled")).toBeDefined();
+      await run.trigger("click");
+      await flushPromises();
+      expect(mocks.createAnomaly).not.toHaveBeenCalled();
+    });
+
+    it("says the Tune step applies to threshold alerts only in a mixed batch", async () => {
+      const wrapper = await mountDialog({
+        seed: null,
+        entries: [seedEntry(), anomalyEntry()],
+        preselect: [seedEntry(), anomalyEntry()],
+      });
+      await click(wrapper, "alert-library-install-next");
+      await click(wrapper, "alert-library-install-next");
+      await click(wrapper, "alert-library-install-next");
+
+      expect(wrapper.find('[data-test="alert-library-install-tune-threshold-only"]').exists()).toBe(
+        true,
+      );
+    });
+
+    it("skips the Tune step for an anomaly-only batch, both ways", async () => {
+      const wrapper = await mountDialog({
+        seed: { entry: anomalyEntry(), file: anomalyFile() },
+        entries: [anomalyEntry()],
+      });
+      expect(wrapper.find('[data-test="alert-library-install-tune-step"]').exists()).toBe(false);
+
+      await click(wrapper, "alert-library-install-next");
+      await click(wrapper, "alert-library-install-next");
+      await click(wrapper, "alert-library-install-next");
+      expect(wrapper.find('[data-test="alert-library-install-run"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="alert-library-install-summary"]').text()).not.toContain(
+        "Tune",
+      );
+
+      await click(wrapper, "alert-library-install-back");
+      expect(wrapper.find('[data-test="alert-library-install-next"]').exists()).toBe(true);
+      await click(wrapper, "alert-library-install-next");
+      expect(wrapper.find('[data-test="alert-library-install-run"]').exists()).toBe(true);
+    });
+
+    it("notes after the run that anomaly alerts wait for training", async () => {
+      const wrapper = await mountDialog({
+        seed: { entry: anomalyEntry(), file: anomalyFile() },
+        entries: [anomalyEntry()],
+      });
+      expect(wrapper.find('[data-test="alert-library-install-anomaly-note"]').exists()).toBe(false);
+      await click(wrapper, "alert-library-install-next");
+      await click(wrapper, "alert-library-install-next");
+      await click(wrapper, "alert-library-install-next");
+      await click(wrapper, "alert-library-install-run");
+
+      expect(wrapper.find('[data-test="alert-library-install-anomaly-note"]').exists()).toBe(true);
+    });
+
+    it("offers no anomaly alert when the build is not entitled", async () => {
+      setAccess("false", true);
+      const wrapper = await mountDialog({
+        seed: null,
+        entries: [seedEntry(), anomalyEntry()],
+        preselect: [seedEntry(), anomalyEntry()],
+      });
+      await click(wrapper, "alert-library-install-next");
+
+      expect(
+        wrapper
+          .find('[data-test="alert-library-install-alert-apm/traces_server_error_ratio_anomaly"]')
+          .exists(),
+      ).toBe(false);
+      await click(wrapper, "alert-library-install-select-all");
+      expect(
+        wrapper.find('[data-test="alert-library-install-count"]').attributes("data-selected"),
+      ).toBe("1");
+    });
+
+    it("refuses to send a file declaring an anomaly alert when the feature is off", async () => {
+      setAccess("true", false);
+      mocks.loadAlertFile.mockResolvedValue(anomalyFile());
+      const wrapper = await mountDialog({ seed: null, entries: [secondEntry()] });
+      await advanceAllToInstall(wrapper);
+      await click(wrapper, "alert-library-install-run");
+
+      expect(mocks.createAnomaly).not.toHaveBeenCalled();
+      expect(mocks.createAlert).not.toHaveBeenCalled();
+      expect(statusOf(wrapper, "k8s/node-disk-pressure")).toBe("failed");
+      expect(
+        wrapper.find('[data-test="alert-library-install-error-k8s/node-disk-pressure"]').text(),
+      ).toContain("Enterprise");
     });
   });
 });

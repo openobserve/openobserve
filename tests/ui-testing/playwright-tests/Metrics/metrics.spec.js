@@ -462,70 +462,11 @@ test.describe("Metrics testcases", () => {
     // Enter invalid PromQL query with actual syntax error (unclosed parenthesis)
     await pm.metricsPage.enterMetricsQuery('sum(rate(');
 
-    // Wait for the API error response after clicking Apply
-    const apiResponsePromise = page.waitForResponse(
-      (resp) => resp.url().includes('/_search') || resp.url().includes('/api/'),
-      { timeout: 15000 }
-    ).catch(() => null);
     await pm.metricsPage.clickApplyButton();
-    await apiResponsePromise;
 
-    // Wait for the panel to settle into a graceful state after the invalid query.
-    // The metrics panel handles invalid PromQL in one of three ways, all valid:
-    //   1. an explicit error  -> [data-test="dashboard-error"] (DashboardErrors) or
-    //      [data-test="panel-schema-renderer-error-message"] (chart error), OR
-    //   2. a no-data placeholder -> rendered via OEmptyState (own data-test="o2-empty-state",
-    //      scoped under the panel-editor container; [data-test="no-data"] as dev fallback), OR
-    //   3. the chart container still renders without crashing -> [data-test="chart-renderer"].
-    // Case 3 is what production hits: the query fails without setting an error and noData is
-    // empty (so the OEmptyState overlay is intentionally suppressed), yet the panel mounts the
-    // chart path cleanly. A genuinely broken/blank panel would match none of these and still
-    // time out, so this stays a meaningful "handled without crashing" gate.
-    await page.waitForFunction(
-      () => {
-        const dashError = document.querySelector('[data-test="dashboard-error"]');
-        const chartError = document.querySelector('[data-test="panel-schema-renderer-error-message"]');
-        const noData = document.querySelector(
-          '[data-test="no-data"], [data-test="panel-editor-container"] [data-test="o2-empty-state"]'
-        );
-        const chartRendered = document.querySelector('[data-test="chart-renderer"]');
-        return !!dashError || !!chartError || !!noData || !!chartRendered;
-      },
-      null,
-      { timeout: 15000 }
-    );
-
-    const inlineErrorLocator = pm.metricsPage.getDashboardError();
-    const chartErrorLocator = pm.metricsPage.getChartErrorMessage();
-    const noDataLocator = await pm.metricsPage.getNoDataMessage();
-    const chartRendererLocator = pm.metricsPage.getChartRenderer();
-
-    const hasInlineError = await inlineErrorLocator.isVisible().catch(() => false);
-    const hasChartError = await chartErrorLocator.isVisible().catch(() => false);
-    const hasNoData = await noDataLocator.isVisible().catch(() => false);
-    // Also check DOM presence (no-data can render with empty text and 0px height)
-    const noDataInDom = await noDataLocator.count() > 0;
-    // Chart container still attached => panel handled the invalid query without crashing.
-    const chartRendered = await chartRendererLocator.count() > 0;
-
-    testLogger.info(`Invalid query state: hasInlineError=${hasInlineError}, hasChartError=${hasChartError}, hasNoData=${hasNoData}, noDataInDom=${noDataInDom}, chartRendered=${chartRendered}`);
-
-    // System must handle invalid syntax gracefully - show error, no data, or keep the
-    // panel rendered (no crash / blank screen).
-    const handledGracefully = hasInlineError || hasChartError || hasNoData || noDataInDom || chartRendered;
-    expect(handledGracefully).toBe(true);
-
-    if (hasInlineError) {
-      const errorText = await inlineErrorLocator.first().textContent().catch(() => '');
-      testLogger.info(`Dashboard error displayed: ${errorText.substring(0, 100)}`);
-    } else if (hasChartError) {
-      const errorText = await chartErrorLocator.first().textContent().catch(() => '');
-      testLogger.info(`Chart error displayed: ${errorText.substring(0, 100)}`);
-    } else if (hasNoData || noDataInDom) {
-      testLogger.info('Invalid query handled gracefully - no-data state (no crash, loading completed)');
-    } else {
-      testLogger.info('Invalid query handled gracefully - panel rendered without crashing (no error/no-data indicator shown)');
-    }
+    // The setup query leaves a chart mounted, so only a surfaced error proves this query was handled.
+    const errorText = await pm.metricsPage.expectQueryErrorVisible();
+    testLogger.info(`Invalid query error displayed: ${errorText.substring(0, 100)}`);
   });
 
   test("Query for non-existent metric", {

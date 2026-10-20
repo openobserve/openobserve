@@ -22,21 +22,6 @@ pub fn get_cpu_num() -> usize {
     system.cpus().len()
 }
 
-// Get average CPU usage
-pub fn get_cpu_usage() -> f32 {
-    let mut system = sysinfo::System::new_with_specifics(
-        RefreshKind::nothing().with_cpu(CpuRefreshKind::everything()),
-    );
-    std::thread::sleep(sysinfo::MINIMUM_CPU_UPDATE_INTERVAL);
-    system.refresh_cpu_usage();
-    let cpus = system.cpus();
-    if cpus.is_empty() {
-        return 0.0;
-    }
-    let total_usage = cpus.iter().map(|cpu| cpu.cpu_usage()).sum::<f32>();
-    total_usage / cpus.len() as f32
-}
-
 // Get process CPU usage
 #[allow(dead_code)]
 pub fn get_process_cpu_usage() -> f32 {
@@ -61,16 +46,6 @@ mod tests {
     #[test]
     fn test_sysinfo_get_cpu_num() {
         assert!(get_cpu_num() > 0);
-    }
-
-    #[test]
-    fn test_sysinfo_get_cpu_usage() {
-        let usage = get_cpu_usage();
-        assert!(
-            (0.0..=100.0).contains(&usage),
-            "CPU usage should be between 0 and 100, got {}",
-            usage
-        );
     }
 
     #[test]

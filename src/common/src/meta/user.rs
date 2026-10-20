@@ -150,16 +150,6 @@ impl UserUpdateMode {
     }
 }
 
-pub fn get_default_user_org() -> UserOrg {
-    UserOrg {
-        name: "".to_string(),
-        org_name: "".to_string(),
-        token: "".to_string(),
-        rum_token: None,
-        role: get_default_user_role(),
-    }
-}
-
 #[cfg(feature = "enterprise")]
 pub fn get_default_user_role() -> UserRole {
     let mut role = UserRole::Admin;
@@ -845,16 +835,6 @@ mod tests {
         assert_eq!(response.given_name, "John");
         assert!(response.is_internal_user);
         assert_eq!(response.user_role, Some(UserRole::Admin));
-    }
-
-    #[test]
-    fn test_get_default_user_org() {
-        let org = get_default_user_org();
-
-        assert_eq!(org.name, "");
-        assert_eq!(org.token, "");
-        assert!(org.rum_token.is_none());
-        assert_eq!(org.role, get_default_user_role());
     }
 
     #[test]

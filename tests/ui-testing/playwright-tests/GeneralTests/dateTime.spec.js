@@ -143,18 +143,15 @@ test.describe("Date-Time Picker Forward Shift Cap testcases", () => {
   });
 
   // TC-05
-  test("forward shift is disabled when the window end is at or past the present", {
+  test("forward shift is disabled when the window end is past the present", {
     tag: ['@date-time-next-shift-cap', '@all', '@P1']
   }, async ({ page }) => {
-    testLogger.info('Verifying Next is disabled for a window already ending at now');
+    testLogger.info('Verifying Next is disabled for a window ending past the present');
 
-    // A window whose end is at the present must not offer a forward shift, since
-    // there is nothing left to shift into. This is the second gating branch of
-    // isNextShiftDisabled() (endUTC + 1s > now). Time-sensitive by nature: the
-    // end is derived from the page clock at paste time.
+    // An end exactly at now re-enables Next ~1s later (endUTC + 1s > now), so end in the future.
     const { startMicros, endMicros } = await page.evaluate(() => {
       const now = Date.now() * 1_000;
-      return { startMicros: now - 30_000_000, endMicros: now };
+      return { startMicros: now - 30_000_000, endMicros: now + 300_000_000 };
     });
 
     await pm.dateTimePickerPage.seedClipboard(`${startMicros} - ${endMicros}`);
@@ -164,7 +161,7 @@ test.describe("Date-Time Picker Forward Shift Cap testcases", () => {
 
     await pm.dateTimePickerPage.expectNextDisabled();
 
-    testLogger.info('Next disabled for a window ending at the present');
+    testLogger.info('Next disabled for a window ending past the present');
   });
 
   // TC-06
