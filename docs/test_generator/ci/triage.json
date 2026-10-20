@@ -1,0 +1,32 @@
+{
+  "feature_slug": "alert-library-anomaly",
+  "feature_title": "Alert Library Anomaly Alerts",
+  "area": "Alerts",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "alert-library-anomaly.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Alerts/alert-library-anomaly.spec.js",
+  "playwright_group": "Alerts-Anomaly",
+  "source_files": [
+    "web/src/views/AlertLibrary/AlertLibrary.vue",
+    "web/src/components/alertLibrary/LibraryCard.vue",
+    "web/src/components/alertLibrary/LibraryDrawer.vue",
+    "web/src/components/alertLibrary/LibraryInstallDialog.vue",
+    "web/src/components/alertLibrary/libraryFacets.ts",
+    "web/src/components/alertLibrary/libraryInstall.ts",
+    "web/src/composables/alerts/useAlertLibrary.ts",
+    "web/src/types/alertLibrary.ts"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "All 31 changed paths sit under web/src/ (components/alertLibrary, composables/alerts, types, views/AlertLibrary, and 16 locales/languages files). None are in enterprise-owned locations (no enterprise/, o2_enterprise/, or src/enterprise/ paths), and none of the enterprise keyword signals (cipher/SSO/SAML/RBAC/SDR/sensitive-data/logo-management) appear in the changed paths or symbol names. The feature renders enterprise-gated anomaly-detection alerts, but that gating is runtime state (config.isEnterprise + zoConfig.anomaly_detection_enabled), not code path ownership, so by the path-based rule this is an OSS change.",
+    "skip": "Not skipped: no explicit opt-out label or skip comment was passed, and the change is a user-facing UI change rather than docs/CI-only. The Alert Library gains new views, badges, drawer sections, and install-dialog steps, so it does not qualify as a no-behavior change.",
+    "e2e": "E2E is warranted: the AlertLibrary view, LibraryCard, LibraryDrawer, and LibraryInstallDialog all gain user-exercisable behavior — anomaly cards with Anomaly/Enterprise badges, a locked-card upgrade dialog instead of the drawer, an anomaly-only install flow that skips the Tune step, mixed-batch installs routing each kind through its own create call, and enterprise gating (locked/hidden/enabled).",
+    "area": "The bulk of the UI change lives in web/src/views/AlertLibrary and web/src/components/alertLibrary plus composables/alerts/useAlertLibrary, which maps to the Alerts product area. The existing alert-library.spec.js already lives under tests/ui-testing/playwright-tests/Alerts, so the new spec belongs beside it.",
+    "group": "Anomaly detection is enterprise-gated, so the new spec must run on the enterprise binary with anomaly_detection_enabled. The enterprise overlay ci_matrix.ent.json already defines an Alerts-Anomaly shard (actual_folder Alerts) running alerts-anomaly-detection.spec.js, which is the closest existing shard for enterprise-only anomaly alert library coverage rather than the shared OSS Alerts shard.",
+    "existing_tests": "No Playwright E2E specs in the diff — the changed .spec.ts files under web/src/ are Vitest unit tests, not E2E coverage, so there are no existing E2E specs to extend or complement."
+  }
+}
