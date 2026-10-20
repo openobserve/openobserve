@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Fleet Manager settings: one row per org; no row means the defaults.
+//! Fleet management org settings: one row per org; no row means the defaults.
 
 use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, Set, sea_query::OnConflict};
 
@@ -25,12 +25,16 @@ pub async fn get_with<C: ConnectionTrait>(conn: &C, org_id: &str) -> Result<Opti
     Ok(Entity::find_by_id(org_id.to_string()).one(conn).await?)
 }
 
-/// Replaces both settings of the org, creating its row when absent.
+/// Replaces every setting of the org, creating its row when absent.
 pub async fn upsert_with<C: ConnectionTrait>(conn: &C, row: Model) -> Result<(), Error> {
     Entity::insert(active_model(row))
         .on_conflict(
             OnConflict::column(Column::OrgId)
-                .update_columns([Column::RestrictedComponents, Column::TargetVersion])
+                .update_columns([
+                    Column::RestrictedComponents,
+                    Column::TargetVersion,
+                    Column::FleetDefaults,
+                ])
                 .to_owned(),
         )
         .exec_without_returning(conn)
@@ -55,6 +59,7 @@ fn active_model(row: Model) -> ActiveModel {
         org_id: Set(row.org_id),
         restricted_components: Set(row.restricted_components),
         target_version: Set(row.target_version),
+        fleet_defaults: Set(row.fleet_defaults),
     }
 }
 
@@ -76,6 +81,7 @@ mod tests {
             org_id: org_id.to_string(),
             restricted_components: serde_json::json!(restricted),
             target_version: target.map(str::to_string),
+            fleet_defaults: None,
         }
     }
 
@@ -86,13 +92,12 @@ mod tests {
         upsert_with(db, settings("o2", &["debug"], Some("0.170.0")))
             .await
             .unwrap();
-        upsert_with(db, settings("o2", &["file"], None))
-            .await
-            .unwrap();
-        assert_eq!(
-            get_with(db, "o2").await.unwrap(),
-            Some(settings("o2", &["file"], None))
-        );
+        let defaults = Model {
+            fleet_defaults: Some(serde_json::json!({"heartbeat_interval_secs": 15})),
+            ..settings("o2", &["file"], None)
+        };
+        upsert_with(db, defaults.clone()).await.unwrap();
+        assert_eq!(get_with(db, "o2").await.unwrap(), Some(defaults));
         assert_eq!(
             get_with(db, "o1").await.unwrap(),
             Some(settings("o1", &[], None)),

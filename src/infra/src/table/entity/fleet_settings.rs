@@ -22,6 +22,8 @@ pub struct Model {
     pub org_id: String,
     pub restricted_components: Json,
     pub target_version: Option<String>,
+    /// `config::meta::fleet::FleetSettings`; null is the built-in defaults.
+    pub fleet_defaults: Option<Json>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

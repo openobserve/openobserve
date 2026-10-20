@@ -13,10 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Fleets' desired and stable configuration versions; no row means neither.
+//! Fleets' desired and stable configuration versions and setting overrides; no row means none.
 
 use config::meta::folder::FolderType;
 use sea_orm::{
+    ActiveValue::NotSet,
     ColumnTrait, ConnectionTrait, DatabaseBackend, EntityTrait, FromQueryResult, JoinType, Order,
     QueryFilter, QuerySelect, Set,
     sea_query::{Alias, Expr, LockType, OnConflict, Query},
@@ -41,6 +42,7 @@ pub struct FleetState {
     pub config_version: Option<i64>,
     pub stable_config_id: Option<String>,
     pub stable_config_version: Option<i64>,
+    pub settings: Option<serde_json::Value>,
 }
 
 /// Every fleet of the org, oldest first, as the shared folder list orders them.
@@ -52,7 +54,7 @@ pub async fn list_with<C: ConnectionTrait>(
     let query = Query::select()
         .expr(Expr::cust(
             "f.folder_id AS fleet_id, f.name, ff.config_id, ff.config_version, \
-             ff.stable_config_id, ff.stable_config_version",
+             ff.stable_config_id, ff.stable_config_version, ff.settings",
         ))
         .from_as(Alias::new("folders"), f.clone())
         .join_as(
@@ -122,6 +124,7 @@ pub async fn set_desired_with<C: ConnectionTrait>(
         stable_config_version: Set(None),
         updated_at: Set(now_us),
         updated_by: Set(actor.to_string()),
+        settings: NotSet,
     };
     Entity::insert(row)
         .on_conflict(
@@ -132,6 +135,37 @@ pub async fn set_desired_with<C: ConnectionTrait>(
                     Column::UpdatedAt,
                     Column::UpdatedBy,
                 ])
+                .to_owned(),
+        )
+        .exec_without_returning(conn)
+        .await?;
+    Ok(())
+}
+
+/// Replaces the fleet's setting overrides, keeping its versions; creates the row when absent.
+pub async fn set_settings_with<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    fleet_id: &str,
+    settings: Option<serde_json::Value>,
+    actor: &str,
+    now_us: i64,
+) -> Result<(), Error> {
+    let row = ActiveModel {
+        org_id: Set(org_id.to_string()),
+        fleet_id: Set(fleet_id.to_string()),
+        config_id: Set(None),
+        config_version: Set(None),
+        stable_config_id: Set(None),
+        stable_config_version: Set(None),
+        updated_at: Set(now_us),
+        updated_by: Set(actor.to_string()),
+        settings: Set(settings),
+    };
+    Entity::insert(row)
+        .on_conflict(
+            OnConflict::columns([Column::OrgId, Column::FleetId])
+                .update_columns([Column::Settings, Column::UpdatedAt, Column::UpdatedBy])
                 .to_owned(),
         )
         .exec_without_returning(conn)
@@ -178,4 +212,40 @@ pub async fn delete_by_org_with<C: ConnectionTrait>(conn: &C, org_id: &str) -> R
         .exec(conn)
         .await?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use sea_orm::Database;
+
+    use super::*;
+    use crate::table::migration::create_fleet_collectors_for_test;
+
+    #[tokio::test]
+    async fn settings_and_desired_never_overwrite_each_other() {
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        create_fleet_collectors_for_test(&db).await.unwrap();
+        let overrides = serde_json::json!({"heartbeat_interval_secs": 10});
+
+        set_settings_with(&db, "o1", "f1", Some(overrides.clone()), "u", 1)
+            .await
+            .unwrap();
+        set_desired_with(&db, "o1", "f1", ("edge", 2), "u", 2)
+            .await
+            .unwrap();
+        let row = get_with(&db, "o1", "f1").await.unwrap().unwrap();
+        assert_eq!(row.settings, Some(overrides));
+        assert_eq!(
+            (row.config_id.as_deref(), row.config_version),
+            (Some("edge"), Some(2))
+        );
+
+        set_settings_with(&db, "o1", "f1", None, "u", 3)
+            .await
+            .unwrap();
+        let row = get_with(&db, "o1", "f1").await.unwrap().unwrap();
+        assert_eq!(row.settings, None);
+        assert_eq!(row.config_version, Some(2), "desired kept");
+        assert_eq!(get_with(&db, "o1", "f2").await.unwrap(), None);
+    }
 }

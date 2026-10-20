@@ -156,6 +156,7 @@ enum FleetSettings {
     OrgId,
     RestrictedComponents,
     TargetVersion,
+    FleetDefaults,
 }
 
 #[derive(DeriveIden)]
@@ -169,6 +170,7 @@ enum Fleets {
     StableConfigVersion,
     UpdatedAt,
     UpdatedBy,
+    Settings,
 }
 
 #[derive(DeriveIden)]
@@ -402,6 +404,7 @@ fn settings_table() -> TableCreateStatement {
         .col(ColumnDef::new(S::OrgId).string().not_null().primary_key())
         .col(ColumnDef::new(S::RestrictedComponents).json().not_null())
         .col(ColumnDef::new(S::TargetVersion).string_len(32).null())
+        .col(ColumnDef::new(S::FleetDefaults).json().null())
         .to_owned()
 }
 
@@ -418,6 +421,7 @@ fn fleets_table() -> TableCreateStatement {
         .col(big(F::StableConfigVersion))
         .col(big_not_null(F::UpdatedAt))
         .col(ColumnDef::new(F::UpdatedBy).string().not_null())
+        .col(ColumnDef::new(F::Settings).json().null())
         .primary_key(Index::create().col(F::OrgId).col(F::FleetId))
         .to_owned()
 }

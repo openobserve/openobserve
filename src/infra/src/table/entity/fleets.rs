@@ -28,6 +28,8 @@ pub struct Model {
     pub stable_config_version: Option<i64>,
     pub updated_at: i64,
     pub updated_by: String,
+    /// `config::meta::fleet::FleetSettings`; null inherits every org default.
+    pub settings: Option<Json>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
