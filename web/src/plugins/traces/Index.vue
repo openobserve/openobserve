@@ -1435,10 +1435,11 @@ onActivated(async () => {
     await loadPageData();
   }
 
-  // Arriving from Service Graph / Services Catalog: this view is keep-alive, so
-  // a handoff navigation re-activates it without remounting. Apply the incoming
-  // stream/time/filter and run the query.
-  if (typeof params.filter === "string" && params.filter) {
+  // Arriving from Service Graph / Services Catalog / RCA evidence: this view is
+  // keep-alive, so a handoff navigation re-activates it without remounting. Apply
+  // the incoming stream/time/filter and run the query. An empty `filter` is an
+  // unfiltered handoff (stream + range only) and still clears and runs.
+  if (typeof params.filter === "string") {
     restoreUrlQueryParams();
     if (applyHandoffFilter()) {
       await loadPageData();
@@ -2173,11 +2174,12 @@ const handleServicesCatalogViewTraces = (data: string | Record<string, any>) => 
 
 /**
  * Hydrate a bookmarkable filter handoff. `restoreUrlQueryParams` applies the
- * stream, time range and tab; this restores the prebuilt filter.
+ * stream, time range and tab; this restores the prebuilt filter. A present but
+ * empty `filter` clears the editor, so the handoff shows every span in range.
  */
 const applyHandoffFilter = (): boolean => {
   const filter = router.currentRoute.value.query.filter;
-  if (typeof filter !== "string" || !filter) return false;
+  if (typeof filter !== "string") return false;
 
   searchObj.data.editorValue = filter;
   searchObj.meta.sqlMode = false; // Traces doesn't use SQL mode

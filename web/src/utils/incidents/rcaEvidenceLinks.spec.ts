@@ -42,7 +42,7 @@ function routeOf(link: RcaEvidenceLink | null) {
 }
 
 describe("rcaEvidenceLink (03 VE29)", () => {
-  it("SQL on logs: /logs with stream, sql_mode=true, base64 query, µs from/to and type=ai_chat_query", () => {
+  it("SQL on logs: /logs with stream, sql_mode=true, base64 query, µs from/to and type=rca_evidence_query", () => {
     const link = rcaEvidenceLink(
       { signal: "logs", streams: ["checkout_api"], sql: SQL, start_us: START_US, end_us: END_US },
       "default",
@@ -58,7 +58,8 @@ describe("rcaEvidenceLink (03 VE29)", () => {
       sql_mode: "true",
       from: String(START_US),
       to: String(END_US),
-      type: "ai_chat_query",
+      // Runs on arrival, unlike the AI chat's re-apply-only `ai_chat_query`.
+      type: "rca_evidence_query",
     });
     expect(q.query).not.toContain("SELECT");
     expect(decodeLogsQuery(q.query)).toBe(SQL);
@@ -122,6 +123,22 @@ describe("rcaEvidenceLink (03 VE29)", () => {
     });
   });
 
+  it("Traces: an unfiltered call (stream + range only) opens the stream with an empty filter", () => {
+    const link = rcaEvidenceLink(
+      { signal: "traces", streams: ["default"], start_us: START_US, end_us: END_US },
+      "default",
+    );
+
+    expect(link?.page).toBe("traces");
+    expect(routeOf(link).query).toEqual({
+      org_identifier: "default",
+      stream: "default",
+      filter: "",
+      from: String(START_US),
+      to: String(END_US),
+    });
+  });
+
   it.each<[string, RcaEvidenceTarget]>([
     ["SQL", { signal: "logs", streams: ["s"], sql: "SELECT 1" }],
     ["PromQL", { signal: "metrics", streams: [], promql: "up" }],
@@ -142,6 +159,7 @@ describe("rcaEvidenceLink (03 VE29)", () => {
     ["infra", { signal: "infra", streams: ["prod"] }],
     ["context", { signal: "context", streams: ["checkout_api"] }],
     ["unclassified", { signal: "unclassified", streams: [] }],
+    ["traces with neither a filter nor a stream", { signal: "traces", streams: [] }],
     ["unclassified SQL (ExecuteCode)", { signal: "unclassified", streams: [], sql: "SELECT 1" }],
     ["a filter on a non-traces signal", { signal: "logs", streams: [], filter: "x=1" }],
     ["a change command", { signal: "change", streams: [], command: "gh pr diff 812" }],
