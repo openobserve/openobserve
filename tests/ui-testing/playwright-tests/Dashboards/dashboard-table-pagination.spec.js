@@ -1141,19 +1141,9 @@ test.describe("Dashboard Table Chart Pagination Feature - PromQL Tables", () => 
     const tablePanel = pm.dashboardPanelActions.dashboardTable;
     await tablePanel.waitFor({ state: "visible", timeout: 15000 });
 
-    // Wait for table rows - if first attempt returns no data, re-apply to retry the query
-    // Rows render directly in tbody, keyed data-test="o2-table-row-<index>"
+    // Rows render directly in tbody, keyed data-test="o2-table-row-<index>"; data is required for pagination to render
     const tableRows = tablePanel.locator('tbody tr[data-test^="o2-table-row-"]');
-    let hasRows = await tableRows.first().waitFor({ state: "visible", timeout: 15000 }).then(() => true).catch(() => false);
-
-    if (!hasRows) {
-      testLogger.warn('No table rows on first attempt - re-applying query to retry');
-      await pm.dashboardPanelActions.applyAndWaitForPromQLQuery();
-      hasRows = await tableRows.first().waitFor({ state: "visible", timeout: 15000 }).then(() => true).catch(() => false);
-    }
-
-    // Data is required for pagination to render - fail clearly if still no data
-    expect(hasRows, 'PromQL query "cpu_usage{}" must return data rows for pagination test - check metrics ingestion').toBe(true);
+    await expect(tableRows.first(), 'PromQL query "cpu_usage{}" must return data rows for pagination test - check metrics ingestion').toBeVisible({ timeout: 15000 });
 
     // Wait for the table bottom container which holds all pagination controls
     // (PromQL with legend uses a custom bottom slot that also has this data-test)
