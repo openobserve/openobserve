@@ -33,6 +33,9 @@ describe("badgeGroups", () => {
     const past = resolveBadge("licenseWaiverStatus", "past");
     expect(past.variant).toBe("default-soft");
     expect(past.labelKey).toBe("components.badge.licenseWaiverStatus.past");
+    const ended = resolveBadge("licenseWaiverStatus", "ended");
+    expect(ended.variant).toBe("default-soft");
+    expect(ended.labelKey).toBe("components.badge.licenseWaiverStatus.ended");
   });
 
   it("resolves downtimeStatus to dot mode with an amber active state", () => {

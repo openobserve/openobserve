@@ -42,7 +42,7 @@ export interface LicenseWaiverFields {
   env_key_active?: boolean;
 }
 
-export type WaiverStatus = "scheduled" | "active" | "past";
+export type WaiverStatus = "scheduled" | "active" | "past" | "ended";
 
 export type LicenseBannerState =
   { kind: "none" } | { kind: "paused" } | { kind: "restored"; untilUs: number; endsSoon: boolean };
@@ -60,7 +60,7 @@ export function knownWaivers(ws: LicenseWaiver[] | undefined): LicenseWaiver[] {
 
 export function waiverStatus(w: LicenseWaiver, nowUs: number): WaiverStatus {
   if (nowUs < w.starts_at) return "scheduled";
-  if (nowUs >= w.ends_at) return "past";
+  if (nowUs >= w.ends_at) return w.type === "search_unblock" ? "ended" : "past";
   return "active";
 }
 

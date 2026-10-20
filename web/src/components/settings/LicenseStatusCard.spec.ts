@@ -77,6 +77,22 @@ describe("LicenseStatusCard", () => {
     );
   });
 
+  it("days row shows the count before waivers when it differs", () => {
+    const w = mountCard({
+      decision: decision({ exceeded_days: 0 }),
+      base: decision({ exceeded_days: 4 }),
+    });
+    expect(w.find("[data-test=license-status-days]").text()).toContain("0 used (4 before waivers)");
+  });
+
+  it("a zero limit shows 0 GB/day, never NaN or Infinity", () => {
+    const w = mountCard({ decision: decision({ limit_today_gb: 0, used_today_gb: 5 }) });
+    const text = w.find("[data-test=license-status-limit]").text();
+    expect(text).toContain("0 GB/day");
+    expect(text).not.toContain("Unlimited");
+    expect(w.html()).not.toMatch(/NaN|Infinity/);
+  });
+
   it("env key notice shows only when the env key is active", () => {
     const on = mountCard({ envKeyActive: true });
     expect(on.find("[data-test=license-status-env-key]").text()).toContain("O2_LICENSE_KEY");

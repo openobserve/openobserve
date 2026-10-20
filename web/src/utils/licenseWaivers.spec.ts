@@ -48,7 +48,8 @@ describe("licenseWaivers", () => {
   it("waiverStatus honours inclusive start and exclusive end", () => {
     expect(waiverStatus(unblock, us(2026, 9, 19))).toBe("scheduled");
     expect(waiverStatus(unblock, unblock.starts_at)).toBe("active");
-    expect(waiverStatus(unblock, unblock.ends_at)).toBe("past");
+    expect(waiverStatus(unblock, unblock.ends_at)).toBe("ended");
+    expect(waiverStatus({ ...unblock, type: "ingestion_limit" }, unblock.ends_at)).toBe("past");
   });
 
   it("knownWaivers drops kinds this release does not know", () => {

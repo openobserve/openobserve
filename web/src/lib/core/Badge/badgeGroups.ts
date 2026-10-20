@@ -203,6 +203,7 @@ export const BADGE_GROUPS = {
       },
       active: { variant: "success-soft", labelKey: "components.badge.licenseWaiverStatus.active" },
       past: { variant: "default-soft", labelKey: "components.badge.licenseWaiverStatus.past" },
+      ended: { variant: "default-soft", labelKey: "components.badge.licenseWaiverStatus.ended" },
     },
   },
 

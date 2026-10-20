@@ -62,6 +62,24 @@ describe("LicenseWaiversCard", () => {
     expect(text).not.toContain("Nov 15");
   });
 
+  it("badges read Scheduled, Ended and Past days", () => {
+    const w = mountCard([
+      waiver({ id: "s", starts_at: us(2026, 11, 1), ends_at: us(2026, 11, 8) }),
+      waiver({ id: "e", starts_at: us(2026, 9, 1), ends_at: us(2026, 9, 8) }),
+      waiver({
+        id: "p",
+        type: "ingestion_limit",
+        limit: { typ: "PerDayCount", value: 300 },
+        starts_at: us(2026, 9, 1),
+        ends_at: us(2026, 9, 8),
+      }),
+    ]);
+    const text = (id: string) => w.find(`[data-test=license-waiver-row-${id}]`).text();
+    expect(text("s")).toContain("Scheduled");
+    expect(text("e")).toContain("Ended");
+    expect(text("p")).toContain("Past days");
+  });
+
   it("an Unlimited ingestion waiver is labelled Unlimited ingestion", () => {
     const w = mountCard([
       waiver({

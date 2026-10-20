@@ -74,12 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("about.license_status_allowed_days") }}
             </td>
             <td class="px-3 py-2 leading-[1.2]">
-              {{
-                t("about.license_status_allowed_days_value", {
-                  allowed: decision.allowed_days,
-                  used: decision.exceeded_days,
-                })
-              }}
+              {{ daysText }}
             </td>
           </tr>
         </tbody>
@@ -134,10 +129,22 @@ const reasons = computed(() => {
   });
 });
 
+const daysText = computed(() => {
+  const d = props.decision;
+  const params = { allowed: d.allowed_days, used: d.exceeded_days };
+  if (props.base && props.base.exceeded_days !== d.exceeded_days) {
+    return t("about.license_status_allowed_days_value_base", {
+      ...params,
+      base: props.base.exceeded_days,
+    });
+  }
+  return t("about.license_status_allowed_days_value", params);
+});
+
 const limitText = computed(() => {
   const d = props.decision;
-  const percent = quotaPercent(d);
-  if (d.limit_today_gb == null || percent == null) return t("about.license_status_unlimited");
+  if (d.limit_today_gb == null) return t("about.license_status_unlimited");
+  const percent = quotaPercent(d) ?? 0;
   return t("about.license_status_limit_value", { limit: d.limit_today_gb, percent });
 });
 </script>

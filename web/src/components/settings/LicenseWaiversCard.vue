@@ -28,6 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :columns="columns"
         row-key="id"
         pagination="none"
+        sorting="none"
         :frame="false"
         :show-global-filter="false"
         table-id="license-waivers"

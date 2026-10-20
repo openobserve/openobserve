@@ -2722,6 +2722,7 @@
     "license_status_unlimited": "Unlimited",
     "license_status_allowed_days": "Over-limit days",
     "license_status_allowed_days_value": "{allowed} allowed this month · {used} used",
+    "license_status_allowed_days_value_base": "{allowed} allowed this month · {used} used ({base} before waivers)",
     "license_status_env_key": "This instance reads its license key from the O2_LICENSE_KEY environment variable. To apply a new key, put it in that variable and restart; a key pasted here is refused.",
     "waivers_title": "Waivers from OpenObserve",
     "waiver_col_waiver": "Waiver",
@@ -20077,7 +20078,8 @@
       "licenseWaiverStatus": {
         "scheduled": "Scheduled",
         "active": "Active",
-        "past": "Past days"
+        "past": "Past days",
+        "ended": "Ended"
       }
     }
   },
