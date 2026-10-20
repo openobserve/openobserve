@@ -28,6 +28,7 @@ import type { AssistantCapability, AssistantSession, TurnEngine } from "./assist
 import { createDraftStore } from "./drafts";
 import type { AssistantFrame } from "./frames";
 import { resetPrefsForTests } from "./prefs";
+import { createSseParser } from "./sseParser";
 import { RECONNECT_DELAYS_MS, createTurnEngine } from "./turnEngine";
 import { STALL_MS, STOP_TIMEOUT_MS } from "./turnStateMachine";
 import type { TurnTerminal } from "./turnStates";
@@ -781,6 +782,205 @@ describe("turnEngine: reconnect (HT-06)", () => {
   });
 });
 
+// The server's wire, through the real parser: `id: N` with data is a frame past seq N, and an `id: N` message alone marks seq N complete (WP-18).
+function wire(sink: FrameSink, sse: string) {
+  const parser = createSseParser({
+    frame: (frame, id) => sink.onFrame(frame, id),
+    keepalive: () => sink.onKeepalive(),
+    unknown: (type) => sink.onUnknown(type),
+    boundary: (id) => sink.onBoundary?.(id),
+  });
+  parser.push(sse);
+}
+
+const sse = (id: number, frame?: AssistantFrame) =>
+  frame ? `id: ${id}\ndata: ${JSON.stringify(frame)}\n\n` : `id: ${id}\n\n`;
+
+const delta = (content: string): AssistantFrame => ({ type: "message_delta", content });
+
+describe("turnEngine: the SSE id rule (WP-18, D2)", () => {
+  it("applies every frame of a live stream whose ids repeat: -1 for turn_started and status, one id per seq", async () => {
+    const h = setup({ tail: true });
+    h.type("Reply with exactly: alpha beta gamma. Then a second sentence: delta epsilon.");
+    const run = h.store.send(h.current.sid);
+    await settle();
+    wire(
+      h.last().sink,
+      [
+        sse(-1, { type: "turn_started", turn_id: h.last().req.turnId } as AssistantFrame),
+        sse(-1, { type: "status", message: "Thinking" } as AssistantFrame),
+        sse(-1, delta("alpha")),
+        sse(0),
+        sse(0, delta(" beta")),
+        sse(0, delta(" gamma.")),
+        sse(1),
+        sse(1, delta(" Then delta epsilon.")),
+        sse(1, { type: "complete", persisted: true }),
+        sse(2),
+      ].join(""),
+    );
+    h.end();
+    await expect(run).resolves.toEqual({ state: "done", saved: "server" });
+    expect(String(h.session().messages[1].content)).toBe("alpha beta gamma. Then delta epsilon.");
+    expect(h.client.tail).not.toHaveBeenCalled();
+    expect(h.session().turnMeta.lastSeq).toBe(2);
+  });
+
+  it("resumes the tail from the last complete seq and shows what it resends only once", async () => {
+    const h = setup({ tail: true });
+    h.type("why?");
+    const run = h.store.send(h.current.sid);
+    await settle();
+    wire(
+      h.last().sink,
+      [sse(-1, delta("alpha")), sse(0), sse(0, delta(" beta")), sse(0, delta(" gam"))].join(""),
+    );
+    h.end();
+    await vi.advanceTimersByTimeAsync(RECONNECT_DELAYS_MS[0]);
+    expect(h.tails[0]).toMatchObject({ fromSeq: 0 });
+    // The tail's frames past seq 0 come as runs: the delta is the whole suffix since seq 0.
+    wire(
+      h.tails[0].sink,
+      [
+        sse(0, delta(" beta gamma.")),
+        sse(1),
+        sse(1, delta(" delta epsilon.")),
+        sse(1, { type: "complete", persisted: true }),
+        sse(2),
+      ].join(""),
+    );
+    h.tails[0].sink.onEnd("eof");
+    await expect(run).resolves.toEqual({ state: "done", saved: "server" });
+    expect(String(h.session().messages[1].content)).toBe("alpha beta gamma. delta epsilon.");
+  });
+
+  it("matches a resent tool call and text by position, across a second drop of the tail", async () => {
+    const h = setup({ tail: true });
+    h.type("why?");
+    const run = h.store.send(h.current.sid);
+    await settle();
+    const call: AssistantFrame = { type: "tool_call", tool: "SearchSQL", call_id: "c1" };
+    wire(
+      h.last().sink,
+      [sse(-1, delta("Hi.")), sse(3), sse(3, call), sse(3, delta("ab"))].join(""),
+    );
+    h.end();
+    await vi.advanceTimersByTimeAsync(RECONNECT_DELAYS_MS[0]);
+    expect(h.tails[0]).toMatchObject({ fromSeq: 3 });
+    // The first tail repeats the call and part of the text, then drops too.
+    wire(h.tails[0].sink, [sse(3, call), sse(3, delta("a"))].join(""));
+    h.tails[0].sink.onEnd("eof");
+    await vi.advanceTimersByTimeAsync(RECONNECT_DELAYS_MS[1]);
+    expect(h.tails[1]).toMatchObject({ fromSeq: 3 });
+    wire(
+      h.tails[1].sink,
+      [
+        sse(3, call),
+        sse(3, delta("abcd")),
+        sse(4),
+        sse(4, { type: "complete", persisted: true }),
+        sse(5),
+      ].join(""),
+    );
+    h.tails[1].sink.onEnd("eof");
+    await expect(run).resolves.toEqual({ state: "done", saved: "server" });
+    const blocks = h.session().messages[1].contentBlocks ?? [];
+    expect(blocks.filter((block) => block.type === "tool_call")).toHaveLength(1);
+    expect(String(h.session().messages[1].content)).toBe("Hi.abcd");
+  });
+
+  // Live, then a drop, then one tail; returns the answer text and the turn's end.
+  async function dropAndTail(live: string, resent: string) {
+    const h = setup({ tail: true });
+    h.type("why?");
+    const run = h.store.send(h.current.sid);
+    await settle();
+    wire(h.last().sink, live);
+    h.end();
+    await vi.advanceTimersByTimeAsync(RECONNECT_DELAYS_MS[0]);
+    wire(h.tails[0].sink, resent);
+    h.tails[0].sink.onEnd("eof");
+    return { h, end: await run, text: String(h.session().messages[1].content) };
+  }
+
+  it("shows a resent text once when a status sat between its deltas: the tail merges the run (F1)", async () => {
+    const status = { type: "status", message: "Searching" } as AssistantFrame;
+    const { end, text } = await dropAndTail(
+      [sse(-1, delta("Hi. ")), sse(3), sse(3, delta("a")), sse(3, status), sse(3, delta("b"))].join(
+        "",
+      ),
+      [sse(3, delta("ab")), sse(4), sse(4, { type: "complete", persisted: true }), sse(5)].join(""),
+    );
+    expect(end).toEqual({ state: "done", saved: "server" });
+    expect(text).toBe("Hi. ab");
+  });
+
+  it("shows a resent text once when the tail leaves out turn_started and status (F1)", async () => {
+    const { end, text } = await dropAndTail(
+      [
+        sse(-1, { type: "turn_started", turn_id: "t1" } as AssistantFrame),
+        sse(-1, { type: "status", message: "Thinking" } as AssistantFrame),
+        sse(-1, delta("alpha")),
+      ].join(""),
+      [
+        sse(-1, delta("alpha beta")),
+        sse(0),
+        sse(0, { type: "complete", persisted: true }),
+        sse(1),
+      ].join(""),
+    );
+    expect(end).toEqual({ state: "done", saved: "server" });
+    expect(text).toBe("alpha beta");
+  });
+
+  it("applies the next seq in full after a resend that stopped short of what was shown (F2)", async () => {
+    const { end, text } = await dropAndTail(
+      [sse(-1, delta("x")), sse(3), sse(3, delta("ab"))].join(""),
+      [
+        sse(3, delta("a")),
+        sse(4),
+        sse(4, delta("zc")),
+        sse(4, { type: "complete", persisted: true }),
+        sse(5),
+      ].join(""),
+    );
+    expect(end).toEqual({ state: "done", saved: "server" });
+    // Seq 4 is what the tail says it is: the "b" shown live but never resent does not stay on screen.
+    expect(text).toBe("xazc");
+  });
+
+  it("keeps the text shown since the cursor when no tail delivers (HT-06 AC 3)", async () => {
+    const h = setup({ tail: true });
+    h.type("why?");
+    const run = h.store.send(h.current.sid);
+    await settle();
+    wire(h.last().sink, [sse(-1, delta("one")), sse(0), sse(0, delta(" two"))].join(""));
+    h.tailResults.push(refusal(404, {}), refusal(404, {}), refusal(404, {}));
+    h.end();
+    await vi.advanceTimersByTimeAsync(RECONNECT_DELAYS_MS.reduce((a, b) => a + b, 0));
+    await expect(run).resolves.toMatchObject({
+      state: "failed",
+      error: { code: "stream_dropped" },
+    });
+    expect(String(h.session().messages[1].content)).toBe("one two");
+  });
+
+  it("drops a tail frame from before the resume point, and a frame without an id is always applied", async () => {
+    const h = setup({ tail: true });
+    h.type("why?");
+    const run = h.store.send(h.current.sid);
+    await settle();
+    wire(h.last().sink, [sse(-1, delta("one")), sse(2), sse(2, delta(" two"))].join(""));
+    h.end();
+    await vi.advanceTimersByTimeAsync(RECONNECT_DELAYS_MS[0]);
+    wire(h.tails[0].sink, [sse(1, delta("one")), sse(2, delta(" two three")), sse(3)].join(""));
+    h.tails[0].sink.onFrame({ type: "complete", persisted: true }, null);
+    h.tails[0].sink.onEnd("eof");
+    await expect(run).resolves.toEqual({ state: "done", saved: "server" });
+    expect(String(h.session().messages[1].content)).toBe("one two three");
+  });
+});
+
 describe("turnEngine: outcomes", () => {
   // Wrapped, so awaiting the start never waits for the turn itself.
   const start = async (h: ReturnType<typeof setup>) => {
@@ -1101,8 +1301,9 @@ describe("turnEngine: round 3 follow-ups", () => {
     vi.mocked(h.client.tail).mockImplementation(async (_org, _sid, _turnId, _from, sink) => {
       const admitted = { ok: true as const, status: 200, traceId: null };
       sink.onAdmitted(admitted);
-      sink.onFrame({ type: "message_delta", content: "lo" }, "2");
-      sink.onFrame({ type: "complete", persisted: true }, "3");
+      // A frame tagged 1 comes after seq 1, so the tail from 1 sends that text again, merged (WP-18).
+      sink.onFrame({ type: "message_delta", content: "Hello" }, "1");
+      sink.onFrame({ type: "complete", persisted: true }, "2");
       sink.onEnd("eof");
       return admitted;
     });
@@ -1206,6 +1407,32 @@ describe("turnEngine: round 3 follow-ups", () => {
     h.feed({ type: "message_delta", content: "a" }, { type: "complete", persisted: true });
     h.end();
     await expect(retry).resolves.toEqual({ state: "done", saved: "server" });
+  });
+
+  it("keeps the restored marker when a tail rolls the restored answer back to its cursor (F4)", async () => {
+    const h = setup({ persistence: true, tail: true });
+    const { run } = await begin(h);
+    h.feed({ type: "error", code: "session_owner_unavailable" });
+    await settle();
+    const restored = {
+      type: "turn_outcome",
+      outcome: expect.objectContaining({ kind: "restored" }),
+    };
+    wire(h.last().sink, [sse(-1, delta("one")), sse(0), sse(0, delta(" tw"))].join(""));
+    h.end();
+    await vi.advanceTimersByTimeAsync(RECONNECT_DELAYS_MS[0]);
+    wire(
+      h.tails[0].sink,
+      [sse(0, delta(" two")), sse(1), sse(1, { type: "complete", persisted: true }), sse(2)].join(
+        "",
+      ),
+    );
+    h.tails[0].sink.onEnd("eof");
+    await expect(run).resolves.toEqual({ state: "done", saved: "server" });
+    const answer = h.session().messages[1];
+    expect(String(answer.content)).toBe("one two");
+    expect(answer.contentBlocks?.[0]).toEqual(restored);
+    expect(answer.contentBlocks?.filter((block) => block.type === "turn_outcome")).toHaveLength(1);
   });
 
   it("does not restore a turn whose id was already reused once", async () => {
