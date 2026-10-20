@@ -6,6 +6,20 @@
 
 import { expect } from '@playwright/test';
 
+// en-US trigger labels for each rule operator. The rule-op select renders a
+// Reka SelectTrigger (not the listbox PopoverTrigger), so the selected value is
+// shown as its display label rather than a `data-test-selected-value` attribute.
+const RULE_OP_LABELS = {
+    in: 'is one of',
+    not_in: 'is not one of',
+    exists: 'is set',
+    not_exists: 'is not set',
+    gt: '>',
+    gte: '>=',
+    lt: '<',
+    lte: '<=',
+};
+
 export class ModelPricingPage {
     constructor(page) {
         this.page = page;
@@ -517,11 +531,15 @@ export class ModelPricingPage {
     }
 
     async expectRuleOpValue(tierIndex, ruleIndex, opValue) {
+        // The rule-op select renders a Reka SelectTrigger whose selected value is
+        // displayed as its label text (e.g. "is one of" for "in") — it has no
+        // `data-test-selected-value` attribute in this build.
+        const label = RULE_OP_LABELS[opValue] ?? opValue;
         await expect(
             this.page.locator(
                 `[data-test="model-pricing-tier-rule-op-select-${tierIndex}-${ruleIndex}-trigger"]`
             )
-        ).toHaveAttribute('data-test-selected-value', opValue, { timeout: 5000 });
+        ).toContainText(label, { timeout: 5000 });
     }
 
     async expectRuleValueInputVisible(tierIndex, ruleIndex) {
