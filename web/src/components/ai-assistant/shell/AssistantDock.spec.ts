@@ -48,6 +48,7 @@ vi.mock("@/composables/useBreakpoint", async () => {
 vi.mock("@/composables/assistant", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/composables/assistant")>()),
   useAssistantStore: () => fake.current.store,
+  useAssistantHistory: () => fake.current.history,
   useAssistantCapability: () => fake.current.handle,
   useAssistantPanelWidth: () => ({}),
   reportDockWidth: widths,

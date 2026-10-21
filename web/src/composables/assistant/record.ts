@@ -14,11 +14,17 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import type { ChatMessage, ContentBlock, ImageAttachment, TurnSpan } from "@/ts/interfaces/chat";
-import { raw, type TranslateFn } from "@/types/i18n";
+import { gt, raw, type TranslateFn } from "@/types/i18n";
 
 import { toAssistantError } from "./assistantErrors";
 import { generateNavigationFromToolResult } from "./navigationRoutes";
-import { interruptSteps, reduce, type ReducerCtx, type StreamState } from "./reducer";
+import {
+  interruptSteps,
+  reduce,
+  type ApprovalBlockData,
+  type ReducerCtx,
+  type StreamState,
+} from "./reducer";
 
 export type { TurnSpan };
 
@@ -50,6 +56,84 @@ export interface StoredTurn {
   first_seq?: number | null;
   last_seq?: number | null;
 }
+
+/** `export` is the owner's own download: no actions, model names scrubbed. */
+export type RecordAudience = "owner" | "viewer" | "export";
+
+export interface ProjectRecordOptions {
+  /** `redact_tools`: tool inputs, outputs and payload diffs go; names, counts and approval outcomes stay. */
+  redacted?: boolean;
+  hidden?: Record<string, { reason: "stream_forbidden"; stream: string }>;
+  /** `hide_attachments`: the prompt's images go; see `hidesAttachments` for the default. */
+  hideAttachments?: boolean;
+  timezone: string;
+  scrubModels: boolean;
+  /** Defaults to the app's translator; the golden tests pass a key echo. */
+  t?: TranslateFn;
+}
+
+declare module "@/ts/interfaces/chat" {
+  interface ContentBlock {
+    /** A tool step whose stream the viewer may not read. */
+    hidden?: { reason: "stream_forbidden"; stream: string };
+    /** Epoch ms of a `compacting` frame, minute precision. */
+    compactedAt?: number;
+  }
+}
+
+/** Every frame type `frames.ts` parses; `projectRecord.spec.ts` pins the two lists together. */
+export const KNOWN_FRAME_TYPES: ReadonlySet<string> = new Set([
+  "status",
+  "title",
+  "tool_call",
+  "tool_result",
+  "message_delta",
+  "message",
+  "usage",
+  "confirmation_required",
+  "navigation_action",
+  "error",
+  "complete",
+  "cancelled",
+  "turn_started",
+  "step",
+  "retrying",
+  "compacting",
+  "permission_denied",
+  "confirmation_resolved",
+  "query",
+  "resource_changed",
+  "findings",
+  "sync",
+  "sync_state",
+]);
+
+const MINUTE_MS = 60_000;
+
+const UNSAFE_RECORD_KEYS: ReadonlySet<string> = new Set(["__proto__", "constructor", "prototype"]);
+
+// Provider model ids as they leak into agent text; a word boundary keeps "o11y" and plain words out.
+const MODEL_NAME =
+  /\b(?:gpt-[\w.-]+|chatgpt[\w.-]*|claude(?:-[\w.]+)*|gemini(?:-[\w.]+)*|llama[\w.-]*|mistral[\w.-]*|mixtral[\w.-]*|deepseek[\w.-]*|qwen[\w.-]*|o[134]-(?:mini|preview|pro)[\w.-]*)\b/gi;
+
+// Keys whose values are ids or enums, never prose a model name could be in.
+const SCRUB_SKIP_KEYS: ReadonlySet<string> = new Set([
+  "type",
+  "id",
+  "call_id",
+  "turn_id",
+  "tool",
+  "kind",
+  "code",
+  "error_code",
+  "trace_id",
+  "by",
+]);
+
+const REDACTED_KEYS: Record<string, readonly string[]> = {
+  tool_call: ["context", "args", "input", "arguments"],
+  tool_result: ["call_args", "response", "message", "query", "output"],
+};
 
 function toAttachment(image: {
   filename: string;
@@ -382,4 +466,189 @@ export function mergeIncremental(
     messages: ordered.flatMap((piece) => piece.messages),
     spans: ordered.map((piece) => piece.span),
   };
+}
+
+/** The one fold behind reload, shared pages and exports; a replayed card is a record, never a pending one. */
+export function projectRecord(
+  turns: StoredTurn[],
+  audience: RecordAudience,
+  options: ProjectRecordOptions,
+): ChatMessage[] {
+  const t = options.t ?? gt;
+  const prepared = prepareTurns(turns, audience, options);
+  const fold = audience === "owner" ? "owner" : "viewer";
+  const { messages } = foldTurns(prepared, t, fold, "replay");
+  for (const message of messages) settleMessage(message, prepared, options, t);
+  return messages;
+}
+
+/** The stored turns as an audience may see them: known frames only, scrubbed and redacted; the JSON export is this. */
+export function prepareTurns(
+  turns: StoredTurn[],
+  audience: RecordAudience,
+  options: ProjectRecordOptions,
+): StoredTurn[] {
+  const t = options.t ?? gt;
+  const warned = new Set<string>();
+  const scrub = options.scrubModels || audience !== "owner";
+  const theModel = scrub ? String(t("assistant.record.theModel")) : "";
+  return turns.map((turn) => ({
+    ...turn,
+    frames: (Array.isArray(turn.frames) ? turn.frames : [])
+      .filter((frame) => knownFrame(frame, warned))
+      .map((frame) => projectFrame(frame, options, theModel)),
+    ...(turn.user && {
+      user: {
+        ...turn.user,
+        ...(scrub && { text: scrubText(turn.user.text, theModel) }),
+        ...(options.hideAttachments && { images: [] }),
+      },
+    }),
+  }));
+}
+
+/** A link without `hide_attachments` hides them when it is public. */
+export function hidesAttachments(share: {
+  hide_attachments?: boolean | null;
+  visibility: string;
+}): boolean {
+  return share.hide_attachments ?? share.visibility === "public";
+}
+
+/** "02:14" in the org's zone; the browser's zone only when the name is unknown to `Intl`. */
+export function minuteLabel(ms: number, timezone: string): string {
+  const format = (timeZone?: string) =>
+    new Intl.DateTimeFormat("en-GB", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+      ...(timeZone && { timeZone }),
+    }).format(ms);
+  try {
+    return format(timezone || undefined);
+  } catch {
+    return format();
+  }
+}
+
+// An unknown kind from a newer server is skipped with one warning per kind, never a crash.
+function knownFrame(frame: unknown, warned: Set<string>): boolean {
+  const type = (frame as { type?: unknown } | null)?.type;
+  if (typeof type === "string" && KNOWN_FRAME_TYPES.has(type)) return true;
+  const name = typeof type === "string" ? type.slice(0, 64) : typeof type;
+  if (!warned.has(name)) {
+    warned.add(name);
+    console.warn(`projectRecord: ignored unknown frame kind "${name}"`);
+  }
+  return false;
+}
+
+function projectFrame(frame: any, options: ProjectRecordOptions, theModel: string): any {
+  let next: any = theModel ? scrubValue(frame, theModel) : frame;
+  const callId = typeof next.call_id === "string" ? next.call_id : "";
+  const hidden = !!callId && !!options.hidden?.[callId];
+  const keys = REDACTED_KEYS[next.type];
+  if (keys && (options.redacted || hidden)) {
+    next = { ...next };
+    for (const key of keys) delete next[key];
+    if (next.type === "tool_result" && !isCountSummary(next.summary)) delete next.summary;
+  }
+  if (next.type === "query" && (options.redacted || hidden)) return { type: "status" };
+  // A redacted link keeps where it goes, never the query, stream or window it carries.
+  if (next.type === "navigation_action" && options.redacted)
+    return { type: next.type, resource_type: next.resource_type, action: next.action, target: {} };
+  return next;
+}
+
+function isCountSummary(summary: unknown): boolean {
+  return (
+    !!summary &&
+    typeof summary === "object" &&
+    Object.values(summary as Record<string, unknown>).every((value) => typeof value === "number")
+  );
+}
+
+// Model names go from every prose field and `model` keys go entirely; ids and enums are left alone.
+function scrubValue(value: unknown, theModel: string, depth = 0): any {
+  if (typeof value === "string") return scrubText(value, theModel);
+  if (depth > 8 || !value || typeof value !== "object") return value;
+  if (Array.isArray(value)) return value.map((item) => scrubValue(item, theModel, depth + 1));
+  const out: Record<string, unknown> = {};
+  for (const [key, item] of Object.entries(value as Record<string, unknown>)) {
+    if (key === "model" || key === "model_provider" || UNSAFE_RECORD_KEYS.has(key)) continue;
+    out[key] = SCRUB_SKIP_KEYS.has(key) ? item : scrubValue(item, theModel, depth + 1);
+  }
+  return out;
+}
+
+function scrubText(text: string, theModel: string): string {
+  return typeof text === "string" ? text.replace(MODEL_NAME, theModel) : text;
+}
+
+function settleMessage(
+  message: ChatMessage,
+  turns: StoredTurn[],
+  options: ProjectRecordOptions,
+  t: TranslateFn,
+): void {
+  if (typeof message.sentAt === "number") message.sentAt = toMinute(message.sentAt);
+  const blocks = message.contentBlocks ?? [];
+  for (const block of blocks) {
+    if (block.approval && !blocks.some((other) => other.resolved?.id === block.approval?.id))
+      block.approval = { ...block.approval, noDecision: true };
+    // Targets come from the arguments on an untyped card, so the redaction goes after the fold, not before it.
+    if (block.approval && options.redacted) block.approval = redactedApproval(block.approval);
+    if (block.resolved && options.redacted) {
+      const { id, approved, at } = block.resolved;
+      block.resolved = { id, approved, ...(at !== undefined && { at }) };
+    }
+    if (block.resolved?.at !== undefined) block.resolved.at = toMinute(block.resolved.at);
+    if (options.redacted) redactNavigation(block);
+    const hidden = block.call_id ? options.hidden?.[block.call_id] : undefined;
+    if (hidden)
+      block.hidden = { reason: hidden.reason, stream: options.redacted ? "" : hidden.stream };
+  }
+  const turn = message.turnId ? turns.find((stored) => stored.turn_id === message.turnId) : null;
+  if (message.role === "user" && turn?.frames.some((frame) => frame?.type === "compacting")) {
+    const at = toMinute(typeof turn.created === "number" ? epochMs(turn.created) : 0);
+    message.contentBlocks = [
+      ...(message.contentBlocks ?? []),
+      {
+        type: "status",
+        compactedAt: at,
+        message: t("assistant.record.compacted", { time: raw(minuteLabel(at, options.timezone)) }),
+      },
+    ];
+  }
+}
+
+// A redacted link names no resource: the card keeps what it was, how many items and whether it was answered.
+function redactedApproval(card: ApprovalBlockData): ApprovalBlockData {
+  const kept: Pick<ApprovalBlockData, "id" | "kind" | "total" | "noDecision"> = {
+    id: card.id,
+    kind: card.kind,
+    total: card.total ?? card.targets?.length ?? 0,
+    ...(card.noDecision && { noDecision: true }),
+  };
+  return kept as ApprovalBlockData;
+}
+
+// Tool results derive links from their arguments, so the fold's link and navigation targets go after it too.
+function redactNavigation(block: ContentBlock): void {
+  if (block.link) block.link = { ...block.link, target: {} };
+  if (block.navigationAction)
+    block.navigationAction = {
+      resource_type: block.navigationAction.resource_type,
+      action: block.navigationAction.action,
+      label: raw(""),
+      target: {},
+    };
+}
+
+function toMinute(ms: number): number {
+  return Math.floor(ms / MINUTE_MS) * MINUTE_MS;
+}
+
+function epochMs(value: number): number {
+  return value > 1e14 ? Math.floor(value / 1000) : value;
 }

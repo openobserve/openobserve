@@ -59,6 +59,15 @@ function setup(
     store,
     context: shallowRef({ getOrg: () => ({ identifier: "default", name: "default" }) }),
     capability: { capability: computed(() => capability.value) },
+    // The history list is this tab's sessions here; the service itself is specced on its own.
+    history: {
+      rows: computed(() =>
+        store.state.recent
+          .map((sid) => store.state.sessions[sid])
+          .filter((session) => session?.messages.length)
+          .map((session) => ({ sid: session.sid, chatId: session.chatId, title: session.title })),
+      ),
+    },
   };
   const effects = effectScope();
   const page$ = ref(page);
@@ -119,6 +128,7 @@ describe("useAssistantStarters", () => {
     expect(recent.kind).toBe("recent");
     expect(recent.label).toBe('Continue "PromQL for p95"');
     expect(recent.chatId).toBe(store.state.sessions[sid].chatId);
+    expect(recent.sid).toBe(sid);
   });
 
   it("gives a fresh org the ingestion set and nothing about alerts or dashboards", async () => {

@@ -207,7 +207,7 @@ export function launcherState(gate: string): "loading" | "gate" | "ready" | null
 </script>
 
 <script setup lang="ts">
-import { computed, ref, useId } from "vue";
+import { computed, onMounted, ref, useId } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 
@@ -218,12 +218,11 @@ import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
 import AssistantContextSeesPopover from "@/components/ai-assistant/context/AssistantContextSeesPopover.vue";
 import AssistantGateState from "@/components/ai-assistant/gate/AssistantGateState.vue";
 import {
-  isRunning,
   openAssistant,
   useAssistantCapability,
+  useAssistantHistory,
   useAssistantName,
   useAssistantStarters,
-  useAssistantStore,
   type Starter,
 } from "@/composables/assistant";
 import useBreakpoint from "@/composables/useBreakpoint";
@@ -245,7 +244,6 @@ const { t } = useI18nTyped();
 const { product } = useAssistantName();
 const router = useRouter();
 const vuex = useStore();
-const store = useAssistantStore();
 const capability = useAssistantCapability();
 const { mdUp } = useBreakpoint();
 const { starters, loading, scope } = useAssistantStarters({ page: "home" });
@@ -270,22 +268,17 @@ const disclosure = computed(() =>
     : t("assistant.welcome.launcher.disclosure"),
 );
 
-// The recent column reads this tab's sessions until WP-11 brings the history list (`70` §2.1).
+const history = useAssistantHistory();
+const recentRows = history.recent(LAUNCHER_ROWS);
 const recent = computed(() =>
-  store.state.recent
-    .map((sid) => store.state.sessions[sid])
-    .filter((session) => !!session && session.messages.length > 0)
-    .slice(0, LAUNCHER_ROWS)
-    .map((session) => {
-      const at = store.lastTurnAt(session.sid);
-      return {
-        sid: session.sid,
-        title: session.title ?? t("assistant.thread.newChatTitle"),
-        running: isRunning(session.turn),
-        at: at ? raw(formatRelative(at)) : null,
-      };
-    }),
+  recentRows.value.map((row) => ({
+    sid: row.sid,
+    title: row.title,
+    running: row.activeTurn,
+    at: row.updatedAt ? raw(formatRelative(row.updatedAt)) : null,
+  })),
 );
+onMounted(() => history.ensureLoaded());
 
 function onKeydown(event: KeyboardEvent): void {
   if (event.isComposing || event.keyCode === 229) return;
@@ -317,9 +310,9 @@ function ask(stage: boolean): void {
 
 function pickStarter(starter: Starter, index: number): void {
   trackAssistant("ai_welcome_starter", { starter_kind: starter.kind, index, via: "click" });
-  if (starter.kind === "recent" && starter.chatId !== undefined) {
-    void router.push({ name: "assistant" }).catch(() => undefined);
-    void store.openSession({ chatId: starter.chatId }, { focus: true }).catch(() => undefined);
+  // The full view's route opens the chat and shows its own not-found or deleted state.
+  if (starter.kind === "recent" && (starter.sid || starter.chatId !== undefined)) {
+    openChat(starter.sid ?? String(starter.chatId));
     return;
   }
   void openAssistant({

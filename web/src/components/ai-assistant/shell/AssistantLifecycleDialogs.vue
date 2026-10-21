@@ -35,7 +35,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         {{ view.note }}
       </OText>
-      <slot v-if="view?.kind === 'sign_out'" name="sign-out-extra" />
+      <slot v-if="view?.kind === 'sign_out'" name="sign-out-extra">
+        <OCheckbox
+          v-if="localHistory"
+          :model-value="deleteLocal"
+          :label="t('assistant.signout.deleteLocal')"
+          data-test="assistant-signout-delete-local"
+          @update:model-value="setDeleteLocal"
+        />
+      </slot>
     </div>
     <template #footer>
       <div
@@ -84,15 +92,17 @@ export interface LifecycleDialogView {
 </script>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 
 import {
   registerLifecycleDialogs,
+  useAssistantHistory,
   useLifecycleQuestion,
   type LifecycleQuestion,
 } from "@/composables/assistant";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OText from "@/lib/core/Typography/OText.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 
@@ -111,6 +121,23 @@ let fallbackFocus: HTMLElement | null = null;
 const view = computed<LifecycleDialogView | null>(() =>
   open.value ? viewOf(open.value.question) : null,
 );
+
+// Local mode only: the choice is the persistent sign-out preference, read when the dialog opens.
+const history = useAssistantHistory();
+const localHistory = computed(() => history.mode.value === "local");
+const deleteLocal = ref(false);
+watch(
+  () => view.value?.kind,
+  (kind) => {
+    if (kind === "sign_out") deleteLocal.value = history.clearOnSignOut();
+  },
+  { immediate: true },
+);
+
+function setDeleteLocal(value: unknown): void {
+  deleteLocal.value = value === true;
+  history.setClearOnSignOut(deleteLocal.value);
+}
 
 function viewOf(question: LifecycleQuestion): LifecycleDialogView {
   if (question.kind === "sign_out") {

@@ -125,6 +125,8 @@ export interface ApprovalBlockData {
   typed: boolean;
   /** The server's own expiry, epoch ms. */
   expiresAt?: number;
+  /** Replayed with no decision in the record, so it renders as a record and never as a live card. */
+  noDecision?: boolean;
 }
 
 /** `confirmation_resolved`: another tab or device answered the card. */

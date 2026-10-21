@@ -13,6 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { flushPromises, mount } from "@vue/test-utils";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { computed, reactive } from "vue";
@@ -20,6 +23,7 @@ import { computed, reactive } from "vue";
 import {
   assistantSessionSourceKey,
   assistantTranscriptHostKey,
+  projectRecord,
   type AssistantSession,
   type AssistantTranscriptHost,
   type TurnState,
@@ -39,6 +43,11 @@ vi.mock("./AssistantMessageActions.vue", () => ({
     template: "<div :data-test=\"`actions-stub-${mode ?? 'bar'}`\" />",
   },
 }));
+
+const COMPACTED = join(
+  __dirname,
+  "../../../composables/assistant/__fixtures__/record/compacted/frames.json",
+);
 
 const prompt = (text: string, turnId: string): ChatMessage => ({
   role: "user",
@@ -245,6 +254,17 @@ describe("AssistantTranscript", () => {
       "retry",
       expect.objectContaining({ code: "stream_dropped" }),
     );
+  });
+
+  it("marks a compacted turn with a divider above its prompt, from the stored record", () => {
+    const record = JSON.parse(readFileSync(COMPACTED, "utf8"));
+    const messages = projectRecord(record.turns, "owner", { timezone: "UTC" });
+    const { wrapper } = mountLive(liveSession(messages));
+    const dividers = wrapper.findAll('[data-test="assistant-compaction-divider"]');
+    expect(dividers).toHaveLength(1);
+    expect(dividers[0].text()).toMatch(/^Earlier context was summarised by the assistant at /);
+    const turn = wrapper.get('[data-test="assistant-turn-t-cmp-2"]');
+    expect(turn.find('[data-test="assistant-compaction-divider"]').exists()).toBe(true);
   });
 
   it("claims kept findings only when answer text shows, never for steps alone (U6)", () => {

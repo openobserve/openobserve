@@ -437,6 +437,10 @@ export interface AssistantCapability {
   attachments?: boolean;
   /** `/confirm {id, extend:true}` gives a card more time. */
   approvalExtend?: boolean;
+  /** Each used only when advertised: server search `q`, server pins, browser-chat import. */
+  historySearch?: boolean;
+  historyPins?: boolean;
+  historyImport?: boolean;
   /** Absent off Cloud; doors read it for the cost line (`80` §3.3). */
   creditMode?: CreditMode;
   isAdmin: boolean;
@@ -838,6 +842,8 @@ export interface TurnEngine {
   retrySave(sid: Sid, turnId: string): Promise<void>;
   /** The last ended turn still has the snapshot a Retry resends (HT-03 AC 5). */
   canRetry?(sid: Sid): boolean;
+  /** The running turn's frames so far, for a browser-only save of the turn as `StoredTurn`. */
+  turnFrames?(sid: Sid): { turnId: string; frames: unknown[] } | null;
   /** `turn_busy`'s Stop it: cancels a turn this tab is not running (`80` §1.3). */
   cancelTurn?(sid: Sid, turnId: string | null): Promise<boolean>;
   /** WP-05 installs `serialize.ts`. */

@@ -1997,6 +1997,35 @@ export const BADGE_GROUPS = {
     },
     fallback: { variant: "default-soft" },
   },
+
+  // Where an O2 Assistant chat started; quiet, never a status colour.
+  assistantOrigin: {
+    mode: "plain",
+    shape: "rounded",
+    size: "sm",
+    values: {
+      editor: { variant: "default-soft", labelKey: "assistant.history.origin.editor" },
+      alert: { variant: "default-soft", labelKey: "assistant.history.origin.alert" },
+      incident: { variant: "default-soft", labelKey: "assistant.history.origin.incident" },
+      browser: { variant: "default-outline", labelKey: "assistant.history.origin.browser" },
+    },
+    fallback: { variant: "default-soft" },
+  },
+
+  // An O2 Assistant chat this browser could not save, or whose history could not load.
+  assistantSave: {
+    mode: "plain",
+    shape: "rounded",
+    size: "sm",
+    values: {
+      notsaved: { variant: "default-outline", labelKey: "assistant.thread.notSaved" },
+      historyunavailable: {
+        variant: "default-outline",
+        labelKey: "assistant.thread.historyUnavailable",
+      },
+    },
+    fallback: { variant: "default-outline" },
+  },
 } satisfies Record<string, BadgeGroupConfig>;
 
 export type BadgeGroupName = keyof typeof BADGE_GROUPS;

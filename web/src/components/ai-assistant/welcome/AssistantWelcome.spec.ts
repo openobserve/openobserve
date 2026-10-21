@@ -136,7 +136,7 @@ describe("AssistantWelcome", () => {
     await wrapper.get('[data-test="assistant-starter-0"]').trigger("click");
     await wrapper.get('[data-test="assistant-starter-2"]').trigger("click");
     expect(wrapper.emitted("select-starter")).toEqual([[STARTERS[0]]]);
-    expect(wrapper.emitted("open-chat")).toEqual([[42]]);
+    expect(wrapper.emitted("open-chat")).toEqual([[{ chatId: 42 }]]);
     expect(track).toHaveBeenCalledWith("ai_welcome_starter", {
       starter_kind: "page",
       index: 0,

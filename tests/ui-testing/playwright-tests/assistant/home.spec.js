@@ -80,7 +80,7 @@ test.describe("assistant on Home", () => {
     await input().press("Enter");
     await page.waitForURL(/\/web\/assistant\//);
     await expect(assistant.status()).toBeVisible();
-    await assistant.container().locator('[data-test="assistant-shell-menu"]').click();
+    await assistant.container().locator('[data-test="assistant-thread-menu"]').click();
     await page.locator('[data-test="assistant-shell-open-in-sidebar"]').click();
     await expect(assistant.sidebar).toBeVisible();
     await page.goto(`${harness.ENV.appUrl}/logs?org_identifier=${harness.ENV.org}`, { waitUntil: "domcontentloaded" });
