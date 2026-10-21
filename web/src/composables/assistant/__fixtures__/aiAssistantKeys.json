@@ -38,6 +38,7 @@
   "aiChat.errorOccurred",
   "aiChat.navigateConfirmQuestion",
   "aiChat.notSpecified",
+  "aiChat.requestFailed",
   "aiChat.serverErrorStatus",
   "aiChat.serverResponseError",
   "aiChat.toolExecutionFailed",

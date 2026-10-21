@@ -345,7 +345,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { reactive } from "vue";
 
-import type { ArchivedRcaReport } from "@/services/incidents";
+/** A superseded report as the retired `rca/history` route returned it. */
+export interface ArchivedRcaReport {
+  content: string;
+  /** Microseconds since epoch. */
+  archived_at: number;
+}
 
 export interface IncidentAnalysisPanelProps {
   incidentId: string;

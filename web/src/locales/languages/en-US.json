@@ -11778,7 +11778,9 @@
       "rcaFreshAnalysisHint": "Analyze from scratch, ignoring the previous report",
       "rcaBuildOnPrevious": "Build on previous report",
       "rcaBuildOnPreviousHint": "Send the current report so the agent extends it",
+      "rcaBackToCurrent": "Back to current report",
       "rcaHistory": "Report history",
+      "rcaViewingArchived": "You are viewing an earlier report",
       "rcaAsk": {
         "button": "Ask about this analysis",
         "chip": "Analysis · {run}"
