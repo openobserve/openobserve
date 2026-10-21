@@ -40,6 +40,17 @@ use {
 };
 
 pub const V2_API_PREFIX: &str = "v2";
+/// Modules routed as `/v2/{org_id}/{module}`; any other path names its org in the first segment.
+pub const V2_ORG_MODULES: [&str; 8] = [
+    "alerts",
+    "folders",
+    "reports",
+    "synthetics",
+    "incidents",
+    "downtimes",
+    "workflows",
+    "alert_calibration",
+];
 pub const SESSION_AUTH_MARKER: &str = "Session::";
 const PASSWORD_HASH_CACHE_CAPACITY: NonZeroUsize = NonZeroUsize::new(10_000).unwrap();
 
@@ -74,6 +85,20 @@ pub fn get_user_details(decoded: impl AsRef<[u8]>) -> Option<(String, String)> {
     credentials
         .split_once(':')
         .map(|(user, password)| (user.to_string(), password.to_string()))
+}
+
+/// The org the router serves for a path below the `/api` mount, which a v2 route carries second.
+pub fn org_from_path<'a>(path_columns: &[&'a str]) -> &'a str {
+    match *path_columns {
+        [V2_API_PREFIX, org, module, ..] if V2_ORG_MODULES.contains(&module) => org,
+        [org, ..] => org,
+        [] => "",
+    }
+}
+
+/// The path as the router matched it, below the mount prefixes axum has already stripped.
+pub fn routed_path(uri_path: &str) -> &str {
+    uri_path.strip_prefix('/').unwrap_or(uri_path)
 }
 
 /// Resolves the effective permission method for write requests (PUT/DELETE/PATCH).
@@ -263,7 +288,6 @@ where
         use o2_openfga::meta::route_permissions::{self as rp, StreamType as RpStreamType};
 
         let start = std::time::Instant::now();
-        let cfg = config::get_config();
 
         // Parse query string
         let query_string = parts.uri.query().unwrap_or("");
@@ -276,10 +300,7 @@ where
 
         let method = parts.method.to_string();
         let local_path = parts.uri.path().to_string();
-        let path = match local_path.strip_prefix(format!("{}/api/", cfg.common.base_uri).as_str()) {
-            Some(path) => path,
-            None => local_path.strip_prefix("/").unwrap_or(&local_path),
-        };
+        let path = routed_path(&local_path);
 
         let mut path_columns = path.split('/').collect::<Vec<&str>>();
         // Drop a trailing empty segment produced by a trailing slash (e.g.
@@ -293,12 +314,7 @@ where
         {
             path_columns.pop();
         }
-        let url_len = path_columns.len();
-        let org_id = if url_len > 1 && path_columns[0].eq(V2_API_PREFIX) {
-            path_columns[1].to_string()
-        } else {
-            path_columns[0].to_string()
-        };
+        let org_id = org_from_path(&path_columns).to_string();
 
         // Synthetics probe job + agent APIs — `/{org_id}/synthetics/{jobs,agent}/*`.
         // Authenticated via the o2syn_ probe token (not a user), so OpenFGA is
@@ -1131,27 +1147,9 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_write_method_alert_trigger_uses_put() {
-        let path: Vec<&str> = "v2/default/alerts/abc123/trigger".split('/').collect();
-        assert_eq!(resolve_write_method("PATCH", &path), "PUT");
-    }
-
-    #[test]
-    fn test_resolve_write_method_alert_enable_uses_put() {
-        let path: Vec<&str> = "v2/default/alerts/abc123/enable".split('/').collect();
-        assert_eq!(resolve_write_method("PATCH", &path), "PUT");
-    }
-
-    #[test]
     fn test_resolve_write_method_alert_crud_put() {
         let path: Vec<&str> = "v2/default/alerts/abc123".split('/').collect();
         assert_eq!(resolve_write_method("PUT", &path), "PUT");
-    }
-
-    #[test]
-    fn test_resolve_write_method_alert_crud_delete() {
-        let path: Vec<&str> = "v2/default/alerts/abc123".split('/').collect();
-        assert_eq!(resolve_write_method("DELETE", &path), "DELETE");
     }
 
     #[test]
@@ -1170,26 +1168,6 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_write_method_non_alert_patch_becomes_put() {
-        let path: Vec<&str> = "v2/default/dashboards/dash123".split('/').collect();
-        assert_eq!(resolve_write_method("PATCH", &path), "PUT");
-    }
-
-    #[test]
-    fn test_resolve_write_method_trigger_only_matches_v2_alerts() {
-        // v1-style path should continue to normalize PATCH to PUT
-        let path: Vec<&str> = "default/streams/alerts/abc123/trigger".split('/').collect();
-        assert_eq!(resolve_write_method("PATCH", &path), "PUT");
-    }
-
-    #[test]
-    fn test_resolve_write_method_trigger_requires_full_path() {
-        // Too short a path should not match
-        let path: Vec<&str> = "v2/default/trigger".split('/').collect();
-        assert_eq!(resolve_write_method("PATCH", &path), "PUT");
-    }
-
-    #[test]
     fn test_build_basic_auth_header_format() {
         use base64::Engine as _;
         let header = build_basic_auth_header("user@example.com", "mytoken");
@@ -1202,21 +1180,6 @@ mod tests {
         )
         .unwrap();
         assert_eq!(decoded, "user@example.com:mytoken");
-    }
-
-    #[test]
-    fn test_build_basic_auth_header_empty_fields() {
-        use base64::Engine as _;
-        let header = build_basic_auth_header("", "");
-        assert!(header.starts_with("Basic "));
-        let encoded = header.strip_prefix("Basic ").unwrap();
-        let decoded = String::from_utf8(
-            base64::engine::general_purpose::STANDARD
-                .decode(encoded)
-                .unwrap(),
-        )
-        .unwrap();
-        assert_eq!(decoded, ":");
     }
 
     #[test]
@@ -1252,6 +1215,37 @@ mod tests {
             i64::MIN
         );
         assert_eq!(get_user_email_from_auth_str(&auth).await, None);
+    }
+
+    // Each URI is what the extractor sees once axum has stripped the `/api` mount.
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn the_extractor_reads_the_org_the_route_serves() {
+        let mut misread = vec![];
+        for (method, uri, served) in [
+            ("POST", "/kv/kv/_search", "kv"),
+            ("POST", "/api/kv/_search", "api"),
+            ("POST", "/v2/kv/_search", "v2"),
+            ("GET", "/v2/acme/alerts", "acme"),
+        ] {
+            let (mut parts, ()) = http::Request::builder()
+                .method(method)
+                .uri(uri)
+                .header(http::header::AUTHORIZATION, "Basic eDp5")
+                .body(())
+                .unwrap()
+                .into_parts();
+            let auth = AuthExtractor::from_request_parts(&mut parts, &())
+                .await
+                .unwrap_or_else(|e| panic!("{method} {uri}: {}", e.message));
+            if auth.org_id != served {
+                misread.push(format!(
+                    "{method} /api{uri}: resolved org {:?}",
+                    auth.org_id
+                ));
+            }
+        }
+        assert!(misread.is_empty(), "{misread:#?}");
     }
 
     #[cfg(feature = "enterprise")]

@@ -30,7 +30,7 @@ use {
     chrono::Utc,
     common::infra::config::{ORG_USERS, USERS},
     o2_enterprise::enterprise::password_policy::enforcement::{PolicyDecision, decide},
-    openobserve_core::auth::V2_API_PREFIX,
+    openobserve_core::auth::{org_from_path, routed_path},
 };
 
 /// The header `auth_middleware` writes the authenticated email into. Reading it here rather than
@@ -82,12 +82,9 @@ async fn check_request(user_email: &str, uri: &Uri, method: &Method) -> Option<R
 /// The role lives on `org_users`, keyed by the org the validator also reads off the path.
 #[cfg(feature = "enterprise")]
 fn is_service_account(user_email: &str, uri: &Uri) -> bool {
-    let mut segments = uri.path().split('/').filter(|s| !s.is_empty());
-    let org = match segments.next() {
-        Some(V2_API_PREFIX) => segments.next(),
-        org => org,
-    };
-    org.and_then(|org| ORG_USERS.get(&format!("{org}/{user_email}")))
+    let path_columns: Vec<&str> = routed_path(uri.path()).split('/').collect();
+    ORG_USERS
+        .get(&format!("{}/{user_email}", org_from_path(&path_columns)))
         .is_some_and(|org_user| org_user.role.is_service_account())
 }
 
@@ -357,7 +354,8 @@ mod tests {
 
         let uri = |s: &str| s.parse::<Uri>().unwrap();
         assert!(is_service_account(email, &uri("/default/streams")));
-        assert!(is_service_account(email, &uri("/v2/default/streams")));
+        assert!(is_service_account(email, &uri("/v2/default/alerts")));
+        assert!(!is_service_account(email, &uri("/v2/default/streams")));
         assert!(!is_service_account(email, &uri("/other/streams")));
         assert!(!is_service_account(email, &uri("/organizations")));
 

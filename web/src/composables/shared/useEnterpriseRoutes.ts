@@ -14,13 +14,13 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import config from "@/aws-exports";
-import ServiceAccountsList from "@/components/iam/serviceAccounts/ServiceAccountsList.vue";
 import { routeGuard } from "@/utils/zincutils";
 import store from "@/stores";
 import {
   withFeatureGate as withFeatureGateBase,
   buildFeatureGateContext,
 } from "@/utils/enterpriseFeatures";
+import { oncallRouteGuard } from "./oncallRouteGuard";
 
 // "rbac" needs the backend `rbac_enabled` flag, which only `store.state.zoConfig`
 // carries — every other key here is edition-only and could use the default.
@@ -73,20 +73,6 @@ const workflowsRouteGuard = (to: any, from: any, next: any) => {
   routeGuard(to, from, next);
 };
 
-// On-call routes are gated on the backend /config flag `oncall_enabled`
-// (enterprise O2_ONCALL_ENABLED); `withFeatureGate("oncall", ...)` at each
-// route below checks the edition separately. Same `=== false` stance as
-// synthetics above: the flag is briefly undefined on a cold load, and
-// bouncing a bookmarked page home on "not yet known" is worse than a moment
-// of empty state.
-const oncallRouteGuard = (to: any, from: any, next: any) => {
-  if (store.state.zoConfig?.oncall_enabled === false) {
-    next("/");
-    return;
-  }
-  routeGuard(to, from, next);
-};
-
 const OnCallTeams = () => import("@/views/OnCall/OnCallTeams.vue");
 const OnCallTeamDetail = () => import("@/views/OnCall/OnCallTeamDetail.vue");
 const OnCallResponses = () => import("@/views/OnCall/OnCallResponses.vue");
@@ -109,9 +95,12 @@ const Quota = () => import("@/components/iam/quota/Quota.vue");
 
 const Organizations = () => import("@/components/iam/organizations/AppOrganizations.vue");
 
+const ServiceAccountsList = () =>
+  import("@/components/iam/serviceAccounts/ServiceAccountsList.vue");
+
 const Invitations = () => import("@/views/Invitations.vue");
 
-import Users from "@/views/User.vue";
+const Users = () => import("@/views/User.vue");
 
 const IncidentList = () => import("@/components/alerts/IncidentList.vue");
 

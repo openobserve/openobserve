@@ -22,6 +22,15 @@ export interface AiUsage {
   credits_remaining: number;
   mode: string;
   requires_additional_credits: boolean;
+  payer_org_id?: string | null;
+  costs: AiCreditCounts;
+  used_by_feature?: AiCreditCounts | null;
+}
+
+export interface AiCreditCounts {
+  chat: number;
+  incident: number;
+  incident_reanalysis: number;
 }
 
 const billings = {
@@ -63,18 +72,9 @@ const billings = {
   list_invoice_history: (org_identifier: string) => {
     return http().get(`/api/${org_identifier}/billings/invoices`);
   },
-  get_data_usage: (
-    org_identifier: string,
-    usage_date: string,
-    data_type: string,
-    member?: string,
-  ) => {
-    let url = `/api/${org_identifier}/billings/data_usage/${usage_date}?data_type=${data_type}`;
-    if (member) {
-      url += `&member=${member}`;
-    }
-    return http().get(url);
-  },
+  // The route still needs a {usage_date} segment, though the server returns the current cycles whatever it is.
+  get_data_usage: (org_identifier: string, usage_date: string) =>
+    http().get(`/api/${org_identifier}/billings/data_usage/${usage_date}`),
   submit_new_user_info: async (org_identifier: string, payload: any) => {
     return http().post(`/api/${org_identifier}/billings/new_user_attribution`, payload);
   },

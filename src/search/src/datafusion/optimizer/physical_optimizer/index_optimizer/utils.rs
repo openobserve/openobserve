@@ -93,12 +93,6 @@ pub mod tests {
     }
 
     #[test]
-    fn test_is_complex_plan_empty_exec_returns_false() {
-        let plan = empty_plan();
-        assert!(!is_complex_plan(&plan));
-    }
-
-    #[test]
     fn test_is_complex_plan_single_child_no_join() {
         let plan = empty_plan();
         assert!(!is_complex_plan(&plan));

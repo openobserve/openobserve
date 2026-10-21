@@ -368,6 +368,31 @@ describe("Login", () => {
     expect(window.location.href).toBe("https://sso.example.com");
   });
 
+  it("should not log a dex login request the browser aborted", async () => {
+    const authService = await import("@/services/auth");
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    wrapper = mount(Login, { global: { plugins: [i18n, store, router] } });
+    (authService.default.get_dex_login as any).mockRejectedValueOnce(
+      Object.assign(new Error("Request aborted"), { code: "ECONNABORTED" }),
+    );
+
+    await expect(wrapper.vm.loginWithSSo()).resolves.toBeUndefined();
+    expect(consoleError).not.toHaveBeenCalled();
+    consoleError.mockRestore();
+  });
+
+  it("should handle a failed dex login request instead of leaving it unhandled", async () => {
+    const authService = await import("@/services/auth");
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    wrapper = mount(Login, { global: { plugins: [i18n, store, router] } });
+    const networkError = Object.assign(new Error("Network Error"), { code: "ERR_NETWORK" });
+    (authService.default.get_dex_login as any).mockRejectedValueOnce(networkError);
+
+    await expect(wrapper.vm.loginWithSSo()).resolves.toBeUndefined();
+    expect(consoleError).toHaveBeenCalledWith("Error during redirection:", networkError);
+    consoleError.mockRestore();
+  });
+
   describe("sign-up intent (screen_hint)", () => {
     const DEX_URL =
       "https://dex.example.com/dex/auth?client_id=o2&redirect_uri=https%3A%2F%2Fcloud.example.com%2Fweb%2Fcb&scope=openid%20profile";
@@ -1058,6 +1083,29 @@ describe("Login", () => {
     expect(userInfo.auth_time).toBeCloseTo(expectedAuthTime, -2);
   });
 
+  it("shows a rejected sign in as an inline alert, not a toast, and clears it on retry", async () => {
+    const authService = await import("@/services/auth");
+    (authService.default.sign_in_user as any).mockRejectedValueOnce({ response: { status: 401 } });
+    mockNotify.mockClear();
+
+    wrapper = mount(Login, { global: { plugins: [i18n, store, router] } });
+    wrapper.vm.name = "testuser";
+    wrapper.vm.password = "wrongpassword";
+    await wrapper.vm.onSignIn();
+    await flushPromises();
+
+    await wrapper.find('[data-test="login-as-internal-user"]').trigger("click");
+    const alert = wrapper.find('[data-test="login-error-message"]');
+    expect(alert.attributes("role")).toBe("alert");
+    expect(alert.text()).toBe("Invalid username or password");
+    expect(mockNotify).not.toHaveBeenCalled();
+
+    (authService.default.sign_in_user as any).mockResolvedValueOnce({ data: { status: false } });
+    await wrapper.vm.onSignIn();
+    await flushPromises();
+    expect(wrapper.find('[data-test="login-error-message"]').exists()).toBe(false);
+  });
+
   it("should handle failed sign in form validation reset", async () => {
     const authService = await import("@/services/auth");
 
@@ -1294,6 +1342,29 @@ describe("Login", () => {
     expect(wrapper.vm.submitting).toBe(true);
     expect(wrapper.vm.loginAsInternalUser).toBe(true);
     expect(wrapper.vm.autoRedirectDexLogin).toBe(true);
+  });
+
+  it("exposes the internal-login toggle as a button with aria-expanded", async () => {
+    store.state.zoConfig.sso_enabled = true;
+    store.state.zoConfig.native_login_enabled = true;
+    wrapper = mount(Login, { global: { plugins: [i18n, store, router] } });
+    const toggle = wrapper.find('[data-test="login-as-internal-user"]');
+    expect(toggle.element.tagName).toBe("BUTTON");
+    expect(toggle.attributes("aria-expanded")).toBe("false");
+    await toggle.trigger("click");
+    expect(toggle.attributes("aria-expanded")).toBe("true");
+  });
+
+  it("moves focus to the email field when the internal login opens", async () => {
+    store.state.zoConfig.sso_enabled = true;
+    store.state.zoConfig.native_login_enabled = true;
+    wrapper = mount(Login, {
+      attachTo: document.body,
+      global: { plugins: [i18n, store, router] },
+    });
+    await wrapper.find('[data-test="login-as-internal-user"]').trigger("click");
+    await flushPromises();
+    expect(document.activeElement?.getAttribute("data-test")).toBe("login-user-id-field");
   });
 
   // Test 53: Test tab and innerTab refs

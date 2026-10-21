@@ -299,6 +299,8 @@ test.describe("Dashboard Panel Time - Apply Button Behavior", () => {
 
   test("24-should not apply changes when Apply is not clicked in Edit Panel mode", async ({ page }) => {
     const pm = new PageManager(page);
+    // This test covers the Apply gate; Auto Run (on where auto_query_enabled) applies picks without Apply.
+    await pm.dashboardAutoRun.setStoredAutoRun("false");
     const timestamp = Date.now();
     const dashboardName = `Dashboard_NoApply_${timestamp}`;
     const panelName = `Panel_NoApply_${timestamp}`;

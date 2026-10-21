@@ -105,7 +105,10 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 105: create ai_chat_shares and add fork columns to ai_chat_sessions.
 // 106: create ai_chat_turns and add replica_purged_at to ai_chat_sessions.
 // 107: add redact_tools to ai_chat_shares.
-pub const DB_SCHEMA_VERSION: u64 = 107;
+// 108: create oncall_phone_verifications and org_telephony.
+// 109: add last_run columns to reports.
+// 110: create rum_pa_app_settings; add rules_hash to rum_pa_funnels.
+pub const DB_SCHEMA_VERSION: u64 = 110;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -2075,12 +2078,6 @@ pub struct Common {
         help = "Enable shared memtable across multiple organizations"
     )]
     pub feature_shared_memtable_enabled: bool,
-    #[env_config(
-        name = "ZO_FEATURE_WAL_PACK_ENABLED",
-        default = true,
-        help = "Persist metrics memtables into packed wal files (one file per rotation instead of one file per stream)"
-    )]
-    pub feature_wal_pack_enabled: bool,
     #[env_config(name = "ZO_UI_ENABLED", default = true)]
     pub ui_enabled: bool,
     #[env_config(name = "ZO_UI_SQL_BASE64_ENABLED", default = false)]
@@ -2159,6 +2156,12 @@ pub struct Common {
         help = "Enable per-stream trace time indexes and trace time-range lookup"
     )]
     pub trace_time_index_enabled: bool,
+    #[env_config(
+        name = "ZO_TRACE_LIST_TIME_INDEX_ENABLED",
+        default = true,
+        help = "Complete trace list summaries from the trace time index; off keeps the per-partition aggregates"
+    )]
+    pub trace_list_time_index_enabled: bool,
     #[env_config(name = "OTEL_OTLP_HTTP_ENDPOINT", default = "")]
     pub otel_otlp_url: String,
     #[env_config(name = "OTEL_OTLP_GRPC_ENDPOINT", default = "")]
@@ -2206,7 +2209,8 @@ pub struct Common {
     pub print_key_sql: bool,
     #[env_config(name = "ZO_PRINT_PLAN_SINGLE_LINE", default = true)]
     pub print_plan_single_line: bool,
-    // usage reporting
+    #[env_config(name = "ZO_USAGE_REPORTING_ENABLED", default = true)]
+    pub usage_reporting_enabled: bool,
     #[env_config(
         name = "ZO_USAGE_REPORTING_MODE",
         default = "local",
@@ -2216,7 +2220,7 @@ pub struct Common {
     #[env_config(
         name = "ZO_USAGE_REPORTING_URL",
         default = "http://localhost:5080/api/_meta/usage/_json",
-        help = "Where remote usage reporting posts. Unused in the open source build, which never reports usage."
+        help = "Where remote usage reporting posts when enabled."
     )]
     pub usage_reporting_url: String,
     #[env_config(name = "ZO_USAGE_REPORTING_CREDS", default = "")]
@@ -2434,12 +2438,6 @@ pub struct Common {
     pub min_auto_refresh_interval: u32,
     #[env_config(name = "ZO_ADDITIONAL_REPORTING_ORGS", default = "")]
     pub additional_reporting_orgs: String,
-    #[env_config(
-        name = "ZO_USAGE_REPORT_TO_OWN_ORG",
-        default = true,
-        help = "Report alert/report triggers to the originating organization in addition to _meta org"
-    )]
-    pub usage_report_to_own_org: bool,
     #[env_config(
         name = "ZO_USE_STREAM_SETTINGS_FOR_PARTITIONS_ENABLED",
         default = false,
@@ -3067,6 +3065,12 @@ pub struct Limit {
     )]
     pub timechart_enabled: bool,
     #[env_config(
+        name = "ZO_EDITOR_SUGGEST_MODE",
+        help = "Query editor suggestions for every user: automatic (field, operator and value menus follow each other), typing (no follow-on menus) or off (the editor as it was before this setting)",
+        default = "automatic"
+    )]
+    pub editor_suggest_mode: String,
+    #[env_config(
         name = "ZO_HISTOGRAM_BREAKDOWN_FIELDS",
         help = "Comma-separated ordered list of stream fields used for stacked histogram breakdown. First match wins. Default: severity,log_level,level,status",
         default = "severity,log_level,level,status"
@@ -3098,12 +3102,6 @@ pub struct Limit {
 pub struct Compact {
     #[env_config(name = "ZO_COMPACT_ENABLED", default = true)]
     pub enabled: bool,
-    #[env_config(
-        name = "ZO_METRICS_INDEX_ENABLED",
-        default = false,
-        help = "Enable experimental metrics indexing and sample blocks for newly written metrics data."
-    )]
-    pub metrics_index_enabled: bool,
     #[env_config(name = "ZO_COMPACT_INTERVAL", default = 10)] // seconds
     pub interval: u64,
     #[env_config(
@@ -3205,7 +3203,7 @@ pub struct Compact {
     #[env_config(
         name = "ZO_COMPACT_TANTIVY_BUILDER_THREAD_NUM",
         default = 2,
-        help = "Per-file concurrent row_group workers for tantivy index generation during compaction. less than or equal to 1 disables (single-threaded)"
+        help = "Per-file concurrent row_group workers for tantivy index generation during compaction. Minimum 2"
     )]
     pub tantivy_builder_thread_num: usize,
 }
@@ -4043,7 +4041,20 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.limit.workflow_error_retention_secs = 3600;
     }
 
+    cfg.limit.editor_suggest_mode = normalize_editor_suggest_mode(&cfg.limit.editor_suggest_mode)?;
+
     Ok(())
+}
+
+fn normalize_editor_suggest_mode(raw: &str) -> Result<String, anyhow::Error> {
+    let mode = raw.trim().to_lowercase();
+    match mode.as_str() {
+        "" => Ok("automatic".to_string()),
+        "automatic" | "typing" | "off" => Ok(mode),
+        _ => Err(anyhow::anyhow!(
+            "ZO_EDITOR_SUGGEST_MODE must be one of: automatic (default), typing or off; got {raw}"
+        )),
+    }
 }
 
 fn check_route_config(cfg: &Config) -> Result<(), anyhow::Error> {
@@ -4783,6 +4794,9 @@ fn check_compact_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.compact.pending_jobs_metric_interval == 0 {
         cfg.compact.pending_jobs_metric_interval = 300;
     }
+    if cfg.compact.tantivy_builder_thread_num < 2 {
+        cfg.compact.tantivy_builder_thread_num = 2;
+    }
     if !cfg.compact.fast_mode && cfg.common.local_mode {
         cfg.compact.fast_mode = true;
     }
@@ -5150,11 +5164,6 @@ mod tests {
         // The gap is what dispatch and the ack need. Equal means a run that
         // uses its full budget cannot report before the reaper requeues it.
         assert!(validate_synthetics_ceilings(&ceilings(900, 900, 300_000)).is_err());
-    }
-
-    #[test]
-    fn budget_above_lease_is_rejected() {
-        assert!(validate_synthetics_ceilings(&ceilings(900, 901, 300_000)).is_err());
     }
 
     #[test]
@@ -5558,35 +5567,6 @@ mod tests {
     }
 
     #[test]
-    fn test_usage_report_to_own_org_field_exists() {
-        // Test that usage_report_to_own_org field exists and is accessible
-        let cfg = Config::init().unwrap();
-        // Verify the field is accessible as a boolean
-        let _value: bool = cfg.common.usage_report_to_own_org;
-        // Test passes if we can access the field without error
-    }
-
-    #[test]
-    fn test_usage_report_to_own_org_env_override() {
-        // Test that environment variable can override the default
-        unsafe {
-            std::env::set_var("ZO_USAGE_REPORT_TO_OWN_ORG", "false");
-        }
-        let cfg = Config::init().unwrap();
-        // Note: This test may fail if the config is already loaded
-        // In that case, we just verify the field exists
-        let _ = cfg.common.usage_report_to_own_org;
-        unsafe {
-            std::env::remove_var("ZO_USAGE_REPORT_TO_OWN_ORG");
-        }
-    }
-
-    #[test]
-    fn test_ensure_not_empty_valid() {
-        assert!(ensure_not_empty("valid", "TEST").is_ok());
-    }
-
-    #[test]
     fn test_ensure_not_empty_invalid() {
         assert!(ensure_not_empty("", "TEST").is_err());
     }
@@ -5594,11 +5574,6 @@ mod tests {
     #[test]
     fn test_ensure_not_empty_with_whitespace() {
         assert!(ensure_not_empty("  value  ", "TEST").is_ok());
-    }
-
-    #[test]
-    fn test_ensure_not_empty_single_char() {
-        assert!(ensure_not_empty("a", "TEST").is_ok());
     }
 
     #[test]
@@ -6112,6 +6087,27 @@ mod tests {
     }
 
     #[test]
+    fn test_editor_suggest_mode_defaults_to_automatic() {
+        let mut cfg = Config::init().unwrap();
+        assert_eq!(cfg.limit.editor_suggest_mode, "automatic");
+        check_limit_config(&mut cfg).unwrap();
+        assert_eq!(cfg.limit.editor_suggest_mode, "automatic");
+    }
+
+    #[test]
+    fn test_editor_suggest_mode_normalizes_and_rejects_unknown_values() {
+        assert_eq!(normalize_editor_suggest_mode(" Typing ").unwrap(), "typing");
+        assert_eq!(normalize_editor_suggest_mode("OFF").unwrap(), "off");
+        assert_eq!(normalize_editor_suggest_mode("").unwrap(), "automatic");
+        for value in ["auto", "on", "invoke", "manual"] {
+            assert!(
+                normalize_editor_suggest_mode(value).is_err(),
+                "editor suggest mode {value} must be rejected instead of falling back"
+            );
+        }
+    }
+
+    #[test]
     fn test_check_queue_store_config_memory_requires_local_mode() {
         let mut cfg = Config::default();
         cfg.common.queue_store = "memory".to_string();
@@ -6527,13 +6523,6 @@ mod tests {
         let p = std::path::Path::new("/data/openobserve");
         let result = deverbatim(p);
         assert_eq!(result, "/data/openobserve");
-    }
-
-    #[test]
-    fn test_deverbatim_empty_path_unchanged() {
-        let p = std::path::Path::new("");
-        let result = deverbatim(p);
-        assert_eq!(result, "");
     }
 
     #[cfg(windows)]

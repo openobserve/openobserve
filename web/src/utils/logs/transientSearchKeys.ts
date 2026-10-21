@@ -37,7 +37,6 @@ export const ITEM2_TRANSIENT_KEYS: TransientSearchKey[] = [
   { path: "meta.runOutcome", mode: "reset", owner: "item2", defaultValue: () => ({}) },
   { path: "meta.runCancelled", mode: "reset", owner: "item2", defaultValue: () => ({}) },
   { path: "meta.editorDirty", mode: "reset", owner: "item2", defaultValue: () => false },
-  { path: "meta.nlDetected", mode: "reset", owner: "item2", defaultValue: () => false },
   { path: "meta.liveMode", mode: "strip-only", owner: "item2" },
   { path: "data.customDownloadQueryObj", mode: "reset", owner: "item2" },
 ];

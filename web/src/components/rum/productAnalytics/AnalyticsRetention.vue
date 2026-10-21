@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :model-value="def.per"
           :options="perOptions"
           size="sm"
-          class="w-48"
+          width="sm"
           data-test="rum-analytics-retention-granularity"
           @update:model-value="(v) => update({ per: v as Granularity })"
         />
@@ -391,7 +391,7 @@ const compute = async (force = false) => {
         events: events.value,
         sample: ratio.value,
       }),
-      startUs: p.boundariesUs[0],
+      startUs: pa.newUsersRange({ startUs: p.boundariesUs[0], endUs: end }).startUs,
       endUs: end,
       limit: (p.boundariesUs.length * (p.boundariesUs.length + 1)) / 2,
       sampled: ratio.value,

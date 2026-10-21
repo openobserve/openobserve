@@ -49,6 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ title }}
       </div>
       <OButton
+        :aria-label="t('common.collapse')"
         variant="outline"
         size="icon-xs-sq"
         class="rotate-90"
@@ -71,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { type I18nText } from "@/types/i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 import { defineComponent, ref, watch, provide, type PropType } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -91,6 +92,7 @@ export default defineComponent({
   },
   emits: ["update:modelValue"],
   setup(props, { emit }) {
+    const { t } = useI18nTyped();
     const isOpen = ref(props.modelValue);
     const sidebarScrollTick = ref(0);
     provide("sidebarScrollTick", sidebarScrollTick);
@@ -112,6 +114,7 @@ export default defineComponent({
     );
 
     return {
+      t,
       isOpen,
       toggleSidebar,
       onSidebarScroll,

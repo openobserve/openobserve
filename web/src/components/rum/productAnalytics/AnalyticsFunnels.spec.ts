@@ -13,12 +13,36 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 import { defineComponent, h, KeepAlive, ref, type Ref } from "vue";
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { createRouter, createWebHistory, type Router } from "vue-router";
 import { createStore } from "vuex";
 
+// JSDOM has no layout, so the real virtualizer renders no rows; render them all.
+vi.mock("@tanstack/vue-virtual", async () => {
+  const { computed, unref } = await import("vue");
+  return {
+    useVirtualizer: (options: any) =>
+      computed(() => {
+        const count = unref(options).count;
+        return {
+          getVirtualItems: () =>
+            Array.from({ length: count }, (_, index) => ({
+              index,
+              key: index,
+              start: index * 28,
+              size: 28,
+              end: (index + 1) * 28,
+              lane: 0,
+            })),
+          getTotalSize: () => count * 28,
+          scrollToIndex: () => {},
+          measureElement: () => {},
+        };
+      }),
+  };
+});
 vi.mock("@/services/search", async (importOriginal) => {
   const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
   return overlayServiceMock(await importOriginal(), { default: { search: vi.fn() } });
@@ -53,6 +77,7 @@ import AnalyticsFunnels from "./AnalyticsFunnels.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import i18n from "@/locales";
 import { assertJoinFree } from "@/utils/rum/productAnalyticsQueries";
 import { decodeDef, encodeDef } from "@/utils/rum/productAnalyticsModel";
 import { alertCreationDialog } from "@/composables/alerts/useAlertCreation";
@@ -195,8 +220,35 @@ describe("AnalyticsFunnels", () => {
             props: ["open", "panels", "dashboardPanelData", "notice"],
             template: "<div data-test='add-to-dashboard-stub' />",
           },
-          VueDraggableNext: { template: "<div><slot /></div>" },
+          VueDraggableNext: {
+            name: "VueDraggableNext",
+            props: ["modelValue"],
+            emits: ["update:modelValue"],
+            template: "<div><slot /></div>",
+          },
           ODropdown: { template: '<div><slot name="trigger" /><slot /></div>' },
+          OPopover: {
+            props: ["open"],
+            emits: ["update:open"],
+            data: () => ({ inner: false }),
+            computed: {
+              shown(this: { open?: boolean; inner: boolean }) {
+                return this.open ?? this.inner;
+              },
+            },
+            methods: {
+              flip(this: {
+                shown: boolean;
+                inner: boolean;
+                $emit: (e: string, v: boolean) => void;
+              }) {
+                this.inner = !this.shown;
+                this.$emit("update:open", this.inner);
+              },
+            },
+            template:
+              '<div><div @click="flip"><slot name="trigger" /></div><slot v-if="shown" /></div>',
+          },
           ODropdownItem: {
             emits: ["select"],
             template: "<button @click=\"$emit('select')\"><slot /></button>",
@@ -220,6 +272,22 @@ describe("AnalyticsFunnels", () => {
   };
 
   const text = (dt: string) => wrapper!.find(`[data-test="${dt}"]`).text();
+
+  // Suggestions and the step picker render only once the toolbar Add step has been clicked.
+  const openAddStep = async () => {
+    if (wrapper!.find('[data-test="rum-analytics-funnel-add-step"]').exists()) return;
+    await wrapper!.find('[data-test="rum-analytics-funnel-add-step-btn"]').trigger("click");
+    await settle();
+  };
+
+  const dragSteps = async (order: number[]) => {
+    const steps = useProductAnalytics().funnel.value.steps;
+    wrapper!.findComponent({ name: "VueDraggableNext" }).vm.$emit(
+      "update:modelValue",
+      order.map((i) => steps[i]),
+    );
+    await settle();
+  };
 
   beforeEach(() => {
     resetProductAnalytics();
@@ -251,6 +319,8 @@ describe("AnalyticsFunnels", () => {
     expect(text("rum-analytics-funnel-entry-start-0")).toContain("/web/login");
     await wrapper!.find('[data-test="rum-analytics-funnel-entry-start-0"]').trigger("click");
     await settle();
+    await openAddStep();
+    await settle();
     expect(useProductAnalytics().funnel.value.steps).toEqual([{ kind: "p", key: "/web/login" }]);
     expect(wrapper!.find('[data-test="rum-analytics-funnel-suggestion-0"]').exists()).toBe(true);
   });
@@ -258,10 +328,12 @@ describe("AnalyticsFunnels", () => {
   it("Build funnel then two suggestions computes a 3-step funnel with no typing (AC-10)", async () => {
     await mountFunnels();
     await setSteps([["p", "/web/logs"]]);
+    await openAddStep();
     expect(text("rum-analytics-funnel-suggestion-0")).toContain("save-btn");
     expect(text("rum-analytics-funnel-suggestion-0")).toContain("41");
     await wrapper!.find('[data-test="rum-analytics-funnel-suggestion-0"]').trigger("click");
     await settle();
+    await openAddStep();
     await wrapper!.find('[data-test="rum-analytics-funnel-suggestion-1"]').trigger("click");
     await settle();
     expect(useProductAnalytics().funnel.value.steps.map((s) => s.key)).toEqual([
@@ -285,9 +357,25 @@ describe("AnalyticsFunnels", () => {
     expect(text("rum-analytics-funnel-step-2")).toContain("50.0%");
     expect(text("rum-analytics-funnel-dropoff-0")).toContain("120");
     expect(text("rum-analytics-funnel-overall")).toContain("20.0%");
-    expect(text("rum-analytics-funnel-order-label")).toBe(
-      "In order (other events allowed between)",
-    );
+    const header = wrapper!.find('[data-test="rum-analytics-funnel-steps-header"]');
+    expect(header.findAll("[data-test^=rum-analytics-funnel-col-]").map((c) => c.text())).toEqual([
+      "Step",
+      "Sessions",
+      "From previous",
+      "Time from step 1",
+      "Of step 1",
+    ]);
+    expect(header.text()).not.toContain("Reached, as share of step 1");
+    expect(
+      wrapper!
+        .find('[data-test="rum-analytics-funnel-col-step"] [aria-label]')
+        .attributes("aria-label"),
+    ).toBe("In order (other events allowed between)");
+    expect(
+      wrapper!
+        .find('[data-test="rum-analytics-funnel-col-unit"] [aria-label]')
+        .attributes("aria-label"),
+    ).toBe("Sessions that reached this step");
   });
 
   it("computes with one join-free search scoped to the app (AC-12, AC-14)", async () => {
@@ -310,8 +398,7 @@ describe("AnalyticsFunnels", () => {
       ["p", "/c"],
     ]);
     const before = funnelSqls().length;
-    await wrapper!.find('[data-test="rum-analytics-funnel-step-2-move-up"]').trigger("click");
-    await settle();
+    await dragSteps([0, 2, 1]);
     expect(useProductAnalytics().funnel.value.steps.map((s) => s.key)).toEqual(["/a", "/c", "b"]);
     await wrapper!.find('[data-test="rum-analytics-funnel-step-0-remove"]').trigger("click");
     await settle();
@@ -569,6 +656,40 @@ describe("AnalyticsFunnels", () => {
     await flushPromises();
     expect(router.currentRoute.value.name).toBe("productAnalyticsPaths");
     expect(useProductAnalytics().paths.value.cohort?.stepIndex).toBe(2);
+  });
+
+  it("See paths of dropped sessions stores the open saved funnel's name on the cohort", async () => {
+    await mountFunnels();
+    await setSteps([
+      ["p", "/a"],
+      ["c", "b"],
+      ["p", "/c"],
+    ]);
+    const pa = useProductAnalytics();
+    pa.openSavedFunnel(
+      {
+        id: "Checkout0000000000000000001",
+        app: "web",
+        name: "Checkout drop-off",
+        def: pa.funnel.value,
+        sql: "SELECT 1",
+        eventIds: [],
+        version: 1,
+        createdBy: "a@x.com",
+        createdAt: 1,
+        updatedBy: "a@x.com",
+        updatedAt: 1,
+      },
+      true,
+    );
+    await flushPromises();
+    await wrapper!.find('[data-test="rum-analytics-funnel-dropoff-1"]').trigger("click");
+    await flushPromises();
+    const drawer = wrapper!.findComponent({ name: "DropoffDrawer" });
+    drawer.vm.$emit("paths", drawer.props("cohort"));
+    await flushPromises();
+    expect(pa.paths.value.cohort?.name).toBe("Checkout drop-off");
+    expect(pa.paths.value.cohort?.funnelId).toBe("Checkout0000000000000000001");
   });
 
   it("Add to dashboard does not reopen when the user comes back from the dashboard it opened (AC-53)", async () => {
@@ -830,6 +951,7 @@ describe("AnalyticsFunnels", () => {
   it("drops next-step suggestions as soon as the steps change, so one cannot be added twice", async () => {
     await mountFunnels();
     await setSteps([["p", "/web/logs"]]);
+    await openAddStep();
     expect(wrapper!.find('[data-test="rum-analytics-funnel-suggestion-0"]').exists()).toBe(true);
     await wrapper!.find('[data-test="rum-analytics-funnel-suggestion-0"]').trigger("click");
     await flushPromises();
@@ -844,6 +966,7 @@ describe("AnalyticsFunnels", () => {
     respond();
     await mountFunnels();
     await setSteps([["p", "/web/logs"]]);
+    await openAddStep();
     expect(wrapper!.find('[data-test="rum-analytics-funnel-suggestion-0"]').exists()).toBe(false);
     expect(text("rum-analytics-funnel-suggestions-error")).toContain("400");
     const funnelCallsBeforeRetry = funnelSqls().length;
@@ -889,6 +1012,7 @@ describe("AnalyticsFunnels", () => {
     respond();
     shown.value = true;
     await settle();
+    await openAddStep();
     expect(wrapper!.find('[data-test="rum-analytics-funnel-suggestion-0"]').exists()).toBe(true);
   });
 
@@ -924,15 +1048,19 @@ describe("AnalyticsFunnels", () => {
       ["p", "/a"],
       ["c", "b"],
     ]);
+    expect(wrapper!.find('[data-test="rum-analytics-funnel-add-step-btn"]').text()).toBe(
+      "Add step",
+    );
     for (const dt of [
-      "rum-analytics-funnel-add-dashboard-btn",
-      "rum-analytics-funnel-alert-btn",
-      "rum-analytics-funnel-step-0-move-up",
-      "rum-analytics-funnel-step-0-move-down",
+      "rum-analytics-funnel-step-0-filters",
       "rum-analytics-funnel-step-0-remove",
     ]) {
       expect(wrapper!.find(`[data-test="${dt}"]`).attributes("aria-label"), dt).toBeTruthy();
     }
+    expect(wrapper!.find('[data-test="rum-analytics-funnel-alert-btn"]').text()).toBe("Alert");
+    expect(wrapper!.find('[data-test="rum-analytics-funnel-add-dashboard-btn"]').text()).toBe(
+      "Add to dashboard",
+    );
   });
 
   it("explains a disabled Alert me or Add to dashboard by its real reason", async () => {
@@ -961,8 +1089,9 @@ describe("AnalyticsFunnels", () => {
       ["p", long("e")],
     ]);
     const pa = useProductAnalytics();
-    const builder = wrapper!.findComponent({ name: "FunnelBuilder" });
     for (const c of ["f", "g", "h", "i"]) {
+      await openAddStep();
+      const builder = wrapper!.findComponent({ name: "FunnelAddStep" });
       (builder.vm as unknown as { add: (s: { kind: "p"; key: string }) => void }).add({
         kind: "p",
         key: long(c),
@@ -1435,6 +1564,638 @@ describe("AnalyticsFunnels", () => {
         .trigger("click");
       await settle();
       expect(loadToasts()).toBe(2);
+    });
+  });
+
+  describe("pa gap fixes: funnels", () => {
+    const svc = api.service as unknown as Record<string, Mock>;
+    const CURRENT_HASH = "0123456789abcdef";
+    const settingsOf = (app: string, extra: Record<string, unknown> = {}) => ({
+      id: `settings-${app}`.padEnd(27, "0"),
+      app,
+      bots: true,
+      builtinBots: {
+        version: 1,
+        families: ["HeadlessChrome", "PhantomJS", "Spider"],
+        devices: ["Spider"],
+      },
+      sessions: [],
+      pages: [],
+      version: 1,
+      rulesHash: CURRENT_HASH,
+      createdBy: "admin@x.com",
+      createdAt: 1,
+      updatedBy: "admin@x.com",
+      updatedAt: 1,
+      ...extra,
+    });
+    const LOGIN_WEB = {
+      s: [
+        ["p", "/web/login"],
+        ["p", "/web"],
+      ],
+      u: "sessions",
+      w: "session",
+    };
+    const THREE = (u: string, w: string, x: unknown[]) =>
+      encodeDef({
+        s: [
+          ["p", "/web"],
+          ["p", "/web/logs"],
+          ["p", "/web/billings"],
+        ],
+        u,
+        w,
+        x,
+      } as never);
+    const BETWEEN = { s: ["p", "/web/ingestion"], a: 2, b: 3 };
+    const pageText = () => document.body.textContent ?? "";
+
+    beforeEach(() => {
+      svc.getAppSettings = vi.fn(async (_org: string, app: string) => ({ data: settingsOf(app) }));
+    });
+    afterEach(() => {
+      delete svc.getAppSettings;
+    });
+
+    // Each mount starts from a clean module state so two opened funnels can be compared.
+    const openedSavedText = async (fields: Record<string, unknown>) => {
+      wrapper?.unmount();
+      wrapper = null;
+      document.body.innerHTML = "";
+      resetProductAnalytics();
+      resetSavedFunnels();
+      resetFunnelDraft();
+      api.reset();
+      // reset() restores the default settings, whose hash would not match the rows' currentRulesHash.
+      svc.getAppSettings.mockImplementation(async (_org: string, app: string) => ({
+        data: settingsOf(app),
+      }));
+      routes = baseRoutes();
+      respond();
+      const row = api.seedFunnel("web", "Signup", LOGIN_WEB, fields);
+      await mountFunnels({ sf: row.id });
+      await settle();
+      expect(text("rum-analytics-funnel-saved-name")).toBe("Signup");
+      return wrapper!.text();
+    };
+
+    it("P7-R11: a saved funnel whose stored rulesHash differs from currentRulesHash shows the stale banner, and a NULL stored hash counts as changed", async () => {
+      const fresh = await openedSavedText({
+        rulesHash: CURRENT_HASH,
+        currentRulesHash: CURRENT_HASH,
+      });
+      const changed = await openedSavedText({
+        rulesHash: "aaaaaaaaaaaaaaaa",
+        currentRulesHash: CURRENT_HASH,
+      });
+      const nullHash = await openedSavedText({ rulesHash: null, currentRulesHash: CURRENT_HASH });
+      expect(changed.length).toBeGreaterThan(fresh.length);
+      expect(nullHash).toBe(changed);
+    }, 30_000);
+
+    const leafTexts = () =>
+      new Set(
+        [...document.body.querySelectorAll("*")]
+          .filter((el) => el.children.length === 0)
+          .map((el) => el.textContent?.trim() ?? "")
+          .filter(Boolean),
+      );
+
+    it("P7-R11: Save on a stale saved funnel stores the current rules_hash and clears the stale banner", async () => {
+      await openedSavedText({ rulesHash: CURRENT_HASH, currentRulesHash: CURRENT_HASH });
+      const freshLeaves = leafTexts();
+      await openedSavedText({ rulesHash: "aaaaaaaaaaaaaaaa", currentRulesHash: CURRENT_HASH });
+      const banner = [...leafTexts()].filter((t) => !freshLeaves.has(t));
+      expect(banner.length).toBeGreaterThan(0);
+      const update = api.service.updateFunnel.getMockImplementation()!;
+      api.service.updateFunnel.mockImplementation(async (...args: never[]) => {
+        const [, , id, body] = args as unknown as [string, string, string, Record<string, unknown>];
+        const res = (await update(...args)) as { data: Record<string, unknown> };
+        const stored = api.funnels.get(id)!;
+        stored.rulesHash = body.rules_hash ?? null;
+        stored.currentRulesHash = CURRENT_HASH;
+        return {
+          data: { ...res.data, rulesHash: stored.rulesHash, currentRulesHash: CURRENT_HASH },
+        };
+      });
+      const pa = useProductAnalytics();
+      pa.funnel.value = {
+        ...pa.funnel.value,
+        steps: [
+          { kind: "p", key: "/web/login" },
+          { kind: "p", key: "/web/logs" },
+        ],
+      };
+      await settle();
+      await wrapper!.find('[data-test="rum-analytics-funnel-save-btn"]').trigger("click");
+      await settle();
+      expect(api.bodies("updateFunnel").at(-1)).toMatchObject({ rules_hash: CURRENT_HASH });
+      const after = leafTexts();
+      expect(banner.filter((t) => after.has(t))).toEqual([]);
+    }, 30_000);
+
+    it("an unchanged stale funnel can be saved to refresh its sql, while an unchanged fresh one cannot", async () => {
+      const save = () => wrapper!.find('[data-test="rum-analytics-funnel-save-btn"]');
+      await openedSavedText({ rulesHash: CURRENT_HASH, currentRulesHash: CURRENT_HASH });
+      expect(save().attributes("disabled")).toBeDefined();
+      await openedSavedText({ rulesHash: "aaaaaaaaaaaaaaaa", currentRulesHash: CURRENT_HASH });
+      expect(save().attributes("disabled")).toBeUndefined();
+      await save().trigger("click");
+      await settle();
+      expect(api.bodies("updateFunnel").at(-1)).toMatchObject({ rules_hash: CURRENT_HASH });
+    }, 30_000);
+
+    it("P7-R11: Save is disabled when the app's settings failed to load", async () => {
+      svc.getAppSettings = vi.fn(async () => {
+        throw { response: { status: 503, data: {} } };
+      });
+      await mountFunnels({ funnel: encodeDef(LOGIN_WEB) });
+      await settle();
+      const save = wrapper!.find('[data-test="rum-analytics-funnel-save-btn"]');
+      expect(save.exists()).toBe(true);
+      expect(save.attributes("disabled")).toBeDefined();
+    });
+
+    it("P6-R2: a saved funnel with an unknown key in an exclusion shows This funnel needs a newer version", async () => {
+      const row = api.seedFunnel("web", "Future", {
+        ...LOGIN_WEB,
+        x: [{ s: ["p", "/web/ingestion"], a: 1, b: 2, zz: 1 }],
+      });
+      await mountFunnels({ sf: row.id });
+      await settle();
+      expect(pageText()).toContain("This funnel needs a newer version");
+    });
+
+    it("P6-R2: a funnel link with an unknown key in a step's options shows This funnel needs a newer version", async () => {
+      await mountFunnels({
+        funnel: encodeDef({
+          ...LOGIN_WEB,
+          s: [["p", "/web/login", { min: 1000, zz: 1 }], ...LOGIN_WEB.s.slice(1)],
+        } as never),
+      });
+      await settle();
+      expect(pageText()).toContain("This funnel needs a newer version");
+    });
+
+    it("P7-R12: a Sessions funnel with an exclusion says Exclusions are checked per session", async () => {
+      await mountFunnels({ funnel: THREE("sessions", "session", [BETWEEN]) });
+      await settle();
+      expect(pageText()).toContain("Exclusions are checked per session");
+      expect(pageText()).not.toContain("across sessions within");
+    });
+
+    it("P7-R12: a Users funnel with a 7d window says the exclusions are checked across sessions within 7 days", async () => {
+      await mountFunnels({ funnel: THREE("users", "7d", [BETWEEN]) });
+      await settle();
+      expect(pageText()).toContain("across sessions within 7 days");
+      expect(pageText()).not.toContain("Exclusions are checked per session");
+    });
+
+    it("P7-R12: a Users funnel with a 1d window says Exclusions are checked across sessions within 1 day", async () => {
+      await mountFunnels({ funnel: THREE("users", "1d", [BETWEEN]) });
+      await settle();
+      expect(pageText()).toContain("Exclusions are checked across sessions within 1 day");
+    });
+
+    it("P7-R12: removing a step an exclusion references drops that exclusion and toasts its name", async () => {
+      await mountFunnels({ funnel: THREE("sessions", "session", [BETWEEN]) });
+      await settle();
+      toastSpy.mockClear();
+      await wrapper!.find('[data-test="rum-analytics-funnel-step-2-remove"]').trigger("click");
+      await settle();
+      const sent = decodeDef(router.currentRoute.value.query.funnel as string) as {
+        s: unknown[];
+        x?: unknown[];
+      };
+      expect(sent.s).toEqual([
+        ["p", "/web"],
+        ["p", "/web/logs"],
+      ]);
+      expect(sent.x ?? []).toEqual([]);
+      const messages = toastSpy.mock.calls.map((c) =>
+        String((c[0] as { message: unknown }).message),
+      );
+      expect(messages.some((m) => m.includes("/web/ingestion"))).toBe(true);
+    });
+
+    it("P7-R13: the By app table says named events use the primary app's rules and marks an app without a settings row built-in rule only", async () => {
+      svc.getAppSettings = vi.fn(async (_org: string, app: string) => ({
+        data:
+          app === "web"
+            ? settingsOf(app)
+            : settingsOf(app, {
+                id: null,
+                version: 0,
+                createdBy: null,
+                createdAt: null,
+                updatedBy: null,
+                updatedAt: null,
+              }),
+      }));
+      routes = [
+        [
+          /AS app, COUNT/,
+          [
+            { app: "web", sessions: 500 },
+            { app: "web-eu1", sessions: 200 },
+          ],
+        ],
+        [
+          /SELECT dim, /,
+          [
+            { dim: "web", c1: 150, c2: 60 },
+            { dim: "web-eu1", c1: 50, c2: 20 },
+          ],
+        ],
+        ...baseRoutes(),
+      ];
+      respond();
+      await mountFunnels({ apps: "web-eu1", funnel: encodeDef({ ...LOGIN_WEB, b: "app" }) });
+      await settle();
+      expect(pageText()).toContain("Named events use web's rules");
+      const rows = wrapper!.findAll('[data-test^="rum-analytics-funnel-breakdown-row-"]');
+      const eu1 = rows.find((r) => r.text().includes("web-eu1"));
+      const primary = rows.find((r) => r.text().includes("web") && !r.text().includes("web-eu1"));
+      expect(eu1?.text()).toContain("built-in rule only");
+      expect(primary?.text()).not.toContain("built-in rule only");
+    });
+
+    const PICKER_ROWS = [
+      { kind: "p", k: "/web", sessions: 10, at: null },
+      { kind: "c", k: "save-btn", sessions: 8, at: "click" },
+    ];
+    const openPicker = async (pickerRows: Hit[]) => {
+      api.seedEvent("web", "Opened logs");
+      // The pickers read action_type and error_message only when the stream has them.
+      usePerformance().performanceState.data.streams._rumdata = {
+        name: "_rumdata",
+        schema: {
+          usr_email: { name: "usr_email" },
+          user_agent_user_agent_family: { name: "b" },
+          action_type: { name: "action_type" },
+          error_message: { name: "error_message" },
+        },
+      };
+      routes = [
+        [
+          /substr\(error_message, 1, 120\) AS k/,
+          [{ k: "Failed to fetch billing info", sessions: 4 }],
+        ],
+        [/\bAS at\b/, pickerRows],
+        ...baseRoutes(),
+      ];
+      respond();
+      await mountFunnels();
+      await setSteps([["p", "/a"]]);
+      await openAddStep();
+      await settle();
+    };
+    const rowText = (step: string) => {
+      const row = wrapper!.find(`[data-test="rum-analytics-funnel-add-step-${step}"]`);
+      return row.exists() ? row.text() : "";
+    };
+
+    it("P7-R15: the step list groups Named events, Clicks and custom actions with a custom action tagged Event, and Errors", async () => {
+      await openPicker([
+        ...PICKER_ROWS,
+        { kind: "c", k: "signup_completed", sessions: 5, at: "custom" },
+      ]);
+      const list = wrapper!.find('[data-test="rum-analytics-funnel-add-step-picker"]').text();
+      for (const header of ["Named events", "Clicks and custom actions", "Errors"])
+        expect(list).toContain(header);
+      expect(list.indexOf("Failed to fetch billing info")).toBeGreaterThan(list.indexOf("Errors"));
+      expect(rowText("c:signup_completed")).toContain("Event");
+      expect(rowText("c:signup_completed")).toContain("5");
+      expect(text("rum-analytics-funnel-suggestion-0")).toContain("save-btn");
+      expect(rowText("c:save-btn")).toBe("");
+      expect(pageText()).not.toContain("No custom actions in range");
+    });
+
+    it("P7-R15: with no custom actions in range the clicks group says why", async () => {
+      await openPicker(PICKER_ROWS);
+      expect(pageText()).toContain(
+        "No custom actions in range. Custom actions come only from users with telemetry on",
+      );
+    });
+
+    const NOTE = "Uses this app's app filters as of now; re-create it after they change";
+
+    it("P7-R17: Alert me hands the alert form a note that it keeps this app's app filters as of creation", async () => {
+      alertCreationDialog.value = null;
+      await mountFunnels();
+      await setSteps([
+        ["p", "/a"],
+        ["c", "b"],
+      ]);
+      await wrapper!.find('[data-test="rum-analytics-funnel-alert-btn"]').trigger("click");
+      const prefill = alertCreationDialog.value!.prefill;
+      const lines = prefill.warnings.map((w) =>
+        String(i18n.global.t(`alerts.prefill.warnings.${w.key}`, w.params ?? {})),
+      );
+      expect(lines.some((l) => l.includes(NOTE))).toBe(true);
+      alertCreationDialog.value = null;
+    });
+
+    it("P7-R17: Add to dashboard carries a note that the panel keeps this app's app filters as of creation", async () => {
+      await mountFunnels();
+      await setSteps([
+        ["p", "/a"],
+        ["c", "b"],
+      ]);
+      await wrapper!.find('[data-test="rum-analytics-funnel-add-dashboard-btn"]').trigger("click");
+      await flushPromises();
+      expect(String(wrapper!.findComponent({ name: "AddToDashboard" }).props("notice"))).toContain(
+        NOTE,
+      );
+    });
+  });
+
+  describe("app filters on the Funnels tab", () => {
+    const FILTERED = { ...SUMMARY, total_sessions: 650, builtin_kept_sessions: 560 };
+    const filtered = () => {
+      routes = [[/va_rows/, [FILTERED]], ...baseRoutes()];
+      respond();
+    };
+    const at = (dt: string) => wrapper!.find(`[data-test="${dt}"]`);
+
+    it("the card line lists built-in and saved-rule removals from the page summary", async () => {
+      filtered();
+      await mountFunnels();
+      await setSteps([
+        ["p", "/a"],
+        ["p", "/b"],
+      ]);
+      await settle();
+      expect(at("rum-analytics-funnel-app-filters-builtin").text()).toBe("Built-in bot rule 90");
+      expect(at("rum-analytics-funnel-app-filters-rules").text()).toBe("Saved rules 60");
+    });
+
+    it("the rail section says nothing is hidden when the app filters removed nothing", async () => {
+      routes = [
+        [/va_rows/, [{ ...SUMMARY, total_sessions: 500, builtin_kept_sessions: 500 }]],
+        ...baseRoutes(),
+      ];
+      respond();
+      await mountFunnels();
+      await setSteps([
+        ["p", "/a"],
+        ["p", "/b"],
+      ]);
+      expect(at("rum-analytics-funnel-app-filters-none").exists()).toBe(true);
+      expect(at("rum-analytics-funnel-app-filters-builtin").exists()).toBe(false);
+    });
+
+    it("Include hidden sessions sets includeExcluded and xall", async () => {
+      filtered();
+      await mountFunnels();
+      await setSteps([
+        ["p", "/a"],
+        ["p", "/b"],
+      ]);
+      wrapper!.findComponent({ name: "OSwitch" }).vm.$emit("update:modelValue", true);
+      await settle();
+      expect(useProductAnalytics().state.includeExcluded).toBe(true);
+      expect(router.currentRoute.value.query.xall).toBe("1");
+    });
+
+    it("turning the rail switch off clears includeExcluded and drops xall from the URL", async () => {
+      filtered();
+      await mountFunnels({ xall: "1" });
+      await setSteps([
+        ["p", "/a"],
+        ["p", "/b"],
+      ]);
+      expect(router.currentRoute.value.query.xall).toBe("1");
+      wrapper!.findComponent({ name: "OSwitch" }).vm.$emit("update:modelValue", false);
+      await settle();
+      expect(useProductAnalytics().state.includeExcluded).toBe(false);
+      expect(router.currentRoute.value.query.xall).toBeUndefined();
+    });
+
+    it("Edit app filters asks the page to open the drawer", async () => {
+      filtered();
+      await mountFunnels();
+      await setSteps([
+        ["p", "/a"],
+        ["p", "/b"],
+      ]);
+      await at("rum-analytics-funnel-app-filters-edit").trigger("click");
+      expect(wrapper!.emitted("open-exclusions")).toHaveLength(1);
+    });
+
+    it("while hidden sessions are included, synthetic sessions stay listed even when the rule count fails", async () => {
+      const { performanceState } = usePerformance();
+      performanceState.data.streams._rumdata.schema.session_type = { name: "session_type" };
+      let fail = true;
+      const row = { ...FILTERED, synthetic_sessions: 7 };
+      routes = [
+        [
+          /va_rows/,
+          (sql: string) => {
+            if (/\b0 AS xb\b/.test(sql)) return [row];
+            if (fail) throw new Error("search failed");
+            return [row];
+          },
+        ],
+        ...baseRoutes(),
+      ];
+      respond();
+      await mountFunnels({ xall: "1" });
+      await setSteps([
+        ["p", "/a"],
+        ["p", "/b"],
+      ]);
+      expect(at("rum-analytics-funnel-app-filters-synthetic").text()).toBe(
+        "Synthetic tests 7 · always excluded",
+      );
+      expect(fail).toBe(true);
+    });
+
+    it("an exclusion's removed count comes from its xr column", async () => {
+      routes = [
+        [/FROM ps LIMIT 1/, [{ c1: 200, c2: 80, seen1: 1, seen2: 1, xr1: 7 }]],
+        ...baseRoutes(),
+      ];
+      respond();
+      await mountFunnels();
+      const pa = useProductAnalytics();
+      pa.funnel.value = {
+        steps: [
+          { kind: "p", key: "/a" },
+          { kind: "p", key: "/b" },
+        ],
+        unit: "sessions",
+        window: "session",
+        breakdown: null,
+        x: [{ step: { kind: "p", key: "/x" }, a: 1, b: 2 }],
+      };
+      await settle();
+      expect(at("rum-analytics-funnel-exclusion-0-removed").text()).toBe("7 removed at step 2");
+      expect(
+        at("rum-analytics-funnel-bar-1")
+          .find('[data-test="rum-analytics-funnel-bar-removed"]')
+          .exists(),
+      ).toBe(true);
+    });
+  });
+
+  describe("phase 2: Filter all steps, Why N?, stored SQL without page scope", () => {
+    const at = (dt: string) => wrapper!.find(`[data-test="${dt}"]`);
+    const layout = () => wrapper!.findComponent({ name: "FunnelLayoutRail" });
+    const twoSteps = async () => {
+      await setSteps([
+        ["p", "/a"],
+        ["p", "/b"],
+      ]);
+    };
+    const withSchema = (fields: string[]) => {
+      const { performanceState } = usePerformance();
+      performanceState.data.streams._rumdata = {
+        name: "_rumdata",
+        schema: Object.fromEntries(fields.map((f) => [f, { name: f }])),
+      };
+    };
+
+    it("refuses any definition change past a link's length, not only an added step", async () => {
+      await mountFunnels();
+      await twoSteps();
+      const pa = useProductAnalytics();
+      const before = pa.funnel.value;
+      const many = Array.from({ length: 20 }, (_, i) => `${"v".repeat(400)}${i}`);
+      layout().vm.$emit("update:def", {
+        ...before,
+        f: (["geo_info_city", "usr_email", "usr_id"] as const).map((field) => ({
+          field,
+          op: "in",
+          values: many,
+        })),
+      });
+      await settle();
+      expect(pa.funnel.value).toBe(before);
+      expect(toastSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ message: expect.stringContaining("too long") }),
+      );
+      layout().vm.$emit("update:def", {
+        ...before,
+        f: [{ field: "geo_info_city", op: "in", values: ["Pune"] }],
+      });
+      await settle();
+      expect(pa.funnel.value.f).toEqual([{ field: "geo_info_city", op: "in", values: ["Pune"] }]);
+    });
+
+    it("a filter applies to the live funnel query", async () => {
+      withSchema(["usr_email", "geo_info_country"]);
+      await mountFunnels();
+      await twoSteps();
+      layout().vm.$emit("update:def", {
+        ...useProductAnalytics().funnel.value,
+        f: [{ field: "geo_info_country", op: "in", values: ["India"] }],
+      });
+      await settle();
+      expect(funnelSqls().at(-1)).toContain(
+        "(geo_info_country IS NOT NULL AND geo_info_country IN ('India'))",
+      );
+    });
+
+    it("the layout's filter-values request runs the value query and hands the rows back", async () => {
+      withSchema(["usr_email", "geo_info_country"]);
+      routes = [[/SELECT geo_info_country AS v/, [{ v: "India", sessions: 212 }]], ...baseRoutes()];
+      respond();
+      await mountFunnels();
+      await twoSteps();
+      expect(layout().props("filterFields")).toEqual(["geo_info_country", "usr_email"]);
+      layout().vm.$emit("filter-values", "geo_info_country");
+      await settle();
+      expect(layout().props("filterValues")).toEqual({
+        field: "geo_info_country",
+        status: "ok",
+        rows: [{ value: "India", sessions: 212 }],
+      });
+    });
+
+    it("Why N? runs its own query only when opened, and its lines add up to the entry count", async () => {
+      routes = [
+        [
+          /va_rows/,
+          [{ ...SUMMARY, total_sessions: 600, builtin_kept_sessions: 520, sessions: 500 }],
+        ],
+        [/AS opened/, [{ opened: 230, kept: 200 }]],
+        ...baseRoutes(),
+      ];
+      respond();
+      await mountFunnels();
+      await twoSteps();
+      const whySql = () => sqls().filter((q) => q.includes("AS opened"));
+      expect(whySql()).toHaveLength(0);
+      const why = wrapper!.findComponent({ name: "WhyEnteredPopover" });
+      expect(at("rum-analytics-funnel-why-btn").text()).toBe("Why 200?");
+      why.vm.$emit("open", true);
+      await settle();
+      expect(whySql()).toHaveLength(1);
+      const lines = why.props("lines") as { lines: { id: string; count: number }[] };
+      expect(lines.lines.map((l) => [l.id, l.count])).toEqual([
+        ["app", 600],
+        ["synthetic", 0],
+        ["bots", 80],
+        ["appFilters", 20],
+        ["step1", 270],
+        ["entered", 200],
+      ]);
+      expect(why.props("estimated")).toBe(false);
+    });
+
+    it("while Why N? is open, edits rerun its query once they settle, not per keystroke", async () => {
+      routes = [[/AS opened/, [{ opened: 230, kept: 200 }]], ...baseRoutes()];
+      respond();
+      await mountFunnels();
+      await twoSteps();
+      const whySql = () => sqls().filter((q) => q.includes("AS opened"));
+      wrapper!.findComponent({ name: "WhyEnteredPopover" }).vm.$emit("open", true);
+      await settle();
+      expect(whySql()).toHaveLength(1);
+      const pa = useProductAnalytics();
+      for (const v of ["a", "ab", "abc"]) {
+        pa.funnel.value = {
+          ...pa.funnel.value,
+          f: [{ field: "usr_email", op: "in", values: [v] }],
+        };
+        await flushPromises();
+      }
+      expect(whySql()).toHaveLength(1);
+      await settle();
+      expect(whySql()).toHaveLength(2);
+      expect(whySql()[1]).toContain("'abc'");
+    });
+
+    it("Why N? is not offered while the funnel counts users", async () => {
+      await mountFunnels();
+      await twoSteps();
+      expect(wrapper!.findComponent({ name: "WhyEnteredPopover" }).exists()).toBe(true);
+      useProductAnalytics().funnel.value = { ...useProductAnalytics().funnel.value, unit: "users" };
+      await settle();
+      expect(wrapper!.findComponent({ name: "WhyEnteredPopover" }).exists()).toBe(false);
+    });
+
+    it("stored SQL and the dashboard panel leave out the page's env, while the live funnel keeps it", async () => {
+      withSchema(["usr_email", "env"]);
+      await mountFunnels();
+      await twoSteps();
+      const compile = wrapper!.findComponent({ name: "SavedFunnelBar" }).props("compileSql") as (
+        d: unknown,
+      ) => string;
+      const plain = compile(useProductAnalytics().funnel.value);
+      useProductAnalytics().setScope({ env: ["prod"] });
+      await settle();
+      expect(funnelSqls().at(-1)).toContain("env IN ('prod')");
+      expect(compile(useProductAnalytics().funnel.value)).toBe(plain);
+      expect(plain).not.toContain("env IN");
+      await at("rum-analytics-funnel-add-dashboard-btn").trigger("click");
+      await flushPromises();
+      const panels = wrapper!.findComponent({ name: "AddToDashboard" }).props("panels") as {
+        queries: { query: string }[];
+      }[];
+      expect(panels[0].queries[0].query).not.toContain("env IN");
     });
   });
 });

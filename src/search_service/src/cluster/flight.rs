@@ -44,13 +44,13 @@ use tracing::{Instrument, info_span};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 #[cfg(feature = "enterprise")]
 use {
-    crate::SEARCH_SERVER,
+    crate::QueryPhase,
     o2_enterprise::enterprise::common::config::get_config as get_o2_config,
     o2_enterprise::enterprise::search::{WorkGroup, admission},
 };
 
 use crate::{
-    SearchResult,
+    QueryTracker, SearchResult,
     datafusion::{
         context::{SearchContextBuilder, register_table},
         optimizer::{
@@ -70,7 +70,12 @@ use crate::{
     skip_all,
     fields(org_id = req.org_id)
 )]
-pub async fn search(trace_id: &str, sql: Arc<Sql>, mut req: Request) -> Result<SearchResult> {
+pub async fn search(
+    query_tracker: &QueryTracker,
+    sql: Arc<Sql>,
+    mut req: Request,
+) -> Result<SearchResult> {
+    let trace_id = query_tracker.trace_id();
     let mut took_watch = TookWatcher::new();
     let cfg = get_config();
     log::info!("[trace_id {trace_id}] flight->search: start {sql}");
@@ -200,7 +205,7 @@ pub async fn search(trace_id: &str, sql: Arc<Sql>, mut req: Request) -> Result<S
         .inc();
 
     let _lock = crate::work_group::acquire_work_group_lock(
-        trace_id,
+        query_tracker,
         &req,
         &mut took_watch,
         "logs",
@@ -271,16 +276,10 @@ pub async fn search(trace_id: &str, sql: Arc<Sql>, mut req: Request) -> Result<S
     );
 
     #[cfg(feature = "enterprise")]
-    SEARCH_SERVER.add_file_stats(trace_id, &scan_stats).await;
+    query_tracker.add_file_stats(&scan_stats);
 
     #[cfg(feature = "enterprise")]
-    let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
-    #[cfg(feature = "enterprise")]
-    if SEARCH_SERVER
-        .insert_sender(trace_id, abort_sender, true)
-        .await
-        .is_err()
-    {
+    let Ok(abort_receiver) = query_tracker.abort_receiver(QueryPhase::Running) else {
         log::info!(
             "[trace_id {trace_id}] flight->search: search canceled before call flight->search"
         );
@@ -289,7 +288,7 @@ pub async fn search(trace_id: &str, sql: Arc<Sql>, mut req: Request) -> Result<S
                 "[trace_id {trace_id}] flight->search: search canceled before call flight->search"
             )),
         ));
-    }
+    };
 
     let trace_stream_name = json::to_string(
         &sql.stream_names

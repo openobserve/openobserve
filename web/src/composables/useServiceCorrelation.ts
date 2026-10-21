@@ -153,9 +153,6 @@ export function useServiceCorrelation() {
 
       if (Object.keys(allDimensions).length === 0) {
         error.value = gt("traces.noRecognizableDimensionsForCorrelation");
-        console.error(
-          "[useServiceCorrelation] No dimensions extracted. Check semantic groups configuration.",
-        );
         return null;
       }
 

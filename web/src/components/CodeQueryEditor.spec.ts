@@ -46,6 +46,8 @@ const mockEditorObj = {
   onDidFocusEditorWidget: vi.fn(),
   onDidBlurEditorWidget: vi.fn(),
   onDidBlurEditorText: vi.fn(),
+  onDidChangeCursorPosition: vi.fn(),
+  createDecorationsCollection: vi.fn(() => ({ set: vi.fn(), clear: vi.fn() })),
   dispose: vi.fn(),
   getValue: vi.fn(() => ""),
   setValue: vi.fn(),
@@ -71,6 +73,11 @@ vi.mock("monaco-editor/esm/vs/editor/editor.api", () => ({
     setModelMarkers: vi.fn(),
     setModelLanguage: vi.fn(),
     TrackedRangeStickiness: { NeverGrowsWhenTypingAtEdges: 1 },
+    addCommand: vi.fn(() => ({ dispose: vi.fn() })),
+    addKeybindingRule: vi.fn(() => ({ dispose: vi.fn() })),
+    addKeybindingRules: vi.fn(() => ({ dispose: vi.fn() })),
+    registerCommand: vi.fn(() => ({ dispose: vi.fn() })),
+    getEditors: vi.fn(() => []),
   },
   languages: {
     // Real values, mirroring monaco-editor/esm/vs/editor/common/languages.js
@@ -102,8 +109,22 @@ vi.mock("monaco-editor/esm/vs/editor/editor.api", () => ({
     registerSignatureHelpProvider: vi.fn(() => ({ dispose: vi.fn() })),
     registerHoverProvider: vi.fn(() => ({ dispose: vi.fn() })),
   },
-  KeyMod: { CtrlCmd: 1 },
-  KeyCode: { Enter: 13 },
+  KeyMod: { CtrlCmd: 2048, WinCtrl: 256 },
+  KeyCode: {
+    Backspace: 1,
+    Tab: 2,
+    Enter: 13,
+    Escape: 9,
+    Space: 10,
+    PageUp: 11,
+    PageDown: 12,
+    UpArrow: 16,
+    DownArrow: 18,
+    KeyI: 39,
+    KeyN: 44,
+    KeyP: 46,
+    KeyZ: 56,
+  },
   Range: class {
     constructor(...args: number[]) {
       Object.assign(this, { args });
@@ -130,15 +151,27 @@ vi.mock("@/composables/useLogs/searchState", () => ({
   }),
 }));
 
-vi.mock("@/composables/useNLQuery", () => ({
-  useNLQuery: () => ({
-    detectNaturalLanguage: vi.fn(() => false),
-    generateSQL: vi.fn(() => Promise.resolve(null)),
-    transformToSQL: vi.fn((_nl: string, sql: string) => sql),
-    isGenerating: { value: false },
-    streamingResponse: { value: "" },
-  }),
+const nlq = vi.hoisted(() => ({
+  generateSQL: vi.fn(() => Promise.resolve(null as string | null)),
+  refusalNotice: null as unknown as { value: string },
+  showErrorNotification: vi.fn(),
 }));
+
+vi.mock("@/composables/useNLQuery", async () => {
+  // A real ref, so the exposed refusalNotice unwraps on the component like it does in the app.
+  const { ref } = await import("vue");
+  nlq.refusalNotice = ref("");
+  return {
+    useNLQuery: () => ({
+      detectNaturalLanguage: vi.fn(() => false),
+      generateSQL: nlq.generateSQL,
+      transformToSQL: vi.fn((_nl: string, sql: string) => sql),
+      isGenerating: { value: false },
+      streamingResponse: { value: "" },
+      refusalNotice: nlq.refusalNotice,
+    }),
+  };
+});
 
 vi.mock("vue-i18n", () => ({
   useI18n: () => ({
@@ -148,7 +181,7 @@ vi.mock("vue-i18n", () => ({
 
 vi.mock("@/composables/useNotifications", () => ({
   default: () => ({
-    showErrorNotification: vi.fn(),
+    showErrorNotification: nlq.showErrorNotification,
     showPositiveNotification: vi.fn(),
   }),
 }));
@@ -426,6 +459,29 @@ describe("CodeQueryEditor", () => {
     it("should have empty fields array as default", () => {
       const wrapper = createWrapper({ fields: undefined });
       expect(wrapper.props("fields")).toEqual([]);
+    });
+  });
+
+  describe("query generation refused by the server", () => {
+    afterEach(() => {
+      nlq.refusalNotice.value = "";
+    });
+
+    it("shows the refusal notice a single time and does not throw", async () => {
+      const notice = "Your organization has used all of its AI credits.";
+      nlq.generateSQL.mockImplementationOnce(() => {
+        nlq.refusalNotice.value = notice;
+        return Promise.resolve(null);
+      });
+      const wrapper = createWrapper();
+
+      await expect(wrapper.vm.handleGenerateSQL("show error rows")).resolves.toBeUndefined();
+      // Exposed so the AI bar records it instead of the unchanged query.
+      expect(wrapper.vm.refusalNotice).toBe(notice);
+
+      expect(nlq.showErrorNotification).toHaveBeenCalledTimes(1);
+      expect(nlq.showErrorNotification).toHaveBeenCalledWith(notice);
+      wrapper.unmount();
     });
   });
 

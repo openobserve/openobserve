@@ -15,6 +15,7 @@ import pytest
 
 from support.client import OpenObserveClient
 from support.factories import unique_email, user_payload
+from support.wait import wait_until
 
 logger = logging.getLogger(__name__)
 
@@ -47,10 +48,12 @@ def test_create_and_delete_admin_user(client: OpenObserveClient, temp_user_email
     create_resp = client.users.create(payload)
     assert create_resp.status_code == 200, f"create failed: {create_resp.status_code} {create_resp.text}"
 
-    # Verify list-side effect — the user we just created should now appear in users.list()
-    user_emails_after = [u.get("email") for u in client.users.list()]
-    assert temp_user_email in user_emails_after, \
-        f"created user {temp_user_email} not in list: {user_emails_after}"
+    # The list reads a cache that a watcher fills after the create returns, so poll.
+    wait_until(
+        lambda: temp_user_email in [u.get("email") for u in client.users.list()],
+        timeout=10,
+        msg=f"created user {temp_user_email} in users.list()",
+    )
 
     delete_resp = client.users.delete(temp_user_email)
     assert delete_resp.status_code == 200, f"delete failed: {delete_resp.status_code} {delete_resp.text}"
@@ -122,14 +125,15 @@ def test_update_user_first_name(client: OpenObserveClient, temp_user_email: str)
     assert update_resp.status_code == 200, \
         f"update failed: {update_resp.status_code} {update_resp.text}"
 
-    # Verify the update persisted — find our user in the list and check first_name
-    user = next(
-        (u for u in client.users.list() if u.get("email") == temp_user_email),
-        None,
+    # The list reads a cache that a watcher fills after the write returns, so poll.
+    wait_until(
+        lambda: any(
+            u.get("email") == temp_user_email and u.get("first_name") == "Renamed"
+            for u in client.users.list()
+        ),
+        timeout=10,
+        msg=f"user {temp_user_email} listed with first_name 'Renamed'",
     )
-    assert user is not None, f"user {temp_user_email} missing from list after update"
-    assert user.get("first_name") == "Renamed", \
-        f"first_name should be 'Renamed' after update, got {user.get('first_name')!r}"
 
 
 def test_update_nonexistent_user_returns_404(client: OpenObserveClient):

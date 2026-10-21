@@ -372,6 +372,17 @@ pub fn parse_interval_to_minutes(s: &str) -> i64 {
     }
 }
 
+/// Rejects a range `file_list` would refuse, so a handler can answer 400 before searching.
+pub fn validate_time_range(start_time: i64, end_time: i64) -> Result<(), &'static str> {
+    if start_time <= 0 || end_time <= 0 {
+        return Err("start_time and end_time must be positive microsecond timestamps");
+    }
+    if start_time >= end_time {
+        return Err("start_time must be before end_time");
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     #[test]
@@ -761,5 +772,18 @@ mod tests {
         // Both i64 parse and str parse fail → Err("invalid time format [string]")
         let result = parse_str_to_timestamp_micros("not_a_time_string!!!$$$");
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_validate_time_range_rejects_what_file_list_refuses() {
+        let positive = Err("start_time and end_time must be positive microsecond timestamps");
+        let ordered = Err("start_time must be before end_time");
+        assert_eq!(validate_time_range(0, 10), positive);
+        assert_eq!(validate_time_range(-1, 10), positive);
+        assert_eq!(validate_time_range(1, 0), positive);
+        assert_eq!(validate_time_range(1, -5), positive);
+        assert_eq!(validate_time_range(10, 10), ordered);
+        assert_eq!(validate_time_range(11, 10), ordered);
+        assert_eq!(validate_time_range(1, 2), Ok(()));
     }
 }

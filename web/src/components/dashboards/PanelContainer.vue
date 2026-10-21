@@ -275,6 +275,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <ODropdown side="bottom" align="end" v-if="!viewOnly && !simplifiedPanelView">
           <template #trigger>
             <OButton
+              :aria-label="t('dashboard.moreActions')"
               variant="ghost"
               size="icon"
               :data-test="`dashboard-edit-panel-${props.data.title}-dropdown`"
@@ -523,6 +524,7 @@ import PanelBar from "@/components/common/PanelBar.vue";
 import SinglePanelMove from "@/components/dashboards/settings/SinglePanelMove.vue";
 import { getUUID, b64EncodeUnicode } from "@/utils/zincutils";
 import useNotifications from "@/composables/useNotifications";
+import { useDashboardSaveConflict } from "@/composables/dashboard/useDashboardSaveConflict";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
@@ -539,6 +541,8 @@ import {
   buildPrefillFromPanel,
   executedPanelQuery,
   panelQueryChoices,
+  alertableQueryIndexes,
+  type PanelQueryShape,
 } from "@/utils/alerts/prefill/fromPanel";
 import type { AlertBuildOptions } from "@/ts/interfaces/alertPrefill";
 import { isFormulaQuery } from "@/utils/dashboard/promql/formula";
@@ -738,11 +742,8 @@ export default defineComponent({
     const showLegendsDialog = ref(false);
     const confirmDeletePanelDialog = ref(false);
     const confirmMovePanelDialog: any = ref(false);
-    const {
-      showPositiveNotification,
-      showErrorNotification,
-      showConfictErrorNotificationWithRefreshBtn,
-    } = useNotifications();
+    const { showPositiveNotification, showErrorNotification } = useNotifications();
+    const saveConflict = useDashboardSaveConflict();
     const metaDataValue = (metadata: any) => {
       metaData.value = metadata;
     };
@@ -1004,11 +1005,12 @@ export default defineComponent({
       } catch (error: any) {
         // Show an error notification.
 
-        if (error?.response?.status === 409) {
-          showConfictErrorNotificationWithRefreshBtn(
-            error?.response?.data?.message ?? error?.message ?? t("panel.panelDuplicationFailed"),
-            t,
-          );
+        if (saveConflict.isConflict(error)) {
+          void saveConflict.openConflict({
+            dashboardId: String(route.query.dashboard),
+            folderId: (route.query.folder as string) ?? "default",
+            change: t("dashboard.saveConflict.change.duplicatedPanel", { name: data.title }),
+          });
         } else {
           showErrorNotification(error?.message ?? t("panel.panelDuplicationFailed"));
         }
@@ -1321,7 +1323,10 @@ export default defineComponent({
     buildPanelAlertPrefill(options: AlertBuildOptions = {}) {
       const queries = this.props.data.queries || [];
       // A saved-hidden query is not drawn, so it is not what the user means to alert on.
-      const visible = queries.flatMap((query: any, i: number) => (query?.config?.hide ? [] : [i]));
+      const visible = alertableQueryIndexes(
+        queries,
+        queries.flatMap((query: PanelQueryShape, i: number) => (query?.config?.hide ? [] : [i])),
+      );
       const queryIndex = options.queryIndex ?? visible[0] ?? 0;
       return buildPrefillFromPanel({
         panelTitle: this.props.data.title,

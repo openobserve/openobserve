@@ -34,7 +34,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <div class="flex h-full min-h-0 flex-col">
-      <div class="px-page-edge shrink-0 py-3">
+      <div class="px-page-edge flex shrink-0 flex-col gap-3 py-3">
+        <AlertCalibrationLastRun v-if="config" only-failure />
         <OStatStrip :items="stats" data-test="alert-calibration-digests-stats" />
       </div>
 
@@ -99,12 +100,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #cell-window="{ row }">
-            <div class="flex min-w-0 flex-col">
+            <span class="relative inline-flex min-w-0 items-baseline gap-2">
               <OTimeCell :value="row.window_end" unit="us" mode="absolute" />
               <span class="text-text-secondary truncate text-xs">
-                <OTimeCell :value="row.window_start" unit="us" mode="date" />
+                {{ formatMinutes(t, windowMinutes(row)) }}
               </span>
-            </div>
+              <OTooltip side="right" :content="formatAgo(row.emitted_at)" />
+            </span>
           </template>
 
           <template #cell-findings="{ row }">
@@ -131,31 +133,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #cell-coverage="{ row }">
-            <OBadge
-              :variant="COVERAGE_BADGE[coverageVerdict(row)].variant"
-              size="sm"
-              shape="rounded"
-            >
-              {{ t(COVERAGE_BADGE[coverageVerdict(row)].labelKey) }}
-            </OBadge>
-          </template>
-
-          <template #cell-generated="{ row }">
-            <OTimeCell :value="row.emitted_at" unit="us" />
-          </template>
-
-          <template #cell-actions="{ row }">
-            <div class="flex items-center justify-center">
-              <OButton
-                variant="ghost"
-                size="icon-sm"
-                icon-left="chevron-right"
-                :aria-label="t('alertCalibration.digests.openDigest')"
-                @click.stop="open(row)"
+            <span class="relative inline-flex">
+              <OBadge
+                :variant="COVERAGE_BADGE[coverageVerdict(row)].variant"
+                size="sm"
+                shape="rounded"
               >
-                <OTooltip side="left" :content="t('alertCalibration.digests.openDigest')" />
-              </OButton>
-            </div>
+                {{ t(COVERAGE_BADGE[coverageVerdict(row)].labelKey) }}
+              </OBadge>
+              <OTooltip v-if="coverageNotes(t, row).length" side="left" max-width="25rem">
+                <template #content>
+                  <span v-for="note in coverageNotes(t, row)" :key="note" class="block">{{
+                    note
+                  }}</span>
+                </template>
+              </OTooltip>
+            </span>
           </template>
 
           <template #empty>
@@ -204,10 +197,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
+import { formatDistanceToNowStrict } from "date-fns";
 import { useQuery } from "@tanstack/vue-query";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
-import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
@@ -224,21 +218,21 @@ import { alertCalibrationConfigQuery } from "@/services/alert_calibration.querie
 import { useLeaveIfAlertCalibrationOff } from "@/composables/alertCalibration/useAlertCalibrationEnabled";
 import AlertCalibrationTabs from "./AlertCalibrationTabs.vue";
 import AlertCalibrationActions from "./AlertCalibrationActions.vue";
+import AlertCalibrationLastRun from "./AlertCalibrationLastRun.vue";
 import { useDigestSearch, useLatestRead } from "./useDigestSearch";
 import {
+  coverageNotes,
   coverageVerdict,
   isClean,
   latestPerWindow,
   latestRun,
   lookbackRange,
   runKey,
-  runsSql,
-  runsWithAlertSql,
   RUNS_LOOKBACK_DAYS,
   SEARCH_SIZE,
   type RunRow,
 } from "./digests";
-import { COVERAGE_BADGE, formatMinutes } from "./format";
+import { COVERAGE_BADGE, formatMinutes, splitMinutes } from "./format";
 
 type Scope = "all" | "findings" | "gaps";
 
@@ -250,10 +244,16 @@ const { search: searchDigests, orgId } = useDigestSearch();
 const configQuery = useQuery(() => alertCalibrationConfigQuery(orgId.value));
 const config = computed(() => configQuery.data.value ?? null);
 
+/** Both badge columns, so they line up; "Measured nothing" is the widest badge. */
+const BADGE_COL = 140;
+
 const nowMicros = () => Date.now() * 1000;
+const windowMinutes = (row: RunRow) => Math.round((row.window_end - row.window_start) / 60_000_000);
+const formatAgo = (micros: number) =>
+  raw(formatDistanceToNowStrict(micros / 1000, { addSuffix: true }));
 
 const runs = useLatestRead(async () => {
-  const emissions = await searchDigests<RunRow>(runsSql(), lookbackRange(nowMicros()));
+  const emissions = await searchDigests<RunRow>("", lookbackRange(nowMicros()));
   return { emissions: emissions.length, rows: latestPerWindow(emissions) };
 });
 const rows = computed(() => runs.data.value?.rows ?? []);
@@ -263,7 +263,10 @@ const scope = ref<Scope>("all");
 const matching = useLatestRead(async () => {
   const name = search.value.trim();
   if (!name) return null;
-  const hits = await searchDigests<RunRow>(runsWithAlertSql(name), lookbackRange(nowMicros()));
+  const hits = await searchDigests<RunRow>("/alerts", {
+    alert_name: name,
+    ...lookbackRange(nowMicros()),
+  });
   return new Set(hits.map(runKey));
 });
 
@@ -283,28 +286,9 @@ const latest = computed(() => latestRun(rows.value));
 const stats = computed<StatItem[]>(() => {
   const c = config.value;
   const run = latest.value;
+  const cadence = splitMinutes(t, c?.frequency_minutes ?? 0);
+  const window = splitMinutes(t, c?.window_minutes ?? 0);
   return [
-    {
-      key: "schedule",
-      label: t("alertCalibration.digests.schedule"),
-      value: c
-        ? c.enabled
-          ? t("alertCalibration.digests.on")
-          : t("alertCalibration.digests.off")
-        : raw("—"),
-      sub: c
-        ? t("alertCalibration.digests.every", { duration: formatMinutes(t, c.frequency_minutes) })
-        : t("alertCalibration.digests.notConfigured"),
-      icon: "schedule",
-      tone: c?.enabled ? "success" : "neutral",
-    },
-    {
-      key: "window",
-      label: t("alertCalibration.digests.window"),
-      value: c ? formatMinutes(t, c.window_minutes) : raw("—"),
-      sub: t("alertCalibration.digests.currentSettings"),
-      icon: "calendar-month",
-    },
     {
       key: "latest",
       label: t("alertCalibration.digests.latestFindings"),
@@ -312,6 +296,25 @@ const stats = computed<StatItem[]>(() => {
       sub: run ? t(COVERAGE_BADGE[coverageVerdict(run)].labelKey) : undefined,
       icon: "fact-check",
       tone: run && run.finding_count > 0 ? "warning" : "neutral",
+    },
+    {
+      key: "window",
+      label: t("alertCalibration.digests.window"),
+      value: c ? window.count : raw("—"),
+      sub: c ? window.unit : t("alertCalibration.digests.notConfigured"),
+      icon: "calendar-month",
+    },
+    {
+      key: "schedule",
+      label: t("alertCalibration.digests.schedule"),
+      value: c ? (c.enabled ? cadence.count : t("alertCalibration.digests.off")) : raw("—"),
+      sub: c
+        ? c.enabled
+          ? cadence.unit
+          : t("alertCalibration.digests.noScheduledRun")
+        : t("alertCalibration.digests.notConfigured"),
+      icon: "schedule",
+      tone: c?.enabled ? "success" : "neutral",
     },
   ];
 });
@@ -334,48 +337,26 @@ const columns = computed<OTableColumnDef<RunRow>[]>(() => [
     header: t("alertCalibration.digests.colRun"),
     accessorFn: (row) => row.window_end,
     sortable: true,
-    size: COL.date,
-    meta: { align: "left", isName: true },
+    // The slack goes to the run, so the badge columns keep their width.
+    meta: { align: "left", isName: true, autoWidth: true, fillRemaining: true },
   },
   {
     id: "findings",
     header: t("alertCalibration.digests.colFindings"),
     accessorKey: "finding_count",
     sortable: true,
-    size: COL.status,
+    size: BADGE_COL,
+    maxSize: BADGE_COL,
     meta: { align: "left" },
-  },
-  {
-    id: "declined",
-    header: t("alertCalibration.digests.colDeclined"),
-    accessorKey: "skip_count",
-    sortable: true,
-    size: COL.count,
-    meta: { align: "right" },
   },
   {
     id: "coverage",
     header: t("alertCalibration.digests.colCoverage"),
     accessorFn: (row) => coverageVerdict(row),
     sortable: true,
-    size: COL.status,
+    size: BADGE_COL,
+    maxSize: BADGE_COL,
     meta: { align: "left" },
-  },
-  {
-    id: "generated",
-    header: t("alertCalibration.digests.colGenerated"),
-    accessorKey: "emitted_at",
-    sortable: true,
-    size: COL.dateAbsolute,
-    meta: { align: "left" },
-  },
-  {
-    id: "actions",
-    header: raw(""),
-    sortable: false,
-    isAction: true,
-    size: 64,
-    meta: { align: "center" },
   },
 ]);
 

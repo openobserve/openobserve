@@ -72,6 +72,21 @@ pub(crate) async fn secret_server() -> String {
     format!("http://127.0.0.1:{port}")
 }
 
+/// Base URL of a local server that answers 200 with a head promising more body than it sends.
+pub(crate) async fn truncated_server() -> String {
+    use tokio::io::AsyncWriteExt;
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let port = listener.local_addr().unwrap().port();
+    tokio::spawn(async move {
+        while let Ok((mut sock, _)) = listener.accept().await {
+            read_request(&mut sock).await;
+            let reply = "HTTP/1.1 200 OK\r\nContent-Length: 100\r\nConnection: close\r\n\r\nsecret";
+            let _ = sock.write_all(reply.as_bytes()).await;
+        }
+    });
+    format!("http://127.0.0.1:{port}")
+}
+
 /// The request line and headers; the body is drained so the client never sees a reset.
 async fn read_request(sock: &mut tokio::net::TcpStream) -> String {
     use tokio::io::AsyncReadExt;

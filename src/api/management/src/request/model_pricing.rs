@@ -22,7 +22,7 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use config::meta::model_pricing::{
-    BUILT_IN_ORG, META_ORG, MINUTES_PER_DAY, ModelPricingDefinition, PricingSource,
+    BUILT_IN_ORG, META_ORG, ModelPricingDefinition, PricingSource, PricingTierDefinition,
 };
 use db::model_pricing;
 use serde::{Deserialize, Serialize};
@@ -653,6 +653,10 @@ pub struct TestModelMatchRequest {
     /// recurring UTC time-of-day windows (peak / off-peak) are resolved against it.
     #[serde(default)]
     pub timestamp: Option<i64>,
+    /// Optional span attributes (e.g. {"openai.response.service_tier": "flex"}) for tier rules.
+    #[serde(default)]
+    #[schema(value_type = HashMap<String, Object>)]
+    pub attributes: HashMap<String, config::utils::json::Value>,
 }
 
 /// Response for the test-model-match endpoint.
@@ -662,6 +666,8 @@ pub struct TestModelMatchResponse {
     pub matched: Option<ModelPricingDefinition>,
     /// The name of the selected pricing tier, or null if no definition matched.
     pub tier: Option<String>,
+    /// Index of the selected tier in `matched.tiers`, which stays unambiguous when names repeat.
+    pub tier_index: Option<usize>,
     /// Per-usage-key costs (excluding "total").
     pub costs: HashMap<String, f64>,
     /// Sum of all per-key costs.
@@ -714,22 +720,28 @@ pub async fn test_model_match(
     let entries = model_pricing::get_org_pricing_entries(&org_id);
     let matched = model_pricing::find_pricing_sync_at(&entries, &req.model_name, req.timestamp);
 
-    let (tier, costs, total_cost) = if let Some(ref def) = matched {
-        let result = model_pricing::calculate_cost_from_definition(def, &req.usage, req.timestamp);
+    let (tier, tier_index, costs, total_cost) = if let Some(ref def) = matched {
+        let ctx = openobserve_core::traces::otel::processor::pricing_context_for_test_endpoint(
+            def,
+            &req.attributes,
+        );
+        let result =
+            model_pricing::calculate_cost_from_definition(def, &req.usage, req.timestamp, &ctx);
         let total = result.cost.get("total").copied().unwrap_or(0.0);
         let costs = result
             .cost
             .into_iter()
             .filter(|(k, _)| k != "total")
             .collect();
-        (Some(result.tier_name), costs, total)
+        (Some(result.tier_name), result.tier_index, costs, total)
     } else {
-        (None, HashMap::new(), 0.0)
+        (None, None, HashMap::new(), 0.0)
     };
 
     MetaHttpResponse::json(TestModelMatchResponse {
         matched,
         tier,
+        tier_index,
         costs,
         total_cost,
     })
@@ -754,64 +766,19 @@ fn validate_definition(item: &ModelPricingDefinition) -> Result<(), String> {
     {
         return Err(format!("Invalid regex pattern: {e}"));
     }
-    if item.tiers.is_empty() {
-        return Err("At least one pricing tier is required".to_string());
-    }
-    // The fallback tier must be unrestricted: no usage condition *and* no UTC time
-    // window. Otherwise a span outside every window would have no tier to price with.
+    item.validate_tiers(false)?;
+    // Builds without rules read a rule tier as unrestricted and would price with it.
+    let first_default = item
+        .tiers
+        .iter()
+        .position(PricingTierDefinition::is_default);
     if item
         .tiers
         .iter()
-        .all(|t| t.condition.is_some() || !t.utc_windows.is_empty())
+        .take(first_default.unwrap_or(0))
+        .any(|t| !t.rules.is_empty())
     {
-        return Err(
-            "At least one tier must have no condition and no time window (default fallback)"
-                .to_string(),
-        );
-    }
-    for tier in &item.tiers {
-        if let Some(ref cond) = tier.condition {
-            if cond.usage_key.trim().is_empty() {
-                return Err(format!(
-                    "Tier '{}' has a condition with an empty usage_key",
-                    tier.name
-                ));
-            }
-            if cond.value.is_nan() || cond.value.is_infinite() {
-                return Err(format!(
-                    "Tier '{}' condition value must be a finite number, got {}",
-                    tier.name, cond.value
-                ));
-            }
-        }
-        for window in &tier.utc_windows {
-            if window.start_minute > MINUTES_PER_DAY || window.end_minute > MINUTES_PER_DAY {
-                return Err(format!(
-                    "Tier '{}' time window must be within 0-{} minutes past UTC midnight, got {}-{}",
-                    tier.name, MINUTES_PER_DAY, window.start_minute, window.end_minute
-                ));
-            }
-            if window.start_minute % MINUTES_PER_DAY == window.end_minute % MINUTES_PER_DAY {
-                return Err(format!(
-                    "Tier '{}' time window start and end are the same ({}); leave the window list empty for an always-on tier",
-                    tier.name, window.start_minute
-                ));
-            }
-        }
-        for (key, &price) in &tier.prices {
-            if price.is_nan() || price.is_infinite() {
-                return Err(format!(
-                    "Price for '{}' in tier '{}' must be a finite number, got {}",
-                    key, tier.name, price
-                ));
-            }
-            if price < 0.0 {
-                return Err(format!(
-                    "Price for '{}' in tier '{}' must be >= 0, got {}",
-                    key, tier.name, price
-                ));
-            }
-        }
+        return Err("The default tier must come before any tier with rules".to_string());
     }
     Ok(())
 }
@@ -934,6 +901,8 @@ mod tests {
             condition: None,
             prices: Default::default(),
             utc_windows: Vec::new(),
+            rules: Vec::new(),
+            priority: 0,
         }
     }
 
@@ -1019,6 +988,8 @@ mod tests {
             }),
             prices: Default::default(),
             utc_windows: Vec::new(),
+            rules: Vec::new(),
+            priority: 0,
         }];
         let err = validate_definition(&def).unwrap_err();
         assert!(err.contains("At least one tier must have no condition"));
@@ -1033,16 +1004,87 @@ mod tests {
             PricingTierDefinition {
                 name: "peak".to_string(),
                 utc_windows: vec![UtcTimeWindow::from_hm((1, 0), (4, 0))],
+                rules: Vec::new(),
                 ..default_tier()
             },
             PricingTierDefinition {
                 name: "off-peak".to_string(),
                 utc_windows: vec![UtcTimeWindow::from_hm((10, 0), (1, 0))],
+                rules: Vec::new(),
                 ..default_tier()
             },
         ];
         let err = validate_definition(&def).unwrap_err();
-        assert!(err.contains("no condition and no time window"));
+        assert!(err.contains("no condition, no time window and no rule"));
+    }
+
+    #[test]
+    fn test_validate_definition_all_rule_restricted_tiers_fails() {
+        use config::meta::model_pricing::{RuleOp, TierRule};
+        let mut def = valid_definition();
+        // Only a Flex tier leaves no tier for a span sent on the standard service tier.
+        def.tiers = vec![PricingTierDefinition {
+            name: "flex".to_string(),
+            rules: vec![TierRule::new(
+                &["openai.request.service_tier"],
+                RuleOp::In,
+                &["flex"],
+                None,
+            )],
+            ..default_tier()
+        }];
+        let err = validate_definition(&def).unwrap_err();
+        assert!(err.contains("no rule"));
+    }
+
+    #[test]
+    fn test_validate_definition_rejects_invalid_rule() {
+        use config::meta::model_pricing::{RuleOp, TierRule};
+        let mut def = valid_definition();
+        def.tiers.push(PricingTierDefinition {
+            name: "flex".to_string(),
+            rules: vec![TierRule::new(&[" "], RuleOp::In, &["flex"], None)],
+            ..default_tier()
+        });
+        let err = validate_definition(&def).unwrap_err();
+        assert!(err.contains("Tier 'flex'") && err.contains("attribute key"));
+
+        def.tiers[1].rules[0].keys = vec!["openai.request.service_tier".to_string()];
+        def.tiers[1].rules[0].values = vec!["".to_string()];
+        assert!(
+            validate_definition(&def)
+                .unwrap_err()
+                .contains("at least one value")
+        );
+
+        def.tiers[1].rules[0].values = vec!["flex".to_string()];
+        assert!(validate_definition(&def).is_ok());
+    }
+
+    #[test]
+    fn test_validate_definition_rule_tier_before_default_fails() {
+        use config::meta::model_pricing::{RuleOp, TierRule};
+        let mut def = valid_definition();
+        def.tiers.insert(
+            0,
+            PricingTierDefinition {
+                name: "flex".to_string(),
+                rules: vec![TierRule::new(
+                    &["service_tier"],
+                    RuleOp::In,
+                    &["flex"],
+                    None,
+                )],
+                ..default_tier()
+            },
+        );
+        assert!(
+            validate_definition(&def)
+                .unwrap_err()
+                .contains("default tier")
+        );
+        def.tiers.swap(0, 1);
+        assert!(validate_definition(&def).is_ok());
     }
 
     #[test]
@@ -1056,6 +1098,7 @@ mod tests {
                     UtcTimeWindow::from_hm((1, 0), (4, 0)),
                     UtcTimeWindow::from_hm((6, 0), (10, 0)),
                 ],
+                rules: Vec::new(),
                 ..default_tier()
             },
             default_tier(),
@@ -1130,6 +1173,8 @@ mod tests {
                 }),
                 prices: Default::default(),
                 utc_windows: Vec::new(),
+                rules: Vec::new(),
+                priority: 0,
             },
             default_tier(),
         ];
@@ -1151,6 +1196,8 @@ mod tests {
                 }),
                 prices: Default::default(),
                 utc_windows: Vec::new(),
+                rules: Vec::new(),
+                priority: 0,
             },
             default_tier(),
         ];

@@ -60,6 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <a :href="homeUrl" @click.prevent="goToHome" class="inline-flex items-center">
           <!-- Dark mode: Show dark logo, fallback to light logo -->
           <img
+            :alt="t('common.customLogoAlt')"
             v-if="
               isDark &&
               store.state.zoConfig.hasOwnProperty('custom_logo_dark_img') &&
@@ -70,6 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <!-- Light mode: Show light logo, fallback to dark logo -->
           <img
+            :alt="t('common.customLogoAlt')"
             v-else-if="
               !isDark &&
               store.state.zoConfig.hasOwnProperty('custom_logo_img') &&
@@ -80,6 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <!-- Fallback: Show whichever logo exists (dark or light) -->
           <img
+            :alt="t('common.customLogoAlt')"
             v-else-if="
               store.state.zoConfig.hasOwnProperty('custom_logo_dark_img') &&
               store.state.zoConfig?.custom_logo_dark_img != null
@@ -88,6 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             style="max-width: 9.375rem; max-height: 2rem"
           />
           <img
+            :alt="t('common.customLogoAlt')"
             v-else-if="
               store.state.zoConfig.hasOwnProperty('custom_logo_img') &&
               store.state.zoConfig?.custom_logo_img != null
@@ -238,6 +242,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @mouseleave="handleMouseLeave"
             >
               <img
+                alt=""
                 :src="getBtnLogo"
                 class="h-5 w-5 shrink-0 [transition:transform_0.6s_ease] group-hover:rotate-180 group-hover:brightness-0 group-hover:invert group-hover:[transition:filter_0.3s_ease]"
               />
@@ -365,6 +370,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <ODropdownSeparator />
 
+              <template v-if="showMyOncall">
+                <ODropdownItem data-test="header-my-oncall" @select="goToMyOncall">
+                  <template #icon-left>
+                    <OIcon size="xs" name="person" class="padding-none" />
+                  </template>
+                  {{ t("oncall.mineTitle") }}
+                </ODropdownItem>
+                <ODropdownSeparator />
+              </template>
+
               <!-- A menuitem cannot hold menuitems, so the list is the row's sibling inside one positioned wrapper. -->
               <div class="relative" role="none">
                 <ODropdownItem
@@ -483,6 +498,7 @@ import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
+import { isGateOpen, useNavGateContext } from "@/lib/core/Navbar/useNavGateContext";
 
 import { getImageURL } from "@/utils/zincutils";
 import { chartColor } from "@/utils/chartTheme";
@@ -783,6 +799,20 @@ export default defineComponent({
       emit("updateOrganization");
     };
 
+    const navGateContext = useNavGateContext();
+    // Same gate and route check the nav flyout applies to the On-Call entries.
+    const showMyOncall = computed(
+      () => isGateOpen(navGateContext.value, "oncall") && props.router.hasRoute("onCallMine"),
+    );
+
+    const goToMyOncall = () => {
+      // eslint-disable-next-line vue/no-mutating-props -- vue-router's push navigates; the rule mistakes it for Array#push.
+      props.router.push({
+        name: "onCallMine",
+        query: { org_identifier: props.store.state.selectedOrganization.identifier },
+      });
+    };
+
     return {
       isDark,
       t,
@@ -815,6 +845,8 @@ export default defineComponent({
       handleMouseLeave,
       handleOrgSelection,
       openEnterpriseDialog,
+      showMyOncall,
+      goToMyOncall,
     };
   },
 });

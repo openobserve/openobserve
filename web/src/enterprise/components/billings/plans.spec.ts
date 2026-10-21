@@ -24,6 +24,7 @@ import * as zincutils from "@/utils/zincutils";
 import { nextTick } from "vue";
 import analytics from "@/services/product_analytics";
 import config from "@/aws-exports";
+import { siteURL } from "@/constants/config";
 
 vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
@@ -80,6 +81,8 @@ vi.mock("@/aws-exports", () => ({
 vi.mock("./enterprisePlan.vue", () => ({
   default: {
     name: "EnterprisePlan",
+    props: ["features", "price", "pricingError"],
+    emits: ["retry-pricing"],
     template: "<div>Enterprise Plan Component</div>",
   },
 }));
@@ -87,6 +90,21 @@ vi.mock("./enterprisePlan.vue", () => ({
 vi.mock("./proPlan.vue", () => ({
   default: {
     name: "ProPlan",
+    props: [
+      "planType",
+      "billingProvider",
+      "subscriptionType",
+      "features",
+      "pricingOptions",
+      "additionalInfo",
+      "pricingError",
+    ],
+    emits: [
+      "retry-pricing",
+      "contact-sales",
+      "update:proSubscription",
+      "update:cancelSubscription",
+    ],
     template: "<div>Pro Plan Component</div>",
   },
 }));
@@ -182,6 +200,22 @@ describe("Plans Component", () => {
 
   afterEach(() => {
     vi.clearAllMocks();
+  });
+
+  it("bounds the pricing request, so a host that never answers cannot leave Plans loading", async () => {
+    const fetchSpy = vi.fn(() => new Promise<Response>(() => {}));
+    vi.stubGlobal("fetch", fetchSpy);
+    const bounded = mount(Plans, {
+      global: { plugins: [i18n], provide: { store }, mocks: { $router: mockRouter } },
+    });
+    await flushPromises();
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    );
+    bounded.unmount();
+    vi.unstubAllGlobals();
   });
 
   it("fires billing_checkout_returned once with the plan when Stripe sends the user back", async () => {
@@ -723,45 +757,192 @@ describe("Plans Component", () => {
     expect(BillingService.resume_subscription).toHaveBeenCalledTimes(2);
   });
 
-  it("links consent-required AI usage to Paid Usage settings", async () => {
+  it("hands the paid usage switch the card's current mode", async () => {
     wrapper.vm.aiUsage = {
-      credits_used: 100,
-      credits_limit: 100,
+      credits_used: 5,
+      credits_limit: 5,
       credits_remaining: 0,
       mode: "consent_required",
       requires_additional_credits: false,
     };
     await nextTick();
 
-    expect(wrapper.text()).toContain(
-      "Free AI credits are depleted. Authorize paid usage to continue.",
+    expect(wrapper.findComponent({ name: "PaidAiUsageControl" }).props("mode")).toBe(
+      "consent_required",
     );
-    await wrapper.get('[data-test="billing-open-paid-usage-settings"]').trigger("click");
-    expect(mockRouter.push).toHaveBeenCalledWith({
-      name: "paidUsage",
-      query: { org_identifier: store.state.selectedOrganization.identifier },
-    });
   });
 
-  it("names the payer billing cycle for metered AI usage", async () => {
+  it("keeps a full bar neutral while paid usage carries on, and red only when blocked", async () => {
+    const usage = { credits_used: 5, credits_limit: 5, credits_remaining: 0 };
+    wrapper.vm.aiUsage = { ...usage, mode: "pay_as_you_go", requires_additional_credits: false };
+    expect(wrapper.vm.aiUsageVariant).toBe("default");
+    wrapper.vm.aiUsage = { ...usage, mode: "exhausted", requires_additional_credits: false };
+    expect(wrapper.vm.aiUsageVariant).toBe("danger");
+  });
+
+  it("offers Contact Sales when a contract org runs out", async () => {
+    const open = vi.spyOn(window, "open").mockImplementation(() => null);
     wrapper.vm.aiUsage = {
-      credits_used: 100,
-      credits_limit: 100,
+      credits_used: 5,
+      credits_limit: 5,
       credits_remaining: 0,
-      mode: "pay_as_you_go",
-      requires_additional_credits: false,
-    };
-    wrapper.vm.paidOverageStatus = {
-      feature: "ai_credits",
-      organization: { org_id: "member", enabled: true, can_manage: true },
-      payer: { org_id: "payer", enabled: true, can_manage: false },
-      effective: true,
-      billing_status: "eligible",
+      mode: "exhausted",
+      requires_additional_credits: true,
     };
     await nextTick();
+    await wrapper.get('[data-test="billing-ai-contact-sales"]').trigger("click");
+    expect(open).toHaveBeenCalledWith("https://openobserve.ai/contactus/", "_blank");
+    open.mockRestore();
+  });
+  describe("pricing JSON", () => {
+    const proFeaturesOld = [
+      { title: "Logs, Metrics, Traces, RUM, Session Replay, Error tracking" },
+      { title: "Ingestion", price: "$0.50 per GB*", isSubItem: true },
+      { title: "Query", price: "$0.01 per GB", isSubItem: true },
+    ];
+    const enterprisePlan = {
+      title: "Enterprise",
+      price: "Custom",
+      priceNote: "volume discounts, BYOB",
+      features: [{ title: "Pipelines" }, { title: "SLAs" }],
+    };
+    const oldJson = {
+      data: [
+        {
+          cloud: [
+            {
+              title: "Cloud Professional",
+              price: "$0.50",
+              period: "/GB ingested",
+              priceNote: "+ $0.01/GB queried · billed monthly",
+              additionalInfo: "*Includes 30% discount for annual commitment",
+              features: proFeaturesOld,
+            },
+            enterprisePlan,
+          ],
+        },
+      ],
+    };
+    const newJson = {
+      data: [
+        {
+          cloud: [
+            {
+              title: "Cloud Professional",
+              price: "$0.70",
+              period: "/GB ingested",
+              pricingOptions: [
+                {
+                  label: "Pay as you go",
+                  price: "$0.70",
+                  period: "/GB ingested",
+                  note: "No commitment, billed monthly",
+                },
+                {
+                  label: "Annual contract",
+                  price: "$0.50",
+                  period: "/GB ingested",
+                  note: "12-month commitment",
+                  badge: "Save 28%",
+                },
+              ],
+              features: [
+                { title: "Logs, Metrics, Traces, RUM, Session Replay, Error tracking" },
+                {
+                  title: "Ingestion, pay as you go",
+                  price: "$0.70 per GB",
+                  isSubItem: true,
+                  inPriceBlock: true,
+                },
+                {
+                  title: "Ingestion, annual contract",
+                  price: "$0.50 per GB",
+                  isSubItem: true,
+                  inPriceBlock: true,
+                },
+                { title: "Query", price: "$0.01 per GB", isSubItem: true },
+              ],
+            },
+            enterprisePlan,
+          ],
+        },
+      ],
+    };
+    const loadPricing = async (json: unknown) => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => ({ json: async () => json })),
+      );
+      await wrapper.vm.fetchPricingData();
+      vi.unstubAllGlobals();
+    };
 
-    expect(wrapper.text()).toContain(
-      "Paid AI usage is added to the payer organization’s current billing cycle.",
-    );
+    it("maps pricing options and skips the rows they replace", async () => {
+      await loadPricing(newJson);
+      expect(wrapper.vm.proPlanPricingOptions.map((o: any) => o.price)).toEqual(["$0.70", "$0.50"]);
+      expect(wrapper.vm.proPlanPricingOptions[1].badge).toBe("Save 28%");
+      expect(wrapper.vm.proPlanFeatures.map((f: any) => f.name)).toEqual([
+        "Logs, Metrics, Traces, RUM, Session Replay, Error tracking",
+        "Query",
+      ]);
+      expect(wrapper.vm.enterprisePlanPrice).toEqual({
+        price: "Custom",
+        note: "volume discounts, BYOB",
+      });
+      expect(wrapper.vm.enterprisePlanFeatures.map((f: any) => f.name)).toEqual([
+        "Pipelines",
+        "SLAs",
+      ]);
+      expect(wrapper.vm.proPlanAdditionalInfo).toBe("");
+    });
+
+    it("drops the footnote when pricing options replace the asterisked row", async () => {
+      const plan = { ...newJson.data[0].cloud[0], additionalInfo: "*Includes 30% discount" };
+      await loadPricing({ data: [{ cloud: [plan, enterprisePlan] }] });
+      expect(wrapper.vm.proPlanPricingOptions).toHaveLength(2);
+      expect(wrapper.vm.proPlanAdditionalInfo).toBe("");
+    });
+
+    it("passes the mapped pricing down to both plan cards", async () => {
+      await flushPromises();
+      await loadPricing(newJson);
+      await nextTick();
+      const pro = wrapper.findComponent({ name: "ProPlan" });
+      expect(pro.props("pricingOptions").map((o: any) => o.price)).toEqual(["$0.70", "$0.50"]);
+      expect(pro.props("additionalInfo")).toBe("");
+      expect(pro.props("features").map((f: any) => f.name)).toEqual([
+        "Logs, Metrics, Traces, RUM, Session Replay, Error tracking",
+        "Query",
+      ]);
+      const enterprise = wrapper.findComponent({ name: "EnterprisePlan" });
+      expect(enterprise.props("price")).toEqual({
+        price: "Custom",
+        note: "volume discounts, BYOB",
+      });
+      expect(enterprise.props("features").map((f: any) => f.name)).toEqual(["Pipelines", "SLAs"]);
+    });
+
+    it("opens the contact page when the pro card asks for sales", async () => {
+      const open = vi.spyOn(window, "open").mockImplementation(() => null);
+      await flushPromises();
+      await wrapper.findComponent({ name: "ProPlan" }).vm.$emit("contact-sales");
+      expect(open).toHaveBeenCalledWith(siteURL.contactSales, "_blank");
+      expect(analytics.track).toHaveBeenCalledWith("billing_contact_sales_clicked", {
+        plan: "annual-contract",
+      });
+      open.mockRestore();
+    });
+
+    it("keeps every row and shows no price block for the old JSON", async () => {
+      await loadPricing(oldJson);
+      expect(wrapper.vm.proPlanPricingOptions).toEqual([]);
+      expect(wrapper.vm.enterprisePlanPrice).toBeNull();
+      expect(wrapper.vm.proPlanAdditionalInfo).toBe("*Includes 30% discount for annual commitment");
+      expect(wrapper.vm.proPlanFeatures.map((f: any) => f.name)).toEqual([
+        "Logs, Metrics, Traces, RUM, Session Replay, Error tracking",
+        "Ingestion",
+        "Query",
+      ]);
+    });
   });
 });

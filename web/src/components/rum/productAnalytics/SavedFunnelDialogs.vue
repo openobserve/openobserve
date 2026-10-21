@@ -76,7 +76,7 @@ import useFunnelDraft, { useFunnelSaveBlockers } from "@/composables/rum/useFunn
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import type { NamedEvent, SavedFunnel } from "@/utils/rum/productAnalyticsModel";
+import type { AppSettings, NamedEvent, SavedFunnel } from "@/utils/rum/productAnalyticsModel";
 import type { FunnelDef } from "@/utils/rum/productAnalyticsQueries";
 
 type Conflict = {
@@ -110,14 +110,13 @@ const dialog = ref<{
   description: string;
   target: SavedFunnel | null;
   def: FunnelDef | null;
-  sql: string;
-}>({ open: false, mode: "save", name: "", description: "", target: null, def: null, sql: "" });
+}>({ open: false, mode: "save", name: "", description: "", target: null, def: null });
 
 const org = () => pa.toQuery().org_identifier as string;
 const app = () => pa.state.app;
 const opened = pa.openedFunnel;
 
-// A rename retry stores their def and sql, so only an Overwrite needs the funnel on screen to compile.
+// A rename retry compiles their stored def, so only an Overwrite needs the funnel on screen to compile.
 const overwriteBlocked = computed<I18nText | null>(() =>
   conflict.value && !conflict.value.renaming ? uncompiled.value : null,
 );
@@ -135,7 +134,7 @@ const openDialog = (
   name: string,
   target: SavedFunnel | null = null,
   description = "",
-  source: { def: FunnelDef; sql: string } | null = null,
+  def: FunnelDef | null = null,
 ) => {
   dialog.value = {
     open: true,
@@ -143,14 +142,51 @@ const openDialog = (
     name,
     description: target?.description ?? description ?? "",
     target,
-    def: source?.def ?? null,
-    sql: source?.sql ?? "",
+    def,
   };
 };
 
+// The hash travels with the sql so the saved funnel can tell when the app's rules changed after it.
+const rulesHash = () => (pa.scope.value.exclusions as AppSettings | undefined)?.rulesHash;
+
 // The funnel on screen with the sql compiled from that same def; the Save buttons are disabled when it is null.
 const draftOf = (name: string, description?: string): SavedFunnelDraft | null =>
-  sql.value === null ? null : { name, description, def: pa.funnel.value, sql: sql.value };
+  sql.value === null
+    ? null
+    : { name, description, def: pa.funnel.value, sql: sql.value, rulesHash: rulesHash() };
+
+const eventsResolved = (def: FunnelDef): boolean =>
+  props.eventsReady &&
+  [...def.steps, ...(def.x ?? []).map((x) => x.step)].every(
+    (s) => s.kind !== "e" || props.events.some((e) => e.id === s.key),
+  );
+
+// A stored def is recompiled, so its sql and hash describe the app's rules now, not when it was saved.
+const storedDraft = (
+  def: FunnelDef,
+  name: string,
+  description?: string,
+  stored?: SavedFunnel,
+): SavedFunnelDraft | null => {
+  // An event step that cannot be resolved would compile to a step nothing matches, so a rename keeps the stored sql.
+  if (!eventsResolved(def)) {
+    if (stored)
+      return { name, description, def, sql: stored.sql, rulesHash: stored.rulesHash ?? undefined };
+    toast({ variant: "error", message: t("rum.analytics.saved.eventsUnresolved") });
+    return null;
+  }
+  const compiled = props.compileSql(def);
+  if (compiled === null) {
+    toast({
+      variant: "error",
+      message: pa.rulesReady.value
+        ? t("rum.analytics.saved.usersUnavailable")
+        : t("rum.analytics.saved.rulesUnavailable"),
+    });
+    return null;
+  }
+  return { name, description, def, sql: compiled, rulesHash: rulesHash() };
+};
 
 const settle = async (
   res: SaveFunnelResult,
@@ -214,17 +250,14 @@ const duplicate = (f: SavedFunnel, asStored: boolean) =>
     t("rum.analytics.saved.copyName", { name: raw(f.name) }),
     null,
     f.description,
-    asStored ? { def: f.def, sql: f.sql } : null,
+    asStored ? f.def : null,
   );
 
 // A rename changes only the name, so a retry after a conflict renames their version as it now stands.
 const submitRename = async (f: SavedFunnel, name: string): Promise<SaveFunnelOutcome> => {
-  const res = await sf.save(
-    org(),
-    app(),
-    { name, description: f.description, def: f.def, sql: f.sql },
-    { id: f.id, version: f.version },
-  );
+  const draft = storedDraft(f.def, name, f.description, f);
+  if (!draft) return "failed";
+  const res = await sf.save(org(), app(), draft, { id: f.id, version: f.version });
   const retry = (c: SavedFunnel) => submitRename(c, name);
   if (opened.value?.id === f.id) return settle(res, retry, true, name, true);
   return settleRow(res, f, retry);
@@ -262,7 +295,7 @@ const submitDialog = async (value: {
   try {
     if (d.mode === "rename" && d.target) return await submitRename(d.target, value.name);
     const draft = d.def
-      ? { name: value.name, description: value.description, def: d.def, sql: d.sql }
+      ? storedDraft(d.def, value.name, value.description)
       : draftOf(value.name, value.description);
     if (!draft) return "failed";
     const res = await sf.save(org(), app(), draft);

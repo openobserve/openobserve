@@ -68,6 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #trigger>
           <OButton
             variant="outline"
+            :aria-label="t('common.addCondition')"
             size="icon-chip"
             icon-left="add"
             :data-test="
@@ -95,6 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <OButton
         variant="ghost"
+        :aria-label="t('common.remove')"
         size="icon-chip"
         class="!w-4"
         :data-test="`dashboard-variable-filter-group-${testKey}-remove`"

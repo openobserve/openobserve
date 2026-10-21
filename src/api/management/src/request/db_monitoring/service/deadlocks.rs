@@ -659,12 +659,7 @@ pub(crate) async fn read_deadlocks_body(
     badge_mode: bool,
     prologue: Option<&DbmServerPrologue>,
 ) -> Result<Value, HttpResponse> {
-    let (start_time, end_time) = resolve_range(q.start_time, q.end_time);
-    if start_time >= end_time {
-        return Err(MetaHttpResponse::bad_request(
-            "start_time must be before end_time",
-        ));
-    }
+    let (start_time, end_time) = resolve_range(q.start_time, q.end_time)?;
     let stream = validate_server_stream(q.stream.as_deref())?.unwrap_or(DBM_SERVER_STREAM);
     let shared_prologue = prologue.filter(|p| p.stream == stream);
     // Server-vantage events live in a LOGS stream (`_o2_dbm_server` by default),

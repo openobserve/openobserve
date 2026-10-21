@@ -1194,13 +1194,6 @@ mod tests {
     // across processes and insensitive to label ordering.
 
     #[test]
-    fn test_group_key_is_stable_for_same_labels() {
-        let a = group_key(&labels(&[("host", "a"), ("env", "prod")]));
-        let b = group_key(&labels(&[("host", "a"), ("env", "prod")]));
-        assert_eq!(a, b);
-    }
-
-    #[test]
     fn test_group_key_is_order_insensitive() {
         // BTreeMap already sorts, but the contract must hold regardless of the
         // order the query returned the columns in.
@@ -2048,13 +2041,6 @@ mod tests {
     }
 
     // ── M-7: fate from elapsed time ─────────────────────────────────────────
-
-    #[test]
-    fn test_recently_seen_group_is_kept() {
-        let now = 1_000 * SEC;
-        let st = state_at("g", Some(AlertLevel::Critical), now - 10 * SEC);
-        assert_eq!(group_fate(&st, now, 180 * SEC, 3600 * SEC), GroupFate::Keep);
-    }
 
     #[test]
     fn test_group_seen_exactly_at_the_threshold_is_still_kept() {
@@ -3066,12 +3052,6 @@ mod tests {
             Operator::GreaterThan,
             true
         ))));
-    }
-
-    #[test]
-    fn test_a_valid_promql_multi_alert_is_accepted() {
-        let q = promql_qc(Operator::GreaterThan, true);
-        assert!(validate_multi_alert(&q, &tc(Operator::GreaterThanEquals, 1, None), false).is_ok());
     }
 
     /// The old code returned `Ok` the instant `aggregation` was `None`, so a

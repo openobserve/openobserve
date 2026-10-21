@@ -46,9 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import DOMPurify from "dompurify";
-import { ref, watch } from "vue";
-
+import { useColorizedQuery } from "@/composables/useColorizedQuery";
 import { colorizeQuery } from "@/utils/query/colorizeQuery";
 
 const props = withDefaults(
@@ -76,20 +74,9 @@ const languageFor = (system: string): string => {
   }
 };
 
-const highlighted = ref("");
-
-watch(
-  () => [props.query, props.dbSystem] as const,
-  async ([query, dbSystem]) => {
-    if (!query) {
-      highlighted.value = "";
-      return;
-    }
-    const html = await colorizeQuery(query, languageFor(dbSystem));
-    // The plain-text branch above stays visible if this races or fails, so a
-    // highlighting problem degrades to unstyled text rather than a blank box.
-    if (props.query === query) highlighted.value = DOMPurify.sanitize(html);
-  },
-  { immediate: true },
+// The plain-text branch stays visible until this lands, so a highlighting problem degrades to unstyled text.
+const highlighted = useColorizedQuery(
+  () => ({ query: props.query, language: languageFor(props.dbSystem) }),
+  colorizeQuery,
 );
 </script>

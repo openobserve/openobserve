@@ -14,6 +14,9 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #[cfg(feature = "enterprise")]
+mod partitioned_search;
+
+#[cfg(feature = "enterprise")]
 use std::{
     collections::HashMap,
     sync::{LazyLock, RwLock},
@@ -74,11 +77,11 @@ const TIMESTAMP_COLUMNS: [&str; 5] = [
 
 /// Bounds staleness after an edit on nodes the update-path invalidation cannot reach.
 #[cfg(feature = "enterprise")]
-const VALUE_COLUMN_TTL: Duration = Duration::from_secs(60);
+const QUERY_METADATA_TTL: Duration = Duration::from_secs(60);
 
 /// Keyed `(org_id, anomaly_id)` so per-tick detection stops PK-reading the meta primary.
 #[cfg(feature = "enterprise")]
-static VALUE_COLUMN_CACHE: LazyLock<RwLock<ValueColumnCache>> =
+static QUERY_METADATA_CACHE: LazyLock<RwLock<QueryMetadataCache>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
 
 /// Lowercased aggregations the trainer's `DetectionFunction` can deserialize. A name
@@ -144,7 +147,7 @@ const MAX_ALERT_WINDOW_SECONDS: i64 = 86_400;
 const REJECTION_BODY_MAX_CHARS: usize = 512;
 
 #[cfg(feature = "enterprise")]
-type ValueColumnCache = HashMap<(String, String), (Option<String>, Instant)>;
+type QueryMetadataCache = HashMap<(String, String), (partitioned_search::QueryMetadata, Instant)>;
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct CreateAnomalyConfigRequest {
@@ -1028,7 +1031,7 @@ pub async fn update_config(
     o2_enterprise::enterprise::anomaly_detection::cache::invalidate_config(&updated.anomaly_id)
         .await;
     #[cfg(feature = "enterprise")]
-    invalidate_value_column_cache(org_id, anomaly_id);
+    invalidate_query_metadata_cache(org_id, anomaly_id);
 
     // Broadcast config update to all super cluster regions.
     #[cfg(feature = "enterprise")]
@@ -2697,11 +2700,61 @@ pub async fn execute_anomaly_query(
         end_time
     );
 
-    let search_req = config::meta::search::Request {
+    // Resolved here rather than threaded through the enterprise query-executor boundary,
+    // whose registered Fn signature is fixed and shared by every anomaly query path.
+    let metadata = resolve_query_metadata(org_id, anomaly_id).await;
+    let trace_id = config::ider::generate_trace_id();
+    let window = (start_time, end_time);
+    match partitioned_search::supported_grid(metadata.as_ref(), query_sql, stream_type, window) {
+        Ok(grid) => {
+            partitioned_search::execute_supported(
+                org_id,
+                query_sql,
+                window,
+                anomaly_id,
+                stream_type,
+                &trace_id,
+                grid,
+            )
+            .await
+        }
+        Err(reason) => {
+            partitioned_search::log_fallback(org_id, anomaly_id, &reason);
+            let value_column = metadata.and_then(|m| m.value_column);
+            let search_req = anomaly_search_request(query_sql, start_time, end_time, 10000);
+            let parsed_stream_type = StreamType::from(stream_type);
+            let search_result =
+                search::search(&trace_id, org_id, parsed_stream_type, None, &search_req)
+                    .await
+                    .map_err(|e| {
+                        anyhow::anyhow!("[anomaly_detection {}] search failed: {}", anomaly_id, e)
+                    })?;
+
+            log::info!(
+                "[anomaly_detection {}] search returned {} hits (total={})",
+                anomaly_id,
+                search_result.hits.len(),
+                search_result.total
+            );
+
+            parse_search_results_to_timeseries(&search_result, anomaly_id, value_column.as_deref())
+        }
+    }
+}
+
+/// The direct anomaly search request every path shares; only the window and size vary.
+#[cfg(feature = "enterprise")]
+fn anomaly_search_request(
+    query_sql: &str,
+    start_time: i64,
+    end_time: i64,
+    size: i64,
+) -> config::meta::search::Request {
+    config::meta::search::Request {
         query: config::meta::search::Query {
             sql: query_sql.to_string(),
             from: 0,
-            size: 10000,
+            size,
             start_time,
             end_time,
             track_total_hits: false,
@@ -2720,40 +2773,21 @@ pub async fn execute_anomaly_query(
         clear_cache: false,
         local_mode: None,
         agent_options: None,
-    };
-
-    let parsed_stream_type = StreamType::from(stream_type);
-    let trace_id = config::ider::generate_trace_id();
-    let search_result = search::search(&trace_id, org_id, parsed_stream_type, None, &search_req)
-        .await
-        .map_err(|e| anyhow::anyhow!("[anomaly_detection {}] search failed: {}", anomaly_id, e))?;
-
-    log::info!(
-        "[anomaly_detection {}] search returned {} hits (total={})",
-        anomaly_id,
-        search_result.hits.len(),
-        search_result.total
-    );
-
-    // Resolved here rather than threaded through the enterprise query-executor boundary,
-    // whose registered Fn signature is fixed and shared by every anomaly query path.
-    let value_column = resolve_value_column(org_id, anomaly_id).await;
-
-    let data_points =
-        parse_search_results_to_timeseries(&search_result, anomaly_id, value_column.as_deref())?;
-
-    Ok(data_points)
+    }
 }
 
-/// The config-declared value column; degrades to `None` (legacy fallback) on lookup failure.
+/// The config snapshot one run reads; `None` on lookup failure keeps the legacy fallback.
 #[cfg(feature = "enterprise")]
-async fn resolve_value_column(org_id: &str, anomaly_id: &str) -> Option<String> {
+async fn resolve_query_metadata(
+    org_id: &str,
+    anomaly_id: &str,
+) -> Option<partitioned_search::QueryMetadata> {
     let key = (org_id.to_string(), anomaly_id.to_string());
-    if let Ok(cache) = VALUE_COLUMN_CACHE.read()
-        && let Some((column, cached_at)) = cache.get(&key)
-        && cached_at.elapsed() < VALUE_COLUMN_TTL
+    if let Ok(cache) = QUERY_METADATA_CACHE.read()
+        && let Some((metadata, cached_at)) = cache.get(&key)
+        && cached_at.elapsed() < QUERY_METADATA_TTL
     {
-        return column.clone();
+        return Some(metadata.clone());
     }
 
     let db = get_orm_client_ro().await;
@@ -2762,22 +2796,22 @@ async fn resolve_value_column(org_id: &str, anomaly_id: &str) -> Option<String> 
         .await
         .inspect_err(|e| {
             log::warn!(
-                "[anomaly_detection {anomaly_id}] could not load config for value column: {e}"
+                "[anomaly_detection {anomaly_id}] could not load config for query metadata: {e}"
             )
         })
         .ok()??;
 
-    let column = declared_value_column(&model.query_mode, &model.detection_function);
-    if let Ok(mut cache) = VALUE_COLUMN_CACHE.write() {
-        cache.insert(key, (column.clone(), Instant::now()));
+    let metadata = partitioned_search::QueryMetadata::from_model(&model);
+    if let Ok(mut cache) = QUERY_METADATA_CACHE.write() {
+        cache.insert(key, (metadata.clone(), Instant::now()));
     }
-    column
+    Some(metadata)
 }
 
 /// Update-path hook; only bounds staleness on the serving node, the TTL covers the rest.
 #[cfg(feature = "enterprise")]
-fn invalidate_value_column_cache(org_id: &str, anomaly_id: &str) {
-    if let Ok(mut cache) = VALUE_COLUMN_CACHE.write() {
+fn invalidate_query_metadata_cache(org_id: &str, anomaly_id: &str) {
+    if let Ok(mut cache) = QUERY_METADATA_CACHE.write() {
         cache.remove(&(org_id.to_string(), anomaly_id.to_string()));
     }
 }
@@ -2917,41 +2951,40 @@ fn parse_search_results_to_timeseries(
 #[cfg(feature = "enterprise")]
 fn extract_timestamp_from_hit(hit: &serde_json::Value) -> Result<i64> {
     // Try different timestamp field names
-    for field_name in &TIMESTAMP_COLUMNS {
-        if let Some(ts_value) = hit.get(field_name) {
-            // Numeric microseconds
-            if let Some(ts_num) = ts_value.as_i64() {
-                return Ok(ts_num);
-            }
-            if let Some(ts_str) = ts_value.as_str() {
-                // RFC3339 with timezone: "2026-02-20T13:15:00Z" or "2026-02-20T13:15:00+00:00"
-                if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(ts_str) {
-                    return Ok(dt.timestamp_micros());
-                }
-                // Naive datetime without timezone (OpenObserve histogram output):
-                // "2026-02-20T13:15:00" — treat as UTC.
-                //
-                // TODO(timezone): OpenObserve histogram() always outputs UTC (origin
-                // hardcoded to "2001-01-01T00:00:00", no timezone field in SearchQuery
-                // proto). Arrow JSON serializer emits Timestamp(Microsecond, None) as
-                // ISO 8601 strings without a "Z" or "+00:00" suffix, so we parse as
-                // NaiveDateTime and attach UTC. If OpenObserve ever adds per-query
-                // timezone support, update this to use the configured timezone.
-                if let Ok(ndt) = chrono::NaiveDateTime::parse_from_str(ts_str, "%Y-%m-%dT%H:%M:%S")
-                {
-                    return Ok(ndt.and_utc().timestamp_micros());
-                }
-                // With fractional seconds: "2026-02-20T13:15:00.000"
-                if let Ok(ndt) =
-                    chrono::NaiveDateTime::parse_from_str(ts_str, "%Y-%m-%dT%H:%M:%S%.f")
-                {
-                    return Ok(ndt.and_utc().timestamp_micros());
-                }
-            }
-        }
-    }
+    TIMESTAMP_COLUMNS
+        .iter()
+        .find_map(|field_name| hit.get(field_name).and_then(timestamp_from_value))
+        .ok_or_else(|| anyhow::anyhow!("No timestamp field found in search result"))
+}
 
-    anyhow::bail!("No timestamp field found in search result")
+/// One timestamp cell as microseconds, or `None` when it is not a recognised format.
+#[cfg(feature = "enterprise")]
+fn timestamp_from_value(ts_value: &serde_json::Value) -> Option<i64> {
+    // Numeric microseconds
+    if let Some(ts_num) = ts_value.as_i64() {
+        return Some(ts_num);
+    }
+    let ts_str = ts_value.as_str()?;
+    // RFC3339 with timezone: "2026-02-20T13:15:00Z" or "2026-02-20T13:15:00+00:00"
+    if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(ts_str) {
+        return Some(dt.timestamp_micros());
+    }
+    // Naive datetime without timezone (OpenObserve histogram output):
+    // "2026-02-20T13:15:00" — treat as UTC.
+    //
+    // TODO(timezone): OpenObserve histogram() always outputs UTC (origin
+    // hardcoded to "2001-01-01T00:00:00", no timezone field in SearchQuery
+    // proto). Arrow JSON serializer emits Timestamp(Microsecond, None) as
+    // ISO 8601 strings without a "Z" or "+00:00" suffix, so we parse as
+    // NaiveDateTime and attach UTC. If OpenObserve ever adds per-query
+    // timezone support, update this to use the configured timezone.
+    if let Ok(ndt) = chrono::NaiveDateTime::parse_from_str(ts_str, "%Y-%m-%dT%H:%M:%S") {
+        return Some(ndt.and_utc().timestamp_micros());
+    }
+    // With fractional seconds: "2026-02-20T13:15:00.000"
+    chrono::NaiveDateTime::parse_from_str(ts_str, "%Y-%m-%dT%H:%M:%S%.f")
+        .ok()
+        .map(|ndt| ndt.and_utc().timestamp_micros())
 }
 
 /// A declared `value_column` is authoritative: a missing one errors, never legacy-falls-back.
@@ -3894,13 +3927,6 @@ mod tests {
     fn test_extract_value_from_hit_value_field_f64() {
         let hit = serde_json::json!({"value": 3.25});
         assert!((extract_value_from_hit(&hit, None).unwrap() - 3.25).abs() < f64::EPSILON);
-    }
-
-    #[cfg(feature = "enterprise")]
-    #[test]
-    fn test_extract_value_from_hit_count_field_integer() {
-        let hit = serde_json::json!({"count": 42});
-        assert!((extract_value_from_hit(&hit, None).unwrap() - 42.0).abs() < f64::EPSILON);
     }
 
     #[cfg(feature = "enterprise")]

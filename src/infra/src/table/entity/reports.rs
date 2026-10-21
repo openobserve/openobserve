@@ -24,6 +24,9 @@ pub struct Model {
     pub updated_at: Option<i64>,
     pub start_at: i64,
     pub image_preview: bool,
+    pub last_run_at: Option<i64>,
+    pub last_run_status: Option<String>,
+    pub last_run_error: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
@@ -88,6 +91,9 @@ mod tests {
             updated_at: Some(2000),
             start_at: 1000,
             image_preview: false,
+            last_run_at: None,
+            last_run_status: None,
+            last_run_error: None,
         };
         assert_eq!(m.id, "report-1");
         assert_eq!(m.org, "myorg");

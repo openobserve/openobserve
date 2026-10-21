@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { CancelledError } from "@tanstack/vue-query";
 import { streamNameListQuery } from "@/services/stream.queries";
 import { streamKeys } from "@/services/stream.querykeys";
 import { queryClient } from "@/composables/query/queryClient";
@@ -28,6 +29,10 @@ import type { TranslateFn, I18nText } from "@/types/i18n";
 // apart from any other failure, and a bare Error would drop it.
 const withResponse = (err: Error, source: any): Error =>
   Object.assign(err, { response: source?.response, status: source?.status });
+
+// A cancelled fetch stays a CancelledError so callers can ignore superseded requests.
+const toStreamError = (e: any): Error =>
+  e instanceof CancelledError ? e : withResponse(new Error(e.message), e);
 
 const useStreams = (t: TranslateFn) => {
   const store = useStore();
@@ -137,7 +142,7 @@ const useStreams = (t: TranslateFn) => {
               })
               .catch((e: any) => {
                 dismiss();
-                reject(withResponse(new Error(e.message), e));
+                reject(toStreamError(e));
               });
           } else {
             queryClient
@@ -156,11 +161,11 @@ const useStreams = (t: TranslateFn) => {
               })
               .catch((e: any) => {
                 dismiss();
-                reject(withResponse(new Error(e.message), e));
+                reject(toStreamError(e));
               });
           }
         } catch (e: any) {
-          reject(withResponse(new Error(e.message), e));
+          reject(toStreamError(e));
         }
       })();
     });
@@ -216,10 +221,10 @@ const useStreams = (t: TranslateFn) => {
             })
             .catch((e: any) => {
               dismiss();
-              reject(withResponse(new Error(e.message), e));
+              reject(toStreamError(e));
             });
         } catch (e: any) {
-          reject(withResponse(new Error(e.message), e));
+          reject(toStreamError(e));
         }
       })();
     });
@@ -255,7 +260,7 @@ const useStreams = (t: TranslateFn) => {
         try {
           await getStreams(streamType, false);
         } catch (e: any) {
-          reject(withResponse(new Error(e.message), e));
+          reject(toStreamError(e));
         }
 
         try {
@@ -311,7 +316,7 @@ const useStreams = (t: TranslateFn) => {
             );
           }
         } catch (e: any) {
-          reject(withResponse(new Error(e.message), e));
+          reject(toStreamError(e));
         }
       })();
     });
@@ -363,7 +368,7 @@ const useStreams = (t: TranslateFn) => {
           return streamsCache[streamType].value?.list?.[streamIndex] || {};
         } catch (e: any) {
           // Use reject in Promise.all to catch errors specifically.
-          throw withResponse(new Error(e.message), e);
+          throw toStreamError(e);
         }
       }),
     );

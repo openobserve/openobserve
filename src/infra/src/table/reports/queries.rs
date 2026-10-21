@@ -353,6 +353,12 @@ pub struct ListReportsQueryResult {
     pub folder_id: String,
     pub folder_name: String,
     pub report_enabled: bool,
+    /// The report's `destinations` column; an empty array marks a cache-only report.
+    pub destinations: Json,
+    /// End of the latest run, µs; None before the first run.
+    pub last_run_at: Option<i64>,
+    pub last_run_status: Option<String>,
+    pub last_run_error: Option<String>,
 }
 
 impl ListReportsQueryResult {
@@ -574,6 +580,9 @@ mod tests {
                 "reports"."updated_at",
                 "reports"."start_at",
                 "reports"."image_preview",
+                "reports"."last_run_at",
+                "reports"."last_run_status",
+                "reports"."last_run_error",
                 "reports"."id" AS "report_id",
                 "reports"."name" AS "report_name",
                 "reports"."owner" AS "report_owner",
@@ -624,6 +633,9 @@ mod tests {
                 "reports"."updated_at",
                 "reports"."start_at",
                 "reports"."image_preview",
+                "reports"."last_run_at",
+                "reports"."last_run_status",
+                "reports"."last_run_error",
                 "reports"."id" AS "report_id",
                 "reports"."name" AS "report_name",
                 "reports"."owner" AS "report_owner",
@@ -657,11 +669,13 @@ mod tests {
         const DASHBOARD_SNOWFLAKE_ID: &str = "TEST_DASHBOARD_SNOWFLAKE_ID";
         const PAGE_SIZE: u64 = 10;
         const PAGE_IDX: u64 = 3;
-        let params = ListReportsParams::new(ORG_ID)
-            .in_folder(REPORT_FOLDER_SNOWFLAKE_ID)
-            .for_dashboard(DASHBOARD_SNOWFLAKE_ID)
-            .has_destinations(true)
-            .paginate(PAGE_SIZE, PAGE_IDX);
+        let params = ListReportsParams {
+            dashboard_snowflake_id: Some(DASHBOARD_SNOWFLAKE_ID.to_string()),
+            ..ListReportsParams::new(ORG_ID)
+                .in_folder(REPORT_FOLDER_SNOWFLAKE_ID)
+                .has_destinations(true)
+                .paginate(PAGE_SIZE, PAGE_IDX)
+        };
 
         let postgres_statement = ListReportsQueryResult::select(&params)
             .into_statement(sea_orm::DatabaseBackend::Postgres)
@@ -688,6 +702,9 @@ mod tests {
                 "reports"."updated_at",
                 "reports"."start_at",
                 "reports"."image_preview",
+                "reports"."last_run_at",
+                "reports"."last_run_status",
+                "reports"."last_run_error",
                 "reports"."id" AS "report_id",
                 "reports"."name" AS "report_name",
                 "reports"."owner" AS "report_owner",
@@ -744,6 +761,9 @@ mod tests {
                 "reports"."updated_at",
                 "reports"."start_at",
                 "reports"."image_preview",
+                "reports"."last_run_at",
+                "reports"."last_run_status",
+                "reports"."last_run_error",
                 "reports"."id" AS "report_id",
                 "reports"."name" AS "report_name",
                 "reports"."owner" AS "report_owner",
@@ -805,6 +825,9 @@ mod tests {
                 "reports"."updated_at",
                 "reports"."start_at",
                 "reports"."image_preview",
+                "reports"."last_run_at",
+                "reports"."last_run_status",
+                "reports"."last_run_error",
                 "reports"."id" AS "report_id",
                 "reports"."name" AS "report_name",
                 "reports"."owner" AS "report_owner",
@@ -857,6 +880,9 @@ mod tests {
                 "reports"."updated_at",
                 "reports"."start_at",
                 "reports"."image_preview",
+                "reports"."last_run_at",
+                "reports"."last_run_status",
+                "reports"."last_run_error",
                 "reports"."id" AS "report_id",
                 "reports"."name" AS "report_name",
                 "reports"."owner" AS "report_owner",

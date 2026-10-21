@@ -97,6 +97,8 @@
         :field-value-resolver="fieldValueResolver ?? undefined"
         :debounce-time="debounceTime"
         :free-text-decorations="freeTextDecorations ?? null"
+        :filter-mode="filterMode"
+        :values-time-range="valuesTimeRange ?? null"
         @update:query="handleQueryUpdate"
         @user-edit="emit('user-edit')"
         @run-query="emit('run-query')"
@@ -180,6 +182,8 @@ interface Props {
   fieldValueResolver?: ((field: string) => Promise<string[]>) | null; // Field-value lookup awaited by the completion provider
   debounceTime?: number; // Debounce time for query updates (ms)
   freeTextDecorations?: { ranges: { start: number; end: number }[]; hover: I18nText } | null;
+  filterMode?: boolean; // The query is a bare WHERE fragment (Logs without SQL mode)
+  valuesTimeRange?: { startTime: number; endTime: number } | null; // Range field values are looked up in (microseconds)
 
   // NL Mode (optional external control)
   nlpMode?: boolean; // External NLP mode control (undefined = internal control)
@@ -418,8 +422,9 @@ const handleAIGenerate = async () => {
         currentSessionId.value,
       );
 
-      // Track assistant response in chat history
-      const generatedQuery = editorRef.value.getValue?.() || "";
+      // Track assistant response in chat history. A refused request (no AI credits, consent
+      // declined) left the editor unchanged, so its notice is the answer instead.
+      const generatedQuery = editorRef.value.refusalNotice || editorRef.value.getValue?.() || "";
       chatMessages.value.push({ role: "assistant", content: generatedQuery });
 
       // Save to IndexedDB (shared with O2AIChat history)
@@ -577,6 +582,7 @@ defineExpose({
   },
 
   // Editor state
+  focus: () => editorRef.value?.editorObj?.focus(),
   getValue: () => {
     return editorRef.value?.getValue();
   },

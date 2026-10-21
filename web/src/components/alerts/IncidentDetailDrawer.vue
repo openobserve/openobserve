@@ -964,6 +964,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @download-report="downloadReport"
                 :is-dark-mode="isDarkMode"
                 :analysis-in-flight="analysisInFlight"
+                :analyze-credit-cost="aiCreditCosts?.incident"
+                :reanalyze-credit-cost="aiCreditCosts?.incident_reanalysis"
                 @trigger-rca="triggerRca"
               />
 
@@ -1551,6 +1553,9 @@ import {
   isPaidOverageConsentError,
   usePaidOverageConsent,
 } from "@/composables/usePaidOverageConsent";
+import BillingService, { type AiCreditCounts } from "@/services/billings";
+import { aiCreditsAction, aiCreditsNotice, isAiCreditsExhausted } from "@/utils/aiCredits";
+import config from "@/aws-exports";
 
 export default defineComponent({
   name: "IncidentDetailDrawer",
@@ -1661,6 +1666,8 @@ export default defineComponent({
     /// answers "who has it now". A failure leaves the panel hidden rather than
     /// claiming nobody was paged.
     async function loadOnCallResponse(org: string, incidentId: string) {
+      // With on-call off the route is unregistered, and cloud answers it with a 401 that logs the user out.
+      if (store.state.zoConfig?.oncall_enabled !== true) return;
       try {
         const records = await queryClient.fetchQuery(responsesForIncidentQuery(org, incidentId));
         oncallResponses.value = records;
@@ -1802,7 +1809,9 @@ export default defineComponent({
     // show elapsed time and flag a run that has outlived the server's staleness window.
     const analysisStartedAt = ref<number | null>(null);
     // Last terminal failure, surfaced persistently in the panel instead of a transient toast.
-    const rcaError = ref<{ reason: string; details: string } | null>(null);
+    const rcaError = ref<{ reason: string; details: string; remedy?: "plans" | "contact" } | null>(
+      null,
+    );
     const rcaCancelling = ref(false);
 
     // Superseded reports (newest first) and which one is being viewed.
@@ -1892,13 +1901,18 @@ export default defineComponent({
 
         // Keep the failure visible until the next run starts. Only the most recent
         // terminal event matters: a later success or cancel clears a older failure.
-        rcaError.value =
-          !nowInFlight && lastTerminalEvent?.type === "ai_analysis_failed"
-            ? {
-                reason: lastTerminalEvent.data?.reason || t("alerts.incidents.rcaFailed"),
-                details: lastTerminalEvent.data?.error_details || "",
-              }
-            : null;
+        // A refused run (no AI credits, consent declined) writes no event, so its
+        // remedy banner stays until a run starts or the user retries.
+        const refused = rcaError.value?.remedy ? rcaError.value : null;
+        rcaError.value = nowInFlight
+          ? null
+          : (refused ??
+            (lastTerminalEvent?.type === "ai_analysis_failed"
+              ? {
+                  reason: lastTerminalEvent.data?.reason || t("alerts.incidents.rcaFailed"),
+                  details: lastTerminalEvent.data?.error_details || "",
+                }
+              : null));
 
         // Transition: banner was showing and analysis just finished — reload to pick up
         // the new report. Skipped when the run failed, since there is nothing new to fetch.
@@ -2602,6 +2616,8 @@ export default defineComponent({
       // Reset correlation state when loading new incident
       correlationData.value = null;
       correlationError.value = null;
+      // A refused run's banner writes no event, so only this can stop it carrying over.
+      if (incidentDetails.value?.id !== incidentId) rcaError.value = null;
 
       try {
         const org = store.state.selectedOrganization.identifier;
@@ -2738,9 +2754,17 @@ export default defineComponent({
       }
     };
 
+    // Credit costs label the analysis actions; without them the actions simply show no cost.
+    const aiCreditCosts = ref<AiCreditCounts | null>(null);
+
     // Add keyboard event listener on mount
     onMounted(() => {
       window.addEventListener("keydown", handleEscapeKey);
+      if (config.isCloud === "true") {
+        BillingService.get_ai_usage(store.state.selectedOrganization.identifier)
+          .then((res) => (aiCreditCosts.value = res.data.costs))
+          .catch(() => {});
+      }
     });
 
     // Remove keyboard event listener on unmount
@@ -3019,6 +3043,7 @@ export default defineComponent({
 
         // A denied request never started on the server. Stop optimistic loading
         // and polling while the user decides whether to authorize paid usage.
+        const wasLoading = rcaLoading.value;
         rcaLoading.value = false;
         analysisStartedAt.value = null;
         if (!analysisInFlight.value) stopInFlightPolling();
@@ -3031,11 +3056,22 @@ export default defineComponent({
           incidentDetails.value?.id === incidentId;
         if (!accepted || !drawerStillActive) {
           if (!accepted && drawerStillActive) {
-            toast({ variant: "info", message: t("paidUsage.declinedNotice") });
+            // Persist it with the way out: Plans is where paid usage is turned on.
+            rcaError.value = {
+              reason: t("paidUsage.declinedNotice"),
+              details: "",
+              remedy: "plans",
+            };
           }
           return null;
         }
 
+        // The replacement request is the run itself, so it gets the running state back.
+        if (wasLoading) {
+          rcaLoading.value = true;
+          analysisStartedAt.value = Date.now() * 1000;
+          startInFlightPolling();
+        }
         // Exactly one guarded replacement request. A second denial propagates.
         return incidentsService.triggerRca(org, incidentId, params, { signal });
       }
@@ -3078,7 +3114,13 @@ export default defineComponent({
           } else {
             const ok = await confirm({
               title: t("alerts.incidents.rerunAnalysisTitle"),
-              message: t("alerts.incidents.rerunAnalysisMessage"),
+              message: aiCreditCosts.value
+                ? t(
+                    "alerts.incidents.rerunAnalysisMessageWithCost",
+                    { cost: aiCreditCosts.value.incident_reanalysis },
+                    aiCreditCosts.value.incident_reanalysis,
+                  )
+                : t("alerts.incidents.rerunAnalysisMessage"),
               confirmLabel: t("alerts.incidents.rerunAnalysisConfirmLabel"),
               cancelLabel: t("alerts.incidents.rerunAnalysisCancelLabel"),
               persistent: false,
@@ -3096,13 +3138,21 @@ export default defineComponent({
                 await loadDetails(incidentId);
               } catch (error: unknown) {
                 const responseData: unknown = isAxiosError(error) ? error.response?.data : null;
-                const message =
-                  responseData &&
-                  typeof responseData === "object" &&
-                  "message" in responseData &&
-                  typeof responseData.message === "string"
+                const message = isAiCreditsExhausted(responseData)
+                  ? aiCreditsNotice(responseData, t)
+                  : responseData &&
+                      typeof responseData === "object" &&
+                      "message" in responseData &&
+                      typeof responseData.message === "string"
                     ? raw(responseData.message)
                     : t("alerts.incidents.reanalysisStartFailed");
+                if (isAiCreditsExhausted(responseData)) {
+                  rcaError.value = {
+                    reason: message,
+                    details: "",
+                    remedy: aiCreditsAction(responseData),
+                  };
+                }
                 toast({ variant: "error", message });
               }
             }
@@ -3626,12 +3676,16 @@ export default defineComponent({
         }
 
         console.error("Failed to trigger RCA:", error);
-        const message =
-          error?.response?.data?.message ||
-          error?.message ||
-          t("alerts.incidents.rcaFailedGeneric");
+        const responseData = error?.response?.data;
+        const message = isAiCreditsExhausted(responseData)
+          ? aiCreditsNotice(responseData, t)
+          : responseData?.message || error?.message || t("alerts.incidents.rcaFailedGeneric");
         // Persist the failure in the panel; the toast alone disappears.
-        rcaError.value = { reason: message, details: "" };
+        rcaError.value = {
+          reason: message,
+          details: "",
+          remedy: isAiCreditsExhausted(responseData) ? aiCreditsAction(responseData) : undefined,
+        };
         toast({ variant: "error", message });
         // Surface the failure event in the Activity timeline too.
         timelineRefreshTrigger.value++;
@@ -3696,6 +3750,7 @@ export default defineComponent({
     };
 
     return {
+      aiCreditCosts,
       mutedBannerText,
       openMutingDowntime,
       raw,

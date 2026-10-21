@@ -88,6 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </ODropdown>
       <OButton
         variant="ghost"
+        :aria-label="t('common.remove')"
         size="icon-chip"
         class="!w-4 shrink-0"
         :data-test="`dashboard-variable-adhoc-close-${testKey}`"

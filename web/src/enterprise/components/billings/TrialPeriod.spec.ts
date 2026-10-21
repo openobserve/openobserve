@@ -231,7 +231,7 @@ describe("TrialPeriod.vue", () => {
       expect(strip().exists()).toBe(true);
     });
 
-    it("keeps the strip and logs a failed lookup that is not a 401", async () => {
+    it("keeps the strip and logs a failed lookup that is not a 401 or 403", async () => {
       const error = vi.spyOn(console, "error").mockImplementation(() => {});
       vi.mocked(BillingService.list_subscription).mockRejectedValue({
         response: { status: 500 },
@@ -247,6 +247,17 @@ describe("TrialPeriod.vue", () => {
       const error = vi.spyOn(console, "error").mockImplementation(() => {});
       vi.mocked(BillingService.list_subscription).mockRejectedValue({
         response: { status: 401 },
+      });
+      await mountStrip({ currentPage: "billing" });
+
+      expect(error).not.toHaveBeenCalled();
+      error.mockRestore();
+    });
+
+    it("does not log a 403, which only means the user has no billing access", async () => {
+      const error = vi.spyOn(console, "error").mockImplementation(() => {});
+      vi.mocked(BillingService.list_subscription).mockRejectedValue({
+        response: { status: 403 },
       });
       await mountStrip({ currentPage: "billing" });
 

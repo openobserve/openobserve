@@ -22,6 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="bg-card-glass-bg rounded-default relative overflow-hidden p-4">
           <div class="relative z-1">
             <img
+              :alt="t('login.openObserveLogoAlt')"
               :src="
                 isDark
                   ? getImageURL('images/common/openobserve_latest_dark_2.svg')

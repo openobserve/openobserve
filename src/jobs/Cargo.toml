@@ -74,7 +74,6 @@ hashbrown.workspace = true
 infra.workspace = true
 ingester.workspace = true
 log.workspace = true
-metrics_index.workspace = true
 transform.workspace = true
 o2_dex = { workspace = true, optional = true }
 o2_enterprise = { workspace = true, optional = true, default-features = false }
@@ -86,6 +85,7 @@ proto.workspace = true
 regex.workspace = true
 report_server.workspace = true
 reqwest.workspace = true
+serde.workspace = true
 serde_json.workspace = true
 tokio.workspace = true
 tonic.workspace = true

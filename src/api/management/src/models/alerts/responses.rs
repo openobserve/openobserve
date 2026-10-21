@@ -67,9 +67,6 @@ pub struct ListAlertsResponseBodyItem {
     pub last_triggered_at: Option<i64>,
     pub last_satisfied_at: Option<i64>,
     pub is_real_time: bool,
-    /// A built-in self-monitoring alert, which the API refuses to delete or rename.
-    #[serde(default)]
-    pub is_builtin: bool,
     /// Timestamp (µs) when the anomaly model was last successfully trained.
     /// Only present for `anomaly_detection` items.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -125,12 +122,12 @@ pub struct ListAlertsResponseBodyItem {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub oncall_team: Option<String>,
     /// Normalized selection tags (PT-6). Omitted when empty.
-    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub tags: Vec<String>,
     /// Names of the notification destinations this alert delivers to
     /// (`Alert.destinations`). Lets the destination↔alert dependency view build
     /// the linkage from the list alone; omitted when empty.
-    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub destinations: Vec<String>,
     /// Alert-level template override (`Alert.template`): when set it replaces the
     /// destination-level template for every destination above. Absent when the
@@ -484,10 +481,6 @@ impl TryFrom<(meta_folders::Folder, meta_alerts::Alert, Option<Trigger>)>
         // alert — but treat it as "no stream" defensively rather than send a
         // stream_name/stream_type pair where one half is a lie.
         let has_stream = !alert.stream_name.is_empty();
-        #[cfg(feature = "enterprise")]
-        let is_builtin = openobserve_core::alerts::prebuilt::is_builtin(&alert);
-        #[cfg(not(feature = "enterprise"))]
-        let is_builtin = false;
         Ok(Self {
             alert_id: alert.id.ok_or(())?,
             folder_id: folder.folder_id,
@@ -504,7 +497,6 @@ impl TryFrom<(meta_folders::Folder, meta_alerts::Alert, Option<Trigger>)>
             last_triggered_at,
             last_satisfied_at,
             is_real_time: alert.is_real_time,
-            is_builtin,
             last_trained_at: None,
             status: None,
             last_error: None,
@@ -619,7 +611,6 @@ pub fn anomaly_config_to_list_item(v: &serde_json::Value) -> Option<ListAlertsRe
         last_triggered_at: v.get("last_detection_run").and_then(|t| t.as_i64()),
         last_satisfied_at: v.get("last_anomaly_detected_at").and_then(|t| t.as_i64()),
         is_real_time: false,
-        is_builtin: false,
         last_trained_at: v.get("training_completed_at").and_then(|t| t.as_i64()),
         status,
         // No `alert_states` row exists, so `enrich_with_run_state` cannot fill these.
@@ -867,7 +858,6 @@ mod tests {
             last_triggered_at: None,
             last_satisfied_at: None,
             is_real_time: false,
-            is_builtin: false,
             last_trained_at: None,
             status: None,
             last_error: None,

@@ -23,7 +23,7 @@ use common::{
 };
 use config::utils::json;
 use infra::{
-    db::put_into_db_coordinator,
+    db::{delete_from_db_coordinator, put_into_db_coordinator},
     errors::{self, Error},
     table::organizations,
 };
@@ -111,6 +111,14 @@ pub async fn get_org_setting(org_id: &str) -> Result<OrganizationSetting, Error>
     Ok(settings)
 }
 
+/// Applies `apply` to the settings in the store's `get_for_update`; true if it wrote them.
+pub async fn update_org_setting<F>(org_id: &str, apply: F) -> Result<bool, anyhow::Error>
+where
+    F: FnOnce(&mut OrganizationSetting) -> bool + Send + 'static,
+{
+    update_org_setting_in(infra::db::get_db().await.as_ref(), org_id, apply).await
+}
+
 /// Get the toggle ingestion logs setting for an org
 /// If the setting is not found, return false
 /// we add a separate function for avoid clone the setting
@@ -139,12 +147,7 @@ pub async fn get_org_setting_toggle_ingestion_logs(org_id: &str) -> Result<bool,
 }
 
 /// Get the usage stream enabled setting for an org.
-/// When no explicit setting exists, this falls back to
-/// `OrganizationSetting::default()`, whose `usage_stream_enabled` defaults to
-/// the global `ZO_USAGE_REPORT_TO_OWN_ORG` flag (see
-/// `default_usage_stream_enabled`). So with self-reporting on, orgs report to
-/// their own `usage` stream by default; a user can toggle it off per org
-/// (which persists an explicit `false`), reverting to the billing-API view.
+/// Without a stored setting this falls back to `default_usage_stream_enabled`, which is off.
 pub async fn get_org_setting_usage_stream_enabled(org_id: &str) -> Result<bool, Error> {
     let key = format!("{ORG_SETTINGS_KEY_PREFIX}/{org_id}");
     if let Some(v) = ORGANIZATION_SETTING.read().await.get(&key) {
@@ -192,6 +195,14 @@ pub async fn get_org_setting_red_insights_enabled(org_id: &str) -> Result<bool, 
     Ok(red_insights_enabled)
 }
 
+/// The coordinator delete evicts `ORGANIZATION_SETTING` on every node.
+pub async fn delete_org_setting(org_id: &str) -> errors::Result<()> {
+    let key = format!("{ORG_SETTINGS_KEY_PREFIX}/{org_id}");
+    db::delete_if_exists(&key, false, db::NEED_WATCH).await?;
+    ORGANIZATION_SETTING.write().await.remove(&key);
+    Ok(())
+}
+
 /// Cache the existing org settings in the beginning
 pub async fn org_settings_cache() -> Result<(), anyhow::Error> {
     let prefix = ORG_SETTINGS_KEY_PREFIX;
@@ -224,26 +235,32 @@ pub async fn org_settings_watch() -> Result<(), anyhow::Error> {
             }
         };
 
-        if let db::Event::Put(ev) = ev {
-            let item_key = ev.key;
-            let json_val: OrganizationSetting = match db::get(&item_key).await {
-                Ok(val) => match json::from_slice(&val) {
-                    Ok(val) => val,
+        match ev {
+            db::Event::Put(ev) => {
+                let item_key = ev.key;
+                let json_val: OrganizationSetting = match db::get(&item_key).await {
+                    Ok(val) => match json::from_slice(&val) {
+                        Ok(val) => val,
+                        Err(e) => {
+                            log::error!("Error getting value: {e}");
+                            continue;
+                        }
+                    },
                     Err(e) => {
                         log::error!("Error getting value: {e}");
                         continue;
                     }
-                },
-                Err(e) => {
-                    log::error!("Error getting value: {e}");
-                    continue;
-                }
-            };
-            ORGANIZATION_SETTING
-                .clone()
-                .write()
-                .await
-                .insert(item_key, json_val);
+                };
+                ORGANIZATION_SETTING
+                    .clone()
+                    .write()
+                    .await
+                    .insert(item_key, json_val);
+            }
+            db::Event::Delete(ev) => {
+                ORGANIZATION_SETTING.write().await.remove(&ev.key);
+            }
+            db::Event::Empty => {}
         }
     }
 }
@@ -263,9 +280,8 @@ pub async fn cache() -> Result<(), anyhow::Error> {
 }
 
 pub async fn watch() -> Result<(), anyhow::Error> {
-    let key = ORG_KEY_PREFIX;
     let cluster_coordinator = db::get_coordinator().await;
-    let mut events = cluster_coordinator.watch(key).await?;
+    let mut events = cluster_coordinator.watch(ORG_KEY_PREFIX).await?;
     let events = Arc::get_mut(&mut events).unwrap();
     log::info!("Start watching organizations");
     loop {
@@ -277,27 +293,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
             }
         };
 
-        if let db::Event::Put(ev) = ev {
-            let item_key = ev.key.strip_prefix(key).unwrap();
-            let item_value = ev.value.unwrap();
-            let json_val: Organization = if !config::get_config().common.local_mode {
-                match get_org_from_db(item_key).await {
-                    Ok(val) => val,
-                    Err(e) => {
-                        log::error!("Error getting value: {e}");
-                        continue;
-                    }
-                }
-            } else {
-                json::from_slice(&item_value).unwrap()
-            };
-            organizations::invalidate_cache(Some(item_key)).await;
-            ORGANIZATIONS
-                .clone()
-                .write()
-                .await
-                .insert(item_key.to_string(), json_val);
-        }
+        apply_event(ev).await;
     }
 }
 
@@ -377,13 +373,20 @@ pub async fn delete_org(org_id: &str) -> Result<(), anyhow::Error> {
         return Err(anyhow::anyhow!("Error deleting org: {}", e));
     }
     organizations::invalidate_cache(Some(org_id)).await;
+    ORGANIZATIONS.clone().write().await.remove(org_id);
+    let key = format!("{ORG_KEY_PREFIX}{org_id}");
+    delete_from_db_coordinator(&key, false, true, None).await?;
     #[cfg(feature = "enterprise")]
-    super_cluster::organization_delete(&format!("{ORG_KEY_PREFIX}{org_id}")).await?;
+    super_cluster::organization_delete(&key).await?;
     Ok(())
 }
 
+/// Lists live orgs; tombstones stay out so caches, jobs and the org list never see them.
 pub async fn list(limit: Option<i64>) -> Result<Vec<Organization>, anyhow::Error> {
-    let filter = organizations::ListFilter::with_limit(limit);
+    let filter = organizations::ListFilter {
+        exclude_deleted: true,
+        ..organizations::ListFilter::with_limit(limit)
+    };
     let orgs = organizations::list(filter)
         .await
         .map_err(|e| anyhow::anyhow!("Error listing orgs: {}", e))?;
@@ -453,9 +456,207 @@ mod super_cluster {
     }
 }
 
+async fn update_org_setting_in<F>(
+    store: &dyn infra::db::Db,
+    org_id: &str,
+    apply: F,
+) -> Result<bool, anyhow::Error>
+where
+    F: FnOnce(&mut OrganizationSetting) -> bool + Send + 'static,
+{
+    let key = format!("{ORG_SETTINGS_KEY_PREFIX}/{org_id}");
+    let written = Arc::new(std::sync::Mutex::new(None));
+    let (slot, insert_key) = (written.clone(), key.clone());
+    // The store reads and writes the key under its own lock, so no other writer lands in between.
+    store
+        .get_for_update(
+            &key,
+            infra::db::NEED_WATCH,
+            None,
+            Box::new(move |stored| {
+                let existed = stored.is_some();
+                let mut settings = match stored {
+                    Some(value) => json::from_slice(&value)?,
+                    None => OrganizationSetting::default(),
+                };
+                if !apply(&mut settings) {
+                    return Ok(None);
+                }
+                let value = json::to_vec(&settings)?.into();
+                *slot.lock().unwrap() = Some(settings);
+                // NATS can only create a missing key through the insert slot.
+                Ok(Some(if existed {
+                    (Some(value), None)
+                } else {
+                    (None, Some((insert_key, value, None)))
+                }))
+            }),
+        )
+        .await?;
+    let Some(settings) = written.lock().unwrap().take() else {
+        return Ok(false);
+    };
+    ORGANIZATION_SETTING.write().await.insert(key, settings);
+    Ok(true)
+}
+
+async fn apply_event(ev: db::Event) {
+    match ev {
+        db::Event::Put(ev) => {
+            let Some(item_key) = ev.key.strip_prefix(ORG_KEY_PREFIX) else {
+                return;
+            };
+            // Invalidate before reading, or the cache-first read copies the stale row back.
+            organizations::invalidate_cache(Some(item_key)).await;
+            let json_val: Organization = if !config::get_config().common.local_mode {
+                match get_org_from_db(item_key).await {
+                    Ok(val) => val,
+                    Err(e) => {
+                        log::error!("Error getting value: {e}");
+                        return;
+                    }
+                }
+            } else {
+                json::from_slice(&ev.value.unwrap()).unwrap()
+            };
+            ORGANIZATIONS
+                .clone()
+                .write()
+                .await
+                .insert(item_key.to_string(), json_val);
+        }
+        db::Event::Delete(ev) => {
+            let Some(item_key) = ev.key.strip_prefix(ORG_KEY_PREFIX) else {
+                return;
+            };
+            organizations::invalidate_cache(Some(item_key)).await;
+            ORGANIZATIONS.clone().write().await.remove(item_key);
+        }
+        db::Event::Empty => {}
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use std::sync::atomic::{AtomicBool, Ordering};
+
+    use bytes::Bytes;
+    use hashbrown::HashMap;
+    use infra::db::{Db, Event, Stats, UpdateFn};
+    use tokio::sync::mpsc;
+
     use super::*;
+
+    /// Shaped like nats.rs `get_for_update`: a missing key cannot take the value slot.
+    #[derive(Default)]
+    struct NatsShapedStore {
+        stored: std::sync::Mutex<Option<Bytes>>,
+        unreadable: bool,
+        wrote: AtomicBool,
+    }
+
+    #[async_trait::async_trait]
+    impl Db for NatsShapedStore {
+        async fn create_table(&self) -> errors::Result<()> {
+            Ok(())
+        }
+
+        async fn stats(&self) -> errors::Result<Stats> {
+            unimplemented!()
+        }
+
+        async fn get(&self, key: &str) -> errors::Result<Bytes> {
+            if self.unreadable {
+                return Err(Error::Message("read failed".to_string()));
+            }
+            self.stored.lock().unwrap().clone().ok_or_else(|| {
+                Error::DbError(infra::errors::DbError::KeyNotExists(key.to_string()))
+            })
+        }
+
+        async fn put(
+            &self,
+            _key: &str,
+            value: Bytes,
+            _need_watch: bool,
+            _start_dt: Option<i64>,
+        ) -> errors::Result<()> {
+            self.wrote.store(true, Ordering::SeqCst);
+            *self.stored.lock().unwrap() = Some(value);
+            Ok(())
+        }
+
+        async fn get_for_update(
+            &self,
+            key: &str,
+            need_watch: bool,
+            start_dt: Option<i64>,
+            update_fn: Box<UpdateFn>,
+        ) -> errors::Result<()> {
+            let old = match self.get(key).await {
+                Ok(value) => Some((key.to_string(), value)),
+                Err(Error::DbError(infra::errors::DbError::KeyNotExists(_))) => None,
+                Err(e) => return Err(e),
+            };
+            let old_key = old.as_ref().map(|(k, _)| k.clone());
+            if let Some((value, insert)) = update_fn(old.map(|(_, v)| v))? {
+                if let Some(value) = value {
+                    self.put(&old_key.unwrap(), value, need_watch, start_dt)
+                        .await?;
+                }
+                if let Some((key, value, start_dt)) = insert {
+                    self.put(&key, value, need_watch, start_dt).await?;
+                }
+            }
+            Ok(())
+        }
+
+        async fn delete(
+            &self,
+            _key: &str,
+            _with_prefix: bool,
+            _need_watch: bool,
+            _start_dt: Option<i64>,
+        ) -> errors::Result<()> {
+            unimplemented!()
+        }
+
+        async fn list(&self, _prefix: &str) -> errors::Result<HashMap<String, Bytes>> {
+            unimplemented!()
+        }
+
+        async fn list_keys(&self, _prefix: &str) -> errors::Result<Vec<String>> {
+            unimplemented!()
+        }
+
+        async fn list_values(&self, _prefix: &str) -> errors::Result<Vec<Bytes>> {
+            unimplemented!()
+        }
+
+        async fn list_values_by_start_dt(
+            &self,
+            _prefix: &str,
+            _start_dt: Option<(i64, i64)>,
+        ) -> errors::Result<Vec<(i64, Bytes)>> {
+            unimplemented!()
+        }
+
+        async fn count(&self, _prefix: &str) -> errors::Result<i64> {
+            unimplemented!()
+        }
+
+        async fn watch(&self, _prefix: &str) -> errors::Result<Arc<mpsc::Receiver<Event>>> {
+            unimplemented!()
+        }
+
+        async fn close(&self) -> errors::Result<()> {
+            Ok(())
+        }
+
+        async fn add_start_dt_column(&self) -> errors::Result<()> {
+            Ok(())
+        }
+    }
 
     #[test]
     fn test_org_settings_key_prefix_value() {
@@ -465,6 +666,142 @@ mod tests {
     #[test]
     fn test_org_key_prefix_value() {
         assert_eq!(ORG_KEY_PREFIX, "/organization/org/");
+    }
+
+    #[tokio::test]
+    async fn test_failed_settings_read_neither_completes_cleanup_nor_writes() {
+        let org_id = "unreadablesettingsorg";
+        let store = NatsShapedStore {
+            unreadable: true,
+            ..Default::default()
+        };
+        let applied = Arc::new(AtomicBool::new(false));
+        let ran = applied.clone();
+        // Shaped like delete_org_domain_mappings, whose mappings field exists only under cloud.
+        let cleanup = update_org_setting_in(&store, org_id, move |settings| {
+            ran.store(true, Ordering::SeqCst);
+            let before = settings.cross_links.len();
+            settings.cross_links.clear();
+            settings.cross_links.len() != before
+        })
+        .await;
+        assert!(cleanup.is_err(), "cleanup reported done: {cleanup:?}");
+        assert!(
+            !applied.load(Ordering::SeqCst),
+            "cleanup ran on default settings"
+        );
+
+        let ran = applied.clone();
+        let update = update_org_setting_in(&store, org_id, move |settings| {
+            ran.store(true, Ordering::SeqCst);
+            settings.scrape_interval += 1;
+            true
+        })
+        .await;
+        assert!(update.is_err(), "update reported done: {update:?}");
+        assert!(
+            !applied.load(Ordering::SeqCst),
+            "update ran on default settings"
+        );
+        assert!(!store.wrote.load(Ordering::SeqCst));
+        let key = format!("{ORG_SETTINGS_KEY_PREFIX}/{org_id}");
+        assert!(!ORGANIZATION_SETTING.read().await.contains_key(&key));
+    }
+
+    #[tokio::test]
+    async fn test_settings_update_creates_then_rewrites_the_key() {
+        let org_id = "firstsettingsorg";
+        let key = format!("{ORG_SETTINGS_KEY_PREFIX}/{org_id}");
+        let store = NatsShapedStore::default();
+        let created = update_org_setting_in(&store, org_id, |s| {
+            s.scrape_interval = 7;
+            true
+        })
+        .await
+        .unwrap();
+        assert!(created);
+        let updated = update_org_setting_in(&store, org_id, |s| {
+            s.scrape_interval += 1;
+            true
+        })
+        .await
+        .unwrap();
+        assert!(updated);
+        let stored: OrganizationSetting =
+            json::from_slice(&store.stored.lock().unwrap().clone().unwrap()).unwrap();
+        assert_eq!(stored.scrape_interval, 8);
+        assert_eq!(
+            ORGANIZATION_SETTING
+                .read()
+                .await
+                .get(&key)
+                .unwrap()
+                .scrape_interval,
+            8
+        );
+
+        store.wrote.store(false, Ordering::SeqCst);
+        let unchanged = update_org_setting_in(&store, org_id, |_| false)
+            .await
+            .unwrap();
+        assert!(!unchanged);
+        assert!(!store.wrote.load(Ordering::SeqCst), "a no-op apply wrote");
+    }
+
+    #[tokio::test]
+    async fn test_concurrent_settings_writers_do_not_lose_updates() {
+        if std::env::var("ZO_META_STORE").is_err() {
+            eprintln!("skipped: needs the meta store CI configures through ZO_META_STORE");
+            return;
+        }
+        infra::db_init().await.expect("meta store");
+        let org_id = format!("lostupdorg{}", config::utils::time::now_micros());
+        let writers: Vec<_> = (0..16)
+            .map(|i| {
+                let org_id = org_id.clone();
+                tokio::spawn(async move {
+                    update_org_setting(&org_id, move |s| {
+                        s.cross_links.push(config::meta::stream::CrossLink {
+                            name: format!("link{i}"),
+                            url: "https://example.com".to_string(),
+                            fields: vec![],
+                        });
+                        true
+                    })
+                    .await
+                    .unwrap()
+                })
+            })
+            .collect();
+        for writer in writers {
+            assert!(writer.await.unwrap());
+        }
+        let key = format!("{ORG_SETTINGS_KEY_PREFIX}/{org_id}");
+        let stored: OrganizationSetting =
+            json::from_slice(&infra::db::get_db().await.get(&key).await.unwrap()).unwrap();
+        assert_eq!(stored.cross_links.len(), 16, "concurrent writes were lost");
+        delete_org_setting(&org_id).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_org_watch_delete_evicts_organizations_cache() {
+        let org_id = "watchdelorg";
+        ORGANIZATIONS.clone().write().await.insert(
+            org_id.to_string(),
+            Organization {
+                identifier: org_id.to_string(),
+                name: org_id.to_string(),
+                org_type: "default".to_string(),
+                service_account: None,
+            },
+        );
+        apply_event(db::Event::Delete(infra::db::EventData {
+            key: format!("{ORG_KEY_PREFIX}{org_id}"),
+            value: None,
+            start_dt: None,
+        }))
+        .await;
+        assert!(!ORGANIZATIONS.read().await.contains_key(org_id));
     }
 
     #[test]

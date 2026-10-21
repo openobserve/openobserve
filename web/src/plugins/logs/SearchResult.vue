@@ -1510,13 +1510,17 @@ export default defineComponent({
 
     // Watch for theme color changes in localStorage
     const handleThemeColorChange = () => {
+      closeStalePinnedTooltip();
       const currentMode = isDark.value ? "dark" : "light";
       const appliedThemeName = localStorage.getItem(THEME_STORAGE_KEYS[currentMode].appliedName);
 
       // Custom color: user may be dragging the picker — debounce to avoid jank
       if (appliedThemeName === CUSTOM_THEME_NAME) {
         if (debounceTimer) clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(() => reDrawChart(), 300);
+        debounceTimer = setTimeout(() => {
+          closeStalePinnedTooltip();
+          reDrawChart();
+        }, 300);
       } else {
         // Predefined / default theme applied - re-render immediately
         if (debounceTimer) clearTimeout(debounceTimer);
@@ -1527,7 +1531,10 @@ export default defineComponent({
     // Re-render stacked chart with correct palette when dark/light mode switches
     watch(
       () => isDark.value,
-      () => reDrawChart(),
+      () => {
+        closeStalePinnedTooltip();
+        reDrawChart();
+      },
     );
 
     // Pinned tooltip — frozen on bar click so user can explore and select
@@ -1581,6 +1588,11 @@ export default defineComponent({
       histogramChart.value?.chart?.setOption({ tooltip: { triggerOn: "mousemove|click" } }, false);
     };
 
+    // Pinned row dots copy series colors at click time, so a theme change would leave them stale.
+    const closeStalePinnedTooltip = () => {
+      if (pinnedTooltip.value.visible) closePinnedTooltip();
+    };
+
     const onHistogramAreaClick = (event: MouseEvent) => {
       const { breakdownField, breakdownSeries, xData } = searchObj.data.histogram;
       if (!breakdownSeries?.size || !xData?.length) return;
@@ -1612,16 +1624,19 @@ export default defineComponent({
 
       const timestamp = formatDate(new Date(xData[dataIndex]));
 
-      const rows = [...breakdownSeries.entries()].map(([category, counts]) => {
+      const plotSeries = plotChart.value?.options?.series ?? [];
+      const rows = [...breakdownSeries.entries()].map(([category, counts], index) => {
         // Explicit check so a numeric 0 stays a real category; the label must match the source exactly.
         const label =
           category === null || category === undefined || category === BREAKDOWN_EMPTY_VALUE
             ? BREAKDOWN_EMPTY_LABEL
             : String(category);
         const rawValue = label === BREAKDOWN_EMPTY_LABEL ? BREAKDOWN_EMPTY_VALUE : label;
-        const matchedSeries = (plotChart.value?.options?.series ?? []).find(
-          (s: any) => s.name === label,
-        );
+        // Series follow breakdownSeries order; the index separates the empty group from a literal "(empty)" value.
+        const matchedSeries =
+          plotSeries[index]?.name === label
+            ? plotSeries[index]
+            : plotSeries.find((s: any) => s.name === label);
         return {
           // label stays the sentinel because it is matched against the ECharts series name
           displayLabel: label === BREAKDOWN_EMPTY_LABEL ? t("logs.searchResult.emptyValue") : label,

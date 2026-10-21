@@ -183,6 +183,8 @@ export class ShortcutManager {
   };
 
   private parseEvent(e: KeyboardEvent): string {
+    // Browser autofill dispatches keydown events with no `key`.
+    if (typeof e.key !== "string") return "";
     const parts: string[] = [];
     if (e.ctrlKey) parts.push("ctrl");
     if (e.shiftKey) parts.push("shift");
