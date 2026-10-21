@@ -925,6 +925,7 @@
   --color-icon-chip-info-bg: color-mix(in srgb, var(--color-blue-500) 15%, transparent);
   --color-icon-chip-info-text: var(--color-blue-400);
   --color-icon-chip-orange-bg: color-mix(in srgb, var(--color-orange-500) 15%, transparent);
+  --color-status-outdated-text: var(--color-purple-500);
   --color-icon-chip-orange-text: var(--color-orange-400);
 
   /* Alert priority ramp — one step lighter on the dark canvas, where a 600 is

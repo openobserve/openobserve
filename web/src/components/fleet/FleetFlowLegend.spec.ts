@@ -40,7 +40,7 @@ describe("FleetFlowLegend", () => {
     expect(w.find('[data-test="fleet-flow-legend-restricted"]').exists()).toBe(false);
   });
 
-  it("leads with Healthy in green, then Rolling out in its own colour", () => {
+  it("leads with Healthy in green, then Rolling out in blue", () => {
     const w = mount(FleetFlowLegend, {
       props: { counts: { healthy: 1, progress: 1 }, modelValue: null },
       global: { plugins: [i18n] },
@@ -52,9 +52,9 @@ describe("FleetFlowLegend", () => {
     expect(w.find('[data-test="fleet-flow-legend-healthy"] .bg-status-success-text').exists()).toBe(
       true,
     );
-    expect(
-      w.find('[data-test="fleet-flow-legend-progress"] .bg-status-progress-text').exists(),
-    ).toBe(true);
+    expect(w.find('[data-test="fleet-flow-legend-progress"] .bg-status-info-text').exists()).toBe(
+      true,
+    );
   });
 
   it("toggles a level filter on click", async () => {
