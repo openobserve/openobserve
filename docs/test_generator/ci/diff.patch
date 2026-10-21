@@ -1,0 +1,210 @@
+===== COMPLETE LIST OF CHANGED FILES (3 files) =====
+# AUTHORITATIVE: this list is never truncated. The diff BODY below may be trimmed for
+# very large PRs, so decide WHICH files/areas changed (e.g. web/src frontend) from THIS list.
+tests/ui-testing/playwright-tests/Dashboards/dashboard-variables-auto-run.spec.js
+web/src/views/Dashboards/ViewDashboard.vue
+web/src/views/Dashboards/viewDashboard.timeRange.spec.ts
+===== END CHANGED FILES =====
+
+diff --git a/tests/ui-testing/playwright-tests/Dashboards/dashboard-variables-auto-run.spec.js b/tests/ui-testing/playwright-tests/Dashboards/dashboard-variables-auto-run.spec.js
+index cd908be5569..bfc89c16b5a 100644
+--- a/tests/ui-testing/playwright-tests/Dashboards/dashboard-variables-auto-run.spec.js
++++ b/tests/ui-testing/playwright-tests/Dashboards/dashboard-variables-auto-run.spec.js
+@@ -67,7 +67,7 @@ test.describe('Dashboard variables Auto Run', { tag: ['@dashboards', '@dashboard
+     await autoRun.waitForRuns('var', base + 1);
+     expect(autoRun.runsOf('var')[base]).toContain(`'${first}'`);
+     await autoRun.expectPanelRows('p_var', { shows: [first], hides: [initial] });
+-    await autoRun.expectRefreshVariant('outline');
++    await autoRun.expectRefreshVariant('primary');
+   });
+ 
+   test('Auto Run on: a variable change re-runs only the panels that use it, once each', { tag: ['@P0'] }, async ({ page }) => {
+diff --git a/web/src/views/Dashboards/ViewDashboard.vue b/web/src/views/Dashboards/ViewDashboard.vue
+index ec29efa9be9..0ff749801e0 100644
+--- a/web/src/views/Dashboards/ViewDashboard.vue
++++ b/web/src/views/Dashboards/ViewDashboard.vue
+@@ -128,18 +128,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+             >
+               <OTooltip :content="t('panel.cancel')" />
+             </OButton>
+-            <OButton
+-              v-else
+-              :variant="isRefreshPending ? 'warning' : 'outline'"
+-              size="icon-toolbar"
+-              @click="refreshData()"
+-              :disabled="arePanelsLoading"
+-              :loading="arePanelsLoading"
+-              data-test="dashboard-refresh-btn"
+-              :icon-left="isAutoRunOn ? 'autorenew' : 'refresh'"
+-            >
+-              <OTooltip :content="refreshTooltip" shortcut-id="dashboardRefresh" />
+-            </OButton>
++            <!-- Wrapper mode: a child-mode tooltip would hover-bind only the icon, not the labelled button. -->
++            <OTooltip v-else :content="refreshTooltip" shortcut-id="dashboardRefresh">
++              <OButton
++                :variant="refreshVariant"
++                :size="isMobile ? 'icon-toolbar' : 'sm-toolbar'"
++                @click="refreshData()"
++                :disabled="arePanelsLoading"
++                :loading="arePanelsLoading"
++                :aria-label="t('dashboard.viewDashboard.refresh')"
++                data-test="dashboard-refresh-btn"
++                :icon-left="isAutoRunOn ? 'autorenew' : 'refresh'"
++              >
++                <template v-if="!isMobile">{{ t("dashboard.viewDashboard.refresh") }}</template>
++              </OButton>
++            </OTooltip>
+             <ODropdown align="end" side="bottom">
+               <template #trigger>
+                 <OButton
+@@ -1655,9 +1658,15 @@ export default defineComponent({
+       });
+     };
+ 
++    // Refresh is the dashboard's main action, but in layout edit Save owns the primary slot.
++    const refreshVariant = computed(() => {
++      if (isRefreshPending.value) return "warning";
++      return isEditingLayout.value ? "outline" : "primary";
++    });
++
+     const refreshOptionsVariant = computed(() => {
+       if (config.isEnterprise == "true" && arePanelsLoading.value) return "outline-destructive";
+-      return isRefreshPending.value ? "warning" : "outline";
++      return refreshVariant.value;
+     });
+ 
+     const refreshData = async (withoutCache = false) => {
+@@ -2352,6 +2361,7 @@ export default defineComponent({
+       isAutoRunAvailable,
+       isAutoRunOn,
+       toggleAutoRun,
++      refreshVariant,
+       refreshOptionsVariant,
+       isVariablesChanged,
+       isRefreshPending,
+diff --git a/web/src/views/Dashboards/viewDashboard.timeRange.spec.ts b/web/src/views/Dashboards/viewDashboard.timeRange.spec.ts
+index 5de32adda16..23d6bcbe3b3 100644
+--- a/web/src/views/Dashboards/viewDashboard.timeRange.spec.ts
++++ b/web/src/views/Dashboards/viewDashboard.timeRange.spec.ts
+@@ -185,7 +185,11 @@ describe("ViewDashboard time range gate", () => {
+   };
+   const refreshButton = () => wrapper.findComponent('[data-test="dashboard-refresh-btn"]');
+   const refreshOptions = () => wrapper.findComponent('[data-test="dashboard-refresh-options-btn"]');
+-  const refreshTooltip = () => refreshButton().findComponent({ name: "OTooltip" }).props("content");
++  const refreshTooltip = () =>
++    wrapper
++      .findAllComponents({ name: "OTooltip" })
++      .find((tip) => tip.find('[data-test="dashboard-refresh-btn"]').exists())
++      ?.props("content");
+   const spanOf = (time: any) => time.end_time.getTime() - time.start_time.getTime();
+   const globalSpan = () => spanOf(wrapper.vm.currentTimeObjPerPanel.__global);
+ 
+@@ -226,7 +230,9 @@ describe("ViewDashboard time range gate", () => {
+ 
+     it("turns Refresh yellow with the time-range tooltip while a range waits", async () => {
+       await mountDashboard();
+-      expect(refreshButton().props("variant")).toBe("outline");
++      expect(refreshButton().props("variant")).toBe("primary");
++      expect(refreshOptions().props("variant")).toBe("primary");
++      expect(refreshButton().text()).toContain("Refresh");
+ 
+       await pick(relative("1h"));
+ 
+@@ -245,7 +251,7 @@ describe("ViewDashboard time range gate", () => {
+       expect(wrapper.vm.selectedDate.relativeTimePeriod).toBe("1h");
+       expect(globalSpan()).toBe(60 * MINUTE);
+       expect(route.query.period).toBe("1h");
+-      expect(refreshButton().props("variant")).toBe("outline");
++      expect(refreshButton().props("variant")).toBe("primary");
+     });
+ 
+     it("applies the waiting range on an auto-refresh tick", async () => {
+@@ -265,7 +271,7 @@ describe("ViewDashboard time range gate", () => {
+       await pick(relative("1h"));
+       await pick(relative("15m"));
+ 
+-      expect(refreshButton().props("variant")).toBe("outline");
++      expect(refreshButton().props("variant")).toBe("primary");
+       expect(wrapper.vm.currentTimeObjPerPanel.__global).toBe(appliedBefore);
+       expect(routerReplace).not.toHaveBeenCalled();
+     });
+@@ -274,10 +280,10 @@ describe("ViewDashboard time range gate", () => {
+       await mountDashboard();
+ 
+       await pick(absolute(NaN, 200));
+-      expect(refreshButton().props("variant")).toBe("outline");
++      expect(refreshButton().props("variant")).toBe("primary");
+ 
+       await pick(absolute(300 * MINUTE, 200 * MINUTE));
+-      expect(refreshButton().props("variant")).toBe("outline");
++      expect(refreshButton().props("variant")).toBe("primary");
+ 
+       refreshButton().vm.$emit("click");
+       await flushPromises();
+@@ -298,7 +304,7 @@ describe("ViewDashboard time range gate", () => {
+         relativeTimePeriod: "15m",
+       });
+       expect(picker().props("modelValue").relativeTimePeriod).toBe("15m");
+-      expect(refreshButton().props("variant")).toBe("outline");
++      expect(refreshButton().props("variant")).toBe("primary");
+       expect(routerReplace).not.toHaveBeenCalled();
+     });
+   });
+@@ -380,12 +386,29 @@ describe("ViewDashboard time range gate", () => {
+ 
+     expect(wrapper.vm.selectedDate.valueType).toBe("absolute");
+     expect(globalSpan()).toBe(10 * MINUTE);
+-    expect(refreshButton().props("variant")).toBe("outline");
++    expect(refreshButton().props("variant")).toBe("primary");
++  });
++
++  it("shows the labelled Refresh with the plain refresh icon while Auto Run is off", async () => {
++    await mountDashboard();
++
++    expect(refreshButton().props("variant")).toBe("primary");
++    expect(refreshButton().props("iconLeft")).toBe("refresh");
++    expect(refreshButton().text()).toContain("Refresh");
+   });
+ 
+   describe("Auto Run on", () => {
+     beforeEach(() => setAutoRun("on"));
+ 
++    it("keeps the labelled Refresh primary and swaps in the Auto Run icon", async () => {
++      await mountDashboard();
++
++      expect(refreshButton().props("variant")).toBe("primary");
++      expect(refreshOptions().props("variant")).toBe("primary");
++      expect(refreshButton().props("iconLeft")).toBe("autorenew");
++      expect(refreshButton().text()).toContain("Refresh");
++    });
++
+     it("applies a preset at once and updates the URL", async () => {
+       await mountDashboard();
+ 
+@@ -394,7 +417,7 @@ describe("ViewDashboard time range gate", () => {
+       expect(wrapper.vm.selectedDate.relativeTimePeriod).toBe("1h");
+       expect(globalSpan()).toBe(60 * MINUTE);
+       expect(route.query.period).toBe("1h");
+-      expect(refreshButton().props("variant")).toBe("outline");
++      expect(refreshButton().props("variant")).toBe("primary");
+       expect(refreshTooltip()).toBe("Runs queries on open and on filter/time changes");
+     });
+ 
+@@ -405,7 +428,7 @@ describe("ViewDashboard time range gate", () => {
+       picker().vm.$emit("show");
+       await pick(absolute(end - 30 * MINUTE, end));
+       expect(wrapper.vm.selectedDate.relativeTimePeriod).toBe("15m");
+-      expect(refreshButton().props("variant")).toBe("outline");
++      expect(refreshButton().props("variant")).toBe("primary");
+ 
+       picker().vm.$emit("hide");
+       await flushPromises();
+@@ -440,7 +463,7 @@ describe("ViewDashboard time range gate", () => {
+       relativeTimePeriod: "6h",
+     });
+     expect(wrapper.vm.selectedDate.relativeTimePeriod).toBe("6h");
+-    expect(refreshButton().props("variant")).toBe("outline");
++    expect(refreshButton().props("variant")).toBe("primary");
+   });
+ 
+   it("leaves the picker alone when a reload keeps the same range", async () => {
