@@ -28,6 +28,7 @@
         @update:model-value="emitValue()"
       />
       <OButton
+        :aria-label="t('common.remove')"
         variant="ghost"
         size="icon"
         class="ms-1"

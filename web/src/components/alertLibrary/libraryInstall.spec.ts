@@ -17,7 +17,11 @@ import { describe, expect, it } from "vitest";
 
 import type { AlertLibraryEntry, AlertLibraryFile } from "@/types/alertLibrary";
 
-import { buildInstallPayload, InstallPayloadError } from "./libraryInstall";
+import {
+  buildAnomalyInstallPayload,
+  buildInstallPayload,
+  InstallPayloadError,
+} from "./libraryInstall";
 
 const entry = (over: Partial<AlertLibraryEntry> = {}): AlertLibraryEntry => ({
   id: "k8s/pod-oom-killed",
@@ -498,6 +502,131 @@ describe("buildInstallPayload", () => {
     });
     const snapshot = structuredClone(source);
     build({ file: source });
+    expect(source).toEqual(snapshot);
+  });
+});
+
+describe("buildAnomalyInstallPayload", () => {
+  const anomalyEntry = (over: Partial<AlertLibraryEntry> = {}) =>
+    entry({
+      id: "apm/traces_server_error_ratio_anomaly",
+      name: "traces_server_error_ratio_anomaly",
+      pack: "apm",
+      category: "traces",
+      severity: "warning",
+      stream: "default",
+      stream_type: "traces",
+      query_type: "sql",
+      alert_type: "anomaly_detection",
+      ...over,
+    });
+
+  const anomalyFile = (over: Partial<AlertLibraryFile> = {}): AlertLibraryFile => ({
+    name: "traces_server_error_ratio_anomaly",
+    title: "Server error ratio is unusually high",
+    severity: "warning",
+    description: "Share of SERVER spans with status ERROR is above its learned band.",
+    tags: ["anomaly", "traces", "errors"],
+    source: { project: "openobserve", license: "CC-BY-4.0" },
+    alert_type: "anomaly_detection",
+    stream_type: "traces",
+    stream_name: "default",
+    enabled: true,
+    anomaly_config: {
+      query_mode: "filters",
+      filters: [{ field: "span_kind", operator: "=", value: "2" }],
+      detection_function: "p95",
+      detection_function_field: "duration",
+      histogram_interval: "5m",
+      schedule_interval: "5m",
+      detection_window_seconds: 900,
+      training_window_days: 28,
+      retrain_interval_days: 7,
+      alert_direction: "above",
+      alert_window_buckets: 3,
+      alert_window_fire_pct: 60,
+      alert_window_recover_pct: 34,
+    },
+    ...over,
+  });
+
+  const buildAnomaly = (over: Record<string, unknown> = {}) =>
+    buildAnomalyInstallPayload({
+      entry: anomalyEntry(),
+      file: anomalyFile(),
+      folderId: "folder-7",
+      destination: "ops-slack",
+      ...over,
+    });
+
+  it("strips the catalogue-only keys", () => {
+    const payload = buildAnomaly();
+    expect(payload).not.toHaveProperty("title");
+    expect(payload).not.toHaveProperty("severity");
+    expect(payload).not.toHaveProperty("source");
+  });
+
+  it("keeps the file's name, description, stream and engine config", () => {
+    const payload = buildAnomaly();
+    expect(payload.name).toBe("traces_server_error_ratio_anomaly");
+    expect(payload.description).toBe(
+      "Share of SERVER spans with status ERROR is above its learned band.",
+    );
+    expect(payload.stream_name).toBe("default");
+    expect(payload.alert_type).toBe("anomaly_detection");
+    expect(payload.anomaly_config).toEqual(anomalyFile().anomaly_config);
+  });
+
+  it("names the alert after its title only when the file has no name", () => {
+    const { name: _dropped, ...unnamed } = anomalyFile();
+    expect(buildAnomaly({ file: unnamed }).name).toBe("Server error ratio is unusually high");
+  });
+
+  it("sends the chosen destination, or none", () => {
+    expect(buildAnomaly().destinations).toEqual(["ops-slack"]);
+    expect(buildAnomaly({ destination: "" }).destinations).toEqual([]);
+  });
+
+  it("files the alert in the chosen folder, matching ?folder=", () => {
+    expect(buildAnomaly().folder_id).toBe("folder-7");
+  });
+
+  it("forces enabled, since a config created disabled never trains", () => {
+    expect(buildAnomaly({ file: anomalyFile({ enabled: false }) }).enabled).toBe(true);
+    const { enabled: _dropped, ...withoutEnabled } = anomalyFile();
+    expect(buildAnomaly({ file: withoutEnabled }).enabled).toBe(true);
+  });
+
+  it("derives priority from the library severity", () => {
+    expect(buildAnomaly().priority).toBe(3);
+    expect(buildAnomaly({ entry: anomalyEntry({ severity: "info" }) }).priority).toBe(4);
+  });
+
+  it("drops a priority the severity does not map to", () => {
+    const payload = buildAnomaly({
+      entry: anomalyEntry({ severity: "nope" as never }),
+      file: anomalyFile({ priority: 1 }),
+    });
+    expect(payload).not.toHaveProperty("priority");
+  });
+
+  it("adds the pack tag once", () => {
+    expect(buildAnomaly().tags).toEqual(["anomaly", "traces", "errors", "pack:apm"]);
+    const tagged = buildAnomaly({ file: anomalyFile({ tags: ["pack:apm"] }) });
+    expect(tagged.tags).toEqual(["pack:apm"]);
+  });
+
+  it("adds none of the scheduled-alert fields", () => {
+    const payload = buildAnomaly();
+    expect(payload).not.toHaveProperty("trigger_condition");
+    expect(payload).not.toHaveProperty("query_condition");
+    expect(payload).not.toHaveProperty("context_attributes");
+  });
+
+  it("does not mutate the file it was handed", () => {
+    const source = anomalyFile();
+    const snapshot = structuredClone(source);
+    buildAnomaly({ file: source });
     expect(source).toEqual(snapshot);
   });
 });

@@ -13,10 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{
-    io::Error,
-    net::{AddrParseError, IpAddr, SocketAddr},
-};
+use std::io::Error;
 
 use axum::http::header::{HeaderMap, HeaderName};
 use config::meta::{
@@ -25,7 +22,11 @@ use config::meta::{
     stream::StreamType,
 };
 use hashbrown::{HashMap, HashSet};
-use opentelemetry::{global, propagation::Extractor, trace::TraceContextExt};
+use opentelemetry::{
+    global,
+    propagation::Extractor,
+    trace::{TraceContextExt, TraceId},
+};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 #[inline(always)]
@@ -177,7 +178,7 @@ pub fn get_or_create_trace_id(headers: &HeaderMap, span: &tracing::Span) -> Stri
             let ctx = global::get_text_map_propagator(|propagator| {
                 propagator.extract(&RequestHeaderExtractor::new(headers))
             });
-            let trace_id = ctx.span().span_context().trace_id().to_string();
+            let trace_id = span_trace_id_or_fresh(ctx.span().span_context().trace_id());
             if !span.is_none() {
                 let _ = span.set_parent(ctx);
             }
@@ -201,29 +202,10 @@ pub fn get_or_create_trace_id(headers: &HeaderMap, span: &tracing::Span) -> Stri
             config::ider::generate_trace_id()
         }
     } else if !span.is_none() {
-        span.context().span().span_context().trace_id().to_string()
+        span_trace_id_or_fresh(span.context().span().span_context().trace_id())
     } else {
         config::ider::generate_trace_id()
     }
-}
-
-/// This function can handle IPv4 and IPv6 addresses which may have port numbers appended
-pub fn parse_ip_addr(ip_address: &str) -> Result<(IpAddr, Option<u16>), AddrParseError> {
-    let mut port: Option<u16> = None;
-    let ip = ip_address.parse::<IpAddr>().or_else(|_| {
-        ip_address
-            .parse::<SocketAddr>()
-            .map(|sock_addr| {
-                port = Some(sock_addr.port());
-                sock_addr.ip()
-            })
-            .map_err(|e| {
-                log::error!("Error parsing IP address: {}, {}", ip_address, e);
-                e
-            })
-    })?;
-
-    Ok((ip, port))
 }
 
 // Extractor for request headers
@@ -276,6 +258,15 @@ pub fn get_dashboard_info_from_request(query: &HashMap<String, String>) -> Optio
         tab_id,
         tab_name,
     })
+}
+
+/// A span without an OpenTelemetry context reports an all-zero id that every request would share.
+fn span_trace_id_or_fresh(trace_id: TraceId) -> String {
+    if trace_id == TraceId::INVALID {
+        config::ider::generate_trace_id()
+    } else {
+        trace_id.to_string()
+    }
 }
 
 #[cfg(test)]
@@ -398,39 +389,6 @@ mod tests {
 
         let query = Query::<HashMap<String, String>>(Default::default());
         assert_eq!(get_folder(&query), config::meta::folder::DEFAULT_FOLDER);
-    }
-
-    #[test]
-    fn test_parse_ip_addr() {
-        let ip_port_exp_map = [
-            (
-                "192.168.1.1",
-                "192.168.1.1".parse::<IpAddr>().unwrap(),
-                None,
-            ),
-            (
-                "192.168.1.1:8080",
-                "192.168.1.1".parse::<IpAddr>().unwrap(),
-                Some(8080),
-            ),
-            (
-                "2001:db8::1",
-                "2001:db8::1".parse::<IpAddr>().unwrap(),
-                None,
-            ),
-            (
-                "[2001:db8::1]:8080",
-                "2001:db8::1".parse::<IpAddr>().unwrap(),
-                Some(8080),
-            ),
-        ];
-
-        for (ip, exp_ip, exp_port) in ip_port_exp_map {
-            assert_eq!(parse_ip_addr(ip).unwrap(), (exp_ip, exp_port));
-        }
-
-        // Test invalid IP
-        assert!(parse_ip_addr("invalid").is_err());
     }
 
     #[test]
@@ -557,6 +515,42 @@ mod tests {
     }
 
     #[test]
+    fn test_get_or_create_trace_id_replaces_an_unset_span_trace_id() {
+        struct EnabledSubscriber;
+        impl tracing::Subscriber for EnabledSubscriber {
+            fn enabled(&self, _: &tracing::Metadata<'_>) -> bool {
+                true
+            }
+            fn new_span(&self, _: &tracing::span::Attributes<'_>) -> tracing::span::Id {
+                tracing::span::Id::from_u64(1)
+            }
+            fn record(&self, _: &tracing::span::Id, _: &tracing::span::Record<'_>) {}
+            fn record_follows_from(&self, _: &tracing::span::Id, _: &tracing::span::Id) {}
+            fn event(&self, _: &tracing::Event<'_>) {}
+            fn enter(&self, _: &tracing::span::Id) {}
+            fn exit(&self, _: &tracing::span::Id) {}
+        }
+
+        tracing::subscriber::with_default(EnabledSubscriber, || {
+            let span = tracing::info_span!("request");
+            assert!(!span.is_none());
+            assert_eq!(
+                span.context().span().span_context().trace_id(),
+                TraceId::INVALID
+            );
+            let trace_id = get_or_create_trace_id(&HeaderMap::new(), &span);
+            assert_eq!(trace_id.len(), 32);
+            assert!(!trace_id.chars().all(|c| c == '0'), "{trace_id}");
+            assert_ne!(trace_id, get_or_create_trace_id(&HeaderMap::new(), &span));
+        });
+        let valid = TraceId::from_hex("4bf92f3577b34da6a3ce929d0e0e4736").unwrap();
+        assert_eq!(
+            span_trace_id_or_fresh(valid),
+            "4bf92f3577b34da6a3ce929d0e0e4736"
+        );
+    }
+
+    #[test]
     fn test_get_or_create_trace_id_lowercases_rum_header() {
         let mut headers = HeaderMap::new();
         headers.insert(
@@ -611,19 +605,6 @@ mod tests {
         // Should generate new trace ID for malformed header
         assert_eq!(trace_id.len(), 32);
         assert!(trace_id.chars().all(|c| c.is_ascii_hexdigit()));
-    }
-
-    #[test]
-    fn test_get_or_create_trace_id_openobserve_header_valid() {
-        // Test x-openobserve-trace-id header with valid trace ID
-        let mut headers = HeaderMap::new();
-        headers.insert(
-            HeaderName::from_static("x-openobserve-trace-id"),
-            HeaderValue::from_static("4bf92f3577b34da6a3ce929d0e0e4736"),
-        );
-        let span = tracing::Span::none();
-        let trace_id = get_or_create_trace_id(&headers, &span);
-        assert_eq!(trace_id, "4bf92f3577b34da6a3ce929d0e0e4736");
     }
 
     #[test]

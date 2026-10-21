@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{cmp::max, fmt::Display, ops::Range, str::FromStr, sync::Arc};
+use std::{fmt::Display, ops::Range, str::FromStr, sync::Arc};
 
 use arrow::buffer::BooleanBuffer;
 use chrono::{DateTime, Duration, TimeZone, Utc};
@@ -518,52 +518,6 @@ impl StreamStats {
             .num_microseconds()
             .unwrap();
         (self.doc_time_min, self.doc_time_max + slack)
-    }
-
-    pub fn add_file_meta(&mut self, meta: &FileMeta) {
-        self.file_num += 1;
-        self.doc_num = max(0, self.doc_num + meta.records);
-        self.doc_time_min = if self.doc_time_min == 0 {
-            meta.min_ts
-        } else if meta.min_ts == 0 {
-            self.doc_time_min
-        } else {
-            self.doc_time_min.min(meta.min_ts)
-        };
-        self.doc_time_max = self.doc_time_max.max(meta.max_ts);
-        self.storage_size += meta.original_size as f64;
-        self.compressed_size += meta.compressed_size as f64;
-        self.index_size += meta.index_size as f64;
-        self.mindex_size += meta.mindex_size as f64;
-        if self.storage_size < 0.0 {
-            self.storage_size = 0.0;
-        }
-        if self.compressed_size < 0.0 {
-            self.compressed_size = 0.0;
-        }
-        if self.mindex_size < 0.0 {
-            self.mindex_size = 0.0;
-        }
-        if self.index_size < 0.0 {
-            self.index_size = 0.0;
-        }
-    }
-
-    pub fn format_by(&mut self, stats: &StreamStats) {
-        self.file_num = stats.file_num;
-        self.doc_num = stats.doc_num;
-        self.storage_size = stats.storage_size;
-        self.compressed_size = stats.compressed_size;
-        self.index_size = stats.index_size;
-        self.mindex_size = stats.mindex_size;
-        self.doc_time_min = if self.doc_time_min == 0 {
-            stats.doc_time_min
-        } else if stats.doc_time_min == 0 {
-            self.doc_time_min
-        } else {
-            self.doc_time_min.min(stats.doc_time_min)
-        };
-        self.doc_time_max = self.doc_time_max.max(stats.doc_time_max);
     }
 
     pub fn merge(&mut self, other: &StreamStats) {
@@ -1382,14 +1336,6 @@ impl StreamPartition {
         }
     }
 
-    pub fn new_prefix(field: &str) -> Self {
-        Self {
-            field: field.to_string(),
-            types: StreamPartitionType::Prefix,
-            disabled: false,
-        }
-    }
-
     pub fn get_partition_key(&self, value: &str) -> String {
         format!("{}={}", self.field, self.get_partition_value(value))
     }
@@ -1554,50 +1500,6 @@ mod tests {
     }
 
     #[test]
-    fn test_stream_stats_add_file_meta() {
-        let mut stats = StreamStats::default();
-        let meta = FileMeta {
-            min_ts: 1000,
-            max_ts: 2000,
-            records: 100,
-            original_size: 1000,
-            compressed_size: 500,
-            index_size: 50,
-            mindex_size: 0,
-            flattened: false,
-            bloom_ver: 0,
-        };
-
-        stats.add_file_meta(&meta);
-        assert_eq!(stats.file_num, 1);
-        assert_eq!(stats.doc_num, 100);
-        assert_eq!(stats.doc_time_min, 1000);
-        assert_eq!(stats.doc_time_max, 2000);
-        assert_eq!(stats.storage_size, 1000.0);
-        assert_eq!(stats.compressed_size, 500.0);
-
-        // Test with negative values (should be clamped to 0)
-        let negative_meta = FileMeta {
-            original_size: -100,
-            compressed_size: -50,
-            index_size: -10,
-            mindex_size: 0,
-            ..meta
-        };
-        let mut negative_stats = StreamStats {
-            storage_size: 50.0,
-            compressed_size: 25.0,
-            index_size: 5.0,
-            mindex_size: 0.0,
-            ..Default::default()
-        };
-        negative_stats.add_file_meta(&negative_meta);
-        assert_eq!(negative_stats.storage_size, 0.0);
-        assert_eq!(negative_stats.compressed_size, 0.0);
-        assert_eq!(negative_stats.index_size, 0.0);
-    }
-
-    #[test]
     fn test_stream_stats_operations() {
         let stats1 = StreamStats {
             file_num: 5,
@@ -1636,13 +1538,6 @@ mod tests {
 
     #[test]
     fn test_stream_partition_types() {
-        // Test prefix partition
-        let prefix_part = StreamPartition::new_prefix("field");
-        assert_eq!(prefix_part.types, StreamPartitionType::Prefix);
-        assert_eq!(prefix_part.get_partition_value("Hello"), "h");
-        assert_eq!(prefix_part.get_partition_value(""), "_");
-        assert_eq!(prefix_part.get_partition_value("123"), "1");
-
         // Test value partition
         let value_part = StreamPartition::new("field");
         assert_eq!(value_part.get_partition_value("test_value"), "test_value");
@@ -2123,34 +2018,6 @@ mod tests {
     }
 
     #[test]
-    fn test_stream_stats_format_by() {
-        let mut stats = StreamStats {
-            doc_time_min: 500,
-            doc_time_max: 1000,
-            ..Default::default()
-        };
-        let src = StreamStats {
-            file_num: 5,
-            doc_num: 100,
-            storage_size: 2048.0,
-            compressed_size: 1024.0,
-            index_size: 10.0,
-            mindex_size: 0.0,
-            doc_time_min: 200,
-            doc_time_max: 800,
-            ..Default::default()
-        };
-        stats.format_by(&src);
-        assert_eq!(stats.file_num, 5);
-        assert_eq!(stats.doc_num, 100);
-        assert_eq!(stats.storage_size, 2048.0);
-        // doc_time_min: min(500, 200) = 200
-        assert_eq!(stats.doc_time_min, 200);
-        // doc_time_max: max(1000, 800) = 1000
-        assert_eq!(stats.doc_time_max, 1000);
-    }
-
-    #[test]
     fn test_stream_stats_merge() {
         let mut a = StreamStats {
             file_num: 3,
@@ -2207,36 +2074,6 @@ mod tests {
         assert!(!v.is_empty());
         let s: String = stats.into();
         assert!(s.contains("42"));
-    }
-
-    #[test]
-    fn test_stream_stats_format_by_self_zero_doc_time_min() {
-        // self.doc_time_min == 0 → take stats.doc_time_min
-        let mut stats = StreamStats {
-            doc_time_min: 0,
-            ..Default::default()
-        };
-        let src = StreamStats {
-            doc_time_min: 300,
-            ..Default::default()
-        };
-        stats.format_by(&src);
-        assert_eq!(stats.doc_time_min, 300);
-    }
-
-    #[test]
-    fn test_stream_stats_format_by_src_zero_doc_time_min() {
-        // stats.doc_time_min == 0 → keep self.doc_time_min
-        let mut stats = StreamStats {
-            doc_time_min: 400,
-            ..Default::default()
-        };
-        let src = StreamStats {
-            doc_time_min: 0,
-            ..Default::default()
-        };
-        stats.format_by(&src);
-        assert_eq!(stats.doc_time_min, 400);
     }
 
     #[test]
@@ -2443,13 +2280,6 @@ mod tests {
     }
 
     #[test]
-    fn test_time_range_contains_strict_subset() {
-        let outer = TimeRange::new(0, 100);
-        let inner = TimeRange::new(20, 80);
-        assert!(outer.contains(&inner));
-    }
-
-    #[test]
     fn test_time_range_contains_not_contained() {
         let outer = TimeRange::new(0, 50);
         let inner = TimeRange::new(40, 100);
@@ -2470,13 +2300,6 @@ mod tests {
         let b = TimeRange::new(50, 100);
         // a.end == b.start: condition is a.start < b.end && a.end > b.start => 0<100 && 50>50 =>
         // false
-        assert!(!a.intersects(&b));
-    }
-
-    #[test]
-    fn test_time_range_intersects_disjoint() {
-        let a = TimeRange::new(0, 30);
-        let b = TimeRange::new(50, 100);
         assert!(!a.intersects(&b));
     }
 
@@ -2567,8 +2390,11 @@ mod tests {
                 .mindex_size,
             0
         );
-        let mut a = StreamStats::default();
-        a.add_file_meta(&meta);
+        let mut a = StreamStats {
+            index_size: 7.0,
+            mindex_size: 13.0,
+            ..Default::default()
+        };
         let b = StreamStats {
             mindex_size: 5.0,
             index_size: 12.0,
@@ -2578,14 +2404,6 @@ mod tests {
         assert_eq!((&a - &b).mindex_size, 8.0);
         a.merge(&b);
         assert_eq!((a.mindex_size, a.index_size), (18.0, 19.0));
-        let mut copied = StreamStats::default();
-        copied.format_by(&a);
-        assert_eq!(copied.mindex_size, 18.0);
-        copied.add_file_meta(&FileMeta {
-            mindex_size: -50,
-            ..Default::default()
-        });
-        assert_eq!((copied.mindex_size, copied.index_size), (0.0, 19.0));
         let mut json = serde_json::to_value(&a).unwrap();
         json.as_object_mut().unwrap().remove("mindex_size");
         assert_eq!(

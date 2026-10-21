@@ -1025,10 +1025,12 @@ pub async fn init() -> Result<(), anyhow::Error> {
         );
 
         o2_enterprise::enterprise::llm_evaluations::eval_jobs::search::register_executor(
-            |request| {
+            |request, scope| {
                 Box::pin(async move {
                     let stream_type =
                         config::meta::stream::StreamType::from(request.stream_type.as_str());
+                    let local = scope
+                        == o2_enterprise::enterprise::llm_evaluations::eval_jobs::search::SearchScope::LocalCluster;
                     let req = config::meta::search::Request {
                         query: config::meta::search::Query {
                             sql: request.sql,
@@ -1040,6 +1042,17 @@ pub async fn init() -> Result<(), anyhow::Error> {
                             ..Default::default()
                         },
                         use_cache: false,
+                        // `local` is what the super-cluster router reads as "this cluster only".
+                        regions: if local {
+                            vec!["local".to_string()]
+                        } else {
+                            vec![]
+                        },
+                        clusters: if local {
+                            vec!["local".to_string()]
+                        } else {
+                            vec![]
+                        },
                         ..Default::default()
                     };
                     search_service::search(
@@ -1073,21 +1086,30 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
         o2_enterprise::enterprise::llm_evaluations::providers::register_provider_cost_calculator(
             |org_id, model, input_tokens, output_tokens, timestamp| {
+                use openobserve_core::traces::otel::pricing::{ResolvedPricing, resolve_pricing};
+
                 let entries = db::model_pricing::get_org_pricing_entries(org_id);
-                let definition =
-                    db::model_pricing::find_pricing_sync_at(&entries, model, Some(timestamp))?;
-                let usage = std::collections::HashMap::from([
-                    ("input".to_string(), input_tokens),
-                    ("output".to_string(), output_tokens),
-                ]);
-                db::model_pricing::calculate_cost_from_definition(
-                    &definition,
-                    &usage,
-                    Some(timestamp),
-                )
-                .cost
-                .get("total")
-                .copied()
+                let resolved = resolve_pricing(&entries, model, Some(timestamp))?;
+                match resolved.pricing {
+                    ResolvedPricing::Definition(definition) => {
+                        let usage = std::collections::HashMap::from([
+                            ("input".to_string(), input_tokens),
+                            ("output".to_string(), output_tokens),
+                        ]);
+                        db::model_pricing::calculate_cost_from_definition(
+                            &definition,
+                            &usage,
+                            Some(timestamp),
+                            &config::meta::model_pricing::PricingContext::default(),
+                        )
+                        .cost
+                        .get("total")
+                        .copied()
+                    }
+                    ResolvedPricing::Compiled(pricing) => {
+                        Some(pricing.cost(input_tokens, output_tokens, Some(timestamp)).2)
+                    }
+                }
             },
         );
 

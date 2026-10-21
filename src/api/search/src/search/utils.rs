@@ -206,7 +206,10 @@ impl Drop for SearchStreamGuard {
                 "[trace_id {trace_id}] client disconnected before search finished, cancelling query"
             );
             tokio::spawn(async move {
-                super::query_manager::cancel_query_internal(&org_id, &trace_id).await;
+                match super::query_manager::cancel_in_cluster(&org_id, &trace_id).await {
+                    Ok(res) => log::info!("[trace_id {trace_id}] query canceled: {res:?}"),
+                    Err(e) => log::error!("[trace_id {trace_id}] failed to cancel query: {e}"),
+                }
             });
         }
         #[cfg(not(feature = "enterprise"))]

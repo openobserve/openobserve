@@ -325,6 +325,18 @@ describe("useSearchBar Composable", () => {
       expect(searchObj.data.stream.selectedFields).toEqual([]);
     });
 
+    it("drops the previous stream's values, so autocomplete never offers them for the new one", async () => {
+      const { searchObj, fieldValues } = searchState();
+      fieldValues.value = { field1: new Set(["old-stream-only"]) };
+      const held = fieldValues.value;
+      searchObj.data.stream.selectedStream = ["new_stream"];
+
+      await wrapper.vm.onStreamChange("");
+
+      expect(fieldValues.value).toBe(held);
+      expect(fieldValues.value).toEqual({});
+    });
+
     // searchObj.loading drives the results-grid skeleton, so it must stay off
     // when the stream change only refreshes the schema.
     describe("results-grid loading flag", () => {

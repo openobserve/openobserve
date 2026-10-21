@@ -138,15 +138,17 @@ const selectionLabel = computed(() => {
           :options="pageSizeSelectOptions"
           :searchable="false"
           size="sm"
+          :aria-label="t('search.recordsPerPage')"
           data-test="o2-table-page-size-select"
         />
       </div>
 
-      <div class="flex items-center gap-1">
+      <nav class="flex items-center gap-1" :aria-label="t('components.pagination.pagination')">
         <OButton
           variant="outline"
           size="icon"
           :disabled="isFirstPage"
+          :aria-label="t('search.firstPage')"
           data-test="o2-table-first-page-btn"
           @click="emit('first-page')"
         >
@@ -156,6 +158,7 @@ const selectionLabel = computed(() => {
           variant="outline"
           size="icon"
           :disabled="isFirstPage"
+          :aria-label="t('components.pagination.previousPage')"
           data-test="o2-table-prev-page-btn"
           @click="emit('prev-page')"
         >
@@ -165,6 +168,7 @@ const selectionLabel = computed(() => {
           variant="outline"
           size="icon"
           :disabled="isLastPage"
+          :aria-label="t('components.pagination.nextPage')"
           data-test="o2-table-next-page-btn"
           @click="emit('next-page')"
         >
@@ -175,12 +179,13 @@ const selectionLabel = computed(() => {
           variant="outline"
           size="icon"
           :disabled="isLastPage"
+          :aria-label="t('search.lastPage')"
           data-test="o2-table-last-page-btn"
           @click="emit('last-page')"
         >
           <OIcon name="last-page" size="sm" />
         </OButton>
-      </div>
+      </nav>
     </div>
   </div>
 </template>

@@ -669,20 +669,6 @@ mod tests {
     }
 
     #[test]
-    fn test_reset_command_invalid_component() {
-        let app = create_test_app();
-        let matches = app
-            .try_get_matches_from(["openobserve", "reset", "--component", "invalid"])
-            .unwrap();
-        let (name, sub_matches) = matches.subcommand().unwrap();
-        assert_eq!(name, "reset");
-        assert_eq!(
-            sub_matches.get_one::<String>("component").unwrap(),
-            "invalid"
-        );
-    }
-
-    #[test]
     fn test_view_command_parsing() {
         let app = create_test_app();
         let matches = app

@@ -252,7 +252,9 @@ test.describe("Logs Query Builder - Query Mode Toggle", () => {
         const histogramQuery = 'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1" FROM "e2e_automate" GROUP BY x_axis_1';
         await setupQueryAndSwitchToBuild(pm, page, histogramQuery);
 
+        // Custom mode copies the builder's generated SQL once, so it must exist before the switch.
         await pm.logsPage.expectBuilderModeActive();
+        await pm.logsPage.expectQueryEditorPopulated();
         await pm.logsPage.clickCustomQueryType();
         await pm.logsPage.expectCustomModeActive();
 
@@ -318,7 +320,7 @@ test.describe("Logs Query Builder - SQL Mode Toggle in Builder", () => {
         await pm.logsPage.enableSqlModeIfNeeded();
         await page.waitForLoadState('domcontentloaded');
 
-        const editorText = await pm.logsPage.getQueryEditorText();
+        const editorText = await pm.logsPage.getQueryEditorTextWhenReady();
         expect(editorText.toLowerCase()).toContain('select');
         expect(editorText.toLowerCase()).toContain('from');
 

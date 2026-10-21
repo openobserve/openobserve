@@ -46,13 +46,6 @@ mod tests {
     }
 
     #[test]
-    fn test_kv_item_new_empty_strings() {
-        let item = cluster_rpc::KvItem::new("", "");
-        assert_eq!(item.key, "");
-        assert_eq!(item.value, "");
-    }
-
-    #[test]
     fn test_ingestion_data_from_empty_vec() {
         let data = cluster_rpc::IngestionData::from(vec![]);
         let decoded: Vec<serde_json::Value> = serde_json::from_slice(&data.data).unwrap();

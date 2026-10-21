@@ -35,6 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="flex items-center max-md:flex-wrap max-md:gap-y-2">
     <OSelect
       :model-value="model"
+      :aria-label="t('alerts.destination')"
       :options="options"
       multiple
       :placeholder="placeholder"

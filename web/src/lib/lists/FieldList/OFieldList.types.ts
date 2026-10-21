@@ -25,13 +25,15 @@ export interface OFieldListProps {
   draggable?: boolean;
   dragEnabledFn?: (row: FieldItem, index: number) => boolean;
   sortFn?: (a: FieldItem, b: FieldItem) => number;
+  /** Rows take focus and Enter or Space picks them, for a list that is a picker. */
+  keyboard?: boolean;
 }
 
 export interface OFieldListEmits {
   "update:search": [value: string];
   "update:currentPage": [page: number];
   "update:expandedIds": [ids: string[]];
-  "row-click": [row: FieldItem, event: MouseEvent];
+  "row-click": [row: FieldItem, event: MouseEvent | KeyboardEvent];
   "row-dblclick": [row: FieldItem, event: MouseEvent];
   "scroll-end": [scrollInfo: any];
   "drag-start": [row: FieldItem, event: DragEvent];

@@ -103,14 +103,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #cell-actions="{ row }">
               <div v-if="row.status === 'Active'" class="flex justify-end gap-2 pe-3">
                 <OButton
-                  variant="outline-destructive"
-                  size="sm"
+                  variant="ghost-destructive"
+                  size="icon-sm"
+                  :title="t('billing.billingGroup.remove')"
+                  :aria-label="t('billing.billingGroup.remove')"
                   :disabled="actioningToken === row.org_id"
                   class="max-md:hidden"
                   :data-test="`org-group-remove-member-${row.org_id}`"
                   @click="removeTarget = row"
                 >
-                  {{ t("billing.billingGroup.remove") }}
+                  <OIcon name="delete" size="sm" />
                 </OButton>
                 <ODropdown side="bottom" align="end">
                   <template #trigger>
@@ -596,7 +598,6 @@ export default defineComponent({
     const headerInvite = inject<{
       trigger: number;
       canInvite: boolean;
-      refreshMembers?: () => void;
     }>("orgGroupInvite", undefined as any);
     watch(
       () => headerInvite?.trigger,
@@ -913,7 +914,6 @@ export default defineComponent({
         removeTarget.value = null;
       }
       await loadAll();
-      headerInvite?.refreshMembers?.();
     };
 
     const leaveGroup = async () => {
@@ -937,7 +937,6 @@ export default defineComponent({
         showLeaveDialog.value = false;
       }
       await loadAll();
-      headerInvite?.refreshMembers?.();
     };
 
     onMounted(loadAll);

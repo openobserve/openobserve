@@ -197,26 +197,36 @@ test.describe('Anomaly Detection', () => {
       }
     });
 
-    test('a new alert starts at Auto, with the level blank', {
+    test('a new alert starts at Auto, with a read-only auto level', {
       tag: ['@anomaly', '@P1', '@functional', '@all'],
     }, async () => {
-      expect(await pm.anomalyDetectionPage.getSensitivityLevel()).toBe('');
       expect(await pm.anomalyDetectionPage.getActiveSensitivityTier()).toBe('auto');
+      const autoLevel = pm.anomalyDetectionPage.getSensitivityAutoLevelLocator();
+      await expect(autoLevel).toBeVisible();
+      await expect(autoLevel).toContainText('Auto level');
+      await expect(autoLevel).toContainText('Available after training');
+      await expect(pm.anomalyDetectionPage.getSensitivityLevelLocator()).toBeHidden();
     });
 
-    test('Auto clears an override back to a blank level', {
+    test('Auto clears an override back to the read-only auto level', {
       tag: ['@anomaly', '@P1', '@functional', '@all'],
     }, async () => {
       await pm.anomalyDetectionPage.selectSensitivityTier(4);
+      expect(await pm.anomalyDetectionPage.getSensitivityLevel()).toBe('4');
       await pm.anomalyDetectionPage.selectSensitivityTier('auto');
-      expect(await pm.anomalyDetectionPage.getSensitivityLevel()).toBe('');
       expect(await pm.anomalyDetectionPage.getActiveSensitivityTier()).toBe('auto');
-      await expect(pm.anomalyDetectionPage.getSensitivityHintLocator()).toBeHidden();
+      await expect(pm.anomalyDetectionPage.getSensitivityLevelLocator()).toBeHidden();
+      await expect(pm.anomalyDetectionPage.getSensitivityAutoLevelLocator()).toBeVisible();
+      await expect(pm.anomalyDetectionPage.getSensitivityHintLocator()).toHaveText(
+        'Auto will learn a level from your history.',
+      );
     });
 
     test('typing a tier value lights that tier up', {
       tag: ['@anomaly', '@P1', '@functional', '@all'],
     }, async () => {
+      // The level input renders only for a non-Auto tier.
+      await pm.anomalyDetectionPage.selectSensitivityTier(4);
       await pm.anomalyDetectionPage.setSensitivityLevel(2.5);
       expect(await pm.anomalyDetectionPage.getActiveSensitivityTier()).toBe(2.5);
     });
@@ -224,23 +234,22 @@ test.describe('Anomaly Detection', () => {
     test('an off-tier level is accepted with no tier selected', {
       tag: ['@anomaly', '@P1', '@functional', '@all'],
     }, async () => {
+      await pm.anomalyDetectionPage.selectSensitivityTier(3);
       await pm.anomalyDetectionPage.setSensitivityLevel(3.5);
       await expect(pm.anomalyDetectionPage.getSensitivityErrorLocator()).toBeHidden();
       expect(await pm.anomalyDetectionPage.getActiveSensitivityTier()).toBeNull();
+      await expect(pm.anomalyDetectionPage.getSensitivityCustomLocator()).toHaveText('Custom sensitivity');
     });
 
-    test('the hint names the band the buckets are judged against', {
+    test('a manual level on an untrained config says a trained model is required', {
       tag: ['@anomaly', '@P1', '@functional', '@all'],
     }, async () => {
-      await pm.anomalyDetectionPage.selectSensitivityTier(3);
-
       const hint = pm.anomalyDetectionPage.getSensitivityHintLocator();
-      await expect(hint).toBeVisible();
-      await expect(hint).toContainText('± 3σ');
-
-      // The number is interpolated, not baked into the string: a stale hint would keep 3.
-      await pm.anomalyDetectionPage.selectSensitivityTier(4);
-      await expect(hint).toContainText('± 4σ');
+      for (const tier of [3, 4]) {
+        await pm.anomalyDetectionPage.selectSensitivityTier(tier);
+        await expect(hint).toBeVisible();
+        await expect(hint).toHaveText('A trained model is required before detection can run.');
+      }
     });
 
     test('the hint does not vary with the resolution', {
@@ -258,6 +267,7 @@ test.describe('Anomaly Detection', () => {
       test(`rejects a ${label} band width`, {
         tag: ['@anomaly', '@P1', '@functional', '@all'],
       }, async () => {
+        await pm.anomalyDetectionPage.selectSensitivityTier(3);
         await pm.anomalyDetectionPage.setSensitivityLevel(value);
         await pm.anomalyDetectionPage.save();
         await expect(pm.anomalyDetectionPage.getSensitivityErrorLocator()).toHaveText(
@@ -269,6 +279,7 @@ test.describe('Anomaly Detection', () => {
     test('the hint is suppressed while the level is invalid', {
       tag: ['@anomaly', '@P2', '@functional', '@all'],
     }, async () => {
+      await pm.anomalyDetectionPage.selectSensitivityTier(3);
       await pm.anomalyDetectionPage.setSensitivityLevel(0.5);
       await expect(pm.anomalyDetectionPage.getSensitivityHintLocator()).toBeHidden();
     });
@@ -276,6 +287,7 @@ test.describe('Anomaly Detection', () => {
     test('the level control is labeled Level and measured in σ', {
       tag: ['@anomaly', '@P0', '@smoke', '@all'],
     }, async () => {
+      await pm.anomalyDetectionPage.selectSensitivityTier(3);
       const label = pm.anomalyDetectionPage.getSensitivityLevelLabelLocator();
       await expect(label).toBeVisible();
       await expect(label).toHaveText('Level');
@@ -1130,8 +1142,9 @@ test.describe('Anomaly Detection', () => {
       await expect(pm.anomalyDetectionPage.getSensitivityTierLocator()).toBeVisible();
       await expect(pm.anomalyDetectionPage.getBudgetTiersLocator()).toBeHidden();
       // No band_width on an API-created config: Auto, so an untouched save cannot pin band_k.
-      expect(await pm.anomalyDetectionPage.getSensitivityLevel()).toBe('');
       expect(await pm.anomalyDetectionPage.getActiveSensitivityTier()).toBe('auto');
+      await expect(pm.anomalyDetectionPage.getSensitivityAutoLevelLocator()).toBeVisible();
+      await expect(pm.anomalyDetectionPage.getSensitivityLevelLocator()).toBeHidden();
 
       await pm.anomalyDetectionPage.cancel();
     });

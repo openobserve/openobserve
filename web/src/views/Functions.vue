@@ -110,6 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   variant="outline"
                   size="sm"
                   data-test="pipeline-list-overflow-menu-btn"
+                  :aria-label="t('dashboard.moreActions')"
                   icon-left="menu"
                 />
               </template>

@@ -79,8 +79,14 @@ pub async fn sync_built_in_from_github(force_refresh: bool) -> Result<SyncResult
         .await
         .map_err(|e| anyhow::anyhow!("Failed to fetch built-in pricing: {e}"))?;
 
-    let entries: Vec<BuiltInModelPricingEntry> = serde_json::from_slice(&data)
+    let raw_entries: Vec<serde_json::Value> = serde_json::from_slice(&data)
         .map_err(|e| anyhow::anyhow!("Failed to parse built-in pricing JSON: {e}"))?;
+    // Names come from the raw JSON so an entry this build cannot parse is kept, not disabled.
+    let upstream_names: std::collections::HashSet<String> = raw_entries
+        .iter()
+        .filter_map(|e| e.get("name").and_then(|n| n.as_str()).map(str::to_string))
+        .collect();
+    let entries = parse_entries(raw_entries);
 
     // Get existing built-in model names for detecting removals
     let existing_names: std::collections::HashSet<String> =
@@ -91,8 +97,6 @@ pub async fn sync_built_in_from_github(force_refresh: bool) -> Result<SyncResult
 
     let mut created = 0usize;
     let mut updated = 0usize;
-    let upstream_names: std::collections::HashSet<String> =
-        entries.iter().map(|e| e.name.clone()).collect();
 
     // Upsert each entry
     for entry in entries {
@@ -112,7 +116,16 @@ pub async fn sync_built_in_from_github(force_refresh: bool) -> Result<SyncResult
             created_at: 0, // set by DB layer
             updated_at: 0,
             children: Vec::new(),
+            prepared_rule_keys: Default::default(),
         };
+        // An invalid entry could overprice every span; keep the previously stored row.
+        if let Err(e) = definition.validate_tiers(true) {
+            log::warn!(
+                "[model_pricing_sync] skipping invalid entry '{}': {e}",
+                definition.name
+            );
+            continue;
+        }
 
         match table::model_pricing::put(definition).await {
             Ok(_) => {
@@ -166,6 +179,22 @@ pub async fn sync_built_in_from_github(force_refresh: bool) -> Result<SyncResult
         updated,
         disabled,
     })
+}
+
+/// Parses each catalogue entry on its own so one malformed entry does not stop the whole sync.
+fn parse_entries(raw: Vec<serde_json::Value>) -> Vec<BuiltInModelPricingEntry> {
+    raw.into_iter()
+        .filter_map(|value| {
+            let name = value
+                .get("name")
+                .and_then(|n| n.as_str())
+                .unwrap_or("<unnamed>")
+                .to_string();
+            serde_json::from_value(value)
+                .inspect_err(|e| log::warn!("[model_pricing_sync] skipping entry '{name}': {e}"))
+                .ok()
+        })
+        .collect()
 }
 
 #[cfg(test)]
@@ -232,6 +261,86 @@ mod tests {
                 "{key}: {peak} != 2 * {off}"
             );
         }
+    }
+
+    /// Pins the JSON shape of a service-tier entry (OpenAI Flex) in `llm_pricing.json`.
+    #[test]
+    fn test_parse_built_in_entry_with_rules() {
+        use config::meta::model_pricing::RuleOp;
+
+        let json = r#"[
+          {
+            "name": "GPT-6 Sol",
+            "provider": "OpenAI",
+            "description": "OpenAI GPT-6 Sol",
+            "match_pattern": "(?i)gpt-6-sol",
+            "tiers": [
+              {
+                "name": "Default",
+                "prices": { "input": 2e-06, "output": 1e-05 }
+              },
+              {
+                "name": "Extended Context (272k+)",
+                "condition": { "usage_key": "input", "operator": "gte", "value": 272000 },
+                "prices": { "input": 4e-06, "output": 1.5e-05 }
+              },
+              {
+                "name": "Flex",
+                "rules": [
+                  {
+                    "keys": ["openai.response.service_tier", "openai.request.service_tier"],
+                    "op": "in",
+                    "values": ["flex"]
+                  }
+                ],
+                "prices": { "input": 1e-06, "output": 5e-06 }
+              },
+              {
+                "name": "Flex · Extended Context (272k+)",
+                "condition": { "usage_key": "input", "operator": "gte", "value": 272000 },
+                "rules": [
+                  {
+                    "keys": ["openai.response.service_tier", "openai.request.service_tier"],
+                    "op": "in",
+                    "values": ["flex"]
+                  }
+                ],
+                "prices": { "input": 2e-06, "output": 7.5e-06 }
+              }
+            ]
+          }
+        ]"#;
+
+        let entries: Vec<BuiltInModelPricingEntry> = serde_json::from_str(json).unwrap();
+        let tiers = &entries[0].tiers;
+        assert_eq!(tiers.len(), 4);
+
+        // Plain tiers come first so binaries that predate `rules` still pick the standard rates.
+        assert!(tiers[0].is_default());
+        assert!(tiers[1].rules.is_empty() && tiers[1].condition.is_some());
+
+        assert_eq!(tiers[2].rules[0].op, RuleOp::In);
+        assert_eq!(tiers[2].rules[0].keys[0], "openai.response.service_tier");
+        assert_eq!(tiers[2].rules[0].values, vec!["flex"]);
+        assert!(tiers[2].condition.is_none());
+        assert_eq!(tiers[3].restriction_count(), 2);
+    }
+
+    #[test]
+    fn test_parse_entries_skips_only_malformed_entries() {
+        let raw: Vec<serde_json::Value> = serde_json::from_str(
+            r#"[
+              {"name": "Good", "match_pattern": "good", "tiers": [{"name": "Default", "prices": {"input": 1e-6}}]},
+              {"name": "Broken", "match_pattern": "broken", "tiers": "not-a-list"},
+              {"name": "Future", "match_pattern": "future", "tiers": [
+                {"name": "Default", "prices": {"input": 1e-6}},
+                {"name": "New op", "rules": [{"keys": ["k"], "op": "regex", "values": ["v"]}], "prices": {"input": 2e-6}}
+              ]}
+            ]"#,
+        )
+        .unwrap();
+        let names: Vec<String> = parse_entries(raw).into_iter().map(|e| e.name).collect();
+        assert_eq!(names, vec!["Good", "Future"]);
     }
 
     #[test]

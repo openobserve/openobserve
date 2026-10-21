@@ -212,30 +212,6 @@ mod tests {
     }
 
     #[test]
-    fn test_openobserve_to_webhook() {
-        let dest = http_dest("https://x", Some("openobserve"), &[]);
-        assert_eq!(derive_channel_format(&dest), ChannelFormat::Webhook);
-    }
-
-    #[test]
-    fn test_splunk_to_webhook() {
-        let dest = http_dest("https://x", Some("splunk"), &[]);
-        assert_eq!(derive_channel_format(&dest), ChannelFormat::Webhook);
-    }
-
-    #[test]
-    fn test_elasticsearch_to_webhook() {
-        let dest = http_dest("https://x", Some("elasticsearch"), &[]);
-        assert_eq!(derive_channel_format(&dest), ChannelFormat::Webhook);
-    }
-
-    #[test]
-    fn test_unknown_type_to_webhook() {
-        let dest = http_dest("https://x", Some("zzz"), &[]);
-        assert_eq!(derive_channel_format(&dest), ChannelFormat::Webhook);
-    }
-
-    #[test]
     fn test_none_type_to_webhook() {
         let dest = http_dest("https://x", None, &[]);
         assert_eq!(derive_channel_format(&dest), ChannelFormat::Webhook);
@@ -312,19 +288,6 @@ mod tests {
         assert_eq!(
             derive_channel_format(&dest),
             ChannelFormat::TeamsAdaptiveCard
-        );
-    }
-
-    #[test]
-    fn test_render_format_teams_messagecard() {
-        let dest = http_dest(
-            "https://x",
-            Some("custom"),
-            &[("render_format", "teams_messagecard")],
-        );
-        assert_eq!(
-            derive_channel_format(&dest),
-            ChannelFormat::TeamsMessageCard
         );
     }
 

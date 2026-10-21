@@ -317,7 +317,7 @@ const OBUTTON_STUB = {
 const QUERY_EDITOR_STUB = {
   name: "CodeQueryEditor",
   template: '<div data-test="query-editor-stub" />',
-  props: ["query", "editorId", "debounceTime", "keywords", "suggestions", "class"],
+  props: ["query", "editorId", "debounceTime", "keywords", "suggestions", "class", "filterMode"],
   emits: ["update:query", "focus", "blur"],
 };
 
@@ -1446,6 +1446,31 @@ describe("AppErrors", () => {
 
       // Behavioral confirmation: component still renders the table after the call
       expect(wrapper.find('[data-test="rum-app-errors-table"]').exists()).toBe(true);
+    });
+  });
+
+  describe("filter editor autocomplete", () => {
+    it("runs the editor in filter mode, since the query is a WHERE fragment", async () => {
+      ({ wrapper, router } = await mountAppErrors());
+      await flushPromises();
+
+      expect(wrapper.findComponent(QUERY_EDITOR_STUB).props("filterMode")).toBe(true);
+    });
+
+    it("hands the query to suggestions after 100 ms, as Logs does", async () => {
+      ({ wrapper, router } = await mountAppErrors());
+      await flushPromises();
+
+      expect(wrapper.findComponent(QUERY_EDITOR_STUB).props("debounceTime")).toBe(100);
+    });
+
+    it("sets the stream context on mount, before anything is typed", async () => {
+      ({ wrapper, router } = await mountAppErrors());
+      await flushPromises();
+
+      expect(wrapper.vm.autoCompleteData.org).toBe(store.state.selectedOrganization.identifier);
+      expect(wrapper.vm.autoCompleteData.streamType).toBe("logs");
+      expect(wrapper.vm.autoCompleteData.streamName).toBe("_rumdata");
     });
   });
 

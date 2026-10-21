@@ -66,7 +66,7 @@ describe("linuxCard builder", () => {
   it("builds the Linux card metadata and step flow", () => {
     const card = linuxCard(SUBS, gt);
     expect(card.provider.name).toBe("Linux");
-    expect(card.provider.metaBadges).toEqual(["Logs", "Metrics"]);
+    expect(card.provider.metaBadges).toEqual(["Logs", "Metrics", "Traces"]);
     expect(card.steps.map((s) => s.id)).toEqual(["install", "verify", "dashboard"]);
     // Host metrics fan out per metric, so detection is existence-based.
     expect(card.detect).toMatchObject({
@@ -75,44 +75,78 @@ describe("linuxCard builder", () => {
     });
   });
 
-  it("offers generic and EC2 environments as one toggle", () => {
-    // Replaces two hand-built clickable <div> cards plus a conditional callout.
+  // The exact pre-traces command: the default variant must not drift from it.
+  const BASE_INSTALL = `curl -O https://raw.githubusercontent.com/openobserve/agents/main/linux/install.sh \\
+  && chmod +x install.sh \\
+  && sudo ./install.sh ${SUBS.url}/api/${SUBS.org}/ ${SUBS.token}`;
+
+  const installVariants = () => linuxCard(SUBS, gt).steps[0].variants!;
+
+  it("toggles the install command between logs & metrics and logs, metrics & traces", () => {
+    // The standard script also collects EC2 instance metadata — no AWS EC2 variant.
     const install = linuxCard(SUBS, gt).steps[0];
     expect(install.required).toBe(true);
-    expect(install.variants?.map((v) => v.id)).toEqual(["generic", "ec2"]);
-    expect(install.variants!.every((v) => !!v.icon)).toBe(true);
+    expect(install.variants?.map((v) => v.id)).toEqual(["logs-metrics", "traces"]);
+    for (const v of install.variants!) expect(v.code.raw).not.toContain("/ec2/");
   });
 
-  it("points each variant at its matching install script", () => {
-    const [generic, ec2] = linuxCard(SUBS, gt).steps[0].variants!;
-    expect(generic.code.raw).toContain("/linux/install.sh");
-    expect(generic.code.raw).not.toContain("/ec2/");
-    expect(ec2.code.raw).toContain("/linux/ec2/install.sh");
+  it("keeps the default logs & metrics command unchanged", () => {
+    const [base] = installVariants();
+    expect(base.code.raw).toBe(BASE_INSTALL);
+    expect(base.code.raw).not.toContain("--trace");
   });
 
-  it("carries the IAM prerequisite only on the EC2 variant", () => {
-    // Previously an amber callout rendered above the command for everyone.
-    const [generic, ec2] = linuxCard(SUBS, gt).steps[0].variants!;
-    expect(ec2.note).toContain("ec2:DescribeTags");
-    expect(generic.note).not.toContain("ec2:DescribeTags");
+  it("appends the tracing flags to the traces variant", () => {
+    const traces = installVariants()[1];
+    expect(traces.code.raw).toBe(`${BASE_INSTALL}{flags}`);
+    expect(linuxCard(SUBS, gt).steps[0].inputs).toBeUndefined();
+    expect(installVariants()[0].inputs).toBeUndefined();
+    expect(traces.inputs?.map((i) => [i.flag, i.default])).toEqual([
+      ["--trace-ports", "8080"],
+      ["--trace-exe", ""],
+      ["--trace-cmd", ""],
+      ["--service-name", ""],
+    ]);
+    expect(traces.requireOneOf?.ids).toEqual(["ports", "exe", "cmd"]);
+  });
+
+  it("shows the tracing note on the traces variant only", () => {
+    const [base, traces] = installVariants();
+    expect(base.note).toBeUndefined();
+    expect(traces.note).toMatch(/^Traces are captured with eBPF/);
+    expect(traces.note).toContain("BTF");
+    // Recovery points at the plain command: --service-name alone would be rejected.
+    expect(traces.note).toContain("re-run the **Logs & metrics** command");
+  });
+
+  it("links the eBPF tracing guide and tells the verify step when traces arrive", () => {
+    const card = linuxCard(SUBS, gt);
+    expect(card.docLinks?.map((l) => l.url)).toEqual([
+      "https://github.com/openobserve/agents/blob/main/obi.md",
+    ]);
+    expect(card.steps[1].note).toContain("traced app handles a request");
+    // Detection stays on host metrics, tracing or not.
+    expect(card.detect?.streamName).toBe("system_");
   });
 
   it("offers the uninstall command", () => {
     const uninstall = linuxCard(SUBS, gt).extras?.uninstall;
     expect(uninstall?.code.raw).toContain("/linux/uninstall.sh");
     expect(uninstall?.code.lang).toBe("bash");
-    // One uninstall script serves both the generic and EC2 installs.
     expect(uninstall?.code.raw).not.toContain("/ec2/");
   });
 
-  it("substitutes url/org and masks the ingestion token", () => {
-    const generic = linuxCard(SUBS, gt).steps[0].variants![0];
-    expect(generic.code.raw).toContain(`${SUBS.url}/api/${SUBS.org}/`);
-    expect(generic.code.raw).toContain(SUBS.token);
-    // The old page rendered a literal [BASIC_PASSCODE] placeholder instead.
-    expect(generic.code.raw).not.toContain("[BASIC_PASSCODE]");
-    expect(generic.code.masked).not.toContain(SUBS.token);
-  });
+  it.each(["logs-metrics", "traces"])(
+    "substitutes url/org and masks the ingestion token (%s)",
+    (id) => {
+      const code = installVariants().find((v) => v.id === id)!.code;
+      expect(code.raw).toContain(`${SUBS.url}/api/${SUBS.org}/`);
+      expect(code.raw).toContain(SUBS.token);
+      // The old page rendered a literal [BASIC_PASSCODE] placeholder instead.
+      expect(code.raw).not.toContain("[BASIC_PASSCODE]");
+      expect(code.masked).not.toContain(SUBS.token);
+    },
+  );
 });
 
 describe("LinuxConfig.vue", () => {
