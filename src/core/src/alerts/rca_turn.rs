@@ -57,7 +57,10 @@ use o2_enterprise::enterprise::{
     ai::{
         chat::{
             CHAT_DELETED, OnCommit, PersistSettings, STREAM_INTERRUPTED, TurnCaps, TurnEnd,
-            TurnIdentity, TurnResult, TurnSpec, batcher::DurableEvent, spawn_headless_turn,
+            TurnIdentity, TurnResult, TurnSpec,
+            batcher::DurableEvent,
+            lease::{self, LeaseError, TurnLease},
+            spawn_headless_turn,
         },
         client::{QueryRequest, RCA_AGENT_TYPE, SESSION_ID_HEADER, get_agent_client},
         toolsets::{CliEntry, McpEntry, SkillEntry, push::load_agent_tools},
@@ -584,22 +587,26 @@ fn spawn_finalize(run: RcaTurnRun, turn_id: String, end: TurnEnd) {
     let (org_id, run_id) = (run.org_id.clone(), run.run_id.clone());
     // Boxed: the finalizer may start a turn whose end spawns the finalizer again.
     let task: Pin<Box<dyn Future<Output = bool> + Send>> =
-        Box::pin(finalize(org_id, run_id, turn_id, end, Some(run)));
+        Box::pin(finalize(org_id, run_id, turn_id, end, Some(run), false));
     runtime.spawn(task);
 }
 
 /// A committed report wins; cancellation permits only stats updates.
 pub async fn finalize_rca_run(org_id: String, run_id: String, turn_id: String, end: TurnEnd) {
-    finalize(org_id, run_id, turn_id, end, None).await;
+    finalize(org_id, run_id, turn_id, end, None, false).await;
 }
 
 /// [finalize_rca_run]; `true` when this call ended the run.
+///
+/// `orphaned`: the caller proved the turn's node gone, so a transcript that cannot be read ends
+/// the run now instead of after the stale threshold.
 async fn finalize(
     org_id: String,
     run_id: String,
     turn_id: String,
     end: TurnEnd,
     resume: Option<RcaTurnRun>,
+    orphaned: bool,
 ) -> bool {
     let run = match runs_table::get_rw(&org_id, &run_id).await {
         Ok(Some(run)) => run,
@@ -619,14 +626,14 @@ async fn finalize(
         Err(e) => {
             let timeout = get_o2_config().incidents.rca_timeout_secs;
             if item.state.is_terminal()
-                || !is_stale(item.state, run.updated_at, now_micros(), timeout)
+                || (!orphaned && !is_stale(item.state, run.updated_at, now_micros(), timeout))
             {
                 log::warn!(
                     "[RCA_TURN] cannot read the transcript of run {run_id}: {e:#}; the sweeper retries"
                 );
                 return false;
             }
-            log::warn!("[RCA_TURN] ending stale run {run_id} without its transcript: {e:#}");
+            log::warn!("[RCA_TURN] ending lost run {run_id} without its transcript: {e:#}");
             (None, Vec::new())
         }
     };
@@ -646,6 +653,7 @@ async fn finalize(
             .rev()
             .find(|turn| turn.turn_id == turn_id)
             .and_then(|turn| turn.error_code.clone()),
+        turn_message: end.error_message,
         org_id,
         run,
         item,
@@ -670,9 +678,12 @@ async fn read_session(
     Ok((events, turns))
 }
 
-/// The `error.code` of a run whose turns ended without a report.
-fn no_report_error(result: TurnResult) -> (&'static str, &'static str) {
+/// The `error.code` of a run whose turns ended without a report; `turn_failed` when the turn
+/// recorded an error code.
+fn no_report_error(result: TurnResult, turn_failed: bool) -> (&'static str, &'static str) {
     match result {
+        // o2-ai reported an error (a provider failure) and then completed: not a model choice.
+        TurnResult::Persisted if turn_failed => (ERROR_AGENT_ERROR, AGENT_ERROR_REASON),
         TurnResult::Persisted => (ERROR_NO_REPORT, NO_REPORT_REASON),
         TurnResult::Timeout => (ERROR_TIMEOUT, TIMEOUT_REASON),
         TurnResult::Error => (ERROR_AGENT_ERROR, AGENT_ERROR_REASON),
@@ -703,6 +714,8 @@ struct RunEnd {
     thread: Option<ThreadStats>,
     transcript: Option<RunTranscript>,
     turn_error: Option<String>,
+    /// The message of the turn's last error, when the turn ended on this node.
+    turn_message: Option<String>,
 }
 
 impl RunEnd {
@@ -754,7 +767,7 @@ impl RunEnd {
             // A continuation ends the run only by failing it.
             return ended.then_some(RunState::Failed);
         }
-        let (code, reason) = no_report_error(result);
+        let (code, reason) = no_report_error(result, self.turn_error.is_some());
         self.fail_without_report(code, reason, self.turn_details(result))
             .await
     }
@@ -889,17 +902,19 @@ impl RunEnd {
     }
 
     fn turn_details(&self, result: TurnResult) -> Option<String> {
-        let broke = matches!(
-            result,
+        let broke = match result {
             TurnResult::Error
-                | TurnResult::Timeout
-                | TurnResult::Interrupted
-                | TurnResult::PersistenceFailed
-        );
-        broke
-            .then_some(self.turn_error.as_deref())
-            .flatten()
-            .map(|code| format!("turn: {code}"))
+            | TurnResult::Timeout
+            | TurnResult::Interrupted
+            | TurnResult::PersistenceFailed => true,
+            TurnResult::Persisted => self.turn_error.is_some(),
+            TurnResult::Cancelled | TurnResult::Deleted => false,
+        };
+        let code = broke.then_some(self.turn_error.as_deref()).flatten()?;
+        Some(match self.turn_message.as_deref() {
+            Some(message) => format!("turn: {code}: {message}"),
+            None => format!("turn: {code}"),
+        })
     }
 
     /// The final stats and summary counts, written with the run's end.
@@ -2022,6 +2037,7 @@ async fn end_at_deadline(org_id: &str, run_id: &str) -> bool {
         thread: Some(project_rca_thread(&events, &turns, false, false).stats),
         transcript: Some(decode_run(&events)),
         turn_error: None,
+        turn_message: None,
         run,
         item,
     };
@@ -2038,6 +2054,9 @@ async fn sweep_run(run: RunRow, now: i64, timeout_secs: u64) -> anyhow::Result<b
             && !resumed_after(turn, run.updated_at)
         {
             let Some(result) = lost_turn_result(turn, now, timeout_secs) else {
+                if turn.status == ai_chat_turns::TURN_RUNNING {
+                    return end_orphaned_turn(run, turn, now).await;
+                }
                 return Ok(false);
             };
             if turn.status == ai_chat_turns::TURN_RUNNING
@@ -2062,8 +2081,17 @@ async fn sweep_run(run: RunRow, now: i64, timeout_secs: u64) -> anyhow::Result<b
             let end = TurnEnd {
                 result,
                 committed_seq: turn.end_seq.unwrap_or(ai_chat_sessions::NO_SEQ),
+                error_message: None,
             };
-            return Ok(finalize(run.org_id, run.run_id, turn.turn_id.clone(), end, None).await);
+            return Ok(finalize(
+                run.org_id,
+                run.run_id,
+                turn.turn_id.clone(),
+                end,
+                None,
+                false,
+            )
+            .await);
         }
     }
     // No turn row: admission never finished, so the stale rule applies.
@@ -2082,6 +2110,7 @@ async fn sweep_run(run: RunRow, now: i64, timeout_secs: u64) -> anyhow::Result<b
         thread: None,
         transcript: None,
         turn_error: None,
+        turn_message: None,
     };
     if !rca_runs::fail_run(
         &ending.org_id,
@@ -2104,6 +2133,75 @@ async fn sweep_run(run: RunRow, now: i64, timeout_secs: u64) -> anyhow::Result<b
     }
     ending.reconcile(Some(RunState::Failed)).await;
     Ok(true)
+}
+
+/// A `running` turn whose session lease is free lost its node (a restart or a crash): a live
+/// turn holds the lease from admission until its row is closed. It ends interrupted now, and
+/// the run continues once as after any interruption.
+async fn end_orphaned_turn(
+    run: RunRow,
+    turn: &ai_chat_turns::Model,
+    now: i64,
+) -> anyhow::Result<bool> {
+    let Some(lease) = free_turn_lease(&run.org_id, &turn.session_id).await else {
+        return Ok(false);
+    };
+    // Under the lease: a turn that ended meanwhile is no longer `running`, and none can start.
+    let closed = ai_chat_turns::finish(
+        &run.org_id,
+        &turn.session_id,
+        &turn.turn_id,
+        ai_chat_turns::TURN_INTERRUPTED,
+        Some(STREAM_INTERRUPTED),
+        None,
+        turn.end_seq,
+        now,
+    )
+    .await;
+    // The continuation's admission takes the lease again.
+    lease.release().await;
+    if !closed? {
+        return Ok(false);
+    }
+    log::warn!(
+        "[RCA_TURN] turn {} of run {} lost its node; it ends interrupted",
+        turn.turn_id,
+        run.run_id
+    );
+    let resume = match turn_run_of(&run).await {
+        Ok(resume) => Some(resume),
+        Err(e) => {
+            log::info!("[RCA_TURN] run {} cannot continue: {e:#}", run.run_id);
+            None
+        }
+    };
+    let end = TurnEnd {
+        result: TurnResult::Interrupted,
+        committed_seq: turn.end_seq.unwrap_or(ai_chat_sessions::NO_SEQ),
+        error_message: None,
+    };
+    Ok(finalize(
+        run.org_id,
+        run.run_id,
+        turn.turn_id.clone(),
+        end,
+        resume,
+        true,
+    )
+    .await)
+}
+
+/// The session's turn lease if no live turn holds it. A dead node's lease is gone at once in
+/// local mode (it lived in that process) and within the NATS lock's 10 s expiry in a cluster.
+async fn free_turn_lease(org_id: &str, session_id: &str) -> Option<TurnLease> {
+    match lease::acquire(org_id, session_id, 1).await {
+        Ok(lease) => Some(lease),
+        Err(LeaseError::Busy) => None,
+        Err(e) => {
+            log::warn!("[RCA_TURN] cannot probe the turn lease of {org_id}/{session_id}: {e}");
+            None
+        }
+    }
 }
 
 fn resumed_after(turn: &ai_chat_turns::Model, run_updated_at: i64) -> bool {
@@ -2276,6 +2374,7 @@ mod tests {
             thread: Some(project_rca_thread(events, &[], false, false).stats),
             transcript: Some(decode_run(events)),
             turn_error: None,
+            turn_message: None,
         }
     }
 
@@ -3954,6 +4053,8 @@ mod tests {
             ),
         )
         .await;
+        // A live turn holds its session's lease.
+        let _live_lease = lease::acquire(&org, "ses-live", 1).await.unwrap();
 
         let just_inc = crate::alerts::rca_runs::tests::add_incident(&org, None).await;
         let just_run = start(&org, &just_inc, RunTrigger::Manual).await;
@@ -4106,6 +4207,55 @@ mod tests {
         assert_eq!(run.error.unwrap().code, ERROR_TIMEOUT);
     }
 
+    /// A young `running` turn whose lease is free lost its node: it ends now and the run tries
+    /// its one continuation. One whose lease is held is live and left alone.
+    #[tokio::test]
+    async fn the_sweep_ends_a_running_turn_only_once_its_lease_is_free() {
+        let _db = db().await;
+        let timeout = get_o2_config().incidents.rca_timeout_secs;
+        let now = now_micros();
+        let young = now - 10_000_000;
+
+        let (org, inc) = new_incident(None).await;
+        let run_id = start(&org, &inc, RunTrigger::Manual).await;
+        with_session(&org, &run_id, "ses-orphan").await;
+        add_turn(
+            &org,
+            turn(
+                "ses-orphan",
+                "t1",
+                ai_chat_turns::TURN_RUNNING,
+                young,
+                None,
+                None,
+            ),
+        )
+        .await;
+
+        let held = lease::acquire(&org, "ses-orphan", 1).await.unwrap();
+        let run = runs_table::get_rw(&org, &run_id).await.unwrap().unwrap();
+        assert!(!sweep_run(run, now, timeout).await.unwrap());
+        assert_eq!(stored(&org, &run_id).await.state, RunState::Running);
+        assert_eq!(
+            turn_row(&org, "ses-orphan", "t1").await.status,
+            ai_chat_turns::TURN_RUNNING
+        );
+
+        // The node holding it died: its lease went with it.
+        drop(held);
+        let run = runs_table::get_rw(&org, &run_id).await.unwrap().unwrap();
+        assert!(sweep_run(run, now, timeout).await.unwrap());
+        let closed = turn_row(&org, "ses-orphan", "t1").await;
+        assert_eq!(closed.status, ai_chat_turns::TURN_INTERRUPTED);
+        assert_eq!(closed.error_code.as_deref(), Some(STREAM_INTERRUPTED));
+        let row = runs_table::get_rw(&org, &run_id).await.unwrap().unwrap();
+        assert_eq!(row.continuations, 1, "the run tried its one continuation");
+        // No agent runs in tests, so the continuation cannot start and the run fails.
+        let run = stored(&org, &run_id).await;
+        assert_eq!(run.state, RunState::Failed);
+        assert_eq!(run.error.unwrap().code, ERROR_INTERRUPTED);
+    }
+
     /// The superseded-turn guard: a turn followed by a continuation no longer ends the run.
     #[tokio::test]
     async fn a_turn_followed_by_another_does_not_end_the_run() {
@@ -4146,6 +4296,7 @@ mod tests {
             TurnEnd {
                 result: TurnResult::Interrupted,
                 committed_seq: 10,
+                error_message: None,
             },
         )
         .await;
@@ -4159,41 +4310,56 @@ mod tests {
     async fn a_broken_turn_names_its_error_code_in_the_details() {
         let _db = db().await;
         let now = now_micros();
-        for (result, turn_code, code, details) in [
+        for (result, turn_code, message, code, details) in [
             (
                 TurnResult::Error,
                 Some("restore_failed"),
+                None,
                 ERROR_AGENT_ERROR,
                 Some("turn: restore_failed"),
             ),
             (
                 TurnResult::Timeout,
                 Some(TURN_TIMEOUT_CODE),
+                None,
                 ERROR_TIMEOUT,
                 Some("turn: turn_timeout"),
             ),
             (
                 TurnResult::Interrupted,
                 Some(STREAM_INTERRUPTED),
+                None,
                 ERROR_INTERRUPTED,
                 Some("turn: stream_interrupted"),
             ),
             (
                 TurnResult::PersistenceFailed,
                 Some("persistence_failed"),
+                None,
                 ERROR_PERSISTENCE_FAILED,
                 Some("turn: persistence_failed"),
             ),
-            (TurnResult::Error, None, ERROR_AGENT_ERROR, None),
+            (TurnResult::Error, None, None, ERROR_AGENT_ERROR, None),
+            // o2-ai sent an error frame, then `complete`: the agent failed, it did not choose.
             (
                 TurnResult::Persisted,
                 Some("restore_failed"),
-                ERROR_NO_REPORT,
                 None,
+                ERROR_AGENT_ERROR,
+                Some("turn: restore_failed"),
             ),
+            (
+                TurnResult::Persisted,
+                Some("llm_overload"),
+                Some("Overloaded"),
+                ERROR_AGENT_ERROR,
+                Some("turn: llm_overload: Overloaded"),
+            ),
+            (TurnResult::Persisted, None, None, ERROR_NO_REPORT, None),
             (
                 TurnResult::Deleted,
                 Some(CHAT_DELETED),
+                None,
                 ERROR_TRANSCRIPT_DELETED,
                 None,
             ),
@@ -4223,6 +4389,7 @@ mod tests {
                 TurnEnd {
                     result,
                     committed_seq: ai_chat_sessions::NO_SEQ,
+                    error_message: message.map(str::to_string),
                 },
             )
             .await;
