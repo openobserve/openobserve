@@ -581,6 +581,15 @@
     }
   },
   "common": {
+    "dismiss": "닫기",
+    "exitFullscreen": "전체 화면 종료",
+    "moreActions": "작업 더 보기",
+    "moreOptions": "옵션 더 보기",
+    "addFilter": "필터 추가",
+    "view": "보기",
+    "compare": "비교",
+    "openInNewTab": "새 탭에서 열기",
+    "send": "보내기",
     "copiedToClipboard": "클립보드에 복사됨",
     "customLogoAlt": "조직 로고",
     "dragToReorder": "드래그하여 순서 변경",
@@ -13030,6 +13039,8 @@
     "traceFilters": "트레이스 필터",
     "showTraces": "트레이스 표시",
     "applyAndSearch": "신청 및 검색",
+    "applyAndSearchEquals": "적용 및 검색 (같음)",
+    "applyAndSearchNotEquals": "적용 및 검색 (같지 않음)",
     "timestamp": "타임스탬프",
     "noErrorPresent": "이 스팬에 오류가 없습니다.",
     "noEventsPresent": "이 스팬에 이벤트가 없습니다.",
@@ -15082,6 +15093,7 @@
         "noDataAvailable": "사용 가능한 데이터 없음",
         "copyInput": "입력 복사",
         "copyOutput": "출력 복사",
+        "copyExpected": "예상 출력 복사",
         "copied": "{type}이(가) 클립보드에 복사되었습니다",
         "copyFailed": "클립보드에 복사하지 못했습니다",
         "execution": "실행",
@@ -17623,6 +17635,7 @@
       "warning": "경고"
     },
     "journey": {
+      "clearResults": "결과 지우기",
       "extract": {
         "action": "서브테스트로 추출",
         "title": "단계 {count}개를 새 테스트로 추출 | 단계 {count}개를 새 테스트로 추출",

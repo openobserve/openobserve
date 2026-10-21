@@ -581,6 +581,15 @@
     }
   },
   "common": {
+    "dismiss": "Ignorer",
+    "exitFullscreen": "Quitter le plein écran",
+    "moreActions": "Plus d'actions",
+    "moreOptions": "Plus d'options",
+    "addFilter": "Ajouter un filtre",
+    "view": "Voir",
+    "compare": "Comparer",
+    "openInNewTab": "Ouvrir dans un nouvel onglet",
+    "send": "Envoyer",
     "copiedToClipboard": "Copié dans le presse-papiers",
     "customLogoAlt": "Logo de l'organisation",
     "dragToReorder": "Faites glisser pour réorganiser",
@@ -13030,6 +13039,8 @@
     "traceFilters": "Filtres de traces",
     "showTraces": "Afficher les traces",
     "applyAndSearch": "Appliquer et rechercher",
+    "applyAndSearchEquals": "Appliquer et rechercher (égal à)",
+    "applyAndSearchNotEquals": "Appliquer et rechercher (différent de)",
     "timestamp": "Horodatage",
     "noErrorPresent": "Aucune erreur présente pour ce span",
     "noEventsPresent": "Aucun événement pour ce span",
@@ -15082,6 +15093,7 @@
         "noDataAvailable": "Aucune donnée disponible",
         "copyInput": "Copier l'entrée",
         "copyOutput": "Copier la sortie",
+        "copyExpected": "Copier la sortie attendue",
         "copied": "{type} copié dans le presse-papiers",
         "copyFailed": "Échec de la copie dans le presse-papiers",
         "execution": "Exécution",
@@ -17623,6 +17635,7 @@
       "warning": "Avertissement"
     },
     "journey": {
+      "clearResults": "Effacer les résultats",
       "extract": {
         "action": "Extraire en sous-test",
         "title": "Extraire {count} étape vers un nouveau test | Extraire {count} étapes vers un nouveau test",

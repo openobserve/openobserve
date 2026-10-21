@@ -581,6 +581,15 @@
     }
   },
   "common": {
+    "dismiss": "關閉",
+    "exitFullscreen": "退出全螢幕",
+    "moreActions": "更多操作",
+    "moreOptions": "更多選項",
+    "addFilter": "新增篩選",
+    "view": "檢視",
+    "compare": "比較",
+    "openInNewTab": "在新分頁中開啟",
+    "send": "傳送",
     "copiedToClipboard": "已複製到剪貼簿",
     "customLogoAlt": "組織標誌",
     "dragToReorder": "拖曳以重新排序",
@@ -13025,6 +13034,8 @@
     "traceFilters": "追蹤篩選條件",
     "showTraces": "顯示追蹤",
     "applyAndSearch": "套用並搜尋",
+    "applyAndSearchEquals": "套用並搜尋（等於）",
+    "applyAndSearchNotEquals": "套用並搜尋（不等於）",
     "timestamp": "時間戳記",
     "noErrorPresent": "此 span 無錯誤",
     "noEventsPresent": "此 Span 沒有事件",
@@ -15077,6 +15088,7 @@
         "noDataAvailable": "沒有可用資料",
         "copyInput": "複製輸入",
         "copyOutput": "複製輸出",
+        "copyExpected": "複製預期輸出",
         "copied": "{type} 已複製到剪貼簿",
         "copyFailed": "複製到剪貼簿失敗",
         "execution": "執行",
@@ -17618,6 +17630,7 @@
       "warning": "警告"
     },
     "journey": {
+      "clearResults": "清除結果",
       "extract": {
         "action": "擷取為子測試",
         "title": "將 {count} 個步驟擷取到新測試",

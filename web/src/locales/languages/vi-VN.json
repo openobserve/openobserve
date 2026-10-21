@@ -581,6 +581,15 @@
     }
   },
   "common": {
+    "dismiss": "Bỏ qua",
+    "exitFullscreen": "Thoát toàn màn hình",
+    "moreActions": "Thêm thao tác",
+    "moreOptions": "Thêm tùy chọn",
+    "addFilter": "Thêm bộ lọc",
+    "view": "Xem",
+    "compare": "So sánh",
+    "openInNewTab": "Mở trong tab mới",
+    "send": "Gửi",
     "copiedToClipboard": "Đã sao chép vào bộ nhớ tạm",
     "customLogoAlt": "Logo tổ chức",
     "dragToReorder": "Kéo để sắp xếp lại",
@@ -13030,6 +13039,8 @@
     "traceFilters": "Bộ lọc trace",
     "showTraces": "Hiển thị trace",
     "applyAndSearch": "Áp dụng & Tìm kiếm",
+    "applyAndSearchEquals": "Áp dụng & Tìm kiếm (bằng)",
+    "applyAndSearchNotEquals": "Áp dụng & Tìm kiếm (khác)",
     "timestamp": "Dấu thời gian",
     "noErrorPresent": "Không có lỗi nào cho span này",
     "noEventsPresent": "Không có sự kiện nào cho span này",
@@ -15082,6 +15093,7 @@
         "noDataAvailable": "Không có dữ liệu",
         "copyInput": "Sao chép đầu vào",
         "copyOutput": "Sao chép đầu ra",
+        "copyExpected": "Sao chép đầu ra mong đợi",
         "copied": "Đã sao chép {type} vào bộ nhớ tạm",
         "copyFailed": "Không thể sao chép vào bộ nhớ tạm",
         "execution": "Thực thi",
@@ -17623,6 +17635,7 @@
       "warning": "Cảnh báo"
     },
     "journey": {
+      "clearResults": "Xóa kết quả",
       "extract": {
         "action": "Tách thành bài test con",
         "title": "Tách {count} bước sang bài test mới | Tách {count} bước sang bài test mới",

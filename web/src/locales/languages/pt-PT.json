@@ -581,6 +581,15 @@
     }
   },
   "common": {
+    "dismiss": "Dispensar",
+    "exitFullscreen": "Sair do ecrã inteiro",
+    "moreActions": "Mais ações",
+    "moreOptions": "Mais opções",
+    "addFilter": "Adicionar filtro",
+    "view": "Ver",
+    "compare": "Comparar",
+    "openInNewTab": "Abrir num novo separador",
+    "send": "Enviar",
     "copiedToClipboard": "Copiado para a área de transferência",
     "customLogoAlt": "Logotipo da organização",
     "dragToReorder": "Arraste para reordenar",
@@ -13030,6 +13039,8 @@
     "traceFilters": "Filtros de trace",
     "showTraces": "Mostrar traces",
     "applyAndSearch": "Aplicar e pesquisar",
+    "applyAndSearchEquals": "Aplicar e pesquisar (igual)",
+    "applyAndSearchNotEquals": "Aplicar e pesquisar (não igual)",
     "timestamp": "Carimbo de data/hora",
     "noErrorPresent": "Nenhum erro presente para este span",
     "noEventsPresent": "Nenhum evento para este span",
@@ -15082,6 +15093,7 @@
         "noDataAvailable": "Nenhum dado disponível",
         "copyInput": "Copiar entrada",
         "copyOutput": "Copiar saída",
+        "copyExpected": "Copiar saída esperada",
         "copied": "{type} copiado para a área de transferência",
         "copyFailed": "Falha ao copiar para a área de transferência",
         "execution": "Execução",
@@ -17623,6 +17635,7 @@
       "warning": "Aviso"
     },
     "journey": {
+      "clearResults": "Limpar resultados",
       "extract": {
         "action": "Extrair para subteste",
         "title": "Extrair {count} passo para um novo teste | Extrair {count} passos para um novo teste",

@@ -581,6 +581,15 @@
     }
   },
   "common": {
+    "dismiss": "Sluiten",
+    "exitFullscreen": "Volledig scherm sluiten",
+    "moreActions": "Meer acties",
+    "moreOptions": "Meer opties",
+    "addFilter": "Filter toevoegen",
+    "view": "Weergeven",
+    "compare": "Vergelijken",
+    "openInNewTab": "Openen in nieuw tabblad",
+    "send": "Verzenden",
     "copiedToClipboard": "Gekopieerd naar klembord",
     "customLogoAlt": "Logo van de organisatie",
     "dragToReorder": "Sleep om te herordenen",
@@ -13030,6 +13039,8 @@
     "traceFilters": "Trace-filters",
     "showTraces": "Toon traces",
     "applyAndSearch": "Toepassen en zoeken",
+    "applyAndSearchEquals": "Toepassen en zoeken (gelijk aan)",
+    "applyAndSearchNotEquals": "Toepassen en zoeken (niet gelijk aan)",
     "timestamp": "Tijdstempel",
     "noErrorPresent": "Geen fout aanwezig voor dit span",
     "noEventsPresent": "Geen events voor dit span",
@@ -15082,6 +15093,7 @@
         "noDataAvailable": "Geen gegevens beschikbaar",
         "copyInput": "Kopieer invoer",
         "copyOutput": "Kopieer uitvoer",
+        "copyExpected": "Verwachte uitvoer kopiëren",
         "copied": "{type} gekopieerd naar klembord",
         "copyFailed": "Kopiëren naar klembord mislukt",
         "execution": "Uitvoering",
@@ -17623,6 +17635,7 @@
       "warning": "Waarschuwing"
     },
     "journey": {
+      "clearResults": "Resultaten wissen",
       "extract": {
         "action": "Extraheren naar subtest",
         "title": "{count} stap naar een nieuwe test extraheren | {count} stappen naar een nieuwe test extraheren",
