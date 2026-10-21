@@ -63,16 +63,18 @@
           data-test="dashboard-viewpanel-refresh-interval"
         />
         <OButtonGroup class="shrink-0">
-          <OButton
-            v-if="config.isEnterprise == 'true' && searchRequestTraceIds.length && disable"
-            variant="outline-destructive"
-            size="icon-toolbar"
-            @click="cancelViewPanelQuery"
-            data-test="dashboard-viewpanel-cancel-btn"
-            icon-left="cancel"
-          >
-            <OTooltip :content="t('panel.cancel')" />
-          </OButton>
+          <OTooltip v-if="isCancelShown" :content="t('panel.cancel')" :disabled="!isMobile">
+            <OButton
+              variant="cancel-query"
+              :size="isMobile ? 'icon-toolbar' : 'sm-toolbar'"
+              @click="cancelViewPanelQuery"
+              :aria-label="t('panel.cancel')"
+              data-test="dashboard-viewpanel-cancel-btn"
+              icon-left="cancel"
+            >
+              <template v-if="!isMobile">{{ t("panel.cancel") }}</template>
+            </OButton>
+          </OTooltip>
           <!-- Wrapper mode: a child-mode tooltip would hover-bind only the icon, not the labelled button. -->
           <OTooltip v-else :content="refreshTooltip">
             <OButton
@@ -90,7 +92,7 @@
           <ODropdown v-if="isAutoRunAvailable" align="end" side="bottom">
             <template #trigger>
               <OButton
-                :variant="refreshVariant"
+                :variant="refreshOptionsVariant"
                 size="icon-toolbar"
                 class="w-5!"
                 :disabled="disable"
@@ -920,6 +922,13 @@ export default defineComponent({
     };
 
     const disable = ref(false);
+    const isCancelShown = computed(
+      () =>
+        config.isEnterprise == "true" && searchRequestTraceIds.value.length > 0 && disable.value,
+    );
+    const refreshOptionsVariant = computed(() =>
+      isCancelShown.value ? "cancel-query" : refreshVariant.value,
+    );
 
     watch(variablesAndPanelsDataLoadingState, () => {
       const panelsValues = Object.values(variablesAndPanelsDataLoadingState.panels);
@@ -984,7 +993,9 @@ export default defineComponent({
     return {
       t,
       isMobile,
+      isCancelShown,
       refreshVariant,
+      refreshOptionsVariant,
       setTimeForVariables,
       dateTimeForVariables,
       updateDateTime,

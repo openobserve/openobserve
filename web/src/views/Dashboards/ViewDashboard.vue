@@ -118,16 +118,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm"
           />
           <OButtonGroup v-show="store.state.printMode !== true">
-            <OButton
+            <OTooltip
               v-if="config.isEnterprise == 'true' && arePanelsLoading"
-              variant="outline-destructive"
-              size="icon-toolbar"
-              @click="cancelQuery"
-              data-test="dashboard-cancel-btn"
-              icon-left="cancel"
+              :content="t('panel.cancel')"
+              :disabled="!isMobile"
             >
-              <OTooltip :content="t('panel.cancel')" />
-            </OButton>
+              <OButton
+                variant="cancel-query"
+                :size="isMobile ? 'icon-toolbar' : 'sm-toolbar'"
+                @click="cancelQuery"
+                :aria-label="t('panel.cancel')"
+                data-test="dashboard-cancel-btn"
+                icon-left="cancel"
+              >
+                <template v-if="!isMobile">{{ t("panel.cancel") }}</template>
+              </OButton>
+            </OTooltip>
             <!-- Wrapper mode: a child-mode tooltip would hover-bind only the icon, not the labelled button. -->
             <OTooltip v-else :content="refreshTooltip" shortcut-id="dashboardRefresh">
               <OButton
@@ -1665,7 +1671,7 @@ export default defineComponent({
     });
 
     const refreshOptionsVariant = computed(() => {
-      if (config.isEnterprise == "true" && arePanelsLoading.value) return "outline-destructive";
+      if (config.isEnterprise == "true" && arePanelsLoading.value) return "cancel-query";
       return refreshVariant.value;
     });
 

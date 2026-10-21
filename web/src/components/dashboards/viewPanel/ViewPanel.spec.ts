@@ -16,6 +16,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { flushPromises, mount, VueWrapper } from "@vue/test-utils";
 import ViewPanel from "./ViewPanel.vue";
+import config from "@/aws-exports";
 import PanelErrorButtons from "@/components/dashboards/PanelErrorButtons.vue";
 
 // Mock vue-router
@@ -965,6 +966,28 @@ describe("ViewPanel", () => {
       await wrapper.vm.$nextTick();
 
       expect(wrapper.find('[data-test="dashboard-viewpanel-cancel-btn"]').exists()).toBe(false);
+    });
+
+    it("shows a labelled Cancel while an enterprise query runs, with the options arrow to match", async () => {
+      const wasEnterprise = config.isEnterprise;
+      config.isEnterprise = "true";
+      try {
+        wrapper = createWrapper();
+        await flushPromises();
+        const loading = (wrapper.vm as any).$.provides.variablesAndPanelsDataLoadingState;
+        loading.searchRequestTraceIds = { p1: ["trace-id-1"] };
+        loading.panels = { p1: true };
+        await flushPromises();
+
+        const cancel = wrapper
+          .findAllComponents({ name: "OButton" })
+          .find((b) => b.attributes("data-test") === "dashboard-viewpanel-cancel-btn")!;
+        expect(cancel.props("variant")).toBe("cancel-query");
+        expect(cancel.text()).toContain("Cancel");
+        expect(wrapper.vm.refreshOptionsVariant).toBe("cancel-query");
+      } finally {
+        config.isEnterprise = wasEnterprise;
+      }
     });
   });
 

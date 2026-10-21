@@ -92,6 +92,7 @@ vi.mock("moment-timezone", () => ({
 }));
 
 import ViewDashboard from "@/views/Dashboards/ViewDashboard.vue";
+import config from "@/aws-exports";
 import i18n from "@/locales";
 
 const relative = (period: string) => ({
@@ -387,6 +388,24 @@ describe("ViewDashboard time range gate", () => {
     expect(wrapper.vm.selectedDate.valueType).toBe("absolute");
     expect(globalSpan()).toBe(10 * MINUTE);
     expect(refreshButton().props("variant")).toBe("primary");
+  });
+
+  it("swaps Refresh for a labelled Cancel while enterprise panels load, with the options arrow to match", async () => {
+    const wasEnterprise = config.isEnterprise;
+    config.isEnterprise = "true";
+    try {
+      await mountDashboard();
+      wrapper.vm.arePanelsLoading = true;
+      await flushPromises();
+
+      const cancel = wrapper.findComponent('[data-test="dashboard-cancel-btn"]');
+      expect(cancel.props("variant")).toBe("cancel-query");
+      expect(cancel.text()).toContain("Cancel");
+      expect(refreshOptions().props("variant")).toBe("cancel-query");
+      expect(wrapper.find('[data-test="dashboard-refresh-btn"]').exists()).toBe(false);
+    } finally {
+      config.isEnterprise = wasEnterprise;
+    }
   });
 
   it("shows the labelled Refresh with the plain refresh icon while Auto Run is off", async () => {
