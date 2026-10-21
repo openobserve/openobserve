@@ -147,7 +147,28 @@ pub struct LiveStream<R> {
     retry_at_us: Option<i64>,
     /// When this stream first saw the run terminal.
     terminal_at_us: Option<i64>,
+    /// What [LiveStream::head] left for [LiveStream::tail].
+    pending: Option<Pending>,
     sink: Sink,
+}
+
+/// The run a probe read, for the half of the probe that reads its transcript.
+struct Pending {
+    run: RunRow,
+    has_session: bool,
+    latest_live: bool,
+    /// Set when a marker changed: the parts to rebuild.
+    rebuild: Option<Rebuild>,
+}
+
+struct Rebuild {
+    session: RunSession,
+    rows: Vec<SteerRecord>,
+    /// The incident's latest run, for the steering view.
+    latest_run_id: Option<String>,
+    /// The head already sent the summary, built from the run row alone.
+    summary_sent: bool,
+    failure: Option<PartError>,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -490,6 +511,7 @@ impl<R: TranscriptReader> LiveStream<R> {
             transcript_gone: false,
             retry_at_us: None,
             terminal_at_us: None,
+            pending: None,
             sink: Sink::default(),
         }
     }
@@ -501,6 +523,14 @@ impl<R: TranscriptReader> LiveStream<R> {
 
     /// One probe at `now_us`: the frames to send, in order.
     pub async fn tick(&mut self, now_us: i64) -> Vec<LiveFrame> {
+        let mut frames = self.head(now_us).await;
+        frames.extend(self.tail(now_us).await);
+        frames
+    }
+
+    /// The first half of a probe: `rca`, and a summary built from the run row alone.
+    /// The stream sends it before [Self::tail] reads the transcript, which can take seconds.
+    pub async fn head(&mut self, now_us: i64) -> Vec<LiveFrame> {
         if self.sink.done {
             return Vec::new();
         }
@@ -508,18 +538,33 @@ impl<R: TranscriptReader> LiveStream<R> {
             self.sink.done = true;
             return Vec::new();
         }
-        self.probe(now_us).await;
-        let mut frames = std::mem::take(&mut self.sink.frames);
-        if frames.is_empty() && now_us - self.last_output_us >= micros(HEARTBEAT_AFTER) {
-            frames.push(LiveFrame::Ping);
+        self.pending = self.probe(now_us).await;
+        self.flush(now_us)
+    }
+
+    /// The second half: the parts that read the transcript, then `end` or a heartbeat.
+    pub async fn tail(&mut self, now_us: i64) -> Vec<LiveFrame> {
+        if let Some(pending) = self.pending.take() {
+            self.finish(pending, now_us).await;
         }
+        if self.sink.frames.is_empty()
+            && !self.sink.done
+            && now_us - self.last_output_us >= micros(HEARTBEAT_AFTER)
+        {
+            self.sink.frames.push(LiveFrame::Ping);
+        }
+        self.flush(now_us)
+    }
+
+    fn flush(&mut self, now_us: i64) -> Vec<LiveFrame> {
+        let frames = std::mem::take(&mut self.sink.frames);
         if !frames.is_empty() {
             self.last_output_us = now_us;
         }
         frames
     }
 
-    async fn probe(&mut self, now_us: i64) {
+    async fn probe(&mut self, now_us: i64) -> Option<Pending> {
         let org_id = self.spec.org_id.as_str();
         let incident = match alert_incidents::get(org_id, &self.spec.incident_id).await {
             Ok(Some(incident)) => incident,
@@ -527,9 +572,12 @@ impl<R: TranscriptReader> LiveStream<R> {
                 let error = PartError::not_found("Incident not found");
                 self.sink.send_error(Part::Rca, &error);
                 self.sink.end(None);
-                return;
+                return None;
             }
-            Err(e) => return self.sink.send_error(Part::Rca, &PartError::internal(e)),
+            Err(e) => {
+                self.sink.send_error(Part::Rca, &PartError::internal(e));
+                return None;
+            }
         };
 
         // `rca` only when the incident part changed; a `stale` flip counts.
@@ -555,11 +603,22 @@ impl<R: TranscriptReader> LiveStream<R> {
             if !latest_live {
                 self.sink.end(incident.rca_state);
             }
-            return;
+            return None;
         }
-        let Some((run, has_session)) = self.probe_run(&incident, now_us).await else {
-            return;
-        };
+        self.probe_run(&incident, latest_live, now_us).await
+    }
+
+    /// Rebuilds the parts whose markers changed, then ends once a terminal run is settled.
+    async fn finish(&mut self, pending: Pending, now_us: i64) {
+        let Pending {
+            run,
+            has_session,
+            latest_live,
+            rebuild,
+        } = pending;
+        if let Some(rebuild) = rebuild {
+            self.rebuild(&run, rebuild, now_us).await;
+        }
 
         // A terminal run is settled by its record, no session, or [SETTLE_WITHIN].
         let terminal = run
@@ -575,8 +634,14 @@ impl<R: TranscriptReader> LiveStream<R> {
         }
     }
 
-    /// Returns the run and whether its session row exists, or `None` when this probe cannot go on.
-    async fn probe_run(&mut self, incident: &IncidentRow, now_us: i64) -> Option<(RunRow, bool)> {
+    /// The run and, when a marker changed, the parts to rebuild; `None` when this probe cannot go
+    /// on. A summary built from the run row alone goes out now, ahead of the transcript read.
+    async fn probe_run(
+        &mut self,
+        incident: &IncidentRow,
+        latest_live: bool,
+        now_us: i64,
+    ) -> Option<Pending> {
         let org_id = self.spec.org_id.as_str();
         let run_id = self.spec.run_id.as_deref()?;
         let run = match runs_table::get(org_id, run_id).await {
@@ -622,40 +687,68 @@ impl<R: TranscriptReader> LiveStream<R> {
             && self.steer_marks.as_ref() == Some(&steer_marks)
             && !retry_due
         {
-            return Some((run, has_session));
+            return Some(Pending {
+                run,
+                has_session,
+                latest_live,
+                rebuild: None,
+            });
         }
         self.retry_at_us = None;
         self.run_mark = Some(run_mark);
         self.steer_marks = Some(steer_marks);
 
-        // One transcript read builds the thread, the summary and the steering view.
         let session = RunSession::of(&run, session_row);
-        let parts = RunParts::new(org_id, &run, &session, &self.reader);
-        let mut failure = None;
+        let summary_sent = !self.transcript_gone && !summary_reads_session(&run);
+        let failure = if summary_sent {
+            let summary = RunParts::new(org_id, &run, &session, &self.reader)
+                .summary(Some(&rows))
+                .await;
+            self.sink.send_part("summary", summary)
+        } else {
+            None
+        };
+        Some(Pending {
+            run,
+            has_session,
+            latest_live,
+            rebuild: Some(Rebuild {
+                session,
+                rows,
+                latest_run_id: incident.rca_run_id.clone(),
+                summary_sent,
+                failure,
+            }),
+        })
+    }
+
+    /// One transcript read builds the thread, the summary the head did not send, and the steering
+    /// view.
+    async fn rebuild(&mut self, run: &RunRow, rebuild: Rebuild, now_us: i64) {
+        let Rebuild {
+            session,
+            rows,
+            latest_run_id,
+            summary_sent,
+            mut failure,
+        } = rebuild;
+        let parts = RunParts::new(&self.spec.org_id, run, &session, &self.reader);
         if !self.transcript_gone {
-            match parts.thread(self.spec.show_tool_io).await {
-                Ok(thread) => self.sink.send("thread", &thread),
-                Err(e) => {
-                    self.sink.forget("thread");
-                    failure = Some(e);
-                }
-            }
-            match parts.summary(Some(&rows)).await {
-                Ok(summary) => self.sink.send("summary", &summary),
-                Err(e) => {
-                    self.sink.forget("summary");
-                    failure = failure.or(Some(e));
-                }
+            let thread = parts.thread(self.spec.show_tool_io).await;
+            failure = self.sink.send_part("thread", thread).or(failure);
+            if !summary_sent {
+                let summary = parts.summary(Some(&rows)).await;
+                failure = failure.or(self.sink.send_part("summary", summary));
             }
         }
-        let transcript = if steering_reads_transcript(&run, &rows) {
+        let transcript = if steering_reads_transcript(run, &rows) {
             parts.steering_transcript().await
         } else {
             None
         };
         let steering = build_steering_view(
-            incident.rca_run_id.as_deref(),
-            &run,
+            latest_run_id.as_deref(),
+            run,
             rows,
             transcript,
             self.spec.can_steer,
@@ -674,7 +767,6 @@ impl<R: TranscriptReader> LiveStream<R> {
             }
             None => self.sink.clear_error(Part::Transcript),
         }
-        Some((run, has_session))
     }
 }
 
@@ -732,6 +824,24 @@ impl Sink {
         let hash = hash_of(&data);
         if self.sent.insert(name, hash) != Some(hash) {
             self.frames.push(LiveFrame::Event { name, data });
+        }
+    }
+
+    /// Sends a part that built; a failed one is forgotten and its error returned.
+    fn send_part(
+        &mut self,
+        name: &'static str,
+        part: Result<impl Serialize, PartError>,
+    ) -> Option<PartError> {
+        match part {
+            Ok(value) => {
+                self.send(name, &value);
+                None
+            }
+            Err(e) => {
+                self.forget(name);
+                Some(e)
+            }
         }
     }
 
@@ -1054,16 +1164,21 @@ pub(crate) mod tests {
         let now = now_micros();
 
         let mut live = LiveStream::new(spec(&org, &inc, Some(&run_id)), &reader, now);
-        let frames = live.tick(now).await;
+        let head = live.head(now).await;
+        assert_eq!(names(&head), ["rca", "summary"]);
         assert_eq!(
-            names(&frames),
-            ["rca", "thread", "summary", "steering", "end"]
+            reader.reads(),
+            0,
+            "the stored summary goes out before the read"
         );
+        let tail = live.tail(now).await;
+        assert_eq!(names(&tail), ["thread", "steering", "end"]);
+        let frames = [head, tail].concat();
         assert_eq!(data(&frames, "rca")["run_id"], run_id.as_str());
         assert_eq!(data(&frames, "summary")["state"], "completed");
         assert_eq!(data(&frames, "end"), json!({"state": "completed"}));
         assert!(live.is_done());
-        assert_eq!(reader.reads(), 1, "one read builds the thread and summary");
+        assert_eq!(reader.reads(), 1, "one read builds the thread");
         assert!(live.tick(now + SEC).await.is_empty());
 
         // A reconnect gets the same snapshots: there is no resume token.
@@ -1377,7 +1492,7 @@ pub(crate) mod tests {
         let mut live = LiveStream::new(spec(&org, &inc, Some(&first)), &reader, now);
 
         let frames = live.tick(now).await;
-        assert_eq!(names(&frames), ["rca", "thread", "summary", "steering"]);
+        assert_eq!(names(&frames), ["rca", "summary", "thread", "steering"]);
         assert_eq!(data(&frames, "rca")["run_id"], latest.as_str());
 
         let done = RunUpdate {

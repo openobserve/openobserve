@@ -1540,8 +1540,21 @@ describe("IncidentRCAAnalysis", () => {
         expect(getRcaFeedback).toHaveBeenCalledWith("default", "inc-1", "run-1");
       });
 
+      it("reads a finished run's feedback before its live summary arrives", async () => {
+        wrapper = mountPanel({
+          ...completedProps(),
+          runSummary: null,
+          runSummaryStatus: "loading",
+        });
+        await flushPromises();
+
+        expect(byTest(wrapper, "rca-feedback").exists()).toBe(false);
+        expect(getRcaFeedback).toHaveBeenCalledWith("default", "inc-1", "run-1");
+      });
+
       it("a legacy finished run has no feedback", async () => {
-        wrapper = mountPanel(completedProps());
+        const legacy = rcaRunItem({ has_record: false });
+        wrapper = mountPanel({ ...completedProps(), reportRun: legacy, history: [legacy] });
         await flushPromises();
 
         expect(byTest(wrapper, "rca-feedback").exists()).toBe(false);
