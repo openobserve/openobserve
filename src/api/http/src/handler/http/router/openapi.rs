@@ -1650,35 +1650,15 @@ mod tests {
         let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
         let paths = spec["paths"].as_object().unwrap();
         let resume = "/api/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/resume";
-        for (path, method, operation_id, ratelimit, statuses) in [(
-            resume,
-            "post",
-            "ResumeIncidentRcaRun",
-            "update",
-            &["202", "404", "409", "410", "503"][..],
-        )] {
-            let op = &paths[path][method];
-            assert!(op.is_object(), "{method} {path} missing");
-            assert_eq!(op["operationId"], operation_id, "{method} {path}");
-            assert_eq!(
-                op["tags"],
-                serde_json::json!(["Incidents"]),
-                "{method} {path}"
-            );
-            assert_eq!(op["x-o2-ratelimit"]["module"], "Alerts", "{method} {path}");
-            assert_eq!(
-                op["x-o2-ratelimit"]["operation"], ratelimit,
-                "{method} {path}"
-            );
-            #[cfg(not(feature = "enterprise"))]
-            let _ = statuses;
-            #[cfg(feature = "enterprise")]
-            for status in statuses {
-                assert!(
-                    op["responses"].get(*status).is_some(),
-                    "{method} {path} {status}"
-                );
-            }
+        let op = &paths[resume]["post"];
+        assert!(op.is_object(), "post {resume} missing");
+        assert_eq!(op["operationId"], "ResumeIncidentRcaRun");
+        assert_eq!(op["tags"], serde_json::json!(["Incidents"]));
+        assert_eq!(op["x-o2-ratelimit"]["module"], "Alerts");
+        assert_eq!(op["x-o2-ratelimit"]["operation"], "update");
+        #[cfg(feature = "enterprise")]
+        for status in ["202", "404", "409", "410", "503"] {
+            assert!(op["responses"].get(status).is_some(), "post {resume} {status}");
         }
         assert!(paths[resume].get("get").is_none());
     }
