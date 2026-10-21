@@ -124,20 +124,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @show-blind-spots="showBlindSpots"
         @tell-agent="threadColumn?.focusComposer()"
         @resume="resumeLatest"
-      >
-        <template v-if="cardRunId" #feedback>
-          <RcaFeedback
-            :key="cardRunId"
-            :org-id="orgId"
-            :incident-id="incidentId"
-            :run-id="cardRunId"
-          />
-        </template>
-        <!-- The cause belongs to the incident: any finished run offers it, none while one runs. -->
-        <template v-if="cardState !== 'investigating' && !live" #correction>
-          <RcaCauseCorrection :org-id="orgId" :incident-id="incidentId" />
-        </template>
-      </RcaVerdictCard>
+      />
 
       <template v-if="recordSummary">
         <RcaWhatHappened
@@ -283,7 +270,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, onUnmounted, ref, toRef, watch } from "vue";
-import { useQueryClient } from "@tanstack/vue-query";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
@@ -304,7 +290,6 @@ import type {
   RcaThread,
   RcaVerdictDetails,
 } from "@/services/incidents";
-import { rcaFeedbackQuery } from "@/services/incidents.queries";
 import type { RcaReadStatus, RcaRefusal } from "@/composables/useIncidentRca";
 import { useRcaSteering } from "@/composables/useRcaSteering";
 import { useViewerTimezone } from "@/composables/downtimes/useViewerTimezone";
@@ -338,8 +323,6 @@ import RcaVerdictCard from "./rca/RcaVerdictCard.vue";
 import RcaWhatHappened from "./rca/RcaWhatHappened.vue";
 import RcaReportContent from "./rca/RcaReportContent.vue";
 import { useTheme } from "@/composables/useTheme";
-import RcaFeedback from "./rca/RcaFeedback.vue";
-import RcaCauseCorrection from "./rca/RcaCauseCorrection.vue";
 import { buildRcaAskAttachment, type RcaAskPayload } from "@/utils/incidents/rcaAskAttachment";
 import { buildFeatureGateContext, checkFeatureAccess } from "@/utils/enterpriseFeatures";
 
@@ -538,20 +521,6 @@ const cardError = computed<RcaRunError | null>(() => {
 });
 
 const cardRunId = computed(() => props.viewedRun?.run_id ?? props.rca?.run_id ?? "");
-
-// Feedback mounts once the live summary grades the card; a finished run with a stored
-// record will be graded, so its read starts now instead of after the summary.
-const queryClient = useQueryClient();
-watch(
-  () =>
-    cardState.value === "analyzed" && findRun(cardRunId.value)?.has_record ? cardRunId.value : "",
-  (runId) => {
-    if (runId) {
-      void queryClient.prefetchQuery(rcaFeedbackQuery(props.orgId, props.incidentId, runId));
-    }
-  },
-  { immediate: true },
-);
 
 /** The loaded report belongs to the shown run; an earlier run's report never shows for it. */
 const ownsReport = computed(() => (props.viewedRun ?? props.reportRun)?.run_id === cardRunId.value);

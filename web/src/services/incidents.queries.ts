@@ -14,10 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { mutationOptions, queryOptions } from "@tanstack/vue-query";
-import incidents, {
-  type PutRcaCauseCorrectionRequest,
-  type PutRcaFeedbackRequest,
-} from "./incidents";
+import incidents from "./incidents";
 import { incidentKeys } from "./incidents.querykeys";
 import { LIVE_STALE_TIME } from "@/composables/query/cachePolicy";
 
@@ -32,20 +29,6 @@ export const incidentQuery = (org: string, id: string) =>
   queryOptions({
     queryKey: incidentKeys.detail(org, id),
     queryFn: async () => (await incidents.get(org, id)).data,
-    staleTime: LIVE_STALE_TIME,
-  });
-
-export const rcaFeedbackQuery = (org: string, incidentId: string, runId: string) =>
-  queryOptions({
-    queryKey: incidentKeys.rcaFeedback(org, incidentId, runId),
-    queryFn: async () => (await incidents.getRcaFeedback(org, incidentId, runId)).data,
-    staleTime: LIVE_STALE_TIME,
-  });
-
-export const rcaCorrectionQuery = (org: string, incidentId: string) =>
-  queryOptions({
-    queryKey: incidentKeys.rcaCorrection(org, incidentId),
-    queryFn: async () => (await incidents.getRcaCorrection(org, incidentId)).data,
     staleTime: LIVE_STALE_TIME,
   });
 
@@ -65,32 +48,4 @@ export const updateIncidentMutation = (org: string) =>
     mutationFn: (vars: { id: string; updates: { title?: string; severity?: string } }) =>
       incidents.updateIncident(org, vars.id, vars.updates),
     meta: { invalidates: [incidentKeys.all(org)], silentError: true },
-  });
-
-// Silent: the panel shows its own error, and puts the returned row into `rcaFeedbackQuery`'s cache.
-export const putRcaFeedbackMutation = (org: string, incidentId: string, runId: string) =>
-  mutationOptions({
-    mutationFn: async (body: PutRcaFeedbackRequest) =>
-      (await incidents.putRcaFeedback(org, incidentId, runId, body)).data,
-    meta: { silentError: true },
-  });
-
-export const deleteRcaFeedbackMutation = (org: string, incidentId: string, runId: string) =>
-  mutationOptions({
-    mutationFn: () => incidents.deleteRcaFeedback(org, incidentId, runId),
-    meta: { silentError: true },
-  });
-
-// Silent: the control shows its own error. Both writes refresh the read, so others' corrections stay current.
-export const putRcaCorrectionMutation = (org: string, incidentId: string) =>
-  mutationOptions({
-    mutationFn: async (body: PutRcaCauseCorrectionRequest) =>
-      (await incidents.putRcaCorrection(org, incidentId, body)).data,
-    meta: { invalidates: [incidentKeys.rcaCorrection(org, incidentId)], silentError: true },
-  });
-
-export const deleteRcaCorrectionMutation = (org: string, incidentId: string) =>
-  mutationOptions({
-    mutationFn: () => incidents.deleteRcaCorrection(org, incidentId),
-    meta: { invalidates: [incidentKeys.rcaCorrection(org, incidentId)], silentError: true },
   });

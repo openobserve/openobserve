@@ -9547,45 +9547,6 @@
       "rcaBuildOnPrevious": "Build on previous report",
       "rcaBuildOnPreviousHint": "Send the current report so the agent extends it",
       "rcaHistory": "Report history",
-      "rcaFeedback": {
-        "question": "Is this the cause?",
-        "yes": "Yes",
-        "no": "No",
-        "yesSaved": "Marked as the cause.",
-        "noPrompt": "What’s wrong with it?",
-        "reason": {
-          "wrong_service": "Wrong service",
-          "symptom_not_cause": "Symptom, not cause",
-          "evidence_does_not_hold": "Evidence doesn’t hold",
-          "missed_change": "Missed a change"
-        },
-        "noteLabel": "Note for the agent (optional)",
-        "notePlaceholder": "e.g. pool size was raised to 150 on Oct 8",
-        "send": "Send feedback",
-        "noSaved": "Marked as not the cause.",
-        "cancel": "Cancel",
-        "undo": "Undo",
-        "loadFailed": "Could not load your feedback.",
-        "saveFailed": "Could not save your feedback.",
-        "undoFailed": "Could not undo your feedback.",
-        "forbidden": "You do not have permission to send feedback.",
-        "notRateable": "Feedback opens when the run has finished."
-      },
-      "rcaCorrection": {
-        "open": "Correct the cause",
-        "label": "What was the actual cause?",
-        "noteLabel": "Note for the next analysis (optional)",
-        "save": "Save cause",
-        "cancel": "Cancel",
-        "edit": "Change",
-        "undo": "Undo",
-        "saved": "You corrected the cause to {cause}. It is saved as a past cause for this incident.",
-        "others": "{count} other responder corrected it. | {count} other responders corrected it.",
-        "loadFailed": "Could not load the cause correction.",
-        "saveFailed": "Could not save the cause.",
-        "undoFailed": "Could not undo the cause correction.",
-        "forbidden": "You do not have permission to correct the cause."
-      },
       "rcaAsk": {
         "button": "Ask about this analysis",
         "chip": "Analysis · {run}"

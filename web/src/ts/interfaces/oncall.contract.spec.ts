@@ -85,7 +85,7 @@ function parseWireEnums(): Map<string, string[]> {
   const enums = new Map<string, string[]>();
   const files = [
     ...rustSources(RUST_ONCALL_META),
-    ...["rca_runs.rs", "rca_steering.rs", "rca_feedback.rs"].map((file) =>
+    ...["rca_runs.rs", "rca_steering.rs"].map((file) =>
       path.join(RUST_ONCALL_META, "../alerts", file),
     ),
   ];
@@ -297,8 +297,6 @@ const RCA_MIRRORS = {
   SteerStatus: "RcaSteerStatus",
   SteerAction: "RcaSteerAction",
   SteerStatusReason: "RcaSteerStatusReason",
-  FeedbackVerdict: "RcaFeedbackVerdict",
-  FeedbackReason: "RcaFeedbackReason",
   ReportFormat: "RcaReportFormat",
 };
 void [_c1, _c2, _c3, _c4, _c5, _c6, _c7, _c8, _c9, _c10, _c11, _c12, _c13, _causes];

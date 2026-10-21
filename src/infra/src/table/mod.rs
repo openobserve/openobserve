@@ -78,8 +78,6 @@ pub mod organizations;
 pub mod providers;
 pub mod query_history;
 pub mod ratelimit;
-pub mod rca_cause_corrections;
-pub mod rca_feedback;
 pub mod rca_runs;
 pub mod rca_steering;
 pub mod re_pattern;

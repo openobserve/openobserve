@@ -365,66 +365,6 @@ describe("incidents service", () => {
     });
   });
 
-  describe("feedback (J4)", () => {
-    const URL = "/api/v2/test-org/alerts/incidents/inc-1/rca/runs/run-2/feedback";
-
-    it("getRcaFeedback GETs the run's feedback and resolves {items, mine}", async () => {
-      mockHttp.get.mockResolvedValue({ data: { items: [], mine: null } });
-
-      const res = await incidents.getRcaFeedback("test-org", "inc-1", "run-2");
-
-      expect(mockHttp.get).toHaveBeenCalledWith(URL);
-      expect(res.data).toEqual({ items: [], mine: null });
-    });
-
-    it("putRcaFeedback PUTs the body as is to the same route", async () => {
-      const body = { verdict: "no" as const, reasons: ["wrong_service" as const], note: "x" };
-      mockHttp.put.mockResolvedValue({ data: { verdict: "no" } });
-
-      await incidents.putRcaFeedback("test-org", "inc-1", "run-2", body);
-
-      expect(mockHttp.put).toHaveBeenCalledWith(URL, body);
-    });
-
-    it("deleteRcaFeedback DELETEs the caller's row", async () => {
-      mockHttp.delete.mockResolvedValue({ status: 204 });
-
-      await incidents.deleteRcaFeedback("test-org", "inc-1", "run-2");
-
-      expect(mockHttp.delete).toHaveBeenCalledWith(URL);
-    });
-  });
-
-  describe("cause correction", () => {
-    const URL = "/api/v2/test-org/alerts/incidents/inc-1/rca/correction";
-
-    it("getRcaCorrection GETs the incident's corrections and resolves {items, mine}", async () => {
-      mockHttp.get.mockResolvedValue({ data: { items: [], mine: null } });
-
-      const res = await incidents.getRcaCorrection("test-org", "inc-1");
-
-      expect(mockHttp.get).toHaveBeenCalledWith(URL);
-      expect(res.data).toEqual({ items: [], mine: null });
-    });
-
-    it("putRcaCorrection PUTs the body as is to the same route", async () => {
-      const body = { cause: "capacity_or_load" as const, note: "x" };
-      mockHttp.put.mockResolvedValue({ data: { cause: "capacity_or_load" } });
-
-      await incidents.putRcaCorrection("test-org", "inc-1", body);
-
-      expect(mockHttp.put).toHaveBeenCalledWith(URL, body);
-    });
-
-    it("deleteRcaCorrection DELETEs the caller's correction", async () => {
-      mockHttp.delete.mockResolvedValue({ status: 204 });
-
-      await incidents.deleteRcaCorrection("test-org", "inc-1");
-
-      expect(mockHttp.delete).toHaveBeenCalledWith(URL);
-    });
-  });
-
   describe("resumeRca (J7)", () => {
     it("POSTs an empty body to the run's resume route with the abort signal", async () => {
       const signal = new AbortController().signal;

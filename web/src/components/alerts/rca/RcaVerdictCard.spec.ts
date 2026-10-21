@@ -709,36 +709,6 @@ describe("RcaVerdictCard", () => {
       }
     });
 
-    it("J4: the feedback slot renders only on a graded analyzed run", () => {
-      const slots = { feedback: '<div data-test="slot-feedback">fb</div>' };
-      const mountWithSlot = (props: Record<string, unknown>) =>
-        mount(RcaVerdictCard, {
-          props: { runId: "run-2", ...props },
-          slots,
-          global: { plugins: [i18n], stubs },
-        });
-      const base = rcaRunSummary();
-
-      const graded = mountWithSlot({ cardState: "analyzed", summary: base });
-      expect(byTest(graded, "slot-feedback").exists()).toBe(true);
-
-      for (const props of [
-        { cardState: "analyzed", summary: null },
-        { cardState: "analyzed", summary: rcaRunSummaryLegacy() },
-        {
-          cardState: "analyzed",
-          summary: rcaRunSummary({
-            card: { ...base.card, outcome: undefined, outcome_reason: undefined },
-          }),
-        },
-        { cardState: "investigating", summary: rcaRunSummaryLive() },
-        { cardState: "failed", summary: rcaRunSummaryCancelled({ state: "failed" }) },
-        { cardState: "cancelled", summary: rcaRunSummaryCancelled() },
-      ]) {
-        expect(byTest(mountWithSlot(props), "slot-feedback").exists()).toBe(false);
-      }
-    });
-
     it("no Ask or Disprove on the card; Resume only with canResume (F2)", () => {
       const wrapper = mountCard({ cardState: "analyzed", summary: rcaRunSummary() });
 
