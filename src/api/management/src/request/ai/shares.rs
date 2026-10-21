@@ -36,6 +36,7 @@ use config::{
     },
 };
 use infra::table::{
+    ai_chat_imports,
     ai_chat_sessions::{self, Model as ChatModel, NO_SEQ, NewFork, STATUS_ACTIVE},
     ai_chat_shares::{
         self, MODE_LIVE, MODE_SNAPSHOT, Model as ShareModel, NewShare, ShareSettings,
@@ -90,6 +91,13 @@ const TURN_IN_PROGRESS: &str = "A response is still being generated; share again
 const SEED_HEADER: &str = "[Restored conversation]\n";
 const SEED_FENCE: &str = "\n---\n\n";
 const CONTEXT_HEADER: &str = "[Context]\n";
+const FORK_SUFFIX: &str = "continued";
+// A fork stores the newest shared turns that fit; the model still sees at most `SEED_MAX_CHARS`.
+const SEED_MAX_BYTES: usize = 2 * 1024 * 1024;
+const STREAM_FORBIDDEN: &str = "stream_forbidden";
+const IMPORTED_CHAT: &str = "imported_chat";
+// Permission checks per read; steps on streams past this many are hidden unchecked.
+const MAX_STREAM_CHECKS: usize = 32;
 
 static PUBLIC_READS: LazyLock<Counters> = LazyLock::new(Counters::default);
 // Reads that resolve no client address still cannot pile up without bound.
@@ -123,6 +131,8 @@ pub struct ShareView {
     pub title: String,
     /// Readers see assistant text and tool names, never tool inputs or outputs.
     pub redact_tools: bool,
+    /// Readers see `[Attached {kind} hidden]` for attachment blocks and no images.
+    pub hide_attachments: bool,
     /// The creator's display name (email when unnamed); only in the org-wide admin listing.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub owner_name: Option<String>,
@@ -136,6 +146,7 @@ impl ShareView {
         Self {
             url_path: Some(url_path(&share)),
             redact_tools: share.redact_tools,
+            hide_attachments: share.hide_attachments,
             owner_name: None,
             owner_email: None,
             id: share.id,
@@ -170,6 +181,8 @@ pub struct CreateShareRequest {
     pub expires_in_secs: Option<i64>,
     /// Hide tool inputs and outputs from readers; defaults to true for public shares.
     pub redact_tools: Option<bool>,
+    /// Replace attachment blocks and drop images for readers; defaults to true for public shares.
+    pub hide_attachments: Option<bool>,
 }
 
 #[derive(Debug, Default, Deserialize, ToSchema)]
@@ -184,6 +197,7 @@ pub struct UpdateShareRequest {
     #[serde(default)]
     pub refresh_snapshot: bool,
     pub redact_tools: Option<bool>,
+    pub hide_attachments: Option<bool>,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -221,6 +235,14 @@ pub struct SharedChat {
     pub not_modified: bool,
     /// Tool inputs and outputs are left out of `turns`.
     pub redact_tools: bool,
+    /// Attachment blocks read `[Attached {kind} hidden]` and images are left out of `turns`.
+    pub hide_attachments: bool,
+    /// The owner's organization, where a signed-in reader continues the chat.
+    pub org_identifier: String,
+    /// `{call_id: {reason, stream}}` of steps hidden from this reader; redacted links name none.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<Object>)]
+    pub hidden: Option<serde_json::Map<String, Value>>,
     /// The oldest turns were left out to keep the response within the server's size cap.
     pub truncated: bool,
     /// Same shape as `GET /ai/chats/{session_id}` returns, without `user_message_id`.
@@ -236,12 +258,22 @@ pub struct SharedChat {
 pub struct ForkResponse {
     pub session_id: String,
     pub title: String,
+    /// `{owner_name, as_of, turns}`: the shared turns as this reader saw them, kept with the fork.
+    #[schema(value_type = Object)]
+    pub seed: Value,
 }
 
 /// A share that may be served, with its chat.
 struct Served {
     share: ShareModel,
     chat: ChatModel,
+}
+
+/// Who reads a share: a signed-in member (`viewer`, with their `auth`), or anyone (public).
+#[derive(Debug, Default, Clone, Copy)]
+struct Reader<'a> {
+    auth: Option<&'a str>,
+    viewer: Option<&'a str>,
 }
 
 /// A chat's stored events folded to final message and part snapshots, like o2-ai's projection.
@@ -425,8 +457,8 @@ impl TurnCache {
 
 /// `(share id, state version)`.
 type TurnKey = (String, String);
-/// The turns a reader is shown, and whether the oldest were cut for size.
-type Shown = (Arc<Vec<Value>>, bool);
+/// The turns a reader is shown, whether the oldest were cut for size, and the steps hidden.
+type Shown = (Arc<Vec<Value>>, bool, Arc<serde_json::Map<String, Value>>);
 
 struct CachedTurns {
     at: Instant,
@@ -548,6 +580,22 @@ pub async fn create(
     if chat.last_committed_seq == NO_SEQ {
         return error::invalid_request("A conversation with no stored messages cannot be shared");
     }
+    // A share reads the stored events, which hold none of the imported turns.
+    match ai_chat_imports::is_imported(&org_id, &chat.session_id).await {
+        Ok(false) => {}
+        Ok(true) => {
+            return AiErrorEnvelope::new(
+                AiErrorCode::InvalidRequest,
+                "A conversation moved from this browser cannot be shared",
+            )
+            .with("reason", IMPORTED_CHAT)
+            .into_response();
+        }
+        Err(e) => {
+            log::error!("[AI-CHAT-SHARE] cannot read the import of {org_id}/{session_id}: {e}");
+            return unavailable();
+        }
+    }
     let now = now_micros();
     let new = NewShare {
         org_id: &org_id,
@@ -557,9 +605,8 @@ pub async fn create(
         snapshot_seq: (req.mode == MODE_SNAPSHOT).then_some(chat.last_committed_seq),
         visibility: &req.visibility,
         expires_at: expires_in.map(|secs| now + secs * 1_000_000),
-        redact_tools: req
-            .redact_tools
-            .unwrap_or(req.visibility == VISIBILITY_PUBLIC),
+        redact_tools: hiding_of(&req).0,
+        hide_attachments: hiding_of(&req).1,
     };
     match ai_chat_shares::insert(&new, now).await {
         Ok(share) => {
@@ -875,9 +922,14 @@ pub async fn get_shared(
     {
         return not_found();
     }
+    let viewer = user_email(&in_req);
     let (parts, _) = in_req.into_parts();
     let auth = openobserve_core::auth::extract_auth_str_from_headers(&parts.headers).await;
-    read_shared(served, &params, Some(&auth), VISIBILITY_ORG).await
+    let reader = Reader {
+        auth: Some(&auth),
+        viewer: viewer.as_deref(),
+    };
+    read_shared(served, &params, reader, VISIBILITY_ORG).await
 }
 
 /// ForkSharedAiChat
@@ -936,7 +988,27 @@ pub async fn fork(
         Ok(None) => return not_found(),
         Err(resp) => return resp,
     };
-    let title = fork_title(&chat.title);
+    let (parts, _) = in_req.into_parts();
+    let auth = openobserve_core::auth::extract_auth_str_from_headers(&parts.headers).await;
+    let reader = Reader {
+        auth: Some(&auth),
+        viewer: Some(&user_email),
+    };
+    let seed = match fork_seed_of(&share, &chat, reader).await {
+        Ok(seed) => seed,
+        Err(resp) => return resp,
+    };
+    let earlier = ai_chat_sessions::count_forks(&org_id, &owner, &share.id)
+        .await
+        .unwrap_or_else(|e| {
+            // Only the title's number depends on it.
+            log::warn!(
+                "[AI-CHAT-SHARE] cannot count forks of share {}: {e}",
+                share.id
+            );
+            0
+        });
+    let title = fork_title(&chat.title, earlier);
     let session_id = uuid::Uuid::now_v7().to_string();
     let fork = NewFork {
         org_id: &org_id,
@@ -947,13 +1019,18 @@ pub async fn fork(
         title: &title,
         share_id: &share.id,
         seed_seq: ai_chat_shares::visible_seq(&share, chat.last_committed_seq),
+        seed: Some(&seed),
     };
     match ai_chat_sessions::insert_fork(&fork, now_micros()).await {
         Ok(_) => {
             count_op("fork");
             (
                 StatusCode::CREATED,
-                Json(ForkResponse { session_id, title }),
+                Json(ForkResponse {
+                    session_id,
+                    title,
+                    seed,
+                }),
             )
                 .into_response()
         }
@@ -1001,7 +1078,7 @@ pub async fn get_public(
     if !super::settings::sharing_allowed(&served.share.org_id, true).await {
         return with_public_headers(not_found());
     }
-    let resp = read_shared(served, &params, None, VISIBILITY_PUBLIC).await;
+    let resp = read_shared(served, &params, Reader::default(), VISIBILITY_PUBLIC).await;
     // Internal error details are for signed-in readers only.
     if resp.status().is_server_error() {
         return with_public_headers(unavailable());
@@ -1017,8 +1094,8 @@ pub(super) async fn revoke_for_deleted(org_id: &str, session_ids: &[String], now
     }
 }
 
-/// The transcript a fork's first turn starts from, if this is one and its share is still live.
-pub(super) async fn fork_seed(
+/// The transcript a chat's first turn starts from: a fork's shared turns or an import's turns.
+pub(super) async fn first_turn_seed(
     org_id: &str,
     session_id: Option<&str>,
     user_email: &str,
@@ -1034,10 +1111,6 @@ pub(super) async fn fork_seed(
             return Err(unavailable());
         }
     };
-    let (Some(share_id), Some(seed_seq)) = (row.forked_from_share.as_deref(), row.fork_seed_seq)
-    else {
-        return Ok(None);
-    };
     if row.last_committed_seq != NO_SEQ || row.status != STATUS_ACTIVE {
         return Ok(None);
     }
@@ -1045,6 +1118,16 @@ pub(super) async fn fork_seed(
     if resolve_owner(user_email).await.ok().as_deref() != Some(row.user_id.as_str()) {
         return Ok(None);
     }
+    // Copied at fork or import time, so a revoked or expired share never empties the chat.
+    if let Some(turns) = stored_seed(&row) {
+        let seed = fit_seed(seed_messages(turns));
+        return Ok((!seed.is_empty()).then_some(seed));
+    }
+    let (Some(share_id), Some(seed_seq)) = (row.forked_from_share.as_deref(), row.fork_seed_seq)
+    else {
+        let read = ai_chat_imports::turns_for_session(org_id, &row.session_id).await;
+        return Ok(import_seed(read, &row.session_id));
+    };
     let source = match seed_source(org_id, share_id).await {
         Ok(Some(source)) => source,
         Ok(None) => return Ok(None),
@@ -1063,6 +1146,144 @@ pub(super) async fn fork_seed(
     };
     let seed = fit_seed(transcript(&events));
     Ok((!seed.is_empty()).then_some(seed))
+}
+
+/// What a turn version is answered from: carried turns, then the chat before `before_seq`.
+pub(super) async fn history_before(
+    row: &ChatModel,
+    before_seq: i64,
+) -> Result<(Vec<Value>, bool), Response> {
+    let carried = carried_seed(row).await?;
+    let mut cut = row.clone();
+    cut.last_committed_seq = cut.last_committed_seq.min(before_seq - 1);
+    let own = if cut.last_committed_seq <= NO_SEQ {
+        Vec::new()
+    } else {
+        match openobserve_core::ai_chat::read_committed_events(&cut, NO_SEQ).await {
+            Ok(events) => transcript_before(&events, before_seq),
+            Err(e) => {
+                log::warn!(
+                    "[AI-CHAT] cannot read {} for a version: {e}",
+                    row.session_id
+                );
+                return Err(unavailable());
+            }
+        }
+    };
+    Ok(versioned_history(carried, own))
+}
+
+/// `{owner_name, as_of, turns}`: what `reader` sees of the share now, to keep with the fork.
+async fn fork_seed_of(
+    share: &ShareModel,
+    chat: &ChatModel,
+    reader: Reader<'_>,
+) -> Result<Value, Response> {
+    let seq = ai_chat_shares::visible_seq(share, chat.last_committed_seq);
+    let records = turn_records(chat).await;
+    let key = (
+        share.id.clone(),
+        state_version(share, seq, &records, running_since(now_micros())),
+    );
+    let (turns, ..) = shared_turns(share, chat, seq, key, reader).await?;
+    let (turns, _) = newest_within(turns.as_ref().clone(), SEED_MAX_BYTES);
+    let as_of = if share.mode == MODE_SNAPSHOT {
+        share.updated_at
+    } else {
+        now_micros()
+    };
+    Ok(serde_json::json!({
+        "owner_name": owner_name(chat, false).await,
+        "as_of": as_of,
+        "turns": turns,
+    }))
+}
+
+/// `{call_id: {reason, stream}}` of steps on streams `viewer` cannot read, one check per stream.
+async fn hidden_steps(
+    org_id: &str,
+    turns: &[Value],
+    viewer: Option<&str>,
+    redact_tools: bool,
+) -> serde_json::Map<String, Value> {
+    // A public reader has no identity: only the owner's un-redacted choice shows steps.
+    let check = |place: Option<(String, String)>| async move {
+        match (viewer, place) {
+            (Some(viewer), Some((stream_type, stream))) => {
+                can_read_stream(org_id, viewer, &stream_type, &stream).await
+            }
+            (Some(_), None) => false,
+            (None, _) => !redact_tools,
+        }
+    };
+    hidden_steps_with(turns, viewer.is_some() && !redact_tools, check).await
+}
+
+/// [`hidden_steps`] over `can_read`, naming streams only when `named`.
+async fn hidden_steps_with<F, Fut>(
+    turns: &[Value],
+    named: bool,
+    mut can_read: F,
+) -> serde_json::Map<String, Value>
+where
+    F: FnMut(Option<(String, String)>) -> Fut,
+    Fut: std::future::Future<Output = bool>,
+{
+    let mut readable: HashMap<Option<(String, String)>, bool> = HashMap::new();
+    let mut hidden = serde_json::Map::new();
+    for (call_id, place) in projection::step_streams(turns) {
+        let can = match readable.get(&place) {
+            Some(can) => *can,
+            None => {
+                let can = readable.len() < MAX_STREAM_CHECKS && can_read(place.clone()).await;
+                readable.insert(place.clone(), can);
+                can
+            }
+        };
+        if !can && !hidden.contains_key(&call_id) {
+            let stream = place.filter(|_| named).map(|p| p.1).unwrap_or_default();
+            hidden.insert(
+                call_id,
+                serde_json::json!({"reason": STREAM_FORBIDDEN, "stream": stream}),
+            );
+        }
+    }
+    hidden
+}
+
+/// The same search permission a query on the stream is checked against.
+async fn can_read_stream(org_id: &str, user_email: &str, stream_type: &str, stream: &str) -> bool {
+    openobserve_core::authz::check_stream_permissions(
+        stream,
+        org_id,
+        user_email,
+        &config::meta::stream::StreamType::from(stream_type),
+        openobserve_core::authz::StreamPermissionResourceType::Search,
+    )
+    .await
+    .is_none()
+}
+
+/// Messages of the turns a chat carries from elsewhere: a fork's stored seed or its import.
+async fn carried_seed(row: &ChatModel) -> Result<Vec<Value>, Response> {
+    if let Some(turns) = stored_seed(row) {
+        return Ok(seed_messages(turns));
+    }
+    // Only a chat that is no fork can have begun as an import.
+    if row.forked_from_share.is_some() {
+        return Ok(Vec::new());
+    }
+    match ai_chat_imports::turns_for_session(&row.org_id, &row.session_id).await {
+        Ok(Some(Value::Array(turns))) => Ok(seed_messages(&turns)),
+        Ok(_) => Ok(Vec::new()),
+        Err(e) => {
+            log::error!(
+                "[AI-CHAT] cannot read the import of {}: {e}",
+                row.session_id
+            );
+            Err(unavailable())
+        }
+    }
 }
 
 /// The active chat a fork's share points at, while the share is live and the chat exists.
@@ -1199,7 +1420,7 @@ async fn settled_chat(chat: &ChatModel, owner: &str) -> Result<ChatModel, Respon
 async fn read_shared(
     served: Served,
     params: &SharedChatParams,
-    auth: Option<&str>,
+    reader: Reader<'_>,
     route: &'static str,
 ) -> Response {
     let Served { share, chat } = served;
@@ -1222,17 +1443,21 @@ async fn read_shared(
         owner_name: None,
         not_modified,
         redact_tools: share.redact_tools,
+        hide_attachments: share.hide_attachments,
+        org_identifier: chat.org_id.clone(),
+        hidden: None,
         truncated: false,
         turns: None,
     };
     if !not_modified {
         let key = (share.id.clone(), body.state_version.clone());
-        let (turns, truncated) = match shared_turns(&share, &chat, seq, key, auth, public).await {
+        let (turns, truncated, hidden) = match shared_turns(&share, &chat, seq, key, reader).await {
             Ok(shown) => shown,
             Err(resp) => return resp,
         };
         body.turns = Some(turns);
         body.truncated = truncated;
+        body.hidden = (!hidden.is_empty()).then(|| hidden.as_ref().clone());
         count_read(&share.id).await;
         config::metrics::AI_CHAT_SHARE_READS_TOTAL
             .with_label_values(&[route])
@@ -1248,9 +1473,9 @@ async fn shared_turns(
     chat: &ChatModel,
     seq: i64,
     key: TurnKey,
-    auth: Option<&str>,
-    public: bool,
+    reader: Reader<'_>,
 ) -> Result<Shown, Response> {
+    let public = reader.viewer.is_none();
     if public && let Some(shown) = PUBLIC_TURNS.get(&key, Instant::now()) {
         return Ok(shown);
     }
@@ -1262,12 +1487,18 @@ async fn shared_turns(
     cut.last_committed_seq = seq;
     // A snapshot hides turns admitted after it was taken, including failures that stored nothing.
     let admitted_by = (share.mode == MODE_SNAPSHOT).then_some(share.updated_at);
-    let turns = attach_turn_status_at(&cut, load_turns(&cut, auth).await?, admitted_by).await;
+    let turns =
+        attach_turn_status_at(&cut, load_turns(&cut, reader.auth).await?, admitted_by).await;
+    let hidden = hidden_steps(&chat.org_id, &turns, reader.viewer, share.redact_tools).await;
+    let view = projection::ReaderView {
+        hidden: Some(&hidden),
+        hide_attachments: share.hide_attachments,
+    };
     let (turns, truncated) = newest_within(
-        reader_view(turns, share.redact_tools),
+        reader_view(turns, share.redact_tools, &view),
         SHARED_TURNS_MAX_BYTES,
     );
-    let shown = (Arc::new(turns), truncated);
+    let shown = (Arc::new(turns), truncated, Arc::new(hidden));
     if public {
         PUBLIC_TURNS.put(key, shown.clone(), Instant::now());
     }
@@ -1602,6 +1833,7 @@ fn apply_update(
         snapshot_seq,
         expires_at,
         redact_tools: req.redact_tools.unwrap_or(share.redact_tools),
+        hide_attachments: req.hide_attachments.unwrap_or(share.hide_attachments),
     })
 }
 
@@ -1618,27 +1850,46 @@ fn display_name(first: &str, last: &str) -> Option<String> {
     (!name.is_empty()).then(|| name.to_string())
 }
 
-fn fork_title(source: &str) -> String {
+/// `(redact_tools, hide_attachments)` of a new share: what it asks, else hidden on public links.
+fn hiding_of(req: &CreateShareRequest) -> (bool, bool) {
+    let public = req.visibility == VISIBILITY_PUBLIC;
+    (
+        req.redact_tools.unwrap_or(public),
+        req.hide_attachments.unwrap_or(public),
+    )
+}
+
+/// "{title} (continued)", "(continued 2)" for the caller's second fork of the share, and so on.
+fn fork_title(source: &str, earlier_forks: u64) -> String {
     let source = source.trim();
     let base = if source.is_empty() {
         FALLBACK_TITLE
     } else {
         source
     };
-    let suffix = " (copy)";
+    let suffix = match earlier_forks {
+        0 => format!(" ({FORK_SUFFIX})"),
+        n => format!(" ({FORK_SUFFIX} {})", n + 1),
+    };
     let keep = MAX_TITLE_CHARS - suffix.chars().count();
     let mut title: String = base.chars().take(keep).collect();
-    title.push_str(suffix);
+    title.push_str(&suffix);
     title
 }
 
-/// Turns as a share reader sees them: no opencode ids or remote images, tool details if allowed.
-fn reader_view(mut turns: Vec<Value>, redact_tools: bool) -> Vec<Value> {
-    if redact_tools {
-        projection::redact_turns(&mut turns);
-    }
+/// Turns as a share reader sees them: no opencode ids, remote images or model names.
+fn reader_view(
+    mut turns: Vec<Value>,
+    redact_tools: bool,
+    view: &projection::ReaderView<'_>,
+) -> Vec<Value> {
+    let audience = if redact_tools {
+        projection::Audience::ViewerRedacted
+    } else {
+        projection::Audience::Viewer
+    };
+    projection::for_audience(&mut turns, audience, view);
     for turn in &mut turns {
-        projection::keep_inline_images(turn);
         if let Some(turn) = turn.as_object_mut() {
             turn.remove("user_message_id");
         }
@@ -1654,8 +1905,8 @@ fn state_version(
     running_since: i64,
 ) -> String {
     let mut key = format!(
-        "{seq}|{}|{}|{:?}",
-        share.mode, share.redact_tools, share.snapshot_seq
+        "{seq}|{}|{}|{}|{:?}",
+        share.mode, share.redact_tools, share.hide_attachments, share.snapshot_seq
     );
     for record in records
         .iter()
@@ -1712,6 +1963,69 @@ fn transcript(events: &[DurableEvent]) -> Vec<Value> {
         let assistant = assistant.trim();
         if !assistant.is_empty() {
             messages.push(serde_json::json!({"role": "assistant", "content": assistant}));
+        }
+    }
+    messages
+}
+
+/// [`transcript`] of the events before `before_seq` only.
+fn transcript_before(events: &[DurableEvent], before_seq: i64) -> Vec<Value> {
+    let kept: Vec<DurableEvent> = events
+        .iter()
+        .filter(|e| e.seq < before_seq)
+        .cloned()
+        .collect();
+    transcript(&kept)
+}
+
+/// The carried messages then the chat's own, fitted; `true` while carried ones survive the fit.
+fn versioned_history(carried: Vec<Value>, own: Vec<Value>) -> (Vec<Value>, bool) {
+    let own_len = own.len();
+    let fitted = fit_seed(carried.into_iter().chain(own).collect());
+    let seeded = fitted.len() > own_len;
+    (fitted, seeded)
+}
+
+/// The turns a fork copied when it was made.
+fn stored_seed(row: &ChatModel) -> Option<&Vec<Value>> {
+    row.seed.as_ref().and_then(|s| s["turns"].as_array())
+}
+
+/// The first-turn seed of a chat that may be an import; an unreadable import seeds nothing.
+fn import_seed(
+    read: Result<Option<Value>, infra::errors::Error>,
+    session_id: &str,
+) -> Option<Vec<Value>> {
+    let turns = match read {
+        Ok(Some(Value::Array(turns))) => turns,
+        Ok(_) => return None,
+        Err(e) => {
+            log::warn!("[AI-CHAT] first turn of {session_id} goes unseeded, import unread: {e}");
+            return None;
+        }
+    };
+    let seed = fit_seed(seed_messages(&turns));
+    (!seed.is_empty()).then_some(seed)
+}
+
+/// Stored seed turns as `{role, content}` messages: the user's words and the assistant's text.
+fn seed_messages(turns: &[Value]) -> Vec<Value> {
+    let mut messages = Vec::new();
+    for turn in turns {
+        let user = turn["user"]["text"].as_str().unwrap_or_default().trim();
+        if !user.is_empty() {
+            messages.push(serde_json::json!({"role": "user", "content": user}));
+        }
+        let answer: String = turn["frames"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter(|f| f["type"] == "message_delta")
+            .filter_map(|f| f["content"].as_str())
+            .collect();
+        let answer = answer.trim();
+        if !answer.is_empty() {
+            messages.push(serde_json::json!({"role": "assistant", "content": answer}));
         }
     }
     messages
@@ -1810,6 +2124,7 @@ mod tests {
             created_at: 1,
             updated_at: 1,
             redact_tools: visibility == VISIBILITY_PUBLIC,
+            hide_attachments: false,
         }
     }
 
@@ -1821,6 +2136,7 @@ mod tests {
             visibility: visibility.into(),
             expires_in_secs: expires,
             redact_tools: None,
+            hide_attachments: None,
         }
     }
 
@@ -1907,11 +2223,12 @@ mod tests {
     #[test]
     fn shared_turns_drop_opencode_message_ids() {
         let turns = vec![json!({"user_message_id": "msg_1", "user": {"text": "hi"}, "frames": []})];
-        let view = reader_view(turns, false);
+        let view = reader_view(turns, false, &projection::ReaderView::default());
         assert_eq!(view, vec![json!({"user": {"text": "hi"}, "frames": []})]);
         let remote = vec![json!({"user": {"text": "", "images": [{"url": "https://x/y.png"}]}})];
         assert_eq!(
-            reader_view(remote, false)[0]["user"]["images"][0]["url"],
+            reader_view(remote, false, &projection::ReaderView::default())[0]["user"]["images"][0]
+                ["url"],
             Value::Null
         );
     }
@@ -1931,7 +2248,7 @@ mod tests {
             }),
             json!({"turn_id": "t2", "status": "failed", "error_code": "x", "user": null, "frames": []}),
         ];
-        let view = reader_view(turns, true);
+        let view = reader_view(turns, true, &projection::ReaderView::default());
         let text = serde_json::to_string(&view).unwrap();
         assert!(!text.contains("secret") && !text.contains("rows"), "{text}");
         assert!(!text.contains("user_message_id"));
@@ -1971,7 +2288,11 @@ mod tests {
         let cache = TurnCache::new(Duration::from_secs(60));
         let t0 = Instant::now();
         let key = ("s".to_string(), "4.a".to_string());
-        cache.put(key.clone(), (Arc::new(vec![json!({"a": 1})]), false), t0);
+        cache.put(
+            key.clone(),
+            (Arc::new(vec![json!({"a": 1})]), false, Arc::default()),
+            t0,
+        );
         assert!(cache.get(&key, t0 + Duration::from_secs(59)).is_some());
         assert!(
             cache
@@ -1982,7 +2303,7 @@ mod tests {
         for i in 0..PUBLIC_TURNS_MAX_ENTRIES + 5 {
             cache.put(
                 (format!("s{i}"), "1".into()),
-                (Arc::new(Vec::new()), false),
+                (Arc::new(Vec::new()), false, Arc::default()),
                 t0,
             );
         }
@@ -2024,6 +2345,8 @@ mod tests {
             started_at,
             ended_at: None,
             first_event_at: None,
+            version_of: None,
+            decisions: None,
         }
     }
 
@@ -2202,10 +2525,11 @@ mod tests {
         assert_eq!(token_prefix("abc"), "");
         assert_eq!(display_name(" Ada ", ""), Some("Ada".into()));
         assert_eq!(display_name("", " "), None);
-        assert_eq!(fork_title(""), "Shared chat (copy)");
-        let long = fork_title(&"x".repeat(500));
+        assert_eq!(fork_title("", 0), "Shared chat (continued)");
+        assert_eq!(fork_title(" 5xx spike ", 1), "5xx spike (continued 2)");
+        let long = fork_title(&"x".repeat(500), 0);
         assert_eq!(long.chars().count(), MAX_TITLE_CHARS);
-        assert!(long.ends_with(" (copy)"));
+        assert!(long.ends_with(" (continued)"));
     }
 
     fn event(seq: i64, event_type: &str, data: Value) -> DurableEvent {
@@ -2386,5 +2710,212 @@ mod tests {
         ]);
         assert_eq!(huge.len(), 1);
         assert!(huge[0]["content"].as_str().unwrap().chars().count() <= SEED_MAX_CHARS);
+    }
+
+    #[test]
+    fn share_bodies_accept_hide_attachments_and_still_refuse_unknown_fields() {
+        let create: CreateShareRequest = serde_json::from_value(json!({
+            "mode": "snapshot", "visibility": "org", "redact_tools": true, "hide_attachments": true,
+        }))
+        .unwrap();
+        assert_eq!(create.hide_attachments, Some(true));
+        let old: CreateShareRequest =
+            serde_json::from_value(json!({"mode": "snapshot", "visibility": "org"})).unwrap();
+        assert_eq!(old.hide_attachments, None);
+        assert!(
+            serde_json::from_value::<CreateShareRequest>(
+                json!({"mode": "snapshot", "visibility": "org", "redact_attachments": true})
+            )
+            .is_err()
+        );
+        let update: UpdateShareRequest =
+            serde_json::from_value(json!({"hide_attachments": false})).unwrap();
+        assert_eq!(update.hide_attachments, Some(false));
+        assert!(serde_json::from_value::<UpdateShareRequest>(json!({"nope": 1})).is_err());
+        let share = share(MODE_LIVE, VISIBILITY_ORG);
+        let kept = apply_update(&share, &UpdateShareRequest::default(), 3, 1, 60).unwrap();
+        assert!(!kept.hide_attachments);
+        let hid = UpdateShareRequest {
+            hide_attachments: Some(true),
+            ..Default::default()
+        };
+        assert!(
+            apply_update(&share, &hid, 3, 1, 60)
+                .unwrap()
+                .hide_attachments
+        );
+    }
+
+    #[test]
+    fn readers_never_see_hidden_attachments_or_model_names() {
+        let turns = vec![json!({
+            "user": {
+                "text": "Explain\n\n--- Log rows [abcdefgh] ---\n\"card 4111\"\n--- end [abcdefgh] ---",
+                "images": [{"filename": "a.png", "mime": "image/png", "url": "data:image/png;base64,AA"}],
+            },
+            "frames": [{"type": "message_delta", "content": "gpt-4o says hi"}],
+        })];
+        let view = projection::ReaderView {
+            hidden: None,
+            hide_attachments: true,
+        };
+        let shown = reader_view(turns, false, &view);
+        assert_eq!(
+            shown[0]["user"]["text"],
+            "Explain\n\n[Attached log rows hidden]"
+        );
+        assert_eq!(shown[0]["user"]["images"], json!([]));
+        assert_eq!(shown[0]["frames"][0]["content"], "the model says hi");
+    }
+
+    #[tokio::test]
+    async fn a_public_reader_of_a_redacted_link_sees_every_stream_step_hidden_without_names() {
+        let turns = vec![json!({"frames": [
+            {"type": "tool_call", "tool": "SearchSQL", "call_id": "c1", "context": {"sql": "SELECT * FROM payments"}},
+            {"type": "tool_call", "tool": "SearchSQL", "call_id": "c2", "context": {"stream_name": "payments"}},
+            {"type": "tool_call", "tool": "StreamList", "call_id": "c3", "context": {}},
+        ]})];
+        let hidden = hidden_steps("org", &turns, None, true).await;
+        assert_eq!(
+            Value::Object(hidden),
+            json!({
+                "c1": {"reason": "stream_forbidden", "stream": ""},
+                "c2": {"reason": "stream_forbidden", "stream": ""},
+            })
+        );
+        assert!(hidden_steps("org", &turns, None, false).await.is_empty());
+    }
+
+    #[tokio::test]
+    async fn a_signed_in_reader_has_unreadable_and_unplaceable_steps_hidden() {
+        let turns = vec![json!({"frames": [
+            {"type": "tool_call", "tool": "SearchSQL", "call_id": "c1", "context": {"sql": "SELECT * FROM payments_audit"}},
+            {"type": "tool_call", "tool": "SearchSQL", "call_id": "c2", "context": {"stream_name": "default"}},
+            {"type": "tool_call", "tool": "PrometheusQuery", "call_id": "c3", "context": {"query": "up"}},
+            {"type": "tool_call", "tool": "SearchSQL", "call_id": "c4", "context": {"stream_name": "default"}},
+            {"type": "tool_call", "tool": "StreamList", "call_id": "c5", "context": {}},
+        ]})];
+        let checked = std::cell::RefCell::new(Vec::new());
+        let can_read = |place: Option<(String, String)>| {
+            checked.borrow_mut().push(place.clone());
+            async move { place.is_some_and(|(_, stream)| stream == "default") }
+        };
+        let hidden = hidden_steps_with(&turns, true, can_read).await;
+        assert_eq!(
+            Value::Object(hidden),
+            json!({
+                "c1": {"reason": "stream_forbidden", "stream": "payments_audit"},
+                "c3": {"reason": "stream_forbidden", "stream": ""},
+            })
+        );
+        assert_eq!(checked.borrow().len(), 3, "one check per distinct stream");
+        // A redacted link names no stream, not even to a signed-in reader.
+        let hidden = hidden_steps_with(&turns, false, |_| async { false }).await;
+        assert_eq!(hidden.len(), 4);
+        assert!(hidden.values().all(|h| h["stream"] == ""));
+        let many: Vec<Value> = (0..MAX_STREAM_CHECKS + 2)
+            .map(|n| json!({"type": "tool_call", "tool": "SearchSQL", "call_id": format!("s{n}"), "context": {"stream_name": format!("s{n}")}}))
+            .collect();
+        let calls = std::cell::Cell::new(0);
+        let hidden = hidden_steps_with(&[json!({"frames": many})], true, |_| {
+            calls.set(calls.get() + 1);
+            async { true }
+        })
+        .await;
+        assert_eq!(calls.get(), MAX_STREAM_CHECKS);
+        assert_eq!(hidden.len(), 2);
+    }
+
+    #[test]
+    fn public_links_hide_tools_and_attachments_unless_asked() {
+        let public = create_req(MODE_LIVE, VISIBILITY_PUBLIC, Some(3600));
+        assert_eq!(hiding_of(&public), (true, true));
+        assert_eq!(
+            hiding_of(&create_req(MODE_LIVE, VISIBILITY_ORG, None)),
+            (false, false)
+        );
+        let shown = CreateShareRequest {
+            hide_attachments: Some(false),
+            redact_tools: Some(false),
+            ..public
+        };
+        assert_eq!(hiding_of(&shown), (false, false));
+    }
+
+    #[test]
+    fn versions_keep_the_carried_turns_ahead_of_the_chat() {
+        let msg = |role: &str, content: &str| json!({"role": role, "content": content});
+        let carried = vec![msg("user", "shared q"), msg("assistant", "shared a")];
+        let own = vec![msg("user", "mine")];
+        let (history, seeded) = versioned_history(carried.clone(), own.clone());
+        assert_eq!(history, [carried.clone(), own.clone()].concat());
+        assert!(seeded);
+        assert_eq!(versioned_history(Vec::new(), own.clone()), (own, false));
+        assert_eq!(
+            versioned_history(carried.clone(), Vec::new()),
+            (carried, true)
+        );
+    }
+
+    #[test]
+    fn fork_seeds_and_version_seeds_hold_only_what_came_before() {
+        let turns = vec![
+            json!({"user": {"text": " why? "}, "frames": [
+                {"type": "message_delta", "content": "Because "},
+                {"type": "tool_call", "tool": "SearchSQL"},
+                {"type": "message_delta", "content": "of GC."},
+            ]}),
+            json!({"user": null, "frames": [{"type": "error", "error": "x"}]}),
+        ];
+        assert_eq!(
+            seed_messages(&turns),
+            vec![
+                json!({"role": "user", "content": "why?"}),
+                json!({"role": "assistant", "content": "Because of GC."}),
+            ]
+        );
+        let events = vec![
+            message(0, "msg_u1", "user", None),
+            part(
+                1,
+                "msg_u1",
+                json!({"id": "p1", "type": "text", "text": "first"}),
+            ),
+            message(2, "msg_a1", "assistant", Some("msg_u1")),
+            part(
+                3,
+                "msg_a1",
+                json!({"id": "p2", "type": "text", "text": "one"}),
+            ),
+            message(4, "msg_u2", "user", None),
+            part(
+                5,
+                "msg_u2",
+                json!({"id": "p3", "type": "text", "text": "replaced"}),
+            ),
+        ];
+        assert_eq!(
+            transcript_before(&events, 4),
+            vec![
+                json!({"role": "user", "content": "first"}),
+                json!({"role": "assistant", "content": "one"}),
+            ]
+        );
+    }
+
+    #[test]
+    fn an_unreadable_import_seeds_nothing_and_never_fails_the_turn() {
+        let failed = Err(infra::errors::Error::Message("db down".into()));
+        assert_eq!(import_seed(failed, "s1"), None);
+        assert_eq!(import_seed(Ok(None), "s1"), None);
+        assert_eq!(import_seed(Ok(Some(json!([]))), "s1"), None);
+        let turns = json!([{"user": {"text": "why?"}, "frames": [{"type": "message_delta", "content": "GC"}]}]);
+        assert_eq!(
+            import_seed(Ok(Some(turns)), "s1"),
+            Some(vec![
+                json!({"role": "user", "content": "why?"}),
+                json!({"role": "assistant", "content": "GC"}),
+            ])
+        );
     }
 }
