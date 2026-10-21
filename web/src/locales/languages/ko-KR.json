@@ -8149,8 +8149,6 @@
     "invoiceHistoryLabel": "인보이스 내역",
     "upgradeNow": "지금 업그레이드하세요",
     "subscribe": "구독하기",
-    "features": "특징",
-    "included": "무엇이 포함되어 있나요?",
     "proPlanSubtitle": "소규모 팀을 위한 맞춤형 솔루션",
     "unlimitedNote": "무제한 사용자, 로그, 메트릭, 트레이스 등.",
     "paymentNote": "월별 청구 주기 말의 사용량을 기준으로 요금이 계산됩니다.",
@@ -8158,7 +8156,7 @@
     "contactLabel": "영업팀에 문의",
     "enterpriseLabel": "엔터프라이즈 플랜",
     "enterpriseSubtitle": "엔터프라이즈 요구 사항을 위한 고급 기능 및 지원",
-    "discountTag": "할인 시",
+    "discountTag": "할인 중",
     "enterpriseNote": "대량 구매가 필요하신가요?스케일에 대해 얘기해 볼까요!맞춤형 솔루션을 원하시면 저희에게 문의하세요.",
     "contactSupport": "지원팀에 문의",
     "usageTrends": {
@@ -14888,6 +14886,7 @@
         "userPromptLabel": "사용자 메시지",
         "userPromptPlaceholder": "데이터셋 필드를 {'{{ input }}'}로 참조하세요.",
         "variablesLabel": "변수 삽입:",
+        "expectedOutputScorersOnly": "{token} · 스코어러만",
         "scorersPlaceholder": "스코어러 선택",
         "scorersHelp": "스코어러 버전은 지금 고정됩니다. 나중에 스코어러를 수정해도 이 실험의 점수는 변경되지 않습니다.",
         "scorersEmpty": "사용 가능한 스코어러가 없습니다. 먼저 Evaluate에서 만드세요.",
@@ -15197,6 +15196,7 @@
         "fallbackTitle": "데이터셋",
         "meta": "{count}개 항목 · 업데이트됨 {updated}",
         "loadError": "데이터셋을 불러오지 못했습니다",
+        "tryInPlayground": "플레이그라운드에서 사용해 보기",
         "tabs": {
           "items": "항목",
           "experiments": "실험"
@@ -15731,6 +15731,7 @@
       "scoreSkippedNoReference": "건너뜀 — 예상 출력 없음",
       "removeExpected": "예상 출력 제거",
       "expectedLeakWarning": "{token}은(는) 태스크 프롬프트에서 사용할 수 없습니다 — 정답은 채점에만 사용됩니다.",
+      "unresolvedVariablesWarning": "{tokens}에 대한 값이 없습니다 — 실행 시 빈 값으로 전송됩니다.",
       "chipInsert": "클릭하여 커서 위치에 삽입",
       "variant": "변형 {label}",
       "variantLimit": "벤치에는 최대 {max}개의 변형이 들어갑니다.",

@@ -8149,8 +8149,6 @@
     "invoiceHistoryLabel": "Historia faktur",
     "upgradeNow": "Ulepsz teraz",
     "subscribe": "Subskrybuj",
-    "features": "FUNKCJE",
-    "included": "Co jest wliczone?",
     "proPlanSubtitle": "Niestandardowe rozwiązania dla małych zespołów",
     "unlimitedNote": "Bez limitów: użytkownicy, logi, metryki, ślady i więcej.",
     "paymentNote": "Płatność obliczana na podstawie użycia na koniec miesięcznego cyklu rozliczeniowego.",
@@ -8158,7 +8156,7 @@
     "contactLabel": "Skontaktuj się z działem sprzedaży",
     "enterpriseLabel": "Plan Enterprise",
     "enterpriseSubtitle": "Zaawansowana funkcjonalność i wsparcie dla wymagań przedsiębiorstw",
-    "discountTag": "Ze zniżką",
+    "discountTag": "Z rabatem",
     "enterpriseNote": "Potrzebujesz dużej pojemności? Porozmawiajmy o skali! Skontaktuj się z nami po rozwiązania dostosowane do Twoich potrzeb.",
     "contactSupport": "Kontakt z pomocą techniczną",
     "usageTrends": {
@@ -14888,6 +14886,7 @@
         "userPromptLabel": "Wiadomość użytkownika",
         "userPromptPlaceholder": "Odwołuj się do pól zbioru danych przez {'{{ input }}'}.",
         "variablesLabel": "Wstaw zmienną:",
+        "expectedOutputScorersOnly": "{token} · tylko scorery",
         "scorersPlaceholder": "Wybierz oceniacze",
         "scorersHelp": "Wersje oceniaczy są teraz przypięte — późniejsze zmiany oceniaczy nigdy nie zmienią wyników tego eksperymentu.",
         "scorersEmpty": "Brak dostępnych oceniaczy. Najpierw utwórz jeden w sekcji Evaluate.",
@@ -15197,6 +15196,7 @@
         "fallbackTitle": "Zbiór danych",
         "meta": "{count} elementów · zaktualizowano {updated}",
         "loadError": "Nie udało się załadować zbioru danych",
+        "tryInPlayground": "Wypróbuj w Playground",
         "tabs": {
           "items": "Elementy",
           "experiments": "Eksperymenty"
@@ -15731,6 +15731,7 @@
       "scoreSkippedNoReference": "Pominięto — brak oczekiwanego wyniku",
       "removeExpected": "Usuń oczekiwane wyjście",
       "expectedLeakWarning": "Token {token} nigdy nie jest dostępny w promptach zadań — złote odpowiedzi zasilają tylko oceniających.",
+      "unresolvedVariablesWarning": "Brak wartości dla {tokens} — przy uruchomieniu zostanie wysłane puste.",
       "chipInsert": "Kliknij, aby wstawić w miejscu kursora",
       "variant": "Wariant {label}",
       "variantLimit": "Środowisko może pomieścić maksymalnie {max} wariantów.",
