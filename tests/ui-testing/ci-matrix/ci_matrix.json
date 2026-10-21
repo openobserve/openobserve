@@ -619,7 +619,8 @@
       "xtab.spec.js",
       "sharing.spec.js",
       "helper.spec.js",
-      "rca.spec.js"
+      "rca.spec.js",
+      "admin.spec.js"
     ],
     "disabled": []
   }

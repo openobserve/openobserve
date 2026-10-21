@@ -11,8 +11,10 @@ const parentDataTest = computed(() => $attrs["data-test"] as string | undefined)
 
 // Forward tabindex to the switch control; keep it off the wrapper (avoids a double tab-stop).
 const inputTabindex = computed(() => $attrs["tabindex"] as number | string | undefined);
+// A description belongs to the control a screen reader focuses, not to its wrapper.
+const describedBy = computed(() => $attrs["aria-describedby"] as string | undefined);
 const wrapperAttrs = computed(() => {
-  const { tabindex: _tabindex, ...rest } = $attrs;
+  const { tabindex: _tabindex, "aria-describedby": _describedBy, ...rest } = $attrs;
   return rest;
 });
 
@@ -117,6 +119,7 @@ const hasLabel = computed(
       role="switch"
       :aria-checked="isChecked"
       :aria-labelledby="hasLabel ? labelId : undefined"
+      :aria-describedby="describedBy"
       :data-state="isChecked ? 'checked' : 'unchecked'"
       :data-test="parentDataTest ? `${parentDataTest}-btn` : undefined"
       :disabled="disabled"
