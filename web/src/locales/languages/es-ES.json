@@ -6091,6 +6091,21 @@
     "gpuExporter": "Exportador de GPU"
   },
   "dashboard": {
+    "panelDraft": {
+      "restoreTitle": "Borrador de panel sin guardar",
+      "restoreMessage": "Tienes cambios sin guardar del {date}.",
+      "changedOnServer": "Este panel se modificó después de guardar tu borrador. Guardar el borrador reemplazará esos cambios.",
+      "continueDraft": "Continuar borrador",
+      "startFresh": "Empezar de nuevo",
+      "panelDeleted": "Este panel ya no existe, así que se descartó su borrador sin guardar.",
+      "variablesSkipped": "{count} variable de tu borrador no se añadió porque su nombre ya está en uso | {count} variables de tu borrador no se añadieron porque sus nombres ya están en uso",
+      "leaveTitle": "¿Salir con cambios sin guardar?",
+      "leaveMessage": "Guarda el panel, conserva los cambios como borrador en este navegador o descártalos.",
+      "keepDraft": "Conservar borrador",
+      "addPanelDot": "Añadir panel · borrador sin guardar",
+      "panelDot": "Cambios sin guardar en este navegador: haz clic para continuar",
+      "panelMissingOnSave": "Este panel ya no existe en el panel de control. Vuelve a cargar el panel de control y añádelo de nuevo."
+    },
     "sortByClear": "Quitar ordenación",
     "sortByAsc": "Ordenar ascendente",
     "sortByDesc": "Ordenar descendente",
@@ -7611,6 +7626,7 @@
     "showExemplarsHelp": "Dibuja muestras de trazas en este gráfico para todos los que abran el dashboard. Los visores aún pueden ocultarlas desde el encabezado del panel."
   },
   "panel": {
+    "saveAndStay": "Guardar y seguir editando",
     "addPivotShort": "+P",
     "addBreakdownShort": "+B",
     "addZAxisShort": "+Z",
@@ -19151,7 +19167,7 @@
       "logsSearchHistory": "Abrir historial de búsqueda",
       "alertsImport": "Importar alerta",
       "panelEditorRun": "Ejecutar/aplicar consulta",
-      "panelEditorSave": "Guardar panel",
+      "panelEditorSave": "Guardar y seguir editando",
       "panelEditorBack": "Descartar y volver",
       "traceNextSpan": "Siguiente span",
       "tracePrevSpan": "Anterior span",
@@ -20007,6 +20023,7 @@
       "updatingSyntheticsSteps": "Actualizando pasos de sintéticos..."
     },
     "dashboard": {
+      "panelSaved": "Panel guardado",
       "clickOnTheChartDataOr": "Haga clic en los datos del gráfico o seleccione un rango para agregar una anotación",
       "runningQueryCanceledSuccessfully": "Consulta en ejecución cancelada correctamente",
       "panelQueryHasNoStreamToAlertOn": "La consulta de este panel no tiene un stream sobre el cual alertar."

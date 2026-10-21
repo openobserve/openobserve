@@ -6091,6 +6091,21 @@
     "gpuExporter": "GPU 匯出器"
   },
   "dashboard": {
+    "panelDraft": {
+      "restoreTitle": "未儲存的面板草稿",
+      "restoreMessage": "您有 {date} 未儲存的變更。",
+      "changedOnServer": "您的草稿儲存後此面板已被變更。儲存草稿將取代這些變更。",
+      "continueDraft": "繼續草稿",
+      "startFresh": "重新開始",
+      "panelDeleted": "此面板已不存在，因此其未儲存的草稿已被捨棄。",
+      "variablesSkipped": "草稿中的 {count} 個變數因名稱已被使用而未新增 | 草稿中的 {count} 個變數因名稱已被使用而未新增",
+      "leaveTitle": "有未儲存的變更，確定離開？",
+      "leaveMessage": "儲存面板、將變更作為草稿保留在此瀏覽器中，或捨棄變更。",
+      "keepDraft": "保留草稿",
+      "addPanelDot": "新增面板 · 未儲存的草稿",
+      "panelDot": "此瀏覽器中有未儲存的變更 — 點擊以繼續",
+      "panelMissingOnSave": "此面板已不在儀表板中。請重新載入儀表板並再次新增。"
+    },
     "sortByClear": "清除排序",
     "sortByAsc": "升冪排序",
     "sortByDesc": "降冪排序",
@@ -7606,6 +7621,7 @@
     "showExemplarsHelp": "為所有開啟儀表板的人在此圖表上繪製追蹤樣本。檢視者仍可從面板標題隱藏它們。"
   },
   "panel": {
+    "saveAndStay": "儲存並繼續編輯",
     "addPivotShort": "+P",
     "addBreakdownShort": "+B",
     "addZAxisShort": "+Z",
@@ -19146,7 +19162,7 @@
       "logsSearchHistory": "開啟搜尋歷史",
       "alertsImport": "匯入警示",
       "panelEditorRun": "執行/套用查詢",
-      "panelEditorSave": "儲存面板",
+      "panelEditorSave": "儲存並繼續編輯",
       "panelEditorBack": "放棄並返回",
       "traceNextSpan": "下一個 Span",
       "tracePrevSpan": "上一個 Span",
@@ -20002,6 +20018,7 @@
       "updatingSyntheticsSteps": "正在更新合成監控步驟..."
     },
     "dashboard": {
+      "panelSaved": "面板已儲存",
       "clickOnTheChartDataOr": "按一下圖表資料或選取範圍以新增註釋",
       "runningQueryCanceledSuccessfully": "執行中的查詢已成功取消",
       "panelQueryHasNoStreamToAlertOn": "此面板的查詢沒有可設定警示的串流。"

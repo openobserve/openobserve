@@ -6091,6 +6091,21 @@
     "gpuExporter": "Exportateur GPU"
   },
   "dashboard": {
+    "panelDraft": {
+      "restoreTitle": "Brouillon de panneau non enregistré",
+      "restoreMessage": "Vous avez des modifications non enregistrées du {date}.",
+      "changedOnServer": "Ce panneau a été modifié après l'enregistrement de votre brouillon. Enregistrer le brouillon remplacera ces modifications.",
+      "continueDraft": "Reprendre le brouillon",
+      "startFresh": "Recommencer",
+      "panelDeleted": "Ce panneau n'existe plus, son brouillon non enregistré a donc été supprimé.",
+      "variablesSkipped": "{count} variable de votre brouillon n'a pas été ajoutée car son nom est déjà utilisé | {count} variables de votre brouillon n'ont pas été ajoutées car leurs noms sont déjà utilisés",
+      "leaveTitle": "Quitter avec des modifications non enregistrées ?",
+      "leaveMessage": "Enregistrez le panneau, conservez vos modifications comme brouillon dans ce navigateur ou supprimez-les.",
+      "keepDraft": "Conserver le brouillon",
+      "addPanelDot": "Ajouter un panneau · brouillon non enregistré",
+      "panelDot": "Modifications non enregistrées dans ce navigateur — cliquez pour continuer",
+      "panelMissingOnSave": "Ce panneau n'existe plus dans le tableau de bord. Rechargez le tableau de bord et ajoutez-le à nouveau."
+    },
     "sortByClear": "Effacer le tri",
     "sortByAsc": "Trier par ordre croissant",
     "sortByDesc": "Trier par ordre décroissant",
@@ -7611,6 +7626,7 @@
     "showExemplarsHelp": "Dessine les échantillons de traces sur ce graphique pour toute personne qui ouvre le tableau de bord. Les spectateurs peuvent toujours les masquer depuis l'en-tête du panneau."
   },
   "panel": {
+    "saveAndStay": "Enregistrer et continuer la modification",
     "addPivotShort": "+P",
     "addBreakdownShort": "+B",
     "addZAxisShort": "+Z",
@@ -19151,7 +19167,7 @@
       "logsSearchHistory": "Ouvrir l'historique des recherches",
       "alertsImport": "Importer une alerte",
       "panelEditorRun": "Exécuter/appliquer une requête",
-      "panelEditorSave": "Enregistrer le panneau",
+      "panelEditorSave": "Enregistrer et continuer la modification",
       "panelEditorBack": "Jeter et revenir en arrière",
       "traceNextSpan": "Span suivant",
       "tracePrevSpan": "Span précédent",
@@ -20007,6 +20023,7 @@
       "updatingSyntheticsSteps": "Mise à jour des étapes synthétiques..."
     },
     "dashboard": {
+      "panelSaved": "Panneau enregistré",
       "clickOnTheChartDataOr": "Cliquez sur les données du graphique ou sélectionnez une plage pour ajouter une annotation",
       "runningQueryCanceledSuccessfully": "Requête en cours annulée avec succès",
       "panelQueryHasNoStreamToAlertOn": "La requête de ce panneau n'a aucun flux sur lequel alerter."
