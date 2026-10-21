@@ -27,12 +27,6 @@ import type { FunnelResult, NamedEvent } from "@/utils/rum/productAnalyticsModel
 import type { FunnelCompareView } from "@/utils/rum/funnelCompare";
 import type { FunnelDef, SampleRatio, StepRef } from "@/utils/rum/productAnalyticsQueries";
 
-export interface FunnelLayoutSetting {
-  id: string;
-  label: I18nText;
-  value: I18nText;
-}
-
 /** Everything a funnel layout renders; a layout reads these and never runs a query of its own. */
 export interface FunnelLayoutProps {
   def: FunnelDef;
@@ -51,7 +45,6 @@ export interface FunnelLayoutProps {
   app: string;
   appFilters: AppFilterCounts | null;
   includeHidden: boolean;
-  settings: FunnelLayoutSetting[];
   filterFields: readonly string[];
   filterFieldTypes?: Readonly<Record<string, string>>;
   filterValues: FilterValuesState;
@@ -80,6 +73,7 @@ export interface FunnelLayoutEmits {
 
 /** A layout places the page's card header, its notices and its footer, so it decides where the card sits. */
 export interface FunnelLayoutSlots {
+  breakdown?: () => unknown;
   header?: () => unknown;
   actions?: () => unknown;
   notices?: () => unknown;

@@ -96,10 +96,6 @@ describe("FunnelLayoutRail", () => {
         includeHidden: false,
         filterFields: ["geo_info_country"],
         filterValues: { field: null, status: "idle", rows: [] },
-        settings: [
-          { id: "unit", label: "Count by" as never, value: "Sessions" as never },
-          { id: "window", label: "Window" as never, value: "Same session" as never },
-        ],
         ...extra,
       },
       global: {
@@ -141,10 +137,36 @@ describe("FunnelLayoutRail", () => {
       "App filters for web",
     );
     expect(w.find('[data-test="rum-analytics-funnel-app-filters-none"]').exists()).toBe(true);
-    expect(w.find('[data-test="rum-analytics-funnel-rail-setting-window"]').text()).toContain(
-      "Same session",
-    );
     expect(w.find('[data-test="rum-analytics-funnel-steps-table"]').exists()).toBe(true);
+  });
+
+  it("has no Settings row, since unit, window and breakdown are all on screen elsewhere", () => {
+    const w = mountRail();
+    expect(w.find('[data-test="rum-analytics-funnel-rail-settings"]').exists()).toBe(false);
+    expect(w.find("aside").text()).not.toContain("Settings");
+  });
+
+  it("renders the breakdown slot as the rail's first section, above Filter all steps", () => {
+    const base = mountRail();
+    const props = base.props() as never;
+    base.unmount();
+    wrapper = mount(FunnelLayoutRail, {
+      props,
+      slots: { breakdown: "<div data-test='b' />" },
+      global: {
+        plugins: [store],
+        stubs: { VueDraggableNext: { template: "<div><slot /></div>" } },
+      },
+    });
+    const sections = wrapper.find('[data-test="rum-analytics-funnel-rail-sections"]');
+    const ids = sections
+      .findAll("[data-test]")
+      .map((e) => e.attributes("data-test"))
+      .filter((id) => ["b", "rum-analytics-funnel-filter-all"].includes(id!));
+    expect(ids).toEqual(["b", "rum-analytics-funnel-filter-all"]);
+    expect(
+      wrapper.find('[data-test="rum-analytics-funnel-card"]').find("[data-test='b']").exists(),
+    ).toBe(false);
   });
 
   it("a page step's filter button opens its conditions and emits update:def", async () => {
@@ -353,6 +375,20 @@ describe("FunnelLayoutRail", () => {
       }
     });
 
+    it("expand() opens a collapsed panel, and leaves an open one open", async () => {
+      localStorage.setItem(COLLAPSED_KEY, "1");
+      const w = mountRail();
+      const expand = () => (w.vm as unknown as { expand: () => void }).expand();
+      expand();
+      await w.vm.$nextTick();
+      expect(w.find(PANEL).classes()).not.toContain("lg:hidden");
+      expect(toggleIn(w).attributes("aria-expanded")).toBe("true");
+      expect(w.find(SEPARATOR).classes()).not.toContain("hidden");
+      expand();
+      await w.vm.$nextTick();
+      expect(toggleIn(w).attributes("aria-expanded")).toBe("true");
+    });
+
     it("still collapses when localStorage cannot be written", async () => {
       const setItem = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
         throw new Error("blocked");
@@ -490,7 +526,6 @@ describe("FunnelLayoutRail: exclusion steps and step options", () => {
         app: "web",
         appFilters: null,
         includeHidden: false,
-        settings: [],
         filterFields: ["geo_info_country"],
         filterValues: { field: null, status: "idle", rows: [] },
         ...extra,

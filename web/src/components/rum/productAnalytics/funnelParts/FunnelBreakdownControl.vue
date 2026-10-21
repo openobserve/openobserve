@@ -15,85 +15,121 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <span class="flex items-center gap-1.5" data-test="rum-analytics-funnel-breakdown-control">
-    <OPopover
-      :open="open"
-      align="end"
-      content-class="p-3 w-96 max-w-[calc(100vw-1.5rem)]"
-      :aria-label="t('rum.analytics.funnel.breakdownLabel')"
-      @update:open="setOpen"
-    >
-      <template #trigger>
-        <OButton
-          variant="outline"
-          size="xs"
-          icon-right="arrow-drop-down"
-          data-test="rum-analytics-funnel-breakdown-select"
-          ><span class="text-text-secondary">{{ t("rum.analytics.funnel.breakdownInside") }}</span>
-          <span :class="attribute ? 'font-mono' : ''">{{ valueLabel }}</span></OButton
-        >
-      </template>
-      <SessionFieldPicker
-        v-if="open"
-        :fields="[]"
-        :values="idleValues"
-        :groups="groups"
-        :note="note"
-        @pick="pick"
-        @cancel="setOpen(false)"
-      />
-    </OPopover>
-    <ODropdown v-if="attribute" align="start">
-      <template #trigger>
-        <OButton
-          variant="outline"
-          size="xs"
-          icon-right="arrow-drop-down"
-          data-test="rum-analytics-funnel-breakdown-from-step"
-          >{{ fromLabel }}</OButton
-        >
-      </template>
-      <ODropdownItem
-        :icon-left="attribute.s === undefined ? 'check' : undefined"
-        data-test="rum-analytics-funnel-breakdown-from-auto"
-        @select="setStep(null)"
-        >{{
-          start?.auto
-            ? t("rum.analytics.funnel.fromAutomatic", { step: start.auto })
-            : t("rum.analytics.funnel.fromAutomaticNone")
-        }}</ODropdownItem
-      >
-      <ODropdownItem
-        v-for="(name, i) in stepNames"
-        :key="i"
-        :icon-left="attribute.s === i + 1 ? 'check' : undefined"
-        :data-test="`rum-analytics-funnel-breakdown-from-${i + 1}`"
-        @select="setStep(i + 1)"
-        >{{
-          t("rum.analytics.funnel.fromStepItem", { step: i + 1, name: raw(name) })
-        }}</ODropdownItem
-      >
-    </ODropdown>
-    <OButton
+  <FunnelSectionRow
+    :title="t('rum.analytics.funnel.railBreakdown')"
+    :caption="t('rum.analytics.funnel.breakdownCaption')"
+    stacked
+    :boxed="!!def.breakdown"
+    test-id="rum-analytics-funnel-breakdown-section"
+  >
+    <OTag
       v-if="def.breakdown"
-      variant="ghost"
-      size="icon-xs"
-      icon-left="close"
-      :aria-label="t('rum.analytics.funnel.breakdownRemove')"
-      data-test="rum-analytics-funnel-breakdown-clear"
-      @click="emit('update:def', { ...def, breakdown: null })"
-      ><OTooltip :content="t('rum.analytics.funnel.breakdownRemove')"
-    /></OButton>
-  </span>
+      ref="chip"
+      :label="valueLabel"
+      variant="primary-outline"
+      size="sm"
+      clickable
+      removable
+      class="max-w-full min-w-0"
+      :remove-label="t('rum.analytics.funnel.breakdownRemove')"
+      data-test="rum-analytics-funnel-breakdown-chip"
+      @click="setOpen(true)"
+      @remove="remove"
+    >
+      <OTruncatedText as="span" class="min-w-0" :class="attribute ? 'font-mono' : ''">{{
+        valueLabel
+      }}</OTruncatedText>
+    </OTag>
+    <template v-if="attribute" #trailing>
+      <span class="text-text-secondary text-xs">{{
+        t("rum.analytics.funnel.breakdownValueFrom")
+      }}</span>
+      <ODropdown align="start">
+        <template #trigger>
+          <OButton
+            variant="outline"
+            size="xs"
+            icon-right="arrow-drop-down"
+            data-test="rum-analytics-funnel-breakdown-from-step"
+            >{{ fromLabel }}</OButton
+          >
+        </template>
+        <ODropdownItem
+          :icon-left="attribute.s === undefined ? 'check' : undefined"
+          data-test="rum-analytics-funnel-breakdown-from-auto"
+          @select="setStep(null)"
+          >{{
+            start?.auto
+              ? t("rum.analytics.funnel.fromAutomatic", { step: start.auto })
+              : t("rum.analytics.funnel.fromAutomaticNone")
+          }}</ODropdownItem
+        >
+        <ODropdownItem
+          v-for="(name, i) in stepNames"
+          :key="i"
+          :icon-left="attribute.s === i + 1 ? 'check' : undefined"
+          :data-test="`rum-analytics-funnel-breakdown-from-${i + 1}`"
+          @select="setStep(i + 1)"
+          >{{
+            t("rum.analytics.funnel.fromStepItem", { step: i + 1, name: raw(name) })
+          }}</ODropdownItem
+        >
+      </ODropdown>
+    </template>
+    <template #action>
+      <OPopover
+        :open="open"
+        side="right"
+        align="start"
+        content-class="p-3 w-96 max-w-[calc(100vw-1.5rem)]"
+        :aria-label="t('rum.analytics.funnel.railBreakdown')"
+        @update:open="setOpen"
+      >
+        <template #trigger>
+          <span>
+            <OButton
+              ref="add"
+              variant="ghost"
+              size="icon-sm"
+              icon-left="add"
+              :active="open"
+              :disabled="!!def.breakdown"
+              :aria-label="t('rum.analytics.funnel.breakdownAdd')"
+              data-test="rum-analytics-funnel-add-breakdown-btn"
+            />
+            <OTooltip
+              :content="
+                def.breakdown
+                  ? t('rum.analytics.funnel.breakdownOneAtATime')
+                  : t('rum.analytics.funnel.breakdownAdd')
+              "
+            />
+          </span>
+        </template>
+        <SessionFieldPicker
+          v-if="open"
+          :fields="[]"
+          :values="idleValues"
+          :groups="groups"
+          :note="note"
+          @pick="pick"
+          @cancel="setOpen(false)"
+        />
+      </OPopover>
+    </template>
+  </FunnelSectionRow>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, nextTick, ref } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import FunnelSectionRow from "@/components/rum/productAnalytics/funnelParts/FunnelSectionRow.vue";
 import SessionFieldPicker from "@/components/rum/productAnalytics/funnelParts/SessionFieldPicker.vue";
 import type {
   FilterValuesState,
@@ -130,6 +166,8 @@ const emit = defineEmits<{
 const { t } = useI18nTyped();
 
 const open = ref(false);
+const chip = ref<{ $el: HTMLElement } | null>(null);
+const add = ref<{ $el: HTMLElement } | null>(null);
 // Set while the picker was opened from a step's menu: it lists that step's fields and pins the pick to it.
 const limitStep = ref<number | null>(null);
 const idleValues: FilterValuesState = { field: null, status: "idle", rows: [] };
@@ -142,7 +180,7 @@ const attribute = computed(() =>
 
 const valueLabel = computed<I18nText>(() => {
   const b = props.def.breakdown;
-  if (!b) return t("rum.analytics.funnel.breakdownNone");
+  if (!b) return raw("");
   if (isAttributeBreakdown(b)) return raw(b.f);
   return props.dims.find((d) => d.dim === b)?.label ?? raw(b);
 });
@@ -244,15 +282,28 @@ const openForStep = (step: number) => {
   setOpen(true);
 };
 
+const focus = () => (chip.value ?? add.value)?.$el.focus();
+
+// The picker's trigger turns disabled and the chip unmounts, which would drop keyboard focus to the page.
+const refocus = () => void nextTick(focus);
+
 const pick = (id: string) => {
   const k = limitStep.value;
   setOpen(false);
   if (id.startsWith(DIM_ID)) {
     emit("update:def", { ...props.def, breakdown: id.slice(DIM_ID.length) as BreakdownDim });
+    refocus();
     return;
   }
   const f = id.slice(FIELD_ID.length);
   emit("update:def", { ...props.def, breakdown: k === null ? { f } : { f, s: k } });
+  refocus();
+};
+
+const remove = () => {
+  setOpen(false);
+  emit("update:def", { ...props.def, breakdown: null });
+  refocus();
 };
 
 const setStep = (s: number | null) => {
@@ -261,5 +312,5 @@ const setStep = (s: number | null) => {
   emit("update:def", { ...props.def, breakdown: s === null ? { f: a.f } : { f: a.f, s } });
 };
 
-defineExpose({ openForStep });
+defineExpose({ openForStep, focus });
 </script>

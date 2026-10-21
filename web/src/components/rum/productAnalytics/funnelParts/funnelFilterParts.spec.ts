@@ -722,6 +722,29 @@ describe("Filter all steps notice", () => {
     );
   });
 
+  it("the way out reads Break down by, or Replace breakdown with once a breakdown is set", async () => {
+    const mountNotice = (breakdown: FunnelDef["breakdown"]) =>
+      mount(FunnelFilterBar, {
+        props: {
+          def: { ...def([UPI]), breakdown },
+          fields: [PAY],
+          values: { field: null, status: "idle", rows: [] },
+          stacked: true,
+          notice: { field: PAY, kept: 8, opened: 84, carry: 36 },
+          unitNoun: "sessions" as never,
+        },
+        global: { stubs },
+      });
+    const action = dt("rum-analytics-funnel-filter-notice-break-down");
+    wrapper = mountNotice(null);
+    expect(wrapper.find(action).text()).toBe(`Break down by ${PAY}`);
+    wrapper.unmount();
+    wrapper = mountNotice("browser");
+    expect(wrapper.find(action).text()).toBe(`Replace breakdown with ${PAY}`);
+    await wrapper.find(action).trigger("click");
+    expect(wrapper.emitted("break-down")).toEqual([[PAY]]);
+  });
+
   it("shows no notice without one", () => {
     wrapper = mount(FunnelFilterBar, {
       props: { def: def([UPI]), fields: [PAY], values: { field: null, status: "idle", rows: [] } },
