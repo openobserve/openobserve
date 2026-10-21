@@ -257,6 +257,30 @@ pub struct ArchivedRcaReport {
     pub content: String,
     /// Microseconds since epoch, stamped when the report was archived
     pub archived_at: i64,
+    /// The key `POST …/rca/feedback` takes; absent on reports saved before it existed
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub report_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub trigger: Option<RcaTrigger>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ended_reason: Option<RcaEndedReason>,
+    /// Microseconds since epoch, stamped when the report was generated
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub created_at: Option<i64>,
+}
+
+impl ArchivedRcaReport {
+    fn archive(content: String, report: Option<RcaReportMeta>) -> Self {
+        let report = report.as_ref();
+        Self {
+            content,
+            archived_at: chrono::Utc::now().timestamp_micros(),
+            report_id: report.map(|r| r.report_id.clone()),
+            trigger: report.and_then(|r| r.trigger),
+            ended_reason: report.and_then(|r| r.ended_reason),
+            created_at: report.map(|r| r.created_at),
+        }
+    }
 }
 
 /// Default number of superseded RCA reports to retain per incident.
@@ -278,6 +302,9 @@ pub struct IncidentTopology {
     /// this JSON column cannot grow without limit across a long-lived incident.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub previous_analyses: Vec<ArchivedRcaReport>,
+    /// What the history says about `suggested_root_cause`; absent on older reports
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub current_report: Option<RcaReportMeta>,
 }
 
 impl IncidentTopology {
@@ -287,26 +314,148 @@ impl IncidentTopology {
     /// and the list is truncated to `history_limit`. A `history_limit` of 0 disables
     /// history entirely and clears any previously retained reports.
     pub fn record_rca_result(&mut self, content: impl Into<String>, history_limit: usize) {
+        self.record_rca_report(content, None, history_limit);
+    }
+
+    /// [`Self::record_rca_result`] with history facts; returns the ids that left the history.
+    pub fn record_rca_report(
+        &mut self,
+        content: impl Into<String>,
+        report: Option<RcaReportMeta>,
+        history_limit: usize,
+    ) -> Vec<String> {
         let content = content.into();
+        let outgoing = self.current_report.take();
+        let prev = self.suggested_root_cause.take();
+        let mut report = report;
+        let mut dropped = Vec::new();
 
         if history_limit == 0 {
-            self.previous_analyses.clear();
-        } else if let Some(prev) = self.suggested_root_cause.take() {
-            // Identical re-runs would otherwise fill the history with duplicates.
-            if !prev.is_empty() && prev != content {
-                self.previous_analyses.insert(
-                    0,
-                    ArchivedRcaReport {
-                        content: prev,
-                        archived_at: chrono::Utc::now().timestamp_micros(),
-                    },
-                );
-                self.previous_analyses.truncate(history_limit);
+            dropped = report_ids(self.previous_analyses.drain(..));
+        }
+        match prev {
+            // Same text, same report: feedback already given on it must stay attached.
+            Some(prev) if prev == content => report = rerun_of(outgoing, report),
+            Some(prev) if history_limit > 0 && !prev.is_empty() => {
+                self.previous_analyses
+                    .insert(0, ArchivedRcaReport::archive(prev, outgoing));
+                dropped = self.truncate_history(history_limit);
             }
+            _ => dropped.extend(outgoing.map(|r| r.report_id)),
         }
 
         self.suggested_root_cause = Some(content);
+        self.current_report = report;
+        dropped
     }
+
+    /// Keeps an unfinished run as history only; returns the ids that left the history.
+    pub fn archive_rca_attempt(
+        &mut self,
+        content: impl Into<String>,
+        report: RcaReportMeta,
+        history_limit: usize,
+    ) -> Vec<String> {
+        if history_limit == 0 {
+            return report_ids(self.previous_analyses.drain(..));
+        }
+        self.previous_analyses
+            .insert(0, ArchivedRcaReport::archive(content.into(), Some(report)));
+        self.truncate_history(history_limit)
+    }
+
+    fn truncate_history(&mut self, history_limit: usize) -> Vec<String> {
+        if self.previous_analyses.len() <= history_limit {
+            return Vec::new();
+        }
+        report_ids(self.previous_analyses.drain(history_limit..))
+    }
+}
+
+/// Why an RCA report exists; absent only on reports saved before this was recorded.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum RcaTrigger {
+    /// No user asked: a new incident, a new alert type joining it, or a reopen
+    Auto,
+    Manual,
+    /// Inferred: a user's run after a severity change that followed the last completed report
+    SeverityChange,
+    BuildOnPrevious,
+}
+
+impl RcaTrigger {
+    /// A user's run: building on the previous report wins, then a severity change since it.
+    pub fn for_user_run(build_on_previous: bool, events: &[IncidentEvent]) -> Self {
+        if build_on_previous {
+            return Self::BuildOnPrevious;
+        }
+        let Some(last_report) = events
+            .iter()
+            .rposition(|e| matches!(e.event_type, IncidentEventType::AIAnalysisComplete))
+        else {
+            return Self::Manual;
+        };
+        let severity_changed = events[last_report..].iter().any(|e| {
+            matches!(
+                e.event_type,
+                IncidentEventType::SeverityUpgrade { .. }
+                    | IncidentEventType::SeverityOverride { .. }
+            )
+        });
+        if severity_changed {
+            Self::SeverityChange
+        } else {
+            Self::Manual
+        }
+    }
+}
+
+/// How the run that produced an RCA report ended.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum RcaEndedReason {
+    /// The agent finished its turn
+    Completed,
+    /// The agent reported an error; the report is what it wrote before it
+    Failed,
+    /// The run was stopped; the report is partial
+    Cancelled,
+    /// The agent's stream ended without finishing; the report is partial
+    Interrupted,
+}
+
+impl RcaEndedReason {
+    /// The incident event that ends a run's lifecycle; each reason has exactly one.
+    pub fn terminal_event(self) -> IncidentEvent {
+        match self {
+            Self::Completed => IncidentEvent::ai_analysis_complete(),
+            Self::Failed => IncidentEvent::ai_analysis_failed(
+                "The analysis failed",
+                AnalysisTriggerType::Manual,
+                None,
+            ),
+            Self::Interrupted => IncidentEvent::ai_analysis_failed(
+                "The analysis stream ended before the assistant finished",
+                AnalysisTriggerType::Manual,
+                None,
+            ),
+            Self::Cancelled => IncidentEvent::ai_analysis_cancelled(None),
+        }
+    }
+}
+
+/// One RCA report's history facts, next to its text.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct RcaReportMeta {
+    /// The key `POST …/rca/feedback` takes
+    pub report_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub trigger: Option<RcaTrigger>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ended_reason: Option<RcaEndedReason>,
+    /// Microseconds since epoch, stamped when the report was generated
+    pub created_at: i64,
 }
 
 /// Node in the alert flow graph
@@ -999,6 +1148,26 @@ impl IncidentEvent {
     }
 }
 
+fn report_ids(reports: impl Iterator<Item = ArchivedRcaReport>) -> Vec<String> {
+    reports.filter_map(|r| r.report_id).collect()
+}
+
+/// An identical re-run keeps the outgoing report's id and age and takes the new run's facts.
+fn rerun_of(
+    outgoing: Option<RcaReportMeta>,
+    report: Option<RcaReportMeta>,
+) -> Option<RcaReportMeta> {
+    match (outgoing, report) {
+        (Some(outgoing), Some(report)) => Some(RcaReportMeta {
+            trigger: report.trigger,
+            ended_reason: report.ended_reason,
+            ..outgoing
+        }),
+        (outgoing, None) => outgoing,
+        (None, report) => report,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1442,6 +1611,7 @@ mod tests {
             related_incident_ids: vec!["incident-1".to_string()],
             suggested_root_cause: Some("High memory usage".to_string()),
             previous_analyses: vec![],
+            current_report: None,
         };
 
         assert_eq!(topology.nodes.len(), 2);
@@ -2367,5 +2537,170 @@ mod tests {
         let back: ExternalAlertEvent = serde_json::from_str(&json).unwrap();
         assert_eq!(back.dedup_key, "abc123");
         assert_eq!(back.severity, IncidentSeverity::P1);
+    }
+
+    fn report(id: &str, trigger: Option<RcaTrigger>) -> RcaReportMeta {
+        RcaReportMeta {
+            report_id: id.to_string(),
+            trigger,
+            ended_reason: Some(RcaEndedReason::Completed),
+            created_at: 7,
+        }
+    }
+
+    #[test]
+    fn test_an_archived_report_keeps_its_history_facts() {
+        let mut t = IncidentTopology::default();
+        t.record_rca_report("first", Some(report("r1", Some(RcaTrigger::Manual))), 25);
+        assert_eq!(t.current_report.as_ref().unwrap().report_id, "r1");
+        t.record_rca_report(
+            "second",
+            Some(report("r2", Some(RcaTrigger::BuildOnPrevious))),
+            25,
+        );
+        assert_eq!(t.current_report.as_ref().unwrap().report_id, "r2");
+        let archived = &t.previous_analyses[0];
+        assert_eq!(archived.report_id.as_deref(), Some("r1"));
+        assert_eq!(archived.trigger, Some(RcaTrigger::Manual));
+        assert_eq!(archived.ended_reason, Some(RcaEndedReason::Completed));
+        assert_eq!(archived.created_at, Some(7));
+        // A legacy writer leaves no facts behind for the next report to inherit.
+        t.record_rca_result("third", 25);
+        assert!(t.current_report.is_none());
+        assert_eq!(t.previous_analyses[0].report_id.as_deref(), Some("r2"));
+    }
+
+    #[test]
+    fn test_history_written_before_s_b4_still_reads_and_serialises_unchanged() {
+        let old = serde_json::json!({
+            "nodes": [], "edges": [], "related_incident_ids": [],
+            "suggested_root_cause": "now",
+            "previous_analyses": [{"content": "before", "archived_at": 5}],
+        });
+        let t: IncidentTopology = serde_json::from_value(old.clone()).unwrap();
+        assert!(t.current_report.is_none());
+        assert!(t.previous_analyses[0].report_id.is_none());
+        assert_eq!(serde_json::to_value(&t).unwrap(), old);
+    }
+
+    #[test]
+    fn test_history_facts_use_the_contract_spelling() {
+        let json = serde_json::to_value(report("r1", Some(RcaTrigger::SeverityChange))).unwrap();
+        assert_eq!(json["trigger"], "severity_change");
+        assert_eq!(json["ended_reason"], "completed");
+        for (reason, wire) in [
+            (RcaEndedReason::Failed, "failed"),
+            (RcaEndedReason::Cancelled, "cancelled"),
+            (RcaEndedReason::Interrupted, "interrupted"),
+        ] {
+            assert_eq!(serde_json::to_value(reason).unwrap(), wire);
+        }
+        let json = serde_json::to_value(RcaTrigger::BuildOnPrevious).unwrap();
+        assert_eq!(json, "build_on_previous");
+    }
+
+    #[test]
+    fn test_a_user_run_names_why_it_exists() {
+        let severity = IncidentEvent::now(IncidentEventType::SeverityOverride {
+            from: IncidentSeverity::P3,
+            to: IncidentSeverity::P1,
+            user_id: "u".to_string(),
+        });
+        let done = IncidentEvent::ai_analysis_complete();
+        assert_eq!(RcaTrigger::for_user_run(false, &[]), RcaTrigger::Manual);
+        // A severity change before the first report is not a re-analysis.
+        let first = [severity.clone()];
+        assert_eq!(RcaTrigger::for_user_run(false, &first), RcaTrigger::Manual);
+        let after = [done.clone(), severity.clone()];
+        assert_eq!(
+            RcaTrigger::for_user_run(false, &after),
+            RcaTrigger::SeverityChange
+        );
+        assert_eq!(
+            RcaTrigger::for_user_run(true, &after),
+            RcaTrigger::BuildOnPrevious
+        );
+        let settled = [severity, done];
+        assert_eq!(
+            RcaTrigger::for_user_run(false, &settled),
+            RcaTrigger::Manual
+        );
+    }
+
+    #[test]
+    fn test_an_identical_rerun_keeps_the_report_its_feedback_names() {
+        let mut t = IncidentTopology::default();
+        t.record_rca_report("same", Some(report("r1", Some(RcaTrigger::Manual))), 25);
+        let rerun = RcaReportMeta {
+            created_at: 9,
+            ..report("r2", Some(RcaTrigger::SeverityChange))
+        };
+        assert!(t.record_rca_report("same", Some(rerun), 25).is_empty());
+        let current = t.current_report.as_ref().unwrap();
+        assert_eq!(current.report_id, "r1");
+        assert_eq!(current.created_at, 7);
+        assert_eq!(current.trigger, Some(RcaTrigger::SeverityChange));
+        assert!(t.previous_analyses.is_empty());
+    }
+
+    #[test]
+    fn test_an_attempt_that_did_not_complete_never_replaces_the_current_report() {
+        let mut t = IncidentTopology::default();
+        t.record_rca_report("good", Some(report("r1", None)), 25);
+        let attempt = RcaReportMeta {
+            ended_reason: Some(RcaEndedReason::Interrupted),
+            ..report("r2", Some(RcaTrigger::Manual))
+        };
+        assert!(t.archive_rca_attempt("partial", attempt, 25).is_empty());
+        assert_eq!(t.suggested_root_cause.as_deref(), Some("good"));
+        assert_eq!(t.current_report.as_ref().unwrap().report_id, "r1");
+        assert_eq!(t.previous_analyses[0].content, "partial");
+        assert_eq!(
+            t.previous_analyses[0].ended_reason,
+            Some(RcaEndedReason::Interrupted)
+        );
+    }
+
+    #[test]
+    fn test_reports_that_fall_out_of_the_history_are_named() {
+        let mut t = IncidentTopology::default();
+        t.record_rca_report("a", Some(report("r1", None)), 1);
+        assert!(
+            t.record_rca_report("b", Some(report("r2", None)), 1)
+                .is_empty()
+        );
+        assert_eq!(
+            t.record_rca_report("c", Some(report("r3", None)), 1),
+            ["r1"]
+        );
+        assert_eq!(t.archive_rca_attempt("d", report("r4", None), 1), ["r2"]);
+        assert_eq!(
+            t.record_rca_report("e", Some(report("r5", None)), 0),
+            ["r4", "r3"]
+        );
+        assert!(t.previous_analyses.is_empty());
+    }
+
+    #[test]
+    fn test_each_way_a_run_ends_has_one_terminal_event() {
+        use IncidentEventType as T;
+        let kind = |reason: RcaEndedReason| reason.terminal_event().event_type;
+        assert!(matches!(
+            kind(RcaEndedReason::Completed),
+            T::AIAnalysisComplete
+        ));
+        assert!(matches!(
+            kind(RcaEndedReason::Failed),
+            T::AIAnalysisFailed { .. }
+        ));
+        assert!(matches!(
+            kind(RcaEndedReason::Interrupted),
+            T::AIAnalysisFailed { .. }
+        ));
+        assert!(matches!(
+            kind(RcaEndedReason::Cancelled),
+            T::AIAnalysisCancelled { .. }
+        ));
+        assert_eq!(serde_json::to_value(RcaTrigger::Auto).unwrap(), "auto");
     }
 }

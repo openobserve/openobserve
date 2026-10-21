@@ -85,6 +85,7 @@ pub mod paid_overage_attribution;
 pub mod providers;
 pub mod query_history;
 pub mod ratelimit;
+pub mod rca_feedback;
 pub mod re_pattern;
 pub mod re_pattern_stream_map;
 pub mod reports;

@@ -15,6 +15,8 @@ pub struct Model {
     pub recipient: Option<String>,
     pub channel: Option<i32>,
     pub delivered: Option<bool>,
+    /// JSON of an `AiVerdict`'s `evidence` and `confidence`; null for every other entry.
+    pub detail: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

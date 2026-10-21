@@ -114,6 +114,10 @@ const CONFIRM_ID_KEYS: [&str; 3] = ["id", "approval_id", "call_id"];
 #[cfg(feature = "enterprise")]
 const UNKNOWN_HEALTH_OWNER_WAIT: std::time::Duration = std::time::Duration::from_secs(10);
 
+/// The interactive incident agent (`prompts/sre.toml`); it reads the same `RcaContext`.
+#[cfg(feature = "enterprise")]
+const SRE_CHAT_AGENT_TYPE: &str = "sre";
+
 /// The RCA agent's context contract (`RcaContext`, `is_reanalysis`); o2-ai routes on key presence.
 #[cfg(feature = "enterprise")]
 const RCA_CONTEXT_KEYS: [&str; 10] = [
@@ -729,33 +733,57 @@ async fn turn_agent_and_context(
     context: serde_json::Value,
     mode: Option<ChatMode>,
 ) -> (&'static str, serde_json::Value) {
-    if mode == Some(ChatMode::GenerateQuery) {
-        return select_chat_agent(context, None);
-    }
-    chat_agent_and_context(org_id, user_id, context).await
+    let rca = match mode {
+        Some(ChatMode::GenerateQuery) => None,
+        _ => incident_rca_context(org_id, user_id, &context).await,
+    };
+    agent_for_mode(mode, context, rca)
 }
 
-/// Picks the agent and its context; RCA only when the caller clears the RCA endpoint's own bar.
+/// The agent a turn runs, given the incident context the caller cleared the RCA bar for.
 #[cfg(feature = "enterprise")]
-async fn chat_agent_and_context(
+fn agent_for_mode(
+    mode: Option<ChatMode>,
+    context: serde_json::Value,
+    rca: Option<RcaContext>,
+) -> (&'static str, serde_json::Value) {
+    let rca = rca.filter(|_| mode != Some(ChatMode::GenerateQuery));
+    let (agent, context) = select_chat_agent(context, rca);
+    match mode {
+        Some(ChatMode::Chat) => (interactive_agent(agent), context),
+        _ => (agent, context),
+    }
+}
+
+/// An explicit chat turn with the incident context runs the interactive incident agent.
+#[cfg(feature = "enterprise")]
+fn interactive_agent(agent: &'static str) -> &'static str {
+    if agent == RCA_AGENT_TYPE {
+        SRE_CHAT_AGENT_TYPE
+    } else {
+        agent
+    }
+}
+
+/// The incident's RCA context, only when the caller clears the RCA endpoint's own bar.
+#[cfg(feature = "enterprise")]
+async fn incident_rca_context(
     org_id: &str,
     user_id: &str,
-    context: serde_json::Value,
-) -> (&'static str, serde_json::Value) {
-    let incident_id = context
-        .get("incident_id")
-        .and_then(|v| v.as_str())
-        .map(str::to_string);
-    let rca = match incident_id {
-        Some(id) if can_run_incident_rca(org_id, user_id, &id).await => Some(
-            o2_enterprise::enterprise::alerts::rca_service::build_incident_context(
-                org_id, &id, None,
-            )
-            .await,
-        ),
-        _ => None,
-    };
-    select_chat_agent(context, rca)
+    context: &serde_json::Value,
+) -> Option<RcaContext> {
+    let incident_id = context.get("incident_id").and_then(|v| v.as_str())?;
+    if !can_run_incident_rca(org_id, user_id, incident_id).await {
+        return None;
+    }
+    Some(
+        o2_enterprise::enterprise::alerts::rca_service::build_incident_context(
+            org_id,
+            incident_id,
+            None,
+        )
+        .await,
+    )
 }
 
 /// Matches the RCA endpoint: RCA enabled, incident in this org, and its `POST .../rca` permission.
@@ -1278,6 +1306,18 @@ fn model_not_allowed_error() -> Response {
         "This model is not allowed for AI chat",
     )
     .into_response()
+}
+
+/// The autonomous incident agent runs only from the analysis route, never from a chat turn.
+#[cfg(feature = "enterprise")]
+fn rca_mode_refused(mode: Option<ChatMode>) -> Option<Response> {
+    (mode == Some(ChatMode::Rca)).then(|| {
+        AiErrorEnvelope::new(
+            AiErrorCode::InvalidRequest,
+            "mode \"rca\" is only accepted by the incident analysis route",
+        )
+        .into_response()
+    })
 }
 
 /// Today's transport break mid-stream, as the frame the browser gets; the cause is logged.
@@ -2711,6 +2751,9 @@ async fn chat_turn(
             return error::invalid_request(problem);
         }
 
+        if let Some(refusal) = rca_mode_refused(prompt_body.mode) {
+            return refusal;
+        }
         let model = Ai::model_override(&prompt_body.model).map(str::to_string);
         if !o2_cfg
             .ai
@@ -3118,6 +3161,12 @@ async fn stream_turn(
         {
             audit
                 .report(refusal.status(), Some("Mode or ephemeral turn refused"))
+                .await;
+            return refusal;
+        }
+        if let Some(refusal) = rca_mode_refused(prompt_body.mode) {
+            audit
+                .report(StatusCode::BAD_REQUEST, Some("RCA mode refused on chat"))
                 .await;
             return refusal;
         }
@@ -5281,6 +5330,79 @@ mod tests {
         assert_eq!(agent, DEFAULT_AGENT_TYPE);
         assert!(context.get("incident_id").is_none() && context.get("severity").is_none());
         assert_eq!(context["locale"], "de-DE");
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn an_explicit_chat_turn_never_runs_the_autonomous_agent() {
+        assert_eq!(interactive_agent(RCA_AGENT_TYPE), SRE_CHAT_AGENT_TYPE);
+        assert_eq!(interactive_agent(DEFAULT_AGENT_TYPE), DEFAULT_AGENT_TYPE);
+        let (agent, context) =
+            select_chat_agent(serde_json::json!({}), Some(incident_rca_context()));
+        assert_eq!(interactive_agent(agent), SRE_CHAT_AGENT_TYPE);
+        assert_eq!(context["incident_id"], "inc-1");
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn with_the_rca_bar_passed_chat_mode_runs_sre_and_keeps_the_incident_context() {
+        let client = serde_json::json!({"incident_id": "inc-1", "locale": "de-DE"});
+        let route = |mode| agent_for_mode(mode, client.clone(), Some(incident_rca_context()));
+        let (agent, context) = route(Some(ChatMode::Chat));
+        assert_eq!(agent, SRE_CHAT_AGENT_TYPE);
+        assert_eq!(context["incident_id"], "inc-1");
+        assert_eq!(context["past_causes"][0], "disk full");
+        assert_eq!(context["severity"], 2);
+        assert_eq!(context["locale"], "de-DE");
+        for mode in [None, Some(ChatMode::Rca)] {
+            let (agent, context) = route(mode);
+            assert_eq!(agent, RCA_AGENT_TYPE, "{mode:?}");
+            assert_eq!(context["past_causes"][0], "disk full", "{mode:?}");
+        }
+        let (agent, context) = route(Some(ChatMode::GenerateQuery));
+        assert_eq!(agent, DEFAULT_AGENT_TYPE);
+        assert!(context.get("past_causes").is_none());
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn without_the_rca_bar_chat_mode_and_no_mode_route_alike() {
+        let context = serde_json::json!({"incident_id": "inc-1", "severity": "P1"});
+        for mode in [None, Some(ChatMode::Chat), Some(ChatMode::Rca)] {
+            let (agent, context) =
+                turn_agent_and_context("org", "user", context.clone(), mode).await;
+            assert_eq!(agent, DEFAULT_AGENT_TYPE, "{mode:?}");
+            assert!(context.get("incident_id").is_none(), "{mode:?}");
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn the_chat_route_refuses_rca_mode_with_a_typed_envelope() {
+        for mode in [None, Some(ChatMode::Chat), Some(ChatMode::GenerateQuery)] {
+            assert!(rca_mode_refused(mode).is_none(), "{mode:?}");
+        }
+        let response = rca_mode_refused(Some(ChatMode::Rca)).unwrap();
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+        let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let body: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(body["code"], "invalid_request");
+        assert!(body["error"].as_str().unwrap().contains("rca"));
+    }
+
+    #[test]
+    fn prompt_mode_accepts_chat_rca_and_generate_query() {
+        for (raw, mode) in [
+            ("chat", ChatMode::Chat),
+            ("rca", ChatMode::Rca),
+            ("generate_query", ChatMode::GenerateQuery),
+        ] {
+            let parsed: ChatMode = serde_json::from_value(serde_json::json!(raw)).unwrap();
+            assert_eq!(parsed, mode);
+            assert_eq!(mode.as_str(), raw);
+        }
     }
 
     #[cfg(feature = "enterprise")]

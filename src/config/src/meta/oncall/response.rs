@@ -18,12 +18,20 @@
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use super::{policy::Channel, subject::SubjectRef};
+use super::{
+    agent::{Confidence, EvidenceLink},
+    policy::Channel,
+    subject::SubjectRef,
+};
 
 /// The run a record's ladder starts on. A record written before handoffs
 /// restarted the ladder carries no run at all and is on this one, so `None` and
 /// `Some(1)` mean the same thing and must never be compared directly.
 pub const FIRST_LADDER_RUN: i32 = 1;
+/// The most evidence chips one verdict carries.
+pub const VERDICT_EVIDENCE_MAX: usize = 10;
+/// The longest evidence chip label, in characters.
+pub const VERDICT_LABEL_MAX: usize = 200;
 
 /// The run a handoff moves a record onto. Handing a page over starts the ladder
 /// again rather than resuming it: the rungs the previous responder climbed say
@@ -332,6 +340,12 @@ pub struct ResponseEvent {
     /// the answer to "did the page reach them" — not the absence of one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub delivered: Option<bool>,
+    /// What an `AiVerdict` rests on, when the agent named it.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub evidence: Vec<VerdictEvidence>,
+    /// The agent's confidence band behind an `AiVerdict`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub confidence: Option<Confidence>,
 }
 
 impl ResponseEvent {
@@ -351,7 +365,20 @@ impl ResponseEvent {
             recipient: None,
             channel: None,
             delivered: None,
+            evidence: Vec::new(),
+            confidence: None,
         }
+    }
+
+    /// An `AiVerdict` entry's evidence and confidence.
+    pub fn with_verdict_facts(
+        mut self,
+        evidence: Vec<VerdictEvidence>,
+        confidence: Option<Confidence>,
+    ) -> Self {
+        self.evidence = evidence;
+        self.confidence = confidence;
+        self
     }
 
     pub fn at_rung(mut self, rung_micros: i64) -> Self {
@@ -422,9 +449,89 @@ impl ResponseEvent {
     }
 }
 
+/// One thing an on-call verdict rests on, so the block can render it as a chip.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct VerdictEvidence {
+    pub kind: VerdictEvidenceKind,
+    pub label: String,
+    /// Query text, only for a stream the incident's viewers may read.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub query: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stream: Option<String>,
+    /// Microseconds.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub from: Option<i64>,
+    /// Microseconds.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub to: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub href: Option<String>,
+}
+
+impl VerdictEvidence {
+    /// The chips for the agent's links: at most ten, each a safe target with a bounded label.
+    pub fn from_links(links: &[EvidenceLink]) -> Vec<Self> {
+        links
+            .iter()
+            .filter_map(Self::from_link)
+            .take(VERDICT_EVIDENCE_MAX)
+            .collect()
+    }
+
+    /// `None` for a link the UI must not render: the model writes it and reads injected text.
+    fn from_link(link: &EvidenceLink) -> Option<Self> {
+        let href = link.url.trim();
+        let label: String = link.label.trim().chars().take(VERDICT_LABEL_MAX).collect();
+        if label.is_empty() || !is_safe_href(href) {
+            return None;
+        }
+        Some(Self {
+            kind: VerdictEvidenceKind::Link,
+            label,
+            query: None,
+            stream: None,
+            from: None,
+            to: None,
+            href: Some(href.to_string()),
+        })
+    }
+}
+
+/// What a [`VerdictEvidence`] chip opens.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum VerdictEvidenceKind {
+    /// A query block (`query`, `stream`, `from`, `to`).
+    Query,
+    /// A link the agent gave (`href`).
+    Link,
+}
+
 fn owner_role() -> ResponderRole {
     ResponderRole::Owner
 }
+
+/// An absolute `http(s)` URL or a path on this origin; `//host` and `/\host` leave it.
+fn is_safe_href(href: &str) -> bool {
+    if href.is_empty()
+        || href
+            .chars()
+            .any(|c| c.is_whitespace() || c.is_control() || c == '\\')
+    {
+        return false;
+    }
+    if let Some(path) = href.strip_prefix('/') {
+        return !path.starts_with('/');
+    }
+    let Some((scheme, rest)) = href.split_once("://") else {
+        return false;
+    };
+    matches!(scheme.to_ascii_lowercase().as_str(), "http" | "https")
+        && !rest.is_empty()
+        && !rest.starts_with('/')
+}
+
 /// Why a page turned out to happen.
 ///
 /// A fixed list rather than free text, so the next firing of the same rule can
@@ -2058,5 +2165,43 @@ mod tests {
                 "finding nobody is an answer, not a fault: {note}"
             );
         }
+    }
+
+    #[test]
+    fn verdict_links_keep_only_safe_targets_within_bounds() {
+        let link = |label: &str, url: &str| EvidenceLink {
+            label: label.into(),
+            url: url.into(),
+        };
+        let links = [
+            link("pool", "javascript:fetch('//x')"),
+            link("data", "data:text/html,<script>1</script>"),
+            link("off origin", "//evil.example/web"),
+            link("slash trick", "/\\evil.example"),
+            link("spaced", "https://o2.example/a b"),
+            link("", "https://o2.example/blank-label"),
+            link("dashboard", "/web/dashboards?id=1"),
+            link("metrics", "HTTPS://o2.example/web/metrics"),
+            link("plain", "http://o2.example"),
+            link(&"x".repeat(300), "https://o2.example/long"),
+        ];
+        let kept = VerdictEvidence::from_links(&links);
+        let hrefs: Vec<_> = kept.iter().map(|e| e.href.as_deref().unwrap()).collect();
+        assert_eq!(
+            hrefs,
+            [
+                "/web/dashboards?id=1",
+                "HTTPS://o2.example/web/metrics",
+                "http://o2.example",
+                "https://o2.example/long"
+            ]
+        );
+        assert_eq!(kept[3].label.chars().count(), VERDICT_LABEL_MAX);
+        assert!(kept.iter().all(|e| e.kind == VerdictEvidenceKind::Link));
+        let many = vec![link("l", "/web/x"); 15];
+        assert_eq!(
+            VerdictEvidence::from_links(&many).len(),
+            VERDICT_EVIDENCE_MAX
+        );
     }
 }

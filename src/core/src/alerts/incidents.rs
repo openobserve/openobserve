@@ -1287,7 +1287,8 @@ async fn spawn_initial_rca(org_id: &str, incident_id: &str) {
 
     let org_id_rca = org_id.to_string();
     let incident_id_rca = incident_id.to_string();
-    let handle = tokio::spawn(async move {
+    super::rca_tasks::spawn_rca_task(org_id, incident_id, move |slot| async move {
+        let _slot = slot;
         if let Err(e) = trigger_rca_for_incident(
             org_id_rca.clone(),
             incident_id_rca.clone(),
@@ -1295,7 +1296,7 @@ async fn spawn_initial_rca(org_id: &str, incident_id: &str) {
             true,
             "system@openobserve.ai".to_string(),
             // First analysis for this incident — there is nothing to build on.
-            false,
+            config::meta::alerts::incidents::RcaTrigger::Auto,
             usage_permit,
         )
         .await
@@ -1304,18 +1305,18 @@ async fn spawn_initial_rca(org_id: &str, incident_id: &str) {
                 "[INCIDENTS::RCA] Immediate trigger failed for incident {incident_id_rca}: {e}"
             );
 
-            emit_analysis_failure(
-                &org_id_rca,
-                &incident_id_rca,
-                config::meta::alerts::incidents::AnalysisTriggerType::AutomaticNewIncident,
-                "Background spawn failed",
-                Some(&e),
-            )
-            .await;
+            if super::rca_tasks::settle_current_rca_task() {
+                emit_analysis_failure(
+                    &org_id_rca,
+                    &incident_id_rca,
+                    config::meta::alerts::incidents::AnalysisTriggerType::AutomaticNewIncident,
+                    "Background spawn failed",
+                    Some(&e),
+                )
+                .await;
+            }
         }
-        unregister_rca_task(&org_id_rca, &incident_id_rca);
     });
-    register_rca_task(org_id, incident_id, handle.abort_handle());
 }
 
 #[cfg(not(feature = "enterprise"))]
@@ -1987,35 +1988,40 @@ async fn find_or_create_incident(
                                 config::meta::alerts::incidents::IncidentEvent::ai_analysis_begin(),
                             )
                             .await;
-                            let handle = tokio::spawn(async move {
-                                if let Err(e) = trigger_rca_for_incident(
-                                    org_id_rca.clone(),
-                                    incident_id_rca.clone(),
-                                    true,
-                                    true,
-                                    "system@openobserve.ai".to_string(),
-                                    // Fresh analysis: a new alert type changes the picture,
-                                    // so the agent should reassess rather than extend.
-                                    false,
-                                    usage_permit,
-                                )
-                                .await
-                                {
-                                    log::debug!(
-                                        "[INCIDENTS::RCA] Reanalysis trigger failed for {incident_id_rca}: {e}"
-                                    );
+                            super::rca_tasks::spawn_rca_task(
+                                org_id,
+                                &existing.id,
+                                move |slot| async move {
+                                    let _slot = slot;
+                                    if let Err(e) = trigger_rca_for_incident(
+                                        org_id_rca.clone(),
+                                        incident_id_rca.clone(),
+                                        true,
+                                        true,
+                                        "system@openobserve.ai".to_string(),
+                                        // Fresh analysis: a new alert type changes the picture,
+                                        // so the agent should reassess rather than extend.
+                                        config::meta::alerts::incidents::RcaTrigger::Auto,
+                                        usage_permit,
+                                    )
+                                    .await
+                                    {
+                                        log::debug!(
+                                            "[INCIDENTS::RCA] Reanalysis trigger failed for {incident_id_rca}: {e}"
+                                        );
 
-                                    emit_analysis_failure(
-                                        &org_id_rca,
-                                        &incident_id_rca,
-                                        config::meta::alerts::incidents::AnalysisTriggerType::AutomaticReanalysis,
-                                        "Reanalysis trigger failed",
-                                        Some(&e),
-                                    ).await;
-                                }
-                                unregister_rca_task(&org_id_rca, &incident_id_rca);
-                            });
-                            register_rca_task(org_id, &existing.id, handle.abort_handle());
+                                        if super::rca_tasks::settle_current_rca_task() {
+                                            emit_analysis_failure(
+                                            &org_id_rca,
+                                            &incident_id_rca,
+                                            config::meta::alerts::incidents::AnalysisTriggerType::AutomaticReanalysis,
+                                            "Reanalysis trigger failed",
+                                            Some(&e),
+                                        ).await;
+                                        }
+                                    }
+                                },
+                            );
                         }
                     } else {
                         log::debug!(
@@ -2432,49 +2438,6 @@ async fn dependency_edge_type_v1(org_id: &str, from: &str, to: &str) -> EdgeType
     }
 }
 
-/// Trigger RCA for a single incident immediately after creation
-///
-/// Called asynchronously via tokio::spawn to avoid blocking incident creation.
-/// Reuses AiAgentClient configuration from enterprise crate.
-///
-/// # Arguments
-/// * `org_id` - Organization ID
-/// * `incident_id` - Incident ID
-///
-/// # Returns
-/// * `Ok(())` if RCA successfully triggered and saved
-/// * `Err(_)` if configuration invalid, agent unavailable, or analysis failed
-///
-/// # Note
-/// Errors are logged but not propagated to caller.
-///
-/// Abort handles for in-flight RCA runs, keyed by `{org_id}/{incident_id}`.
-///
-/// Registered when a run is spawned and removed when it settles. A cancel request
-/// looks the incident up here and aborts the task; if the entry is missing (another
-/// node owns the run, or the process restarted) the caller still writes the terminal
-/// `AIAnalysisCancelled` event so the in-flight guard is released.
-#[cfg(feature = "enterprise")]
-static RCA_ABORT_HANDLES: std::sync::LazyLock<dashmap::DashMap<String, tokio::task::AbortHandle>> =
-    std::sync::LazyLock::new(dashmap::DashMap::new);
-
-#[cfg(feature = "enterprise")]
-fn rca_task_key(org_id: &str, incident_id: &str) -> String {
-    format!("{org_id}/{incident_id}")
-}
-
-/// Track a spawned RCA task so it can be cancelled later.
-#[cfg(feature = "enterprise")]
-pub fn register_rca_task(org_id: &str, incident_id: &str, handle: tokio::task::AbortHandle) {
-    RCA_ABORT_HANDLES.insert(rca_task_key(org_id, incident_id), handle);
-}
-
-/// Stop tracking a run once it has settled. Safe to call when nothing is registered.
-#[cfg(feature = "enterprise")]
-pub fn unregister_rca_task(org_id: &str, incident_id: &str) {
-    RCA_ABORT_HANDLES.remove(&rca_task_key(org_id, incident_id));
-}
-
 /// Cancel the in-flight RCA run for an incident.
 ///
 /// Aborts the local task when this node owns it, then records the terminal
@@ -2494,12 +2457,11 @@ pub async fn cancel_rca_for_incident(
     user_id: Option<String>,
     stale_threshold_minutes: u64,
 ) -> Result<Option<bool>, anyhow::Error> {
-    let aborted = match RCA_ABORT_HANDLES.remove(&rca_task_key(org_id, incident_id)) {
-        Some((_, handle)) => {
-            handle.abort();
-            true
-        }
-        None => false,
+    let aborted = match super::rca_tasks::abort_local_rca_task(org_id, incident_id) {
+        super::rca_tasks::LocalRun::Aborted => true,
+        // The run is writing its own terminal event; a cancel now would add a second one.
+        super::rca_tasks::LocalRun::Settling => return Ok(None),
+        super::rca_tasks::LocalRun::Absent => false,
     };
 
     // Authoritative check: no local handle means the run may be on another node, or may
@@ -2631,6 +2593,21 @@ pub async fn rca_will_run(org_id: &str, incident_id: &str) -> bool {
     will_run
 }
 
+/// Trigger RCA for a single incident immediately after creation
+///
+/// Called asynchronously via tokio::spawn to avoid blocking incident creation.
+/// Reuses AiAgentClient configuration from enterprise crate.
+///
+/// # Arguments
+/// * `org_id` - Organization ID
+/// * `incident_id` - Incident ID
+///
+/// # Returns
+/// * `Ok(())` if RCA successfully triggered and saved
+/// * `Err(_)` if configuration invalid, agent unavailable, or analysis failed
+///
+/// # Note
+/// Errors are logged but not propagated to caller.
 #[cfg(feature = "enterprise")]
 pub async fn trigger_rca_for_incident(
     org_id: String,
@@ -2645,9 +2622,8 @@ pub async fn trigger_rca_for_incident(
     // Email of the user who triggered the analysis, used for AI usage tracking.
     // For automated/system-initiated calls, use "system@openobserve.ai".
     user_email: String,
-    // When true, the previous report is sent to the agent so it extends that analysis.
-    // Automatic triggers pass false so each run stands on its own.
-    build_on_previous: bool,
+    // Only `BuildOnPrevious` sends the previous report; every other run stands on its own.
+    trigger: config::meta::alerts::incidents::RcaTrigger,
     // A caller that emits Begin before spawning must authorize synchronously and
     // pass this one-shot proof so the spawned task cannot meter twice.
     #[cfg_attr(not(feature = "cloud"), allow(unused_variables))] usage_permit: Option<
@@ -2659,6 +2635,7 @@ pub async fn trigger_rca_for_incident(
     };
 
     let config = get_o2_config();
+    let build_on_previous = trigger == config::meta::alerts::incidents::RcaTrigger::BuildOnPrevious;
 
     // Check if RCA is enabled and configured
     if !config.incidents.enabled || !config.incidents.rca_enabled {
@@ -2855,6 +2832,17 @@ pub async fn trigger_rca_for_incident(
         previous_analysis,
     )
     .await;
+    // Determine trigger type based on function context
+    let trigger_type = if reanalysis {
+        if user_email == "system@openobserve.ai" {
+            config::meta::alerts::incidents::AnalysisTriggerType::AutomaticReanalysis
+        } else {
+            config::meta::alerts::incidents::AnalysisTriggerType::Manual
+        }
+    } else {
+        config::meta::alerts::incidents::AnalysisTriggerType::AutomaticNewIncident
+    };
+
     match client
         .analyze_incident(context, &auth_header, &policy)
         .await
@@ -2864,21 +2852,35 @@ pub async fn trigger_rca_for_incident(
                 "[INCIDENTS::RCA] RCA completed for {incident_id}: {} chars",
                 rca_result.len()
             );
+            // Claimed before saving: a cancel that won already wrote the run's terminal.
+            if !super::rca_tasks::settle_current_rca_task() {
+                return Ok(());
+            }
 
             // §2.2: the report and the verdict are read once, by the single
             // writer. Writing `topology_context` here instead is what left the
             // autonomous run — the one that IS L0 acting — with an answer no
             // ladder could ever see.
-            if let Err(e) = o2_enterprise::enterprise::alerts::rca_service::save_rca_result(
+            if let Err(e) = o2_enterprise::enterprise::alerts::rca_service::save_rca_report(
                 &org_id,
                 &incident_id,
                 &rca_result,
+                Some(trigger),
+                config::meta::alerts::incidents::RcaEndedReason::Completed,
             )
             .await
             {
                 log::error!(
                     "[INCIDENTS::RCA] Failed to save RCA result for {org_id}/{incident_id}: {e}"
                 );
+                emit_analysis_failure(
+                    &org_id,
+                    &incident_id,
+                    trigger_type,
+                    "RCA result could not be saved",
+                    Some(&e),
+                )
+                .await;
                 return Err(e);
             }
 
@@ -2902,25 +2904,16 @@ pub async fn trigger_rca_for_incident(
         Err(e) => {
             log::warn!("[INCIDENTS::RCA] RCA failed for {org_id}/{incident_id}: {e}");
 
-            // Determine trigger type based on function context
-            let trigger_type = if reanalysis {
-                if user_email == "system@openobserve.ai" {
-                    config::meta::alerts::incidents::AnalysisTriggerType::AutomaticReanalysis
-                } else {
-                    config::meta::alerts::incidents::AnalysisTriggerType::Manual
-                }
-            } else {
-                config::meta::alerts::incidents::AnalysisTriggerType::AutomaticNewIncident
-            };
-
-            emit_analysis_failure(
-                &org_id,
-                &incident_id,
-                trigger_type,
-                "RCA service call failed",
-                Some(&e),
-            )
-            .await;
+            if super::rca_tasks::settle_current_rca_task() {
+                emit_analysis_failure(
+                    &org_id,
+                    &incident_id,
+                    trigger_type,
+                    "RCA service call failed",
+                    Some(&e),
+                )
+                .await;
+            }
 
             Err(e)
         }
@@ -3158,7 +3151,8 @@ pub async fn update_status_as(
                     config::meta::alerts::incidents::IncidentEvent::ai_analysis_begin(),
                 )
                 .await;
-                let handle = tokio::spawn(async move {
+                super::rca_tasks::spawn_rca_task(org_id, incident_id, move |slot| async move {
+                    let _slot = slot;
                     if let Err(e) = trigger_rca_for_incident(
                         org_id_rca.clone(),
                         incident_id_rca.clone(),
@@ -3166,7 +3160,7 @@ pub async fn update_status_as(
                         true,
                         "system@openobserve.ai".to_string(),
                         // Reopened incidents get a fresh read of the current state.
-                        false,
+                        config::meta::alerts::incidents::RcaTrigger::Auto,
                         usage_permit,
                     )
                     .await
@@ -3175,18 +3169,18 @@ pub async fn update_status_as(
                             "[INCIDENTS::RCA] Reanalysis trigger failed after Reopened: {e}"
                         );
 
-                        emit_analysis_failure(
-                            &org_id_rca,
-                            &incident_id_rca,
-                            config::meta::alerts::incidents::AnalysisTriggerType::AutomaticReopened,
-                            "Reanalysis after reopen failed",
-                            Some(&e),
-                        )
-                        .await;
+                        if super::rca_tasks::settle_current_rca_task() {
+                            emit_analysis_failure(
+                                &org_id_rca,
+                                &incident_id_rca,
+                                config::meta::alerts::incidents::AnalysisTriggerType::AutomaticReopened,
+                                "Reanalysis after reopen failed",
+                                Some(&e),
+                            )
+                            .await;
+                        }
                     }
-                    unregister_rca_task(&org_id_rca, &incident_id_rca);
                 });
-                register_rca_task(org_id, incident_id, handle.abort_handle());
             }
         } else {
             log::debug!(

@@ -87,6 +87,7 @@ pub mod pipeline_last_errors;
 pub mod providers;
 pub mod query_history;
 pub mod rate_limit_rules;
+pub mod rca_feedback;
 pub mod re_pattern_stream_map;
 pub mod re_patterns;
 pub mod report_dashboards;

@@ -26,5 +26,7 @@
   "policy_enforced": false,
   "attachments": true,
   "context_used": true,
-  "answer_locale": true
+  "answer_locale": true,
+  "rca_chat_mode": true,
+  "rca_feedback": true
 }
