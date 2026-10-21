@@ -285,7 +285,7 @@ function pairedPrContext() {
 
 // Trusted repo rules (base-branch AGENTS.md files) that sanitize removed from the PR tree; opencode used to attach them itself.
 function readRepoRules() {
-  const files = (process.env.REVIEW_RULES_FILES || resolve(ENGINE_DIR, "AGENTS.md")).split("\n").map(f => f.trim()).filter(Boolean);
+  const files = (process.env.REVIEW_RULES_FILES ?? resolve(ENGINE_DIR, "AGENTS.md")).split("\n").map(f => f.trim()).filter(Boolean);
   const sections = files.filter(f => existsSync(f)).map(f => readFileSync(f, "utf-8").trim()).filter(Boolean);
   if (sections.length === 0) return "";
   return `## Repository rules (from the base branch)\n\nThese are the repository's contributor rules. Flag changed code that breaks them.\n\n${sections.join("\n\n---\n\n")}`;
