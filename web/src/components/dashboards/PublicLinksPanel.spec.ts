@@ -509,6 +509,13 @@ describe("PublicLinksPanel", () => {
     expect(notify.positive).toHaveBeenCalledWith("The link refreshes on its next view");
   });
 
+  it("shows no refresh field; the link keeps its stored interval", async () => {
+    vi.mocked(admin.list).mockResolvedValue({ data: { list: [link()] } } as never);
+    const w = build({ editLinkId: "l1" });
+    await flushPromises();
+    expect(has(w, "dashboards-public-links-panel-refresh-select")).toBe(false);
+  });
+
   it.each([
     [
       {
