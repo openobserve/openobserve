@@ -59,11 +59,11 @@ describe("FleetInstallCommand", () => {
 
   afterEach(() => vi.clearAllMocks());
 
-  it("offers Linux, macOS, Windows and Kubernetes", () => {
+  it("offers Linux, macOS, Windows, Docker and Kubernetes", () => {
     const offered = mountCommand()
       .findAll('[data-test^="fleet-install-command-os-"]')
       .map((b) => b.text());
-    expect(offered).toEqual(["Linux", "macOS", "Windows", "Kubernetes"]);
+    expect(offered).toEqual(["Linux", "macOS", "Windows", "Docker", "Kubernetes"]);
   });
 
   it("runs the install script for the current org with the token", () => {

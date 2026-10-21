@@ -62,6 +62,21 @@ describe("installCommand", () => {
     expect(cmd).toContain("-Token 'o2ft_abc123'");
   });
 
+  it("writes a supervisor.yaml and runs one container for Docker, reaching a local server through host.docker.internal", () => {
+    const cmd = installCommand("docker", { ...target, baseUrl: "http://localhost:5080" });
+    expect(cmd).toContain("AUTH=$(printf 'fleet:%s' 'o2ft_abc123' | base64");
+    expect(cmd).toContain("endpoint: ws://host.docker.internal:5080/api/acme/v1/opamp");
+    expect(cmd).toContain("insecure: true");
+    expect(cmd).toContain("O2_ENDPOINT: http://host.docker.internal:5080/api/acme");
+    expect(cmd).toContain("-v otel-fleet-state:/var/lib/opampsupervisor");
+    expect(cmd).toContain('--hostname "$(hostname)"');
+    expect(cmd).toContain("o2cr.ai/openobserve/otel-fleet-collector:0.163.1");
+    const remote = installCommand("docker", { ...target, version: null });
+    expect(remote).toContain("endpoint: wss://o2.example.com/api/acme/v1/opamp");
+    expect(remote).not.toContain("insecure");
+    expect(remote).toContain("otel-fleet-collector:latest");
+  });
+
   it("installs the Helm chart with the fleet collector image at the target version", () => {
     const cmd = installCommand("kubernetes", target);
     expect(cmd).toContain("helm upgrade --install");

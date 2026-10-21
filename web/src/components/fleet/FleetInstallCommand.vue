@@ -48,9 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :language="platform === 'windows' ? 'powershell' : 'shell'"
       data-test="fleet-install-command-code"
     />
-    <OText variant="meta" data-test="fleet-install-command-note">{{
-      platform === "kubernetes" ? t("fleet.install.kubernetesNote") : t("fleet.install.rerunNote")
-    }}</OText>
+    <OText variant="meta" data-test="fleet-install-command-note">{{ note }}</OText>
   </div>
 </template>
 
@@ -64,9 +62,9 @@ import { useOrgId } from "@/composables/query/useOrgId";
 import { getIngestionURL } from "@/utils/queryUtils";
 import { raw, useI18nTyped } from "@/types/i18n";
 import FleetCodeEditor from "./FleetCodeEditor.vue";
-import { OS_LABEL } from "./fleetFormat";
 import {
   INSTALL_PLATFORMS,
+  PLATFORM_LABEL,
   installCommand,
   resolveBaseUrl,
   type InstallPlatform,
@@ -86,8 +84,14 @@ const http = ref(false);
 
 const platformOptions = INSTALL_PLATFORMS.map((value) => ({
   value,
-  label: raw(OS_LABEL[value]),
+  label: raw(PLATFORM_LABEL[value]),
 }));
+
+const note = computed(() => {
+  if (platform.value === "kubernetes") return t("fleet.install.kubernetesNote");
+  if (platform.value === "docker") return t("fleet.install.dockerNote");
+  return t("fleet.install.rerunNote");
+});
 
 const command = computed(() =>
   installCommand(platform.value, {

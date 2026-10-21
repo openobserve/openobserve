@@ -13,9 +13,23 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-export type InstallPlatform = "linux" | "macos" | "windows" | "kubernetes";
+export type InstallPlatform = "linux" | "macos" | "windows" | "docker" | "kubernetes";
 
-export const INSTALL_PLATFORMS: InstallPlatform[] = ["linux", "macos", "windows", "kubernetes"];
+export const INSTALL_PLATFORMS: InstallPlatform[] = [
+  "linux",
+  "macos",
+  "windows",
+  "docker",
+  "kubernetes",
+];
+
+export const PLATFORM_LABEL: Record<InstallPlatform, string> = {
+  linux: "Linux",
+  macos: "macOS",
+  windows: "Windows",
+  docker: "Docker",
+  kubernetes: "Kubernetes",
+};
 
 export interface InstallTarget {
   baseUrl: string;
@@ -86,9 +100,55 @@ function helmCommand(t: InstallTarget): string {
   ].join("\n");
 }
 
+// A container cannot reach the host's loopback, so a local test points at host.docker.internal.
+const DOCKER_HOST = "host.docker.internal";
+function dockerReachable(url: string): string {
+  return url.replace(/\/\/(localhost|127\.0\.0\.1)(?=[:/]|$)/, `//${DOCKER_HOST}`);
+}
+
+/** A supervisor.yaml written next to the user, then one container with a named state volume. */
+function dockerCommand(t: InstallTarget): string {
+  const reachable = { ...t, baseUrl: dockerReachable(t.baseUrl) };
+  const endpoint = opampEndpoint(reachable);
+  const insecure = !reachable.baseUrl.startsWith("https:");
+  const yaml = [
+    "server:",
+    `  endpoint: ${endpoint}`,
+    "  headers:",
+    '    Authorization: "Basic $AUTH"',
+    ...(insecure ? ["  tls:", "    insecure: true"] : []),
+    "capabilities:",
+    "  accepts_remote_config: true",
+    "  reports_effective_config: true",
+    "  reports_health: true",
+    "  reports_own_metrics: true",
+    "  accepts_restart_command: true",
+    "  reports_available_components: true",
+    "agent:",
+    "  executable: /usr/local/bin/otelcol-contrib",
+    "  env:",
+    `    O2_ENDPOINT: ${reachable.baseUrl.replace(/\/+$/, "")}/api/${t.org}`,
+    '    O2_TOKEN: "Basic $AUTH"',
+    "storage:",
+    "  directory: /var/lib/opampsupervisor",
+  ];
+  return [
+    `AUTH=$(printf 'fleet:%s' ${q(t.token)} | base64 | tr -d '\\n')`,
+    "mkdir -p otel-fleet && cat > otel-fleet/supervisor.yaml <<EOF",
+    ...yaml,
+    "EOF",
+    "docker run -d --name otel-fleet-collector --restart unless-stopped \\",
+    '  --hostname "$(hostname)" \\',
+    '  -v "$PWD/otel-fleet/supervisor.yaml:/etc/opampsupervisor/supervisor.yaml:ro" \\',
+    "  -v otel-fleet-state:/var/lib/opampsupervisor \\",
+    `  ${IMAGE}:${t.version ?? "latest"}`,
+  ].join("\n");
+}
+
 /** One command per platform; re-running it upgrades or reconfigures an existing install. */
 export function installCommand(platform: InstallPlatform, target: InstallTarget): string {
   if (platform === "windows") return windowsCommand(target);
+  if (platform === "docker") return dockerCommand(target);
   if (platform === "kubernetes") return helmCommand(target);
   return unixCommand(target);
 }
