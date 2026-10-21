@@ -1069,14 +1069,20 @@ describe("pa gap fixes (scope bar and Exclusions drawer)", { timeout: 20000 }, (
     await chip()!.trigger("click");
     await until(() => expect(drawer()).toBeDefined());
   };
-  // Settling only after the reply has resolved keeps a no-bot check from passing before the result is read.
-  const uaAnswered = async () => {
-    await until(() => expect(uaSearches()).toBeGreaterThan(0));
+  // Settling only after the replies have resolved keeps a negative check from passing before they are read.
+  const answered = async (re: RegExp) => {
+    await until(() => expect(searchCount(re)).toBeGreaterThan(0));
     const { calls, results } = vi.mocked(searchService.search).mock;
     await Promise.all(
-      results.filter((_, i) => UA_RE.test(calls[i][0].query.query.sql)).map((r) => r.value),
+      results.filter((_, i) => re.test(calls[i][0].query.query.sql)).map((r) => r.value),
     );
     await settle();
+  };
+  const uaAnswered = () => answered(UA_RE);
+  // The drawer closes only after the PUT and the settings reload, so no Save round leaks into the next test.
+  const saveDrawer = async (d: HTMLElement) => {
+    buttonIn(d, "Save")!.click();
+    await until(() => expect(drawer()).toBeUndefined());
   };
   const botSwitch = (d: HTMLElement) =>
     d.querySelector<HTMLElement>('[data-test="rum-analytics-exclusions-builtin-switch-btn"]')!;
@@ -1321,8 +1327,8 @@ describe("pa gap fixes (scope bar and Exclusions drawer)", { timeout: 20000 }, (
     const d = drawer()!;
     botSwitch(d).click();
     await settle();
-    buttonIn(d, "Save")!.click();
-    await until(() => expect(settingsApi.putAppSettings).toHaveBeenCalledTimes(1));
+    await saveDrawer(d);
+    expect(settingsApi.putAppSettings).toHaveBeenCalledTimes(1);
     const [org, app, body] = settingsApi.putAppSettings.mock.calls[0];
     expect([org, app]).toEqual(["org1", "web"]);
     expect(body).toMatchObject({ bots: false, version: 7, sessions: [STAFF_RULE], pages: [] });
@@ -1350,8 +1356,8 @@ describe("pa gap fixes (scope bar and Exclusions drawer)", { timeout: 20000 }, (
         d.querySelector('[data-test="rum-analytics-exclusions-page-0"]')?.textContent,
       ).toContain("Page is /health"),
     );
-    buttonIn(d, "Save")!.click();
-    await until(() => expect(settingsApi.putAppSettings).toHaveBeenCalledTimes(1));
+    await saveDrawer(d);
+    expect(settingsApi.putAppSettings).toHaveBeenCalledTimes(1);
     const body = settingsApi.putAppSettings.mock.calls[0][2];
     expect(body).toMatchObject({ pages: [{ op: "eq", value: "/health" }] });
   });
@@ -1370,8 +1376,8 @@ describe("pa gap fixes (scope bar and Exclusions drawer)", { timeout: 20000 }, (
     await until(() => expect(apply()).not.toBeNull());
     apply()!.click();
     await settle();
-    buttonIn(d, "Save")!.click();
-    await until(() => expect(settingsApi.putAppSettings).toHaveBeenCalledTimes(1));
+    await saveDrawer(d);
+    expect(settingsApi.putAppSettings).toHaveBeenCalledTimes(1);
     expect(settingsApi.putAppSettings.mock.calls[0][2]).toMatchObject({ sessions: [rule] });
   });
 
@@ -1388,11 +1394,9 @@ describe("pa gap fixes (scope bar and Exclusions drawer)", { timeout: 20000 }, (
     // The drawer's preview runs the summary SQL too, so the baseline is taken after it.
     await until(() => expect(searchCount(/va_rows/)).toBe(before + 1));
     const summaries = searchCount(/va_rows/);
-    buttonIn(d, "Save")!.click();
-    const scope = () => useProductAnalytics().scope.value as unknown as { exclusions: unknown };
-    await until(() =>
-      expect(scope().exclusions).toMatchObject({ bots: false, rulesHash: "fedcba9876543210" }),
-    );
+    await saveDrawer(d);
+    const scope = useProductAnalytics().scope.value as unknown as { exclusions: unknown };
+    expect(scope.exclusions).toMatchObject({ bots: false, rulesHash: "fedcba9876543210" });
     await until(() => expect(searchCount(/va_rows/)).toBeGreaterThan(summaries));
     expect(settingsApi.getAppSettings.mock.calls.length).toBeGreaterThan(reads);
     expect(searchCount(/AS app, COUNT/)).toBe(probes);
@@ -1504,7 +1508,8 @@ describe("pa gap fixes (scope bar and Exclusions drawer)", { timeout: 20000 }, (
     persistPuts();
     withHits([[UA_RE, [{ ua: "Chrome", dev: "Other", sessions: 1500 }]]]);
     await mountAt("/product-analytics/overview?app=web&period=7d", true);
-    await until(() => expect(uaSearches()).toBe(1));
+    await uaAnswered();
+    expect(uaSearches()).toBe(1);
     await openDrawer();
     expect(uaSearches()).toBe(1);
     const before = searchCount(/va_rows/);
@@ -1512,8 +1517,9 @@ describe("pa gap fixes (scope bar and Exclusions drawer)", { timeout: 20000 }, (
     botSwitch(d).click();
     await until(() => expect(searchCount(/va_rows/)).toBe(before + 1));
     const summaries = searchCount(/va_rows/);
-    buttonIn(d, "Save")!.click();
+    await saveDrawer(d);
     await until(() => expect(searchCount(/va_rows/)).toBeGreaterThan(summaries));
+    await answered(/va_rows/);
     expect(settingsApi.putAppSettings).toHaveBeenCalledTimes(1);
     expect(uaSearches()).toBe(1);
     await useProductAnalytics().refresh();
