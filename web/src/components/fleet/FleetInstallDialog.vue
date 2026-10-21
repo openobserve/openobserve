@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <ODialog
     :open="open"
-    size="lg"
+    size="xl"
     :title="t('fleet.addCollector')"
     :sub-title="t('fleet.install.subtitle')"
     :primary-button-label="t('fleet.common.done')"
@@ -78,10 +78,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :content="t('fleet.enrollment.copyOnce')"
           data-test="fleet-install-dialog-copy-once"
         />
+        <OBanner
+          v-if="!secret"
+          variant="warning"
+          dense
+          :content="t('fleet.install.placeholderHint', { placeholder: TOKEN_PLACEHOLDER })"
+          data-test="fleet-install-dialog-placeholder-hint"
+        >
+          <template #actions>
+            <OButton
+              variant="outline"
+              size="sm"
+              data-test="fleet-install-dialog-new-token"
+              @click="creatingHere = !creatingHere"
+            >
+              {{ t("fleet.enrollment.newToken") }}
+            </OButton>
+          </template>
+        </OBanner>
+        <FleetTokenForm
+          v-if="!secret && creatingHere"
+          :fleet-id="fleetId"
+          data-test="fleet-install-dialog-inline-token-form"
+          @created="onTokenCreated"
+        />
         <FleetInstallCommand :token="secret ?? TOKEN_PLACEHOLDER" />
-        <OText v-if="!secret" variant="meta" data-test="fleet-install-dialog-placeholder-hint">{{
-          t("fleet.install.placeholderHint", { placeholder: TOKEN_PLACEHOLDER })
-        }}</OText>
         <OText variant="meta" data-test="fleet-install-dialog-security-note"
           >{{ t("fleet.enrollment.securityNote") }}
           {{ t("fleet.install.envRefNote", { ref: ENV_REF }) }}</OText
@@ -204,6 +225,7 @@ const selectedId = computed<string | null>({
   },
   set: (id) => (chosenId.value = id),
 });
+const creatingHere = ref(false);
 const secret = computed(() =>
   selectedId.value ? heldTokenSecret(orgId.value, selectedId.value) : null,
 );
@@ -313,6 +335,7 @@ function onTokenCreated(token: { id: string }) {
   if (!props.open) return;
   pendingTokenId.value = token.id;
   chosenId.value = token.id;
+  creatingHere.value = false;
 }
 
 function viewCollectors() {
