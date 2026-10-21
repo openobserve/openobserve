@@ -193,7 +193,7 @@ pub async fn search(
             let remaining_ms = (timeout * 1000).saturating_sub(elapsed_ms);
             let guard = Some(
                 o2_enterprise::enterprise::search::admission::acquire_node_slots(
-                    query_tracker.query_id(),
+                    trace_id,
                     &nodes,
                     &WorkGroup::Short,
                     remaining_ms,

@@ -108,7 +108,6 @@ pub async fn check_work_group(
     caller: &str,
 ) -> Result<DeferredLock> {
     let trace_id = query_tracker.trace_id();
-    let query_id = query_tracker.query_id();
     let cfg = get_config();
     let work_group_str = work_group.to_string();
     // Get distributed lock temporarily (for queue coordination)
@@ -140,7 +139,7 @@ pub async fn check_work_group(
     .await?;
 
     // Add to workgroup queue
-    if let Err(e) = work_group.process(query_id, Some(org_id), user_id).await {
+    if let Err(e) = work_group.process(trace_id, Some(org_id), user_id).await {
         metrics::QUERY_PENDING_NUMS
             .with_label_values(&[org_id])
             .dec();
@@ -157,7 +156,7 @@ pub async fn check_work_group(
         metrics::QUERY_PENDING_NUMS
             .with_label_values(&[org_id])
             .dec();
-        if let Err(done_err) = work_group.done(query_id, Some(org_id), user_id).await {
+        if let Err(done_err) = work_group.done(trace_id, Some(org_id), user_id).await {
             log::error!(
                 "[trace_id {trace_id}] {caller}->search: failed to mark work group as done after unlock error: {done_err:?}"
             );
@@ -170,7 +169,6 @@ pub async fn check_work_group(
 
     // Create cleanup guard
     let trace_id_owned = trace_id.to_string();
-    let query_id_owned = query_id.to_string();
     let user_id_owned = user_id.map(|s| s.to_string());
     let org_id_owned = org_id.to_string();
     let work_group_clone = work_group.clone();
@@ -178,7 +176,7 @@ pub async fn check_work_group(
     let guard = AsyncDefer::new(async move {
         if let Err(e) = work_group_clone
             .done(
-                &query_id_owned,
+                &trace_id_owned,
                 Some(&org_id_owned),
                 user_id_owned.as_deref(),
             )

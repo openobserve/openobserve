@@ -231,13 +231,7 @@ pub async fn search(
             let elapsed_ms = took_watch.total_millis();
             let remaining_ms = (timeout * 1000).saturating_sub(elapsed_ms);
             let guard = Some(
-                admission::acquire_node_slots(
-                    query_tracker.query_id(),
-                    &nodes,
-                    &work_group,
-                    remaining_ms,
-                )
-                .await?,
+                admission::acquire_node_slots(trace_id, &nodes, &work_group, remaining_ms).await?,
             );
             let took_wait = start_time.elapsed().as_millis() as usize;
             _took_wait += took_wait;
