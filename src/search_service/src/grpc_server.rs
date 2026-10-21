@@ -250,9 +250,11 @@ impl Search for Searcher {
     ) -> Result<Response<CancelQueryResponse>, Status> {
         let req = req.into_inner();
         let cancelled = self.cancel(&req.org_id, &req.trace_id);
-        metrics::QUERY_CANCELED_NUMS
-            .with_label_values(&[&req.org_id])
-            .inc_by(cancelled as u64);
+        if cancelled > 0 {
+            metrics::QUERY_CANCELED_NUMS
+                .with_label_values(&[&req.org_id])
+                .inc_by(cancelled as u64);
+        }
         Ok(Response::new(CancelQueryResponse {
             is_success: cancelled > 0,
         }))
