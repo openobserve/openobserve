@@ -1453,7 +1453,7 @@ pub(crate) async fn guidance_admitted(mut row: SteerRecord) {
 }
 
 /// The rows of a run that ended before its first turn started become `not_read`.
-pub(crate) async fn close_unread(org_id: &str, run_id: &str, state: RunState) {
+pub async fn close_unread(org_id: &str, run_id: &str, state: RunState) {
     let Some(reason) = end_reason(state) else {
         return;
     };
