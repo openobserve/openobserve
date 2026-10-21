@@ -102,9 +102,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <OTabs v-model="tab" class="border-border-default mt-2 shrink-0 border-b" dense>
         <OTab name="overview" :label="t('fleet.collectors.overview')" />
-        <OTab name="delivery" :label="t('fleet.collectors.assignmentDelivery')" />
-        <OTab name="health" :label="t('fleet.collectors.health')" />
         <OTab name="metrics" :label="t('fleet.collectorMetrics.tab')" />
+        <OTab name="health" :label="t('fleet.collectors.health')" />
+        <OTab name="delivery" :label="t('fleet.collectors.assignmentDelivery')" />
         <OTab name="config" :label="t('fleet.collectors.effectiveConfig')" />
         <OTab name="history" :label="t('fleet.collectors.history')" />
       </OTabs>
@@ -177,6 +177,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </ODescriptionItem>
           </ODescriptionList>
         </div>
+
+        <FleetCollectorMetrics
+          v-else-if="tab === 'metrics'"
+          :collector-id="collector.id"
+          :collector-name="collector.name"
+        />
 
         <div v-else-if="tab === 'delivery'" class="flex flex-col gap-4">
           <OText variant="meta" data-test="fleet-collector-drawer-evidence-line">{{
@@ -312,12 +318,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </ODescriptionItem>
           </ODescriptionList>
         </div>
-
-        <FleetCollectorMetrics
-          v-else-if="tab === 'metrics'"
-          :collector-id="collector.id"
-          :collector-name="collector.name"
-        />
 
         <div v-else-if="tab === 'config'" class="flex flex-col gap-3">
           <template v-if="collector.effectiveConfig && split">

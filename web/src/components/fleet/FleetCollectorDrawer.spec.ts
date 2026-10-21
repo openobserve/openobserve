@@ -351,11 +351,11 @@ describe("FleetCollectorDrawer", () => {
     expect(wrapper.find(sel("history")).exists()).toBe(true);
   });
 
-  it("adds a metrics tab after health, scoped to this collector", async () => {
+  it("puts metrics right after overview, scoped to this collector", async () => {
     wrapper = mountDrawer();
     await flushPromises();
     const names = wrapper.findAllComponents({ name: "OTab" }).map((tab) => tab.props("name"));
-    expect(names).toEqual(["overview", "delivery", "health", "metrics", "config", "history"]);
+    expect(names).toEqual(["overview", "metrics", "health", "delivery", "config", "history"]);
     expect(wrapper.findComponent(MetricsStub).exists()).toBe(false);
 
     await wrapper.setProps({ initialTab: "metrics" });
