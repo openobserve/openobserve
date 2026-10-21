@@ -47,13 +47,11 @@ export interface PanelDoorSource {
 
 /** Epoch ms from a picker value: a Date, an ISO string, or µs/ms since the epoch. */
 export function pickerTimeMs(value: Date | number | string | undefined): number | undefined {
-  if (value instanceof Date) return value.getTime();
-  if (typeof value === "string") {
-    const parsed = Date.parse(value);
-    return Number.isFinite(parsed) ? parsed : undefined;
-  }
-  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) return undefined;
-  return value > 1e14 ? Math.round(value / 1000) : value;
+  const time =
+    value instanceof Date ? value.getTime() : typeof value === "string" ? Date.parse(value) : value;
+  if (typeof time !== "number" || !Number.isFinite(time) || time <= 0) return undefined;
+  // Dashboards build their picker Dates from µs, so a Date's getTime() can be µs too.
+  return time > 1e14 ? Math.round(time / 1000) : time;
 }
 
 /** Explain this panel / Add panel to chat with the host's own range and variables. */
