@@ -65,26 +65,28 @@ describe("FleetOverview", () => {
     vi.clearAllMocks();
   });
 
-  it("shows the summary's counts, active rollouts and total in one strip", async () => {
+  it("shows only collector states, total first then online, no outdated or rollout tile", async () => {
     vi.mocked(fleet.summary).mockResolvedValue({ data: summary } as any);
     wrapper = await mountOverview();
-    const texts = ["offline", "degraded", "unknown", "outdated", "rollouts", "online", "total"].map(
-      (k) => tile(wrapper, k).text(),
-    );
-    expect(texts[0]).toContain("1");
-    expect(texts[2]).toContain("Not reported");
-    expect(texts[3]).toContain("2");
-    expect(texts[4]).toContain("Active rollouts");
-    expect(texts[4]).toContain("3");
-    expect(texts[5]).toContain("4");
-    expect(texts[6]).toContain("7");
+    const tiles = wrapper.findAll('[data-test^="fleet-overview-stat-"]');
+    expect(tiles.map((el) => el.attributes("data-test"))).toEqual([
+      "fleet-overview-stat-total",
+      "fleet-overview-stat-online",
+      "fleet-overview-stat-offline",
+      "fleet-overview-stat-degraded",
+      "fleet-overview-stat-unknown",
+    ]);
+    expect(tile(wrapper, "total").text()).toContain("7");
+    expect(tile(wrapper, "online").text()).toContain("4");
+    expect(tile(wrapper, "offline").text()).toContain("1");
+    expect(tile(wrapper, "unknown").text()).toContain("Not reported");
   });
 
   it("shows dashes while the summary is unavailable", async () => {
     vi.mocked(fleet.summary).mockRejectedValue({ response: { status: 403 } });
     wrapper = await mountOverview();
     expect(tile(wrapper, "total").text()).toContain("—");
-    expect(tile(wrapper, "rollouts").text()).toContain("—");
+    expect(tile(wrapper, "online").text()).toContain("—");
   });
 
   it("opens the Fleets tab filtered by the clicked state, or unfiltered from Total", async () => {
@@ -92,7 +94,6 @@ describe("FleetOverview", () => {
     wrapper = await mountOverview();
     await tile(wrapper, "offline").trigger("click");
     await tile(wrapper, "total").trigger("click");
-    await tile(wrapper, "rollouts").trigger("click");
     expect(wrapper.emitted("navigate")).toEqual([
       ["fleets", { scope: "all", status: "offline" }],
       ["fleets", { scope: "all" }],

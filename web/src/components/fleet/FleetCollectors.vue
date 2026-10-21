@@ -524,6 +524,20 @@ const statusStats = computed<StatItem[]>(() => {
     counts?.[key] ?? DASH;
   const items: StatItem[] = [
     {
+      key: "all",
+      label: t("fleet.stats.total"),
+      value: counts?.total ?? DASH,
+      icon: "dns",
+      tone: "neutral",
+    },
+    {
+      key: "online",
+      label: t("fleet.stats.online"),
+      value: n("online"),
+      icon: "check-circle",
+      tone: "success",
+    },
+    {
       key: "offline",
       label: t("fleet.stats.offline"),
       value: n("offline"),
@@ -550,20 +564,6 @@ const statusStats = computed<StatItem[]>(() => {
       value: n("outdated"),
       icon: "update",
       tone: "info",
-    },
-    {
-      key: "online",
-      label: t("fleet.stats.online"),
-      value: n("online"),
-      icon: "check-circle",
-      tone: "success",
-    },
-    {
-      key: "all",
-      label: t("fleet.stats.total"),
-      value: counts?.total ?? DASH,
-      icon: "dns",
-      tone: "neutral",
     },
   ];
   return items.map((item) => ({ ...item, dataTest: `fleet-collectors-stat-${item.key}` }));

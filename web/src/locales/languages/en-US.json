@@ -25034,8 +25034,7 @@
       "offline": "Offline",
       "degraded": "Degraded",
       "outdated": "Outdated",
-      "unknown": "Not reported",
-      "activeRollouts": "Active rollouts"
+      "unknown": "Not reported"
     },
     "badge": {
       "inProgress": "In progress",

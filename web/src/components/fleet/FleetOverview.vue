@@ -64,12 +64,27 @@ const { t } = useI18nTyped();
 const { summary, fetching, lastUpdatedAt, refetch } = useFleetSummary(FLOW_POLL_MS);
 const expanded = ref(false);
 
-// The summary already covers only the fleets the caller may read.
+// The summary already covers only the fleets the caller may read; largest count first.
 const stats = computed<StatItem[]>(() => {
   const counts = summary.value?.collectors;
   const total = counts?.total;
   const n = (key: keyof NonNullable<typeof counts>) => counts?.[key] ?? DASH;
   const items: StatItem[] = [
+    {
+      key: "total",
+      label: t("fleet.stats.total"),
+      value: n("total"),
+      icon: "dns",
+      tone: "neutral",
+    },
+    {
+      key: "online",
+      label: t("fleet.stats.online"),
+      value: n("online"),
+      icon: "check-circle",
+      tone: "success",
+      max: total,
+    },
     {
       key: "offline",
       label: t("fleet.stats.offline"),
@@ -93,37 +108,6 @@ const stats = computed<StatItem[]>(() => {
       icon: "help-outline",
       tone: "neutral",
       max: total,
-    },
-    {
-      key: "outdated",
-      label: t("fleet.stats.outdated"),
-      value: n("outdated"),
-      icon: "update",
-      tone: "info",
-      max: total,
-    },
-    {
-      key: "rollouts",
-      label: t("fleet.stats.activeRollouts"),
-      value: summary.value?.rollouts_active ?? DASH,
-      icon: "rocket-launch",
-      tone: "primary",
-      selectable: false,
-    },
-    {
-      key: "online",
-      label: t("fleet.stats.online"),
-      value: n("online"),
-      icon: "check-circle",
-      tone: "success",
-      max: total,
-    },
-    {
-      key: "total",
-      label: t("fleet.stats.total"),
-      value: n("total"),
-      icon: "dns",
-      tone: "neutral",
     },
   ];
   return items.map((item) => ({ ...item, dataTest: `fleet-overview-stat-${item.key}` }));
