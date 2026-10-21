@@ -272,7 +272,7 @@ struct LicenseConfig {
     search: LicenseSearchConfig,
 }
 
-/// Cloud never shows the licence search banner, so it does not serve these fields.
+/// Cloud never shows the license search banner, so it does not serve these fields.
 #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
 #[derive(Serialize)]
 struct LicenseSearchConfig {

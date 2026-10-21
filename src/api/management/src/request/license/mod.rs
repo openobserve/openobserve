@@ -44,8 +44,7 @@ struct LicenseResponse {
     base: LicenseDecision,
     evaluated_at: i64,
     env_key_active: bool,
-    /// The check `store_license` and `refresh_license_limits` make, so the UI hides what would
-    /// 403.
+    /// Whether `POST /license/refresh` would pass both its route check and its handler check.
     can_update_license: bool,
 }
 
@@ -113,6 +112,44 @@ async fn check_license_permission(user_id: &str, method: &str) -> Result<(), any
 }
 
 // license admins need the instance id to request a license, unless it doubles as the grpc token
+// the middleware checks the route table's method on license:_meta, then the handler checks PUT
+async fn can_update_license(user_id: &str) -> bool {
+    db::user::is_root_user(user_id)
+        || (check_license_permission(user_id, "PUT").await.is_ok()
+            && refresh_route_allows(user_id).await)
+}
+
+fn refresh_route() -> Option<o2_openfga::meta::route_permissions::ResolvedRoute> {
+    o2_openfga::meta::route_permissions::resolve_permission(
+        &["license", "refresh"],
+        "POST",
+        config::META_ORG_ID,
+        "",
+        None,
+    )
+}
+
+async fn refresh_route_allows(user_id: &str) -> bool {
+    let Some(route) = refresh_route() else {
+        return false;
+    };
+    let Some((object_type, object_id)) = route.o2_type.split_once(':') else {
+        return false;
+    };
+    openobserve_core::auth::check_permissions(
+        object_id,
+        &route.org_id,
+        user_id,
+        object_type,
+        &route.method,
+        Some(&route.parent_id),
+        route.use_all_org,
+        route.use_self_context,
+        route.use_self_parent,
+    )
+    .await
+}
+
 fn viewer_license_fields(
     is_root: bool,
     is_license_admin: bool,
@@ -206,7 +243,7 @@ pub async fn get_license_info(Headers(email): Headers<UserEmail>) -> Response {
         base,
         evaluated_at,
         env_key_active: env_key_active(&o2_cfg.common.license_key),
-        can_update_license: is_license_admin,
+        can_update_license: can_update_license(&email.user_id).await,
     };
     MetaHttpResponse::json(res)
 }
@@ -555,12 +592,73 @@ mod tests {
         assert_eq!(json["env_key_active"], true);
     }
 
+    // a watcher fills these caches on a running node; a miss here would go to the database
+    fn join(org_id: &str, email: &str, role: config::meta::user::UserRole) {
+        common::infra::config::USERS.insert(
+            email.to_string(),
+            infra::table::users::UserRecord {
+                email: email.to_string(),
+                first_name: "F".to_string(),
+                last_name: "L".to_string(),
+                password: "hash".to_string(),
+                salt: "salt".to_string(),
+                is_root: role == config::meta::user::UserRole::Root,
+                password_ext: None,
+                user_type: config::meta::user::UserType::Internal,
+                created_at: 0,
+                updated_at: 0,
+                must_reset_password: false,
+                password_reset_reason: None,
+                flagged_at: None,
+                password_updated_at: None,
+            },
+        );
+        common::infra::config::ORG_USERS.insert(
+            format!("{org_id}/{email}"),
+            infra::table::org_users::OrgUserRecord {
+                role,
+                token: "token".to_string(),
+                rum_token: None,
+                org_id: org_id.to_string(),
+                email: email.to_string(),
+                created_at: 0,
+                allow_static_token: true,
+            },
+        );
+    }
+
     #[test]
-    fn test_license_response_says_who_may_update_the_license() {
-        for (is_root, is_license_admin) in [(false, false), (false, true), (true, true)] {
-            let json: json::Value =
-                json::from_str(&response_json(is_root, is_license_admin)).unwrap();
-            assert_eq!(json["can_update_license"], is_license_admin, "{is_root}");
-        }
+    fn test_the_update_flag_checks_the_route_the_middleware_checks() {
+        let route = refresh_route().expect("license/refresh is in the route table");
+        assert!(!route.bypass_check);
+        assert_eq!(route.method, "POST");
+        assert_eq!(route.org_id, config::META_ORG_ID);
+        assert_eq!(route.o2_type, "license:_meta");
+    }
+
+    #[tokio::test]
+    async fn test_root_and_meta_admins_may_update_the_license() {
+        join(
+            "default",
+            "lw-root@flag.test",
+            config::meta::user::UserRole::Root,
+        );
+        join(
+            "_meta",
+            "lw-admin@flag.test",
+            config::meta::user::UserRole::Admin,
+        );
+        assert!(can_update_license("lw-root@flag.test").await);
+        assert!(can_update_license("lw-admin@flag.test").await);
+    }
+
+    #[tokio::test]
+    async fn test_a_user_outside_meta_may_not_update_the_license() {
+        join(
+            "lw-acme",
+            "lw-member@flag.test",
+            config::meta::user::UserRole::Admin,
+        );
+        assert!(!can_update_license("lw-member@flag.test").await);
     }
 }
