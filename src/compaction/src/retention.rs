@@ -408,8 +408,10 @@ pub async fn delete_all(
     }
 
     // delete from file list
-    delete_from_file_list(org_id, stream_type, stream_name, (start_time, end_time)).await?;
-    super::dump::delete_all(org_id, stream_type, stream_name).await?;
+    let mut bloom_hours =
+        delete_from_file_list(org_id, stream_type, stream_name, (start_time, end_time)).await?;
+    bloom_hours.extend(super::dump::delete_all(org_id, stream_type, stream_name).await?);
+    enqueue_bloom_files(org_id, stream_type, stream_name, &bloom_hours).await?;
     log::info!("deleted file list for: {org_id}/{stream_type}/{stream_name}/all");
 
     // mark delete done
@@ -519,16 +521,24 @@ pub async fn delete_by_date(
         get_ymdh_from_micros(time_range.0, HourFormat::Real),
         get_ymdh_from_micros(time_range.1, HourFormat::Real),
     );
-    delete_from_file_list(org_id, stream_type, stream_name, time_range)
+    let mut bloom_hours = delete_from_file_list(org_id, stream_type, stream_name, time_range)
         .await
         .map_err(|e| {
             log::error!("[COMPACTOR] delete_by_date delete_from_file_list failed: {e}");
             e
         })?;
-    super::dump::delete_by_time_range(org_id, stream_type, stream_name, time_range)
+    let dump_bloom_hours =
+        super::dump::delete_by_time_range(org_id, stream_type, stream_name, time_range)
+            .await
+            .map_err(|e| {
+                log::error!("[COMPACTOR] delete_by_date delete_file_list_dump failed: {e}");
+                e
+            })?;
+    bloom_hours.extend(dump_bloom_hours);
+    enqueue_bloom_files(org_id, stream_type, stream_name, &bloom_hours)
         .await
         .map_err(|e| {
-            log::error!("[COMPACTOR] delete_by_date delete_file_list_dump failed: {e}");
+            log::error!("[COMPACTOR] delete_by_date enqueue bloom files failed: {e}");
             e
         })?;
 
@@ -568,12 +578,14 @@ pub async fn delete_by_date(
     handle_delete_by_date_done(org_id, stream_type, stream_name, date_range).await
 }
 
+/// Deletes the stream's `file_list` rows in the range and returns the (hour, `bloom_ver`) pairs
+/// their bloom files were built for.
 pub async fn delete_from_file_list(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
     time_range: (i64, i64),
-) -> Result<(), anyhow::Error> {
+) -> Result<HashSet<(String, i64)>, anyhow::Error> {
     let task_id = tokio::task::try_id()
         .map(|id| id.to_string())
         .unwrap_or_else(|| rand::random::<u64>().to_string());
@@ -592,27 +604,23 @@ pub async fn delete_from_file_list(
     )
     .await?;
     if files.is_empty() {
-        return Ok(());
+        return Ok(HashSet::new());
     }
 
     for file in files.iter_mut() {
         file.deleted = true;
     }
     files.sort_unstable_by(|a, b| a.key.cmp(&b.key));
+    let bloom_hours = bloom_hours_of(&files)?;
 
     // write file list to storage
-    write_file_list(org_id, stream_type, stream_name, &files).await?;
+    write_file_list(org_id, &files).await?;
 
-    Ok(())
+    Ok(bloom_hours)
 }
 
 // write file list to db, all the files should be deleted
-async fn write_file_list(
-    org_id: &str,
-    stream_type: StreamType,
-    stream_name: &str,
-    files: &[FileKey],
-) -> Result<(), anyhow::Error> {
+async fn write_file_list(org_id: &str, files: &[FileKey]) -> Result<(), anyhow::Error> {
     let cfg = get_config();
     // the db layer splits each batch by date itself, so a batch may span many hours
     for events in files.chunks(cfg.compact.file_list_deleted_batch_size.max(1)) {
@@ -650,7 +658,7 @@ async fn write_file_list(
                 .file_list_deleted_mode
                 .eq(&FileListBookKeepMode::Deleted.to_string())
             {
-                let mut del_items = events
+                let del_items = events
                     .iter()
                     .map(|v| FileListDeleted {
                         id: 0,
@@ -661,14 +669,6 @@ async fn write_file_list(
                         flattened: v.meta.flattened,
                     })
                     .collect::<Vec<_>>();
-                match unreferenced_blooms(org_id, stream_type, stream_name, events).await {
-                    Ok(blooms) => del_items.extend(blooms),
-                    Err(e) => {
-                        log::error!("[COMPACTOR] bloom_ver_referenced failed, retrying: {e}");
-                        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-                        continue;
-                    }
-                }
                 if let Err(e) =
                     infra_file_list::batch_add_deleted(org_id, created_at, &del_items).await
                 {
@@ -687,40 +687,45 @@ async fn write_file_list(
     Ok(())
 }
 
-// a `.bf` covers several files of an hour, so it may only go once none of them is left
-async fn unreferenced_blooms(
+fn bloom_hours_of(files: &[FileKey]) -> Result<HashSet<(String, i64)>, anyhow::Error> {
+    let mut bloom_hours = HashSet::new();
+    for file in files.iter().filter(|file| file.meta.bloom_ver > 0) {
+        let (_, date_key, _) = parse_file_key_columns(&file.key)?;
+        bloom_hours.insert((date_key, file.meta.bloom_ver));
+    }
+
+    Ok(bloom_hours)
+}
+
+// retention drops whole hours, so once they are gone no remaining file can reference their `.bf`
+async fn enqueue_bloom_files(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
-    deleted_files: &[FileKey],
-) -> Result<Vec<FileListDeleted>, anyhow::Error> {
-    let mut candidates = HashSet::new();
-    for file in deleted_files.iter().filter(|file| file.meta.bloom_ver > 0) {
-        let (_, date_key, _) = parse_file_key_columns(&file.key)?;
-        candidates.insert((date_key, file.meta.bloom_ver));
+    bloom_hours: &HashSet<(String, i64)>,
+) -> Result<(), anyhow::Error> {
+    let deleted_mode = FileListBookKeepMode::Deleted.to_string();
+    if bloom_hours.is_empty() || get_config().compact.file_list_deleted_mode != deleted_mode {
+        return Ok(());
     }
-    let mut blooms = Vec::with_capacity(candidates.len());
-    for (date_key, bloom_ver) in candidates {
-        if !infra_file_list::bloom_ver_referenced(
-            org_id,
-            stream_type,
-            stream_name,
-            &date_key,
-            bloom_ver,
-        )
-        .await?
-        {
-            blooms.push(bloom_file_deleted(
-                org_id,
-                stream_type,
-                stream_name,
-                &date_key,
-                bloom_ver,
-            ));
+    let del_items = bloom_hours
+        .iter()
+        .map(|(date_key, bloom_ver)| {
+            bloom_file_deleted(org_id, stream_type, stream_name, date_key, *bloom_ver)
+        })
+        .collect::<Vec<_>>();
+    let created_at = Utc::now().timestamp_micros();
+    for _ in 0..5 {
+        match infra_file_list::batch_add_deleted(org_id, created_at, &del_items).await {
+            Ok(_) => return Ok(()),
+            Err(e) => {
+                log::error!("[COMPACTOR] batch_add_deleted for bloom files failed, retrying: {e}");
+                tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+            }
         }
     }
 
-    Ok(blooms)
+    Err(anyhow::anyhow!("[COMPACTOR] enqueue bloom files failed"))
 }
 
 fn generate_local_dirs(
@@ -904,53 +909,35 @@ mod tests {
         );
     }
 
-    #[tokio::test]
-    async fn test_unreferenced_blooms_only_returns_blooms_without_live_files() {
-        infra_file_list::create_table().await.unwrap();
-        let hour = "files/org/logs/bloom_retention/2026/08/19/07";
-        let file = |name: &str, bloom_ver: i64| {
+    #[test]
+    fn test_bloom_hours_of_dedups_per_hour_and_skips_files_without_bloom() {
+        let file = |hour: &str, name: &str, bloom_ver: i64| {
             FileKey::new(
                 0,
                 String::new(),
-                format!("{hour}/{name}.parquet"),
+                format!("files/org/logs/app/2026/08/19/{hour}/{name}.parquet"),
                 FileMeta {
-                    min_ts: 1,
-                    max_ts: 2,
-                    records: 1,
                     bloom_ver,
                     ..Default::default()
                 },
-                false,
+                true,
             )
         };
-        let shared_kept = file("shared_kept", 7);
-        let shared_deleted = file("shared_deleted", 7);
-        let alone_deleted = file("alone_deleted", 9);
-        let without_bloom = file("without_bloom", 0);
-        infra_file_list::batch_add(&[
-            shared_kept,
-            shared_deleted.clone(),
-            alone_deleted.clone(),
-            without_bloom.clone(),
-        ])
-        .await
-        .unwrap();
+        let files = [
+            file("07", "a", 7),
+            file("07", "b", 7),
+            file("07", "c", 9),
+            file("08", "d", 7),
+            file("08", "e", 0),
+        ];
 
-        let deleted = [shared_deleted, alone_deleted, without_bloom].map(|file| FileKey {
-            deleted: true,
-            ..file
-        });
-        infra_file_list::batch_process(&deleted).await.unwrap();
-
-        let blooms = unreferenced_blooms("org", StreamType::Logs, "bloom_retention", &deleted)
-            .await
-            .unwrap();
         assert_eq!(
-            blooms
-                .iter()
-                .map(|bloom| bloom.file.as_str())
-                .collect::<Vec<_>>(),
-            vec!["files/org/bloom/bloom_retention_logs/2026/08/19/07/9.bf"]
+            bloom_hours_of(&files).unwrap(),
+            HashSet::from([
+                ("2026/08/19/07".to_string(), 7),
+                ("2026/08/19/07".to_string(), 9),
+                ("2026/08/19/08".to_string(), 7),
+            ])
         );
     }
 
