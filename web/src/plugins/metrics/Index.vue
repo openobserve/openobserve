@@ -122,6 +122,7 @@ import {
   reactive,
   onMounted,
   onBeforeMount,
+  onBeforeUnmount,
   defineAsyncComponent,
   provide,
 } from "vue";
@@ -415,6 +416,10 @@ export default defineComponent({
       },
     );
 
+    // chartData is also rewritten without a run (chart-type and config watchers), so the last run is tracked by its own signature.
+    const appliedSignature = ref<string | null>(null);
+    const isRunQueryArmed = ref(false);
+
     // Auto-refresh and deep links run here too, so only `onUserRun` writes history.
     const runQuery = (): boolean => {
       if (!isValid(true, false)) {
@@ -423,6 +428,7 @@ export default defineComponent({
 
       // copy the data object excluding the reactivity
       chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
+      appliedSignature.value = panelPayloadSignature(dashboardPanelData.data);
       // refresh the date time based on current time if relative date is selected
       dateTimePickerRef.value && dateTimePickerRef.value.refresh();
       updateDateTime();
@@ -592,14 +598,26 @@ export default defineComponent({
       disable.value = panelsValues.some((item: any) => item === true);
     });
 
-    // The editor's isOutDated ignores builders with no x/y/z fields (every PromQL query), so compare the payload too.
     const isRunQueryPending = computed(() => {
-      if (disable.value) return false;
-      if (panelEditorRef.value?.isOutDated) return true;
-      if (!chartData.value?.queries) return false;
-      return (
-        panelPayloadSignature(chartData.value) !== panelPayloadSignature(dashboardPanelData.data)
-      );
+      if (!isRunQueryArmed.value || disable.value || appliedSignature.value === null) return false;
+      return panelPayloadSignature(dashboardPanelData.data) !== appliedSignature.value;
+    });
+
+    // Load-time seeding (stream pick, default query, builder normalisation) is not an edit, so whatever is on screen at the user's first input counts as applied.
+    const armRunQueryPending = () => {
+      if (isRunQueryArmed.value) return;
+      isRunQueryArmed.value = true;
+      if (appliedSignature.value !== null) {
+        appliedSignature.value = panelPayloadSignature(dashboardPanelData.data);
+      }
+    };
+    onMounted(() => {
+      window.addEventListener("pointerdown", armRunQueryPending, true);
+      window.addEventListener("keydown", armRunQueryPending, true);
+    });
+    onBeforeUnmount(() => {
+      window.removeEventListener("pointerdown", armRunQueryPending, true);
+      window.removeEventListener("keydown", armRunQueryPending, true);
     });
 
     const addToDashboard = () => {
