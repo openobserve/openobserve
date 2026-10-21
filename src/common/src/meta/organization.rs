@@ -542,6 +542,7 @@ pub struct OrganizationSettingPayload {
     #[cfg(feature = "cloud")]
     #[serde(default)]
     pub enforce_allowed_orgs_only: Option<bool>,
+    #[cfg(feature = "cloud")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub budget_config: Option<Vec<BudgetNotificationConfiguration>>,
 }
@@ -594,6 +595,8 @@ pub struct OrganizationSetting {
     #[cfg(feature = "cloud")]
     #[serde(default)]
     pub domain_management_config: DomainManagementConfig,
+    #[cfg(feature = "cloud")]
+    #[serde(default)]
     pub budget_config: Vec<BudgetNotificationConfiguration>,
 }
 
@@ -635,6 +638,7 @@ impl Default for OrganizationSetting {
             domain_management_config: Default::default(),
             #[cfg(feature = "cloud")]
             enforce_allowed_orgs_only: false,
+            #[cfg(feature = "cloud")]
             budget_config: Vec::new(),
         }
     }
@@ -1480,6 +1484,7 @@ mod tests {
             domain_management_config: None,
             #[cfg(feature = "cloud")]
             enforce_allowed_orgs_only: None,
+            #[cfg(feature = "cloud")]
             budget_config: None,
         };
         let json = serde_json::to_value(&payload).unwrap();
@@ -1565,6 +1570,7 @@ mod tests {
             domain_management_config: Default::default(),
             #[cfg(feature = "cloud")]
             enforce_allowed_orgs_only: false,
+            #[cfg(feature = "cloud")]
             budget_config: vec![],
         };
         let json = serde_json::to_value(&setting).unwrap();
@@ -1601,6 +1607,7 @@ mod tests {
             domain_management_config: Default::default(),
             #[cfg(feature = "cloud")]
             enforce_allowed_orgs_only: false,
+            #[cfg(feature = "cloud")]
             budget_config: vec![],
         };
         let json = serde_json::to_value(&setting).unwrap();
