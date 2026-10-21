@@ -24,7 +24,7 @@ import type { I18nText, TranslateFn } from "@/types/i18n";
 import { parseDuration } from "@/utils/date";
 
 export const REFRESH_SECONDS = [
-  60, 300, 900, 1800, 3600, 7200, 21600, 86400, 172800, 604800, 1209600, 2592000,
+  300, 900, 1800, 3600, 7200, 21600, 86400, 172800, 604800, 1209600, 2592000,
 ];
 export const DEFAULT_REFRESH_SECS = 300;
 /** The operator minimum when the server does not report one (ZO_PUBLIC_DASHBOARD_MIN_REFRESH_SECS default). */

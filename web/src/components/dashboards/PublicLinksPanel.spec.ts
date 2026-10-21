@@ -472,7 +472,7 @@ describe("PublicLinksPanel", () => {
     expect(notify.positive).toHaveBeenCalledWith("The link refreshes on its next view");
   });
 
-  it("offers refresh intervals from 1 minute and keeps the link's own", async () => {
+  it("offers refresh intervals from 5 minutes and keeps the link's own", async () => {
     vi.mocked(admin.list).mockResolvedValue({ data: { list: [link()] } } as never);
     const w = build({ editLinkId: "l1" });
     await flushPromises();
@@ -483,8 +483,8 @@ describe("PublicLinksPanel", () => {
     ).refreshOptions;
     const byValue = (v: number) => options.find((o) => o.value === v);
 
-    expect(options[0].value).toBe(60);
-    expect(options.some((o) => o.value < 60)).toBe(false);
+    expect(options[0].value).toBe(300);
+    expect(options.some((o) => o.value < 300)).toBe(false);
     expect(byValue(600)?.label).toBe("10 minutes");
     expect(byValue(2592000)?.label).toBe("1 month");
     expect(options.map((o) => o.value)).toEqual(

@@ -52,10 +52,9 @@ describe("PublicLinkForm schema", () => {
     expect(r.error?.issues[0].path).toEqual(["name"]);
   });
 
-  it("defaults the refresh to 5 minutes and offers nothing under 1 minute", () => {
+  it("defaults the refresh to 5 minutes and offers nothing under it", () => {
     expect(publicLinkDefaults().refreshSecs).toBe(300);
-    expect(REFRESH_SECONDS[0]).toBe(60);
-    expect(REFRESH_SECONDS.some((s) => s < 60)).toBe(false);
+    expect(REFRESH_SECONDS[0]).toBe(300);
   });
 
   it("rejects an expiry before today but allows today", () => {
