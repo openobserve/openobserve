@@ -1939,10 +1939,6 @@ pub fn service_routes() -> Router {
             )
             .route("/{org_id}/billing_group/members", get(billing_group::check_members))
             .route(
-                "/{org_id}/billing_group/members",
-                get(organization::billing_group::check_members),
-            )
-            .route(
                 "/{org_id}/settings/domains",
                 get(org_domains::get_linked_domain).post(org_domains::link_domain)
             )
