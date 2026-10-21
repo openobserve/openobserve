@@ -37,6 +37,12 @@ const makeRouter = () =>
         component: { template: "<router-view />" },
         children: [{ path: "prometheus", name: "prometheus", component: page }],
       },
+      {
+        path: "/profiles",
+        name: "ingestProfiles",
+        component: { template: "<router-view />" },
+        children: [{ path: "otel", name: "profilesOtelCollector", component: page }],
+      },
       { path: "/servers/nginx", name: "nginx", component: page },
     ],
   });
@@ -144,6 +150,13 @@ describe("IngestionContent.vue", () => {
       expect(wrapper.findComponent(FirstEventStatusStub).props()).toMatchObject({
         kind: "standard",
         signal: "metrics",
+      });
+    });
+
+    it("watches for profiles on the profiles setup page", async () => {
+      wrapper = await mountAt("/profiles/otel", { default: () => [h("div")] });
+      expect(wrapper.findComponent(FirstEventStatusStub).props()).toMatchObject({
+        signal: "profiles",
       });
     });
 

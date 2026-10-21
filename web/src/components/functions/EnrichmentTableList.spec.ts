@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { resetListViewState, useListViewState } from "@/composables/useListViewState";
 import { mount, flushPromises } from "@vue/test-utils";
 import { createStore } from "vuex";
 import i18n from "@/locales";
@@ -68,6 +69,10 @@ vi.mock("@/services/stream", async (importOriginal) => {
 
 vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 vi.mock("@/services/reodotdev_analytics", () => ({ useReo: () => ({ track: vi.fn() }) }));
+vi.mock("@/stores", () => ({
+  default: { state: { selectedOrganization: { identifier: "test-org" } } },
+}));
+
 vi.mock("@/utils/zincutils", () => ({
   formatSizeFromMB: vi.fn((v) => v + " MB"),
   getImageURL: vi.fn((u) => u),
@@ -166,6 +171,7 @@ const mountComponent = () =>
 describe("EnrichmentTableList", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    resetListViewState();
     mockGetStreams.mockResolvedValue({ list: [] });
     mockGetAllEnrichmentTableStatuses.mockResolvedValue({ data: {} });
     store = makeStore();
@@ -701,6 +707,40 @@ describe("EnrichmentTableList", () => {
 
       expect(vm.showAddJSTransformDialog).toBe(false);
       expect(mockGetStreams).toHaveBeenCalled();
+    });
+  });
+
+  describe("view state restore", () => {
+    it("restores search, tab, page, size and sort", async () => {
+      useListViewState("enrichmentTables", {
+        filterQuery: "geo",
+        filter: "uploaded",
+        pageSize: 50,
+        currentPage: 2,
+        sortBy: "name",
+        sortOrder: "desc",
+      });
+      const wrapper = mountComponent();
+      const vm = wrapper.vm as any;
+      expect(vm.currentPage).toBe(2);
+      await flushPromises();
+      expect(vm.filterQuery).toBe("geo");
+      expect(vm.selectedFilter).toBe("uploaded");
+      expect(vm.selectedPerPage).toBe(50);
+      expect(vm.sortBy).toBe("name");
+      expect(vm.sortOrder).toBe("desc");
+    });
+
+    it("saves changes to the view state", async () => {
+      const wrapper = mountComponent();
+      await flushPromises();
+      const vm = wrapper.vm as any;
+      vm.filterQuery = "abc";
+      vm.selectedFilter = "file_url";
+      await flushPromises();
+      const saved: any = useListViewState("enrichmentTables", {});
+      expect(saved.filterQuery).toBe("abc");
+      expect(saved.filter).toBe("file_url");
     });
   });
 });

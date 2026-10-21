@@ -24,12 +24,6 @@ import type { LocationQuery, LocationQueryRaw, RouteLocationRaw } from "vue-rout
 import config from "@/aws-exports";
 import { resolveTraceSearchMode, type TraceSearchMode } from "@/ts/interfaces/traces/trace.types";
 import store from "@/stores";
-import Home from "@/views/HomeView.vue";
-import ImportDashboard from "@/views/Dashboards/ImportDashboard.vue";
-import About from "@/views/About.vue";
-import MemberSubscription from "@/views/MemberSubscription.vue";
-import Error404 from "@/views/Error404.vue";
-import ShortUrl from "@/views/ShortUrl.vue";
 import { hasMetricsEditorParams } from "@/utils/metrics/metricsEditorParams";
 import { PA_ROUTES } from "@/utils/rum/productAnalyticsRoutes";
 
@@ -65,11 +59,7 @@ const redirectToTraceTab =
     query: canonicalTraceQuery(to.query, supportedTraceTab(tab)),
   });
 
-// Eager, not lazy: the shell hosts the keep-alive that every DBM tab lives in,
-// so it is on the critical path for the first DBM route either way, and it is a
-// single `<router-view>`.
-import DbmShell from "@/views/DatabaseMonitoring/DbmShell.vue";
-
+const DbmShell = () => import("@/views/DatabaseMonitoring/DbmShell.vue");
 const DbmDatabasesPage = () => import("@/views/DatabaseMonitoring/DatabasesPage.vue");
 const DbmQueriesPage = () => import("@/views/DatabaseMonitoring/QueriesPage.vue");
 const DbmMetricsPage = () => import("@/views/DatabaseMonitoring/MetricsPage.vue");
@@ -134,6 +124,44 @@ const dbmEnterpriseGuard = (to: any, from: any, next: any) => {
   routeGuard(to, from, next);
 };
 
+// `=== false`, not falsy: a cold load with `/config` still in flight must not bounce.
+const downtimesRouteGuard = (to: any, from: any, next: any) => {
+  const zoConfig = store.state.zoConfig;
+  const isOss = zoConfig?.build_type === "opensource";
+  if (
+    isOss ||
+    (config.isEnterprise !== "true" && config.isCloud !== "true") ||
+    zoConfig?.downtimes_enabled === false
+  ) {
+    next({ name: "alertList", query: { org_identifier: to.query.org_identifier } });
+    return;
+  }
+  routeGuard(to, from, next);
+};
+
+// `=== false`, not falsy: a cold load with `/config` still in flight must not bounce.
+const alertCalibrationRouteGuard = (to: any, from: any, next: any) => {
+  const zoConfig = store.state.zoConfig;
+  if (
+    zoConfig?.build_type === "opensource" ||
+    (config.isEnterprise !== "true" && config.isCloud !== "true") ||
+    zoConfig?.alert_calibration_enabled === false
+  ) {
+    next({ name: "alertList", query: { org_identifier: to.query.org_identifier } });
+    return;
+  }
+  routeGuard(to, from, next);
+};
+
+// `=== false`, as for Downtimes: a cold load with `/config` still in flight must not bounce.
+const profilesRouteGuard = (to: any, from: any, next: any) => {
+  if (store.state.zoConfig?.profiling_enabled === false) {
+    next({ name: "home", query: { org_identifier: to.query.org_identifier } });
+    return;
+  }
+  routeGuard(to, from, next);
+};
+
 const ViewDashboard = () => import("@/views/Dashboards/ViewDashboard.vue");
 const AddPanel = () => import("@/views/Dashboards/addPanel/AddPanel.vue");
 const StreamExplorer = () => import("@/views/StreamExplorer.vue");
@@ -183,6 +211,13 @@ import useEnterpriseRoutes from "./useEnterpriseRoutes";
 import useManagementRoutes from "./useManagementRoutes";
 import Login from "@/views/Login.vue";
 
+const Home = () => import("@/views/HomeView.vue");
+const ImportDashboard = () => import("@/views/Dashboards/ImportDashboard.vue");
+const About = () => import("@/views/About.vue");
+const MemberSubscription = () => import("@/views/MemberSubscription.vue");
+const Error404 = () => import("@/views/Error404.vue");
+const ShortUrl = () => import("@/views/ShortUrl.vue");
+
 const useRoutes = () => {
   const parentRoutes: any = [
     {
@@ -222,6 +257,17 @@ const useRoutes = () => {
       component: Login,
       meta: {
         titleKey: "routeTitles.loginCallback",
+      },
+    },
+    {
+      // Outside MainLayout and the login redirect: anyone holding a public link can read it.
+      path: "/ai/public/:token",
+      name: "publicSharedChat",
+      component: () => import("@/views/SharedChatView.vue"),
+      props: (to: any) => ({ token: to.params.token, isPublic: true }),
+      meta: {
+        public: true,
+        titleKey: "routeTitles.sharedChat",
       },
     },
     {
@@ -403,9 +449,7 @@ const useRoutes = () => {
         keepAlive: true,
         titleKey: "menu.profiles",
       },
-      beforeEnter(to: any, from: any, next: any) {
-        routeGuard(to, from, next);
-      },
+      beforeEnter: profilesRouteGuard,
     },
     {
       path: "traces/service-graph",
@@ -903,6 +947,80 @@ const useRoutes = () => {
       },
     },
     {
+      path: "alert-calibration",
+      name: "alertCalibration",
+      component: () => import("@/components/alert_calibration/AlertCalibrationDashboard.vue"),
+      meta: { titleKey: "menu.alertCalibration" },
+      beforeEnter: alertCalibrationRouteGuard,
+    },
+    {
+      path: "alert-calibration/runs",
+      name: "alertCalibrationRuns",
+      component: () => import("@/components/alert_calibration/AlertCalibrationDigests.vue"),
+      meta: { titleKey: "menu.alertCalibration" },
+      beforeEnter: alertCalibrationRouteGuard,
+    },
+    {
+      path: "alert-calibration/settings",
+      name: "alertCalibrationSettings",
+      component: () => import("@/components/alert_calibration/AlertCalibrationSettings.vue"),
+      meta: { titleKey: "menu.alertCalibration" },
+      beforeEnter: alertCalibrationRouteGuard,
+    },
+    {
+      path: "alert-calibration/digests/:windowStart/:windowEnd",
+      name: "alertCalibrationDigest",
+      component: () => import("@/components/alert_calibration/AlertCalibrationDigestDetail.vue"),
+      props: true,
+      meta: { titleKey: "menu.alertCalibration" },
+      beforeEnter: alertCalibrationRouteGuard,
+    },
+    {
+      path: "downtimes",
+      name: "downtimes",
+      component: () => import("@/components/alerts/downtimes/DowntimeList.vue"),
+      meta: {
+        titleKey: "menu.downtimes",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        downtimesRouteGuard(to, from, next);
+      },
+    },
+    {
+      // Literal segments before the :id catch-all.
+      path: "downtimes/add",
+      name: "addDowntime",
+      component: () => import("@/components/alerts/downtimes/AddDowntime.vue"),
+      meta: {
+        titleKey: "alerts.downtimes.newTitle",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        downtimesRouteGuard(to, from, next);
+      },
+    },
+    {
+      path: "downtimes/:id/edit",
+      name: "editDowntime",
+      component: () => import("@/components/alerts/downtimes/AddDowntime.vue"),
+      meta: {
+        titleKey: "alerts.downtimes.editTitle",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        downtimesRouteGuard(to, from, next);
+      },
+    },
+    {
+      path: "downtimes/:id",
+      name: "downtimeDetail",
+      component: () => import("@/components/alerts/downtimes/DowntimeDetail.vue"),
+      meta: {
+        titleKey: "alerts.downtimes.detailTitle",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        downtimesRouteGuard(to, from, next);
+      },
+    },
+    {
       // Alert status page. Replaces the row-click side panel, and is where a
       // multi-alert's per-group state lives (alerts_2.md §5.4).
       path: "alerts/detail/:alert_id",
@@ -1014,6 +1132,15 @@ const useRoutes = () => {
           return;
         }
         routeGuard(to, from, next);
+      },
+    },
+    {
+      path: "ai/shared/:token",
+      name: "sharedChat",
+      component: () => import("@/views/SharedChatView.vue"),
+      props: (to: any) => ({ token: to.params.token }),
+      meta: {
+        titleKey: "routeTitles.sharedChat",
       },
     },
     {
@@ -1260,6 +1387,18 @@ const useRoutes = () => {
         props: true,
         meta: {
           titleKey: "menu.report",
+        },
+        beforeEnter(to: any, from: any, next: any) {
+          routeGuard(to, from, next);
+        },
+      },
+      {
+        path: "/reports/detail/:report_id",
+        name: "reportDetail",
+        component: () => import("@/views/reports/ReportDetail.vue"),
+        props: true,
+        meta: {
+          titleKey: "routeTitles.reportDetail",
         },
         beforeEnter(to: any, from: any, next: any) {
           routeGuard(to, from, next);

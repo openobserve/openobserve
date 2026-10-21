@@ -123,10 +123,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         data-test="panel-editor-add-to-dashboard-btn"
                         variant="primary"
                         size="xs"
+                        :disabled="!!addToDashboardDisabledReason"
+                        focusable-unavailable
                         @click="emit('addToDashboard')"
-                        :title="t('search.addToDashboard')"
+                        :title="
+                          addToDashboardDisabledReason ? undefined : t('search.addToDashboard')
+                        "
                       >
                         {{ t("search.addToDashboard") }}
+                        <OTooltip
+                          v-if="addToDashboardDisabledReason"
+                          :content="addToDashboardDisabledReason"
+                        />
+                        <template #unavailable-reason>{{ addToDashboardDisabledReason }}</template>
                       </OButton>
                     </div>
                   </div>
@@ -221,7 +230,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="panel-editor-annotation-btn"
                     >
                       <OIcon
-                        :name="panelSchemaRendererRef?.isAddAnnotationMode ? 'cancel' : 'edit'"
+                        :name="
+                          panelSchemaRendererRef?.isAddAnnotationMode ? 'cancel' : 'bookmark-add'
+                        "
                         size="sm"
                       />
                       <OTooltip
@@ -239,6 +250,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :error="errorMessage"
                       :maxQueryRangeWarning="maxQueryRangeWarning"
                       :limitNumberOfSeriesWarningMessage="limitNumberOfSeriesWarningMessage"
+                      v-bind="noticeActionProps"
+                      @open-inspector="emit('openQueryInspector')"
+                      @edit-panel="onNoticeEdit"
+                      @refresh-panel="onNoticeRefresh"
                       :sparklineWarning="sparklineWarning"
                       :isCachedDataDifferWithCurrentTimeRange="
                         isCachedDataDifferWithCurrentTimeRange
@@ -280,6 +295,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :enableColumnFormat="true"
                         @metadata-update="metaDataValue"
                         @result-metadata-update="handleResultMetadataUpdate"
+                        @panel-diagnostics-update="handlePanelDiagnosticsUpdate"
+                        @series-limit-update="handleSeriesLimitUpdate"
                         @limit-number-of-series-warning-message-update="
                           handleLimitNumberOfSeriesWarningMessage
                         "
@@ -556,6 +573,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             :error="errorMessage"
                             :maxQueryRangeWarning="maxQueryRangeWarning"
                             :limitNumberOfSeriesWarningMessage="limitNumberOfSeriesWarningMessage"
+                            v-bind="noticeActionProps"
+                            @open-inspector="emit('openQueryInspector')"
+                            @edit-panel="onNoticeEdit"
+                            @refresh-panel="onNoticeRefresh"
                             :sparklineWarning="sparklineWarning"
                             :isCachedDataDifferWithCurrentTimeRange="
                               isCachedDataDifferWithCurrentTimeRange
@@ -585,6 +606,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :is_ui_histogram="props.isUiHistogram"
                           @metadata-update="metaDataValue"
                           @result-metadata-update="handleResultMetadataUpdate"
+                          @panel-diagnostics-update="handlePanelDiagnosticsUpdate"
+                          @series-limit-update="handleSeriesLimitUpdate"
                           @limit-number-of-series-warning-message-update="
                             handleLimitNumberOfSeriesWarningMessage
                           "
@@ -680,6 +703,7 @@ import {
   computed,
   provide,
   defineAsyncComponent,
+  getCurrentInstance,
   toRef,
   watch,
   type CSSProperties,
@@ -708,6 +732,8 @@ import DashboardQueryBuilder from "@/components/dashboards/addPanel/DashboardQue
 import DashboardErrorsComponent from "@/components/dashboards/addPanel/DashboardErrors.vue";
 import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue";
 import PanelErrorButtons from "@/components/dashboards/PanelErrorButtons.vue";
+import { usePanelEditorFocus } from "@/composables/dashboard/usePanelEditorFocus";
+import type { PanelNoticeActionId } from "@/utils/dashboard/panelNotices";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -760,6 +786,7 @@ const props = withDefaults(defineProps<PanelEditorProps>(), {
   showLastRefreshedTime: undefined,
   showOutdatedWarning: undefined,
   showAddToDashboardButton: undefined,
+  addToDashboardDisabledReason: null,
   allowedChartTypes: undefined,
   externalChartData: undefined,
   searchResponse: undefined,
@@ -770,6 +797,7 @@ const props = withDefaults(defineProps<PanelEditorProps>(), {
   variablesData: undefined,
   dashboardData: undefined,
   editMode: false,
+  holdQueries: false,
 });
 
 const emit = defineEmits<PanelEditorEmits>();
@@ -822,6 +850,9 @@ const {
   showLegendsDialog,
   shouldRefreshWithoutCache,
   maxQueryRangeWarning,
+  panelDiagnostics,
+  seriesLimit,
+  noticeProps,
   limitNumberOfSeriesWarningMessage,
   sparklineWarning,
   errorMessage,
@@ -834,12 +865,14 @@ const {
 
   // Computed
   isOutDated,
+  sparklinePendingApply,
   isLoading,
   currentPanelData,
 
   // Actions
   initChartData,
   runQuery,
+  reportValidationErrors,
   handleChartApiError,
   handleLastTriggeredAtUpdate,
   handleLimitNumberOfSeriesWarningMessage,
@@ -848,6 +881,8 @@ const {
   handleLoadingStateChange,
   handleIsCachedDataDifferWithCurrentTimeRangeUpdate,
   handleResultMetadataUpdate,
+  handlePanelDiagnosticsUpdate,
+  handleSeriesLimitUpdate,
   metaDataValue,
   seriesDataUpdate,
   collapseFieldList: baseCollapseFieldList,
@@ -870,6 +905,7 @@ const {
   dateTimePickerRef: undefined, // Managed by parent
   selectedDate: undefined, // Managed by parent
   validatePanel,
+  holdQueries: () => props.holdQueries,
 });
 
 // The desktop 20% field-list splitter is unusable on a phone, so there it opens at ~half width.
@@ -1128,6 +1164,28 @@ const fieldListInnerStyle = computed(() => {
   return { width: "100%", height: "100%" };
 });
 
+// ---- Preview notice actions: the editor fixes things in place ----
+const { focusInEditor } = usePanelEditorFocus();
+const hostListens = (event: string) => !!getCurrentInstance()?.vnode.props?.[event];
+const canInspectPreview = hostListens("onOpenQueryInspector");
+const hostRunsApply = hostListens("onApplyRequested");
+
+const noticeActionProps = computed(() => ({
+  ...noticeProps.value,
+  canEdit: resolvedConfig.value.showQueryEditor,
+  canInspect: canInspectPreview,
+  canRefresh: true,
+}));
+
+const onNoticeEdit = (action: PanelNoticeActionId) => {
+  focusInEditor(dashboardPanelData.layout, action === "edit-function" ? "vrl" : "top-n");
+};
+
+const onNoticeRefresh = () => {
+  if (hostRunsApply) emit("applyRequested");
+  else runQuery();
+};
+
 // Search type for PanelSchemaRenderer
 const searchType = computed(() => {
   switch (props.pageType) {
@@ -1317,6 +1375,7 @@ defineExpose({
   // Actions
   initChartData,
   runQuery,
+  reportValidationErrors,
   resetErrors,
   collapseFieldList,
   updateDateTime,
@@ -1332,6 +1391,7 @@ defineExpose({
   // Panel data
   dashboardPanelData,
   isOutDated,
+  sparklinePendingApply,
 
   // Loading state
   isLoading,
@@ -1339,6 +1399,8 @@ defineExpose({
 
   // Warning messages
   maxQueryRangeWarning,
+  panelDiagnostics,
+  seriesLimit,
   limitNumberOfSeriesWarningMessage,
   sparklineWarning,
   errorMessage,

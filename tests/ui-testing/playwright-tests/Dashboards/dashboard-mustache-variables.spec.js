@@ -423,6 +423,7 @@ test.describe(
         const sqlQuery = `SELECT histogram(_timestamp) as "x_axis_1", count(*) as "y_axis_1" FROM "e2e_automate" WHERE kubernetes_container_name = '{{variablename}}' GROUP BY x_axis_1 ORDER BY x_axis_1`;
 
         await pm.chartTypeSelector.enterCustomSQL(sqlQuery);
+        await pm.chartTypeSelector.waitForCustomQueryAxes("x_axis_1", "y_axis_1");
 
         // Apply the query
         await pm.dashboardPanelActions.applyDashboardBtn();
@@ -503,7 +504,7 @@ test.describe(
         await pm.dashboardPanelConfigs.openConfigPanel();
         await pm.dashboardDrilldown.addDrilldownByURL(
           "Mustache URL Drilldown",
-          "https://openobserve.ai?filter={{variablename}}"
+          "https://www.google.com/?filter={{variablename}}"
         );
 
         await expect(
@@ -526,7 +527,7 @@ test.describe(
         await pm.dashboardDrilldown.drilldownMenuFirstItem.click();
 
         // Wait for navigation — the URL should contain "controller" not "{{variablename}}"
-        await page.waitForURL(/openobserve\.ai/, { timeout: 15000 });
+        await page.waitForURL(/google\.com/, { timeout: 15000 });
         const navigatedUrl = page.url();
 
         expect(navigatedUrl).toContain("filter=controller");
@@ -844,6 +845,7 @@ test.describe(
         const sqlQuery = `SELECT histogram(_timestamp) as "x_axis_1", count(*) as "y_axis_1" FROM "e2e_automate" WHERE kubernetes_container_name = '{{ variablename }}' GROUP BY x_axis_1 ORDER BY x_axis_1`;
 
         await pm.chartTypeSelector.enterCustomSQL(sqlQuery);
+        await pm.chartTypeSelector.waitForCustomQueryAxes("x_axis_1", "y_axis_1");
 
         // Apply the query
         await pm.dashboardPanelActions.applyDashboardBtn();

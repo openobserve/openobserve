@@ -16,6 +16,7 @@
 import { queryClient } from "@/composables/query/queryClient";
 import { functionKeys } from "@/services/jstransform.querykeys";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { resetListViewState, useListViewState } from "@/composables/useListViewState";
 import { mount, flushPromises } from "@vue/test-utils";
 import { nextTick } from "vue";
 import FunctionList from "./FunctionList.vue";
@@ -70,6 +71,10 @@ vi.mock("@/services/product_analytics", () => ({
   default: {
     track: vi.fn(),
   },
+}));
+
+vi.mock("@/stores", () => ({
+  default: { state: { selectedOrganization: { identifier: "test-org" } } },
 }));
 
 vi.mock("@/utils/zincutils", () => ({
@@ -130,6 +135,7 @@ describe("FunctionList", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    resetListViewState();
 
     mockJsTransformList.mockResolvedValue(mockFunctionData);
     mockJsTransformDelete.mockResolvedValue({
@@ -1214,6 +1220,41 @@ describe("FunctionList", () => {
 
       expect(mockToastFn).toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
       expect(mockToastFn).not.toHaveBeenCalledWith(expect.objectContaining({ variant: "success" }));
+    });
+  });
+
+  describe("View state restore", () => {
+    const mountList = () =>
+      mount(FunctionList, {
+        global: { plugins: [i18n, store, router], stubs: globalStubs },
+      });
+
+    it("restores search, page, size and sort", () => {
+      useListViewState("functions", {
+        filterQuery: "func",
+        pageSize: 50,
+        currentPage: 2,
+        sortBy: "name",
+        sortOrder: "desc",
+      });
+      const wrapper = mountList();
+      expect(wrapper.vm.filterQuery).toBe("func");
+      expect(wrapper.vm.pageSize).toBe(50);
+      expect(wrapper.vm.currentPage).toBe(2);
+      expect(wrapper.vm.sortBy).toBe("name");
+      expect(wrapper.vm.sortOrder).toBe("desc");
+      wrapper.unmount();
+    });
+
+    it("saves changes to the view state", async () => {
+      const wrapper = mountList();
+      wrapper.vm.filterQuery = "js";
+      wrapper.vm.sortOrder = "desc";
+      await nextTick();
+      const saved: any = useListViewState("functions", {});
+      expect(saved.filterQuery).toBe("js");
+      expect(saved.sortOrder).toBe("desc");
+      wrapper.unmount();
     });
   });
 });

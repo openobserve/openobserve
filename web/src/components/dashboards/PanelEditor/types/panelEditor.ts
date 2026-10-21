@@ -228,6 +228,14 @@ export interface PanelEditorProps {
    */
   showAddToDashboardButton?: boolean;
 
+  addToDashboardDisabledReason?: I18nText | null;
+
+  /**
+   * While true, chart-type and config re-renders keep the queries the chart last ran.
+   * @default false
+   */
+  holdQueries?: boolean;
+
   // ---- Chart Configuration ----
   /**
    * Array of allowed chart types. If not specified, all chart types are allowed.
@@ -384,6 +392,17 @@ export interface PanelEditorEmits {
    * Parent can use these to initialize variables from URL.
    */
   (e: "initialVariableValuesUpdated", values: Record<string, any>): void;
+
+  /**
+   * Emitted by the preview's Refresh notice action. A host that listens re-runs it the way its
+   * Apply does; without a listener the editor re-runs its own preview.
+   */
+  (e: "applyRequested"): void;
+
+  /**
+   * Emitted by a preview notice's "Open inspector". The action is offered only when the host listens.
+   */
+  (e: "openQueryInspector"): void;
 }
 
 // ============================================================================
@@ -516,7 +535,8 @@ export const DASHBOARD_PRESET: PanelEditorConfig = {
   showQueryBuilder: true,
   showVariablesSelector: true,
   showLastRefreshedTime: true,
-  showOutdatedWarning: true,
+  // Live preview runs builder edits itself; pending changes show on the Apply button.
+  showOutdatedWarning: false,
   showAddToDashboardButton: false, // Dashboard has Save button instead
   showQueryTypeSelector: false,
   showGeneratedQueryDisplay: false,

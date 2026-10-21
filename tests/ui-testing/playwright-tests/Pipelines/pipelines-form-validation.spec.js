@@ -289,19 +289,17 @@ test.describe(
                 await expect(
                     pm.pipelinesFormValidation.getAssociateFunctionDrawerLocator()
                 ).toBeVisible({ timeout: 10000 });
+                // Save clicked during the functions-list spinner validates nothing, so wait for the form.
+                await expect(
+                    pm.pipelinesFormValidation.getAssociateFunctionSelectTriggerLocator()
+                ).toBeVisible({ timeout: 10000 });
 
                 // Attempt to save without selecting a function
-                const saveBtn = pm.pipelinesFormValidation.getAssociateFunctionSaveBtnLocator();
-                await saveBtn.click();
+                await pm.pipelinesFormValidation.getAssociateFunctionSaveBtnLocator().click();
 
-                const errorVisible = await pm.pipelinesFormValidation
-                    .getAssociateFunctionSelectErrorLocator()
-                    .isVisible({ timeout: 3000 })
-                    .catch(() => false);
-
-                const saveDisabled = await saveBtn.isDisabled({ timeout: 1000 }).catch(() => false);
-
-                expect(errorVisible || saveDisabled).toBe(true);
+                await expect(
+                    pm.pipelinesFormValidation.getAssociateFunctionSaveBlockedLocator()
+                ).toBeVisible({ timeout: 5000 });
             }
         );
 

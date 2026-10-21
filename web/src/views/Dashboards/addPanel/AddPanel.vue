@@ -80,6 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model="selectedDate"
               ref="dateTimePickerRef"
               :disable="disable"
+              :auto-apply-dashboard="true"
               class="max-md:[&_.date-time-label]:hidden"
               @hide="setTimeForVariables"
               data-test="dashboard-global-date-time-picker"
@@ -101,48 +102,83 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :loading="isSavingPanel"
               >{{ t("panel.save") }}</OButton
             >
-            <template v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type)">
+            <OButtonGroup
+              v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type)"
+              radius="lg"
+            >
               <OButton
                 v-if="config.isEnterprise === 'false'"
-                variant="primary"
+                :variant="applyVariant"
                 size="sm-action"
+                :class="{ 'border-e-button-group-divider': showApplyMenu }"
                 data-test="dashboard-apply"
                 :loading="searchRequestTraceIds.length > 0"
                 :disabled="searchRequestTraceIds.length > 0"
                 @click="() => runQuery(false)"
-                >{{ t("panel.apply") }}</OButton
+                >{{ t("panel.apply") }}
+                <OTooltip :content="applyTooltip" shortcut-id="panelEditorRun" />
+              </OButton>
+              <OButton
+                v-else
+                :data-test="
+                  searchRequestTraceIds.length > 0 ? 'dashboard-cancel' : 'dashboard-apply'
+                "
+                :variant="applyVariant"
+                size="sm-action"
+                class="border-e-button-group-divider"
+                @click="onApplyBtnClick"
               >
-              <OButtonGroup v-if="config.isEnterprise === 'true'" radius="lg">
-                <OButton
-                  :data-test="
-                    searchRequestTraceIds.length > 0 ? 'dashboard-cancel' : 'dashboard-apply'
-                  "
-                  :variant="searchRequestTraceIds.length > 0 ? 'destructive' : 'primary'"
-                  size="sm-action"
-                  @click="onApplyBtnClick"
-                >
-                  {{ searchRequestTraceIds.length > 0 ? t("panel.cancel") : t("panel.apply") }}
-                </OButton>
+                {{ searchRequestTraceIds.length > 0 ? t("panel.cancel") : t("panel.apply") }}
+                <OTooltip
+                  v-if="searchRequestTraceIds.length === 0"
+                  :content="applyTooltip"
+                  shortcut-id="panelEditorRun"
+                />
+              </OButton>
 
-                <ODropdown side="bottom" align="end">
-                  <template #trigger>
-                    <OButton
-                      :variant="searchRequestTraceIds.length > 0 ? 'destructive' : 'primary'"
-                      size="icon-sm"
-                      class="h-8.5!"
-                      :disabled="searchRequestTraceIds.length > 0"
-                      icon-left="keyboard-arrow-down"
-                    />
-                  </template>
-                  <ODropdownItem @select="runQuery(true)">
-                    <div class="flex items-center gap-2">
-                      <OIcon name="refresh" size="xs" />
-                      <span>{{ t("dashboard.addPanel.refreshCacheAndApply") }}</span>
-                    </div>
+              <ODropdown v-if="showApplyMenu" side="bottom" align="end">
+                <template #trigger>
+                  <OButton
+                    :variant="applyVariant"
+                    size="icon-sm"
+                    class="h-8.5!"
+                    :disabled="searchRequestTraceIds.length > 0"
+                    data-test="dashboard-apply-options-btn"
+                    :aria-label="t('dashboard.moreActions')"
+                    icon-left="keyboard-arrow-down"
+                  />
+                </template>
+                <ODropdownItem v-if="config.isEnterprise === 'true'" @select="runQuery(true)">
+                  <div class="flex items-center gap-2">
+                    <OIcon name="refresh" size="xs" />
+                    <span>{{ t("dashboard.addPanel.refreshCacheAndApply") }}</span>
+                  </div>
+                </ODropdownItem>
+                <template v-if="isAutoRunAvailable">
+                  <ODropdownSeparator v-if="config.isEnterprise === 'true'" />
+                  <ODropdownItem
+                    data-test="dashboard-panel-auto-run-toggle-btn"
+                    @select="toggleAutoRun"
+                  >
+                    <template #icon-left>
+                      <OIcon
+                        :name="isAutoRunOn ? 'autorenew' : 'sync-disabled'"
+                        size="sm"
+                        :class="isAutoRunOn ? 'text-accent' : ''"
+                      />
+                    </template>
+                    <span>
+                      <div class="font-medium">
+                        {{ isAutoRunOn ? t("search.turnOffLiveMode") : t("search.turnOnLiveMode") }}
+                      </div>
+                      <div class="text-text-secondary text-xs">
+                        {{ t("search.liveModeTooltip") }}
+                      </div>
+                    </span>
                   </ODropdownItem>
-                </ODropdown>
-              </OButtonGroup>
-            </template>
+                </template>
+              </ODropdown>
+            </OButtonGroup>
           </template>
           <template #actions-overflow>
             <template v-if="isMobile">
@@ -179,6 +215,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       ref="panelEditorRef"
       pageType="dashboard"
       :editMode="editMode"
+      :holdQueries="livePreview.isTypedPending.value"
       :dashboardData="dashboardDataForPanelEditor"
       :variablesData="updatedVariablesData"
       :selectedDateTime="dateTimeForVariables || dashboardPanelData.meta.dateTime"
@@ -187,6 +224,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @chartApiError="handleChartApiError"
       @dataZoom="onDataZoom"
       @metaDataUpdated="metaDataValue"
+      @applyRequested="runQuery()"
+      @openQueryInspector="showViewPanel = true"
     />
 
     <!-- Query Inspector Dialog -->
@@ -194,6 +233,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model:open="showViewPanel"
       :metaData="metaData"
       :data="panelTitle"
+      :diagnostics="panelEditorRef?.panelDiagnostics"
+      :seriesLimit="panelEditorRef?.seriesLimit"
       data-test="query-inspector-dialog"
     />
 
@@ -256,12 +297,28 @@ import { debounce, isEqual } from "lodash-es";
 import { rangesFromServerError, type SqlErrorRange } from "@/utils/query/sqlDiagnostics";
 import useBreakpoint from "@/composables/useBreakpoint";
 import useNotifications from "@/composables/useNotifications";
+import { useDashboardSaveConflict } from "@/composables/dashboard/useDashboardSaveConflict";
+import type { ConflictOutcome } from "@/composables/dashboard/dashboardSaveConflictState";
 import config from "@/aws-exports";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import { isQueryVrlEnabled } from "@/composables/dashboard/useVrlFunction";
+import {
+  PANEL_EDITOR_FOCUS_PARAM,
+  parsePanelEditorFocus,
+  usePanelEditorFocus,
+  withoutFocusParam,
+} from "@/composables/dashboard/usePanelEditorFocus";
 import useAiChat from "@/composables/useAiChat";
 import useStreams from "@/composables/useStreams";
 import { checkIfConfigChangeRequiredApiCallOrNot } from "@/utils/dashboard/checkConfigChangeApiCall";
+import { usePanelLivePreview } from "@/composables/dashboard/usePanelLivePreview";
+import { useAutoRunToggle } from "@/composables/dashboard/useAutoRunToggle";
+import {
+  validateConditions,
+  validateJoinFields,
+  validateSQLPanelFields,
+} from "@/utils/dashboard/panelValidation";
+import { restoreDashboardPanelStreamType, saveDashboardPanelStream } from "@/utils/streamPersist";
 import { panelIdToBeRefreshed } from "@/utils/dashboard/convertCustomChartData";
 import { createDashboardsContextProvider, contextRegistry } from "@/composables/contextProviders";
 import { useVariablesManager } from "@/composables/dashboard/useVariablesManager";
@@ -280,6 +337,7 @@ import { buildPanelAutoName } from "@/utils/autoName";
 import { makeAddPanelSchema, type AddPanelForm } from "./AddPanel.schema";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 
@@ -300,6 +358,7 @@ export default defineComponent({
     OFormInlineEdit,
     ODropdown,
     ODropdownItem,
+    ODropdownSeparator,
     OTooltip,
     DateTimePickerDashboard,
     AddSettingVariable,
@@ -333,8 +392,8 @@ export default defineComponent({
     if (!injectedManager) {
       provide("variablesManager", variablesManager);
     }
-    const { showErrorNotification, showConfictErrorNotificationWithRefreshBtn } =
-      useNotifications();
+    const { showErrorNotification } = useNotifications();
+    const saveConflict = useDashboardSaveConflict();
     const {
       dashboardPanelData,
       resetDashboardPanelData,
@@ -492,6 +551,27 @@ export default defineComponent({
     // this is used to again assign query params on discard or save
     let routeQueryParamsOnMount: any = {};
 
+    const { focusInEditor } = usePanelEditorFocus();
+    // A notice's "Use Top N" / "Edit function" link lands here; the param is dropped once used.
+    let focusParamUsed = false;
+    const dropFocusParam = () => router.replace({ query: withoutFocusParam({ ...route.query }) });
+    // A concurrent replace here (date, variables) can cancel ours or spread a stale query back in.
+    watch(
+      () => route.fullPath,
+      () => {
+        if (focusParamUsed && route.query[PANEL_EDITOR_FOCUS_PARAM] !== undefined) {
+          dropFocusParam();
+        }
+      },
+    );
+    const applyFocusFromRoute = () => {
+      const target = parsePanelEditorFocus(route.query[PANEL_EDITOR_FOCUS_PARAM]);
+      if (!target) return;
+      focusParamUsed = true;
+      dropFocusParam();
+      focusInEditor(dashboardPanelData.layout, target);
+    };
+
     // ======= [START] default variable values
 
     const initialVariableValues: any = { value: {} };
@@ -529,7 +609,9 @@ export default defineComponent({
           if (editMode.value || !isInitialDashboardPanelData()) {
             // Copy the panel data to trigger chart render with initial variables
             chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
-            panelEditorRef.value?.initChartData(dashboardPanelData.data);
+            panelEditorRef.value?.initChartData(dashboardPanelData.data, {
+              keepQueries: livePreview.isTypedPending.value,
+            });
           }
         }
         // After initial load, don't return - we still need to update URL params below
@@ -597,6 +679,8 @@ export default defineComponent({
       if (isUnsavedTrackingActive && panelBaseline === null) {
         panelBaseline = JSON.parse(JSON.stringify(dashboardPanelData.data));
       }
+      // A saved panel's load-time normalisation is not an edit, so it must not trigger a run.
+      if (isUnsavedTrackingActive) livePreview.arm();
     };
 
     const hasUnsavedChanges = () =>
@@ -636,7 +720,7 @@ export default defineComponent({
 
     onMounted(async () => {
       // assign the route query params
-      routeQueryParamsOnMount = JSON.parse(JSON.stringify(route?.query ?? {}));
+      routeQueryParamsOnMount = withoutFocusParam(JSON.parse(JSON.stringify(route?.query ?? {})));
 
       errorData.errors = [];
 
@@ -683,11 +767,19 @@ export default defineComponent({
         // Initialize PanelEditor's chartData after loading panel data
         panelEditorRef.value?.initChartData(dashboardPanelData.data);
         updateDateTime();
+        applyFocusFromRoute();
       } else {
         editMode.value = false;
         resetDashboardPanelDataAndAddTimeField();
+        const lastStreamType = restoreDashboardPanelStreamType(
+          store.state.selectedOrganization.identifier,
+        );
+        if (lastStreamType) {
+          dashboardPanelData.data.queries[0].fields.stream_type = lastStreamType;
+        }
         // Initialize PanelEditor's chartData as empty for new panel
         panelEditorRef.value?.initChartData({});
+        livePreview.arm();
         // set the value of the date time after the reset
         updateDateTime();
       }
@@ -912,76 +1004,15 @@ export default defineComponent({
       );
     };
 
-    const isOutDated = computed(() => {
-      //check that is it addpanel initial call
-      if (isInitialDashboardPanelData() && !editMode.value) return false;
-      // chartData not yet initialized — don't show "not up to date" banner
-      if (!chartData.value) return false;
-      //compare chartdata and dashboardpaneldata and variables data as well
-
-      const normalizeVariables = (obj: any) => {
-        const normalized = JSON.parse(JSON.stringify(obj));
-        // Sort arrays to ensure consistent ordering
-        if (normalized.values && Array.isArray(normalized.values)) {
-          normalized.values = normalized.values
-            .map((variable: any) => {
-              if (Array.isArray(variable.value)) {
-                variable.value.sort((a: any, b: any) =>
-                  JSON.stringify(a).localeCompare(JSON.stringify(b)),
-                );
-              }
-              return variable;
-            })
-            .sort((a: any, b: any) => a.name.localeCompare(b.name));
-        }
-        return normalized;
-      };
-
-      // Get LIVE variables from variablesManager
-      let liveVariables: any = { values: [] };
-      if (variablesManager && variablesManager.variablesData.isInitialized) {
-        const mergedVars = variablesManager.getVariablesForPanel(
-          currentPanelId.value,
-          currentTabId.value || "",
-        );
-        liveVariables = {
-          isVariablesLoading: variablesManager.isLoading.value,
-          values: mergedVars,
-        };
-      } else {
-        liveVariables = variablesData;
-      }
-
-      const normalizedCurrent = normalizeVariables(liveVariables);
-      const normalizedRefreshed = normalizeVariables(updatedVariablesData);
-      const variablesChanged = !isEqual(normalizedCurrent, normalizedRefreshed);
-
-      const configChanged = !isEqual(
-        JSON.parse(JSON.stringify(chartData.value ?? {})),
-        JSON.parse(JSON.stringify(dashboardPanelData.data ?? {})),
-      );
-      let configNeedsApiCall = false;
-
-      if (configChanged) {
-        configNeedsApiCall = checkIfConfigChangeRequiredApiCallOrNot(
-          chartData.value,
-          dashboardPanelData.data,
-        );
-      }
-
-      return configNeedsApiCall || variablesChanged;
-    });
-
-    watch(isOutDated, () => {
-      window.dispatchEvent(new Event("resize"));
-    });
-
     watch(
       () => dashboardPanelData.data.type,
       async () => {
         await nextTick();
         chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
-        panelEditorRef.value?.initChartData(dashboardPanelData.data);
+        panelEditorRef.value?.initChartData(dashboardPanelData.data, {
+          keepQueries: livePreview.isTypedPending.value,
+        });
+        refreshDateTime();
       },
     );
     const dateTimeForVariables = ref<{
@@ -1000,8 +1031,21 @@ export default defineComponent({
         end_time: endTime,
       };
     };
+    // A relative range is the same selection whatever "now" it last ended at.
+    const dateSelectionKey = (date: any) =>
+      date?.valueType === "relative"
+        ? `relative:${date.relativeTimePeriod}`
+        : `absolute:${date?.startTime}:${date?.endTime}`;
+    const appliedDateKey = ref<string | null>(null);
+    const isTimeChangePending = computed(
+      () =>
+        appliedDateKey.value !== null &&
+        dateSelectionKey(selectedDate.value) !== appliedDateKey.value,
+    );
+
+    // With Auto Run off a picked range waits for Apply like any other edit; the first range always applies.
     watch(selectedDate, () => {
-      updateDateTime();
+      if (isAutoRunOn.value || appliedDateKey.value === null) updateDateTime();
     });
     // Watch for panel-level time configuration changes and update URL
     watch(
@@ -1078,8 +1122,16 @@ export default defineComponent({
         // PanelEditor.runQuery shows the toast on Apply.
         isValid(true, true, false);
 
+        // An incomplete builder tab must not run; typed queries run as before.
+        const builderErrors = collectBuilderTabErrors();
+        if (builderErrors.length) {
+          panelEditorRef.value?.reportValidationErrors(builderErrors);
+          return;
+        }
+
         // should use cache flag
         shouldRefreshWithoutCache.value = withoutCache;
+        livePreview.markRunStarted();
 
         // Commit the current variable values to updatedVariablesData
         // This is what the chart will use for the query
@@ -1088,9 +1140,7 @@ export default defineComponent({
         // copy the data object excluding the reactivity
         chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
         panelEditorRef.value?.initChartData(dashboardPanelData.data);
-        // refresh the date time based on current time if relative date is selected
-        dateTimePickerRef.value && dateTimePickerRef.value.refresh();
-        updateDateTime();
+        refreshDateTime();
 
         // Call PanelEditor's runQuery if available
         if (panelEditorRef.value) {
@@ -1137,10 +1187,13 @@ export default defineComponent({
 
         // Set the effective time for chart rendering
         dashboardPanelData.meta.dateTime = effectiveTime;
+        appliedDateKey.value = dateSelectionKey(selectedDate.value);
 
         // CRITICAL: Update chartData to trigger PanelSchemaRenderer to re-render
         chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
-        panelEditorRef.value?.initChartData(dashboardPanelData.data);
+        panelEditorRef.value?.initChartData(dashboardPanelData.data, {
+          keepQueries: livePreview.isTypedPending.value,
+        });
 
         // Variables also use the global time in add/edit mode
         dateTimeForVariables.value = {
@@ -1154,6 +1207,12 @@ export default defineComponent({
           },
         });
       }
+    };
+
+    // A relative range such as "Past 15 Minutes" must end now for every run, not only on Apply.
+    const refreshDateTime = () => {
+      dateTimePickerRef.value?.refresh();
+      updateDateTime();
     };
 
     const goBack = async () => {
@@ -1263,6 +1322,63 @@ export default defineComponent({
       } else {
         return true;
       }
+    };
+
+    const rememberPanelStream = () => {
+      const fields = dashboardPanelData.data.queries?.find(
+        (query: any) => query?.fields?.stream,
+      )?.fields;
+      if (!fields) return;
+      saveDashboardPanelStream(
+        store.state.selectedOrganization.identifier,
+        fields.stream_type,
+        fields.stream,
+      );
+    };
+
+    const finishPanelSave = async (dashId: string) => {
+      rememberPanelStream();
+      analytics.track("dashboard_panel_saved", {
+        chart_type: dashboardPanelData.data.type,
+        is_new: !editMode.value,
+      });
+
+      isUnsavedTrackingActive = false;
+
+      // The author sees the value just saved, not an older view-mode override of this panel.
+      clearExemplarOverride(
+        exemplarOverrideKey(
+          store.state.selectedOrganization.identifier,
+          dashId,
+          String(dashboardPanelData.data.id),
+        ),
+      );
+
+      // Clear variables created during session since panel is being saved
+      variablesCreatedInSession.value = [];
+      variablesWithCurrentPanel.value = [];
+
+      await nextTick();
+      return router.push({
+        path: "/dashboards/view",
+        query: {
+          ...routeQueryParamsOnMount,
+          org_identifier: store.state.selectedOrganization.identifier,
+          dashboard: dashId,
+          folder: route.query.folder ?? "default",
+          tab: route.query.tab ?? currentDashboardData.data.tabs[0].tabId,
+        },
+      });
+    };
+
+    const onPanelConflictResolved = async (dashId: string, outcome: ConflictOutcome) => {
+      // Reload discards my edit, so the editor must not prompt; the view then shows exactly what is saved.
+      if (outcome === "reloaded") {
+        isUnsavedTrackingActive = false;
+        await goBack();
+        return;
+      }
+      await finishPanelSave(dashId);
     };
 
     const savePanelChangesToDashboard = async (dashId: string) => {
@@ -1400,47 +1516,27 @@ export default defineComponent({
             return;
           }
         }
-        analytics.track("dashboard_panel_saved", {
-          chart_type: dashboardPanelData.data.type,
-          is_new: !editMode.value,
-        });
-
-        isUnsavedTrackingActive = false;
-
-        // The author sees the value just saved, not an older view-mode override of this panel.
-        clearExemplarOverride(
-          exemplarOverrideKey(
-            store.state.selectedOrganization.identifier,
-            dashId,
-            String(dashboardPanelData.data.id),
-          ),
-        );
-
-        // Clear variables created during session since panel is being saved
-        variablesCreatedInSession.value = [];
-        variablesWithCurrentPanel.value = [];
-
-        await nextTick();
-        return router.push({
-          path: "/dashboards/view",
-          query: {
-            ...routeQueryParamsOnMount,
-            org_identifier: store.state.selectedOrganization.identifier,
-            dashboard: dashId,
-            folder: route.query.folder ?? "default",
-            tab: route.query.tab ?? currentDashboardData.data.tabs[0].tabId,
-          },
-        });
+        return await finishPanelSave(dashId);
       } catch (error: any) {
-        if (error?.response?.status === 409) {
-          showConfictErrorNotificationWithRefreshBtn(
-            error?.response?.data?.message ??
-              error?.message ??
-              (editMode.value
-                ? t("dashboard.addPanel.errorUpdatingPanel")
-                : t("dashboard.addPanel.errorCreatingPanel")),
-            t,
-          );
+        if (saveConflict.isConflict(error)) {
+          void saveConflict.openConflict({
+            dashboardId: dashId,
+            folderId: (route.query.folder as string) ?? "default",
+            mine:
+              editMode.value && variablesCreatedInSession.value.length > 0
+                ? currentDashboardData.data
+                : undefined,
+            panelId: String(dashboardPanelData.data.id),
+            change: t(
+              editMode.value
+                ? "dashboard.saveConflict.change.editedPanel"
+                : "dashboard.saveConflict.change.addedPanel",
+              {
+                name: dashboardPanelData.data.title,
+              },
+            ),
+            onResolved: (outcome) => onPanelConflictResolved(dashId, outcome),
+          });
         } else {
           showErrorNotification(
             error?.message ??
@@ -1558,7 +1654,9 @@ export default defineComponent({
 
         if (!configNeedsApiCall) {
           chartData.value = JSON.parse(JSON.stringify(newVal));
-          panelEditorRef.value?.initChartData(newVal);
+          panelEditorRef.value?.initChartData(newVal, {
+            keepQueries: livePreview.isTypedPending.value,
+          });
 
           window.dispatchEvent(new Event("resize"));
         }
@@ -1633,6 +1731,113 @@ export default defineComponent({
       // In add mode, use "current_panel" as the panel ID before the panel is saved
       // This allows variables scoped to "current_panel" to be visible
       return dashboardPanelData.data.id || "current_panel";
+    });
+
+    const getLiveVariables = (): any[] => {
+      if (variablesManager && variablesManager.variablesData.isInitialized) {
+        return variablesManager.getVariablesForPanel(
+          currentPanelId.value,
+          currentTabId.value || "",
+        );
+      }
+      return variablesData.values ?? [];
+    };
+
+    // Only builder-mode tabs; typed SQL/PromQL keeps the toast-then-run behaviour of Apply.
+    const collectBuilderTabErrors = (): string[] => {
+      const errors: string[] = [];
+      const panel = dashboardPanelData.data;
+      panel.queries.forEach((query: any, index: number) => {
+        if (query?.customQuery) return;
+        validateSQLPanelFields(
+          t,
+          panel,
+          index,
+          t("panel.xAxisShort"),
+          t("panel.yAxisShort"),
+          errors,
+          true,
+          "dashboard",
+        );
+        if (panel.queryType !== "promql") validateJoinFields(t, query?.joins, errors);
+        if ((query?.query ?? "").trim() === "") {
+          errors.push(t("dashboard.utils.queryIsEmpty", { index: index + 1 }));
+        }
+      });
+      return errors;
+    };
+
+    // Collected locally so the live check never writes the shared error list or toasts.
+    const collectBuilderErrors = (): string[] => {
+      const errors: string[] = [];
+      validatePanel(errors, true);
+      // A half-built filter waits even when the SQL drops it, or the live run would show unfiltered data.
+      dashboardPanelData.data.queries.forEach((query: any) => {
+        if (query?.customQuery) return;
+        validateConditions(t, query?.fields?.filter?.conditions ?? [], errors);
+      });
+      return [...errors, ...collectBuilderTabErrors()];
+    };
+
+    const isBuilderValidSilently = () => collectBuilderErrors().length === 0;
+
+    const runLivePreview = () => {
+      updateCommittedVariables();
+      chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
+      panelEditorRef.value?.initChartData(dashboardPanelData.data);
+      refreshDateTime();
+      // The editor's own run records what was loaded (e.g. the sparkline), so Apply stops showing it as pending.
+      panelEditorRef.value?.runQuery();
+    };
+
+    // Same switch as the dashboard's Auto Run: ZO_AUTO_QUERY_ENABLED plus the user's on/off choice.
+    const { isAutoRunAvailable, isAutoRunOn, toggleAutoRun } = useAutoRunToggle();
+
+    const livePreview = usePanelLivePreview({
+      panel: () => dashboardPanelData.data,
+      applied: () => panelEditorRef.value?.chartData,
+      liveVariables: getLiveVariables,
+      committedVariables: () => updatedVariablesData.values,
+      isBuilderValid: isBuilderValidSilently,
+      isLoading: disable,
+      run: runLivePreview,
+      pendingApply: () =>
+        (panelEditorRef.value?.sparklinePendingApply ?? false) || isTimeChangePending.value,
+      autoRun: () => isAutoRunOn.value,
+    });
+
+    // Turning Auto Run back on applies a range picked while it was off.
+    watch(isAutoRunOn, (on) => {
+      if (on && isTimeChangePending.value) refreshDateTime();
+    });
+
+    const isOutDated = computed(() => livePreview.isPending.value);
+
+    const applyVariant = computed(() => {
+      // Only enterprise can cancel a query, so only there does Apply turn into a red Cancel.
+      if (config.isEnterprise === "true" && searchRequestTraceIds.value.length > 0) {
+        return "destructive";
+      }
+      return livePreview.isPending.value ? "warning" : "primary";
+    });
+
+    const showApplyMenu = computed(
+      () => config.isEnterprise === "true" || isAutoRunAvailable.value,
+    );
+
+    const applyTooltip = computed(() => {
+      switch (livePreview.applyState.value) {
+        case "typed":
+          return t("panel.applyTooltipTyped");
+        case "slow":
+          return t("panel.applyTooltipSlow");
+        case "pending":
+          return t("panel.applyTooltipPending");
+        case "incomplete":
+          return t("panel.applyTooltipIncomplete");
+        default:
+          return t("panel.applyTooltipRefresh");
+      }
     });
 
     /**
@@ -1820,6 +2025,14 @@ export default defineComponent({
       dateTimeForVariables,
       seriesData,
       onApplyBtnClick,
+      livePreview,
+      isBuilderValidSilently,
+      isAutoRunAvailable,
+      isAutoRunOn,
+      toggleAutoRun,
+      showApplyMenu,
+      applyVariant,
+      applyTooltip,
       shouldRefreshWithoutCache,
       maxQueryRangeWarning,
       limitNumberOfSeriesWarningMessage,

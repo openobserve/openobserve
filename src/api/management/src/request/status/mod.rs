@@ -34,6 +34,7 @@ use config::{
         cluster::{NodeStatus, Role, RoleGroup},
         function::ZoFunction,
         search::{HashFileRequest, HashFileResponse},
+        user::UserRole,
     },
     stats::{CacheStats, CacheStatsAsync},
     utils::{base64, json},
@@ -190,6 +191,7 @@ struct ConfigResponse<'a> {
     streaming_enabled: bool,
     histogram_enabled: bool,
     timechart_enabled: bool,
+    editor_suggest_mode: String,
     max_query_range: i64,
     cluster_name: String,
     /// Hours back the ingester accepts a record's timestamp.
@@ -197,9 +199,15 @@ struct ConfigResponse<'a> {
     /// Hours ahead the ingester accepts a record's timestamp.
     ingest_allowed_in_future: i64,
     ai_enabled: bool,
-    /// Days a soft-deleted org stays recoverable before it is purged. `0` means no
-    /// recovery window at all — deletion is immediate and permanent, which is what
-    /// every OSS build reports.
+    /// AI conversations are stored server-side (`/ai/chats`); IndexedDB is then only a cache.
+    ai_chat_persistence_enabled: bool,
+    /// Persisted AI chats may be shared through public links.
+    public_ai_chat_enabled: bool,
+    /// Longest expiry, in days, a public AI chat link may have.
+    public_ai_chat_max_expiry_days: u64,
+    /// The caller is root or an admin of the URL org (may list and revoke every AI chat share).
+    is_org_admin: bool,
+    /// Days a soft-deleted org stays recoverable; `0` (every OSS build) means none.
     org_deletion_grace_period_days: i64,
     dashboard_placeholder: String,
     dashboard_show_symbol_enabled: bool,
@@ -217,6 +225,8 @@ struct ConfigResponse<'a> {
     query_values_default_num: i64,
     alert_preview_timerange_minutes: i64,
     incidents_enabled: bool,
+    downtimes_enabled: bool,
+    alert_calibration_enabled: bool,
     service_streams_enabled: bool,
     model_pricing_enabled: bool,
     online_evals_enabled: bool,
@@ -224,34 +234,20 @@ struct ConfigResponse<'a> {
     composite_alerts_available: bool,
     synthetics_enabled: bool,
     oncall_enabled: bool,
-    /// Whether private locations — pools served by long-running agents deployed
-    /// inside the customer's network — are available. Enterprise only, so the
-    /// UI hides the private-locations views, the agent-setup drawer and the
-    /// public/private selector on this rather than on `synthetics_enabled`.
+    /// Enterprise-only private locations; the UI gates their views on this flag.
     synthetics_private_locations_enabled: bool,
-    synthetics_subtests_enabled: bool,
     /// Server-side step cap (`ZO_SYNTHETICS_BROWSER_MAX_STEPS`); the UI budget must follow it.
     synthetics_browser_max_steps: usize,
-    /// Chrome Web Store URL of the OpenObserve Recorder extension
-    /// (`ZO_SYNTHETICS_RECORDER_EXTENSION_URL`) — the browser-test setup UI
-    /// links its install button here.
+    /// Chrome Web Store URL of the Recorder extension (`ZO_SYNTHETICS_RECORDER_EXTENSION_URL`).
     synthetics_recorder_extension_url: String,
-    /// Database Monitoring (`ZO_DB_MONITORING_ENABLED`). Plain OSS flag — no
-    /// enterprise gating (design §8): menu/route gating in the UI checks this
-    /// flag alone, without an `isEnterprise` conjunct.
-    ///
-    /// The ONLY DBM field on this payload, by product decision: DBM is a single
-    /// switch — enabled means every signal is canonicalized and served,
-    /// disabled means none is. The per-signal flags (instance metrics,
-    /// activity, top query) were removed together with their config knobs, so
-    /// the UI never has to distinguish "feed switched off here" from "collector
-    /// not reporting".
+    /// The only DBM flag (`ZO_DB_MONITORING_ENABLED`): one OSS switch for every signal.
     database_monitoring_enabled: bool,
     enable_cross_linking: bool,
     show_fts_field_values: bool,
     search_inspector_enabled: bool,
     auto_query_enabled: bool,
     profiling_enabled: bool,
+    experimental: bool,
     #[cfg(feature = "enterprise")]
     last_usage_report_ts: i64,
     #[cfg(feature = "enterprise")]
@@ -264,17 +260,11 @@ struct ConfigResponse<'a> {
     workflows_enabled: bool,
 }
 
-/// Unauthenticated bootstrap configuration (`GET /config`).
-///
-/// Served without auth so the login page can render, which makes every field a
-/// disclosure to anonymous clients. Keep it to what the login page actually
-/// consumes; everything else belongs in [`ConfigResponse`] behind auth. The
-/// exact-key-set test on this response enforces that.
+/// Unauthenticated `GET /config`: every field is public, so only what the login page consumes, plus
+/// `editor_suggest_mode`.
 #[derive(Serialize)]
 struct ConfigBootstrapResponse {
-    /// `enterprise` / `cloud` / `opensource`. Not sensitive, and the o2 CLI and
-    /// o2-operator read it from this unauthenticated endpoint to gate their
-    /// enterprise-only commands, so it must stay on the bootstrap.
+    /// `enterprise` / `cloud` / `opensource`; the o2 CLI and o2-operator read it here.
     build_type: String,
     /// The UI's stale-build checker compares it across deploys.
     commit_hash: String,
@@ -285,6 +275,8 @@ struct ConfigBootstrapResponse {
     custom_logo_img: Option<String>,
     custom_logo_dark_img: Option<String>,
     custom_hide_self_logo: bool,
+    /// The editors need it before the authenticated config lands, or `off` arrives too late.
+    editor_suggest_mode: String,
     rum: Rum,
 }
 
@@ -343,8 +335,7 @@ pub async fn healthz() -> impl IntoResponse {
     })
 }
 
-/// Healthz HEAD
-/// Vector pipeline healthcheck support
+/// Healthz HEAD, for Vector pipeline healthchecks.
 pub async fn healthz_head() -> impl IntoResponse {
     StatusCode::OK
 }
@@ -388,8 +379,7 @@ pub async fn schedulez() -> impl IntoResponse {
     )
 }
 
-/// Unauthenticated login-page bootstrap; the full config is served
-/// authenticated by [`zo_config`].
+/// Unauthenticated login-page bootstrap; the full config is served by [`zo_config`].
 pub async fn zo_config_bootstrap() -> impl IntoResponse {
     let cfg = get_config();
     #[cfg(feature = "enterprise")]
@@ -429,12 +419,12 @@ pub async fn zo_config_bootstrap() -> impl IntoResponse {
         custom_logo_img,
         custom_logo_dark_img,
         custom_hide_self_logo,
+        editor_suggest_mode: cfg.limit.editor_suggest_mode.clone(),
         rum: Rum::from_cfg(cfg.clone()),
     })
 }
 
-/// Full UI configuration; mostly instance-level, but `search_inspector_enabled`
-/// is computed per requesting user in the URL org.
+/// Full UI configuration; `search_inspector_enabled` and `is_org_admin` are per caller and org.
 pub async fn zo_config(
     Path(org_id): Path<String>,
     user_email: Option<Headers<UserEmail>>,
@@ -444,6 +434,10 @@ pub async fn zo_config(
     // per-user value: false unless this caller may use the search inspector
     let search_inspector_enabled = match &user_email {
         Some(Headers(user)) => search_inspector_permitted(&org_id, &user.user_id).await,
+        None => false,
+    };
+    let is_org_admin = match &user_email {
+        Some(Headers(user)) => org_admin(&org_id, &user.user_id).await,
         None => false,
     };
     #[cfg(feature = "enterprise")]
@@ -481,25 +475,22 @@ pub async fn zo_config(
     let custom_hide_self_logo = enterprise_value!(false, o2cfg.common.custom_hide_self_logo);
     // AI needs o2-ai to answer; with no agent target its buttons could only fail, so report it off.
     let ai_enabled = enterprise_value!(false, o2cfg.ai.enabled && o2cfg.ai.has_agent_target());
+    let ai_chat_persistence_enabled = enterprise_value!(
+        false,
+        o2cfg.ai.enabled && o2cfg.ai.has_agent_target() && o2cfg.ai.chat_persistence_enabled
+    );
     let incidents_enabled = enterprise_value!(false, o2cfg.incidents.enabled);
+    let downtimes_enabled = enterprise_value!(false, o2cfg.downtimes.enabled);
+    let alert_calibration_enabled = enterprise_value!(false, o2cfg.alert_calibration.enabled);
     let service_streams_enabled = enterprise_value!(false, o2cfg.service_streams.enabled);
-    // Anomaly detection is on when the enterprise feature is compiled in, unless turned off at
-    // runtime via O2_ANOMALY_DETECTION_DISABLED. When disabled the UI hides the anomaly tab.
+    // Enterprise builds have it unless O2_ANOMALY_DETECTION_DISABLED turns it off.
     let anomaly_detection_enabled = enterprise_value!(false, !o2cfg.anomaly_detection.disabled);
-    // Composite alerts are available for creation when writes are enabled
-    // (on by default; disabled by the opt-out kill-switch) and the deployment
-    // is not running super-cluster mode (§18, §19.2).
+    // Composite alerts are not available in super-cluster mode (§18, §19.2).
     let composite_alerts_available =
         config::get_config().alert_composite.writes_enabled && !super_cluster_enabled;
-    let synthetics_subtests_enabled = cfg.synthetics.subtests_enabled;
     let online_evals_enabled = enterprise_value!(false, o2cfg.llm_eval_config.enabled);
-    // Read straight from the config in every build: synthetics is OSS now, and
-    // reporting `false` here is what hid the whole feature from the UI.
     let synthetics_enabled = cfg.synthetics.enabled;
-    // The private-agent path is the part that stays enterprise, so it gets its
-    // own flag. Gating the UI on this rather than on `synthetics_enabled` is
-    // what lets an OSS build show synthetics without offering a location it
-    // cannot serve.
+    // Private agents stay enterprise, so an OSS build shows synthetics without them.
     let synthetics_private_locations_enabled = enterprise_value!(false, cfg.synthetics.enabled);
     let synthetics_recorder_extension_url = &cfg.synthetics.recorder_extension_url;
     let synthetics_browser_max_steps = cfg.synthetics.browser_max_steps;
@@ -525,8 +516,7 @@ pub async fn zo_config(
 
     let usage_enabled = enterprise_value!(false, true);
 
-    // max usage reporting interval can be 10 mins, because we
-    // need relatively recent data for usage calculations
+    // Usage calculations need data at most 10 minutes old.
     let usage_publish_interval = enterprise_value!(
         cfg.common.usage_publish_interval,
         (10 * 60).min(cfg.common.usage_publish_interval)
@@ -592,11 +582,16 @@ pub async fn zo_config(
         streaming_enabled: cfg.http_streaming.streaming_enabled,
         histogram_enabled: cfg.limit.histogram_enabled,
         timechart_enabled: cfg.limit.timechart_enabled,
+        editor_suggest_mode: cfg.limit.editor_suggest_mode.clone(),
         max_query_range: cfg.limit.default_max_query_range_days * 24,
         cluster_name: cfg.common.cluster_name.clone(),
         ingest_allowed_upto: cfg.limit.ingest_allowed_upto,
         ingest_allowed_in_future: cfg.limit.ingest_allowed_in_future,
         ai_enabled,
+        ai_chat_persistence_enabled,
+        public_ai_chat_enabled: ai_chat_persistence_enabled && cfg.public_ai_chat.enabled,
+        public_ai_chat_max_expiry_days: cfg.public_ai_chat.expiry_limit_days(),
+        is_org_admin,
         org_deletion_grace_period_days: openobserve_core::org_cleanup::grace_period_days(),
         dashboard_placeholder: cfg.common.dashboard_placeholder.to_string(),
         dashboard_show_symbol_enabled: cfg.common.dashboard_show_symbol_enabled,
@@ -614,6 +609,8 @@ pub async fn zo_config(
         query_values_default_num: cfg.limit.query_values_default_num,
         alert_preview_timerange_minutes: cfg.limit.alert_preview_timerange_minutes,
         incidents_enabled,
+        downtimes_enabled,
+        alert_calibration_enabled,
         service_streams_enabled,
         model_pricing_enabled: cfg.common.model_pricing_enabled,
         online_evals_enabled,
@@ -622,7 +619,6 @@ pub async fn zo_config(
         synthetics_enabled,
         oncall_enabled,
         synthetics_private_locations_enabled,
-        synthetics_subtests_enabled,
         synthetics_browser_max_steps,
         synthetics_recorder_extension_url: synthetics_recorder_extension_url.to_string(),
         database_monitoring_enabled: cfg.db_monitoring.enabled,
@@ -631,6 +627,7 @@ pub async fn zo_config(
         search_inspector_enabled,
         auto_query_enabled: cfg.common.auto_query_enabled,
         profiling_enabled: cfg.common.profiling_enabled,
+        experimental: cfg.common.experimental,
         #[cfg(feature = "enterprise")]
         last_usage_report_ts,
         #[cfg(feature = "enterprise")]
@@ -644,8 +641,7 @@ pub async fn zo_config(
     })
 }
 
-// mirrors the route check for GET /{org}/search/profile so the UI can hide
-// inspector entry points the caller may not use
+/// The route check of `GET /{org}/search/profile`, so the UI hides what the caller may not use.
 async fn search_inspector_permitted(org_id: &str, user_id: &str) -> bool {
     if !get_config().common.search_inspector_enabled {
         return false;
@@ -680,6 +676,13 @@ async fn search_inspector_permitted(org_id: &str, user_id: &str) -> bool {
 #[cfg(feature = "enterprise")]
 async fn rbac_enabled_for_config(openfga_enabled: bool) -> bool {
     openfga_enabled && !openobserve_core::authz::report_failure_lifts_rbac().await
+}
+
+async fn org_admin(org_id: &str, user_id: &str) -> bool {
+    is_root_user(user_id)
+        || openobserve_core::users::get_user(Some(org_id), user_id)
+            .await
+            .is_some_and(|u| matches!(u.role, UserRole::Root | UserRole::Admin))
 }
 
 pub async fn cache_status() -> impl IntoResponse {
@@ -1838,6 +1841,7 @@ const CACHE_MODULES: &[&str] = &[
     "realtime_triggers",
     "org_users",
     "compact_retention",
+    "downtimes",
 ];
 
 // Helper function to reload cache for a specific module
@@ -1857,7 +1861,28 @@ async fn reload_module_cache(module: &str) -> Result<(), anyhow::Error> {
         "org_users" => db::org_users::cache().await,
         "org_ingestion_tokens" => db::org_ingestion_tokens::cache().await,
         "compact_retention" => db::compact::retention::cache().await,
+        "downtimes" => {
+            reload_downtimes(enterprise_value!(false, get_o2_config().downtimes.enabled)).await
+        }
         _ => Err(anyhow::anyhow!("unsupported module")),
+    }
+}
+
+/// `all` lists downtimes only with the flag on, so the reply and total match main otherwise.
+fn all_cache_modules(downtimes_enabled: bool) -> Vec<&'static str> {
+    CACHE_MODULES
+        .iter()
+        .copied()
+        .filter(|module| downtimes_enabled || *module != "downtimes")
+        .collect()
+}
+
+/// With the flag off the cache stays empty, so no evaluation or SLO pass reads a downtime.
+async fn reload_downtimes(enabled: bool) -> Result<(), anyhow::Error> {
+    if enabled {
+        db::downtimes::cache().await
+    } else {
+        Ok(())
     }
 }
 
@@ -1880,7 +1905,8 @@ pub async fn cache_reload(
 
     // Expand "all" to all available modules
     if modules.contains(&"all") {
-        modules = CACHE_MODULES.to_vec();
+        let downtimes_enabled = enterprise_value!(false, get_o2_config().downtimes.enabled);
+        modules = all_cache_modules(downtimes_enabled);
     }
 
     let total_modules = modules.len();
@@ -1932,6 +1958,19 @@ mod tests {
 
     use super::*;
 
+    #[test]
+    fn with_downtimes_off_all_names_the_modules_main_names() {
+        assert!(!all_cache_modules(false).contains(&"downtimes"));
+        assert_eq!(all_cache_modules(false).len(), CACHE_MODULES.len() - 1);
+        assert!(all_cache_modules(true).contains(&"downtimes"));
+    }
+
+    #[tokio::test]
+    async fn with_downtimes_off_a_cache_reload_loads_no_downtime() {
+        reload_downtimes(false).await.unwrap();
+        assert!(db::downtimes::all_cached().is_empty());
+    }
+
     #[cfg(feature = "enterprise")]
     #[tokio::test]
     async fn test_config_rbac_enabled_matches_enforcement_before_any_usage_report() {
@@ -1949,16 +1988,6 @@ mod tests {
 
         let json = serde_json::to_string(&response).unwrap();
         assert!(json.contains("\"status\":\"not ok\""));
-    }
-
-    #[test]
-    fn test_healthz_response_empty_status() {
-        let response = HealthzResponse {
-            status: "".to_string(),
-        };
-
-        let json = serde_json::to_string(&response).unwrap();
-        assert!(json.contains("\"status\":\"\""));
     }
 
     #[test]
@@ -2024,17 +2053,6 @@ mod tests {
         assert!(json.contains("site with spaces"));
         assert!(json.contains("service/with/slashes"));
         assert!(json.contains("1.0.0-beta+build.1"));
-    }
-
-    #[test]
-    fn test_healthz_response_structure() {
-        // Test that we can create and serialize a HealthzResponse
-        let response = HealthzResponse {
-            status: "ok".to_string(),
-        };
-
-        let json = serde_json::to_string(&response).unwrap();
-        assert!(json.contains("\"status\":\"ok\""));
     }
 
     #[test]

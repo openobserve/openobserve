@@ -247,8 +247,11 @@ import TraceDetails from "@/plugins/traces/TraceDetails.vue";
 const { t } = useI18nTyped();
 const store = useStore();
 const { getStream } = useStreams(t);
-const { resolveTraceLocationsBulk, cancel: cancelCorrelatedTracesStream } =
-  useCorrelatedTracesStream(t);
+const {
+  resolveTraceLocationsBulk,
+  fallbackTracesStream,
+  cancel: cancelCorrelatedTracesStream,
+} = useCorrelatedTracesStream(t);
 
 const props = defineProps({
   sessionId: {
@@ -655,16 +658,17 @@ async function fetchTraces() {
       try {
         // Which stream holds each trace (one bulk request; cached in the store).
         // Every row keeps ITS OWN stream so multi-stream sessions list fully and
-        // each click opens against the right stream; unresolved ids fall back to
-        // the default correlation stream — today's behavior.
+        // each click opens against the right stream; an unresolved id falls back
+        // to `default` only where the org has it, and otherwise drops out unfetched.
         const locationById = await resolveTraceLocationsBulk(
           views.map((v) => v.traceId),
           searchWindow.start,
           searchWindow.end,
         );
+        const fallbackStream = await fallbackTracesStream();
         for (const view of views as any[]) {
           const location = locationById[view.traceId];
-          view.stream = location?.stream ?? RUM_CORRELATION_TRACES_STREAM;
+          view.stream = location?.stream ?? fallbackStream;
           view.range = location?.range;
         }
 
@@ -672,6 +676,7 @@ async function fetchTraces() {
         const idsByStream = new Map<string, string[]>();
         const rangeById = new Map<string, TraceTimeRange | undefined>();
         for (const view of views as any[]) {
+          if (!view.stream) continue;
           const ids = idsByStream.get(view.stream) ?? [];
           ids.push(view.traceId);
           idsByStream.set(view.stream, ids);

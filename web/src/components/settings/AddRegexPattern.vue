@@ -38,12 +38,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="icon-toolbar"
           @click="toggleAIChat"
           data-test="add-regex-pattern-open-close-ai-btn"
+          :aria-label="t('menu.aiAssistant')"
           class="group text-ai-accent! hover:shadow-ai-accent/35 dark:shadow-ai-accent/20 dark:hover:shadow-ai-accent/35 [background:var(--color-gradient-ai-subtle)]! [transition:background_0.3s_ease,box-shadow_0.3s_ease,color_0.3s_ease] hover:text-white! hover:shadow-md hover:[background:var(--color-gradient-ai)]! dark:text-white! dark:shadow-md dark:hover:shadow-md"
           :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''"
           @mouseenter="isHovered = true"
           @mouseleave="isHovered = false"
         >
           <img
+            alt=""
             :src="getBtnLogo"
             class="header-icon [transition:transform_0.6s_ease] group-hover:rotate-180 group-hover:brightness-0 group-hover:invert group-hover:[transition:filter_0.3s_ease]"
           />
@@ -116,7 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="sm"
                   @click="toggleAIChat"
                 >
-                  <img :src="goToAILogo" class="me-1 h-5 w-5" />
+                  <img alt="" :src="goToAILogo" class="me-1 h-5 w-5" />
                   <span class="text-brand-indigo flex items-center gap-1 text-sm">
                     {{ t("settings.addRegexPattern.tryAiAssistant") }}
                   </span>

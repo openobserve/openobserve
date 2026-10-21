@@ -248,16 +248,17 @@ impl Search for Searcher {
         &self,
         req: Request<CancelQueryRequest>,
     ) -> Result<Response<CancelQueryResponse>, Status> {
-        let trace_id = req.into_inner().trace_id;
-        if let Some(cancelled) = self.remove(&trace_id, true).await {
-            for (_, senders) in cancelled {
-                for sender in senders.abort_senders.into_iter().rev() {
-                    let _ = sender.send(());
-                }
-                metrics::QUERY_CANCELED_NUMS
-                    .with_label_values(&[&senders.org_id.unwrap_or_default()])
-                    .inc();
+        let req = req.into_inner();
+        let Some(cancelled) = self.cancel(&req.org_id, &req.trace_id).await else {
+            return Ok(Response::new(CancelQueryResponse { is_success: false }));
+        };
+        for (_, senders) in cancelled {
+            for sender in senders.abort_senders.into_iter().rev() {
+                let _ = sender.send(());
             }
+            metrics::QUERY_CANCELED_NUMS
+                .with_label_values(&[&req.org_id])
+                .inc();
         }
         Ok(Response::new(CancelQueryResponse { is_success: true }))
     }
@@ -277,11 +278,16 @@ impl Search for Searcher {
     ) -> Result<Response<CancelQueryResponse>, Status> {
         use crate as SearchService;
 
-        let trace_id = req.into_inner().trace_id;
-        if let Err(e) = SearchService::cancel_query("", &trace_id).await {
-            log::error!("failed to cancel query: {e}");
-        }
-        Ok(Response::new(CancelQueryResponse { is_success: true }))
+        let req = req.into_inner();
+        let res = SearchService::cancel_query(&req.org_id, &req.trace_id)
+            .await
+            .map_err(|e| {
+                log::error!("failed to cancel query: {e}");
+                Status::internal(format!("failed to cancel query: {e}"))
+            })?;
+        Ok(Response::new(CancelQueryResponse {
+            is_success: res.is_success,
+        }))
     }
 
     #[cfg(not(feature = "enterprise"))]
@@ -509,6 +515,83 @@ impl Search for Searcher {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(feature = "enterprise")]
+    async fn cancel_in(searcher: &Searcher, trace_id: &str, org_id: &str) -> bool {
+        let req = Request::new(CancelQueryRequest {
+            trace_id: trace_id.to_string(),
+            org_id: org_id.to_string(),
+        });
+        searcher
+            .cancel_query(req)
+            .await
+            .unwrap()
+            .into_inner()
+            .is_success
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_cancel_scoped_to_one_org_keeps_another_orgs_query() {
+        use o2_enterprise::enterprise::search::TaskStatus;
+
+        let searcher = Searcher::new();
+        let leader = || TaskStatus::new_follower(vec![], true);
+        searcher.insert("b", "t1".to_string(), leader()).await;
+
+        assert!(!cancel_in(&searcher, "t1", "a").await);
+        assert!(!cancel_in(&searcher, "t1", "").await);
+        assert!(searcher.contain_key("b", "t1").await);
+        assert!(cancel_in(&searcher, "t1", "b").await);
+        assert!(!searcher.contain_key("b", "t1").await);
+        assert!(!cancel_in(&searcher, "t1", "b").await);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_one_trace_id_runs_and_cancels_in_two_orgs_independently() {
+        use o2_enterprise::enterprise::search::TaskStatus;
+
+        let searcher = Searcher::new();
+        let status = |is_leader| TaskStatus::new_follower(vec![], is_leader);
+        searcher.insert("a", "t".to_string(), status(true)).await;
+        searcher.insert("b", "t".to_string(), status(true)).await;
+        searcher.insert("b", "t-1".to_string(), status(false)).await;
+
+        assert!(cancel_in(&searcher, "t", "a").await);
+        assert!(!searcher.contain_key("a", "t").await);
+        assert!(searcher.is_leader("b", "t").await);
+        assert!(searcher.contain_key("b", "t-1").await);
+
+        searcher.insert("a", "t".to_string(), status(true)).await;
+        assert!(cancel_in(&searcher, "t", "b").await);
+        assert!(!searcher.contain_key("b", "t").await);
+        assert!(!searcher.contain_key("b", "t-1").await);
+        assert!(searcher.contain_key("a", "t").await);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_completion_after_a_cancel_keeps_the_next_orgs_entry() {
+        use o2_enterprise::enterprise::search::TaskStatus;
+
+        let searcher = Searcher::new();
+        let leader = || TaskStatus::new_follower(vec![], true);
+        searcher.insert("a", "t".to_string(), leader()).await;
+        assert!(cancel_in(&searcher, "t", "a").await);
+        searcher.insert("b", "t".to_string(), leader()).await;
+
+        assert!(searcher.remove("a", "t").await.is_none());
+        let (sender, _receiver) = tokio::sync::oneshot::channel();
+        assert!(
+            searcher
+                .insert_sender("a", "t", sender, true)
+                .await
+                .is_err()
+        );
+        assert!(searcher.contain_key("b", "t").await);
+        assert!(cancel_in(&searcher, "t", "b").await);
+    }
 
     #[tokio::test]
     async fn test_get_table_rejects_non_join_paths() {

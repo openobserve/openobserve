@@ -153,6 +153,13 @@ fn validate_branch_handles(
     Ok(())
 }
 
+/// Whether a dynamic `{field}` stream name always resolves into an internal `_o2_` stream.
+fn is_internal_template(stream_name: &str) -> bool {
+    stream_name
+        .split_once('{')
+        .is_some_and(|(prefix, _)| prefix.to_ascii_lowercase().starts_with("_o2_"))
+}
+
 // TODO YJDoc2: in a separate PR, use this fn in the pipeline validation below, so we have
 // same logic for pipelines and workflows as intended
 pub fn validate_nodes_edges(
@@ -258,17 +265,6 @@ impl Pipeline {
         self.kind == PipelineKind::Evaluation
     }
 
-    pub fn get_cache_key(&self) -> String {
-        match &self.source {
-            PipelineSource::Realtime(stream_params) => {
-                format!("{}/{}", self.org, stream_params)
-            }
-            PipelineSource::Scheduled(_) => {
-                format!("{}/{}", self.org, self.id)
-            }
-        }
-    }
-
     pub fn get_derived_stream(&self) -> Option<DerivedStream> {
         match &self.source {
             PipelineSource::Scheduled(derived_stream) => Some(derived_stream.to_owned()),
@@ -315,6 +311,23 @@ impl Pipeline {
                 return Err(anyhow!(
                     "Node {} is not a pipeline compatible node",
                     node.id
+                ));
+            }
+            let NodeData::Stream(params) = &node.data else {
+                continue;
+            };
+            if crate::meta::self_reporting::ai_chat::is_protected_ai_chat_stream(
+                &params.stream_name,
+            ) {
+                return Err(anyhow!(
+                    "Stream {} is internal and cannot be used in a pipeline",
+                    params.stream_name
+                ));
+            }
+            if is_internal_template(&params.stream_name) {
+                return Err(anyhow!(
+                    "Destination {} would write an internal stream",
+                    params.stream_name
                 ));
             }
         }
@@ -485,16 +498,6 @@ impl Pipeline {
                 StreamParams::new(&ds.org_id, stream_name.as_str(), ds.stream_type)
             }
         }
-    }
-
-    pub fn contains_remote_destination(&self, destination: &str) -> bool {
-        self.nodes.iter().any(|node| {
-            if let NodeData::RemoteStream(dest) = &node.data {
-                dest.destination_name == destination
-            } else {
-                false
-            }
-        })
     }
 
     pub fn get_metadata_by_stream_params(
@@ -671,47 +674,16 @@ pub fn default_status() -> bool {
     true
 }
 
+/// Whether a pipeline must not write `destination`; an internal stream only takes its own records.
+pub fn is_forbidden_destination(source_stream: &str, destination: &str, cross_type: bool) -> bool {
+    crate::meta::self_reporting::usage::is_internal_rollup_stream(destination)
+        && (cross_type || destination != source_stream)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::meta::alerts::{QueryCondition, TriggerCondition};
-
-    #[test]
-    fn test_pipeline_get_cache_key() {
-        let mut pipeline = Pipeline {
-            id: "test_pipeline".to_string(),
-            version: 1,
-            enabled: true,
-            org: "test_org".to_string(),
-            name: "test_pipeline".to_string(),
-            description: "test description".to_string(),
-            source: PipelineSource::Realtime(StreamParams::new(
-                "test_org",
-                "test_stream",
-                StreamType::Logs,
-            )),
-            kind: PipelineKind::User,
-            nodes: vec![],
-            edges: vec![],
-        };
-
-        let cache_key = pipeline.get_cache_key();
-        assert_eq!(cache_key, "test_org/test_org/test_stream/logs");
-
-        // Test scheduled pipeline
-        let derived_stream = DerivedStream {
-            org_id: "test_org".to_string(),
-            stream_type: StreamType::Logs,
-            query_condition: QueryCondition::default(),
-            trigger_condition: TriggerCondition::default(),
-            tz_offset: 0,
-            delay: None,
-            start_at: None,
-        };
-        pipeline.source = PipelineSource::Scheduled(derived_stream);
-        let cache_key = pipeline.get_cache_key();
-        assert_eq!(cache_key, "test_org/test_pipeline");
-    }
 
     #[test]
     fn test_pipeline_get_derived_stream() {
@@ -1233,38 +1205,6 @@ mod tests {
         assert_eq!(stream_params.org_id, "test_org");
         assert_eq!(stream_params.stream_name, "test_stream");
         assert_eq!(stream_params.stream_type, StreamType::Logs);
-    }
-
-    #[test]
-    fn test_pipeline_contains_remote_destination() {
-        let pipeline = Pipeline {
-            id: "test_pipeline".to_string(),
-            version: 1,
-            enabled: true,
-            org: "test_org".to_string(),
-            name: "test_pipeline".to_string(),
-            description: "test description".to_string(),
-            source: PipelineSource::Realtime(StreamParams::new(
-                "test_org",
-                "test_stream",
-                StreamType::Logs,
-            )),
-            kind: PipelineKind::User,
-            nodes: vec![Node::new(
-                "1".to_string(),
-                NodeData::RemoteStream(crate::meta::stream::RemoteStreamParams {
-                    org_id: "test_org".to_string().into(),
-                    destination_name: "test_destination".to_string().into(),
-                }),
-                100.0,
-                100.0,
-                "input".to_string(),
-            )],
-            edges: vec![],
-        };
-
-        assert!(pipeline.contains_remote_destination("test_destination"));
-        assert!(!pipeline.contains_remote_destination("nonexistent_destination"));
     }
 
     #[test]
@@ -2071,5 +2011,68 @@ mod tests {
         ];
 
         assert!(validate_nodes_edges(&nodes, &edges, false).is_ok());
+    }
+
+    #[test]
+    fn test_pipeline_validation_rejects_internal_destination_templates() {
+        let stream = |id: &str, name: &str| {
+            Node::new(
+                id.to_string(),
+                NodeData::Stream(StreamParams::new("test_org", name, StreamType::Logs)),
+                0.0,
+                0.0,
+                "input".to_string(),
+            )
+        };
+        let pipeline = |destination: &str| Pipeline {
+            id: "p".to_string(),
+            version: 1,
+            enabled: true,
+            org: "test_org".to_string(),
+            name: "p".to_string(),
+            description: String::new(),
+            source: PipelineSource::Realtime(StreamParams::new(
+                "test_org",
+                "src",
+                StreamType::Logs,
+            )),
+            kind: PipelineKind::User,
+            nodes: vec![stream("1", "src"), stream("2", destination)],
+            edges: vec![Edge {
+                id: "e1-2".to_string(),
+                source: "1".to_string(),
+                target: "2".to_string(),
+                source_handle: None,
+            }],
+        };
+        for bad in ["_o2_{kind}", "_O2_ai_{x}"] {
+            let err = pipeline(bad).validate().unwrap_err().to_string();
+            assert!(err.contains("internal stream"), "{bad}: {err}");
+        }
+        for ok in ["logs_{kind}", "{kind}", "_o2"] {
+            assert!(pipeline(ok).validate().is_ok(), "{ok}");
+        }
+    }
+
+    #[test]
+    fn test_internal_streams_take_back_only_their_own_records() {
+        assert!(is_forbidden_destination("app", "_o2_ai_chat_events", false));
+        assert!(is_forbidden_destination(
+            "_o2_dbm_server",
+            "_o2_service_graph",
+            false
+        ));
+        assert!(is_forbidden_destination("app", "_agent_signals", false));
+        assert!(is_forbidden_destination(
+            "_o2_dbm_server",
+            "_o2_dbm_server",
+            true
+        ));
+        assert!(!is_forbidden_destination(
+            "_o2_dbm_server",
+            "_o2_dbm_server",
+            false
+        ));
+        assert!(!is_forbidden_destination("app", "app_copy", true));
     }
 }

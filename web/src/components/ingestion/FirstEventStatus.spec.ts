@@ -56,7 +56,7 @@ const awsConfig = vi.hoisted(() => ({ isEnterprise: "false", isCloud: "false" })
 vi.mock("@/aws-exports", () => ({ default: awsConfig }));
 
 const NOW = Date.UTC(2026, 9, 7, 10, 0, 0);
-const routes = ["logs", "metrics", "traces", "recommended", "curl"].map((name) => ({
+const routes = ["logs", "metrics", "traces", "profiles", "recommended", "curl"].map((name) => ({
   path: `/${name}`,
   name,
   component: { template: "<div />" },
@@ -256,6 +256,22 @@ describe("FirstEventStatus — received", () => {
     expect(router.currentRoute.value.query).toMatchObject({
       metric: "up",
       from: String(result.rangeStart / 1000),
+    });
+  });
+
+  it("sends a profiles record to the Profiles page, in microseconds", async () => {
+    mountBar();
+    fake.result.value = { ...result, streamType: "profiles", streamName: "default" };
+    fake.state.value = "received";
+    await nextTick();
+    expect(q("first-event-status-open-btn").text()).toBe("Open in Profiles");
+    await q("first-event-status-open-btn").trigger("click");
+    await flushPromises();
+    expect(router.currentRoute.value.name).toBe("profiles");
+    expect(router.currentRoute.value.query).toMatchObject({
+      stream: "default",
+      from: String(result.rangeStart),
+      to: String(result.rangeEnd),
     });
   });
 
@@ -643,6 +659,37 @@ describe("FirstEventStatus — pill display for empty pages", () => {
     await nextTick();
     expect(q("first-event-status").attributes("data-state")).toBe("waiting");
     expect(q("first-event-status-restart-btn").exists()).toBe(false);
+  });
+
+  it("waits for the user on a target that already has data, and Check now starts the count", async () => {
+    mountBar({ targetStream: "default", signal: "logs" });
+    fake.start.mockClear();
+    fake.state.value = "idle";
+    await nextTick();
+    expect(q("first-event-status").attributes("data-state")).toBe("idle");
+    expect(q("first-event-status").text()).toContain("Not checking yet");
+    expect(q("first-event-status-meta").text()).toBe(
+      "default already receives data. Checks start when you copy the command.",
+    );
+    expect(q("first-event-status-troubleshoot-btn").exists()).toBe(false);
+    expect(wrapper.text()).not.toContain("turns green by itself");
+    await q("first-event-status-check-now-btn").trigger("click");
+    expect(fake.start).toHaveBeenCalledWith("check");
+  });
+
+  it.each([
+    [{ targetStream: "system_", match: "keyword" }, "Matching streams already receive data."],
+    [{ targetStream: "default", snippetKind: "config" }, "Checks start when you copy the config."],
+  ])("names what the idle bar waits on (%o)", async (props, text) => {
+    mountBar(props);
+    fake.state.value = "idle";
+    await nextTick();
+    expect(q("first-event-status-meta").text()).toContain(text);
+  });
+
+  it("offers no Check now outside the idle state", () => {
+    mountBar({ targetStream: "default" });
+    expect(q("first-event-status-check-now-btn").exists()).toBe(false);
   });
 
   it("offers no Check again while the watch runs", () => {

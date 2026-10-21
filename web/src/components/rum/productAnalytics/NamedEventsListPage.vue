@@ -52,6 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </OBanner>
     <div class="min-h-0 flex-1 overflow-hidden">
       <OTable
+        ref="oTableRef"
         v-model:selected-ids="selectedIds"
         :frame="false"
         :data="filtered"
@@ -62,9 +63,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         selection="multiple"
         :is-row-selectable="() => canWrite"
         pagination="client"
-        :page-size="20"
+        :page-size="pageSize"
         :page-size-options="[20, 50]"
+        :current-page="currentPage"
+        @update:current-page="currentPage = $event"
+        @update:page-size="pageSize = $event"
         sorting="client"
+        :sort-by="sortBy"
+        :sort-order="sortOrder"
+        @update:sort-by="sortBy = $event"
+        @update:sort-order="sortOrder = $event"
         :default-columns="false"
         :show-global-filter="false"
         :persist-columns="true"
@@ -250,6 +258,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, ref, watch } from "vue";
 import { useRouter, type HistoryState } from "vue-router";
 import { useStore } from "vuex";
+import { useListViewState } from "@/composables/useListViewState";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -269,7 +278,11 @@ import useSavedFunnels from "@/composables/rum/useSavedFunnels";
 import useProductAnalytics from "@/composables/rum/useProductAnalytics";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import { MAX_EVENTS_PER_APP, type NamedEvent } from "@/utils/rum/productAnalyticsModel";
+import {
+  MAX_EVENTS_PER_APP,
+  type NamedEvent,
+  type NamedRule,
+} from "@/utils/rum/productAnalyticsModel";
 import { PA_ROUTES } from "@/utils/rum/productAnalyticsRoutes";
 
 defineOptions({ name: "NamedEventsListPage" });
@@ -285,13 +298,46 @@ const savedFunnels = useSavedFunnels();
 const { confirm } = useConfirmDialog();
 const { events, permission, invalidCount, loading } = ne;
 
-const filter = ref("");
+const viewState = useListViewState("rumNamedEvents", {
+  filter: "",
+  pageSize: 20,
+  currentPage: 1,
+  sortBy: "",
+  sortOrder: "asc" as "asc" | "desc",
+});
+const filter = ref(viewState.filter);
+const pageSize = ref(viewState.pageSize);
+const currentPage = ref(viewState.currentPage);
+const sortBy = ref(viewState.sortBy);
+const sortOrder = ref<"asc" | "desc">(viewState.sortOrder);
+const oTableRef = ref<any>(null);
+watch([filter, pageSize, currentPage, sortBy, sortOrder], () => {
+  Object.assign(viewState, {
+    filter: filter.value,
+    pageSize: pageSize.value,
+    currentPage: currentPage.value,
+    sortBy: sortBy.value,
+    sortOrder: sortOrder.value,
+  });
+});
+watch(filter, () => (currentPage.value = 1));
 const selectedIds = ref<string[]>([]);
 const bulkDeleting = ref(false);
 
 const org = (): string => store.state.selectedOrganization?.identifier ?? "";
 const app = computed(() => pa.state.app);
 const status = computed(() => ne.status(org(), app.value));
+let pageRestored = false;
+watch(
+  () => status.value === "ready",
+  (ready) => {
+    if (!ready || pageRestored) return;
+    pageRestored = true;
+    // Macrotask so the restored page wins over the table's own reset on data change.
+    setTimeout(() => oTableRef.value?.restorePage?.(currentPage.value), 0);
+  },
+  { immediate: true },
+);
 const canWrite = computed(() => permission.value === "write");
 const canCreate = computed(() => canWrite.value && events.value.length < MAX_EVENTS_PER_APP);
 const readOnlyTip = computed(() => t("rum.analytics.events.readOnly"));
@@ -355,22 +401,39 @@ const columns = computed<OTableColumnDef<NamedEvent>[]>(() => [
   },
 ]);
 
-const summary = (ev: NamedEvent): I18nText =>
-  raw(
-    ev.rules
-      .map((r) => {
-        if (r.t === "action") {
-          const targets = raw(r.targets.join(", "));
-          return r.onPage
-            ? t("rum.analytics.events.summaryClickOn", { targets, page: raw(r.onPage) })
-            : t("rum.analytics.events.summaryClick", { targets });
-        }
-        const key =
-          r.op === "eq" ? "summaryEq" : r.op === "prefix" ? "summaryPrefix" : "summaryRegex";
-        return t(`rum.analytics.events.${key}`, { value: raw(r.value) });
-      })
-      .join(" · "),
-  );
+const CLICK_SUMMARY = {
+  prefix: "summaryClickPrefix",
+  contains: "summaryClickContains",
+  regex: "summaryClickRegex",
+} as const;
+const ERROR_SUMMARY = {
+  eq: "summaryErrorEq",
+  prefix: "summaryErrorPrefix",
+  contains: "summaryErrorContains",
+  regex: "summaryErrorRegex",
+} as const;
+const PAGE_SUMMARY = { eq: "summaryEq", prefix: "summaryPrefix", regex: "summaryRegex" } as const;
+
+const ruleSummary = (r: NamedRule): I18nText => {
+  if (r.t === "action") {
+    if (r.op && r.op !== "in")
+      return t(`rum.analytics.events.${CLICK_SUMMARY[r.op]}`, { value: raw(r.value) });
+    const targets = raw((r.targets ?? []).join(", "));
+    return r.onPage
+      ? t("rum.analytics.events.summaryClickOn", { targets, page: raw(r.onPage) })
+      : t("rum.analytics.events.summaryClick", { targets });
+  }
+  if (r.t === "error")
+    return t(`rum.analytics.events.${ERROR_SUMMARY[r.op]}`, { value: raw(r.value) });
+  if (r.op === "param")
+    return r.value
+      ? t("rum.analytics.events.summaryParamValue", { name: raw(r.name), value: raw(r.value) })
+      : t("rum.analytics.events.summaryParam", { name: raw(r.name) });
+  if (r.op === "ref") return t("rum.analytics.events.summaryRef", { value: raw(r.value) });
+  return t(`rum.analytics.events.${PAGE_SUMMARY[r.op]}`, { value: raw(r.value) });
+};
+
+const summary = (ev: NamedEvent): I18nText => raw(ev.rules.map(ruleSummary).join(" · "));
 
 const load = (force = false) => {
   if (!app.value) return;

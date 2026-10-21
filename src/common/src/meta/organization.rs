@@ -336,7 +336,8 @@ impl TriggerStatus {
                     usage::RunOutcome::Firing
                     | usage::RunOutcome::Normal
                     | usage::RunOutcome::Succeeded
-                    | usage::RunOutcome::Pending => status.healthy += 1,
+                    | usage::RunOutcome::Pending
+                    | usage::RunOutcome::Suppressed => status.healthy += 1,
                     usage::RunOutcome::Error | usage::RunOutcome::NotifyFailed => {
                         status.failed += 1
                     }
@@ -471,10 +472,6 @@ fn default_enable_streaming_search() -> bool {
 /// absent setting means the per-org `usage` stream is not written and the
 /// Usage tab shows only the billing-API cards plus an "Enable usage reporting"
 /// CTA.
-///
-/// The global `ZO_USAGE_REPORT_TO_OWN_ORG` remains the deploy-wide master
-/// switch for whether per-org self-reporting is available at all; it no longer
-/// flips the per-org default.
 fn default_usage_stream_enabled() -> bool {
     false
 }
@@ -493,6 +490,14 @@ pub struct DomainOrgMapping {
     pub role_claim_name: Option<String>,
     #[serde(default)]
     pub create_missing_roles: bool,
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone, ToSchema)]
+pub struct BudgetNotificationConfiguration {
+    pub org_id: String,
+    pub total_budget_amount: f64,
+    pub warn_at_amount: f64,
+    pub paused: bool,
 }
 
 #[derive(Serialize, ToSchema, Deserialize, Debug, Clone)]
@@ -537,6 +542,8 @@ pub struct OrganizationSettingPayload {
     #[cfg(feature = "cloud")]
     #[serde(default)]
     pub enforce_allowed_orgs_only: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub budget_config: Option<Vec<BudgetNotificationConfiguration>>,
 }
 
 #[derive(Serialize, ToSchema, Deserialize, Debug, Clone)]
@@ -587,6 +594,7 @@ pub struct OrganizationSetting {
     #[cfg(feature = "cloud")]
     #[serde(default)]
     pub domain_management_config: DomainManagementConfig,
+    pub budget_config: Vec<BudgetNotificationConfiguration>,
 }
 
 impl Default for OrganizationSetting {
@@ -627,6 +635,7 @@ impl Default for OrganizationSetting {
             domain_management_config: Default::default(),
             #[cfg(feature = "cloud")]
             enforce_allowed_orgs_only: false,
+            budget_config: Vec::new(),
         }
     }
 }
@@ -699,13 +708,6 @@ impl NodeListResponse {
 
         cluster_entry.push(node);
     }
-
-    /// Adds multiple nodes to the response structure
-    pub fn add_nodes(&mut self, nodes: Vec<(Node, String, String)>) {
-        for (node, region, cluster) in nodes {
-            self.add_node(node, region, cluster);
-        }
-    }
 }
 
 #[derive(Serialize, Deserialize, Default, Clone, Debug, ToSchema)]
@@ -776,33 +778,6 @@ mod tests {
             .unwrap();
         assert_eq!(nodes.len(), 1);
         assert_eq!(nodes[0].name, "node-1");
-    }
-
-    #[test]
-    fn test_node_list_response_add_nodes() {
-        let node1 = Node {
-            name: "node-1".into(),
-            ..Default::default()
-        };
-        let node2 = Node {
-            name: "node-2".into(),
-            ..Default::default()
-        };
-
-        let mut response = NodeListResponse::new();
-        response.add_nodes(vec![
-            (node1.clone(), "us-west".into(), "cluster-x".into()),
-            (node2.clone(), "us-west".into(), "cluster-x".into()),
-        ]);
-
-        let nodes = &response
-            .regions
-            .get("us-west")
-            .unwrap()
-            .clusters
-            .get("cluster-x")
-            .unwrap();
-        assert_eq!(nodes.len(), 2);
     }
 
     #[test]
@@ -1505,6 +1480,7 @@ mod tests {
             domain_management_config: None,
             #[cfg(feature = "cloud")]
             enforce_allowed_orgs_only: None,
+            budget_config: None,
         };
         let json = serde_json::to_value(&payload).unwrap();
         let obj = json.as_object().unwrap();
@@ -1589,6 +1565,7 @@ mod tests {
             domain_management_config: Default::default(),
             #[cfg(feature = "cloud")]
             enforce_allowed_orgs_only: false,
+            budget_config: vec![],
         };
         let json = serde_json::to_value(&setting).unwrap();
         let obj = json.as_object().unwrap();
@@ -1624,6 +1601,7 @@ mod tests {
             domain_management_config: Default::default(),
             #[cfg(feature = "cloud")]
             enforce_allowed_orgs_only: false,
+            budget_config: vec![],
         };
         let json = serde_json::to_value(&setting).unwrap();
         let obj = json.as_object().unwrap();
@@ -1656,9 +1634,7 @@ mod tests {
     #[cfg(feature = "cloud")]
     #[test]
     fn test_usage_stream_enabled_defaults_off_in_cloud() {
-        // Own-org usage reporting is OFF by default on cloud; orgs opt in
-        // explicitly. The global ZO_USAGE_REPORT_TO_OWN_ORG stays the master
-        // switch but no longer flips the per-org default.
+        // Own-org usage reporting is OFF by default on cloud; orgs opt in explicitly.
         assert!(!default_usage_stream_enabled());
         assert!(!OrganizationSetting::default().usage_stream_enabled);
 

@@ -82,6 +82,7 @@ import { alertKeys } from "@/services/alerts.querykeys";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import TemplateService from "@/services/alert_templates";
 import DestinationService from "@/services/alert_destination";
+import { resetListViewState, useListViewState } from "@/composables/useListViewState";
 
 const node = document.createElement("div");
 node.setAttribute("id", "app");
@@ -285,11 +286,7 @@ beforeEach(() => {
   ];
   (store.state as any).organizationData.allAlertsListByFolderId = {};
   // Reset alert list filters to prevent leaking between tests
-  (store.state as any).alertListFilters = {
-    searchQuery: "",
-    filterQuery: "",
-    searchAcrossFolders: false,
-  };
+  resetListViewState();
 
   alertsDB = [
     makeAlert(1, {
@@ -646,6 +643,27 @@ describe("AlertList - data fetching and columns", () => {
     expect(summary.text()).toContain(String(wrapper.vm.stateCounts.total));
   });
 
+  it("counts and filters firing alerts the same way the Last outcome badge shows them", async () => {
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+
+    wrapper.vm.filteredResults = [
+      { enabled: true, name: "firing", last_outcome: "firing" },
+      { enabled: true, name: "notify-failed", last_outcome: "notify_failed" },
+      { enabled: true, name: "normal", last_outcome: "normal" },
+      // A paused alert freezes its last outcome, so it never shows Firing.
+      { enabled: false, name: "paused-firing", last_outcome: "firing" },
+    ];
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.vm.stateCounts.firing).toBe(2);
+    expect(wrapper.find('[data-test="alert-summary-firing"]').exists()).toBe(true);
+
+    wrapper.vm.onStatSelect("firing");
+    await wrapper.vm.$nextTick();
+    expect(wrapper.vm.displayedAlerts.map((r: any) => r.name)).toEqual(["firing", "notify-failed"]);
+  });
+
   it("dynamicQueryModel binds to filterQuery by default and to searchQuery when across-folders toggled", async () => {
     const wrapper: any = await mountAlertList();
     await waitData(wrapper);
@@ -945,13 +963,7 @@ describe("AlertList - pagination restoration", () => {
     // second, spurious autoResetPageIndex after the legitimate one has already settled.
     (store.state as any).organizationData.allAlertsListByFolderId = {};
     alertsDB = Array.from({ length: 15 }, (_, i) => makeAlert(i + 1));
-    (store.state as any).alertListFilters = {
-      searchQuery: "",
-      filterQuery: "",
-      searchAcrossFolders: false,
-      perPage: 5,
-      currentPage: 3,
-    };
+    Object.assign(useListViewState("alerts", {}), { perPage: 5, currentPage: 3 });
     const wrapper: any = await mountAlertList();
     await flushPromises();
     await wrapper.vm.$nextTick();
@@ -965,13 +977,7 @@ describe("AlertList - pagination restoration", () => {
   it("resets the persisted page on a folder switch so it is not restored onto the new folder", async () => {
     (store.state as any).organizationData.allAlertsListByFolderId = {};
     alertsDB = Array.from({ length: 15 }, (_, i) => makeAlert(i + 1));
-    (store.state as any).alertListFilters = {
-      searchQuery: "",
-      filterQuery: "",
-      searchAcrossFolders: false,
-      perPage: 5,
-      currentPage: 3,
-    };
+    Object.assign(useListViewState("alerts", {}), { perPage: 5, currentPage: 3 });
     const wrapper: any = await mountAlertList();
     await flushPromises();
     expect(wrapper.vm.currentPage).toBe(3);
@@ -980,7 +986,59 @@ describe("AlertList - pagination restoration", () => {
     await flushPromises();
 
     expect(wrapper.vm.currentPage).toBe(1);
-    expect((store.state as any).alertListFilters.currentPage).toBe(1);
+    expect(useListViewState("alerts", {}).currentPage).toBe(1);
+  });
+});
+
+describe("AlertList - view state restoration", () => {
+  it("restores the stat-tile chip, sort and page size saved before navigating away", async () => {
+    Object.assign(useListViewState("alerts", {}), {
+      stateFilter: "paused",
+      sortBy: "name",
+      sortOrder: "desc",
+      perPage: 50,
+    });
+    const wrapper: any = await mountAlertList();
+    await flushPromises();
+
+    expect(wrapper.vm.stateFilter).toBe("paused");
+    expect(wrapper.vm.sortBy).toBe("name");
+    expect(wrapper.vm.sortOrder).toBe("desc");
+    expect(wrapper.vm.pageSize).toBe(50);
+  });
+
+  it("saves chip, sort and page size changes for the next visit", async () => {
+    const wrapper: any = await mountAlertList();
+    await flushPromises();
+
+    wrapper.vm.stateFilter = "active";
+    wrapper.vm.sortBy = "name";
+    wrapper.vm.sortOrder = "asc";
+    wrapper.vm.pageSize = 100;
+    await flushPromises();
+
+    expect(useListViewState("alerts", {})).toMatchObject({
+      stateFilter: "active",
+      sortBy: "name",
+      sortOrder: "asc",
+      perPage: 100,
+    });
+  });
+
+  it("carries the active tab to the alert detail page so back lands on it", async () => {
+    const wrapper: any = await mountAlertList();
+    await flushPromises();
+    const push = vi.spyOn(wrapper.vm.$router, "push");
+
+    wrapper.vm.activeTab = "scheduled";
+    wrapper.vm.triggerExpand({ alert_id: "a1", folder_id: "default" });
+
+    expect(push).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "alertDetail",
+        query: expect.objectContaining({ tab: "scheduled" }),
+      }),
+    );
   });
 });
 
@@ -1303,14 +1361,15 @@ describe("AlertList - isAnomalyDetectionEnabled", () => {
     expect(tabValues).toContain("anomalyDetection");
   });
 
-  it("should disable anomalyDetection tab when build_type=opensource even when enterprise flags are set", async () => {
+  it("should show anomalyDetection tab locked when build_type=opensource even when enterprise flags are set", async () => {
     (config as any).isEnterprise = "true";
     (config as any).isCloud = "false";
     (store.state as any).zoConfig.build_type = "opensource";
 
     const wrapper: any = await mountAlertList();
-    const tabValues = wrapper.vm.alertTabs.map((t: any) => t.value);
-    expect(tabValues).not.toContain("anomalyDetection");
+    const tab = wrapper.vm.alertTabs.find((t: any) => t.value === "anomalyDetection");
+    expect(tab).toBeTruthy();
+    expect(tab.locked).toBe(true);
   });
 
   it("should enable anomalyDetection tab when isCloud=true (cloud build)", async () => {
@@ -1324,21 +1383,23 @@ describe("AlertList - isAnomalyDetectionEnabled", () => {
     expect(tabValues).toContain("anomalyDetection");
   });
 
-  it("should disable anomalyDetection tab when isEnterprise=false (opensource frontend)", async () => {
+  it("should show anomalyDetection tab locked when isEnterprise=false (opensource frontend)", async () => {
     (config as any).isEnterprise = "false";
     (config as any).isCloud = "false";
     (store.state as any).zoConfig.build_type = "enterprise";
 
     const wrapper: any = await mountAlertList();
-    const tabValues = wrapper.vm.alertTabs.map((t: any) => t.value);
-    expect(tabValues).not.toContain("anomalyDetection");
+    const tab = wrapper.vm.alertTabs.find((t: any) => t.value === "anomalyDetection");
+    expect(tab).toBeTruthy();
+    expect(tab.locked).toBe(true);
   });
 
-  it("should disable anomalyDetection tab by default (no env vars set)", async () => {
-    // isEnterprise defaults to "false" → feature disabled
+  it("should show anomalyDetection tab locked by default (no env vars set)", async () => {
+    // isEnterprise defaults to "false" → feature locked, not hidden
     const wrapper: any = await mountAlertList();
-    const tabValues = wrapper.vm.alertTabs.map((t: any) => t.value);
-    expect(tabValues).not.toContain("anomalyDetection");
+    const tab = wrapper.vm.alertTabs.find((t: any) => t.value === "anomalyDetection");
+    expect(tab).toBeTruthy();
+    expect(tab.locked).toBe(true);
   });
 
   it("should include anomalyDetection tab in alertTabs when enabled", async () => {
@@ -1352,13 +1413,14 @@ describe("AlertList - isAnomalyDetectionEnabled", () => {
     expect(tabValues).toContain("anomalyDetection");
   });
 
-  it("should exclude anomalyDetection tab from alertTabs when disabled", async () => {
+  it("should show anomalyDetection tab locked in alertTabs when not entitled", async () => {
     (config as any).isEnterprise = "false";
     (config as any).isCloud = "false";
 
     const wrapper: any = await mountAlertList();
-    const tabValues = wrapper.vm.alertTabs.map((t: any) => t.value);
-    expect(tabValues).not.toContain("anomalyDetection");
+    const tab = wrapper.vm.alertTabs.find((t: any) => t.value === "anomalyDetection");
+    expect(tab).toBeTruthy();
+    expect(tab.locked).toBe(true);
   });
 
   it("should fall back activeTab to 'all' when anomalyDetection tab requested but feature disabled", async () => {
@@ -1751,6 +1813,25 @@ describe("AlertList - ODialog/ODrawer migration", () => {
       );
     });
 
+    it("marks a firing row under an active downtime as a muted firing", async () => {
+      const downtime = { id: "dt-1", name: "Kafka upgrade", ends_at: 1_900_000_000_000_000 };
+      const { wrapper, row } = await anomalyRow({ active_downtime: downtime });
+
+      expect(row.last_outcome).toBe("firing");
+      expect(wrapper.vm.isMutedFiring(row)).toBe(true);
+      // Row cells render through the virtualised table, which jsdom does not lay out reliably.
+      expect(i18n.global.t("alerts.downtimes.mute.firingMuted")).toBe("Firing · muted");
+      expect(
+        i18n.global.t("alerts.downtimes.mute.firingMutedTooltip", { name: "Kafka upgrade" }),
+      ).toContain("Kafka upgrade");
+    });
+
+    it("keeps the plain outcome badge when no downtime is active", async () => {
+      const { wrapper, row } = await anomalyRow();
+
+      expect(wrapper.vm.isMutedFiring(row)).toBe(false);
+    });
+
     it("carries the priority and tags the API already sends", async () => {
       const { row } = await anomalyRow();
 
@@ -1977,4 +2058,4 @@ describe("AlertList - triggered in the last 15 minutes", () => {
     expect(never.every((c: any) => !c.find(".rounded-full").exists())).toBe(true);
     expect(fired.filter((c: any) => c.find(".bg-warning-500").exists())).toHaveLength(4);
   });
-});
+}, 15000);

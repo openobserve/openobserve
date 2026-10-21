@@ -119,6 +119,21 @@ export const emptyStatePresets = {
     ],
   },
 
+  "search-cancelled": {
+    illustration: "query",
+    variant: "neutral",
+    titleKey: "emptyState.searchCancelled.title",
+    descriptionKey: "emptyState.searchCancelled.description",
+    actions: [
+      {
+        id: "run",
+        icon: "play-arrow",
+        titleKey: "emptyState.searchCancelled.action",
+        descriptionKey: "emptyState.searchCancelled.actionDesc",
+      },
+    ],
+  },
+
   // --- first-run "create your first X" -------------------------------------
   "no-dashboards": {
     illustration: "board",
@@ -685,6 +700,20 @@ export const emptyStatePresets = {
       },
     ],
   },
+  "no-downtimes": {
+    illustration: "schedule",
+    variant: "create",
+    titleKey: "emptyState.noDowntimes.title",
+    descriptionKey: "emptyState.noDowntimes.description",
+    actions: [
+      {
+        id: "create",
+        icon: "notifications-paused",
+        titleKey: "emptyState.noDowntimes.action",
+        descriptionKey: "emptyState.noDowntimes.actionDesc",
+      },
+    ],
+  },
   "no-pipeline-destinations": {
     illustration: "pipeline",
     variant: "create",
@@ -860,6 +889,20 @@ export const emptyStatePresets = {
         icon: "cloud-upload",
         titleKey: "emptyState.noStorageConfig.action",
         descriptionKey: "emptyState.noStorageConfig.actionDesc",
+      },
+    ],
+  },
+  "no-phone-provider": {
+    illustration: "connect",
+    variant: "create",
+    titleKey: "emptyState.noPhoneProvider.title",
+    descriptionKey: "emptyState.noPhoneProvider.description",
+    actions: [
+      {
+        id: "connect",
+        icon: "call",
+        titleKey: "emptyState.noPhoneProvider.action",
+        descriptionKey: "emptyState.noPhoneProvider.actionDesc",
       },
     ],
   },

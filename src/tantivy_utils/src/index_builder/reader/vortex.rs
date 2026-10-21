@@ -19,8 +19,7 @@ use std::{ops::Range, sync::Arc};
 use arrow::{datatypes::DataType, error::ArrowError, record_batch::RecordBatch};
 use arrow_schema::Schema;
 use bytes::Bytes;
-use config::utils::parquet::{RecordBatchStream, vortex_array_to_record_batch};
-use futures::StreamExt;
+use config::utils::parquet::vortex_array_to_record_batch;
 use vortex::{
     VortexSessionDefault,
     array::ArrayRef,
@@ -36,34 +35,6 @@ use vortex::{
 };
 
 use super::RecordBatchIter;
-
-/// Open a vortex file, apply an optional projection, and return an async
-/// record batch stream over all rows.
-pub(super) async fn scan_vortex_async(
-    data: Bytes,
-    projection: Option<&[String]>,
-) -> Result<RecordBatchStream, anyhow::Error> {
-    let session = VortexSession::default().with_tokio();
-    let vxf = session.open_options().open_buffer(data)?;
-    let scan = open_projected_scan(&vxf, projection)?;
-
-    let stream_schema: Arc<Schema> = Arc::new(session.arrow().to_arrow_schema(&scan.dtype()?)?);
-    let data_type = DataType::Struct(stream_schema.fields().clone());
-
-    let stream = scan.into_array_stream()?.then(move |result| {
-        let data_type = data_type.clone();
-        let session = session.clone();
-        async move {
-            match result {
-                Ok(array) => vortex_array_to_record_batch(&session, array, &data_type),
-                Err(e) => Err(ArrowError::ExternalError(Box::new(e))),
-            }
-        }
-    });
-
-    let stream: RecordBatchStream = Box::pin(stream);
-    Ok(stream)
-}
 
 /// Build a lazy sync iterator for one vortex row range.
 pub(super) fn scan_vortex_row_range(

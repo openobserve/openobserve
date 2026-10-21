@@ -48,6 +48,7 @@ const props = withDefaults(defineProps<DrawerProps>(), {
   showClose: true,
   width: undefined,
   seamless: false,
+  primaryButtonDataTest: "o-drawer-primary-btn",
   primaryButtonVariant: "primary",
   secondaryButtonVariant: "outline",
   neutralButtonVariant: "ghost",
@@ -110,9 +111,17 @@ onActivated(() => (hostAway.value = false));
 
 function handleCloseAutoFocus(event: Event) {
   if (hostAway.value || awaySinceOpen) event.preventDefault();
-  if (hostAway.value || !awaySinceOpen) return;
-  awaySinceOpen = false;
-  if (openedFrom?.isConnected) openedFrom.focus();
+  const target = hostAway.value ? null : props.returnFocusTo?.();
+  if (target?.isConnected) {
+    event.preventDefault();
+    awaySinceOpen = false;
+    target.scrollIntoView({ block: "nearest" });
+    target.focus({ preventScroll: true });
+  } else if (!hostAway.value && awaySinceOpen) {
+    awaySinceOpen = false;
+    if (openedFrom?.isConnected) openedFrom.focus();
+  }
+  emit("after-close");
 }
 
 function handleOpenChange(v: boolean) {
@@ -305,24 +314,25 @@ function findAutoFocusTarget(root: Element): HTMLElement | null {
 
 function handleOpenAutoFocus(event: Event) {
   event.preventDefault();
+  // The panel is still translated off-screen by the slide-in, so a scrolling focus would drag a contained portal target sideways.
   nextTick(() => {
     const body = bodyRef.value;
     const field = body ? findAutoFocusTarget(body) : null;
     if (field) {
-      field.focus();
+      field.focus({ preventScroll: true });
       return;
     }
     const autofocus = body?.querySelector<HTMLElement>("[autofocus]");
     if (autofocus) {
-      autofocus.focus();
+      autofocus.focus({ preventScroll: true });
       return;
     }
     const btnEl = (primaryBtnRef.value as any)?.$el as HTMLElement | undefined;
     if (btnEl) {
-      btnEl.focus();
+      btnEl.focus({ preventScroll: true });
       return;
     }
-    body?.closest<HTMLElement>("[data-o2-drawer]")?.focus();
+    body?.closest<HTMLElement>("[data-o2-drawer]")?.focus({ preventScroll: true });
   });
 }
 
@@ -620,7 +630,7 @@ watch(shown, (open) => {
               <OButton
                 v-if="primaryButtonLabel"
                 ref="primaryBtnRef"
-                data-test="o-drawer-primary-btn"
+                :data-test="primaryButtonDataTest"
                 :variant="primaryButtonVariant"
                 size="sm-action"
                 :type="formId ? 'submit' : 'button'"

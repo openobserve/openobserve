@@ -18,6 +18,7 @@ import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { reactive } from "vue";
 import { createStore } from "vuex";
 import i18n from "@/locales";
+import { resetListViewState, useListViewState } from "@/composables/useListViewState";
 
 // web/.env sets VITE_OPENOBSERVE_ENTERPRISE=true locally but CI does not, so pin it.
 vi.mock("@/aws-exports", async (importOriginal) => {
@@ -427,6 +428,7 @@ describe("ServicesCatalog", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    resetListViewState();
     localStorage.removeItem("servicesCatalog_streamFilter");
 
     // Reset searchObj to baseline before each test
@@ -1407,6 +1409,48 @@ describe("ServicesCatalog", () => {
       await firstRow.trigger("click");
       expect(wrapper.vm.showSidePanel).toBe(false);
       expect(wrapper.vm.selectedServiceRow).toBeNull();
+    });
+
+    it("should switch the open side panel to another row in place", async () => {
+      mockFetchQueryDataWithHttpStream.mockImplementation((_req: any, callbacks: any) => {
+        const hits = mockServices.slice(0, 2).map((s) => ({
+          service_name: s.service_name,
+          total_requests: s.total_requests,
+          error_count: s.error_count,
+          error_rate: s.error_rate,
+          avg_duration_ns: s.avg_duration_ns,
+          max_duration_ns: s.max_duration_ns,
+          p50_latency_ns: s.p50_latency_ns,
+          p95_latency_ns: s.p95_latency_ns,
+          p99_latency_ns: s.p99_latency_ns,
+        }));
+
+        if (callbacks?.data) {
+          callbacks.data(null, {
+            type: "search_response_hits",
+            content: { results: { hits } },
+          });
+        }
+        if (callbacks?.complete) {
+          callbacks.complete(null, {});
+        }
+      });
+
+      wrapper = mountServicesCatalog();
+      await flushPromises();
+
+      await wrapper.find('[data-test="services-catalog-row-name-api-gateway"]').trigger("click");
+      expect(wrapper.vm.showSidePanel).toBe(true);
+      expect(wrapper.vm.selectedServiceRow?.service_name).toBe("api-gateway");
+      const panelBefore = wrapper.findComponent('[data-test="services-catalog-node-side-panel"]');
+      expect(panelBefore.exists()).toBe(true);
+
+      await wrapper.find('[data-test="services-catalog-row-name-auth-service"]').trigger("click");
+      expect(wrapper.vm.showSidePanel).toBe(true);
+      expect(wrapper.vm.selectedServiceRow?.service_name).toBe("auth-service");
+      const panelAfter = wrapper.findComponent('[data-test="services-catalog-node-side-panel"]');
+      expect(panelAfter.vm).toBe(panelBefore.vm);
+      expect(panelAfter.props("selectedNode")?.name).toBe("auth-service");
     });
   });
 
@@ -3245,6 +3289,34 @@ describe("ServicesCatalog", () => {
 
       const panel = wrapper.findComponent('[data-test="services-catalog-node-side-panel"]');
       expect(panel.props("timeRange").endTime).toBe(secondOpen * 1000);
+    });
+  });
+
+  describe("View state restore", () => {
+    it("restores filter, sort, page and size", () => {
+      useListViewState("servicesCatalog", {
+        filterText: "pay",
+        currentPage: 2,
+        rowsPerPage: 50,
+        sortBy: "service_name",
+        sortOrder: "asc",
+      });
+      wrapper = mountServicesCatalog();
+      expect(wrapper.vm.filterText).toBe("pay");
+      expect(wrapper.vm.currentPage).toBe(2);
+      expect(wrapper.vm.rowsPerPage).toBe(50);
+      expect(wrapper.vm.sortBy).toBe("service_name");
+      expect(wrapper.vm.sortOrder).toBe("asc");
+    });
+
+    it("saves changes to the view state", async () => {
+      wrapper = mountServicesCatalog();
+      wrapper.vm.filterText = "auth";
+      wrapper.vm.sortBy = "service_name";
+      await wrapper.vm.$nextTick();
+      const saved: any = useListViewState("servicesCatalog", {});
+      expect(saved.filterText).toBe("auth");
+      expect(saved.sortBy).toBe("service_name");
     });
   });
 });

@@ -195,6 +195,19 @@ describe("SettingsIndex", () => {
       expect(items.some((i: any) => i.dataTest === "pipeline-destinations-tab")).toBe(true);
     });
 
+    it("lists Telephony with the page's icon, gated on enterprise and on-call", () => {
+      const telephony = () => getAllItems(createWrapper()).find((i: any) => i.key === "telephony");
+      expect(telephony()).toMatchObject({
+        icon: "call",
+        group: "Destinations",
+        dataTest: "telephony-settings-tab",
+        to: { name: "telephonySettings", query: { org_identifier: "test-org" } },
+        visible: true,
+      });
+      mockStore.state.zoConfig = { service_streams_enabled: true, oncall_enabled: false } as any;
+      expect(telephony().visible).toBe(false);
+    });
+
     it("should include synthetics_locations item with correct properties", () => {
       const wrapper = createWrapper();
       const items = getAllItems(wrapper);
@@ -212,10 +225,10 @@ describe("SettingsIndex", () => {
       const regexItem = items.find((i: any) => i.dataTest === "regex-patterns-tab");
       const pipelineItem = items.find((i: any) => i.dataTest === "pipeline-destinations-tab");
 
-      // visible=true when isEnterprise=true
-      expect(cipherItem?.visible).toBe(true);
-      expect(regexItem?.visible).toBe(true);
-      expect(pipelineItem?.visible).toBe(true);
+      // Always present now — unlocked (not just "visible") when isEnterprise=true.
+      expect(cipherItem?.locked).toBe(false);
+      expect(regexItem?.locked).toBe(false);
+      expect(pipelineItem?.locked).toBe(false);
     });
 
     it("should include meta org items when isMetaOrg is true and enterprise", () => {
@@ -254,6 +267,17 @@ describe("SettingsIndex", () => {
     });
   });
 
+  it("maps the telephonySettings route to the telephony section", () => {
+    const originalRoute = router.currentRoute.value;
+    router.currentRoute.value = {
+      ...router.currentRoute.value,
+      name: "telephonySettings",
+      path: "/telephony",
+    } as any;
+    expect(createWrapper().vm.settingsTab).toBe("telephony");
+    router.currentRoute.value = originalRoute;
+  });
+
   describe("Theme integration", () => {
     // regexIcon is computed internally and used in settingsItems icon field
     // (not directly exposed on vm), so we verify it via the sectionGroups items.
@@ -290,12 +314,15 @@ describe("SettingsIndex", () => {
       expect(generalGroup).toBeDefined();
     });
 
-    it("should contain a Destinations group holding only Pipeline Destinations", () => {
+    it("should contain a Destinations group holding Pipeline Destinations, then Telephony", () => {
       const wrapper = createWrapper();
       const groups = wrapper.vm.sectionGroups as any[];
       const destGroup = groups.find((g: any) => g.label === "Destinations");
       expect(destGroup).toBeDefined();
-      expect(destGroup.items.map((i: any) => i.key)).toEqual(["pipeline_destinations"]);
+      expect(destGroup.items.map((i: any) => i.key)).toEqual([
+        "pipeline_destinations",
+        "telephony",
+      ]);
     });
 
     it("should contain a Synthetics group", () => {
@@ -326,9 +353,12 @@ describe("SettingsIndex", () => {
       return groups.flatMap((g: any) => g.items ?? []);
     };
 
-    it("should mark enterprise-only items as not visible when not enterprise", async () => {
+    it("should mark enterprise-only items as locked (not hidden) in a true OSS build", async () => {
       const config = await import("@/aws-exports");
       vi.mocked(config.default).isEnterprise = "false";
+      // Not just "not enterprise" — this batch doesn't exist on Cloud at all
+      // (see the next test), so OSS means neither flag is set.
+      vi.mocked(config.default).isCloud = "false";
 
       const wrapper = createWrapper();
       const items = getAllItems(wrapper);
@@ -337,10 +367,34 @@ describe("SettingsIndex", () => {
       const pipelineItem = items.find((i: any) => i.dataTest === "pipeline-destinations-tab");
       const regexItem = items.find((i: any) => i.dataTest === "regex-patterns-tab");
 
+      // Present but locked — not hidden — in OSS, so the feature stays discoverable.
+      expect(cipherItem?.visible).not.toBe(false);
+      expect(nodesItem?.visible).not.toBe(false);
+      expect(pipelineItem?.visible).not.toBe(false);
+      expect(regexItem?.visible).not.toBe(false);
+      expect(cipherItem?.locked).toBe(true);
+      expect(nodesItem?.locked).toBe(true);
+      expect(pipelineItem?.locked).toBe(true);
+      expect(regexItem?.locked).toBe(true);
+    });
+
+    // Cloud never offers this batch at all — not even locked — because a
+    // Cloud customer can't "upgrade" into self-hosted node/license/cipher-key
+    // management. Pure cloud (isEnterprise=false, isCloud=true) must hide it.
+    it("should hide (not lock) enterprise-only items in a pure cloud build", async () => {
+      const config = await import("@/aws-exports");
+      vi.mocked(config.default).isEnterprise = "false";
+      vi.mocked(config.default).isCloud = "true";
+
+      const wrapper = createWrapper();
+      const items = getAllItems(wrapper);
+      const cipherItem = items.find((i: any) => i.dataTest === "management-cipher-key-tab");
+      const nodesItem = items.find((i: any) => i.dataTest === "nodes-tab");
+      const pipelineItem = items.find((i: any) => i.dataTest === "pipeline-destinations-tab");
+
       expect(cipherItem?.visible).toBe(false);
       expect(nodesItem?.visible).toBe(false);
       expect(pipelineItem?.visible).toBe(false);
-      expect(regexItem?.visible).toBe(false);
     });
 
     // Synthetics ships in OSS: the locations hub card stays visible on an OSS
@@ -478,6 +532,28 @@ describe("SettingsIndex", () => {
         );
       });
     });
+
+    it.each(["announcementBanners", "announcementBannerEditor"])(
+      "should redirect %s to general outside the meta org",
+      async (name) => {
+        mockStore.state.zoConfig = { meta_org: "_meta", service_streams_enabled: true };
+        mockIsMetaOrg.value = false;
+
+        const awsConfig = await import("@/aws-exports");
+        vi.mocked(awsConfig.default).isEnterprise = "true";
+
+        const originalRoute = router.currentRoute.value;
+        router.currentRoute.value = { ...originalRoute, name } as any;
+        try {
+          createWrapper();
+          expect(mockRouterPush).toHaveBeenCalledWith(
+            expect.objectContaining({ path: "/settings/general" }),
+          );
+        } finally {
+          router.currentRoute.value = originalRoute;
+        }
+      },
+    );
 
     it("should NOT redirect syntheticsLocations on an OSS build with synthetics on", async () => {
       mockStore.state.zoConfig = {

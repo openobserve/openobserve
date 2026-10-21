@@ -26,6 +26,14 @@ use {
     axum::extract::{Multipart, Query},
     o2_enterprise::enterprise::common::settings,
 };
+#[cfg(feature = "cloud")]
+use {
+    config::META_ORG_ID,
+    o2_enterprise::enterprise::cloud::{
+        billing_group::list_billing_group_members_of, billings::MeteringProvider, customer_billings,
+    },
+    std::collections::HashSet,
+};
 
 use crate::common::meta::{
     http::HttpResponse as MetaHttpResponse,
@@ -64,202 +72,30 @@ pub async fn create(
     Path(org_id): Path<String>,
     Json(settings): Json<OrganizationSettingPayload>,
 ) -> Response {
-    let mut data = match get_org_setting(&org_id).await {
-        Ok(data) => data,
-        Err(err) => {
-            if let Error::DbError(DbError::KeyNotExists(_e)) = &err {
-                OrganizationSetting::default()
-            } else {
-                return MetaHttpResponse::bad_request(&err);
-            }
-        }
+    if let Err(msg) = validate_settings_payload(&settings) {
+        return MetaHttpResponse::bad_request(msg);
+    }
+    #[cfg(feature = "cloud")]
+    let settings = match check_domain_org_mappings(&org_id, settings).await {
+        Ok(settings) => settings,
+        Err(msg) => return MetaHttpResponse::bad_request(msg),
     };
-
-    let mut field_found = false;
-    if let Some(scrape_interval) = settings.scrape_interval {
-        if scrape_interval == 0 {
-            return MetaHttpResponse::bad_request("scrape_interval should be a positive value");
-        }
-        field_found = true;
-        data.scrape_interval = scrape_interval;
-    }
-    if let Some(trace_id_field_name) = settings.trace_id_field_name {
-        field_found = true;
-        data.trace_id_field_name = trace_id_field_name;
-    }
-    if let Some(span_id_field_name) = settings.span_id_field_name {
-        field_found = true;
-        data.span_id_field_name = span_id_field_name;
-    }
-    if let Some(toggle_ingestion_logs) = settings.toggle_ingestion_logs {
-        field_found = true;
-        data.toggle_ingestion_logs = toggle_ingestion_logs;
-    }
-
-    if let Some(enable_streaming_search) = settings.enable_streaming_search {
-        field_found = true;
-        data.enable_streaming_search = enable_streaming_search;
-    }
-
-    if let Some(light_mode_theme_color) = settings.light_mode_theme_color {
-        field_found = true;
-        data.light_mode_theme_color = Some(light_mode_theme_color);
-    }
-
-    if let Some(dark_mode_theme_color) = settings.dark_mode_theme_color {
-        field_found = true;
-        data.dark_mode_theme_color = Some(dark_mode_theme_color);
-    }
-
-    if let Some(max_series_per_query) = settings.max_series_per_query {
-        // Validate max_series_per_query is within acceptable range
-        if !(1_000..=1_000_000).contains(&max_series_per_query) {
-            return MetaHttpResponse::bad_request(
-                "max_series_per_query must be between 1,000 and 1,000,000",
-            );
-        }
-        field_found = true;
-        data.max_series_per_query = Some(max_series_per_query);
-    }
-
-    #[cfg(feature = "enterprise")]
-    if let Some(claim_parser_function) = settings.claim_parser_function {
-        field_found = true;
-        data.claim_parser_function = claim_parser_function;
-    }
-
-    if let Some(usage_stream_enabled) = settings.usage_stream_enabled {
-        field_found = true;
-        data.usage_stream_enabled = usage_stream_enabled;
-    }
-
-    if merge_red_insights_enabled(&mut data, settings.red_insights_enabled) {
-        field_found = true;
-    }
-
-    if let Some(cross_links) = settings.cross_links {
-        for link in &cross_links {
-            if link.name.is_empty() {
-                return MetaHttpResponse::bad_request("Cross-link name is required");
-            }
-            if link.name.len() > 256 {
-                return MetaHttpResponse::bad_request(
-                    "Cross-link name must be 256 characters or less",
-                );
-            }
-            if link.url.is_empty() {
-                return MetaHttpResponse::bad_request("Cross-link URL is required");
-            }
-        }
-        field_found = true;
-        data.cross_links = cross_links;
-    }
-
     #[cfg(feature = "cloud")]
-    if let Some(mut mappings) = settings.domain_org_mappings {
-        use hashbrown::HashSet;
-
-        field_found = true;
-        let child_orgs =
-            o2_enterprise::enterprise::cloud::billing_group::list_billing_group_members_of(&org_id)
-                .await
-                .unwrap_or_default();
-
-        let mut allowed_orgs: HashSet<_> =
-            child_orgs.into_iter().map(|v| v.member_org_id).collect();
-        allowed_orgs.insert(org_id.clone());
-        for mapping in &mut mappings {
-            use openobserve_core::org_domain_ownership;
-
-            let domain = mapping.domain.trim().to_lowercase();
-
-            if !allowed_orgs.contains(&mapping.org_id) {
-                return MetaHttpResponse::bad_request(format!(
-                    "Not allowed to setup a mapping for org {}",
-                    mapping.org_id
-                ));
-            }
-
-            if openobserve_core::organization::get_org(&mapping.org_id)
-                .await
-                .is_none()
-            {
-                return MetaHttpResponse::bad_request(format!(
-                    "No org with org id {} found",
-                    mapping.org_id
-                ));
-            }
-
-            if mapping.domain.is_empty() || mapping.domain.contains(' ') {
-                return MetaHttpResponse::bad_request(format!(
-                    "domain cannot have space or be empty, bad domain '{}'",
-                    mapping.domain
-                ));
-            }
-
-            if !matches!(
-                mapping.base_role.as_str(),
-                "admin" | "editor" | "viewer" | "allowed_user"
-            ) {
-                return MetaHttpResponse::bad_request(format!(
-                    "base role {} for org {} is not a valid base role - only admin, editor, viewer, allowed_user are supported",
-                    mapping.base_role, mapping.org_id
-                ));
-            }
-            if let Some(claim) = mapping.role_claim_name.as_mut() {
-                if claim.trim().is_empty() {
-                    return MetaHttpResponse::bad_request("role claim name must not be empty");
-                }
-                *claim = claim.trim().to_string();
-            }
-
-            match org_domain_ownership::get_domain_org_record(&org_id, &domain).await {
-                Ok(None) => {
-                    return MetaHttpResponse::bad_request("This domain is not linked yet");
-                }
-                Err(e) => {
-                    return MetaHttpResponse::internal_error(format!(
-                        "error getting domain mappings : {e}"
-                    ));
-                }
-                Ok(Some(v)) => {
-                    use infra::table::org_domain_ownership::OwnershipState;
-
-                    if v.verification_state != OwnershipState::Verified as i32 {
-                        return MetaHttpResponse::bad_request("This domain is not verified yet");
-                    }
-                }
-            }
-
-            mapping.domain = domain;
-        }
-        data.domain_org_mappings = mappings;
+    if let Err(response) = check_budget_config(&org_id, &settings).await {
+        return response;
     }
 
-    #[cfg(feature = "cloud")]
-    if let Some(enforce) = settings.enforce_allowed_orgs_only {
-        data.enforce_allowed_orgs_only = enforce;
-        field_found = true;
-    }
-
-    #[cfg(feature = "cloud")]
-    if let Some(config) = settings.domain_management_config {
-        data.domain_management_config = config;
-        field_found = true;
-    }
-
-    if !field_found {
-        return MetaHttpResponse::bad_request("No valid field found");
-    }
-
-    // this will always be taken from orgs table, never from settings
-    data.free_trial_expiry = None;
-    match set_org_setting(&org_id, &data).await {
-        Ok(()) => (
+    match db::organization::update_org_setting(&org_id, |data| {
+        apply_settings_payload(data, settings)
+    })
+    .await
+    {
+        Ok(true) => (
             StatusCode::OK,
             Json(serde_json::json!({"successful": "true"})),
         )
             .into_response(),
+        Ok(false) => MetaHttpResponse::bad_request("No valid field found"),
         Err(e) => MetaHttpResponse::bad_request(e.to_string().as_str()),
     }
 }
@@ -396,6 +232,252 @@ pub async fn delete_logo_text() -> Response {
 #[cfg(not(feature = "enterprise"))]
 pub async fn delete_logo_text() -> Response {
     (StatusCode::FORBIDDEN, Json("Not Supported")).into_response()
+}
+
+fn validate_settings_payload(settings: &OrganizationSettingPayload) -> Result<(), &'static str> {
+    if settings.scrape_interval == Some(0) {
+        return Err("scrape_interval should be a positive value");
+    }
+    if let Some(max_series_per_query) = settings.max_series_per_query
+        && !(1_000..=1_000_000).contains(&max_series_per_query)
+    {
+        return Err("max_series_per_query must be between 1,000 and 1,000,000");
+    }
+    for link in settings.cross_links.iter().flatten() {
+        if link.name.is_empty() {
+            return Err("Cross-link name is required");
+        }
+        if link.name.len() > 256 {
+            return Err("Cross-link name must be 256 characters or less");
+        }
+        if link.url.is_empty() {
+            return Err("Cross-link URL is required");
+        }
+    }
+    Ok(())
+}
+
+// ignore this for all non _meta orgs
+#[cfg(feature = "cloud")]
+async fn check_domain_org_mappings(
+    org_id: &str,
+    mut settings: OrganizationSettingPayload,
+) -> Result<OrganizationSettingPayload, String> {
+    let Some(mut mappings) = settings.domain_org_mappings.take() else {
+        return Ok(settings);
+    };
+    use hashbrown::HashSet;
+    let child_orgs =
+        o2_enterprise::enterprise::cloud::billing_group::list_billing_group_members_of(&org_id)
+            .await
+            .unwrap_or_default();
+
+    let mut allowed_orgs: HashSet<_> = child_orgs.into_iter().map(|v| v.member_org_id).collect();
+    allowed_orgs.insert(org_id.clone());
+    for mapping in &mut mappings {
+        use openobserve_core::org_domain_ownership;
+
+        let domain = mapping.domain.trim().to_lowercase();
+
+        if !allowed_orgs.contains(&mapping.org_id) {
+            return MetaHttpResponse::bad_request(format!(
+                "Not allowed to setup a mapping for org {}",
+                mapping.org_id
+            ));
+        }
+
+        if openobserve_core::organization::get_org(&mapping.org_id)
+            .await
+            .is_none()
+        {
+            return MetaHttpResponse::bad_request(format!(
+                "No org with org id {} found",
+                mapping.org_id
+            ));
+        }
+
+        if mapping.domain.is_empty() || mapping.domain.contains(' ') {
+            return MetaHttpResponse::bad_request(format!(
+                "domain cannot have space or be empty, bad domain '{}'",
+                mapping.domain
+            ));
+        }
+
+        if !matches!(
+            mapping.base_role.as_str(),
+            "admin" | "editor" | "viewer" | "allowed_user"
+        ) {
+            return MetaHttpResponse::bad_request(format!(
+                "base role {} for org {} is not a valid base role - only admin, editor, viewer, allowed_user are supported",
+                mapping.base_role, mapping.org_id
+            ));
+        }
+        if let Some(claim) = mapping.role_claim_name.as_mut() {
+            if claim.trim().is_empty() {
+                return MetaHttpResponse::bad_request("role claim name must not be empty");
+            }
+            *claim = claim.trim().to_string();
+        }
+
+        match org_domain_ownership::get_domain_org_record(&org_id, &domain).await {
+            Ok(None) => {
+                return MetaHttpResponse::bad_request("This domain is not linked yet");
+            }
+            Err(e) => {
+                return MetaHttpResponse::internal_error(format!(
+                    "error getting domain mappings : {e}"
+                ));
+            }
+            Ok(Some(v)) => {
+                use infra::table::org_domain_ownership::OwnershipState;
+
+                if v.verification_state != OwnershipState::Verified as i32 {
+                    return MetaHttpResponse::bad_request("This domain is not verified yet");
+                }
+            }
+        }
+
+        mapping.domain = domain;
+    }
+    settings.domain_org_mappings = Some(mappings);
+    Ok(settings)
+}
+
+// Budgets are for Stripe-billed orgs only, and only for this org, its group members and the
+// group total; checked before the settings lock, since it reads billing and group tables.
+#[cfg(feature = "cloud")]
+async fn check_budget_config(
+    org_id: &str,
+    settings: &OrganizationSettingPayload,
+) -> Result<(), Response> {
+    let Some(configs) = settings.budget_config.as_ref() else {
+        return Ok(());
+    };
+    let billings = match customer_billings::get_by_org_id(org_id).await {
+        Ok(v) => v,
+        Err(e) => {
+            log::error!("error getting customer billings for org_id {org_id} : {e}");
+            return Err(MetaHttpResponse::internal_error(e));
+        }
+    };
+    if !billings
+        .first()
+        .is_some_and(|v| v.provider == MeteringProvider::Stripe)
+    {
+        return Err(MetaHttpResponse::bad_request(
+            "this org is not configured with stripe billing, so budget cannot be set".to_string(),
+        ));
+    }
+    let child_orgs = match list_billing_group_members_of(org_id).await {
+        Ok(v) => v,
+        Err(e) => {
+            log::error!("error in getting child orgs of {org_id} for budget config update : {e}");
+            return Err(MetaHttpResponse::internal_error(e));
+        }
+    };
+    let mut allowed_orgs: HashSet<_> = child_orgs.into_iter().map(|v| v.member_org_id).collect();
+    allowed_orgs.insert(org_id.to_string());
+    allowed_orgs.insert("total".to_string()); // special indicator for total of super org
+    if let Some(config) = configs.iter().find(|c| !allowed_orgs.contains(&c.org_id)) {
+        return Err(MetaHttpResponse::bad_request(format!(
+            "cannot set budget notification configuration for org {}",
+            config.org_id
+        )));
+    }
+    for config in configs {
+        if config.total_budget_amount <= 0.0 {
+            return Err(MetaHttpResponse::bad_request(format!(
+                "cannot set budget amount less than 0 for org {}",
+                config.org_id
+            )));
+        }
+        if config.warn_at_amount <= 0.0 || config.warn_at_amount > config.total_budget_amount {
+            return Err(MetaHttpResponse::bad_request(format!(
+                "invalid warning amount for org {}",
+                config.org_id
+            )));
+        }
+    }
+    Ok(())
+}
+
+// Runs under the settings lock on a fresh read, so it must not await or fail.
+fn apply_settings_payload(
+    data: &mut OrganizationSetting,
+    settings: OrganizationSettingPayload,
+) -> bool {
+    let mut field_found = false;
+    if let Some(scrape_interval) = settings.scrape_interval {
+        field_found = true;
+        data.scrape_interval = scrape_interval;
+    }
+    if let Some(trace_id_field_name) = settings.trace_id_field_name {
+        field_found = true;
+        data.trace_id_field_name = trace_id_field_name;
+    }
+    if let Some(span_id_field_name) = settings.span_id_field_name {
+        field_found = true;
+        data.span_id_field_name = span_id_field_name;
+    }
+    if let Some(toggle_ingestion_logs) = settings.toggle_ingestion_logs {
+        field_found = true;
+        data.toggle_ingestion_logs = toggle_ingestion_logs;
+    }
+    if let Some(enable_streaming_search) = settings.enable_streaming_search {
+        field_found = true;
+        data.enable_streaming_search = enable_streaming_search;
+    }
+    if let Some(light_mode_theme_color) = settings.light_mode_theme_color {
+        field_found = true;
+        data.light_mode_theme_color = Some(light_mode_theme_color);
+    }
+    if let Some(dark_mode_theme_color) = settings.dark_mode_theme_color {
+        field_found = true;
+        data.dark_mode_theme_color = Some(dark_mode_theme_color);
+    }
+    if let Some(max_series_per_query) = settings.max_series_per_query {
+        field_found = true;
+        data.max_series_per_query = Some(max_series_per_query);
+    }
+    #[cfg(feature = "enterprise")]
+    if let Some(claim_parser_function) = settings.claim_parser_function {
+        field_found = true;
+        data.claim_parser_function = claim_parser_function;
+    }
+    if let Some(usage_stream_enabled) = settings.usage_stream_enabled {
+        field_found = true;
+        data.usage_stream_enabled = usage_stream_enabled;
+    }
+    if merge_red_insights_enabled(data, settings.red_insights_enabled) {
+        field_found = true;
+    }
+    if let Some(cross_links) = settings.cross_links {
+        field_found = true;
+        data.cross_links = cross_links;
+    }
+    #[cfg(feature = "cloud")]
+    if let Some(mappings) = settings.domain_org_mappings {
+        field_found = true;
+        data.domain_org_mappings = mappings;
+    }
+    #[cfg(feature = "cloud")]
+    if let Some(configs) = settings.budget_config {
+        field_found = true;
+        data.budget_config = configs;
+    }
+    #[cfg(feature = "cloud")]
+    if let Some(enforce) = settings.enforce_allowed_orgs_only {
+        field_found = true;
+        data.enforce_allowed_orgs_only = enforce;
+    }
+    #[cfg(feature = "cloud")]
+    if let Some(config) = settings.domain_management_config {
+        field_found = true;
+        data.domain_management_config = config;
+    }
+    // this will always be taken from orgs table, never from settings
+    data.free_trial_expiry = None;
+    field_found
 }
 
 fn merge_red_insights_enabled(data: &mut OrganizationSetting, value: Option<bool>) -> bool {

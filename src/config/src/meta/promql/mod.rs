@@ -84,6 +84,10 @@ pub const METADATA_LABEL: &str = "prom_metadata"; // for schema metadata key
 pub const EXEMPLARS_LABEL: &str = "exemplars";
 /// Prometheus' staleness-marker NaN; an ordinary NaN is not stale.
 pub const STALE_NAN_BITS: u64 = 0x7ff0_0000_0000_0002;
+/// Exemplars live in a stream of their own next to the metric, never in its sample rows.
+pub const EXEMPLARS_STREAM_SUFFIX: &str = "_exemplars";
+/// The stream a histogram's buckets degrade into; `le` on it is what marks a histogram family.
+pub const BUCKET_STREAM_SUFFIX: &str = "_bucket";
 
 /// Columns that metrics ingestion may exclude when deriving [`HASH_LABEL`].
 ///
@@ -104,6 +108,18 @@ pub const METRICS_HASH_EXCLUDED_LABELS: &[&str] = &[
     crate::TIMESTAMP_COL_NAME,
     crate::INDEX_FIELD_NAME_FOR_ALL,
 ];
+
+/// The stream that holds `metric`'s exemplars.
+pub fn exemplars_stream_name(metric: &str) -> String {
+    format!("{metric}{EXEMPLARS_STREAM_SUFFIX}")
+}
+
+/// The histogram family a bucket stream name belongs to; the caller supplies the `le` evidence.
+pub fn histogram_family(bucket_stream: &str) -> Option<&str> {
+    bucket_stream
+        .strip_suffix(BUCKET_STREAM_SUFFIX)
+        .filter(|family| !family.is_empty())
+}
 
 #[inline]
 pub fn is_metrics_hash_excluded_label(name: &str) -> bool {
@@ -443,6 +459,9 @@ pub struct QueryResult {
 pub enum ApiFuncResponse<T: Serialize> {
     Success {
         data: T,
+        /// Prometheus API: non-empty when the result may be incomplete.
+        #[serde(skip_serializing_if = "Vec::is_empty")]
+        warnings: Vec<String>,
         #[serde(skip_serializing_if = "Option::is_none")]
         trace_id: Option<String>,
     },
@@ -457,7 +476,15 @@ pub enum ApiFuncResponse<T: Serialize> {
 
 impl<T: Serialize> ApiFuncResponse<T> {
     pub fn ok(data: T, trace_id: Option<String>) -> Self {
-        ApiFuncResponse::Success { data, trace_id }
+        Self::ok_with_warnings(data, vec![], trace_id)
+    }
+
+    pub fn ok_with_warnings(data: T, warnings: Vec<String>, trace_id: Option<String>) -> Self {
+        ApiFuncResponse::Success {
+            data,
+            warnings,
+            trace_id,
+        }
     }
 
     pub fn err_bad_data(error: impl ToString, trace_id: Option<String>) -> Self {
@@ -495,6 +522,24 @@ mod tests {
     use expect_test::expect;
 
     use super::*;
+
+    #[test]
+    fn test_histogram_family_is_named_by_its_bucket_stream_only() {
+        assert_eq!(
+            exemplars_stream_name("http_requests_total"),
+            "http_requests_total_exemplars"
+        );
+        assert_eq!(histogram_family("rpc_latency_bucket"), Some("rpc_latency"));
+        // count and sum names are not evidence of a family; neither is a bare suffix
+        for name in [
+            "rpc_latency_count",
+            "rpc_latency_sum",
+            "_bucket",
+            "queue_count",
+        ] {
+            assert_eq!(histogram_family(name), None, "{name}");
+        }
+    }
 
     #[test]
     fn test_metric_type_display() {
@@ -698,6 +743,15 @@ mod tests {
         let err = ApiFuncResponse::<()>::err_internal("fail", Some("trace-xyz".to_string()));
         let json2 = serde_json::to_string(&err).unwrap();
         assert!(json2.contains("trace-xyz"));
+    }
+
+    #[test]
+    fn test_api_func_response_with_warnings() {
+        let ok = ApiFuncResponse::ok_with_warnings(1, vec!["node down".to_string()], None);
+        assert_eq!(
+            serde_json::to_string(&ok).unwrap(),
+            r#"{"status":"success","data":1,"warnings":["node down"]}"#
+        );
     }
 
     #[test]

@@ -17,26 +17,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!--
   OCodeBlock — a syntax-highlighted block of code with a copy button, optional
   secret masking (Reveal/Hide), optional window chrome (terminal / editor), and
-  a slot for extra toolbar actions. Copy always copies the raw `code` prop, never
-  the highlighted markup or the masked variant.
+  a slot for extra toolbar actions. The Copy button copies the raw `code` prop;
+  a text selection copies only what is shown, so a masked token stays masked.
 
   For inline / simple code chips without highlighting, use OCode.
 -->
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, type CSSProperties } from "vue";
-import hljs from "highlight.js";
+import { computed, ref, type CSSProperties } from "vue";
+import hljs from "./highlighter";
 import { copyToClipboard } from "@/utils/clipboard";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useI18nTyped } from "@/types/i18n";
-import { hclLanguage } from "./hclLanguage";
 import type { CodeBlockProps, CodeBlockEmits, CodeBlockSlots } from "./OCodeBlock.types";
-
-// highlight.js has no HCL grammar of its own, so `lang="hcl"` is registered here
-// — once per module, not per instance — and behaves like a built-in from then on.
-if (!hljs.getLanguage("hcl")) hljs.registerLanguage("hcl", hclLanguage);
 
 const { t } = useI18nTyped();
 
@@ -50,14 +45,6 @@ const CODE_LINE_HEIGHT = 1.55;
 const CODE_INSET = "0.75rem";
 
 const MASK_CHAR = "\u2022";
-
-const COPIED_ICON_MS = 2000;
-
-interface MaskedSpan {
-  start: number;
-  end: number;
-  real: string;
-}
 
 const props = withDefaults(defineProps<CodeBlockProps>(), {
   wrap: false,
@@ -150,130 +137,36 @@ const copySuccessMessage = computed(() =>
     : (props.copyMessage ?? t("common.copySuccess")),
 );
 
-const justCopied = ref(false);
-let copiedTimer: ReturnType<typeof setTimeout> | undefined;
-const markCopied = () => {
-  if (!props.copyOnClick) return;
-  justCopied.value = true;
-  clearTimeout(copiedTimer);
-  copiedTimer = setTimeout(() => (justCopied.value = false), COPIED_ICON_MS);
-};
-onBeforeUnmount(() => clearTimeout(copiedTimer));
-
 const onCopy = () => {
   copyToClipboard(props.code, t, {
     successMessage: copySuccessMessage.value,
     errorMessage: t("common.copyContentError"),
   }).then((copied) => {
-    if (!copied) return;
-    markCopied();
-    emit("copy", { partial: false });
+    if (copied) emit("copy", { partial: false });
   });
 };
 
-/** Pairs each mask run in `masked` with the slice of `code` it hides; null when they do not line up. */
-const maskedSpans = (code: string, masked: string): MaskedSpan[] | null => {
-  const spans: MaskedSpan[] = [];
-  let delta = 0;
-  let from = 0;
-  let start = masked.indexOf(MASK_CHAR, from);
-  while (start >= 0) {
-    let end = start;
-    while (end < masked.length && masked[end] === MASK_CHAR) end++;
-    const next = masked.indexOf(MASK_CHAR, end);
-    const anchor = masked.slice(end, next < 0 ? masked.length : next);
-    const realStart = start + delta;
-    const realEnd = next < 0 ? code.length - anchor.length : code.indexOf(anchor, realStart);
-    if (realEnd < realStart) return null;
-    spans.push({ start, end, real: code.slice(realStart, realEnd) });
-    delta = realEnd - end;
-    from = end;
-    start = next;
-  }
-  let rebuilt = "";
-  let pos = 0;
-  for (const span of spans) {
-    rebuilt += masked.slice(pos, span.start) + span.real;
-    pos = span.end;
-  }
-  return rebuilt + masked.slice(pos) === code ? spans : null;
-};
-
-const spans = computed(() => (props.codeMasked ? maskedSpans(props.code, props.codeMasked) : null));
-
-// Any overlap with a mask copies the whole secret: a fragment of a token is useless.
-const unmaskSelection = (masked: string, list: MaskedSpan[], from: number, to: number) => {
-  let text = "";
-  let pos = from;
-  let replaced = false;
-  for (const span of list) {
-    if (span.end <= from || span.start >= to) continue;
-    text += masked.slice(pos, Math.max(pos, span.start)) + span.real;
-    pos = Math.max(pos, span.end);
-    replaced = true;
-  }
-  return { text: text + masked.slice(pos, Math.max(pos, to)), replaced };
-};
-
 const codeEl = ref<HTMLElement | null>(null);
-const preEl = ref<HTMLElement | null>(null);
-
-const textOffset = (root: Node, node: Node, offset: number) => {
-  const range = document.createRange();
-  range.selectNodeContents(root);
-  range.setEnd(node, offset);
-  return range.toString().length;
-};
-
-const onNativeCopy = (event: ClipboardEvent) => {
+const onNativeCopy = () => {
   const root = codeEl.value;
   const selection = window.getSelection();
   if (!root || !selection || selection.rangeCount === 0 || selection.isCollapsed) return;
   const range = selection.getRangeAt(0);
   const inside = root.contains(range.startContainer) && root.contains(range.endContainer);
   if (!inside) return;
-  if (props.codeMasked && !revealed.value && spans.value && event.clipboardData) {
-    const from = textOffset(root, range.startContainer, range.startOffset);
-    const to = textOffset(root, range.endContainer, range.endOffset);
-    const { text, replaced } = unmaskSelection(props.codeMasked, spans.value, from, to);
-    if (replaced) {
-      event.clipboardData.setData("text/plain", text);
-      event.preventDefault();
-      toast({ variant: "success", message: copySuccessMessage.value, timeout: 2000 });
-    }
+  // a selection over the hidden token pastes as dots, so it is not a usable copy of the command
+  if (props.codeMasked && !revealed.value && selection.toString().includes(MASK_CHAR)) {
+    toast({ variant: "warning", message: t("components.codeBlock.maskedSelectionWarning") });
+    return;
   }
-  if (props.copyOnClick) emit("copy", { partial: true });
-};
-
-const isFocused = ref(false);
-// Focus lands on pointerdown, so the click handler needs the state from before it.
-let focusedBeforeClick: boolean | null = null;
-const onPrePointerDown = () => {
-  focusedBeforeClick = document.activeElement === preEl.value;
-};
-const onPreClick = () => {
-  const wasFocused = focusedBeforeClick ?? document.activeElement === preEl.value;
-  focusedBeforeClick = null;
-  if (!props.copyOnClick || wasFocused) return;
-  const selection = window.getSelection();
-  if (selection && !selection.isCollapsed && selection.toString() !== "") return;
-  preEl.value?.focus();
-  onCopy();
-};
-const onPreEnter = (event: KeyboardEvent) => {
-  if (!props.copyOnClick) return;
-  event.preventDefault();
-  onCopy();
+  emit("copy", { partial: true });
 };
 </script>
 
 <template>
   <div
-    class="o2-code-block rounded-default bg-syntax-bg my-3 overflow-hidden border"
-    :class="[
-      chrome ? `o2-chrome-${chrome}` : '',
-      copyOnClick && isFocused ? 'border-accent' : 'border-border-default',
-    ]"
+    class="o2-code-block rounded-default border-border-default bg-syntax-bg my-3 overflow-hidden border"
+    :class="chrome ? `o2-chrome-${chrome}` : ''"
     :data-test="dataTest"
   >
     <div
@@ -335,7 +228,7 @@ const onPreEnter = (event: KeyboardEvent) => {
           size="icon-xs-sq"
           @click="onCopy"
         >
-          <OIcon :name="justCopied ? 'check' : 'content-copy'" size="sm" />
+          <OIcon name="content-copy" size="sm" />
           <OTooltip :content="t('common.copy')" side="top" />
         </OButton>
       </div>
@@ -348,24 +241,14 @@ const onPreEnter = (event: KeyboardEvent) => {
          Tag and content stay on one line: Vue preserves whitespace inside
          <pre>, so a newline here would indent the first line of code. -->
     <pre
-      ref="preEl"
       class="o2-code-pre"
       :class="[
         wrap ? 'o2-code-pre--wrap' : '',
         showLineNumbers ? 'o2-code-pre--numbered' : '',
         padded ? 'px-3 py-2' : '',
-        copyOnClick ? 'focus:outline-none' : '',
-        copyOnClick && !isFocused ? 'cursor-pointer' : '',
       ]"
       :style="preStyle"
-      :tabindex="copyOnClick ? 0 : undefined"
-      :aria-keyshortcuts="copyOnClick ? 'Enter' : undefined"
       :data-test="`${dataTest}-pre`"
-      @pointerdown="onPrePointerDown"
-      @click="onPreClick"
-      @keydown.enter="onPreEnter"
-      @focus="isFocused = true"
-      @blur="isFocused = false"
       @copy="onNativeCopy"
     ><span
       v-if="showLineNumbers"

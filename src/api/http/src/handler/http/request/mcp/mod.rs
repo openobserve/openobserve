@@ -797,6 +797,44 @@ mod tests {
         // stream-scoped time range stays an MCP tool; the org-level one opted out
         assert!(tools.iter().any(|tool| tool.name == "GetTraceTimeRange"));
         assert!(tools.iter().all(|tool| tool.name != "GetOrgTraceTimeRange"));
+        for name in [
+            "GetDbMonitoringDatabases",
+            "GetDbMonitoringQueries",
+            "GetDbMonitoringQueryInsights",
+            "GetDbMonitoringInstanceMetrics",
+        ] {
+            let tool = tools
+                .iter()
+                .find(|tool| tool.name == name)
+                .unwrap_or_else(|| panic!("{name} is not an MCP tool"));
+            assert_eq!(tool.category.as_deref(), Some("db_monitoring"), "{name}");
+        }
+        for (name, params) in [
+            (
+                "GetDbMonitoringQueryHistory",
+                &["system", "instance", "namespace", "env", "service"][..],
+            ),
+            (
+                "GetDbMonitoringQueries",
+                &["baseline_start_time", "baseline_end_time"][..],
+            ),
+        ] {
+            let tool = tools.iter().find(|tool| tool.name == name).unwrap();
+            for param in params {
+                assert!(
+                    tool.input_schema["properties"].get(param).is_some(),
+                    "{name} cannot express {param}"
+                );
+            }
+        }
+        // superseded by GetDbMonitoringQueryInsights, or a UI-only aggregate
+        for name in [
+            "GetDbMonitoringQueryPlans",
+            "GetDbMonitoringQueryServerMetrics",
+            "GetDbMonitoringBadges",
+        ] {
+            assert!(tools.iter().all(|tool| tool.name != name), "{name}");
+        }
     }
 
     #[test]

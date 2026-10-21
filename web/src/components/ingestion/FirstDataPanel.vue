@@ -24,7 +24,6 @@ import OCard from "@/lib/core/Card/OCard.vue";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OText from "@/lib/core/Typography/OText.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import config from "@/aws-exports";
@@ -35,7 +34,11 @@ import { getEndPoint, getImageURL } from "@/utils/zincutils";
 import { b64EncodeStandard } from "@/utils/formatters";
 import { copyToClipboard } from "@/utils/clipboard";
 import { isPrimaryCloudWebUrl } from "@/utils/otelCollectorConfig";
-import { USER_DATA_STREAM_TYPES, userDataStreams } from "@/utils/internalStreams";
+import {
+  USER_DATA_STREAM_TYPES,
+  userDataStreams,
+  type UserDataStreamType,
+} from "@/utils/internalStreams";
 import { OPEN_TOKEN_PICKER, useCredentialSnippet } from "@/composables/useCredentialSnippet";
 import { useOrgCredential } from "@/composables/useOrgCredential";
 import type { FirstEventResult, StreamSignal } from "@/composables/firstEvent/useFirstEventWatch";
@@ -51,7 +54,8 @@ type FirstDataLayout = "panel" | "card" | "status" | "pending" | "forbidden" | "
 
 const props = withDefaults(
   defineProps<{
-    signal: StreamSignal | "any";
+    /** Profiles have no first-data panel; they are watched only on their setup page. */
+    signal: UserDataStreamType | "any";
     variant: "full" | "compact";
     /** Set after the page re-queried on the first stream: renders the arrival strip only. */
     arrived?: FirstEventResult;
@@ -458,7 +462,6 @@ const StatusLine = defineComponent({
             chrome="terminal"
             wrap
             inset
-            copy-on-click
             data-test="first-data-panel-code-block"
             @copy="({ partial }) => trackCopy(partial)"
             @token-click="onTokenClick"
@@ -473,9 +476,6 @@ const StatusLine = defineComponent({
               :waiting-label="waitingLabel"
               @detected="onDetected"
             />
-            <OText v-if="command" variant="meta">{{
-              t("ingestion.firstDataPanel.clickToCopy")
-            }}</OText>
             <span class="flex-1" />
             <OButton
               variant="ghost-primary"

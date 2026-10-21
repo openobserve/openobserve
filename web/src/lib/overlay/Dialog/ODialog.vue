@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { DIALOG_DEPTH_KEY } from "./dialogStacking";
 // Copyright 2026 OpenObserve Inc.
 
 import type { DialogProps, DialogEmits, DialogSlots } from "./ODialog.types";
@@ -43,8 +44,8 @@ const $attrs = useAttrs();
 const parentDataTest = computed(() => $attrs["data-test"] as string | undefined);
 
 // Stacking support: each nested ODialog gets a higher z-index layer
-const dialogDepth = inject<number>("o2DialogDepth", 0);
-provide("o2DialogDepth", dialogDepth + 1);
+const dialogDepth = inject<number>(DIALOG_DEPTH_KEY, 0);
+provide(DIALOG_DEPTH_KEY, dialogDepth + 1);
 
 // Auto loading: an OForm nested in the body (linked via `form-id`) mirrors its
 // `isSubmitting` into this ref, so the footer Save button shows its spinner
@@ -61,6 +62,7 @@ const props = withDefaults(defineProps<DialogProps>(), {
   showClose: true,
   width: undefined,
   maxHeight: undefined,
+  primaryButtonDataTest: "o-dialog-primary-btn",
   primaryButtonVariant: "primary",
   secondaryButtonVariant: "outline",
   neutralButtonVariant: "ghost",
@@ -70,6 +72,7 @@ const props = withDefaults(defineProps<DialogProps>(), {
   primaryButtonLoading: false,
   secondaryButtonLoading: false,
   neutralButtonLoading: false,
+  initialFocus: "primary",
 });
 
 const emit = defineEmits<DialogEmits>();
@@ -146,7 +149,8 @@ function handleEscapeKeyDown(e: KeyboardEvent) {
 // non-printable keys — Escape must keep reaching reka's dismiss layer.
 function handleContentKeydown(e: KeyboardEvent) {
   if (e.ctrlKey || e.metaKey || e.altKey) return;
-  if (e.key.length !== 1) return;
+  // Browser autofill dispatches keydown events with no `key`.
+  if (typeof e.key !== "string" || e.key.length !== 1) return;
   if (isInputFocused(e.target)) return;
   e.stopPropagation();
 }
@@ -249,6 +253,7 @@ const contentStyle = computed(() => {
 // ── Auto-focus logic ─────────────────────────────────────────────────────────
 const bodyRef = ref<HTMLElement | null>(null);
 const primaryBtnRef = ref<InstanceType<typeof OButton> | null>(null);
+const secondaryBtnRef = ref<InstanceType<typeof OButton> | null>(null);
 
 // Text fields take priority; a select/combobox trigger (OSelect listbox
 // trigger, reka SelectTrigger) is the second tier so a dialog whose
@@ -283,8 +288,9 @@ function handleOpenAutoFocus(event: Event) {
       field.focus();
       return;
     }
-    // No form field found → focus primary button (confirm dialog pattern)
-    const btnEl = (primaryBtnRef.value as any)?.$el as HTMLElement | undefined;
+    // No form field found → focus the chosen footer button (confirm dialog pattern)
+    const btnRef = props.initialFocus === "secondary" ? secondaryBtnRef : primaryBtnRef;
+    const btnEl = (btnRef.value as any)?.$el as HTMLElement | undefined;
     if (btnEl) {
       btnEl.focus();
     }
@@ -606,6 +612,7 @@ watch(shown, (open) => {
             <div class="flex items-center gap-2">
               <OButton
                 v-if="secondaryButtonLabel"
+                ref="secondaryBtnRef"
                 data-test="o-dialog-secondary-btn"
                 :variant="secondaryButtonVariant"
                 size="sm-action"
@@ -619,7 +626,7 @@ watch(shown, (open) => {
               <OButton
                 v-if="primaryButtonLabel"
                 ref="primaryBtnRef"
-                data-test="o-dialog-primary-btn"
+                :data-test="primaryButtonDataTest"
                 :variant="primaryButtonVariant"
                 size="sm-action"
                 :type="formId ? 'submit' : 'button'"

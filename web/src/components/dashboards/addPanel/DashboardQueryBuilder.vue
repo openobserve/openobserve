@@ -90,6 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @dragenter="onDragEnter($event, 'x', index)"
               >
                 <OButton
+                  :aria-label="t('common.dragToReorder')"
                   variant="ghost"
                   size="icon-chip"
                   class="!w-4 !cursor-grab"
@@ -140,6 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </ODropdown>
                 <OButton
+                  :aria-label="t('common.remove')"
                   variant="ghost"
                   size="icon-chip"
                   class="!w-4"
@@ -258,6 +260,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @dragenter="onDragEnter($event, 'breakdown', index)"
               >
                 <OButton
+                  :aria-label="t('common.dragToReorder')"
                   variant="ghost"
                   size="icon-chip"
                   class="!w-4 !cursor-grab"
@@ -308,6 +311,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </ODropdown>
                 <OButton
+                  :aria-label="t('common.remove')"
                   variant="ghost"
                   size="icon-chip"
                   class="!w-4"
@@ -393,6 +397,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @dragenter="onDragEnter($event, 'y', index)"
           >
             <OButton
+              :aria-label="t('common.dragToReorder')"
               variant="ghost"
               size="icon-chip"
               class="!w-4 cursor-grab"
@@ -443,6 +448,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </ODropdown>
             <OButton
+              :aria-label="t('common.remove')"
               variant="ghost"
               size="icon-chip"
               class="!w-4"
@@ -527,6 +533,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @dragenter="onDragEnter($event, 'z', index)"
             >
               <OButton
+                :aria-label="t('common.dragToReorder')"
                 variant="ghost"
                 size="icon-chip"
                 class="!w-4 cursor-grab"
@@ -577,6 +584,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </ODropdown>
               <OButton
+                :aria-label="t('common.remove')"
                 variant="ghost"
                 size="icon-chip"
                 class="!w-4"

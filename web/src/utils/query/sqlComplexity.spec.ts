@@ -14,7 +14,12 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect } from "vitest";
-import { maxParenDepth, stripWherePredicate, SQL_PARSE_MAX_DEPTH } from "./sqlComplexity";
+import {
+  lexicalParenDepth,
+  maxParenDepth,
+  stripWherePredicate,
+  SQL_PARSE_MAX_DEPTH,
+} from "./sqlComplexity";
 
 describe("maxParenDepth", () => {
   it("counts the deepest nesting, not the total number of parens", () => {
@@ -24,6 +29,30 @@ describe("maxParenDepth", () => {
 
   it("returns 0 when there are no parens", () => {
     expect(maxParenDepth("SELECT a FROM t")).toBe(0);
+  });
+});
+
+describe("lexicalParenDepth", () => {
+  it("counts real nesting only", () => {
+    expect(lexicalParenDepth("SELECT a FROM t")).toBe(0);
+    expect(lexicalParenDepth("SELECT * FROM t WHERE ((a = 1) AND (b = 2))")).toBe(2);
+  });
+
+  it("ignores parens in literals ('' escapes), quoted identifiers and comments", () => {
+    expect(lexicalParenDepth("WHERE a = ')))' AND ((b = 1))")).toBe(2);
+    expect(lexicalParenDepth("WHERE a = 'it''s )))' AND (b = 1)")).toBe(1);
+    expect(lexicalParenDepth('SELECT "x))" FROM t WHERE (a = 1)')).toBe(1);
+    expect(lexicalParenDepth('SELECT "x"")" FROM t WHERE (a = 1)')).toBe(1);
+    expect(lexicalParenDepth("SELECT a -- )))\nFROM t WHERE (a = 1)")).toBe(1);
+    expect(lexicalParenDepth("SELECT a /* ))) */ FROM t WHERE (a = 1)")).toBe(1);
+  });
+
+  it("fails closed when it cannot be sure", () => {
+    expect(lexicalParenDepth("WHERE a = ')))")).toBe(Infinity);
+    expect(lexicalParenDepth('SELECT "x FROM t')).toBe(Infinity);
+    expect(lexicalParenDepth("SELECT a /* ) FROM t")).toBe(Infinity);
+    expect(lexicalParenDepth("WHERE a = 1))) AND ((b = 1))")).toBe(Infinity);
+    expect(lexicalParenDepth("WHERE ((a = 1)")).toBe(Infinity);
   });
 });
 

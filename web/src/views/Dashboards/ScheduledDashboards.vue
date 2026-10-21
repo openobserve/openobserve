@@ -51,6 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div data-test="scheduled-dashboards-container" class="scheduled-dashboards h-full min-h-0">
       <OTable
+        ref="oTableRef"
         class="w-full"
         data-test="scheduled-dashboard-table"
         :data="displayReports"
@@ -59,6 +60,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         pagination="client"
         :page-size="selectedPerPage"
         :page-size-options="perPageOptionsList"
+        :current-page="currentPage"
+        :sort-by="sortBy"
+        :sort-order="sortOrder"
+        @update:page-size="selectedPerPage = $event"
+        @update:current-page="currentPage = $event"
+        @update:sort-by="sortBy = $event"
+        @update:sort-order="sortOrder = $event"
         :show-global-filter="false"
         :default-columns="false"
         show-index
@@ -80,14 +88,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span class="cursor-pointer" @click="openReport(row)">{{ row.frequency }}</span>
         </template>
 
-        <template #cell-last_triggered_at="{ row }">
-          <span class="cursor-pointer" @click="openReport(row)">
+        <template #cell-last_run="{ row }">
+          <span class="inline-flex cursor-pointer items-center gap-2" @click="openReport(row)">
+            <OTag type="reportRunStatus" :value="row.last_run_chip" />
+            <OTooltip
+              v-if="row.last_run_chip === 'unrecorded'"
+              :content="t('reports.history.unrecordedTooltip')"
+            />
             <OTimeCell
-              :value="row.last_triggered_at_raw"
+              v-if="row.last_run_at_raw"
+              :value="row.last_run_at_raw"
               unit="us"
-              mode="absolute"
+              mode="relative"
               :timezone="store.state.timezone"
-              :empty-label="t('dashboard.scheduledDashboardsPage.never')"
             />
           </span>
         </template>
@@ -128,8 +141,12 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import AppTabs from "@/components/common/AppTabs.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
+import { isCachedReport, lastRunChip } from "@/utils/reports/reportRun";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { COL } from "@/lib/core/Table/OTable.types";
+import { useListViewState } from "@/composables/useListViewState";
 
 const props = defineProps({
   open: {
@@ -170,8 +187,20 @@ const { t } = useI18nTyped();
 
 const router = useRouter();
 
-const scheduledFilterQuery = ref("");
-const scheduledActiveTab = ref("cached");
+const savedView = useListViewState("scheduled-dashboards", {
+  activeTab: "cached",
+  filterQuery: "",
+  sortBy: "",
+  sortOrder: "asc" as "asc" | "desc",
+  pageSize: 20,
+  currentPage: 1,
+});
+const scheduledFilterQuery = ref(savedView.filterQuery);
+const scheduledActiveTab = ref(savedView.activeTab);
+const sortBy = ref<string>(savedView.sortBy);
+const sortOrder = ref<"asc" | "desc">(savedView.sortOrder);
+const currentPage = ref<number>(savedView.currentPage);
+const oTableRef = ref<any>(null);
 const scheduledReportTypeTabs = reactive([
   { label: t("reports.cached"), value: "cached", icon: "database" },
   { label: t("reports.scheduled"), value: "shared", icon: "schedule" },
@@ -191,8 +220,9 @@ const createScheduledReport = () => {
 
 // Row shape for the list: adds the raw sort keys not on the shared interface.
 // "#" is provided by OTable's show-index, so rows built here omit it.
-type ScheduledReportRow = Omit<ScheduledDashboardReport, "#"> & {
-  last_triggered_at_raw: number | null;
+type ScheduledReportRow = Omit<ScheduledDashboardReport, "#" | "last_triggered_at"> & {
+  last_run_at_raw: number | null;
+  last_run_chip: string;
   created_at_raw: number | null;
 };
 
@@ -213,8 +243,10 @@ watch(
 );
 
 watch(scheduledActiveTab, () => {
+  currentPage.value = 1;
   filterReports();
 });
+
 //this makes sure that reports are formatted when the component is mounted
 //because sometimes watcher might not be triggered if the props are already set
 onMounted(() => {
@@ -227,14 +259,12 @@ const formatReports = () => {
     tab: getTabName(report.dashboards?.[0]?.tabs?.[0]),
     time_range: getTimeRangeValue(report.dashboards?.[0]?.timerange),
     frequency: getFrequencyValue(report.frequency),
-    last_triggered_at_raw: report.last_triggered_at || null,
-    last_triggered_at: report.last_triggered_at
-      ? convertUnixToDateFormat(report.last_triggered_at)
-      : "-",
+    last_run_at_raw: report.last_run_at || null,
+    last_run_chip: lastRunChip(report, isCachedReport(report)),
     created_at_raw: report.created_at || null,
     created_at: convertUnixToDateFormat(report.created_at),
     orgId: report.org_id,
-    isCached: !report?.destinations?.length,
+    isCached: isCachedReport(report),
   }));
 
   filterReports();
@@ -289,9 +319,10 @@ const columns: OTableColumnDef[] = [
     meta: { align: "left" },
   },
   {
-    id: "last_triggered_at",
-    header: t("reports.lastTriggeredAt"),
-    accessorKey: "last_triggered_at",
+    id: "last_run",
+    header: t("reports.history.lastRun"),
+    accessorKey: "last_run_chip",
+    cell: " ",
     sortable: false,
     size: COL.dateAbsolute,
     meta: { align: "left" },
@@ -306,7 +337,31 @@ const columns: OTableColumnDef[] = [
   },
 ];
 
-const selectedPerPage = ref(20);
+const selectedPerPage = ref<number>(savedView.pageSize);
+
+watch(
+  [scheduledActiveTab, scheduledFilterQuery, sortBy, sortOrder, selectedPerPage, currentPage],
+  () => {
+    Object.assign(savedView, {
+      activeTab: scheduledActiveTab.value,
+      filterQuery: scheduledFilterQuery.value,
+      sortBy: sortBy.value,
+      sortOrder: sortOrder.value,
+      pageSize: selectedPerPage.value,
+      currentPage: currentPage.value,
+    });
+  },
+);
+
+// setTimeout(0) runs after TanStack's deferred auto-reset on the first data load, so the restored page wins.
+let pageRestored = false;
+watch(formattedReports, (rows) => {
+  if (pageRestored || !rows.length) return;
+  pageRestored = true;
+  setTimeout(() => {
+    (oTableRef.value as any)?.restorePage?.(currentPage.value);
+  }, 0);
+});
 
 const perPageOptionsList = [5, 10, 20, 50, 100];
 

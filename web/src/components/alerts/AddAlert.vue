@@ -220,6 +220,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OFormSelect
                   ref="streamTypeRef"
                   name="stream_type"
+                  :aria-label="t('alerts.streamType')"
                   data-test="add-alert-stream-type-select-dropdown"
                   :options="streamTypes"
                   :searchable="false"
@@ -241,6 +242,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OFormSelect
                   ref="streamNameRef"
                   name="stream_name"
+                  :aria-label="t('alerts.stream_name')"
                   data-test="add-alert-stream-name-select-dropdown"
                   :options="indexOptions"
                   :loading="isFetchingStreams"
@@ -923,6 +925,7 @@ export default defineComponent({
         path: "/alerts",
         query: {
           folder: alertForm.activeFolderId.value ?? "default",
+          tab: alertForm.router.currentRoute.value.query.tab,
           org_identifier: store.state.selectedOrganization.identifier,
         },
       });

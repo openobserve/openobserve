@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { createI18n } from "vue-i18n";
 import ScheduledDashboards from "./ScheduledDashboards.vue";
+import { resetListViewState, useListViewState } from "@/composables/useListViewState";
 
 // Mock Vuex store
 const mockStore = {
@@ -21,6 +22,10 @@ const mockRouter = {
 // Mock composables
 vi.mock("vuex", () => ({
   useStore: vi.fn(() => mockStore),
+}));
+
+vi.mock("@/stores", () => ({
+  default: { state: { selectedOrganization: { identifier: "test-org" } } },
 }));
 
 vi.mock("vue-router", () => ({
@@ -115,6 +120,8 @@ const i18n = createI18n({
 });
 
 describe("ScheduledDashboards", () => {
+  beforeEach(() => resetListViewState());
+
   const defaultProps = {
     open: true,
     reports: [],
@@ -354,6 +361,22 @@ describe("ScheduledDashboards", () => {
       expect(rows[0].name).toBe("Test Report 1");
       expect(rows[0].tab).toBe("Test Tab");
       expect(rows[0].isCached).toBe(true);
+    });
+
+    it("reads the list's is_cached flag for the tab and the Last run chip", async () => {
+      const emailed = {
+        ...mockReports[1],
+        name: "Emailed",
+        destinations: undefined,
+        is_cached: false,
+        last_run_status: "succeeded",
+        last_run_at: 1_760_000_000_000_000,
+      };
+      const wrapper = createWrapper({ reports: [emailed] });
+      await flushPromises();
+      const rows = (wrapper.vm as any).scheduledReports;
+      expect(rows[0].isCached).toBe(false);
+      expect(rows[0].last_run_chip).toBe("succeeded");
     });
 
     it("should handle frequency formatting for different types", () => {
@@ -625,6 +648,52 @@ describe("ScheduledDashboards", () => {
     it("should render action buttons", () => {
       const wrapper = createWrapper();
       expect(wrapper.findAll('[data-test="alert-list-add-alert-btn"]').length).toBeGreaterThan(0);
+    });
+  });
+
+  describe("view state persistence", () => {
+    const defaults = {
+      activeTab: "cached",
+      filterQuery: "",
+      sortBy: "",
+      sortOrder: "asc" as "asc" | "desc",
+      pageSize: 20,
+      currentPage: 1,
+    };
+
+    it("seeds tab, search, sort and paging from the saved view", () => {
+      Object.assign(useListViewState("scheduled-dashboards", defaults), {
+        activeTab: "shared",
+        filterQuery: "daily",
+        sortBy: "name",
+        sortOrder: "desc",
+        pageSize: 50,
+        currentPage: 2,
+      });
+      const vm = createWrapper().vm as any;
+
+      expect(vm.scheduledActiveTab).toBe("shared");
+      expect(vm.scheduledFilterQuery).toBe("daily");
+      expect(vm.sortBy).toBe("name");
+      expect(vm.sortOrder).toBe("desc");
+      expect(vm.selectedPerPage).toBe(50);
+      expect(vm.currentPage).toBe(2);
+    });
+
+    it("saves changes into the view state and resets the page on a tab switch", async () => {
+      Object.assign(useListViewState("scheduled-dashboards", defaults), { currentPage: 3 });
+      const vm = createWrapper().vm as any;
+
+      vm.scheduledFilterQuery = "weekly";
+      vm.scheduledActiveTab = "shared";
+      await flushPromises();
+
+      expect(vm.currentPage).toBe(1);
+      expect(useListViewState("scheduled-dashboards", defaults)).toMatchObject({
+        filterQuery: "weekly",
+        activeTab: "shared",
+        currentPage: 1,
+      });
     });
   });
 });

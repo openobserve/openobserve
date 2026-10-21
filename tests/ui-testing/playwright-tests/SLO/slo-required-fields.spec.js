@@ -431,23 +431,14 @@ test.describe('SLO alert required fields', { tag: ['@slo', '@sloAlerts', '@all']
     await context.close();
   });
 
-  /**
-   * A missing destination used to reach the server, which answered "Alert
-   * destination or workflows is required" in a banner attached to nothing.
-   * The field is where that belongs.
-   */
-  test('a missing destination is marked on the destinations field', {
+  // A destination is optional; the field says the alert notifies nobody instead of erroring.
+  test('a missing destination is noted on the destinations field, not rejected', {
     tag: ['@P0', '@validation'],
-  }, async ({ page }) => {
+  }, async () => {
     await pm.sloAlertsPage.setName(uniqueName(`${PREFIX}_nodest`));
     await pm.sloAlertsPage.applyPreset('fast');
-    await pm.sloAlertsPage.submitExpectingClientRejection();
 
-    // The field's own error node, shared with the generic alert form.
-    await expect(
-      page.locator('[data-test="alert-settings-destinations-error"]'),
-      'the destinations field must carry the reason',
-    ).toContainText(/at least one destination or workflow/i);
+    await pm.sloAlertsPage.expectNoDestinationNote();
   });
 
   test('a blank frequency is marked on the frequency field', {

@@ -583,7 +583,7 @@ sqlx = { version = "0.8.6", features = [
 strum = { version = "0.28", features = ["derive"] }
 svix-ksuid = { version = "0.8", features = ["serde"] }
 sysinfo = "0.38"
-tantivy = { version = "0.26", features = ["quickwit"] }
+tantivy = { version = "0.27", features = ["quickwit"] }
 tantivy-fst = "0.5"
 tempfile = "3"
 thiserror = "2.0"
@@ -627,9 +627,9 @@ vrl = { version = "0.31", features = [
     "test",
 ] }
 x509-parser = "0.18.0"
-zip = "8.0"
+zip = "9.0"
 zstd = "0.13"
 
 [patch.crates-io]
 object_store = { git = "https://github.com/openobserve/arrow-rs-object-store", branch = "openobserve-v0.13.2" }
-tantivy = { git = "https://github.com/openobserve/tantivy", branch = "perf/openobserve" }
+sqlparser = { git = "https://github.com/openobserve/sqlparser-rs", branch = "0.62.0-patch" }

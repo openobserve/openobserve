@@ -97,7 +97,18 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 97: create query_history.
 // 98: key alert_dedup_state by (org_id, fingerprint).
 // 99: add name to rum_pa_tombstones.
-pub const DB_SCHEMA_VERSION: u64 = 99;
+// 100: rule mode and raw transition values require new columns.
+// 101: create downtimes; muted_by_downtime_id, last_downtime_id, slo_backfill_jobs kind/attempts.
+// 102: create downtime_notifications.
+// 103: create alert_calibration_configs.
+// 104: create ai_chat_sessions (server-side AI chat persistence).
+// 105: create ai_chat_shares and add fork columns to ai_chat_sessions.
+// 106: create ai_chat_turns and add replica_purged_at to ai_chat_sessions.
+// 107: add redact_tools to ai_chat_shares.
+// 108: create oncall_phone_verifications and org_telephony.
+// 109: add last_run columns to reports.
+// 110: create rum_pa_app_settings; add rules_hash to rum_pa_funnels.
+pub const DB_SCHEMA_VERSION: u64 = 110;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -216,8 +227,14 @@ pub static SQL_FULL_TEXT_SEARCH_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
     fields
 });
 
-const _DEFAULT_SQL_SECONDARY_INDEX_SEARCH_FIELDS: [&str; 3] =
-    ["trace_id", "service_name", "operation_name"];
+const _DEFAULT_SQL_SECONDARY_INDEX_SEARCH_FIELDS: [&str; 6] = [
+    "trace_id",
+    "service_name",
+    "operation_name",
+    "_o2_trace_id",
+    "view_id",
+    "action_id",
+];
 pub static SQL_SECONDARY_INDEX_SEARCH_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
     let cfg = get_config();
     let default_fields: &[&str] = if cfg.common.feature_default_index_fields_enabled {
@@ -395,6 +412,12 @@ pub static COMPACT_OLD_DATA_STREAM_SET: Lazy<HashSet<String>> = Lazy::new(|| {
         .collect()
 });
 
+/// `ZO_COMPACT_DYNAMIC_MERGE_STREAM_TYPES` as a set; `check_compact_config` validated it.
+pub static COMPACT_DYNAMIC_MERGE_STREAM_TYPES: Lazy<HashSet<StreamType>> = Lazy::new(|| {
+    parse_dynamic_merge_stream_types(&get_config().compact.dynamic_merge_stream_types)
+        .expect("validated at startup")
+});
+
 pub static NATS_KV_WATCH_MODULES: Lazy<HashSet<String>> = Lazy::new(|| {
     get_config()
         .nats
@@ -459,7 +482,6 @@ pub const SYNTHETICS_RELOAD_CLASSES: &[(&str, SyntheticsReloadClass)] = &[
         "ZO_SYNTHETICS_ENABLED",
         SyntheticsReloadClass::RestartRequired,
     ),
-    ("ZO_SYNTHETICS_SUBTESTS_ENABLED", SyntheticsReloadClass::Hot),
     (
         "ZO_SYNTHETICS_SUBTESTS_REPLICATION_GRACE_SECS",
         SyntheticsReloadClass::Hot,
@@ -522,7 +544,6 @@ pub(crate) fn synthetics_restart_required_changes(
     // compiling here until someone decides whether a reload can carry it.
     let Synthetics {
         enabled,
-        subtests_enabled: _,
         subtests_replication_grace_secs: _,
         status_page_rebuild_interval,
         status_page_domain_verify_interval,
@@ -1039,6 +1060,40 @@ pub struct Config {
     pub alert_composite: AlertComposite,
     pub db_monitoring: DatabaseMonitoring,
     pub self_profiles: SelfProfiles,
+    pub public_ai_chat: PublicAiChat,
+}
+
+/// Unauthenticated read-only links to shared AI chats.
+#[derive(Debug, Serialize, EnvConfig, Default)]
+pub struct PublicAiChat {
+    #[env_config(
+        name = "ZO_PUBLIC_AI_CHAT_ENABLED",
+        default = false,
+        help = "Allow AI chats to be shared through public links. Off by default; the public route only exists when this is true."
+    )]
+    pub enabled: bool,
+    #[env_config(
+        name = "ZO_PUBLIC_AI_CHAT_RPM",
+        default = 60,
+        help = "Per-IP requests-per-minute limit on the public shared-chat route (0 disables)."
+    )]
+    pub rpm: u64,
+    #[env_config(
+        name = "ZO_PUBLIC_AI_CHAT_MAX_EXPIRY_DAYS",
+        default = 90,
+        help = "Longest expiry, in days, a public AI chat link may have; public links must expire (0 means 90)."
+    )]
+    pub max_expiry_days: u64,
+}
+
+impl PublicAiChat {
+    /// Longest expiry of a public link in days: `max_expiry_days`, 90 when unset, at most 365.
+    pub fn expiry_limit_days(&self) -> u64 {
+        match self.max_expiry_days {
+            0 => 90,
+            days => days.min(365),
+        }
+    }
 }
 
 /// Background self CPU/memory profile ingest into `_meta.self_profiles`.
@@ -1136,13 +1191,6 @@ pub struct Synthetics {
         help = "Master switch for synthetic monitoring. Off by default; the background workers and HTTP routes only exist when this is true."
     )]
     pub enabled: bool,
-    /// Off by default so no composed check can exist until an org opts in.
-    #[env_config(
-        name = "ZO_SYNTHETICS_SUBTESTS_ENABLED",
-        default = false,
-        help = "Enables subtest references in browser checks. Off by default; while false the server refuses composition writes and the UI hides Insert subtest."
-    )]
-    pub subtests_enabled: bool,
     /// Super-cluster only: how long a parent may reference a child that has not replicated yet.
     #[env_config(
         name = "ZO_SYNTHETICS_SUBTESTS_REPLICATION_GRACE_SECS",
@@ -2030,12 +2078,6 @@ pub struct Common {
         help = "Enable shared memtable across multiple organizations"
     )]
     pub feature_shared_memtable_enabled: bool,
-    #[env_config(
-        name = "ZO_FEATURE_WAL_PACK_ENABLED",
-        default = true,
-        help = "Persist metrics memtables into packed wal files (one file per rotation instead of one file per stream)"
-    )]
-    pub feature_wal_pack_enabled: bool,
     #[env_config(name = "ZO_UI_ENABLED", default = true)]
     pub ui_enabled: bool,
     #[env_config(name = "ZO_UI_SQL_BASE64_ENABLED", default = false)]
@@ -2114,6 +2156,12 @@ pub struct Common {
         help = "Enable per-stream trace time indexes and trace time-range lookup"
     )]
     pub trace_time_index_enabled: bool,
+    #[env_config(
+        name = "ZO_TRACE_LIST_TIME_INDEX_ENABLED",
+        default = true,
+        help = "Complete trace list summaries from the trace time index; off keeps the per-partition aggregates"
+    )]
+    pub trace_list_time_index_enabled: bool,
     #[env_config(name = "OTEL_OTLP_HTTP_ENDPOINT", default = "")]
     pub otel_otlp_url: String,
     #[env_config(name = "OTEL_OTLP_GRPC_ENDPOINT", default = "")]
@@ -2161,7 +2209,8 @@ pub struct Common {
     pub print_key_sql: bool,
     #[env_config(name = "ZO_PRINT_PLAN_SINGLE_LINE", default = true)]
     pub print_plan_single_line: bool,
-    // usage reporting
+    #[env_config(name = "ZO_USAGE_REPORTING_ENABLED", default = true)]
+    pub usage_reporting_enabled: bool,
     #[env_config(
         name = "ZO_USAGE_REPORTING_MODE",
         default = "local",
@@ -2171,7 +2220,7 @@ pub struct Common {
     #[env_config(
         name = "ZO_USAGE_REPORTING_URL",
         default = "http://localhost:5080/api/_meta/usage/_json",
-        help = "Where remote usage reporting posts. Unused in the open source build, which never reports usage."
+        help = "Where remote usage reporting posts when enabled."
     )]
     pub usage_reporting_url: String,
     #[env_config(name = "ZO_USAGE_REPORTING_CREDS", default = "")]
@@ -2390,12 +2439,6 @@ pub struct Common {
     #[env_config(name = "ZO_ADDITIONAL_REPORTING_ORGS", default = "")]
     pub additional_reporting_orgs: String,
     #[env_config(
-        name = "ZO_USAGE_REPORT_TO_OWN_ORG",
-        default = true,
-        help = "Report alert/report triggers to the originating organization in addition to _meta org"
-    )]
-    pub usage_report_to_own_org: bool,
-    #[env_config(
         name = "ZO_USE_STREAM_SETTINGS_FOR_PARTITIONS_ENABLED",
         default = false,
         help = "Enable to use stream settings for partitions. This will apply for all streams"
@@ -2457,6 +2500,12 @@ pub struct Common {
         help = "Show the Profiles module in the UI. Early-stage feature, hidden by default; ingestion and APIs stay available regardless"
     )]
     pub profiling_enabled: bool,
+    #[env_config(
+        name = "ZO_EXPERIMENTAL",
+        default = false,
+        help = "Show experimental features in the UI. Hidden by default"
+    )]
+    pub experimental: bool,
 }
 
 impl Common {
@@ -2869,6 +2918,12 @@ pub struct Limit {
         help = "Poll cadence in seconds for the query-recommendation puller. Only used when ZO_SCHEDULER_PER_MODULE_PULLERS=true. 0 inherits ZO_ALERT_SCHEDULE_INTERVAL."
     )]
     pub scheduler_query_reco_interval: i64,
+    #[env_config(
+        name = "ZO_SCHEDULER_ALERT_CALIBRATION_INTERVAL",
+        default = 0, // seconds
+        help = "Poll cadence in seconds for the alert calibration puller. Only used when ZO_SCHEDULER_PER_MODULE_PULLERS=true. 0 inherits ZO_ALERT_SCHEDULE_INTERVAL."
+    )]
+    pub scheduler_alert_calibration_interval: i64,
     #[env_config(name = "ZO_SEARCH_JOB_WORKS", default = 1)]
     pub search_job_workers: i64,
     #[env_config(name = "ZO_SEARCH_JOB_SCHEDULE_INTERVAL", default = 10)] // seconds
@@ -3010,6 +3065,12 @@ pub struct Limit {
     )]
     pub timechart_enabled: bool,
     #[env_config(
+        name = "ZO_EDITOR_SUGGEST_MODE",
+        help = "Query editor suggestions for every user: automatic (field, operator and value menus follow each other), typing (no follow-on menus) or off (the editor as it was before this setting)",
+        default = "automatic"
+    )]
+    pub editor_suggest_mode: String,
+    #[env_config(
         name = "ZO_HISTOGRAM_BREAKDOWN_FIELDS",
         help = "Comma-separated ordered list of stream fields used for stacked histogram breakdown. First match wins. Default: severity,log_level,level,status",
         default = "severity,log_level,level,status"
@@ -3041,12 +3102,6 @@ pub struct Limit {
 pub struct Compact {
     #[env_config(name = "ZO_COMPACT_ENABLED", default = true)]
     pub enabled: bool,
-    #[env_config(
-        name = "ZO_METRICS_INDEX_ENABLED",
-        default = false,
-        help = "Enable experimental metrics indexing and sample blocks for newly written metrics data."
-    )]
-    pub metrics_index_enabled: bool,
     #[env_config(name = "ZO_COMPACT_INTERVAL", default = 10)] // seconds
     pub interval: u64,
     #[env_config(
@@ -3077,6 +3132,12 @@ pub struct Compact {
     pub extended_data_retention_days: i64,
     #[env_config(name = "ZO_COMPACT_OLD_DATA_STREAMS", default = "")] // use comma to split
     pub old_data_streams: String,
+    #[env_config(
+        name = "ZO_COMPACT_DYNAMIC_MERGE_STREAM_TYPES",
+        default = "",
+        help = "Comma-separated stream types (logs, metrics, traces) whose closed days the compactor merges across hours when the day holds many more files than its size needs. The stream setting `dynamic_merge` overrides it per stream. Empty disables the feature. Queries on an enabled stream select files with a daily max_ts bound; after removing a type here, set ZO_<TYPE>_QUERY_RETENTION=daily so already merged days are still found."
+    )]
+    pub dynamic_merge_stream_types: String,
     #[env_config(name = "ZO_COMPACT_DATA_RETENTION_DAYS", default = 3650)] // days
     pub data_retention_days: i64,
     #[env_config(name = "ZO_COMPACT_OLD_DATA_MAX_DAYS", default = 7)] // days
@@ -3142,7 +3203,7 @@ pub struct Compact {
     #[env_config(
         name = "ZO_COMPACT_TANTIVY_BUILDER_THREAD_NUM",
         default = 2,
-        help = "Per-file concurrent row_group workers for tantivy index generation during compaction. less than or equal to 1 disables (single-threaded)"
+        help = "Per-file concurrent row_group workers for tantivy index generation during compaction. Minimum 2"
     )]
     pub tantivy_builder_thread_num: usize,
 }
@@ -3980,7 +4041,20 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.limit.workflow_error_retention_secs = 3600;
     }
 
+    cfg.limit.editor_suggest_mode = normalize_editor_suggest_mode(&cfg.limit.editor_suggest_mode)?;
+
     Ok(())
+}
+
+fn normalize_editor_suggest_mode(raw: &str) -> Result<String, anyhow::Error> {
+    let mode = raw.trim().to_lowercase();
+    match mode.as_str() {
+        "" => Ok("automatic".to_string()),
+        "automatic" | "typing" | "off" => Ok(mode),
+        _ => Err(anyhow::anyhow!(
+            "ZO_EDITOR_SUGGEST_MODE must be one of: automatic (default), typing or off; got {raw}"
+        )),
+    }
 }
 
 fn check_route_config(cfg: &Config) -> Result<(), anyhow::Error> {
@@ -4676,6 +4750,7 @@ fn check_compact_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
             "Data retention is not allowed to be less than 3 days."
         ));
     }
+    parse_dynamic_merge_stream_types(&cfg.compact.dynamic_merge_stream_types)?;
     if cfg.compact.interval < 1 {
         cfg.compact.interval = 10;
     }
@@ -4719,11 +4794,33 @@ fn check_compact_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.compact.pending_jobs_metric_interval == 0 {
         cfg.compact.pending_jobs_metric_interval = 300;
     }
+    if cfg.compact.tantivy_builder_thread_num < 2 {
+        cfg.compact.tantivy_builder_thread_num = 2;
+    }
     if !cfg.compact.fast_mode && cfg.common.local_mode {
         cfg.compact.fast_mode = true;
     }
 
     Ok(())
+}
+
+/// Parses `ZO_COMPACT_DYNAMIC_MERGE_STREAM_TYPES`; only logs, metrics and traces are merged by day.
+fn parse_dynamic_merge_stream_types(list: &str) -> Result<HashSet<StreamType>, anyhow::Error> {
+    list.split(',')
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(|s| {
+            let stream_type = StreamType::from(s);
+            stream_type
+                .support_dynamic_merge()
+                .then_some(stream_type)
+                .ok_or_else(|| {
+                    anyhow::anyhow!(
+                        "ZO_COMPACT_DYNAMIC_MERGE_STREAM_TYPES accepts logs, metrics, traces; got {s}"
+                    )
+                })
+        })
+        .collect()
 }
 
 fn check_sns_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
@@ -5070,11 +5167,6 @@ mod tests {
     }
 
     #[test]
-    fn budget_above_lease_is_rejected() {
-        assert!(validate_synthetics_ceilings(&ceilings(900, 901, 300_000)).is_err());
-    }
-
-    #[test]
     fn net_timeout_larger_than_the_budget_is_rejected() {
         // One attempt could never fit, so every config of that type would fail
         // validation for a reason the user cannot act on.
@@ -5141,7 +5233,6 @@ mod tests {
     /// `synthetics_restart_required_changes`.
     const ALL_SYNTHETICS_ENV_VARS: &[&str] = &[
         "ZO_SYNTHETICS_ENABLED",
-        "ZO_SYNTHETICS_SUBTESTS_ENABLED",
         "ZO_SYNTHETICS_SUBTESTS_REPLICATION_GRACE_SECS",
         "ZO_SYNTHETICS_LAMBDA_BROWSER",
         "ZO_SYNTHETICS_LAMBDA_NET",
@@ -5176,8 +5267,8 @@ mod tests {
     fn synthetics_reload_classification_is_pinned() {
         assert_eq!(
             SYNTHETICS_RELOAD_CLASSES.len(),
-            17,
-            "Synthetics has 17 keys; every one needs a reload class"
+            16,
+            "Synthetics has 16 keys; every one needs a reload class"
         );
 
         let mut classified: Vec<&str> = SYNTHETICS_RELOAD_CLASSES
@@ -5214,7 +5305,6 @@ mod tests {
                 "ZO_SYNTHETICS_ORPHAN_DETECTION_ENABLED",
                 "ZO_SYNTHETICS_RECORDER_EXTENSION_URL",
                 "ZO_SYNTHETICS_SCHEDULER_JITTER_ENABLED",
-                "ZO_SYNTHETICS_SUBTESTS_ENABLED",
                 "ZO_SYNTHETICS_SUBTESTS_REPLICATION_GRACE_SECS",
             ]
         );
@@ -5253,21 +5343,11 @@ mod tests {
         );
     }
 
-    #[test]
-    fn composition_is_off_by_default() {
-        let cfg = Config::init().unwrap();
-        assert!(
-            !cfg.synthetics.subtests_enabled,
-            "composition must ship dark: a fresh deployment must refuse subtest writes"
-        );
-    }
-
     /// Mutates every field away from its current value, so the two tests below
     /// run against the whole struct — an implementation that warns about an
     /// extra key cannot hide in the fields a subset forgot to touch.
     fn mutate_every_synthetics_field(cfg: &mut Synthetics) {
         cfg.enabled = !cfg.enabled;
-        cfg.subtests_enabled = !cfg.subtests_enabled;
         cfg.subtests_replication_grace_secs += 1;
         cfg.lambda_browser.push_str("-changed");
         cfg.lambda_net.push_str("-changed");
@@ -5487,35 +5567,6 @@ mod tests {
     }
 
     #[test]
-    fn test_usage_report_to_own_org_field_exists() {
-        // Test that usage_report_to_own_org field exists and is accessible
-        let cfg = Config::init().unwrap();
-        // Verify the field is accessible as a boolean
-        let _value: bool = cfg.common.usage_report_to_own_org;
-        // Test passes if we can access the field without error
-    }
-
-    #[test]
-    fn test_usage_report_to_own_org_env_override() {
-        // Test that environment variable can override the default
-        unsafe {
-            std::env::set_var("ZO_USAGE_REPORT_TO_OWN_ORG", "false");
-        }
-        let cfg = Config::init().unwrap();
-        // Note: This test may fail if the config is already loaded
-        // In that case, we just verify the field exists
-        let _ = cfg.common.usage_report_to_own_org;
-        unsafe {
-            std::env::remove_var("ZO_USAGE_REPORT_TO_OWN_ORG");
-        }
-    }
-
-    #[test]
-    fn test_ensure_not_empty_valid() {
-        assert!(ensure_not_empty("valid", "TEST").is_ok());
-    }
-
-    #[test]
     fn test_ensure_not_empty_invalid() {
         assert!(ensure_not_empty("", "TEST").is_err());
     }
@@ -5523,11 +5574,6 @@ mod tests {
     #[test]
     fn test_ensure_not_empty_with_whitespace() {
         assert!(ensure_not_empty("  value  ", "TEST").is_ok());
-    }
-
-    #[test]
-    fn test_ensure_not_empty_single_char() {
-        assert!(ensure_not_empty("a", "TEST").is_ok());
     }
 
     #[test]
@@ -6041,6 +6087,27 @@ mod tests {
     }
 
     #[test]
+    fn test_editor_suggest_mode_defaults_to_automatic() {
+        let mut cfg = Config::init().unwrap();
+        assert_eq!(cfg.limit.editor_suggest_mode, "automatic");
+        check_limit_config(&mut cfg).unwrap();
+        assert_eq!(cfg.limit.editor_suggest_mode, "automatic");
+    }
+
+    #[test]
+    fn test_editor_suggest_mode_normalizes_and_rejects_unknown_values() {
+        assert_eq!(normalize_editor_suggest_mode(" Typing ").unwrap(), "typing");
+        assert_eq!(normalize_editor_suggest_mode("OFF").unwrap(), "off");
+        assert_eq!(normalize_editor_suggest_mode("").unwrap(), "automatic");
+        for value in ["auto", "on", "invoke", "manual"] {
+            assert!(
+                normalize_editor_suggest_mode(value).is_err(),
+                "editor suggest mode {value} must be rejected instead of falling back"
+            );
+        }
+    }
+
+    #[test]
     fn test_check_queue_store_config_memory_requires_local_mode() {
         let mut cfg = Config::default();
         cfg.common.queue_store = "memory".to_string();
@@ -6458,13 +6525,6 @@ mod tests {
         assert_eq!(result, "/data/openobserve");
     }
 
-    #[test]
-    fn test_deverbatim_empty_path_unchanged() {
-        let p = std::path::Path::new("");
-        let result = deverbatim(p);
-        assert_eq!(result, "");
-    }
-
     #[cfg(windows)]
     #[test]
     fn test_deverbatim_verbatim_disk_stripped() {
@@ -6479,6 +6539,18 @@ mod tests {
         let p = std::path::Path::new(r"C:\data\openobserve");
         let result = deverbatim(p);
         assert_eq!(result, r"C:\data\openobserve");
+    }
+
+    #[test]
+    fn dynamic_merge_stream_types_accept_only_merged_types() {
+        let set = super::parse_dynamic_merge_stream_types(" logs, Metrics ,,traces ").unwrap();
+        assert_eq!(set.len(), 3);
+        assert!(
+            super::parse_dynamic_merge_stream_types("")
+                .unwrap()
+                .is_empty()
+        );
+        assert!(super::parse_dynamic_merge_stream_types("logs,index").is_err());
     }
 
     #[test]

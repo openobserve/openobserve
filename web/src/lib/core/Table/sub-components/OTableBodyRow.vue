@@ -3,6 +3,7 @@
 <script setup lang="ts">
 import type { Row, Table } from "@tanstack/vue-table";
 import { computed, inject, ref, onMounted, useSlots } from "vue";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OTableBodyCell from "./OTableBodyCell.vue";
 import OTableSelectCheckbox from "./OTableSelectCheckbox.vue";
 import OTableExpandButton from "./OTableExpandButton.vue";
@@ -33,6 +34,7 @@ const props = defineProps<{
   bordered?: boolean;
   striped?: boolean;
   rowClassFn?: string | ((row: any) => string);
+  isActive?: boolean;
   rowStyleFn?: (row: any) => Record<string, any>;
   /** Virtual scroll: callback for measuring row DOM element height */
   measureEl?: (el: HTMLElement | null) => void;
@@ -60,6 +62,21 @@ const props = defineProps<{
   /** Per-row predicate: when false, the drag handle is hidden for this row. */
   rowDraggable?: boolean;
 }>();
+
+const { t } = useI18nTyped();
+const selectLabel = computed(() => {
+  let named: unknown;
+  for (const cell of props.row.getVisibleCells()) {
+    const value = cell.getValue();
+    if ((typeof value === "string" && value.trim()) || typeof value === "number") {
+      named = value;
+      break;
+    }
+  }
+  return t("components.table.selectRow", {
+    name: raw(String(named ?? props.row.index + 1).slice(0, 80)),
+  });
+});
 
 const emit = defineEmits<{
   "toggle-selection": [row: any];
@@ -177,6 +194,8 @@ function onRowMouseleave() {
     :ref="setRowRef"
     :data-test="`o2-table-row-${row.index}`"
     :data-index="dynamicRowHeight ? virtualIndex : undefined"
+    :data-active-row="isActive ? 'true' : undefined"
+    :aria-current="isActive ? 'true' : undefined"
     :tabindex="clickable ? 0 : undefined"
     :class="[
       'group/row',
@@ -184,8 +203,9 @@ function onRowMouseleave() {
       clickable ? 'cursor-pointer' : '',
       'hover:bg-table-row-hover-bg',
       clickable ? 'focus-visible:bg-table-row-hover-bg focus:outline-none' : '',
-      isRowSelected ? 'bg-table-row-selected-bg' : '',
-      !isRowSelected && isStriped ? 'bg-table-row-striped-bg' : '',
+      isRowSelected || isActive ? 'bg-table-row-selected-bg' : '',
+      isActive ? 'ring-focus-ring-accent ring-2 ring-inset' : '',
+      !isRowSelected && !isActive && isStriped ? 'bg-table-row-striped-bg' : '',
       statusBarColor ? 'o2-table-row-with-status' : '',
       rowClass,
     ]"
@@ -238,6 +258,7 @@ function onRowMouseleave() {
         <OTableSelectCheckbox
           :model-value="isRowSelected ?? false"
           :row-id="String(row.index)"
+          :label="selectLabel"
           :disabled="isRowSelectable ? !isRowSelectable(row.original) : false"
           @update:model-value="emit('toggle-selection', row.original)"
         />

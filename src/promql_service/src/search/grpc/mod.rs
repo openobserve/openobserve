@@ -58,6 +58,8 @@ struct GroupPlan {
 
 struct StorageProvider {
     trace_id: String,
+    #[cfg(feature = "enterprise")]
+    org_id: String,
     need_wal: bool,
 }
 
@@ -116,7 +118,7 @@ impl TableProvider for StorageProvider {
     ) -> datafusion::error::Result<Option<tokio::sync::oneshot::Receiver<()>>> {
         let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
         if search_service::SEARCH_SERVER
-            .insert_sender(trace_id, abort_sender, true)
+            .insert_sender(&self.org_id, trace_id, abort_sender, true)
             .await
             .is_err()
         {
@@ -150,7 +152,16 @@ pub async fn search(
     } else {
         // 1. get max records stream
         let start_ts = std::time::Instant::now();
-        let plan = match get_max_file_list(&trace_id, org_id, &query.query, start, end).await {
+        let plan = match get_max_file_list(
+            &trace_id,
+            org_id,
+            &query.query,
+            start,
+            end,
+            query.query_exemplars,
+        )
+        .await
+        {
             Ok(v) => v,
             Err(e) => {
                 log::error!(
@@ -230,9 +241,10 @@ pub async fn search(
     };
 
     let mut scan_stats = ScanStats::default();
-    for (value, _result_type, stats, _took) in results {
+    for (value, _result_type, stats, _took, warnings) in results {
         add_value(&mut resp, value);
         scan_stats.add(&stats);
+        resp.warnings.extend(warnings);
     }
     resp.scan_stats = Some(cluster_rpc::ScanStats::from(&scan_stats));
 
@@ -253,7 +265,8 @@ pub async fn data(
     let trace_id = req.job.as_ref().unwrap().trace_id.to_string();
     let org_id = &req.org_id;
 
-    let (data_tx, mut data_rx) = mpsc::channel::<(value::Value, String, ScanStats, i64)>(2);
+    let (data_tx, mut data_rx) =
+        mpsc::channel::<(value::Value, String, ScanStats, i64, Vec<String>)>(2);
     let data_trace_id = trace_id.clone();
     let job = req.job.clone();
     tokio::task::spawn(async move {
@@ -263,11 +276,12 @@ pub async fn data(
                     log::info!("[trace_id {data_trace_id}] promql->data->grpc: data streaming end");
                     break;
                 }
-                Some((value, result_type, stats, took)) => {
+                Some((value, result_type, stats, took, warnings)) => {
                     let mut resp = cluster_rpc::MetricsQueryResponse {
                         job: job.clone(),
                         took: took as i32,
                         result_type: result_type.clone(),
+                        warnings,
                         ..Default::default()
                     };
 
@@ -296,7 +310,16 @@ pub async fn data(
         return Ok(());
     }
     // 1. get max records stream
-    let plan = match get_max_file_list(&trace_id, org_id, &query.query, start, end).await {
+    let plan = match get_max_file_list(
+        &trace_id,
+        org_id,
+        &query.query,
+        start,
+        end,
+        query.query_exemplars,
+    )
+    .await
+    {
         Ok(v) => v,
         Err(e) => {
             log::error!(
@@ -365,7 +388,7 @@ pub async fn data(
 #[tracing::instrument(name = "promql:search:grpc:search_inner", skip_all, fields(org_id = req.org_id))]
 pub async fn search_inner(
     req: &cluster_rpc::MetricsQueryRequest,
-) -> Result<(value::Value, String, ScanStats, i64)> {
+) -> Result<(value::Value, String, ScanStats, i64, Vec<String>)> {
     let start = std::time::Instant::now();
     let trace_id = req.job.as_ref().unwrap().trace_id.to_string();
     let org_id = &req.org_id;
@@ -408,12 +431,14 @@ pub async fn search_inner(
         query_ctx,
         StorageProvider {
             trace_id: trace_id.to_string(),
+            #[cfg(feature = "enterprise")]
+            org_id: org_id.to_string(),
             need_wal: req.need_wal,
         },
         query.label_selector.clone(),
     );
 
-    let (value, result_type, mut scan_stats) = if query.query_exemplars {
+    let (value, result_type, mut scan_stats, warnings) = if query.query_exemplars {
         ctx.query_exemplars(&trace_id, eval_stmt).await?
     } else {
         ctx.exec(&trace_id, eval_stmt).await?
@@ -428,7 +453,7 @@ pub async fn search_inner(
 
     scan_stats.format_to_mb();
     let took = start.elapsed().as_millis() as i64;
-    Ok((value, result_type, scan_stats, took))
+    Ok((value, result_type, scan_stats, took, warnings))
 }
 
 async fn get_max_file_list(
@@ -437,12 +462,20 @@ async fn get_max_file_list(
     query: &str,
     start: i64,
     end: i64,
+    query_exemplars: bool,
 ) -> Result<GroupPlan> {
     // 1. get metrics name
     let ast = promql::parse(query).map_err(DataFusionError::Execution)?;
     let mut visitor = name_visitor::MetricNameVisitor::default();
     walk_expr(&mut visitor, &ast).map_err(|e| DataFusionError::Execution(e.to_string()))?;
-    let metrics_name = visitor.into_names();
+    let mut metrics_name = visitor.into_names();
+    if query_exemplars {
+        let mut mapped = std::collections::HashSet::with_capacity(metrics_name.len());
+        for name in &metrics_name {
+            mapped.insert(promql::utils::exemplars_stream_for(org_id, name).await);
+        }
+        metrics_name = mapped;
+    }
     let window = selector_window(&ast);
 
     // 2. get max records stream

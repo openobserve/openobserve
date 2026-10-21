@@ -35,6 +35,7 @@ vi.mock("monaco-editor/esm/vs/editor/editor.api", () => ({
     setLanguageConfiguration: vi.fn(),
   },
 }));
+vi.mock("monaco-editor/esm/vs/editor/editor.all.js", () => ({}));
 vi.mock("monaco-editor/esm/vs/basic-languages/sql/sql.contribution.js", () => ({}));
 vi.mock("@/utils/query/promqlLanguageDefinition", () => ({
   loadPromqlLanguage: vi.fn().mockResolvedValue({ language: {}, languageConfiguration: {} }),

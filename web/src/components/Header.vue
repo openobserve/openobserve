@@ -60,6 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <a :href="homeUrl" @click.prevent="goToHome" class="inline-flex items-center">
           <!-- Dark mode: Show dark logo, fallback to light logo -->
           <img
+            :alt="t('common.customLogoAlt')"
             v-if="
               isDark &&
               store.state.zoConfig.hasOwnProperty('custom_logo_dark_img') &&
@@ -70,6 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <!-- Light mode: Show light logo, fallback to dark logo -->
           <img
+            :alt="t('common.customLogoAlt')"
             v-else-if="
               !isDark &&
               store.state.zoConfig.hasOwnProperty('custom_logo_img') &&
@@ -80,6 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <!-- Fallback: Show whichever logo exists (dark or light) -->
           <img
+            :alt="t('common.customLogoAlt')"
             v-else-if="
               store.state.zoConfig.hasOwnProperty('custom_logo_dark_img') &&
               store.state.zoConfig?.custom_logo_dark_img != null
@@ -88,6 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             style="max-width: 9.375rem; max-height: 2rem"
           />
           <img
+            :alt="t('common.customLogoAlt')"
             v-else-if="
               store.state.zoConfig.hasOwnProperty('custom_logo_img') &&
               store.state.zoConfig?.custom_logo_img != null
@@ -221,10 +225,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
 
         <div class="header-utility-icons flex items-center gap-x-2">
-          <!-- AI CHAT TOGGLE: Enterprise feature to toggle AI chat panel.
+          <!-- AI CHAT TOGGLE: Enterprise/Cloud feature to toggle AI chat panel.
            Leads the utility-icon cluster, set off by a separator from the
-           org selector so it reads as the primary action in this group. -->
-          <template v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled">
+           org selector so it reads as the primary action in this group.
+           Shown locked (not hidden) in builds that don't unlock it. -->
+          <template v-if="aiButtonVisible">
             <OButton
               variant="ghost"
               size="icon-toolbar"
@@ -237,10 +242,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @mouseleave="handleMouseLeave"
             >
               <img
+                alt=""
                 :src="getBtnLogo"
                 class="h-5 w-5 shrink-0 [transition:transform_0.6s_ease] group-hover:rotate-180 group-hover:brightness-0 group-hover:invert group-hover:[transition:filter_0.3s_ease]"
               />
+              <span
+                v-if="!aiAccess.allowed"
+                aria-hidden="true"
+                class="bg-surface-overlay border-surface-base absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full border shadow-sm"
+              >
+                <OIcon name="lock" size="xs" class="text-warning-600 size-2.5!" />
+              </span>
               <OTooltip
+                v-if="aiAccess.allowed"
                 side="bottom"
                 align="center"
                 :content="t('menu.aiAssistant')"
@@ -356,6 +370,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <ODropdownSeparator />
 
+              <template v-if="showMyOncall">
+                <ODropdownItem data-test="header-my-oncall" @select="goToMyOncall">
+                  <template #icon-left>
+                    <OIcon size="xs" name="person" class="padding-none" />
+                  </template>
+                  {{ t("oncall.mineTitle") }}
+                </ODropdownItem>
+                <ODropdownSeparator />
+              </template>
+
               <!-- A menuitem cannot hold menuitems, so the list is the row's sibling inside one positioned wrapper. -->
               <div class="relative" role="none">
                 <ODropdownItem
@@ -461,6 +485,7 @@ import { defineComponent, PropType, computed, nextTick, ref } from "vue";
 import { useRouter } from "vue-router";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useTheme } from "@/composables/useTheme";
+import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 import useBreakpoint from "@/composables/useBreakpoint";
 import ThemeSwitcher from "./ThemeSwitcher.vue";
 import EnterpriseUpgradeDialog from "./EnterpriseUpgradeDialog.vue";
@@ -468,10 +493,12 @@ import OrganizationSelector from "./OrganizationSelector.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { checkFeatureAccess } from "@/utils/enterpriseFeatures";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
+import { isGateOpen, useNavGateContext } from "@/lib/core/Navbar/useNavGateContext";
 
 import { getImageURL } from "@/utils/zincutils";
 import { chartColor } from "@/utils/chartTheme";
@@ -588,8 +615,11 @@ export default defineComponent({
       }).href;
     });
 
-    // Enterprise upgrade dialog state
-    const showEnterpriseDialog = ref(false);
+    // Enterprise upgrade dialog state — a module-level singleton (see the
+    // composable) so a locked feature's tooltip link elsewhere in the app can
+    // open the SAME dialog instance this header button does.
+    const { isOpen: showEnterpriseDialog, open: openEnterpriseDialog } =
+      useEnterpriseUpgradeDialog();
 
     const showLanguageSubmenu = ref(false);
     const languageListRef = ref<HTMLElement | null>(null);
@@ -659,6 +689,26 @@ export default defineComponent({
       event.stopPropagation();
     };
 
+    // AI chat toggle — shown locked (not hidden) in builds that don't unlock
+    // it. Same `ai_enabled`-is-an-admin-preference-not-an-upsell-target
+    // reasoning as QueryEditor.vue's floating AI icon: an entitled org that's
+    // turned AI off still never sees the button at all.
+    //
+    // NOT `buildFeatureGateContext()` — that reads the `@/aws-exports`
+    // singleton directly, but this component takes edition info as its own
+    // `config` PROP (so a host can inject it / tests can override it) rather
+    // than importing the module. Build the context from the prop instead.
+    const aiAccess = computed(() =>
+      checkFeatureAccess("aiAssistant", {
+        isEnterprise: props.config.isEnterprise === "true",
+        isCloud: props.config.isCloud === "true",
+        rbac: props.store.state.zoConfig?.rbac_enabled !== false,
+      }),
+    );
+    const aiButtonVisible = computed(
+      () => !aiAccess.value.allowed || Boolean(props.store.state.zoConfig.ai_enabled),
+    );
+
     // Computed property for enterprise button text based on deployment type
     const enterpriseButtonText = computed(() => {
       const isEnterprise = props.config.isEnterprise === "true";
@@ -699,6 +749,10 @@ export default defineComponent({
     };
 
     const toggleAIChat = () => {
+      if (!aiAccess.value.allowed) {
+        openEnterpriseDialog();
+        return;
+      }
       emit("toggleAIChat");
     };
 
@@ -745,9 +799,18 @@ export default defineComponent({
       emit("updateOrganization");
     };
 
-    // Open enterprise upgrade dialog
-    const openEnterpriseDialog = () => {
-      showEnterpriseDialog.value = true;
+    const navGateContext = useNavGateContext();
+    // Same gate and route check the nav flyout applies to the On-Call entries.
+    const showMyOncall = computed(
+      () => isGateOpen(navGateContext.value, "oncall") && props.router.hasRoute("onCallMine"),
+    );
+
+    const goToMyOncall = () => {
+      // eslint-disable-next-line vue/no-mutating-props -- vue-router's push navigates; the rule mistakes it for Array#push.
+      props.router.push({
+        name: "onCallMine",
+        query: { org_identifier: props.store.state.selectedOrganization.identifier },
+      });
     };
 
     return {
@@ -769,6 +832,8 @@ export default defineComponent({
       homeUrl,
       goToAbout,
       toggleAIChat,
+      aiAccess,
+      aiButtonVisible,
       openSlack,
       navigateToOpenAPI,
       navigateToDocs,
@@ -780,6 +845,8 @@ export default defineComponent({
       handleMouseLeave,
       handleOrgSelection,
       openEnterpriseDialog,
+      showMyOncall,
+      goToMyOncall,
     };
   },
 });

@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Unified View Toggle: Service Graph / Traces / Spans -->
           <OToggleGroup
             :model-value="searchObj.meta.searchMode"
-            @update:model-value="$emit('update:searchMode', $event)"
+            @update:model-value="onSearchModeChange"
           >
             <OToggleGroupItem
               data-test="traces-search-mode-spans-btn"
@@ -53,11 +53,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span v-if="!shouldHideToggleText">{{ t("traces.tracesTab") }}</span>
             </OToggleGroupItem>
             <OToggleGroupItem
-              v-if="config.isEnterprise == 'true'"
+              v-if="serviceGraphAccess.visible"
               data-test="traces-service-graph-toggle"
               value="service-graph"
               size="sm"
-              :tooltip="shouldHideToggleText ? t('traces.serviceGraphTab') : undefined"
+              :icon-right="!serviceGraphAccess.allowed ? 'lock' : undefined"
+              :tooltip="
+                serviceGraphAccess.allowed && shouldHideToggleText
+                  ? t('traces.serviceGraphTab')
+                  : undefined
+              "
             >
               <template #icon-left><OIcon name="share" size="sm" class="shrink-0" /></template>
               <span v-if="!shouldHideToggleText">{{ t("traces.serviceGraphTab") }}</span>
@@ -392,6 +397,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div class="text-2xs text-muted-foreground">
                       {{ t("search.liveModeTooltip") }}
                     </div>
+                    <div class="text-2xs text-muted-foreground">
+                      {{ t("search.autoRunAppliesTo") }}
+                    </div>
                   </span>
                 </ODropdownItem>
               </ODropdown>
@@ -505,6 +513,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :keywords="effectiveKeywords"
           :suggestions="effectiveSuggestions"
           :field-value-resolver="resolveFieldValues"
+          :debounce-time="100"
+          :filter-mode="!searchObj.meta.sqlMode"
           language="sql"
           @update:query="updateQueryValue"
           @run-query="searchData"
@@ -585,6 +595,8 @@ import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
+import { useLockedAffordance } from "@/composables/useLockedAffordance";
 import useTraces from "@/composables/useTraces";
 import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
 import SyntaxGuide from "./SyntaxGuide.vue";
@@ -760,18 +772,28 @@ export default defineComponent({
       { immediate: true },
     );
 
+    // Set as soon as the stream is chosen, so a value lookup on the first keystroke is not left without one.
+    const syncSuggestStreamContext = () => {
+      autoCompleteData.value.org = store.state.selectedOrganization?.identifier ?? "";
+      autoCompleteData.value.streamType = "traces";
+      autoCompleteData.value.streamName = searchObj.data.stream.selectedStream?.value ?? "";
+      autoCompleteData.value.fieldValues = props.fieldValues;
+    };
+    watch(
+      () => [
+        store.state.selectedOrganization?.identifier,
+        searchObj.data.stream.selectedStream?.value,
+        props.fieldValues,
+      ],
+      syncSuggestStreamContext,
+      { immediate: true },
+    );
+
     const updateAutoComplete = (value) => {
       autoCompleteData.value.query = value;
-      autoCompleteData.value.cursorIndex = queryEditorRef.value.getCursorIndex();
-      autoCompleteData.value.fieldValues = props.fieldValues;
-      autoCompleteData.value.popup.open = queryEditorRef.value.triggerAutoComplete;
-      // [NEW] Set stream context so getSuggestions can read stored values from
-      // IndexedDB. Traces field expansion already writes to IDB via
-      // captureFromValuesApi (useFieldValuesStream) with stream_type="traces",
-      // so values are already being captured — this just enables the read side.
-      autoCompleteData.value.org = store.state.selectedOrganization.identifier;
-      autoCompleteData.value.streamType = "traces";
-      autoCompleteData.value.streamName = searchObj.data.stream.selectedStream.value ?? "";
+      autoCompleteData.value.cursorIndex = queryEditorRef.value?.getCursorIndex();
+      autoCompleteData.value.popup.open = queryEditorRef.value?.triggerAutoComplete;
+      syncSuggestStreamContext();
       getSuggestions();
     };
 
@@ -1268,10 +1290,21 @@ export default defineComponent({
         !searchObj.data.errorMsg?.trim()?.length &&
         !!searchObj.searchApplied,
     );
+    const serviceGraphAccess = useLockedAffordance("enterprise");
+    const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
+
+    // OToggleGroup is controlled, so refusing to emit here keeps a locked Service Graph from switching.
+    const onSearchModeChange = (value: unknown) => {
+      if (value === "service-graph" && !serviceGraphAccess.value.allowed) {
+        openUpgradeDialog();
+        return;
+      }
+      emit("update:searchMode", value);
+    };
 
     const leftBaseWidth = computed(() => {
       const textKey = shouldHideToggleText.value ? "icon" : "text";
-      const toggle = config.isEnterprise == "true" ? TOGGLE_WIDTH.enterprise : TOGGLE_WIDTH.oss;
+      const toggle = serviceGraphAccess.value.visible ? TOGGLE_WIDTH.enterprise : TOGGLE_WIDTH.oss;
       const widths = [toggle[textKey], MORE_WIDTH];
       if (showDrillDown.value) widths.push(DRILL_DOWN_WIDTH[textKey]);
       if (isSearchMode.value) widths.push(RESET_WIDTH[shouldHideResetText.value ? "icon" : "text"]);
@@ -1349,6 +1382,8 @@ export default defineComponent({
       savedViewsDropdownOpen,
       quickUpdateSavedView,
       confirmUpdateSavedView,
+      serviceGraphAccess,
+      onSearchModeChange,
     };
   },
   computed: {

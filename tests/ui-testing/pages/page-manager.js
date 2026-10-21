@@ -9,6 +9,8 @@ import DashboardPanel from "./dashboardPages/dashboard-panel-edit";
 import DashboardSetting from "./dashboardPages/dashboard-settings";
 import DashboardVariables from "./dashboardPages/dashboard-variables";
 import DashboardVariablesScoped from "./dashboardPages/dashboard-variables-scoped.js";
+import DashboardAutoRun from "./dashboardPages/dashboard-auto-run.js";
+import DashboardLivePreview from "./dashboardPages/dashboard-live-preview.js";
 import ChartTypeSelector from "./dashboardPages/dashboard-chart";
 import DashboardSqlAutocomplete from "./dashboardPages/dashboard-sql-autocomplete";
 import DashboardPromQLEditor from "./dashboardPages/dashboard-promql-editor";
@@ -33,12 +35,25 @@ import { AlertLibraryPage } from "./alertsPages/alertLibraryPage.js";
 import { AlertHistoryPage } from "./alertsPages/alertHistoryPage.js";
 import { AlertDetailPage } from "./alertsPages/alertDetailPage.js";
 import { AlertSaveQueryModePage } from "./alertsPages/alertSaveQueryModePage.js";
+import { AlertNoDestinationPage } from "./alertsPages/alertNoDestinationPage.js";
 import { CompositeAlertsPage } from "./alertsPages/compositeAlertsPage.js";
 import { IncidentsPage } from "./alertsPages/incidentsPage.js";
 import { SloListPage } from "./sloPages/sloListPage.js";
 import { SloFormPage } from "./sloPages/sloFormPage.js";
 import { SloDetailPage } from "./sloPages/sloDetailPage.js";
 import { SloAlertsPage } from "./sloPages/sloAlertsPage.js";
+import { OnCallTeamsPage } from "./oncallPages/oncallTeamsPage.js";
+import { OnCallTeamDetailPage } from "./oncallPages/oncallTeamDetailPage.js";
+import { OnCallPagesListPage } from "./oncallPages/oncallPagesListPage.js";
+import { OnCallRoutingPage } from "./oncallPages/oncallRoutingPage.js";
+import { OnCallResponseDetailPage } from "./oncallPages/oncallResponseDetailPage.js";
+import { OnCallCoveragePage } from "./oncallPages/oncallCoveragePage.js";
+import { OnCallPolicyEditorPage } from "./oncallPages/oncallPolicyEditorPage.js";
+import { OnCallMinePage } from "./oncallPages/oncallMinePage.js";
+import { SyntheticsListPage } from "./syntheticsPages/syntheticsListPage.js";
+import { SyntheticsCreatePage } from "./syntheticsPages/syntheticsCreatePage.js";
+import { SyntheticsResultsPage } from "./syntheticsPages/syntheticsResultsPage.js";
+import { SyntheticsSettingsPage } from "./syntheticsPages/syntheticsSettingsPage.js";
 
 // ===== SANITY SPEC ADDITIONAL PAGE OBJECTS =====
 import { LogsPage } from "./logsPages/logsPage.js";
@@ -120,6 +135,7 @@ const WorkflowFoldersPage = require("./workflowsPages/workflowFoldersPage.js");
 
 // ===== LOGS, REPORTS, STREAMS, PIPELINES ADDITIONAL PAGE OBJECTS =====
 import { LogsQueryPage } from "./logsPages/logsQueryPage.js";
+import { LogsToolbarPinsPage } from "./logsPages/logsToolbarPinsPage.js";
 import { SearchHistoryPage } from "./logsPages/searchHistoryPage.js";
 import UnflattenedPage from "./logsPages/unflattened.js";
 
@@ -135,6 +151,7 @@ import { StreamsFormValidationPage } from "./streamsPages/streamsFormValidationP
 const FunctionsPage = require("./functionsPages/functionsPage.js");
 const FunctionsFormValidationPage = require("./functionsPages/functionsFormValidationPage.js");
 const FunctionsImportExportPage = require("./functionsPages/functionsImportExportPage.js");
+const PipelineImportExportPage = require("./pipelinesPages/pipelineImportExportPage.js");
 
 // ===== ANOMALY DETECTION PAGE OBJECTS =====
 const { AnomalyDetectionPage } = require("./anomalyPages/anomalyDetectionPage.js");
@@ -160,6 +177,8 @@ class PageManager {
     this.dashboardSetting = new DashboardSetting(page);
     this.dashboardVariables = new DashboardVariables(page);
     this.dashboardVariablesScoped = new DashboardVariablesScoped(page);
+    this.dashboardAutoRun = new DashboardAutoRun(page);
+    this.dashboardLivePreview = new DashboardLivePreview(page);
     this.chartTypeSelector = new ChartTypeSelector(page);
     this.dashboardSqlAutocomplete = new DashboardSqlAutocomplete(page);
     this.dashboardPromQLEditor = new DashboardPromQLEditor(page);
@@ -186,6 +205,7 @@ class PageManager {
     this.alertHistoryPage = new AlertHistoryPage(page);
     this.alertDetailPage = new AlertDetailPage(page);
     this.alertSaveQueryModePage = new AlertSaveQueryModePage(page);
+    this.alertNoDestinationPage = new AlertNoDestinationPage(page);
     this.compositeAlertsPage = new CompositeAlertsPage(page);
     this.incidentsPage = new IncidentsPage(page);
 
@@ -194,6 +214,22 @@ class PageManager {
     this.sloFormPage = new SloFormPage(page);
     this.sloDetailPage = new SloDetailPage(page);
     this.sloAlertsPage = new SloAlertsPage(page);
+
+    // ===== ON-CALL PAGE OBJECTS (enterprise) =====
+    this.oncallTeamsPage = new OnCallTeamsPage(page);
+    this.oncallTeamDetailPage = new OnCallTeamDetailPage(page);
+    this.oncallPagesListPage = new OnCallPagesListPage(page);
+    this.oncallRoutingPage = new OnCallRoutingPage(page);
+    this.oncallResponseDetailPage = new OnCallResponseDetailPage(page);
+    this.oncallCoveragePage = new OnCallCoveragePage(page);
+    this.oncallPolicyEditorPage = new OnCallPolicyEditorPage(page);
+    this.oncallMinePage = new OnCallMinePage(page);
+
+    // ===== SYNTHETICS PAGE OBJECTS =====
+    this.syntheticsListPage = new SyntheticsListPage(page);
+    this.syntheticsCreatePage = new SyntheticsCreatePage(page);
+    this.syntheticsResultsPage = new SyntheticsResultsPage(page);
+    this.syntheticsSettingsPage = new SyntheticsSettingsPage(page);
 
     // ===== API CLEANUP =====
     this.apiCleanup = new APICleanup(page);
@@ -204,6 +240,7 @@ class PageManager {
 
     // ===== SANITY SPEC ADDITIONAL PAGE OBJECTS =====
     this.logsPage = new LogsPage(page);
+    this.logsToolbarPinsPage = new LogsToolbarPinsPage(page);
     this.searchHistoryPage = new SearchHistoryPage(page);
     this.streamsPage = new StreamsPage(page);
     this.alertTemplatesPage = new AlertTemplatesPage(page);
@@ -282,6 +319,7 @@ class PageManager {
     this.functionsPage = new FunctionsPage(page);
     this.functionsFormValidation = new FunctionsFormValidationPage(page);
     this.functionsImportExport = new FunctionsImportExportPage(page);
+    this.pipelineImportExport = new PipelineImportExportPage(page);
 
     // ===== CIPHER KEYS PAGE OBJECTS =====
     this.cipherKeysFormValidation = new CipherKeysFormValidationPage(page);

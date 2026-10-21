@@ -30,13 +30,11 @@
 //!
 //! ## Architecture
 //!
-//! - **Hot path** (`try_deduct`): atomic CAS on per-org counter, sends deduction record to a
-//!   bounded channel, broadcasts delta via dedicated NATS queue.
+//! - **AI hot path** (`try_deduct`): one DB transaction checks and spends, so nodes agree.
+//! - **In-memory path** (`try_deduct_units`): atomic CAS plus NATS deltas; no production caller.
 //! - **DB flush** (`flush_to_db`): background job drains the channel periodically, coalesces
 //!   per-org/feature records, and batch-upserts to DB.
-//! - **Cluster sync** (`subscribe_ha_queue`): listens for delta messages from other nodes on a
-//!   dedicated NATS queue and atomically adds the delta to the local counter. Skips messages from
-//!   self (source_node check). Deltas are commutative so message ordering doesn't matter.
+//! - **Cluster sync** (`subscribe_ha_queue`): applies other nodes' limit, consent and deltas.
 
 use std::{
     collections::HashMap,
@@ -657,24 +655,63 @@ pub async fn refresh_paid_overage_from_db() {
     }
 }
 
-/// Try to deduct one unit of a feature from its org pool.
-///
-/// Returns `Ok(remaining)` on success, or `Err(QuotaExhaustedError)` when
-/// the pool is depleted.
-///
-/// The limit check is against total usage across every feature IN THAT POOL,
-/// not per-feature and not across pools; the DB still tracks per feature.
+/// Reload the AI usage cache from the DB; it feeds precheck, display and emails, not deduction.
+pub async fn refresh_usage_from_db() {
+    let pool = TrialQuotaPool::AiCredits;
+    match infra::table::trial_quota_usage::load_for_features(pool.feature_keys()).await {
+        Ok(records) => {
+            let (totals, _) = fold_db_records(&records);
+            let mut map = ORG_USAGE.write();
+            for (key, total) in totals {
+                map.insert(key, AtomicU64::new(total));
+            }
+        }
+        Err(err) => {
+            log::warn!("[TRIAL_QUOTA] Failed to refresh usage: {err}");
+        }
+    }
+}
+
+/// Deduct one unit against the shared DB pool; outer `Err` = DB unavailable, inner = pool depleted.
 pub async fn try_deduct(
     org_id: &str,
     feature: TrialQuotaFeature,
-) -> Result<u64, Box<dyn std::error::Error + Send + Sync>> {
-    log::info!(
-        "[TRIAL_QUOTA] try_deduct called: org={org_id} feature={feature} cost={} pool_limit={}",
-        feature.cost(),
-        get_pool_limit(org_id, feature.pool()),
-    );
-    try_deduct_units(org_id, feature, 1)
-        .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)
+) -> Result<Result<u64, QuotaExhaustedError>, anyhow::Error> {
+    let pool = feature.pool();
+    let to_i64 = |v: u64| i64::try_from(v).unwrap_or(i64::MAX);
+    let spend = infra::table::trial_quota_usage::try_spend(
+        org_id,
+        pool.seed_feature(),
+        feature.feature_key(),
+        pool.feature_keys(),
+        to_i64(feature.cost()),
+        to_i64(pool.default_limit()),
+    )
+    .await?;
+    let to_u64 = |v: i64| u64::try_from(v).unwrap_or(0);
+    match spend {
+        infra::table::trial_quota_usage::Spend::Spent { used, limit } => {
+            // Display/precheck cache only; `refresh_usage_from_db` keeps the rest in step.
+            let key = scope(org_id, pool);
+            ensure_scope_counter(&key);
+            if let Some(counter) = ORG_USAGE.read().get(&key) {
+                counter.fetch_max(to_u64(used), Ordering::AcqRel);
+            }
+            log::debug!(
+                "[TRIAL_QUOTA] deducted: org={org_id} feature={feature} total_used={used}/{limit}"
+            );
+            Ok(Ok(to_u64(limit.saturating_sub(used))))
+        }
+        infra::table::trial_quota_usage::Spend::Exhausted { used, limit } => {
+            log::info!(
+                "[TRIAL_QUOTA] quota exhausted: org={org_id} feature={feature} used={used} limit={limit}"
+            );
+            Ok(Err(QuotaExhaustedError {
+                usage_count: to_u64(used),
+                usage_limit: to_u64(limit),
+            }))
+        }
+    }
 }
 
 /// Deduct `units x feature.cost()` from the feature's pool, all or nothing.
@@ -1275,12 +1312,27 @@ impl AiUsagePermit {
     }
 }
 
+/// What unblocks a 402, sent with it so the UI needs no second billing lookup.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PaymentRemedy {
+    Subscribe,
+    ContactAccountManager,
+    /// Credits ran out mid-request; resending reaches the consent prompt.
+    Retry,
+}
+
 #[derive(Debug, thiserror::Error)]
 pub enum AiUsageAuthorizationError {
     #[error("Paid usage requires organization consent.")]
     PaidOverageConsentRequired(PaidOverageStatus),
-    #[error("{0}")]
-    PaymentRequired(String),
+    #[error("{message}")]
+    PaymentRequired {
+        message: String,
+        remedy: PaymentRemedy,
+        /// Set for a billing-group member, whose payer org holds the subscription.
+        payer_org_id: Option<String>,
+    },
     #[error("AI usage authorization is temporarily unavailable: {0}")]
     Unavailable(String),
 }
@@ -1322,14 +1374,21 @@ async fn authorize_paid_overage(
             ))
         }
         PaidOverageBillingStatus::AdditionalCreditsRequired => {
-            Err(AiUsageAuthorizationError::PaymentRequired(
-                "AI credit limit exhausted. Contact your account manager to add more credits."
-                    .to_string(),
-            ))
+            Err(AiUsageAuthorizationError::PaymentRequired {
+                message:
+                    "AI credit limit exhausted. Contact your account manager to add more credits."
+                        .to_string(),
+                remedy: PaymentRemedy::ContactAccountManager,
+                payer_org_id: resolution.payer_org_id,
+            })
         }
-        PaidOverageBillingStatus::SubscriptionRequired => Err(
-            AiUsageAuthorizationError::PaymentRequired(exhausted_message.to_string()),
-        ),
+        PaidOverageBillingStatus::SubscriptionRequired => {
+            Err(AiUsageAuthorizationError::PaymentRequired {
+                message: exhausted_message.to_string(),
+                remedy: PaymentRemedy::Subscribe,
+                payer_org_id: resolution.payer_org_id,
+            })
+        }
     }
 }
 
@@ -1342,7 +1401,11 @@ pub async fn authorize_ai_usage(
     feature: TrialQuotaFeature,
     usage_context: &AiUsageContext,
 ) -> Result<AiUsagePermit, AiUsageAuthorizationError> {
-    match try_deduct(org_id, feature).await {
+    // A DB error must not reach the paid path: that would bill an org with free credits left.
+    let deducted = try_deduct(org_id, feature)
+        .await
+        .map_err(|error| AiUsageAuthorizationError::Unavailable(error.to_string()))?;
+    match deducted {
         Ok(_) => {
             record_free_ai_usage(org_id, usage_context, feature);
             Ok(AiUsagePermit { feature })
@@ -1369,6 +1432,19 @@ pub struct AiUsageResponse {
     pub credits_limit: u64,
     pub credits_remaining: u64,
     pub requires_additional_credits: bool,
+    /// Set for a billing-group member, whose payer org holds the subscription.
+    pub payer_org_id: Option<String>,
+    pub costs: AiCreditCosts,
+    /// Free credits each feature used; `None` when the breakdown could not be read.
+    pub used_by_feature: Option<AiCreditCosts>,
+}
+
+/// Credits per AI feature: the configured cost of one operation, or the credits it used.
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct AiCreditCosts {
+    pub chat: u64,
+    pub incident: u64,
+    pub incident_reanalysis: u64,
 }
 
 /// One pool's usage for an org. Field names are unit-neutral because AI counts
@@ -1383,6 +1459,8 @@ pub struct PoolUsageResponse {
     pub limit: u64,
     pub remaining: u64,
     pub requires_additional_credits: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub payer_org_id: Option<String>,
 }
 fn pool_usage_mode(
     exhaustion_policy: Option<
@@ -1446,16 +1524,24 @@ pub async fn get_pool_usage(org_id: &str, pool: TrialQuotaPool) -> PoolUsageResp
 
     let used = db_used.max(in_memory_used);
     let remaining = limit.saturating_sub(used);
-    let exhaustion_policy = if remaining == 0 {
+    use o2_enterprise::enterprise::cloud::ai_credits::{
+        AiCreditBillingResolution, AiCreditExhaustionPolicy, resolve_ai_credit_billing,
+    };
+
+    // A billing lookup failure stays fail-closed as subscription-required.
+    let billing = if remaining == 0 {
         Some(
-            o2_enterprise::enterprise::cloud::ai_credits::resolve_ai_credit_exhaustion_policy(
-                org_id,
-            )
-            .await,
+            resolve_ai_credit_billing(org_id)
+                .await
+                .unwrap_or(AiCreditBillingResolution {
+                    policy: AiCreditExhaustionPolicy::SubscriptionRequired,
+                    payer_org_id: None,
+                }),
         )
     } else {
         None
     };
+    let exhaustion_policy = billing.as_ref().map(|billing| billing.policy);
     let requires_additional_credits =
         exhaustion_policy.is_some_and(|policy| policy.requires_additional_credits());
     let consent_effective = if exhaustion_policy
@@ -1477,6 +1563,7 @@ pub async fn get_pool_usage(org_id: &str, pool: TrialQuotaPool) -> PoolUsageResp
         limit,
         remaining,
         requires_additional_credits,
+        payer_org_id: billing.and_then(|billing| billing.payer_org_id),
     }
 }
 
@@ -1488,15 +1575,43 @@ impl From<PoolUsageResponse> for AiUsageResponse {
             credits_limit: usage.limit,
             credits_remaining: usage.remaining,
             requires_additional_credits: usage.requires_additional_credits,
+            payer_org_id: usage.payer_org_id,
+            used_by_feature: None,
+            costs: AiCreditCosts {
+                chat: TrialQuotaFeature::AiChat.cost(),
+                incident: TrialQuotaFeature::NewIncident.cost(),
+                incident_reanalysis: TrialQuotaFeature::IncidentReAnalysis.cost(),
+            },
         }
     }
 }
 
 /// AI usage in the `credits_*` field names the AI route and UI consume.
 pub async fn get_usage(org_id: &str) -> AiUsageResponse {
-    get_pool_usage(org_id, TrialQuotaPool::AiCredits)
-        .await
-        .into()
+    let pool = TrialQuotaPool::AiCredits;
+    let mut usage: AiUsageResponse = get_pool_usage(org_id, pool).await.into();
+    usage.used_by_feature =
+        infra::table::trial_quota_usage::get_usage_by_feature(org_id, pool.feature_keys())
+            .await
+            .inspect_err(|e| log::warn!("[TRIAL_QUOTA] get_usage: org={org_id} breakdown: {e}"))
+            .ok()
+            .map(|rows| {
+                let used = |feature: TrialQuotaFeature| {
+                    let total: i64 = rows
+                        .iter()
+                        .filter(|(key, _)| key == feature.feature_key())
+                        .map(|(_, count)| count)
+                        .sum();
+                    // Clamped like the pool total: a refund can flush a negative delta.
+                    total.max(0) as u64
+                };
+                AiCreditCosts {
+                    chat: used(TrialQuotaFeature::AiChat),
+                    incident: used(TrialQuotaFeature::NewIncident),
+                    incident_reanalysis: used(TrialQuotaFeature::IncidentReAnalysis),
+                }
+            });
+    usage
 }
 
 /// Get the current usage percentage for an org (0–100, clamped).

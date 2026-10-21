@@ -23,6 +23,7 @@ use tokio::{
 };
 use usage::{TriggerData, UsageData};
 
+pub mod ai_chat;
 pub mod error;
 pub mod evaluator;
 pub mod llm_experiments;
@@ -389,6 +390,7 @@ mod tests {
             grouped: None,
             group_size: None,
             actual_value: None,
+            rule_value: None,
             threshold_value: None,
             threshold_operator: None,
             level: None,
@@ -396,7 +398,14 @@ mod tests {
             value_is_lower_bound: None,
             synthetics_error_source: None,
             synthetics_location: None,
+            downtime_id: None,
             delivery_attempted: None,
+            trigger_source: None,
+            triggered_by: None,
+            recipient_count: None,
+            attachment_type: None,
+            dashboard_count: None,
+            scheduled_for: None,
         };
 
         let result = queue
@@ -940,6 +949,7 @@ mod tests {
             grouped: None,
             group_size: None,
             actual_value: None,
+            rule_value: None,
             threshold_value: None,
             threshold_operator: None,
             level: None,
@@ -947,7 +957,14 @@ mod tests {
             value_is_lower_bound: None,
             synthetics_error_source: None,
             synthetics_location: None,
+            downtime_id: None,
             delivery_attempted: None,
+            trigger_source: None,
+            triggered_by: None,
+            recipient_count: None,
+            attachment_type: None,
+            dashboard_count: None,
+            scheduled_for: None,
         };
 
         let error_data = error::ErrorData {
@@ -1022,6 +1039,7 @@ mod tests {
             grouped: None,
             group_size: None,
             actual_value: None,
+            rule_value: None,
             threshold_value: None,
             threshold_operator: None,
             level: None,
@@ -1029,7 +1047,14 @@ mod tests {
             value_is_lower_bound: None,
             synthetics_error_source: None,
             synthetics_location: None,
+            downtime_id: None,
             delivery_attempted: None,
+            trigger_source: None,
+            triggered_by: None,
+            recipient_count: None,
+            attachment_type: None,
+            dashboard_count: None,
+            scheduled_for: None,
         };
 
         let trigger_data2 = TriggerData {
@@ -1089,6 +1114,7 @@ mod tests {
             grouped: None,
             group_size: None,
             actual_value: None,
+            rule_value: None,
             threshold_value: None,
             threshold_operator: None,
             level: None,
@@ -1096,7 +1122,14 @@ mod tests {
             value_is_lower_bound: None,
             synthetics_error_source: None,
             synthetics_location: None,
+            downtime_id: None,
             delivery_attempted: None,
+            trigger_source: None,
+            triggered_by: None,
+            recipient_count: None,
+            attachment_type: None,
+            dashboard_count: None,
+            scheduled_for: None,
         };
 
         // Should succeed when queue has space

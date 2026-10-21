@@ -3,6 +3,8 @@ import { shallowMount } from "@vue/test-utils";
 import { ref, reactive, nextTick } from "vue";
 import { createI18n } from "vue-i18n";
 import PanelEditor from "./PanelEditor.vue";
+import PanelErrorButtons from "@/components/dashboards/PanelErrorButtons.vue";
+import { usePanelEditorFocus } from "@/composables/dashboard/usePanelEditorFocus";
 
 // Mock vuex store
 const mockStore = {
@@ -89,6 +91,8 @@ vi.mock("@/composables/dashboard/useDashboardPanel", () => ({
 // Shared refs so tests can toggle composable state to truthy/falsy
 const mockChartData = ref(undefined as any);
 const mockShowLegendsDialog = ref(false);
+const mockNoticeProps = ref<Record<string, unknown>>({});
+const mockRunQuery = vi.fn();
 
 // Mock usePanelEditor composable
 vi.mock("./composables/usePanelEditor", () => ({
@@ -101,6 +105,11 @@ vi.mock("./composables/usePanelEditor", () => ({
     showLegendsDialog: mockShowLegendsDialog,
     shouldRefreshWithoutCache: ref(false),
     maxQueryRangeWarning: ref(""),
+    panelDiagnostics: ref(null),
+    seriesLimit: ref(null),
+    noticeProps: mockNoticeProps,
+    handlePanelDiagnosticsUpdate: vi.fn(),
+    handleSeriesLimitUpdate: vi.fn(),
     limitNumberOfSeriesWarningMessage: ref(""),
     errorMessage: ref(""),
     isPartialData: ref(false),
@@ -113,7 +122,7 @@ vi.mock("./composables/usePanelEditor", () => ({
     isLoading: ref(false),
     currentPanelData: ref({}),
     initChartData: vi.fn(),
-    runQuery: vi.fn(),
+    runQuery: mockRunQuery,
     handleChartApiError: vi.fn(),
     handleLastTriggeredAtUpdate: vi.fn(),
     handleLimitNumberOfSeriesWarningMessage: vi.fn(),
@@ -299,6 +308,85 @@ const mountGlobal = {
 
 describe("PanelEditor.vue", () => {
   let wrapper: any;
+
+  describe("preview notice chips", () => {
+    const mountWithNotices = (listeners: Record<string, unknown> = {}) =>
+      shallowMount(PanelEditor, {
+        props: { pageType: "dashboard", editMode: true, ...listeners },
+        global: {
+          ...mountGlobal,
+          stubs: { ...mountGlobal.stubs, PanelErrorButtons: false, OTooltip: false, OTag: false },
+        },
+      });
+
+    beforeEach(() => {
+      mockChartData.value = { type: "line", queries: [] };
+      mockNoticeProps.value = {
+        functionErrors: ["error[E203]: syntax error"],
+        seriesLimit: { shown: 100, total: 342, cap: 100 },
+        serverPartial: false,
+      };
+      mockDashboardPanelData.layout.isConfigPanelOpen = false;
+      mockDashboardPanelData.layout.showQueryBar = false;
+      (mockDashboardPanelData.layout as any).vrlFunctionToggle = false;
+    });
+
+    afterEach(() => {
+      usePanelEditorFocus().requestFocus(null);
+      mockNoticeProps.value = {};
+    });
+
+    it("renders the real PanelErrorButtons with the notice props and editor actions", () => {
+      wrapper = mountWithNotices();
+      const buttons = wrapper.findComponent(PanelErrorButtons);
+      expect(buttons.exists()).toBe(true);
+      expect(buttons.props("functionErrors")).toEqual(["error[E203]: syntax error"]);
+      expect(buttons.props("seriesLimit")).toEqual({ shown: 100, total: 342, cap: 100 });
+      expect(buttons.props("canEdit")).toBe(true);
+      expect(buttons.props("canRefresh")).toBe(true);
+      expect(buttons.props("canInspect")).toBe(false);
+      // The chips sit inside reka tooltip triggers, which a shallow mount does not render.
+      expect(buttons.vm.notices.map((n: any) => n.id)).toEqual(["function-error", "series-cap"]);
+      expect(buttons.find('[data-test="panel-limit-number-of-series-warning"]').exists()).toBe(
+        true,
+      );
+    });
+
+    it("focuses the VRL pane and the Top N input in place", () => {
+      wrapper = mountWithNotices();
+      const buttons = wrapper.findComponent(PanelErrorButtons);
+      const { pendingFocus } = usePanelEditorFocus();
+
+      buttons.vm.$emit("edit-panel", "edit-function");
+      expect(pendingFocus.value).toBe("vrl");
+      expect(mockDashboardPanelData.layout.showQueryBar).toBe(true);
+      expect((mockDashboardPanelData.layout as any).vrlFunctionToggle).toBe(true);
+
+      buttons.vm.$emit("edit-panel", "use-top-n");
+      expect(pendingFocus.value).toBe("top-n");
+      expect(mockDashboardPanelData.layout.isConfigPanelOpen).toBe(true);
+    });
+
+    it("re-runs its own preview on Refresh when the host does not take Apply", () => {
+      wrapper = mountWithNotices();
+      wrapper.findComponent(PanelErrorButtons).vm.$emit("refresh-panel");
+      expect(mockRunQuery).toHaveBeenCalled();
+    });
+
+    it("hands Refresh and Open inspector to a host that listens", () => {
+      const onApplyRequested = vi.fn();
+      const onOpenQueryInspector = vi.fn();
+      wrapper = mountWithNotices({ onApplyRequested, onOpenQueryInspector });
+      const buttons = wrapper.findComponent(PanelErrorButtons);
+      expect(buttons.props("canInspect")).toBe(true);
+
+      buttons.vm.$emit("refresh-panel");
+      buttons.vm.$emit("open-inspector");
+      expect(onApplyRequested).toHaveBeenCalledTimes(1);
+      expect(onOpenQueryInspector).toHaveBeenCalledTimes(1);
+      expect(mockRunQuery).not.toHaveBeenCalled();
+    });
+  });
 
   beforeEach(() => {
     // Reset shared state to a known baseline before each test

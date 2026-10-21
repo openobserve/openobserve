@@ -95,6 +95,7 @@ import {
 } from "@/utils/alerts/alertDataTransforms";
 import { AlertFocusManager } from "@/utils/alerts/focusManager";
 import { readAlertPrefill } from "@/utils/alerts/alertPrefillStorage";
+import { hasDeliveryTarget } from "@/utils/alerts/deliveryTarget";
 import { getAlertSource } from "@/utils/alerts/alertSourceRegistry";
 import type { AlertPrefill, AlertPrefillWarning } from "@/ts/interfaces/alertPrefill";
 import {
@@ -109,7 +110,6 @@ import {
   operatorNeedsValue,
 } from "@/utils/alerts/anomalyFilterOperators";
 import { toDetectionFunctionSql } from "@/utils/alerts/anomalySqlBuilder";
-import config from "@/aws-exports";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import { makeAddAlertSchema, defaultAddAlertMeta } from "@/components/alerts/AddAlert.schema";
 import {
@@ -159,6 +159,7 @@ export const defaultAlertValue: any = () => {
       // aggregation.multi_alert — a PromQL alert has no aggregation, so the
       // flag cannot live there.
       promql_multi_alert: false,
+      promql_rule_mode: false,
       // Feature 5 (§6b.6). `null` until the SLO query mode is chosen: the
       // backend enforces `query_type == slo` IFF this is present, so an empty
       // object here would make every ordinary alert fail validation.
@@ -515,21 +516,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   };
 
   // i18n-driven validation schema (messages resolve via `t` — see AddAlert.schema).
-  // Workflows are enterprise/cloud-only; where they exist an alert may be
-  // delivered to a destination OR a workflow, which relaxes "destinations ≥ 1"
-  // into "at least one of the two". In OSS this stays false and the rule (and
-  // its message) is byte-identical to before.
-  // Also respects the backend /config flag: on an enterprise build with
-  // workflows switched OFF the picker has no Workflows group, so relaxing the
-  // rule would surface "destination or workflow required" for a choice the user
-  // cannot make. Falls back to the strict "destination required" rule, which is
-  // the same rule OSS gets. (Built once in setup — if /config has not landed
-  // yet this is the stricter of the two, which is the safe direction.)
-  const addAlertSchema = makeAddAlertSchema(
-    t,
-    (config.isEnterprise === "true" || config.isCloud === "true") &&
-      store.state.zoConfig?.workflows_enabled === true,
-  );
+  const addAlertSchema = makeAddAlertSchema(t);
   const form = useOForm<AlertFormValues>({
     defaultValues: buildDefaultForm() as AlertFormValues,
     schema: addAlertSchema,
@@ -1868,7 +1855,9 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       // Otherwise: with a threshold expressed inside the query (HAVING / promql
       // condition), the trigger itself only needs "at least one row came back".
       const hasQueryThreshold =
-        !!prefill.promqlCondition || !!prefill.meta?.sqlHaving || !!prefill.aggregation;
+        !!prefill.promqlCondition ||
+        !!prefill.meta?.sqlHaving ||
+        (!!prefill.aggregation && !getAlertSource(prefill.source).aggregationIsSeed);
       if (prefill.triggerThreshold !== undefined) {
         data.trigger_condition.threshold = prefill.triggerThreshold;
         if (prefill.triggerOperator) {
@@ -2000,18 +1989,6 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       toast({
         variant: "error",
         message: t("alerts.messages.fixHighlightedFields"),
-      });
-      return;
-    }
-
-    if (
-      anomalyConfig.value.alert_enabled &&
-      anomalyConfig.value.alert_destination_ids.length === 0
-    ) {
-      activeTab.value = "anomaly-alerting";
-      toast({
-        variant: "error",
-        message: t("alerts.validation.destinationRequired"),
       });
       return;
     }
@@ -2406,6 +2383,8 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     }
 
     const payload = getAlertPayload();
+    // Read before the save: resetForm in .then clears the form the payload came from.
+    const sendsNowhere = !hasDeliveryTarget(payload);
 
     const dismiss = toast({
       variant: "loading",
@@ -2454,7 +2433,9 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
           dismiss();
           toast({
             variant: "success",
-            message: t("alerts.messages.alertUpdated"),
+            message: sendsNowhere
+              ? t("alerts.messages.alertUpdatedNoDestination")
+              : t("alerts.messages.alertUpdated"),
           });
           showSaveWarnings(res);
         })
@@ -2492,7 +2473,9 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
           dismiss();
           toast({
             variant: "success",
-            message: t("alerts.messages.alertSaved"),
+            message: sendsNowhere
+              ? t("alerts.messages.alertSavedNoDestination")
+              : t("alerts.messages.alertSaved"),
           });
           showSaveWarnings(res);
         })
@@ -2581,7 +2564,11 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       // frequency field's display unit). Falls back to 0 for any alert type
       // where the field is absent from the GET response (older cached
       // response shape, etc.) rather than showing NaN.
-      data.pending_period_sec = Math.round((Number(data.pending_period_sec) || 0) / 60);
+      const pendingMinutes = (Number(data.pending_period_sec) || 0) / 60;
+      data.pending_period_sec =
+        data.query_condition?.type === "promql" && data.query_condition.promql_rule_mode
+          ? pendingMinutes
+          : Math.round(pendingMinutes);
       isAggregationEnabled.value = !!data.query_condition?.aggregation;
       // The saved type is the user's earlier answer; ask again only on a switch.
       confirmedSaveMode.value = data.query_condition?.type ?? null;
@@ -2761,21 +2748,6 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     },
   );
 
-  // Watch for destination changes
-  watch(
-    () => props.destinations.length,
-    () => {
-      setF(
-        "destinations",
-        (formData.value.destinations ?? []).filter((destination: any) => {
-          return props.destinations.some((dest: any) => {
-            return dest.name === destination;
-          });
-        }),
-      );
-    },
-  );
-
   watch(
     triggerCols.value,
     () => {
@@ -2818,7 +2790,10 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
           ? formData.value.query_condition.promql.trim()
           : "";
         isUsingBackendSql.value = false;
-        if (!formData.value.query_condition.promql_condition) {
+        if (
+          !formData.value.query_condition.promql_condition &&
+          !formData.value.query_condition.promql_rule_mode
+        ) {
           setF("query_condition.promql_condition", {
             column: "value",
             operator: ">=",

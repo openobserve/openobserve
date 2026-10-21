@@ -449,6 +449,31 @@ describe("Search Service", () => {
       });
     });
 
+    it("passes the abort signal to the request so a cancel stops it", async () => {
+      const controller = new AbortController();
+      await search.search_around({
+        org_identifier: "test-org",
+        index: "logs",
+        key: "key123",
+        size: "10",
+        query_context: "SELECT * FROM logs",
+        query_fn: "",
+        stream_type: "logs",
+        regions: "",
+        clusters: "",
+        is_multistream: false,
+        traceparent: "trace-123",
+        body: { filter: "test" },
+        signal: controller.signal,
+      });
+
+      expect(mockHttp.post).toHaveBeenCalledWith(
+        "/api/test-org/logs/_around?key=key123&size=10&sql=SELECT * FROM logs&type=logs",
+        { filter: "test" },
+        { signal: controller.signal },
+      );
+    });
+
     it("should use multistream endpoint when is_multistream is true", async () => {
       const params = {
         org_identifier: "test-org",
@@ -855,7 +880,23 @@ describe("Search Service", () => {
 
       await search.delete_running_queries("test-org", traceIDs);
 
-      expect(mockHttp.put).toHaveBeenCalledWith("/api/test-org/query_manager/cancel", traceIDs);
+      expect(mockHttp.put).toHaveBeenCalledWith("/api/test-org/query_manager/cancel", [
+        { trace_id: "trace1", org_id: "test-org" },
+        { trace_id: "trace2", org_id: "test-org" },
+      ]);
+    });
+  });
+
+  describe("cancel_running_queries", () => {
+    it("should send each query with its org", async () => {
+      const queries = [
+        { trace_id: "trace1", org_id: "org-a" },
+        { trace_id: "trace2", org_id: "org-b" },
+      ];
+
+      await search.cancel_running_queries("_meta", queries);
+
+      expect(mockHttp.put).toHaveBeenCalledWith("/api/_meta/query_manager/cancel", queries);
     });
   });
 

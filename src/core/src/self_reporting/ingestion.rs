@@ -63,6 +63,10 @@ pub(super) async fn ingest_usages(mut curr_usages: Vec<UsageData>) {
                     folder.folder_id,
                 )
             };
+        }
+        #[cfg(not(feature = "enterprise"))]
+        usage_data.org_id.clear();
+        if usage_data.event == UsageEvent::Search {
             search_events.push(usage_data.clone());
             continue;
         }
@@ -213,52 +217,50 @@ pub(super) async fn ingest_usages(mut curr_usages: Vec<UsageData>) {
         }
 
         // Distribute usage to individual orgs if usage_stream_enabled is set
-        if cfg.common.usage_report_to_own_org {
-            let mut per_org_map: HashMap<String, Vec<json::Value>> = HashMap::new();
+        let mut per_org_map: HashMap<String, Vec<json::Value>> = HashMap::new();
 
-            for usage in &report_data {
-                if let Some(org_id) = usage.get("org_id").and_then(|v| v.as_str()) {
-                    // Skip meta org (already handled above)
-                    if org_id == META_ORG_ID {
-                        continue;
-                    }
-                    per_org_map
-                        .entry(org_id.to_string())
-                        .or_default()
-                        .push(usage.clone());
+        for usage in &report_data {
+            if let Some(org_id) = usage.get("org_id").and_then(|v| v.as_str()) {
+                // Skip meta org (already handled above)
+                if org_id.is_empty() || org_id == META_ORG_ID {
+                    continue;
+                }
+                per_org_map
+                    .entry(org_id.to_string())
+                    .or_default()
+                    .push(usage.clone());
+            }
+        }
+
+        for (org, values) in per_org_map {
+            // report to super org as well
+            #[cfg(feature = "cloud")]
+            if let Err(e) = send_to_super_org(&org, &values).await {
+                log::error!("error in reporting usage of {org} to super org : {e}");
+            }
+            // do not skip self-reporting even if super org reporting fails
+
+            // Check if org has usage stream enabled
+            match crate::db::organization::get_org_setting_usage_stream_enabled(&org).await {
+                Ok(true) => {}
+                Ok(false) => continue, // self-report not enabled, so skip
+                Err(e) => {
+                    log::error!(
+                        "[SELF-REPORTING] Could not check usage_stream_enabled for {org}: {e}"
+                    );
+                    continue;
                 }
             }
 
-            for (org, values) in per_org_map {
-                // report to super org as well
-                #[cfg(feature = "cloud")]
-                if let Err(e) = send_to_super_org(&org, &values).await {
-                    log::error!("error in reporting usage of {org} to super org : {e}");
-                }
-                // do not skip self-reporting even if super org reporting fails
+            if let Err(e) = super::usage_schema::ensure_usage_stream_initialized(&org).await {
+                log::warn!(
+                    "[SELF-REPORTING] Failed to ensure usage stream initialized for {org}: {e}"
+                );
+            }
 
-                // Check if org has usage stream enabled
-                match crate::db::organization::get_org_setting_usage_stream_enabled(&org).await {
-                    Ok(true) => {}
-                    Ok(false) => continue, // self-report not enabled, so skip
-                    Err(e) => {
-                        log::error!(
-                            "[SELF-REPORTING] Could not check usage_stream_enabled for {org}: {e}"
-                        );
-                        continue;
-                    }
-                }
-
-                if let Err(e) = super::usage_schema::ensure_usage_stream_initialized(&org).await {
-                    log::warn!(
-                        "[SELF-REPORTING] Failed to ensure usage stream initialized for {org}: {e}"
-                    );
-                }
-
-                let org_usage_stream = StreamParams::new(&org, USAGE_STREAM, StreamType::Logs);
-                if let Err(e) = ingest_reporting_data(values, org_usage_stream).await {
-                    log::error!("[SELF-REPORTING] Error ingesting usage data for org {org}: {e}");
-                }
+            let org_usage_stream = StreamParams::new(&org, USAGE_STREAM, StreamType::Logs);
+            if let Err(e) = ingest_reporting_data(values, org_usage_stream).await {
+                log::error!("[SELF-REPORTING] Error ingesting usage data for org {org}: {e}");
             }
         }
     }
@@ -962,13 +964,11 @@ mod tests {
         );
     }
 
-    /// Verifies that self-org usage reporting (when enabled) also goes through
+    /// Verifies that self-org usage reporting also goes through
     /// IngestionRequest::Usage to prevent circular reporting in the org's own stream.
     #[test]
     fn test_self_org_usage_reporting_prevents_circular_reporting() {
-        // When usage_report_to_own_org is enabled, usage data is also sent to
-        // each org's own "usage" stream via ingest_reporting_data().
-        // This test ensures that path also uses IngestionRequest::Usage.
+        // The per-org "usage" stream path must also use IngestionRequest::Usage.
         let usage = create_test_usage_data(
             UsageEvent::Ingestion,
             "my-org",

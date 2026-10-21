@@ -23,14 +23,14 @@ use std::{
 };
 
 use infra::table::rum_pa::{
-    self, Applied, FunnelRow, Funnels, NamedEventRow, NamedEvents, PaRow, PaTable,
+    self, AppSettingsRow, Applied, FunnelRow, Funnels, NamedEventRow, NamedEvents, PaRow, PaTable,
 };
 use sea_orm::{ConnectionTrait, DbErr, RuntimeErr, TransactionTrait, sqlx};
 
 use super::{
     RumPaError, is_id,
-    service::{EVENTS_TABLE, FUNNELS_TABLE, REPLICATION_MODULE},
-    sql_state, validate_app, validate_name,
+    service::{APP_SETTINGS_TABLE, EVENTS_TABLE, FUNNELS_TABLE, REPLICATION_MODULE},
+    settings_id, sql_state, validate_app, validate_name, validate_rules_hash,
 };
 
 /// Tries per delivery for a deadlock, serialization failure, lock wait or unique-index race.
@@ -63,6 +63,7 @@ enum Target {
 enum Table {
     NamedEvents,
     Funnels,
+    AppSettings,
 }
 
 /// The checks that keep the store from refusing a replicated row.
@@ -90,7 +91,22 @@ impl Replicated for FunnelRow {
             &self.name,
             &self.created_by,
             &self.updated_by,
-        )
+        )?;
+        validate_rules_hash(self.rules_hash.as_deref())
+    }
+}
+
+/// Not `check_common`: an app name may be longer than a name, and the id must be the derived one.
+impl Replicated for AppSettingsRow {
+    fn check(&self) -> Result<(), RumPaError> {
+        check_lengths(&self.org_id, &self.created_by, &self.updated_by)?;
+        validate_app(Some(&self.app))?;
+        if self.id != settings_id(&self.org_id, &self.app) {
+            return Err(RumPaError::InvalidId(
+                "a settings id is derived from its org and app".into(),
+            ));
+        }
+        Ok(())
     }
 }
 
@@ -158,7 +174,7 @@ pub async fn apply<C: ConnectionTrait + TransactionTrait>(
     settle(key, outcome)
 }
 
-/// `/rum_analytics/{org}/` or `/rum_analytics/{org}/{named_events|funnels}/{id}`.
+/// `/rum_analytics/{org}/` or `/rum_analytics/{org}/{named_events|funnels|app_settings}/{id}`.
 fn parse_key(key: &str) -> Option<Target> {
     let rest = key.strip_prefix(&format!("/{REPLICATION_MODULE}/"))?;
     let parts: Vec<&str> = rest.split('/').collect();
@@ -169,6 +185,7 @@ fn parse_key(key: &str) -> Option<Target> {
             table: match *table {
                 EVENTS_TABLE => Table::NamedEvents,
                 FUNNELS_TABLE => Table::Funnels,
+                APP_SETTINGS_TABLE => Table::AppSettings,
                 _ => return None,
             },
             id: id.to_string(),
@@ -281,6 +298,10 @@ async fn put<C: ConnectionTrait + TransactionTrait>(
             Some(row) => upsert::<Funnels, _>(db, row).await?,
             None => return Ok(()),
         },
+        Table::AppSettings => match row::<AppSettingsRow>(org, id, value) {
+            Some(row) => rum_pa::apply_settings_upsert(db, row).await?,
+            None => return Ok(()),
+        },
     };
     match applied {
         Applied::Renamed { id, name } => log::warn!(
@@ -336,14 +357,19 @@ fn check_common(
     created_by: &str,
     updated_by: &str,
 ) -> Result<(), RumPaError> {
+    check_lengths(org, created_by, updated_by)?;
+    validate_app(Some(app))?;
+    if validate_name(name)? != name {
+        return Err(RumPaError::InvalidName("name is not trimmed".into()));
+    }
+    Ok(())
+}
+
+fn check_lengths(org: &str, created_by: &str, updated_by: &str) -> Result<(), RumPaError> {
     if org.chars().count() > MAX_ORG_CHARS {
         return Err(RumPaError::InvalidBody(format!(
             "an org id is at most {MAX_ORG_CHARS} characters"
         )));
-    }
-    validate_app(Some(app))?;
-    if validate_name(name)? != name {
-        return Err(RumPaError::InvalidName("name is not trimmed".into()));
     }
     if [created_by, updated_by]
         .iter()
@@ -371,6 +397,12 @@ async fn delete<C: ConnectionTrait + TransactionTrait>(
     match table {
         Table::NamedEvents => rum_pa::apply_delete::<NamedEvents, _>(db, org, id, version).await?,
         Table::Funnels => rum_pa::apply_delete::<Funnels, _>(db, org, id, version).await?,
+        Table::AppSettings => {
+            log::warn!(
+                "[SUPER_CLUSTER:rum_analytics] dropped delete {org}/{id}: settings have no delete"
+            );
+            return Ok(());
+        }
     };
     Ok(())
 }
@@ -385,6 +417,7 @@ mod tests {
     use sea_orm::{ConnectOptions, Database, DatabaseConnection, EntityTrait, PaginatorTrait};
 
     use super::*;
+    use crate::rum_pa::service::{self, Scope};
 
     const ID: &str = "2kY9pF34Qy6nB3Wwd25rq4f5zr3";
 
@@ -745,5 +778,251 @@ mod tests {
             .unwrap()
             .unwrap();
         assert_eq!(stored.name_key, "signup");
+    }
+
+    fn settings_key(org: &str, id: &str) -> String {
+        format!("/rum_analytics/{org}/app_settings/{id}")
+    }
+
+    fn settings_body(sessions: serde_json::Value) -> crate::rum_pa::PutAppSettings {
+        serde_json::from_value(
+            serde_json::json!({"bots": true, "sessions": sessions, "pages": [], "version": 0}),
+        )
+        .unwrap()
+    }
+
+    /// The stored settings row as `emit_put` would publish it.
+    async fn stored_settings(db: &DatabaseConnection) -> serde_json::Value {
+        let row = infra::table::entity::rum_pa_app_settings::Entity::find()
+            .one(db)
+            .await
+            .unwrap()
+            .unwrap();
+        serde_json::to_value(row).unwrap()
+    }
+
+    async fn read_settings(db: &DatabaseConnection, scope: Scope<'_>) -> serde_json::Value {
+        serde_json::to_value(service::get_app_settings(db, scope).await.unwrap()).unwrap()
+    }
+
+    async fn put_settings(
+        db: &DatabaseConnection,
+        scope: Scope<'_>,
+        user: &str,
+        sessions: serde_json::Value,
+    ) -> serde_json::Value {
+        let saved = service::put_app_settings(db, scope, user, &settings_body(sessions))
+            .await
+            .unwrap();
+        serde_json::to_value(saved).unwrap()
+    }
+
+    #[test]
+    fn p2_r14_an_app_settings_key_parses_to_its_own_table() {
+        let id = "0123456789abcdef0123456789a";
+        match parse_key(&settings_key("acme", id)) {
+            Some(Target::Row {
+                org,
+                table,
+                id: got,
+            }) => {
+                assert_eq!((org.as_str(), got.as_str()), ("acme", id));
+                assert!(matches!(table, Table::AppSettings), "{table:?}");
+            }
+            other => panic!("{other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn p2_r14_a_replicated_settings_row_for_an_app_over_80_units_lands() {
+        let app = "a".repeat(100);
+        let scope = Scope {
+            org: "acme",
+            app: &app,
+        };
+        let source = db().await;
+        let saved = put_settings(
+            &source,
+            scope,
+            "a@x.io",
+            serde_json::json!([{"field": "env", "op": "eq", "values": ["dev"]}]),
+        )
+        .await;
+        let value = serde_json::to_vec(&stored_settings(&source).await).unwrap();
+        let target = db().await;
+        let key = settings_key("acme", saved["id"].as_str().unwrap());
+        apply(&target, &key, Op::Put(Some(&value))).await.unwrap();
+        assert_eq!(
+            read_settings(&target, scope).await,
+            read_settings(&source, scope).await
+        );
+    }
+
+    #[tokio::test]
+    async fn p2_r14_a_settings_row_whose_id_is_not_derived_from_its_app_is_dropped() {
+        let scope = Scope {
+            org: "acme",
+            app: "web",
+        };
+        let source = db().await;
+        put_settings(&source, scope, "a@x.io", serde_json::json!([])).await;
+        let mut row = stored_settings(&source).await;
+        row["id"] = ID.into();
+        let value = serde_json::to_vec(&row).unwrap();
+        let target = db().await;
+        apply(&target, &settings_key("acme", ID), Op::Put(Some(&value)))
+            .await
+            .unwrap();
+        let kept = infra::table::entity::rum_pa_app_settings::Entity::find()
+            .count(&target)
+            .await
+            .unwrap();
+        assert_eq!(kept, 0);
+        assert_eq!(
+            read_settings(&target, scope).await["id"],
+            serde_json::Value::Null
+        );
+    }
+
+    #[tokio::test]
+    async fn p2_r14_a_settings_row_whose_app_is_over_256_units_is_dropped() {
+        use sha2::{Digest, Sha256};
+        let source = db().await;
+        put_settings(
+            &source,
+            Scope {
+                org: "acme",
+                app: "web",
+            },
+            "a@x.io",
+            serde_json::json!([]),
+        )
+        .await;
+        let long_app = "a".repeat(257);
+        let derived: String = Sha256::digest(format!("acme/{long_app}").as_bytes())
+            .iter()
+            .map(|b| format!("{b:02x}"))
+            .collect();
+        let id = &derived[..27];
+        let mut row = stored_settings(&source).await;
+        row["app"] = long_app.into();
+        row["id"] = id.into();
+        let value = serde_json::to_vec(&row).unwrap();
+        let target = db().await;
+        apply(&target, &settings_key("acme", id), Op::Put(Some(&value)))
+            .await
+            .unwrap();
+        let kept = infra::table::entity::rum_pa_app_settings::Entity::find()
+            .count(&target)
+            .await
+            .unwrap();
+        assert_eq!(kept, 0);
+    }
+
+    #[tokio::test]
+    async fn a_settings_row_whose_editor_is_over_256_chars_is_dropped() {
+        let scope = Scope {
+            org: "acme",
+            app: "web",
+        };
+        let source = db().await;
+        let saved = put_settings(&source, scope, "a@x.io", serde_json::json!([])).await;
+        let mut row = stored_settings(&source).await;
+        row["updated_by"] = "u".repeat(257).into();
+        let value = serde_json::to_vec(&row).unwrap();
+        let target = db().await;
+        let key = settings_key("acme", saved["id"].as_str().unwrap());
+        apply(&target, &key, Op::Put(Some(&value))).await.unwrap();
+        let kept = infra::table::entity::rum_pa_app_settings::Entity::find()
+            .count(&target)
+            .await
+            .unwrap();
+        assert_eq!(kept, 0);
+    }
+
+    #[tokio::test]
+    async fn a_funnel_row_with_a_malformed_rules_hash_is_dropped() {
+        let db = db().await;
+        let row = serde_json::json!({
+            "id": ID, "org_id": "acme", "app": "web", "name": "Flow", "name_key": "flow",
+            "description": null, "definition": {"s": [["p", "/"], ["p", "/a"]]}, "sql": "SELECT 1",
+            "event_ids": [], "version": 1, "created_by": "a@x.io", "updated_by": "a@x.io",
+            "created_at": 1, "updated_at": 2, "rules_hash": "0123456789abcdef0"
+        });
+        let value = serde_json::to_vec(&row).unwrap();
+        apply(
+            &db,
+            &format!("/rum_analytics/acme/funnels/{ID}"),
+            Op::Put(Some(&value)),
+        )
+        .await
+        .unwrap();
+        assert!(
+            rum_pa::get::<Funnels, _>(&db, "acme", "web", ID)
+                .await
+                .unwrap()
+                .is_none()
+        );
+    }
+
+    #[tokio::test]
+    async fn p2_r15_an_old_funnel_payload_replicates_with_no_rules_hash() {
+        let db = db().await;
+        let old = serde_json::json!({
+            "id": ID, "org_id": "acme", "app": "web", "name": "Flow", "name_key": "flow",
+            "description": null, "definition": {"s": [["p", "/"], ["p", "/a"]]}, "sql": "SELECT 1",
+            "event_ids": [], "version": 1, "created_by": "a@x.io", "updated_by": "a@x.io",
+            "created_at": 1, "updated_at": 2
+        });
+        let value = serde_json::to_vec(&old).unwrap();
+        apply(
+            &db,
+            &format!("/rum_analytics/acme/funnels/{ID}"),
+            Op::Put(Some(&value)),
+        )
+        .await
+        .unwrap();
+        let stored = rum_pa::get::<Funnels, _>(&db, "acme", "web", ID)
+            .await
+            .unwrap()
+            .unwrap();
+        let stored = serde_json::to_value(stored).unwrap();
+        assert_eq!(
+            stored.get("rules_hash"),
+            Some(&serde_json::Value::Null),
+            "{stored}"
+        );
+    }
+
+    #[tokio::test]
+    async fn p2_r15_two_regions_creating_the_first_settings_row_converge() {
+        let scope = Scope {
+            org: "acme",
+            app: "web",
+        };
+        let (east, west) = (db().await, db().await);
+        let first = put_settings(
+            &east,
+            scope,
+            "a@x.io",
+            serde_json::json!([{"field": "env", "op": "eq", "values": ["dev"]}]),
+        )
+        .await;
+        tokio::time::sleep(Duration::from_millis(5)).await;
+        let later_rules = serde_json::json!([{"field": "env", "op": "eq", "values": ["prod"]}]);
+        let second = put_settings(&west, scope, "b@x.io", later_rules.clone()).await;
+        assert_eq!(first["id"], second["id"]);
+        let key = settings_key("acme", second["id"].as_str().unwrap());
+        let from_east = serde_json::to_vec(&stored_settings(&east).await).unwrap();
+        let from_west = serde_json::to_vec(&stored_settings(&west).await).unwrap();
+        apply(&east, &key, Op::Put(Some(&from_west))).await.unwrap();
+        apply(&west, &key, Op::Put(Some(&from_east))).await.unwrap();
+        let (east_now, west_now) = (
+            read_settings(&east, scope).await,
+            read_settings(&west, scope).await,
+        );
+        assert_eq!(east_now, west_now);
+        assert_eq!(east_now["sessions"], later_rules);
+        assert_eq!(east_now["updatedBy"], "b@x.io");
     }
 }

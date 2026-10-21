@@ -40,6 +40,7 @@ import usePerformance from "@/composables/rum/usePerformance";
 import useProductAnalytics, { resetProductAnalytics } from "@/composables/rum/useProductAnalytics";
 import AnalyticsRetention from "./AnalyticsRetention.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { b64DecodeUnicode } from "@/utils/formatters";
 
@@ -148,6 +149,14 @@ describe("AnalyticsRetention", () => {
     wrapper?.unmount();
     wrapper = null;
     document.body.innerHTML = "";
+  });
+
+  it("the granularity select keeps a compact width instead of spanning the toolbar", async () => {
+    await mountRetention();
+    const per = wrapper!
+      .findAllComponents(OSelect)
+      .find((c) => c.attributes("data-test") === "rum-analytics-retention-granularity");
+    expect(per?.props("width")).toBe("sm");
   });
 
   it("without an identity shows the unlock state with the setUser snippet and never a grid (AC-30)", async () => {

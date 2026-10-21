@@ -74,6 +74,8 @@ export type AlertPriorityValue = 1 | 2 | 3 | 4 | 5;
 
 export type Channel =
   | "email"
+  | "sms"
+  | "voice"
   /** An existing alert Destination — Slack, Teams, or any HTTP endpoint. */
   | "webhook";
 
@@ -1179,6 +1181,79 @@ export interface MyOnCall {
   /** True if any team is true. */
   on_call_now: boolean;
   teams: MyOnCallTeam[];
+}
+
+/** `GET /oncall/contacts/{email}` — the caller's own phone and whether a code can be sent to it. */
+export interface Contact {
+  /** E.164; absent when none is saved. */
+  phone?: string;
+  /** Micros; absent until a code is confirmed for the saved number. */
+  phone_verified_at?: number;
+  unverified: string[];
+  phone_is_pageable: boolean;
+  phone_provider_available: boolean;
+  press4_available: boolean;
+}
+
+/** Why a send or confirm was refused; the wire form is the backend's `RefusalReason` in snake_case. */
+export type RefusalReason =
+  | "wrong_code"
+  | "expired"
+  | "too_many_tries"
+  | "no_code"
+  | "too_soon"
+  | "user_daily_limit"
+  | "number_daily_limit"
+  | "no_provider"
+  | "no_phone"
+  | "number_rejected"
+  | "provider_unavailable";
+
+/** The 400/429/503 body of a refused send or confirm; `message` is the English API text. */
+export interface VerificationRefusalBody {
+  message: string;
+  reason: RefusalReason;
+  tries_left?: number;
+  retry_after_secs?: number;
+}
+
+/** `GET /telephony`: the deployment's account is reported by presence and From number only, never its SID or token. */
+export interface TelephonyView {
+  deployment_account_present: boolean;
+  deployment_from_number?: string | null;
+  press4_available: boolean;
+  org?: OrgTelephonyView | null;
+}
+
+/** The org's own account; the token never comes back. */
+export interface OrgTelephonyView {
+  provider: string;
+  account_sid: string;
+  from_number: string;
+}
+
+/** `PUT /telephony`; an absent `auth_token` keeps the stored one. */
+export interface PutTelephonyBody {
+  provider: "twilio";
+  account_sid: string;
+  auth_token?: string;
+  from_number: string;
+}
+
+/** Why a telephony save or read was refused; the wire form is the backend's `TelephonyReason` in snake_case. */
+export type TelephonyReason =
+  | "bad_provider"
+  | "bad_sid"
+  | "bad_from_number"
+  | "token_required"
+  | "no_master_key"
+  | "account_rejected"
+  | "unreadable";
+
+/** The 400 body of a refused telephony call; `message` is the English API text. */
+export interface TelephonyRefusalBody {
+  message: string;
+  reason: TelephonyReason;
 }
 
 /**

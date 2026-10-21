@@ -240,6 +240,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                          nudging the inputs/button out of alignment). -->
                     <div class="flex h-[2.125rem] shrink-0 items-center">
                       <OButton
+                        :aria-label="t('common.remove')"
                         variant="ghost"
                         size="icon"
                         @click="removeFilter(index)"
@@ -337,6 +338,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div>
                 <OButton
+                  :aria-label="t('common.remove')"
                   variant="ghost"
                   size="icon"
                   :disabled="variableData?.options?.length === 1"
@@ -418,6 +420,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :data-test="`dashboard-variable-custom-value-${index}`"
                   />
                   <OButton
+                    :aria-label="t('common.remove')"
                     v-if="variableData.multiSelect"
                     variant="ghost"
                     size="icon"
@@ -540,6 +543,7 @@ import {
 import { getScopeType } from "@/utils/dashboard/variables/variablesScopeUtils";
 import OFormCombobox from "@/lib/forms/Combobox/OFormCombobox.vue";
 import useNotifications from "@/composables/useNotifications";
+import { useDashboardSaveConflict } from "@/composables/dashboard/useDashboardSaveConflict";
 import analytics from "@/services/product_analytics";
 
 export default defineComponent({
@@ -763,8 +767,8 @@ export default defineComponent({
     const route = useRoute();
     const title = ref(t("dashboard.newVariable"));
     const { getStreams, getStream } = useStreams(t);
-    const { showErrorNotification, showConfictErrorNotificationWithRefreshBtn } =
-      useNotifications();
+    const { showErrorNotification } = useNotifications();
+    const saveConflict = useDashboardSaveConflict();
     // const model = ref(null)
     // const filteredStreams = ref([]);
     const variableTypes = ref([
@@ -1157,13 +1161,15 @@ export default defineComponent({
           analytics.track("dashboard_variable_saved", { type: payload.type, is_new: false });
           emit("save");
         } catch (error: any) {
-          if (error?.response?.status === 409) {
-            showConfictErrorNotificationWithRefreshBtn(
-              error?.response?.data?.message ??
-                error?.message ??
-                t("dashboard.addSettingVariable.variableUpdateFailed"),
-              t,
-            );
+          if (saveConflict.isConflict(error)) {
+            void saveConflict.openConflict({
+              dashboardId: dashId,
+              folderId: (route.query.folder as string) ?? "default",
+              change: t("dashboard.saveConflict.change.editedVariable", { name: payload.name }),
+              onResolved: () => emit("save"),
+            });
+            // The variable is already in the working copy; leaving the form open would let Save add it again.
+            emit("save");
           } else {
             showErrorNotification(
               error.message ?? t("dashboard.addSettingVariable.variableUpdateFailed"),
@@ -1179,13 +1185,15 @@ export default defineComponent({
           analytics.track("dashboard_variable_saved", { type: payload.type, is_new: true });
           emit("save");
         } catch (error: any) {
-          if (error?.response?.status === 409) {
-            showConfictErrorNotificationWithRefreshBtn(
-              error?.response?.data?.message ??
-                error?.message ??
-                t("dashboard.addSettingVariable.variableCreationFailed"),
-              t,
-            );
+          if (saveConflict.isConflict(error)) {
+            void saveConflict.openConflict({
+              dashboardId: dashId,
+              folderId: (route.query.folder as string) ?? "default",
+              change: t("dashboard.saveConflict.change.addedVariable", { name: payload.name }),
+              onResolved: () => emit("save"),
+            });
+            // The variable is already in the working copy; leaving the form open would let Save add it again.
+            emit("save");
           } else {
             showErrorNotification(
               error.message ?? t("dashboard.addSettingVariable.variableCreationFailed"),

@@ -110,12 +110,6 @@ impl StreamInfo {
             dropped_dimensions: Vec::new(),
         }
     }
-
-    /// Set the stream type (builder pattern)
-    pub fn set_stream_type(mut self, stream_type: StreamType) -> Self {
-        self.stream_type = stream_type;
-        self
-    }
 }
 
 /// Response from the correlate API
@@ -476,18 +470,6 @@ impl CardinalityClass {
             CardinalityClass::VeryLow | CardinalityClass::Low | CardinalityClass::Medium
         )
     }
-
-    /// Get priority score for correlation (lower is better)
-    /// Used to sort dimensions by preference for correlation
-    pub fn priority_score(&self) -> u8 {
-        match self {
-            CardinalityClass::VeryLow => 1,
-            CardinalityClass::Low => 2,
-            CardinalityClass::Medium => 3,
-            CardinalityClass::High => 4,
-            CardinalityClass::VeryHigh => 5,
-        }
-    }
 }
 
 #[cfg(test)]
@@ -644,27 +626,12 @@ mod tests {
     }
 
     #[test]
-    fn test_stream_info_set_stream_type() {
-        let s = StreamInfo::new("s".to_string()).set_stream_type(StreamType::Metrics);
-        assert_eq!(s.stream_type, StreamType::Metrics);
-    }
-
-    #[test]
     fn test_cardinality_class_is_suitable_for_correlation() {
         assert!(CardinalityClass::VeryLow.is_suitable_for_correlation());
         assert!(CardinalityClass::Low.is_suitable_for_correlation());
         assert!(CardinalityClass::Medium.is_suitable_for_correlation());
         assert!(!CardinalityClass::High.is_suitable_for_correlation());
         assert!(!CardinalityClass::VeryHigh.is_suitable_for_correlation());
-    }
-
-    #[test]
-    fn test_cardinality_class_priority_score() {
-        assert_eq!(CardinalityClass::VeryLow.priority_score(), 1);
-        assert_eq!(CardinalityClass::Low.priority_score(), 2);
-        assert_eq!(CardinalityClass::Medium.priority_score(), 3);
-        assert_eq!(CardinalityClass::High.priority_score(), 4);
-        assert_eq!(CardinalityClass::VeryHigh.priority_score(), 5);
     }
 
     #[test]

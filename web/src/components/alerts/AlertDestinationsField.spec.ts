@@ -48,12 +48,12 @@ vi.mock("@/services/workflows", async (importOriginal) => {
 
 const TargetsStub = defineComponent({
   name: "AlertTargetsSelect",
-  props: ["workflowOptions", "workflowsEnabled"],
+  props: ["workflowOptions", "workflowsEnabled", "placeholder"],
   emits: ["refresh"],
   template: "<div />",
 });
 
-function mountField() {
+function mountField(props: Record<string, unknown> = {}) {
   const store = createStore({
     state: {
       selectedOrganization: { identifier: "test-org" },
@@ -61,7 +61,7 @@ function mountField() {
     },
   });
   return mount(AlertDestinationsField, {
-    props: { destinations: [], workflows: [], destinationOptions: [] },
+    props: { destinations: [], workflows: [], destinationOptions: [], ...props },
     global: {
       plugins: [i18n, store],
       stubs: { AlertTargetsSelect: TargetsStub, OIcon: true, OTooltip: true },
@@ -110,5 +110,69 @@ describe("AlertDestinationsField workflows", () => {
 
     expect(listWorkflowsMock).toHaveBeenCalledTimes(2);
     expect(wrapper.emitted("refresh")).toHaveLength(1);
+  });
+});
+
+describe("AlertDestinationsField status line", () => {
+  const NOTE = '[data-test="alert-settings-destinations-note"]';
+  const STATUS = '[data-test="alert-settings-destinations-status"]';
+  const ERROR = '[data-test="alert-settings-destinations-error"]';
+  const t = i18n.global.t as any;
+
+  it("is not marked required", () => {
+    expect(mountField().text()).not.toContain("*");
+  });
+
+  it("says no destination is notified when the alert has nowhere to send", () => {
+    const wrapper = mountField({ notifiesNobody: true, showStatus: true });
+    expect(wrapper.find(NOTE).text()).toBe(t("alerts.alertSettings.noDestinationNote"));
+    expect(wrapper.find(STATUS).exists()).toBe(false);
+  });
+
+  it("names a single destination", () => {
+    const wrapper = mountField({ destinations: ["ops-slack"], showStatus: true });
+    expect(wrapper.find(STATUS).text()).toBe(
+      t("alerts.alertSettings.sendsToStatus", { targets: "ops-slack" }),
+    );
+    expect(wrapper.find(NOTE).exists()).toBe(false);
+  });
+
+  it("counts several destinations and names a single workflow", async () => {
+    const wrapper = mountField({
+      destinations: ["a", "b"],
+      workflows: ["wf-1"],
+      showStatus: true,
+    });
+    await flushPromises();
+    expect(wrapper.find(STATUS).text()).toBe(
+      t("alerts.alertSettings.sendsToStatus", { targets: "2 destinations and Escalate" }),
+    );
+  });
+
+  // The team lives on the Advanced tab, so the picker cannot show it.
+  it("falls back to the on-call team when the parent says there is a target but none is picked", () => {
+    expect(mountField({ showStatus: true }).find(STATUS).text()).toBe(
+      t("alerts.alertSettings.sendsToStatus", {
+        targets: t("alerts.alertSettings.oncallTeamTarget"),
+      }),
+    );
+  });
+
+  it("stays quiet unless asked, as on the recovery field", () => {
+    const wrapper = mountField({ notifiesNobody: true });
+    expect(wrapper.find(NOTE).exists()).toBe(false);
+    expect(wrapper.find(STATUS).exists()).toBe(false);
+  });
+
+  it("passes the placeholder to the picker", () => {
+    const wrapper = mountField({ placeholder: "No destination" });
+    expect(wrapper.findComponent(TargetsStub).props("placeholder")).toBe("No destination");
+  });
+
+  // focusOnFirstError finds the tab that owns an invalid field by its [role="alert"] message.
+  it("renders an error instead of the status, as [role=alert]", () => {
+    const wrapper = mountField({ notifiesNobody: true, showStatus: true, error: "bad" });
+    expect(wrapper.find(ERROR).attributes("role")).toBe("alert");
+    expect(wrapper.find(NOTE).exists()).toBe(false);
   });
 });

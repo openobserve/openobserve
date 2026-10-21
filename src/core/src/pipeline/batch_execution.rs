@@ -29,7 +29,7 @@ use config::meta::{destinations::Module, pipeline::components::WorkflowDestinati
 use config::{
     meta::{
         function::{Transform, VRLResultResolver},
-        pipeline::{Pipeline, PipelineKind, components::NodeData},
+        pipeline::{Pipeline, PipelineKind, components::NodeData, is_forbidden_destination},
         self_reporting::error::{ErrorData, ErrorSource, NodeErrors, PipelineError},
         stream::{StreamParams, StreamType},
     },
@@ -307,13 +307,6 @@ impl MemorySize for ExecutableNode {
             + self.children.mem_size()
             + self.is_disabled.mem_size()
     }
-}
-
-#[derive(Debug)]
-pub struct ExecutablePipelineBulkInputs {
-    records: Vec<Value>,
-    doc_ids: Vec<Option<String>>,
-    originals: Vec<Option<String>>,
 }
 
 impl ExecutablePipeline {
@@ -1218,37 +1211,6 @@ impl std::fmt::Display for ExecutableNode {
     }
 }
 
-impl ExecutablePipelineBulkInputs {
-    pub fn new() -> Self {
-        Self {
-            records: Vec::new(),
-            doc_ids: Vec::new(),
-            originals: Vec::new(),
-        }
-    }
-
-    pub fn add_input(
-        &mut self,
-        record: Value,
-        doc_id: Option<String>,
-        original_data: Option<String>,
-    ) {
-        self.records.push(record);
-        self.doc_ids.push(doc_id);
-        self.originals.push(original_data);
-    }
-
-    pub fn into_parts(self) -> (Vec<Value>, Vec<Option<String>>, Vec<Option<String>>) {
-        (self.records, self.doc_ids, self.originals)
-    }
-}
-
-impl Default for ExecutablePipelineBulkInputs {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 #[derive(Debug, Clone)]
 struct PipelineItem {
     idx: usize,
@@ -2093,7 +2055,7 @@ async fn process_function_node(
                     if !is_result_array {
                         // Single record processing with JS
                         let js_timer = Instant::now();
-                        let js_res = apply_js_fn(
+                        let js_res = apply_js_fn_off_worker(
                             js_config,
                             record,
                             &metadata.org_id,
@@ -2234,7 +2196,7 @@ async fn process_function_node(
             CompiledFunctionRuntime::JS(js_config, true) => {
                 // JS result array processing
                 let js_arr_timer = Instant::now();
-                let js_arr_res = apply_js_fn(
+                let js_arr_res = apply_js_fn_off_worker(
                     js_config,
                     json::Value::Array(result_array_records),
                     &metadata.org_id,
@@ -2302,6 +2264,16 @@ async fn process_function_node(
     );
 
     count
+}
+
+/// `apply_js_fn`, run where its synchronous eval cannot stall the other tasks on this worker.
+fn apply_js_fn_off_worker(
+    js_config: &JSRuntimeConfig,
+    record: json::Value,
+    org_id: &str,
+    stream_name: &[String],
+) -> (json::Value, Option<String>) {
+    tokio::task::block_in_place(|| apply_js_fn(js_config, record, org_id, stream_name))
 }
 
 async fn process_condition_node(
@@ -2552,6 +2524,27 @@ async fn process_branch_node(
     outcome
 }
 
+/// Hands a dropped record's error to the collector; true when the collector is gone.
+#[allow(clippy::type_complexity)]
+async fn report_leaf_error(
+    (pipeline_name, inv_id): (&str, &str),
+    node: &ExecutableNode,
+    error_sender: &Sender<(String, String, String, Option<String>, Option<Value>)>,
+    err_msg: String,
+    value: Option<Value>,
+) -> bool {
+    log::warn!("[Pipeline] {pipeline_name} [inv={inv_id}]: {err_msg}");
+    let sent = error_sender
+        .send((node.id.to_string(), node.node_type(), err_msg, None, value))
+        .await;
+    if let Err(send_err) = &sent {
+        log::error!(
+            "[Pipeline] {pipeline_name} [inv={inv_id}]: LeafNode failed sending errors for collection caused by: {send_err}",
+        );
+    }
+    sent.is_err()
+}
+
 async fn process_stream_node(
     stream_params: &StreamParams,
     metadata: ProcessMetadata,
@@ -2671,6 +2664,26 @@ async fn process_stream_node(
                         continue;
                     }
                 }
+            }
+
+            let written = [&destination_stream.stream_name, &stream_params.stream_name];
+            if let Some(internal) = written.into_iter().find(|name| {
+                is_forbidden_destination(&metadata.source_stream_name, name, is_cross_type)
+            }) {
+                let err_msg =
+                    format!("Destination {internal} is an internal stream. Record dropped");
+                if report_leaf_error(
+                    (&metadata.pipeline_name, &inv_id),
+                    node,
+                    &channels.error_sender,
+                    err_msg,
+                    value_copy,
+                )
+                .await
+                {
+                    break;
+                }
+                continue;
             }
 
             if is_cross_type {
@@ -3230,7 +3243,13 @@ fn resolve_stream_name(haystack: &str, record: &Value) -> Result<String> {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
+    use std::{
+        collections::HashMap,
+        sync::{
+            Arc,
+            atomic::{AtomicU64, Ordering},
+        },
+    };
 
     use config::{
         meta::pipeline::components::{Edge, Node},
@@ -3266,15 +3285,6 @@ mod tests {
         assert!(err1.is_err());
         let err1 = resolve_stream_name("{{eulav}}", &record);
         assert!(err1.is_err());
-    }
-
-    // Test ExecutablePipelineBulkInputs
-    #[test]
-    fn test_executable_pipeline_bulk_inputs_new() {
-        let inputs = ExecutablePipelineBulkInputs::new();
-        assert!(inputs.records.is_empty());
-        assert!(inputs.doc_ids.is_empty());
-        assert!(inputs.originals.is_empty());
     }
 
     #[test]
@@ -3423,74 +3433,6 @@ mod tests {
         assert_eq!(eval_sampling_key(&first_span, 0), "span-a");
         assert_eq!(eval_sampling_key(&second_span, 0), "span-b");
         assert_eq!(eval_sampling_key(&trace_only, 99), "same-trace");
-    }
-
-    #[test]
-    fn test_executable_pipeline_bulk_inputs_default() {
-        let inputs = ExecutablePipelineBulkInputs::default();
-        assert!(inputs.records.is_empty());
-        assert!(inputs.doc_ids.is_empty());
-        assert!(inputs.originals.is_empty());
-    }
-
-    #[test]
-    fn test_executable_pipeline_bulk_inputs_add_input() {
-        let mut inputs = ExecutablePipelineBulkInputs::new();
-        let record = json::json!({"key": "value"});
-        let doc_id = Some("doc123".to_string());
-        let original = Some("original_data".to_string());
-
-        inputs.add_input(record.clone(), doc_id.clone(), original.clone());
-
-        assert_eq!(inputs.records.len(), 1);
-        assert_eq!(inputs.doc_ids.len(), 1);
-        assert_eq!(inputs.originals.len(), 1);
-        assert_eq!(inputs.records[0], record);
-        assert_eq!(inputs.doc_ids[0], doc_id);
-        assert_eq!(inputs.originals[0], original);
-    }
-
-    #[test]
-    fn test_executable_pipeline_bulk_inputs_add_multiple() {
-        let mut inputs = ExecutablePipelineBulkInputs::new();
-
-        // Add first input
-        let record1 = json::json!({"key1": "value1"});
-        inputs.add_input(record1.clone(), Some("doc1".to_string()), None);
-
-        // Add second input
-        let record2 = json::json!({"key2": "value2"});
-        inputs.add_input(record2.clone(), None, Some("original2".to_string()));
-
-        assert_eq!(inputs.records.len(), 2);
-        assert_eq!(inputs.doc_ids.len(), 2);
-        assert_eq!(inputs.originals.len(), 2);
-
-        assert_eq!(inputs.records[0], record1);
-        assert_eq!(inputs.records[1], record2);
-        assert_eq!(inputs.doc_ids[0], Some("doc1".to_string()));
-        assert_eq!(inputs.doc_ids[1], None);
-        assert_eq!(inputs.originals[0], None);
-        assert_eq!(inputs.originals[1], Some("original2".to_string()));
-    }
-
-    #[test]
-    fn test_executable_pipeline_bulk_inputs_into_parts() {
-        let mut inputs = ExecutablePipelineBulkInputs::new();
-        let record = json::json!({"test": "data"});
-        let doc_id = Some("test_doc".to_string());
-        let original = Some("test_original".to_string());
-
-        inputs.add_input(record.clone(), doc_id.clone(), original.clone());
-
-        let (records, doc_ids, originals) = inputs.into_parts();
-
-        assert_eq!(records.len(), 1);
-        assert_eq!(doc_ids.len(), 1);
-        assert_eq!(originals.len(), 1);
-        assert_eq!(records[0], record);
-        assert_eq!(doc_ids[0], doc_id);
-        assert_eq!(originals[0], original);
     }
 
     // Test ExecutableNode
@@ -5502,5 +5444,94 @@ mod tests {
         let (node_id, _, message, ..) = error_rx.try_recv().expect("a node error is expected");
         assert_eq!(node_id, "fn-1");
         assert!(message.contains("array"), "{message}");
+    }
+
+    #[tokio::test]
+    async fn test_leaf_node_refuses_dynamic_internal_destinations() {
+        let node = ExecutableNode {
+            id: "dest-1".to_string(),
+            node_data: NodeData::Stream(StreamParams::new("org-1", "{target}", StreamType::Logs)),
+            children: vec![],
+            is_disabled: false,
+        };
+        let (input_tx, input_rx) = channel(4);
+        let (result_tx, mut result_rx) = channel(4);
+        let (error_tx, mut error_rx) = channel(4);
+        let channels = ProcessChannels {
+            receiver: input_rx,
+            child_senders: vec![],
+            result_sender: Some(result_tx),
+            error_sender: error_tx,
+            inputs_sender: None,
+            outputs_sender: None,
+        };
+        send_records(
+            &input_tx,
+            vec![
+                json::json!({"target": "_o2_ai_chat_events"}),
+                json::json!({"target": "app"}),
+            ],
+        )
+        .await;
+        drop(input_tx);
+
+        let stream_params = StreamParams::new("org-1", "{target}", StreamType::Logs);
+        let mut busy = Duration::ZERO;
+        process_stream_node(
+            &stream_params,
+            dummy_metadata(1),
+            &node,
+            channels,
+            &mut busy,
+        )
+        .await;
+
+        let (_, written, _) = result_rx.try_recv().expect("the user stream is written");
+        assert_eq!(written.stream_name.as_str(), "app");
+        assert!(result_rx.try_recv().is_err());
+        let (_, _, err, ..) = error_rx.try_recv().expect("the internal write is reported");
+        assert!(err.contains("_o2_ai_chat_events"), "{err}");
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
+    async fn a_js_function_does_not_stall_the_other_tasks_on_its_worker() {
+        const BURN_MS: u64 = 600;
+        let js_config = compile_js_function(
+            &format!(
+                "var t = Date.now(); while (Date.now() - t < {BURN_MS}) {{}} row.done = true;"
+            ),
+            "off_worker_org",
+        )
+        .unwrap();
+
+        let start = Instant::now();
+        // Queued first on the only worker, so the eval holds it unless it declares the block.
+        let eval = tokio::spawn(async move {
+            apply_js_fn_off_worker(
+                &js_config,
+                json::json!({"a": 1}),
+                "off_worker_org",
+                std::slice::from_ref(&String::new()),
+            )
+        });
+        let woke_after = Arc::new(AtomicU64::new(0));
+        let ticker = {
+            let woke_after = woke_after.clone();
+            tokio::spawn(async move {
+                tokio::time::sleep(Duration::from_millis(50)).await;
+                woke_after.store(start.elapsed().as_millis() as u64, Ordering::SeqCst);
+            })
+        };
+
+        let (record, error) = eval.await.unwrap();
+        assert_eq!(error, None);
+        assert_eq!(record["done"], json::json!(true));
+
+        ticker.await.unwrap();
+        let woke_after = woke_after.load(Ordering::SeqCst);
+        assert!(
+            woke_after < BURN_MS / 2,
+            "the sleeping task only woke after {woke_after}ms, so the JavaScript eval held the worker"
+        );
     }
 }

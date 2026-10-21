@@ -34,10 +34,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :forbidden="forbidden"
           :global-filter="filterQuery"
           :show-global-filter="false"
-          :page-size="20"
+          :page-size="pageSize"
           :page-size-options="[20, 50, 100, 250, 500]"
           :current-page="currentPage"
           @update:current-page="onPageChange"
+          @update:page-size="pageSize = $event"
+          :sort-by="sortBy"
+          :sort-order="sortOrder"
+          @update:sort-by="sortBy = $event"
+          @update:sort-order="sortOrder = $event"
           selection="multiple"
           :enable-column-resize="true"
           :persist-columns="true"
@@ -339,6 +344,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="pipeline-list-export-pipelines-btn"
               variant="outline"
               size="sm"
+              :loading="exportLoading"
               @click="exportBulkPipelines"
               icon-left="download"
             >
@@ -504,6 +510,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { useQuery } from "@tanstack/vue-query";
 import { useOrgId } from "@/composables/query/useOrgId";
 import { pipelinesQuery } from "@/services/pipelines.queries";
+import { downloadFile } from "@/utils/dom";
+import { functionsQuery } from "@/services/jstransform.queries";
 import { pipelineKeys } from "@/services/pipelines.querykeys";
 import { queryClient } from "@/composables/query/queryClient";
 import { ref, computed, watch, onMounted, nextTick } from "vue";
@@ -511,6 +519,7 @@ import { normalizeNodeErrorMessages } from "@/utils/pipelines/nodeErrors";
 import { MarkerType } from "@vue-flow/core";
 import { useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
+import { useListViewState } from "@/composables/useListViewState";
 import StreamSelection from "./StreamSelection.vue";
 import pipelineService from "@/services/pipelines";
 import { useStore } from "vuex";
@@ -556,7 +565,18 @@ interface PipelineRow {
   sql_query?: string;
 }
 
-const filterQuery = ref("");
+const viewState = useListViewState("pipelines", {
+  filterQuery: "",
+  tab: "all",
+  stateFilter: null as "errored" | "paused" | "active" | null,
+  pageSize: 20,
+  sortBy: "",
+  sortOrder: "asc" as "asc" | "desc",
+});
+const filterQuery = ref(viewState.filterQuery);
+const pageSize = ref(viewState.pageSize);
+const sortBy = ref(viewState.sortBy);
+const sortOrder = ref<"asc" | "desc">(viewState.sortOrder);
 
 const showCreatePipeline = ref(false);
 
@@ -676,7 +696,7 @@ const confirmDialogMeta: any = ref({
   data: null,
   onConfirm: () => {},
 });
-const activeTab = ref("all");
+const activeTab = ref(viewState.tab);
 // Derived, not assigned: a copy written only by updateActiveTab() is empty on a cold mount.
 const filteredPipelines = computed<any[]>(() =>
   activeTab.value === "all"
@@ -686,6 +706,9 @@ const filteredPipelines = computed<any[]>(() =>
 const columns: any = ref([]);
 
 const selectedPipelineIds = ref<string[]>([]);
+// Export fetches the function list before it writes the file, so a second press
+// mid-flight would download twice.
+const exportLoading = ref(false);
 const bulkDeleteLoading = ref(false);
 const selectedPipelines = computed(() =>
   filteredPipelines.value.filter((p: any) => selectedPipelineIds.value.includes(p.pipeline_id)),
@@ -769,7 +792,17 @@ const pipelineRowStyle = (row: any): Record<string, string> => {
 // ── State facet + summary strip ─────────────────────────────────────────────
 // Counts run over the TYPE-filtered rows (not the state-filtered ones) so the
 // tiles keep their totals while a facet is active.
-const stateFilter = ref<"errored" | "paused" | "active" | null>(null);
+const stateFilter = ref<"errored" | "paused" | "active" | null>(viewState.stateFilter);
+watch([filterQuery, activeTab, stateFilter, pageSize, sortBy, sortOrder], () => {
+  Object.assign(viewState, {
+    filterQuery: filterQuery.value,
+    tab: activeTab.value,
+    stateFilter: stateFilter.value,
+    pageSize: pageSize.value,
+    sortBy: sortBy.value,
+    sortOrder: sortOrder.value,
+  });
+});
 
 const displayedPipelines = computed(() => {
   const rows = filteredPipelines.value || [];
@@ -1187,54 +1220,119 @@ const resetConfirmDialog = () => {
   confirmDialogMeta.value.data = null;
 };
 
-const exportPipeline = (row: any) => {
-  const pipelineToBeExported = row.name;
-
-  const pipelineJson = JSON.stringify(row, null, 2);
-  // Create a Blob from the JSON string
-  const blob = new Blob([pipelineJson], { type: "application/json" });
-
-  // Create an object URL for the Blob
-  const url = URL.createObjectURL(blob);
-
-  // Create an anchor element to trigger the download
-  const link = document.createElement("a");
-  link.href = url;
-
-  // Set the filename of the download
-  link.download = `${pipelineToBeExported}.json`;
-
-  // Trigger the download by simulating a click
-  link.click();
-
-  // Clean up the URL object after download
-  URL.revokeObjectURL(url);
+// The names a pipeline's function nodes call, deduped and in node order.
+const functionNamesIn = (pipeline: any): string[] => {
+  const names = (pipeline?.nodes ?? [])
+    .filter((node: any) => node?.data?.node_type === "function")
+    .map((node: any) => node?.data?.name)
+    .filter((name: any) => typeof name === "string" && name !== "");
+  return Array.from(new Set<string>(names));
 };
 
-const exportBulkPipelines = () => {
-  // Create an array of selected pipelines without modifying their structure
-  const pipelinesToExport = selectedPipelines.value;
+// The same four keys the Functions export writes (FunctionList.vue exportPayload).
+// `streams` is a deprecated association whose names mean nothing in another org,
+// and `numArgs` is derived from `params`, so neither travels.
+const bundledFunctionPayload = (fn: any) => ({
+  name: fn.name,
+  function: fn.function,
+  params: fn.params,
+  transType: fn.transType,
+});
 
-  const exportJson = JSON.stringify(pipelinesToExport, null, 2);
-  const blob = new Blob([exportJson], { type: "application/json" });
+/**
+ * Attaches a `functions` key to every pipeline that calls one, so the import can
+ * recreate them in the target org instead of making the user remap each node.
+ *
+ * Mutates nothing: the rows belong to the pipelines cache. An older server ignores
+ * the extra key on the way back in - `Pipeline` does not set `deny_unknown_fields`.
+ *
+ * Returns the names that could not be bundled: under enterprise RBAC the list is
+ * filtered per user, so a node can name a function this user cannot read.
+ */
+const bundleFunctions = async (pipelines: any[]) => {
+  const wanted = Array.from(new Set<string>(pipelines.flatMap(functionNamesIn)));
+  if (!wanted.length) return { pipelines, missing: [] as string[] };
 
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  const date = new Date().toISOString().split("T")[0];
-  link.download = `pipelines_export_${date}.json`;
+  // GET /functions already returns every body, so one read covers the whole file.
+  let available: any[] = [];
+  try {
+    // staleTime 0: the functions tier caches for an hour, and a stale body would
+    // export logic the org no longer runs -- the drift this bundling removes.
+    available = await queryClient.fetchQuery({
+      ...functionsQuery(store.state.selectedOrganization.identifier),
+      staleTime: 0,
+    });
+  } catch {
+    // The pipeline itself is still worth exporting; the import falls back to remap.
+    return { pipelines, missing: wanted };
+  }
 
-  link.click();
+  const byName = new Map<string, any>(
+    (available ?? []).map((fn: any) => [fn.name, bundledFunctionPayload(fn)]),
+  );
 
-  URL.revokeObjectURL(url);
-
-  selectedPipelineIds.value = [];
-  toast({
-    message: t("toastMessages.pipeline.pipelinesExportedSuccessfully", {
-      count: pipelinesToExport.length,
-    }),
-    variant: "success",
+  const bundled = pipelines.map((pipeline: any) => {
+    const functions = functionNamesIn(pipeline)
+      .map((name) => byName.get(name))
+      .filter(Boolean);
+    return functions.length ? { ...pipeline, functions } : pipeline;
   });
+
+  return { pipelines: bundled, missing: wanted.filter((name) => !byName.has(name)) };
+};
+
+// Names a node calls but the file cannot carry. Said out loud, because the import
+// will stop on them and the user is the only one who can grant the read.
+const warnAboutMissingFunctions = (missing: string[]) => {
+  if (!missing.length) return;
+  toast({
+    message: t("toastMessages.pipeline.functionsNotBundled", {
+      count: missing.length,
+      names: missing.join(", "),
+    }),
+    variant: "warning",
+  });
+};
+
+const exportPipeline = async (row: any) => {
+  if (exportLoading.value) return;
+  exportLoading.value = true;
+  try {
+    const { pipelines, missing } = await bundleFunctions([row]);
+    downloadFile(`${row.name}.json`, JSON.stringify(pipelines[0], null, 2), "application/json");
+    warnAboutMissingFunctions(missing);
+  } finally {
+    exportLoading.value = false;
+  }
+};
+
+const exportBulkPipelines = async () => {
+  if (exportLoading.value) return;
+  exportLoading.value = true;
+  try {
+    // Stays an array of pipelines, each carrying its own `functions` key, so the
+    // import loop keeps its shape.
+    const selected = selectedPipelines.value;
+    const { pipelines, missing } = await bundleFunctions(selected);
+
+    const date = new Date().toISOString().split("T")[0];
+    downloadFile(
+      `pipelines_export_${date}.json`,
+      JSON.stringify(pipelines, null, 2),
+      "application/json",
+    );
+
+    selectedPipelineIds.value = [];
+    toast({
+      message: t("toastMessages.pipeline.pipelinesExportedSuccessfully", {
+        count: selected.length,
+      }),
+      variant: "success",
+    });
+    warnAboutMissingFunctions(missing);
+  } finally {
+    exportLoading.value = false;
+  }
 };
 //if user clicks on run pipeline button then we need toggle the pipeline state and resume the pipeline from where it paused / start from now as per the user choice
 const handleResumePipeline = () => {

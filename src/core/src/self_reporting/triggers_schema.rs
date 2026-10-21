@@ -17,7 +17,6 @@ use std::sync::LazyLock as Lazy;
 
 use anyhow::Result;
 use config::{
-    get_config,
     meta::{
         self_reporting::usage::{self},
         stream::StreamType,
@@ -41,20 +40,12 @@ static INITIALIZED_ORGS: Lazy<DashSet<String>> = Lazy::new(DashSet::new);
 /// * `org_id` - The organization ID to initialize the triggers stream for
 ///
 /// # Behavior
-/// - Only applies when ZO_USAGE_REPORT_TO_OWN_ORG is enabled
 /// - Uses lock-free per-org tracking to ensure initialization happens only once per restart
 /// - Auto-generates field list from TriggerData struct via reflection
 /// - Creates schema directly without ingesting sample data
 /// - Does NOT manipulate defined_schema_fields (no UDS filtering for system streams)
 /// - Never blocks ingestion even if initialization fails
 pub async fn ensure_triggers_stream_initialized(org_id: &str) -> Result<()> {
-    let cfg = get_config();
-
-    // Only initialize when usage_report_to_own_org is enabled
-    if !cfg.common.usage_report_to_own_org {
-        return Ok(());
-    }
-
     // Check if already initialized (lock-free read)
     if INITIALIZED_ORGS.contains(org_id) {
         return Ok(());
@@ -169,6 +160,7 @@ mod tests {
         // reflection sample or orgs created after the change get a triggers
         // stream schema without them.
         assert!(field_names.contains(&"actual_value".to_string()));
+        assert!(field_names.contains(&"rule_value".to_string()));
         assert!(field_names.contains(&"threshold_value".to_string()));
         assert!(field_names.contains(&"threshold_operator".to_string()));
         assert!(field_names.contains(&"level".to_string()));
@@ -181,11 +173,24 @@ mod tests {
         assert!(field_names.contains(&"synthetics_error_source".to_string()));
         assert!(field_names.contains(&"synthetics_location".to_string()));
         assert!(field_names.contains(&"delivery_attempted".to_string()));
+        for f in [
+            "trigger_source",
+            "triggered_by",
+            "recipient_count",
+            "attachment_type",
+            "dashboard_count",
+            "scheduled_for",
+        ] {
+            assert!(field_names.contains(&f.to_string()), "missing {f}");
+        }
+
+        // The history filter and the Suppressed tab of a downtime read this column.
+        assert!(field_names.contains(&"downtime_id".to_string()));
 
         // Verify count matches struct fields
-        // (35 total: 21 original + 5 dedup/grouping + 6 value-context + 2 synthetics skip + 1
-        // delivery)
-        assert_eq!(field_names.len(), 35);
+        // 43: 21 original + 5 dedup + 6 value + 2 synthetics + downtime + delivery + rule_value + 6
+        // report
+        assert_eq!(field_names.len(), 43);
 
         // Verify no duplicate fields
         let unique_count = field_names
@@ -193,13 +198,6 @@ mod tests {
             .collect::<std::collections::HashSet<_>>()
             .len();
         assert_eq!(unique_count, field_names.len());
-    }
-
-    #[tokio::test]
-    async fn test_ensure_triggers_stream_initialized_meta_org() {
-        // Should return Ok immediately for META org
-        let result = ensure_triggers_stream_initialized(config::META_ORG_ID).await;
-        assert!(result.is_ok());
     }
 
     #[tokio::test]

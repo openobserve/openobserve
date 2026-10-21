@@ -6,11 +6,11 @@
     :fields="visibleFields"
     :search="search"
     :search-class="searchClass"
-    :search-placeholder="t('search.searchField')"
+    :search-placeholder="searchPlaceholder ?? t('search.searchField')"
     :current-page="currentPage"
     :page-size="pageSize"
     :page-size-options="[pageSize]"
-    row-key="name"
+    :row-key="rowKey"
     :loading="loading"
     :show-pagination="showPagination"
     @update:search="$emit('update:search', $event)"
@@ -23,7 +23,15 @@
           class="-ms-page-edge px-page-edge bg-surface-subtle text-field-list-group-text flex h-full w-[calc(100%+2*var(--spacing-page-edge))] shrink-0 cursor-pointer items-center justify-between text-xs font-semibold"
           @click="toggleGroup(row.group)"
         >
-          <div class="min-w-0 flex-1">{{ groupName }} ({{ groupFieldCount[row.group] ?? 0 }})</div>
+          <div class="min-w-0 flex-1">
+            <slot
+              name="group-label"
+              :row="row"
+              :group-name="groupName"
+              :count="groupFieldCount[row.group] ?? 0"
+              >{{ groupName }} ({{ groupFieldCount[row.group] ?? 0 }})</slot
+            >
+          </div>
           <OButton
             v-if="(groupFieldCount[row.group] ?? 0) > 0"
             variant="ghost"
@@ -73,7 +81,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OFieldList from "@/lib/lists/FieldList/OFieldList.vue";
@@ -90,6 +98,9 @@ interface Props {
   currentPage?: number;
   pageSize?: number;
   showPagination?: boolean;
+  searchPlaceholder?: I18nText;
+  /** Field that keys each row; set it when two rows can share a `name`. */
+  rowKey?: string;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -100,6 +111,7 @@ const props = withDefaults(defineProps<Props>(), {
   currentPage: 1,
   pageSize: 50,
   showPagination: false,
+  rowKey: "name",
 });
 
 defineEmits<{

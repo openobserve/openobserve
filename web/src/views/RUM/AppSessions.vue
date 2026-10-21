@@ -38,7 +38,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   queryEditorHeight,
                 ]"
                 v-model:query="sessionState.data.editorValue"
-                :debounce-time="300"
+                :debounce-time="100"
+                :filter-mode="true"
                 :keywords="effectiveKeywords"
                 :suggestions="effectiveSuggestions"
                 :field-value-resolver="resolveFieldValues"
@@ -642,14 +643,22 @@ const {
   resolveFieldValues,
 } = useSqlSuggestions();
 
+// Set as soon as the page mounts, so a value lookup on the first keystroke is not left without a stream.
+const syncSuggestStreamContext = () => {
+  autoCompleteData.value.org = store.state.selectedOrganization?.identifier ?? "";
+  autoCompleteData.value.streamType = "logs";
+  autoCompleteData.value.streamName = rumSessionStreamName;
+};
+watch(() => store.state.selectedOrganization?.identifier, syncSuggestStreamContext, {
+  immediate: true,
+});
+
 const updateAutoComplete = (value: string) => {
   _sqlOnQueryChange();
   autoCompleteData.value.query = value;
   autoCompleteData.value.cursorIndex = sessionQueryEditorRef.value?.getCursorIndex?.();
   autoCompleteData.value.popup.open = sessionQueryEditorRef.value?.triggerAutoComplete;
-  autoCompleteData.value.org = store.state.selectedOrganization.identifier;
-  autoCompleteData.value.streamType = "logs";
-  autoCompleteData.value.streamName = rumSessionStreamName;
+  syncSuggestStreamContext();
   getSuggestions();
 };
 

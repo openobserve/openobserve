@@ -73,9 +73,12 @@ fn disabled_response() -> Option<Response> {
         ("org_id" = String, Path, description = "Organization identifier"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = AnomalyConfigListResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Vec<AnomalyConfigResponse>),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = MetaHttpResponse),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"description": "List anomaly detection configs", "category": "anomaly_detection"}))
+    )
 )]
 #[tracing::instrument(skip_all, fields(org_id = %org_id))]
 pub async fn list_configs(Path(org_id): Path<String>) -> Response {
@@ -83,7 +86,10 @@ pub async fn list_configs(Path(org_id): Path<String>) -> Response {
         return resp;
     }
     match anomaly_service::list_configs(&org_id, None, None).await {
-        Ok(configs) => MetaHttpResponse::json(configs),
+        Ok(mut configs) => {
+            add_active_downtimes(&org_id, &mut configs).await;
+            MetaHttpResponse::json(configs)
+        }
         Err(e) => {
             tracing::error!("Failed to list anomaly configs: {}", e);
             MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
@@ -91,6 +97,56 @@ pub async fn list_configs(Path(org_id): Path<String>) -> Response {
         }
     }
 }
+
+/// Sets `active_downtime` on each config an active downtime's Anomaly detections target matches.
+#[cfg(feature = "enterprise")]
+async fn add_active_downtimes(org_id: &str, configs: &mut [serde_json::Value]) {
+    if !o2_enterprise::enterprise::common::config::get_config()
+        .downtimes
+        .enabled
+        || db::downtimes::list_cached(org_id).is_empty()
+    {
+        return;
+    }
+    let semantic_groups = db::system_settings::get_semantic_field_groups(org_id).await;
+    let now = config::utils::time::now_micros();
+    for value in configs.iter_mut() {
+        let Some(obj) = value.as_object_mut() else {
+            continue;
+        };
+        let text = |key: &str| obj.get(key).and_then(|v| v.as_str()).map(str::to_string);
+        let (Some(anomaly_id), Some(folder_id)) = (text("anomaly_id"), text("folder_id")) else {
+            continue;
+        };
+        let tags: Vec<String> = obj
+            .get("tags")
+            .and_then(|t| serde_json::from_value(t.clone()).ok())
+            .unwrap_or_default();
+        let query_mode = text("query_mode").unwrap_or_default();
+        let dims = o2_enterprise::enterprise::downtimes::scope::anomaly_dimensions(
+            openobserve_core::alerts::downtimes::anomaly_sql(
+                &query_mode,
+                text("custom_sql").as_deref(),
+            ),
+            openobserve_core::alerts::downtimes::anomaly_filters(&query_mode, obj.get("filters")),
+            &tags,
+            &semantic_groups,
+        );
+        if let Some(downtime) = openobserve_core::alerts::downtimes::active_for_anomaly(
+            org_id,
+            &anomaly_id,
+            &folder_id,
+            &dims,
+            now,
+        ) && let Ok(active) = serde_json::to_value(downtime)
+        {
+            obj.insert("active_downtime".to_string(), active);
+        }
+    }
+}
+
+#[cfg(not(feature = "enterprise"))]
+async fn add_active_downtimes(_org_id: &str, _configs: &mut [serde_json::Value]) {}
 
 /// Get a specific anomaly detection configuration
 #[utoipa::path(
@@ -111,6 +167,9 @@ pub async fn list_configs(Path(org_id): Path<String>) -> Response {
         (status = 404, description = "Not Found", content_type = "application/json", body = MetaHttpResponse),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = MetaHttpResponse),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"description": "Get an anomaly detection config by ID", "category": "anomaly_detection"}))
+    )
 )]
 #[tracing::instrument(skip_all, fields(org_id = %org_id, anomaly_id = %anomaly_id))]
 pub async fn get_config(Path((org_id, anomaly_id)): Path<(String, String)>) -> Response {
@@ -231,7 +290,7 @@ fn resolve_owner(owner: Option<String>, fallback: &str) -> Option<String> {
         ("org_id" = String, Path, description = "Organization identifier"),
     ),
     responses(
-        (status = 201, description = "Created", content_type = "application/json", body = AnomalyConfigResponse),
+        (status = 200, description = "Created", content_type = "application/json", body = AnomalyConfigResponse),
         (status = 400, description = "Bad Request", content_type = "application/json", body = MetaHttpResponse),
         (status = 403, description = "Forbidden", content_type = "application/json", body = MetaHttpResponse),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = MetaHttpResponse),
@@ -241,6 +300,9 @@ fn resolve_owner(owner: Option<String>, fallback: &str) -> Option<String> {
         description = "Anomaly detection configuration",
         content_type = "application/json",
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"description": "Create an anomaly detection config", "category": "anomaly_detection"}))
+    )
 )]
 #[tracing::instrument(skip_all, fields(org_id = %org_id))]
 pub async fn create_config(
@@ -296,6 +358,9 @@ pub async fn create_config(
         description = "Updated configuration",
         content_type = "application/json",
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"description": "Update an anomaly detection config", "category": "anomaly_detection"}))
+    )
 )]
 #[tracing::instrument(skip_all, fields(org_id = %org_id, anomaly_id = %anomaly_id))]
 pub async fn update_config(
@@ -345,6 +410,9 @@ pub async fn update_config(
         (status = 404, description = "Not Found", content_type = "application/json", body = MetaHttpResponse),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = MetaHttpResponse),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"description": "Delete an anomaly detection config by ID", "category": "anomaly_detection", "requires_confirmation": true}))
+    )
 )]
 #[tracing::instrument(skip_all, fields(org_id = %org_id, anomaly_id = %anomaly_id))]
 pub async fn delete_config(Path((org_id, anomaly_id)): Path<(String, String)>) -> Response {
@@ -383,10 +451,13 @@ pub async fn delete_config(Path((org_id, anomaly_id)): Path<(String, String)>) -
         ("anomaly_id" = String, Path, description = "Anomaly config identifier"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = TrainingResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 404, description = "Not Found", content_type = "application/json", body = MetaHttpResponse),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = MetaHttpResponse),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"description": "Start training the model for an anomaly detection config", "category": "anomaly_detection"}))
+    )
 )]
 #[tracing::instrument(skip_all, fields(org_id = %org_id, anomaly_id = %anomaly_id))]
 pub async fn train_model(
@@ -432,6 +503,9 @@ pub async fn train_model(
         (status = 404, description = "Not Found", content_type = "application/json", body = MetaHttpResponse),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = MetaHttpResponse),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"description": "Cancel in-progress training for an anomaly detection config", "category": "anomaly_detection"}))
+    )
 )]
 #[tracing::instrument(skip_all, fields(org_id = %org_id, anomaly_id = %anomaly_id))]
 pub async fn cancel_training(Path((org_id, anomaly_id)): Path<(String, String)>) -> Response {
@@ -465,10 +539,13 @@ pub async fn cancel_training(Path((org_id, anomaly_id)): Path<(String, String)>)
         ("anomaly_id" = String, Path, description = "Anomaly config identifier"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = DetectionResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 404, description = "Not Found", content_type = "application/json", body = MetaHttpResponse),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = MetaHttpResponse),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"description": "Run anomaly detection now for a config", "category": "anomaly_detection"}))
+    )
 )]
 #[tracing::instrument(skip_all, fields(org_id = %org_id, anomaly_id = %anomaly_id))]
 pub async fn detect_anomalies(
@@ -511,9 +588,13 @@ pub async fn detect_anomalies(
         ("limit" = Option<i64>, Query, description = "Maximum number of results"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = DetectionHistoryResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Vec<DetectionHistoryItem>),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = MetaHttpResponse),
     ),
+    extensions(
+        // The core getter is still a stub returning [], so an agent would report no history
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 #[tracing::instrument(skip_all, fields(org_id = %org_id, anomaly_id = %anomaly_id))]
 pub async fn get_detection_history(
@@ -552,32 +633,6 @@ pub struct HistoryQuery {
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct AnomalyConfigResponse {
     // The config row is returned flat, with every column as a top-level key
-}
-
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
-pub struct AnomalyConfigListResponse {
-    pub configs: Vec<AnomalyConfigResponse>,
-}
-
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
-pub struct TrainingResponse {
-    pub model_version: i64,
-    pub trained_points: usize,
-    pub s3_path: String,
-    pub model_size_bytes: usize,
-}
-
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
-pub struct DetectionResponse {
-    pub anomaly_id: String,
-    pub model_version: i64,
-    pub points_scored: usize,
-    pub anomalies_detected: usize,
-}
-
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
-pub struct DetectionHistoryResponse {
-    pub history: Vec<DetectionHistoryItem>,
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]

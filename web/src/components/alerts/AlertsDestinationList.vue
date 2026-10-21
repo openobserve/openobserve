@@ -62,10 +62,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :selected-ids="selectedDestinationIds"
           selection="multiple"
           pagination="client"
-          :page-size="20"
+          :page-size="pageSize"
           :page-size-options="[5, 10, 20, 50, 100]"
           :current-page="currentPage"
+          @update:page-size="pageSize = $event"
           sorting="client"
+          :sort-by="sortBy"
+          :sort-order="sortOrder"
+          @update:sort-by="sortBy = $event"
+          @update:sort-order="sortOrder = $event"
           :default-columns="false"
           :enable-column-resize="true"
           :persist-columns="true"
@@ -348,6 +353,7 @@ import { templatesQuery } from "@/services/alert_templates.queries";
 import { useStore } from "vuex";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import { useRouter, useRoute } from "vue-router";
+import { useListViewState } from "@/composables/useListViewState";
 import type { DestinationPayload } from "@/ts/interfaces";
 import { usePrebuiltDestinations } from "@/composables/usePrebuiltDestinations";
 import type { Template } from "@/ts/interfaces/index";
@@ -505,7 +511,17 @@ export default defineComponent({
     const showImportDestination = ref(false);
     const router = useRouter();
     const route = useRoute();
-    const filterQuery = ref("");
+    const viewState = useListViewState("alertDestinations", {
+      filterQuery: "",
+      tab: "all" as "all" | "prebuilt" | "custom",
+      pageSize: 20,
+      sortBy: "",
+      sortOrder: "asc" as "asc" | "desc",
+    });
+    const filterQuery = ref(viewState.filterQuery);
+    const pageSize = ref(viewState.pageSize);
+    const sortBy = ref(viewState.sortBy);
+    const sortOrder = ref<"asc" | "desc">(viewState.sortOrder);
     const deletingDestinations = ref(new Set<string>());
     const oTableRef: any = ref(null);
 
@@ -858,7 +874,16 @@ export default defineComponent({
     // (Slack/Opsgenie/PagerDuty/ServiceNow/etc., identified via the
     // `prebuilt_type` metadata or URL/template pattern); "custom" is the
     // negation, capturing user-defined HTTP/Email destinations.
-    const activeTab = ref<"all" | "prebuilt" | "custom">("all");
+    const activeTab = ref<"all" | "prebuilt" | "custom">(viewState.tab);
+    watch([filterQuery, activeTab, pageSize, sortBy, sortOrder], () => {
+      Object.assign(viewState, {
+        filterQuery: filterQuery.value,
+        tab: activeTab.value,
+        pageSize: pageSize.value,
+        sortBy: sortBy.value,
+        sortOrder: sortOrder.value,
+      });
+    });
 
     const visibleRows = computed(() => {
       const base = destinations.value || [];
@@ -1006,6 +1031,9 @@ export default defineComponent({
       forbidden,
       conformDeleteDestination,
       filterQuery,
+      pageSize,
+      sortBy,
+      sortOrder,
       filterData,
       editingDestination,
       templates,

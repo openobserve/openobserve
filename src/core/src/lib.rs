@@ -17,6 +17,8 @@
 
 #![recursion_limit = "256"]
 
+#[cfg(feature = "enterprise")]
+pub mod ai_chat;
 pub mod alerts;
 #[cfg(feature = "enterprise")]
 pub mod anomaly_detection;
@@ -28,6 +30,8 @@ pub mod bootstrap;
 pub mod cache;
 pub mod dashboards;
 pub mod db_monitoring;
+#[cfg(feature = "enterprise")]
+pub mod downtimes;
 use ::common;
 use ::db;
 pub mod error_suggest;

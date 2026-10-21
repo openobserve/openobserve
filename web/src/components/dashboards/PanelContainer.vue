@@ -36,9 +36,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-panel-bar"
       >
         <OIcon
-          v-if="!viewOnly && !simplifiedPanelView"
+          v-if="!viewOnly && !simplifiedPanelView && layoutMode !== 'view'"
           name="drag-indicator"
           size="sm"
+          class="shrink-0"
           data-test="dashboard-panel-drag"
         />
         <!-- me-5 is a truncation MARGIN, not decoration. The spacer after this
@@ -48,10 +49,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              ellipsis always lands a gap short of the icons. A title that fits is
              unaffected — the spacer just absorbs 1.25rem less. -->
         <!-- Curated tiles sit six to a row: they wrap at every width and keep two lines so a row's values stay level. -->
+        <!-- One line; next to notice chips it holds ~40% of the bar so the chip squeezes nothing but the spacer. -->
         <OTruncatedText
           as="div"
-          class="text-compact text-text-heading me-5 font-medium tracking-[0.02em] max-lg:line-clamp-2 max-lg:whitespace-normal"
-          :class="curatedTile ? 'me-1! line-clamp-2 min-h-[2lh] whitespace-normal!' : undefined"
+          class="text-compact text-text-heading me-5 font-medium tracking-[0.02em] @max-[22rem]/panelbar:me-1"
+          :class="[
+            curatedTile ? 'me-1! line-clamp-2 min-h-[2lh] whitespace-normal!' : undefined,
+            hasNoticeChips
+              ? 'min-w-[min(10rem,40%)]! @max-[12rem]/panelbar:min-w-[35%]!'
+              : undefined,
+          ]"
           data-test="dashboard-panel-header"
         >
           {{ props.data.title }}
@@ -170,7 +177,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <ExemplarToggle
           v-if="exemplarsEligible && !viewOnly"
-          :class="exemplarToggleAtRest ? '' : hoverRevealClass"
+          :class="exemplarToggleAtRest && !isLayoutEditing ? '' : hoverRevealClass"
           :on="exemplarsOn"
           :loading="PanleSchemaRendererRef?.exemplarsStatus === 'loading'"
           :count="PanleSchemaRendererRef?.exemplarsCount ?? 0"
@@ -218,10 +225,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </OButton>
         <!-- show error here -->
+        <!-- The title gives way first; this clips only past the title's floor, so refresh and the menu always stay in the panel. -->
         <PanelErrorButtons
+          class="min-w-0 shrink-[0.001] overflow-x-clip"
           :error="errorData"
           :maxQueryRangeWarning="maxQueryRangeWarning"
           :limitNumberOfSeriesWarningMessage="limitNumberOfSeriesWarningMessage"
+          v-bind="noticeProps"
           :sparklineWarning="sparklineWarning"
           :isCachedDataDifferWithCurrentTimeRange="isCachedDataDifferWithCurrentTimeRange"
           :isPartialData="isPartialData"
@@ -229,11 +239,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :lastTriggeredAt="lastTriggeredAt"
           :viewOnly="viewOnly"
           :exemplarError="exemplarErrorMessage"
+          :canEdit="canEditFromNotice"
+          :canInspect="canInspectFromNotice"
+          :canRefresh="canRefreshFromNotice"
           @retry-exemplars="PanleSchemaRendererRef?.retryExemplars()"
+          @open-inspector="showViewPanel = true"
+          @edit-panel="onNoticeEditPanel"
+          @refresh-panel="onRefreshPanel(false)"
         />
         <OButton
-          v-if="!viewOnly && !simplifiedPanelView"
-          :variant="variablesDataUpdated ? 'ghost-warning' : 'ghost'"
+          v-if="!viewOnly && !simplifiedPanelView && !isLayoutEditing"
+          :variant="variablesDataUpdated || isTimeRangeWaiting ? 'ghost-warning' : 'ghost'"
           size="icon"
           @click="() => onRefreshPanel(false)"
           :title="t('panel.refreshPanel')"
@@ -241,11 +257,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :disabled="isPanelLoading"
           icon-left="refresh"
         >
-          <OTooltip
-            :content="
-              variablesDataUpdated ? t('panel.refreshToApplyVariables') : t('panel.refresh')
-            "
-          />
+          <OTooltip :content="refreshTooltip" />
         </OButton>
         <!-- simplifiedPanelView panels are ephemeral (Insights / Drill down): delete without a confirm -->
         <OButton
@@ -263,6 +275,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <ODropdown side="bottom" align="end" v-if="!viewOnly && !simplifiedPanelView">
           <template #trigger>
             <OButton
+              :aria-label="t('dashboard.moreActions')"
               variant="ghost"
               size="icon"
               :data-test="`dashboard-edit-panel-${props.data.title}-dropdown`"
@@ -271,7 +284,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
           </template>
           <ODropdownItem
-            v-if="!simplifiedPanelView"
+            v-if="!simplifiedPanelView && !isLayoutEditing"
             data-test="dashboard-edit-panel"
             @select="onPanelModifyClick('EditPanel')"
             shortcut-id="panelEdit"
@@ -280,93 +293,96 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("panel.editPanel") }}
           </ODropdownItem>
           <ODropdownItem
-            v-if="!simplifiedPanelView"
+            v-if="!simplifiedPanelView && layoutMode !== 'view'"
             data-test="dashboard-edit-layout"
             @select="onPanelModifyClick('EditLayout')"
           >
             <template #icon-left><OIcon name="dashboard-customize" size="sm" /></template>
             {{ t("panel.editLayout") }}
           </ODropdownItem>
-          <ODropdownItem
-            v-if="!simplifiedPanelView"
-            data-test="dashboard-duplicate-panel"
-            @select="onPanelModifyClick('DuplicatePanel')"
-            shortcut-id="panelDuplicate"
-          >
-            <template #icon-left><OIcon name="content-copy" size="sm" /></template>
-            {{ t("panel.duplicate") }}
-          </ODropdownItem>
-          <ODropdownItem
-            data-test="dashboard-delete-panel"
-            @select="onPanelModifyClick('DeletePanel')"
-            shortcut-id="panelDelete"
-          >
-            <template #icon-left
-              ><OIcon name="delete-outline" size="sm" class="text-current!"
-            /></template>
-            {{ t("panel.deletePanel") }}
-          </ODropdownItem>
-          <ODropdownItem
-            v-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
-            data-test="dashboard-query-inspector-panel"
-            @select="showViewPanel = true"
-            shortcut-id="panelQueryInspector"
-          >
-            <template #icon-left><OIcon name="manage-search" size="sm" /></template>
-            {{ t("panel.queryInspector") }}
-          </ODropdownItem>
-          <ODropdownItem
-            v-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
-            data-test="dashboard-panel-download-as-csv-btn"
-            @select="PanleSchemaRendererRef?.downloadDataAsCSV(props.data.title)"
-          >
-            <template #icon-left><OIcon name="file-download" size="sm" /></template>
-            {{ t("panel.downloadAsCSV") }}
-          </ODropdownItem>
-          <ODropdownItem
-            v-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
-            data-test="dashboard-panel-download-as-json-btn"
-            @select="PanleSchemaRendererRef?.downloadDataAsJSON(props.data.title)"
-          >
-            <template #icon-left><OIcon name="data-object" size="sm" /></template>
-            {{ t("panel.downloadAsJSON") }}
-          </ODropdownItem>
-          <ODropdownItem
-            v-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
-            :disabled="props.data.queryType != 'sql'"
-            data-test="dashboard-move-to-logs-module"
-            @select="onLogPanel"
-            icon-left="search"
-          >
-            {{ t("panel.goToLogs") }}
-          </ODropdownItem>
-          <ODropdownItem
-            v-if="!simplifiedPanelView"
-            data-test="dashboard-refresh-without-cache"
-            @select="onPanelModifyClick('Refresh')"
-            icon-left="cached"
-          >
-            {{ t("dashboard.panelContainer.refreshCacheReload") }}
-          </ODropdownItem>
-          <ODropdownItem
-            v-if="!simplifiedPanelView"
-            data-test="dashboard-move-to-another-panel"
-            @select="onPanelModifyClick('MovePanel')"
-          >
-            <template #icon-left><OIcon name="drive-file-move" size="sm" /></template>
-            {{ t("panel.moveToAnotherTab") }}
-          </ODropdownItem>
-          <!-- Alert creation is shared platform machinery: this contributes the
-               panel's state through a pure adapter and the action owns the rest
-               (label, confirm dialog, transport). See CreateAlertAction.vue. -->
-          <CreateAlertAction
-            v-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
-            variant="menu-item"
-            source="panel"
-            :build="buildPanelAlertPrefill"
-            :disabled-reason="alertDisabledReason"
-            data-test="dashboard-create-alert-from-panel"
-          />
+          <!-- Only the layout dialog belongs to layout edit mode; every other action saves on its own. -->
+          <template v-if="!isLayoutEditing">
+            <ODropdownItem
+              v-if="!simplifiedPanelView"
+              data-test="dashboard-duplicate-panel"
+              @select="onPanelModifyClick('DuplicatePanel')"
+              shortcut-id="panelDuplicate"
+            >
+              <template #icon-left><OIcon name="content-copy" size="sm" /></template>
+              {{ t("panel.duplicate") }}
+            </ODropdownItem>
+            <ODropdownItem
+              data-test="dashboard-delete-panel"
+              @select="onPanelModifyClick('DeletePanel')"
+              shortcut-id="panelDelete"
+            >
+              <template #icon-left
+                ><OIcon name="delete-outline" size="sm" class="text-current!"
+              /></template>
+              {{ t("panel.deletePanel") }}
+            </ODropdownItem>
+            <ODropdownItem
+              v-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
+              data-test="dashboard-query-inspector-panel"
+              @select="showViewPanel = true"
+              shortcut-id="panelQueryInspector"
+            >
+              <template #icon-left><OIcon name="manage-search" size="sm" /></template>
+              {{ t("panel.queryInspector") }}
+            </ODropdownItem>
+            <ODropdownItem
+              v-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
+              data-test="dashboard-panel-download-as-csv-btn"
+              @select="PanleSchemaRendererRef?.downloadDataAsCSV(props.data.title)"
+            >
+              <template #icon-left><OIcon name="file-download" size="sm" /></template>
+              {{ t("panel.downloadAsCSV") }}
+            </ODropdownItem>
+            <ODropdownItem
+              v-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
+              data-test="dashboard-panel-download-as-json-btn"
+              @select="PanleSchemaRendererRef?.downloadDataAsJSON(props.data.title)"
+            >
+              <template #icon-left><OIcon name="data-object" size="sm" /></template>
+              {{ t("panel.downloadAsJSON") }}
+            </ODropdownItem>
+            <ODropdownItem
+              v-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
+              :disabled="props.data.queryType != 'sql'"
+              data-test="dashboard-move-to-logs-module"
+              @select="onLogPanel"
+              icon-left="search"
+            >
+              {{ t("panel.goToLogs") }}
+            </ODropdownItem>
+            <ODropdownItem
+              v-if="!simplifiedPanelView"
+              data-test="dashboard-refresh-without-cache"
+              @select="onPanelModifyClick('Refresh')"
+              icon-left="cached"
+            >
+              {{ t("dashboard.panelContainer.refreshCacheReload") }}
+            </ODropdownItem>
+            <ODropdownItem
+              v-if="!simplifiedPanelView"
+              data-test="dashboard-move-to-another-panel"
+              @select="onPanelModifyClick('MovePanel')"
+            >
+              <template #icon-left><OIcon name="drive-file-move" size="sm" /></template>
+              {{ t("panel.moveToAnotherTab") }}
+            </ODropdownItem>
+            <!-- Alert creation is shared platform machinery: this contributes the
+                 panel's state through a pure adapter and the action owns the rest
+                 (label, confirm dialog, transport). See CreateAlertAction.vue. -->
+            <CreateAlertAction
+              v-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
+              variant="menu-item"
+              source="panel"
+              :build="buildPanelAlertPrefill"
+              :disabled-reason="alertDisabledReason"
+              data-test="dashboard-create-alert-from-panel"
+            />
+          </template>
         </ODropdown>
       </PanelBar>
     </div>
@@ -408,6 +424,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           handleLimitNumberOfSeriesWarningMessageUpdate
         "
         @sparkline-warning-update="handleSparklineWarningUpdate"
+        @series-limit-update="handleSeriesLimitUpdate"
+        @panel-diagnostics-update="handlePanelDiagnosticsUpdate"
         @result-metadata-update="handleResultMetadataUpdate"
         @last-triggered-at-update="handleLastTriggeredAtUpdate"
         @is-cached-data-differ-with-current-time-range-update="
@@ -453,6 +471,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model:open="showViewPanel"
       :metaData="metaData"
       :data="props.data"
+      :diagnostics="panelDiagnostics"
+      :seriesLimit="seriesLimit"
       data-test="query-inspector-dialog"
     />
 
@@ -502,8 +522,9 @@ import ConfirmDialog from "../ConfirmDialog.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import PanelBar from "@/components/common/PanelBar.vue";
 import SinglePanelMove from "@/components/dashboards/settings/SinglePanelMove.vue";
-import { getUUID, processQueryMetadataErrors, b64EncodeUnicode } from "@/utils/zincutils";
+import { getUUID, b64EncodeUnicode } from "@/utils/zincutils";
 import useNotifications from "@/composables/useNotifications";
+import { useDashboardSaveConflict } from "@/composables/dashboard/useDashboardSaveConflict";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
@@ -520,6 +541,8 @@ import {
   buildPrefillFromPanel,
   executedPanelQuery,
   panelQueryChoices,
+  alertableQueryIndexes,
+  type PanelQueryShape,
 } from "@/utils/alerts/prefill/fromPanel";
 import type { AlertBuildOptions } from "@/ts/interfaces/alertPrefill";
 import { isFormulaQuery } from "@/utils/dashboard/promql/formula";
@@ -531,6 +554,12 @@ import {
   useExemplarOverride,
 } from "@/composables/dashboard/useExemplarOverride";
 import { isExemplarEligible } from "@/utils/dashboard/exemplars/exemplarEligibility";
+import {
+  PANEL_EDITOR_FOCUS_PARAM,
+  type PanelEditorFocusTarget,
+} from "@/composables/dashboard/usePanelEditorFocus";
+import type { PanelNoticeActionId } from "@/utils/dashboard/panelNotices";
+import { usePanelNotices } from "@/composables/dashboard/usePanelNotices";
 
 const QueryInspector = defineAsyncComponent(() => {
   return import("@/components/dashboards/QueryInspector.vue");
@@ -577,6 +606,8 @@ export default defineComponent({
     "simplifiedPanelView",
     "shouldRefreshWithoutCache",
     "showLegendsButton",
+    "isTimeRangeWaiting",
+    "layoutMode",
   ],
   components: {
     OTag,
@@ -711,22 +742,24 @@ export default defineComponent({
     const showLegendsDialog = ref(false);
     const confirmDeletePanelDialog = ref(false);
     const confirmMovePanelDialog: any = ref(false);
-    const {
-      showPositiveNotification,
-      showErrorNotification,
-      showConfictErrorNotificationWithRefreshBtn,
-    } = useNotifications();
+    const { showPositiveNotification, showErrorNotification } = useNotifications();
+    const saveConflict = useDashboardSaveConflict();
     const metaDataValue = (metadata: any) => {
       metaData.value = metadata;
     };
 
-    const maxQueryRangeWarning = ref("");
-
     const limitNumberOfSeriesWarningMessage = ref("");
 
-    const handleResultMetadataUpdate = (metadata: any) => {
-      maxQueryRangeWarning.value = processQueryMetadataErrors(metadata, store.state.timezone);
-    };
+    // Function errors and partial reasons have their own header chips; the range warning keeps the rest.
+    const {
+      panelDiagnostics,
+      seriesLimit,
+      maxQueryRangeWarning,
+      noticeProps,
+      handleResultMetadataUpdate,
+      handlePanelDiagnosticsUpdate,
+      handleSeriesLimitUpdate,
+    } = usePanelNotices(() => store.state.timezone);
 
     // to store and show when the panel was last loaded
     const lastTriggeredAt = ref(null);
@@ -777,6 +810,16 @@ export default defineComponent({
 
     // for full screen button
     const isCurrentlyHoveredPanel: any = ref(false);
+    const isLayoutEditing = computed(() => props.layoutMode === "edit");
+
+    // Editor actions follow the "Edit panel" menu item; Refresh is a viewer action, so layout edit and viewOnly keep it.
+    const canEditFromNotice = computed(
+      () => !props.viewOnly && !props.simplifiedPanelView && !isLayoutEditing.value,
+    );
+    const canRefreshFromNotice = computed(() => !props.simplifiedPanelView);
+    const canInspectFromNotice = computed(
+      () => !props.simplifiedPanelView && (metaData.value?.queries?.length ?? 0) > 0,
+    );
 
     // Applied to every hover-revealed control in the panel bar. They stay in the
     // layout while hidden so the title's truncation point never moves when the
@@ -784,12 +827,26 @@ export default defineComponent({
     // out of the tab order and the a11y tree, so nothing hidden is reachable.
     // Touch has no hover, so < md the controls are simply always shown.
     const { isMobile } = useBreakpoint();
-    const hoverRevealClass = computed(() =>
-      isCurrentlyHoveredPanel.value || isMobile.value ? "" : "invisible pointer-events-none",
+    // Layout editing drops them so the grip does not squeeze a narrow panel's title.
+    // Mirrors buildPanelNotices' inputs: whether PanelErrorButtons draws any notice chip.
+    const hasNoticeChips = computed(
+      () =>
+        !!limitNumberOfSeriesWarningMessage.value ||
+        !!seriesLimit.value ||
+        !!panelDiagnostics.value?.serverPartial ||
+        !!panelDiagnostics.value?.functionErrors?.length ||
+        (isPartialData.value && !isPanelLoading.value),
     );
+    // A notice chip outranks the hover-only controls: on a narrow bar they stay out of the layout, hovered or not.
+    const hoverRevealClass = computed(() => {
+      if (isLayoutEditing.value) return "hidden";
+      const narrowHide = hasNoticeChips.value ? "@max-[28rem]/panelbar:hidden" : "";
+      if (isCurrentlyHoveredPanel.value || isMobile.value) return narrowHide;
+      return `invisible pointer-events-none ${narrowHide}`.trim();
+    });
 
     //for edit panel
-    const onEditPanel = (data: any) => {
+    const onEditPanel = (data: any, focus?: PanelEditorFocusTarget) => {
       return router.push({
         path: "/dashboards/add_panel",
         query: {
@@ -798,9 +855,18 @@ export default defineComponent({
           panelId: data.id,
           folder: route.query.folder ?? "default",
           tab: route.query.tab ?? data.panels[0]?.tabId,
+          ...(focus ? { [PANEL_EDITOR_FOCUS_PARAM]: focus } : {}),
         },
       });
     };
+
+    // A notice's fix action deep-links into the editor on the setting that resolves it.
+    const NOTICE_EDITOR_FOCUS: Partial<Record<PanelNoticeActionId, PanelEditorFocusTarget>> = {
+      "use-top-n": "top-n",
+      "edit-function": "vrl",
+    };
+    const onNoticeEditPanel = (action: PanelNoticeActionId) =>
+      onEditPanel(props.data, NOTICE_EDITOR_FOCUS[action]);
     const getOriginalQueryAndStream = (queryDetails: any, metadata: any) => {
       const originalQuery = metadata?.value?.queries[0]?.query;
       const streamName = queryDetails?.queries[0]?.fields?.stream;
@@ -939,11 +1005,12 @@ export default defineComponent({
       } catch (error: any) {
         // Show an error notification.
 
-        if (error?.response?.status === 409) {
-          showConfictErrorNotificationWithRefreshBtn(
-            error?.response?.data?.message ?? error?.message ?? t("panel.panelDuplicationFailed"),
-            t,
-          );
+        if (saveConflict.isConflict(error)) {
+          void saveConflict.openConflict({
+            dashboardId: String(route.query.dashboard),
+            folderId: (route.query.folder as string) ?? "default",
+            change: t("dashboard.saveConflict.change.duplicatedPanel", { name: data.title }),
+          });
         } else {
           showErrorNotification(error?.message ?? t("panel.panelDuplicationFailed"));
         }
@@ -1042,6 +1109,15 @@ export default defineComponent({
       });
     });
 
+    const refreshTooltip = computed(() => {
+      if (props.isTimeRangeWaiting) {
+        return variablesDataUpdated.value
+          ? t("dashboard.refreshToApplyTimeRangeAndVariables")
+          : t("dashboard.refreshToApplyTimeRange");
+      }
+      return variablesDataUpdated.value ? t("panel.refreshToApplyVariables") : t("panel.refresh");
+    });
+
     const errorData = ref("");
     const onError = (error: any) => {
       if (typeof error === "string") {
@@ -1108,6 +1184,7 @@ export default defineComponent({
     const handlePanelKeydown = (e: KeyboardEvent) => {
       if (!isCurrentlyHoveredPanel.value) return;
       if (isInputFocused()) return;
+      if (isLayoutEditing.value && !["v", "V", "i", "I"].includes(e.key)) return;
       // These are single-letter shortcuts — never fire while a modifier is held.
       // Otherwise combos like Alt+Left (panel-editor "Discard & go back") leaking
       // a still-held Alt into the next keystroke would wrongly trigger edit/view.
@@ -1166,11 +1243,14 @@ export default defineComponent({
       onCuratedSeriesData,
       alertDisabledReason,
       onEditPanel,
+      onNoticeEditPanel,
       onLogPanel,
       onDuplicatePanel,
       deletePanelDialog,
       isCurrentlyHoveredPanel,
+      isLayoutEditing,
       hoverRevealClass,
+      hasNoticeChips,
       showViewPanel,
       dependentAdHocVariable,
       confirmDeletePanelDialog,
@@ -1180,6 +1260,7 @@ export default defineComponent({
       movePanelDialog,
       onRefreshPanel,
       variablesDataUpdated,
+      refreshTooltip,
       onError,
       errorData,
       isPanelLoading,
@@ -1206,6 +1287,14 @@ export default defineComponent({
       lastTriggeredAt,
       maxQueryRangeWarning,
       metaData,
+      panelDiagnostics,
+      handlePanelDiagnosticsUpdate,
+      seriesLimit,
+      noticeProps,
+      handleSeriesLimitUpdate,
+      canEditFromNotice,
+      canRefreshFromNotice,
+      canInspectFromNotice,
     };
   },
   methods: {
@@ -1234,7 +1323,10 @@ export default defineComponent({
     buildPanelAlertPrefill(options: AlertBuildOptions = {}) {
       const queries = this.props.data.queries || [];
       // A saved-hidden query is not drawn, so it is not what the user means to alert on.
-      const visible = queries.flatMap((query: any, i: number) => (query?.config?.hide ? [] : [i]));
+      const visible = alertableQueryIndexes(
+        queries,
+        queries.flatMap((query: PanelQueryShape, i: number) => (query?.config?.hide ? [] : [i])),
+      );
       const queryIndex = options.queryIndex ?? visible[0] ?? 0;
       return buildPrefillFromPanel({
         panelTitle: this.props.data.title,

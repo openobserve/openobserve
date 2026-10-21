@@ -4,7 +4,6 @@
     :open="showInDialog"
     size="sm"
     :title="t('paidUsage.consentTitle')"
-    :sub-title="t('paidUsage.consentSubtitle')"
     :primary-button-label="canEnable ? t('paidUsage.enablePaidUsage') : undefined"
     :secondary-button-label="t('common.cancel')"
     :primary-button-disabled="!acknowledgementChecked || !canEnable"

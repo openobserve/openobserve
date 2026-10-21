@@ -799,13 +799,14 @@ describe("useIngestionRoutes", () => {
       validateComponents(routes);
     });
 
-    it("should have proper component types", () => {
+    it("should lazy-load every route component", () => {
       const routes = useIngestionRoutes();
 
+      // An eager component here lands in the entry bundle the login page downloads.
       function validateComponentTypes(routeArray: any[]) {
         routeArray.forEach((route: any) => {
           if (route.redirect) return;
-          expect(typeof route.component).toBe("object");
+          expect(typeof route.component).toBe("function");
 
           if (route.children) {
             validateComponentTypes(route.children);

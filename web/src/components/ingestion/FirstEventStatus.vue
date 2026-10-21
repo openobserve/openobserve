@@ -24,7 +24,7 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import config from "@/aws-exports";
 import analytics from "@/services/product_analytics";
-import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import { FIRST_EVENT_BUDGET, cadenceAt } from "@/composables/firstEvent/firstEventBudget";
 import { rangeRoute } from "@/composables/firstEvent/confirmQuery";
 import {
@@ -229,6 +229,8 @@ const pill = computed(
         };
       case "stopped":
         return { label: t("ingestion.firstEvent.stoppedPill"), variant: "default" };
+      case "idle":
+        return { label: t("ingestion.firstEvent.idlePill"), variant: "default" };
       default:
         return {
           label:
@@ -239,6 +241,17 @@ const pill = computed(
     }
   },
 );
+
+const idleStream = computed(() =>
+  props.targetStream && props.match !== "keyword" ? raw(props.targetStream) : undefined,
+);
+const idleKey = computed<I18nKey>(() => {
+  const config = props.snippetKind === "config";
+  if (!idleStream.value) {
+    return config ? "ingestion.firstEvent.idleMatchesConfig" : "ingestion.firstEvent.idleMatches";
+  }
+  return config ? "ingestion.firstEvent.idleInConfig" : "ingestion.firstEvent.idleIn";
+});
 
 const metaText = computed(() => {
   const params = { seconds: cadenceSeconds.value, elapsed: formatElapsed(elapsedMs.value) };
@@ -269,6 +282,7 @@ const openLabel = computed(() => {
   const type = result.value?.streamType;
   if (type === "metrics") return t("ingestion.firstEvent.openInMetrics");
   if (type === "traces") return t("ingestion.firstEvent.openInTraces");
+  if (type === "profiles") return t("ingestion.firstEvent.openInProfiles");
   return t("ingestion.firstEvent.openInLogs");
 });
 
@@ -348,6 +362,7 @@ const stillStuckQuery = computed(() => {
 });
 
 const hint = computed((): I18nText | undefined => {
+  if (state.value === "idle") return undefined;
   if (state.value === "received") {
     return props.kind === "standard" && scope.value !== "since-watch-start"
       ? t("ingestion.firstEvent.receivedHint", { action: openLabel.value })
@@ -453,6 +468,19 @@ defineExpose({ start: watcher.start, probeNow: watcher.probeNow });
         {{ t("ingestion.firstEvent.checkAgain") }}
       </OButton>
     </template>
+    <template v-else-if="state === 'idle'">
+      <OText variant="meta" data-test="first-event-status-meta">{{
+        t(idleKey, { stream: idleStream ?? raw("") })
+      }}</OText>
+      <OButton
+        variant="outline"
+        size="sm-action"
+        data-test="first-event-status-check-now-btn"
+        @click="watcher.start('check')"
+      >
+        {{ t("ingestion.firstEvent.checkNow") }}
+      </OButton>
+    </template>
     <OText v-else-if="state === 'received'" variant="meta" data-test="first-event-status-summary">{{
       t(summaryKey, {
         records: recordsText,
@@ -493,6 +521,13 @@ defineExpose({ start: watcher.start, probeNow: watcher.probeNow });
         <OText v-else-if="state === 'stopped'" variant="meta" data-test="first-event-status-meta">{{
           t("ingestion.firstEvent.stoppedMeta")
         }}</OText>
+        <OText v-else-if="state === 'idle'" variant="meta" data-test="first-event-status-meta">
+          <i18n-t :keypath="idleKey" tag="span">
+            <template #stream
+              ><strong>{{ idleStream }}</strong></template
+            >
+          </i18n-t>
+        </OText>
         <span v-else-if="state === 'received'" data-test="first-event-status-summary">
           <i18n-t :keypath="summaryKey" tag="span">
             <template #records
@@ -544,7 +579,12 @@ defineExpose({ start: watcher.start, probeNow: watcher.probeNow });
           </i18n-t>
         </span>
       </div>
-      <template v-if="state === 'waiting' || state === 'stopped' || state === 'received'" #actions>
+      <template
+        v-if="
+          state === 'waiting' || state === 'stopped' || state === 'idle' || state === 'received'
+        "
+        #actions
+      >
         <div class="flex items-center gap-2">
           <OButton
             v-if="showTroubleshoot"
@@ -564,6 +604,15 @@ defineExpose({ start: watcher.start, probeNow: watcher.probeNow });
             @click="watcher.start('open')"
           >
             {{ t("ingestion.firstEvent.checkAgain") }}
+          </OButton>
+          <OButton
+            v-if="state === 'idle'"
+            variant="outline"
+            size="sm-action"
+            data-test="first-event-status-check-now-btn"
+            @click="watcher.start('check')"
+          >
+            {{ t("ingestion.firstEvent.checkNow") }}
           </OButton>
           <template v-if="state === 'received' && kind === 'test'">
             <OButton

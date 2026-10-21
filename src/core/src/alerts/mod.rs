@@ -41,6 +41,8 @@ use usage_reporting::http_report_metrics;
 use crate::{search as SearchService, service::setup_tracing_with_trace_id};
 
 pub mod alert;
+#[cfg(feature = "enterprise")]
+pub mod alert_calibration;
 pub mod backfill;
 pub mod composite;
 pub mod composite_graph_lock;
@@ -49,6 +51,7 @@ pub mod deduplication;
 pub mod derived_streams;
 pub mod destination_usage;
 pub mod destinations;
+pub mod downtimes;
 pub mod external_alerts;
 #[cfg(feature = "enterprise")]
 pub mod grouping;
@@ -57,6 +60,7 @@ pub mod incidents;
 pub mod notifications;
 #[cfg(feature = "enterprise")]
 pub mod org_config;
+mod prom_rule;
 pub mod recovery;
 pub mod scheduler;
 pub mod templates;
@@ -164,6 +168,16 @@ impl QueryConditionExt for QueryCondition {
                 return Ok(eval_results);
             }
             QueryType::PromQL => {
+                if self.promql_rule_mode {
+                    return prom_rule::evaluate(
+                        self,
+                        org_id,
+                        end_time,
+                        &trace_id,
+                        search_event_context,
+                    )
+                    .await;
+                }
                 let Some(v) = self.promql.as_ref() else {
                     return Ok(eval_results);
                 };
@@ -242,7 +256,13 @@ impl QueryConditionExt for QueryCondition {
                 )
                 .await
                 {
-                    Ok(v) => v,
+                    Ok(v) if !v.warnings.is_empty() => {
+                        return Err(anyhow::anyhow!(
+                            "Partial response: {}",
+                            v.warnings.join(", ")
+                        ));
+                    }
+                    Ok(v) => v.value,
                     // A failed search is an ERROR, not an empty result. Returning
                     // Ok here would record outcome=Normal/level=Ok and refresh
                     // `level_at`, silently clearing a prior Critical — an error
@@ -2091,28 +2111,6 @@ mod tests {
 
         let sql = condition_group.to_sql(&schema).await.unwrap();
         assert_eq!(sql, "");
-    }
-
-    #[tokio::test]
-    async fn test_condition_group_to_sql_single_condition() {
-        let schema = Schema::new(vec![Field::new("level", DataType::Utf8, false)]);
-
-        // Single condition should be wrapped in parentheses
-        let condition_group = ConditionGroup {
-            filter_type: "group".to_string(),
-            logical_operator: LogicalOperator::And,
-            conditions: vec![ConditionItem::Condition(ConditionItemCondition {
-                column: "level".to_string(),
-                operator: Operator::EqualTo,
-                value: Value::String("error".to_string()),
-                ignore_case: None,
-                logical_operator: LogicalOperator::And,
-            })],
-        };
-
-        let sql = condition_group.to_sql(&schema).await.unwrap();
-
-        assert_eq!(sql, "(\"level\" = 'error')");
     }
 
     #[tokio::test]

@@ -153,6 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OTabs>
         </div>
         <OButton
+          :aria-label="t('dashboard.newTab')"
           variant="ghost"
           size="icon"
           @click.stop="addTab"
@@ -188,12 +189,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="logs-search-bar-show-query-toggle-btn"
           v-model="dashboardPanelData.layout.vrlFunctionToggle"
           :title="t('dashboard.toggleFunctionEditor')"
+          :aria-label="t('dashboard.toggleFunctionEditor')"
           @update:model-value="onFunctionToggle"
           :disabled="promqlMode"
           size="lg"
         >
           <template #label>
-            <img :src="getImageURL('images/common/function.svg')" class="h-4 w-4 dark:invert" />
+            <img
+              alt=""
+              :src="getImageURL('images/common/function.svg')"
+              class="h-4 w-4 dark:invert"
+            />
           </template>
         </OSwitch>
         <QueryTypeSelector @click.stop></QueryTypeSelector>
@@ -268,6 +274,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :keywords="currentEditorKeywords"
                   :suggestions="currentEditorSuggestions"
                   :field-value-resolver="resolveFieldValues"
+                  :values-time-range="valuesTimeRange"
                   @update:query="handleQueryUpdate"
                   @focus="_sqlOnFocus"
                   @blur="_sqlOnBlur"
@@ -388,6 +395,12 @@ import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
 import { useVrlPlaceholder } from "@/composables/useVrlPlaceholder";
 import UnifiedQueryEditor from "@/components/QueryEditor.vue";
 import { isQueryVrlEnabled } from "@/composables/dashboard/useVrlFunction";
+import {
+  isShown,
+  revealAndFocus,
+  usePanelEditorFocus,
+  waitForElement,
+} from "@/composables/dashboard/usePanelEditorFocus";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -545,6 +558,7 @@ export default defineComponent({
       updateAllKeywords: sqlUpdateAllKeywords,
       updateStreamKeywords: sqlUpdateStreamKeywords,
       resolveFieldValues,
+      setValuesTimeRange,
     } = useSqlSuggestions();
 
     const queryEditorRef = ref<QueryEditorInstance | null>(null);
@@ -780,40 +794,58 @@ export default defineComponent({
     // SQL field + function keyword autocomplete.
     // Sources (in priority order):
     //   1. selectedStreamFieldsBasedOnUserDefinedSchema — user-defined schema when enabled
-    //   2. customQueryFields — columns derived from query results (custom SQL mode, post-run)
-    //   3. groupedFields[].schema — stream schema fetched on stream selection (always available)
+    //   2. groupedFields[].schema — stream schema fetched on stream selection (always available)
     // groupedFields is the primary source in SQL/custom mode because selectedStreamFields
     // is always [] (never populated by the dashboard composable — only groupedFields is).
     // Field lists and function lists are replaced as new array references (never mutated
     // in-place), so deep watching is unnecessary and expensive.
+    // Not customQueryFields: untyped SELECT names the schema already types, plus aliases (x_axis_1) invalid in WHERE.
     watch(
       [
         () => selectedStreamFieldsBasedOnUserDefinedSchema.value,
-        () => dashboardPanelData.meta.stream.customQueryFields,
         () => dashboardPanelData.meta.streamFields.groupedFields,
         () => functionList.value,
       ],
-      ([streamFields, customFields, groupedFields, functions]) => {
+      ([streamFields, groupedFields, functions]) => {
         // Flatten schema fields from all selected streams (the Fields panel source).
         const schemaFields = ((groupedFields as any[]) ?? []).flatMap(
           (group: any) => group.schema ?? [],
         );
-        // Merge all sources; deduplicate by name so fields don't appear twice.
-        const allFields = [
-          ...((streamFields as any[]) ?? []),
-          ...((customFields as any[]) ?? []),
-          ...schemaFields,
-        ];
-        const seen = new Set<string>();
-        const uniqueFields = allFields.filter((f: any) => {
-          if (seen.has(f.name)) return false;
-          seen.add(f.name);
-          return true;
-        });
-        sqlUpdateAllKeywords(uniqueFields, (functions as any[]) ?? []);
+        const byName = new Map<string, any>();
+        for (const f of [...((streamFields as any[]) ?? []), ...schemaFields]) {
+          const kept = byName.get(f.name);
+          // An untyped duplicate must never shadow a typed one: the type drives quoting and operators.
+          if (!kept || (!(kept.type || kept.dataType) && (f.type || f.dataType))) {
+            byName.set(f.name, f);
+          }
+        }
+        sqlUpdateAllKeywords([...byName.values()], (functions as any[]) ?? []);
       },
       { immediate: true },
     );
+
+    // Live preview re-stamps "now" on every run; whole minutes keep one lookup window instead of restarting it.
+    const VALUES_RANGE_GRAIN_US = 60_000_000;
+    // Panel pages store Dates whose getTime() is already in microseconds.
+    const panelTimeUs = (d: any, round: (n: number) => number) =>
+      typeof d?.getTime === "function"
+        ? round(d.getTime() / VALUES_RANGE_GRAIN_US) * VALUES_RANGE_GRAIN_US
+        : NaN;
+    const valuesTimeRange = ref<{ startTime: number; endTime: number } | null>(null);
+    // Server value lookups follow the panel's own range instead of the default 15 minutes.
+    watch(
+      [
+        () => panelTimeUs(dashboardPanelData.meta?.dateTime?.start_time, Math.floor),
+        () => panelTimeUs(dashboardPanelData.meta?.dateTime?.end_time, Math.ceil),
+      ],
+      ([startTime, endTime]) => {
+        valuesTimeRange.value =
+          Number.isFinite(startTime) && Number.isFinite(endTime) ? { startTime, endTime } : null;
+        setValuesTimeRange(valuesTimeRange.value);
+      },
+      { immediate: true },
+    );
+    onUnmounted(() => setValuesTimeRange(null));
 
     // Feed stream names into PromQL metric keyword autocomplete
     // and SQL FROM autocomplete (stream suggestions after FROM keyword).
@@ -943,6 +975,29 @@ export default defineComponent({
     const onUpdateToggle = () => {
       dashboardPanelData.meta.errors.queryErrors = [];
     };
+
+    // "Edit function" on a dashboard notice lands in the VRL editor, opened beside the query.
+    const { pendingFocus, takeFocus } = usePanelEditorFocus();
+    watch(
+      pendingFocus,
+      async () => {
+        if (promqlMode.value || !takeFocus("vrl")) return;
+        dashboardPanelData.layout.showQueryBar = true;
+        dashboardPanelData.layout.vrlFunctionToggle = true;
+        splitterModel.value = 70;
+        const el = await waitForElement(() => {
+          const found = document.querySelector<HTMLElement>(
+            '[data-test="dashboard-vrl-function-editor"]',
+          );
+          // The editor surface mounts after its pane, so wait for something that can take focus.
+          const ready = found?.querySelector("textarea, [contenteditable='true']");
+          return isShown(found) && ready ? found : null;
+        });
+        // The VRL pane sits beside the query, already in view; scrolling would push the chart preview off.
+        if (el) revealAndFocus(el, { scroll: false });
+      },
+      { immediate: true },
+    );
 
     const onFunctionToggle = (value: any, event?: any) => {
       // OSwitch's @update:model-value calls this with only the value (no event),
@@ -1126,6 +1181,7 @@ export default defineComponent({
       sqlAutoCompleteSuggestions,
       queryEditorRef,
       updateQuery,
+      valuesTimeRange,
       functionEditorPlaceholderFlag,
       vrlFnEditorRef,
       splitterModel,

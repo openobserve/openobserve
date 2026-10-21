@@ -179,19 +179,9 @@ test.describe("Logs Queries testcases", () => {
     await pm.logsPage.clickDateTimeButton();
     await pm.logsPage.clickRelative15MinButton();
     await pm.logsPage.clickQueryEditor();
-    // Use a deterministically-invalid SQL fragment that the backend MUST reject.
-    // Previous input `kubernetes` (wrapped as `WHERE kubernetes`) was flaky —
-    // on backends with kubernetes log entries the search succeeded (~20% pass
-    // rate flake), defeating the test. `_invalid_field_does_not_exist` is
-    // guaranteed to fail column resolution on any backend.
-    await pm.logsPage.typeInQueryEditor("_invalid_field_does_not_exist");
-    // Monaco's onDidChangeModelContent is debounced 100ms before emitting
-    // update:query → searchObj.data.query. Wait for the Monaco model to reflect
-    // the typed value so the store is updated before Run is clicked.
-    await pm.logsPage.waitForQueryEditorValue("_invalid_field_does_not_exist");
-    // Use runQueryAndWaitForResults -- it waits for any in-flight auto-search
-    // to settle (button exits Cancel state) before clicking, so the click
-    // actually triggers the new (invalid) search instead of cancelling.
+    // A comparison forces field resolution instead of treating the input as full-text search.
+    await pm.logsPage.typeInQueryEditor("_invalid_field_does_not_exist > 1");
+    await pm.logsPage.waitForQueryEditorValue("_invalid_field_does_not_exist > 1");
     await pm.logsPage.runQueryAndWaitForResults();
     await pm.logsPage.expectErrorMessageVisible();
 

@@ -546,7 +546,7 @@
           type="button"
           variant="outline"
           size="sm-action"
-          :disabled="isSubmitting"
+          :disabled="isSubmitting || sendingConfirmed"
           data-test="ai-experiment-form-cancel-btn"
           @click="goBack"
         >
@@ -556,7 +556,7 @@
           type="submit"
           variant="primary"
           size="sm-action"
-          :loading="isSubmitting"
+          :loading="isSubmitting || sendingConfirmed"
           data-test="ai-experiment-form-submit-btn"
         >
           {{
@@ -576,13 +576,21 @@
     @update:ok="leaveDialog.onConfirm"
     @update:cancel="leaveDialog.show = false"
   />
+  <ConfirmDialog
+    v-model="costDialog.show"
+    :title="t('aiObservability.experiments.form.costConfirmTitle')"
+    :message="costDialog.message"
+    :ok-label="t('aiObservability.experiments.form.costConfirmOk')"
+    @update:ok="confirmCost"
+  />
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
+import { debounce } from "lodash-es";
 import { useStore } from "vuex";
 import { useRoute, useRouter, onBeforeRouteLeave } from "vue-router";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
@@ -620,6 +628,7 @@ import {
 } from "@/enterprise/components/onlineEvals/utils/evalEntity";
 import {
   createPreviewRequestGate,
+  formatEstimatedCost,
   withPreviewScorers,
 } from "../../views/AIObservability/experimentPreview";
 import { aiExperimentsRoute } from "../../views/AIObservability/experimentRoutes";
@@ -654,9 +663,21 @@ const resolvedPrompt = ref<ResolvedPrompt | null>(null);
 const resolvingPrompt = ref(false);
 let promptResolveRequest = 0;
 const previewRequests = createPreviewRequestGate();
+/** previewKey() of the values the preview on screen was built for. */
+let previewedFor = "";
 const nextIdempotencyKey = () => globalThis.crypto?.randomUUID?.() ?? `${Date.now()}`;
 const idempotencyKey = ref(nextIdempotencyKey());
 const leaveDialog = reactive({ show: false, onConfirm: () => {} });
+// The body awaiting the user's OK to go over the cost warning threshold. Cancel
+// just closes the dialog: the form keeps its state and nothing is resent.
+const costDialog = reactive({
+  show: false,
+  message: "" as I18nText,
+  body: null as ExperimentCreatePayload | null,
+});
+// True while a confirmed create runs: it starts from the dialog, outside the
+// form's own submit, so isSubmitting does not cover it.
+const sendingConfirmed = ref(false);
 let allowLeave = false;
 
 /** A query value only when it is really there — an absent key must fall through
@@ -696,6 +717,7 @@ const temperature = form.useStore((s: any) => s.values.temperature as number);
 // Read through useStore, never form.state: the latter is an untracked snapshot,
 // so a computed built on it silently serves a stale value.
 const userPrompt = form.useStore((s: any) => s.values.userPrompt as string);
+const systemPrompt = form.useStore((s: any) => s.values.systemPrompt as string);
 const sources = form.useStore((s: any) => (s.values.sources ?? []) as string[]);
 const isDirty = form.useStore((s: any) => s.isDirty as boolean);
 
@@ -1039,12 +1061,57 @@ async function submitClone(payload: ExperimentCreatePayload): Promise<string> {
   ).id;
 }
 
-async function onSubmit(values: ExperimentForm) {
+function askCostConfirmation(body: ExperimentCreatePayload) {
+  const estimate = preview.value?.costEstimate;
+  costDialog.message =
+    estimate?.estimatedCost != null
+      ? t("aiObservability.experiments.form.costConfirmMessage", {
+          cost: formatEstimatedCost(estimate.estimatedCost),
+          threshold: formatEstimatedCost(estimate.warningThreshold),
+        })
+      : t("aiObservability.experiments.form.costConfirmMessageUnpriced");
+  costDialog.body = body;
+  costDialog.show = true;
+}
+
+async function confirmCost() {
+  const body = costDialog.body;
+  costDialog.body = null;
+  if (!body) return;
+  sendingConfirmed.value = true;
   try {
-    // The server pins scorer versions itself; reusing the preview's pins when
-    // one is in hand just closes the gap if a version ships mid-edit.
-    const payload = buildPayload(values);
-    const body = preview.value ? withPreviewScorers(payload, preview.value) : payload;
+    await send({ ...body, confirmCostEstimate: true });
+  } finally {
+    sendingConfirmed.value = false;
+  }
+}
+
+/** What a preview depends on: the payload without its name, description and key. */
+function previewKey(payload: ExperimentCreatePayload): string {
+  return JSON.stringify({ ...payload, name: "", description: null, idempotencyKey: null });
+}
+
+async function onSubmit(values: ExperimentForm) {
+  if (sendingConfirmed.value) return;
+  // The server pins scorer versions itself; reusing the preview's pins when
+  // one is in hand just closes the gap if a version ships mid-edit.
+  const payload = buildPayload(values);
+  // A preview that is still loading, or was built before the last edit, carries
+  // the old scorers and the old cost, so decide on a fresh one.
+  if (previewing.value || previewedFor !== previewKey(payload)) {
+    runPreviewAfterTyping.cancel();
+    await runPreview();
+  }
+  const body = preview.value ? withPreviewScorers(payload, preview.value) : payload;
+  if (preview.value?.costEstimate?.confirmationRequired) {
+    askCostConfirmation(body);
+    return;
+  }
+  await send(body);
+}
+
+async function send(body: ExperimentCreatePayload) {
+  try {
     const createdId = cloning.value
       ? await submitClone(body)
       : (await createExperimentWrite.mutateAsync(body)).experiment.id;
@@ -1058,6 +1125,15 @@ async function onSubmit(values: ExperimentForm) {
     });
     router.push(aiExperimentsRoute(orgId.value, { selectedId: createdId }));
   } catch (error: any) {
+    // 412 = over the cost warning threshold. Nothing was stored, so the
+    // confirmed retry may reuse the same idempotency key.
+    // The preview on screen said no confirmation was needed, so it is out of
+    // date: refresh it so the dialog shows the cost the server used.
+    if (error?.response?.status === 412) {
+      await runPreview();
+      askCostConfirmation(body);
+      return;
+    }
     // An AxiosError IS an Error, so error.message is only ever "Request failed
     // with status code 400" — the server's reason lives on the response body.
     toast({
@@ -1082,12 +1158,13 @@ async function runPreview() {
   previewing.value = true;
   previewFailed.value = false;
   previewErrorMessage.value = "";
+  const payload = buildPayload(form.state.values);
   try {
-    const result = await llmExperimentsService.preview(
-      orgId.value,
-      buildPayload(form.state.values),
-    );
-    if (previewRequests.isCurrent(request)) preview.value = result;
+    const result = await llmExperimentsService.preview(orgId.value, payload);
+    if (previewRequests.isCurrent(request)) {
+      preview.value = result;
+      previewedFor = previewKey(payload);
+    }
   } catch (error: any) {
     if (previewRequests.isCurrent(request)) {
       preview.value = null;
@@ -1101,15 +1178,18 @@ async function runPreview() {
   }
 }
 
-// Only the fields that change the slot maths re-request; typing a prompt does
-// not. Every trigger here is a click, so there is nothing to debounce — the
-// request gate inside runPreview is what keeps a slow response from landing on
-// top of a newer one.
+// The fields that change the slot maths or the server's cost estimate re-request.
+// The messages and the model are priced too (characters / 4 times the model's
+// price), so typing in them re-requests after a pause. The request gate inside
+// runPreview keeps a slow response from landing on top of a newer one.
 watch(
-  [datasetId, trialCount, scorerIds, sources, taskType, taskRef, promptVersion, providerId],
+  [datasetId, trialCount, scorerIds, sources, taskType, taskRef, promptVersion, providerId, model],
   runPreview,
   { deep: true },
 );
+const runPreviewAfterTyping = debounce(runPreview, 500);
+watch([systemPrompt, userPrompt], runPreviewAfterTyping);
+onBeforeUnmount(() => runPreviewAfterTyping.cancel());
 watch([promptId, promptSelectionMode, promptLabel, promptVersion], resolvePromptSelection);
 
 onBeforeRouteLeave((to, _from, next) => {

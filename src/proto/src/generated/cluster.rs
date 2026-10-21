@@ -563,6 +563,9 @@ pub struct MetricsQueryResponse {
     pub series: ::prost::alloc::vec::Vec<Series>,
     #[prost(message, optional, tag = "5")]
     pub scan_stats: ::core::option::Option<ScanStats>,
+    /// non-empty when the result may be incomplete
+    #[prost(string, repeated, tag = "6")]
+    pub warnings: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
 }
 #[derive(serde::Serialize)]
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -998,6 +1001,9 @@ pub struct QueryStatusResponse {
 pub struct CancelQueryRequest {
     #[prost(string, tag = "1")]
     pub trace_id: ::prost::alloc::string::String,
+    /// The org whose queries are cancelled; nodes that predate the field ignore it.
+    #[prost(string, tag = "2")]
+    pub org_id: ::prost::alloc::string::String,
 }
 #[derive(Clone, Copy, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct CancelQueryResponse {

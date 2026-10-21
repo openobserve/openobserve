@@ -35,6 +35,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     onDragStart — (event, item) => void   drag-to-add (both editors)
     onItemClick — (item) => void          click-to-add (workflows); omit for drag-only
     testPrefix  — data-test prefix, so each editor keeps its existing selectors
+
+  A `locked: true` item (edition doesn't unlock it, e.g. Remote Destination on
+  OSS/Cloud) stays IN the list rather than being omitted by the caller — a gold
+  lock glyph, not draggable, and a click opens the upgrade dialog instead of
+  adding the node, same "visible but locked" treatment as the rest of this
+  gating pass.
 -->
 <script lang="ts">
 import type { I18nText } from "@/types/i18n";
@@ -47,6 +53,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 
 interface NodePaletteItem {
   subtype?: string;
@@ -55,6 +62,9 @@ interface NodePaletteItem {
   label?: I18nText;
   tooltip?: I18nText;
   icon?: string;
+  /** Edition doesn't unlock this node — shown with a gold lock glyph; drag is disabled and click opens the upgrade dialog. */
+  locked?: boolean;
+  lockedMessage?: I18nText;
   [key: string]: unknown;
 }
 
@@ -66,6 +76,10 @@ export default {
     onItemClick: { type: Function, default: undefined },
   },
   components: { OButton, OTooltip, OIcon, OSeparator },
+  setup() {
+    const { open: onLockedClick } = useEnterpriseUpgradeDialog();
+    return { onLockedClick };
+  },
 };
 </script>
 
@@ -87,14 +101,17 @@ export default {
           <OButton
             variant="ghost"
             size="md"
-            :class="[`o2vf_node_${node.io_type}`, onItemClick ? 'cursor-pointer' : '']"
+            :class="[
+              `o2vf_node_${node.io_type}`,
+              node.locked || onItemClick ? 'cursor-pointer' : '',
+            ]"
             class="btn-fixed-width relative flex w-full items-center justify-start p-0 hover:translate-x-[0.1875rem] hover:bg-white/10 hover:backdrop-blur-[0.5rem] dark:hover:bg-white/8! dark:hover:backdrop-blur-[0.75rem]!"
             :data-test="`${testPrefix}-${node.subtype}-${node.io_type}-btn`"
-            :draggable="!!onDragStart"
+            :draggable="!!onDragStart && !node.locked"
             @dragstart="onDragStart && onDragStart($event, node)"
-            @click="onItemClick && onItemClick(node)"
+            @click="node.locked ? onLockedClick() : onItemClick && onItemClick(node)"
           >
-            <OTooltip side="right" :side-offset="10">
+            <OTooltip v-if="!node.locked" side="right" :side-offset="10">
               <template #content>
                 <div class="px-2.5 py-1.5">
                   <div class="text-2xs mb-0.5 font-medium capitalize">{{ node.label }}</div>
@@ -122,7 +139,8 @@ export default {
               >
                 {{ node.label }}
               </div>
-              <div class="drag-dots grid h-2 w-2 grid-cols-2 gap-0.5">
+              <OIcon v-if="node.locked" name="lock" size="sm" class="text-warning-600 shrink-0" />
+              <div v-else class="drag-dots grid h-2 w-2 grid-cols-2 gap-0.5">
                 <span class="dot h-0.5 w-0.5 rounded-full transition-all"></span>
                 <span class="dot h-0.5 w-0.5 rounded-full transition-all"></span>
                 <span class="dot h-0.5 w-0.5 rounded-full transition-all"></span>

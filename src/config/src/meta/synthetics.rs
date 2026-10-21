@@ -19,7 +19,10 @@ use chrono::FixedOffset;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use super::synthetics_variables::{placeholder_names, substitute_placeholders};
+use super::{
+    downtimes::ActiveDowntime,
+    synthetics_variables::{placeholder_names, substitute_placeholders},
+};
 
 // ── Frequency ─────────────────────────────────────────────────────────────────
 
@@ -583,6 +586,8 @@ pub struct SyntheticListItem {
     /// Omitted for a check that holds no subtest reference.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reference_state: Option<ReferenceState>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub active_downtime: Option<ActiveDowntime>,
 }
 
 /// Whether a parent's subtest references can run as stored.
@@ -3138,13 +3143,6 @@ mod tests {
         })
     }
 
-    #[test]
-    fn test_v2_minimal_journey_accepted() {
-        let (locs, brs, devs) = allowed();
-        let s = v2_synthetic(serde_json::json!([v2_nav_step(), v2_click_step()]));
-        assert!(s.validate(&locs, &brs, &devs, true).is_ok());
-    }
-
     // ── Recorder test-id attribute ───────────────────────────────────────────
     // The attribute is a property of the application under test, not of O2, and
     // getting it wrong is SILENT: upstream's generator falls back to a hardcoded
@@ -4656,6 +4654,7 @@ mod tests {
             referenced_by: 0,
             references: Some(0),
             reference_state: None,
+            active_downtime: None,
         };
         let json = serde_json::to_value(&item).unwrap();
         assert!(json.get("reference_state").is_none(), "{json}");

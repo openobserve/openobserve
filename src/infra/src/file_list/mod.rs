@@ -739,31 +739,42 @@ fn validate_time_range(time_range: (i64, i64)) -> Result<()> {
     Ok(())
 }
 
-pub fn calculate_max_ts_upper_bound(time_end: i64, stream_type: StreamType) -> i64 {
+/// Daily when the stream is dynamically merged (its files can span a day), else the type's level.
+pub async fn max_ts_bound_level(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+) -> PartitionTimeLevel {
+    let level = query_retention_level(stream_type);
+    if level == PartitionTimeLevel::Daily || !stream_type.support_dynamic_merge() {
+        return level;
+    }
+    if crate::schema::get_dynamic_merge(org_id, stream_name, stream_type).await {
+        PartitionTimeLevel::Daily
+    } else {
+        level
+    }
+}
+
+/// `ZO_*_QUERY_RETENTION` of the type; `Filelist` is daily, a dump file can hold a merged day.
+pub fn query_retention_level(stream_type: StreamType) -> PartitionTimeLevel {
     let cfg = get_config();
     let level = match stream_type {
         StreamType::Logs => PartitionTimeLevel::from(cfg.limit.logs_query_retention.as_str()),
         StreamType::Traces => PartitionTimeLevel::from(cfg.limit.traces_query_retention.as_str()),
         StreamType::Metrics => PartitionTimeLevel::from(cfg.limit.metrics_query_retention.as_str()),
+        StreamType::Filelist => PartitionTimeLevel::Daily,
         _ => PartitionTimeLevel::Hourly,
     };
-    let ts = level.duration();
-    if ts > 0 {
-        time_end + second_micros(ts)
+    if level.duration() > 0 {
+        level
     } else {
-        time_end + second_micros(PartitionTimeLevel::Hourly.duration())
+        PartitionTimeLevel::Hourly
     }
 }
 
-pub fn parse_stream_key(key: &str) -> Option<(String, StreamType, String)> {
-    let parts = key.split('/').collect::<Vec<_>>();
-    if parts.len() != 3 {
-        return None;
-    }
-    let org_id = parts[0].to_string();
-    let stream_type = parts[1].into();
-    let stream_name = parts[2].to_string();
-    Some((org_id, stream_type, stream_name))
+pub fn calculate_max_ts_upper_bound(time_end: i64, level: PartitionTimeLevel) -> i64 {
+    time_end + second_micros(level.duration())
 }
 
 #[derive(Debug, Clone, PartialEq, sqlx::FromRow)]
@@ -933,54 +944,9 @@ pub struct FileIdWithFile {
 
 #[cfg(test)]
 mod tests {
-    use config::meta::stream::{StreamStats, StreamType};
+    use config::meta::stream::StreamStats;
 
     use super::*;
-
-    // ── parse_stream_key ──────────────────────────────────────────────────────
-
-    #[test]
-    fn test_parse_stream_key_valid_logs() {
-        let result = parse_stream_key("myorg/logs/mystream");
-        assert!(result.is_some());
-        let (org, stype, stream) = result.unwrap();
-        assert_eq!(org, "myorg");
-        assert_eq!(stype, StreamType::Logs);
-        assert_eq!(stream, "mystream");
-    }
-
-    #[test]
-    fn test_parse_stream_key_valid_metrics() {
-        let result = parse_stream_key("default/metrics/cpu_usage");
-        assert!(result.is_some());
-        let (org, stype, stream) = result.unwrap();
-        assert_eq!(org, "default");
-        assert_eq!(stype, StreamType::Metrics);
-        assert_eq!(stream, "cpu_usage");
-    }
-
-    #[test]
-    fn test_parse_stream_key_valid_traces() {
-        let result = parse_stream_key("acme/traces/http_spans");
-        assert!(result.is_some());
-        let (org, stype, stream) = result.unwrap();
-        assert_eq!(org, "acme");
-        assert_eq!(stype, StreamType::Traces);
-        assert_eq!(stream, "http_spans");
-    }
-
-    #[test]
-    fn test_parse_stream_key_too_few_parts() {
-        assert!(parse_stream_key("myorg/logs").is_none());
-        assert!(parse_stream_key("myorg").is_none());
-        assert!(parse_stream_key("").is_none());
-    }
-
-    #[test]
-    fn test_parse_stream_key_too_many_parts() {
-        // More than 3 segments → None
-        assert!(parse_stream_key("org/logs/stream/extra").is_none());
-    }
 
     // ── FileListJobStatus::from(i32) ──────────────────────────────────────────
 
@@ -1298,5 +1264,43 @@ mod tests {
         assert_eq!(stats.original_size, 10000000000);
         assert_eq!(stats.compressed_size, 5000000000);
         assert_eq!(stats.idx_scan_size, 500000000);
+    }
+
+    #[test]
+    fn test_query_retention_level_defaults() {
+        // logs and traces hourly, metrics daily; a dump stream holds files that can span a day
+        assert_eq!(
+            query_retention_level(StreamType::Logs),
+            PartitionTimeLevel::Hourly
+        );
+        assert_eq!(
+            query_retention_level(StreamType::Traces),
+            PartitionTimeLevel::Hourly
+        );
+        assert_eq!(
+            query_retention_level(StreamType::Metrics),
+            PartitionTimeLevel::Daily
+        );
+        assert_eq!(
+            query_retention_level(StreamType::Filelist),
+            PartitionTimeLevel::Daily
+        );
+        assert_eq!(
+            query_retention_level(StreamType::EnrichmentTables),
+            PartitionTimeLevel::Hourly
+        );
+    }
+
+    #[test]
+    fn test_calculate_max_ts_upper_bound() {
+        let end = 1_700_000_000_000_000;
+        assert_eq!(
+            calculate_max_ts_upper_bound(end, PartitionTimeLevel::Hourly),
+            end + second_micros(3600)
+        );
+        assert_eq!(
+            calculate_max_ts_upper_bound(end, PartitionTimeLevel::Daily),
+            end + second_micros(86400)
+        );
     }
 }

@@ -82,6 +82,7 @@ use crate::{
         openobserve_api_search::traces::time_index::get_trace_time_range,
         openobserve_api_search::traces::time_index::get_org_trace_time_range,
         openobserve_api_search::traces::dag::get_trace_dag,
+        openobserve_api_search::rum::lookup::lookup,
         openobserve_api_search::profiles::meta::get_profiles_meta,
         openobserve_api_search::profiles::tag_values::get_profiles_tag_values,
         openobserve_api_search::profiles::series::profiles_series_get,
@@ -237,6 +238,7 @@ use crate::{
         openobserve_api_management::request::dashboards::reports::enable_report_v2,
         openobserve_api_management::request::dashboards::reports::trigger_report_v2,
         openobserve_api_management::request::dashboards::reports::move_reports,
+        openobserve_api_management::request::dashboards::reports_history::get_report_history,
         openobserve_api_management::request::authz::fga::create_role,
         openobserve_api_management::request::authz::fga::delete_role,
         openobserve_api_management::request::authz::fga::get_roles,
@@ -266,6 +268,20 @@ use crate::{
         openobserve_api_search::search::search_stream::values_http2_stream,
         patterns::extract_patterns,
         openobserve_core::traces::service_graph::api::get_current_topology,
+        openobserve_api_management::request::db_monitoring::handler::get_dbm_databases,
+        openobserve_api_management::request::db_monitoring::handler::get_dbm_queries,
+        openobserve_api_management::request::db_monitoring::handler::get_dbm_query_history,
+        openobserve_api_management::request::db_monitoring::handler::get_dbm_query_endpoints,
+        openobserve_api_management::request::db_monitoring::handler::get_dbm_samples,
+        openobserve_api_management::request::db_monitoring::handler::get_dbm_activity,
+        openobserve_api_management::request::db_monitoring::handler::get_dbm_query_insights,
+        openobserve_api_management::request::db_monitoring::handler::get_dbm_query_plans,
+        openobserve_api_management::request::db_monitoring::handler::get_dbm_query_server_metrics,
+        openobserve_api_management::request::db_monitoring::handler::get_dbm_server_queries,
+        openobserve_api_management::request::db_monitoring::handler::get_dbm_server_samples,
+        openobserve_api_management::request::db_monitoring::handler::get_dbm_instances,
+        openobserve_api_management::request::db_monitoring::handler::get_dbm_instance_metrics,
+        openobserve_api_management::request::db_monitoring::handler::get_dbm_badges,
         service_streams::list_services,
         service_streams::get_dimension_analytics,
         service_streams::correlate_streams,
@@ -293,6 +309,17 @@ use crate::{
         openobserve_api_management::request::slos::move_slos,
         openobserve_api_management::request::slos::list_slo_eligible_alerts,
         openobserve_api_management::request::slos::preview_alert_sli,
+        openobserve_api_management::request::downtimes::list_downtimes,
+        openobserve_api_management::request::downtimes::create_downtime,
+        openobserve_api_management::request::downtimes::preview_downtime,
+        openobserve_api_management::request::downtimes::downtime_resources,
+        openobserve_api_management::request::downtimes::downtime_values,
+        openobserve_api_management::request::downtimes::get_downtime,
+        openobserve_api_management::request::downtimes::update_downtime,
+        openobserve_api_management::request::downtimes::cancel_downtime,
+        openobserve_api_management::request::downtimes::extend_downtime,
+        openobserve_api_management::request::downtimes::move_downtimes,
+        openobserve_api_management::request::downtimes::delete_downtime,
         synthetics::list_synthetics,
         synthetics::create_synthetic,
         synthetics::get_synthetic,
@@ -338,6 +365,8 @@ use crate::{
         rum_analytics::get_funnel,
         rum_analytics::update_funnel,
         rum_analytics::delete_funnel,
+        rum_analytics::get_app_settings,
+        rum_analytics::put_app_settings,
     ),
     components(
         schemas(
@@ -427,6 +456,44 @@ use crate::{
             openobserve_api_management::request::alerts::incidents::IncidentSeverity,
             openobserve_api_management::request::alerts::incidents::IncidentStatus,
             config::meta::alerts::incidents::Incident,
+            config::meta::downtimes::Downtime,
+            config::meta::downtimes::DowntimeRequest,
+            config::meta::downtimes::DowntimeListItem,
+            config::meta::downtimes::DowntimeDetail,
+            config::meta::downtimes::ListDowntimesResponse,
+            config::meta::downtimes::PreviewRequest,
+            config::meta::downtimes::PreviewResponse,
+            config::meta::downtimes::ResourcesRequest,
+            config::meta::downtimes::ResourcesResponse,
+            config::meta::downtimes::ValuesRequest,
+            config::meta::downtimes::ValuesResponse,
+            config::meta::downtimes::ValueSuggestion,
+            config::meta::downtimes::MoveDowntimesRequest,
+            config::meta::downtimes::CreateDowntimeResponse,
+            config::meta::downtimes::ExtendDowntimeRequest,
+            config::meta::downtimes::ExtendDowntimeResponse,
+            config::meta::downtimes::DowntimeTarget,
+            config::meta::downtimes::TargetFolders,
+            config::meta::downtimes::DimensionCondition,
+            config::meta::downtimes::LogicalOp,
+            config::meta::downtimes::PairOperator,
+            config::meta::downtimes::TargetModule,
+            config::meta::downtimes::DowntimeSchedule,
+            config::meta::downtimes::Repeat,
+            config::meta::downtimes::DowntimeStatus,
+            config::meta::downtimes::DowntimeWindow,
+            config::meta::downtimes::ResourceValue,
+            config::meta::downtimes::SloCorrectionMode,
+            config::meta::downtimes::IncidentMode,
+            config::meta::downtimes::PreviewMatch,
+            config::meta::downtimes::ActiveDowntime,
+            config::meta::downtimes::CorrectionRef,
+            config::meta::downtimes::DowntimeStatusCounts,
+            config::meta::downtimes::AffectedItems,
+            config::meta::downtimes::DowntimeNotifications,
+            config::meta::downtimes::NotificationEvents,
+            config::meta::downtimes::NotificationEvent,
+            config::meta::downtimes::DowntimeNotificationLogEntry,
             config::meta::alerts::incidents::IncidentWithAlerts,
             config::meta::alerts::incidents::IncidentAlert,
             config::meta::alerts::incidents::IncidentStats,
@@ -564,6 +631,16 @@ use crate::{
             openobserve_core::rum_pa::NamedEventRefList,
             openobserve_core::rum_pa::Current,
             openobserve_core::rum_pa::RumPaErrorBody,
+            openobserve_core::rum_pa::MatchOp,
+            openobserve_core::rum_pa::SessionField,
+            openobserve_core::rum_pa::SessionRule,
+            openobserve_core::rum_pa::FunnelFilter,
+            openobserve_core::rum_pa::FilterField,
+            openobserve_core::rum_pa::PageOp,
+            openobserve_core::rum_pa::PageRule,
+            openobserve_core::rum_pa::PutAppSettings,
+            openobserve_core::rum_pa::BuiltinBots,
+            openobserve_core::rum_pa::AppSettings,
          ),
     ),
     modifiers(&SecurityAddon),
@@ -593,7 +670,10 @@ use crate::{
         (name = "Patterns", description = "Log pattern extraction operations (enterprise)"),
         (name = "Service Streams", description = "Multi-signal correlation across logs, traces, and metrics (enterprise)"),
         (name = "Synthetics", description = "Synthetic monitoring — uptime and browser checks (enterprise)"),
+        (name = "Downtimes", description = "Scheduled windows that keep evaluating alerts, anomaly detections, synthetics checks and SLOs but notify nobody (enterprise)"),
         (name = "Announcements", description = "Operator-authored announcement banners shown across organizations (enterprise)"),
+        (name = "Alert Calibration", description = "Per-org alert calibration settings and on-demand runs (enterprise)"),
+        (name = "Anomaly Detection", description = "Anomaly detection configs, model training and detection history (enterprise)"),
     ),
     info(
         description = "OpenObserve API documents [https://openobserve.ai/docs/](https://openobserve.ai/docs/)",
@@ -665,6 +745,27 @@ pub struct ApiDoc;
     openobserve_api_management::request::organization::password_policy::get_policy,
     openobserve_api_management::request::organization::password_policy::set_policy,
     openobserve_api_management::request::organization::password_policy::get_password_complexity,
+    openobserve_api_management::request::alert_calibration::config::get_alert_calibration_config,
+    openobserve_api_management::request::alert_calibration::config::update_alert_calibration_config,
+    openobserve_api_management::request::alert_calibration::digests::run_alert_calibration,
+    openobserve_api_management::request::alert_calibration::digests::get_status,
+    openobserve_api_management::request::alert_calibration::digests::list_runs,
+    openobserve_api_management::request::alert_calibration::digests::list_runs_for_alert,
+    openobserve_api_management::request::alert_calibration::digests::get_run_records,
+    openobserve_api_management::request::alert_calibration::digests::count_findings_by_rule,
+    openobserve_api_management::request::db_monitoring::handler::get_dbm_deadlocks,
+    openobserve_api_management::request::db_monitoring::handler::get_dbm_blocking,
+    openobserve_api_management::request::db_monitoring::handler::get_dbm_table_health,
+    openobserve_api_management::request::anomaly_detection::list_configs,
+    openobserve_api_management::request::anomaly_detection::get_config,
+    openobserve_api_management::request::anomaly_detection::create_config,
+    openobserve_api_management::request::anomaly_detection::update_config,
+    openobserve_api_management::request::anomaly_detection::delete_config,
+    openobserve_api_management::request::anomaly_detection::train_model,
+    openobserve_api_management::request::anomaly_detection::cancel_training,
+    openobserve_api_management::request::anomaly_detection::detect_anomalies,
+    openobserve_api_management::request::anomaly_detection::get_detection_history,
+    openobserve_api_management::request::alerts::history::get_all_anomaly_history,
 ))]
 #[openapi(components(schemas(
     openobserve_api_management::models::experiments::ExperimentResultRowSortBody,
@@ -797,6 +898,42 @@ pub async fn openapi_info() -> OpenapiInfo {
 #[cfg(all(test, feature = "enterprise"))]
 mod experiment_tests {
     use super::*;
+
+    #[test]
+    fn anomaly_and_gated_dbm_paths_are_mcp_tools() {
+        let spec = serde_json::to_value(EnterpriseExperimentApiDoc::openapi()).unwrap();
+        let paths = &spec["paths"];
+        let anomaly = "/api/{org_id}/anomaly_detection";
+        let anomaly_cases = [
+            (anomaly.to_string(), "get"),
+            (anomaly.to_string(), "post"),
+            (format!("{anomaly}/{{anomaly_id}}"), "delete"),
+            (format!("{anomaly}/{{anomaly_id}}/train"), "post"),
+            (format!("{anomaly}/{{anomaly_id}}/detect"), "post"),
+            (format!("{anomaly}/history"), "get"),
+        ];
+        for (path, method) in &anomaly_cases {
+            let ext = &paths[path.as_str()][method]["x-o2-mcp"];
+            assert_eq!(ext["category"], "anomaly_detection", "{method} {path}");
+        }
+        for route in ["deadlocks", "blocking", "table_health"] {
+            let path = format!("/api/{{org_id}}/db_monitoring/{route}");
+            let ext = &paths[path.as_str()]["get"]["x-o2-mcp"];
+            assert_eq!(ext["category"], "db_monitoring", "{path}");
+        }
+        let delete = &paths[format!("{anomaly}/{{anomaly_id}}").as_str()]["delete"];
+        assert_eq!(delete["x-o2-mcp"]["requires_confirmation"], true);
+        let history = &paths[format!("{anomaly}/{{anomaly_id}}/history").as_str()]["get"];
+        assert_eq!(history["x-o2-mcp"]["enabled"], false);
+        for path in [
+            anomaly.to_string(),
+            format!("{anomaly}/{{anomaly_id}}/history"),
+        ] {
+            let body =
+                &paths[path.as_str()]["get"]["responses"]["200"]["content"]["application/json"];
+            assert_eq!(body["schema"]["type"], "array", "{path}");
+        }
+    }
 
     #[test]
     fn coordinate_retry_is_registered_in_openapi() {
@@ -1003,5 +1140,53 @@ mod tests {
             .collect();
         assert!(tags.contains(&"Product Analytics"), "{tags:?}");
         assert!(!tags.contains(&"RUM"), "{tags:?}");
+    }
+
+    #[test]
+    fn every_schema_ref_resolves() {
+        fn collect_refs<'a>(value: &'a serde_json::Value, refs: &mut Vec<&'a str>) {
+            match value {
+                serde_json::Value::Object(map) => {
+                    if let Some(r) = map.get("$ref").and_then(|r| r.as_str()) {
+                        refs.push(r);
+                    }
+                    map.values().for_each(|v| collect_refs(v, refs));
+                }
+                serde_json::Value::Array(items) => items.iter().for_each(|v| collect_refs(v, refs)),
+                _ => {}
+            }
+        }
+
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let schemas = spec["components"]["schemas"].as_object().unwrap();
+        let mut refs = Vec::new();
+        collect_refs(&spec, &mut refs);
+        let mut unresolved = refs
+            .into_iter()
+            .filter(|r| {
+                r.strip_prefix("#/components/schemas/")
+                    .is_some_and(|name| !schemas.contains_key(name))
+            })
+            .collect::<Vec<_>>();
+        unresolved.sort_unstable();
+        unresolved.dedup();
+        assert!(unresolved.is_empty(), "unresolved refs: {unresolved:?}");
+    }
+
+    #[test]
+    fn p4_r4_rum_analytics_settings_routes_and_schemas_are_registered() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let settings = &spec["paths"]["/api/{org_id}/rum/analytics/settings"];
+        for (method, statuses) in [("get", &["200"][..]), ("put", &["200", "400", "409"][..])] {
+            let op = &settings[method];
+            assert!(op.is_object(), "{method} settings missing");
+            for status in statuses {
+                assert!(op["responses"].get(*status).is_some(), "{method} {status}");
+            }
+        }
+        let schemas = spec["components"]["schemas"].as_object().unwrap();
+        for name in ["AppSettings", "PutAppSettings"] {
+            assert!(schemas.contains_key(name), "schema {name} missing");
+        }
     }
 }

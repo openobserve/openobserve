@@ -384,6 +384,12 @@ export class LogsPage {
         this.logDetailCloseButton = '[data-test="logs-search-result-detail-dialog"] [data-test="o-drawer-close-btn"]';
         this.logDetailPreviousBtn = '[data-test="log-detail-previous-detail-btn"]';
         this.logDetailNextBtn = '[data-test="log-detail-next-detail-btn"]';
+        this.logDetailPreviousKbd = '[data-test="log-detail-previous-detail-btn-kbd"]';
+        this.logDetailNextKbd = '[data-test="log-detail-next-detail-btn-kbd"]';
+        this.logDetailPageLoading = '[data-test="log-detail-page-loading"]';
+        this.logsDetailNavLive = '[data-test="logs-detail-nav-live"]';
+        this.logsRowNavLive = '[data-test="logs-row-nav-live"]';
+        this.logDetailDialog = '[data-test="logs-search-result-detail-dialog"]';
         this.logDetailWrapToggle = '[data-test="log-detail-wrap-values-toggle-btn"]';
 
         // ===== VIEW RELATED / CORRELATION SELECTORS (Enterprise Feature) =====
@@ -504,6 +510,8 @@ export class LogsPage {
         this.resultsSkeleton = '[data-test="logs-search-result-logs-table"] [data-test="o2-table-skeleton-body"]';
         this.resultsLoadingBanner = '[data-test="logs-search-result-logs-table"] [data-test="o2-table-loading-banner"]';
         this.noResultsFoundText = '[data-test="logs-search-no-events-found-text"]';
+        // States that only render once a search has run (or the auto-run guard held it); the pre-search "apply search" hero is excluded on purpose.
+        this.searchSettledStates = `${this.logsSearchResultTableRows}, ${this.noResultsFoundText}, [data-test="logs-search-error-state"], [data-test="logs-search-filter-error-message"], [data-test="logs-search-cancelled-state"], [data-test="logs-auto-run-guard"]`;
         this.resultsProgressBar = '[data-test="logs-results-progress"]';
         this.queryPlanDialog = '[data-test="query-plan-dialog"]';
         this.queryEditorSplitter = '[role="separator"][aria-orientation="horizontal"]';
@@ -1091,6 +1099,116 @@ export class LogsPage {
         throw new Error(`selectStream: Failed to find stream "${stream}" after ${maxRetries} attempts`);
     }
 
+    /** Wait until the Logs search bar's completion lists (what it feeds the query editor) know the stream's fields and optionally a server function. */
+    async waitForStreamFieldsLoaded(fieldName = 'level', functionName = null, timeout = 30000) {
+        testLogger.info(`waitForStreamFieldsLoaded: waiting for field "${fieldName}"${functionName ? ` and function "${functionName}"` : ''} in the query editor`);
+        // Each check walks the whole vnode tree, so poll on an interval rather than every animation frame.
+        await this.page.waitForFunction(({ field, fn }) => {
+            const app = document.querySelector('#app');
+            if (!app?._vnode) return false;
+            const visited = new Set();
+            let searchBar = null;
+            const walk = (node, depth) => {
+                if (!node || depth > 80 || visited.has(node) || searchBar) return;
+                visited.add(node);
+                // The editor's own component props read back empty in prod builds; SearchBar's setupState holds the same lists.
+                if (node.component?.setupState && 'effectiveKeywords' in node.component.setupState) {
+                    searchBar = node.component.setupState;
+                    return;
+                }
+                if (node.component?.subTree) walk(node.component.subTree, depth + 1);
+                if (Array.isArray(node.children)) {
+                    for (const c of node.children) {
+                        if (c && typeof c === 'object') walk(c, depth + 1);
+                        if (searchBar) return;
+                    }
+                }
+            };
+            walk(app._vnode, 0);
+            if (!searchBar) return false;
+            const keywords = Array.isArray(searchBar.effectiveKeywords) ? searchBar.effectiveKeywords : [];
+            const hasField = keywords.some((k) => k?.kind === 'Field' && k?.name === field);
+            if (!fn) return hasField;
+            const suggestions = Array.isArray(searchBar.effectiveSuggestions) ? searchBar.effectiveSuggestions : [];
+            return hasField && suggestions.some((s) => (s?.name ?? s?.label) === fn);
+        }, { field: fieldName, fn: functionName }, { timeout, polling: 250 });
+    }
+
+    /** Field names the Logs search bar feeds the query editor's completions. */
+    async getQueryEditorFieldNames() {
+        return await this.page.evaluate(() => {
+            const app = document.querySelector('#app');
+            if (!app?._vnode) return [];
+            const visited = new Set();
+            let searchBar = null;
+            const walk = (node, depth) => {
+                if (!node || depth > 80 || visited.has(node) || searchBar) return;
+                visited.add(node);
+                if (node.component?.setupState && 'effectiveKeywords' in node.component.setupState) {
+                    searchBar = node.component.setupState;
+                    return;
+                }
+                if (node.component?.subTree) walk(node.component.subTree, depth + 1);
+                if (Array.isArray(node.children)) {
+                    for (const c of node.children) {
+                        if (c && typeof c === 'object') walk(c, depth + 1);
+                        if (searchBar) return;
+                    }
+                }
+            };
+            walk(app._vnode, 0);
+            const keywords = Array.isArray(searchBar?.effectiveKeywords) ? searchBar.effectiveKeywords : [];
+            return keywords.filter((k) => k?.kind === 'Field' && typeof k?.name === 'string').map((k) => k.name);
+        });
+    }
+
+    /** Read one o2FieldValues record by its "org|streamType|streamName|fieldName" key; null until the app has written it. */
+    async readFieldValueRecord(key) {
+        return await this.page.evaluate((searchKey) => new Promise((resolve, reject) => {
+            const req = indexedDB.open('o2FieldValues', 1);
+            let aborted = false;
+            // A reader that creates the DB leaves it without the app's store, and the app never writes again.
+            req.onupgradeneeded = () => { aborted = true; req.transaction.abort(); resolve(null); };
+            req.onerror = () => (aborted ? resolve(null) : reject(req.error));
+            req.onsuccess = () => {
+                const db = req.result;
+                if (!db.objectStoreNames.contains('fieldValues')) { db.close(); resolve(null); return; }
+                const getReq = db.transaction('fieldValues', 'readonly').objectStore('fieldValues').get(searchKey);
+                getReq.onsuccess = () => { db.close(); resolve(getReq.result || null); };
+                getReq.onerror = () => { db.close(); reject(getReq.error); };
+            };
+        }), key);
+    }
+
+    /** Read every o2FieldValues record; [] until the app has created the DB. */
+    async readAllFieldValueRecords() {
+        return await this.page.evaluate(() => new Promise((resolve, reject) => {
+            const req = indexedDB.open('o2FieldValues', 1);
+            let aborted = false;
+            // A reader that creates the DB leaves it without the app's store, and the app never writes again.
+            req.onupgradeneeded = () => { aborted = true; req.transaction.abort(); resolve([]); };
+            req.onerror = () => (aborted ? resolve([]) : reject(req.error));
+            req.onsuccess = () => {
+                const db = req.result;
+                if (!db.objectStoreNames.contains('fieldValues')) { db.close(); resolve([]); return; }
+                const getAllReq = db.transaction('fieldValues', 'readonly').objectStore('fieldValues').getAll();
+                getAllReq.onsuccess = () => { db.close(); resolve(getAllReq.result || []); };
+                getAllReq.onerror = () => { db.close(); reject(getAllReq.error); };
+            };
+        }));
+    }
+
+    /** Delete the o2FieldValues DB and resolve once the delete has completed. */
+    async clearFieldValueDB() {
+        await this.page.evaluate(() => new Promise((resolve, reject) => {
+            const req = indexedDB.deleteDatabase('o2FieldValues');
+            // onblocked is not completion: the app closes its connection on versionchange, then onsuccess fires.
+            req.onsuccess = () => resolve();
+            req.onerror = () => reject(req.error);
+        }));
+        testLogger.info('Cleared IndexedDB o2FieldValues database');
+    }
+
     async deselectStream(streamName) {
         testLogger.info(`Deselecting stream: ${streamName}`);
         // Legacy select used `log-search-index-list-stream-toggle-<name> div`;
@@ -1264,7 +1382,7 @@ export class LogsPage {
             // Wait for button to leave Cancel/loading state before clicking —
             // otherwise a click on "Cancel" aborts the in-flight query instead
             // of starting a fresh one.
-            await this.page.waitForFunction(
+            const settled = await this.page.waitForFunction(
                 (sel) => {
                     const b = document.querySelector(sel);
                     if (!b) return false;
@@ -1274,8 +1392,13 @@ export class LogsPage {
                 },
                 this.queryButton,
                 { timeout: 30000 },
-            ).catch(() => {});
-            await queryBtn.click();
+            ).then(() => true).catch(() => false);
+            // A retry on a still-busy button would cancel and restart the same search; keep waiting on it instead.
+            if (settled || attempt === 1) {
+                await queryBtn.click();
+            } else {
+                testLogger.debug(`selectRunQuery: search still running on attempt ${attempt} — waiting instead of re-clicking`);
+            }
 
             try {
                 await this.page.waitForSelector('[data-test="logs-search-result-logs-table"]', {
@@ -1676,6 +1799,11 @@ export class LogsPage {
     // when the query contains SELECT...FROM. Delegate to the canonical enableSqlModeIfNeeded.
     async enableSQLMode() {
         await this.enableSqlModeIfNeeded();
+    }
+
+    async expectSqlModeActive() {
+        // Filter mode rejects LIMIT client-side, so a run before this flips sends no request at all.
+        await expect.poll(() => this._isSqlModeEnabledViaVue(), { timeout: 10000 }).toBe(true);
     }
 
     // Quick Mode methods (now inside the utilities hamburger menu)
@@ -2972,21 +3100,8 @@ export class LogsPage {
         await this.page.waitForTimeout(200);
     }
 
-    /**
-     * Click Run query and wait for query execution to complete.
-     * Uses button UI state (loading/disabled → ready) instead of response matching
-     * to avoid capturing stale responses from auto-searches.
-     * @param {number} timeout - Max wait time in ms (default 60000)
-     */
-    async runQueryAndWaitForResults(timeout = 60000) {
-        const btn = this.page.locator(this.queryButton);
-
-        // If a prior auto-search (e.g. from toggling SQL mode) is still running, the button
-        // renders as "Cancel query" via a v-if/v-else swap — wait for the run-mode variant
-        // to appear (not in Cancel state) before clicking, so we don't accidentally cancel it.
-        // Use the full timeout here (not a hard-coded 15 s) so a slow CI auto-search never
-        // causes us to force-click the Cancel button instead of the Run button.
-        let buttonWasInCancelState = false;
+    async waitForRunQueryButton(timeout = 60000) {
+        // An automatic search shares this button, so a premature click would cancel it.
         await this.page.waitForFunction(
             (selector) => {
                 const el = document.querySelector(selector);
@@ -2997,7 +3112,14 @@ export class LogsPage {
             },
             this.queryButton,
             { timeout }
-        ).catch(() => {
+        );
+    }
+
+    async runQueryAndWaitForResults(timeout = 60000) {
+        const btn = this.page.locator(this.queryButton);
+
+        let buttonWasInCancelState = false;
+        await this.waitForRunQueryButton(timeout).catch(() => {
             buttonWasInCancelState = true;
             testLogger.warn('runQueryAndWaitForResults: refresh button never exited Cancel state, force-clicking to cancel in-flight search');
         });
@@ -3183,10 +3305,7 @@ export class LogsPage {
     }
 
     async clickSearchBarRefreshButton() {
-        // Use .first() to avoid strict-mode violations when multiple data-test matches exist.
-        // waitForSearchBarRefreshButton() must be called first to ensure the button is enabled;
-        // OButton.handleClick() guards on props.loading/disabled and will not emit when loading,
-        // making force-click on a loading button a silent no-op.
+        await this.waitForRunQueryButton();
         return await this.page.locator(this.searchBarRefreshButton).first().click({ force: true });
     }
 
@@ -3916,6 +4035,19 @@ export class LogsPage {
         await expect(this.page.locator(this.logDetailPreviousBtn)).toBeVisible();
         await expect(this.page.locator(this.logDetailNextBtn)).toBeVisible();
         testLogger.info('✓ Previous and Next navigation buttons are visible');
+    }
+
+    logResultsRow(n) {
+        return this.page.locator(`[data-test="logs-search-result-logs-table"] [data-test="o2-table-row-${n}"]`);
+    }
+
+    async pressLogRowKey(key, options = {}) {
+        await this.page.keyboard.press(key, options);
+    }
+
+    async expectActiveLogRow(n) {
+        await expect(this.logResultsRow(n)).toHaveAttribute('aria-current', 'true');
+        await expect(this.page.locator('[data-test="logs-search-result-logs-table"] [data-active-row="true"]')).toHaveCount(1);
     }
 
     // ===== VIEW RELATED / CORRELATION METHODS (Enterprise Feature) =====
@@ -7145,26 +7277,19 @@ export class LogsPage {
 
             for (const row of rows) {
                 const text = row.textContent;
-                // OTable draws the spine as a ::before on the row's first cell, fed by
-                // the --row-status-color custom property set inline on the <tr>, and
-                // marks the row with data-status-bar. The level rides along on the row
-                // class (o2-log-level-<level>) so it stays machine-readable whichever
-                // column is shown.
-                const raw = row.style.getPropertyValue('--row-status-color').trim();
-                if (!raw || raw === 'rgba(0, 0, 0, 0)' || raw === 'transparent') continue;
-                // The token resolves to a hex; callers normalise through rgbToHex,
-                // so hand back the rgb() form a computed style would have given.
-                let bgColor = raw;
-                const hex = raw.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
-                if (hex) {
-                    let h = hex[1];
-                    if (h.length === 3) h = h.split('').map((c) => c + c).join('');
-                    const n = parseInt(h, 16);
-                    bgColor = `rgb(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255})`;
-                }
+                const firstCell = row.querySelector('td');
+                if (!firstCell) continue;
+                const spine = getComputedStyle(firstCell, '::before');
+                const backgroundImage = spine.backgroundImage;
+                const bgColor = spine.backgroundColor;
+                if (!bgColor || bgColor === 'rgba(0, 0, 0, 0)' || bgColor === 'transparent') continue;
 
-                const levelClass = Array.from(row.classList).find((c) => c.startsWith('o2-log-level-'));
+                const levelClass = Array.from(row.classList).find(
+                    (c) => c.startsWith('o2-log-level-') && !c.startsWith('o2-log-level-src-'),
+                );
                 const level = levelClass ? levelClass.replace('o2-log-level-', '') : null;
+                const sourceClass = Array.from(row.classList).find((c) => c.startsWith('o2-log-level-src-'));
+                const source = sourceClass ? sourceClass.replace('o2-log-level-src-', '') : null;
 
                 // Best-effort: also recover the raw severity number when the JSON
                 // source column is visible (kept for backward compatibility).
@@ -7184,7 +7309,7 @@ export class LogsPage {
                 }
 
                 if (level === null && severity === null) continue;
-                findings.push({ severity, level, color: bgColor });
+                findings.push({ severity, level, source, backgroundImage, color: bgColor });
             }
 
             return findings;
@@ -7564,12 +7689,11 @@ export class LogsPage {
     async clickShareLinkButton() {
         const btn = this.page.locator(this.shareLinkButton);
         await btn.waitFor({ state: 'visible', timeout: 10000 });
-        // ShareButton stays disabled until the authenticated /api/<org>/config supplies web_url; the public /config lacks it.
         const enabled = await expect(btn).toBeEnabled({ timeout: 30000 }).then(() => true).catch(() => false);
         if (!enabled) {
-            testLogger.warn('Share link button still disabled after 30s (org config not loaded); reloading once', { url: this.page.url() });
+            testLogger.warn('Share link button still disabled after 30s; reloading once', { url: this.page.url() });
             await this.page.reload({ waitUntil: 'domcontentloaded' });
-            await expect(btn, 'share link button never enabled: org config (web_url) did not load').toBeEnabled({ timeout: 30000 });
+            await expect(btn, 'share link button never enabled: the query has not run yet (G1), or web_url is missing from the org config').toBeEnabled({ timeout: 30000 });
         }
         await btn.click();
         testLogger.info('Clicked share link button');
@@ -8565,13 +8689,26 @@ export class LogsPage {
      */
     async clickRelative1HourOrFallback() {
         const oneHourButton = this.page.locator('[data-test="date-time-relative-1-h-btn"]');
+        let picked;
         if (await oneHourButton.isVisible({ timeout: 2000 }).catch(() => false)) {
             await oneHourButton.click();
-            return 'Last 1 hour';
+            picked = 'Last 1 hour';
         } else {
             await this.clickRelative15MinButton();
-            return 'Last 15 minutes';
+            picked = 'Last 15 minutes';
         }
+        await this.closeDateTimePickerIfOpen();
+        return picked;
+    }
+
+    /** The auto-apply picker stays open after a pick, and force-clicks behind it land on the panel. */
+    async closeDateTimePickerIfOpen() {
+        const panel = this.page.locator('#date-time-menu');
+        if (!(await panel.isVisible().catch(() => false))) return;
+        await this.page.keyboard.press('Escape');
+        const closed = await panel.waitFor({ state: 'hidden', timeout: 2000 }).then(() => true).catch(() => false);
+        if (!closed) await this.page.locator(this.dateTimeButton).click();
+        await expect(panel).toBeHidden({ timeout: 5000 });
     }
 
     /**
@@ -11364,10 +11501,12 @@ export class LogsPage {
         const count = Math.min(await cells.count(), limit);
         const values = [];
         for (let i = 0; i < count; i++) {
-            let text = await cells.nth(i).textContent();
+            const valueSpan = cells.nth(i).locator('[data-test="log-row-timestamp-value"]');
+            let text = (await valueSpan.count()) > 0
+                ? await valueSpan.first().textContent()
+                : await cells.nth(i).textContent();
             text = text?.trim() || '';
             // Strip expand button icon text that appears before the timestamp
-            // The cell contains both the expand icon ("chevron_right" or "expand_more") and the timestamp
             text = text.replace(/^(chevron_right|expand_more|chevron_left|expand_less)/, '').trim();
             values.push(text);
         }
@@ -11479,9 +11618,18 @@ export class LogsPage {
      * is positioned at a location where suggestions can be provided.
      */
     async triggerEditorSuggestions() {
-        // Focus the editor's input area (click auto-waits for actionability)
-        const inputArea = this.page.locator('[data-test="logs-search-bar-query-editor"] .inputarea');
-        await inputArea.click({ force: true });
+        // A click lands wherever the textarea sits and can move the caret into a word; pin it to the end instead.
+        const placed = await this.page.evaluate((selector) => {
+            const host = document.querySelector(selector);
+            const ed = window.monaco?.editor?.getEditors?.().find((e) => host?.contains(e.getDomNode()));
+            if (!ed) return false;
+            const model = ed.getModel();
+            const lastLine = model.getLineCount();
+            ed.focus();
+            ed.setPosition({ lineNumber: lastLine, column: model.getLineMaxColumn(lastLine) });
+            return true;
+        }, this.queryEditor);
+        if (!placed) throw new Error('Monaco query editor not found to place the caret');
         // Trigger suggestion widget and wait for it to appear
         await this.page.keyboard.press('Control+Space');
         await this.waitForSuggestionWidgetVisible();
@@ -13188,7 +13336,23 @@ export class LogsPage {
 
     /** Refreshes and waits for the results table to render. */
     async runSearchAndWaitForResults(timeout = 30000) {
-        await this.page.locator(this.searchBarRefreshButton).click();
+        // The button reads Run before the load-time search starts, so first wait for that search to have produced a state.
+        await expect(this.page.locator(this.searchSettledStates).first()).toBeVisible({ timeout });
+        // A click while the load-time search is in flight hits the Cancel variant of this button.
+        await this.waitForRunQueryButton(timeout);
+        // The table is already visible from the load-time search, so gate on this click's own hits response.
+        const [response] = await Promise.all([
+            this.page.waitForResponse(
+                (r) =>
+                    r.request().method() === 'POST' &&
+                    /\/_search(_stream)?\?/.test(r.url()) &&
+                    !r.url().includes('is_ui_histogram'),
+                { timeout }
+            ),
+            this.page.locator(this.searchBarRefreshButton).click(),
+        ]);
+        await response.finished();
+        await this.waitForRunQueryButton(timeout);
         await expect(this.resultsTable()).toBeVisible({ timeout });
     }
 
@@ -13267,6 +13431,8 @@ export class LogsPage {
     /** Opens the first row's detail and returns the stream name that row came from. */
     async openFirstHitDetail(timeout = 20000) {
         const streamCell = this.streamNameCells().first();
+        // The grid is rebuilt per streamed chunk; a one-shot read can land on a cell not yet filled.
+        await expect(streamCell).toHaveText(/\S/, { timeout });
         const hitStream = (await streamCell.innerText()).trim();
         await streamCell.click();
         await expect(this.page.locator(this.logDetailDialog)).toBeVisible({ timeout });

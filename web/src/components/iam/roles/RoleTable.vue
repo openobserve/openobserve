@@ -1,7 +1,7 @@
 ﻿<!-- Copyright 2026 OpenObserve Inc. -->
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -22,6 +22,10 @@ const props = defineProps<{
   actionLoading?: boolean;
   selectedIds?: string[];
   globalFilter?: string;
+  pageSize?: number;
+  currentPage?: number;
+  sortBy?: string;
+  sortOrder?: "asc" | "desc";
   /** Member email being assigned to a role (from the "Assign a role" quick-link).
    *  Presence alone turns on the Assign column — not gated separately. */
   assignTarget?: string;
@@ -35,12 +39,19 @@ const props = defineProps<{
 const emit = defineEmits<{
   "update:selectedIds": [ids: string[]];
   "update:globalFilter": [value: string];
+  "update:pageSize": [value: number];
+  "update:currentPage": [value: number];
+  "update:sortBy": [value: string];
+  "update:sortOrder": [value: "asc" | "desc"];
   edit: [row: any];
   delete: [row: any];
   "bulk-delete": [];
   create: [];
   assign: [row: any];
 }>();
+
+const oTableRef = ref<any>(null);
+defineExpose({ restorePage: (page: number) => oTableRef.value?.restorePage?.(page) });
 
 const onEmptyStateAction = (id?: string) => {
   if (id === "clear-filters") {
@@ -115,6 +126,7 @@ const isAssigned = (row: any): boolean => (props.assignedRoleNames ?? []).includ
 
 <template>
   <OTable
+    ref="oTableRef"
     :frame="false"
     :data="data"
     :columns="columns"
@@ -124,8 +136,11 @@ const isAssigned = (row: any): boolean => (props.assignedRoleNames ?? []).includ
     :global-filter="globalFilter"
     :show-global-filter="false"
     pagination="client"
-    :page-size="20"
+    :page-size="pageSize ?? 20"
     :page-size-options="[20, 50, 100, 250, 500]"
+    :current-page="currentPage ?? 1"
+    :sort-by="sortBy"
+    :sort-order="sortOrder"
     sorting="client"
     selection="multiple"
     row-key="role_name"
@@ -134,6 +149,10 @@ const isAssigned = (row: any): boolean => (props.assignedRoleNames ?? []).includ
     show-index
     @update:selected-ids="emit('update:selectedIds', $event)"
     @update:global-filter="emit('update:globalFilter', $event)"
+    @update:page-size="emit('update:pageSize', $event)"
+    @update:current-page="emit('update:currentPage', $event)"
+    @update:sort-by="emit('update:sortBy', $event)"
+    @update:sort-order="emit('update:sortOrder', $event)"
   >
     <template #toolbar>
       <div class="flex w-full min-w-0 items-center gap-2 max-md:contents">

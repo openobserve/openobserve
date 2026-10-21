@@ -235,14 +235,4 @@ mod tests {
         );
         assert!(metadata_path.to_string_lossy().contains("metadata.json"));
     }
-
-    #[test]
-    fn test_get_table_dir_with_custom_cache_dir() {
-        // Test that the functions return valid paths with custom cache dir
-        let table_dir = get_table_dir("org123/table456");
-        assert!(table_dir.to_string_lossy().contains("org123/table456"));
-
-        let metadata_path = get_metadata_path();
-        assert!(metadata_path.to_string_lossy().contains("metadata.json"));
-    }
 }

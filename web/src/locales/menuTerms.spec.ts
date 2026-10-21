@@ -28,6 +28,17 @@ describe("menu terms (AC-12)", () => {
     expect(load(code).function.streamPipeline).toBe(value);
   });
 
+  it("fr-FR keeps Pipelines, RUM and Logs, and calls a downtime a maintenance window", () => {
+    const fr = load("fr-FR");
+    expect(fr.menu.pipeline).toBe("Pipelines");
+    expect(fr.menu.rum).toBe("RUM");
+    expect(fr.menu.search).toBe("Logs");
+    expect(fr.common.logs).toBe("Logs");
+    expect(fr.menu.downtimes).toBe("Périodes de maintenance");
+    expect(fr.settings.lightMode).toBe("Mode clair");
+    expect(read("fr-FR")).not.toMatch(/[Cc]analisation|[Ii]ndisponibilit|[Bb]uteur/);
+  });
+
   it("de-DE says Alarme in the header and the menu, like its items", () => {
     const de = load("de-DE");
     expect(de.menu.alerts).toBe("Alarme");

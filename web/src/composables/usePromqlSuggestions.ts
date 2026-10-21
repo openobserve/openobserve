@@ -1,6 +1,12 @@
 import { streamSchemaQuery } from "@/services/stream.queries";
 import { queryClient } from "@/composables/query/queryClient";
-import { getFieldValuesForSuggestion, requestFieldValues } from "@/composables/fieldValueStore";
+import {
+  fieldValuesUnavailable,
+  getFieldValuesForSuggestion,
+  pendingFieldValues,
+  requestFieldValues,
+  type ValueLookupOptions,
+} from "@/composables/fieldValueStore";
 import { nextTick, ref } from "vue";
 import { PROMQL_CATALOG } from "@/utils/query/promqlCompletion";
 import { SORT_LANE } from "@/utils/query/sqlCompletion";
@@ -11,6 +17,75 @@ import { SORT_LANE } from "@/utils/query/sqlCompletion";
 const NON_LABEL_COLUMNS = new Set(["value", "_timestamp", "__hash__", "__name__"]);
 
 import { useStore } from "vuex";
+
+export interface PromqlValueContext {
+  metric: string;
+  label: string;
+  hasOpenQuote: boolean;
+  typed: string;
+}
+
+export const parsePromqlValueContext = (textBeforeCursor: string): PromqlValueContext | null => {
+  const open = textBeforeCursor.lastIndexOf("{");
+  if (open < 0 || textBeforeCursor.lastIndexOf("}") > open) return null;
+  const matcher = textBeforeCursor
+    .slice(open + 1)
+    .match(/(\w+)\s*(?:=~|!=|!~|=)\s*(?:"((?:[^"\\]|\\.)*)|([\w.:-]*))$/);
+  if (!matcher) return null;
+  // Without a metric there is no stream to read, and nothing honest to offer.
+  const metric = textBeforeCursor.slice(0, open).match(/([A-Za-z_:][\w:]*)\s*$/)?.[1];
+  if (!metric) return null;
+  return {
+    metric,
+    label: matcher[1],
+    hasOpenQuote: matcher[2] !== undefined,
+    typed: matcher[2] ?? matcher[3] ?? "",
+  };
+};
+
+export const resolvePromqlLabelValues = async (
+  org: string,
+  metric: string,
+  label: string,
+  options: ValueLookupOptions = {},
+): Promise<string[]> => {
+  const ctx = { org, streamType: "metrics", streamName: metric };
+  const cached = await getFieldValuesForSuggestion(ctx, label).catch(() => [] as string[]);
+  if (cached.length) return cached;
+  const fetched = await requestFieldValues(ctx, label, options);
+  // A request still answering after its timeout has not shown the label to be empty.
+  const slow = !fetched.length && pendingFieldValues(ctx, label);
+  const answer = slow ? await slow : fetched;
+  if (!answer.length && fieldValuesUnavailable(ctx, label)) {
+    throw new Error("label values unavailable");
+  }
+  return answer;
+};
+
+/** An auto-closed quote ahead is swallowed so the caret ends outside the string. */
+export const buildPromqlValueEntries = (
+  values: string[],
+  {
+    hasOpenQuote,
+    closingQuoteAhead = false,
+    range,
+  }: { hasOpenQuote: boolean; closingQuoteAhead?: boolean; range?: Record<string, number> },
+): any[] =>
+  values.map((value, index) => {
+    const literal = value.replace(/[\\"]/g, "\\$&");
+    const entry: any = {
+      name: value,
+      label: `"${literal}"`,
+      kind: "Value",
+      insertText: hasOpenQuote ? `${literal}"` : `"${literal}"`,
+      sortText: `\u0000${String(index).padStart(6, "0")}`,
+      filterText: hasOpenQuote ? value : `"${value}"`,
+    };
+    if (hasOpenQuote && closingQuoteAhead && range) {
+      entry.range = { ...range, endColumn: (range.endColumn ?? 1) + 1 };
+    }
+    return entry;
+  });
 
 const usePromqlSuggestions = () => {
   const autoCompleteData = ref({
@@ -213,13 +288,12 @@ const usePromqlSuggestions = () => {
         return;
       }
 
-      if (!(labelFocus.focusOn === "value" || labelFocus.focusOn === "label")) return;
-      // Both lookups are scoped to one metric; without a metric name there is
-      // no stream to read and nothing honest to offer.
+      // Values belong to the completion provider: a popup opened from here is always highlighted, and Enter would insert one.
+      if (labelFocus.focusOn !== "label") return;
+      // Without a metric name there is no stream to read and nothing honest to offer.
       if (!metricName) return;
 
       const org = store.state.selectedOrganization.identifier;
-      const streamCtx = { org, streamType: "metrics", streamName: metricName };
 
       autoCompletePromqlKeywords.value = [
         {
@@ -230,83 +304,37 @@ const usePromqlSuggestions = () => {
       ];
       autoCompleteData.value.popup.open(autoCompleteData.value.text);
 
-      if (labelFocus.focusOn === "label") {
-        // The SCHEMA, not the series. `/series` returns every matching series
-        // with all of its labels for the client to dedupe — 5903 bytes where
-        // the schema answers in 1699, and it is metadata, so no scan at all.
-        try {
-          // The query is the cache: keyed per org and metric, and it expires.
-          const response: any = await queryClient.fetchQuery(
-            streamSchemaQuery(org, metricName, "metrics"),
-          );
-          const columns = response?.schema ?? response?.uds_schema ?? [];
-          const labels: string[] = columns
-            .map((column: any) => column?.name)
-            .filter((name: string) => name && !NON_LABEL_COLUMNS.has(name));
-
-          if (!isCurrent()) return;
-
-          const alreadyFiltered = formattedLabels.join(",");
-          updatePromqlKeywords(
-            labels
-              .filter((name) => alreadyFiltered.indexOf(`${name}=`) === -1)
-              .map((name) => ({
-                label: name,
-                kind: "Variable",
-                // The bare name, without an `=`.
-                //
-                // Appending the operator reads like a convenience, but the
-                // habit it collides with is typing `=` yourself: accepting
-                // `environment` and then typing `=` gives `environment==`,
-                // which matches nothing and offers nothing. Monaco does not
-                // dedupe the operator, so the safe insert is the name alone.
-                insertText: name,
-              })),
-            { contextual: true },
-          );
-        } catch {
-          // The labels are unavailable; the language is not.
-          if (!isCurrent()) return;
-          updatePromqlKeywords([]);
-          autoCompleteData.value.popup.close("");
-        }
-        return;
-      }
-
-      // Label VALUES are field values of the metric's stream — the same cache,
-      // the same key, the same on-demand fetch the SQL editors use.
-      const labelName = labelFocus.meta.label;
-      let values: string[] = [];
+      // The schema, not /series: it is metadata (no scan) and a third of the bytes.
       try {
-        values = await getFieldValuesForSuggestion(streamCtx, labelName);
-        if (!values.length) values = await requestFieldValues(streamCtx, labelName);
+        // The query is the cache: keyed per org and metric, and it expires.
+        const response: any = await queryClient.fetchQuery(
+          streamSchemaQuery(org, metricName, "metrics"),
+        );
+        const columns = response?.schema ?? response?.uds_schema ?? [];
+        const labels: string[] = columns
+          .map((column: any) => column?.name)
+          .filter((name: string) => name && !NON_LABEL_COLUMNS.has(name));
+
+        if (!isCurrent()) return;
+
+        const alreadyFiltered = formattedLabels.join(",");
+        updatePromqlKeywords(
+          labels
+            .filter((name) => alreadyFiltered.indexOf(`${name}=`) === -1)
+            .map((name) => ({
+              label: name,
+              kind: "Variable",
+              // Users type the `=` themselves, and Monaco does not dedupe it into `==`.
+              insertText: name,
+            })),
+          { contextual: true },
+        );
       } catch {
-        values = [];
+        // The labels are unavailable; the language is not.
+        if (!isCurrent()) return;
+        updatePromqlKeywords([]);
+        autoCompleteData.value.popup.close("");
       }
-
-      if (!isCurrent()) return;
-
-      // Quoting, decided from what is actually around the cursor. Monaco
-      // auto-closes `"`, so the model is `service=""` with the cursor between
-      // them; inserting a fully quoted value there produced
-      // `service=""api-gateway""`.
-      const textBeforeCursor = autoCompleteData.value.query.slice(0, cursorIndex + 1);
-      const textAfterCursor = autoCompleteData.value.query.slice(cursorIndex + 1);
-      const hasOpeningQuote = /"[^"]*$/.test(textBeforeCursor);
-      const hasClosingQuote = textAfterCursor.startsWith('"');
-
-      updatePromqlKeywords(
-        values.map((value) => ({
-          label: value,
-          kind: "Variable",
-          insertText: hasOpeningQuote ? (hasClosingQuote ? value : `${value}"`) : `"${value}"`,
-        })),
-        { contextual: true },
-      );
-      // Nothing matched: take the widget away rather than leaving an empty box
-      // hanging over the query.
-      if (!values.length) autoCompleteData.value.popup.close("");
-      return;
     } catch (e) {
       console.log(e);
     }

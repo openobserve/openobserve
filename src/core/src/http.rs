@@ -66,7 +66,7 @@ impl From<AlertError> for Response {
             AlertError::AlertNameMissing
             | AlertError::AlertNameOfgaUnsupported
             | AlertError::AlertNameContainsForwardSlash
-            | AlertError::AlertDestinationMissing
+            | AlertError::ProtectedStream(_)
             | AlertError::TemplateNotConfigured { .. }
             | AlertError::RealtimeMissingCustomQuery
             // Both are user input errors -> 400, same as the other
@@ -85,6 +85,7 @@ impl From<AlertError> for Response {
             | AlertError::InvalidSloAlert(_)
             | AlertError::SqlMissingQuery
             | AlertError::SqlContainsSelectStar
+            | AlertError::PromRuleStreamMissing(_)
             | AlertError::PromqlMissingQuery
             | AlertError::SqlUnsupportedQueryType { .. }
             | AlertError::PeriodExceedsMaxQueryRange { .. }

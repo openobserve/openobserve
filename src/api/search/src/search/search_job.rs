@@ -33,7 +33,7 @@ use {
         },
     },
     crate::search::{
-        query_manager::cancel_query_inner,
+        query_manager::cancel_in_cluster,
         utils::{
             StreamPermissionResourceType, check_cipher_key_permissions, check_stream_permissions,
         },
@@ -689,7 +689,10 @@ async fn cancel_job_inner(org_id: &str, job_id: &str, user_id: &str) -> Response
     }
 
     // 4. use cancel query function to cancel the query
-    cancel_query_inner(org_id, &[&job.trace_id]).await
+    match cancel_in_cluster(org_id, &job.trace_id).await {
+        Ok(status) => Json(vec![status]).into_response(),
+        Err(e) => MetaHttpResponse::bad_request(e),
+    }
 }
 
 #[cfg(feature = "enterprise")]

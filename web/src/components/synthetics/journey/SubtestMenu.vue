@@ -39,7 +39,6 @@ const props = defineProps<{
   ownCheckId?: string;
   /** The journey cannot take a new row right now (recording, replay, restore, readonly). */
   disabled: boolean;
-  compositionEnabled: boolean;
 }>();
 
 const emit = defineEmits<{ pick: [child: SubtestRef] }>();
@@ -60,13 +59,6 @@ const { org, usable, blocked, isLoading, isEmpty, loadError, refetch } = useSubt
     onError: (err) =>
       console.error("[synthetics] failed to load browser tests for the subtest menu", err),
   },
-);
-
-const triggerDisabled = computed(() => !props.compositionEnabled || props.disabled);
-const tooltip = computed(() =>
-  props.compositionEnabled
-    ? t("synthetics.journey.addMenu.subtestHint")
-    : t("synthetics.journey.subtest.disabledTooltip"),
 );
 
 const matches = (c: SubtestCandidate) =>
@@ -129,11 +121,15 @@ async function onPick(c: SubtestCandidate) {
       <OButton
         variant="outline"
         size="xs"
-        :disabled="triggerDisabled"
+        :disabled="disabled"
         data-test="synthetics-journey-add-subtest-btn"
       >
         <!-- First child so it anchors to the whole button; suppressed while the menu is open. -->
-        <OTooltip :content="tooltip" side="bottom" :disabled="open" />
+        <OTooltip
+          :content="t('synthetics.journey.addMenu.subtestHint')"
+          side="bottom"
+          :disabled="open"
+        />
         <OIcon name="account-tree" size="sm" aria-hidden="true" />
         <span>{{ t("synthetics.journey.addMenu.addSubtest") }}</span>
         <OIcon name="arrow-drop-down" size="sm" aria-hidden="true" />

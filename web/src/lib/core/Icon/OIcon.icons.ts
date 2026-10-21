@@ -276,6 +276,8 @@ import SaveIcon from "~icons/material-symbols/save-outline";
 import SavedSearchIcon from "~icons/material-symbols/saved-search";
 import SearchOffIcon from "~icons/material-symbols/search-off";
 import SensorsOff from "~icons/material-symbols/sensors-off-outline";
+import NotificationsPaused from "~icons/material-symbols/notifications-paused-outline";
+import RepeatIcon from "~icons/material-symbols/repeat";
 import SecurityIcon from "~icons/material-symbols/shield-outline";
 import SentimentVeryDissatisfiedIcon from "~icons/material-symbols/mood-bad-outline";
 import AddReactionIcon from "~icons/material-symbols/add-reaction-outline";
@@ -354,6 +356,7 @@ import Web from "~icons/material-symbols/web";
 import SmartDisplay from "~icons/material-symbols/smart-display-outline";
 import AndroidIcon from "~icons/material-symbols/android";
 import PhoneIphoneIcon from "~icons/material-symbols/phone-iphone-outline";
+import CallIcon from "~icons/material-symbols/call-outline";
 
 // Brand mark (not a Material Symbol) — a local inline SVG component. See McpLogo.vue.
 import McpLogo from "./McpLogo.vue";
@@ -704,6 +707,7 @@ export const iconRegistry = {
   web: Web,
   android: AndroidIcon,
   "phone-iphone": PhoneIphoneIcon,
+  call: CallIcon,
 
   // Batch 3: Synthetics / browser-check icons (2026-06-22)
   // (duplicate "person-pin-circle" from batch 2 removed — keep the first entry at line 624)
@@ -717,6 +721,10 @@ export const iconRegistry = {
   // Batch 4: Alert Library (2026-08-20)
   // "no signal arriving" — the alert library's not-ingesting-this-stream state.
   "sensors-off": SensorsOff,
+
+  // Batch 5: Downtimes (2026-09-24)
+  "notifications-paused": NotificationsPaused,
+  repeat: RepeatIcon,
 } as const satisfies Record<string, Component>;
 
 export type IconName = keyof typeof iconRegistry;
