@@ -2254,6 +2254,12 @@ pub struct Common {
         help = "Enable per-stream trace time indexes and trace time-range lookup"
     )]
     pub trace_time_index_enabled: bool,
+    #[env_config(
+        name = "ZO_TRACE_LIST_TIME_INDEX_ENABLED",
+        default = true,
+        help = "Complete trace list summaries from the trace time index; off keeps the per-partition aggregates"
+    )]
+    pub trace_list_time_index_enabled: bool,
     #[env_config(name = "OTEL_OTLP_HTTP_ENDPOINT", default = "")]
     pub otel_otlp_url: String,
     #[env_config(name = "OTEL_OTLP_GRPC_ENDPOINT", default = "")]
@@ -2301,7 +2307,8 @@ pub struct Common {
     pub print_key_sql: bool,
     #[env_config(name = "ZO_PRINT_PLAN_SINGLE_LINE", default = true)]
     pub print_plan_single_line: bool,
-    // usage reporting
+    #[env_config(name = "ZO_USAGE_REPORTING_ENABLED", default = true)]
+    pub usage_reporting_enabled: bool,
     #[env_config(
         name = "ZO_USAGE_REPORTING_MODE",
         default = "local",
@@ -2311,7 +2318,7 @@ pub struct Common {
     #[env_config(
         name = "ZO_USAGE_REPORTING_URL",
         default = "http://localhost:5080/api/_meta/usage/_json",
-        help = "Where remote usage reporting posts. Unused in the open source build, which never reports usage."
+        help = "Where remote usage reporting posts when enabled."
     )]
     pub usage_reporting_url: String,
     #[env_config(name = "ZO_USAGE_REPORTING_CREDS", default = "")]

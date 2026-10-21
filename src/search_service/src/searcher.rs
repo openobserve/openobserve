@@ -16,9 +16,7 @@
 #[cfg(feature = "enterprise")]
 use {
     config::meta::search::ScanStats,
-    o2_enterprise::enterprise::search::{
-        QueryManager, TaskStatus, WorkGroup, query_manager::Registration,
-    },
+    o2_enterprise::enterprise::search::{QueryManager, TaskStatus, WorkGroup},
 };
 
 #[derive(Clone, Debug)]
@@ -47,38 +45,13 @@ impl Searcher {
             .await;
     }
 
-    /// Registers a task, or joins the org's existing task under the same id.
-    pub async fn insert_or_join(
-        &self,
-        org_id: &str,
-        trace_id: String,
-        task_status: TaskStatus,
-    ) -> Registration {
-        self.query_manager
-            .insert_or_join(org_id, trace_id, task_status)
-            .await
-    }
-
     // remove the trace_id from the query_manager
     pub async fn remove(&self, org_id: &str, trace_id: &str) -> Option<(String, TaskStatus)> {
         self.query_manager.remove(org_id, trace_id).await
     }
 
-    /// Removes the org's exact `trace_id` entry only when it is not a leader.
-    pub async fn remove_follower(
-        &self,
-        org_id: &str,
-        trace_id: &str,
-    ) -> Option<(String, TaskStatus)> {
-        self.query_manager.remove_follower(org_id, trace_id).await
-    }
-
-    /// Removes `trace_id` and its `{trace_id}-` sub-tasks in `org_id`, or in every org for `None`.
-    pub async fn cancel(
-        &self,
-        org_id: Option<&str>,
-        trace_id: &str,
-    ) -> Option<Vec<(String, TaskStatus)>> {
+    /// Removes `trace_id` and its `{trace_id}-` sub-tasks in `org_id`.
+    pub async fn cancel(&self, org_id: &str, trace_id: &str) -> Option<Vec<(String, TaskStatus)>> {
         self.query_manager.cancel(org_id, trace_id).await
     }
 
@@ -101,11 +74,8 @@ impl Searcher {
     }
 
     // get all task status that is leader
-    pub async fn get_task_status(
-        &self,
-        org_id: Option<&str>,
-    ) -> Vec<proto::cluster_rpc::QueryStatus> {
-        let mut status = self.query_manager.get_task_status(org_id).await;
+    pub async fn get_task_status(&self) -> Vec<proto::cluster_rpc::QueryStatus> {
+        let mut status = self.query_manager.get_task_status().await;
 
         // Enrich dashboard searches submitted without names so query management can display the
         // dashboard and folder instead of only their IDs.

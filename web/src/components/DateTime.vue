@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="border-button-outline-border h-auto! rounded-e-none! border-e!"
         icon-left="chevron-left"
         :aria-label="t('common.previous')"
-        :disabled="disable"
+        :disabled="disable || disablePrevShift"
         @click.prevent.stop="shiftTimeRange('prev')"
       />
     </OTooltip>
@@ -40,6 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       side="bottom"
       :align="menuAlign"
       :z-index="10001"
+      :aria-label="t('common.selectDateRange')"
       content-class="p-1"
       @update:open="onMenuOpenChange"
     >
@@ -201,6 +202,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div class="flex w-20 flex-col">
                       <OInput
                         v-model.number="relativeValue"
+                        :aria-label="t('common.timeAmount')"
                         type="number"
                         :min="1"
                         :step="1"
@@ -217,6 +219,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div class="flex min-w-0 flex-1 flex-col">
                       <OSelect
                         v-model="relativePeriod"
+                        :aria-label="t('common.timeUnit')"
                         :options="relativePeriodsSelect"
                         @update:model-value="onCustomPeriodSelect"
                       >
@@ -462,6 +465,11 @@ export default defineComponent({
       default: false,
     },
     hideRangeShift: {
+      type: Boolean,
+      default: false,
+    },
+    /** Turns off the ‹ shift, for a parent that knows there is nothing earlier to show. */
+    disablePrevShift: {
       type: Boolean,
       default: false,
     },

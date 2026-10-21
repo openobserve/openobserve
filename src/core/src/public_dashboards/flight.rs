@@ -276,22 +276,23 @@ impl Drop for WaiterGuard<'_> {
 
 /// One build's trace ids: children are `{prefix}-{n}`, so one prefix abort reaches every search.
 pub struct TraceFamily {
+    org_id: String,
     prefix: String,
     next: AtomicU32,
     cancelled: AtomicBool,
 }
 
-impl Default for TraceFamily {
-    fn default() -> Self {
+impl TraceFamily {
+    /// A family whose children run in `org_id`, the org the abort is scoped to.
+    pub fn new(org_id: &str) -> Self {
         Self {
+            org_id: org_id.to_string(),
             prefix: config::ider::generate_trace_id(),
             next: AtomicU32::new(0),
             cancelled: AtomicBool::new(false),
         }
     }
-}
 
-impl TraceFamily {
     /// The build id every child trace id starts with.
     pub fn id(&self) -> &str {
         &self.prefix
@@ -313,7 +314,7 @@ impl TraceFamily {
     pub async fn cancel(&self) {
         self.cancelled.store(true, Ordering::SeqCst);
         // The prefix itself is never registered, so only the children are aborted.
-        search_service::abort_trace_family(&self.prefix).await;
+        search_service::abort_trace_family(&self.org_id, &self.prefix).await;
     }
 }
 
@@ -554,7 +555,7 @@ mod tests {
         let cancelled_seen = Arc::new(AtomicUsize::new(0));
         let (done, seen) = (child_done.clone(), cancelled_seen.clone());
         let Start::Leader(f) = flights.start("k", "o", Kind::Build, move |_| async move {
-            let family = TraceFamily::default();
+            let family = TraceFamily::new("o");
             let deadline = tokio::time::Instant::now() + Duration::from_millis(50);
             // A child that cannot be interrupted, as an OSS search without an abort channel.
             drain_by(&family, deadline, async {
@@ -578,7 +579,7 @@ mod tests {
 
     #[test]
     fn gate09_child_trace_ids_share_the_build_prefix() {
-        let family = TraceFamily::default();
+        let family = TraceFamily::new("o");
         let (a, b) = (family.child(), family.child());
         assert_ne!(a, b);
         assert!(a.starts_with(family.id()) && b.starts_with(family.id()));

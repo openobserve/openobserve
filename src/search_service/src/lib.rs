@@ -788,10 +788,10 @@ pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
     Ok(search::QueryStatusResponse { status })
 }
 
-/// Aborts this node's `trace_id` search and its `{trace_id}-` children in every org; OSS no-op.
-pub async fn abort_trace_family(trace_id: &str) {
+/// Aborts this node's `trace_id` search and its `{trace_id}-` children in `org_id`; OSS no-op.
+pub async fn abort_trace_family(org_id: &str, trace_id: &str) {
     #[cfg(feature = "enterprise")]
-    if let Some(cancelled) = SEARCH_SERVER.cancel(None, trace_id).await {
+    if let Some(cancelled) = SEARCH_SERVER.cancel(org_id, trace_id).await {
         for (_, status) in cancelled {
             for sender in status.abort_senders.into_iter().rev() {
                 let _ = sender.send(());
@@ -799,13 +799,13 @@ pub async fn abort_trace_family(trace_id: &str) {
         }
     }
     #[cfg(not(feature = "enterprise"))]
-    let _ = trace_id;
+    let _ = (org_id, trace_id);
 }
 
-/// Cancels `trace_id` on every querier; `Some(org)` limits each node to that org's queries.
+/// Cancels `trace_id` in `org_id` on every querier.
 #[cfg(feature = "enterprise")]
 pub async fn cancel_query(
-    scope: Option<&str>,
+    org_id: &str,
     trace_id: &str,
 ) -> Result<search::CancelQueryResponse, Error> {
     // get nodes from cluster
@@ -831,7 +831,7 @@ pub async fn cancel_query(
         );
 
         let trace_id = trace_id.to_string();
-        let org_id = scope.map(str::to_string);
+        let org_id = org_id.to_string();
         let task = tokio::task::spawn(
             async move {
                 let mut request = tonic::Request::new(proto::cluster_rpc::CancelQueryRequest {

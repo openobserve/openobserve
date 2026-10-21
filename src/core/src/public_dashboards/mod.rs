@@ -2701,7 +2701,7 @@ mod tests {
         (
             link,
             dashboard(vec![vec![panel("a", Some("SELECT 1"))]]),
-            TraceFamily::default(),
+            TraceFamily::new("o1"),
         )
     }
 

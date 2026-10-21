@@ -510,6 +510,8 @@ export class LogsPage {
         this.resultsSkeleton = '[data-test="logs-search-result-logs-table"] [data-test="o2-table-skeleton-body"]';
         this.resultsLoadingBanner = '[data-test="logs-search-result-logs-table"] [data-test="o2-table-loading-banner"]';
         this.noResultsFoundText = '[data-test="logs-search-no-events-found-text"]';
+        // States that only render once a search has run (or the auto-run guard held it); the pre-search "apply search" hero is excluded on purpose.
+        this.searchSettledStates = `${this.logsSearchResultTableRows}, ${this.noResultsFoundText}, [data-test="logs-search-error-state"], [data-test="logs-search-filter-error-message"], [data-test="logs-search-cancelled-state"], [data-test="logs-auto-run-guard"]`;
         this.resultsProgressBar = '[data-test="logs-results-progress"]';
         this.queryPlanDialog = '[data-test="query-plan-dialog"]';
         this.queryEditorSplitter = '[role="separator"][aria-orientation="horizontal"]';
@@ -1095,6 +1097,116 @@ export class LogsPage {
 
         // All retries exhausted
         throw new Error(`selectStream: Failed to find stream "${stream}" after ${maxRetries} attempts`);
+    }
+
+    /** Wait until the Logs search bar's completion lists (what it feeds the query editor) know the stream's fields and optionally a server function. */
+    async waitForStreamFieldsLoaded(fieldName = 'level', functionName = null, timeout = 30000) {
+        testLogger.info(`waitForStreamFieldsLoaded: waiting for field "${fieldName}"${functionName ? ` and function "${functionName}"` : ''} in the query editor`);
+        // Each check walks the whole vnode tree, so poll on an interval rather than every animation frame.
+        await this.page.waitForFunction(({ field, fn }) => {
+            const app = document.querySelector('#app');
+            if (!app?._vnode) return false;
+            const visited = new Set();
+            let searchBar = null;
+            const walk = (node, depth) => {
+                if (!node || depth > 80 || visited.has(node) || searchBar) return;
+                visited.add(node);
+                // The editor's own component props read back empty in prod builds; SearchBar's setupState holds the same lists.
+                if (node.component?.setupState && 'effectiveKeywords' in node.component.setupState) {
+                    searchBar = node.component.setupState;
+                    return;
+                }
+                if (node.component?.subTree) walk(node.component.subTree, depth + 1);
+                if (Array.isArray(node.children)) {
+                    for (const c of node.children) {
+                        if (c && typeof c === 'object') walk(c, depth + 1);
+                        if (searchBar) return;
+                    }
+                }
+            };
+            walk(app._vnode, 0);
+            if (!searchBar) return false;
+            const keywords = Array.isArray(searchBar.effectiveKeywords) ? searchBar.effectiveKeywords : [];
+            const hasField = keywords.some((k) => k?.kind === 'Field' && k?.name === field);
+            if (!fn) return hasField;
+            const suggestions = Array.isArray(searchBar.effectiveSuggestions) ? searchBar.effectiveSuggestions : [];
+            return hasField && suggestions.some((s) => (s?.name ?? s?.label) === fn);
+        }, { field: fieldName, fn: functionName }, { timeout, polling: 250 });
+    }
+
+    /** Field names the Logs search bar feeds the query editor's completions. */
+    async getQueryEditorFieldNames() {
+        return await this.page.evaluate(() => {
+            const app = document.querySelector('#app');
+            if (!app?._vnode) return [];
+            const visited = new Set();
+            let searchBar = null;
+            const walk = (node, depth) => {
+                if (!node || depth > 80 || visited.has(node) || searchBar) return;
+                visited.add(node);
+                if (node.component?.setupState && 'effectiveKeywords' in node.component.setupState) {
+                    searchBar = node.component.setupState;
+                    return;
+                }
+                if (node.component?.subTree) walk(node.component.subTree, depth + 1);
+                if (Array.isArray(node.children)) {
+                    for (const c of node.children) {
+                        if (c && typeof c === 'object') walk(c, depth + 1);
+                        if (searchBar) return;
+                    }
+                }
+            };
+            walk(app._vnode, 0);
+            const keywords = Array.isArray(searchBar?.effectiveKeywords) ? searchBar.effectiveKeywords : [];
+            return keywords.filter((k) => k?.kind === 'Field' && typeof k?.name === 'string').map((k) => k.name);
+        });
+    }
+
+    /** Read one o2FieldValues record by its "org|streamType|streamName|fieldName" key; null until the app has written it. */
+    async readFieldValueRecord(key) {
+        return await this.page.evaluate((searchKey) => new Promise((resolve, reject) => {
+            const req = indexedDB.open('o2FieldValues', 1);
+            let aborted = false;
+            // A reader that creates the DB leaves it without the app's store, and the app never writes again.
+            req.onupgradeneeded = () => { aborted = true; req.transaction.abort(); resolve(null); };
+            req.onerror = () => (aborted ? resolve(null) : reject(req.error));
+            req.onsuccess = () => {
+                const db = req.result;
+                if (!db.objectStoreNames.contains('fieldValues')) { db.close(); resolve(null); return; }
+                const getReq = db.transaction('fieldValues', 'readonly').objectStore('fieldValues').get(searchKey);
+                getReq.onsuccess = () => { db.close(); resolve(getReq.result || null); };
+                getReq.onerror = () => { db.close(); reject(getReq.error); };
+            };
+        }), key);
+    }
+
+    /** Read every o2FieldValues record; [] until the app has created the DB. */
+    async readAllFieldValueRecords() {
+        return await this.page.evaluate(() => new Promise((resolve, reject) => {
+            const req = indexedDB.open('o2FieldValues', 1);
+            let aborted = false;
+            // A reader that creates the DB leaves it without the app's store, and the app never writes again.
+            req.onupgradeneeded = () => { aborted = true; req.transaction.abort(); resolve([]); };
+            req.onerror = () => (aborted ? resolve([]) : reject(req.error));
+            req.onsuccess = () => {
+                const db = req.result;
+                if (!db.objectStoreNames.contains('fieldValues')) { db.close(); resolve([]); return; }
+                const getAllReq = db.transaction('fieldValues', 'readonly').objectStore('fieldValues').getAll();
+                getAllReq.onsuccess = () => { db.close(); resolve(getAllReq.result || []); };
+                getAllReq.onerror = () => { db.close(); reject(getAllReq.error); };
+            };
+        }));
+    }
+
+    /** Delete the o2FieldValues DB and resolve once the delete has completed. */
+    async clearFieldValueDB() {
+        await this.page.evaluate(() => new Promise((resolve, reject) => {
+            const req = indexedDB.deleteDatabase('o2FieldValues');
+            // onblocked is not completion: the app closes its connection on versionchange, then onsuccess fires.
+            req.onsuccess = () => resolve();
+            req.onerror = () => reject(req.error);
+        }));
+        testLogger.info('Cleared IndexedDB o2FieldValues database');
     }
 
     async deselectStream(streamName) {
@@ -11506,9 +11618,18 @@ export class LogsPage {
      * is positioned at a location where suggestions can be provided.
      */
     async triggerEditorSuggestions() {
-        // Focus the editor's input area (click auto-waits for actionability)
-        const inputArea = this.page.locator('[data-test="logs-search-bar-query-editor"] .inputarea');
-        await inputArea.click({ force: true });
+        // A click lands wherever the textarea sits and can move the caret into a word; pin it to the end instead.
+        const placed = await this.page.evaluate((selector) => {
+            const host = document.querySelector(selector);
+            const ed = window.monaco?.editor?.getEditors?.().find((e) => host?.contains(e.getDomNode()));
+            if (!ed) return false;
+            const model = ed.getModel();
+            const lastLine = model.getLineCount();
+            ed.focus();
+            ed.setPosition({ lineNumber: lastLine, column: model.getLineMaxColumn(lastLine) });
+            return true;
+        }, this.queryEditor);
+        if (!placed) throw new Error('Monaco query editor not found to place the caret');
         // Trigger suggestion widget and wait for it to appear
         await this.page.keyboard.press('Control+Space');
         await this.waitForSuggestionWidgetVisible();
@@ -13215,7 +13336,23 @@ export class LogsPage {
 
     /** Refreshes and waits for the results table to render. */
     async runSearchAndWaitForResults(timeout = 30000) {
-        await this.page.locator(this.searchBarRefreshButton).click();
+        // The button reads Run before the load-time search starts, so first wait for that search to have produced a state.
+        await expect(this.page.locator(this.searchSettledStates).first()).toBeVisible({ timeout });
+        // A click while the load-time search is in flight hits the Cancel variant of this button.
+        await this.waitForRunQueryButton(timeout);
+        // The table is already visible from the load-time search, so gate on this click's own hits response.
+        const [response] = await Promise.all([
+            this.page.waitForResponse(
+                (r) =>
+                    r.request().method() === 'POST' &&
+                    /\/_search(_stream)?\?/.test(r.url()) &&
+                    !r.url().includes('is_ui_histogram'),
+                { timeout }
+            ),
+            this.page.locator(this.searchBarRefreshButton).click(),
+        ]);
+        await response.finished();
+        await this.waitForRunQueryButton(timeout);
         await expect(this.resultsTable()).toBeVisible({ timeout });
     }
 
@@ -13294,6 +13431,8 @@ export class LogsPage {
     /** Opens the first row's detail and returns the stream name that row came from. */
     async openFirstHitDetail(timeout = 20000) {
         const streamCell = this.streamNameCells().first();
+        // The grid is rebuilt per streamed chunk; a one-shot read can land on a cell not yet filled.
+        await expect(streamCell).toHaveText(/\S/, { timeout });
         const hitStream = (await streamCell.innerText()).trim();
         await streamCell.click();
         await expect(this.page.locator(this.logDetailDialog)).toBeVisible({ timeout });

@@ -66,6 +66,7 @@
                 <OIcon name="add" size="sm" />
               </OButton>
               <OButton
+                :aria-label="t('common.copyToClipboard')"
                 v-if="!hideCopyValue && isExpandable(row)"
                 variant="ghost-neutral"
                 size="icon"

@@ -1643,8 +1643,7 @@ pub fn service_routes() -> Router {
 
             // Query manager
             .route("/{org_id}/query_manager/status", get(search::query_manager::query_status))
-            .route("/{org_id}/query_manager/cancel", put(search::query_manager::cancel_multiple_query))
-            .route("/{org_id}/query_manager/{query_id}/cancel", delete(search::query_manager::cancel_query))
+            .route("/{org_id}/query_manager/cancel", put(search::query_manager::cancel_query))
 
             // search inspector
             .route("/{org_id}/search/profile", get(search::search_inspector::get_search_profile))

@@ -317,9 +317,9 @@ pub async fn search(
         // A public dashboard build owns its children: no delta may outlive a failed call.
         let drain = in_req.search_type == Some(search::SearchEventType::PublicDashboard);
         // Deltas run as `{trace_id}-{n}`; the failing parent goes with them.
-        let family = trace_id.to_string();
+        let (org, family) = (org_id.to_string(), trace_id.to_string());
         let mut results = join_deltas(tasks, drain, move || async move {
-            crate::abort_trace_family(&family).await
+            crate::abort_trace_family(&org, &family).await
         })
         .await?;
         for res in &results {

@@ -27,6 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex flex-wrap items-start gap-2">
         <OFormSelect
           :id="directionId"
+          :aria-label="t('alerts.forecast.alertWhen')"
           name="_ui.forecast.direction"
           :options="directionOptions"
           :searchable="false"
@@ -82,6 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex flex-col gap-1">
         <OFormSelect
           :id="windowId"
+          :aria-label="t('alerts.forecast.basedOn')"
           name="_ui.forecast.W"
           :options="windowOptions"
           :searchable="false"

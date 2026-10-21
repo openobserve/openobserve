@@ -1001,9 +1001,9 @@ pub struct QueryStatusResponse {
 pub struct CancelQueryRequest {
     #[prost(string, tag = "1")]
     pub trace_id: ::prost::alloc::string::String,
-    /// Unset cancels in every org; nodes that predate the field ignore it.
-    #[prost(string, optional, tag = "2")]
-    pub org_id: ::core::option::Option<::prost::alloc::string::String>,
+    /// The org whose queries are cancelled; nodes that predate the field ignore it.
+    #[prost(string, tag = "2")]
+    pub org_id: ::prost::alloc::string::String,
 }
 #[derive(Clone, Copy, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct CancelQueryResponse {

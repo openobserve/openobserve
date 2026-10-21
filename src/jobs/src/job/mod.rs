@@ -1096,6 +1096,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
                     &definition,
                     &usage,
                     Some(timestamp),
+                    &config::meta::model_pricing::PricingContext::default(),
                 )
                 .cost
                 .get("total")

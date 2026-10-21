@@ -332,79 +332,14 @@ describe("Billings Service", () => {
   });
 
   describe("get_data_usage", () => {
-    it("should fetch data usage for specific date and type", async () => {
-      const usageDate = "2024-01-01";
-      const dataType = "logs";
-      const mockUsage = {
-        data: {
-          date: usageDate,
-          data_type: dataType,
-          usage_bytes: 1024000000,
-          usage_readable: "1.02 GB",
-          cost: 0.15,
-        },
-      };
+    it("fetches the org's metering without the query params the server ignores", async () => {
+      const mockUsage = { data: { price_details: null } };
+      mockHttp.mockReturnValue({ get: vi.fn().mockResolvedValue(mockUsage) } as any);
 
-      mockHttp.mockReturnValue({
-        get: vi.fn().mockResolvedValue(mockUsage),
-      } as any);
+      const result = await billings.get_data_usage(mockOrgId, "30days");
 
-      const result = await billings.get_data_usage(mockOrgId, usageDate, dataType);
-
-      expect(mockHttp().get).toHaveBeenCalledWith(
-        `/api/${mockOrgId}/billings/data_usage/${usageDate}?data_type=${dataType}`,
-      );
+      expect(mockHttp().get).toHaveBeenCalledWith(`/api/${mockOrgId}/billings/data_usage/30days`);
       expect(result).toEqual(mockUsage);
-    });
-
-    it("should handle different data types", async () => {
-      const usageDate = "2024-01-01";
-      const dataTypes = ["logs", "metrics", "traces"];
-
-      mockHttp.mockReturnValue({
-        get: vi.fn().mockResolvedValue({ data: {} }),
-      } as any);
-
-      for (const dataType of dataTypes) {
-        await billings.get_data_usage(mockOrgId, usageDate, dataType);
-
-        expect(mockHttp().get).toHaveBeenCalledWith(
-          `/api/${mockOrgId}/billings/data_usage/${usageDate}?data_type=${dataType}`,
-        );
-      }
-
-      expect(mockHttp().get).toHaveBeenCalledTimes(3);
-    });
-
-    it("should append member query param when a member org is provided", async () => {
-      const usageDate = "2024-01-01";
-      const dataType = "gb";
-      const member = "child-org";
-
-      mockHttp.mockReturnValue({
-        get: vi.fn().mockResolvedValue({ data: {} }),
-      } as any);
-
-      await billings.get_data_usage(mockOrgId, usageDate, dataType, member);
-
-      expect(mockHttp().get).toHaveBeenCalledWith(
-        `/api/${mockOrgId}/billings/data_usage/${usageDate}?data_type=${dataType}&member=${member}`,
-      );
-    });
-
-    it("should not append member query param for empty member values", async () => {
-      const usageDate = "2024-01-01";
-      const dataType = "gb";
-
-      mockHttp.mockReturnValue({
-        get: vi.fn().mockResolvedValue({ data: {} }),
-      } as any);
-
-      await billings.get_data_usage(mockOrgId, usageDate, dataType, "");
-
-      expect(mockHttp().get).toHaveBeenCalledWith(
-        `/api/${mockOrgId}/billings/data_usage/${usageDate}?data_type=${dataType}`,
-      );
     });
   });
 

@@ -547,7 +547,7 @@ pub async fn build(
             });
         }
     }
-    let family = TraceFamily::default();
+    let family = TraceFamily::new(&org);
     let deadline = tokio::time::Instant::now()
         + Duration::from_secs(u64::from(get_config().public_dashboards.build_timeout_secs));
     let probe = AuthorizerProbe::default();
