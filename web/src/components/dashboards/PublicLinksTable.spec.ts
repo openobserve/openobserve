@@ -34,6 +34,17 @@ vi.mock("@/services/public_dashboards_admin", () => ({
     revoke: vi.fn(),
   },
 }));
+const folders = vi.hoisted(() => ({ list: [] as Array<Record<string, unknown>> }));
+vi.mock("@/services/common", async (importOriginal) => {
+  const actual = await importOriginal<{ default: Record<string, unknown> }>();
+  return {
+    ...actual,
+    default: {
+      ...actual.default,
+      list_Folders: vi.fn(() => Promise.resolve({ data: { list: folders.list } })),
+    },
+  };
+});
 const notify = vi.hoisted(() => ({ error: vi.fn(), positive: vi.fn() }));
 vi.mock("@/composables/useNotifications", () => ({
   default: () => ({
@@ -201,6 +212,22 @@ describe("PublicLinksTable", () => {
     expect(find(w, "dashboards-public-links-l1-expires").text()).toBe("Never");
     expect(w.text()).toContain("10 minutes");
     expect(w.text()).toContain("a@b.c");
+  });
+
+  it("shows the row's folder icon, and the folder glyph for a folder without one", async () => {
+    const cell = (w: ReturnType<typeof build>) => find(w, "dashboards-public-links-l1-dashboard");
+    let w = build();
+    await flushPromises();
+    expect(cell(w).find('[data-test="folder-icon"]').exists()).toBe(true);
+    expect(cell(w).find('[data-test="glyph-emoji"]').exists()).toBe(false);
+    w.unmount();
+
+    folders.list = [{ folderId: "f1", name: "Ops", icon: "🚀" }];
+    queryClient.clear();
+    w = build();
+    await flushPromises();
+    expect(cell(w).find('[data-test="glyph-emoji"]').text()).toBe("🚀");
+    folders.list = [];
   });
 
   it("filters by the summary tiles, with needs attention from one batch status call", async () => {

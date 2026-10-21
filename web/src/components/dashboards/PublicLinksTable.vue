@@ -95,13 +95,16 @@
         </span>
         <span
           v-else
-          class="truncate text-sm"
+          class="flex min-w-0 items-center gap-1.5 text-sm"
           :data-test="`dashboards-public-links-${row.id}-dashboard`"
         >
-          <span class="text-text-secondary">{{
-            raw(`${row.folder_name ?? row.folder_id ?? "default"} / `)
-          }}</span>
-          <span class="text-text-body">{{ raw(row.dashboard_title) }}</span>
+          <FolderIcon :token="folderIconOf(row)" class="text-text-secondary" />
+          <span class="min-w-0 truncate">
+            <span class="text-text-secondary">{{
+              raw(`${row.folder_name ?? row.folder_id ?? "default"} / `)
+            }}</span>
+            <span class="text-text-body">{{ raw(row.dashboard_title) }}</span>
+          </span>
         </span>
       </template>
       <template #cell-status="{ row }">
@@ -385,6 +388,9 @@ import {
   refreshLabel,
 } from "./publicLinkDisplay";
 import PublicLinkRangesCell from "./PublicLinkRangesCell.vue";
+import FolderIcon from "@/components/common/sidebar/FolderIcon.vue";
+import { useFolderIcons } from "@/composables/useFolderIcons";
+import { foldersQuery } from "@/services/common.queries";
 import PublicLinkExpiresCell from "./PublicLinkExpiresCell.vue";
 
 type StatusFilter = "live" | "paused" | "attention" | "expired" | "all";
@@ -414,6 +420,21 @@ const linksQuery = useQuery(() =>
   Object.assign(publicLinksListQuery(orgId.value), { enabled: !!orgId.value }),
 );
 const links = computed(() => linksQuery.data.value ?? []);
+const { iconFor } = useFolderIcons();
+const foldersListQuery = useQuery(() =>
+  Object.assign(foldersQuery(orgId.value, "dashboards"), { enabled: !!orgId.value }),
+);
+const folderIcons = computed(
+  () =>
+    new Map(
+      (foldersListQuery.data.value ?? []).map((folder) => [
+        folder.folderId,
+        iconFor({ icon: typeof folder.icon === "string" ? folder.icon : null }),
+      ]),
+    ),
+);
+const folderIconOf = (link: PublicLink) =>
+  folderIcons.value.get(link.folder_id ?? "default") ?? null;
 const loading = linksQuery.isPending;
 const lastUpdatedAt = linksQuery.dataUpdatedAt;
 const forbidden = computed(
