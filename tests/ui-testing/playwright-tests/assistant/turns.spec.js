@@ -268,8 +268,8 @@ test.describe("assistant honest turns", () => {
     await assistant.stop();
     await expect(assistant.outcome()).toHaveAttribute("data-kind", "stopped");
     await ask(page, "permission_denied_frame", "change it");
-    await expect(assistant.answer().locator('[data-test="assistant-block-policy"]')).toHaveText(
-      "The assistant wasn't allowed to run o2_UpdateAlert.",
+    await expect(assistant.answer().locator('[data-test="assistant-permission-denied"]')).toHaveText(
+      "Blocked by policy: o2_UpdateAlert.",
     );
     await expect(assistant.transcript()).not.toHaveAttribute("aria-busy", "true");
   });

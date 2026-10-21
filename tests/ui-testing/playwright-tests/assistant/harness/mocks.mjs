@@ -200,6 +200,104 @@ export const SCENARIOS = {
     ],
     delayMs: 40,
   },
+  // A delete batch of five alerts (o2-ai events.build_delete_confirmation_event).
+  confirmation_batch: {
+    frames: [
+      f.status(),
+      f.title("Delete stale alerts"),
+      ...chunk("Five alerts have been disabled for over a month. Deleting them needs your approval.").map(f.delta),
+      {
+        type: "confirmation_required",
+        tool: "o2_delete",
+        args: {
+          items: ["checkout-latency-old", "payments-5xx-staging", "cart-p95", "search-errors", "login-latency"].map((name, i) => ({
+            resource_type: "alert",
+            name,
+            id: `stale${i + 1}`,
+            params: {},
+          })),
+        },
+        message: "Do you really want to delete these 5 resources?",
+      },
+      { waitForConfirm: true },
+      ...chunk("Done.").map(f.delta),
+      f.complete(),
+    ],
+    delayMs: 40,
+  },
+  // An opencode permission (events._permission_event): the turn pauses on it; o2-ai auto-denies at 30 s.
+  permission_card: {
+    frames: [
+      f.status(),
+      f.title("List pods"),
+      ...chunk("I need to look at the pods in prod.").map(f.delta),
+      {
+        type: "confirmation_required",
+        tool: "bash",
+        args: { permission_id: "per_e2e", detail: "kubectl get pods -n prod" },
+        message: "The assistant wants to run: kubectl get pods -n prod",
+      },
+      { waitForConfirm: true },
+      ...chunk("Three pods are running.").map(f.delta),
+      f.complete(),
+    ],
+    delayMs: 40,
+  },
+  // A typed update card with before/after.
+  update_card: {
+    frames: [
+      f.status(),
+      f.title("Raise the alert threshold"),
+      ...chunk("I can raise the threshold of **checkout-latency** from 1 s to 2 s.").map(f.delta),
+      {
+        type: "confirmation_required",
+        tool: "o2_UpdateAlert",
+        call_id: "call_upd1",
+        kind: "update",
+        operation: "Update alert",
+        targets: [{ type: "alert", id: "2Yx9alert", name: "checkout-latency" }],
+        before: { threshold: "1s", period: "5m" },
+        after: { threshold: "2s", period: "5m" },
+        impact: ["Pages 3 on-call users"],
+        message: "Update alert checkout-latency?",
+      },
+      { waitForConfirm: true },
+      ...chunk("Updated.").map(f.delta),
+      f.complete(),
+    ],
+    delayMs: 40,
+  },
+  // A CLI toolset command that needs confirmation (agent/clis/handler.py).
+  command_card: {
+    frames: [
+      f.status(),
+      f.title("Restart the checkout pods"),
+      ...chunk("I'll restart the checkout deployment with the acme-cli toolset.").map(f.delta),
+      {
+        type: "confirmation_required",
+        tool: "acme-cli",
+        args: { command: "kubectl rollout restart deploy/checkout -n prod", toolset: "acme-cli" },
+        message: "The assistant wants to run: acme-cli kubectl rollout restart deploy/checkout -n prod",
+      },
+      { waitForConfirm: true },
+      ...chunk("Restarted.").map(f.delta),
+      f.complete(),
+    ],
+    delayMs: 40,
+  },
+  // A change no card asked about: the turn ran a mutating tool directly.
+  resource_changed_unreviewed: {
+    frames: [
+      f.status(),
+      f.title("Raise the alert threshold"),
+      f.toolCall("o2_UpdateAlert", "Updating alert", { name: "checkout-latency" }, "call_u1"),
+      f.toolResult("o2_UpdateAlert", { call_id: "call_u1" }),
+      { type: "resource_changed", resource_type: "alert", id: "2Yx9alert", op: "update" },
+      ...chunk("I raised the threshold of **checkout-latency** to 2 s.").map(f.delta),
+      f.complete(),
+    ],
+    delayMs: 40,
+  },
   navigation: {
     frames: [
       f.status(),
@@ -583,6 +681,16 @@ export const HTTP_SCENARIOS = {
   upstream_429: { status: 429, body: { code: 429, error: "upstream returned 429 Too Many Requests" }, envelope: { code: "rate_limited", message: "Rate limited", retryable: true, retry_after: 30, action: "retry" } },
   agent_503: { status: 503, body: { code: 503, error: "error sending request for url (http://o2-ai:8000/api/v1/chat/stream)" }, envelope: { code: "agent_unavailable", message: "Agent unavailable", retryable: true } },
   authz_503: { status: 503, body: { code: 503, message: "redis connection timed out" }, envelope: { code: "authorization_unavailable", message: "Authorization unavailable", retryable: true } },
+  // A member of the org: the consent object says the user cannot manage paid usage.
+  consent_member: {
+    status: 412,
+    body: {
+      code: 412,
+      message: "Paid usage requires organization consent.",
+      error_type: "paid_overage_consent_required",
+      consent: overageStatus({ effective: false, billing_status: "eligible", can_manage: false }),
+    },
+  },
   // The same-turn retry after Enable answers 412 again (consent_still_required).
   consent_twice: {
     status: 412,

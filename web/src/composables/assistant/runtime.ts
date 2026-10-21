@@ -29,8 +29,12 @@ import config from "@/aws-exports";
 import { requestAlertCreation } from "@/composables/alerts/useAlertCreation";
 import { contextRegistry } from "@/composables/contextProviders/registry";
 import { queryClient } from "@/composables/query/queryClient";
+import { useAiDashboardEvents } from "@/composables/useAiDashboardEvents";
 import useBreakpoint from "@/composables/useBreakpoint";
+import { registerSessionConsentSurface } from "@/composables/usePaidOverageConsent";
 import assistantService, { type AssistantCapabilitiesResponse } from "@/services/assistant";
+import type { PaidOverageFeature } from "@/services/paidOverage";
+import { paidOverageQuery, setPaidOverageMutation } from "@/services/paidOverage.queries";
 import searchService from "@/services/search";
 import { gt } from "@/types/i18n";
 import { copyToClipboard } from "@/utils/clipboard";
@@ -56,6 +60,7 @@ import type {
   HostRegistry,
   OpenAssistantResult,
 } from "./assistantStore.types";
+import { cancelConsentOnClose, createConsentRuntime, type ConsentRuntime } from "./consent";
 import { serialize } from "./context/serialize";
 import { createHintChannel, type AssistantHintChannel } from "./hints";
 import { createLifecycle, type AssistantLifecycleRuntime } from "./lifecycle";
@@ -68,7 +73,9 @@ import {
   type AssistantServerConfig,
   type CapabilityDeps,
 } from "./useAssistantCapability";
+import { createApprovalsRuntime, type ApprovalsRuntime } from "./useAssistantApprovals";
 import { useAssistantClient } from "./useAssistantClient";
+import { assistantKeydownAt } from "./useAssistantIdleFocus";
 
 const TELEMETRY_ROLES: Record<string, TelemetryRole> = {
   admin: "admin",
@@ -100,6 +107,8 @@ export interface AssistantRuntime {
   hosts: HostRegistry;
   hints: AssistantHintChannel;
   lifecycle: AssistantLifecycleRuntime;
+  approvals: ApprovalsRuntime;
+  consent: ConsentRuntime;
   context: ShallowRef<AssistantRuntimeContext | null>;
   /** Set by `telemetryContext`; the `context.client.ui_version` of every turn (B-13). */
   uiVersion: ShallowRef<string>;
@@ -178,7 +187,7 @@ function buildRuntime(): AssistantRuntime {
 
     deps.engine.setRequestBuilder(serialize);
     registerBuiltInAppliers();
-    deps.actions = createActionDispatcher(
+    const dispatcher = createActionDispatcher(
       actionEnv(
         context,
         () => store,
@@ -186,15 +195,36 @@ function buildRuntime(): AssistantRuntime {
         () => hosts,
       ),
     );
+    deps.actions = dispatcher;
 
     const hints = createHintChannel("");
     deps.hints = hints;
+    const approvals = createApprovalsRuntime({
+      state: () => store.state,
+      annotate: (sid, blockId, patch) => store.annotate(sid, blockId, patch),
+      resend: (sid, snapshot, input, opts) => store.resend(sid, snapshot, input, opts),
+      engine: () => deps.engine,
+      dispatch: dispatcher.approvals,
+      extend: (org, sid, id) => useAssistantClient().confirm(org, sid, { id, extend: true }),
+      extendable: () => capability.capability.value.approvalExtend === true,
+      changed: refreshLists,
+      hints,
+      now: deps.now,
+      lastKeydownAt: assistantKeydownAt,
+      t: gt,
+    });
+    deps.approvals = approvals;
+    const consent = createConsentRuntime(consentDeps(context, () => store, deps, hints));
+    deps.consent = consent;
+    deps.engine.setConsentHandler(consent.onConsentRequired);
+    registerSessionConsentSurface(consent.promptFor);
     const store = createAssistantStore(deps, {
       signOutKeys: () => orgKeysOf(context.value),
       remoteLight: () => lifecycle.remoteLight(),
       turnLock: (sid) => lifecycle.turnLock(sid),
     });
     flushDraftsOnLeave(store);
+    cancelConsentOnClose(() => store.state, consent);
     // A deleted session, or one of the org the user just left, keeps no Run rows or searches.
     watch(
       () => {
@@ -237,7 +267,18 @@ function buildRuntime(): AssistantRuntime {
       currentOrg: () => context.value?.getOrg()?.identifier ?? null,
       now: deps.now,
     });
-    return { store, capability, hosts, hints, lifecycle, context, uiVersion, openAssistant };
+    return {
+      store,
+      capability,
+      hosts,
+      hints,
+      lifecycle,
+      approvals,
+      consent,
+      context,
+      uiVersion,
+      openAssistant,
+    };
   })!;
 }
 
@@ -268,6 +309,7 @@ function engineDeps(
     pageContext: () => contextRegistry.getActiveContext(),
     uiVersion: () => uiVersion.value,
     container: () => containerOf(store().state.shell.placement, lgUp()) ?? "home",
+    approvals: () => deps.approvals,
   };
 }
 
@@ -287,6 +329,7 @@ function actionEnv(
     },
     capability: () => capability().capability.value,
     currentOrg: () => context.value?.getOrg()?.identifier ?? null,
+    currentUser: () => context.value?.getUser()?.email ?? "",
     now: () => Date.now(),
     t: gt,
     openTab: openTabWithoutOpener,
@@ -311,8 +354,45 @@ function actionEnv(
       return (response?.data ?? {}) as Record<string, unknown>;
     },
     feedback: (org, sid, body) => client.feedback(org, sid, body),
+    confirm: (org, sid, body, timeoutMs) => client.confirm(org, sid, body, timeoutMs),
+    undo: (org, ledgerId) => assistantService.undo(org, ledgerId),
     requestAlert: (prefill) => requestAlertCreation(prefill),
     requestDashboard: (draft) => requestDashboardDraft(draft),
+  };
+}
+
+// Writes go through the mutation's `meta.invalidates` and reads through the query, so the meter and Billing see the grant.
+function consentDeps(
+  context: ShallowRef<AssistantRuntimeContext | null>,
+  store: () => AssistantStoreInternal,
+  deps: AssistantStoreDeps,
+  hints: AssistantHintChannel,
+) {
+  return {
+    state: () => store().state,
+    // The engine resumes the waiting turn; the store would join the send still in flight instead.
+    send: (sid: string, turnId: string) => deps.engine.send(sid, { turnId }),
+    stop: (sid: string) => store().stop(sid),
+    withdraw: (sid: string) => deps.engine.consentWithdrawn?.(sid),
+    enable: (org: string, feature: PaidOverageFeature) =>
+      queryClient
+        .getMutationCache()
+        .build(queryClient, setPaidOverageMutation(org, feature))
+        .execute(true),
+    read: (org: string, feature: PaidOverageFeature) =>
+      queryClient.fetchQuery({ ...paidOverageQuery(org, feature), staleTime: 0 }),
+    hints,
+    announce: (sid: string, key: Parameters<AssistantStoreInternal["announce"]>[1]) =>
+      store().announce(sid, key),
+    currentOrg: () => context.value?.getOrg()?.identifier ?? null,
+    currentUser: () => context.value?.getUser()?.email ?? "",
+    now: () => Date.now(),
+    onVisible: (cb: () => void) => {
+      if (typeof document === "undefined") return () => undefined;
+      const listener = () => document.visibilityState === "visible" && cb();
+      document.addEventListener("visibilitychange", listener);
+      return () => document.removeEventListener("visibilitychange", listener);
+    },
   };
 }
 
@@ -350,6 +430,13 @@ function capabilityDeps(context: ShallowRef<AssistantRuntimeContext | null>): Ca
         refetchType: "none",
       }),
   };
+}
+
+// The open Alerts and Dashboards lists hear about an approved change on their own refresh bus.
+function refreshLists(types: string[]): void {
+  const { emit } = useAiDashboardEvents();
+  if (types.includes("dashboard")) emit({ type: "dashboard_updated" });
+  if (types.includes("alert")) emit({ type: "alerts_changed" });
 }
 
 async function orgKeysOf(context: AssistantRuntimeContext | null): Promise<string[]> {

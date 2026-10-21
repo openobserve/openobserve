@@ -423,7 +423,7 @@ describe("useAssistantClient: tail, stop, confirm, feedback", () => {
       query_index: 0,
       trace_id: "t",
     });
-    expect(svc.confirm).toHaveBeenCalledWith("org1", "sid-1", { approved: true });
+    expect(svc.confirm).toHaveBeenCalledWith("org1", "sid-1", { approved: true }, undefined);
     expect(svc.feedback).toHaveBeenCalledWith(
       "org1",
       "sid-1",

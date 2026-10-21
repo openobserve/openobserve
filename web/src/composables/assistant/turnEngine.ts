@@ -23,6 +23,7 @@ import { epochMs } from "@/utils/assistant/explorerRoutes";
 import { ERROR_LEDGER, isConsentPrompt } from "./assistantErrors";
 import type { AssistantStoreInternal } from "./assistantStore";
 import type {
+  ApprovalsService,
   AssistantError,
   AssistantSession,
   AssistantState,
@@ -87,6 +88,11 @@ const LINGER_MS = 3_000;
 /** A turn id goes on the wire at most twice: the send and one reuse (constraint 16). */
 const MAX_ID_SENDS = 2;
 
+const MAX_TIMER_MS = 2 ** 31 - 1;
+
+// The card's own expiry declines it on the server first; the turn's timer ends the turn only after that had its chance.
+const APPROVAL_GRACE_MS = 1_000;
+
 // Mutating tools turn Retry into "Ask again" (`80` §1.3): rerunning cannot undo what they changed.
 const MUTATING_TOOL = /^(o2_)?(delete|update|create|confirm)/i;
 
@@ -133,6 +139,8 @@ export interface TurnEngineDeps {
   tailEnabled?: () => boolean;
   raf?: (cb: () => void) => void;
   visibility?: { hidden(): boolean; onVisible(cb: () => void): () => void };
+  /** The approvals runtime the reducer's card frames go to. */
+  approvals?: () => Pick<ApprovalsService, "onConfirmationRequired" | "onResolved">;
 }
 
 /** The engine's record of one running turn; lives in `turnRuntime`, never in reactive state. */
@@ -165,6 +173,8 @@ interface TurnRecord {
   restoreUsed: boolean;
   restoring: boolean;
   consentRetried: boolean;
+  /** The approval card this turn's prompt answers (Reply, Ask again). */
+  replyToApproval?: string;
   notSaved: boolean;
   streamEnded: boolean;
   /** Frames applied up to the resume cursor `turnMeta.lastSeq`: what a tail from the cursor builds on (WP-18). */
@@ -288,9 +298,18 @@ export function createTurnEngine(deps: TurnEngineDeps): TurnEngine {
         out.turn.push(...first.effects);
       }
       session.turnMeta.lastFrameAt = deps.now();
-      if (acceptsFrames(session.turn)) {
+      // A delete batch is proposed once the answer is complete, so its card still lands on that answer.
+      const lateCard = frame.type === "confirmation_required" && session.turn.state === "done";
+      if (acceptsFrames(session.turn) || lateCard) {
         rec.stream.messages = session.messages;
-        out.stream.push(...reduce(rec.stream, frame, liveCtx(t)));
+        const live = { ...liveCtx(t), pendingApprovalId: session.pendingApproval?.id ?? null };
+        for (const effect of reduce(rec.stream, frame, live)) {
+          if (effect.kind === "approval")
+            deps.approvals?.().onConfirmationRequired(rec.sid, effect.frame);
+          else if (effect.kind === "approval_resolved")
+            deps.approvals?.().onResolved(rec.sid, effect.frame);
+          else out.stream.push(effect);
+        }
         mirrorExtras(session.turnMeta, rec.stream);
       }
       if (frame.type === "complete") {
@@ -305,7 +324,8 @@ export function createTurnEngine(deps: TurnEngineDeps): TurnEngine {
       noteOutcome(session, rec, before);
       out.turn.push(...next.effects);
       if (session.turn.state !== "awaiting_approval") clearApproval(rec);
-      else if (frame.type === "confirmation_required") watchApproval(rec, frame.expires_at);
+      else if (frame.type === "confirmation_required")
+        watchApproval(rec, session.pendingApproval?.expiresAt ?? frame.expires_at);
       return out;
     };
 
@@ -451,7 +471,8 @@ export function createTurnEngine(deps: TurnEngineDeps): TurnEngine {
         rec.approvalTimer = undefined;
         dispatch(rec, { type: "approval_expired", callId });
       },
-      Math.max(0, expiresAt - deps.now()),
+      // A delay past the timer's range would fire at once, so a far-off expiry waits as long as a timer can.
+      Math.min(Math.max(0, expiresAt - deps.now()) + APPROVAL_GRACE_MS, MAX_TIMER_MS),
     );
   };
 
@@ -766,6 +787,31 @@ export function createTurnEngine(deps: TurnEngineDeps): TurnEngine {
         resumeConsent(rec);
       return rec.promise;
     },
+    approvalDecided(sid) {
+      const rec = record(sid);
+      const turn = sessionOf(sid)?.turn;
+      if (rec && turn?.state === "awaiting_approval")
+        dispatch(rec, { type: "approval_decided", callId: turn.callId, approved: true });
+    },
+    consentWithdrawn(sid) {
+      const rec = record(sid);
+      const session = sessionOf(sid);
+      if (!rec || session?.turn.state !== "awaiting_consent") return;
+      session.pendingConsent = null;
+      dispatch(rec, { type: "consent_enable" });
+      dispatch(rec, { type: "stop" });
+    },
+    approvalExtended(sid, until) {
+      const rec = record(sid);
+      const session = sessionOf(sid);
+      if (rec && session?.turn.state === "awaiting_approval")
+        watchApproval(rec, until ?? session.pendingApproval?.expiresAt);
+    },
+    // A decision on its way must never meet a cancel from the card's own expiry; the runtime re-arms it if the decision does not land.
+    approvalSending(sid) {
+      const rec = record(sid);
+      if (rec) clearApproval(rec);
+    },
     async stop(sid) {
       const rec = record(sid);
       const session = sessionOf(sid);
@@ -876,6 +922,7 @@ function defaultRequestBuilder(
       },
       ...(rec?.mode && { mode: rec.mode }),
       ...(rec?.ephemeral && { ephemeral: true }),
+      ...(rec?.replyToApproval && { replyToApproval: rec.replyToApproval }),
     };
     if (persisted) {
       const seq = session.record.cachedLastSeq;
@@ -897,6 +944,7 @@ function requestTurnOf(rec: TurnRecord, deps: TurnEngineDeps): RequestTurn {
     persisted: capability.persistence(),
     attachments: capability.attachments?.() ?? false,
     now: deps.now(),
+    ...(rec.replyToApproval && { replyToApproval: rec.replyToApproval }),
   };
 }
 
@@ -934,6 +982,7 @@ function newRecord(
     restoreUsed: false,
     restoring: false,
     consentRetried: false,
+    ...(opts.replyToApproval && { replyToApproval: opts.replyToApproval }),
     notSaved: false,
     streamEnded: false,
     throughSeq: [],

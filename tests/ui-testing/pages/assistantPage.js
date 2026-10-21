@@ -107,11 +107,11 @@ export class AssistantPage {
   }
 
   consentCard() {
-    return notYet("WP-10");
+    return this.container().locator('[data-test="assistant-consent-card"]');
   }
 
   meter() {
-    return notYet("WP-10");
+    return notYet("WP-10b");
   }
 
   notice() {
@@ -126,8 +126,14 @@ export class AssistantPage {
     return this.page.locator('[data-test="assistant-ask-admin"]').filter({ visible: true });
   }
 
+  /** The pending approval card of the visible container. */
   approval() {
-    return notYet("WP-10");
+    return this.container().locator('[data-test="assistant-approval-card"]');
+  }
+
+  /** The record a decided card leaves in the transcript. */
+  approvalResult() {
+    return this.container().locator('[data-test="assistant-approval-result"]').last();
   }
 
   history() {

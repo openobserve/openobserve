@@ -611,7 +611,9 @@
       "doors.spec.js",
       "evidence.spec.js",
       "editors.spec.js",
-      "lifecycle.spec.js"
+      "lifecycle.spec.js",
+      "approvals.spec.js",
+      "consent.spec.js"
     ],
     "disabled": []
   }

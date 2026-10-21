@@ -164,6 +164,12 @@ export function assistantGoToAnswer(): boolean {
   return false;
 }
 
+/** Focuses the pending card of the visible container, as leaving Reply mode does. */
+export function assistantFocusCard(): boolean {
+  for (const focus of focusTargets.get("card") ?? []) if (focus()) return true;
+  return false;
+}
+
 /** Opens or focuses; the chord never closes (`10` §6.2). */
 export function onAssistantOpen(): void {
   const { store } = getAssistantRuntime();

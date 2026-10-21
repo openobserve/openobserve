@@ -13,7 +13,17 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import type { BlockAnnotation, HistoryFilter, Placement, Sid } from "./assistantStore.types";
+import type {
+  ActionLedgerEntry,
+  ApprovalDecision,
+  ApprovalOutcome,
+  ApprovalResult,
+  ApprovalResultItem,
+  BlockAnnotation,
+  HistoryFilter,
+  Placement,
+  Sid,
+} from "./assistantStore.types";
 import type { ContextChip } from "./context/types";
 
 export const RECALL_CAP = 10;
@@ -43,10 +53,42 @@ const LOCAL_KEYS = {
   annotations: (k: string) => `o2.assistant.annotations:${k}`,
 };
 
-// The chats whose votes, "Opened" lines and asked windows a browser keeps; the oldest go first.
+// The chats whose votes, "Opened" lines, asked windows and approval records a browser keeps; the oldest go first.
 const ANNOTATION_SESSIONS = 50;
 
 const ANNOTATION_KEYS_PER_SESSION = 200;
+
+// An approval record read back is checked field by field and capped like the server data it came from.
+const OUTCOME_STATES: ReadonlySet<unknown> = new Set<ApprovalOutcome["state"]>([
+  "approved",
+  "done",
+  "partial",
+  "failed",
+  "declined",
+  "new_chat",
+  "stopped",
+  "replied",
+  "editing",
+  "narrowed",
+  "expired",
+  "withdrawn",
+  "delivery_failed",
+  "unconfirmed",
+  "approved_elsewhere",
+  "declined_elsewhere",
+]);
+
+const DENY_REASONS: ReadonlySet<unknown> = new Set([
+  "deny",
+  "escape",
+  "new_chat",
+  "reply",
+  "expired",
+  "withdrawn",
+  "edited",
+]);
+
+const MAX_KEPT_ROWS = 200;
 
 // A stored vote reason is only ever one of the bar's reasons or a findings outcome.
 const FEEDBACK_REASONS: ReadonlySet<unknown> = new Set([
@@ -381,7 +423,107 @@ function toAnnotation(value: unknown): BlockAnnotation | null {
   const from = source.window?.from;
   const to = source.window?.to;
   if (typeof from === "number" && typeof to === "number" && to > from) out.window = { from, to };
+  const outcome = keptOutcome(source.approvalOutcome);
+  if (outcome) out.approvalOutcome = outcome;
+  const result = keptResult(source.approvalResult);
+  if (result) out.approvalResult = result;
+  const ledger = Array.isArray(source.ledger)
+    ? source.ledger.slice(0, MAX_KEPT_ROWS).flatMap(keptEntry)
+    : [];
+  if (ledger.length) out.ledger = ledger;
   return Object.keys(out).length ? out : null;
+}
+
+// A decision still on its way when the page went has an outcome nobody saw, which is what it says after a reload.
+function keptOutcome(value: any): ApprovalOutcome | null {
+  const state = value?.state === "sending" ? "unconfirmed" : value?.state;
+  if (!OUTCOME_STATES.has(state) || !isNumber(value.at)) return null;
+  const decision = keptDecision(value.decision);
+  return {
+    state,
+    at: value.at,
+    ...(decision && { decision }),
+    ...(isNumber(value.httpStatus) && { httpStatus: value.httpStatus }),
+    ...(typeof value.by === "string" && { by: value.by.slice(0, 200) }),
+  };
+}
+
+function keptDecision(value: any): ApprovalDecision | null {
+  if (value?.approved === true)
+    return {
+      approved: true,
+      scope: value.scope === "chat" || value.scope === "tool" ? value.scope : "once",
+    };
+  if (value?.approved !== false || !DENY_REASONS.has(value.reason)) return null;
+  return {
+    approved: false,
+    reason: value.reason,
+    ...(typeof value.reply === "string" && { reply: value.reply.slice(0, 500) }),
+  };
+}
+
+function keptResult(value: any): ApprovalResult | null {
+  const status = value?.status;
+  if (
+    (status !== "done" && status !== "partial" && status !== "failed") ||
+    !isNumber(value.resolvedAt)
+  )
+    return null;
+  const items: ApprovalResultItem[] = (Array.isArray(value.items) ? value.items : [])
+    .slice(0, MAX_KEPT_ROWS)
+    .flatMap((item: any): ApprovalResultItem[] =>
+      typeof item?.name === "string" && typeof item.type === "string"
+        ? [
+            {
+              type: item.type.slice(0, 40),
+              name: item.name.slice(0, 200),
+              status: item.status === "done" ? "done" : "failed",
+              ...(typeof item.id === "string" && { id: item.id.slice(0, 200) }),
+              ...(typeof item.code === "string" && { code: item.code.slice(0, 10) }),
+              ...(typeof item.ledgerId === "string" &&
+                item.undoable === true && {
+                  undoable: true,
+                  ledgerId: item.ledgerId.slice(0, 200),
+                }),
+            },
+          ]
+        : [],
+    );
+  const by = typeof value.resolvedBy === "string" ? value.resolvedBy.slice(0, 200) : "";
+  return { status, items, resolvedBy: by, resolvedAt: value.resolvedAt };
+}
+
+function keptEntry(value: any): ActionLedgerEntry[] {
+  const ops = ["create", "update", "delete", "run_command"];
+  const statuses = ["done", "failed", "undone"];
+  if (typeof value?.id !== "string" || !ops.includes(value.op) || !statuses.includes(value.status))
+    return [];
+  if (typeof value.resource?.name !== "string" || !isNumber(value.at)) return [];
+  const text = (v: unknown, max: number) => (typeof v === "string" ? v.slice(0, max) : "");
+  return [
+    {
+      id: value.id.slice(0, 200),
+      ...(typeof value.approvalId === "string" && { approvalId: value.approvalId.slice(0, 200) }),
+      turnId: text(value.turnId, 64),
+      tool: text(value.tool, 100),
+      op: value.op,
+      resource: {
+        type: text(value.resource.type, 40) || "object",
+        name: value.resource.name.slice(0, 200),
+        ...(typeof value.resource.id === "string" && { id: value.resource.id.slice(0, 200) }),
+      },
+      status: value.status,
+      undoable: value.undoable === true,
+      at: value.at,
+      ...(isNumber(value.undoneAt) && { undoneAt: value.undoneAt }),
+      // An undo still on its way when the page went may have restored the object, so it is never offered again.
+      ...((value.undoing === true || value.undoUnconfirmed === true) && { undoUnconfirmed: true }),
+    },
+  ];
+}
+
+function isNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
 }
 
 // Legacy prompts are bare strings; anything else without a string `text` is dropped.

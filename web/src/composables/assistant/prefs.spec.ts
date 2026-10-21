@@ -185,6 +185,71 @@ describe("annotations", () => {
     expect(readAnnotations("k1", "s1")).toEqual({});
   });
 
+  it("keeps an approval's record and its ledger entries across a reload, an undo still on its way as unconfirmed", () => {
+    const entry = {
+      id: "led-1",
+      approvalId: "t1:1",
+      turnId: "t1",
+      tool: "o2_delete",
+      op: "delete" as const,
+      resource: { type: "alert", name: "a", id: "A1" },
+      status: "done" as const,
+      undoable: true,
+      undoing: true,
+      at: 3,
+    };
+    writeAnnotation(
+      "k1",
+      "s1",
+      "approval:t1:1",
+      {
+        approvalOutcome: { state: "done", at: 3, decision: { approved: true, scope: "once" } },
+        approvalResult: {
+          status: "done",
+          items: [{ type: "alert", name: "a", status: "done", undoable: true, ledgerId: "led-1" }],
+          resolvedBy: "me@example.com",
+          resolvedAt: 3,
+        },
+        ledger: [entry],
+      },
+      3,
+    );
+    writeAnnotation(
+      "k1",
+      "s1",
+      "approval:t1:2",
+      { approvalOutcome: { state: "sending", at: 4 } },
+      4,
+    );
+    const back = readAnnotations("k1", "s1");
+    expect(back["approval:t1:1"].approvalOutcome).toEqual({
+      state: "done",
+      at: 3,
+      decision: { approved: true, scope: "once" },
+    });
+    expect(back["approval:t1:1"].approvalResult?.items[0]).toMatchObject({ ledgerId: "led-1" });
+    const { undoing: _undoing, ...kept } = entry;
+    expect(back["approval:t1:1"].ledger).toEqual([{ ...kept, undoUnconfirmed: true }]);
+    expect(back["approval:t1:2"].approvalOutcome?.state).toBe("unconfirmed");
+  });
+
+  it("drops an approval record it cannot trust", () => {
+    localStorage.setItem(
+      "o2.assistant.annotations:k1",
+      JSON.stringify({
+        s1: {
+          at: 1,
+          entries: {
+            a: { approvalOutcome: { state: "approved_by_magic", at: 1 } },
+            b: { approvalResult: { status: "done", items: "all", resolvedAt: "now" } },
+            c: { ledger: [{ id: 1, op: "drop_table" }] },
+          },
+        },
+      }),
+    );
+    expect(readAnnotations("k1", "s1")).toEqual({});
+  });
+
   it("caps a chat at 200 keys on write, keeping the newest and the one just written", () => {
     for (let i = 0; i < 205; i++)
       writeAnnotation("k1", "s1", `b${i}`, { linkOutcome: { openedAt: i + 1 } }, i);

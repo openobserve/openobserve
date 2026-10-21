@@ -45,7 +45,13 @@ import type {
 import type { ContextChip } from "./context/types";
 import { createDraftStore, type DraftStore } from "./drafts";
 import { sidebarWidthFor } from "./sidebarWidth";
-import { TAB_HEARTBEAT_MS, markTabAlive, pushRecall, resetPrefsForTests } from "./prefs";
+import {
+  TAB_HEARTBEAT_MS,
+  markTabAlive,
+  pushRecall,
+  resetPrefsForTests,
+  writeAnnotation,
+} from "./prefs";
 import type { TurnTerminal } from "./turnStates";
 
 const ORIGIN: SessionOrigin = {
@@ -538,6 +544,67 @@ describe("composer", () => {
     expect(store.state.sessions[sid].composer.replyApprovalId).toBeUndefined();
   });
 
+  it("sets the draft aside while Reply holds the box, and gives it back whichever way Reply ends", () => {
+    const { store } = makeStore();
+    const sid = newSession(store);
+    store.setDraft(sid, { text: "and check cart too" });
+    store.startReply(sid, "call-1");
+    expect(store.state.sessions[sid].composer.text).toBe("");
+    store.setDraft(sid, { text: "use 5%" });
+    store.startReply(sid, "call-1");
+    store.cancelReply(sid);
+    expect(store.state.sessions[sid].composer).toMatchObject({
+      mode: "compose",
+      text: "and check cart too",
+    });
+    expect(store.state.sessions[sid].composer.replyStash).toBeUndefined();
+  });
+
+  it("answers an Enable on its way before a Stop: the stop waits on the consent runtime", async () => {
+    const consent = {
+      onConsentRequired: vi.fn(),
+      resolve: vi.fn(),
+      cancel: vi.fn(),
+      busy: vi.fn(() => true),
+    };
+    const engine = { ...inertAssistantDeps().engine, stop: vi.fn(async () => undefined) };
+    const { store } = makeStore({ consent, engine });
+    const sid = newSession(store);
+    await store.stop(sid);
+    expect(consent.cancel).toHaveBeenCalledWith(sid, "stopped");
+    expect(engine.stop).not.toHaveBeenCalled();
+  });
+
+  it("rebuilds a chat's action ledger from its kept records, newest 200 only", () => {
+    const sid = "0190f3a0-0000-7000-8000-000000000777";
+    for (let card = 0; card < 3; card++)
+      writeAnnotation(
+        "k1",
+        sid,
+        `approval:t${card}:1`,
+        {
+          ledger: Array.from({ length: 100 }, (_, i) => ({
+            id: `led-${card}-${i}`,
+            approvalId: `t${card}:1`,
+            turnId: `t${card}`,
+            tool: "o2_delete",
+            op: "delete" as const,
+            resource: { type: "alert", name: `a${i}` },
+            status: "done" as const,
+            undoable: true,
+            at: card * 1_000 + i,
+          })),
+        },
+        card,
+      );
+    const { store } = makeStore({ uuid: () => sid });
+    const created = newSession(store);
+    const ledger = store.state.sessions[created].ledger;
+    expect(ledger).toHaveLength(200);
+    expect(ledger[0].id).toBe("led-1-0");
+    expect(ledger.at(-1)?.id).toBe("led-2-99");
+  });
+
   it("clears a draft with a 10 s undo token, and never across orgs", () => {
     const { store, clock } = makeStore();
     const sid = newSession(store);
@@ -635,14 +702,18 @@ describe("turn actions", () => {
     store.continueTurn(sid);
     await store.retrySave(sid, "t1");
     await store.decideApproval(sid, { approved: true, scope: "once" });
-    await store.resolveConsent(sid, true);
+    await store.resolveConsent(sid, true, true);
     await store.dispatch(sid, { kind: "retry" });
     expect(engine.stop).toHaveBeenCalledWith(sid);
     expect(engine.retry).toHaveBeenCalledWith(sid);
     expect(engine.continueTurn).toHaveBeenCalledWith(sid);
     expect(engine.retrySave).toHaveBeenCalledWith(sid, "t1");
-    expect(approvals.decide).toHaveBeenCalledWith(sid, { approved: true, scope: "once" });
-    expect(consent.resolve).toHaveBeenCalledWith(sid, true);
+    expect(approvals.decide).toHaveBeenCalledWith(
+      sid,
+      { approved: true, scope: "once" },
+      undefined,
+    );
+    expect(consent.resolve).toHaveBeenCalledWith(sid, true, true);
     expect(actions.apply).toHaveBeenCalledWith(sid, { kind: "retry" });
   });
 

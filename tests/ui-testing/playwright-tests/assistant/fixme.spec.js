@@ -10,8 +10,6 @@ const GAPS = [
   ["PERF-06 open and close x50 and 30 chat_300 records from history", "WP-11"],
   ["DOOR log-row Explain sends through openAssistant", "WP-07"],
   ["EVID query block runs inline and opens in Logs", "WP-08"],
-  ["APPR approval card from the confirmation scenario", "WP-10"],
-  ["CONS consent as a turn state (CONS-*) @edition", "WP-10"],
   ["HIST history list, thread header and local-only mode", "WP-11"],
   ["SHARE one-click snapshot and the shared page", "WP-12"],
   ["RCA incident analysis card before ?stream=true", "WP-13"],

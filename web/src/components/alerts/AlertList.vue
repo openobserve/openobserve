@@ -1064,6 +1064,7 @@ import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import { COL } from "@/lib/core/Table/OTable.types";
 import { useAssistantPanelWidth } from "@/composables/assistant/pure";
+import { useAiDashboardEvents, type AiDashboardEvent } from "@/composables/useAiDashboardEvents";
 
 // The toolbar turns icon-only once the list beside a pinned assistant is narrower than this.
 const COMPACT_TOOLBAR_MAIN_REM = 68;
@@ -2419,6 +2420,12 @@ export default defineComponent({
       await getAlertsByFolderId(store, activeFolderId.value);
       filterAlertsByTab();
     });
+    const { on: onAssistantChange, off: offAssistantChange } = useAiDashboardEvents();
+    const onAlertsChanged = (event: AiDashboardEvent) => {
+      if (event.type === "alerts_changed") void refreshAlerts();
+    };
+    onMounted(() => onAssistantChange(onAlertsChanged));
+    onBeforeUnmount(() => offAssistantChange(onAlertsChanged));
     watch(
       () => store.state.organizationData.foldersByType["alerts"],
       async (folders) => {
