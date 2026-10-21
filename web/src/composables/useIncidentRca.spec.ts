@@ -873,17 +873,20 @@ describe("useIncidentRca (RR-35)", () => {
         "The transcript expired",
       ],
       [500, {}, "Could not resume the run."],
-    ])("a refused resume (%i) toasts the server message and re-reads nothing", async (status, data, text) => {
-      service.resumeRca.mockRejectedValue({ isAxiosError: true, response: { status, data } });
-      host = mountHost(stopped());
-      await flushPromises();
+    ])(
+      "a refused resume (%i) toasts the server message and re-reads nothing",
+      async (status, data, text) => {
+        service.resumeRca.mockRejectedValue({ isAxiosError: true, response: { status, data } });
+        host = mountHost(stopped());
+        await flushPromises();
 
-      await host.api.resume("run-2");
+        await host.api.resume("run-2");
 
-      expect(toastMock).toHaveBeenCalledWith({ variant: "error", message: text });
-      expect(service.get).not.toHaveBeenCalled();
-      expect(host.api.resuming.value).toBe(false);
-    });
+        expect(toastMock).toHaveBeenCalledWith({ variant: "error", message: text });
+        expect(service.get).not.toHaveBeenCalled();
+        expect(host.api.resuming.value).toBe(false);
+      },
+    );
 
     it("a 412 (AI not available) toasts the server message and re-reads nothing", async () => {
       service.resumeRca.mockRejectedValue({
