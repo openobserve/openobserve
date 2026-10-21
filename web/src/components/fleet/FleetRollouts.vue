@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <ODrawer
     :open="open"
-    size="lg"
+    size="xl"
     :title="active ? raw(active.config) : t('fleet.fleets.rollouts')"
     :sub-title="active ? changeText(active) : fleetName"
     data-test="fleet-rollouts-drawer"

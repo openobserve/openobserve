@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <ODrawer
     :open="open"
-    size="lg"
+    size="xl"
     :title="collector ? raw(collector.name) : undefined"
     :sub-title="collector?.hostname ? raw(collector.hostname) : undefined"
     bleed

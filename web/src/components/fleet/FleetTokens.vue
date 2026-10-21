@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <ODrawer
     :open="open"
-    size="lg"
+    size="xl"
     :title="mode === 'list' ? t('fleet.enrollment.tokens') : t('fleet.enrollment.newToken')"
     :sub-title="fleetName"
     data-test="fleet-tokens-drawer"
