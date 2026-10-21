@@ -13,18 +13,21 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Public dashboard tables, replacing the four draft migrations and resetting draft databases.
+//! Public dashboard tables, replacing the draft migrations and resetting draft databases.
 
 use sea_orm::{ConnectionTrait, DatabaseConnection};
 use sea_orm_migration::prelude::*;
 
 const LINKS: &str = "public_dashboards";
 const SNAPSHOTS: &str = "public_dashboard_snapshots";
-const DRAFT_MIGRATIONS: [&str; 4] = [
+const DRAFT_MIGRATIONS: [&str; 6] = [
     "m20260907_000001_create_public_dashboards_tables",
     "m20260925_000001_add_name_to_public_dashboards",
     "m20260930_000001_add_updated_by_to_public_dashboards",
     "m20261005_000001_public_dashboards_time_ranges",
+    // The two migrations below under their pre-merge dates; both bodies are idempotent.
+    "m20261015_000001_create_public_dashboards",
+    "m20261015_000002_add_search_type_to_search_queue",
 ];
 const RETIRED_COLUMNS: [&str; 4] = [
     "last_rebuilt_at",
@@ -547,6 +550,12 @@ mod tests {
 
     #[tokio::test]
     async fn forgetting_the_draft_migrations_lets_the_migrator_run() {
+        for name in [
+            "m20261015_000001_create_public_dashboards",
+            "m20261015_000002_add_search_type_to_search_queue",
+        ] {
+            assert!(DRAFT_MIGRATIONS.contains(&name), "{name} is not forgotten");
+        }
         let db = Database::connect("sqlite::memory:").await.unwrap();
         forget_draft_migrations(&db).await.unwrap();
         Migrator::install(&db).await.unwrap();

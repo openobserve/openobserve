@@ -223,20 +223,20 @@ mod m20261009_000005_create_downtime_notifications;
 mod m20261012_000001_create_alert_calibration_configs;
 mod m20261013_000001_create_oncall_phone_verifications;
 mod m20261013_000002_create_org_telephony;
-mod m20261015_000001_create_public_dashboards;
 mod m20261015_000001_reports_add_last_run_columns;
-mod m20261015_000002_add_search_type_to_search_queue;
 mod m20261016_000001_create_rum_pa_app_settings;
+mod m20261021_000001_create_public_dashboards;
+mod m20261021_000002_add_search_type_to_search_queue;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
 
-pub(crate) use m20261015_000001_create_public_dashboards::forget_draft_migrations;
+pub(crate) use m20261021_000001_create_public_dashboards::forget_draft_migrations;
 
 #[cfg(any(test, feature = "test-utils"))]
 pub(crate) async fn create_public_dashboards_schema_for_test(
     db: &sea_orm::DatabaseConnection,
 ) -> Result<(), DbErr> {
-    m20261015_000001_create_public_dashboards::Migration
+    m20261021_000001_create_public_dashboards::Migration
         .up(&SchemaManager::new(db))
         .await
 }
@@ -253,7 +253,7 @@ pub(crate) async fn create_search_queue_schema_for_test(
     m20251219_000001_add_org_id_to_search_queue::Migration
         .up(&manager)
         .await?;
-    m20261015_000002_add_search_type_to_search_queue::Migration
+    m20261021_000002_add_search_type_to_search_queue::Migration
         .up(&manager)
         .await
 }
@@ -612,8 +612,8 @@ impl MigratorTrait for Migrator {
             Box::new(m20261013_000002_create_org_telephony::Migration),
             Box::new(m20261015_000001_reports_add_last_run_columns::Migration),
             Box::new(m20261016_000001_create_rum_pa_app_settings::Migration),
-            Box::new(m20261015_000001_create_public_dashboards::Migration),
-            Box::new(m20261015_000002_add_search_type_to_search_queue::Migration),
+            Box::new(m20261021_000001_create_public_dashboards::Migration),
+            Box::new(m20261021_000002_add_search_type_to_search_queue::Migration),
         ]
     }
 }
@@ -683,8 +683,8 @@ mod tests {
         (108, "m20261013_000002_create_org_telephony"),
         (109, "m20261015_000001_reports_add_last_run_columns"),
         (110, "m20261016_000001_create_rum_pa_app_settings"),
-        (111, "m20261015_000001_create_public_dashboards"),
-        (112, "m20261015_000002_add_search_type_to_search_queue"),
+        (111, "m20261021_000001_create_public_dashboards"),
+        (112, "m20261021_000002_add_search_type_to_search_queue"),
     ];
 
     // Two branches that each claim the next version merge cleanly, so a reused number must fail
