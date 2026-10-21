@@ -86,7 +86,7 @@ const OTableStub = {
 };
 const DateTimeStub = {
   name: "DateTime",
-  props: ["defaultType", "defaultRelativeTime", "defaultAbsoluteTime"],
+  props: ["defaultType", "defaultRelativeTime", "defaultAbsoluteTime", "defaultOpen"],
   emits: ["on:date-change"],
   template: "<div />",
 };
@@ -428,6 +428,7 @@ describe("PublicLinksPanel", () => {
     await w.find('[data-test="dashboards-public-links-panel-add-range-btn"]').trigger("click");
     expect(pickers()).toHaveLength(3);
     expect(pickers()[2].props("defaultRelativeTime")).toBe("1w");
+    expect(pickers().map((p) => !!p.props("defaultOpen"))).toEqual([false, false, true]);
 
     // The picker's own mount emit repeats its value and must not overwrite the row.
     await pick(2, { userChangedValue: false, valueType: "relative", relativeTimePeriod: "1h" });

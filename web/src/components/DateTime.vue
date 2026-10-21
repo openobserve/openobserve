@@ -490,6 +490,11 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    /** Opens the picker as soon as it mounts, for a range the user just asked to add. */
+    defaultOpen: {
+      type: Boolean,
+      default: false,
+    },
   },
 
   emits: ["on:date-change", "on:timezone-change", "hide", "show"],
@@ -1512,6 +1517,15 @@ export default defineComponent({
         onHide();
       }
     };
+
+    onMounted(() => {
+      if (!props.defaultOpen) return;
+      // The click that mounted this picker must finish first, or the popover reads it as an outside click.
+      nextTick(() => {
+        menuOpen.value = true;
+        onMenuOpenChange(true);
+      });
+    });
 
     return {
       raw,

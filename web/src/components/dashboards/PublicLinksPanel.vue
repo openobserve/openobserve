@@ -213,6 +213,7 @@
                       menu-align="start"
                       auto-apply
                       hide-range-shift
+                      :default-open="row.id === addedRowId"
                       :default-type="row.range.type"
                       :default-relative-time="
                         row.range.type === 'relative' ? pickerPeriod(row.range.secs) : '1h'
@@ -1010,6 +1011,8 @@ const defaultOptions = computed<RangeOption[]>(() =>
 // The form holds the ranges; rows give each a stable id, so a picker isn't remounted mid-pick.
 let nextRowId = 0;
 const rows = ref<RangeRow[]>([]);
+// Only a range added by the button opens its picker; rows loaded from a link stay closed.
+const addedRowId = ref<number | null>(null);
 watch(
   ranges,
   (list) => {
@@ -1094,6 +1097,7 @@ function onRangeChanged(row: RangeRow, value: PickedTime) {
 }
 
 function addRange() {
+  addedRowId.value = nextRowId;
   rows.value.push({ id: nextRowId++, range: nextNewRange(rows.value.map((r) => r.range)) });
   syncRanges();
 }

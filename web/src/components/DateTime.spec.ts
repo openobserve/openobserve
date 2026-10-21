@@ -1,4 +1,4 @@
-import { mount } from "@vue/test-utils";
+import { flushPromises, mount } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import DateTime from "@/components/DateTime.vue";
 import i18n from "@/locales";
@@ -84,6 +84,16 @@ describe("DateTime Component", () => {
     wrapper = createWrapper();
     expect(wrapper.exists()).toBe(true);
     expect(wrapper.vm).toBeDefined();
+  });
+
+  it("opens its picker on mount only when asked to", async () => {
+    wrapper = createWrapper();
+    await flushPromises();
+    expect(wrapper.vm.menuOpen).toBe(false);
+    wrapper.unmount();
+    wrapper = createWrapper({ defaultOpen: true });
+    await flushPromises();
+    expect(wrapper.vm.menuOpen).toBe(true);
   });
 
   it("should render without errors", () => {
