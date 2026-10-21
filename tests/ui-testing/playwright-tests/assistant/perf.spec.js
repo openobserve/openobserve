@@ -18,7 +18,12 @@ const CODE_BLOCK = '[data-test="assistant-code-block"]';
 
 const CODE_HIGHLIGHTED = '[data-test="assistant-code-block"]:has(code span)';
 
-const PLAIN_FENCE = '[data-test="assistant-block-text"] pre:not([data-test="assistant-code-block"] pre)';
+const QUERY_BLOCK = '[data-test="assistant-query-block"]';
+
+const QUERY_HIGHLIGHTED = '[data-test="assistant-query-text"]:has(code span)';
+
+const PLAIN_FENCE =
+  '[data-test="assistant-block-text"] pre:not([data-test="assistant-code-block"] pre):not([data-test="assistant-query-block"] pre)';
 
 test.describe("assistant transcript performance", () => {
   let assistant;
@@ -110,13 +115,14 @@ test.describe("assistant transcript performance", () => {
     await openOnLogs(page);
     await harness.nextScenario(page, "long_answer_fenced");
     await assistant.send("fences");
-    const sql = assistant.answer().locator('[data-test="assistant-code-block"][data-query]');
+    // A closed SQL fence becomes the runnable query block; the unlabelled one stays a code block.
+    const sql = assistant.answer().locator('[data-test="assistant-query-block"]');
     const open = assistant.answer().locator('[data-test="assistant-code-block"]').last();
     await expect(open).toBeVisible({ timeout: 30_000 });
     await expect.poll(async () => open.locator("code span").count(), { timeout: 2_000 }).toBe(0);
     await expect(assistant.transcript()).not.toHaveAttribute("aria-busy", "true", { timeout: 60_000 });
     await expect(sql).toHaveCount(1);
-    expect(await sql.locator("code span").count()).toBeGreaterThan(0);
+    await expect(sql.locator('[data-test="assistant-query-language"]')).toHaveText("SQL");
   });
 
   // Each case: the text the reader must see, and how many of each element the answer must hold (">0" for some).
@@ -134,8 +140,8 @@ test.describe("assistant transcript performance", () => {
     ["markdown_table_cap", "| val | val |", { tr: 200 }],
     ["markdown_bomb_long_link", "Done.", { strong: ">0", 'a[href^="https://e.com"]': 0 }],
     ["markdown_bomb_alt", "After.", { strong: ">0", "img[alt$='…']": 1 }],
-    // The first 40 fences are code blocks, highlighted where the language is known; the rest are plain `<pre>` by design (Z2).
-    ["markdown_query_examples", "Here are queries you can run", { [CODE_BLOCK]: 40, [CODE_HIGHLIGHTED]: 40, [PLAIN_FENCE]: 110 }],
+    // The first 40 SQL fences are query blocks, highlighted; the rest are plain `<pre>` by design.
+    ["markdown_query_examples", "Here are queries you can run", { [QUERY_BLOCK]: 40, [QUERY_HIGHLIGHTED]: 40, [PLAIN_FENCE]: 110 }],
     ["markdown_bomb_fences", "a", { [CODE_BLOCK]: 40, [PLAIN_FENCE]: 1_960 }],
   ]) {
     test(`Rounds 4-8 ${scenario}: the main thread never takes the parse, a long mount or the fill of a scroll through the answer`, async ({ page }, info) => {

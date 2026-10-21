@@ -140,6 +140,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <span v-else />
           <OButton
+            v-if="openLabel"
+            variant="ghost"
+            size="sm"
+            :icon-right="assistantGlyph.openSource"
+            class="max-md:min-h-11 pointer-coarse:min-h-11"
+            data-test="assistant-chip-open-source"
+            @click="emit('open-source')"
+          >
+            {{ openLabel }}
+          </OButton>
+          <OButton
             variant="outline"
             size="sm"
             class="max-md:min-h-11 pointer-coarse:min-h-11"
@@ -165,6 +176,8 @@ export interface AssistantChipPopoverProps {
   imageSrc?: string;
   window?: TimeWindow;
   timezone?: string;
+  /** "Open in Logs": shown when the chip names something the explorer can open. */
+  openLabel?: I18nText | null;
 }
 
 export interface AssistantChipPopoverEmits {
@@ -177,6 +190,8 @@ export interface AssistantChipPopoverEmits {
   (e: "apply-time", range: ComposerState["timeOverride"]): void;
   /** Tab past the last control: the tray moves focus to the control after the chip. */
   (e: "tab-out"): void;
+  /** Open in {page}: the tray opens it through the explorer applier. */
+  (e: "open-source"): void;
 }
 </script>
 
@@ -229,6 +244,7 @@ const props = withDefaults(defineProps<AssistantChipPopoverProps>(), {
   imageSrc: undefined,
   window: undefined,
   timezone: "UTC",
+  openLabel: null,
 });
 
 const emit = defineEmits<AssistantChipPopoverEmits>();

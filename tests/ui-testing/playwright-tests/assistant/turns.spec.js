@@ -64,6 +64,8 @@ test.describe("assistant honest turns", () => {
     await expect(assistant.answer().locator("h2")).toHaveText("Checkout 5xx spike — what happened");
     await expect(assistant.status()).toHaveCount(0);
     await expect(assistant.transcript()).not.toHaveAttribute("aria-busy", "true");
+    // The evaluated-window footer closes a done answer.
+    await expect(assistant.answer().locator('[data-test="assistant-turn-footer"]')).toContainText(/^Evaluated .+·\s*1 query/);
     const ended = (await events(page)).filter((e) => e.name === "ai_turn_ended");
     expect(ended.at(-1)?.properties.outcome).toBe("done");
   });
@@ -230,6 +232,15 @@ test.describe("assistant honest turns", () => {
     await outcome.locator('[data-test="assistant-error-details"] button').first().click();
     await expect(outcome.locator('[data-test="assistant-error-details-code"]')).toHaveText("provider_error");
     await expect(page.getByText(/^Error:/)).toHaveCount(0);
+    // The non-AI path opens Logs with the failed step's SQL and the prompt's absolute window.
+    const manual = outcome.locator('[data-test="assistant-turn-outcome-manual"]');
+    await expect(manual).toHaveText("Open in Logs instead");
+    await manual.click();
+    await expect.poll(() => new URL(page.url()).searchParams.get("type")).toBe("ai_chat_query");
+    const params = new URL(page.url()).searchParams;
+    const sql = Buffer.from(params.get("query").replace(/-/g, "+").replace(/_/g, "/").replace(/\./g, "="), "base64").toString("utf8");
+    expect(sql).toContain("GROUP BY service_name, http_status");
+    expect(Number(params.get("to"))).toBeGreaterThan(Number(params.get("from")));
   });
 
   test("TURN-12 an unknown frame is counted and ignored", async ({ page }) => {

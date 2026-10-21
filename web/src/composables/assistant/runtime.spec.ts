@@ -24,10 +24,15 @@ import { queryClient } from "@/composables/query/queryClient";
 import assistantService from "@/services/assistant";
 import { computeUserOrgKey } from "@/utils/userOrgKey";
 
+import { queryRunOf, runQueryApplier } from "./actions/appliers/query";
 import * as storeModule from "./assistantStore";
 import { assistantStore, openAssistant, useAssistantCapability } from "./index";
 import { pushRecall, readRecall } from "./prefs";
-import { getAssistantRuntime, resetAssistantRuntimeForTests } from "./runtime";
+import {
+  getAssistantRuntime,
+  openTabWithoutOpener,
+  resetAssistantRuntimeForTests,
+} from "./runtime";
 
 vi.mock("@/aws-exports", () => ({ default: { isEnterprise: "true", isCloud: "false" } }));
 
@@ -144,6 +149,69 @@ describe("assistant runtime", () => {
     expect(sessionStorage.getItem(key)).toBeNull();
     window.dispatchEvent(new Event("pagehide"));
     expect(sessionStorage.getItem(key)).toContain("half typed");
+  });
+
+  it("opens a tab the page cannot script back, and counts it as opened", () => {
+    const opened = { opener: window as unknown };
+    // window.open returns null whenever `noopener` is asked for, even though the tab opens.
+    const open = vi.fn((_url: string, _target: string, features?: string) =>
+      features?.includes("noopener") ? null : opened,
+    );
+    vi.stubGlobal("open", open);
+    expect(openTabWithoutOpener("/web/logs")).toBe(true);
+    expect(open).toHaveBeenCalledWith("/web/logs", "_blank");
+    expect(opened.opener).toBeNull();
+    open.mockReturnValueOnce(null);
+    expect(openTabWithoutOpener("/web/logs")).toBe(false);
+  });
+
+  it("forgets a session's Run rows when the store drops the session", async () => {
+    assistantStore.init(context("admin"));
+    await vi.waitFor(() => expect(assistantStore.state.ready).toBe(true));
+    const sid = assistantStore.createSession({
+      origin: { entryKind: "header_button", objectKind: "none", container: "sidebar" },
+    });
+    const { store } = getAssistantRuntime();
+    const env = {
+      store: () => store,
+      now: () => 1,
+      search: async () => ({ hits: [{ a: 1 }], total: 1 }),
+    };
+    const query = { language: "sql" as const, text: "SELECT 1", org: "org1" };
+    await runQueryApplier(sid, { kind: "run_query", query, blockId: "b1" }, env as never);
+    expect(queryRunOf(sid, "b1")?.status).toBe("done");
+    assistantStore.dropSession(sid);
+    await flushPromises();
+    expect(queryRunOf(sid, "b1")).toBeNull();
+  });
+
+  it("aborts a Run of the org the user just left", async () => {
+    const org = ref("org1");
+    assistantStore.init(context("admin", org));
+    await vi.waitFor(() => expect(assistantStore.state.ready).toBe(true));
+    const sid = assistantStore.createSession({
+      origin: { entryKind: "header_button", objectKind: "none", container: "sidebar" },
+    });
+    const { store } = getAssistantRuntime();
+    let aborted = false;
+    const env = {
+      store: () => store,
+      now: () => 1,
+      search: ({ signal }: { signal: AbortSignal }) =>
+        new Promise((_resolve, reject) =>
+          signal.addEventListener("abort", () => {
+            aborted = true;
+            reject(new Error("aborted"));
+          }),
+        ),
+    };
+    const query = { language: "sql" as const, text: "SELECT 1", org: "org1" };
+    const pending = runQueryApplier(sid, { kind: "run_query", query, blockId: "b1" }, env as never);
+    org.value = "org2";
+    await flushPromises();
+    await pending;
+    expect(aborted).toBe(true);
+    expect(queryRunOf(sid, "b1")).toBeNull();
   });
 
   it("drops the recall of every org of the user on sign-out", async () => {

@@ -94,6 +94,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </li>
     </ul>
     <p
+      v-if="message.rerunFor"
+      class="text-text-body text-xs leading-5"
+      data-test="assistant-message-rerun"
+    >
+      {{ t("assistant.footer.rerunFor", { range: rerunRange }) }}
+    </p>
+    <p
       v-if="message.editedFrom"
       class="text-text-body text-xs leading-5"
       data-test="assistant-message-edited"
@@ -133,6 +140,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :live="item.live"
           />
           <AssistantMarkdownCode
+            v-else-if="fenceBlock(item.key, part)"
+            :code="part.code"
+            :weight="part.code.length"
+            :live="item.live"
+          >
+            <AssistantQueryBlock
+              :block="fenceBlock(item.key, part)!"
+              :is-last="fenceBlock(item.key, part)!.blockId === lastQueryId"
+              :readonly="readonly"
+              :permissions="permissions"
+              :sid="turn?.sid ?? null"
+              :source-step="sourceStepOf(fenceBlock(item.key, part)!)"
+              :turn-id="turn?.turnId"
+              :openable="turn?.openable ?? true"
+            />
+          </AssistantMarkdownCode>
+          <AssistantMarkdownCode
             v-else
             :code="part.code"
             :weight="part.code.length + (part.highlighted?.length ?? 0)"
@@ -147,7 +171,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :scroll-label="t('assistant.message.codeName', { lang: codeLang(part.lang) })"
               :copy-button-class="TOUCH_TARGET_CLASS"
               contrast="aa"
-              :copy-message="t('common.copySuccess')"
+              :copy-message="t('assistant.evidence.copied')"
               role="group"
               :aria-label="t('assistant.message.codeName', { lang: codeLang(part.lang) })"
               :data-query="part.query ? '' : undefined"
@@ -155,6 +179,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </AssistantMarkdownCode>
         </template>
+        <AssistantInlineClaims
+          v-if="item.claims.length && !item.live"
+          :claims="item.claims"
+          :numbers="claimMap"
+          :available="claimAvailable"
+          :label="claimLabel"
+          :sid="turn?.sid ?? null"
+          :readonly="readonly"
+        />
       </div>
       <OText
         v-else-if="item.kind === 'policy'"
@@ -171,6 +204,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :body="item.body"
         :hidden="item.hidden"
       />
+      <AssistantQueryBlock
+        v-else-if="item.kind === 'query'"
+        :block="item.block"
+        :is-last="item.block.blockId === lastQueryId"
+        :readonly="readonly"
+        :permissions="permissions"
+        :sid="turn?.sid ?? null"
+        :source-step="sourceStepOf(item.block)"
+        :turn-id="turn?.turnId"
+        :openable="turn?.openable ?? true"
+      />
+      <AssistantLinkCard
+        v-else-if="item.kind === 'link'"
+        :link="item.link"
+        :source="item.source"
+        :block-id="item.key"
+        :sid="turn?.sid ?? null"
+        :readonly="readonly"
+        :copy-text="item.copyText"
+        :openable="turn?.openable ?? true"
+      />
       <component
         :is="item.component"
         v-else-if="item.kind === 'registered'"
@@ -179,18 +233,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :message="message"
         :readonly="readonly"
         :density="density"
+        :turn="turn"
       />
     </template>
     <slot name="after" />
-    <slot name="actions" />
+    <component
+      :is="footerRenderer"
+      v-if="footerRenderer && turn && !live"
+      :block="FOOTER_BLOCK"
+      :block-id="`${turnId}:footer`"
+      :message="message"
+      :readonly="readonly"
+      :density="density"
+      :turn="turn"
+    />
+    <div
+      v-if="!live && (feedbackShown || $slots.actions)"
+      class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1"
+    >
+      <AssistantFeedback v-if="feedbackShown" :message="message" :turn="turn" />
+      <slot name="actions" />
+    </div>
   </div>
 </template>
 
 <script lang="ts">
 import { markRaw, shallowReactive, type Component } from "vue";
 
+import AssistantFindings from "@/components/ai-assistant/evidence/AssistantFindings.vue";
+import AssistantTurnFooter from "@/components/ai-assistant/evidence/AssistantTurnFooter.vue";
+import type { AssistantTurnView } from "@/composables/assistant/pure";
 import type { BlockKind } from "@/services/assistantAnalytics";
 import type { ChatMessage, ContentBlock } from "@/ts/interfaces/chat";
+
+import AssistantStepTrail from "./AssistantStepTrail.vue";
 
 export interface AssistantMessageProps {
   message: ChatMessage;
@@ -199,10 +275,26 @@ export interface AssistantMessageProps {
   live?: boolean;
   readonly?: boolean;
   density?: "compact" | "roomy";
+  /** The answer's turn: its session, prompt and outcome, for the evidence blocks. */
+  turn?: AssistantTurnView | null;
 }
 
-/** One renderer per block kind; WP-08 registers query, trail, findings, link and footer, WP-10 the approvals. */
-const renderers = shallowReactive(new Map<ContentBlock["type"] | string, Component>());
+const BUILT_IN_RENDERERS: [string, Component][] = [
+  ["trail", AssistantStepTrail],
+  ["findings", AssistantFindings],
+  ["footer", AssistantTurnFooter],
+];
+
+const TRAIL_BLOCK: ContentBlock = { type: "trail" };
+
+const FOOTER_BLOCK: ContentBlock = { type: "footer" };
+
+/** One renderer per block kind; the evidence kinds are built in and the approvals register their own. */
+const renderers = shallowReactive(
+  new Map<ContentBlock["type"] | string, Component>(
+    BUILT_IN_RENDERERS.map(([kind, component]) => [kind, markRaw(component)]),
+  ),
+);
 
 // The kinds `ai_block_invalid` can name; a legacy kind with no renderer (tool_call, navigation, status) is not invalid.
 const COUNTED_KINDS: ReadonlySet<string> = new Set<BlockKind>([
@@ -256,17 +348,37 @@ export function registerBlockRenderer(
 /** Lets a spec start from the built-in kinds only; never called by app code. */
 export function resetBlockRenderersForTests(): void {
   renderers.clear();
+  for (const [kind, component] of BUILT_IN_RENDERERS) renderers.set(kind, markRaw(component));
   reported.clear();
 }
 </script>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, inject, provide } from "vue";
+import { useRouter } from "vue-router";
 
 import AssistantMark from "@/components/ai-assistant/common/AssistantMark.vue";
 import { chipGlyph } from "@/components/ai-assistant/common/glyphs";
 import { TOUCH_TARGET_CLASS } from "@/components/ai-assistant/common/touchTarget";
-import { parseAttachmentBlocks } from "@/composables/assistant/pure";
+import AssistantInlineClaims from "@/components/ai-assistant/evidence/AssistantInlineClaims.vue";
+import AssistantLinkCard from "@/components/ai-assistant/evidence/AssistantLinkCard.vue";
+import AssistantQueryBlock, {
+  type QueryBlock,
+} from "@/components/ai-assistant/evidence/AssistantQueryBlock.vue";
+import { claimNumbersKey, stepCitation } from "@/components/ai-assistant/evidence/evidenceText";
+import {
+  assistantEvidenceHostKey,
+  claimNumbers,
+  fenceQuery,
+  footerOf,
+  rebuildMarkdownTarget,
+  buildNavigationRoute,
+  parseAttachmentBlocks,
+  promptRange,
+  stepsOf,
+  toolLinksOf,
+  type LinkTarget,
+} from "@/composables/assistant/pure";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
@@ -275,9 +387,10 @@ import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import { trackAssistant } from "@/services/assistantAnalytics";
 import type { ImageAttachment } from "@/ts/interfaces/chat";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import { formatOrgTime } from "@/utils/formatters";
+import { formatOrgRange, formatOrgTime } from "@/utils/formatters";
 
 import AssistantAttachmentBlock from "./AssistantAttachmentBlock.vue";
+import AssistantFeedback from "./AssistantFeedback.vue";
 import {
   AssistantMarkdownCode,
   AssistantMarkdownPart,
@@ -286,18 +399,29 @@ import {
 } from "./markdown";
 
 type Rendered =
-  | { kind: "markdown"; key: string; parts: MarkdownPart[]; live: boolean }
+  | { kind: "markdown"; key: string; parts: MarkdownPart[]; live: boolean; claims: string[] }
   | { kind: "policy"; key: string; text: I18nText }
   | { kind: "attachment"; key: string; name: string; body: string; hidden?: boolean }
+  | { kind: "query"; key: string; block: QueryBlock }
+  | {
+      kind: "link";
+      key: string;
+      link: LinkTarget | null;
+      source: "navigation" | "tool" | "markdown";
+      copyText: string | null;
+    }
   | { kind: "registered"; key: string; component: Component; block: ContentBlock };
 
 const props = withDefaults(defineProps<AssistantMessageProps>(), {
   live: false,
   readonly: false,
   density: "compact",
+  turn: null,
 });
 
 const { t } = useI18nTyped();
+const router = useRouter();
+const evidence = props.readonly ? null : inject(assistantEvidenceHostKey, null);
 
 const renderMarkdown = useRenderedMarkdown();
 
@@ -329,33 +453,225 @@ const userMeta = computed<I18nText>(() => {
   return t("assistant.message.meta", { who, time: formatOrgTime(at, { showZone: true }) });
 });
 
+const rerunRange = computed(() => {
+  const window = props.message.rerunFor;
+  return window ? raw(formatOrgRange(window.from, window.to)) : raw("");
+});
+
 const lastTextIndex = computed(() => {
   for (let i = blocks.value.length - 1; i >= 0; i--) if (blocks.value[i].type === "text") return i;
   return -1;
 });
 
+const org = computed(() => props.turn?.org ?? "");
+const steps = computed(() =>
+  props.message.role === "assistant" ? stepsOf(props.message, org.value) : [],
+);
+const pageRange = computed(() => promptRange(props.turn?.prompt, props.turn?.askedWindow));
+// Viewers lose the drafts; an unknown permission still shows them.
+const permissions = computed(() => {
+  const canWrite = evidence?.capability().canWrite;
+  return canWrite === "no" ? { dashboardCreate: false, alertCreate: false } : {};
+});
+
 // Blocks in reducer order, each keyed by its id so a completed one is never re-parsed (EB-01 AC 4).
-const rendered = computed<Rendered[]>(() =>
-  blocks.value.flatMap<Rendered>((block, index) => {
-    const key = `${props.turnId}:${index}`;
-    const custom = renderers.get(block.type);
-    if (custom) return [{ kind: "registered", key, component: custom, block }];
-    if (block.type === "text") {
-      if (!block.text?.trim()) return [];
-      const open = props.live && index === lastTextIndex.value;
-      const { parts } = renderMarkdown(key, block.text, open ? "open" : "closed");
-      return [{ kind: "markdown", key, parts, live: open }];
-    }
-    if (block.type === "attachment" && block.attachment)
-      return [{ kind: "attachment", key, ...block.attachment }];
-    if (block.type === "tool_call" && POLICY_CODES.has(block.errorType ?? ""))
-      return [{ kind: "policy", key, text: policyText(block) }];
-    if (COUNTED_KINDS.has(block.type) && !reported.has(key)) {
-      reported.add(key);
-      trackAssistant("ai_block_invalid", { block_kind: block.type as BlockKind });
-    }
-    return [];
-  }),
+const rendered = computed<Rendered[]>(() => {
+  const out: Rendered[] = [];
+  const links = new Set<string>();
+  const trail = renderers.get("trail");
+  // The trail is always first, above the answer it explains.
+  if (trail && steps.value.length)
+    out.push({
+      kind: "registered",
+      key: `${props.turnId}:trail`,
+      component: trail,
+      block: TRAIL_BLOCK,
+    });
+  blocks.value.forEach((block, index) => out.push(...renderBlock(block, index, links)));
+  toolLinksOf(props.message).forEach((action, index) => {
+    const link = buildNavigationRoute(action, org.value);
+    pushLink(out, links, {
+      kind: "link",
+      key: `${props.turnId}:tool${index}`,
+      link,
+      source: "tool",
+      copyText: null,
+    });
+  });
+  return out;
+});
+
+function renderBlock(block: ContentBlock, index: number, links: Set<string>): Rendered[] {
+  const key = `${props.turnId}:${index}`;
+  // Data for the footer, and the steps the trail already shows.
+  if (block.type === "footer" || block.type === "tool_call") {
+    return block.type === "tool_call" && POLICY_CODES.has(block.errorType ?? "")
+      ? [{ kind: "policy", key, text: policyText(block) }]
+      : [];
+  }
+  if (block.type === "query" && block.query)
+    return [
+      {
+        kind: "query",
+        key,
+        block: {
+          blockId: key,
+          query: { ...block.query, org: org.value },
+          rangeSource: "turn",
+          ...(block.query.callId && { sourceCallId: block.query.callId }),
+        },
+      },
+    ];
+  if (block.type === "link" && block.link) {
+    const link = buildNavigationRoute(
+      {
+        resource_type: block.link.resourceType,
+        action: block.link.action,
+        target: block.link.target,
+      },
+      org.value,
+    );
+    const query = block.link.target.query;
+    const out: Rendered[] = [];
+    pushLink(out, links, {
+      kind: "link",
+      key,
+      link,
+      source: "navigation",
+      copyText: typeof query === "string" ? query : null,
+    });
+    return out;
+  }
+  const custom = renderers.get(block.type);
+  if (custom && block.type !== "trail")
+    return [{ kind: "registered", key, component: custom, block }];
+  if (block.type === "text") {
+    if (!block.text?.trim()) return [];
+    const open = props.live && index === lastTextIndex.value;
+    const result = renderMarkdown(key, block.text, open ? "open" : "closed");
+    const out: Rendered[] = [
+      { kind: "markdown", key, parts: result.parts, live: open, claims: result.claims },
+    ];
+    // Links in the answer become cards only for allowlisted routes, after the text that names them.
+    if (!open)
+      result.links.forEach((href, n) => {
+        const link = markdownTarget(href);
+        if (link)
+          pushLink(out, links, {
+            kind: "link",
+            key: `${key}:link${n}`,
+            link,
+            source: "markdown",
+            copyText: null,
+          });
+      });
+    return out;
+  }
+  if (block.type === "attachment" && block.attachment)
+    return [{ kind: "attachment", key, ...block.attachment }];
+  if (COUNTED_KINDS.has(block.type) && !reported.has(key)) {
+    reported.add(key);
+    trackAssistant("ai_block_invalid", { block_kind: block.type as BlockKind });
+  }
+  return [];
+}
+
+// One card per destination, whatever proposed it.
+function pushLink(
+  out: Rendered[],
+  seen: Set<string>,
+  item: Extract<Rendered, { kind: "link" }>,
+): void {
+  const route = item.link?.route;
+  const id = route
+    ? `${item.link?.kind}:${route.name}:${JSON.stringify(route.params ?? {})}:${JSON.stringify({ ...route.query, t: undefined, org_identifier: undefined })}`
+    : `unsupported:${item.key}`;
+  if (seen.has(id)) return;
+  seen.add(id);
+  out.push(item);
+}
+
+function markdownTarget(href: string): LinkTarget | null {
+  if (!router) return null;
+  const base = (router.options.history.base ?? "").replace(/\/$/, "");
+  const path = base && href.startsWith(`${base}/`) ? href.slice(base.length) : href;
+  try {
+    const resolved = router.resolve(path);
+    return resolved.matched.length ? rebuildMarkdownTarget(resolved) : null;
+  } catch {
+    return null;
+  }
+}
+
+const claimMap = computed(() =>
+  claimNumbers([
+    ...rendered.value.flatMap((item) => (item.kind === "markdown" ? item.claims : [])),
+    ...blocks.value.flatMap((block) =>
+      (block.findings?.evidence ?? []).flatMap((item) => (item.callId ? [item.callId] : [])),
+    ),
+  ]),
+);
+
+provide(claimNumbersKey, claimMap);
+
+const lastQueryId = computed(() => {
+  let last: string | null = null;
+  for (const item of rendered.value) {
+    if (item.kind === "query") last = item.block.blockId;
+    if (item.kind === "markdown")
+      for (const part of item.parts) {
+        const fence = part.kind === "code" ? fenceBlock(item.key, part) : null;
+        if (fence) last = fence.blockId;
+      }
+  }
+  return last;
+});
+
+const feedbackShown = computed(
+  () =>
+    !props.readonly &&
+    !!props.turn?.sid &&
+    (props.turn.outcome === "done" || props.turn.outcome === "done_not_saved") &&
+    !!footerOf(props.message),
+);
+
+const fences = new Map<string, QueryBlock | null>();
+
+// A closed SQL, PromQL or VRL fence is a runnable block; an open one streams as code.
+function fenceBlock(key: string, part: MarkdownPart): QueryBlock | null {
+  if (part.kind !== "code" || part.open || !part.query || props.message.role !== "assistant")
+    return null;
+  const blockId = `${key}:${part.key}`;
+  const memo = `${blockId}\u0000${part.code.length}\u0000${steps.value.length}\u0000${org.value}`;
+  if (fences.has(memo)) return fences.get(memo)!;
+  const fence = fenceQuery(part.code, part.lang, steps.value, org.value, pageRange.value);
+  const block: QueryBlock | null = fence
+    ? {
+        blockId,
+        query: fence.query,
+        rangeSource: fence.rangeSource,
+        ...(fence.sourceStep && { sourceCallId: fence.sourceStep.callId }),
+      }
+    : null;
+  fences.set(memo, block);
+  return block;
+}
+
+function sourceStepOf(block: QueryBlock): number | null {
+  return steps.value.find((step) => step.callId === block.sourceCallId)?.n ?? null;
+}
+
+function claimAvailable(callId: string): boolean {
+  return !props.turn?.hiddenByOwner && steps.value.some((step) => step.callId === callId);
+}
+
+function claimLabel(callId: string): I18nText {
+  const step = steps.value.find((candidate) => candidate.callId === callId);
+  return step ? stepCitation(step, t) : t("assistant.claim.notAvailable");
+}
+
+const footerRenderer = computed(() =>
+  props.message.role === "assistant" ? (renderers.get("footer") ?? null) : null,
 );
 
 const hasContent = computed(() => rendered.value.length > 0);

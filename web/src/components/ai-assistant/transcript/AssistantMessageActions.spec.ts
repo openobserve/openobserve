@@ -210,6 +210,20 @@ describe("AssistantMessageActions", () => {
     expect(edit.mock.calls[0][1].chips).toEqual([]);
   });
 
+  it("copies claim chips as [n] with one footnote per cited step, never the raw marker", () => {
+    const copy = {
+      step: () => "",
+      fenceSource: () => null,
+      stamp: null,
+      claim: (id: string) => (id === "call_3" ? "Queried default · 13:43–13:58 IST" : null),
+    };
+    const text =
+      "Reset by peer [^call_3]. Again [^call_3], and [^gone].\n\n```bash\necho [^call_3]\n```";
+    expect(answerMarkdown([{ type: "text", text }], copy)).toBe(
+      "Reset by peer [1]. Again [1], and [2].\n\n```bash\necho [^call_3]\n```\n\n1. Queried default · 13:43–13:58 IST\n2. gone",
+    );
+  });
+
   it("serialises steps as a list then the text as written", () => {
     const copy = {
       step: (block: ContentBlock) => String(block.message),

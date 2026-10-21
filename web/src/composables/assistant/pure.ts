@@ -16,8 +16,16 @@
 import type { ComputedRef, InjectionKey } from "vue";
 
 import type { ChatMessage, TurnOutcomeRecord } from "@/ts/interfaces/chat";
+import type { I18nText } from "@/types/i18n";
 
-import type { AssistantErrorAction, AssistantSession, Sid } from "./assistantStore.types";
+import type { QueryRun } from "./actions/appliers/query";
+import type { ActionResult, AssistantAction } from "./actions/types";
+import type {
+  AssistantCapability,
+  AssistantErrorAction,
+  AssistantSession,
+  Sid,
+} from "./assistantStore.types";
 
 export { isAssistantV2 } from "./flags";
 export { useAssistantName } from "./useAssistantName";
@@ -28,11 +36,45 @@ export {
   errorTitle,
   outcomeError,
   outcomeRecordOf,
+  stepLabel,
   stepLabelOf,
   turnStatusText,
   STALL_MS,
 } from "./turnStateMachine";
 export { isTerminal } from "./turnStates";
+export {
+  MAX_HIT_ROWS,
+  chipOpenQuery,
+  claimNumbers,
+  fenceQuery,
+  footerOf,
+  manualRouteOf,
+  promptRange,
+  queryCount,
+  stateOf,
+  stepsOf,
+  toolLinksOf,
+  turnAnnotationKey,
+  windowsOf,
+} from "./evidence";
+export {
+  MARKDOWN_LINK_ROUTES,
+  rebuildMarkdownTarget,
+  buildNavigationRoute,
+  type LinkKind,
+  type LinkTarget,
+} from "./navigationRoutes";
+export type {
+  FenceQuery,
+  FindingsData,
+  FooterData,
+  LinkBlockData,
+  QueryBlockData,
+  StepFacts,
+  StepKind,
+  StepResult,
+} from "./evidence";
+export type { QueryRun } from "./actions/appliers/query";
 export type { TurnStatusText } from "./turnStateMachine";
 export type { AttachmentBlock } from "./record";
 export type * from "./assistantStore.types";
@@ -40,6 +82,10 @@ export type * from "./turnStates";
 export type * from "./frames";
 export type * from "./context/types";
 export type * from "./actions/types";
+
+/** The live half of an answer's evidence: dispatch, session state and run results; a shared page provides none. */
+export const assistantEvidenceHostKey: InjectionKey<AssistantEvidenceHost> =
+  /* @__PURE__ */ Symbol("assistantEvidenceHost");
 
 /** Lets a readonly transcript read messages without importing the runtime store. */
 export const assistantSessionSourceKey: InjectionKey<(sid: Sid) => ComputedRef<ChatMessage[]>> =
@@ -69,4 +115,40 @@ export interface AssistantTranscriptHost {
   canRetry(sid: Sid): boolean;
   /** After a turn action whose control unmounts (`95` §3, HT-04 AC 10). */
   focusComposer(): void;
+}
+
+/** What evidence blocks ask of the live store; every action still goes through `dispatch`. */
+export interface AssistantEvidenceHost {
+  dispatch(sid: Sid, action: AssistantAction): Promise<ActionResult>;
+  session(sid: Sid): AssistantSession | null;
+  capability(): AssistantCapability;
+  queryRun(sid: Sid, blockId: string): QueryRun | null;
+  /** Docked or with unsaved changes: Open in new tab is the primary. */
+  prefersNewTab(): boolean;
+  currentOrg(): string | null;
+  /** The persisted "Opened · {time}" of a link card. */
+  markOpened(sid: Sid, blockId: string): void;
+  toggleStep(sid: Sid, callId: string): void;
+  /** Speaks through the composer's status region, the one the container owns. */
+  announce(sid: Sid, text: I18nText): void;
+}
+
+/** What an answer's evidence knows of its turn; the transcript builds it. */
+export interface AssistantTurnView {
+  sid: Sid | null;
+  /** The raw turn id: store keys, annotations and Re-run use it. */
+  turnId: string;
+  /** The session's org; a query block carries it. */
+  org: string;
+  prompt: ChatMessage | null;
+  /** The page's window when the prompt was sent, kept with the session's annotations. */
+  askedWindow?: { from: number; to: number } | null;
+  /** False on a readonly page with no explorer behind it: evidence offers no Open. */
+  openable?: boolean;
+  outcome: "live" | "done" | "done_not_saved" | "stopped" | "failed";
+  isLast: boolean;
+  /** When a live turn started, for the trail's running duration. */
+  startedAt: number | null;
+  /** A share made with tool data hidden: the trail shows a count, nothing expands. */
+  hiddenByOwner?: boolean;
 }

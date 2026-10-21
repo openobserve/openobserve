@@ -102,11 +102,18 @@ Present today (`mocks.mjs`):
 | `long_answer_fenced` | SSE | a 400-delta unlabelled fence, then a 400-delta ```` ```sql ```` fence (PERF-02 variant, WP-06) |
 | `retrying_frame`, `compacting_frame` | SSE | a B-02 `retrying{attempt:2, reason, retry_after:20}` or `compacting` frame, then held open (WP-06) |
 | `permission_denied_frame` | SSE | `o2_UpdateAlert` refused by policy (`step{state:"failed"}` + `permission_denied`), then the answer goes on (WP-06) |
+| `cite` | SSE | the `complete` turn whose answer cites `call_3` and `call_1` with `[^call_id]` markers |
+| `navigation_card` | SSE | a Logs `navigation_action`, then `complete` with no confirmation wait |
+| `nav_path_override`, `nav_org_override` | SSE | a dashboard navigation whose `target.path` and label point at logout, an alert navigation naming another org |
+| `assistant_stage_link` | SSE | an answer link to `/web/assistant/{id}` with `assistant`/`object`/`ref` keys |
+| `findings_valid`, `findings_invalid` | SSE | a `findings` frame, and one missing `likely_cause` and `confidence` |
+| `findings_inconclusive` | SSE | a `findings` frame with `confidence:"inconclusive"` |
+| `multi_window` | SSE | two SearchSQL steps over different windows |
 
 Named by the specs and added by the WP that first needs them (`99` §5, honest-turns §0.4):
 `data_level_frame`,
 `confirm_500`, `update_card`, `cli_card`,
-`permission_card`, `resource_changed_unreviewed`, `findings_inconclusive`, `multi_window`,
+`permission_card`, `resource_changed_unreviewed`,
 `nl_needs_chat`, `nl_parse_error`, `rca_stream`, `delimiter_breakout`,
 `cloud_401_mid_stream`, `payloads/*`; fixture `chat_300`. The wire shapes they replay are
 the golden fixtures in `web/src/composables/assistant/__fixtures__/`.
