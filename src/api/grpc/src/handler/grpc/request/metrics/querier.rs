@@ -20,12 +20,11 @@ use futures::Stream;
 use infra::errors;
 use opentelemetry::global;
 use promql_service::search as SearchService;
+use search_service::{QueryRegistration, SEARCH_SERVER};
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
-#[cfg(feature = "enterprise")]
-use {o2_enterprise::enterprise::search::TaskStatus, search_service::SEARCH_SERVER};
 
 use crate::handler::grpc::{
     MetadataMap,
@@ -52,15 +51,14 @@ impl Metrics for MetricsQuerier {
         let _ = tracing::Span::current().set_parent(parent_cx);
 
         let req = req.into_inner();
-        #[cfg_attr(not(feature = "enterprise"), allow(unused_variables))]
         let (_, trace_id) = query_and_trace_id(&req)?;
-        #[cfg(feature = "enterprise")]
-        let (req, trace_id) = register_follower(req, &trace_id).await;
+        let (req, registration) = register_follower(req, &trace_id);
+
         let org_id = &req.org_id;
         let stream_type = StreamType::Metrics.as_str();
-        let result = SearchService::grpc::search(&req).await;
-        #[cfg(feature = "enterprise")]
-        SEARCH_SERVER.remove(org_id, &trace_id).await;
+        let result = SearchService::grpc::search(&req, registration.tracker()).await;
+        drop(registration);
+
         let result = result.map_err(|err| {
             let time = start.elapsed().as_secs_f64();
             metrics::GRPC_RESPONSE_TIME
@@ -93,9 +91,8 @@ impl Metrics for MetricsQuerier {
         &self,
         req: Request<MetricsQueryRequest>,
     ) -> Result<Response<Self::DataStream>, Status> {
-        let cap = std::cmp::max(2, config::get_config().limit.cpu_num);
-        let (tx, rx) = mpsc::channel::<Result<MetricsQueryResponse, Status>>(cap);
         let mut req: MetricsQueryRequest = req.into_inner();
+
         let (query, trace_id) = query_and_trace_id(&req)?;
         log::info!(
             "[trace_id {trace_id}] promql->data->grpc: org_id: {}, use_cache: {}, time_range: [{},{}), step: {}, query: {}, label_selector: {:?}",
@@ -111,19 +108,17 @@ impl Metrics for MetricsQuerier {
             query.query_data = true;
         }
 
-        // Register trace_id in SEARCH_SERVER so selector_load_data_inner can
-        // insert_sender — without this the engine returns SearchCancelQuery
-        // immediately (same registration the `query` handler performs).
-        #[cfg(feature = "enterprise")]
-        let (req, trace_id) = register_follower(req, &trace_id).await;
+        let (req, registration) = register_follower(req, &trace_id);
 
         // spawn a task to push streaming responses
+        let cap = std::cmp::max(2, config::get_config().limit.cpu_num);
+        let (tx, rx) = mpsc::channel::<Result<MetricsQueryResponse, Status>>(cap);
         tokio::task::spawn(async move {
-            if let Err(e) = promql_service::search::grpc::data(&req, tx).await {
+            let result = promql_service::search::grpc::data(&req, registration.tracker(), tx).await;
+            drop(registration);
+            if let Err(e) = result {
                 log::error!("[gRPC:metrics:data] get data error: req:{req:?}, error:{e:?}")
             }
-            #[cfg(feature = "enterprise")]
-            SEARCH_SERVER.remove(&req.org_id, &trace_id).await;
         });
 
         let out_stream = ReceiverStream::new(rx);
@@ -131,25 +126,17 @@ impl Metrics for MetricsQuerier {
     }
 }
 
-/// Registers the request under a `{trace_id}-{suffix}` id that a cancel of `trace_id` reaches.
-#[cfg(feature = "enterprise")]
-async fn register_follower(
+/// Runs the request under its own `{trace_id}-{suffix}` id that a cancel of `trace_id` reaches.
+fn register_follower(
     mut req: MetricsQueryRequest,
     trace_id: &str,
-) -> (MetricsQueryRequest, String) {
-    // one query sends a request per selector, so concurrent requests must not share an entry
-    let follower_id = format!("{trace_id}-{}", config::ider::generate_span_id());
+) -> (MetricsQueryRequest, QueryRegistration) {
+    let registration = SEARCH_SERVER.register_follower(&req.org_id, trace_id);
+    // file lists are keyed by this id, so concurrent requests need their own
     if let Some(job) = req.job.as_mut() {
-        job.trace_id = follower_id.clone();
+        job.trace_id = registration.tracker().query_id().to_string();
     }
-    SEARCH_SERVER
-        .insert(
-            &req.org_id,
-            follower_id.clone(),
-            TaskStatus::new_follower(vec![], false),
-        )
-        .await;
-    (req, follower_id)
+    (req, registration)
 }
 
 fn query_and_trace_id(req: &MetricsQueryRequest) -> Result<(&MetricsQueryStmt, String), Status> {
@@ -197,5 +184,26 @@ mod tests {
             };
             assert_eq!(status.code(), tonic::Code::InvalidArgument);
         }
+    }
+
+    #[test]
+    fn test_follower_runs_under_its_own_id_below_the_trace() {
+        let req = |trace_id: &str| MetricsQueryRequest {
+            org_id: "org".to_string(),
+            job: Some(Job {
+                trace_id: trace_id.to_string(),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        let (first, first_registration) = register_follower(req("t"), "t");
+        let (second, second_registration) = register_follower(req("t"), "t");
+
+        let first_id = first.job.unwrap().trace_id;
+        let second_id = second.job.unwrap().trace_id;
+        assert_ne!(first_id, second_id);
+        assert!(first_id.starts_with("t-"));
+        assert_eq!(first_id, first_registration.tracker().query_id());
+        assert_eq!(second_id, second_registration.tracker().query_id());
     }
 }
