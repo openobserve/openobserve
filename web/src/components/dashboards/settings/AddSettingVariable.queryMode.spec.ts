@@ -101,7 +101,9 @@ describe("AddSettingVariable with the real query editor", () => {
   it("opens a saved auto PromQL variable, switches to custom with the prefilled query and previews it", async () => {
     labelValues.mockResolvedValue({ data: { status: "success", data: ["api", "web"] } });
     const wrapper = await mountForm();
-    expect(wrapper.find('[data-test="dashboard-variable-query-language"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="dashboard-variable-query-language-row"]').text()).toContain(
+      "Query language",
+    );
     expect(wrapper.find('[data-test="dashboard-variable-query-editor"]').exists()).toBe(false);
 
     await click(wrapper, "dashboard-variable-query-mode-custom");

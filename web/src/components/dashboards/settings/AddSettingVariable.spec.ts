@@ -18,12 +18,15 @@ import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { nextTick, ref } from "vue";
 import AddSettingVariable from "./AddSettingVariable.vue";
 import { makeAddSettingVariableSchema } from "./AddSettingVariable.schema";
+import {
+  createFilterCondition,
+  createFilterGroup,
+  legacyFiltersToGroup,
+} from "@/utils/dashboard/variables/variableFilterGroupUtils";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
-import OFormCombobox from "@/lib/forms/Combobox/OFormCombobox.vue";
-import OCombobox from "@/lib/forms/Combobox/OCombobox.vue";
 import analytics from "@/services/product_analytics";
-import { addVariable, updateVariable } from "../../../utils/commons";
+import { addVariable, getDashboard, updateVariable } from "../../../utils/commons";
 
 vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
@@ -440,100 +443,121 @@ describe("AddSettingVariable", () => {
       expect(addFilterBtn.exists()).toBe(true);
     });
 
-    it("should add filter when button clicked", async () => {
-      const initialFilterCount = wrapper.vm.variableData.query_data.filter.length;
-      const addFilterBtn = wrapper.find('[data-test="dashboard-add-filter-btn"]');
+    const filterGroup = () => wrapper.vm.variableData.query_data.filter_group;
+    const condition = (field: string, value: string, logic: "AND" | "OR" = "AND") => ({
+      ...createFilterCondition(logic),
+      column: { field },
+      value,
+    });
+    const openAddMenu = async (testId = "dashboard-add-filter-btn") => {
+      const trigger = wrapper.find(`[data-test="${testId}"]`);
+      await trigger.trigger("pointerdown");
+      await trigger.trigger("click");
+      await flushPromises();
+    };
+    const selectMenuItem = async (testId: string) => {
+      const item = document.body.querySelector(`[data-test="${testId}"]`) as HTMLElement;
+      expect(item).not.toBeNull();
+      item.click();
+      await flushPromises();
+    };
+    const chipTexts = () =>
+      wrapper
+        .findAll('[data-test^="dashboard-variable-filter-condition-"]')
+        .map((chip) => chip.text().replace(/\s+/g, " ").trim());
 
-      await addFilterBtn.trigger("click");
+    it("adds a condition from the add menu, in the backend's condition shape", async () => {
+      await openAddMenu();
+      await selectMenuItem("dashboard-variable-filter-add-condition");
 
-      expect(wrapper.vm.variableData.query_data.filter).toHaveLength(initialFilterCount + 1);
+      expect(filterGroup().conditions).toEqual([createFilterCondition()]);
+      expect(wrapper.find('[data-test="dashboard-variable-filter-condition-0"]').exists()).toBe(
+        true,
+      );
+    });
 
-      const newFilter =
-        wrapper.vm.variableData.query_data.filter[
-          wrapper.vm.variableData.query_data.filter.length - 1
-        ];
-      // Component initializes filter name as undefined (field is selected via autocomplete)
-      expect(newFilter).toEqual({
-        name: undefined,
-        operator: "=",
-        value: "",
+    it("adds a nested group, toggles OR and saves filter_group without a flat filter copy", async () => {
+      wrapper.vm.form.setFieldValue(
+        "query_data.filter_group",
+        createFilterGroup("AND", [condition("env", "$env")]),
+      );
+      await flushPromises();
+
+      await openAddMenu();
+      await selectMenuItem("dashboard-variable-filter-add-group");
+      expect(filterGroup().conditions[1]).toEqual(createFilterGroup());
+      expect(wrapper.find('[data-test="dashboard-variable-filter-group-1"]').exists()).toBe(true);
+      expect(
+        wrapper.find('[data-test="dashboard-variable-filter-logical-operator-1"]').exists(),
+      ).toBe(true);
+
+      wrapper.vm.form.setFieldValue("query_data.filter_group.conditions[1].logicalOperator", "OR");
+      wrapper.vm.form.setFieldValue(
+        "query_data.filter_group.conditions[1].conditions[0]",
+        condition("level", "error"),
+      );
+      await flushPromises();
+
+      const payload = wrapper.vm.buildVariablePayload({
+        ...JSON.parse(JSON.stringify(wrapper.vm.form.state.values)),
+        name: "v",
+        query_data: {
+          ...JSON.parse(JSON.stringify(wrapper.vm.form.state.values.query_data)),
+          stream_type: "logs",
+          stream: "s1",
+          field: "f1",
+        },
       });
+      expect(payload.query_data).not.toHaveProperty("filter");
+      expect(payload.query_data.filter_group).toEqual(
+        createFilterGroup("AND", [
+          condition("env", "$env"),
+          createFilterGroup("OR", [condition("level", "error")]),
+        ]),
+      );
     });
 
-    it("should remove filter when remove button clicked", async () => {
-      // Add a filter first (form-owned array; projection lags by a flush)
-      wrapper.vm.addFilter();
-      wrapper.vm.addFilter();
+    it("hides add group and disables OR for PromQL, with the AND-only hint", async () => {
+      wrapper.vm.form.setFieldValue("query_data.stream_type", "metrics");
+      wrapper.vm.form.setFieldValue("query_data.query_type", "promql");
+      wrapper.vm.form.setFieldValue(
+        "query_data.filter_group",
+        createFilterGroup("AND", [condition("job", "api"), condition("env", "prod", "OR")]),
+      );
       await flushPromises();
-      const initialFilterCount = wrapper.vm.variableData.query_data.filter.length;
 
-      wrapper.vm.removeFilter(0);
-      await flushPromises();
-
-      expect(wrapper.vm.variableData.query_data.filter).toHaveLength(initialFilterCount - 1);
+      expect(wrapper.find('[data-test="dashboard-variable-filter-promql-hint"]').exists()).toBe(
+        true,
+      );
+      expect(wrapper.find('[data-test="dashboard-variable-filter-promql-error"]').exists()).toBe(
+        true,
+      );
+      await openAddMenu();
+      expect(
+        document.body.querySelector('[data-test="dashboard-variable-filter-add-condition"]'),
+      ).not.toBeNull();
+      expect(
+        document.body.querySelector('[data-test="dashboard-variable-filter-add-group"]'),
+      ).toBeNull();
     });
 
-    // START-HERE ① "non-negotiable gate" (field-array): deleting a NON-last
-    // filter row must keep each RENDERED value input aligned with its surviving
-    // row — assert the OFormCombobox→OCombobox `model-value` per row, NOT just the
-    // form data array. `:key="index"` is what keeps the indexed `name` bindings
-    // aligned after a mid-list delete.
-    it("keeps each filter row's RENDERED value input aligned after deleting a NON-last row", async () => {
-      // type is query_values by default → filter rows render. Seed 3 distinct rows
-      // (operator "=" needs a value, so the OFormCombobox is shown for each).
-      wrapper.vm.form.setFieldValue("query_data.filter", [
-        { name: "f0", operator: "=", value: "V0" },
-        { name: "f1", operator: "=", value: "V1" },
-        { name: "f2", operator: "=", value: "V2" },
-      ]);
+    it("removes a NON-last condition and keeps the remaining chips in order", async () => {
+      wrapper.vm.form.setFieldValue(
+        "query_data.filter_group",
+        legacyFiltersToGroup([
+          { name: "f0", operator: "=", value: "V0" },
+          { name: "f1", operator: "=", value: "V1" },
+          { name: "f2", operator: "=", value: "V2" },
+        ]),
+      );
       await flushPromises();
-      await nextTick();
+      expect(chipTexts()).toEqual(["f0 = V0", "f1 = V1", "f2 = V2"]);
 
-      const renderedFilterValues = () =>
-        wrapper
-          .findAllComponents(OFormCombobox)
-          .filter((c: any) => /^query_data\.filter\[\d+\]\.value$/.test(c.props("name")))
-          .map((c: any) => c.findComponent(OCombobox).props("modelValue"));
-
-      expect(renderedFilterValues()).toEqual(["V0", "V1", "V2"]);
-
-      // Delete the MIDDLE (non-last) row via its delete button.
       await wrapper.find('[data-test="dashboard-variable-adhoc-close-1"]').trigger("click");
       await flushPromises();
-      await nextTick();
 
-      expect(renderedFilterValues()).toEqual(["V0", "V2"]);
-    });
-
-    it("should have correct operator options for filters", () => {
-      const expectedOperators = [
-        "=",
-        "!=",
-        ">=",
-        "<=",
-        ">",
-        "<",
-        "IN",
-        "NOT IN",
-        "str_match",
-        "str_match_ignore_case",
-        "match_all",
-        "re_match",
-        "re_not_match",
-        "Contains",
-        "Not Contains",
-        "Starts With",
-        "Ends With",
-        "Is Null",
-        "Is Not Null",
-      ];
-
-      // Add a filter to test
-      wrapper.vm.addFilter();
-
-      // The operators are defined in the template, so we check if they're available
-      expect(expectedOperators).toContain("=");
-      expect(expectedOperators).toContain("Is Null");
+      expect(chipTexts()).toEqual(["f0 = V0", "f2 = V2"]);
+      expect(filterGroup().conditions.map((c: any) => c.value)).toEqual(["V0", "V2"]);
     });
   });
 
@@ -831,7 +855,7 @@ describe("AddSettingVariable", () => {
         ...validBase,
         query_data: {
           ...validBase.query_data,
-          filter: [{ name: "f", operator: "=", value: "" }],
+          filter_group: legacyFiltersToGroup([{ name: "f", operator: "=", value: "" }]),
         },
       };
       expect(schema.safeParse(withEmptyValue).success).toBe(false);
@@ -839,7 +863,7 @@ describe("AddSettingVariable", () => {
         ...validBase,
         query_data: {
           ...validBase.query_data,
-          filter: [{ name: "f", operator: "=", value: "v" }],
+          filter_group: legacyFiltersToGroup([{ name: "f", operator: "=", value: "v" }]),
         },
       };
       expect(schema.safeParse(withValue).success).toBe(true);
@@ -850,7 +874,7 @@ describe("AddSettingVariable", () => {
         ...validBase,
         query_data: {
           ...validBase.query_data,
-          filter: [{ name: "f", operator: "Is Null", value: "" }],
+          filter_group: legacyFiltersToGroup([{ name: "f", operator: "Is Null", value: "" }]),
         },
       };
       expect(schema.safeParse(isNull).success).toBe(true);
@@ -861,7 +885,7 @@ describe("AddSettingVariable", () => {
         ...validBase,
         query_data: {
           ...validBase.query_data,
-          filter: [{ name: "", operator: "=", value: "v" }],
+          filter_group: legacyFiltersToGroup([{ name: "", operator: "=", value: "v" }]),
         },
       };
       expect(schema.safeParse(noName).success).toBe(false);
@@ -898,13 +922,19 @@ describe("AddSettingVariable", () => {
       f.setFieldValue("query_data.stream_type", "logs");
       f.setFieldValue("query_data.stream", "s1");
       f.setFieldValue("query_data.field", "f1");
-      f.setFieldValue("query_data.filter", [{ name: "f", operator: "=", value: "" }]);
+      f.setFieldValue(
+        "query_data.filter_group",
+        legacyFiltersToGroup([{ name: "f", operator: "=", value: "" }]),
+      );
       await flushPromises();
       await f.handleSubmit();
       await flushPromises();
       expect(f.state.isValid).toBe(false);
 
-      f.setFieldValue("query_data.filter", [{ name: "f", operator: "=", value: "v" }]);
+      f.setFieldValue(
+        "query_data.filter_group",
+        legacyFiltersToGroup([{ name: "f", operator: "=", value: "v" }]),
+      );
       await flushPromises();
       await f.handleSubmit();
       await flushPromises();
@@ -998,6 +1028,44 @@ describe("AddSettingVariable", () => {
       expect(exists("dashboard-variable-query-language")).toBe(false);
     });
 
+    it("puts Auto/Custom in the options header and the language row alone under Stream Type", async () => {
+      const el = (dataTest: string) =>
+        wrapper.find(`[data-test="${dataTest}"]`).element as HTMLElement;
+      const follows = (a: string, b: string) =>
+        (el(a).compareDocumentPosition(el(b)) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+
+      await setQueryData({ stream_type: "metrics" });
+      expect(
+        follows("dashboard-variable-query-mode", "dashboard-variable-stream-type-select"),
+      ).toBe(true);
+      expect(
+        follows("dashboard-variable-stream-type-select", "dashboard-variable-query-language"),
+      ).toBe(true);
+      expect(follows("dashboard-variable-query-language", "dashboard-variable-stream-select")).toBe(
+        true,
+      );
+      expect(el("dashboard-variable-query-mode").parentElement?.textContent).toContain(
+        "Extra Options",
+      );
+      expect(el("dashboard-variable-query-mode").parentElement?.textContent).not.toContain(
+        "panel.SQL",
+      );
+
+      const row = wrapper.find('[data-test="dashboard-variable-query-language-row"]');
+      expect(row.text()).toContain("dashboard.queryVariable.queryLanguage");
+      expect(row.find('[data-test="dashboard-variable-query-language-sql"]').exists()).toBe(true);
+      expect(row.find('[data-test="dashboard-variable-stream-type-select"]').exists()).toBe(false);
+      expect(row.find('[data-test="dashboard-variable-stream-select"]').exists()).toBe(false);
+      expect(row.find('[data-test="dashboard-variable-query-mode"]').exists()).toBe(false);
+
+      wrapper.vm.onQueryModeChange("custom");
+      await flushPromises();
+      expect(
+        follows("dashboard-variable-stream-type-select", "dashboard-variable-query-language"),
+      ).toBe(true);
+      expect(follows("dashboard-variable-query-language", "query-variable-editor-mock")).toBe(true);
+    });
+
     it("goes back to SQL when the stream type leaves metrics", async () => {
       await setQueryData({ stream_type: "metrics", query_type: "promql" });
       await wrapper.vm.streamTypeUpdated("logs");
@@ -1018,7 +1086,7 @@ describe("AddSettingVariable", () => {
           stream: "default",
           field: "host",
           query_type: language,
-          filter: [{ name: "env", operator: "=", value: "$env" }],
+          filter_group: legacyFiltersToGroup([{ name: "env", operator: "=", value: "$env" }]),
         });
         wrapper.vm.onQueryModeChange("custom");
         expect(wrapper.vm.variableData.query_data.custom_query).toBe(true);
@@ -1064,11 +1132,33 @@ describe("AddSettingVariable", () => {
         stream: "up",
         field: "job",
         query_type: "promql",
-        filter: [{ name: "env", operator: "=", value: "$env" }],
+        filter_group: legacyFiltersToGroup([{ name: "env", operator: "=", value: "$env" }]),
       });
       await wrapper.vm.onQueryModeChange("custom");
       await flushPromises();
       expect(wrapper.vm.variableData.query_data.query).toBe('label_values(up{env=~"$env"}, job)');
+    });
+
+    it("prefills custom SQL with the parenthesised AND/OR WHERE of a nested group", async () => {
+      const leaf = (field: string, value: string, logic: "AND" | "OR" = "AND") => ({
+        ...createFilterCondition(logic),
+        column: { field },
+        value,
+      });
+      await setQueryData({
+        stream_type: "logs",
+        stream: "default",
+        field: "host",
+        filter_group: createFilterGroup("AND", [
+          leaf("env", "$env"),
+          createFilterGroup("AND", [leaf("level", "error"), leaf("level", "warn", "OR")]),
+        ]),
+      });
+      await wrapper.vm.onQueryModeChange("custom");
+      await flushPromises();
+      expect(wrapper.vm.variableData.query_data.query).toBe(
+        `SELECT DISTINCT "host" FROM "default" WHERE "env" = '$env' AND ("level" = 'error' OR "level" = 'warn')`,
+      );
     });
 
     it("keeps the auto fields and the custom text when switching back and forth", async () => {
@@ -1308,6 +1398,47 @@ describe("AddSettingVariable", () => {
     it("should load existing variable data in edit mode", async () => {
       // The component should load the variable data in edit mode
       expect(wrapper.vm.title).toBe("Edit Variable");
+    });
+
+    it("loads a legacy filter array as the same chips and re-saves it unchanged", async () => {
+      const legacyQueryData = {
+        stream_type: "logs",
+        stream: "stream1",
+        field: "field1",
+        max_record_size: null,
+        filter: [
+          { name: "env", operator: "=", value: "$env" },
+          { name: "level", operator: "Is Null", value: "" },
+        ],
+      };
+      vi.mocked(getDashboard).mockResolvedValueOnce({
+        tabs: [],
+        variables: {
+          list: [
+            {
+              name: "legacyVar",
+              label: "legacyVar",
+              type: "query_values",
+              query_data: legacyQueryData,
+            },
+          ],
+        },
+      });
+      const legacyWrapper = mount(AddSettingVariable, {
+        props: { variableName: "legacyVar", dashboardVariablesList: [] },
+      });
+      await flushPromises();
+
+      const chips = legacyWrapper
+        .findAll('[data-test^="dashboard-variable-filter-condition-"]')
+        .map((chip) => chip.text().replace(/\s+/g, " ").trim());
+      expect(chips).toEqual(["env = $env", "level dashboard.filterOperators.isNull"]);
+
+      const payload = legacyWrapper.vm.buildVariablePayload(
+        JSON.parse(JSON.stringify(legacyWrapper.vm.form.state.values)),
+      );
+      expect(JSON.stringify(payload.query_data)).toBe(JSON.stringify(legacyQueryData));
+      legacyWrapper.unmount();
     });
   });
 
