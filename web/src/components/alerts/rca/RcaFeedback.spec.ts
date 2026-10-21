@@ -26,7 +26,6 @@ vi.mock("@/services/incidents", () => ({
 
 import i18n from "@/locales";
 import { withQueryClient } from "@/test/unit/helpers/queryClient";
-import OSelect from "@/lib/forms/Select/OSelect.vue";
 import incidentsService, { type RcaFeedback as RcaFeedbackRow } from "@/services/incidents";
 import RcaFeedback from "./RcaFeedback.vue";
 
@@ -39,7 +38,6 @@ const row = (overrides: Partial<RcaFeedbackRow> = {}): RcaFeedbackRow => ({
   subject_type: "incident",
   subject_id: "inc-1",
   verdict: "yes",
-  cause: null,
   note: null,
   reasons: [],
   created_at: 1,
@@ -64,7 +62,7 @@ const mountFeedback = (runId = "run-1") =>
 const byTest = (wrapper: VueWrapper, id: string) => wrapper.find(`[data-test="${id}"]`);
 
 const pressed = (wrapper: VueWrapper) =>
-  (["yes", "no", "change"] as const).filter(
+  (["yes", "no"] as const).filter(
     (verdict) => byTest(wrapper, `rca-feedback-${verdict}`).attributes("aria-pressed") === "true",
   );
 
@@ -93,15 +91,14 @@ describe("RcaFeedback (J4)", () => {
   });
 
   describe("load", () => {
-    it("asks for the run's feedback and shows the question with Yes / No / Correct the cause", async () => {
+    it("asks for the run's feedback and shows the question with Yes / No only", async () => {
       wrapper = mountFeedback();
       await flushPromises();
 
       expect(service.getRcaFeedback).toHaveBeenCalledWith("default", "inc-1", "run-1");
       expect(wrapper.text()).toContain("Is this the cause?");
-      expect(
-        ["yes", "no", "change"].map((v) => byTest(wrapper!, `rca-feedback-${v}`).text()),
-      ).toEqual(["Yes", "No", "Correct the cause"]);
+      const toggles = wrapper.findAll('[data-test^="rca-feedback-"][aria-pressed]');
+      expect(toggles.map((b) => b.text())).toEqual(["Yes", "No"]);
       expect(pressed(wrapper)).toEqual([]);
       expect(message(wrapper)).toBeNull();
     });
@@ -120,16 +117,6 @@ describe("RcaFeedback (J4)", () => {
     it.each([
       [row({ verdict: "yes" }), "yes", "Marked as the cause."],
       [row({ verdict: "no", reasons: ["wrong_service"] }), "no", "Marked as not the cause."],
-      [
-        row({ verdict: "change", cause: "capacity_or_load" }),
-        "change",
-        "Saved as a past cause for this incident.",
-      ],
-      [
-        row({ verdict: "change", cause: "capacity_or_load", subject_type: "alert" }),
-        "change",
-        "Saved as a past cause for this alert.",
-      ],
     ])("a saved %# row: pressed %s and its message", async (mine, verdict, text) => {
       service.getRcaFeedback.mockResolvedValue(
         listed(mine, [mine, row({ author_email: "other@acme.io", verdict: "yes" })]),
@@ -201,7 +188,7 @@ describe("RcaFeedback (J4)", () => {
       await flushPromises();
 
       await byTest(wrapper, "rca-feedback-yes").trigger("click");
-      for (const v of ["yes", "no", "change"]) {
+      for (const v of ["yes", "no"]) {
         expect(byTest(wrapper, `rca-feedback-${v}`).attributes("disabled")).toBeDefined();
         await byTest(wrapper, `rca-feedback-${v}`).trigger("click");
       }
@@ -328,71 +315,6 @@ describe("RcaFeedback (J4)", () => {
 
       put.resolve({ data: row({ verdict: "no" }) });
       await flushPromises();
-    });
-  });
-
-  describe("Correct the cause", () => {
-    const openChange = async () => {
-      wrapper = mountFeedback();
-      await flushPromises();
-      await byTest(wrapper, "rca-feedback-change").trigger("click");
-      return byTest(wrapper, "rca-feedback-change-panel");
-    };
-
-    it("the cause form has the J4 labels, no on-call hint and no 'still unknown'", async () => {
-      const panel = await openChange();
-
-      expect(panel.text()).toContain("What was the actual cause?");
-      expect(panel.text()).toContain("Note for the next analysis (optional)");
-      expect(panel.text()).not.toContain(String(i18n.global.t("oncall.resolveCauseHint")));
-      const options = wrapper!.findComponent(OSelect).props("options");
-      expect(options).not.toContainEqual(expect.objectContaining({ value: "still_unknown" }));
-      expect(options).toContainEqual(expect.objectContaining({ value: "capacity_or_load" }));
-    });
-
-    it("the correction note keeps the server's 1,000-character limit", async () => {
-      const panel = await openChange();
-
-      expect(panel.find("textarea").attributes("maxlength")).toBe("1000");
-    });
-
-    it("Save cause waits for a cause, then sends it with the note", async () => {
-      service.putRcaFeedback.mockResolvedValue({
-        data: row({ verdict: "change", cause: "capacity_or_load", subject_type: "alert" }),
-      } as never);
-      const panel = await openChange();
-      const save = byTest(wrapper!, "rca-feedback-save");
-
-      expect(save.text()).toBe("Save cause");
-      expect(save.attributes("disabled")).toBeDefined();
-      await save.trigger("click");
-      expect(service.putRcaFeedback).not.toHaveBeenCalled();
-
-      wrapper!.findComponent(OSelect).vm.$emit("update:modelValue", "capacity_or_load");
-      await panel.find("textarea").setValue(" raised pool ");
-      await flushPromises();
-      expect(byTest(wrapper!, "rca-feedback-save").attributes("disabled")).toBeUndefined();
-      await byTest(wrapper!, "rca-feedback-save").trigger("click");
-      await flushPromises();
-
-      expect(service.putRcaFeedback).toHaveBeenCalledWith("default", "inc-1", "run-1", {
-        verdict: "change",
-        cause: "capacity_or_load",
-        note: "raised pool",
-      });
-      expect(message(wrapper!)).toBe("Saved as a past cause for this alert.");
-    });
-
-    it("a No draft does not leak into the cause form", async () => {
-      wrapper = mountFeedback();
-      await flushPromises();
-      await byTest(wrapper, "rca-feedback-no").trigger("click");
-      await byTest(wrapper, "rca-feedback-no-panel").find("textarea").setValue("draft");
-
-      await byTest(wrapper, "rca-feedback-change").trigger("click");
-
-      expect(byTest(wrapper, "rca-feedback-change-panel").find("textarea").element.value).toBe("");
-      expect(byTest(wrapper, "rca-feedback-no-panel").exists()).toBe(false);
     });
   });
 

@@ -133,6 +133,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :run-id="cardRunId"
           />
         </template>
+        <!-- The cause belongs to the incident: any finished run offers it, none while one runs. -->
+        <template v-if="cardState !== 'investigating' && !live" #correction>
+          <RcaCauseCorrection :org-id="orgId" :incident-id="incidentId" />
+        </template>
       </RcaVerdictCard>
 
       <template v-if="recordSummary">
@@ -335,6 +339,7 @@ import RcaWhatHappened from "./rca/RcaWhatHappened.vue";
 import RcaReportContent from "./rca/RcaReportContent.vue";
 import { useTheme } from "@/composables/useTheme";
 import RcaFeedback from "./rca/RcaFeedback.vue";
+import RcaCauseCorrection from "./rca/RcaCauseCorrection.vue";
 import { buildRcaAskAttachment, type RcaAskPayload } from "@/utils/incidents/rcaAskAttachment";
 import { buildFeatureGateContext, checkFeatureAccess } from "@/utils/enterpriseFeatures";
 

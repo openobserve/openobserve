@@ -15,18 +15,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div data-test="rca-analysis-bar" class="flex flex-wrap items-center gap-2.5">
+  <!-- One row at any width: the subtitle truncates first, then Ask and Re-analyze drop to icons,
+       then the run label truncates. -->
+  <div data-test="rca-analysis-bar" class="@container flex flex-nowrap items-center gap-2.5">
     <ODropdown align="start" content-class="w-80">
       <template #trigger>
-        <OButton data-test="rca-run-selector" variant="outline" size="sm">
+        <OButton data-test="rca-run-selector" variant="outline" size="sm" class="min-w-0">
           <span
             v-if="selectedIsLive"
-            class="bg-status-positive me-1.5 inline-block size-1.75 animate-pulse rounded-full motion-reduce:animate-none"
+            class="bg-status-positive me-1.5 inline-block size-1.75 shrink-0 animate-pulse rounded-full motion-reduce:animate-none"
             aria-hidden="true"
           />
-          <OIcon v-else name="history" size="sm" class="text-text-secondary me-1.5" />
-          <span data-test="rca-run-selector-label">{{ selectorLabel }}</span>
-          <OIcon name="expand-more" size="sm" class="ms-1" />
+          <OIcon v-else name="history" size="sm" class="text-text-secondary me-1.5 shrink-0" />
+          <span data-test="rca-run-selector-label" class="min-w-0 truncate">{{
+            selectorLabel
+          }}</span>
+          <OIcon name="expand-more" size="sm" class="ms-1 shrink-0" />
         </OButton>
       </template>
       <ODropdownGroup :label="t('alerts.incidents.rcaHistory')">
@@ -55,6 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="rca-cancel-btn"
       variant="ghost-destructive"
       size="sm"
+      class="shrink-0"
       icon-left="stop-circle"
       :loading="cancelling"
       @click="$emit('cancel')"
@@ -67,10 +72,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="rca-ask-btn"
       variant="outline"
       size="sm"
+      class="shrink-0"
       icon-left="auto-awesome"
       @click="$emit('ask')"
     >
-      {{ t("alerts.incidents.rcaAsk.button") }}
+      <span class="sr-only @2xl:not-sr-only">{{ t("alerts.incidents.rcaAsk.button") }}</span>
     </OButton>
 
     <ODropdown v-if="!live" align="end" content-class="w-75">
@@ -79,11 +85,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="rca-reanalyze-btn"
           variant="outline"
           size="sm"
+          class="shrink-0"
           :loading="triggering"
           :disabled="resuming"
         >
-          <OIcon name="refresh" size="sm" class="me-1" />
-          {{ t("alerts.incidents.rcaReanalyze") }}
+          <OIcon name="refresh" size="sm" class="@2xl:me-1" />
+          <span class="sr-only @2xl:not-sr-only">{{ t("alerts.incidents.rcaReanalyze") }}</span>
           <OIcon name="expand-more" size="sm" class="ms-1" />
         </OButton>
       </template>
@@ -131,6 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="rca-more-btn"
           variant="outline"
           size="icon-toolbar"
+          class="shrink-0"
           :aria-label="t('alerts.incidents.rcaRun.more')"
         >
           <OIcon name="more-horiz" size="sm" />

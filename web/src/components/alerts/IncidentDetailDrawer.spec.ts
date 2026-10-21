@@ -69,6 +69,7 @@ vi.mock("@/services/incidents", async (importOriginal) => {
       resumeRca: vi.fn(),
       cancelRca: vi.fn(),
       getRcaFeedback: vi.fn(),
+      getRcaCorrection: vi.fn(),
       getRcaRun: vi.fn(),
       openRcaLiveStream: vi.fn(),
       getCorrelatedStreams: vi.fn(),
@@ -272,6 +273,10 @@ describe("IncidentDetailDrawer.vue", () => {
     (incidentsService.triggerRca as any).mockResolvedValue({
       data: { message: "started", run_id: "run-1" },
     });
+
+    vi.mocked(incidentsService.getRcaCorrection).mockResolvedValue({
+      data: { items: [], mine: null },
+    } as never);
 
     vi.mocked(incidentsService.getRcaRun).mockImplementation((_org, _id, runId) =>
       Promise.resolve({
@@ -1861,45 +1866,6 @@ describe("IncidentDetailDrawer.vue", () => {
       expect(incidentsService.get).toHaveBeenCalledWith("default", "1");
     });
 
-    it("shows a severity rerun that committed failure before returning 503, without a duplicate error toast", async () => {
-      vi.mocked(incidentsService.updateIncident).mockResolvedValueOnce({
-        data: { severity: "P2", analysis_in_flight: false },
-      } as never);
-      const failure = {
-        code: "agent_unavailable",
-        reason: "Agent unavailable",
-        details: null,
-        trigger_type: null,
-      };
-      const failedDetail = {
-        data: createIncidentWithAlerts({
-          id: "1",
-          rca: rcaSummary({
-            run_id: "severity-failed",
-            state: "failed",
-            current_run: rcaRun({
-              run_id: "severity-failed",
-              state: "failed",
-              error: failure,
-            }),
-          }),
-        }),
-      };
-      vi.mocked(incidentsService.triggerRca).mockImplementationOnce(async () => {
-        vi.mocked(incidentsService.get).mockResolvedValue(failedDetail as never);
-        throw {
-          isAxiosError: true,
-          response: { status: 503, data: { message: "Agent unavailable" } },
-        };
-      });
-      mockToast.mockClear();
-      wrapper.vm.activeTab = "incidentAnalysis";
-      await wrapper.vm.updateSeverity("P2");
-      await flushPromises();
-      expect(wrapper.find('[data-test="rca-error-banner"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="rca-error-reason"]').text()).toBe("Agent unavailable");
-      expect(mockToast.mock.calls.some(([message]) => message.variant === "error")).toBe(false);
-    });
     it("does not call updateIncident when no incidentDetails", async () => {
       wrapper.vm.incidentDetails = null;
       await wrapper.vm.updateSeverity("P3");

@@ -16,10 +16,8 @@ pub struct Model {
     pub subject_type: String,
     /// Copied from the run; an alert id is stored bare (no `:group:<team>`).
     pub subject_id: String,
-    /// `yes` | `no` | `change`.
+    /// `yes` | `no`.
     pub verdict: String,
-    /// A `ResolutionCause` wire value; `change` only.
-    pub cause: Option<String>,
     #[sea_orm(column_type = "Text", nullable)]
     pub note: Option<String>,
     /// JSON array of `FeedbackReason` wire values; `no` only.

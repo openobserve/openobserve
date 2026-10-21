@@ -428,13 +428,12 @@ export function useIncidentRca(
     return false;
   };
 
-  /** Reload committed failures before deciding whether a trigger error needs a toast. */
+  /** Start a run. A 202 means the run exists; the spinner holds until the re-read shows it, so no second start slips in. */
   const trigger = async (options: RcaTriggerRequest = {}) => {
     const incident = incidentRef.value;
     if (!incident || triggering.value || resuming.value) return;
     const org = orgRef.value;
     const incidentId = incident.id;
-    const previousRunId = currentRun.value?.run_id ?? null;
     const guidance = options.guidance?.trim();
     const buildOnPrevious = options.buildOnPrevious === true;
 
@@ -462,16 +461,9 @@ export function useIncidentRca(
         await reload();
       }
     } catch (error) {
+      // A launch failure ends the run as failed on the server; an error here means no run started.
       console.error("Failed to start RCA:", error);
       if (!isCurrentIncident(org, incidentId)) return;
-      await reload();
-      if (!isCurrentIncident(org, incidentId)) return;
-      const latestRunId = currentRun.value?.run_id ?? null;
-      if (latestRunId && latestRunId !== previousRunId) {
-        // The server created the run; its state (the failure banner) says the rest.
-        invalidateList(org);
-        return;
-      }
       const message = serverMessage(error);
       toast({
         variant: "error",
@@ -518,7 +510,6 @@ export function useIncidentRca(
     if (!incident || resuming.value || triggering.value) return;
     const org = orgRef.value;
     const incidentId = incident.id;
-    const previousRunId = currentRun.value?.run_id ?? null;
 
     resuming.value = true;
     viewedRunId.value = null;
@@ -545,19 +536,13 @@ export function useIncidentRca(
           ),
         });
         invalidateList(org);
+        // The spinner holds until the re-read shows the new run, so Resume cannot be sent twice.
         await reload();
       }
     } catch (error) {
+      // As for a trigger: an error here means no run started.
       console.error("Failed to resume RCA:", error);
       if (!isCurrentIncident(org, incidentId)) return;
-      await reload();
-      if (!isCurrentIncident(org, incidentId)) return;
-      const latestRunId = currentRun.value?.run_id ?? null;
-      if (latestRunId && latestRunId !== previousRunId) {
-        // The server created the resumed run; its state (the failure banner) says the rest.
-        invalidateList(org);
-        return;
-      }
       const message = serverMessage(error);
       toast({
         variant: "error",

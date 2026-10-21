@@ -455,7 +455,7 @@ pub struct TriggerRcaQuery {
     tag = "Incidents",
     operation_id = "TriggerIncidentRca",
     summary = "Trigger RCA analysis for an incident",
-    description = "Starts a root cause analysis run for an incident and returns 202 with the run id as soon as its investigation turn is spawned. Follow the run through the run list and its thread. An optional JSON body `{guidance}` (1 to 2000 characters) is given to the agent with the first prompt.",
+    description = "Starts a root cause analysis run for an incident and returns 202 with the run id as soon as the run exists; its investigation turn is launched in the background. A launch that fails (too many analyses running, agent unreachable) ends the run as `failed` with its error code. Follow the run through the run list and its thread. An optional JSON body `{guidance}` (1 to 2000 characters) is given to the agent with the first prompt; other fields are refused.",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
@@ -465,12 +465,11 @@ pub struct TriggerRcaQuery {
     request_body(content = TriggerRcaBody, description = "Optional guidance for the new run", content_type = "application/json"),
     responses(
         (status = 202, description = "Analysis started", content_type = "application/json", body = RcaStartedResponse),
-        (status = 400, description = "RCA not enabled, an analysis is already in progress, or invalid guidance (`error_code: invalid_guidance`)", content_type = "application/json", body = ()),
+        (status = 400, description = "RCA not enabled, an analysis is already in progress, an invalid body (`error_code: invalid_body`, also for unknown fields) or invalid guidance (`error_code: invalid_guidance`)", content_type = "application/json", body = ()),
         (status = 402, description = "AI credits exhausted", content_type = "application/json", body = ()),
         (status = 412, description = "Paid usage requires organization consent", content_type = "application/json", body = ()),
         (status = 404, description = "Not found", content_type = "application/json", body = ()),
-        (status = 429, description = "Too many analyses running; body {error_code: \"turn_limit\", message}", content_type = "application/json", body = Object),
-        (status = 500, description = "SRE agent credentials could not be read", content_type = "application/json", body = Object),
+        (status = 500, description = "Internal error", content_type = "application/json", body = Object),
         (status = 503, description = "RCA agent or billing state unavailable", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -597,50 +596,24 @@ pub async fn trigger_incident_rca(
         }
     };
 
-    // Detached launch must terminate the persisted run even if the request disconnects.
-    let task = tokio::spawn(async move {
-        // Meter usage only now, after the start: a refused start never costs a credit.
+    let started = rca_started_response(run_id.clone());
+    launch_started_run(
+        org_id,
+        incident_id,
+        run_id,
         #[cfg(feature = "cloud")]
-        let usage_permit = match authorize_started_rca(
-            &org_id,
-            &incident_id,
-            &run_id,
+        (usage_feature, usage_context),
+        openobserve_core::alerts::incidents::RcaLaunch {
             trigger,
-            usage_feature,
-            &usage_context,
-        )
-        .await
-        {
-            Ok(permit) => Some(permit),
-            Err(response) => return response,
-        };
-        #[cfg(not(feature = "cloud"))]
-        let usage_permit = None;
-
-        // Every error has already ended the run with the turn's code and freed its page.
-        match openobserve_core::alerts::incidents::trigger_rca_for_incident(
-            org_id,
-            incident_id,
-            run_id.clone(),
-            openobserve_core::alerts::incidents::RcaLaunch {
-                trigger,
-                user_email: user_email.user_id,
-                build_on_previous: query.build_on_previous,
-                usage_permit,
-                guidance,
-                resume: None,
-            },
-        )
-        .await
-        {
-            Ok(()) => rca_started_response(run_id),
-            Err(e) => rca_turn_error_response(&e),
-        }
-    });
-    match task.await {
-        Ok(response) => response,
-        Err(e) => MetaHttpResponse::internal_error(format!("The analysis task failed: {e}")),
-    }
+            user_email: user_email.user_id,
+            build_on_previous: query.build_on_previous,
+            usage_permit: None,
+            guidance,
+            resume: None,
+        },
+        started,
+    )
+    .await
 }
 
 #[cfg(feature = "cloud")]
@@ -685,7 +658,7 @@ async fn authorize_started_rca(
     }
 }
 
-/// `202 {message, run_id}`: the run is started and its turn spawned.
+/// `202 {message, run_id}`: the run is started; its turn launches in the background.
 #[cfg(feature = "enterprise")]
 fn rca_started_response(run_id: String) -> Response {
     json_status_response(
@@ -698,39 +671,63 @@ fn rca_started_response(run_id: String) -> Response {
     )
 }
 
-/// Return fixed start-error messages; keep redacted diagnostic details on the run.
+/// Launches a started run's first turn in a detached task, so the run is ended even if the
+/// request disconnects, and answers `started` once the launch is under way: at once, or on Cloud
+/// once usage is authorized. The answer does not wait for the turn: every launch error ends the
+/// run as failed with its code (`trigger_rca_for_incident`).
 #[cfg(feature = "enterprise")]
-fn rca_turn_error_response(error: &openobserve_core::alerts::rca_turn::RcaTurnError) -> Response {
-    use axum::http::StatusCode;
-    use openobserve_core::alerts::{incidents::TURN_LIMIT_REASON, rca_turn::RcaTurnError};
-
-    let (status, message) = match error {
-        RcaTurnError::TurnLimit => (StatusCode::TOO_MANY_REQUESTS, TURN_LIMIT_REASON),
-        RcaTurnError::AgentUnavailable(_) => (
-            StatusCode::SERVICE_UNAVAILABLE,
-            "The AI SRE agent is not reachable",
-        ),
-        RcaTurnError::Credentials(_) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "Failed to get SRE agent credentials",
-        ),
-        RcaTurnError::Busy => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "The analysis session is busy",
-        ),
-        RcaTurnError::Other(_) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "Failed to start the analysis",
-        ),
-    };
-    log::warn!(
-        "[INCIDENTS::RCA] analysis turn did not start ({}): {error:?}",
-        error.error_code()
-    );
-    json_status_response(
-        status,
-        serde_json::json!({ "error_code": error.error_code(), "message": message }),
-    )
+async fn launch_started_run(
+    org_id: String,
+    incident_id: String,
+    run_id: String,
+    #[cfg(feature = "cloud")] usage: (
+        openobserve_core::trial_quota::TrialQuotaFeature,
+        openobserve_core::trial_quota::AiUsageContext,
+    ),
+    launch: openobserve_core::alerts::incidents::RcaLaunch,
+    started: Response,
+) -> Response {
+    let (launching, launched) = tokio::sync::oneshot::channel::<Option<Response>>();
+    tokio::spawn(async move {
+        // Meter usage only now, after the start: a refused start never costs a credit.
+        #[cfg(feature = "cloud")]
+        let launch = {
+            let (feature, context) = usage;
+            match authorize_started_rca(
+                &org_id,
+                &incident_id,
+                &run_id,
+                launch.trigger,
+                feature,
+                &context,
+            )
+            .await
+            {
+                Ok(permit) => openobserve_core::alerts::incidents::RcaLaunch {
+                    usage_permit: Some(permit),
+                    ..launch
+                },
+                Err(refused) => {
+                    let _ = launching.send(Some(refused));
+                    return;
+                }
+            }
+        };
+        let _ = launching.send(None);
+        // The error is logged and stored on the run there.
+        let _ = openobserve_core::alerts::incidents::trigger_rca_for_incident(
+            org_id,
+            incident_id,
+            run_id,
+            launch,
+        )
+        .await;
+    });
+    match launched.await {
+        Ok(None) => started,
+        Ok(Some(refused)) => refused,
+        Err(e) => MetaHttpResponse::internal_error(format!("The analysis task failed: {e}")),
+    }
 }
 
 #[cfg(feature = "enterprise")]
@@ -978,8 +975,9 @@ pub async fn get_incident_rca_thread(
     }
 }
 
-/// Optional body of `POST …/rca`: guidance for the new run.
+/// Optional body of `POST …/rca`: guidance for the new run. Unknown fields are refused.
 #[derive(Debug, Default, Deserialize, ToSchema)]
+#[serde(deny_unknown_fields)]
 pub struct TriggerRcaBody {
     /// What the responder wants this analysis to look at; 1 to 2000 characters.
     #[serde(default)]
@@ -1246,7 +1244,7 @@ fn is_rateable(run: &infra::table::rca_runs::Model) -> bool {
     tag = "Incidents",
     operation_id = "PutIncidentRcaFeedback",
     summary = "Say whether a finished analysis found the cause",
-    description = "Saves the caller's answer to \"Is this the cause?\" for a completed analysis run: `yes`, `no` with up to four reasons, or `change` with the actual cause. A `change` becomes a past cause that later analyses of the same subject treat as a lead. One answer per user and run; a new answer replaces the earlier one. The author is the authenticated user.",
+    description = "Saves the caller's answer to \"Is this the cause?\" for a completed analysis run: `yes`, or `no` with up to four reasons. To record the actual cause, use the incident's correction (`PUT …/incidents/{incident_id}/rca/correction`), which needs no finished run. One answer per user and run; a new answer replaces the earlier one. The author is the authenticated user.",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
@@ -1259,7 +1257,7 @@ fn is_rateable(run: &infra::table::rca_runs::Model) -> bool {
         (status = 400, description = "Invalid body (`error_code`: `invalid_body`, `invalid_feedback`)", content_type = "application/json", body = Object),
         (status = 403, description = "The user cannot run an analysis on this incident", content_type = "application/json", body = Object),
         (status = 404, description = "Unknown incident or run", content_type = "application/json", body = Object),
-        (status = 409, description = "`error_code: not_rateable`: the run has not completed with an outcome", content_type = "application/json", body = Object),
+        (status = 409, description = "`error_code: not_rateable`: the run has not completed with an outcome; the incident's cause correction is still open", content_type = "application/json", body = Object),
         (status = 500, description = "Internal error", content_type = "application/json", body = Object),
     ),
     extensions(
@@ -1337,7 +1335,6 @@ pub async fn put_incident_rca_feedback(
         subject_type: run.subject_type,
         subject_id,
         verdict: feedback.verdict.as_str().to_string(),
-        cause: feedback.cause.map(|c| c.as_str().to_string()),
         note: feedback.note,
         reasons: rca_feedback::reasons_column(&feedback.reasons),
         created_at: now,
@@ -1469,6 +1466,234 @@ pub async fn delete_incident_rca_feedback(
     }
 }
 
+/// 404 unless the incident exists in the org.
+#[cfg(feature = "enterprise")]
+async fn require_incident(org_id: &str, incident_id: &str) -> Result<(), Response> {
+    match infra::table::alert_incidents::get(org_id, incident_id).await {
+        Ok(Some(_)) => Ok(()),
+        Ok(None) => Err(MetaHttpResponse::not_found("Incident not found")),
+        Err(e) => Err(MetaHttpResponse::internal_error(e)),
+    }
+}
+
+#[cfg(feature = "enterprise")]
+/// PutIncidentRcaCorrection
+#[utoipa::path(
+    put,
+    path = "/v2/{org_id}/alerts/incidents/{incident_id}/rca/correction",
+    context_path = "/api",
+    tag = "Incidents",
+    operation_id = "PutIncidentRcaCorrection",
+    summary = "Record what caused the incident",
+    description = "Saves the caller's correction of the incident's cause: a cause (any but `still_unknown`) and an optional note. It does not depend on any analysis run, so it works also when every analysis failed. Later analyses of the same subject read it as a past cause. One correction per user and incident; a new one replaces the earlier one. The author is the authenticated user.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("incident_id" = String, Path, description = "Incident ID"),
+    ),
+    request_body(content = config::meta::alerts::rca_feedback::PutRcaCauseCorrectionRequest, description = "The cause", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Saved correction", content_type = "application/json", body = config::meta::alerts::rca_feedback::RcaCauseCorrection),
+        (status = 400, description = "Invalid body (`error_code`: `invalid_body`, `invalid_correction`)", content_type = "application/json", body = Object),
+        (status = 403, description = "The user cannot run an analysis on this incident", content_type = "application/json", body = Object),
+        (status = 404, description = "Unknown incident", content_type = "application/json", body = Object),
+        (status = 500, description = "Internal error", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false})),
+    )
+)]
+pub async fn put_incident_rca_correction(
+    Path((org_id, incident_id)): Path<(String, String)>,
+    Headers(user_email): Headers<UserEmail>,
+    body: axum::body::Bytes,
+) -> Response {
+    use axum::http::StatusCode;
+    use config::meta::alerts::rca_feedback::PutRcaCauseCorrectionRequest;
+    use infra::table::rca_cause_corrections;
+
+    let request: PutRcaCauseCorrectionRequest = match serde_json::from_slice(&body) {
+        Ok(request) => request,
+        Err(e) => {
+            return rca_error_response(
+                StatusCode::BAD_REQUEST,
+                &format!("Invalid request body: {e}"),
+                Some("invalid_body"),
+                None,
+            );
+        }
+    };
+    let correction = match request.validate() {
+        Ok(correction) => correction,
+        Err(message) => {
+            return rca_error_response(
+                StatusCode::BAD_REQUEST,
+                &message,
+                Some("invalid_correction"),
+                None,
+            );
+        }
+    };
+    if let Err(response) = require_rca_permission(
+        &org_id,
+        &user_email.user_id,
+        &incident_id,
+        "correct the cause",
+    )
+    .await
+    {
+        return response;
+    }
+    if let Err(response) = require_incident(&org_id, &incident_id).await {
+        return response;
+    }
+
+    let (subject_type, subject_id) =
+        o2_enterprise::enterprise::alerts::rca_service::correction_subject(&org_id, &incident_id)
+            .await;
+    let now = config::utils::time::now_micros();
+    let row = rca_cause_corrections::Model {
+        org_id: org_id.clone(),
+        incident_id: incident_id.clone(),
+        author_email: user_email.user_id,
+        subject_type: subject_type.as_str().to_string(),
+        subject_id,
+        cause: correction.cause.as_str().to_string(),
+        note: correction.note,
+        created_at: now,
+        updated_at: now,
+    };
+    match rca_cause_corrections::upsert(&row).await {
+        Ok(stored) => match rca_cause_corrections::to_correction(stored) {
+            Some(stored) => {
+                config::metrics::RCA_FEEDBACK_TOTAL
+                    .with_label_values(&[org_id.as_str(), "correction"])
+                    .inc();
+                MetaHttpResponse::json(stored)
+            }
+            None => MetaHttpResponse::internal_error("The saved correction could not be read"),
+        },
+        Err(e) => {
+            log::error!("[INCIDENTS::RCA] Failed to save the cause of incident {incident_id}: {e}");
+            rca_error_response(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Failed to save the correction",
+                None,
+                None,
+            )
+        }
+    }
+}
+
+#[cfg(feature = "enterprise")]
+/// GetIncidentRcaCorrection
+#[utoipa::path(
+    get,
+    path = "/v2/{org_id}/alerts/incidents/{incident_id}/rca/correction",
+    context_path = "/api",
+    tag = "Incidents",
+    operation_id = "GetIncidentRcaCorrection",
+    summary = "Get the corrections of the incident's cause",
+    description = "Returns every user's correction of the incident's cause (`items`, oldest first) and the caller's own (`mine`, null when the caller has none).",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("incident_id" = String, Path, description = "Incident ID"),
+    ),
+    responses(
+        (status = 200, description = "Corrections of the incident's cause", content_type = "application/json", body = config::meta::alerts::rca_feedback::ListRcaCauseCorrectionResponse),
+        (status = 404, description = "Unknown incident", content_type = "application/json", body = Object),
+        (status = 500, description = "Internal error", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": false})),
+    )
+)]
+pub async fn get_incident_rca_correction(
+    Path((org_id, incident_id)): Path<(String, String)>,
+    Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    use config::meta::alerts::rca_feedback::{ListRcaCauseCorrectionResponse, RcaCauseCorrection};
+    use infra::table::rca_cause_corrections;
+
+    if let Err(response) = require_incident(&org_id, &incident_id).await {
+        return response;
+    }
+    match rca_cause_corrections::list_for_incident(&org_id, &incident_id).await {
+        Ok(rows) => {
+            let items: Vec<RcaCauseCorrection> = rows
+                .into_iter()
+                .filter_map(rca_cause_corrections::to_correction)
+                .collect();
+            let mine = items
+                .iter()
+                .find(|c| c.author_email == user_email.user_id)
+                .cloned();
+            MetaHttpResponse::json(ListRcaCauseCorrectionResponse { items, mine })
+        }
+        Err(e) => MetaHttpResponse::internal_error(e),
+    }
+}
+
+#[cfg(feature = "enterprise")]
+/// DeleteIncidentRcaCorrection
+#[utoipa::path(
+    delete,
+    path = "/v2/{org_id}/alerts/incidents/{incident_id}/rca/correction",
+    context_path = "/api",
+    tag = "Incidents",
+    operation_id = "DeleteIncidentRcaCorrection",
+    summary = "Remove your correction of the incident's cause",
+    description = "Deletes the caller's own correction of the incident's cause (Undo). Other users' corrections are never touched. Succeeds also when the caller had none.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("incident_id" = String, Path, description = "Incident ID"),
+    ),
+    responses(
+        (status = 204, description = "Correction removed"),
+        (status = 403, description = "The user cannot run an analysis on this incident", content_type = "application/json", body = Object),
+        (status = 404, description = "Unknown incident", content_type = "application/json", body = Object),
+        (status = 500, description = "Internal error", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false})),
+    )
+)]
+pub async fn delete_incident_rca_correction(
+    Path((org_id, incident_id)): Path<(String, String)>,
+    Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    use axum::response::IntoResponse;
+
+    if let Err(response) = require_rca_permission(
+        &org_id,
+        &user_email.user_id,
+        &incident_id,
+        "correct the cause",
+    )
+    .await
+    {
+        return response;
+    }
+    if let Err(response) = require_incident(&org_id, &incident_id).await {
+        return response;
+    }
+    match infra::table::rca_cause_corrections::delete_own(
+        &org_id,
+        &incident_id,
+        &user_email.user_id,
+    )
+    .await
+    {
+        Ok(_) => axum::http::StatusCode::NO_CONTENT.into_response(),
+        Err(e) => MetaHttpResponse::internal_error(e),
+    }
+}
+
 #[cfg(feature = "enterprise")]
 /// ResumeIncidentRcaRun
 #[utoipa::path(
@@ -1478,7 +1703,7 @@ pub async fn delete_incident_rca_feedback(
     tag = "Incidents",
     operation_id = "ResumeIncidentRcaRun",
     summary = "Resume a failed or cancelled analysis run",
-    description = "Starts a new analysis run that keeps the finished steps of the incident's latest run, when that run failed or was cancelled, and redoes the step it stopped in. Returns 202 with the new run id as soon as its investigation turn is spawned. The body is empty.",
+    description = "Starts a new analysis run that keeps the finished steps of the incident's latest run, when that run failed or was cancelled, and redoes the step it stopped in. Returns 202 with the new run id as soon as the run exists; its investigation turn is launched in the background, and a launch that fails ends the run as `failed` with its error code. The body is empty.",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
@@ -1493,7 +1718,6 @@ pub async fn delete_incident_rca_feedback(
         (status = 409, description = "`error_code`: `not_resumable`, `nothing_to_resume` or `run_in_flight`", content_type = "application/json", body = Object),
         (status = 410, description = "`error_code: transcript_expired`: the earlier run's transcript is gone", content_type = "application/json", body = Object),
         (status = 412, description = "Paid usage requires organization consent", content_type = "application/json", body = ()),
-        (status = 429, description = "Too many analyses running; body {error_code: \"turn_limit\", message}", content_type = "application/json", body = Object),
         (status = 500, description = "Internal error", content_type = "application/json", body = Object),
         (status = 503, description = "RCA agent or billing state unavailable, or the earlier run's transcript could not be read in full (`error_code: history_unavailable`)", content_type = "application/json", body = Object),
     ),
@@ -1668,59 +1892,34 @@ async fn start_resumed_run(
         }
     };
 
-    let started = RcaResumedResponse {
-        message: "Analysis resumed".to_string(),
-        run_id: new_run_id.clone(),
-        resumed_from: seed.source_run_id.clone(),
-        reused_steps: seed.reused_steps,
-        from_step: seed.from_step.clone(),
-    };
-
-    let task = tokio::spawn(async move {
+    let started = json_status_response(
+        StatusCode::ACCEPTED,
+        serde_json::to_value(RcaResumedResponse {
+            message: "Analysis resumed".to_string(),
+            run_id: new_run_id.clone(),
+            resumed_from: seed.source_run_id.clone(),
+            reused_steps: seed.reused_steps,
+            from_step: seed.from_step.clone(),
+        })
+        .unwrap_or_default(),
+    );
+    launch_started_run(
+        org_id,
+        incident_id,
+        new_run_id,
         #[cfg(feature = "cloud")]
-        let usage_permit = match authorize_started_rca(
-            &org_id,
-            &incident_id,
-            &new_run_id,
-            RunTrigger::Resume,
-            usage_feature,
-            &usage_context,
-        )
-        .await
-        {
-            Ok(permit) => Some(permit),
-            Err(response) => return response,
-        };
-        #[cfg(not(feature = "cloud"))]
-        let usage_permit = None;
-
-        // Every error has already ended the run with the turn's code and freed its page.
-        match openobserve_core::alerts::incidents::trigger_rca_for_incident(
-            org_id,
-            incident_id,
-            new_run_id,
-            openobserve_core::alerts::incidents::RcaLaunch {
-                trigger: RunTrigger::Resume,
-                user_email: user_email.user_id,
-                build_on_previous: false,
-                usage_permit,
-                guidance: None,
-                resume: Some(seed),
-            },
-        )
-        .await
-        {
-            Ok(()) => json_status_response(
-                StatusCode::ACCEPTED,
-                serde_json::to_value(started).unwrap_or_default(),
-            ),
-            Err(e) => rca_turn_error_response(&e),
-        }
-    });
-    match task.await {
-        Ok(response) => response,
-        Err(e) => MetaHttpResponse::internal_error(format!("The analysis task failed: {e}")),
-    }
+        (usage_feature, usage_context),
+        openobserve_core::alerts::incidents::RcaLaunch {
+            trigger: RunTrigger::Resume,
+            user_email: user_email.user_id,
+            build_on_previous: false,
+            usage_permit: None,
+            guidance: None,
+            resume: Some(seed),
+        },
+        started,
+    )
+    .await
 }
 
 /// The answer of a part route that could not build its part.
@@ -2555,6 +2754,94 @@ pub async fn delete_incident_rca_feedback(
 
 #[cfg(not(feature = "enterprise"))]
 #[utoipa::path(
+    put,
+    path = "/v2/{org_id}/alerts/incidents/{incident_id}/rca/correction",
+    context_path = "/api",
+    tag = "Incidents",
+    operation_id = "PutIncidentRcaCorrection",
+    summary = "Record what caused the incident",
+    description = "Saves the caller's correction of the incident's cause. This endpoint is only available with enterprise features enabled.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("incident_id" = String, Path, description = "Incident ID"),
+    ),
+    responses(
+        (status = 403, description = "Not supported without enterprise features", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false})),
+    )
+)]
+pub async fn put_incident_rca_correction(
+    _path: Path<(String, String)>,
+    _headers: Headers<UserEmail>,
+    _body: axum::body::Bytes,
+) -> Response {
+    MetaHttpResponse::forbidden("Cause corrections are only available in enterprise")
+}
+
+#[cfg(not(feature = "enterprise"))]
+#[utoipa::path(
+    get,
+    path = "/v2/{org_id}/alerts/incidents/{incident_id}/rca/correction",
+    context_path = "/api",
+    tag = "Incidents",
+    operation_id = "GetIncidentRcaCorrection",
+    summary = "Get the corrections of the incident's cause",
+    description = "Returns the corrections of the incident's cause. This endpoint is only available with enterprise features enabled.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("incident_id" = String, Path, description = "Incident ID"),
+    ),
+    responses(
+        (status = 403, description = "Not supported without enterprise features", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": false})),
+    )
+)]
+pub async fn get_incident_rca_correction(
+    _path: Path<(String, String)>,
+    _headers: Headers<UserEmail>,
+) -> Response {
+    MetaHttpResponse::forbidden("Cause corrections are only available in enterprise")
+}
+
+#[cfg(not(feature = "enterprise"))]
+#[utoipa::path(
+    delete,
+    path = "/v2/{org_id}/alerts/incidents/{incident_id}/rca/correction",
+    context_path = "/api",
+    tag = "Incidents",
+    operation_id = "DeleteIncidentRcaCorrection",
+    summary = "Remove your correction of the incident's cause",
+    description = "Deletes the caller's correction of the incident's cause. This endpoint is only available with enterprise features enabled.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("incident_id" = String, Path, description = "Incident ID"),
+    ),
+    responses(
+        (status = 403, description = "Not supported without enterprise features", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false})),
+    )
+)]
+pub async fn delete_incident_rca_correction(
+    _path: Path<(String, String)>,
+    _headers: Headers<UserEmail>,
+) -> Response {
+    MetaHttpResponse::forbidden("Cause corrections are only available in enterprise")
+}
+
+#[cfg(not(feature = "enterprise"))]
+#[utoipa::path(
     post,
     path = "/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/resume",
     context_path = "/api",
@@ -2827,7 +3114,7 @@ mod tests {
     }
 
     #[test]
-    fn test_steer_body_refuses_an_author_field() {
+    fn test_steer_and_trigger_bodies_refuse_unknown_fields() {
         let body: SteerRequestBody = serde_json::from_str(
             r#"{"kind":"hypothesis_action","action":"disprove","hypothesis_id":"h3"}"#,
         )
@@ -2842,6 +3129,17 @@ mod tests {
         );
         let trigger: TriggerRcaBody = serde_json::from_str(r#"{"guidance":"look at db"}"#).unwrap();
         assert_eq!(trigger.guidance.as_deref(), Some("look at db"));
+        let empty: TriggerRcaBody = serde_json::from_str("{}").unwrap();
+        assert_eq!(empty.guidance, None);
+        for body in [
+            r#"{"guidance":"look at db","mode":"fresh"}"#,
+            r#"{"guidence":"look at db"}"#,
+        ] {
+            assert!(
+                serde_json::from_str::<TriggerRcaBody>(body).is_err(),
+                "{body}"
+            );
+        }
     }
 
     #[test]
@@ -2956,57 +3254,43 @@ mod tests {
         );
     }
 
-    #[cfg(feature = "enterprise")]
+    /// The trigger answers 202 once the run exists; a launch that fails afterwards (no agent at
+    /// the configured URL) still ends that run as failed with its code.
+    #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
     #[tokio::test]
-    async fn test_a_turn_that_could_not_start_answers_with_its_code() {
+    async fn test_a_trigger_answers_202_and_a_failed_launch_still_ends_the_run() {
         use axum::http::StatusCode;
-        use openobserve_core::alerts::rca_turn::RcaTurnError;
 
-        let details = "error sending request for url (http://o2-ai.svc:8080/o2_agent/health)";
-        for (error, status, code, message) in [
-            (
-                RcaTurnError::TurnLimit,
-                StatusCode::TOO_MANY_REQUESTS,
-                "turn_limit",
-                "Too many analyses running",
-            ),
-            (
-                RcaTurnError::AgentUnavailable(details.to_string()),
-                StatusCode::SERVICE_UNAVAILABLE,
-                "agent_unavailable",
-                "The AI SRE agent is not reachable",
-            ),
-            (
-                RcaTurnError::Credentials(details.to_string()),
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "credentials",
-                "Failed to get SRE agent credentials",
-            ),
-            (
-                RcaTurnError::Busy,
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "busy",
-                "The analysis session is busy",
-            ),
-            (
-                RcaTurnError::Other(details.to_string()),
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "agent_error",
-                "Failed to start the analysis",
-            ),
-        ] {
-            let (got, body) = status_and_body(rca_turn_error_response(&error)).await;
-            assert_eq!(got, status, "{error:?}");
-            assert_eq!(
-                body,
-                serde_json::json!({"error_code": code, "message": message}),
-                "{error:?}"
-            );
-            let text = body.to_string();
-            for leak in ["o2-ai", "svc", "http://", "health"] {
-                assert!(!text.contains(leak), "{error:?}: {text}");
-            }
-        }
+        let conn = steering_tables().await;
+        let org = steering_org("trigger202");
+        steering_incident(conn, &org, "inc_1", None).await;
+        let (status, body) = status_and_body(
+            trigger_incident_rca(
+                Path((org.clone(), sid(&org, "inc_1"))),
+                Headers(UserEmail {
+                    user_id: STEER_ROOT.to_string(),
+                }),
+                Query(TriggerRcaQuery {
+                    build_on_previous: false,
+                }),
+                axum::body::Bytes::new(),
+            )
+            .await,
+        )
+        .await;
+        assert_eq!(status, StatusCode::ACCEPTED, "{body}");
+        let runs = settled_runs(conn, &org, "inc_1").await;
+        assert_eq!(runs.len(), 1, "{runs:?}");
+        assert_eq!(body["run_id"], runs[0].run_id.as_str());
+        assert_eq!(runs[0].state, "failed");
+        let error = runs[0]
+            .error
+            .as_ref()
+            .expect("the failed launch is on the run");
+        assert!(
+            error["code"].as_str().is_some_and(|code| !code.is_empty()),
+            "{error}"
+        );
     }
 
     /// The global SQLite meta store with the run and chat tables.
@@ -3609,6 +3893,15 @@ mod tests {
             (true, ReadError::Search("timeout".to_string()), unavailable),
             (true, ReadError::NoTimeRange, unavailable),
             (false, gap(), unavailable),
+            // A lost tail of an ended run is served as a truncated thread; a running one waits.
+            (
+                false,
+                ReadError::Gap {
+                    expected: 5,
+                    found: None,
+                },
+                unavailable,
+            ),
             (
                 false,
                 ReadError::Corrupt("bad hash".to_string()),
@@ -3642,7 +3935,7 @@ mod tests {
     async fn steering_tables() -> &'static sea_orm::DatabaseConnection {
         use infra::table::entity::{
             ai_chat_sessions, ai_chat_turns, alert_incident_alerts, alert_incidents,
-            incident_events, rca_feedback, rca_runs, rca_steering,
+            incident_events, rca_cause_corrections, rca_feedback, rca_runs, rca_steering,
         };
         use sea_orm::{ConnectionTrait, Schema};
 
@@ -3672,6 +3965,7 @@ mod tests {
                     schema.create_table_from_entity(rca_runs::Entity),
                     schema.create_table_from_entity(rca_steering::Entity),
                     schema.create_table_from_entity(rca_feedback::Entity),
+                    schema.create_table_from_entity(rca_cause_corrections::Entity),
                     schema.create_table_from_entity(ai_chat_sessions::Entity),
                     schema.create_table_from_entity(ai_chat_turns::Entity),
                 ] {
@@ -4544,6 +4838,10 @@ mod tests {
                 "invalid_guidance",
             ),
             ("guidance please".to_string(), "invalid_body"),
+            (
+                r#"{"guidance":"look at db","priority":1}"#.to_string(),
+                "invalid_body",
+            ),
         ] {
             let label: String = body.chars().take(40).collect();
             let (status, answer) = status_and_body(trigger("inc_1", body).await).await;
@@ -4776,29 +5074,14 @@ mod tests {
             ),
             (r#"{"verdict":"yes","priority":1}"#, "invalid_body"),
             (r#"{"verdict":"no","reasons":["too_slow"]}"#, "invalid_body"),
+            // The cause belongs to the incident's correction now.
+            (r#"{"verdict":"change"}"#, "invalid_body"),
             (
-                r#"{"verdict":"change","cause":"cosmic_rays"}"#,
+                r#"{"verdict":"no","cause":"capacity_or_load"}"#,
                 "invalid_body",
-            ),
-            (r#"{"verdict":"change"}"#, "invalid_feedback"),
-            (
-                r#"{"verdict":"change","cause":"still_unknown"}"#,
-                "invalid_feedback",
-            ),
-            (
-                r#"{"verdict":"change","cause":"capacity_or_load","reasons":["wrong_service"]}"#,
-                "invalid_feedback",
-            ),
-            (
-                r#"{"verdict":"yes","cause":"capacity_or_load"}"#,
-                "invalid_feedback",
             ),
             (
                 r#"{"verdict":"yes","reasons":["wrong_service"]}"#,
-                "invalid_feedback",
-            ),
-            (
-                r#"{"verdict":"no","cause":"capacity_or_load"}"#,
                 "invalid_feedback",
             ),
             (
@@ -4816,7 +5099,7 @@ mod tests {
             assert_eq!(answer["error_code"], code, "{label}: {answer}");
         }
         assert!(feedback_rows(&org, "run_done").await.is_empty());
-        for verdict in ["yes", "no", "change"] {
+        for verdict in ["yes", "no"] {
             assert_eq!(feedback_count(&org, verdict), 0, "{verdict}");
         }
 
@@ -4832,31 +5115,15 @@ mod tests {
         assert!(!row["note"].as_str().unwrap().starts_with(' '));
         assert_eq!(row["reasons"], json!(all_reasons));
 
-        for (body, verdict, cause, reasons) in [
-            (
-                r#"{"verdict":"no","note":"   "}"#,
-                "no",
-                json!(null),
-                json!([]),
-            ),
-            (
-                r#"{"verdict":"change","cause":"capacity_or_load"}"#,
-                "change",
-                json!("capacity_or_load"),
-                json!([]),
-            ),
-            (
-                r#"{"verdict":"yes","note":"spot on"}"#,
-                "yes",
-                json!(null),
-                json!([]),
-            ),
+        for (body, verdict) in [
+            (r#"{"verdict":"no","note":"   "}"#, "no"),
+            (r#"{"verdict":"yes","note":"spot on"}"#, "yes"),
         ] {
             let (status, row) = put_feedback_as(&org, "inc_1", "run_done", STEER_ROOT, body).await;
             assert_eq!(status, StatusCode::OK, "{body}: {row}");
             assert_eq!(row["verdict"], verdict, "{body}");
-            assert_eq!(row["cause"], cause, "{body}");
-            assert_eq!(row["reasons"], reasons, "{body}");
+            assert!(row.get("cause").is_none(), "{body}: {row}");
+            assert_eq!(row["reasons"], json!([]), "{body}");
             if verdict == "yes" {
                 assert_eq!(row["note"], "spot on");
             } else {
@@ -4995,7 +5262,6 @@ mod tests {
                 "subject_type": "incident",
                 "subject_id": sid(&org, "inc_1"),
                 "verdict": "yes",
-                "cause": null,
                 "note": null,
                 "reasons": [],
             })
@@ -5011,12 +5277,11 @@ mod tests {
             "inc_1",
             "run_done",
             STEER_ROOT,
-            r#"{"verdict":"change","cause":"capacity_or_load","note":"The orders pool was raised to 150 on Oct 8"}"#,
+            r#"{"verdict":"no","note":"The orders pool was raised to 150 on Oct 8"}"#,
         )
         .await;
         assert_eq!(status, StatusCode::OK, "{mine}");
-        assert_eq!(mine["verdict"], "change");
-        assert_eq!(mine["cause"], "capacity_or_load");
+        assert_eq!(mine["verdict"], "no");
         assert_eq!(mine["note"], "The orders pool was raised to 150 on Oct 8");
         assert_eq!(mine["created_at"], created_at, "an upsert keeps created_at");
         assert!(mine["updated_at"].as_i64().unwrap() > created_at);
@@ -5050,7 +5315,7 @@ mod tests {
                 "{user}"
             );
         }
-        for (verdict, count) in [("yes", 1), ("change", 1), ("no", 1)] {
+        for (verdict, count) in [("yes", 1), ("no", 2)] {
             assert_eq!(feedback_count(&org, verdict), count, "{verdict}");
         }
 
@@ -5066,7 +5331,7 @@ mod tests {
         let (status, view) = get_feedback_as(&org, "inc_1", "run_done", STEER_ROOT).await;
         assert_eq!(status, StatusCode::OK);
         assert_eq!(view, json!({"items": [theirs.clone()], "mine": null}));
-        for (verdict, count) in [("yes", 1), ("change", 1), ("no", 1)] {
+        for (verdict, count) in [("yes", 1), ("no", 2)] {
             assert_eq!(feedback_count(&org, verdict), count, "{verdict}");
         }
     }
@@ -5146,18 +5411,274 @@ mod tests {
             "inc_1",
             "run_alert",
             STEER_ROOT,
-            r#"{"verdict":"change","cause":"dependency_failure"}"#,
+            r#"{"verdict":"no"}"#,
         )
         .await;
         assert_eq!(status, StatusCode::OK, "{row}");
         assert_eq!(row["subject_type"], "alert");
         assert_eq!(row["subject_id"], "alert_7");
-        let corrections =
-            infra::table::rca_feedback::list_corrections_for_subject(&org, "alert", "alert_7", 10)
-                .await
-                .unwrap();
-        assert_eq!(corrections.len(), 1, "{corrections:?}");
-        assert_eq!(corrections[0].cause.as_deref(), Some("dependency_failure"));
+    }
+
+    #[cfg(feature = "enterprise")]
+    fn correction_path(org_id: &str, incident_id: &str) -> Path<(String, String)> {
+        Path((org_id.to_string(), sid(org_id, incident_id)))
+    }
+
+    #[cfg(feature = "enterprise")]
+    async fn put_correction_at(
+        path: Path<(String, String)>,
+        user: &str,
+        body: &str,
+    ) -> (axum::http::StatusCode, serde_json::Value) {
+        status_and_body(
+            put_incident_rca_correction(
+                path,
+                as_user(user),
+                axum::body::Bytes::from(body.to_string()),
+            )
+            .await,
+        )
+        .await
+    }
+
+    #[cfg(feature = "enterprise")]
+    async fn put_correction_as(
+        org_id: &str,
+        incident_id: &str,
+        user: &str,
+        body: &str,
+    ) -> (axum::http::StatusCode, serde_json::Value) {
+        put_correction_at(correction_path(org_id, incident_id), user, body).await
+    }
+
+    #[cfg(feature = "enterprise")]
+    async fn get_correction_at(
+        path: Path<(String, String)>,
+        user: &str,
+    ) -> (axum::http::StatusCode, serde_json::Value) {
+        status_and_body(get_incident_rca_correction(path, as_user(user)).await).await
+    }
+
+    /// The DELETE answer's status and raw body (a 204 has none).
+    #[cfg(feature = "enterprise")]
+    async fn delete_correction_at(
+        path: Path<(String, String)>,
+        user: &str,
+    ) -> (axum::http::StatusCode, axum::body::Bytes) {
+        let response = delete_incident_rca_correction(path, as_user(user)).await;
+        let status = response.status();
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        (status, body)
+    }
+
+    /// The incident's stored corrections as the routes serialize them, oldest first.
+    #[cfg(feature = "enterprise")]
+    async fn correction_rows(org_id: &str, incident_id: &str) -> Vec<serde_json::Value> {
+        infra::table::rca_cause_corrections::list_for_incident(org_id, &sid(org_id, incident_id))
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|row| {
+                serde_json::to_value(
+                    infra::table::rca_cause_corrections::to_correction(row).unwrap(),
+                )
+                .unwrap()
+            })
+            .collect()
+    }
+
+    /// The cause correction is the incident's: it works whatever state its runs are in, even
+    /// with no run at all, one row per author, and Undo removes only the caller's.
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_the_cause_correction_works_whatever_the_runs_and_is_one_row_per_author() {
+        use axum::http::StatusCode;
+        use serde_json::json;
+
+        let conn = feedback_tables().await;
+        let org = steering_org("corr");
+        steering_incident(conn, &org, "inc_failed", Some("run_timed_out")).await;
+        for (run, state) in [
+            ("run_failed", "failed"),
+            ("run_cancelled", "cancelled"),
+            ("run_timed_out", "failed"),
+        ] {
+            feedback_run(conn, &org, run, "inc_failed", state, None).await;
+        }
+        steering_incident(conn, &org, "inc_never", None).await;
+        let body = r#"{"cause":"capacity_or_load","note":"  The orders pool was raised to 150  "}"#;
+
+        for incident in ["inc_failed", "inc_never"] {
+            let (status, first) = put_correction_as(&org, incident, STEER_ROOT, body).await;
+            assert_eq!(status, StatusCode::OK, "{incident}: {first}");
+            let created_at = first["created_at"].as_i64().unwrap();
+            assert_eq!(first["updated_at"], created_at);
+            let mut expected = first.clone();
+            for key in ["created_at", "updated_at"] {
+                expected.as_object_mut().unwrap().remove(key);
+            }
+            assert_eq!(
+                expected,
+                json!({
+                    "org_id": org,
+                    "incident_id": sid(&org, incident),
+                    "author_email": STEER_ROOT,
+                    "cause": "capacity_or_load",
+                    "note": "The orders pool was raised to 150",
+                }),
+                "{incident}"
+            );
+        }
+        // The run feedback stays closed on those runs.
+        let (status, _) = put_feedback_as(
+            &org,
+            "inc_failed",
+            "run_failed",
+            STEER_ROOT,
+            r#"{"verdict":"no"}"#,
+        )
+        .await;
+        assert_eq!(status, StatusCode::CONFLICT);
+
+        tokio::time::sleep(std::time::Duration::from_millis(5)).await;
+        let first = correction_rows(&org, "inc_failed").await.remove(0);
+        let (status, mine) = put_correction_as(
+            &org,
+            "inc_failed",
+            STEER_ROOT,
+            r#"{"cause":"dependency_failure"}"#,
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{mine}");
+        assert_eq!(mine["cause"], "dependency_failure");
+        assert!(
+            mine["note"].is_null(),
+            "a new correction replaces the note too"
+        );
+        assert_eq!(
+            mine["created_at"], first["created_at"],
+            "an upsert keeps created_at"
+        );
+        assert!(mine["updated_at"].as_i64() > first["updated_at"].as_i64());
+
+        let (status, theirs) = put_correction_as(
+            &org,
+            "inc_failed",
+            FEEDBACK_ROOT,
+            r#"{"cause":"genuine_defect"}"#,
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{theirs}");
+        assert_eq!(
+            correction_rows(&org, "inc_failed").await,
+            [mine.clone(), theirs.clone()]
+        );
+        for (user, own) in [
+            (STEER_ROOT, mine.clone()),
+            (FEEDBACK_ROOT, theirs.clone()),
+            (STEER_READER, json!(null)),
+        ] {
+            let (status, view) = get_correction_at(correction_path(&org, "inc_failed"), user).await;
+            assert_eq!(status, StatusCode::OK, "{user}: {view}");
+            assert_eq!(
+                view,
+                json!({"items": [mine.clone(), theirs.clone()], "mine": own}),
+                "{user}"
+            );
+        }
+        assert_eq!(feedback_count(&org, "correction"), 4);
+
+        for _ in 0..2 {
+            let (status, body) =
+                delete_correction_at(correction_path(&org, "inc_failed"), STEER_ROOT).await;
+            assert_eq!(status, StatusCode::NO_CONTENT);
+            assert!(body.is_empty(), "{body:?}");
+            assert_eq!(
+                correction_rows(&org, "inc_failed").await,
+                std::slice::from_ref(&theirs)
+            );
+        }
+        assert_eq!(correction_rows(&org, "inc_never").await.len(), 1);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_an_invalid_correction_body_is_400_with_its_code() {
+        use axum::http::StatusCode;
+
+        let conn = feedback_tables().await;
+        let org = steering_org("corr400");
+        steering_incident(conn, &org, "inc_1", None).await;
+        let too_long =
+            serde_json::json!({"cause": "capacity_or_load", "note": "é".repeat(1001)}).to_string();
+        for (body, code) in [
+            ("not json", "invalid_body"),
+            ("{}", "invalid_body"),
+            (r#"{"cause":"cosmic_rays"}"#, "invalid_body"),
+            (
+                r#"{"cause":"capacity_or_load","verdict":"change"}"#,
+                "invalid_body",
+            ),
+            (
+                r#"{"cause":"capacity_or_load","author_email":"x@acme.io"}"#,
+                "invalid_body",
+            ),
+            (r#"{"cause":"still_unknown"}"#, "invalid_correction"),
+            (too_long.as_str(), "invalid_correction"),
+        ] {
+            let label: String = body.chars().take(80).collect();
+            let (status, answer) = put_correction_as(&org, "inc_1", STEER_ROOT, body).await;
+            assert_eq!(status, StatusCode::BAD_REQUEST, "{label}: {answer}");
+            assert_eq!(answer["error_code"], code, "{label}: {answer}");
+        }
+        assert!(correction_rows(&org, "inc_1").await.is_empty());
+        assert_eq!(feedback_count(&org, "correction"), 0);
+    }
+
+    /// Viewers read but cannot write; an unknown incident, or one of another org, is 404.
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_correction_writes_need_the_rca_permission_and_the_incident() {
+        use axum::http::StatusCode;
+
+        let conn = feedback_tables().await;
+        let org = steering_org("corr403");
+        let other_org = steering_org("corr404");
+        steering_incident(conn, &org, "inc_1", None).await;
+        let body = r#"{"cause":"noisy_threshold"}"#;
+        let (status, row) = put_correction_as(&org, "inc_1", FEEDBACK_ROOT, body).await;
+        assert_eq!(status, StatusCode::OK, "{row}");
+
+        let (status, answer) = put_correction_as(&org, "inc_1", STEER_READER, body).await;
+        assert_eq!(status, StatusCode::FORBIDDEN, "{answer}");
+        let (status, _) = delete_correction_at(correction_path(&org, "inc_1"), STEER_READER).await;
+        assert_eq!(status, StatusCode::FORBIDDEN);
+        let (status, view) = get_correction_at(correction_path(&org, "inc_1"), STEER_READER).await;
+        assert_eq!(status, StatusCode::OK, "{view}");
+        assert_eq!(view["items"], serde_json::json!([row]));
+        assert!(view["mine"].is_null());
+
+        let elsewhere = || Path((other_org.clone(), sid(&org, "inc_1")));
+        for path in [correction_path(&org, "inc_unknown"), elsewhere()] {
+            let label = format!("{}/{}", path.0.0, path.0.1);
+            let (status, answer) = put_correction_at(path, STEER_ROOT, body).await;
+            assert_eq!(status, StatusCode::NOT_FOUND, "PUT {label}: {answer}");
+        }
+        for path in [correction_path(&org, "inc_unknown"), elsewhere()] {
+            let (status, answer) = get_correction_at(path, STEER_ROOT).await;
+            assert_eq!(status, StatusCode::NOT_FOUND, "GET: {answer}");
+        }
+        for path in [correction_path(&org, "inc_unknown"), elsewhere()] {
+            let (status, _) = delete_correction_at(path, STEER_ROOT).await;
+            assert_eq!(status, StatusCode::NOT_FOUND, "DELETE");
+        }
+        assert_eq!(
+            correction_rows(&org, "inc_1").await,
+            std::slice::from_ref(&row)
+        );
+        assert_eq!(feedback_count(&org, "correction"), 1);
     }
 
     #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
@@ -5274,6 +5795,26 @@ mod tests {
             .all(conn)
             .await
             .unwrap()
+    }
+
+    /// The incident's runs once none is live: the launch goes on after the 202.
+    #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
+    async fn settled_runs(
+        conn: &sea_orm::DatabaseConnection,
+        org_id: &str,
+        incident_id: &str,
+    ) -> Vec<infra::table::entity::rca_runs::Model> {
+        for _ in 0..200 {
+            let runs = incident_runs(conn, org_id, incident_id).await;
+            if runs
+                .iter()
+                .all(|run| !matches!(run.state.as_str(), "running" | "waiting_input"))
+            {
+                return runs;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        }
+        panic!("a run of {incident_id} is still live after 10 s");
     }
 
     #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
@@ -5613,7 +6154,7 @@ mod tests {
         )
         .await;
         assert_eq!(status, StatusCode::ACCEPTED, "{body}");
-        let runs = incident_runs(conn, &org, "inc_1").await;
+        let runs = settled_runs(conn, &org, "inc_1").await;
         assert_eq!(runs.len(), 2, "{runs:?}");
         let new_run = runs
             .iter()
@@ -5769,12 +6310,11 @@ mod tests {
             resume_seed(&org, "run_src"),
         )
         .await;
+        assert_eq!(response.status(), StatusCode::ACCEPTED);
+        let runs = settled_runs(conn, &org, "inc_1").await;
         conn.execute_unprepared(&format!("DROP TRIGGER {trigger}"))
             .await
             .unwrap();
-        assert_eq!(response.status(), StatusCode::ACCEPTED);
-
-        let runs = incident_runs(conn, &org, "inc_1").await;
         assert_eq!(runs.len(), 2, "{runs:?}");
         let new_run = runs
             .iter()
@@ -5872,7 +6412,7 @@ mod tests {
 
     #[cfg(not(feature = "enterprise"))]
     #[tokio::test]
-    async fn test_the_oss_feedback_and_resume_routes_are_403() {
+    async fn test_the_oss_feedback_correction_and_resume_routes_are_403() {
         let path = || {
             Path((
                 "default".to_string(),
@@ -5885,6 +6425,7 @@ mod tests {
                 user_id: "a.rao@acme.io".to_string(),
             })
         };
+        let incident = || Path(("default".to_string(), "inc_1".to_string()));
         for response in [
             put_incident_rca_feedback(
                 path(),
@@ -5895,6 +6436,14 @@ mod tests {
             get_incident_rca_feedback(path(), user()).await,
             delete_incident_rca_feedback(path(), user()).await,
             resume_incident_rca_run(path(), user()).await,
+            put_incident_rca_correction(
+                incident(),
+                user(),
+                axum::body::Bytes::from_static(br#"{"cause":"capacity_or_load"}"#),
+            )
+            .await,
+            get_incident_rca_correction(incident(), user()).await,
+            delete_incident_rca_correction(incident(), user()).await,
         ] {
             assert_eq!(response.status(), axum::http::StatusCode::FORBIDDEN);
         }

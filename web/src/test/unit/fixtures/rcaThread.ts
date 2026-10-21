@@ -111,6 +111,7 @@ export function rcaThread(overrides: Partial<RcaThread> = {}): RcaThread {
     questions: [],
     report_submitted: false,
     stats: { steps: 9, tool_calls: 27, duration_ms: 252_000 },
+    truncated: false,
     ...overrides,
   };
 }

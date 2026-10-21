@@ -76,7 +76,11 @@ export type RcaReportFormat = "v1" | "v2";
 
 /** Outcome of a completed run. */
 export type RcaOutcome =
-  "root_cause_identified" | "contributing_factor" | "inconclusive" | "blocked";
+  | "root_cause_identified"
+  | "multiple_root_causes"
+  | "contributing_factor"
+  | "inconclusive"
+  | "blocked";
 
 /** Graded confidence band. */
 export type RcaBand = "high" | "medium" | "low";
@@ -294,6 +298,10 @@ export interface RcaThread {
   questions: RcaThreadQuestion[];
   report_submitted: boolean;
   stats: RcaThreadStats;
+  /** The end of the transcript was lost; the thread is the part that was saved. */
+  truncated: boolean;
+  /** With `truncated`: the last saved seq (-1: none). */
+  saved_through_seq?: number;
 }
 
 export type RcaSteerKind = "message" | "answer" | "hypothesis_action" | "guidance";
@@ -369,7 +377,7 @@ export interface RcaSteerResponse {
 export type RcaOutcomeReason =
   | "answer_deadline"
   | "root_cause_graded"
-  | "ambiguous_cause"
+  | "root_causes_graded"
   | "leading_blocked"
   | "contributing_graded"
   | "cause_below_medium"
@@ -461,6 +469,18 @@ export interface RcaSummaryCard {
   suspect_change?: RcaSummarySuspectChange;
   impact?: RcaImpact;
   needs?: string;
+  /** `multiple_root_causes` only: each root cause, in first-seen order. */
+  causes?: RcaSummaryCause[];
+}
+
+/** One root cause of a run with several. */
+export interface RcaSummaryCause {
+  id: string;
+  statement: string;
+  /** Microseconds since epoch; the agent's claim. */
+  onset_us?: number;
+  /** This cause's own band. */
+  band: RcaBand;
 }
 
 /** `verdict.proposed_actions[].kind`; an unknown kind reads as `other`. */
@@ -505,6 +525,8 @@ export interface RcaSummaryHypothesis {
   unverified_ids: string[];
   lead_ids: string[];
   first_seen_seq: number;
+  /** Microseconds since epoch; the agent's claim. */
+  onset_us?: number;
   history: RcaSummaryStatusChange[];
 }
 
@@ -623,7 +645,7 @@ export interface CancelRcaResponse {
 }
 
 /** A responder's verdict on a finished run. */
-export type RcaFeedbackVerdict = "yes" | "no" | "change";
+export type RcaFeedbackVerdict = "yes" | "no";
 
 /** Why a run is not the cause (`no` only). */
 export type RcaFeedbackReason =
@@ -637,7 +659,6 @@ export interface RcaFeedback {
   subject_type: RcaRunSubjectType;
   subject_id: string;
   verdict: RcaFeedbackVerdict;
-  cause: ResolutionCause | null;
   note: string | null;
   reasons: RcaFeedbackReason[];
   created_at: number;
@@ -647,7 +668,6 @@ export interface RcaFeedback {
 /** Body of `PUT …/rca/runs/{run_id}/feedback`. */
 export interface PutRcaFeedbackRequest {
   verdict: RcaFeedbackVerdict;
-  cause?: ResolutionCause;
   note?: string;
   reasons?: RcaFeedbackReason[];
 }
@@ -656,6 +676,29 @@ export interface PutRcaFeedbackRequest {
 export interface ListRcaFeedbackResponse {
   items: RcaFeedback[];
   mine: RcaFeedback | null;
+}
+
+/** One responder's correction of an incident's cause: one per incident and author. Times are microseconds. */
+export interface RcaCauseCorrection {
+  org_id: string;
+  incident_id: string;
+  author_email: string;
+  cause: ResolutionCause;
+  note: string | null;
+  created_at: number;
+  updated_at: number;
+}
+
+/** Body of `PUT …/rca/correction`; any cause but `still_unknown`. */
+export interface PutRcaCauseCorrectionRequest {
+  cause: ResolutionCause;
+  note?: string;
+}
+
+/** `GET …/rca/correction`: every author's correction (oldest first) and the caller's own. */
+export interface ListRcaCauseCorrectionResponse {
+  items: RcaCauseCorrection[];
+  mine: RcaCauseCorrection | null;
 }
 
 /** `POST …/rca/runs/{run_id}/resume`: 202 (J7). */
@@ -994,6 +1037,32 @@ const incidents = {
   deleteRcaFeedback: (org_identifier: string, incident_id: string, run_id: string) => {
     return http().delete(
       `/api/v2/${org_identifier}/alerts/incidents/${incident_id}/rca/runs/${run_id}/feedback`,
+    );
+  },
+
+  /** Read the cause corrections of an incident; `mine` is the caller's. */
+  getRcaCorrection: (org_identifier: string, incident_id: string) => {
+    return http().get<ListRcaCauseCorrectionResponse>(
+      `/api/v2/${org_identifier}/alerts/incidents/${incident_id}/rca/correction`,
+    );
+  },
+
+  /** Save the caller's cause correction; it replaces their earlier one. */
+  putRcaCorrection: (
+    org_identifier: string,
+    incident_id: string,
+    body: PutRcaCauseCorrectionRequest,
+  ) => {
+    return http().put<RcaCauseCorrection>(
+      `/api/v2/${org_identifier}/alerts/incidents/${incident_id}/rca/correction`,
+      body,
+    );
+  },
+
+  /** Undo: delete the caller's own correction (204). */
+  deleteRcaCorrection: (org_identifier: string, incident_id: string) => {
+    return http().delete(
+      `/api/v2/${org_identifier}/alerts/incidents/${incident_id}/rca/correction`,
     );
   },
 

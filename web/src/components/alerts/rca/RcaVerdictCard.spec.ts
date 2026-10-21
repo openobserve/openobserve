@@ -547,6 +547,46 @@ describe("RcaVerdictCard", () => {
       expect(text(wrapper, "rca-verdict-band")).toContain("Medium");
     });
 
+    it("multiple root causes: the verdict sentence heads the card and each cause shows its onset and band", () => {
+      const base = rcaRunSummary();
+      const card = {
+        ...base.card,
+        outcome: "multiple_root_causes" as const,
+        outcome_reason: "root_causes_graded" as const,
+        headline: "Pool exhaustion and a cache eviction storm",
+        band: "medium" as const,
+        causes: [
+          {
+            id: "h1",
+            statement: "orders-db pool exhausted",
+            // 2025-10-09T09:00:20Z.
+            onset_us: 1_760_000_420_000_000,
+            band: "high" as const,
+          },
+          { id: "h2", statement: "cache eviction storm", band: "medium" as const },
+        ],
+      };
+      const wrapper = mountCard({ cardState: "analyzed", summary: rcaRunSummary({ card }) });
+
+      expect(text(wrapper, "rca-verdict-state")).toBe("Multiple root causes");
+      expect(text(wrapper, "rca-verdict-headline")).toBe(
+        "Pool exhaustion and a cache eviction storm",
+      );
+      expect(byTest(wrapper, "rca-verdict-qualifier").exists()).toBe(false);
+      const causes = wrapper.findAll('[data-test="rca-verdict-cause"]');
+      expect(causes.map((c) => c.text().replace(/\s+/g, " "))).toEqual([
+        "orders-db pool exhausted · from 09:00 UTC · High confidence",
+        "cache eviction storm · Medium confidence",
+      ]);
+
+      // Another outcome never lists causes.
+      const single = mountCard({
+        cardState: "analyzed",
+        summary: rcaRunSummary({ card: { ...card, outcome: "root_cause_identified" } }),
+      });
+      expect(byTest(single, "rca-verdict-causes").exists()).toBe(false);
+    });
+
     it("C: Inconclusive, 'Suspected, not confirmed' with the subject statement, band Low, '(diff not read)' (VE17, VE35)", () => {
       const wrapper = mountCard({ cardState: "analyzed", summary: rcaRunSummaryInconclusive() });
 

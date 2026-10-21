@@ -22,6 +22,7 @@ vi.mock("@/services/incidents", () => ({
   default: {
     steerRca: vi.fn(),
     getRcaFeedback: vi.fn(),
+    getRcaCorrection: vi.fn(),
   },
 }));
 
@@ -62,6 +63,7 @@ import type { RcaRunSummary, RcaSteering, RcaThread } from "@/services/incidents
 
 const steerRca = vi.mocked(incidentsService.steerRca);
 const getRcaFeedback = vi.mocked(incidentsService.getRcaFeedback);
+const getRcaCorrection = vi.mocked(incidentsService.getRcaCorrection);
 
 /** What the live stream holds for the thread's run; a test sets the parts it needs. */
 interface StreamAnswers {
@@ -165,6 +167,7 @@ describe("IncidentRCAAnalysis", () => {
     writeText.mockReset().mockResolvedValue(undefined);
     steerRca.mockReset().mockResolvedValue({ data: { run_state: "running" } } as never);
     getRcaFeedback.mockClear();
+    getRcaCorrection.mockReset().mockResolvedValue({ data: { items: [], mine: null } } as never);
   });
 
   afterEach(() => {
@@ -1390,6 +1393,19 @@ describe("IncidentRCAAnalysis", () => {
 
     const askPayloads = (w: VueWrapper) => w.emitted<[RcaAskPayload]>("ask-ai") ?? [];
 
+    const failedProps = (overrides: Record<string, unknown> = {}) => ({
+      rca: rcaSummary({
+        state: "failed",
+        current_run: rcaRun({ state: "failed", ended_at: RCA_T0 + sec(180) }),
+      }),
+      error: { code: "timeout", reason: "Timed out", details: null, trigger_type: null },
+      history: [rcaRunItem({ run_id: "run-2", state: "failed" }), rcaRunItem()],
+      reportRun: rcaRunItem(),
+      reportText: REPORT,
+      threadRunId: "run-2",
+      ...overrides,
+    });
+
     describe("J5 Ask", () => {
       it("a finished run with a report: Ask emits the hand-off payload for a new, unsent chat", async () => {
         wrapper = mountPanel({ ...completedProps(), incidentTitle: "checkout 5xx" });
@@ -1469,19 +1485,6 @@ describe("IncidentRCAAnalysis", () => {
     });
 
     describe("J9 Resume", () => {
-      const failedProps = (overrides: Record<string, unknown> = {}) => ({
-        rca: rcaSummary({
-          state: "failed",
-          current_run: rcaRun({ state: "failed", ended_at: RCA_T0 + sec(180) }),
-        }),
-        error: { code: "timeout", reason: "Timed out", details: null, trigger_type: null },
-        history: [rcaRunItem({ run_id: "run-2", state: "failed" }), rcaRunItem()],
-        reportRun: rcaRunItem(),
-        reportText: REPORT,
-        threadRunId: "run-2",
-        ...overrides,
-      });
-
       it("Resume run on the L banner emits resume-rca with the resumable run id", async () => {
         wrapper = mountPanel(failedProps({ resumeRunId: "run-src" }));
         await flushPromises();
@@ -1530,14 +1533,16 @@ describe("IncidentRCAAnalysis", () => {
       });
     });
 
-    describe("J4 Feedback", () => {
-      it("a graded finished run shows the question and reads the caller's feedback for that run", async () => {
+    describe("J4 Feedback and the cause correction", () => {
+      it("a graded finished run shows Yes/No for that run and the incident's cause correction", async () => {
         answers.runSummary = rcaRunSummary();
         wrapper = mountPanel(completedProps());
         await flushPromises();
 
         expect(byTest(wrapper, "rca-feedback").exists()).toBe(true);
         expect(getRcaFeedback).toHaveBeenCalledWith("default", "inc-1", "run-1");
+        expect(byTest(wrapper, "rca-correction").exists()).toBe(true);
+        expect(getRcaCorrection).toHaveBeenCalledWith("default", "inc-1");
       });
 
       it("reads a finished run's feedback before its live summary arrives", async () => {
@@ -1552,21 +1557,54 @@ describe("IncidentRCAAnalysis", () => {
         expect(getRcaFeedback).toHaveBeenCalledWith("default", "inc-1", "run-1");
       });
 
-      it("a legacy finished run has no feedback", async () => {
+      it("a legacy finished run has no Yes/No but still offers the cause correction", async () => {
         const legacy = rcaRunItem({ has_record: false });
         wrapper = mountPanel({ ...completedProps(), reportRun: legacy, history: [legacy] });
         await flushPromises();
 
         expect(byTest(wrapper, "rca-feedback").exists()).toBe(false);
         expect(getRcaFeedback).not.toHaveBeenCalled();
+        expect(byTest(wrapper, "rca-correction").exists()).toBe(true);
       });
 
-      it("a live run has no feedback", async () => {
+      it("a failed (timed-out) run has no Yes/No; its card offers the cause correction", async () => {
+        wrapper = mountPanel(failedProps());
+        await flushPromises();
+
+        expect(byTest(wrapper, "rca-error-banner").exists()).toBe(true);
+        expect(byTest(wrapper, "rca-feedback").exists()).toBe(false);
+        expect(getRcaFeedback).not.toHaveBeenCalled();
+        expect(byTest(wrapper, "rca-correction").exists()).toBe(true);
+        expect(getRcaCorrection).toHaveBeenCalledWith("default", "inc-1");
+      });
+
+      it("a cancelled run has no Yes/No; its card offers the cause correction", async () => {
+        wrapper = mountPanel({
+          rca: rcaSummary({ state: "cancelled", current_run: rcaRun({ state: "cancelled" }) }),
+          threadRunId: "run-2",
+        });
+        await flushPromises();
+
+        expect(byTest(wrapper, "rca-cancelled-banner").exists()).toBe(true);
+        expect(byTest(wrapper, "rca-feedback").exists()).toBe(false);
+        expect(byTest(wrapper, "rca-correction").exists()).toBe(true);
+      });
+
+      it("a live run has neither Yes/No nor the cause correction", async () => {
         answers.runSummary = rcaRunSummaryLive();
         wrapper = mountPanel(liveProps());
         await flushPromises();
 
         expect(byTest(wrapper, "rca-feedback").exists()).toBe(false);
+        expect(byTest(wrapper, "rca-correction").exists()).toBe(false);
+        expect(getRcaCorrection).not.toHaveBeenCalled();
+      });
+
+      it("a finished run picked while the latest runs has no cause correction", async () => {
+        wrapper = mountPanel(liveProps({ viewedRun: rcaRunItem(), threadRunId: "run-1" }));
+        await flushPromises();
+
+        expect(byTest(wrapper, "rca-correction").exists()).toBe(false);
       });
     });
   });

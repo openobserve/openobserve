@@ -17,12 +17,9 @@
 
 use std::str::FromStr;
 
-use config::meta::{
-    alerts::rca_feedback::{FeedbackReason, FeedbackVerdict, RcaFeedback},
-    oncall::ResolutionCause,
-};
+use config::meta::alerts::rca_feedback::{FeedbackReason, FeedbackVerdict, RcaFeedback};
 use sea_orm::{
-    ColumnTrait, ConnectionTrait, DbErr, EntityTrait, QueryFilter, QueryOrder, QuerySelect,
+    ColumnTrait, ConnectionTrait, DbErr, EntityTrait, QueryFilter, QueryOrder,
     sea_query::OnConflict,
 };
 
@@ -45,7 +42,6 @@ pub async fn upsert_with<C: ConnectionTrait>(conn: &C, row: &Model) -> Result<Mo
                     Column::SubjectType,
                     Column::SubjectId,
                     Column::Verdict,
-                    Column::Cause,
                     Column::Note,
                     Column::Reasons,
                     Column::UpdatedAt,
@@ -125,42 +121,6 @@ pub async fn latest_for_run_with<C: ConnectionTrait>(
         .await
 }
 
-/// The subject's `change` rows (corrected causes), newest `updated_at` first, at most `limit`.
-pub async fn list_corrections_for_subject(
-    org_id: &str,
-    subject_type: &str,
-    subject_id: &str,
-    limit: u64,
-) -> Result<Vec<Model>, DbErr> {
-    list_corrections_for_subject_with(
-        get_orm_client_ro().await,
-        org_id,
-        subject_type,
-        subject_id,
-        limit,
-    )
-    .await
-}
-
-/// [list_corrections_for_subject] on a given connection.
-pub async fn list_corrections_for_subject_with<C: ConnectionTrait>(
-    conn: &C,
-    org_id: &str,
-    subject_type: &str,
-    subject_id: &str,
-    limit: u64,
-) -> Result<Vec<Model>, DbErr> {
-    Entity::find()
-        .filter(Column::OrgId.eq(org_id))
-        .filter(Column::SubjectType.eq(subject_type))
-        .filter(Column::SubjectId.eq(subject_id))
-        .filter(Column::Verdict.eq(FeedbackVerdict::Change.as_str()))
-        .order_by_desc(Column::UpdatedAt)
-        .limit(limit)
-        .all(conn)
-        .await
-}
-
 /// Deletes every row of the org.
 pub async fn delete_by_org(org_id: &str) -> Result<(), DbErr> {
     delete_by_org_with(get_orm_client_rw().await, org_id).await
@@ -188,7 +148,6 @@ pub fn to_feedback(m: Model) -> Option<RcaFeedback> {
             return None;
         }
     };
-    let cause = m.cause.as_deref().and_then(ResolutionCause::from_str_opt);
     let reasons = m
         .reasons
         .as_ref()
@@ -207,7 +166,6 @@ pub fn to_feedback(m: Model) -> Option<RcaFeedback> {
         subject_type: m.subject_type,
         subject_id: m.subject_id,
         verdict,
-        cause,
         note: m.note,
         reasons,
         created_at: m.created_at,
@@ -261,18 +219,10 @@ mod tests {
             subject_type: "alert".to_string(),
             subject_id: ALERT.to_string(),
             verdict: verdict.as_str().to_string(),
-            cause: None,
             note: None,
             reasons: None,
             created_at: at,
             updated_at: at,
-        }
-    }
-
-    fn change(org: &str, run: &str, author: &str, cause: ResolutionCause, at: i64) -> Model {
-        Model {
-            cause: Some(cause.as_str().to_string()),
-            ..row(org, run, author, FeedbackVerdict::Change, at)
         }
     }
 
@@ -295,8 +245,7 @@ mod tests {
         let second = Model {
             created_at: T0 + 60 * SEC,
             updated_at: T0 + 60 * SEC,
-            note: None,
-            ..change(ORG, RUN, RAO, ResolutionCause::CapacityOrLoad, T0)
+            ..row(ORG, RUN, RAO, FeedbackVerdict::Yes, T0)
         };
         let stored = upsert_with(&db, &second).await.unwrap();
         assert_eq!(
@@ -394,13 +343,13 @@ mod tests {
         // A newer row in another org or run does not count.
         upsert_with(
             &db,
-            &row(OTHER_ORG, RUN, RAO, FeedbackVerdict::Change, T0 + 99 * SEC),
+            &row(OTHER_ORG, RUN, RAO, FeedbackVerdict::Yes, T0 + 99 * SEC),
         )
         .await
         .unwrap();
         upsert_with(
             &db,
-            &row(ORG, "run_2", RAO, FeedbackVerdict::Change, T0 + 99 * SEC),
+            &row(ORG, "run_2", RAO, FeedbackVerdict::Yes, T0 + 99 * SEC),
         )
         .await
         .unwrap();
@@ -425,96 +374,11 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn list_corrections_for_subject_filters_orders_and_limits() {
-        let db = db().await;
-        for r in [
-            change(ORG, "run_1", RAO, ResolutionCause::CapacityOrLoad, T0),
-            change(
-                ORG,
-                "run_2",
-                RAO,
-                ResolutionCause::DependencyFailure,
-                T0 + 30 * SEC,
-            ),
-            change(
-                ORG,
-                "run_3",
-                KIM,
-                ResolutionCause::GenuineDefect,
-                T0 + 10 * SEC,
-            ),
-            // Not corrections.
-            row(ORG, "run_4", RAO, FeedbackVerdict::Yes, T0 + 40 * SEC),
-            row(ORG, "run_5", RAO, FeedbackVerdict::No, T0 + 50 * SEC),
-            // Other subjects and orgs.
-            Model {
-                subject_id: "alert_2".to_string(),
-                ..change(
-                    ORG,
-                    "run_6",
-                    RAO,
-                    ResolutionCause::NoisyThreshold,
-                    T0 + 60 * SEC,
-                )
-            },
-            Model {
-                subject_type: "incident".to_string(),
-                ..change(
-                    ORG,
-                    "run_7",
-                    RAO,
-                    ResolutionCause::NoisyThreshold,
-                    T0 + 60 * SEC,
-                )
-            },
-            Model {
-                subject_id: format!("{ALERT}:group:payments"),
-                ..change(
-                    ORG,
-                    "run_8",
-                    RAO,
-                    ResolutionCause::NoisyThreshold,
-                    T0 + 60 * SEC,
-                )
-            },
-            change(
-                OTHER_ORG,
-                "run_9",
-                RAO,
-                ResolutionCause::NoisyThreshold,
-                T0 + 60 * SEC,
-            ),
-        ] {
-            upsert_with(&db, &r).await.unwrap();
-        }
-        let got = list_corrections_for_subject_with(&db, ORG, "alert", ALERT, 10)
-            .await
-            .unwrap();
-        assert_eq!(keys(&got), [("run_2", RAO), ("run_3", KIM), ("run_1", RAO)]);
-        let got = list_corrections_for_subject_with(&db, ORG, "alert", ALERT, 2)
-            .await
-            .unwrap();
-        assert_eq!(keys(&got), [("run_2", RAO), ("run_3", KIM)]);
-
-        // A correction rewritten as `yes` stops being a lead.
-        upsert_with(
-            &db,
-            &row(ORG, "run_2", RAO, FeedbackVerdict::Yes, T0 + 70 * SEC),
-        )
-        .await
-        .unwrap();
-        let got = list_corrections_for_subject_with(&db, ORG, "alert", ALERT, 10)
-            .await
-            .unwrap();
-        assert_eq!(keys(&got), [("run_3", KIM), ("run_1", RAO)]);
-    }
-
-    #[tokio::test]
     async fn delete_by_org_leaves_other_orgs() {
         let db = db().await;
         for r in [
             row(ORG, RUN, RAO, FeedbackVerdict::Yes, T0),
-            change(ORG, "run_2", KIM, ResolutionCause::CapacityOrLoad, T0),
+            row(ORG, "run_2", KIM, FeedbackVerdict::No, T0),
             row(OTHER_ORG, RUN, RAO, FeedbackVerdict::Yes, T0),
         ] {
             upsert_with(&db, &r).await.unwrap();
@@ -522,7 +386,7 @@ mod tests {
         delete_by_org_with(&db, ORG).await.unwrap();
         assert!(list_for_run_with(&db, ORG, RUN).await.unwrap().is_empty());
         assert!(
-            list_corrections_for_subject_with(&db, ORG, "alert", ALERT, 10)
+            list_for_run_with(&db, ORG, "run_2")
                 .await
                 .unwrap()
                 .is_empty()
@@ -562,32 +426,22 @@ mod tests {
         assert_eq!(api.note.as_deref(), Some("deploy at 14:02"));
         assert_eq!((api.created_at, api.updated_at), (T0, T0));
 
-        let corrected = upsert_with(
-            &db,
-            &change(ORG, "run_2", RAO, ResolutionCause::DataOrIngestionIssue, T0),
-        )
-        .await
-        .unwrap();
-        assert_eq!(
-            to_feedback(corrected).unwrap().cause,
-            Some(ResolutionCause::DataOrIngestionIssue)
-        );
-
-        assert!(
-            to_feedback(Model {
-                verdict: "partly".to_string(),
-                ..row(ORG, RUN, RAO, FeedbackVerdict::Yes, T0)
-            })
-            .is_none()
-        );
+        for retired in ["partly", "change"] {
+            assert!(
+                to_feedback(Model {
+                    verdict: retired.to_string(),
+                    ..row(ORG, RUN, RAO, FeedbackVerdict::Yes, T0)
+                })
+                .is_none(),
+                "{retired}"
+            );
+        }
 
         let lenient = to_feedback(Model {
-            cause: Some("solar_flare".to_string()),
             reasons: Some(serde_json::json!(["wrong_service", "new_reason", 3])),
-            ..row(ORG, RUN, RAO, FeedbackVerdict::Change, T0)
+            ..row(ORG, RUN, RAO, FeedbackVerdict::No, T0)
         })
         .unwrap();
-        assert_eq!(lenient.cause, None);
         assert_eq!(lenient.reasons, [FeedbackReason::WrongService]);
 
         assert_eq!(reasons_column(&[]), None);

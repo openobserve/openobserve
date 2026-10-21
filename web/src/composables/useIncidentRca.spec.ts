@@ -509,6 +509,29 @@ describe("useIncidentRca (RR-35)", () => {
     expect(host.api.live.value).toBe(true);
   });
 
+  it("after the 202, triggering holds until the re-read shows the new run; no second start slips in", async () => {
+    const read = Promise.withResolvers<unknown>();
+    service.triggerRca.mockResolvedValue({ data: { run_id: "run-2" } } as never);
+    service.get.mockReturnValue(read.promise as never);
+    host = mountHost(rca("completed", "run-1", "run-1"));
+    await flushPromises();
+
+    const started = host.api.trigger();
+    await flushPromises();
+
+    expect(service.get).toHaveBeenCalledTimes(1);
+    expect(host.api.triggering.value).toBe(true);
+    await host.api.trigger();
+    await host.api.resume("run-1");
+    expect(service.triggerRca).toHaveBeenCalledTimes(1);
+    expect(service.resumeRca).not.toHaveBeenCalled();
+
+    read.resolve(detail(rca("running", "run-2", "run-1")));
+    await started;
+    expect(host.api.triggering.value).toBe(false);
+    expect(host.api.live.value).toBe(true);
+  });
+
   it("SG33: trigger passes the trimmed guidance with the mode", async () => {
     service.triggerRca.mockResolvedValue({ data: { run_id: "run-2" } } as never);
     service.get.mockResolvedValue(detail(rca("running", "run-2", "run-1")) as never);
@@ -538,43 +561,12 @@ describe("useIncidentRca (RR-35)", () => {
   });
 
   describe("RR-47: a rejected trigger", () => {
-    const withCurrentRun = (summary: RcaSummary, run: Partial<RcaRun>): RcaSummary => ({
-      ...summary,
-      current_run: { run_id: summary.run_id, state: summary.state, error: null, ...run } as RcaRun,
-    });
-
-    it("that committed a run shows the failure banner and no toast", async () => {
-      service.triggerRca.mockRejectedValue({
-        isAxiosError: true,
-        response: { status: 503, data: { message: "Agent unavailable" } },
-      });
-      const failed = withCurrentRun(rca("failed", "run-2", "run-1"), {
-        error: {
-          code: "agent_unavailable",
-          reason: "Agent unavailable",
-          details: null,
-          trigger_type: null,
-        },
-      });
-      service.get.mockResolvedValue(detail(failed) as never);
-      host = mountHost(withCurrentRun(rca("completed", "run-1", "run-1"), {}));
-      await flushPromises();
-
-      await host.api.trigger();
-
-      expect(service.get).toHaveBeenCalledTimes(1);
-      expect(host.api.currentError.value?.reason).toBe("Agent unavailable");
-      expect(toastMock).not.toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
-    });
-
-    it("that created no run (400 in progress) still toasts", async () => {
+    it("started no run: it toasts and re-reads nothing", async () => {
       service.triggerRca.mockRejectedValue({
         isAxiosError: true,
         response: { status: 400, data: { message: "An analysis is already in progress" } },
       });
-      const unchanged = withCurrentRun(rca("completed", "run-1", "run-1"), {});
-      service.get.mockResolvedValue(detail(unchanged) as never);
-      host = mountHost(unchanged);
+      host = mountHost(rca("completed", "run-1", "run-1"));
       await flushPromises();
 
       await host.api.trigger();
@@ -583,7 +575,9 @@ describe("useIncidentRca (RR-35)", () => {
         variant: "error",
         message: "An analysis is already in progress",
       });
+      expect(service.get).not.toHaveBeenCalled();
       expect(host.api.currentError.value).toBeNull();
+      expect(host.api.triggering.value).toBe(false);
     });
   });
 
@@ -843,33 +837,28 @@ describe("useIncidentRca (RR-35)", () => {
       },
     );
 
-    it("a rejected resume that created a run shows the banner, not a toast (review fix)", async () => {
-      service.resumeRca.mockRejectedValue({
-        isAxiosError: true,
-        response: { status: 500, data: { message: "The earlier steps could not be reused" } },
-      });
-      service.get.mockResolvedValue(
-        detail(
-          stopped({
-            run_id: "run-3",
-            trigger: "resume",
-            error: {
-              code: "resume_failed",
-              reason: "The earlier steps could not be reused",
-              details: null,
-              trigger_type: null,
-            },
-          }),
-        ) as never,
-      );
+    it("after the 202, resuming holds until the re-read shows the new run; a second Resume sends nothing", async () => {
+      const read = Promise.withResolvers<unknown>();
+      service.resumeRca.mockResolvedValue(RESUMED(2) as never);
+      service.get.mockReturnValue(read.promise as never);
       host = mountHost(stopped());
       await flushPromises();
 
-      await host.api.resume("run-2");
+      const resumed = host.api.resume("run-2");
+      await flushPromises();
 
       expect(service.get).toHaveBeenCalledTimes(1);
-      expect(host.api.currentError.value?.reason).toBe("The earlier steps could not be reused");
-      expect(toastMock).not.toHaveBeenCalled();
+      expect(host.api.resuming.value).toBe(true);
+      await host.api.resume("run-2");
+      await host.api.trigger();
+      expect(service.resumeRca).toHaveBeenCalledTimes(1);
+      expect(service.triggerRca).not.toHaveBeenCalled();
+
+      read.resolve(detail(rca("running", "run-3", null)));
+      await resumed;
+      expect(host.api.resuming.value).toBe(false);
+      expect(host.api.summary.value?.run_id).toBe("run-3");
+      expect(host.api.live.value).toBe(true);
     });
 
     it.each([
@@ -884,20 +873,17 @@ describe("useIncidentRca (RR-35)", () => {
         "The transcript expired",
       ],
       [500, {}, "Could not resume the run."],
-    ])(
-      "a refused resume (%i) that created no run toasts the server message",
-      async (status, data, text) => {
-        service.resumeRca.mockRejectedValue({ isAxiosError: true, response: { status, data } });
-        service.get.mockResolvedValue(detail(stopped()) as never);
-        host = mountHost(stopped());
-        await flushPromises();
+    ])("a refused resume (%i) toasts the server message and re-reads nothing", async (status, data, text) => {
+      service.resumeRca.mockRejectedValue({ isAxiosError: true, response: { status, data } });
+      host = mountHost(stopped());
+      await flushPromises();
 
-        await host.api.resume("run-2");
+      await host.api.resume("run-2");
 
-        expect(toastMock).toHaveBeenCalledWith({ variant: "error", message: text });
-        expect(host.api.resuming.value).toBe(false);
-      },
-    );
+      expect(toastMock).toHaveBeenCalledWith({ variant: "error", message: text });
+      expect(service.get).not.toHaveBeenCalled();
+      expect(host.api.resuming.value).toBe(false);
+    });
 
     it("a 412 (AI not available) toasts the server message and re-reads nothing", async () => {
       service.resumeRca.mockRejectedValue({

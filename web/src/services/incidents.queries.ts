@@ -14,7 +14,10 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { mutationOptions, queryOptions } from "@tanstack/vue-query";
-import incidents, { type PutRcaFeedbackRequest } from "./incidents";
+import incidents, {
+  type PutRcaCauseCorrectionRequest,
+  type PutRcaFeedbackRequest,
+} from "./incidents";
 import { incidentKeys } from "./incidents.querykeys";
 import { LIVE_STALE_TIME } from "@/composables/query/cachePolicy";
 
@@ -36,6 +39,13 @@ export const rcaFeedbackQuery = (org: string, incidentId: string, runId: string)
   queryOptions({
     queryKey: incidentKeys.rcaFeedback(org, incidentId, runId),
     queryFn: async () => (await incidents.getRcaFeedback(org, incidentId, runId)).data,
+    staleTime: LIVE_STALE_TIME,
+  });
+
+export const rcaCorrectionQuery = (org: string, incidentId: string) =>
+  queryOptions({
+    queryKey: incidentKeys.rcaCorrection(org, incidentId),
+    queryFn: async () => (await incidents.getRcaCorrection(org, incidentId)).data,
     staleTime: LIVE_STALE_TIME,
   });
 
@@ -69,4 +79,18 @@ export const deleteRcaFeedbackMutation = (org: string, incidentId: string, runId
   mutationOptions({
     mutationFn: () => incidents.deleteRcaFeedback(org, incidentId, runId),
     meta: { silentError: true },
+  });
+
+// Silent: the control shows its own error. Both writes refresh the read, so others' corrections stay current.
+export const putRcaCorrectionMutation = (org: string, incidentId: string) =>
+  mutationOptions({
+    mutationFn: async (body: PutRcaCauseCorrectionRequest) =>
+      (await incidents.putRcaCorrection(org, incidentId, body)).data,
+    meta: { invalidates: [incidentKeys.rcaCorrection(org, incidentId)], silentError: true },
+  });
+
+export const deleteRcaCorrectionMutation = (org: string, incidentId: string) =>
+  mutationOptions({
+    mutationFn: () => incidents.deleteRcaCorrection(org, incidentId),
+    meta: { invalidates: [incidentKeys.rcaCorrection(org, incidentId)], silentError: true },
   });

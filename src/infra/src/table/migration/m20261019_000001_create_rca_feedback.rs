@@ -180,13 +180,9 @@ mod tests {
         // The longest wire values fit their columns.
         use config::meta::alerts::rca_feedback::FeedbackVerdict;
         assert!(
-            [
-                FeedbackVerdict::Yes,
-                FeedbackVerdict::No,
-                FeedbackVerdict::Change
-            ]
-            .iter()
-            .all(|v| v.as_str().len() <= 8)
+            [FeedbackVerdict::Yes, FeedbackVerdict::No]
+                .iter()
+                .all(|v| v.as_str().len() <= 8)
         );
         assert!(
             config::meta::oncall::ResolutionCause::ALL

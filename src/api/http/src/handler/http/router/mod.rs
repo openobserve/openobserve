@@ -1354,6 +1354,7 @@ pub fn service_routes() -> Router {
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/steer", post(alerts::incidents::steer_incident_rca_run))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/steering", get(alerts::incidents::get_incident_rca_steering))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/feedback", put(alerts::incidents::put_incident_rca_feedback).get(alerts::incidents::get_incident_rca_feedback).delete(alerts::incidents::delete_incident_rca_feedback))
+        .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca/correction", put(alerts::incidents::put_incident_rca_correction).get(alerts::incidents::get_incident_rca_correction).delete(alerts::incidents::delete_incident_rca_correction))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/resume", post(alerts::incidents::resume_incident_rca_run))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/summary", get(alerts::incidents::get_incident_rca_summary))
         .route("/v2/{org_id}/alerts/incidents/rca/backtest", post(alerts::incidents::run_incident_rca_backtest))
@@ -4485,9 +4486,10 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn rca_feedback_and_resume_routes_take_only_their_methods() {
+    async fn rca_feedback_correction_and_resume_routes_take_only_their_methods() {
         const FEEDBACK_PATH: &str =
             "/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/feedback";
+        const CORRECTION_PATH: &str = "/v2/{org_id}/alerts/incidents/{incident_id}/rca/correction";
         const RESUME_PATH: &str =
             "/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/resume";
         let registrations = service_routes_registrations();
@@ -4496,6 +4498,12 @@ mod tests {
                 r#".route("{FEEDBACK_PATH}",put(alerts::incidents::put_incident_rca_feedback).get(alerts::incidents::get_incident_rca_feedback).delete(alerts::incidents::delete_incident_rca_feedback))"#
             )),
             "the feedback path must be registered in service_routes() for PUT, GET and DELETE"
+        );
+        assert!(
+            registrations.contains(&format!(
+                r#".route("{CORRECTION_PATH}",put(alerts::incidents::put_incident_rca_correction).get(alerts::incidents::get_incident_rca_correction).delete(alerts::incidents::delete_incident_rca_correction))"#
+            )),
+            "the correction path must be registered in service_routes() for PUT, GET and DELETE"
         );
         assert!(
             registrations.contains(&format!(
@@ -4512,6 +4520,12 @@ mod tests {
                     .delete(alerts::incidents::delete_incident_rca_feedback),
             )
             .route(
+                CORRECTION_PATH,
+                put(alerts::incidents::put_incident_rca_correction)
+                    .get(alerts::incidents::get_incident_rca_correction)
+                    .delete(alerts::incidents::delete_incident_rca_correction),
+            )
+            .route(
                 RESUME_PATH,
                 post(alerts::incidents::resume_incident_rca_run),
             );
@@ -4524,6 +4538,8 @@ mod tests {
                 "PATCH",
                 "/v2/myorg/alerts/incidents/inc1/rca/runs/run1/feedback",
             ),
+            ("POST", "/v2/myorg/alerts/incidents/inc1/rca/correction"),
+            ("PATCH", "/v2/myorg/alerts/incidents/inc1/rca/correction"),
             (
                 "GET",
                 "/v2/myorg/alerts/incidents/inc1/rca/runs/run1/resume",
