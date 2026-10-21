@@ -6,12 +6,14 @@
     size="icon-toolbar"
     @click.stop="sendToAiChat"
     data-test="o2-ai-context-add-btn"
+    :aria-label="t('menu.aiAssistant')"
     class="group hover:shadow-ai-accent/35 dark:shadow-ai-accent/20 dark:hover:shadow-ai-accent/35! [background:var(--color-gradient-ai-subtle)]! [transition:background_0.3s_ease,box-shadow_0.3s_ease] hover:shadow-md hover:[background:var(--color-gradient-ai)]! dark:shadow-md dark:hover:shadow-md"
     :class="props.class"
     :style="props.style"
   >
     <div class="flex flex-nowrap items-center">
       <img
+        alt=""
         :height="props.imageHeight"
         :width="props.imageWidth"
         :src="getBtnLogo"
@@ -23,11 +25,13 @@
 
 <script setup lang="ts">
 import { getImageURL } from "@/utils/zincutils";
+import { useI18nTyped } from "@/types/i18n";
 import { computed, type PropType } from "vue";
 import { useStore } from "vuex";
 import config from "@/aws-exports";
 import OButton from "@/lib/core/Button/OButton.vue";
 import useTheme from "@/composables/useTheme";
+const { t } = useI18nTyped();
 //we can pass class to the button to make it customized
 //all of the props are optional
 const props = defineProps({

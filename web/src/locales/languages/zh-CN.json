@@ -582,6 +582,12 @@
   },
   "common": {
     "copiedToClipboard": "已复制到剪贴板",
+    "customLogoAlt": "组织 Logo",
+    "dragToReorder": "拖动以重新排序",
+    "timeAmount": "时间数值",
+    "timeUnit": "时间单位",
+    "queryEditorAriaLabel": "查询编辑器。按 Escape 移动到下一个控件。",
+    "queryEditorEscapeAction": "将焦点移至下一个控件",
     "inlineEdit": {
       "autoHint": "点击重命名。在您重命名之前，此名称会根据您的配置自动生成，并在您更改配置时随之更新。"
     },
@@ -6075,6 +6081,11 @@
     "gpuExporter": "GPU 导出器"
   },
   "dashboard": {
+    "sortByClear": "清除排序",
+    "sortByAsc": "升序排序",
+    "sortByDesc": "降序排序",
+    "panelError": "面板错误：{message}",
+    "panelWarning": "面板警告",
     "saveConflict": {
       "notSaved": "未保存：其他人先保存了此仪表板。",
       "notSavedChange": "未保存：{change}。其他人先保存了此仪表板。",
@@ -8149,16 +8160,14 @@
     "invoiceHistoryLabel": "发票历史记录",
     "upgradeNow": "立即升级",
     "subscribe": "订阅",
-    "features": "功能",
-    "included": "包括什么？",
     "proPlanSubtitle": "适用于小型团队的定制解决方案",
     "unlimitedNote": "无限用户、日志、指标、追踪及更多。",
     "paymentNote": "付款按每月计费周期结束时的使用量计算。",
     "proPlanLabel": "即用即付",
-    "contactLabel": "联系销售人员",
+    "contactLabel": "联系销售",
     "enterpriseLabel": "企业计划",
     "enterpriseSubtitle": "高级功能和对企业需求的支持",
-    "discountTag": "打折时",
+    "discountTag": "折扣中",
     "enterpriseNote": "高容量需求？让我们来谈谈规模！联系我们获取量身定制的解决方案。",
     "contactSupport": "联系支持部门",
     "usageTrends": {
@@ -8795,6 +8804,7 @@
     }
   },
   "alerts": {
+    "moreActions": "更多操作",
     "promRuleMode": "规则模式",
     "promRulePreview": "{count} 个返回的序列当前匹配。每个序列必须在触发前完成待处理期。",
     "promRuleModeDescription": "当表达式返回任意序列时匹配。待处理期为零时，请选择单告警或多告警；设置待处理期会自动启用多告警。将数据流留空可推断所引用的指标数据流。",
@@ -9789,6 +9799,7 @@
     "selectStreamTypeFirst": "请先选择数据流类型",
     "previewEmptyState": "选择数据流类型和数据流名称以查看预览",
     "queryConfig": {
+      "aggregationFunction": "聚合函数",
       "sectionTitle": "条件",
       "openFullEditor": "打开完整版编辑器",
       "groupByTooltip": "按这些字段对结果分组 — 告警按每个唯一组合触发",
@@ -19260,6 +19271,8 @@
         "resetToDefault": "重置为默认",
         "resetColumnWidths": "重置列宽"
       },
+      "selectAllRows": "选择所有行",
+      "selectRow": "选择行 {name}",
       "removeColumnAria": "移除列",
       "formatColumnAria": "格式化列",
       "selectedOfTotal": "已选择 {selected}/{total}",

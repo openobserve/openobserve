@@ -3,6 +3,7 @@
 
 import type { InputProps, InputEmits, InputSlots } from "./OInput.types";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { splitControlAttrs, warnIfUnlabelled } from "@/lib/forms/controlAttrs";
 import { useI18nTyped } from "@/types/i18n";
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, useAttrs, useId, watch } from "vue";
 
@@ -19,10 +20,16 @@ const parentDataTest = computed(() => $attrs["data-test"] as string | undefined)
 
 // Forward tabindex to the real control; keep it off the wrapper (avoids a double tab-stop).
 const inputTabindex = computed(() => $attrs["tabindex"] as number | string | undefined);
-const wrapperAttrs = computed(() => {
-  const { tabindex: _tabindex, "aria-describedby": _describedBy, ...rest } = $attrs;
-  return rest;
-});
+const split = computed(() => splitControlAttrs($attrs));
+const wrapperAttrs = computed(() => split.value.wrapperAttrs);
+const controlAttrs = computed(() => split.value.controlAttrs);
+onMounted(() =>
+  warnIfUnlabelled(
+    "OInput",
+    Boolean(props.label || props.placeholder || $attrs["aria-label"] || $attrs["aria-labelledby"]),
+    inputId.value,
+  ),
+);
 
 const props = withDefaults(defineProps<InputProps>(), {
   type: "text",
@@ -296,10 +303,11 @@ const wrapperClasses = computed(() => [
     <!-- Input row -->
     <div :class="wrapperClasses">
       <!-- Inside label: floating mini-label at the top of the input border -->
-      <span
+      <label
         v-if="label && labelPosition === 'inside' && !isTextarea"
+        :for="inputId"
         class="text-2xs text-text-secondary pointer-events-none absolute start-3 end-7 top-1 overflow-hidden leading-none font-medium text-ellipsis whitespace-nowrap select-none"
-        >{{ label }}<span v-if="required" aria-hidden="true">&nbsp;*</span></span
+        >{{ label }}<span v-if="required" aria-hidden="true">&nbsp;*</span></label
       >
 
       <!-- Icon-left slot (inside border, left — matches OButton #icon-left pattern) -->
@@ -331,12 +339,13 @@ const wrapperClasses = computed(() => [
         :readonly="readonly"
         :aria-required="required || undefined"
         :aria-invalid="hasError || undefined"
-        :aria-describedby="describedBy"
         :autofocus="autofocus"
         :maxlength="maxlength"
         :rows="autogrow ? 1 : rows"
         :autocomplete="autocomplete"
         :tabindex="inputTabindex"
+        v-bind="controlAttrs"
+        :aria-describedby="describedBy"
         :style="autogrow ? { overflow: 'hidden' } : undefined"
         :class="[
           'min-w-0 flex-1 rounded-[inherit] bg-transparent outline-none',
@@ -380,6 +389,7 @@ const wrapperClasses = computed(() => [
         :autocomplete="autocomplete"
         :tabindex="inputTabindex"
         :aria-invalid="hasError || undefined"
+        v-bind="controlAttrs"
         :aria-describedby="describedBy"
         :class="[
           'min-w-0 flex-1 rounded-[inherit] bg-transparent outline-none',

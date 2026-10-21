@@ -144,6 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="h-8.5!"
                     :disabled="searchRequestTraceIds.length > 0"
                     data-test="dashboard-apply-options-btn"
+                    :aria-label="t('dashboard.moreActions')"
                     icon-left="keyboard-arrow-down"
                   />
                 </template>

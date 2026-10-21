@@ -582,6 +582,12 @@
   },
   "common": {
     "copiedToClipboard": "Đã sao chép vào bộ nhớ tạm",
+    "customLogoAlt": "Logo tổ chức",
+    "dragToReorder": "Kéo để sắp xếp lại",
+    "timeAmount": "Số lượng thời gian",
+    "timeUnit": "Đơn vị thời gian",
+    "queryEditorAriaLabel": "Trình soạn truy vấn. Nhấn Escape để chuyển sang điều khiển tiếp theo.",
+    "queryEditorEscapeAction": "Di chuyển tiêu điểm đến điều khiển tiếp theo",
     "inlineEdit": {
       "autoHint": "Nhấp để đổi tên. Cho đến khi bạn đổi tên, tên này được tạo từ cấu hình của bạn và sẽ cập nhật theo khi bạn thay đổi."
     },
@@ -6075,6 +6081,11 @@
     "gpuExporter": "GPU exporter"
   },
   "dashboard": {
+    "sortByClear": "Xóa sắp xếp",
+    "sortByAsc": "Sắp xếp tăng dần",
+    "sortByDesc": "Sắp xếp giảm dần",
+    "panelError": "Lỗi panel: {message}",
+    "panelWarning": "Cảnh báo panel",
     "saveConflict": {
       "notSaved": "Chưa lưu: người khác đã lưu bảng điều khiển này trước.",
       "notSavedChange": "Chưa lưu: {change}. Người khác đã lưu bảng điều khiển này trước.",
@@ -8149,14 +8160,12 @@
     "invoiceHistoryLabel": "Lịch sử hóa đơn",
     "upgradeNow": "Nâng cấp ngay",
     "subscribe": "Đăng ký",
-    "features": "TÍNH NĂNG",
-    "included": "Bao gồm những gì?",
     "proPlanSubtitle": "Giải pháp tùy chỉnh cho các nhóm nhỏ",
     "unlimitedNote": "Không giới hạn người dùng, nhật ký, chỉ số, trace và hơn thế nữa.",
     "paymentNote": "Thanh toán được tính theo mức sử dụng vào cuối chu kỳ thanh toán hàng tháng.",
     "proPlanLabel": "Trả theo mức sử dụng",
-    "contactLabel": "Liên hệ bộ phận bán hàng",
-    "enterpriseLabel": "Gói Doanh nghiệp",
+    "contactLabel": "Liên hệ kinh doanh",
+    "enterpriseLabel": "Gói doanh nghiệp",
     "enterpriseSubtitle": "Chức năng nâng cao và hỗ trợ cho nhu cầu Doanh nghiệp",
     "discountTag": "Đang giảm giá",
     "enterpriseNote": "Cần khối lượng lớn? Hãy nói về quy mô! Liên hệ với chúng tôi để có giải pháp phù hợp.",
@@ -8795,6 +8804,7 @@
     }
   },
   "alerts": {
+    "moreActions": "Thêm hành động",
     "promRuleMode": "Chế độ quy tắc",
     "promRulePreview": "{count} chuỗi trả về khớp hiện tại. Mỗi chuỗi phải hoàn thành khoảng thời gian chờ trước khi kích hoạt.",
     "promRuleModeDescription": "Khớp khi biểu thức trả về bất kỳ chuỗi nào. Chọn Single hoặc Multi alert khi khoảng thời gian chờ bằng không; khoảng thời gian chờ sẽ tự động bật Multi alert. Để trống stream để suy ra stream chỉ số được tham chiếu.",
@@ -9789,6 +9799,7 @@
     "selectStreamTypeFirst": "Chọn loại luồng trước",
     "previewEmptyState": "Chọn loại luồng và tên luồng để xem trước",
     "queryConfig": {
+      "aggregationFunction": "Hàm tổng hợp",
       "sectionTitle": "Điều kiện",
       "openFullEditor": "Mở toàn bộ trình soạn thảo",
       "groupByTooltip": "Nhóm kết quả theo các trường này — cảnh báo kích hoạt cho mỗi tổ hợp duy nhất",
@@ -19260,6 +19271,8 @@
         "resetToDefault": "Đặt lại mặc định",
         "resetColumnWidths": "Đặt lại độ rộng cột"
       },
+      "selectAllRows": "Chọn tất cả các hàng",
+      "selectRow": "Chọn hàng {name}",
       "removeColumnAria": "Xóa cột",
       "formatColumnAria": "Định dạng cột",
       "selectedOfTotal": "Đã chọn {selected} trong {total}",

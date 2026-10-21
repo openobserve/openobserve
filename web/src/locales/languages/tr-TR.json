@@ -582,6 +582,12 @@
   },
   "common": {
     "copiedToClipboard": "Panoya kopyalandı",
+    "customLogoAlt": "Kuruluş logosu",
+    "dragToReorder": "Sıralamak için sürükleyin",
+    "timeAmount": "Süre miktarı",
+    "timeUnit": "Süre birimi",
+    "queryEditorAriaLabel": "Sorgu düzenleyici. Sonraki denetime geçmek için Escape tuşuna basın.",
+    "queryEditorEscapeAction": "Odağı sonraki denetime taşı",
     "inlineEdit": {
       "autoHint": "Yeniden adlandırmak için tıklayın. Siz yapana kadar bu ad, yapılandırmanızdan oluşturulur ve siz değiştirdikçe güncel kalır."
     },
@@ -6075,6 +6081,11 @@
     "gpuExporter": "GPU dışa aktarıcı"
   },
   "dashboard": {
+    "sortByClear": "Sıralamayı temizle",
+    "sortByAsc": "Artan sırala",
+    "sortByDesc": "Azalan sırala",
+    "panelError": "Panel hatası: {message}",
+    "panelWarning": "Panel uyarısı",
     "saveConflict": {
       "notSaved": "Kaydedilmedi: bu panoyu önce başka biri kaydetti.",
       "notSavedChange": "Kaydedilmedi: {change}. Bu panoyu önce başka biri kaydetti.",
@@ -8149,16 +8160,14 @@
     "invoiceHistoryLabel": "Fatura Geçmişi",
     "upgradeNow": "Şimdi Yükselt",
     "subscribe": "abone",
-    "features": "ÖZELLİKLERİ",
-    "included": "Neler dahildir?",
     "proPlanSubtitle": "Küçük ekipler için özel çözümler",
     "unlimitedNote": "Sınırsız kullanıcı, günlük, metrik, iz ve daha fazlası.",
     "paymentNote": "Aylık faturalandırma döngüsünün sonunda kullanıma göre hesaplanan ödeme.",
     "proPlanLabel": "Kullandıkça öde",
-    "contactLabel": "Satış İletişim",
-    "enterpriseLabel": "Kurumsal Plan",
+    "contactLabel": "Satış ekibiyle iletişime geç",
+    "enterpriseLabel": "Kurumsal plan",
     "enterpriseSubtitle": "Kurumsal talepler için gelişmiş işlevsellik ve destek",
-    "discountTag": "İndirimli",
+    "discountTag": "İndirimde",
     "enterpriseNote": "Yüksek hacimli ihtiyaçlar? Ölçekten bahsedelim! Özel çözümler için bizimle iletişime geçin.",
     "contactSupport": "Destek ile iletişime geçin",
     "usageTrends": {
@@ -8795,6 +8804,7 @@
     }
   },
   "alerts": {
+    "moreActions": "Diğer işlemler",
     "promRuleMode": "Kural modu",
     "promRulePreview": "{count} döndürülen seri şu anda eşleşiyor. Her seri, tetiklenmeden önce bekleme süresini tamamlamalıdır.",
     "promRuleModeDescription": "İfade herhangi bir seri döndürdüğünde eşleşir. Bekleme süresi sıfır olduğunda Tek veya Çoklu uyarı seçin; bir bekleme süresi Çoklu uyarıyı otomatik olarak etkinleştirir. Referans verilen bir metrik akışını çıkarsamak için akışı boş bırakın.",
@@ -9789,6 +9799,7 @@
     "selectStreamTypeFirst": "Önce bir akış türü seçin",
     "previewEmptyState": "Önizlemeyi görmek için bir akış türü ve akış adı seçin",
     "queryConfig": {
+      "aggregationFunction": "Toplama işlevi",
       "sectionTitle": "Koşullar",
       "openFullEditor": "Tam Düzenleyiciyi Aç",
       "groupByTooltip": "Sonuçları bu alanlara göre gruplayın - benzersiz kombinasyon başına uyarı tetikleyicileri",
@@ -19260,6 +19271,8 @@
         "resetToDefault": "Varsayılana sıfırla",
         "resetColumnWidths": "Sütun genişliklerini sıfırla"
       },
+      "selectAllRows": "Tüm satırları seç",
+      "selectRow": "{name} satırını seç",
       "removeColumnAria": "Sütunu kaldır",
       "formatColumnAria": "Sütunu biçimlendir",
       "selectedOfTotal": "{total} öğeden {selected} tanesi seçildi",

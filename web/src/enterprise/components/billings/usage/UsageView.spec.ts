@@ -362,7 +362,7 @@ describe("UsageView AI credits warning", () => {
     const banner = wrapper.find('[data-test="billings-usageview-ai-exhausted"]');
     expect(banner.text()).toContain("Contact your account manager");
     expect(wrapper.find('[data-test="billings-usageview-ai-exhausted-action"]').text()).toBe(
-      "Contact Sales",
+      "Contact sales",
     );
   });
 

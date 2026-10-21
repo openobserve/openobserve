@@ -31,10 +31,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="icon-toolbar"
         @click="scheduledPipelineRef?.toggleAIChat()"
         data-test="menu-link-ai-item"
+        :aria-label="t('menu.aiAssistant')"
         class="bg-gradient-ai-subtle! hover:bg-gradient-ai! hover:shadow-ai-accent/35 transition-[background,box-shadow] duration-300 hover:shadow-md"
         :class="store.state.isAiChatEnabled ? 'ai-btn-active bg-gradient-ai-subtle!' : ''"
       >
         <img
+          alt=""
           :src="scheduledPipelineRef?.getBtnLogo"
           class="header-icon ai-icon opacity-70 transition-[transform] duration-[0.6s] ease-[ease]"
           :class="store.state.isAiChatEnabled ? 'opacity-100!' : ''"

@@ -582,6 +582,12 @@
   },
   "common": {
     "copiedToClipboard": "Copiado para a área de transferência",
+    "customLogoAlt": "Logotipo da organização",
+    "dragToReorder": "Arraste para reordenar",
+    "timeAmount": "Quantidade de tempo",
+    "timeUnit": "Unidade de tempo",
+    "queryEditorAriaLabel": "Editor de consulta. Pressione Escape para ir para o próximo controle.",
+    "queryEditorEscapeAction": "Mover o foco para o próximo controle",
     "inlineEdit": {
       "autoHint": "Clique para renomear. Até que você o faça, este nome é gerado a partir da sua configuração e acompanha as alterações."
     },
@@ -6075,6 +6081,11 @@
     "gpuExporter": "Exportador de GPU"
   },
   "dashboard": {
+    "sortByClear": "Limpar ordenação",
+    "sortByAsc": "Ordenar em ordem crescente",
+    "sortByDesc": "Ordenar em ordem decrescente",
+    "panelError": "Erro no painel: {message}",
+    "panelWarning": "Aviso no painel",
     "saveConflict": {
       "notSaved": "Não guardado: outra pessoa guardou este painel primeiro.",
       "notSavedChange": "Não guardado: {change}. Outra pessoa guardou este painel primeiro.",
@@ -8149,14 +8160,12 @@
     "invoiceHistoryLabel": "Histórico de faturas",
     "upgradeNow": "Atualize agora",
     "subscribe": "Inscrever-se",
-    "features": "CARACTERÍSTICAS",
-    "included": "O que está incluído?",
     "proPlanSubtitle": "Soluções personalizadas para equipes pequenas",
     "unlimitedNote": "Usuários ilimitados, registros, métricas, traces e muito mais.",
     "paymentNote": "Pagamento calculado pelo uso no final do ciclo de cobrança mensal.",
     "proPlanLabel": "Pague conforme o uso",
-    "contactLabel": "Entre em contato com vendas",
-    "enterpriseLabel": "Plano corporativo",
+    "contactLabel": "Falar com vendas",
+    "enterpriseLabel": "Plano Enterprise",
     "enterpriseSubtitle": "Funcionalidade avançada e suporte para demandas corporativas",
     "discountTag": "Com desconto",
     "enterpriseNote": "Necessidades de alto volume? Vamos falar de escala! Entre em contato conosco para obter soluções personalizadas.",
@@ -8795,6 +8804,7 @@
     }
   },
   "alerts": {
+    "moreActions": "Mais ações",
     "promRuleMode": "Modo de regra",
     "promRulePreview": "{count} séries retornadas correspondem agora. Cada série deve completar o período pendente antes de disparar.",
     "promRuleModeDescription": "Corresponde quando a expressão retorna qualquer série. Escolha alerta Único ou Múltiplo quando o período pendente for zero; um período pendente habilita o alerta Múltiplo automaticamente. Deixe o stream vazio para inferir um stream de métricas referenciado.",
@@ -9789,6 +9799,7 @@
     "selectStreamTypeFirst": "Selecione primeiro um tipo de stream",
     "previewEmptyState": "Selecione o tipo e o nome do stream para ver uma prévia",
     "queryConfig": {
+      "aggregationFunction": "Função de agregação",
       "sectionTitle": "Condições",
       "openFullEditor": "Abrir editor completo",
       "groupByTooltip": "Agrupe os resultados por esses campos — acionadores de alerta por combinação exclusiva",
@@ -19260,6 +19271,8 @@
         "resetToDefault": "Restaurar padrão",
         "resetColumnWidths": "Redefinir larguras das colunas"
       },
+      "selectAllRows": "Selecionar todas as linhas",
+      "selectRow": "Selecionar linha {name}",
       "removeColumnAria": "Remover coluna",
       "formatColumnAria": "Formatar coluna",
       "selectedOfTotal": "{selected} de {total} selecionados",

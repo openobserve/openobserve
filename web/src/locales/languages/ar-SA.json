@@ -582,6 +582,12 @@
   },
   "common": {
     "copiedToClipboard": "تم نسخها إلى الحافظة",
+    "customLogoAlt": "شعار المؤسسة",
+    "dragToReorder": "اسحب لإعادة الترتيب",
+    "timeAmount": "مقدار الوقت",
+    "timeUnit": "وحدة الوقت",
+    "queryEditorAriaLabel": "محرر الاستعلام. اضغط على Escape للانتقال إلى عنصر التحكم التالي.",
+    "queryEditorEscapeAction": "نقل التركيز إلى عنصر التحكم التالي",
     "inlineEdit": {
       "autoHint": "انقر لإعادة الاسم. حتى تفعل ذلك، يتم توليد هذا الاسم من إعدادك ويستمر مع تغييره."
     },
@@ -6075,6 +6081,11 @@
     "gpuExporter": "مصدِّر GPU"
   },
   "dashboard": {
+    "sortByClear": "مسح الفرز",
+    "sortByAsc": "فرز تصاعدي",
+    "sortByDesc": "فرز تنازلي",
+    "panelError": "خطأ في اللوحة: {message}",
+    "panelWarning": "تحذير اللوحة",
     "saveConflict": {
       "notSaved": "لم يُحفظ: حفظ شخص آخر لوحة المعلومات هذه أولًا.",
       "notSavedChange": "لم يُحفظ: {change}. حفظ شخص آخر لوحة المعلومات هذه أولًا.",
@@ -8149,16 +8160,14 @@
     "invoiceHistoryLabel": "تاريخ الفواتير",
     "upgradeNow": "قم بالترقية الآن",
     "subscribe": "اشترك",
-    "features": "المميزات",
-    "included": "ما الذي يشمله؟",
     "proPlanSubtitle": "حلول مخصصة للفرق الصغيرة",
     "unlimitedNote": "عدد غير محدود من المستخدمين، السجلات، المقاييس، التتبع والمزيد.",
     "paymentNote": "يتم حساب الدفع حسب الاستخدام في نهاية دورة الفوترة الشهرية.",
     "proPlanLabel": "ادفع حسب الاستخدام",
-    "contactLabel": "مبيعات الاتصال",
-    "enterpriseLabel": "خطة المؤسسة",
+    "contactLabel": "تواصل مع المبيعات",
+    "enterpriseLabel": "خطة المؤسسات",
     "enterpriseSubtitle": "وظائف ودعم متقدم لتلبية احتياجات المؤسسات",
-    "discountTag": "بتخفيض",
+    "discountTag": "مخفّض",
     "enterpriseNote": "هل تحتاج إلى حجم كبير؟ دعنا نتحدث عن التوسع! اتصل بنا للحصول على حلول مخصصة.",
     "contactSupport": "اتصل بالدعم",
     "usageTrends": {
@@ -8795,6 +8804,7 @@
     }
   },
   "alerts": {
+    "moreActions": "مزيد من الإجراءات",
     "promRuleMode": "وضع القاعدة",
     "promRulePreview": "{count} من السلاسل المُرجعة تحقق تطابقًا الآن. يجب أن تُكمل كل سلسلة فترة الانتظار قبل أن تُفعَّل.",
     "promRuleModeDescription": "يتحقق التطابق عندما يُرجع التعبير أي سلسلة. اختر تنبيهًا فرديًا أو متعددًا عندما تكون فترة الانتظار صفرًا؛ وفترة الانتظار تُفعِّل التنبيه المتعدد تلقائيًا. اترك الجدول فارغًا لاستنتاج جدول مقاييس مُشار إليه.",
@@ -9789,6 +9799,7 @@
     "selectStreamTypeFirst": "اختر نوع التدفق أولا",
     "previewEmptyState": "اختر نوع البث واسم البث لرؤية معاينة",
     "queryConfig": {
+      "aggregationFunction": "دالة التجميع",
       "sectionTitle": "الظروف",
       "openFullEditor": "المحرر الكامل المفتوح",
       "groupByTooltip": "اجمع النتائج حسب هذه الحقول — محفزات التنبيه لكل تركيبة فريدة",
@@ -19260,6 +19271,8 @@
         "resetToDefault": "إعادة التعيين إلى الوضع الافتراضي",
         "resetColumnWidths": "إعادة ضبط عرض الأعمدة"
       },
+      "selectAllRows": "تحديد كل الصفوف",
+      "selectRow": "تحديد الصف {name}",
       "removeColumnAria": "إزالة العمود",
       "formatColumnAria": "عمود التنسيق",
       "selectedOfTotal": "تم تحديد {selected} من {total}",

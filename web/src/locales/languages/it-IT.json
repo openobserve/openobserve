@@ -582,6 +582,12 @@
   },
   "common": {
     "copiedToClipboard": "Copiato negli appunti",
+    "customLogoAlt": "Logo dell'organizzazione",
+    "dragToReorder": "Trascina per riordinare",
+    "timeAmount": "Quantità di tempo",
+    "timeUnit": "Unità di tempo",
+    "queryEditorAriaLabel": "Editor di query. Premi Escape per passare al controllo successivo.",
+    "queryEditorEscapeAction": "Sposta il focus al controllo successivo",
     "inlineEdit": {
       "autoHint": "Fai clic per rinominare. Finché non lo fai, questo nome viene generato dalla tua configurazione e si aggiorna man mano che la modifichi."
     },
@@ -6075,6 +6081,11 @@
     "gpuExporter": "Esportatore GPU"
   },
   "dashboard": {
+    "sortByClear": "Cancella ordinamento",
+    "sortByAsc": "Ordina in modo crescente",
+    "sortByDesc": "Ordina in modo decrescente",
+    "panelError": "Errore del pannello: {message}",
+    "panelWarning": "Avviso del pannello",
     "saveConflict": {
       "notSaved": "Non salvato: qualcun altro ha salvato prima questa dashboard.",
       "notSavedChange": "Non salvato: {change}. Qualcun altro ha salvato prima questa dashboard.",
@@ -8149,16 +8160,14 @@
     "invoiceHistoryLabel": "Cronologia fatture",
     "upgradeNow": "Aggiorna ora",
     "subscribe": "Abbonati",
-    "features": "CARATTERISTICHE",
-    "included": "Cosa è incluso?",
     "proPlanSubtitle": "Soluzioni personalizzate per piccoli team",
     "unlimitedNote": "Utenti, log, metriche, tracce illimitati e altro.",
     "paymentNote": "Pagamento calcolato in base all'utilizzo alla fine del ciclo di fatturazione mensile.",
     "proPlanLabel": "Paga in base al tuo uso",
-    "contactLabel": "Contatta il reparto vendite",
-    "enterpriseLabel": "Piano aziendale",
+    "contactLabel": "Contatta il team commerciale",
+    "enterpriseLabel": "Piano Enterprise",
     "enterpriseSubtitle": "Funzionalità e supporto avanzati per le esigenze aziendali",
-    "discountTag": "In sconto",
+    "discountTag": "Scontato",
     "enterpriseNote": "Esigenze di volume elevato? Parliamo di scala! Contattaci per soluzioni su misura.",
     "contactSupport": "Contatta l'assistenza",
     "usageTrends": {
@@ -8795,6 +8804,7 @@
     }
   },
   "alerts": {
+    "moreActions": "Altre azioni",
     "promRuleMode": "Modalità regola",
     "promRulePreview": "{count} serie restituite corrispondono ora. Ogni serie deve completare il periodo di attesa prima di attivarsi.",
     "promRuleModeDescription": "Corrisponde quando l'espressione restituisce una qualsiasi serie. Scegli avviso Singolo o Multiplo quando il periodo di attesa è zero; un periodo di attesa abilita automaticamente l'avviso Multiplo. Lascia lo stream vuoto per dedurre uno stream di metriche referenziato.",
@@ -9789,6 +9799,7 @@
     "selectStreamTypeFirst": "Seleziona prima un tipo di stream",
     "previewEmptyState": "Seleziona il tipo e il nome dello stream per visualizzarne l'anteprima",
     "queryConfig": {
+      "aggregationFunction": "Funzione di aggregazione",
       "sectionTitle": "Condizioni",
       "openFullEditor": "Apri l'editor completo",
       "groupByTooltip": "Raggruppa i risultati in base a questi campi: trigger di avviso per combinazione univoca",
@@ -19260,6 +19271,8 @@
         "resetToDefault": "Ripristina predefiniti",
         "resetColumnWidths": "Ripristina larghezze colonne"
       },
+      "selectAllRows": "Seleziona tutte le righe",
+      "selectRow": "Seleziona la riga {name}",
       "removeColumnAria": "Rimuovi colonna",
       "formatColumnAria": "Formatta colonna",
       "selectedOfTotal": "{selected} di {total} selezionati",
