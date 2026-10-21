@@ -114,7 +114,8 @@
       "dashboard-refresh-without-cache.spec.js",
       "dashboard-print-layout.spec.js",
       "dashboard-layout-edit-mode.spec.js",
-      "dashboardPagination.spec.js"
+      "dashboardPagination.spec.js",
+      "dashboard-refresh-button.spec.js"
     ],
     "disabled": [
       {
