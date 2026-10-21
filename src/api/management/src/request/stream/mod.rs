@@ -588,8 +588,7 @@ pub async fn list(
     }
 
     #[cfg(feature = "enterprise")]
-    if fetch_schema
-        && !listed_by_permission
+    if !listed_by_permission
         && !db::user::is_root_user(&_user_email.user_id)
         && openobserve_core::authz::rbac_enforced().await
     {
@@ -614,7 +613,7 @@ pub async fn list(
         .into_response()
 }
 
-/// Strips the fields of each stream `can_read` refuses, so it lists as without `fetchSchema`.
+/// Keeps only the name and stats of each stream `can_read` refuses: settings name fields too.
 #[cfg(any(feature = "enterprise", test))]
 fn hide_unreadable_schemas(
     streams: &mut [meta::stream::Stream],
@@ -622,7 +621,10 @@ fn hide_unreadable_schemas(
 ) {
     for stream in streams.iter_mut().filter(|s| !can_read(s)) {
         stream.schema.clear();
+        stream.uds_schema.clear();
         stream.total_fields = 0;
+        stream.settings = Default::default();
+        stream.pattern_associations.clear();
     }
 }
 
@@ -1177,6 +1179,37 @@ mod tests {
         assert_eq!(streams[1].total_fields, 1);
     }
 
+    #[test]
+    fn listing_drops_the_settings_of_streams_the_caller_cannot_read() {
+        let field = config::meta::stream::StreamField {
+            name: "card_bin".to_string(),
+            r#type: "Utf8".to_string(),
+        };
+        let mut streams = vec![
+            make_stream("hidden", 3, 1.0, 1.0, 0.0),
+            make_stream("readable", 3, 1.0, 1.0, 0.0),
+        ];
+        for s in streams.iter_mut() {
+            s.uds_schema = vec![field.clone()];
+            s.settings.partition_keys =
+                vec![config::meta::stream::StreamPartition::new("card_bin")];
+            s.settings.full_text_search_keys = vec!["card_bin".to_string()];
+            s.settings.index_fields = vec!["card_bin".to_string()];
+            s.settings.bloom_filter_fields = vec!["card_bin".to_string()];
+            s.settings.defined_schema_fields = vec!["card_bin".to_string()];
+            s.settings.data_retention = 7;
+        }
+        let readable_settings = streams[1].settings.clone();
+        hide_unreadable_schemas(&mut streams, |s| s.name == "readable");
+        assert_eq!(streams[0].settings, Default::default());
+        assert!(streams[0].uds_schema.is_empty());
+        assert!(!format!("{:?}", streams[0]).contains("card_bin"));
+        assert_eq!(streams[0].name, "hidden");
+        assert_eq!(streams[0].stats.doc_num, 3);
+        assert_eq!(streams[1].settings, readable_settings);
+        assert_eq!(streams[1].uds_schema.len(), 1);
+    }
+
     fn typed_stream(name: &str, stream_type: StreamType) -> meta::stream::Stream {
         let mut stream = make_stream(name, 1, 1.0, 1.0, 0.0);
         stream.stream_type = stream_type;
@@ -1235,6 +1268,10 @@ mod tests {
         let body = &text[start..];
         let body = &body[..body.find("\n}\n").expect("handler end")];
         assert!(body.contains("hide_unreadable_schemas("));
+        assert!(
+            !body.contains("if fetch_schema"),
+            "settings carry field names, so the guard runs with or without fetchSchema"
+        );
     }
 
     #[test]
