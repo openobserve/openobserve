@@ -1063,6 +1063,11 @@ describe("pa gap fixes (scope bar and Exclusions drawer)", () => {
     await chip()!.trigger("click");
     await settle();
   };
+  const waitUntil = async (cond: () => boolean, tries = 100) => {
+    for (let i = 0; i < tries && !cond(); i++) await new Promise((r) => setTimeout(r, 20));
+    await settle();
+  };
+  const putCalls = () => settingsApi.putAppSettings.mock.calls.length;
   const botSwitch = (d: HTMLElement) =>
     d.querySelector<HTMLElement>('[data-test="rum-analytics-exclusions-builtin-switch-btn"]')!;
   const isDisabled = (el: Element | undefined) =>
@@ -1321,7 +1326,7 @@ describe("pa gap fixes (scope bar and Exclusions drawer)", () => {
       "Page is /health",
     );
     buttonIn(d, "Save")!.click();
-    await settle();
+    await waitUntil(() => putCalls() > 0);
     const body = settingsApi.putAppSettings.mock.calls[0][2];
     expect(body).toMatchObject({ pages: [{ op: "eq", value: "/health" }] });
   });
@@ -1341,7 +1346,7 @@ describe("pa gap fixes (scope bar and Exclusions drawer)", () => {
       .click();
     await settle();
     buttonIn(d, "Save")!.click();
-    await settle();
+    await waitUntil(() => putCalls() > 0);
     expect(settingsApi.putAppSettings.mock.calls[0][2]).toMatchObject({ sessions: [rule] });
   });
 
@@ -1367,7 +1372,7 @@ describe("pa gap fixes (scope bar and Exclusions drawer)", () => {
     botSwitch(d).click();
     await settle();
     buttonIn(d, "Save")!.click();
-    await settle();
+    await waitUntil(() => searchCount(/va_rows/) > summaries);
     expect(settingsApi.getAppSettings.mock.calls.length).toBeGreaterThan(reads);
     const scope = useProductAnalytics().scope.value as unknown as { exclusions: unknown };
     expect(scope.exclusions).toMatchObject({ bots: false, rulesHash: "fedcba9876543210" });
