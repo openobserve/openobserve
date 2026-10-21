@@ -1,0 +1,9 @@
+{
+  "action": "append",
+  "target_spec": "tests/ui-testing/playwright-tests/Alerts/alerts-anomaly-detection.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/Alerts/alerts-anomaly-detection.spec.js"
+  ],
+  "needs_registration": false,
+  "rationale": "The single anomaly suite (alerts-anomaly-detection.spec.js) is the only spec that touches the sensitivity control, and its `Sensitivity` describe block already hosts the tier/level tests the dev has just extended in this diff (the read-only Auto readout, the Custom-sensitivity label, the manual-model-required hint, and the tier-before-level inputs). Grep across tests/ui-testing/playwright-tests found no other spec asserting sensitivity/band_width. The feature's core UI behaviors are therefore already covered; what remains are two gaps in the SAME file: (1) the new cleared-draft validation semantics — the schema now treats only `null` as Auto and a cleared '' manual draft as an error, which no E2E test asserts (only numeric 0.5/10.5 out-of-range is covered) — and (2) the trained `Current level` readout, which needs a seeded+training run. Both are `append` (new test() inside the existing spec), not a new file, so no ci_matrix registration is needed. The spec is enterprise-gated (anomaly_detection_enabled is false on OSS), which is unchanged by appending."
+}
