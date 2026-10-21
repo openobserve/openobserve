@@ -547,6 +547,8 @@ export function useFleetAudit() {
     rows: computed(() => (isForbidden(query.error.value) ? [] : (query.data.value?.items ?? []))),
     disabled: computed(() => !!query.data.value?.audit_disabled),
     loading: query.isPending,
+    fetching: query.isFetching,
+    lastUpdatedAt: query.dataUpdatedAt,
     error: query.error,
     refetch: () => query.refetch(),
   };

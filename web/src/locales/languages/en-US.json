@@ -25451,6 +25451,7 @@
       "retentionDaysHelp": "0 keeps offline collectors forever"
     },
     "audit": {
+      "search": "Search the audit trail",
       "editedConfig": "Edited configuration",
       "revokedToken": "Revoked enrollment token",
       "enrolledCollector": "Enrolled collector",
