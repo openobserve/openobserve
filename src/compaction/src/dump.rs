@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashSet, sync::Arc};
+use std::sync::Arc;
 
 use arrow::{
     array::{BooleanBuilder, Int64Builder, StringBuilder},
@@ -46,6 +46,8 @@ use itertools::Itertools;
 use parquet::{arrow::AsyncArrowWriter, file::properties::WriterProperties};
 use search_service::file_list_dump::*;
 use tokio::sync::mpsc;
+
+use crate::bloom::compact::bloom_files_deleted;
 
 #[derive(Clone)]
 pub struct DumpJob {
@@ -368,7 +370,7 @@ pub async fn delete_all(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
-) -> Result<HashSet<(String, i64)>, errors::Error> {
+) -> Result<(), errors::Error> {
     delete_by_time_range(
         org_id,
         stream_type,
@@ -384,23 +386,22 @@ pub async fn delete_all(
 //   3. if not all the files need to be deleted, we need to generate new dump files
 //   4. insert the deleted items into file_list_deleted table
 //   5. make the old files deleted and add the new files to file_list table
-// returns the (hour, bloom_ver) pairs of the deleted data files
 pub async fn delete_by_time_range(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
     range: (i64, i64),
-) -> Result<HashSet<(String, i64)>, errors::Error> {
+) -> Result<(), errors::Error> {
     let cfg = get_config();
     if !cfg.compact.file_list_dump_enabled {
-        return Ok(HashSet::new());
+        return Ok(());
     }
     let dump_stream_name = generate_dump_stream_name(stream_type, stream_name);
     let list =
         infra::file_list::query_for_dump(org_id, StreamType::Filelist, &dump_stream_name, range)
             .await?;
     if list.is_empty() {
-        return Ok(HashSet::new());
+        return Ok(());
     }
 
     let dump_files = list.iter().map(|f| f.into()).collect::<Vec<_>>();
@@ -420,13 +421,8 @@ pub async fn delete_by_time_range(
         .partition(|f| f.date >= start_date && f.date <= end_date);
 
     if files_to_delete.is_empty() {
-        return Ok(HashSet::new());
+        return Ok(()); // nothing need to do
     }
-    let bloom_hours = files_to_delete
-        .iter()
-        .filter(|f| f.bloom_ver > 0)
-        .map(|f| (f.date.clone(), f.bloom_ver))
-        .collect::<HashSet<_>>();
 
     // Check if there are some files need to be kept, then we need to generate new dump files
     let mut new_dump_files = Vec::new();
@@ -451,6 +447,14 @@ pub async fn delete_by_time_range(
 
     // Create deleted items for file_list_deleted table
     let mut del_items: Vec<_> = files_to_delete.iter().map(deleted_data_file).collect();
+    del_items.extend(bloom_files_deleted(
+        org_id,
+        stream_type,
+        stream_name,
+        files_to_delete
+            .iter()
+            .map(|f| (f.date.clone(), f.bloom_ver)),
+    ));
 
     // we also need to delete the dump files
     del_items.extend(dump_files.iter().map(|f| FileListDeleted {
@@ -534,7 +538,7 @@ pub async fn delete_by_time_range(
         }
     }
 
-    Ok(bloom_hours)
+    Ok(())
 }
 
 fn deleted_data_file(file: &FileRecord) -> FileListDeleted {

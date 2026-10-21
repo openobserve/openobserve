@@ -34,7 +34,10 @@
 //! data-retention to reap. Neither affects correctness, so neither
 //! propagates to the caller as a hard error.
 
-use std::{collections::HashSet, sync::Arc};
+use std::{
+    collections::{BTreeSet, HashSet},
+    sync::Arc,
+};
 
 use anyhow::Context;
 use bytes::Bytes;
@@ -163,8 +166,27 @@ pub(crate) async fn build_for_stream(
     Ok(true)
 }
 
+/// The `file_list_deleted` entries for the `.bf` files behind the given (hour, `bloom_ver`)
+/// pairs, one per distinct pair; pairs with `bloom_ver == 0` have no `.bf` and are skipped.
+pub(crate) fn bloom_files_deleted(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    bloom_hours: impl IntoIterator<Item = (String, i64)>,
+) -> Vec<FileListDeleted> {
+    bloom_hours
+        .into_iter()
+        .filter(|(_, bloom_ver)| *bloom_ver > 0)
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .map(|(date_key, bloom_ver)| {
+            bloom_file_deleted(org_id, stream_type, stream_name, &date_key, bloom_ver)
+        })
+        .collect()
+}
+
 /// The `file_list_deleted` entry that retires the `.bf` of one (stream, hour, `bloom_ver`).
-pub(crate) fn bloom_file_deleted(
+fn bloom_file_deleted(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
