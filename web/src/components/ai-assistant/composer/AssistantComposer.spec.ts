@@ -225,12 +225,78 @@ describe("states (`40` §1.3)", () => {
 
   it("switches to the reply placeholder and helper (CT-07 AC 4)", async () => {
     const { wrapper, store, sid, textarea } = setup();
+    store.state.sessions[sid].pendingApproval = { id: "c1" } as PendingApproval;
     store.startReply(sid, "c1");
     await flushPromises();
     expect(textarea().attributes("placeholder")).toBe("Reply to the assistant");
+    expect(textarea().attributes("readonly")).toBeUndefined();
     expect(wrapper.get('[data-test="assistant-composer-helper"]').text()).toContain(
       "Your reply answers",
     );
+  });
+
+  it("answers the card with Enter in reply mode, the turn still running, chips left staged", async () => {
+    const { store, sid, textarea } = setup();
+    const session = store.state.sessions[sid];
+    session.pendingApproval = { id: "c1" } as PendingApproval;
+    session.turn = { state: "awaiting_approval", callId: "c1" };
+    store.setDraft(sid, { text: "and check cart too" });
+    store.startReply(sid, "c1");
+    const decide = vi.spyOn(store, "decideApproval").mockImplementation(async () => {
+      session.pendingApproval = null;
+      return {} as never;
+    });
+    const send = vi.spyOn(store, "send");
+    await flushPromises();
+    expect(textarea().element.value).toBe("");
+    await textarea().trigger("keydown", { key: "Enter" });
+    expect(decide).not.toHaveBeenCalled();
+    await type(textarea(), "use staging");
+    await textarea().trigger("keydown", { key: "Enter" });
+    await flushPromises();
+    expect(decide).toHaveBeenCalledWith(
+      sid,
+      { approved: false, reason: "reply", reply: "use staging" },
+      "c1",
+    );
+    expect(send).not.toHaveBeenCalled();
+    expect(session.composer.text).toBe("and check cart too");
+    expect(session.composer.mode).toBe("compose");
+  });
+
+  it("keeps a refused reply in the box and says why", async () => {
+    const { store, sid, textarea, wrapper } = setup();
+    const session = store.state.sessions[sid];
+    session.pendingApproval = { id: "c1" } as PendingApproval;
+    store.startReply(sid, "c1");
+    vi.spyOn(store, "decideApproval").mockResolvedValue({} as never);
+    await flushPromises();
+    await type(textarea(), "use staging");
+    await textarea().trigger("keydown", { key: "Enter" });
+    await flushPromises();
+    expect(session.composer).toMatchObject({ mode: "reply", text: "use staging" });
+    expect(wrapper.get('[data-test="assistant-composer-status"]').text()).toBe(
+      "Your reply wasn't sent. This request can't be answered from this page.",
+    );
+  });
+
+  it("leaves Reply with Cancel or Escape, the draft back and nothing sent", async () => {
+    const { store, sid, textarea, wrapper } = setup();
+    const session = store.state.sessions[sid];
+    session.pendingApproval = { id: "c1" } as PendingApproval;
+    store.setDraft(sid, { text: "my draft" });
+    store.startReply(sid, "c1");
+    const decide = vi.spyOn(store, "decideApproval");
+    await flushPromises();
+    await wrapper.get('[data-test="assistant-composer-reply-cancel"]').trigger("click");
+    expect(session.composer).toMatchObject({ mode: "compose", text: "my draft" });
+    store.startReply(sid, "c1");
+    await flushPromises();
+    const escape = new KeyboardEvent("keydown", { key: "Escape" });
+    Object.defineProperty(escape, "target", { value: textarea().element });
+    expect(runEscapeLadder(escape)).toBe(true);
+    expect(session.composer).toMatchObject({ mode: "compose", text: "my draft" });
+    expect(decide).not.toHaveBeenCalled();
   });
 
   it("says once that drafts will not survive a reload when storage is blocked (ERR-14)", async () => {

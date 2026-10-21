@@ -24,7 +24,12 @@ import {
   inertAssistantDeps,
   type AssistantStoreInternal,
 } from "./assistantStore";
-import type { AssistantCapability, AssistantSession, TurnEngine } from "./assistantStore.types";
+import type {
+  ApprovalsService,
+  AssistantCapability,
+  AssistantSession,
+  TurnEngine,
+} from "./assistantStore.types";
 import { createDraftStore } from "./drafts";
 import type { AssistantFrame } from "./frames";
 import { resetPrefsForTests } from "./prefs";
@@ -76,7 +81,13 @@ interface Sent {
 let clock = 0;
 
 function setup(
-  opts: { persistence?: boolean; tail?: boolean; hidden?: boolean; client?: AssistantClient } = {},
+  opts: {
+    persistence?: boolean;
+    tail?: boolean;
+    hidden?: boolean;
+    client?: AssistantClient;
+    approvals?: Pick<ApprovalsService, "onConfirmationRequired" | "onResolved">;
+  } = {},
 ) {
   const persistence = { value: opts.persistence ?? true };
   const sends: Sent[] = [];
@@ -136,6 +147,7 @@ function setup(
     tailEnabled: () => !!opts.tail,
     raf: (cb) => cb(),
     visibility,
+    ...(opts.approvals && { approvals: () => opts.approvals! }),
   });
   deps.engine = engine;
   store = createAssistantStore(deps, {
@@ -539,6 +551,23 @@ describe("turnEngine: consent (CC-06)", () => {
     });
     expect(h.session().pendingConsent).toBeNull();
     expect(h.session().composer.text).toBe("why?");
+    expect(h.client.stop).not.toHaveBeenCalled();
+  });
+
+  it("ends a turn whose paid usage went on after a Stop unsent, the prompt back, with no claim it stayed off", async () => {
+    const h = setup();
+    h.type("why?");
+    h.results.push(refusal(412, consentBody));
+    const run = h.store.send(h.current.sid);
+    await settle();
+    h.engine.consentWithdrawn?.(h.current.sid);
+    await expect(run).resolves.toMatchObject({
+      state: "refused",
+      error: { code: "stopped_before_send" },
+    });
+    expect(h.session().pendingConsent).toBeNull();
+    expect(h.session().composer.text).toBe("why?");
+    expect(h.sends).toHaveLength(1);
     expect(h.client.stop).not.toHaveBeenCalled();
   });
 });
@@ -1074,7 +1103,7 @@ describe("turnEngine: outcomes", () => {
       expires_at: clock + 25_000,
     });
     expect(h.session().turn).toEqual({ state: "awaiting_approval", callId: "c9" });
-    await vi.advanceTimersByTimeAsync(25_000);
+    await vi.advanceTimersByTimeAsync(26_000);
     await expect(run).resolves.toMatchObject({
       state: "failed",
       error: { code: "approval_expired", action: "ask_again" },
@@ -1796,5 +1825,159 @@ describe("turnEngine: WP-06 outcomes, Regenerate and Edit and resend", () => {
       "org1",
       expect.objectContaining({ turnId: "active-1" }),
     );
+  });
+});
+
+describe("turn engine: approval cards", () => {
+  const start = async (h: ReturnType<typeof setup>) => {
+    h.type("why?");
+    const run = h.store.send(h.current.sid);
+    await settle();
+    return { run };
+  };
+
+  const approvalsFor = (expiresIn?: number) => {
+    let store: AssistantStoreInternal | null = null;
+    const approvals = {
+      onConfirmationRequired: vi.fn((sid: string, frame: AssistantFrame & { call_id?: string }) => {
+        const session = store?.state.sessions[sid];
+        if (!session) return;
+        session.pendingApproval = {
+          id: frame.call_id ?? (frame as { id?: string }).id ?? "c9",
+          sessionId: sid,
+          turnId: session.turnMeta.turnId ?? "",
+          kind: "delete",
+          destructive: true,
+          operation: "",
+          tool: "o2_delete",
+          targets: [],
+          askedIn: "here",
+          grantable: false,
+          editable: false,
+          question: "",
+          ...(expiresIn !== undefined && { expiresAt: clock + expiresIn }),
+        };
+      }),
+      onResolved: vi.fn(),
+    };
+    const h = setup({ approvals });
+    store = h.store;
+    return { h, approvals };
+  };
+
+  it("hands the card frame to the approvals runtime and ends the turn just after the card's own expiry", async () => {
+    const { h, approvals } = approvalsFor(5_000);
+    const { run } = await start(h);
+    h.feed({ type: "confirmation_required", tool: "o2_delete", call_id: "c9" });
+    expect(approvals.onConfirmationRequired).toHaveBeenCalledWith(
+      h.current.sid,
+      expect.objectContaining({ call_id: "c9" }),
+    );
+    expect(h.session().messages.at(-1)?.contentBlocks?.at(-1)?.type).toBe("approval");
+    // The card's own decline goes out at its expiry; the turn waits a moment longer before it ends.
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(h.session().turn.state).toBe("awaiting_approval");
+    await vi.advanceTimersByTimeAsync(1_000);
+    await expect(run).resolves.toMatchObject({ error: { code: "approval_expired" } });
+  });
+
+  it("stops waiting once the card is answered, so its TTL no longer ends the turn", async () => {
+    const { h } = approvalsFor(5_000);
+    await start(h);
+    h.feed({ type: "confirmation_required", tool: "o2_delete", call_id: "c9" });
+    h.engine.approvalDecided?.(h.current.sid);
+    expect(h.session().turn.state).toBe("responding.thinking");
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(h.session().turn.state).toBe("responding.thinking");
+  });
+
+  it("follows More time: the turn's own TTL moves with the card's expiry", async () => {
+    const { h } = approvalsFor(5_000);
+    const { run } = await start(h);
+    h.feed({ type: "confirmation_required", tool: "o2_delete", call_id: "c9" });
+    h.session().pendingApproval!.expiresAt = clock + 60_000;
+    h.engine.approvalExtended?.(h.current.sid);
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(h.session().turn.state).toBe("awaiting_approval");
+    await vi.advanceTimersByTimeAsync(55_000);
+    await expect(run).resolves.toMatchObject({ error: { code: "approval_expired" } });
+  });
+
+  it("pauses the card's expiry while a decision is on its way, so no cancel goes mid-confirm", async () => {
+    const { h } = approvalsFor(5_000);
+    const { run } = await start(h);
+    h.feed({ type: "confirmation_required", tool: "o2_delete", call_id: "c9" });
+    h.engine.approvalSending?.(h.current.sid);
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(h.session().turn.state).toBe("awaiting_approval");
+    expect(h.client.stop).not.toHaveBeenCalled();
+    h.engine.approvalExtended?.(h.current.sid, clock + 15_000);
+    await vi.advanceTimersByTimeAsync(16_000);
+    await expect(run).resolves.toMatchObject({ error: { code: "approval_expired" } });
+  });
+
+  it("drops a card frame redelivered while its card waits, and shows a re-ask after the decision", async () => {
+    const { h, approvals } = approvalsFor();
+    await start(h);
+    const frame = { type: "confirmation_required", tool: "bash", args: { command: "ls" } };
+    h.feed(frame, frame);
+    expect(approvals.onConfirmationRequired).toHaveBeenCalledTimes(1);
+    h.session().pendingApproval = null;
+    h.feed(frame);
+    expect(approvals.onConfirmationRequired).toHaveBeenCalledTimes(2);
+  });
+
+  it("gives an untyped card an id of its own, never the tool name", async () => {
+    const { h, approvals } = approvalsFor();
+    await start(h);
+    h.feed({ type: "confirmation_required", tool: "o2_delete" });
+    const frame = approvals.onConfirmationRequired.mock.calls[0]?.[1] as { id?: string };
+    expect(frame.id).toMatch(/:1$/);
+    expect(frame.id).not.toBe("o2_delete");
+  });
+
+  it("lands a delete batch proposed after complete on that answer", async () => {
+    const { h, approvals } = approvalsFor();
+    const { run } = await start(h);
+    h.feed(
+      { type: "message_delta", content: "I'll delete it." },
+      { type: "complete", persisted: true },
+    );
+    await run;
+    h.feed({ type: "confirmation_required", tool: "o2_delete", call_id: "c9" });
+    await settle();
+    expect(approvals.onConfirmationRequired).toHaveBeenCalled();
+    expect(h.session().pendingApproval?.id).toBe("c9");
+    expect(
+      h
+        .session()
+        .messages.at(-1)
+        ?.contentBlocks?.some((b) => b.type === "approval"),
+    ).toBe(true);
+  });
+
+  it("passes confirmation_resolved to the runtime", async () => {
+    const { h, approvals } = approvalsFor();
+    await start(h);
+    h.feed(
+      { type: "confirmation_required", tool: "o2_delete", call_id: "c9" },
+      { type: "confirmation_resolved", id: "c9", approved: true },
+    );
+    expect(approvals.onResolved).toHaveBeenCalledWith(
+      h.current.sid,
+      expect.objectContaining({ id: "c9", approved: true }),
+    );
+  });
+
+  it("names the card a reply answers on the turn it sends", async () => {
+    const h = setup();
+    void h.store.resend(
+      h.current.sid,
+      { text: "use staging", chips: [], images: [], mentions: [], timeOverride: null },
+      "typed",
+      { replyToApproval: "c9" },
+    );
+    await settle();
+    expect(h.last().req.replyToApproval).toBe("c9");
   });
 });

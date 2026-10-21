@@ -67,6 +67,8 @@ export interface ComposerState {
   removedPageKeys: string[];
   mode: "compose" | "reply";
   replyApprovalId?: string;
+  /** The draft set aside while Reply mode holds the box; it comes back when Reply ends. */
+  replyStash?: string;
   /** One send per id, so an IME Enter cannot send twice. */
   sendId: string;
 }
@@ -144,6 +146,9 @@ export interface QueryRunState {
 export interface BlockAnnotation {
   linkOutcome?: { openedAt: number };
   approvalResult?: ApprovalResult;
+  approvalOutcome?: ApprovalOutcome;
+  /** The timeline entries an approval made, kept with its record so a reload has them. */
+  ledger?: ActionLedgerEntry[];
   feedback?: { rating: "up" | "down"; reason?: string };
   versionIndex?: number;
   run?: QueryRunState;
@@ -288,6 +293,8 @@ export interface ApprovalResultItem {
   message?: string;
   link?: string;
   undoable?: boolean;
+  /** The server's action-ledger id, which Undo posts. */
+  ledgerId?: string;
 }
 
 export interface ApprovalResult {
@@ -296,6 +303,34 @@ export interface ApprovalResult {
   resolvedBy: string;
   resolvedAt: number;
   ledgerId?: string;
+}
+
+/** What became of an approval card; the record the transcript shows in the card's place. */
+export interface ApprovalOutcome {
+  state:
+    | "sending"
+    | "approved"
+    | "done"
+    | "partial"
+    | "failed"
+    | "declined"
+    | "new_chat"
+    | "stopped"
+    | "replied"
+    | "editing"
+    | "narrowed"
+    | "expired"
+    | "withdrawn"
+    | "delivery_failed"
+    | "unconfirmed"
+    | "approved_elsewhere"
+    | "declined_elsewhere";
+  at: number;
+  decision?: ApprovalDecision;
+  /** The `/confirm` status behind a failed or undelivered decision. */
+  httpStatus?: number;
+  /** Who decided elsewhere, from `confirmation_resolved.by`. */
+  by?: string;
 }
 
 /** A mutation this chat made (AA-10); undo only where the object's API allows it. */
@@ -310,6 +345,11 @@ export interface ActionLedgerEntry {
   undoable: boolean;
   at: number;
   undoneAt?: number;
+  /** An undo of this entry is on its way; a second one is refused. */
+  undoing?: boolean;
+  undoFailed?: boolean;
+  /** An undo was sent and never answered (a timeout, or a reload while it ran): it may have restored the object. */
+  undoUnconfirmed?: boolean;
 }
 
 /** A 412 consent prompt held on its session (`00` §11). */
@@ -395,6 +435,8 @@ export interface AssistantCapability {
   retentionDays?: number;
   /** B-09: the server takes typed `attachments` and echoes `context_used`. */
   attachments?: boolean;
+  /** `/confirm {id, extend:true}` gives a card more time. */
+  approvalExtend?: boolean;
   /** Absent off Cloud; doors read it for the cost line (`80` §3.3). */
   creditMode?: CreditMode;
   isAdmin: boolean;
@@ -556,6 +598,8 @@ export type AssistantHint =
       at: number;
     }
   | { v: 1; type: "approval_resolved"; sid: string; callId?: string; approved: boolean; at: number }
+  /** Stop from a tab waiting on another tab's card: the holder declines it and stops the turn. */
+  | { v: 1; type: "approval_stop"; sid: string; at: number }
   | { v: 1; type: "consent_granted"; org: string; feature: "ai_credits"; at: number }
   | { v: 1; type: "signed_out"; at: number }
   | {
@@ -642,8 +686,12 @@ export interface AssistantStoreApi {
   /** Re-POSTs a not-saved turn (server mode only). */
   retrySave(sid: Sid, turnId: string): Promise<void>;
   /** Posts on `sessions[sid].sid`. */
-  decideApproval(sid: Sid, decision: ApprovalDecision): Promise<ApprovalResult>;
-  resolveConsent(sid: Sid, accepted: boolean): Promise<void>;
+  decideApproval(
+    sid: Sid,
+    decision: ApprovalDecision,
+    approvalId?: string,
+  ): Promise<ApprovalResult>;
+  resolveConsent(sid: Sid, accepted: boolean, acknowledged?: boolean): Promise<void>;
 
   dispatch(sid: Sid, action: AssistantAction): Promise<ActionResult>;
 
@@ -732,6 +780,8 @@ export interface SendRequest {
   ephemeral?: boolean;
   /** B-09: the chips as typed attachments instead of delimiter blocks in `message.text`. */
   attachments?: WireAttachment[];
+  /** The approval card a Reply or Ask again answers. */
+  replyToApproval?: string;
 }
 
 /** One B-09 attachment (`00` §6.3). */
@@ -753,6 +803,7 @@ export interface RequestTurn {
   /** B-09 `attachments` capability. */
   attachments: boolean;
   now: number;
+  replyToApproval?: string;
 }
 
 export type RequestBuilder = (
@@ -775,6 +826,7 @@ export interface TurnEngine {
       snapshot?: ComposerSnapshot;
       /** Edit and resend: the 1-based user message the edit came from (EB-09 AC 4). */
       editedFrom?: number;
+      replyToApproval?: string;
     },
   ): Promise<TurnTerminal>;
   stop(sid: Sid): Promise<void>;
@@ -790,6 +842,14 @@ export interface TurnEngine {
   cancelTurn?(sid: Sid, turnId: string | null): Promise<boolean>;
   /** WP-05 installs `serialize.ts`. */
   setRequestBuilder(builder: RequestBuilder): void;
+  /** The pending card was answered, so the turn stops waiting on it and its TTL no longer applies. */
+  approvalDecided?(sid: Sid): void;
+  /** The pending card's expiry moved, so the turn's own TTL timer follows it (to `until` when given). */
+  approvalExtended?(sid: Sid, until?: number): void;
+  /** A decision on the card is on its way, so its expiry does not end the turn meanwhile. */
+  approvalSending?(sid: Sid): void;
+  /** A turn waiting on consent ends unsent with its prompt back, as a Stop before sending does. */
+  consentWithdrawn?(sid: Sid): void;
   /** WP-10 installs `consent.ts`. */
   setConsentHandler(handler: (sid: Sid, err: AssistantError) => void): void;
 }
@@ -826,15 +886,19 @@ export interface HintChannel {
 
 export interface ApprovalsService {
   onConfirmationRequired(sid: Sid, frame: ConfirmationRequiredFrame): void;
-  decide(sid: Sid, decision: ApprovalDecision): Promise<ApprovalResult>;
+  /** With `approvalId`, refused unless that card is the one pending. */
+  decide(sid: Sid, decision: ApprovalDecision, approvalId?: string): Promise<ApprovalResult>;
   withdraw(sid: Sid, reason: "new_chat" | "withdrawn" | "stopped"): Promise<void>;
   onResolved(sid: Sid, frame: ConfirmationResolvedFrame): void;
 }
 
 export interface ConsentService {
   onConsentRequired(sid: Sid, err: AssistantError): void;
-  resolve(sid: Sid, accepted: boolean): Promise<void>;
-  cancel(sid: Sid, reason: "container_closed" | "org_switch" | "sign_out"): void;
+  /** An accept turns paid usage on only with the card's acknowledgement ticked. */
+  resolve(sid: Sid, accepted: boolean, acknowledged?: boolean): Promise<void>;
+  cancel(sid: Sid, reason: "container_closed" | "org_switch" | "sign_out" | "stopped"): void;
+  /** True while an Enable is on its way; a cancel then waits for its answer. */
+  busy?(sid: Sid): boolean;
 }
 
 export interface ActionDispatcher {

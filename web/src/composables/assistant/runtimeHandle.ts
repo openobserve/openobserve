@@ -61,6 +61,11 @@ export function markSignedIn(): void {
   current.value?.lifecycle.onSignedIn();
 }
 
+/** Stop on a turn another tab's card holds: that tab declines the card before the cancel. */
+export function stopElsewhere(sid: string): Promise<void> {
+  return current.value?.lifecycle.stopElsewhere(sid) ?? Promise.resolve();
+}
+
 /** True while another tab of this browser holds `sid`'s approval card, so Send here waits for that decision. */
 export function useApprovalElsewhere(sid: () => string | null): ComputedRef<boolean> {
   return computed(() => {

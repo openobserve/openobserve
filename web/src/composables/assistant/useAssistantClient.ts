@@ -79,7 +79,7 @@ export interface AssistantClient {
     signal: AbortSignal,
   ): Promise<TailResult>;
   stop(org: string, session: StopTarget): Promise<void>;
-  confirm(org: string, sid: Sid, body: ConfirmBody): Promise<ConfirmResponse>;
+  confirm(org: string, sid: Sid, body: ConfirmBody, timeoutMs?: number): Promise<ConfirmResponse>;
   feedback(org: string, sid: Sid, body: FeedbackBody): Promise<void>;
 }
 
@@ -180,7 +180,7 @@ export function useAssistantClient(opts: AssistantClientOptions = {}): Assistant
       }
       await services.cancelTurn(org, session.sid, session.turnId ?? "");
     },
-    confirm: (org, sid, body) => services.confirm(org, sid, body),
+    confirm: (org, sid, body, timeoutMs) => services.confirm(org, sid, body, timeoutMs),
     feedback: (org, sid, body) => services.feedback(org, sid, body),
   };
 }
@@ -197,6 +197,7 @@ function wireBody(req: ClientSendRequest): Record<string, unknown> {
     ...(req.mode && req.mode !== "chat" && { mode: req.mode }),
     ...(req.ephemeral && { ephemeral: true }),
     ...(req.attachments?.length && { attachments: req.attachments }),
+    ...(req.replyToApproval && { reply_to_approval: req.replyToApproval }),
   };
 }
 

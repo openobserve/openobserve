@@ -15,7 +15,12 @@
 
 import type { Router } from "vue-router";
 
-import type { FeedbackBody } from "@/services/assistant";
+import type {
+  ConfirmBody,
+  ConfirmResponse,
+  FeedbackBody,
+  UndoResponse,
+} from "@/services/assistant";
 import { trackAssistant, type AiEventProps } from "@/services/assistantAnalytics";
 import type { AlertPrefill } from "@/ts/interfaces/alertPrefill";
 import type { TranslateFn } from "@/types/i18n";
@@ -61,6 +66,8 @@ export interface ActionEnv {
   hosts: HostRegistry;
   capability(): AssistantCapability;
   currentOrg(): string | null;
+  /** The signed-in user's email, recorded as who decided. */
+  currentUser(): string;
   now(): number;
   t: TranslateFn;
   /** Opens a new tab with no `opener`; false when the browser blocked it. */
@@ -68,6 +75,10 @@ export interface ActionEnv {
   copy(text: string): Promise<boolean>;
   search(request: SearchRequest): Promise<Record<string, unknown>>;
   feedback(org: string, sid: Sid, body: FeedbackBody): Promise<void>;
+  /** `POST /ai/confirm/{sid}` on the session the card was asked in. */
+  confirm(org: string, sid: Sid, body: ConfirmBody, timeoutMs?: number): Promise<ConfirmResponse>;
+  /** The server's undo of one action-ledger entry. */
+  undo(org: string, ledgerId: string): Promise<UndoResponse>;
   requestAlert(prefill: AlertPrefill): void;
   requestDashboard(draft: DashboardDraft): void;
 }
@@ -83,8 +94,11 @@ const TURN_KINDS: ReadonlySet<AssistantAction["kind"]> = new Set([
   "edit_resend",
 ]);
 
-// Writes the assistant proposed land only through the approvals runtime, which no package registers yet.
+// Writes the assistant proposed land only through the approvals runtime's own dispatch, never from model output or another caller.
 const APPROVAL_KINDS: ReadonlySet<AssistantAction["kind"]> = new Set(["approval", "undo"]);
+
+// Held by this module and the dispatch it hands to the approvals runtime, so no other caller can present it.
+const APPROVALS_RUNTIME = /* @__PURE__ */ Symbol("approvalsRuntime");
 
 // A session of another org must never open, draft or start a turn while the page is on another org.
 const ORG_BOUND_KINDS: ReadonlySet<AssistantAction["kind"]> = new Set([
@@ -114,19 +128,24 @@ export function registerApplier<K extends AssistantAction["kind"]>(
 }
 
 /** Runs the confirmation rule, then the applier, then the action's telemetry. */
-export async function applyAction(sid: Sid, action: AssistantAction): Promise<ActionResult> {
+export async function applyAction(
+  sid: Sid,
+  action: AssistantAction,
+  via?: symbol,
+): Promise<ActionResult> {
   const applier = appliers.get(action.kind);
   // Insert needs an editor host; without its applier there is none to show the diff in.
   if (!applier)
     return { ok: false, reason: action.kind === "insert_into_editor" ? "needs_host" : "failed" };
   if (!env) return { ok: false, reason: "failed" };
-  if (APPROVAL_KINDS.has(action.kind)) return { ok: false, reason: "gated" };
+  if (APPROVAL_KINDS.has(action.kind) && via !== APPROVALS_RUNTIME)
+    return { ok: false, reason: "gated" };
   if (TURN_KINDS.has(action.kind) && env.capability().gate !== "available")
     return { ok: false, reason: "gated" };
   if (TURN_KINDS.has(action.kind) && env.store().turnLockOf(sid))
     return { ok: false, reason: "gated" };
   const session = env.store().state.sessions[sid];
-  if (ORG_BOUND_KINDS.has(action.kind) && session && env.currentOrg() !== session.org) {
+  if (orgBound(action) && session && env.currentOrg() !== session.org) {
     return { ok: false, reason: "other_org" };
   }
   let result: ActionResult;
@@ -139,10 +158,21 @@ export async function applyAction(sid: Sid, action: AssistantAction): Promise<Ac
   return result;
 }
 
-/** Wires the appliers to the app and returns the store's `deps.actions`. */
-export function createActionDispatcher(next: ActionEnv): ActionDispatcher {
+/** Wires the appliers to the app and returns the store's `deps.actions`, plus the one dispatch the approvals runtime may decide with. */
+export function createActionDispatcher(
+  next: ActionEnv,
+): ActionDispatcher & { approvals: ActionDispatcher["apply"] } {
   env = next;
-  return { apply: applyAction };
+  return {
+    apply: (sid, action) => applyAction(sid, action),
+    approvals: (sid, action) => applyAction(sid, action, APPROVALS_RUNTIME),
+  };
+}
+
+// A deny always goes out, so the agent is never left waiting; an approval or an undo acts on the session's org only.
+function orgBound(action: AssistantAction): boolean {
+  if (action.kind === "approval") return action.decision.approved;
+  return action.kind === "undo" || ORG_BOUND_KINDS.has(action.kind);
 }
 
 // Names, enums and ids only: no query, value, title or URL ever leaves.

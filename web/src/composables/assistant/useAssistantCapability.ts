@@ -320,6 +320,7 @@ function resolveCapability(input: CapabilityInput): AssistantCapability {
   if (typeof input.b06?.retention_days === "number")
     capability.retentionDays = input.b06.retention_days;
   if (input.b06?.attachments === true) capability.attachments = true;
+  if (input.b06?.approval_extend === true) capability.approvalExtend = true;
   if (gate !== "available") return capability;
   if (!persistence) capability.reasonCode = "local_only";
   else if (canShare === "no") capability.reasonCode = "no_share";

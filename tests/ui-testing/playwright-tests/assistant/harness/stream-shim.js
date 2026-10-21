@@ -4,7 +4,7 @@
   const SCENARIOS = window.__O2MOCK_SCENARIOS__ || {};
   const HTTP_SCENARIOS = window.__O2MOCK_HTTP_SCENARIOS__ || {};
   const mock = (window.__o2mock = window.__o2mock || {});
-  // tailEnabled (B-03), envelopeEnabled (B-01), lifecycleFramesEnabled (B-02), cancelDelayMs, cancelStatus.
+  // tailEnabled, envelopeEnabled, lifecycleFramesEnabled, cancelDelayMs, cancelStatus, confirmStatus, confirmDelayMs, confirmFail (item names /confirm fails), confirmUndoable (items the server can undo).
   mock.knobs = { ...(window.__O2MOCK_KNOBS__ || {}), ...(mock.knobs || {}) };
   // The last streamed turn, so the tail route can resume it.
   mock.lastTurn = null;
@@ -17,6 +17,28 @@
   let confirmWaiters = [];
 
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  // o2-ai's /confirm answer for the last turn's card: a delete batch item by item, a permission or CLI echo (app.py confirm_action).
+  const confirmAnswer = (body) => {
+    const status = mock.knobs.confirmStatus || 200;
+    if (status !== 200) return { status, body: { code: status, message: `Confirmation failed: upstream ${status}` } };
+    const scenario = SCENARIOS[mock.lastTurn?.name] || {};
+    const card = (scenario.frames || []).find((frame) => frame.type === "confirmation_required");
+    const items = card?.tool === "o2_delete" ? card.args?.items || [] : null;
+    if (!body.approved) return { status, body: items ? { approved: false, deleted: false, count: 0 } : { approved: false, kind: "opencode_permission" } };
+    if (!items) return { status, body: { approved: true, replied: true, kind: "opencode_permission" } };
+    const failed = new Set(mock.knobs.confirmFail || []);
+    const results = items.map((item) => ({
+      resource: item.name,
+      resource_type: item.resource_type,
+      deleted: !failed.has(item.name),
+      status_code: failed.has(item.name) ? 403 : 200,
+      detail: failed.has(item.name) ? "forbidden" : "",
+      ...(mock.knobs.confirmUndoable && !failed.has(item.name) && { undoable: true, ledger_id: `led-${item.id || item.name}` }),
+    }));
+    const count = results.filter((r) => r.deleted).length;
+    return { status, body: { approved: true, deleted: count === results.length, count, total: results.length, results } };
+  };
   const origFetch = window.fetch.bind(window);
 
   const pickScenario = (bodyText, stack) => {
@@ -148,12 +170,28 @@
       });
     }
     if (/\/api\/[^/]+\/ai\/confirm\//.test(url)) {
-      const body = typeof init.body === "string" ? JSON.parse(init.body) : {};
-      mock.confirmations.push(body);
-      const waiters = confirmWaiters;
-      confirmWaiters = [];
-      waiters.forEach((r) => r(body));
-      return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { "Content-Type": "application/json" } });
+      // The legacy chat posts a string body; axios' fetch adapter (keepalive) passes a Request.
+      const request = new Request(input, init);
+      const text = typeof init.body === "string" ? init.body : await request.clone().text().catch(() => "");
+      let body = {};
+      try {
+        body = JSON.parse(text || "{}");
+      } catch (_) {}
+      mock.confirmations.push({ ...body, url, keepalive: !!(init.keepalive ?? input?.keepalive ?? request.keepalive) });
+      // A real fetch gives up when the caller's timeout aborts it; the stand-in does the same.
+      if (mock.knobs.confirmDelayMs)
+        await Promise.race([
+          sleep(mock.knobs.confirmDelayMs),
+          new Promise((_, reject) => request.signal.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")))),
+        ]);
+      const answer = confirmAnswer(body);
+      // A refused decision never reached the agent, so the paused stream keeps waiting.
+      if (answer.status === 200) {
+        const waiters = confirmWaiters;
+        confirmWaiters = [];
+        waiters.forEach((r) => r(body));
+      }
+      return new Response(JSON.stringify(answer.body), { status: answer.status, headers: { "Content-Type": "application/json" } });
     }
     if (/\/api\/[^/]+\/ai\/chats\/[^/]+\/cancel/.test(url)) {
       // axios' fetch adapter passes a Request whose body is a stream, so the body and headers are read back from it.

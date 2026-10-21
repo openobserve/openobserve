@@ -127,7 +127,7 @@ describe("assistant service", () => {
     await expect(assistant.cancelTurn("org1", "s", "t")).rejects.toBeDefined();
   });
 
-  it("posts a decision on the originating session and returns the result", async () => {
+  it("posts a decision on the originating session, bounded in time, and returns the result", async () => {
     api.post.mockResolvedValue({ data: { deleted: 1, count: 1, total: 1, results: [] } });
     await expect(
       assistant.confirm("org1", "sid-1", { approved: true, scope: "once" }),
@@ -140,7 +140,7 @@ describe("assistant service", () => {
     expect(api.post).toHaveBeenCalledWith(
       "/api/org1/ai/confirm/sid-1",
       { approved: true, scope: "once" },
-      managed,
+      { ...managed, adapter: "fetch", fetchOptions: { keepalive: true }, timeout: 15_000 },
     );
   });
 

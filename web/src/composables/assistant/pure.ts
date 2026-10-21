@@ -106,6 +106,21 @@ export type {
   StepResult,
 } from "./evidence";
 export type { QueryRun } from "./actions/appliers/query";
+export { canAlwaysAllow } from "./actions/appliers/approval";
+export {
+  approvalClock,
+  approvalEntity,
+  approvalHeading,
+  approvalOutcomeOf,
+  approvalTargetHref,
+  entityKeyOf,
+} from "./useAssistantApprovals";
+export type {
+  ApprovalBlockData,
+  ConsentNoteData,
+  PolicyBlockData,
+  ResolvedBlockData,
+} from "./reducer";
 export type { TurnStatusText } from "./turnStateMachine";
 export type { AttachmentBlock } from "./record";
 export type * from "./assistantStore.types";

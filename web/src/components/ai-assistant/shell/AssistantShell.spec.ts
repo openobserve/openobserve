@@ -808,3 +808,165 @@ describe("AssistantShell after a sign-out in another tab", () => {
     expect(wrapper.find('[data-test="assistant-shell-signed-out-block"]').exists()).toBe(false);
   });
 });
+
+describe("AssistantShell decision cards", () => {
+  const ORIGIN = { entryKind: "header_button", objectKind: "none", container: "sidebar" } as const;
+  const DELETE = {
+    type: "confirmation_required",
+    tool: "o2_delete",
+    message: "Delete?",
+    args: { items: [{ resource_type: "alert", name: "checkout-latency-old", id: "a1" }] },
+  };
+
+  async function mountWithCard(card: "approval" | "consent" | "none" = "approval", open = true) {
+    localStorage.clear();
+    sessionStorage.clear();
+    fake.current = fakeAssistant("available");
+    const store = fake.current.store;
+    const { approvalOf } = await import("@/composables/assistant/reducer");
+    const approval = { ...approvalOf(DELETE), id: "t1:1" };
+    const sid = store.createSession({
+      origin: ORIGIN,
+      thread: "new",
+      messages: [
+        { role: "user", content: raw("clean up"), turnId: "t1" },
+        {
+          role: "assistant",
+          content: raw(""),
+          turnId: "t1",
+          contentBlocks: [{ type: "approval", approval }],
+        },
+      ],
+    });
+    if (card === "approval")
+      store.state.sessions[sid].pendingApproval = {
+        ...approval,
+        sessionId: sid,
+        turnId: "t1",
+        askedIn: "here",
+        expiresAt: Date.now() + 25_000,
+      };
+    if (card === "consent")
+      store.state.sessions[sid].pendingConsent = {
+        org: "default",
+        feature: "ai_credits",
+        turnId: "t1",
+        snapshot: { text: "why?", chips: [], images: [], mentions: [], timeOverride: null },
+        status: {
+          feature: "ai_credits",
+          organization: { org_id: "default", enabled: false, can_manage: true },
+          payer: null,
+          effective: false,
+          billing_status: "eligible",
+        },
+      };
+    if (open) store.open({ kind: "sidebar", mode: "pinned" }, { sid, focus: "none" });
+    const wrapper = mount(AssistantShell, {
+      props: { placement: "sidebar" },
+      slots: { composer: '<div data-test="assistant-composer">composer</div>' },
+      global: { plugins: [fakeRouter(), fakeVuex()] },
+      attachTo: document.body,
+    });
+    await flushPromises();
+    return { wrapper, store, sid };
+  }
+
+  afterEach(() => setRuntimeHandle(null));
+
+  it("renders the pending card in the visible container, and nowhere while hidden", async () => {
+    const shown = await mountWithCard();
+    expect(shown.wrapper.find('[data-test="assistant-approval-card"]').exists()).toBe(true);
+    shown.wrapper.unmount();
+    const hidden = await mountWithCard("approval", false);
+    expect(hidden.store.state.shell.placement.kind).toBe("hidden");
+    expect(hidden.wrapper.find('[data-test="assistant-approval-card"]').exists()).toBe(false);
+  });
+
+  it("posts the card's decision through the store, and Reply puts the composer in reply mode", async () => {
+    const { wrapper, store, sid } = await mountWithCard();
+    const decide = vi.spyOn(store, "decideApproval").mockResolvedValue({} as never);
+    wrapper
+      .get('[data-test="assistant-approval-deny"]')
+      .element.dispatchEvent(new MouseEvent("click", { bubbles: true, detail: 1 }));
+    await flushPromises();
+    expect(decide).toHaveBeenCalledWith(sid, { approved: false, reason: "deny" }, "t1:1");
+    wrapper
+      .get('[data-test="assistant-approval-reply"]')
+      .element.dispatchEvent(new MouseEvent("click", { bubbles: true, detail: 1 }));
+    await flushPromises();
+    expect(store.state.sessions[sid].composer).toMatchObject({
+      mode: "reply",
+      replyApprovalId: "t1:1",
+    });
+  });
+
+  it("keeps Review request in the strip while a card waits, and it lands on Deny", async () => {
+    const { wrapper } = await mountWithCard();
+    const close = wrapper.get('[data-test="assistant-shell-close"]').element as HTMLElement;
+    close.focus();
+    await flushPromises();
+    const review = wrapper.get('[data-test="assistant-strip-review"]');
+    expect(review.text()).toMatch(/^Review request · expires in \d+:\d\d$/);
+    expect(review.attributes("aria-label")).toBe("Review request");
+    await review.trigger("click");
+    await flushPromises();
+    expect(document.activeElement).toBe(
+      wrapper.get('[data-test="assistant-approval-deny"]').element,
+    );
+    // It never leaves while the card waits, so the strip cannot shift under a pointer.
+    expect(wrapper.find('[data-test="assistant-strip-review"]').exists()).toBe(true);
+  });
+
+  it("shows the waiting line with Stop where another tab holds the card", async () => {
+    const stopElsewhere = vi.fn(async () => undefined);
+    setRuntimeHandle({
+      lifecycle: {
+        signedOutElsewhere: computed(() => false),
+        otherAccountSignedIn: computed(() => false),
+        turnLock: () => "approval_elsewhere",
+        stopElsewhere,
+      },
+    } as never);
+    const { wrapper, sid } = await mountWithCard("none");
+    expect(wrapper.find('[data-test="assistant-approval-card"]').exists()).toBe(false);
+    await wrapper.get('[data-test="assistant-approval-result-stop"]').trigger("click");
+    expect(stopElsewhere).toHaveBeenCalledWith(sid);
+  });
+
+  it("renders the consent card named by its org, and Cancel declines through the store", async () => {
+    const { wrapper, store, sid } = await mountWithCard("consent");
+    const resolve = vi.spyOn(store, "resolveConsent").mockResolvedValue();
+    expect(wrapper.get('[data-test="assistant-consent-card-org"]').text()).toBe(
+      "Enable paid AI usage for default?",
+    );
+    wrapper
+      .get('[data-test="assistant-consent-card-cancel"]')
+      .element.dispatchEvent(new MouseEvent("click", { bubbles: true, detail: 1 }));
+    await flushPromises();
+    expect(resolve).toHaveBeenCalledWith(sid, false, false);
+  });
+
+  it("clears the declined-consent note on the first keystroke after it", async () => {
+    const { wrapper, store, sid } = await mountWithCard("none");
+    const session = store.state.sessions[sid];
+    session.composer.text = "why?";
+    session.turn = {
+      state: "refused",
+      error: { code: "consent_declined", phase: "pre_admission", retryable: false, action: "none" },
+    };
+    await flushPromises();
+    const note = () => wrapper.findAll('[data-test="assistant-turn-outcome"]');
+    expect(note()).toHaveLength(1);
+    store.setDraft(sid, { text: "why?!" });
+    await flushPromises();
+    expect(note()).toHaveLength(0);
+  });
+
+  it("declines a card the old chat waits on when a new chat starts", async () => {
+    const { wrapper, store, sid } = await mountWithCard();
+    const decide = vi.spyOn(store, "decideApproval").mockResolvedValue({} as never);
+    (wrapper.vm as unknown as { $: { setupState: { newChat(): void } } }).$.setupState.newChat();
+    await flushPromises();
+    expect(decide).toHaveBeenCalledWith(sid, { approved: false, reason: "new_chat" });
+  });
+});

@@ -211,16 +211,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <OText
-      v-if="helper"
-      :id="helperId"
-      variant="meta"
-      as="p"
-      :class="helperEmphasis ? 'text-text-body font-medium' : undefined"
-      data-test="assistant-composer-helper"
-    >
-      {{ helper }}
-    </OText>
+    <div v-if="helper" class="flex min-w-0 flex-wrap items-center gap-x-2">
+      <OText
+        :id="helperId"
+        variant="meta"
+        as="p"
+        :class="['min-w-0 flex-1', helperEmphasis ? 'text-text-body font-medium' : '']"
+        data-test="assistant-composer-helper"
+      >
+        {{ helper }}
+      </OText>
+      <OButton
+        v-if="replying"
+        variant="ghost"
+        size="xs"
+        :class="TOUCH_TARGET_CLASS"
+        data-test="assistant-composer-reply-cancel"
+        @click="leaveReply"
+      >
+        {{ t("assistant.composer.replyCancel") }}
+      </OButton>
+    </div>
     <OText
       v-if="storageBlocked"
       variant="meta"
@@ -294,6 +305,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, useId, watch } fro
 
 import AssistantIconButton from "@/components/ai-assistant/common/AssistantIconButton.vue";
 import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
+import { TOUCH_TARGET_CLASS } from "@/components/ai-assistant/common/touchTarget";
 import AssistantChipPopover from "@/components/ai-assistant/context/AssistantChipPopover.vue";
 import AssistantMentionMenu, {
   type MentionOption,
@@ -302,6 +314,7 @@ import {
   MAX_IMAGES,
   STALL_MS,
   UNDO_WINDOW_MS,
+  assistantFocusCard,
   assistantGoToAnswer,
   isRunning,
   markHintSeen,
@@ -413,11 +426,14 @@ const elsewhere = computed(
   () => !!turn.value && isRunning(turn.value) && !session.value?.turnMeta.ownedByThisTab,
 );
 const running = computed(() => !!turn.value && isRunning(turn.value));
+const replying = computed(
+  () => composer.value?.mode === "reply" && !!session.value?.pendingApproval,
+);
+// Reply is the one way to type under an approval card; its Enter answers the card.
 const inertKind = computed<"approval" | "consent" | null>(() => {
-  if (session.value?.pendingApproval) return "approval";
+  if (session.value?.pendingApproval && !replying.value) return "approval";
   return session.value?.pendingConsent ? "consent" : null;
 });
-const replying = computed(() => composer.value?.mode === "reply");
 
 const state = computed(() => {
   if (inertKind.value) return "inert";
@@ -450,7 +466,10 @@ const stalled = computed(() => {
   return running.value && last !== null && clock.value - last >= STALL_MS;
 });
 const canSend = computed(
-  () => hasContent.value && !inertKind.value && !running.value && !props.cooldownReason,
+  () =>
+    hasContent.value &&
+    !inertKind.value &&
+    (replying.value || (!running.value && !props.cooldownReason)),
 );
 const sendBlockedReason = computed(() => {
   if (props.cooldownReason) return props.cooldownReason;
@@ -778,6 +797,12 @@ function trySend(): void {
     if (!helperEmphasis.value) say(line);
     return emphasise(line);
   }
+  if (replying.value) {
+    if (hasContent.value) return void sendReply(id);
+    if (!emptyEnterSaid) say(t("assistant.composer.sendEmpty"));
+    emptyEnterSaid = true;
+    return;
+  }
   if (props.cooldownReason) {
     if (blockedLine.value !== props.cooldownReason) say(props.cooldownReason);
     return emphasise(props.cooldownReason);
@@ -797,7 +822,6 @@ function trySend(): void {
     emptyEnterSaid = true;
     return;
   }
-  if (replying.value) return void sendReply(id);
   const sendId = composer.value.sendId;
   if (usedSendIds.has(sendId)) return;
   usedSendIds.add(sendId);
@@ -824,12 +848,19 @@ function freshSendId(id: Sid): void {
   if (current && usedSendIds.has(current)) store.setDraft(id, { sendId: getUUIDv7() });
 }
 
+// The reply stays in the box until the card takes it; a refused one stays, with the reason spoken.
 async function sendReply(id: Sid): Promise<void> {
   const approval = composer.value?.replyApprovalId;
+  if (!approval) return;
   const reply = text.value;
-  store.setDraft(id, { text: "" });
-  store.cancelReply(id);
-  if (approval) await store.decideApproval(id, { approved: false, reason: "reply", reply });
+  await store.decideApproval(id, { approved: false, reason: "reply", reply }, approval);
+  if (store.state.sessions[id]?.pendingApproval?.id === approval)
+    say(t("assistant.composer.replyRefused"));
+}
+
+function leaveReply(): void {
+  if (liveSid.value) store.cancelReply(liveSid.value);
+  void nextTick(() => assistantFocusCard() || focusInput("end"));
 }
 
 // Stop turns into Send, so the textbox takes focus rather than the page (HT-04 AC 3).
@@ -1107,6 +1138,15 @@ watch(inertKind, (kind) => {
   if (kind === null) clearBlocked();
 });
 
+// A card answered or withdrawn elsewhere takes reply mode with it.
+watch(
+  () => !!session.value?.pendingApproval,
+  (pending) => {
+    if (!pending && composer.value?.mode === "reply" && liveSid.value)
+      store.cancelReply(liveSid.value);
+  },
+);
+
 // The menu is silent by role on a textarea, so its result count is spoken once per query (U7).
 watch(
   () => [
@@ -1244,6 +1284,13 @@ onMounted(() => {
     registerAssistantFocusTarget("composer", () => {
       if (!props.visible || !el()) return false;
       focusInput("end");
+      return true;
+    }),
+    // Rung c: Escape in Reply mode leaves it before anything closes.
+    registerEscapeRung("c", (event) => {
+      if (!replying.value || !(event.target instanceof Node) || !root.value?.contains(event.target))
+        return false;
+      leaveReply();
       return true;
     }),
     // Rung c: Escape in the prefill-choice banner is Cancel and returns to the composer (`10` §6.3).
