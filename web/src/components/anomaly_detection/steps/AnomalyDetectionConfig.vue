@@ -962,9 +962,10 @@ export default defineComponent({
       }
       if (autoSensitivity.value) return t(modelHelpKeys[modelState.value.state]);
       if (sensitivityError.value) return raw("");
-      if (!modelState.value.current) return t("alerts.anomaly.manualModelRequired");
+      // The range error only renders after save, so an invalid draft must not show the model note.
       const k = Number(bandWidth.value);
       if (bandWidth.value === "" || !Number.isFinite(k) || k < 1 || k > 10) return raw("");
+      if (!modelState.value.current) return t("alerts.anomaly.manualModelRequired");
       return t("alerts.anomaly.manualSensitivityHelp");
     });
 

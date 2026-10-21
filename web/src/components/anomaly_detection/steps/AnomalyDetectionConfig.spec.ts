@@ -661,6 +661,19 @@ describe("AnomalyDetectionConfig", () => {
       );
     });
 
+    it("an untrained config hides the model note while the typed level is out of range", async () => {
+      wrapper = mountConfig({ band_width: 3 });
+      await flushPromises();
+      expect(sensitivityHintText(wrapper)).toBe(
+        i18n.global.t("alerts.anomaly.manualModelRequired"),
+      );
+
+      await levelInput(wrapper).setValue("0.5");
+      await flushPromises();
+
+      expect(sensitivityHintText(wrapper)).toBeUndefined();
+    });
+
     it("typing a tier value lights that tier up, as a number", async () => {
       wrapper = mountConfig({ band_width: 3.5 });
       await flushPromises();
