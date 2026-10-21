@@ -92,6 +92,29 @@
           <OTag type="evalStatus" :value="statusOf(row)" :label="statusLabel(statusOf(row))" />
         </template>
 
+        <template #cell-health="{ row }">
+          <span v-if="!healthOf(row)" class="text-text-secondary">—</span>
+          <span v-else class="inline-flex">
+            <OTag type="evalJobHealth" :value="healthOf(row)?.state" :label="healthLabel(row)" />
+            <OTooltip>
+              <template #content>
+                <div v-if="healthOf(row)?.recentRuns">{{ healthSummary(row) }}</div>
+                <div>{{ healthSince(row) }}</div>
+                <div>{{ healthChecked(row) }}</div>
+              </template>
+            </OTooltip>
+          </span>
+        </template>
+
+        <template #cell-lastError="{ row }">
+          <span v-if="!lastErrorOf(row)" class="text-text-secondary">—</span>
+          <span v-else class="inline-flex min-w-0 items-center gap-1.5">
+            <span class="truncate">{{ lastErrorKind(row) }}</span>
+            <span class="text-text-secondary shrink-0">{{ lastErrorAgo(row) }}</span>
+            <OTooltip :content="lastErrorMessage(row)" max-width="30rem" hoverable />
+          </span>
+        </template>
+
         <template #cell-stream="{ row }">
           {{ row.stream }}
         </template>
@@ -211,7 +234,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { useI18nTyped, raw } from "@/types/i18n";
+import { useI18nTyped, raw, type I18nKey, type I18nText } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
@@ -220,12 +243,20 @@ import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import { COL } from "@/lib/core/Table/OTable.types";
-import type { EvalJob, EvalJobStatus } from "@/services/online-evals.service";
+import type {
+  EvalJob,
+  EvalJobHealth,
+  EvalJobHealthState,
+  EvalJobLastError,
+  EvalJobStatus,
+} from "@/services/online-evals.service";
 import { statusOf, targetScopeOf, valueOf } from "./utils/evalEntity";
+import { relativeTime } from "./utils/evalFormat";
 import { formatDate } from "@/utils/date";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EvalListShell from "./EvalListShell.vue";
@@ -259,11 +290,11 @@ const emit = defineEmits<{
 }>();
 
 function canActivate(status: EvalJobStatus): boolean {
-  return status === "draft" || status === "paused" || status === "degraded";
+  return status === "draft" || status === "paused";
 }
 
 function canPause(status: EvalJobStatus): boolean {
-  return status === "active" || status === "degraded";
+  return status === "active";
 }
 
 const { t } = useI18nTyped();
@@ -342,6 +373,23 @@ const columns = computed(() =>
       meta: { align: "right" },
     },
     {
+      id: "health",
+      header: t("onlineEvals.job.columns.health"),
+      // Sorts worst-first when descending: waiting > degraded > healthy > idle.
+      accessorFn: (row: EvalJob) => HEALTH_SEVERITY[healthOf(row)?.state ?? "none"],
+      sortable: true,
+      size: 190,
+      meta: { align: "left" },
+    },
+    {
+      id: "lastError",
+      header: t("onlineEvals.job.columns.lastError"),
+      accessorFn: (row: EvalJob) => healthOf(row)?.lastError?.at ?? 0,
+      sortable: true,
+      size: 200,
+      meta: { align: "left" },
+    },
+    {
       id: "created",
       header: t("onlineEvals.job.columns.created"),
       accessorFn: (row: EvalJob) => rowCreated(row),
@@ -391,13 +439,7 @@ const statusCounts = computed(() => {
   }
   return { active, paused, draft, total: rows.length };
 });
-// The strip is the ONLY status filter (the redundant dropdown was removed), so it
-// carries every status the UI can actually produce. "degraded" and "archived"
-// are both excluded on purpose: nothing in the product currently transitions a
-// job into either status (no health-check sets degraded; there's no archive
-// action in the UI), so their tiles would always read zero. Attention-first
-// order (paused, active, then the inert draft), "All" last — matching the
-// Alerts / Incidents strip.
+// "archived" has no tile: nothing in the UI archives a job, so it would always read zero.
 const summaryStats = computed<StatItem[]>(() => {
   const c = statusCounts.value;
   const has = c.total > 0;
@@ -449,29 +491,32 @@ function onStatSelect(key: string) {
   statusFilter.value = key === "all" || statusFilter.value === key ? null : (key as EvalJobStatus);
 }
 
-// Extreme-left status rail (mirrors the Incidents rail) — reads "does this job
-// need attention?": degraded=orange, paused=amber, active=green, and the inert
-// states (draft/archived) a quiet grey. Tones match the status tiles + chip.
+// Health drives the rail only for active jobs; it never changes the persisted status.
+function needsAttention(row: EvalJob): boolean {
+  const health = healthOf(row)?.state;
+  return (
+    statusOf(row) === "active" && (health === "degraded" || health === "waiting_for_credentials")
+  );
+}
+
 function evalJobRowStyle(row: EvalJob): Record<string, string> {
   const s = statusOf(row);
-  const color =
-    s === "active"
+  const color = needsAttention(row)
+    ? "var(--color-orange-500)"
+    : s === "active"
       ? "var(--color-success-500)"
-      : s === "degraded"
-        ? "var(--color-orange-500)"
-        : s === "paused"
-          ? "var(--color-warning-500)"
-          : "var(--color-grey-400)";
+      : s === "paused"
+        ? "var(--color-warning-500)"
+        : "var(--color-grey-400)";
   return { boxShadow: `var(--shadow-rail-geom) ${color}` };
 }
 
-// Light exception wash (matches the Alerts list) — degraded jobs (failing) get a
+// Light exception wash (matches the Alerts list) — jobs needing attention get a
 // warm wash, paused a muted grey; healthy/active/draft/archived stay clean so
 // attention goes to what's off, not the norm.
 function evalJobRowClass(row: EvalJob): string {
-  const s = statusOf(row);
-  if (s === "degraded") return "!bg-status-warning-bg";
-  if (s === "paused") return "!bg-surface-panel";
+  if (needsAttention(row)) return "!bg-status-warning-bg";
+  if (statusOf(row) === "paused") return "!bg-surface-panel";
   return "";
 }
 
@@ -509,6 +554,83 @@ function rowCreated(row: EvalJob) {
   return Number(
     valueOf(row, "createdAt", "created_at") || valueOf(row, "updatedAt", "updated_at") || 0,
   );
+}
+
+const HEALTH_SEVERITY: Record<EvalJobHealthState | "none", number> = {
+  none: 0,
+  no_recent_runs: 1,
+  healthy: 2,
+  degraded: 3,
+  waiting_for_credentials: 4,
+};
+
+const HEALTH_LABELS: Record<EvalJobHealthState, I18nKey> = {
+  healthy: "onlineEvals.job.health.healthy",
+  degraded: "onlineEvals.job.health.degraded",
+  waiting_for_credentials: "onlineEvals.job.health.waitingForCredentials",
+  no_recent_runs: "onlineEvals.job.health.noRecentRuns",
+};
+
+const ERROR_KIND_LABELS: Record<string, I18nKey> = {
+  provider_auth: "onlineEvals.job.errorKinds.providerAuth",
+  rate_limited: "onlineEvals.job.errorKinds.rateLimited",
+  timeout: "onlineEvals.job.errorKinds.timeout",
+  provider_5xx: "onlineEvals.job.errorKinds.provider5xx",
+  parse_error: "onlineEvals.job.errorKinds.parseError",
+  mapping_error: "onlineEvals.job.errorKinds.mappingError",
+  scorer_missing: "onlineEvals.job.errorKinds.scorerMissing",
+  execution_error: "onlineEvals.job.errorKinds.executionError",
+};
+
+function healthOf(row: EvalJob): EvalJobHealth | undefined {
+  return row.health ?? undefined;
+}
+
+function lastErrorOf(row: EvalJob): EvalJobLastError | undefined {
+  return healthOf(row)?.lastError ?? undefined;
+}
+
+function healthLabel(row: EvalJob): I18nText {
+  const health = healthOf(row);
+  return health ? t(HEALTH_LABELS[health.state]) : raw("—");
+}
+
+function healthSummary(row: EvalJob): I18nText {
+  const health = healthOf(row);
+  return t("onlineEvals.job.health.summary", {
+    errors: health?.recentErrors ?? 0,
+    runs: health?.recentRuns ?? 0,
+  });
+}
+
+function healthSince(row: EvalJob): I18nText {
+  return t("onlineEvals.job.health.since", { time: microsAgo(healthOf(row)?.since) });
+}
+
+function healthChecked(row: EvalJob): I18nText {
+  return t("onlineEvals.job.health.checked", { time: microsAgo(healthOf(row)?.evaluatedAt) });
+}
+
+function microsAgo(micros: number | null | undefined): string {
+  return micros ? relativeTime(micros / 1000, t) : "—";
+}
+
+/** Known kinds get a translated label; a kind from a newer server shows as-is. */
+function lastErrorKind(row: EvalJob): I18nText {
+  const kind = lastErrorOf(row)?.kind ?? "";
+  const key = ERROR_KIND_LABELS[kind];
+  return key ? t(key) : raw(kind);
+}
+
+function lastErrorAgo(row: EvalJob): string {
+  const at = lastErrorOf(row)?.at;
+  // `at` is the span's `_timestamp`, in microseconds.
+  return at ? relativeTime(at / 1000, t) : "—";
+}
+
+function lastErrorMessage(row: EvalJob): I18nText {
+  const error = lastErrorOf(row);
+  return raw(error?.message || error?.kind || "");
 }
 
 function formatDateShort(value: number) {
