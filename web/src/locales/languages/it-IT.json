@@ -7734,7 +7734,6 @@
       "tabVariables": "Scheda: {name}",
       "panelVariables": "Pannello: {name}",
       "frozenVariablesNote": "Il link pubblico carica sempre la dashboard con i valori selezionati qui. I visitatori possono vederli ma non modificarli.",
-      "variablesLoading": "Caricamento dei valori delle variabili…",
       "editAccessRequired": "Per gestire i link pubblici di questa dashboard è necessario l'accesso in modifica.",
       "actionForbidden": "Non hai l'autorizzazione per modificare i link pubblici. Rivolgiti a un amministratore.",
       "createForbidden": "Non hai l'autorizzazione per creare link pubblici. Rivolgiti a un amministratore.",

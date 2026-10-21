@@ -7734,7 +7734,6 @@
       "tabVariables": "탭: {name}",
       "panelVariables": "패널: {name}",
       "frozenVariablesNote": "공개 링크는 항상 여기에서 선택한 값으로 대시보드를 로드합니다. 조회자는 값을 볼 수 있지만 변경할 수는 없습니다.",
-      "variablesLoading": "변수 값을 불러오는 중…",
       "editAccessRequired": "이 대시보드의 공개 링크를 관리하려면 편집 액세스 권한이 필요합니다.",
       "actionForbidden": "공개 링크를 변경할 권한이 없습니다. 관리자에게 문의하세요.",
       "createForbidden": "공개 링크를 만들 권한이 없습니다. 관리자에게 문의하세요.",

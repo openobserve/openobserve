@@ -7734,7 +7734,6 @@
       "tabVariables": "Tab: {name}",
       "panelVariables": "Panel: {name}",
       "frozenVariablesNote": "Liên kết công khai luôn tải bảng điều khiển với các giá trị được chọn ở đây. Người xem có thể thấy chúng nhưng không thể thay đổi.",
-      "variablesLoading": "Đang tải giá trị biến…",
       "editAccessRequired": "Bạn cần quyền chỉnh sửa bảng điều khiển này để quản lý các liên kết công khai của nó.",
       "actionForbidden": "Bạn không có quyền thay đổi liên kết công khai. Hãy liên hệ quản trị viên.",
       "createForbidden": "Bạn không có quyền tạo liên kết công khai. Hãy liên hệ quản trị viên.",

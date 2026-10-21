@@ -327,15 +327,6 @@
           :content="t('dashboard.publicLinks.frozenVariablesNote')"
           data-test="dashboards-public-links-panel-variables-note"
         />
-        <div
-          v-if="variablesPending"
-          class="text-text-secondary flex items-center gap-2 text-xs"
-          role="status"
-          data-test="dashboards-public-links-panel-variables-loading"
-        >
-          <OSpinner size="xs" />
-          {{ t("dashboard.publicLinks.variablesLoading") }}
-        </div>
         <template v-if="formVarsReady">
           <VariablesValueSelector
             :key="`global-${formKey}`"
@@ -636,7 +627,6 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";

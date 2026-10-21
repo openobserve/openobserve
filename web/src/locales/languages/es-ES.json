@@ -7734,7 +7734,6 @@
       "tabVariables": "Pestaña: {name}",
       "panelVariables": "Panel: {name}",
       "frozenVariablesNote": "El enlace público siempre carga el dashboard con los valores seleccionados aquí. Los visitantes pueden verlos, pero no cambiarlos.",
-      "variablesLoading": "Cargando valores de variables…",
       "editAccessRequired": "Necesitas acceso de edición a este dashboard para gestionar sus enlaces públicos.",
       "actionForbidden": "No tienes permiso para cambiar enlaces públicos. Pídeselo a un administrador.",
       "createForbidden": "No tienes permiso para crear enlaces públicos. Pídeselo a un administrador.",

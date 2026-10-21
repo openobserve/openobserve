@@ -7734,7 +7734,6 @@
       "tabVariables": "Tab: {name}",
       "panelVariables": "Panel: {name}",
       "frozenVariablesNote": "Der öffentliche Link lädt das Dashboard immer mit den hier ausgewählten Werten. Betrachter können sie sehen, aber nicht ändern.",
-      "variablesLoading": "Variablenwerte werden geladen…",
       "editAccessRequired": "Sie benötigen Bearbeitungszugriff auf dieses Dashboard, um seine öffentlichen Links zu verwalten.",
       "actionForbidden": "Sie haben keine Berechtigung, öffentliche Links zu ändern. Wenden Sie sich an einen Administrator.",
       "createForbidden": "Sie haben keine Berechtigung, öffentliche Links zu erstellen. Wenden Sie sich an einen Administrator.",

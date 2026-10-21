@@ -7734,7 +7734,6 @@
       "tabVariables": "Sekme: {name}",
       "panelVariables": "Panel: {name}",
       "frozenVariablesNote": "Genel bağlantı, gösterge panosunu her zaman burada seçilen değerlerle yükler. Görüntüleyenler bunları görebilir ancak değiştiremez.",
-      "variablesLoading": "Değişken değerleri yükleniyor…",
       "editAccessRequired": "Bu gösterge panosunun genel bağlantılarını yönetmek için düzenleme erişiminiz olmalı.",
       "actionForbidden": "Genel bağlantıları değiştirme izniniz yok. Bir yöneticiye danışın.",
       "createForbidden": "Genel bağlantı oluşturma izniniz yok. Bir yöneticiye danışın.",

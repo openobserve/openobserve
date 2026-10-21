@@ -7734,7 +7734,6 @@
       "tabVariables": "Onglet : {name}",
       "panelVariables": "Panneau : {name}",
       "frozenVariablesNote": "Le lien public charge toujours le tableau de bord avec les valeurs sélectionnées ici. Les visiteurs peuvent les voir mais ne peuvent pas les modifier.",
-      "variablesLoading": "Chargement des valeurs de variables…",
       "editAccessRequired": "Vous devez disposer d'un accès en modification à ce tableau de bord pour gérer ses liens publics.",
       "actionForbidden": "Vous n'avez pas la permission de modifier les liens publics. Contactez un administrateur.",
       "createForbidden": "Vous n'avez pas la permission de créer des liens publics. Contactez un administrateur.",

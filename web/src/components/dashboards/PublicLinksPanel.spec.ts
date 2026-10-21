@@ -588,7 +588,6 @@ describe("PublicLinksPanel", () => {
     };
     vm.form.setFieldValue("name", "NOC wall");
     expect(drawer().props("primaryButtonDisabled")).toBe(true);
-    expect(has(w, "dashboards-public-links-panel-variables-loading")).toBe(true);
     await submit(w);
     expect(admin.create).not.toHaveBeenCalled();
 
@@ -599,7 +598,6 @@ describe("PublicLinksPanel", () => {
     });
     await flushPromises();
     expect(drawer().props("primaryButtonDisabled")).toBe(false);
-    expect(has(w, "dashboards-public-links-panel-variables-loading")).toBe(false);
     await submit(w);
     expect(admin.create).toHaveBeenCalledTimes(1);
   });

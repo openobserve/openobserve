@@ -7734,7 +7734,6 @@
       "tabVariables": "Tabblad: {name}",
       "panelVariables": "Paneel: {name}",
       "frozenVariablesNote": "De openbare link laadt het dashboard altijd met de hier geselecteerde waarden. Bezoekers kunnen ze zien, maar niet wijzigen.",
-      "variablesLoading": "Variabelewaarden laden…",
       "editAccessRequired": "Je hebt bewerkrechten op dit dashboard nodig om de openbare links ervan te beheren.",
       "actionForbidden": "Je hebt geen toestemming om openbare links te wijzigen. Vraag een beheerder.",
       "createForbidden": "Je hebt geen toestemming om openbare links te maken. Vraag een beheerder.",

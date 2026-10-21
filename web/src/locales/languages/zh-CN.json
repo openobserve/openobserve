@@ -7734,7 +7734,6 @@
       "tabVariables": "标签页：{name}",
       "panelVariables": "面板：{name}",
       "frozenVariablesNote": "公开链接始终使用此处选定的值加载仪表盘。查看者可以看到这些值，但无法更改。",
-      "variablesLoading": "正在加载变量值…",
       "editAccessRequired": "您需要拥有此仪表盘的编辑权限才能管理其公开链接。",
       "actionForbidden": "您没有更改公开链接的权限。请联系管理员。",
       "createForbidden": "您没有创建公开链接的权限。请联系管理员。",

@@ -7734,7 +7734,6 @@
       "tabVariables": "タブ: {name}",
       "panelVariables": "パネル: {name}",
       "frozenVariablesNote": "公開リンクは常に、ここで選択した値でダッシュボードを読み込みます。閲覧者は値を表示できますが、変更はできません。",
-      "variablesLoading": "変数の値を読み込み中…",
       "editAccessRequired": "このダッシュボードの公開リンクを管理するには編集権限が必要です。",
       "actionForbidden": "公開リンクを変更する権限がありません。管理者に問い合わせてください。",
       "createForbidden": "公開リンクを作成する権限がありません。管理者に問い合わせてください。",

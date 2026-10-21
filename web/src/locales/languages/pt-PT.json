@@ -7734,7 +7734,6 @@
       "tabVariables": "Aba: {name}",
       "panelVariables": "Painel: {name}",
       "frozenVariablesNote": "O link público sempre carrega o painel com os valores selecionados aqui. Os visitantes podem vê-los, mas não podem alterá-los.",
-      "variablesLoading": "Carregando valores das variáveis…",
       "editAccessRequired": "Você precisa de acesso de edição a este painel para gerenciar seus links públicos.",
       "actionForbidden": "Você não tem permissão para alterar links públicos. Peça a um administrador.",
       "createForbidden": "Você não tem permissão para criar links públicos. Peça a um administrador.",

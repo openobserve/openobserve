@@ -7734,7 +7734,6 @@
       "tabVariables": "Karta: {name}",
       "panelVariables": "Panel: {name}",
       "frozenVariablesNote": "Publiczny link zawsze ładuje pulpit z wartościami wybranymi tutaj. Wyświetlający mogą je zobaczyć, ale nie mogą ich zmienić.",
-      "variablesLoading": "Ładowanie wartości zmiennych…",
       "editAccessRequired": "Aby zarządzać publicznymi linkami tego pulpitu, potrzebujesz uprawnień do edycji.",
       "actionForbidden": "Nie masz uprawnień do zmiany publicznych linków. Skontaktuj się z administratorem.",
       "createForbidden": "Nie masz uprawnień do tworzenia publicznych linków. Skontaktuj się z administratorem.",
