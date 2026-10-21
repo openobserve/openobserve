@@ -134,4 +134,31 @@ describe("AssistantDiffBlock", () => {
     expect(lines[1].find(".sr-only").text()).toBe("added:");
     wrapper.unmount();
   });
+
+  it("marks each unknown field where it appears in the proposal, named for screen readers", async () => {
+    const { wrapper } = setup({
+      before: "a",
+      after: "SELECT levl, levl_count FROM t",
+      checks: { validated: "error", unknownFields: ["levl"] } as never,
+    });
+    await flushPromises();
+    const added = wrapper.findAll('[data-test="assistant-diff-lines"] li')[1];
+    const marks = added.findAll(".decoration-wavy");
+    expect(marks).toHaveLength(1);
+    expect(marks[0].text()).toContain("levl");
+    expect(marks[0].find(".sr-only").text()).toBe("Unknown field");
+    wrapper.unmount();
+  });
+
+  it("leaves room for the host's expand button only when asked", async () => {
+    const plain = mount(AssistantDiffBlock, { props: { proposal: proposal() } });
+    const reserved = mount(AssistantDiffBlock, {
+      props: { proposal: proposal(), reserveEnd: true },
+    });
+    await flushPromises();
+    expect(plain.html()).not.toContain("pe-10");
+    expect(reserved.html()).toContain("pe-10");
+    plain.unmount();
+    reserved.unmount();
+  });
 });

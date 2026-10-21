@@ -147,6 +147,8 @@ export function createEffectsRunner(deps: EffectsDeps): EffectsRunner {
   };
 
   const save = (sid: Sid, force: boolean) => {
+    // Helper and analysis sessions are never written or listed.
+    if (deps.store().state.sessions[sid]?.record.ephemeral) return;
     const slot = saves.get(sid) ?? { lastAt: -Infinity };
     saves.set(sid, slot);
     const wait = slot.lastAt + SAVE_INTERVAL_MS - deps.now();

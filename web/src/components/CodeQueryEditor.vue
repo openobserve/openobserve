@@ -23,26 +23,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       ref="editorRef"
       :id="editorId"
     />
-    <!-- AI Icon Button -->
-    <OButton
-      v-if="showAiIcon && !disableAi"
-      variant="sidebar-toggle"
-      size="icon-toolbar"
-      class="bg-card-glass-bg border-card-glass-border hover:bg-button-outline-hover-bg hover:border-accent absolute! top-2 right-2 z-10 border transition-all duration-200"
-      :class="nlpMode ? 'bg-surface-accent-active border-accent' : ''"
-      @click="toggleNlpMode"
-      data-test="query-editor-ai-icon-btn"
-    >
-      <!-- name="" satisfies the required prop; empty name renders only the slot -->
-      <OIcon name="" size="md">
-        <img :src="aiIcon" :alt="t('search.aiIconAlt')" class="h-4.5 w-4.5" />
-      </OIcon>
-      <OTooltip side="top" align="center">
-        <template #content>{{
-          disableAiReason || t(nlpMode ? "search.nlpModeEnabled" : "search.nlpModeLabel")
-        }}</template>
-      </OTooltip>
-    </OButton>
   </div>
 </template>
 
@@ -65,19 +45,22 @@ import type * as MonacoEditor from "monaco-editor/esm/vs/editor/editor.api";
 // Lazy load Monaco Editor - only loaded when this component is rendered
 // This reduces initial bundle size by ~3.1MB
 let monaco: any = null;
-const loadMonaco = async () => {
-  if (!monaco) {
-    // editor.api must be imported first — it bootstraps StandaloneServices (the
-    // Monaco DI container). Importing editor.all.js before api causes feature
-    // contributions (ICodeLensCache, ISuggestMemories, actionWidgetService, etc.)
-    // to register against an uninitialised container, producing "[createInstance]
-    // X depends on UNKNOWN service" errors that silently degrade intellisense.
-    monaco = await import("monaco-editor/esm/vs/editor/editor.api");
+// Shared, so a second editor mounting mid-load waits for editor.all instead of creating an editor early.
+let monacoLoading: Promise<any> | null = null;
+const loadMonaco = () => {
+  monacoLoading ??= (async () => {
+    // editor.api first: it bootstraps StandaloneServices, which editor.all's contributions need.
+    const api = await import("monaco-editor/esm/vs/editor/editor.api");
     await import("monaco-editor/esm/vs/editor/editor.all.js");
+    monaco = api;
     // Monaco caches glyph widths once; a webfont swapping in later leaves carets drawn at stale offsets.
     document.fonts?.addEventListener?.("loadingdone", () => monaco?.editor?.remeasureFonts?.());
-  }
-  return monaco;
+    return monaco;
+  })().catch((error) => {
+    monacoLoading = null;
+    throw error;
+  });
+  return monacoLoading;
 };
 
 import { vrlLanguageDefinition } from "@/utils/query/vrlLanguageDefinition";
@@ -125,15 +108,10 @@ import searchState from "@/composables/useLogs/searchState";
 import { useNLQuery } from "@/composables/useNLQuery";
 import { type I18nText, useI18nTyped, raw } from "@/types/i18n";
 import useNotifications from "@/composables/useNotifications";
-import { getImageURL } from "@/utils/zincutils";
 import { isAuthError } from "@/utils/authErrors";
 import { getFontMono } from "@/utils/fonts";
-import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 export default defineComponent({
   inheritAttrs: false,
-  components: { OButton, OIcon, OTooltip },
   props: {
     editorId: {
       type: String,
@@ -196,18 +174,6 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
-    showAiIcon: {
-      type: Boolean,
-      default: false,
-    },
-    disableAi: {
-      type: Boolean,
-      default: false,
-    },
-    disableAiReason: {
-      type: String as unknown as PropType<I18nText>,
-      default: raw(""),
-    },
     /**
      * Resolves the values of one field, awaited by the completion provider.
      * Absent on surfaces that have none — pass `undefined`, not `null`, so the
@@ -224,6 +190,11 @@ export default defineComponent({
       } | null>,
       default: null,
     },
+    /** The assistant's Ask AI chord: bound as an editor action so it wins over Monaco's own Ctrl+I suggest. */
+    assistantChord: {
+      type: Function as PropType<() => boolean>,
+      default: null,
+    },
   },
   emits: [
     "update-query",
@@ -236,7 +207,6 @@ export default defineComponent({
     "generation-start",
     "generation-end",
     "generation-success",
-    "toggle-nlp-mode",
   ],
   setup(props, { emit }) {
     const store = useStore();
@@ -245,6 +215,7 @@ export default defineComponent({
     const { showErrorNotification } = useNotifications();
     const editorRef: any = ref();
     let editorObj: any = null;
+    let chordAction: { dispose(): void } | null = null;
     let programmatic = false;
     const asProgrammatic = (edit: () => void) => {
       const previous = programmatic;
@@ -614,7 +585,7 @@ export default defineComponent({
         emit("update:query", newValue, e);
 
         // Check for natural language after user stops typing (debounced)
-        if (newValue) checkForNaturalLanguage(newValue);
+        if (newValue && !props.assistantChord) checkForNaturalLanguage(newValue);
 
         validateDoubleQuotes();
       }, props.debounceTime);
@@ -645,6 +616,17 @@ export default defineComponent({
           runQuery();
         }
       });
+      if (props.assistantChord)
+        chordAction = editorObj.addAction({
+          id: "o2.assistantHelper",
+          label: t("shortcuts.actions.assistantHelper"),
+          keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyI],
+          // A build where the door does not render keeps Monaco's own suggest on the chord.
+          run: () => {
+            if (props.assistantChord?.() === false)
+              editorObj?.trigger("keyboard", "editor.action.triggerSuggest", {});
+          },
+        });
       editorObj.onDidFocusEditorWidget(() => {
         emit("focus");
       });
@@ -821,6 +803,8 @@ export default defineComponent({
         if (publishedKey) editorConfigs.delete(publishedKey);
         publishedKey = null;
 
+        chordAction?.dispose();
+        chordAction = null;
         // Dispose the editor
         editorObj.dispose();
         editorObj = null;
@@ -1241,18 +1225,6 @@ export default defineComponent({
       }
     });
 
-    // Computed property for AI icon based on theme
-    const aiIcon = computed(() => {
-      return isDark.value
-        ? getImageURL("images/common/ai_icon_dark.svg")
-        : getImageURL("images/common/ai_icon_gradient.svg");
-    });
-
-    // Toggle NLP mode
-    const toggleNlpMode = () => {
-      emit("toggle-nlp-mode");
-    };
-
     return {
       editorRef,
       // `editorObj` is reassigned by a plain closure variable (monaco.editor.create
@@ -1281,8 +1253,6 @@ export default defineComponent({
       // Read by the AI bar after a generation: set when the server refused it.
       refusalNotice,
       t,
-      aiIcon,
-      toggleNlpMode,
     };
   },
 });

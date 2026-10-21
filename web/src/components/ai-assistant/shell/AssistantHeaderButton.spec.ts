@@ -370,6 +370,19 @@ describe("AssistantHeaderButton announcements and toasts", () => {
     expect(openAssistant).toHaveBeenCalledWith(expect.objectContaining({ entryKind: "toast" }));
   });
 
+  it("raises no toast for an ephemeral helper or analysis turn", async () => {
+    const { store } = setup();
+    const sid = store.createSession({
+      origin: { entryKind: "object_verb", objectKind: "incident", container: "rca" },
+      ephemeral: true,
+    });
+    store.state.sessions[sid].turnMeta.turnId = "turn-rca";
+    store.state.sessions[sid].turn = { state: "done", saved: "local" };
+    store.state.sessions[sid].unread = true;
+    await flushPromises();
+    expect(toast).not.toHaveBeenCalled();
+  });
+
   it("raises no toast for the session a container shows", async () => {
     const { store } = setup();
     const a = session(store, "Visible");

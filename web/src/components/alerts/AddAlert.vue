@@ -432,6 +432,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :config="anomalyConfig"
                   :preview-sql="anomalyPreviewSql"
                   :stored-intervals="anomalyStoredIntervals"
+                  @run-preview="($refs.anomalyPreviewRef as any)?.loadPreview?.()"
                 />
               </div>
 
@@ -511,7 +512,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div class="min-h-0 flex-1 overflow-hidden">
               <template v-if="isAnomalyMode">
-                <AnomalyDataPreview :config="anomalyConfig" />
+                <AnomalyDataPreview ref="anomalyPreviewRef" :config="anomalyConfig" />
               </template>
               <template v-else>
                 <div

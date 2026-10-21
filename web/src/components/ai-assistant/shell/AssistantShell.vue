@@ -662,7 +662,8 @@ import {
   approvalClock,
   approvalOutcomeOf,
   assistantApprovals,
-  assistantConsent,
+  consentCardFor,
+  orgDisplayName,
   isRunning,
   markHintSeen,
   noteAssistantKeydown,
@@ -1103,28 +1104,9 @@ const approvalElsewhere = computed(
   () => !!decisions.value && turnLock.value === "approval_elsewhere",
 );
 
-const consentCard = computed(() => {
-  const current = session.value;
-  const pending = current?.pendingConsent;
-  if (!decisions.value || !current || !pending) return null;
-  const view = assistantConsent()?.view(current.sid) ?? { state: "shown" as const };
-  const { organization, payer } = pending.status;
-  const missing = [organization, payer].filter((o) => !!o && !o.enabled);
-  return {
-    sid: current.sid,
-    orgName: orgNameOf(pending.org),
-    orgId: pending.org,
-    payerName: payer?.org_id ?? "",
-    planType: payer ? ("payer" as const) : ("direct" as const),
-    payerOnly: !!payer && !payer.enabled && organization.enabled,
-    canEnable: missing.length > 0 && missing.every((o) => o!.can_manage),
-    variant: "card" as const,
-    state: view.state,
-    ...(view.error && { error: view.error }),
-    ...(view.via && { via: view.via }),
-    promptPreview: pending.snapshot.text,
-  };
-});
+const consentCard = computed(() =>
+  decisions.value ? consentCardFor(session.value, orgNameOf, "card") : null,
+);
 
 const reviewClock = ref(Date.now());
 let reviewTimer: ReturnType<typeof setInterval> | null = null;
@@ -1148,8 +1130,7 @@ const approvalsHost: AssistantApprovalsHost = {
 provide(assistantApprovalsHostKey, approvalsHost);
 
 function orgNameOf(id: string): string {
-  const selected = vuex.state.selectedOrganization;
-  return selected?.identifier === id && selected?.label ? String(selected.label) : id;
+  return orgDisplayName(id, vuex.state.selectedOrganization);
 }
 
 function onDecide({ decision, approvalId }: ApprovalCardDecision): void {

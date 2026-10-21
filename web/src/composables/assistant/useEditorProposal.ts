@@ -18,9 +18,9 @@ import { getCurrentScope, nextTick, onScopeDispose, shallowRef, watch, type Shal
 import useBreakpoint from "@/composables/useBreakpoint";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { trackAssistant } from "@/services/assistantAnalytics";
-import { gt, type I18nKey } from "@/types/i18n";
+import { gt, type I18nKey, type I18nText } from "@/types/i18n";
 
-import type { AssistantHostAdapter, DockHostId } from "./assistantStore.types";
+import type { AssistantHostAdapter, ProposalHostId } from "./assistantStore.types";
 import { focusDockComposer, isDockOpen } from "./hostAdapter";
 import { runtimeHandle } from "./runtimeHandle";
 
@@ -48,9 +48,29 @@ export const PROPOSAL_LANGUAGE_NAMES: Record<AssistantHostAdapter["language"], s
 };
 
 // Controllers of the mounted editors, so the Insert applier finds the one its action names.
-const controllers = new Map<DockHostId, EditorProposal>();
+const controllers = new Map<ProposalHostId, EditorProposal>();
 
 export type ProposalLanguage = AssistantHostAdapter["language"];
+
+/** The editor a proposal lands in: a docked host's adapter or an inline helper host. */
+export type ProposalHost = Pick<
+  AssistantHostAdapter,
+  "language" | "getBuffer" | "focusEditor" | "run"
+> & {
+  id: ProposalHostId;
+};
+
+/** What the client check found, shown in the diff's bar; Accept waits while `checking`. */
+export interface ProposalChecks {
+  state: "checking" | "ok" | "error" | "skipped";
+  unknownCount?: number;
+  /** Marked in the proposed side of the diff. */
+  unknownFields?: string[];
+  /** Accept and run stays focusable but inert with this reason. */
+  runBlocked?: I18nText;
+  /** The line under Accept and run: the range it scans. */
+  runNote?: I18nText;
+}
 
 export interface ProposalProvenance {
   prompt: string;
@@ -59,6 +79,9 @@ export interface ProposalProvenance {
 }
 
 export type ProposalDecision = "accepted" | "rejected" | "discarded" | "no_change";
+
+/** How the user decided, for `ai_nl_decided`; `accept_run` is Accept and run. */
+export type ProposalChoice = "accept" | "accept_run" | "reject" | "discarded";
 
 export interface ProposalHandle {
   accept(): void;
@@ -72,12 +95,13 @@ export interface ProposalHandle {
 export interface PendingProposal extends Omit<ProposalHandle, "decision"> {
   id: number;
   /** The editor the proposal belongs to; the diff names its object. */
-  hostId: DockHostId;
+  hostId: ProposalHostId;
   before: string;
   after: string;
   language: ProposalLanguage;
   provenance: ProposalProvenance;
   canRun: boolean;
+  checks?: ProposalChecks;
 }
 
 /** Editor-session state of accepted text; never persisted on the object. */
@@ -107,6 +131,9 @@ export interface ProposeOptions {
   mode: "replace" | "append";
   provenance: ProposalProvenance;
   canRun: boolean;
+  checks?: ProposalChecks;
+  /** Called once with the user's choice; an edit in the editor is `discarded`. */
+  onDecided?(choice: ProposalChoice): void;
 }
 
 export interface EditorProposal {
@@ -118,6 +145,8 @@ export interface EditorProposal {
   clear(): void;
   /** Drops an open proposal without touching the editor. */
   discard(): void;
+  /** Shows the client check of the open proposal `id` in its diff. */
+  annotate(id: number, checks: ProposalChecks): void;
 }
 
 /** Lets a spec start with no mounted editor; never called by app code. */
@@ -131,7 +160,7 @@ export function discardProposals(): void {
 }
 
 /** The proposal controller of a mounted editor, for the Insert applier. */
-export function proposalFor(hostId: DockHostId): EditorProposal | null {
+export function proposalFor(hostId: ProposalHostId): EditorProposal | null {
   return controllers.get(hostId) ?? null;
 }
 
@@ -157,10 +186,7 @@ export function withoutProvenance(text: string, language: ProposalLanguage): str
 }
 
 /** Owns one editor's proposal: the text before it, one undo step on Accept, and the label after it. */
-export function useEditorProposal(
-  host: AssistantHostAdapter,
-  editor: EditorBinding,
-): EditorProposal {
+export function useEditorProposal(host: ProposalHost, editor: EditorBinding): EditorProposal {
   const hostId = host.id;
   const { lgUp } = useBreakpoint();
   const pending = shallowRef<PendingProposal | null>(null);
@@ -168,13 +194,18 @@ export function useEditorProposal(
   let original: string | null = null;
   let seq = 0;
   let settle: ((decision: ProposalDecision) => void) | null = null;
+  let choose: ((choice: ProposalChoice) => void) | null = null;
   const now = () => editor.now?.() ?? Date.now();
   const languageNow = () => editor.language?.() ?? host.language;
 
-  const decide = (decision: ProposalDecision) => {
+  const decide = (decision: ProposalDecision, choice?: ProposalChoice) => {
     pending.value = null;
     const done = settle;
+    const chosen = choose;
     settle = null;
+    choose = null;
+    if (decision !== "no_change")
+      chosen?.(choice ?? (decision === "accepted" ? "accept" : "discarded"));
     done?.(decision);
   };
 
@@ -195,7 +226,7 @@ export function useEditorProposal(
     else toast({ variant: "default", message: gt(key) });
   };
 
-  const accept = (proposal: PendingProposal) => {
+  const accept = (proposal: PendingProposal, ran = false) => {
     if (pending.value?.id !== proposal.id) return;
     const landed = editor.write(proposal.after) ?? {};
     original ??= proposal.before;
@@ -208,13 +239,13 @@ export function useEditorProposal(
       acceptedAt: now(),
       note: landed.note ?? null,
     };
-    decide("accepted");
+    decide("accepted", ran ? "accept_run" : "accept");
     returnFocus();
   };
 
   const reject = (proposal: PendingProposal) => {
     if (pending.value?.id !== proposal.id) return;
-    decide("rejected");
+    decide("rejected", "reject");
     returnFocus();
   };
 
@@ -240,15 +271,17 @@ export function useEditorProposal(
         language,
         provenance: opts.provenance,
         canRun: opts.canRun && !!host.run,
+        ...(opts.checks && { checks: opts.checks }),
         accept: () => accept(proposal),
         acceptAndRun: () => {
           if (pending.value?.id !== proposal.id) return;
-          accept(proposal);
+          accept(proposal, true);
           host.run?.();
         },
         reject: () => reject(proposal),
       };
       const decision = new Promise<ProposalDecision>((resolve) => (settle = resolve));
+      choose = opts.onDecided ?? null;
       pending.value = proposal;
       if (asSheet()) runtimeHandle().value?.store.setSheetSnap("peek");
       await nextTick();
@@ -287,6 +320,10 @@ export function useEditorProposal(
     },
     discard() {
       if (pending.value) decide("discarded");
+    },
+    annotate(id, checks) {
+      const current = pending.value;
+      if (current?.id === id) pending.value = { ...current, checks };
     },
   };
 

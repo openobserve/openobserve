@@ -108,8 +108,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div class="min-w-0 flex-1 basis-60">
             <div
-              class="custom-sql-editor-wrapper rounded-default h-35 overflow-hidden border"
-              :class="hasSqlError ? 'border-input-border-error' : 'border-border-default'"
+              class="custom-sql-editor-wrapper rounded-default overflow-hidden border"
+              :class="[
+                hasSqlError ? 'border-input-border-error' : 'border-border-default',
+                assistantV2 ? '' : 'h-35',
+              ]"
             >
               <!-- Bare Monaco: value bridged into the form from the editor's
                    own change handler so the schema covers it. -->
@@ -124,7 +127,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :disable-ai-reason="
                   !config.stream_name ? t('alerts.anomaly.selectStreamFirst') : raw('')
                 "
-                editor-height="100%"
+                :editor-height="assistantV2 ? '8.75rem' : '100%'"
+                :assistant="anomalyAssistant"
                 data-test="anomaly-custom-sql"
                 @update:query="onCustomSqlChange"
               />
@@ -632,6 +636,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :hide-nl-toggle="true"
               :query="previewSql"
               editor-height="100%"
+              helper="off"
               data-test="anomaly-sql-preview"
             />
           </div>
@@ -653,6 +658,8 @@ import {
   operatorNeedsValue,
 } from "@/utils/alerts/anomalyFilterOperators";
 import QueryEditor from "@/components/QueryEditor.vue";
+import { isAssistantV2 } from "@/composables/assistant/flags";
+import type { QueryEditorAssistant } from "@/composables/assistant/pure";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
@@ -712,7 +719,8 @@ export default defineComponent({
     },
   },
 
-  setup(props) {
+  emits: ["run-preview"],
+  setup(props, { emit }) {
     const { t } = useI18nTyped();
     const store = useStore();
 
@@ -1034,6 +1042,30 @@ export default defineComponent({
 
     // Stream fields for filter field selector and detection function field
     const allStreamFields = ref<string[]>([]);
+    const assistantV2 = isAssistantV2();
+    const anomalyAssistant: QueryEditorAssistant = {
+      id: "anomaly",
+      get stream() {
+        return String(props.config.stream_name ?? "");
+      },
+      get streamType() {
+        return String(props.config.stream_type ?? "");
+      },
+      schemaFields: () => allStreamFields.value,
+      // The custom query runs over the detection window, so that is the range its chip names.
+      get timeRange() {
+        const value = Number(detectionWindowValue.value);
+        if (!Number.isFinite(value) || value <= 0) return undefined;
+        const unit = detectionWindowUnit.value === "h" ? "h" : "m";
+        const to = Date.now();
+        return {
+          from: to - value * (unit === "h" ? 3_600_000 : 60_000),
+          to,
+          period: `${value}${unit}`,
+        };
+      },
+      run: () => emit("run-preview"),
+    };
     // Same completion machinery every other SQL editor in the app uses, so this
     // one also gets SQL keywords, the O2 functions and the server function
     // catalog rather than bare field names.
@@ -1205,6 +1237,8 @@ export default defineComponent({
     };
 
     return {
+      assistantV2,
+      anomalyAssistant,
       raw,
       t,
       store,

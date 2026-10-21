@@ -27,6 +27,7 @@ import type {
   AssistantSession,
   AssistantState,
   ConsentService,
+  CreditMode,
   PendingConsent,
   Sid,
 } from "./assistantStore.types";
@@ -60,6 +61,15 @@ export interface AssistantConsentCardProps {
   canEnable: boolean;
   variant: "card" | "compact";
   state: ConsentCardState;
+}
+
+/** Everything a container binds on `AssistantConsentCard` for one session. */
+export interface ConsentCardBinding extends AssistantConsentCardProps {
+  orgId: string;
+  payerOnly: boolean;
+  error?: ConsentView["error"];
+  via?: ConsentView["via"];
+  promptPreview: string;
 }
 
 /** What the consent runtime reads and calls; `runtime.ts` provides it, specs pass fakes. */
@@ -103,9 +113,49 @@ export interface ConsentRuntime extends ConsentService {
   dispose(): void;
 }
 
+/** True where a turn can cost the org money, so cost lines and hints render. */
+export function isMeteredCredit(mode: CreditMode | undefined): boolean {
+  return mode === "consent_required" || mode === "pay_as_you_go";
+}
+
+/** The org's display name for consent copy; the identifier when the selected org is another. */
+export function orgDisplayName(
+  id: string,
+  selected: { identifier?: unknown; label?: unknown } | null | undefined,
+): string {
+  return selected?.identifier === id && selected?.label ? String(selected.label) : id;
+}
+
 /** The built runtime's consent, for the card; `null` before it exists. */
 export function assistantConsent(): ConsentRuntime | null {
   return runtimeHandle().value?.consent ?? null;
+}
+
+/** The card's bindings for a session's pending consent; `null` when nothing waits. */
+export function consentCardFor(
+  session: AssistantSession | null,
+  orgName: (id: string) => string,
+  variant: AssistantConsentCardProps["variant"],
+): ConsentCardBinding | null {
+  const pending = session?.pendingConsent;
+  if (!session || !pending) return null;
+  const view = assistantConsent()?.view(session.sid) ?? { state: "shown" as const };
+  const { organization, payer } = pending.status;
+  const missing = [organization, payer].filter((o) => !!o && !o.enabled);
+  return {
+    sid: session.sid,
+    orgName: orgName(pending.org),
+    orgId: pending.org,
+    payerName: payer?.org_id ?? "",
+    planType: payer ? "payer" : "direct",
+    payerOnly: !!payer && !payer.enabled && organization.enabled,
+    canEnable: missing.length > 0 && missing.every((o) => o!.can_manage),
+    variant,
+    state: view.state,
+    ...(view.error && { error: view.error }),
+    ...(view.via && { via: view.via }),
+    promptPreview: pending.snapshot.text,
+  };
 }
 
 /** Consent as a turn state of the session that asked: one card per session, one grant per org and feature. */

@@ -71,6 +71,7 @@ export {
   contextChipFor,
   periodMs,
   shortLabelFor,
+  timeChipOf,
   timeRangeShortText,
   timeRangeText,
   truncateChip,
@@ -153,7 +154,8 @@ export {
   assistantApprovals,
   useAssistantApprovals,
 } from "./useAssistantApprovals";
-export { assistantConsent } from "./consent";
+export { assistantConsent, consentCardFor, isMeteredCredit, orgDisplayName } from "./consent";
+export type { ConsentCardBinding } from "./consent";
 export {
   assistantKeydownAt,
   noteAssistantKeydown,
@@ -176,6 +178,9 @@ export type {
   EditorBinding,
   EditorProposal,
   PendingProposal,
+  ProposalChecks,
+  ProposalChoice,
+  ProposalHost,
   ProposalLanguage,
   ProposalProvenance,
 } from "./useEditorProposal";
@@ -198,6 +203,17 @@ export type { AssistantLifecycle, LeaveGuard, LifecycleQuestion, OpenQuestion } 
 export type { InsertOutcome } from "./actions/appliers/editor";
 export type { AssistantScope, AssistantStartersInput, Starter } from "./useAssistantStarters";
 export type { AssistantClient, FrameSink, SendResult, TailResult } from "./useAssistantClient";
+export {
+  rcaRefusalOf,
+  resetIncidentAnalysisForTests,
+  useIncidentAnalysis,
+  type IncidentAnalysis,
+  type IncidentAnalysisGate,
+  type IncidentAnalysisRun,
+  type IncidentRefusal,
+} from "./useIncidentAnalysis";
+export { followKey, followedAnalyses, latestRunOf } from "./analysisFollow";
+export type { AnalysisEvent, FollowState } from "./analysisFollow";
 export type * from "./assistantStore.types";
 export type * from "./turnStates";
 export type * from "./frames";

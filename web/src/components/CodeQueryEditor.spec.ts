@@ -42,6 +42,7 @@ const mockEditorObj = {
   onDidChangeModelContent: vi.fn(),
   createContextKey: vi.fn(),
   addCommand: vi.fn(),
+  addAction: vi.fn(() => ({ dispose: vi.fn() })),
   onKeyDown: vi.fn(),
   onDidFocusEditorWidget: vi.fn(),
   onDidBlurEditorWidget: vi.fn(),
@@ -103,7 +104,7 @@ vi.mock("monaco-editor/esm/vs/editor/editor.api", () => ({
     registerHoverProvider: vi.fn(() => ({ dispose: vi.fn() })),
   },
   KeyMod: { CtrlCmd: 1 },
-  KeyCode: { Enter: 13 },
+  KeyCode: { Enter: 13, KeyI: 39, Space: 10 },
   Range: class {
     constructor(...args: number[]) {
       Object.assign(this, { args });
@@ -692,6 +693,49 @@ describe("CodeQueryEditor", () => {
     // The shortcut is bound via onKeyDown rather than addCommand: monaco's
     // addCommand discards the disposable it gets back, so its CommandsRegistry
     // entry outlives the editor and retains this component.
+    it("binds the assistant chord as an editor action that wins over Monaco's own Ctrl+I", async () => {
+      const chord = vi.fn(() => true);
+      await mountAndSetup({ assistantChord: chord });
+      const action = (mockEditorObj.addAction.mock.calls as unknown as [any][])[0][0];
+      expect(action.keybindings).toEqual([1 | 39]);
+      action.run();
+      expect(chord).toHaveBeenCalled();
+      expect(mockEditorObj.trigger).not.toHaveBeenCalled();
+    });
+
+    it("keeps Monaco's suggest on the chord where the door does not render", async () => {
+      await mountAndSetup({ assistantChord: () => false });
+      const action = (mockEditorObj.addAction.mock.calls as unknown as [any][])[0][0];
+      action.run();
+      expect(mockEditorObj.trigger).toHaveBeenCalledWith(
+        "keyboard",
+        "editor.action.triggerSuggest",
+        {},
+      );
+    });
+
+    it("leaves Ctrl+Space to Monaco's suggest when the assistant chord is bound", async () => {
+      await mountAndSetup({ assistantChord: vi.fn(() => true) });
+      const action = (mockEditorObj.addAction.mock.calls as unknown as [any][])[0][0];
+      expect(action.keybindings).toEqual([1 | 39]);
+      const handler = mockEditorObj.onKeyDown.mock.calls[0][0];
+      const preventDefault = vi.fn();
+      handler({
+        keyCode: 10,
+        ctrlKey: true,
+        metaKey: false,
+        preventDefault,
+        stopPropagation: vi.fn(),
+      });
+      expect(preventDefault).not.toHaveBeenCalled();
+      expect(mockEditorObj.trigger).not.toHaveBeenCalled();
+    });
+
+    it("binds no assistant action without a chord", async () => {
+      await mountAndSetup();
+      expect(mockEditorObj.addAction).not.toHaveBeenCalled();
+    });
+
     it("should bind the shortcut through onKeyDown, not addCommand", async () => {
       await mountAndSetup();
       expect(mockEditorObj.onKeyDown).toHaveBeenCalled();

@@ -144,6 +144,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="incident-activity-tab"
           />
           <OTab
+            v-if="assistantV2 && severitySuggestion"
+            name="incidentAnalysis"
+            data-test="incident-analysis-tab"
+          >
+            <template #default>
+              <span class="flex items-center gap-1.5">
+                <span>{{ t("alerts.incidents.incidentAnalysis") }}</span>
+                <span
+                  class="bg-status-warning-text size-2 rounded-full"
+                  aria-hidden="true"
+                  data-test="incident-analysis-tab-badge"
+                />
+                <span class="sr-only">{{ t("assistant.rca.rerunSuggested") }}</span>
+              </span>
+            </template>
+          </OTab>
+          <OTab
+            v-else
             name="incidentAnalysis"
             :label="t('alerts.incidents.incidentAnalysis')"
             data-test="incident-analysis-tab"
@@ -198,7 +216,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="flex flex-1 overflow-hidden">
           <!-- Left Column: Incident Details (only show on Incident Analysis tab, HIDDEN for Overview) -->
           <div
-            v-if="activeTab === 'incidentAnalysis'"
+            v-if="activeTab === 'incidentAnalysis' && !assistantV2"
             class="order-1 flex h-full w-100 max-w-100 min-w-100 flex-shrink-0 flex-col"
           >
             <!-- Table of Contents (only on Incident Analysis) -->
@@ -945,8 +963,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
 
               <!-- Incident Analysis Tab Content -->
+              <IncidentAnalysisPanel
+                v-if="activeTab === 'incidentAnalysis' && assistantV2 && incidentDetails"
+                :incident-id="incidentDetails.id"
+                :incident-title="incidentDetails.title ?? ''"
+                :severity="incidentDetails.severity"
+                :status="incidentDetails.status"
+                :existing-report="activeRcaMarkdown"
+                :history="rcaHistory"
+                :viewing-index="viewingArchivedIndex"
+                :analyzed-at="rcaAnalyzedAt ? rcaAnalyzedAt / 1000 : null"
+                :server-run-started-at="
+                  analysisInFlight && analysisStartedAt ? analysisStartedAt / 1000 : null
+                "
+                :window="incidentWindow"
+                :log-streams="incidentLogStreams"
+                :severity-change="severitySuggestion"
+                class="flex-1"
+                @completed="onAnalysisCompleted"
+                @view-report="viewReport"
+                @refresh-state="checkAnalysisInFlight(incidentDetails.id)"
+                @dismiss-severity="severitySuggestion = null"
+              />
               <IncidentRCAAnalysis
-                v-if="activeTab === 'incidentAnalysis'"
+                v-else-if="activeTab === 'incidentAnalysis'"
                 :has-existing-rca="hasExistingRca"
                 :rca-loading="rcaLoading"
                 :rca-stream-content="rcaStreamContent"
@@ -1492,6 +1532,7 @@ import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import {
+  defineAsyncComponent,
   defineComponent,
   ref,
   watch,
@@ -1532,6 +1573,7 @@ import CorrelatedLogsTable from "@/plugins/correlation/CorrelatedLogsTable.vue";
 import IncidentServiceGraph from "./IncidentServiceGraph.vue";
 import IncidentTableOfContents from "./IncidentTableOfContents.vue";
 import IncidentRCAAnalysis from "./IncidentRCAAnalysis.vue";
+import { isAssistantV2 } from "@/composables/assistant/flags";
 import IncidentTimeline from "./IncidentTimeline.vue";
 import IncidentAlertTriggersTable from "./IncidentAlertTriggersTable.vue";
 import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRenderer.vue";
@@ -1569,6 +1611,7 @@ export default defineComponent({
     IncidentAlertTriggersTable,
     IncidentTableOfContents,
     IncidentRCAAnalysis,
+    IncidentAnalysisPanel: defineAsyncComponent(() => import("./IncidentAnalysisPanel.vue")),
     IncidentTimeline,
     CustomChartRenderer,
     OButton,
@@ -1801,8 +1844,12 @@ export default defineComponent({
       return resp ? buildChipDimensionsFromFilters(resp, semanticGroups.value) : {};
     });
 
+    // Read once: the flag never changes in a running app.
+    const assistantV2 = isAssistantV2();
     // True when a background AI analysis run has started but not yet completed.
     const analysisInFlight = ref(false);
+    // The severity a save just set, offered once as a re-analysis on the v2 tab.
+    const severitySuggestion = ref<string | null>(null);
     // Epoch micros of the AIAnalysisBegin that is currently in flight, so the panel can
     // show elapsed time and flag a run that has outlived the server's staleness window.
     const analysisStartedAt = ref<number | null>(null);
@@ -1834,6 +1881,20 @@ export default defineComponent({
     const viewReport = (index: number | null) => {
       viewingArchivedIndex.value = index;
     };
+
+    // The alert window ±15 min (ms): the analysis tab's Time chip and its Logs link.
+    const incidentWindow = computed(() => {
+      const incident = incidentDetails.value;
+      if (!incident?.first_alert_at || !incident.last_alert_at) return null;
+      const margin = 15 * 60 * 1000;
+      return {
+        from: incident.first_alert_at / 1000 - margin,
+        to: incident.last_alert_at / 1000 + margin,
+      };
+    });
+    const incidentLogStreams = computed<string[]>(() =>
+      (correlationData.value?.logStreams ?? []).map((stream) => stream.stream_name).filter(Boolean),
+    );
 
     // Mirrors the backend stale threshold (reanalysis_cooldown_minutes * 2, default 30*2).
     // A begin older than this is ignored server-side, so the run is almost certainly dead.
@@ -1917,7 +1978,7 @@ export default defineComponent({
         if (analysisInFlight.value && !nowInFlight) {
           analysisInFlight.value = false;
           if (lastTerminalEvent?.type === "ai_analysis_complete") {
-            await loadDetails(incidentId);
+            await loadDetails(incidentId, assistantV2);
           }
           timelineRefreshTrigger.value++;
         } else {
@@ -2608,12 +2669,15 @@ export default defineComponent({
       };
     });
 
-    const loadDetails = async (incidentId: string) => {
-      loading.value = true;
+    // `quiet` refreshes in place, so a mounted tab such as a finished analysis keeps its state.
+    const loadDetails = async (incidentId: string, quiet = false) => {
+      if (!quiet) loading.value = true;
 
-      // Reset correlation state when loading new incident
-      correlationData.value = null;
-      correlationError.value = null;
+      // Reset correlation state when loading new incident; an in-place refresh keeps it.
+      if (!quiet) {
+        correlationData.value = null;
+        correlationError.value = null;
+      }
       // A refused run's banner writes no event, so only this can stop it carrying over.
       if (incidentDetails.value?.id !== incidentId) rcaError.value = null;
 
@@ -3101,8 +3165,11 @@ export default defineComponent({
         // Mark data as stale so incident list will refresh
         store.dispatch("incidents/setShouldRefresh", true);
 
-        // Handle reanalysis prompt based on in-flight state
-        if ("analysis_in_flight" in data) {
+        // The v2 tab offers the re-run inline and shows a run already going as running; no modal.
+        if (assistantV2 && "analysis_in_flight" in data) {
+          if (data.analysis_in_flight) await checkAnalysisInFlight(incidentId);
+          else severitySuggestion.value = data.severity;
+        } else if ("analysis_in_flight" in data) {
           analysisInFlight.value = !!data.analysis_in_flight;
           if (data.analysis_in_flight) {
             toast({
@@ -3695,6 +3762,14 @@ export default defineComponent({
       }
     };
 
+    // The v2 tab streams its own run; the drawer reloads what it saved once, never again from its poll.
+    const onAnalysisCompleted = async () => {
+      const incidentId = incidentDetails.value?.id;
+      if (!incidentId) return;
+      analysisInFlight.value = false;
+      await loadDetails(incidentId, true);
+    };
+
     const cancelRca = async () => {
       if (!incidentDetails.value || rcaCancelling.value) return;
 
@@ -3748,6 +3823,13 @@ export default defineComponent({
     };
 
     return {
+      assistantV2,
+      severitySuggestion,
+      incidentWindow,
+      incidentLogStreams,
+      analysisStartedAt,
+      onAnalysisCompleted,
+      activeRcaMarkdown,
       aiCreditCosts,
       mutedBannerText,
       openMutingDowntime,

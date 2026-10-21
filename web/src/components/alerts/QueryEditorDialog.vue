@@ -221,7 +221,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :disable-ai-reason="t('search.selectStreamForAI')"
                         @update:query="handleQueryUpdate"
                         @language-change="handleLanguageChange"
-                        @ask-ai="handleAskAI"
                         @run-query="handleRunQuery(localTab)"
                         @focus="onQueryEditorFocus"
                         @blur="onBlurQueryEditor"
@@ -230,9 +229,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :keywords="effectiveKeywords"
                         :suggestions="effectiveSuggestions"
                         :field-value-resolver="resolveFieldValues"
+                        :assistant="dialogAssistant"
+                        :placeholder="dialogAssistant ? fullEditorPlaceholder : undefined"
                       />
                       <div
                         v-if="
+                          !dialogAssistant &&
                           (localTab === 'sql' ? !localSqlQuery : !localPromqlQuery) &&
                           queryEditorPlaceholderFlag
                         "
@@ -361,10 +363,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @update:query="updateVrlFunction"
                       @focus="functionEditorPlaceholderFlag = false"
                       @blur="onBlurFunctionEditor"
-                      @toggle-nlp-mode="handleAlertFunctionEditorToggleNlpMode"
-                      @generation-start="handleAlertFunctionEditorGenerationStart"
-                      @generation-end="handleAlertFunctionEditorGenerationEnd"
-                      @generation-success="handleAlertFunctionEditorGenerationSuccess"
                     />
                     <div
                       v-if="!vrlFunctionContent && functionEditorPlaceholderFlag"
@@ -603,6 +601,7 @@ import {
   useAssistantPanelWidth,
   useDockedEditor,
   type DockedEditor,
+  type QueryEditorAssistant,
 } from "@/composables/assistant/pure";
 
 const props = defineProps({
@@ -879,34 +878,6 @@ const onBlurQueryEditor = debounce(async () => {
 
 const onBlurFunctionEditor = () => {
   functionEditorPlaceholderFlag.value = vrlFunctionContent.value === "";
-};
-
-/**
- * Handle NLP mode toggle from AI icon in alert function editor
- */
-const handleAlertFunctionEditorToggleNlpMode = () => {
-  // UnifiedQueryEditor manages its own NLP mode state internally
-};
-
-/**
- * Handle generation start event from alert function editor
- */
-const handleAlertFunctionEditorGenerationStart = () => {
-  // Can add loading indicators here if needed
-};
-
-/**
- * Handle generation end event from alert function editor
- */
-const handleAlertFunctionEditorGenerationEnd = () => {
-  // Can remove loading indicators here if needed
-};
-
-/**
- * Handle successful generation from alert function editor
- */
-const handleAlertFunctionEditorGenerationSuccess = () => {
-  // Function code is already updated via @update:query handler
 };
 
 // Column and function selection.
@@ -1283,6 +1254,26 @@ watch(
   },
 );
 
+const dialogAssistant: QueryEditorAssistant | null = docked
+  ? {
+      id: "alert_query",
+      proposal: docked.proposal,
+      get stream() {
+        return String(props.streamName ?? "");
+      },
+      get streamType() {
+        return props.streamType;
+      },
+      get timeRange() {
+        const minutes = Number(props.period);
+        if (!Number.isFinite(minutes) || minutes <= 0) return undefined;
+        const to = Date.now();
+        return { from: to - minutes * 60_000, to, period: `${minutes}m` };
+      },
+      run: () => handleRunQuery(localTab.value),
+    }
+  : null;
+
 function alertQueryHost(): DockedEditor {
   const buffer = () => (localTab.value === "sql" ? localSqlQuery.value : localPromqlQuery.value);
   return useDockedEditor(
@@ -1356,11 +1347,6 @@ const handleRunQuery = (language: "sql" | "promql") => {
   } else {
     runPromqlQuery();
   }
-};
-
-const handleAskAI = async () => {
-  // The unified component handles AI generation internally
-  // This event is just for parent components that may need to react
 };
 
 // AI Chat

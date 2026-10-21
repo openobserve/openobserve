@@ -617,7 +617,9 @@
       "credits.spec.js",
       "history.spec.js",
       "xtab.spec.js",
-      "sharing.spec.js"
+      "sharing.spec.js",
+      "helper.spec.js",
+      "rca.spec.js"
     ],
     "disabled": []
   }

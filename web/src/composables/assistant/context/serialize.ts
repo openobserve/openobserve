@@ -102,6 +102,7 @@ export const serialize: RequestBuilder = (session, snapshot, client, turn) => {
     ...(turn?.ephemeral && { ephemeral: true }),
     ...(typed && attached.length > 0 && { attachments: attached.map(toAttachment) }),
     ...(turn?.replyToApproval && { replyToApproval: turn.replyToApproval }),
+    ...(turn?.mode === "rca" && session.incidentId && { incident: incidentOf(session) }),
   };
   if (turn?.persisted) {
     const seq = session.record.cachedLastSeq;
@@ -235,6 +236,14 @@ function rowsCapped(
 
 function block(name: string, body: string, nonce: string): string {
   return `--- ${name} [${nonce}] ---\n${body}\n--- end [${nonce}] ---`;
+}
+
+function incidentOf(session: AssistantSession): NonNullable<SendRequest["incident"]> {
+  return {
+    id: session.incidentId ?? "",
+    reanalysis: session.rcaRun?.reanalysis === true,
+    buildOnPrevious: session.rcaRun?.buildOnPrevious === true,
+  };
 }
 
 function toAttachment(chip: ContextChip): WireAttachment {

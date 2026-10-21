@@ -29,6 +29,9 @@ import type {
 } from "./assistantStore.types";
 
 export { isAssistantV2 } from "./flags";
+export { INLINE_HOST_IDS, isDockHostId } from "./hostIds";
+export { answerTextOf, lastAnswerOf, markdownMessage } from "./answers";
+export { splitReportFindings } from "./reportFindings";
 export { useAssistantName } from "./useAssistantName";
 export {
   foldTurns,
@@ -64,6 +67,7 @@ export {
   type AssistantDockHost,
   type DockedEditor,
   type DockedEditorConfig,
+  type QueryEditorAssistant,
 } from "./hostAdapter";
 export {
   scheduleResizeSignal,
@@ -82,8 +86,17 @@ export {
   useTurnLock,
 } from "./runtimeHandle";
 export type { InsertOutcome } from "./actions/appliers/editor";
-export { PROPOSAL_LANGUAGE_NAMES, proposalFor } from "./useEditorProposal";
-export type { AiLabelState, PendingProposal, ProposalProvenance } from "./useEditorProposal";
+export { PROPOSAL_LANGUAGE_NAMES, proposalFor, useEditorProposal } from "./useEditorProposal";
+export { validateProposal, type ProposalValidation } from "./queryValidation";
+export type {
+  AiLabelState,
+  EditorProposal,
+  PendingProposal,
+  ProposalChecks,
+  ProposalChoice,
+  ProposalHost,
+  ProposalProvenance,
+} from "./useEditorProposal";
 export {
   MAX_HIT_ROWS,
   chipOpenQuery,
