@@ -46,8 +46,8 @@ export class ModelPricingPage {
         this.listTable          = page.locator('[data-test="model-pricing-list-table"]');
         this.toggleBtn          = page.locator('[data-test="model-pricing-toggle-btn"]');
         this.editBtn            = page.locator('[data-test="model-pricing-edit-btn"]');
-        this.deleteBtn          = page.locator('[data-test="model-pricing-delete-btn"]');
-        this.duplicateBtn       = page.locator('[data-test="model-pricing-duplicate-btn"]');
+        this.deleteBtn          = page.locator('[data-test="model-pricing-delete-btn-menu"]');
+        this.duplicateBtn       = page.locator('[data-test="model-pricing-duplicate-btn-menu"]');
         this.cloneBtn           = page.locator('[data-test="model-pricing-clone-btn"]');
         this.pricingDrawer      = page.locator('[data-test="model-pricing-list-pricing-drawer"]');
 
@@ -193,11 +193,18 @@ export class ModelPricingPage {
             .locator('[data-test="model-pricing-edit-btn"]');
     }
 
-    deleteBtnForModel(name) {
-        return this.page
+    // Duplicate and Delete live in the row's ⋮ menu, which renders in a portal outside the row.
+    async openRowMenuForModel(name) {
+        await this.page
             .locator('[data-test="model-pricing-list-table"]')
             .locator(`tr:has-text("${name}")`)
-            .locator('[data-test="model-pricing-delete-btn"]');
+            .locator('[data-test="model-pricing-row-more-actions"]')
+            .click();
+    }
+
+    async clickDeleteForModel(name) {
+        await this.openRowMenuForModel(name);
+        await this.deleteBtn.click();
     }
 
     toggleBtnForModel(name) {
@@ -207,11 +214,9 @@ export class ModelPricingPage {
             .locator('[data-test="model-pricing-toggle-btn"]');
     }
 
-    duplicateBtnForModel(name) {
-        return this.page
-            .locator('[data-test="model-pricing-list-table"]')
-            .locator(`tr:has-text("${name}")`)
-            .locator('[data-test="model-pricing-duplicate-btn"]');
+    async clickDuplicateForModel(name) {
+        await this.openRowMenuForModel(name);
+        await this.duplicateBtn.click();
     }
 
     cloneBtnForRow(rowLocator) {
