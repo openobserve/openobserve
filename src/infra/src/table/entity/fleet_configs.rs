@@ -24,8 +24,6 @@ pub struct Model {
     pub id: String,
     #[sea_orm(column_type = "Text")]
     pub description: String,
-    #[sea_orm(default_value = false)]
-    pub template: bool,
     #[sea_orm(default_value = 0)]
     pub latest_version: i64,
     #[sea_orm(column_type = "Text", nullable)]

@@ -301,7 +301,6 @@ pub struct CreatedToken {
 pub struct FleetConfig {
     pub id: String,
     pub description: String,
-    pub template: bool,
     pub latest_version: i64,
     pub live_version: Option<i64>,
     pub collectors: usize,
@@ -1164,7 +1163,6 @@ mod tests {
             config: FleetConfig {
                 id: "edge".to_string(),
                 description: String::new(),
-                template: false,
                 latest_version: 1,
                 live_version: None,
                 collectors: 0,

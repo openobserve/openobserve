@@ -127,7 +127,6 @@ enum FleetConfigs {
     OrgId,
     Id,
     Description,
-    Template,
     LatestVersion,
     DraftYaml,
     DraftBy,
@@ -357,12 +356,6 @@ fn configs_table() -> TableCreateStatement {
         .col(ColumnDef::new(F::OrgId).string().not_null())
         .col(ColumnDef::new(F::Id).string_len(63).not_null())
         .col(ColumnDef::new(F::Description).custom(text()).not_null())
-        .col(
-            ColumnDef::new(F::Template)
-                .boolean()
-                .not_null()
-                .default(false),
-        )
         .col(big_not_null(F::LatestVersion).default(0).to_owned())
         .col(ColumnDef::new(F::DraftYaml).custom(text()).null())
         .col(ColumnDef::new(F::DraftBy).string().null())
