@@ -129,6 +129,8 @@ const iconSize: Record<NonNullable<ToggleGroupItemProps["size"]>, "xs" | "sm" | 
     :aria-labelledby="unavailable && typeof attrs['aria-label'] !== 'string' ? labelId : undefined"
     :aria-describedby="unavailable && props.tooltip ? reasonId : undefined"
   >
+    <!-- First child when disabled: with nothing before it, the tooltip binds to this wrapper, the only element that gets the hover. -->
+    <OTooltip v-if="props.tooltip && props.disabled" :content="props.tooltip" />
     <ToggleGroupItem
       v-bind="$attrs"
       :value="props.value"
@@ -198,6 +200,6 @@ const iconSize: Record<NonNullable<ToggleGroupItemProps["size"]>, "xs" | "sm" | 
     <span v-if="unavailable && props.tooltip" :id="reasonId" aria-hidden="true" class="sr-only">{{
       props.tooltip
     }}</span>
-    <OTooltip v-if="props.tooltip" :content="props.tooltip" />
+    <OTooltip v-if="props.tooltip && !props.disabled" :content="props.tooltip" />
   </span>
 </template>

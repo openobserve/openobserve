@@ -27,6 +27,11 @@ import SetupCardRenderer from "./SetupCardRenderer.vue";
 import { iconRegistry } from "@/lib/core/Icon/OIcon.icons";
 import type { RichCardContent } from "./types";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OStep from "@/lib/navigation/Stepper/OStep.vue";
+import linuxCard from "./content/linux";
+import kubernetesCard from "./content/kubernetes";
+import { gt } from "@/types/i18n";
 import analytics from "@/services/product_analytics";
 
 vi.mock("@/composables/useStreams", () => ({
@@ -167,7 +172,7 @@ describe("SetupCardRenderer — key-as-data copy", () => {
         variants: [
           {
             id: "generic",
-            labelKey: "ingestion.setupCard.genericWindowsVariant",
+            labelKey: "ingestion.setupCard.jmxPortLabel",
             code: { lang: "bash", raw: "echo hi" },
           },
         ],
@@ -183,7 +188,7 @@ describe("SetupCardRenderer — key-as-data copy", () => {
     // inlineMd turns the `config.yaml` backticks into <code>, so match the prose.
     expect(text).toContain("set the host/port below");
     expect(text).toContain("JMX Host");
-    expect(text).toContain("Generic Windows");
+    expect(text).toContain("JMX Port");
     expect(text).not.toContain("ingestion.setupCard.");
   });
 });
@@ -557,5 +562,271 @@ describe("SetupCardRenderer — product analytics", () => {
     });
     const block = wrapper.findComponent(OCodeBlock);
     expect(block.props("tokenName")).toBe("default");
+  });
+});
+
+describe("SetupCardRenderer — Linux install step tracing toggle", () => {
+  let wrapper: VueWrapper<any>;
+
+  afterEach(() => {
+    if (wrapper) wrapper.unmount();
+  });
+
+  const LINUX_SUBS = { ...SUBS, token: "dGVzdEB0b2tlbg==" };
+  const BASE_TAIL = `./install.sh ${LINUX_SUBS.url}/api/${LINUX_SUBS.org}/ ${LINUX_SUBS.token}`;
+  const installBlock = () => wrapper.findAllComponents(OCodeBlock)[0];
+  const installNotes = () =>
+    wrapper.find('[data-test="ai-variant-tabs"]').element.parentElement!.textContent ?? "";
+  const field = (id: string) => wrapper.find(`[data-test="ai-input-${id}"]`);
+  const type = (id: string, v: string) => field(id).find("input").setValue(v);
+  const warning = () => wrapper.find('[data-test="ai-variant-require-install"]');
+  const pick = async (id: string) => {
+    wrapper.findAllComponents(OToggleGroup)[0].vm.$emit("update:modelValue", id);
+    await flushPromises();
+  };
+  const mountLinux = () =>
+    mount(SetupCardRenderer, {
+      props: { content: linuxCard(LINUX_SUBS, gt), subs: LINUX_SUBS },
+      global: { plugins: [store, router], stubs: { FirstEventStatus: FirstEventStatusStub } },
+      attachTo: document.body,
+    });
+
+  it("shows the tracing fields only under traces, and leaves the default command unchanged", async () => {
+    wrapper = mountLinux();
+    expect(installBlock().props("code").endsWith(BASE_TAIL)).toBe(true);
+    expect(installNotes()).not.toContain("BTF");
+    for (const id of ["ports", "exe", "cmd", "serviceName"]) expect(field(id).exists()).toBe(false);
+    expect(wrapper.find('[data-test="ai-step-inputs-install"]').exists()).toBe(false);
+
+    await pick("traces");
+    for (const id of ["ports", "exe", "cmd", "serviceName"]) expect(field(id).exists()).toBe(true);
+    expect(installNotes()).toContain("BTF");
+    expect(warning().exists()).toBe(false);
+    expect(installBlock().props("code").endsWith(`${BASE_TAIL} --trace-ports '8080'`)).toBe(true);
+
+    await pick("logs-metrics");
+    expect(field("ports").exists()).toBe(false);
+    expect(installBlock().props("code").endsWith(BASE_TAIL)).toBe(true);
+  });
+
+  it("emits all four flags in order, single-quoted, with the token still masked", async () => {
+    wrapper = mountLinux();
+    await pick("traces");
+    await type("ports", "80,443,8000-8999");
+    await type("exe", "/opt/my app/*");
+    await type("cmd", "*it's.py*");
+    await type("serviceName", "checkout");
+    const flags =
+      " --trace-ports '80,443,8000-8999' --trace-exe '/opt/my app/*'" +
+      " --trace-cmd '*it'\\''s.py*' --service-name 'checkout'";
+    expect(installBlock().props("code").endsWith(`${BASE_TAIL}${flags}`)).toBe(true);
+    expect(installBlock().props("codeMasked").endsWith(flags)).toBe(true);
+    expect(installBlock().props("codeMasked")).not.toContain(LINUX_SUBS.token);
+  });
+
+  it("keeps a typed $ literal inside the quotes", async () => {
+    wrapper = mountLinux();
+    await pick("traces");
+    await type("exe", "/opt/$$x/*a$&$");
+    expect(installBlock().props("code").endsWith(` --trace-exe '/opt/$$x/*a$&$'`)).toBe(true);
+  });
+
+  it("omits blank (or whitespace-only) fields instead of falling back to a default", async () => {
+    wrapper = mountLinux();
+    await pick("traces");
+    await type("ports", "   ");
+    await type("cmd", "*reports.py*");
+    expect(installBlock().props("code").endsWith(`${BASE_TAIL} --trace-cmd '*reports.py*'`)).toBe(
+      true,
+    );
+  });
+
+  it("warns and hides the command when no selector is filled", async () => {
+    wrapper = mountLinux();
+    await pick("traces");
+    await type("serviceName", "checkout");
+    await type("ports", "");
+    expect(warning().exists()).toBe(true);
+    expect(warning().text()).toContain("Fill in at least one");
+    const codes = wrapper.findAllComponents(OCodeBlock).map((b) => b.props("code"));
+    expect(codes.some((c) => c.includes("install.sh"))).toBe(false);
+
+    await type("exe", "/opt/myapp/*");
+    expect(warning().exists()).toBe(false);
+    expect(
+      installBlock()
+        .props("code")
+        .endsWith(" --trace-exe '/opt/myapp/*' --service-name 'checkout'"),
+    ).toBe(true);
+  });
+
+  it("scrolls to the install step when the bar asks for a command that is hidden", async () => {
+    wrapper = mountLinux();
+    await pick("traces");
+    await type("ports", "");
+    expect(warning().exists()).toBe(true);
+    const original = (Element.prototype as any).scrollIntoView;
+    const scrollSpy = vi.fn();
+    (Element.prototype as any).scrollIntoView = scrollSpy;
+    try {
+      bar(wrapper).vm.$emit("copy-command");
+      expect(scrollSpy).toHaveBeenCalledTimes(1);
+      expect((scrollSpy.mock.contexts[0] as Element).contains(warning().element)).toBe(true);
+    } finally {
+      (Element.prototype as any).scrollIntoView = original;
+    }
+  });
+
+  it("marks the install step done when the traces command is copied", async () => {
+    wrapper = mountLinux();
+    await pick("traces");
+    const step = () => wrapper.findAllComponents(OStep)[0];
+    expect(step().props("done")).toBe(false);
+    installBlock().vm.$emit("copy", { partial: false });
+    await flushPromises();
+    expect(step().props("done")).toBe(true);
+  });
+
+  it("leaves step-level inputs where they were (Kubernetes cluster name)", async () => {
+    wrapper = mount(SetupCardRenderer, {
+      props: { content: kubernetesCard(LINUX_SUBS, gt), subs: LINUX_SUBS },
+      global: { plugins: [store, router], stubs: { FirstEventStatus: FirstEventStatusStub } },
+      attachTo: document.body,
+    });
+    expect(
+      wrapper.find('[data-test="ai-step-inputs-install"] [data-test="ai-input-cluster"]').exists(),
+    ).toBe(true);
+    expect(wrapper.find('[data-test="ai-variant-inputs-install"]').exists()).toBe(false);
+    await wrapper.find('[data-test="ai-input-cluster"] input').setValue("prod-eu");
+    expect(installBlock().props("code")).toContain("--cluster-name=prod-eu");
+    await wrapper.find('[data-test="ai-input-cluster"] input').setValue("");
+    expect(installBlock().props("code")).not.toContain("cluster1");
+  });
+});
+
+describe("SetupCardRenderer — Kubernetes instrument step (nested toggle)", () => {
+  let wrapper: VueWrapper<any>;
+
+  afterEach(() => {
+    if (wrapper) wrapper.unmount();
+  });
+
+  const BASE = `helm repo update openobserve
+helm --namespace openobserve-collector upgrade o2c openobserve/openobserve-collector \\
+  --version '>=0.6.0' --reset-then-reuse-values \\
+  --set ebpf.enabled=true`;
+  const codes = () => wrapper.findAllComponents(OCodeBlock).map((b) => b.props("code") as string);
+  const instrumentCode = () =>
+    codes().find((c) => c.includes("kubectl annotate") || c.includes("upgrade o2c"));
+  const field = (id: string) => wrapper.find(`[data-test="ai-input-${id}"]`);
+  const type = (id: string, v: string) => field(id).find("input").setValue(v);
+  const warning = () => wrapper.find('[data-test="ai-variant-require-instrument"]');
+  const subTabs = () => wrapper.find('[data-test="ai-subvariant-tabs-instrument"]');
+  const pickTop = async (id: string) => {
+    const tabs = wrapper
+      .findAll('[data-test="ai-variant-tabs"]')
+      .find((t) => t.find('[data-test="ai-variant-ebpf"]').exists())!;
+    tabs.findComponent(OToggleGroup).vm.$emit("update:modelValue", id);
+    await flushPromises();
+  };
+  const pickSub = async (id: string) => {
+    subTabs().findComponent(OToggleGroup).vm.$emit("update:modelValue", id);
+    await flushPromises();
+  };
+  const mountK8s = () =>
+    mount(SetupCardRenderer, {
+      props: { content: kubernetesCard(SUBS, gt), subs: SUBS },
+      global: { plugins: [store, router], stubs: { FirstEventStatus: FirstEventStatusStub } },
+      attachTo: document.body,
+    });
+
+  it("renders the nested language toggle under language libraries and switches code", async () => {
+    wrapper = mountK8s();
+    expect(subTabs().exists()).toBe(true);
+    for (const id of ["java", "dotnet", "nodejs", "python"]) {
+      expect(subTabs().find(`[data-test="ai-variant-${id}"]`).exists()).toBe(true);
+    }
+    expect(instrumentCode()).toContain("inject-java=");
+    await pickSub("python");
+    expect(instrumentCode()).toContain("inject-python=");
+    expect(instrumentCode()).not.toContain("inject-java=");
+
+    await pickTop("ebpf");
+    expect(subTabs().exists()).toBe(false);
+    await pickTop("libraries");
+    // Each top-level choice remembers its own nested selection.
+    expect(instrumentCode()).toContain("inject-python=");
+  });
+
+  it("shows the eBPF fields only under eBPF, opening with nothing selected", async () => {
+    wrapper = mountK8s();
+    for (const id of ["ebpfPorts", "ebpfExe", "ebpfCmd"]) expect(field(id).exists()).toBe(false);
+    await pickTop("ebpf");
+    for (const id of ["ebpfPorts", "ebpfExe", "ebpfCmd"]) expect(field(id).exists()).toBe(true);
+    expect(warning().exists()).toBe(true);
+    expect(codes().some((c) => c.includes("upgrade o2c"))).toBe(false);
+
+    await type("ebpfPorts", "8080");
+    expect(warning().exists()).toBe(false);
+    expect(instrumentCode()).toBe(
+      `${BASE} \\\n  --set-string 'ebpf.trace.ports={8080}'` +
+        ` \\\n  --set ebpf.trace.exePaths=null \\\n  --set ebpf.trace.cmdLines=null`,
+    );
+  });
+
+  it("emits one --set-string per filled field, in order, with comma-split quoted lists", async () => {
+    wrapper = mountK8s();
+    await pickTop("ebpf");
+    await type("ebpfPorts", " 8080, 9000-9100 ,,");
+    await type("ebpfExe", "/app/it's*");
+    await type("ebpfCmd", "*reports.py*, *worker*");
+    expect(instrumentCode()).toBe(
+      `${BASE} \\\n  --set-string 'ebpf.trace.ports={8080,9000-9100}'` +
+        ` \\\n  --set-string 'ebpf.trace.exePaths={/app/it'\\''s*}'` +
+        ` \\\n  --set-string 'ebpf.trace.cmdLines={*reports.py*,*worker*}'`,
+    );
+  });
+
+  it("sets blank fields to null so a selector from an earlier run is cleared", async () => {
+    wrapper = mountK8s();
+    await pickTop("ebpf");
+    await type("ebpfPorts", "  ");
+    await type("ebpfCmd", "*reports.py*");
+    expect(instrumentCode()).toBe(
+      `${BASE} \\\n  --set ebpf.trace.ports=null \\\n  --set ebpf.trace.exePaths=null` +
+        ` \\\n  --set-string 'ebpf.trace.cmdLines={*reports.py*}'`,
+    );
+  });
+
+  it("warns and hides the command when every selector is blank", async () => {
+    wrapper = mountK8s();
+    await pickTop("ebpf");
+    expect(warning().exists()).toBe(true);
+    expect(warning().text()).toContain("Fill in at least one");
+    expect(codes().some((c) => c.includes("upgrade o2c"))).toBe(false);
+  });
+
+  it("escapes backslashes and braces so a value cannot close the Helm list", async () => {
+    wrapper = mountK8s();
+    await pickTop("ebpf");
+    await type(
+      "ebpfCmd",
+      "*x*},exporters.otlphttp/openobserve.endpoint=https://evil.example,ebpf.trace.cmdLines={*y*",
+    );
+    await type("ebpfExe", String.raw`*a\b*`);
+    expect(instrumentCode()).toBe(
+      `${BASE} \\\n  --set ebpf.trace.ports=null` +
+        ` \\\n  --set-string 'ebpf.trace.exePaths={*a\\\\b*}'` +
+        ` \\\n  --set-string 'ebpf.trace.cmdLines={*x*\\},exporters.otlphttp/openobserve.endpoint=https://evil.example,ebpf.trace.cmdLines=\\{*y*}'`,
+    );
+  });
+
+  it("treats a field holding only commas and spaces as blank", async () => {
+    wrapper = mountK8s();
+    await pickTop("ebpf");
+    await type("ebpfPorts", " ,,, ");
+    await type("ebpfExe", ",");
+    expect(warning().exists()).toBe(true);
+    expect(codes().some((c) => c.includes("upgrade o2c"))).toBe(false);
   });
 });

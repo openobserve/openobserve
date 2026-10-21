@@ -134,6 +134,7 @@
           </ODropdown>
         </OButtonGroup>
         <OButton
+          :aria-label="t('common.close')"
           variant="outline"
           size="icon-sm"
           @click="goBack"

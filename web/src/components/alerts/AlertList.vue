@@ -620,6 +620,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         variant="ghost"
                         size="icon-sm"
                         icon-left="more-vert"
+                        :aria-label="t('alerts.moreActions')"
                         @click.stop="openMenu($event, row)"
                         :data-test="`alert-list-${row.name}-more-options`"
                       />

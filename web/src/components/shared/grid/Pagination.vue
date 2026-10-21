@@ -27,21 +27,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-if="position === 'top' && pageTitle" class="flex items-center font-bold">
       <OButton
         v-if="collapsibleIcon === 'show' && searchCollapseImage == 'collapse_sidebar_icon'"
+        :aria-label="t('common.collapse')"
         variant="ghost"
         size="icon"
         class="me-2"
         @click="toggleSidePanel"
       >
-        <img :src="getImageURL('images/common/collapse_sidebar_icon.svg')" width="16" height="16" />
+        <img
+          alt=""
+          :src="getImageURL('images/common/collapse_sidebar_icon.svg')"
+          width="16"
+          height="16"
+        />
       </OButton>
       <OButton
         v-if="collapsibleIcon === 'show' && searchCollapseImage == 'expand_sidebar_icon'"
+        :aria-label="t('common.expand')"
         variant="ghost"
         size="icon"
         class="me-2"
         @click="toggleSidePanel"
       >
-        <img :src="getImageURL('images/common/expand_sidebar_icon.svg')" width="16" height="16" />
+        <img
+          alt=""
+          :src="getImageURL('images/common/expand_sidebar_icon.svg')"
+          width="16"
+          height="16"
+        />
       </OButton>
       <div class="ms-1">
         {{ resultTotal }}

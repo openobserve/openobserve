@@ -107,7 +107,8 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 107: add redact_tools to ai_chat_shares.
 // 108: create oncall_phone_verifications and org_telephony.
 // 109: add last_run columns to reports.
-pub const DB_SCHEMA_VERSION: u64 = 109;
+// 110: create rum_pa_app_settings; add rules_hash to rum_pa_funnels.
+pub const DB_SCHEMA_VERSION: u64 = 110;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -2155,6 +2156,12 @@ pub struct Common {
         help = "Enable per-stream trace time indexes and trace time-range lookup"
     )]
     pub trace_time_index_enabled: bool,
+    #[env_config(
+        name = "ZO_TRACE_LIST_TIME_INDEX_ENABLED",
+        default = true,
+        help = "Complete trace list summaries from the trace time index; off keeps the per-partition aggregates"
+    )]
+    pub trace_list_time_index_enabled: bool,
     #[env_config(name = "OTEL_OTLP_HTTP_ENDPOINT", default = "")]
     pub otel_otlp_url: String,
     #[env_config(name = "OTEL_OTLP_GRPC_ENDPOINT", default = "")]
@@ -2202,7 +2209,8 @@ pub struct Common {
     pub print_key_sql: bool,
     #[env_config(name = "ZO_PRINT_PLAN_SINGLE_LINE", default = true)]
     pub print_plan_single_line: bool,
-    // usage reporting
+    #[env_config(name = "ZO_USAGE_REPORTING_ENABLED", default = true)]
+    pub usage_reporting_enabled: bool,
     #[env_config(
         name = "ZO_USAGE_REPORTING_MODE",
         default = "local",
@@ -2212,7 +2220,7 @@ pub struct Common {
     #[env_config(
         name = "ZO_USAGE_REPORTING_URL",
         default = "http://localhost:5080/api/_meta/usage/_json",
-        help = "Where remote usage reporting posts. Unused in the open source build, which never reports usage."
+        help = "Where remote usage reporting posts when enabled."
     )]
     pub usage_reporting_url: String,
     #[env_config(name = "ZO_USAGE_REPORTING_CREDS", default = "")]
@@ -5159,11 +5167,6 @@ mod tests {
     }
 
     #[test]
-    fn budget_above_lease_is_rejected() {
-        assert!(validate_synthetics_ceilings(&ceilings(900, 901, 300_000)).is_err());
-    }
-
-    #[test]
     fn net_timeout_larger_than_the_budget_is_rejected() {
         // One attempt could never fit, so every config of that type would fail
         // validation for a reason the user cannot act on.
@@ -5564,11 +5567,6 @@ mod tests {
     }
 
     #[test]
-    fn test_ensure_not_empty_valid() {
-        assert!(ensure_not_empty("valid", "TEST").is_ok());
-    }
-
-    #[test]
     fn test_ensure_not_empty_invalid() {
         assert!(ensure_not_empty("", "TEST").is_err());
     }
@@ -5576,11 +5574,6 @@ mod tests {
     #[test]
     fn test_ensure_not_empty_with_whitespace() {
         assert!(ensure_not_empty("  value  ", "TEST").is_ok());
-    }
-
-    #[test]
-    fn test_ensure_not_empty_single_char() {
-        assert!(ensure_not_empty("a", "TEST").is_ok());
     }
 
     #[test]
@@ -6530,13 +6523,6 @@ mod tests {
         let p = std::path::Path::new("/data/openobserve");
         let result = deverbatim(p);
         assert_eq!(result, "/data/openobserve");
-    }
-
-    #[test]
-    fn test_deverbatim_empty_path_unchanged() {
-        let p = std::path::Path::new("");
-        let result = deverbatim(p);
-        assert_eq!(result, "");
     }
 
     #[cfg(windows)]

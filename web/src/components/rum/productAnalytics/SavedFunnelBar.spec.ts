@@ -93,6 +93,7 @@ const def = (...steps: [string, string][]): FunnelDef => ({
   unit: "sessions",
   window: "session",
   breakdown: null,
+  x: [],
 });
 const events: NamedEvent[] = [
   {
@@ -197,6 +198,30 @@ describe("SavedFunnelBar, the builder header (AC-67, AC-68, AC-70)", () => {
     expect(q("rum-analytics-funnel-saved-name").text()).toBe("Signup");
     expect(q("rum-analytics-funnel-dirty-tag").exists()).toBe(false);
     expect(useProductAnalytics().toQuery().sf).toBe(useProductAnalytics().openedFunnel.value?.id);
+  });
+
+  it("a Filter all steps change or a step's view condition marks an opened funnel Edited", async () => {
+    api.seedFunnel("web", "Signup", PARAM);
+    await mountBar(def(["p", "/x"], ["p", "/y"]));
+    await openRow(0);
+    const pa = useProductAnalytics();
+    const opened = pa.funnel.value;
+    pa.funnel.value = {
+      ...opened,
+      f: [{ field: "geo_info_country", op: "in", values: ["India"] }],
+    };
+    await settle();
+    expect(q("rum-analytics-funnel-dirty-tag").text()).toBe("Edited");
+    pa.funnel.value = opened;
+    await settle();
+    expect(q("rum-analytics-funnel-dirty-tag").exists()).toBe(false);
+    const vc = [{ t: "ref" as const, op: "eq" as const, values: ["google.com"] }];
+    pa.funnel.value = {
+      ...opened,
+      steps: [{ ...opened.steps[0], f: { vc } }, ...opened.steps.slice(1)],
+    };
+    await settle();
+    expect(q("rum-analytics-funnel-dirty-tag").text()).toBe("Edited");
   });
 
   it("opening one restores its definition; a change marks it Edited and Save overwrites with the opened version (AC-67, AC-70)", async () => {

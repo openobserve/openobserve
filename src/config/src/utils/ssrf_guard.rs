@@ -155,16 +155,6 @@ impl SsrfGuard {
         Self::is_private_ip_inner(ip, false)
     }
 
-    /// Validate one IP against the strict SSRF policy.
-    pub fn check_ip_with_config(ip: &IpAddr) -> Result<(), String> {
-        let allow_loopback = crate::get_config().common.ssrf_allow_loopback;
-        let skip_ssrf = crate::get_config().common.skip_ssrf_checks;
-        if skip_ssrf {
-            return Ok(());
-        }
-        Self::check_ip_inner(ip, allow_loopback, false, &NO_ALLOWLIST)
-    }
-
     /// `host_allowed` lifts the private-address check except for link-local and metadata IPs.
     fn check_ip_inner(
         ip: &IpAddr,
@@ -923,13 +913,6 @@ mod tests {
         assert!(SsrfGuard::is_private_ip(&"fc00::1".parse().unwrap()));
         assert!(!SsrfGuard::is_private_ip(&"8.8.8.8".parse().unwrap()));
         assert!(!SsrfGuard::is_private_ip(&"2606:4700::1".parse().unwrap()));
-    }
-
-    #[test]
-    fn test_check_ip_with_config_rejects_private() {
-        assert!(SsrfGuard::check_ip_with_config(&"10.0.0.1".parse().unwrap()).is_err());
-        assert!(SsrfGuard::check_ip_with_config(&"169.254.169.254".parse().unwrap()).is_err());
-        assert!(SsrfGuard::check_ip_with_config(&"8.8.8.8".parse().unwrap()).is_ok());
     }
 
     #[tokio::test]

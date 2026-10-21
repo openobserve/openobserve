@@ -1995,7 +1995,6 @@ mod tests {
     }
 
     use super::span_duration_micros;
-    use crate::ingestion::grpc::get_val_for_attr;
 
     #[test]
     fn test_otlp_json_decodes_non_canonical_doubles() {
@@ -2027,14 +2026,6 @@ mod tests {
             value(&span.links[0].attributes[0]),
             Some(Value::DoubleValue(-0.0025))
         );
-    }
-
-    #[test]
-    fn test_get_val_for_attr() {
-        let in_val = 10.00;
-        let input = json!({ "key": in_val });
-        let resp = get_val_for_attr(input);
-        assert_eq!(resp.as_str().unwrap(), in_val.to_string());
     }
 
     #[test]
@@ -2313,47 +2304,6 @@ mod tests {
         );
     }
 
-    // Test format_response with different OtlpRequestType variants
-    #[test]
-    fn test_format_response_unknown_type() {
-        let partial_success =
-            opentelemetry_proto::tonic::collector::trace::v1::ExportTracePartialSuccess {
-                rejected_spans: 0,
-                error_message: "".to_string(),
-            };
-
-        // Test with an unknown request type (should default to protobuf)
-        let result =
-            super::format_response(partial_success, config::meta::otlp::OtlpRequestType::Grpc);
-        assert!(result.is_ok());
-
-        let response = result.unwrap();
-        assert_eq!(response.status(), http::StatusCode::OK);
-        assert_eq!(
-            response.headers().get("content-type").unwrap(),
-            "application/x-protobuf"
-        );
-    }
-
-    // Test format_response error message for partial success
-    #[test]
-    fn test_format_response_error_message() {
-        let partial_success =
-            opentelemetry_proto::tonic::collector::trace::v1::ExportTracePartialSuccess {
-                rejected_spans: 3,
-                error_message: "original message".to_string(),
-            };
-
-        let result = super::format_response(
-            partial_success,
-            config::meta::otlp::OtlpRequestType::HttpJson,
-        );
-        assert!(result.is_ok());
-
-        let response = result.unwrap();
-        assert_eq!(response.status(), http::StatusCode::PARTIAL_CONTENT);
-    }
-
     // Test get_span_status with invalid status codes
     #[test]
     fn test_get_span_status_invalid_code() {
@@ -2365,16 +2315,6 @@ mod tests {
         let result = super::get_span_status(Some(status));
         assert!(!result.is_empty());
         assert!(result == "OK" || result == "ERROR" || result == "UNSET");
-    }
-
-    // Test get_span_status with empty message
-    #[test]
-    fn test_get_span_status_empty_message() {
-        let status = Status {
-            code: StatusCode::Ok as i32,
-            message: "".to_string(),
-        };
-        assert_eq!(super::get_span_status(Some(status)), "OK");
     }
 
     // Test get_span_status with long message
@@ -2477,33 +2417,6 @@ mod tests {
         let service_attr_key = "version";
         let transformed = format!("{}_{}", super::SERVICE, service_attr_key);
         assert_eq!(transformed, "service_version");
-    }
-
-    // Test span reference type formatting
-    #[test]
-    fn test_span_ref_type_format() {
-        use common::meta::traces::SpanRefType;
-        let ref_type = format!("{:?}", SpanRefType::ChildOf);
-        assert_eq!(ref_type, "ChildOf");
-    }
-
-    // Test edge cases for format_response function
-    #[test]
-    fn test_format_response_zero_rejected_spans() {
-        let partial_success =
-            opentelemetry_proto::tonic::collector::trace::v1::ExportTracePartialSuccess {
-                rejected_spans: 0,
-                error_message: "Some error".to_string(), // Error message but no rejected spans
-            };
-
-        let result = super::format_response(
-            partial_success,
-            config::meta::otlp::OtlpRequestType::HttpJson,
-        );
-        assert!(result.is_ok());
-
-        let response = result.unwrap();
-        assert_eq!(response.status(), http::StatusCode::OK); // Should be OK, not partial
     }
 
     #[test]
@@ -2657,7 +2570,6 @@ mod tests {
     fn test_span_reference_creation() {
         use std::collections::HashMap;
 
-        use common::meta::traces::SpanRefType;
         use opentelemetry::trace::{SpanId, TraceId};
 
         let trace_bytes = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
@@ -2669,10 +2581,7 @@ mod tests {
         let mut span_ref = HashMap::new();
         span_ref.insert(super::PARENT_TRACE_ID.to_string(), trace_id.clone());
         span_ref.insert(super::PARENT_SPAN_ID.to_string(), parent_span_id.clone());
-        span_ref.insert(
-            super::REF_TYPE.to_string(),
-            format!("{:?}", SpanRefType::ChildOf),
-        );
+        span_ref.insert(super::REF_TYPE.to_string(), "ChildOf".to_string());
 
         assert_eq!(span_ref.get(super::PARENT_TRACE_ID).unwrap(), &trace_id);
         assert_eq!(

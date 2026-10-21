@@ -28,9 +28,9 @@ use openobserve_api_common::extractors::Headers;
 use openobserve_core::{
     auth::UserEmail,
     rum_pa::{
-        CreateFunnel, CreateNamedEvent, FunnelRefList, NamedEvent, NamedEventList,
-        NamedEventRefList, RumPaError, RumPaErrorBody, SavedFunnel, SavedFunnelList, UpdateFunnel,
-        UpdateNamedEvent,
+        AppSettings, CreateFunnel, CreateNamedEvent, FunnelRefList, NamedEvent, NamedEventList,
+        NamedEventRefList, PutAppSettings, RumPaError, RumPaErrorBody, SavedFunnel,
+        SavedFunnelList, UpdateFunnel, UpdateNamedEvent,
         service::{self, Scope},
         validate_app, validate_id,
     },
@@ -509,6 +509,81 @@ pub async fn delete_funnel(Path((org_id, id)): Path<(String, String)>, query: Q)
     }
 }
 
+#[utoipa::path(
+    get,
+    path = "/{org_id}/rum/analytics/settings",
+    context_path = "/api",
+    tag = "Product Analytics",
+    operation_id = "GetRumAppSettings",
+    summary = "Get an app's exclusions, or the built-in default when it has none saved",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("app" = String, Query, description = "RUM application name"),
+    ),
+    responses(
+        (status = 200, description = "Success", body = AppSettings),
+        (status = 400, description = "Invalid app", body = RumPaErrorBody),
+        (status = 500, description = "Internal error", body = RumPaErrorBody),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "RUM Product Analytics", "operation": "get"})),
+        ("x-o2-mcp" = json!({"description": "Get a RUM app's exclusion settings", "category": "rum"}))
+    )
+)]
+pub async fn get_app_settings(Path(org_id): Path<String>, query: Q) -> Response {
+    let app = match app_of(&query) {
+        Ok(app) => app,
+        Err(e) => return error_response(e),
+    };
+    let db = infra::db::get_orm_client_rw().await;
+    match service::get_app_settings(db, scope(&org_id, &app)).await {
+        Ok(settings) => Json(settings).into_response(),
+        Err(e) => error_response(e),
+    }
+}
+
+#[utoipa::path(
+    put,
+    path = "/{org_id}/rum/analytics/settings",
+    context_path = "/api",
+    tag = "Product Analytics",
+    operation_id = "PutRumAppSettings",
+    summary = "Save an app's exclusions at the version the caller read; 0 creates",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("app" = String, Query, description = "RUM application name"),
+    ),
+    request_body(content = PutAppSettings, content_type = "application/json"),
+    responses(
+        (status = 200, description = "Saved", body = AppSettings),
+        (status = 400, description = "Invalid body, rules or app", body = RumPaErrorBody),
+        (status = 409, description = "version_conflict with the current settings", body = RumPaErrorBody),
+        (status = 500, description = "Internal error", body = RumPaErrorBody),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "RUM Product Analytics", "operation": "update"})),
+        ("x-o2-mcp" = json!({"description": "Save a RUM app's exclusion settings", "category": "rum"}))
+    )
+)]
+pub async fn put_app_settings(
+    Path(org_id): Path<String>,
+    query: Q,
+    Headers(user): Headers<UserEmail>,
+    body: Result<Json<PutAppSettings>, JsonRejection>,
+) -> Response {
+    let (app, body) = match app_and_body(&query, body) {
+        Ok(parts) => parts,
+        Err(e) => return error_response(e),
+    };
+    let db = infra::db::get_orm_client_rw().await;
+    match service::put_app_settings(db, scope(&org_id, &app), &user.user_id, &body).await {
+        Ok(settings) => Json(settings).into_response(),
+        Err(e) => error_response(e),
+    }
+}
+
 /// The body every failure returns; an internal error's detail goes to the log only.
 pub fn error_response(e: RumPaError) -> Response {
     if let RumPaError::Internal { message, .. } = &e {
@@ -764,5 +839,53 @@ mod tests {
             parse(&format!("?ids={}", many.join(","))).len(),
             MAX_DELETED_NAMES_IDS
         );
+    }
+
+    fn app_query(app: Option<&str>) -> Q {
+        Ok(Query(AppQuery {
+            app: app.map(str::to_string),
+            force: false,
+        }))
+    }
+
+    fn user() -> Headers<UserEmail> {
+        Headers(UserEmail {
+            user_id: "a@x.io".into(),
+        })
+    }
+
+    #[tokio::test]
+    async fn p4_r1_reading_settings_without_an_app_is_invalid_app() {
+        let (status, body) =
+            json_of(get_app_settings(Path("acme".into()), app_query(None)).await).await;
+        assert_eq!((status, body["code"].as_str()), (400, Some("invalid_app")));
+    }
+
+    #[tokio::test]
+    async fn p4_r2_a_settings_put_with_a_bad_body_or_no_app_is_refused() {
+        let ok = r#"{"bots": true, "sessions": [], "pages": [], "version": 0}"#;
+        let extra = r#"{"bots": true, "sessions": [], "pages": [], "version": 0, "x": 1}"#;
+        let (status, body) = json_of(
+            put_app_settings(
+                Path("acme".into()),
+                app_query(Some("web")),
+                user(),
+                rejection::<PutAppSettings>("application/json", extra).await,
+            )
+            .await,
+        )
+        .await;
+        assert_eq!((status, body["code"].as_str()), (400, Some("invalid_body")));
+        let (status, body) = json_of(
+            put_app_settings(
+                Path("acme".into()),
+                app_query(None),
+                user(),
+                rejection::<PutAppSettings>("application/json", ok).await,
+            )
+            .await,
+        )
+        .await;
+        assert_eq!((status, body["code"].as_str()), (400, Some("invalid_app")));
     }
 }

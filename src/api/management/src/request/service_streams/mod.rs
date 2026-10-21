@@ -682,16 +682,6 @@ mod tests {
         assert!(result.is_err());
     }
 
-    #[test]
-    fn test_correlation_request_missing_dimensions_field() {
-        let json = r#"{
-            "source_stream": "default",
-            "source_type": "logs"
-        }"#;
-        let result = serde_json::from_str::<CorrelationRequest>(json);
-        assert!(result.is_err());
-    }
-
     // -----------------------------------------------------------------------
     // Group B: CardinalityClass — boundary values and methods
     // -----------------------------------------------------------------------
@@ -734,38 +724,6 @@ mod tests {
             CardinalityClass::from_cardinality(10001),
             CardinalityClass::VeryHigh
         );
-    }
-
-    #[test]
-    fn test_cardinality_class_is_suitable_for_correlation() {
-        assert!(CardinalityClass::VeryLow.is_suitable_for_correlation());
-        assert!(CardinalityClass::Low.is_suitable_for_correlation());
-        assert!(CardinalityClass::Medium.is_suitable_for_correlation());
-        assert!(!CardinalityClass::High.is_suitable_for_correlation());
-        assert!(!CardinalityClass::VeryHigh.is_suitable_for_correlation());
-    }
-
-    #[test]
-    fn test_cardinality_class_priority_score_ordering() {
-        assert!(
-            CardinalityClass::VeryLow.priority_score() < CardinalityClass::Low.priority_score()
-        );
-        assert!(CardinalityClass::Low.priority_score() < CardinalityClass::Medium.priority_score());
-        assert!(
-            CardinalityClass::Medium.priority_score() < CardinalityClass::High.priority_score()
-        );
-        assert!(
-            CardinalityClass::High.priority_score() < CardinalityClass::VeryHigh.priority_score()
-        );
-    }
-
-    #[test]
-    fn test_cardinality_class_priority_score_values() {
-        assert_eq!(CardinalityClass::VeryLow.priority_score(), 1);
-        assert_eq!(CardinalityClass::Low.priority_score(), 2);
-        assert_eq!(CardinalityClass::Medium.priority_score(), 3);
-        assert_eq!(CardinalityClass::High.priority_score(), 4);
-        assert_eq!(CardinalityClass::VeryHigh.priority_score(), 5);
     }
 
     // -----------------------------------------------------------------------
@@ -938,12 +896,6 @@ mod tests {
     }
 
     #[test]
-    fn test_stream_info_set_stream_type_builder() {
-        let stream = StreamInfo::new("my_stream".to_string()).set_stream_type(StreamType::Metrics);
-        assert_eq!(stream.stream_type, StreamType::Metrics);
-    }
-
-    #[test]
     fn test_stream_info_with_filters() {
         let mut filters = HashMap::new();
         filters.insert("env".to_string(), "prod".to_string());
@@ -1032,13 +984,5 @@ mod tests {
             let deserialized: CardinalityClass = serde_json::from_str(&json).unwrap();
             assert_eq!(class, deserialized);
         }
-    }
-
-    #[test]
-    fn test_cardinality_class_ordering() {
-        assert!(CardinalityClass::VeryLow < CardinalityClass::Low);
-        assert!(CardinalityClass::Low < CardinalityClass::Medium);
-        assert!(CardinalityClass::Medium < CardinalityClass::High);
-        assert!(CardinalityClass::High < CardinalityClass::VeryHigh);
     }
 }

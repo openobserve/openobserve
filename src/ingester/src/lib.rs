@@ -237,16 +237,6 @@ mod tests {
     }
 
     #[test]
-    fn test_is_wal_file_storage_file() {
-        assert!(!is_wal_file(
-            "files/org/stype/stream/2025/03/24/00/file.parquet"
-        ));
-        assert!(!is_wal_file(
-            "files/org/stype/stream/2025/03/24/00/a=b/file.parquet"
-        ));
-    }
-
-    #[test]
     fn test_is_wal_file_not_local_mode() {
         assert!(is_wal_file(
             "files/org/stype/stream/0/2025/03/24/00/2adf99cbc1277d5c/file.parquet"

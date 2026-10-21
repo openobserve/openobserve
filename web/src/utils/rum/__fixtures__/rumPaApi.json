@@ -33,7 +33,9 @@
     "createdBy": "editor@example.com",
     "createdAt": 1759300000000,
     "updatedBy": "editor@example.com",
-    "updatedAt": 1759300000000
+    "updatedAt": 1759300000000,
+    "rulesHash": "0123456789abcdef",
+    "currentRulesHash": "0123456789abcdef"
   },
   "createEvent": {
     "name": "Opened logs",
