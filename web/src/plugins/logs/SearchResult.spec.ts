@@ -15,6 +15,7 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
+import { nextTick } from "vue";
 import SearchResult from "@/plugins/logs/SearchResult.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -277,6 +278,164 @@ describe("SearchResult Component", () => {
       await wrapper.vm.sendToAiChat(testValue);
 
       expect(wrapper.emitted()["sendToAiChat"]).toEqual([[testValue, true]]); // includes append parameter
+    });
+  });
+
+  describe("pinned breakdown tooltip and theme changes", () => {
+    const ts = 1640995200000;
+    const accents = new Map<Element, string>();
+    let styleSpy: ReturnType<typeof vi.spyOn>;
+    let originalTheme: string;
+    let originalShowHistogram: boolean;
+    let originalHistogram: any;
+    let chartMock: any;
+
+    const pinAt = () =>
+      wrapper.vm.onHistogramAreaClick({
+        currentTarget: { getBoundingClientRect: () => ({ left: 0, top: 0 }) },
+        clientX: 10,
+        clientY: 10,
+      });
+    const emptyRowColor = () =>
+      wrapper.vm.pinnedTooltip.rows.find((r: any) => r.rawValue === "").color;
+
+    beforeEach(async () => {
+      originalTheme = store.state.theme;
+      originalShowHistogram = wrapper.vm.searchObj.meta.showHistogram;
+      originalHistogram = wrapper.vm.searchObj.data.histogram;
+      store.state.theme = "light";
+      await flushPromises();
+      document.documentElement.classList.remove("dark");
+      accents.set(document.documentElement, "rgba(91, 76, 240, 1)");
+      accents.set(document.body, "rgba(139, 141, 240, 1)");
+      styleSpy = vi.spyOn(window, "getComputedStyle").mockImplementation(
+        (el: Element) =>
+          ({
+            getPropertyValue: (prop: string) =>
+              prop === "--color-theme-accent" ? (accents.get(el) ?? "") : "",
+          }) as unknown as CSSStyleDeclaration,
+      );
+      // Hidden chart, so re-renders cannot replace the mocked ECharts instance.
+      wrapper.vm.searchObj.meta.showHistogram = false;
+      wrapper.vm.searchObj.data.histogram = {
+        xData: [ts],
+        yData: [5],
+        breakdownField: "level",
+        breakdownSeries: new Map([
+          ["error", [2]],
+          ["", [3]],
+        ]),
+        chartParams: { title: "", timezone: "UTC" },
+      };
+      wrapper.vm.reDrawChart();
+      await flushPromises();
+      chartMock = {
+        containPixel: vi.fn(() => true),
+        convertFromPixel: vi.fn(() => [ts, 0]),
+        dispatchAction: vi.fn(),
+        setOption: vi.fn(),
+      };
+      wrapper.vm.histogramChart = { chart: chartMock };
+    });
+
+    afterEach(async () => {
+      styleSpy.mockRestore();
+      accents.clear();
+      vi.useRealTimers();
+      localStorage.removeItem("appliedLightThemeName");
+      document.documentElement.classList.remove("dark");
+      wrapper.vm.searchObj.meta.showHistogram = originalShowHistogram;
+      wrapper.vm.searchObj.data.histogram = originalHistogram;
+      store.state.theme = originalTheme;
+      await flushPromises();
+    });
+
+    it("pins the (empty) row with the current accent and keeps populated colors", () => {
+      pinAt();
+
+      expect(wrapper.vm.pinnedTooltip.visible).toBe(true);
+      expect(emptyRowColor()).toBe("rgba(91, 76, 240, 1)");
+      expect(wrapper.vm.pinnedTooltip.rows.find((r: any) => r.rawValue === "error").color).toBe(
+        "#EF5350",
+      );
+    });
+
+    it("closes the pin on a custom accent change and repins with the new accent", async () => {
+      vi.useFakeTimers();
+      localStorage.setItem("appliedLightThemeName", "__custom__");
+      pinAt();
+
+      accents.set(document.documentElement, "rgba(16, 185, 129, 1)");
+      window.dispatchEvent(new CustomEvent("themeColorChanged"));
+      await nextTick();
+
+      expect(wrapper.vm.pinnedTooltip.visible).toBe(false);
+      expect(chartMock.setOption).toHaveBeenCalledWith(
+        { tooltip: { triggerOn: "mousemove|click" } },
+        false,
+      );
+
+      vi.advanceTimersByTime(300);
+      pinAt();
+      expect(emptyRowColor()).toBe("rgba(16, 185, 129, 1)");
+    });
+
+    it("closes the pin on a light/dark mode change and repins with the dark accent", async () => {
+      pinAt();
+
+      store.state.theme = "dark";
+      await flushPromises();
+
+      expect(wrapper.vm.pinnedTooltip.visible).toBe(false);
+      pinAt();
+      expect(emptyRowColor()).toBe("rgba(139, 141, 240, 1)");
+    });
+
+    it("closes a pin opened during the accent debounce once the redraw runs", async () => {
+      vi.useFakeTimers();
+      localStorage.setItem("appliedLightThemeName", "__custom__");
+      pinAt();
+
+      accents.set(document.documentElement, "rgba(16, 185, 129, 1)");
+      window.dispatchEvent(new CustomEvent("themeColorChanged"));
+      await nextTick();
+      pinAt();
+      expect(wrapper.vm.pinnedTooltip.visible).toBe(true);
+
+      vi.advanceTimersByTime(300);
+      expect(wrapper.vm.pinnedTooltip.visible).toBe(false);
+      pinAt();
+      expect(emptyRowColor()).toBe("rgba(16, 185, 129, 1)");
+    });
+
+    it("gives the empty group and a literal (empty) value their own series colors", async () => {
+      wrapper.vm.searchObj.data.histogram = {
+        ...wrapper.vm.searchObj.data.histogram,
+        breakdownSeries: new Map([
+          ["", [3]],
+          ["(empty)", [1]],
+          ["error", [2]],
+        ]),
+      };
+      wrapper.vm.reDrawChart();
+      await flushPromises();
+      const seriesColors = wrapper.vm.plotChart.options.series.map((s: any) => s.itemStyle.color);
+
+      pinAt();
+      const rowColors = wrapper.vm.pinnedTooltip.rows.map((r: any) => r.color);
+
+      expect(seriesColors[0]).toBe("rgba(91, 76, 240, 1)");
+      expect(seriesColors[1]).not.toBe(seriesColors[0]);
+      expect(rowColors).toEqual(seriesColors);
+    });
+
+    it("keeps the pin open across a streaming redraw", async () => {
+      pinAt();
+
+      wrapper.vm.reDrawChart();
+      await flushPromises();
+
+      expect(wrapper.vm.pinnedTooltip.visible).toBe(true);
     });
   });
 
