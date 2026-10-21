@@ -582,6 +582,12 @@
   },
   "common": {
     "copiedToClipboard": "Skopiowano do schowka",
+    "customLogoAlt": "Logo organizacji",
+    "dragToReorder": "Przeciągnij, aby zmienić kolejność",
+    "timeAmount": "Wartość czasu",
+    "timeUnit": "Jednostka czasu",
+    "queryEditorAriaLabel": "Edytor zapytań. Naciśnij Escape, aby przejść do następnego elementu sterującego.",
+    "queryEditorEscapeAction": "Przenieś fokus do następnego elementu sterującego",
     "inlineEdit": {
       "autoHint": "Kliknij, aby zmienić nazwę. Dopóki tego nie zrobisz, nazwa ta jest generowana z Twojej konfiguracji i aktualizuje się w miarę jej zmian."
     },
@@ -6075,6 +6081,11 @@
     "gpuExporter": "Eksporter GPU"
   },
   "dashboard": {
+    "sortByClear": "Wyczyść sortowanie",
+    "sortByAsc": "Sortuj rosnąco",
+    "sortByDesc": "Sortuj malejąco",
+    "panelError": "Błąd panelu: {message}",
+    "panelWarning": "Ostrzeżenie panelu",
     "saveConflict": {
       "notSaved": "Nie zapisano: ktoś inny zapisał ten pulpit wcześniej.",
       "notSavedChange": "Nie zapisano: {change}. Ktoś inny zapisał ten pulpit wcześniej.",
@@ -8149,8 +8160,6 @@
     "invoiceHistoryLabel": "Historia faktur",
     "upgradeNow": "Ulepsz teraz",
     "subscribe": "Subskrybuj",
-    "features": "FUNKCJE",
-    "included": "Co jest wliczone?",
     "proPlanSubtitle": "Niestandardowe rozwiązania dla małych zespołów",
     "unlimitedNote": "Bez limitów: użytkownicy, logi, metryki, ślady i więcej.",
     "paymentNote": "Płatność obliczana na podstawie użycia na koniec miesięcznego cyklu rozliczeniowego.",
@@ -8158,7 +8167,7 @@
     "contactLabel": "Skontaktuj się z działem sprzedaży",
     "enterpriseLabel": "Plan Enterprise",
     "enterpriseSubtitle": "Zaawansowana funkcjonalność i wsparcie dla wymagań przedsiębiorstw",
-    "discountTag": "Ze zniżką",
+    "discountTag": "Z rabatem",
     "enterpriseNote": "Potrzebujesz dużej pojemności? Porozmawiajmy o skali! Skontaktuj się z nami po rozwiązania dostosowane do Twoich potrzeb.",
     "contactSupport": "Kontakt z pomocą techniczną",
     "usageTrends": {
@@ -8795,6 +8804,7 @@
     }
   },
   "alerts": {
+    "moreActions": "Więcej akcji",
     "promRuleMode": "Tryb reguły",
     "promRulePreview": "{count} zwróconych serii pasuje teraz. Każda seria musi ukończyć okres oczekiwania, zanim alert zostanie wyzwolony.",
     "promRuleModeDescription": "Pasuje, gdy wyrażenie zwraca dowolną serię. Wybierz alert pojedynczy lub wielokrotny, gdy okres oczekiwania wynosi zero; okres oczekiwania automatycznie włącza alert wielokrotny. Pozostaw strumień pusty, aby wywnioskować strumień metryk, do którego istnieje odwołanie.",
@@ -9789,6 +9799,7 @@
     "selectStreamTypeFirst": "Najpierw wybierz typ strumienia",
     "previewEmptyState": "Wybierz typ strumienia i nazwę strumienia, aby zobaczyć podgląd",
     "queryConfig": {
+      "aggregationFunction": "Funkcja agregacji",
       "sectionTitle": "Warunki",
       "openFullEditor": "Otwórz pełny edytor",
       "groupByTooltip": "Grupuj wyniki według tych pól — powiadomienie jest wywoływane dla każdej unikalnej kombinacji",
@@ -19244,6 +19255,8 @@
         "resetToDefault": "Przywróć domyślne",
         "resetColumnWidths": "Resetuj szerokości kolumn"
       },
+      "selectAllRows": "Zaznacz wszystkie wiersze",
+      "selectRow": "Zaznacz wiersz {name}",
       "removeColumnAria": "Usuń kolumnę",
       "formatColumnAria": "Formatuj kolumnę",
       "selectedOfTotal": "Wybrano {selected} z {total}",

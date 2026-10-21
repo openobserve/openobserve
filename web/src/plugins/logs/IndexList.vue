@@ -36,6 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="min-w-0 flex-1">
         <OSelect
           ref="streamSelect"
+          :aria-label="t('search.selectStream')"
           data-test="log-search-index-list-select-stream"
           :model-value="
             selectionMode === 'single'

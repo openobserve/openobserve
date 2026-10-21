@@ -1648,9 +1648,9 @@ test.describe("Logs Regression Bugs", () => {
   // Bug #11400 sub-issue #2: Mixed quote handling in multi-condition WHERE
   // clauses. Fix: PR #11403 - hasOpenQuote regex scoped to textUpToCursor
   // slice, not the full query. This ensures that in a query like:
-  //   WHERE http = 'te' AND host = 'te
-  // the open quote in the second condition ('te) is correctly detected even
-  // though the first condition has a closed quote ('te').
+  //   WHERE kubernetes_namespace_name = 've' AND kubernetes_container_name = 'zi
+  // the open quote in the second condition ('zi) is correctly detected even
+  // though the first condition has a closed quote ('ve').
   // ======================================================================
 
   test("Bug #11400: should handle mixed quotes in multi-condition WHERE clauses", {
@@ -1681,18 +1681,18 @@ test.describe("Logs Regression Bugs", () => {
     testLogger.info('✅ Auto-search completed, field values cached');
 
     // Set multi-condition WHERE query with mixed quotes.
-    // The first condition has a properly closed quote: http = 'te'
-    // The second condition has a partial open quote: host = 'te
+    // The first condition has a properly closed quote: kubernetes_namespace_name = 've'
+    // The second condition has a partial open quote: kubernetes_container_name = 'zi
     // The hasOpenQuote fix ensures the second condition correctly detects
     // the opening quote, even though the first condition's quote is closed.
-    const mixedQuoteQuery = `SELECT * FROM "e2e_automate" WHERE http = 'te' AND host = 'te`;
+    const mixedQuoteQuery = `SELECT * FROM "e2e_automate" WHERE kubernetes_namespace_name = 've' AND kubernetes_container_name = 'zi`;
     await pm.logsPage.setQueryEditorContent(mixedQuoteQuery);
 
     // Wait for Monaco to process the content
     await page.waitForTimeout(500);
 
     // Verify the query text is set correctly - the full query should be present
-    await pm.logsPage.expectQueryEditorContainsText('host = \'te');
+    await pm.logsPage.expectQueryEditorContainsText('kubernetes_container_name = \'zi');
     testLogger.info('✅ Mixed quote query text verified in editor');
 
     // Verify no error states are present (editor should not show errors for this pattern)
@@ -1704,11 +1704,11 @@ test.describe("Logs Regression Bugs", () => {
     testLogger.info('✅ No editor error states for mixed quote pattern');
 
     // SECONDARY CHECK: Trigger Ctrl+Space to open suggestion widget in the
-    // value context of the second condition (after host = 'te).
+    // value context of the second condition (after kubernetes_container_name = 'zi).
     // This is the key behavior the hasOpenQuote fix enables: the scoped
     // regex must detect the open quote in the second condition independently
     // from the closed quote in the first condition, so value completions work.
-    // Without the fix, the regex would see the closed quote ('te') from the
+    // Without the fix, the regex would see the closed quote ('ve') from the
     // first condition and fail to detect the open quote in the second.
     testLogger.info('Triggering suggestion widget after partial open quote in second condition...');
     await pm.logsPage.triggerEditorSuggestions();
@@ -1726,6 +1726,8 @@ test.describe("Logs Regression Bugs", () => {
 
     // Verify actual field values are suggested (proving hasOpenQuote fix works)
     expect(result.rowCount).toBeGreaterThan(0);
+    // Must be values of kubernetes_container_name, not a cached list from another field.
+    expect(result.firstFew.some((row) => row.includes('ziox'))).toBe(true);
     testLogger.info(`✅ ${result.rowCount} value suggestions in mixed quote context`);
 
     testLogger.info("Test passed: Mixed quote handling verified");
