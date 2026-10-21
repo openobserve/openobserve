@@ -896,6 +896,13 @@ describe("Plans Component", () => {
       expect(wrapper.vm.proPlanAdditionalInfo).toBe("");
     });
 
+    it("drops the footnote when pricing options replace the asterisked row", async () => {
+      const plan = { ...newJson.data[0].cloud[0], additionalInfo: "*Includes 30% discount" };
+      await loadPricing({ data: [{ cloud: [plan, enterprisePlan] }] });
+      expect(wrapper.vm.proPlanPricingOptions).toHaveLength(2);
+      expect(wrapper.vm.proPlanAdditionalInfo).toBe("");
+    });
+
     it("passes the mapped pricing down to both plan cards", async () => {
       await flushPromises();
       await loadPricing(newJson);

@@ -160,6 +160,16 @@ interface InvoiceRow {
 
 const invoiceHistory = ref<InvoiceRow[]>([]);
 
+const formatInvoiceAmount = (total: number, currency: string) => {
+  const formatter = new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: currency.toUpperCase(),
+  });
+  // Stripe amounts are in the currency's minor unit, which is 0 digits for JPY/KRW etc.
+  const minorDigits = formatter.resolvedOptions().maximumFractionDigits ?? 2;
+  return formatter.format(total / 10 ** minorDigits);
+};
+
 const getInvoiceHistory = () => {
   const dismiss = toast({
     variant: "loading",
@@ -178,7 +188,7 @@ const getInvoiceHistory = () => {
             start_date: invoice.period_start,
             end_date: invoice.period_end,
             paid: invoice.paid ? t("common.yes") : t("common.no"),
-            amount: invoice.total + " " + invoice.currency.toUpperCase(),
+            amount: formatInvoiceAmount(invoice.total, invoice.currency),
             amount_paid: invoice.amount_paid,
             amount_due: invoice.amount_due,
             attempt_count: invoice.attempt_count,

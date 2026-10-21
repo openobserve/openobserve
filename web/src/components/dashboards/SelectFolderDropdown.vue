@@ -32,6 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </OSelect>
 
     <OButton
+      :aria-label="t('dashboard.newFolder')"
       data-test="dashboard-folder-move-new-add"
       variant="outline"
       size="icon-xs-sq"

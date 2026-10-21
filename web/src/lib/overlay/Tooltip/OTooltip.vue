@@ -21,11 +21,13 @@ import {
   onUnmounted,
   onDeactivated,
   useAttrs,
+  watch,
   useSlots,
   type ComponentPublicInstance,
 } from "vue";
 import OShortcut from "@/lib/core/Shortcut/OShortcut.vue";
 import { isElementTruncated, readElementText } from "./useIsTruncated";
+import { tooltipNameTarget } from "./triggerName";
 
 // Both modes render a fragment (provider + portalled content, or the child-mode
 // anchor pair), so Vue has no single root to fall attributes onto: anything a
@@ -125,6 +127,26 @@ let childShowTimer: ReturnType<typeof setTimeout> | null = null;
 // bubble; entering the bubble cancels this timer and keeps the tooltip open.
 let childHideTimer: ReturnType<typeof setTimeout> | null = null;
 const HOVERABLE_GRACE_MS = 120;
+let labelledEl: Element | null = null;
+
+// An icon-only control has no other name, so the tooltip text becomes it and follows the text.
+function syncTriggerName() {
+  const text = props.content && !props.overflowOnly ? String(props.content) : "";
+  if (labelledEl) {
+    if (text) labelledEl.setAttribute("aria-label", text);
+    else {
+      labelledEl.removeAttribute("aria-label");
+      labelledEl = null;
+    }
+    return;
+  }
+  const target = text && parentEl.value ? tooltipNameTarget(parentEl.value) : null;
+  if (target) {
+    target.setAttribute("aria-label", text);
+    labelledEl = target;
+  }
+}
+watch(() => props.content, syncTriggerName);
 
 // Called from the content bubble's hover handlers (child mode). Entering the
 // bubble cancels a pending close; leaving it closes the tooltip.
@@ -181,6 +203,7 @@ onMounted(() => {
     parentEl.value = candidate;
     if (parentEl.value) {
       parentEl.value.setAttribute(TOOLTIP_TRIGGER_ATTR, triggerMarker.value);
+      syncTriggerName();
       // Open after `props.delay` ms of hover (matching wrapper mode); leaving
       // before then cancels the pending open so a quick pass-over shows nothing.
       // Mount the reka tree (if not already) and open it. Deferring the mount to
@@ -235,6 +258,7 @@ onMounted(() => {
         parentEl.value?.removeEventListener("focus", show);
         parentEl.value?.removeEventListener("blur", hide);
         parentEl.value?.removeAttribute(TOOLTIP_TRIGGER_ATTR);
+        labelledEl?.removeAttribute("aria-label");
       };
     }
   }

@@ -16,6 +16,7 @@ import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import ChartRenderer from "./ChartRenderer.vue";
 import i18n from "@/locales";
+import { raw } from "@/types/i18n";
 import store from "@/test/unit/helpers/store";
 
 // Mock ECharts with comprehensive functionality
@@ -184,10 +185,19 @@ describe("ChartRenderer", () => {
   });
 
   describe("Component Rendering & Initialization", () => {
+    it("exposes the label as the accessible name of the chart", async () => {
+      await wrapper.setProps({ label: raw("CPU usage") });
+      expect(wrapper.find('[data-test="chart-renderer"]').attributes("aria-label")).toBe(
+        "CPU usage",
+      );
+      expect(wrapper.find('[data-test="chart-renderer"]').attributes("role")).toBe("img");
+    });
+
     it("should render chart container with correct attributes", () => {
       expect(wrapper.find('[data-test="chart-renderer"]').exists()).toBe(true);
       const container = wrapper.find('[data-test="chart-renderer"]');
-      expect(container.attributes("id")).toBe("chart1");
+      expect(container.attributes("id")).toMatch(/^chart-/);
+      expect(container.attributes("role")).toBeUndefined();
       // Sizing moved from inline `style="height:100%;width:100%"` to utilities.
       expect(container.classes()).toContain("h-full");
       expect(container.classes()).toContain("w-full");
@@ -613,6 +623,24 @@ describe("ChartRenderer", () => {
       };
       const handlerFor = (mockChart: { on: { mock: { calls: unknown[][] } } }, name: string) =>
         mockChart.on.mock.calls.find((call) => call[0] === name)?.[1] as (params: unknown) => void;
+
+      it("lets ECharts describe the chart only when no label names it", async () => {
+        const mockChart = await chartMock();
+        const lastAria = () => vi.mocked(mockChart.setOption).mock.calls.at(-1)?.[0].aria;
+
+        await wrapper.setProps({
+          data: { ...mockChartData, options: { ...mockChartData.options } },
+        });
+        await flushPromises();
+        expect(lastAria()).toEqual({ enabled: true });
+
+        await wrapper.setProps({
+          label: raw("CPU usage"),
+          data: { ...mockChartData, options: { ...mockChartData.options } },
+        });
+        await flushPromises();
+        expect(lastAria()).toEqual({ enabled: false });
+      });
 
       it("reports events only while the panel needs to know which line was meant", async () => {
         const mockChart = await chartMock();

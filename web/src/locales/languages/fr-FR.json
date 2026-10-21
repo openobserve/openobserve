@@ -582,6 +582,12 @@
   },
   "common": {
     "copiedToClipboard": "Copié dans le presse-papiers",
+    "customLogoAlt": "Logo de l'organisation",
+    "dragToReorder": "Faites glisser pour réorganiser",
+    "timeAmount": "Durée",
+    "timeUnit": "Unité de temps",
+    "queryEditorAriaLabel": "Éditeur de requête. Appuyez sur Échap pour passer au contrôle suivant.",
+    "queryEditorEscapeAction": "Déplacer le focus vers le contrôle suivant",
     "inlineEdit": {
       "autoHint": "Cliquez pour renommer. Tant que vous ne le faites pas, ce nom est généré à partir de votre configuration et se met à jour lorsque vous la changez."
     },
@@ -6075,6 +6081,11 @@
     "gpuExporter": "Exportateur GPU"
   },
   "dashboard": {
+    "sortByClear": "Effacer le tri",
+    "sortByAsc": "Trier par ordre croissant",
+    "sortByDesc": "Trier par ordre décroissant",
+    "panelError": "Erreur du panneau : {message}",
+    "panelWarning": "Avertissement du panneau",
     "saveConflict": {
       "notSaved": "Non enregistré : quelqu'un d'autre a enregistré ce tableau de bord avant vous.",
       "notSavedChange": "Non enregistré : {change}. Quelqu'un d'autre a enregistré ce tableau de bord avant vous.",
@@ -8156,7 +8167,7 @@
     "contactLabel": "Contacter les ventes",
     "enterpriseLabel": "Plan Enterprise",
     "enterpriseSubtitle": "Fonctionnalité avancée et prise en charge des demandes des entreprises",
-    "discountTag": "En promotion",
+    "discountTag": "Remise appliquée",
     "enterpriseNote": "Vous avez besoin d'un volume élevé ? Parlons d'échelle ! Contactez-nous pour des solutions sur mesure.",
     "contactSupport": "Contacter le service d'assistance",
     "usageTrends": {
@@ -8793,6 +8804,7 @@
     }
   },
   "alerts": {
+    "moreActions": "Plus d'actions",
     "promRuleMode": "Mode de règle",
     "promRulePreview": "{count} séries retournées correspondent maintenant. Chaque série doit atteindre la fin de la période d'attente avant de se déclencher.",
     "promRuleModeDescription": "Correspond lorsque l'expression renvoie au moins une série. Choisissez une alerte Simple ou Multiple lorsque la période d'attente est nulle ; une période d'attente active automatiquement l'alerte Multiple. Laissez le flux vide pour déduire un flux de métriques référencé.",
@@ -9787,6 +9799,7 @@
     "selectStreamTypeFirst": "Sélectionnez d'abord un type de flux",
     "previewEmptyState": "Sélectionnez un type de flux et un nom de flux pour voir un aperçu",
     "queryConfig": {
+      "aggregationFunction": "Fonction d'agrégation",
       "sectionTitle": "Conditions",
       "openFullEditor": "Ouvrir l'éditeur complet",
       "groupByTooltip": "Regroupez les résultats selon ces champs : les alertes sont déclenchées par combinaison unique",
@@ -19245,6 +19258,8 @@
         "resetToDefault": "Rétablir les valeurs par défaut",
         "resetColumnWidths": "Réinitialiser les largeurs des colonnes"
       },
+      "selectAllRows": "Sélectionner toutes les lignes",
+      "selectRow": "Sélectionner la ligne {name}",
       "removeColumnAria": "Supprimer la colonne",
       "formatColumnAria": "Formater la colonne",
       "selectedOfTotal": "{selected} sur {total} sélectionnés",
