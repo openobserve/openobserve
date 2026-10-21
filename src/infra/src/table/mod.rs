@@ -125,6 +125,8 @@ pub mod trial_quota_usage;
 pub mod user_auth_state;
 pub mod user_password_history;
 pub mod users;
+pub mod workflow_http_trigger_requests;
+pub mod workflow_http_triggers;
 pub mod workflows;
 
 pub async fn init() -> Result<(), anyhow::Error> {
