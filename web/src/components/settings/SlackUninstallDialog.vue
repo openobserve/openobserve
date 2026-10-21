@@ -106,14 +106,22 @@ const deleteAppUrl = computed(() => {
   return isSlackUrl(url, "api.slack.com") ? url : null;
 });
 
-const columns = computed<OTableColumnDef<SlackDestinationRef>[]>(() => [
-  {
+const isThisOrg = (d: SlackDestinationRef): boolean => d.org_id === org.value;
+const removable = computed(() => affected.value.filter(isThisOrg));
+const hasOtherOrgRows = computed(() => affected.value.some((d) => !isThisOrg(d)));
+
+const columns = computed<OTableColumnDef<SlackDestinationRef>[]>(() => {
+  const name: OTableColumnDef<SlackDestinationRef> = {
     id: "name",
-    header: t("slackApp.uninstall.affectedDestinations", { team: team.value }),
+    header: hasOtherOrgRows.value
+      ? t("slackApp.uninstall.affectedDestinationsAllOrgs", { team: team.value })
+      : t("slackApp.uninstall.affectedDestinations", { team: team.value }),
     accessorKey: "name",
     meta: { flex: true },
-  },
-]);
+  };
+  if (!hasOtherOrgRows.value) return [name];
+  return [name, { id: "org_id", header: t("slackApp.uninstall.orgColumn"), accessorKey: "org_id" }];
+});
 
 const confirm = async (): Promise<void> => {
   if (result.value) {
@@ -135,7 +143,7 @@ const confirm = async (): Promise<void> => {
 };
 
 const removeSelected = async (): Promise<void> => {
-  const names = affected.value.filter((d) => selectedIds.value.includes(d.id)).map((d) => d.name);
+  const names = removable.value.filter((d) => selectedIds.value.includes(d.id)).map((d) => d.name);
   if (!names.length) return;
   try {
     const response = await removeDestinations.mutateAsync(names);
@@ -144,7 +152,7 @@ const removeSelected = async (): Promise<void> => {
         typeof entry === "string" ? entry : (entry.name ?? ""),
       ),
     );
-    affected.value = affected.value.filter((d) => !removed.has(d.name));
+    affected.value = affected.value.filter((d) => !(isThisOrg(d) && removed.has(d.name)));
     selectedIds.value = [];
     toast({
       variant: removed.size === names.length ? "success" : "warning",
@@ -221,6 +229,7 @@ const removeSelected = async (): Promise<void> => {
           :columns="columns"
           row-key="id"
           selection="multiple"
+          :is-row-selectable="isThisOrg"
           :selected-ids="selectedIds"
           pagination="none"
           :show-global-filter="false"
@@ -241,7 +250,7 @@ const removeSelected = async (): Promise<void> => {
                 {{
                   t("components.table.selectedOfTotal", {
                     selected: selectedIds.length,
-                    total: affected.length,
+                    total: removable.length,
                   })
                 }}
               </span>
@@ -259,6 +268,9 @@ const removeSelected = async (): Promise<void> => {
         </OTable>
         <p v-else class="text-text-secondary m-0">
           {{ t("slackApp.uninstall.affectedEmpty", { team }) }}
+        </p>
+        <p v-if="hasOtherOrgRows" class="text-text-secondary m-0" data-test="slack-other-org-note">
+          {{ t("slackApp.uninstall.otherOrgDestinationsNote") }}
         </p>
         <OButton
           v-if="deleteAppUrl"

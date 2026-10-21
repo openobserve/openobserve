@@ -44,7 +44,7 @@ const mountDialog = (mode: "disconnect" | "uninstall") =>
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(slack.disconnectInstallation).mockReturnValue(
-    ok({ stopped_destinations: [{ id: "d1", name: "sre-prod-slack" }] }) as any,
+    ok({ stopped_destinations: [{ id: "d1", name: "sre-prod-slack", org_id: "acme" }] }) as any,
   );
   vi.mocked(slack.uninstallInstallation).mockReturnValue(
     ok({
@@ -52,8 +52,8 @@ beforeEach(() => {
       affected: {
         orgs: 3,
         destinations: [
-          { id: "d1", name: "sre-prod-slack" },
-          { id: "d2", name: "payments-slack" },
+          { id: "d1", name: "sre-prod-slack", org_id: "acme" },
+          { id: "d2", name: "payments-slack", org_id: "acme" },
         ],
         links_revoked: 14,
       },
@@ -162,5 +162,69 @@ describe("SlackUninstallDialog: Uninstall from workspace (row 19)", () => {
       ids: ["sre-prod-slack", "payments-slack"],
     });
     expect(body().find('[data-test="slack-dialog-result"]').text()).not.toContain("payments-slack");
+  });
+});
+
+describe("SlackUninstallDialog: instance workspace uninstalled from _meta (R-79)", () => {
+  const mixed = [
+    { id: "d1", name: "sre-prod-slack", org_id: "acme" },
+    { id: "d2", name: "sre-prod-slack", org_id: "globex" },
+    { id: "d3", name: "payments-slack", org_id: "acme" },
+    { id: "d4", name: "billing-slack", org_id: "initech" },
+  ];
+
+  const uninstallMixed = async () => {
+    vi.mocked(slack.uninstallInstallation).mockReturnValue(
+      ok({
+        revoked: true,
+        affected: { orgs: 3, destinations: mixed, links_revoked: 2 },
+        delete_app_url: null,
+      }) as any,
+    );
+    mountDialog("uninstall");
+    await flushPromises();
+    await primary()!.trigger("click");
+    await flushPromises();
+  };
+
+  const checkbox = (row: number) => body().find(`[data-test="o2-table-select-${row}"] button`);
+
+  it("lists every org's destinations with their org and says where to remove the others", async () => {
+    await uninstallMixed();
+    const result = body().find('[data-test="slack-dialog-result"]');
+    for (const org of ["acme", "globex", "initech"]) expect(result.text()).toContain(org);
+    expect(result.text()).toContain("billing-slack");
+    expect(result.find('[data-test="slack-other-org-note"]').text()).toContain(
+      "alert destinations",
+    );
+  });
+
+  it("disables selection of the other orgs' rows", async () => {
+    await uninstallMixed();
+    expect(checkbox(0).attributes("disabled")).toBeUndefined();
+    expect(checkbox(1).attributes("disabled")).toBeDefined();
+    expect(checkbox(2).attributes("disabled")).toBeUndefined();
+    expect(checkbox(3).attributes("disabled")).toBeDefined();
+    await checkbox(1).trigger("click");
+    await flushPromises();
+    expect(body().find('[data-test="slack-remove-destinations"]').exists()).toBe(false);
+  });
+
+  it("removes only this org's destinations, even when another org has one of the same name", async () => {
+    await uninstallMixed();
+    await body().find('[data-test="o2-table-select-all"] button').trigger("click");
+    await flushPromises();
+    expect(body().find('[data-test="slack-selected-count"]').text()).toBe("2 of 2 selected");
+    await body().find('[data-test="slack-remove-destinations"]').trigger("click");
+    await flushPromises();
+    expect(destinationService.bulkDelete).toHaveBeenCalledTimes(1);
+    expect(destinationService.bulkDelete).toHaveBeenCalledWith("acme", {
+      ids: ["sre-prod-slack", "payments-slack"],
+    });
+    const result = body().find('[data-test="slack-dialog-result"]');
+    expect(result.text()).toContain("globex");
+    expect(result.text()).toContain("sre-prod-slack");
+    expect(result.text()).toContain("billing-slack");
+    expect(result.text()).not.toContain("payments-slack");
   });
 });

@@ -145,6 +145,8 @@ export interface LinkingView {
 export interface SlackDestinationRef {
   id: string;
   name: string;
+  /** An instance-workspace uninstall from `_meta` lists every served org's destinations. */
+  org_id: string;
 }
 
 export interface SlackCreatedDestination {
