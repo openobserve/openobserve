@@ -297,9 +297,10 @@ pub struct PushDatasetItemResponseBody {
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct UpsertDatasetItemBody {
-    /// Stable Dataset Case identity. Omit to append a new Case with a
-    /// server-generated identity.
+    /// Stable Dataset Case identity, at most 27 characters. Omit to append a new
+    /// Case with a server-generated identity.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(max_length = 27)]
     pub logical_id: Option<String>,
     pub input: Value,
     #[serde(default, skip_serializing_if = "Option::is_none")]
