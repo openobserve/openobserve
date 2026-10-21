@@ -28,7 +28,7 @@ const rootRef = ref<{ $el?: Element } | null>(null);
 // Labels that arrive with data are not unnamed, so the dev check waits for them.
 let nameCheckTimer: ReturnType<typeof setTimeout> | undefined;
 onMounted(() => {
-  if (!import.meta.env.DEV) return;
+  if (!import.meta.env.DEV || import.meta.env.MODE === "test") return;
   nameCheckTimer = setTimeout(
     () => warnIfUnnamedIconOnly(rootRef.value?.$el),
     UNNAMED_ICON_ONLY_DELAY_MS,
