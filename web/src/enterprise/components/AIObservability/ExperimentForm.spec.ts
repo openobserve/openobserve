@@ -671,6 +671,15 @@ describe("ExperimentForm", () => {
       true,
     );
   });
+
+  it("warns when the system prompt references expected_output", async () => {
+    wrapper = await createWrapper();
+    setField(wrapper, "systemPrompt", "Grade against {{ expected_output }}");
+    await flushPromises();
+    expect(wrapper.find('[data-test="ai-experiment-form-expected-leak-warning"]').exists()).toBe(
+      true,
+    );
+  });
 });
 
 // Cloning opens this same form seeded from the source run, so a copy can be

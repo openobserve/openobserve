@@ -976,7 +976,9 @@ const promptVariables = computed(() =>
 );
 const expectedOutputToken = raw("{{ expected_output }}");
 const usesExpectedOutput = computed(() =>
-  /\{\{\s*expected_output\s*\}\}/.test(String(userPrompt.value ?? "")),
+  [systemPrompt.value, userPrompt.value].some((prompt) =>
+    /\{\{\s*expected_output\s*\}\}/.test(String(prompt ?? "")),
+  ),
 );
 
 /** Bumped per load, so a slow response for a since-deselected dataset is dropped. */

@@ -13,6 +13,7 @@ import type {
   PlaygroundRequestMessage,
   PlaygroundScoreResult,
 } from "@/services/llm-playground.service";
+import { TEMPLATE_VARIABLE_NAME_SOURCE } from "@/services/llm-datasets.service";
 
 /** Golden answers feed scorers only. Binding one into a task prompt would leak
  *  the answer into the question, so this token is never substituted. */
@@ -174,7 +175,7 @@ function claimId(id: string): void {
 
 // ── template variables ────────────────────────────────────────────
 
-const VARIABLE_PATTERN = /\{\{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\}\}/g;
+const VARIABLE_PATTERN = new RegExp(`\\{\\{\\s*(${TEMPLATE_VARIABLE_NAME_SOURCE})\\s*\\}\\}`, "g");
 
 /** Every distinct `{{token}}` across a variant's messages, in first-seen order. */
 export function extractVariantVars(variant: PlaygroundVariant): string[] {

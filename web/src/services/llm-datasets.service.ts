@@ -205,8 +205,9 @@ function objectOrNull(value: unknown): Record<string, unknown> | null {
     : null;
 }
 
-/** Names a `{{token}}` can carry — same rule as VARIABLE_PATTERN in playgroundDraft.ts. */
-const TEMPLATE_VARIABLE_NAME = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
+/** Names a `{{token}}` can carry; the playground renderer substitutes exactly these. */
+export const TEMPLATE_VARIABLE_NAME_SOURCE = "[a-zA-Z_][a-zA-Z0-9_]*";
+const TEMPLATE_VARIABLE_NAME = new RegExp(`^${TEMPLATE_VARIABLE_NAME_SOURCE}$`);
 /** `input` is bound to the whole value separately; `expected_output` only ever feeds scorers. */
 const NON_FIELD_VARIABLES: Record<string, true> = { input: true, expected_output: true };
 
