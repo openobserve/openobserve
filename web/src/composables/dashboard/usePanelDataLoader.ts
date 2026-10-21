@@ -467,6 +467,9 @@ export const usePanelDataLoader = (
 
       state.lastTriggeredAt = new Date().getTime();
 
+      // The superseded run was aborted above, so an off-screen panel must not keep reporting it as loading.
+      if (!isVisible.value && forceLoad?.value != true) state.loading = false;
+
       // Wait for visibility BEFORE the cache restore below — restoring first
       // rendered every cached panel on mount, visible or not.
       await waitForThePanelToBecomeVisible(abortController.signal);
