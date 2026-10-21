@@ -1069,11 +1069,14 @@ describe("pa gap fixes (scope bar and Exclusions drawer)", { timeout: 20000 }, (
     await chip()!.trigger("click");
     await until(() => expect(drawer()).toBeDefined());
   };
-  // With no bot found nothing changes on the page, so the drawer's empty note is the proof the result arrived.
-  const suggestionsShown = async (bot: boolean) => {
-    if (bot) return until(() => expect(chip()?.text()).toContain("likely bot found"));
-    await openDrawer();
-    await until(() => expect(drawer()!.textContent).toContain("Nothing stands out in this range"));
+  // Settling only after the reply has resolved keeps a no-bot check from passing before the result is read.
+  const uaAnswered = async () => {
+    await until(() => expect(uaSearches()).toBeGreaterThan(0));
+    const { calls, results } = vi.mocked(searchService.search).mock;
+    await Promise.all(
+      results.filter((_, i) => UA_RE.test(calls[i][0].query.query.sql)).map((r) => r.value),
+    );
+    await settle();
   };
   const botSwitch = (d: HTMLElement) =>
     d.querySelector<HTMLElement>('[data-test="rum-analytics-exclusions-builtin-switch-btn"]')!;
@@ -1183,11 +1186,11 @@ describe("pa gap fixes (scope bar and Exclusions drawer)", { timeout: 20000 }, (
   });
 
   it("P7-R2: the App filters button shows a warning icon when it says likely bot found", async () => {
-    const chipTone = async (rows: Record<string, unknown>[], bot: boolean) => {
+    const chipTone = async (rows: Record<string, unknown>[]) => {
       resetProductAnalytics();
       withHits([[UA_RE, rows]]);
       await mountAt("/product-analytics/overview?app=web&period=7d", true);
-      await suggestionsShown(bot);
+      await uaAnswered();
       const btn = wrapper!.find('[data-test="rum-analytics-exclusions-chip"]');
       const out = {
         text: btn.text(),
@@ -1198,8 +1201,8 @@ describe("pa gap fixes (scope bar and Exclusions drawer)", { timeout: 20000 }, (
       document.body.innerHTML = "";
       return out;
     };
-    const normal = await chipTone([{ ua: "Chrome", dev: "Other", sessions: 1500 }], false);
-    const warned = await chipTone(BOT_UA, true);
+    const normal = await chipTone([{ ua: "Chrome", dev: "Other", sessions: 1500 }]);
+    const warned = await chipTone(BOT_UA);
     expect(normal.text).toMatch(/^\s*App filters/);
     expect(warned.text).toContain("likely bot found");
     expect(normal.icons).toContain("filter-alt");
@@ -1209,7 +1212,7 @@ describe("pa gap fixes (scope bar and Exclusions drawer)", { timeout: 20000 }, (
   it("P7-R2: no likely bot found without a banner", async () => {
     withHits([[UA_RE, [{ ua: "Chrome", dev: "Other", sessions: 1500 }]]]);
     await mountAt("/product-analytics/overview?app=web&period=7d", true);
-    await suggestionsShown(false);
+    await uaAnswered();
     expect(chip()?.text()).not.toContain("likely bot found");
   });
 
@@ -1266,7 +1269,8 @@ describe("pa gap fixes (scope bar and Exclusions drawer)", { timeout: 20000 }, (
     withHits([[UA_RE, [{ ua: "Chrome", dev: "Other", sessions: 1500 }]]]);
     await mountAt("/product-analytics/overview?app=web&period=7d");
     await openDrawer();
-    await until(() => expect(drawer()!.textContent).toContain("Nothing stands out in this range"));
+    await uaAnswered();
+    expect(drawer()!.textContent).toContain("Nothing stands out in this range");
   });
 
   it("P7-R3: the live preview reads M of <total> sessions remain, with Cancel and Save", async () => {
