@@ -59,14 +59,13 @@ _cov_test() {
         --skip bootstrap \
         --skip cache::file_data::disk \
         --skip sourcemaps \
-        "$@"
         
 }
 
-cmd_html() {
-    _cov_test --html "$@"
-    open target/llvm-cov/html/index.html # HACK: `open` is not portable
-}
+# cmd_html() {
+#     _cov_test --html "$@"
+#     open target/llvm-cov/html/index.html # HACK: `open` is not portable
+# }
 
 cmd_show_env() {
     cat <<EOF
@@ -172,7 +171,7 @@ main() {
         ;;
     run-cov)
         shift
-        _cov_test "$@"
+        _cov_test
         ;;
     show-env)
         cmd_show_env
