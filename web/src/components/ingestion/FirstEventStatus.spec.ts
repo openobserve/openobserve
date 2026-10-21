@@ -35,6 +35,8 @@ const fake = {
   scope: ref<"new-data" | "since-watch-start">("new-data"),
   troubleshooting: ref(false),
   sinceUs: ref<number>(),
+  targetExists: ref(true),
+  deciding: ref(false),
   start: vi.fn(),
   stop: vi.fn(),
   probeNow: vi.fn(),
@@ -48,6 +50,8 @@ vi.mock("@/composables/firstEvent/useFirstEventWatch", () => ({
       ...fake,
       scope: computed(() => fake.scope.value),
       sinceUs: computed(() => fake.sinceUs.value),
+      targetExists: computed(() => fake.targetExists.value),
+      deciding: computed(() => fake.deciding.value),
     };
   },
 }));
@@ -112,6 +116,8 @@ beforeEach(() => {
   fake.scope.value = "new-data";
   fake.troubleshooting.value = false;
   fake.sinceUs.value = undefined;
+  fake.targetExists.value = true;
+  fake.deciding.value = false;
   awsConfig.isEnterprise = "false";
 });
 
@@ -185,6 +191,29 @@ describe("FirstEventStatus — waiting", () => {
     expect(q("first-event-status-troubleshoot-btn").attributes("aria-busy")).toBe("true");
     expect(fake.state.value).toBe("waiting");
   });
+});
+
+describe("FirstEventStatus — before the first decision", () => {
+  it.each([{}, { display: "pill" }])(
+    "renders a neutral placeholder and no claim until the watch decides (%o)",
+    async (props) => {
+      fake.deciding.value = true;
+      mountBar({ targetStream: "syslog_ng", signal: "logs", ...props });
+      const root = q("first-event-status");
+      expect(root.attributes("data-state")).toBe("deciding");
+      expect(root.text()).toBe("");
+      expect(root.find('[role="status"]').exists()).toBe(true);
+      expect(q("first-event-status-meta").exists()).toBe(false);
+      expect(q("first-event-status-troubleshoot-btn").exists()).toBe(false);
+      expect(q("first-event-status-check-now-btn").exists()).toBe(false);
+      await vi.advanceTimersByTimeAsync(130_000);
+      expect(q("first-event-status").text()).not.toContain("Waiting");
+      fake.deciding.value = false;
+      await nextTick();
+      expect(q("first-event-status").attributes("data-state")).toBe("waiting");
+      expect(q("first-event-status").text()).toContain("Waiting for logs in syslog_ng");
+    },
+  );
 });
 
 describe("FirstEventStatus — received", () => {
@@ -417,6 +446,22 @@ describe("FirstEventStatus — diagnosis", () => {
     expect(q("first-event-diagnosis-fix").text()).toContain("Fluent Bit");
     await q("first-event-diagnosis-copy-btn").trigger("click");
     expect(wrapper.emitted("copy-command")).toHaveLength(1);
+  });
+
+  it("names the guide's own tool in the config fix", async () => {
+    mountBar({ snippetKind: "config", configTool: "syslog-ng" });
+    fake.diagnosis.value = {
+      form: "rejected",
+      trigger: "troubleshoot",
+      rejections: [rejection("invalid_credentials", 401)],
+    };
+    fake.state.value = "rejected";
+    await nextTick();
+    expect(q("first-event-diagnosis-fix").text()).toContain(
+      "The password in your syslog-ng config",
+    );
+    expect(q("first-event-diagnosis-fix").text()).toContain("restart syslog-ng");
+    expect(q("first-event-diagnosis-fix").text()).not.toContain("Fluent Bit");
   });
 
   it("shows the org id, endpoint and compare sentence when no request reached the org", async () => {
@@ -686,6 +731,28 @@ describe("FirstEventStatus — pill display for empty pages", () => {
     await nextTick();
     expect(q("first-event-status-meta").text()).toContain(text);
   });
+
+  it.each([
+    [{ targetStream: "syslog_ng" }, "Checks start when you copy the command."],
+    [
+      { targetStream: "syslog_ng", snippetKind: "config" },
+      "Checks start when you copy the config.",
+    ],
+    [{ targetStream: "system_", match: "keyword" }, "Checks start when you copy the command."],
+    [{ targetStream: "syslog_ng", display: "pill" }, "Checks start when you copy the command."],
+  ])(
+    "claims no existing data when the idle bar waits on a target that does not exist (%o)",
+    async (props, text) => {
+      mountBar(props);
+      fake.state.value = "idle";
+      fake.targetExists.value = false;
+      await nextTick();
+      expect(q("first-event-status-meta").text()).toBe(text);
+      expect(q("first-event-status").text()).toContain("Not checking yet");
+      await q("first-event-status-check-now-btn").trigger("click");
+      expect(fake.start).toHaveBeenCalledWith("check");
+    },
+  );
 
   it("offers no Check now outside the idle state", () => {
     mountBar({ targetStream: "default" });
