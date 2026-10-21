@@ -75,8 +75,10 @@ const makeAnomalyDetectionConfigBase = (t: Translator) =>
     retrain_interval_days: z.coerce.number(),
     // Sensitivity rules are mode-conditional (superRefine): each mode judges only its own fields.
     sensitivity_mode: z.enum(["band", "budget"]),
-    // Blank (null or a cleared "") is Auto; raw so superRefine judges it, not coerced to 0.
-    band_width: z.union([z.string(), z.number(), z.null()]),
+    // Only null is Auto; a cleared manual draft must fail validation.
+    band_width: z.custom<string | number | null>(
+      (v) => v === null || typeof v === "string" || typeof v === "number",
+    ),
     budget_count: z.coerce.number(),
     budget_period: z.enum(["day", "week"]),
   });
@@ -234,7 +236,10 @@ export const createAnomalyDetectionConfigSchema = (
     }
 
     if (value.sensitivity_mode === "band") {
-      if (!isBlankNumber(value.band_width) && !isBandWidth(Number(value.band_width))) {
+      if (
+        value.band_width !== null &&
+        (String(value.band_width).trim() === "" || !isBandWidth(Number(value.band_width)))
+      ) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["band_width"],
@@ -333,6 +338,54 @@ export const anomalyBandWidthPrefill = (
 export const anomalyTrainedK = (cfg: Record<string, any> | null | undefined): number | null => {
   const k = isBlankNumber(cfg?.band_k) ? NaN : Number(cfg?.band_k);
   return Number.isFinite(k) ? Math.round(k * 100) / 100 : null;
+};
+
+// Query edits invalidate a learned level before the server has saved the new query.
+export const anomalyModelQuery = (cfg: Record<string, any>): string =>
+  JSON.stringify([
+    cfg.stream_type,
+    cfg.stream_name,
+    cfg.query_mode,
+    cfg.query_mode === "custom_sql"
+      ? cfg.custom_sql
+      : [cfg.detection_function, cfg.detection_function_field, cfg.filters],
+    cfg.histogram_interval_value,
+    cfg.histogram_interval_unit,
+  ]);
+
+export const anomalySensitivityModel = (cfg: Record<string, any>) => {
+  const level = anomalyTrainedK(cfg);
+  const invalidated =
+    cfg.sensitivity_model_stale || cfg.current_model_version === 0 || cfg.status === "waiting";
+  const available =
+    !invalidated &&
+    cfg.status === "ready" &&
+    cfg.is_trained === true &&
+    Number(cfg.current_model_version) > 0;
+  const previous = !invalidated && level !== null;
+  const state:
+    | "untrained"
+    | "training"
+    | "failed"
+    | "retraining"
+    | "retrainFailed"
+    | "trained"
+    | "unconfirmed" = cfg.sensitivity_model_stale
+    ? "untrained"
+    : cfg.status === "training"
+      ? previous
+        ? "retraining"
+        : "training"
+      : cfg.status === "failed"
+        ? previous
+          ? "retrainFailed"
+          : "failed"
+        : available && level !== null
+          ? "trained"
+          : previous
+            ? "unconfirmed"
+            : "untrained";
+  return { level: previous ? level : null, current: available, state };
 };
 
 export const ANOMALY_DIRECTION_KEYS: Record<string, string> = {
@@ -434,6 +487,6 @@ export const anomalyDetectionConfigDefaults = (
   training_window_days: cfg?.training_window_days ?? 28,
   retrain_interval_days: cfg?.retrain_interval_days ?? 7,
   sensitivity_mode: anomalyBudgetPerDay(cfg) !== null ? "budget" : "band",
-  band_width: isBlankNumber(cfg?.band_width) ? null : Number(cfg?.band_width),
+  band_width: cfg?.band_width == null ? null : cfg.band_width,
   ...budgetFieldsFromPerDay(anomalyBudgetPerDay(cfg)),
 });

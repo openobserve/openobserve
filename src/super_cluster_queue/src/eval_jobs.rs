@@ -15,7 +15,7 @@
 
 use infra::{
     errors::{Error, Result},
-    table::online_eval_jobs,
+    table::{eval_job_states, online_eval_jobs},
 };
 use o2_enterprise::enterprise::super_cluster::queue::{EvalJobMessage, Message, MessageType};
 use openobserve_core::llm_evaluations::eval_jobs::reconciler;
@@ -46,6 +46,8 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
                     .map_err(|e| Error::Message(e.to_string()))?;
                 online_eval_jobs::delete(&job_id).await?;
             }
+            // Each region measures its own health, so each region drops its own rows.
+            eval_job_states::delete_by_job(&job_id).await?;
         }
         _ => {
             log::error!(
