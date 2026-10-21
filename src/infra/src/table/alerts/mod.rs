@@ -455,33 +455,6 @@ pub async fn delete_by_id<C: ConnectionTrait>(
     Ok(())
 }
 
-/// Deletes an alert by its name.
-pub async fn delete_by_name<C: ConnectionTrait>(
-    conn: &C,
-    org_id: &str,
-    folder_id: &str,
-    stream_type: MetaStreamType,
-    stream_name: &str,
-    alert_name: &str,
-) -> Result<(), errors::Error> {
-    let model = get_model_by_name(
-        conn,
-        org_id,
-        folder_id,
-        stream_type,
-        stream_name,
-        alert_name,
-    )
-    .await?
-    .and_then(|(_folder, maybe_alert)| maybe_alert);
-
-    if let Some(model) = model {
-        let _ = model.delete(conn).await?;
-    }
-
-    Ok(())
-}
-
 /// Lists alerts.
 pub async fn list<C: ConnectionTrait>(
     conn: &C,

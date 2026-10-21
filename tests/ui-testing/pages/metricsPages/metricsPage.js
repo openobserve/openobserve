@@ -126,6 +126,13 @@ export class MetricsPage {
         this.configToggleAllSectionsBtnExpanded = page.locator(
             '[data-test="dashboard-config-toggle-all-sections-btn"][data-test-all-expanded="true"]'
         );
+        this.configToggleAllSectionsTooltip = page
+            .locator('[data-test="o-tooltip-content"]')
+            .filter({ hasText: /(Collapse|Expand) all sections/ });
+        this.panelSidebarExpandedTitle = page
+            .locator('[data-test="panel-sidebar-root"]')
+            .filter({ has: this.configToggleAllSectionsBtn })
+            .locator('[data-test="panel-sidebar-expanded-title"]');
         // All config-panel controls (used by getConfigSectionKeys to enumerate).
         this.allDashboardConfigControls = page.locator('[data-test^="dashboard-config-"]');
         // Metrics page does not yet surface a chart-type picker; this defensive
@@ -187,6 +194,13 @@ export class MetricsPage {
      */
     getDashboardError() {
         return this.inlineError;
+    }
+
+    /** Assert the panel surfaces a query error (chart-area or inline) and return its text. */
+    async expectQueryErrorVisible(timeout = 15000) {
+        const error = this.chartErrorMessage.or(this.inlineError).first();
+        await expect(error).toBeVisible({ timeout });
+        return (await error.textContent()) ?? '';
     }
 
     /**
@@ -1151,6 +1165,9 @@ export class MetricsPage {
         await this.configToggleAllSectionsBtnExpanded
             .waitFor({ state: 'visible', timeout: 5000 })
             .catch(() => {});
+        // The toggle's tooltip stays open while the pointer rests on it and covers the sidebar collapse button.
+        await this.panelSidebarExpandedTitle.hover();
+        await expect(this.configToggleAllSectionsTooltip).toBeHidden({ timeout: 5000 });
         // Wait for the sections' open (height) animations to finish — clicking
         // an OSelect while sections are still animating dismisses the dropdown.
         await this.page

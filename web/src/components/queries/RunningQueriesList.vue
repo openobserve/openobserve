@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="running-queries-table"
       :data="rows"
       :columns="columns"
-      row-key="trace_id"
+      row-key="row_key"
       :loading="loadingState"
       :forbidden="forbidden"
       :selected-ids="selectedRowIds"
@@ -360,12 +360,12 @@ export default defineComponent({
     ];
 
     const selectedRowIds = computed(() =>
-      ((props.selectedRows as any[]) || []).map((r: any) => r.trace_id),
+      ((props.selectedRows as any[]) || []).map((r: any) => r.row_key),
     );
 
     const handleSelectedIdsUpdate = (ids: string[]) => {
       const rows = (props.rows as any[]) || [];
-      const map = new Map(rows.map((r: any) => [r.trace_id, r]));
+      const map = new Map(rows.map((r: any) => [r.row_key, r]));
       const selected = ids.map((id: any) => map.get(id)).filter(Boolean);
       emit("update:selectedRows", selected);
     };

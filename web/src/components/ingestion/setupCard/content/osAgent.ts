@@ -15,13 +15,12 @@
 
 // Shared pieces for the host-agent cards (Linux, Windows). Both install the same
 // OpenObserve agent from the openobserve/agents repo and differ only by shell,
-// script path and what the agent collects — so the environment choice
-// (generic host vs AWS EC2), the EC2 IAM prerequisite and the detection config
-// live here rather than being duplicated in both cards.
+// script path and what the agent collects — so the install code block, the
+// detection config and the troubleshooting rows live here rather than being
+// duplicated in both cards.
 
 import { type I18nKey, type TranslateFn } from "@/types/i18n";
 
-import { getImageURL } from "@/utils/zincutils";
 import type { CardSubstitutions, RichCardDetect, RichCardExtras, RichCardStep } from "../types";
 import { applySubs, applySubsMasked } from "../subs";
 
@@ -30,23 +29,6 @@ export const HOST_AGENT_SLUGS = new Set(["linux", "windows", "macos"]);
 
 /** Base of the agent install scripts, e.g. `${AGENTS_REPO}/linux/install.sh`. */
 export const AGENTS_REPO = "https://raw.githubusercontent.com/openobserve/agents/main";
-
-/** Environment the agent is installed onto — drives the script path. */
-export type AgentEnv = "generic" | "ec2";
-
-/**
- * The EC2 variants read the instance's Name tag and use it as the host
- * identifier, which needs an instance role — without it the agent installs but
- * every host shows up under its opaque instance id instead.
- */
-export const EC2_IAM_NOTE_KEY: I18nKey = "ingestion.setupCard.ec2IamNote";
-
-/** Icon shown on the generic/EC2 toggle. */
-export const envIcons = () => ({
-  ec2: getImageURL("images/ingestion/aws.svg"),
-  linux: getImageURL("images/common/linux.svg"),
-  windows: getImageURL("images/common/windows.svg"),
-});
 
 /** Build a code block whose `[BASIC_PASSCODE]`-equivalent token is masked. */
 export function agentCode(template: string, subs: CardSubstitutions, lang: string) {
@@ -82,8 +64,6 @@ export function dashboardReadyStep(t: TranslateFn): RichCardStep {
   };
 }
 
-// The agents repo ships a single uninstall script per OS — there is no EC2-specific
-// one — so an EC2 install is removed by the same command as a generic one.
 const unixUninstall = (dir: "linux" | "mac") =>
   `curl -O ${AGENTS_REPO}/${dir}/uninstall.sh \\
   && chmod +x uninstall.sh \\
@@ -122,7 +102,7 @@ export function agentUninstall(os: AgentOs): NonNullable<RichCardExtras["uninsta
 /**
  * Troubleshooting rows common to the host agents.
  *
- * `includeEc2` drops the instance-id row for agents that ship no EC2 variant
+ * `includeEc2` drops the instance-id row for agents with no EC2 support
  * (macOS), where an EC2-only symptom would just be noise.
  */
 export function sharedAgentTroubleshooting(
@@ -140,7 +120,7 @@ export function sharedAgentTroubleshooting(
           {
             q: t("ingestion.setupCard.agentTroubleInstanceIdQ"),
             a: t("ingestion.setupCard.agentTroubleInstanceIdA", {
-              iamNote: t(EC2_IAM_NOTE_KEY),
+              iamNote: t("ingestion.setupCard.ec2IamNote"),
             }),
           },
         ]

@@ -240,6 +240,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                          nudging the inputs/button out of alignment). -->
                     <div class="flex h-[2.125rem] shrink-0 items-center">
                       <OButton
+                        :aria-label="t('common.remove')"
                         variant="ghost"
                         size="icon"
                         @click="removeFilter(index)"
@@ -337,6 +338,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div>
                 <OButton
+                  :aria-label="t('common.remove')"
                   variant="ghost"
                   size="icon"
                   :disabled="variableData?.options?.length === 1"
@@ -418,6 +420,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :data-test="`dashboard-variable-custom-value-${index}`"
                   />
                   <OButton
+                    :aria-label="t('common.remove')"
                     v-if="variableData.multiSelect"
                     variant="ghost"
                     size="icon"

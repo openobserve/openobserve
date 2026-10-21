@@ -18,7 +18,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     data-test="chart-renderer"
     ref="chartRef"
-    id="chart1"
+    :id="chartId"
+    :role="label ? 'img' : undefined"
+    :aria-label="label || undefined"
     class="chart-container h-full w-full"
     @mouseover="
       () => {
@@ -73,6 +75,7 @@ import { throttle } from "lodash-es";
 import {
   defineComponent,
   ref,
+  useId,
   onMounted,
   watch,
   onUnmounted,
@@ -80,7 +83,9 @@ import {
   onActivated,
   onDeactivated,
   inject,
+  type PropType,
 } from "vue";
+import type { I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import useBreakpoint from "@/composables/useBreakpoint";
 import { useTheme } from "@/composables/useTheme";
@@ -111,6 +116,7 @@ import {
   MarkLineComponent,
   MarkAreaComponent,
   GraphicComponent,
+  AriaComponent,
 } from "echarts/components";
 import { LabelLayout, UniversalTransition } from "echarts/features";
 import { CanvasRenderer, SVGRenderer } from "echarts/renderers";
@@ -140,6 +146,7 @@ echarts.use([
   MarkLineComponent,
   MarkAreaComponent,
   GraphicComponent,
+  AriaComponent,
   BarChart,
   LineChart,
   CustomChart,
@@ -216,6 +223,11 @@ export default defineComponent({
       type: String,
       default: "100%",
     },
+    /** Accessible name of the chart, normally the panel title. */
+    label: {
+      type: String as unknown as PropType<I18nText | undefined>,
+      default: undefined,
+    },
     /** Name the line under a right-click that hit no symbol, so the alert can tell which query was meant. */
     findLineOnContextMenu: {
       type: Boolean,
@@ -224,6 +236,7 @@ export default defineComponent({
   },
   setup(props: any, { emit }) {
     const chartRef: any = ref(null);
+    const chartId = `chart-${useId()}`;
     let chart: any;
     const store = useStore();
     const { isDark } = useTheme();
@@ -370,7 +383,12 @@ export default defineComponent({
     };
 
     const chartOptions = (options: Record<string, unknown>) =>
-      withChartFont(withLineStrokeEvents(options, props.findLineOnContextMenu));
+      withChartFont(
+        withLineStrokeEvents(
+          { aria: { enabled: !props.label }, ...options },
+          props.findLineOnContextMenu,
+        ),
+      );
 
     // The data point nearest the cursor along x, for a right-click on a line's stroke between points.
     const nearestDataIndex = (seriesIndex: number, data: unknown[], cursorX: number) => {
@@ -1051,6 +1069,7 @@ export default defineComponent({
     );
     return {
       chartRef,
+      chartId,
       hoveredSeriesState,
       handleNativeContextMenu,
       get chart() {

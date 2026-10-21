@@ -55,6 +55,7 @@ import type {
   RichCardInput,
   RichCardStep,
   RichCardStepVariant,
+  RichCardStepVariantGroup,
   RichCardStreamInput,
   StepChipKind,
 } from "./types";
@@ -131,7 +132,15 @@ const watchedStream = computed(() =>
 // reactively, like `{stream}` above. We aggregate every step's inputs so a value
 // can fill code anywhere, and seed from defaults so all keys exist (keeps
 // mutations reactive) and code shows sensible values before the user edits.
-const allInputs = computed(() => props.content.steps.flatMap((s) => s.inputs ?? []));
+// Variant inputs are included whether selected or not, so ids must be unique card-wide.
+const allInputs = computed(() =>
+  props.content.steps.flatMap((s) => [
+    ...(s.inputs ?? []),
+    ...(s.variants ?? [])
+      .flatMap((v) => ("variants" in v ? v.variants : [v]))
+      .flatMap((v) => v.inputs ?? []),
+  ]),
+);
 const inputValues = ref<Record<string, string>>(
   Object.fromEntries(allInputs.value.map((i) => [i.id, i.default])),
 );
@@ -139,14 +148,45 @@ const inputValues = ref<Record<string, string>>(
 // Substitute live values (stream + free-form inputs) into authored code at
 // display/copy time (kept out of build-time subs because they change as the user
 // types). Build-time {url}/{org}/{token} are already resolved.
-const subStream = (text?: string): string | undefined => {
+const subStream = (text?: string, variant?: RichCardStepVariant): string | undefined => {
   if (text == null) return text;
-  let out = text.replaceAll("{stream}", watchedStream.value);
+  const flags = variantFlags(variant);
+  let out = text.replaceAll("{stream}", watchedStream.value).replaceAll("{flags}", () => flags);
   for (const inp of allInputs.value) {
-    out = out.replaceAll(`{${inp.id}}`, inputValues.value[inp.id] ?? inp.default);
+    if (inp.flag || inp.helmSet) continue;
+    const value = inputValues.value[inp.id] ?? inp.default;
+    // A function replacement keeps typed `$&`, `$$` etc. literal.
+    out = out.replaceAll(`{${inp.id}}`, () => value);
   }
   return out;
 };
+
+const inputValue = (id: string) => inputValues.value[id]?.trim() ?? "";
+const missingRequired = (variant?: RichCardStepVariant) =>
+  !!variant?.requireOneOf &&
+  variant.requireOneOf.ids.every((id) => !inputValue(id).replace(/[\s,]/g, ""));
+// Single-quoted for POSIX shells, so globs like *app* reach the installer unexpanded.
+const shellQuote = (v: string) => `'${v.replaceAll("'", "'\\''")}'`;
+// Helm list items end at an unescaped `,` or `}`; escaping stops a value from closing the list.
+const helmList = (v: string) =>
+  v
+    .split(",")
+    .map((item) => item.trim().replace(/[\\{}]/g, "\\$&"))
+    .filter(Boolean)
+    .join(",");
+const variantFlags = (variant?: RichCardStepVariant): string =>
+  (variant?.inputs ?? [])
+    .map((inp) => {
+      // A blank list is set to null, not omitted: --reset-then-reuse-values would keep the old one.
+      if (inp.helmSet) {
+        const list = helmList(inputValue(inp.id));
+        return list
+          ? ` \\\n  --set-string ${shellQuote(`${inp.helmSet}={${list}}`)}`
+          : ` \\\n  --set ${inp.helmSet}=null`;
+      }
+      return inp.flag && inputValue(inp.id) ? ` ${inp.flag} ${shellQuote(inputValue(inp.id))}` : "";
+    })
+    .join("");
 
 const detect = useStreamDetect({
   config: () => ({
@@ -188,8 +228,11 @@ const onBarDetected = (result: { count: number }) => detect.markConnected(result
 
 // Re-copies through the first step's own block, so the clipboard and the toast match a click on it.
 const copyFirstSnippet = () => {
-  const step = props.content.steps.find((st) => displayCode(st));
+  const index = props.content.steps.findIndex((st) => displayCode(st));
+  const step = props.content.steps[index];
   if (!step) return;
+  // A hidden command can't be copied; show the step and its warning instead.
+  if (missingRequired(activeVariant(step))) return scrollToStep(index);
   const prefix = displayCode(step)?.dataTest ?? SETUP_CODE_BLOCK;
   cardRoot.value?.querySelector<HTMLElement>(`[data-test="${prefix}-copy-btn"]`)?.click();
 };
@@ -228,8 +271,22 @@ const variantSel = ref<Record<string, string>>({});
 const variantKey = (step: RichCardStep): string => step.variantGroup ?? step.id;
 const currentVariantId = (step: RichCardStep): string | undefined =>
   step.variants?.length ? (variantSel.value[variantKey(step)] ?? step.variants[0].id) : undefined;
-const activeVariant = (step: RichCardStep) =>
+const topVariant = (step: RichCardStep) =>
   step.variants?.find((v) => v.id === currentVariantId(step));
+// A nested selection is keyed under its parent, so each top-level choice remembers its own.
+const subVariantKey = (step: RichCardStep) => `${variantKey(step)}/${topVariant(step)?.id}`;
+const subVariants = (step: RichCardStep) => {
+  const top = topVariant(step);
+  return top && "variants" in top ? top.variants : undefined;
+};
+const currentSubVariantId = (step: RichCardStep): string | undefined =>
+  variantSel.value[subVariantKey(step)] ?? subVariants(step)?.[0]?.id;
+const activeVariant = (step: RichCardStep): RichCardStepVariant | undefined => {
+  const top = topVariant(step);
+  return top && "variants" in top
+    ? top.variants.find((v) => v.id === currentSubVariantId(step))
+    : top;
+};
 const selectVariant = (key: string, variantId: unknown) => {
   variantSel.value = { ...variantSel.value, [key]: String(variantId) };
 };
@@ -244,7 +301,7 @@ const stepTitle = (step: RichCardStep): I18nText =>
   step.titleKey ? t(step.titleKey) : (step.title ?? raw(""));
 const stepDescription = (step: RichCardStep): I18nText =>
   step.descriptionKey ? t(step.descriptionKey) : (step.description ?? raw(""));
-const variantLabel = (variant: RichCardStepVariant): I18nText =>
+const variantLabel = (variant: RichCardStepVariant | RichCardStepVariantGroup): I18nText =>
   variant.labelKey ? t(variant.labelKey) : (variant.label ?? raw(""));
 const streamInputHelp = (input: RichCardStreamInput): I18nText | undefined =>
   input.helpKey ? t(input.helpKey) : input.help;
@@ -602,6 +659,62 @@ function fireConfetti() {
               </OToggleGroup>
             </div>
 
+            <div
+              v-if="subVariants(step)?.length && step.variantToggle !== false"
+              class="variant-tabs"
+              :data-test="`ai-subvariant-tabs-${step.id}`"
+            >
+              <OToggleGroup
+                :model-value="currentSubVariantId(step)"
+                @update:model-value="(v) => selectVariant(subVariantKey(step), v)"
+              >
+                <OToggleGroupItem
+                  v-for="v in subVariants(step)"
+                  :key="v.id"
+                  :value="v.id"
+                  size="sm"
+                  :data-test="`ai-variant-${v.id}`"
+                >
+                  <template v-if="v.icon" #icon-left>
+                    <img
+                      :src="v.icon"
+                      alt=""
+                      aria-hidden="true"
+                      class="variant-icon"
+                      :class="{ 'variant-icon-invert': v.iconInvertDark }"
+                    />
+                  </template>
+                  {{ variantLabel(v) }}
+                </OToggleGroupItem>
+              </OToggleGroup>
+            </div>
+
+            <div
+              v-if="activeVariant(step)?.inputs?.length"
+              class="step-inputs"
+              :data-test="`ai-variant-inputs-${step.id}`"
+            >
+              <OInput
+                v-for="inp in activeVariant(step)?.inputs"
+                :key="inp.id"
+                v-model="inputValues[inp.id]"
+                :label="inputLabel(inp)"
+                :placeholder="raw(inp.placeholder || inp.default)"
+                :help-text="inp.helpKey ? t(inp.helpKey) : undefined"
+                size="sm"
+                :width="inp.width || 'md'"
+                :data-test="`ai-input-${inp.id}`"
+              />
+            </div>
+            <p
+              v-if="missingRequired(activeVariant(step))"
+              class="step-note"
+              :data-test="`ai-variant-require-${step.id}`"
+            >
+              <OIcon name="warning-amber" size="sm" />
+              <span>{{ t(activeVariant(step)!.requireOneOf!.messageKey) }}</span>
+            </p>
+
             <!-- Page-supplied controls that CHOOSE this step's code (a client
                  picker, an install shortcut) — above the block they drive. -->
             <div
@@ -613,12 +726,12 @@ function fireConfetti() {
             </div>
 
             <OCodeBlock
-              v-if="displayCode(step)"
+              v-if="displayCode(step) && !missingRequired(activeVariant(step))"
               :lang="displayCode(step)?.lang"
               :chrome="codeChrome(step)"
               :filename="displayCode(step)?.filename"
-              :code="subStream(displayCode(step)?.raw) || ''"
-              :code-masked="subStream(displayCode(step)?.masked)"
+              :code="subStream(displayCode(step)?.raw, activeVariant(step)) || ''"
+              :code-masked="subStream(displayCode(step)?.masked, activeVariant(step))"
               :data-test="displayCode(step)?.dataTest ?? SETUP_CODE_BLOCK"
               :reveal-tooltip="t('ingestion.setupCard.revealToken')"
               :hide-tooltip="t('ingestion.setupCard.hideToken')"

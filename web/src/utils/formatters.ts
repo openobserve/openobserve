@@ -265,6 +265,27 @@ export function operatorSymbol(op: string): string {
   return map[op] || op;
 }
 
+/** Attribute rule → `openai.response.service_tier +1 is one of flex, priority`, labelled through `t`. */
+export function formatTierRule(
+  rule: { keys?: string[]; op?: string; values?: string[]; value?: number | null },
+  t: (_key: string) => string,
+): string {
+  const keys = (rule?.keys ?? []).map((k) => String(k ?? "").trim()).filter(Boolean);
+  const key = keys.length > 1 ? `${keys[0]} +${keys.length - 1}` : (keys[0] ?? "");
+  const op = rule?.op ?? "in";
+  const labels: Record<string, string> = {
+    in: "modelPricing.ruleOpIn",
+    not_in: "modelPricing.ruleOpNotIn",
+    exists: "modelPricing.ruleOpExists",
+    not_exists: "modelPricing.ruleOpNotExists",
+  };
+  if (op === "exists" || op === "not_exists") return `${key} ${t(labels[op])}`;
+  if (op === "in" || op === "not_in") {
+    return `${key} ${t(labels[op])} ${(rule?.values ?? []).join(", ")}`;
+  }
+  return `${key} ${operatorSymbol(op)} ${rule?.value ?? ""}`;
+}
+
 /**
  * Minutes past UTC midnight → `HH:MM`. 1440 renders as `24:00` so a range
  * ending at midnight labels its end rather than wrapping back to `00:00`.

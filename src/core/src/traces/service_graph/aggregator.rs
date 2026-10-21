@@ -121,30 +121,22 @@ fn map_edge_to_record(
     record
 }
 
-// Stub functions for non-enterprise builds
 #[cfg(not(feature = "enterprise"))]
-pub fn aggregate_edges(_edges: Vec<()>) -> Result<(), anyhow::Error> {
+pub async fn write_aggregated_edges(_org_id: &str, _aggregated: ()) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-#[allow(clippy::items_after_test_module)]
+#[cfg(not(feature = "enterprise"))]
+pub async fn write_sql_aggregated_edges(
+    _org_id: &str,
+    _stream_name: &str,
+    _records: Vec<serde_json::Value>,
+) -> Result<(), anyhow::Error> {
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
-    #[cfg(not(feature = "enterprise"))]
-    use super::*;
-
-    #[test]
-    #[cfg(not(feature = "enterprise"))]
-    fn test_aggregate_edges_empty_returns_ok() {
-        assert!(aggregate_edges(vec![]).is_ok());
-    }
-
-    #[test]
-    #[cfg(not(feature = "enterprise"))]
-    fn test_aggregate_edges_nonempty_returns_ok() {
-        assert!(aggregate_edges(vec![(), ()]).is_ok());
-    }
-
     #[test]
     #[cfg(feature = "enterprise")]
     fn test_map_edge_to_record_with_agent_env() {
@@ -181,18 +173,4 @@ mod tests {
         assert!(record.get("agent_env").is_none());
         assert!(record.get("agent_version").is_none());
     }
-}
-
-#[cfg(not(feature = "enterprise"))]
-pub async fn write_aggregated_edges(_org_id: &str, _aggregated: ()) -> Result<(), anyhow::Error> {
-    Ok(())
-}
-
-#[cfg(not(feature = "enterprise"))]
-pub async fn write_sql_aggregated_edges(
-    _org_id: &str,
-    _stream_name: &str,
-    _records: Vec<serde_json::Value>,
-) -> Result<(), anyhow::Error> {
-    Ok(())
 }

@@ -38,10 +38,7 @@ use tonic::{Request, Response, Status, Streaming};
 use tracing::Instrument;
 #[cfg(feature = "enterprise")]
 use {
-    o2_enterprise::enterprise::{
-        common::config::get_config as get_o2_config,
-        search::{TaskStatus, query_manager::Registration},
-    },
+    o2_enterprise::enterprise::{common::config::get_config as get_o2_config, search::TaskStatus},
     search::utils::AsyncDefer,
     search_service::SEARCH_SERVER,
 };
@@ -381,20 +378,17 @@ async fn register_follower_task_status(
     if !is_super_cluster {
         return None;
     }
-    let registration = SEARCH_SERVER
-        .insert_or_join(
+    SEARCH_SERVER
+        .insert(
             org_id,
             trace_id.to_string(),
             TaskStatus::new_follower(vec![], false),
         )
         .await;
-    if registration == Registration::Joined {
-        return None;
-    }
     let org_id = org_id.to_string();
     let trace_id = trace_id.to_string();
     Some(AsyncDefer::new(async move {
-        SEARCH_SERVER.remove_follower(&org_id, &trace_id).await;
+        SEARCH_SERVER.remove(&org_id, &trace_id).await;
     }))
 }
 
