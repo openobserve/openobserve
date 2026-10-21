@@ -1023,7 +1023,7 @@ describe("pa gap fixes (scope bar and Exclusions drawer)", { timeout: 20000 }, (
     await new Promise((r) => setTimeout(r, 30));
     for (let i = 0; i < 5; i++) await flushPromises();
   };
-  // A fixed wait loses the race on a slow runner: Save chains a PUT, a settings read and a summary re-run.
+  // Save chains a PUT, a settings read and a summary re-run, so tests wait on the outcome, never on the clock.
   const until = (check: () => void) => vi.waitFor(check, { timeout: 10000, interval: 20 });
 
   const mountAt = async (path: string, real = false) => {
@@ -1395,9 +1395,10 @@ describe("pa gap fixes (scope bar and Exclusions drawer)", { timeout: 20000 }, (
     await until(() => expect(searchCount(/va_rows/)).toBe(before + 1));
     const summaries = searchCount(/va_rows/);
     await saveDrawer(d);
+    await answered(/va_rows/);
     const scope = useProductAnalytics().scope.value as unknown as { exclusions: unknown };
     expect(scope.exclusions).toMatchObject({ bots: false, rulesHash: "fedcba9876543210" });
-    await until(() => expect(searchCount(/va_rows/)).toBeGreaterThan(summaries));
+    expect(searchCount(/va_rows/)).toBeGreaterThan(summaries);
     expect(settingsApi.getAppSettings.mock.calls.length).toBeGreaterThan(reads);
     expect(searchCount(/AS app, COUNT/)).toBe(probes);
   });
@@ -1518,8 +1519,8 @@ describe("pa gap fixes (scope bar and Exclusions drawer)", { timeout: 20000 }, (
     await until(() => expect(searchCount(/va_rows/)).toBe(before + 1));
     const summaries = searchCount(/va_rows/);
     await saveDrawer(d);
-    await until(() => expect(searchCount(/va_rows/)).toBeGreaterThan(summaries));
     await answered(/va_rows/);
+    expect(searchCount(/va_rows/)).toBeGreaterThan(summaries);
     expect(settingsApi.putAppSettings).toHaveBeenCalledTimes(1);
     expect(uaSearches()).toBe(1);
     await useProductAnalytics().refresh();
