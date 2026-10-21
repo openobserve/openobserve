@@ -617,6 +617,7 @@ export const fleetMock: FleetApi = {
     reply({
       collectors: {
         total: store.collectors.length,
+        unknown: store.collectors.filter((c) => c.status === "unknown").length,
         online: store.collectors.filter((c) => c.status === "online").length,
         degraded: store.collectors.filter((c) => c.status === "degraded").length,
         offline: store.collectors.filter((c) => c.status === "offline").length,

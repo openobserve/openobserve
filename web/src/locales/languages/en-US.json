@@ -25008,10 +25008,10 @@
     "addCollector": "Add collector",
     "tabs": {
       "collectors": "Collectors",
+      "overview": "Overview",
       "fleets": "Fleets",
       "configurations": "Configurations",
-      "settings": "Settings",
-      "pipelines": "Pipelines"
+      "settings": "Settings"
     },
     "common": {
       "actions": "Actions",
@@ -25034,7 +25034,8 @@
       "offline": "Offline",
       "degraded": "Degraded",
       "outdated": "Outdated",
-      "unknown": "Not reported"
+      "unknown": "Not reported",
+      "activeRollouts": "Active rollouts"
     },
     "badge": {
       "inProgress": "In progress",

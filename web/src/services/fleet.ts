@@ -101,6 +101,7 @@ export interface FleetCollectorDetail extends FleetCollector {
 
 export interface FleetStatusCounts {
   total: number;
+  unknown: number;
   online: number;
   degraded: number;
   offline: number;
