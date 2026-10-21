@@ -53,6 +53,7 @@ vi.mock("vue-i18n", () => ({
         "dashboard.queryValues": "Query Values",
         "dashboard.constant": "Constant",
         "dashboard.textbox": "Textbox",
+        "dashboard.date": "Date",
         "dashboard.custom": "Custom",
       };
       return translations[key] || key;
@@ -255,6 +256,7 @@ describe("AddSettingVariable", () => {
         { label: "Query Values", value: "query_values" },
         { label: "Constant", value: "constant" },
         { label: "Textbox", value: "textbox" },
+        { label: "Date", value: "date" },
         { label: "Custom", value: "custom" },
       ];
       expect(wrapper.vm.variableTypes).toEqual(expectedTypes);
@@ -282,6 +284,36 @@ describe("AddSettingVariable", () => {
       expect(wrapper.find('[data-test="dashboard-variable-textbox-default-value"]').exists()).toBe(
         true,
       );
+
+      // Test date type
+      wrapper.vm.variableData.type = "date";
+      await nextTick();
+
+      expect(wrapper.find('[data-test="dashboard-variable-date-default-value"]').exists()).toBe(
+        true,
+      );
+    });
+
+    it("should keep a valid YYYY-MM-DD value when switching textbox to date", async () => {
+      wrapper.vm.variableData.type = "textbox";
+      wrapper.vm.variableData.value = "2026-01-31";
+      await nextTick();
+      wrapper.vm.variableData.type = "date";
+      await nextTick();
+      await nextTick();
+
+      expect(wrapper.vm.variableData.value).toBe("2026-01-31");
+    });
+
+    it("should clear a non-date value when switching textbox to date", async () => {
+      wrapper.vm.variableData.type = "textbox";
+      wrapper.vm.variableData.value = "not a date";
+      await nextTick();
+      wrapper.vm.variableData.type = "date";
+      await nextTick();
+      await nextTick();
+
+      expect(wrapper.vm.variableData.value).toBe("");
     });
   });
 

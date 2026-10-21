@@ -402,6 +402,10 @@ export default defineComponent({
         value: "textbox",
       },
       {
+        label: t("dashboard.date"),
+        value: "date",
+      },
+      {
         label: t("dashboard.custom"),
         value: "custom",
       },

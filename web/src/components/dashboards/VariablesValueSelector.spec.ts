@@ -17,6 +17,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
 import { nextTick, reactive } from "vue";
 import VariablesValueSelector from "./VariablesValueSelector.vue";
+import ODate from "@/lib/forms/Date/ODate.vue";
 
 // Mock external dependencies
 vi.mock("vue-i18n", () => ({
@@ -3018,6 +3019,77 @@ describe("VariablesValueSelector", () => {
       endStream();
       await nextTick();
       expect(state.isVariablePartialLoaded).toBe(false);
+    });
+  });
+
+  describe("Date variable", () => {
+    const dateConfig = {
+      list: [
+        { name: "from_date", type: "date", label: "From", value: "2026-01-01" },
+        { name: "to_date", type: "date", label: "To", value: "" },
+      ],
+    };
+
+    it("should render ODate and fall back to the default value", async () => {
+      wrapper = createWrapper({
+        variablesConfig: dateConfig,
+        initialVariableValues: { value: {} },
+      });
+      await nextTick();
+
+      const vm = wrapper.vm as any;
+      expect(vm.variablesData.values.find((v: any) => v.name === "from_date").value).toBe(
+        "2026-01-01",
+      );
+      expect(wrapper.findAllComponents(ODate)).toHaveLength(2);
+      // label inside the border, like the textbox and select variables next to it
+      expect(wrapper.findAllComponents(ODate)[0].props("labelPosition")).toBe("inside");
+      expect(wrapper.find('[data-test="variable-selector-from_date"]').exists()).toBe(true);
+    });
+
+    it("should prefer the initial value over the default", async () => {
+      wrapper = createWrapper({
+        variablesConfig: dateConfig,
+        initialVariableValues: { value: { from_date: "2026-02-02" } },
+      });
+      await nextTick();
+
+      const vm = wrapper.vm as any;
+      expect(vm.variablesData.values.find((v: any) => v.name === "from_date").value).toBe(
+        "2026-02-02",
+      );
+    });
+
+    it("should update the variable value when the date changes", async () => {
+      wrapper = createWrapper({
+        variablesConfig: dateConfig,
+        initialVariableValues: { value: {} },
+      });
+      await nextTick();
+
+      wrapper.findAllComponents(ODate)[1].vm.$emit("update:modelValue", "2026-03-03");
+      await nextTick();
+
+      const vm = wrapper.vm as any;
+      expect(vm.variablesData.values.find((v: any) => v.name === "to_date").value).toBe(
+        "2026-03-03",
+      );
+    });
+
+    it("should load without running a query", async () => {
+      wrapper = createWrapper({
+        variablesConfig: dateConfig,
+        initialVariableValues: { value: {} },
+      });
+      await nextTick();
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      const vm = wrapper.vm as any;
+      expect(vm.variablesData.values.every((v: any) => v.isVariableLoadingPending !== true)).toBe(
+        true,
+      );
+      expect(vm.variablesData.isVariablesLoading).toBe(false);
+      expect(mockStreamingComposable.fetchQueryDataWithHttpStream).not.toHaveBeenCalled();
     });
   });
 });

@@ -74,6 +74,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:model-value="onVariablesValueUpdated(Number(index))"
         />
       </div>
+      <div v-else-if="item.type == 'date'" class="max-w-[40rem] min-w-37.5">
+        <ODate
+          v-show="!item.hideOnDashboard"
+          class="me-4 mt-1 w-37.5!"
+          v-model="item.value"
+          :label="item.label || item.name"
+          label-position="inside"
+          clearable
+          :data-test="`variable-selector-${item.name}`"
+          @update:model-value="onVariablesValueUpdated(Number(index))"
+        />
+      </div>
       <div v-else-if="item.type == 'custom'" class="max-w-[40rem] min-w-37.5">
         <VariableCustomValueSelector
           v-show="!item.hideOnDashboard"
@@ -129,6 +141,7 @@ import VariableCustomValueSelector from "./settings/VariableCustomValueSelector.
 import VariableAdHocValueSelector from "./settings/VariableAdHocValueSelector.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
+import ODate from "@/lib/forms/Date/ODate.vue";
 import { isInvalidDate } from "@/utils/date";
 import { addLabelsToSQlQuery } from "@/utils/query/sqlUtils";
 import { b64EncodeUnicode, escapeSingleQuotes, generateTraceContext } from "@/utils/zincutils";
@@ -198,6 +211,7 @@ export default defineComponent({
     VariableCustomValueSelector,
     OButton,
     OInput,
+    ODate,
   },
   setup(props: any, { emit }) {
     const store = useStore();
@@ -877,8 +891,8 @@ export default defineComponent({
             variableData.value = item.multiSelect ? [] : null;
           }
         } else if (item.type != "constant") {
-          // for textbox type variable, if initial value is not exist, use the default value
-          if (item.type == "textbox") {
+          // for textbox/date type variable, if initial value is not exist, use the default value
+          if (item.type == "textbox" || item.type == "date") {
             variableData.value = initialValue ?? variableData.value;
           } else {
             // use the initial value
@@ -1828,6 +1842,7 @@ export default defineComponent({
         }
         case "constant":
         case "textbox":
+        case "date":
         case "dynamic_filters": {
           finalizePartialVariableLoading(variableObject, true, isInitialLoad);
           finalizeVariableLoading(variableObject, true);

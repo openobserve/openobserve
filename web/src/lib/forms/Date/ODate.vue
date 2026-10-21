@@ -42,6 +42,7 @@ const wrapperAttrs = computed(() => {
 
 const props = withDefaults(defineProps<DateProps>(), {
   size: "md",
+  labelPosition: "outside",
   disabled: false,
   readonly: false,
   clearable: false,
@@ -53,6 +54,9 @@ defineSlots<DateSlots>();
 
 const _fallbackId = useId();
 const inputId = computed(() => props.id ?? _fallbackId);
+
+// Inside-label mode: the label floats inside the field border, like OInput's
+const isInsideLabel = computed(() => props.labelPosition === "inside" && !!props.label);
 
 const effectiveError = computed(() => props.errorMessage || (props.error ? " " : null) || null);
 const hasError = computed(() => !!effectiveError.value);
@@ -138,13 +142,14 @@ const wrapperClasses = computed(() => [
   "focus-within:ring-[0.125rem] focus-within:ring-focus-ring-accent",
   props.disabled ? "bg-datepicker-disabled-bg border-datepicker-disabled-border opacity-60" : "",
   heightClasses[props.size ?? "md"],
+  isInsideLabel.value ? "relative" : "",
 ]);
 </script>
 
 <template>
   <div v-bind="wrapperAttrs" class="flex w-full flex-col gap-1">
     <label
-      v-if="$slots.label || label || $slots.tooltip"
+      v-if="($slots.label || label || $slots.tooltip) && !isInsideLabel"
       :for="inputId"
       :class="[
         'o-input-label text-compact flex items-center gap-1 leading-tight',
@@ -183,6 +188,14 @@ const wrapperClasses = computed(() => [
         @focusin="onFocusIn"
         @focusout="onFocusOut"
       >
+        <!-- Inside label: floating mini-label at the top of the border, above the date text -->
+        <label
+          v-if="isInsideLabel"
+          :for="inputId"
+          class="text-2xs text-text-secondary pointer-events-none absolute start-9 end-3 top-1 overflow-hidden leading-none font-medium text-ellipsis whitespace-nowrap select-none"
+          >{{ label }}<span v-if="required" aria-hidden="true">&nbsp;*</span></label
+        >
+
         <!-- Calendar trigger (calendar icon) -->
         <DatePickerTrigger
           class="text-datepicker-icon flex shrink-0 cursor-pointer items-center ps-3 outline-none disabled:cursor-not-allowed"
@@ -198,7 +211,8 @@ const wrapperClasses = computed(() => [
           :class="[
             'flex min-w-0 flex-1 items-center gap-px ps-2 outline-none',
             clearable ? 'pe-2' : 'pe-3',
-            heightClasses[size ?? 'md'],
+            // Inside-label: push the date down to leave room for the floating mini-label
+            isInsideLabel ? 'h-8.5 pt-3 pb-0.5 text-xs font-semibold' : heightClasses[size ?? 'md'],
           ]"
         >
           <template #default="{ segments }">

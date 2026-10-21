@@ -7600,6 +7600,7 @@
     "queryValues": "Query Values",
     "constant": "Constant",
     "textbox": "Textbox",
+    "date": "Date",
     "newFolder": "New Folder",
     "updateFolder": "Update Folder",
     "newReport": "New Report",
