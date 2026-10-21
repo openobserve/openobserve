@@ -17,73 +17,73 @@ import { describe, it, expect } from "vitest";
 import { mount } from "@vue/test-utils";
 import { raw } from "@/types/i18n";
 import FleetFlowEdge from "./FleetFlowEdge.vue";
+import type { FleetFlowEdgeData } from "./flowTypes";
+
+const mountEdge = (data: FleetFlowEdgeData) =>
+  mount(FleetFlowEdge, {
+    props: {
+      id: "e1",
+      sourceX: 100,
+      sourceY: 50,
+      targetX: 300,
+      targetY: 80,
+      sourcePosition: "right" as any,
+      targetPosition: "left" as any,
+      data,
+    },
+    attachTo: document.body,
+    global: { stubs: { EdgeLabelRenderer: { template: "<div><slot /></div>" } } },
+  });
+
+const line = (w: ReturnType<typeof mountEdge>) => w.find('[data-test="fleet-flow-edge-e1"]');
 
 describe("FleetFlowEdge", () => {
-  it("opens the edge from a label click, through the edge's own click target", async () => {
-    const wrapper = mount(FleetFlowEdge, {
-      props: {
-        id: "a->d",
-        sourceX: 100,
-        sourceY: 50,
-        targetX: 300,
-        targetY: 80,
-        sourcePosition: "right" as any,
-        targetPosition: "left" as any,
-        data: { severity: "error", sourceLabel: raw("v1"), targetLabel: raw("2 items/s") },
-      },
-      attachTo: document.body,
-      global: { stubs: { EdgeLabelRenderer: { template: "<div><slot /></div>" } } },
+  it("colours a line by its signal and sizes it by the given width", () => {
+    const wrapper = mountEdge({ signal: "traces", width: 6 });
+    expect(line(wrapper).classes()).toContain("stroke-signal-traces");
+    expect(line(wrapper).attributes("stroke-width")).toBe("6");
+    expect(line(wrapper).attributes("stroke-dasharray")).toBeUndefined();
+    wrapper.unmount();
+  });
+
+  it("draws a failure branch dashed in the danger colour, never in the signal colour", () => {
+    const wrapper = mountEdge({
+      signal: "logs",
+      width: 3,
+      branch: true,
+      label: raw("Send failed 18%"),
     });
+    expect(line(wrapper).classes()).toContain("stroke-status-error-text");
+    expect(line(wrapper).classes()).not.toContain("stroke-signal-logs");
+    expect(line(wrapper).attributes("stroke-dasharray")).toBe("6 4");
+    expect(wrapper.find('[data-test="fleet-flow-edge-e1-label"]').text()).toBe("Send failed 18%");
+    wrapper.unmount();
+  });
+
+  it("thickens a highlighted line and fades a dimmed or unmeasured one", () => {
+    let wrapper = mountEdge({ signal: "logs", width: 2, highlighted: true });
+    expect(line(wrapper).attributes("stroke-width")).toBe("3.5");
+    wrapper.unmount();
+    wrapper = mountEdge({ signal: "logs", width: 2, dimmed: true });
+    expect(line(wrapper).classes()).toContain("opacity-15");
+    wrapper.unmount();
+    wrapper = mountEdge({ signal: "logs", width: 1.5, noData: true });
+    expect(line(wrapper).classes()).toContain("opacity-40");
+    wrapper.unmount();
+  });
+
+  it("opens the edge from a label click, through the edge's own click target", async () => {
+    const wrapper = mountEdge({ signal: "logs", width: 2, branch: true, label: raw("Dropped 2%") });
     const clicks: { x: number; y: number }[] = [];
     wrapper
-      .find('[data-test="fleet-flow-edge-a->d-hit"]')
+      .find('[data-test="fleet-flow-edge-e1-hit"]')
       .element.addEventListener("click", (e) =>
         clicks.push({ x: (e as MouseEvent).clientX, y: (e as MouseEvent).clientY }),
       );
     await wrapper
-      .find('[data-test="fleet-flow-edge-a->d-source-label"]')
+      .find('[data-test="fleet-flow-edge-e1-label"]')
       .trigger("click", { clientX: 40, clientY: 12 });
-    await wrapper
-      .find('[data-test="fleet-flow-edge-a->d-target-label"]')
-      .trigger("click", { clientX: 90, clientY: 30 });
-    expect(clicks).toEqual([
-      { x: 40, y: 12 },
-      { x: 90, y: 30 },
-    ]);
+    expect(clicks).toEqual([{ x: 40, y: 12 }]);
     wrapper.unmount();
-  });
-
-  it("caps each label at its half of the edge less the offset, truncating it and keeping the full text as its title", () => {
-    const label = raw("v12 reverted automatically");
-    const wrapper = mount(FleetFlowEdge, {
-      props: {
-        id: "a->d",
-        sourceX: 100,
-        sourceY: 50,
-        targetX: 300,
-        targetY: 80,
-        sourcePosition: "right" as any,
-        targetPosition: "left" as any,
-        data: { severity: "error", sourceLabel: label, targetLabel: raw("No throughput data") },
-      },
-      global: { stubs: { EdgeLabelRenderer: { template: "<div><slot /></div>" } } },
-    });
-    const el = wrapper.find('[data-test="fleet-flow-edge-a->d-source-label"]');
-    const target = wrapper.find('[data-test="fleet-flow-edge-a->d-target-label"]');
-    for (const [node, text] of [
-      [el, label],
-      [target, "No throughput data"],
-    ] as const) {
-      expect(node.classes()).toEqual(
-        expect.arrayContaining([
-          "truncate",
-          "max-w-[calc(var(--fleet-edge-half)-0.75rem)]",
-          "pointer-events-auto",
-          "z-10",
-        ]),
-      );
-      expect(node.attributes("style")).toContain("--fleet-edge-half: 100px");
-      expect(node.attributes("title")).toBe(text);
-    }
   });
 });

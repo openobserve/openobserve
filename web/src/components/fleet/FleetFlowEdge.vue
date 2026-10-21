@@ -17,9 +17,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <path
     :d="path[0]"
-    class="fill-none transition-[stroke,opacity]"
-    :class="[SEVERITY_STROKE[severity], data?.dimmed ? 'opacity-15' : '']"
+    class="fill-none transition-[stroke-width,opacity]"
+    :class="[
+      data?.branch ? 'stroke-status-error-text' : SIGNAL_STROKE[data?.signal ?? 'logs'],
+      data?.dimmed ? 'opacity-15' : data?.noData ? 'opacity-40' : '',
+    ]"
     :stroke-width="strokeWidth"
+    :stroke-dasharray="data?.branch ? '6 4' : undefined"
+    stroke-linecap="round"
+    :data-test="`fleet-flow-edge-${id}`"
   />
   <!-- Wide transparent twin: an easy click and hover target for a thin line. -->
   <path
@@ -31,35 +37,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <title v-if="data?.summary">{{ data.summary }}</title>
   </path>
-  <EdgeLabelRenderer v-if="data?.sourceLabel">
-    <!-- Vue Flow gives edge coordinates in px, so the label cap derived from them is px too. -->
+  <EdgeLabelRenderer v-if="data?.label">
+    <!-- Vue Flow gives edge coordinates in px, so the label offset derived from them is px too. -->
     <div
-      class="pointer-events-auto absolute top-0 left-0 z-10 max-w-[calc(var(--fleet-edge-half)-0.75rem)] [transform:var(--fleet-edge-at)] truncate text-xs font-medium whitespace-nowrap tabular-nums"
-      :class="[SEVERITY_TEXT[severity], data.dimmed ? 'opacity-30' : '']"
+      class="text-status-error-text pointer-events-auto absolute top-0 left-0 z-10 [transform:var(--fleet-edge-at)] text-xs font-medium whitespace-nowrap tabular-nums"
+      :class="data.dimmed ? 'opacity-30' : ''"
       :style="{
-        '--fleet-edge-at': `translate(0.75rem, -150%) translate(${sourceX}px, ${sourceY}px)`,
-        '--fleet-edge-half': `${Math.max(0, (targetX - sourceX) / 2)}px`,
+        '--fleet-edge-at': `translate(0.25rem, -50%) translate(${targetX}px, ${targetY}px)`,
       }"
-      :title="data.sourceLabel"
-      :data-test="`fleet-flow-edge-${id}-source-label`"
+      :data-test="`fleet-flow-edge-${id}-label`"
       @click="clickEdge"
     >
-      {{ data.sourceLabel }}
-    </div>
-  </EdgeLabelRenderer>
-  <EdgeLabelRenderer v-if="data?.targetLabel">
-    <div
-      class="pointer-events-auto absolute top-0 left-0 z-10 max-w-[calc(var(--fleet-edge-half)-0.75rem)] [transform:var(--fleet-edge-at)] truncate text-xs font-medium whitespace-nowrap tabular-nums"
-      :class="[SEVERITY_TEXT[severity], data.dimmed ? 'opacity-30' : '']"
-      :style="{
-        '--fleet-edge-at': `translate(calc(-100% - 0.75rem), -150%) translate(${targetX}px, ${targetY}px)`,
-        '--fleet-edge-half': `${Math.max(0, (targetX - sourceX) / 2)}px`,
-      }"
-      :title="data.targetLabel"
-      :data-test="`fleet-flow-edge-${id}-target-label`"
-      @click="clickEdge"
-    >
-      {{ data.targetLabel }}
+      {{ data.label }}
     </div>
   </EdgeLabelRenderer>
 </template>
@@ -68,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, ref } from "vue";
 import { EdgeLabelRenderer, getBezierPath, type Position } from "@vue-flow/core";
 import type { FleetFlowEdgeData } from "./flowTypes";
-import { SEVERITY_STROKE, SEVERITY_TEXT } from "./flowIssues";
+import { SIGNAL_STROKE } from "./flowIssues";
 
 const props = defineProps<{
   id: string;
@@ -83,9 +72,8 @@ const props = defineProps<{
 
 const hitEl = ref<SVGPathElement | null>(null);
 
-const severity = computed(() => props.data?.severity ?? "healthy");
 const strokeWidth = computed(() => {
-  const base = severity.value === "healthy" || severity.value === "restricted" ? 1.5 : 3;
+  const base = props.data?.width ?? 1.5;
   return props.data?.highlighted ? base + 1.5 : base;
 });
 

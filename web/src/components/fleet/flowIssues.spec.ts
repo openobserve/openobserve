@@ -19,7 +19,11 @@ import { defineComponent } from "vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import { queryClient } from "@/composables/query/queryClient";
-import fleet, { type FleetFlowLink } from "@/services/fleet";
+import fleet, {
+  type FleetCollector,
+  type FleetPipeline,
+  type FleetRollout,
+} from "@/services/fleet";
 import { apiCollector, apiRollout } from "./fleet.fixtures";
 import { raw } from "@/types/i18n";
 import { useFlowIssues } from "./flowIssues";
@@ -38,14 +42,29 @@ const DAY = 24 * 3600_000;
 const collector = apiCollector;
 const rollout = apiRollout;
 
-const link = (over: Partial<FleetFlowLink> = {}): FleetFlowLink => ({
-  config: "edge",
-  destination: "d_3b9c0e5a1f2d4c67",
-  exporters: ["otlphttp/o2"],
-  rate: { logs: 10, metrics: 5, traces: null },
+const pipeline = (over: Partial<FleetPipeline> = {}): FleetPipeline => ({
+  id: "default/logs",
+  fleet: "default",
+  name: "logs",
+  signal: "logs",
+  receivers: [
+    { name: "filelog", rate: 10, refused: 0 },
+    { name: "otlp", rate: 5, refused: 3 },
+  ],
+  exporters: [
+    { name: "otlphttp/o2", destination: "d_o2", rate: 10, failed: 0, dropped: 0, queue: 0.1 },
+    { name: "kafka/bus", destination: "d_bus", rate: 5, failed: 4, dropped: 2, queue: 0.9 },
+  ],
+  in_rate: 15,
+  out_rate: 15,
+  failed_ratio: 0.2,
+  dropped_ratio: 0.1,
+  queue_ratio: 0.9,
   issues: [],
   ...over,
 });
+
+const label = (id: string) => raw(id === "d_bus" ? "kafka.acme.io" : "o2.acme.io");
 
 function serve(collectors: FleetCollector[], rollouts: FleetRollout[] = []) {
   vi.mocked(fleet.listCollectors).mockResolvedValue({
@@ -79,84 +98,52 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-describe("flow map link issues", () => {
-  const issues: FleetFlowLink["issues"] = [
+describe("pipeline issues", () => {
+  const issues: FleetPipeline["issues"] = [
     { kind: "export_errors", signal: "logs", value: 0.021 },
-    { kind: "dropped", signal: "metrics", value: 72 },
-    { kind: "backpressure", signal: "traces", value: 0.92 },
+    { kind: "dropped", signal: "logs", value: 72 },
+    { kind: "backpressure", signal: "logs", value: 0.92 },
+    { kind: "receiver_refused", signal: "logs", value: 0.2 },
   ];
 
-  it("keeps only the selected signal's issues and names the destination label", async () => {
+  it("words each issue kind with its value and severity, ids unique per pipeline", async () => {
     serve([]);
     const api = await mountIssues();
-    const out = api.pathIssues(link({ issues }), "logs", raw("o2.acme.io"));
-    expect(out.map((i) => i.id)).toEqual(["edge-logs-export_errors"]);
-    expect(out[0].evidence).toContain("o2.acme.io");
-    expect(out[0].evidence).not.toContain("d_");
-  });
-
-  it("keeps every signal's issues under all, with ids unique per signal", async () => {
-    serve([]);
-    const api = await mountIssues();
-    const both: FleetFlowLink["issues"] = [
-      ...issues,
-      { kind: "export_errors", signal: "metrics", value: 0.5 },
-    ];
-    const out = api.pathIssues(link({ issues: both }), "all", raw("o2.acme.io"));
-    expect(out.map((i) => i.id)).toEqual([
-      "edge-logs-export_errors",
-      "edge-metrics-dropped",
-      "edge-traces-backpressure",
-      "edge-metrics-export_errors",
+    const out = api.pipelineIssues(pipeline({ issues }), label);
+    expect(out.map((i) => [i.id, i.severity, String(i.title)])).toEqual([
+      ["default/logs-export_errors", "error", "Logs: 2.1% export failures"],
+      ["default/logs-dropped", "error", "72 records/min dropped"],
+      ["default/logs-backpressure", "warning", "Logs: queue at 92% (backpressure)"],
+      ["default/logs-receiver_refused", "warning", "Logs: 20% refused by receivers"],
     ]);
   });
 
-  it("names the signal so the same kind on two signals reads differently", async () => {
+  it("points the evidence at the worst exporter or receiver by its label, never its id", async () => {
     serve([]);
     const api = await mountIssues();
-    const twin: FleetFlowLink["issues"] = [
-      { kind: "export_errors", signal: "logs", value: 0.1 },
-      { kind: "export_errors", signal: "metrics", value: 0.1 },
-      { kind: "backpressure", signal: "logs", value: 0.8 },
-      { kind: "backpressure", signal: "traces", value: 0.8 },
-    ];
-    const out = api.pathIssues(link({ issues: twin }), "all", raw("o2.acme.io"));
-    expect(out.map((i) => i.title)).toEqual([
-      "Logs: 10% export failures",
-      "Metrics: 10% export failures",
-      "Logs: queue at 80% (backpressure)",
-      "Traces: queue at 80% (backpressure)",
+    const out = api.pipelineIssues(pipeline({ issues }), label);
+    expect(out.slice(0, 3).map((i) => String(i.evidence))).toEqual([
+      "Reported by the exporter to kafka.acme.io",
+      "Reported by the exporter to kafka.acme.io",
+      "Reported by the exporter to kafka.acme.io",
     ]);
+    expect(out[3].evidence).toBe("Refused by the otlp receiver");
+    expect(out.some((i) => String(i.evidence).includes("d_"))).toBe(false);
   });
 
-  it("words each issue kind with its value and severity", async () => {
+  it("sends a pipeline issue to the collectors of its fleet", async () => {
     serve([]);
     const api = await mountIssues();
-    const label = raw("o2.acme.io");
-    const [errors] = api.pathIssues(link({ issues }), "logs", label);
-    expect(errors.title).toBe("Logs: 2.1% export failures");
-    expect(errors.severity).toBe("error");
-    const [dropped] = api.pathIssues(link({ issues }), "metrics", label);
-    expect(dropped.title).toBe("72 points/min dropped");
-    expect(dropped.severity).toBe("error");
-    const [queue] = api.pathIssues(link({ issues }), "traces", label);
-    expect(queue.title).toBe("Traces: queue at 92% (backpressure)");
-    expect(queue.severity).toBe("warning");
-  });
-
-  it("sends a link issue to the collectors of its config", async () => {
-    serve([]);
-    const api = await mountIssues();
-    const [issue] = api.pathIssues(link({ issues }), "logs", raw("o2.acme.io"));
-    expect(issue.action).toEqual({ kind: "collectors", query: { q: "edge" } });
+    const [issue] = api.pipelineIssues(pipeline({ issues }), label);
+    expect(issue.action).toEqual({ kind: "collectors", query: { fleet: "default" } });
   });
 });
 
-describe("flow map config issues", () => {
+describe("fleet issues", () => {
   it("shows an in-progress rollout as progress", async () => {
     serve([], [rollout({ status: "in_progress", attempted: 0 })]);
     const api = await mountIssues();
-    const [issue] = api.configIssues("edge");
+    const [issue] = api.fleetIssues("default");
     expect(issue.severity).toBe("progress");
     expect(issue.action).toEqual({ kind: "rollout", rolloutId: "r1" });
   });
@@ -164,27 +151,27 @@ describe("flow map config issues", () => {
   it("shows a halted rollout within 3 days as an error and an older one as nothing", async () => {
     serve([], [rollout({ status: "halted", started_at: Date.now() - DAY })]);
     let api = await mountIssues();
-    const [issue] = api.configIssues("edge");
+    const [issue] = api.fleetIssues("default");
     expect(issue.severity).toBe("error");
     expect(String(issue.title)).toBe("v2 rollout halted");
     wrapper?.unmount();
     queryClient.clear();
     serve([], [rollout({ status: "halted", started_at: Date.now() - 4 * DAY })]);
     api = await mountIssues();
-    expect(api.configIssues("edge")).toEqual([]);
+    expect(api.fleetIssues("default")).toEqual([]);
   });
 
   it("shows an auto-reverted rollout as an error, and one a user superseded as nothing", async () => {
     serve([], [rollout({ status: "reverted", auto_revert: true })]);
     let api = await mountIssues();
-    const [issue] = api.configIssues("edge");
+    const [issue] = api.fleetIssues("default");
     expect(issue.severity).toBe("error");
     expect(String(issue.title)).toBe("v2 reverted automatically");
     wrapper?.unmount();
     queryClient.clear();
     serve([], [rollout({ status: "superseded" })]);
     api = await mountIssues();
-    expect(api.configIssues("edge")).toEqual([]);
+    expect(api.fleetIssues("default")).toEqual([]);
   });
 
   it("explains a halted rollout with its halt class and reason", async () => {
@@ -196,7 +183,7 @@ describe("flow map config issues", () => {
     };
     serve([], [rollout({ status: "halted", halt })]);
     const api = await mountIssues();
-    const [issue] = api.configIssues("edge");
+    const [issue] = api.fleetIssues("default");
     expect(issue.severity).toBe("error");
     expect(issue.evidence).toBe("Proven bad: 1 collector rejected");
     expect(issue.action).toEqual({ kind: "rollout", rolloutId: "r1" });
@@ -205,20 +192,20 @@ describe("flow map config issues", () => {
   it("informs on outdated collectors and never mentions drift", async () => {
     serve([
       collector({ id: "c3", name: "old", outdated: true }),
-      collector({ id: "c4", config: "other", outdated: true }),
+      collector({ id: "c4", fleet: { id: "other", name: "other" }, outdated: true }),
     ]);
     const api = await mountIssues();
-    const out = api.configIssues("edge");
+    const out = api.fleetIssues("default");
     expect(out.map((i) => [i.id, i.severity])).toEqual([["behind", "info"]]);
     expect(out[0].title).toBe("1 collector older than the target version");
     expect(out[0].evidence).toBe("Older than the target version: old");
   });
 
-  it("sends offline collectors to the collectors of that config", async () => {
+  it("sends offline collectors to the offline collectors of that fleet", async () => {
     serve([collector({ id: "c2", status: "offline" })]);
     const api = await mountIssues();
-    expect(api.configIssues("edge").map((i) => i.action)).toEqual([
-      { kind: "collectors", query: { q: "edge" } },
+    expect(api.fleetIssues("default").map((i) => i.action)).toEqual([
+      { kind: "collectors", query: { fleet: "default", status: "offline" } },
     ]);
   });
 
@@ -226,11 +213,11 @@ describe("flow map config issues", () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     serve([collector({ status: "online" })], [rollout()]);
     const api = await mountIssues();
-    expect(api.configIssues("edge")).toEqual([]);
+    expect(api.fleetIssues("default")).toEqual([]);
     serve([collector({ status: "offline" })], [rollout()]);
     await vi.advanceTimersByTimeAsync(15_000);
     await flushPromises();
-    expect(api.configIssues("edge").map((i) => i.id)).toEqual(["offline"]);
+    expect(api.fleetIssues("default").map((i) => i.id)).toEqual(["offline"]);
     wrapper?.unmount();
     wrapper = null;
     const calls = vi.mocked(fleet.listCollectors).mock.calls.length;

@@ -68,7 +68,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("fleet.flowIssues.noIssues") }}
       </div>
     </div>
-    <div class="border-border-default flex items-center gap-2 border-t px-4 py-2.5">
+    <div
+      v-if="!hideConfig"
+      class="border-border-default flex items-center gap-2 border-t px-4 py-2.5"
+    >
       <OButton
         variant="ghost"
         size="xs"
@@ -95,6 +98,8 @@ defineProps<{
   /** The caller may not read the metric streams behind a missing throughput. */
   restricted?: boolean;
   issues: PathIssue[];
+  /** Nothing to open, such as for a destination. */
+  hideConfig?: boolean;
 }>();
 const emit = defineEmits<{
   close: [];

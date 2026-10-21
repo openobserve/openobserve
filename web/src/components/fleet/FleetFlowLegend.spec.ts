@@ -28,4 +28,27 @@ describe("FleetFlowLegend", () => {
     expect(info).toContain("Outdated");
     expect(info).not.toContain("ring");
   });
+
+  it("shows the pipeline count per level, zero for a missing one, restricted only when present", () => {
+    const w = mount(FleetFlowLegend, {
+      props: { counts: { error: 1, healthy: 3 }, modelValue: null },
+      global: { plugins: [i18n] },
+    });
+    expect(w.find('[data-test="fleet-flow-legend-error"]').text()).toContain("1");
+    expect(w.find('[data-test="fleet-flow-legend-healthy"]').text()).toContain("3");
+    expect(w.find('[data-test="fleet-flow-legend-warning"]').text()).toContain("0");
+    expect(w.find('[data-test="fleet-flow-legend-restricted"]').exists()).toBe(false);
+  });
+
+  it("toggles a level filter on click", async () => {
+    const w = mount(FleetFlowLegend, {
+      props: { counts: { error: 1 }, modelValue: null },
+      global: { plugins: [i18n] },
+    });
+    await w.find('[data-test="fleet-flow-legend-error"]').trigger("click");
+    expect(w.emitted("update:modelValue")?.[0]).toEqual(["error"]);
+    await w.setProps({ modelValue: "error" });
+    await w.find('[data-test="fleet-flow-legend-error"]').trigger("click");
+    expect(w.emitted("update:modelValue")?.[1]).toEqual([null]);
+  });
 });

@@ -34,8 +34,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ? 'border-border-strong text-text-secondary bg-surface-base border-dashed'
           : data.selected
             ? 'border-accent bg-surface-base text-accent ring-accent/30 ring-2'
-            : 'border-border-default bg-surface-base text-text-heading hover:border-border-strong',
+            : data.ring && data.ring !== 'healthy' && data.ring !== 'restricted'
+              ? ['bg-surface-base text-text-heading', SEVERITY_RING[data.ring]]
+              : 'border-border-default bg-surface-base text-text-heading hover:border-border-strong',
       ]"
+      :data-test="`fleet-flow-node-${id}-box`"
     >
       <OIcon :name="data.icon" :size="data.compact ? 'sm' : 'md'" />
       <span
@@ -87,7 +90,7 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { raw } from "@/types/i18n";
 import type { FleetFlowNodeData } from "./flowTypes";
-import { SEVERITY_DOT } from "./flowIssues";
+import { SEVERITY_DOT, SEVERITY_RING } from "./flowIssues";
 
 defineProps<{ id: string; data: FleetFlowNodeData }>();
 </script>

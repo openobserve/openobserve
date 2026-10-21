@@ -25047,9 +25047,7 @@
       "reverted": "Reverted"
     },
     "flow": {
-      "configurations": "Configurations",
       "destinations": "Destinations",
-      "filterConfigs": "Filter by config name",
       "filterDestinations": "Filter by destination name",
       "showTop": "Show top {count}",
       "selectAll": "Select all",
@@ -25057,8 +25055,6 @@
       "logs": "Logs",
       "metrics": "Metrics",
       "traces": "Traces",
-      "collectorsBadge": "{count} collector | {count} collectors",
-      "emptyHint": "Select configurations and destinations to see how telemetry flows.",
       "noThroughputData": "No throughput data",
       "metricsRestricted": "No access to throughput metrics",
       "perSecond": {
@@ -25072,11 +25068,31 @@
         "metrics": "{value} points/min",
         "traces": "{value} spans/min"
       },
-      "noConfigs": "No configurations yet. Publish one and change a fleet's version to it to see where its telemetry goes.",
-      "loadFailed": "Could not load the telemetry flow",
-      "pathLabel": "{config} → {destination}",
       "expandMap": "Expand map",
       "collapseMap": "Collapse map"
+    },
+    "pipelines": {
+      "fleets": "Fleets",
+      "filterFleets": "Filter by fleet name",
+      "fleet": "Fleet",
+      "pipeline": "Pipeline",
+      "receivers": "Receivers",
+      "signal": "Signal",
+      "exporters": "Exporters",
+      "in": "In",
+      "out": "Out",
+      "failed": "Failed",
+      "queue": "Queue",
+      "fleetMeta": "v{version} · {count} collector | v{version} · {count} collectors",
+      "fleetMetaNoVersion": "No version · {count} collector | No version · {count} collectors",
+      "pipelineTitle": "{fleet} · {pipeline}",
+      "edgeSummary": "{from} → {to} · {rate}",
+      "sendFailed": "Send failed {value}",
+      "dropped": "Dropped {value}",
+      "fanOutNote": "Fan-out copies data to each exporter, so a line's width describes only itself.",
+      "noFleets": "No fleets yet. Enroll collectors into a fleet to see its pipelines.",
+      "emptyHint": "Select fleets and destinations to see their pipelines.",
+      "loadFailed": "Could not load the pipelines"
     },
     "collectors": {
       "search": "Search collectors in this fleet",
@@ -25563,13 +25579,14 @@
       "throughput": "Throughput {rate}",
       "noIssues": "No issues",
       "openConfig": "Open config",
-      "edgeSummary": "{path} · {rate} · {issues}",
       "issuesOnly": "Issues only",
       "legendError": "Error",
       "legendWarning": "Warning",
       "legendInfo": "Outdated",
       "legendProgress": "Rolling out",
-      "legendHealthy": "Healthy"
+      "legendHealthy": "Healthy",
+      "receiverRefused": "{signal}: {value} refused by receivers",
+      "receiverEvidence": "Refused by the {receiver} receiver"
     },
     "move": {
       "confirm": "Move",

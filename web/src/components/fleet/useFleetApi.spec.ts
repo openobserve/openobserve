@@ -22,7 +22,7 @@ import fleet, {
   type FleetCollector,
   type FleetCollectorDetail,
   type FleetConfigItem,
-  type FleetFlow,
+  type FleetPipelines,
   type FleetFlowWindow,
   type Fleet,
   type FleetRollout,
@@ -737,17 +737,27 @@ describe("useFleetSettings", () => {
 });
 
 describe("useFleetFlow", () => {
-  const flow = (window: FleetFlowWindow): FleetFlow => ({
+  const flow = (window: FleetFlowWindow): FleetPipelines => ({
     window,
     generated_at: 1791122400000,
     metrics_restricted: false,
+    fleets: [{ id: "edge", name: "edge", config: "base", version: 2, collectors: 3 }],
     destinations: [{ id: "d_1", type: "otlphttp", target: "https://o2.acme.io", exporter: null }],
-    links: [
+    pipelines: [
       {
-        config: "edge",
-        destination: "d_1",
-        exporters: ["otlphttp/o2"],
-        rate: { logs: 10, metrics: null, traces: null },
+        id: "edge/logs",
+        fleet: "edge",
+        name: "logs",
+        signal: "logs",
+        receivers: [{ name: "filelog", rate: 10, refused: 0 }],
+        exporters: [
+          { name: "otlphttp/o2", destination: "d_1", rate: 10, failed: 0, dropped: 0, queue: 0 },
+        ],
+        in_rate: 10,
+        out_rate: 10,
+        failed_ratio: 0,
+        dropped_ratio: 0,
+        queue_ratio: 0,
         issues: [],
       },
     ],

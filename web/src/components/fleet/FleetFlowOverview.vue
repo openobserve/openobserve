@@ -16,32 +16,83 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="rounded-surface border-border-default bg-surface-base grid min-h-0 flex-1 grid-cols-[16rem_minmax(0,1fr)_16rem] overflow-hidden border max-lg:grid-cols-1"
+    class="rounded-surface border-border-default bg-surface-base grid min-h-0 flex-1 grid-cols-[16rem_minmax(0,1fr)_16rem] overflow-hidden border max-lg:auto-rows-max max-lg:grid-cols-1 max-lg:overflow-y-auto"
     data-test="fleet-flow-overview"
   >
     <div
       class="border-border-default min-h-0 border-e max-lg:h-64 max-lg:border-e-0 max-lg:border-b"
     >
       <FleetFlowList
-        v-model="checkedConfigs"
-        list-id="configs"
-        :title="t('fleet.flow.configurations')"
-        :filter-placeholder="t('fleet.flow.filterConfigs')"
-        :items="configItems"
+        v-model="checkedFleets"
+        list-id="fleets"
+        :title="t('fleet.pipelines.fleets')"
+        :filter-placeholder="t('fleet.pipelines.filterFleets')"
+        :items="fleetItems"
       />
     </div>
 
     <div
       class="flex min-h-0 flex-col"
-      :class="expanded ? 'max-lg:h-dvh' : 'max-lg:h-112'"
+      :class="expanded ? 'max-lg:h-dvh' : ''"
       data-test="fleet-flow-overview-map"
     >
+      <div v-if="!forbidden" class="flex shrink-0 flex-col gap-2 p-3">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <div class="flex items-center gap-3">
+            <OToggleGroup
+              :model-value="telemetry"
+              mobile-dropdown
+              data-test="fleet-flow-overview-telemetry"
+              @update:model-value="(v) => (telemetry = v as FlowSignal)"
+            >
+              <OToggleGroupItem
+                v-for="opt in telemetryOptions"
+                :key="opt.value"
+                :value="opt.value"
+                size="sm"
+              >
+                {{ opt.label }}
+              </OToggleGroupItem>
+            </OToggleGroup>
+            <OSwitch
+              v-model="issuesOnly"
+              size="sm"
+              :label="t('fleet.flowIssues.issuesOnly')"
+              data-test="fleet-flow-overview-issues-only"
+            />
+          </div>
+          <div class="flex items-center gap-2">
+            <OToggleGroup
+              :model-value="timeWindow"
+              mobile-dropdown
+              data-test="fleet-flow-overview-window"
+              @update:model-value="(v) => (timeWindow = v as FlowWindow)"
+            >
+              <OToggleGroupItem v-for="w in windows" :key="w" :value="w" size="sm">
+                {{ raw(w) }}
+              </OToggleGroupItem>
+            </OToggleGroup>
+            <OButton
+              variant="outline"
+              size="icon-sm"
+              :icon-left="expanded ? 'close-fullscreen' : 'open-in-full'"
+              :aria-label="expandLabel"
+              data-test="fleet-flow-overview-expand"
+              @click="expanded = !expanded"
+            >
+              <OTooltip side="bottom" :content="expandLabel" />
+            </OButton>
+          </div>
+        </div>
+        <FleetFlowLegend v-model="severityFilter" class="self-start" :counts="legendCounts" />
+      </div>
+
       <OBanner
         v-if="loadError"
-        class="mx-3 mt-3"
+        class="mx-3 mb-3"
         variant="error"
         dense
-        :content="t('fleet.flow.loadFailed')"
+        :content="t('fleet.pipelines.loadFailed')"
         data-test="fleet-flow-overview-error"
       >
         <template #actions>
@@ -50,70 +101,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </template>
       </OBanner>
-      <div ref="canvasEl" class="relative min-h-0 flex-1">
+
+      <div
+        v-if="!forbidden && !expanded"
+        class="border-border-default flex h-56 min-h-0 shrink-0 flex-col border-y"
+      >
+        <FleetPipelineTable
+          :rows="tableRows"
+          :selected-id="selection?.kind === 'pipeline' ? selection.id : null"
+          :filtered="filtered"
+          :loading="loading"
+          @select="onRowSelect"
+          @retry="retry"
+          @clear-filters="clearFilters"
+        />
+      </div>
+
+      <div ref="canvasEl" class="relative min-h-0 flex-1 max-lg:min-h-112">
         <div
           v-if="forbidden"
           class="absolute inset-0 grid place-items-center"
           data-test="fleet-flow-overview-forbidden"
         >
           <OEmptyState size="block" preset="no-access" />
-        </div>
-        <div
-          v-else
-          class="pointer-events-none absolute inset-x-0 top-0 z-10 flex flex-col gap-2 p-3"
-        >
-          <div class="flex flex-wrap items-center justify-between gap-2">
-            <div class="pointer-events-auto flex items-center gap-3">
-              <OToggleGroup
-                :model-value="telemetry"
-                mobile-dropdown
-                data-test="fleet-flow-overview-telemetry"
-                @update:model-value="(v) => (telemetry = v as FlowSignal)"
-              >
-                <OToggleGroupItem
-                  v-for="opt in telemetryOptions"
-                  :key="opt.value"
-                  :value="opt.value"
-                  size="sm"
-                >
-                  {{ opt.label }}
-                </OToggleGroupItem>
-              </OToggleGroup>
-              <OSwitch
-                v-model="issuesOnly"
-                size="sm"
-                :label="t('fleet.flowIssues.issuesOnly')"
-                data-test="fleet-flow-overview-issues-only"
-              />
-            </div>
-            <div class="pointer-events-auto flex items-center gap-2">
-              <OToggleGroup
-                :model-value="timeWindow"
-                mobile-dropdown
-                data-test="fleet-flow-overview-window"
-                @update:model-value="(v) => (timeWindow = v as FlowWindow)"
-              >
-                <OToggleGroupItem v-for="w in windows" :key="w" :value="w" size="sm">
-                  {{ raw(w) }}
-                </OToggleGroupItem>
-              </OToggleGroup>
-              <OButton
-                variant="outline"
-                size="icon-sm"
-                :icon-left="expanded ? 'close-fullscreen' : 'open-in-full'"
-                :aria-label="expandLabel"
-                data-test="fleet-flow-overview-expand"
-                @click="expanded = !expanded"
-              >
-                <OTooltip side="bottom" :content="expandLabel" />
-              </OButton>
-            </div>
-          </div>
-          <FleetFlowLegend
-            v-model="severityFilter"
-            class="pointer-events-auto self-start"
-            :counts="legendCounts"
-          />
         </div>
 
         <VueFlow
@@ -144,6 +154,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #node-fleet="nodeProps">
             <FleetFlowNode :id="nodeProps.id" :data="nodeProps.data" />
           </template>
+          <template #node-sink>
+            <div class="relative size-1">
+              <Handle
+                type="target"
+                :position="Position.Left"
+                :connectable="false"
+                class="opacity-0"
+              />
+            </div>
+          </template>
           <template #edge-fleet="edgeProps">
             <FleetFlowEdge v-bind="edgeProps" />
           </template>
@@ -161,22 +181,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :throughput="details.throughput"
             :restricted="metricsRestricted"
             :issues="details.issues"
+            :hide-config="!details.configId"
             class="max-h-112"
             @close="selection = null"
             @action="runAction"
-            @open-config="openConfig(details.configId)"
+            @open-config="details.configId && openConfig(details.configId)"
           />
         </div>
 
         <div
-          v-if="noConfigs"
+          v-if="noFleets"
           class="absolute inset-0 grid place-items-center"
-          data-test="fleet-flow-overview-no-configs"
+          data-test="fleet-flow-overview-no-fleets"
         >
           <OEmptyState
             size="block"
             preset="no-data"
-            :description="t('fleet.flow.noConfigs')"
+            :description="t('fleet.pipelines.noFleets')"
             hide-action
           />
         </div>
@@ -188,13 +209,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OEmptyState
             size="block"
             preset="no-data"
-            :description="t('fleet.flow.emptyHint')"
+            :description="t('fleet.pipelines.emptyHint')"
             hide-action
           />
         </div>
 
         <OInnerLoading :showing="loading" data-test="fleet-flow-overview-loading" />
       </div>
+      <p
+        v-if="!forbidden"
+        class="text-text-secondary border-border-default shrink-0 border-t px-3 py-2 text-xs"
+        data-test="fleet-flow-overview-note"
+      >
+        {{ t("fleet.pipelines.fanOutNote") }}
+      </p>
     </div>
 
     <div
@@ -214,6 +242,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import {
+  Handle,
+  Position,
   VueFlow,
   useVueFlow,
   type Edge,
@@ -223,6 +253,7 @@ import {
 } from "@vue-flow/core";
 import { Background, BackgroundVariant } from "@vue-flow/background";
 import "@vue-flow/core/dist/style.css";
+import { useRoute, useRouter } from "vue-router";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -230,29 +261,32 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
-import type { FleetFlowLink } from "@/services/fleet";
-import { FLOW_POLL_MS } from "@/services/fleet.queries";
+import type { FleetPipeline, FleetPipelineFleet } from "@/services/fleet";
 import FleetFlowList, { type FlowListItem } from "./FleetFlowList.vue";
 import FleetFlowNode from "./FleetFlowNode.vue";
 import FleetFlowEdge from "./FleetFlowEdge.vue";
 import FleetFlowLegend from "./FleetFlowLegend.vue";
 import FleetFlowDetails from "./FleetFlowDetails.vue";
-import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
-import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import FleetPipelineTable, { type PipelineRow } from "./FleetPipelineTable.vue";
 import type { FleetTab } from "./fleetRoute";
-import { useRoute, useRouter } from "vue-router";
 import {
   useFlowIssues,
   worstSeverity,
+  percent,
+  ratio,
   SEVERITY_ORDER,
   type IssueAction,
+  type PathIssue,
   type PathSeverity,
 } from "./flowIssues";
 import type { FleetFlowEdgeData, FleetFlowNodeData, FlowSignal, FlowWindow } from "./flowTypes";
+import { buildPipelineMap, strokeWidth, type MapEdge, type MapNode } from "./pipelineGraph";
 import { formatCount } from "./fleetFormat";
-import { useFleetConfigs, useFleetFlow } from "./useFleetApi";
+import { useFleetFlow } from "./useFleetApi";
 
 const emit = defineEmits<{
   navigate: [tab: FleetTab, query: Record<string, string>];
@@ -275,13 +309,19 @@ const DESTINATION_ICON: Record<string, IconName> = {
   awss3: "inventory-2",
 };
 
+const COLUMN_ICON: Record<string, IconName> = { f: "dns", r: "input", e: "send" };
+
+// An exporter failing at least this share of its items, or a receiver refusing it, is rung like its issue.
+const ISSUE_RATIO = 0.01;
+const QUEUE_WARNING = 0.8;
+
 const { t } = useI18nTyped();
 const expandLabel = computed(() =>
   t(expanded.value ? "fleet.flow.collapseMap" : "fleet.flow.expandMap"),
 );
 const router = useRouter();
 const route = useRoute();
-const { configIssues, pathIssues, error: issuesError, refetch: refetchIssues } = useFlowIssues();
+const { fleetIssues, pipelineIssues, error: issuesError, refetch: refetchIssues } = useFlowIssues();
 
 const worstOf = (list: PathSeverity[]): PathSeverity =>
   SEVERITY_ORDER.find((s) => list.includes(s)) ??
@@ -292,9 +332,9 @@ const { setViewport } = useVueFlow(flowId);
 // SVG fill on the background dots, the one place a token is read by var().
 const dotColor = "var(--color-border-strong)";
 // Layout is in screen pixels at zoom 1: readable text beats fitting everything on screen.
-const ROW = 112;
-const TOP = 120;
-const NODE_HALF = 72;
+const ROW = 104;
+const TOP = 24;
+const NODE_WIDTH = 144;
 const POPOVER_GAP = 12;
 const POPOVER_MARGIN = 8;
 const canvasEl = ref<HTMLElement | null>(null);
@@ -311,55 +351,44 @@ const telemetryOptions = computed(() => [
   { value: "traces", label: t("fleet.flow.traces") },
 ]);
 
-const configsQuery = useFleetConfigs(() => true, FLOW_POLL_MS);
 const flowQuery = useFleetFlow(() => timeWindow.value);
 
-// The configs list is org-wide, but the flow and the counts cover only fleets the caller may read.
-const fleetConfigs = computed(() => {
-  const linked = new Set((flowQuery.flow.value?.links ?? []).map((l) => l.config));
-  return configsQuery.rows.value.filter(
-    (c) => !c.template && (c.collectors > 0 || linked.has(c.id)),
-  );
-});
-const flowLinks = computed(() => {
-  const shown = new Set(fleetConfigs.value.map((c) => c.id));
-  return (flowQuery.flow.value?.links ?? []).filter((l) => shown.has(l.config));
+const fleets = computed(() => flowQuery.flow.value?.fleets ?? []);
+const fleetById = computed(() => new Map(fleets.value.map((f) => [f.id, f])));
+const pipelines = computed(() => {
+  const order = new Map(fleets.value.map((f, i) => [f.id, i]));
+  return (flowQuery.flow.value?.pipelines ?? [])
+    .filter((p) => order.has(p.fleet))
+    .sort((a, b) => order.get(a.fleet)! - order.get(b.fleet)! || a.name.localeCompare(b.name));
 });
 const destinations = computed(() => {
-  const linked = new Set(flowLinks.value.map((l) => l.destination));
-  return (flowQuery.flow.value?.destinations ?? []).filter((d) => linked.has(d.id));
+  const used = new Set(pipelines.value.flatMap((p) => p.exporters.map((e) => e.destination)));
+  return (flowQuery.flow.value?.destinations ?? []).filter((d) => used.has(d.id));
 });
 
-const forbidden = computed(() => flowQuery.forbidden.value || configsQuery.forbidden.value);
+const forbidden = computed(() => flowQuery.forbidden.value);
 const loadError = computed(
-  () =>
-    !forbidden.value && !!(flowQuery.error.value || configsQuery.error.value || issuesError.value),
+  () => !forbidden.value && !!(flowQuery.error.value || issuesError.value),
 );
-const loading = computed(
-  () => !forbidden.value && (configsQuery.loading.value || flowQuery.loading.value),
-);
-const noConfigs = computed(
-  () =>
-    !forbidden.value &&
-    !configsQuery.loading.value &&
-    !loadError.value &&
-    fleetConfigs.value.length === 0,
+const loading = computed(() => !forbidden.value && flowQuery.loading.value);
+const noFleets = computed(
+  () => !forbidden.value && !loading.value && !loadError.value && fleets.value.length === 0,
 );
 
 function retry() {
   flowQuery.refetch();
-  configsQuery.refetch();
   refetchIssues();
 }
 
-// Stored as exclusions, so configurations and destinations that arrive later start checked.
-const excludedConfigs = ref<string[]>([]);
+defineExpose({ refresh: retry });
+
+// Stored as exclusions, so fleets and destinations that arrive later start checked.
+const excludedFleets = ref<string[]>([]);
 const excludedDestinations = ref<string[]>([]);
-const checkedConfigs = computed<string[]>({
-  get: () =>
-    fleetConfigs.value.map((c) => c.id).filter((id) => !excludedConfigs.value.includes(id)),
+const checkedFleets = computed<string[]>({
+  get: () => fleets.value.map((f) => f.id).filter((id) => !excludedFleets.value.includes(id)),
   set: (ids) => {
-    excludedConfigs.value = fleetConfigs.value.map((c) => c.id).filter((id) => !ids.includes(id));
+    excludedFleets.value = fleets.value.map((f) => f.id).filter((id) => !ids.includes(id));
   },
 });
 const checkedDestinations = computed<string[]>({
@@ -373,80 +402,154 @@ const checkedDestinations = computed<string[]>({
 });
 const issuesOnly = ref(false);
 const severityFilter = ref<PathSeverity | null>(null);
-const selection = ref<{ kind: "edge" | "node"; id: string } | null>(null);
+type Selection = { kind: "pipeline" | "fleet" | "node"; id: string };
+const selection = ref<Selection | null>(null);
 const popover = ref({ x: 0, y: 0 });
 const popoverEl = ref<HTMLElement | null>(null);
 
-// Under "all" a link is null only when every signal is null, so a measured zero still reads as zero.
-function linkRate(l: FleetFlowLink): number | null {
-  if (telemetry.value !== "all") return l.rate[telemetry.value];
-  const rates = [l.rate.logs, l.rate.metrics, l.rate.traces];
-  return rates.every((r) => r === null)
-    ? null
-    : rates.reduce<number>((sum, r) => sum + (r ?? 0), 0);
+const filtered = computed(
+  () =>
+    issuesOnly.value ||
+    !!severityFilter.value ||
+    telemetry.value !== "all" ||
+    excludedFleets.value.length > 0 ||
+    excludedDestinations.value.length > 0,
+);
+
+function clearFilters() {
+  issuesOnly.value = false;
+  severityFilter.value = null;
+  telemetry.value = "all";
+  excludedFleets.value = [];
+  excludedDestinations.value = [];
 }
-
-// Null only when every link is null, so a measured zero still reads as zero.
-function sumRates(links: FleetFlowLink[]): number | null {
-  const rates = links.map(linkRate).filter((r): r is number => r !== null);
-  return rates.length ? rates.reduce((sum, r) => sum + r, 0) : null;
-}
-
-const rateOf = (configId: string) => sumRates(flowLinks.value.filter((l) => l.config === configId));
-
-const destinationRate = (destId: string, onlyChecked = false) =>
-  sumRates(
-    flowLinks.value.filter(
-      (l) => l.destination === destId && (!onlyChecked || checkedConfigs.value.includes(l.config)),
-    ),
-  );
-
-const perSecond = (rate: number | null): I18nText | null =>
-  rate === null ? null : t(PER_SECOND[telemetry.value], { value: raw(formatCount(rate)) });
 
 // A null rate under restricted metrics means the user may not read it, not that nothing flowed.
 const metricsRestricted = computed(() => !!flowQuery.flow.value?.metrics_restricted);
-const rateText = (rate: number | null): I18nText =>
-  perSecond(rate) ??
+
+const perSecond = (rate: number | null, signal: FlowSignal = "all"): I18nText | null =>
+  rate === null ? null : t(PER_SECOND[signal], { value: raw(formatCount(rate)) });
+
+const rateText = (rate: number | null, signal: FlowSignal = "all"): I18nText =>
+  perSecond(rate, signal) ??
   (metricsRestricted.value ? t("fleet.flow.metricsRestricted") : t("fleet.flow.noThroughputData"));
 
-const destinationById = computed(() => new Map(destinations.value.map((d) => [d.id, d])));
+// Null only when every rate is null, so a measured zero still reads as zero.
+function sumRates(rates: (number | null)[]): number | null {
+  const known = rates.filter((r): r is number => r !== null);
+  return known.length ? known.reduce((sum, r) => sum + r, 0) : null;
+}
 
-// A config-scoped destination has exactly one link, so its config tells same-named exporters apart.
+const destinationById = computed(
+  () => new Map((flowQuery.flow.value?.destinations ?? []).map((d) => [d.id, d])),
+);
+
+// A destination without a target is fleet-scoped, so its fleet tells same-named exporters apart.
 function destinationLabel(id: string): I18nText {
   const d = destinationById.value.get(id);
   if (d?.target) return raw(d.target.replace(/^[a-z][a-z0-9+.-]*:\/\//i, ""));
-  const config = flowQuery.flow.value?.links.find((l) => l.destination === id)?.config;
-  return raw([d?.exporter, config].filter(Boolean).join(" · "));
+  const fleet = pipelines.value.find((p) => p.exporters.some((e) => e.destination === id))?.fleet;
+  return raw([d?.exporter, fleet].filter(Boolean).join(" · "));
 }
 
-const linkId = (l: FleetFlowLink) => `${l.config}->${l.destination}`;
-const linkPathIssues = (l: FleetFlowLink) =>
-  pathIssues(l, telemetry.value, destinationLabel(l.destination));
-const nodeIssues = computed(() =>
-  Object.fromEntries(fleetConfigs.value.map((c) => [c.id, configIssues(c.id)])),
+const fleetName = (id: string) => fleetById.value.get(id)?.name ?? id;
+
+function fleetMeta(f: FleetPipelineFleet | undefined): I18nText {
+  const count = f?.collectors ?? 0;
+  return f?.version != null
+    ? t("fleet.pipelines.fleetMeta", { version: f.version, count }, count)
+    : t("fleet.pipelines.fleetMetaNoVersion", { count }, count);
+}
+
+const fleetIssueMap = computed(() =>
+  Object.fromEntries(fleets.value.map((f) => [f.id, fleetIssues(f.id)])),
 );
-const linkSeverity = computed<Record<string, PathSeverity>>(() =>
+const issuesOf = (p: FleetPipeline): PathIssue[] => [
+  ...(fleetIssueMap.value[p.fleet] ?? []),
+  ...pipelineIssues(p, destinationLabel),
+];
+const severityOf = computed<Record<string, PathSeverity>>(() =>
   Object.fromEntries(
-    flowLinks.value.map((l) => {
-      const severity = worstSeverity(linkPathIssues(l));
-      return [
-        linkId(l),
-        severity === "healthy" && metricsRestricted.value ? "restricted" : severity,
-      ];
+    pipelines.value.map((p) => {
+      const severity = worstSeverity(issuesOf(p));
+      return [p.id, severity === "healthy" && metricsRestricted.value ? "restricted" : severity];
     }),
   ),
 );
 
-const configItems = computed<FlowListItem[]>(() =>
-  fleetConfigs.value.map((c) => ({
-    id: c.id,
-    label: raw(c.name),
-    rate: sourceLabel(c.id),
-    value: rateOf(c.id) ?? -1,
-    dot: worstSeverity(nodeIssues.value[c.id] ?? []),
+const scoped = computed(() =>
+  pipelines.value.filter(
+    (p) =>
+      checkedFleets.value.includes(p.fleet) &&
+      (telemetry.value === "all" || p.signal === telemetry.value) &&
+      (!p.exporters.length ||
+        p.exporters.some((e) => checkedDestinations.value.includes(e.destination))),
+  ),
+);
+
+const legendCounts = computed(() =>
+  scoped.value.reduce<Partial<Record<PathSeverity, number>>>((acc, p) => {
+    const sev = severityOf.value[p.id];
+    acc[sev] = (acc[sev] ?? 0) + 1;
+    return acc;
+  }, {}),
+);
+
+const visible = computed(() =>
+  scoped.value.filter((p) => {
+    const sev = severityOf.value[p.id];
+    return (
+      (!severityFilter.value || severityFilter.value === sev) &&
+      (!issuesOnly.value || sev !== "healthy")
+    );
+  }),
+);
+
+const tableRows = computed<PipelineRow[]>(() =>
+  visible.value.map((p) => ({
+    id: p.id,
+    fleet: p.fleet,
+    fleetName: fleetName(p.fleet),
+    fleetMeta: fleetMeta(fleetById.value.get(p.fleet)),
+    name: p.name,
+    signal: p.signal,
+    receivers: p.receivers.map((r) => r.name).join(", "),
+    exporters: p.exporters.map((e) => e.name).join(", "),
+    inRate: p.in_rate,
+    outRate: p.out_rate,
+    failedRatio: p.failed_ratio,
+    queueRatio: p.queue_ratio,
+    severity: severityOf.value[p.id],
   })),
 );
+
+const fleetRate = (id: string) =>
+  sumRates(pipelines.value.filter((p) => p.fleet === id).map((p) => p.out_rate));
+
+// A fleet's own failure, such as a halted rollout, says more about it than its throughput.
+function fleetLabel(id: string): I18nText {
+  const failure = (fleetIssueMap.value[id] ?? []).find((i) => i.severity === "error");
+  return failure?.title ?? rateText(fleetRate(id));
+}
+
+const fleetItems = computed<FlowListItem[]>(() =>
+  fleets.value.map((f) => ({
+    id: f.id,
+    label: raw(f.name),
+    rate: fleetLabel(f.id),
+    value: fleetRate(f.id) ?? -1,
+    dot: worstOf(
+      pipelines.value.filter((p) => p.fleet === f.id).map((p) => severityOf.value[p.id]),
+    ),
+  })),
+);
+
+const destinationRate = (id: string) =>
+  sumRates(
+    pipelines.value.flatMap((p) =>
+      p.exporters.filter((e) => e.destination === id).map((e) => e.rate),
+    ),
+  );
 
 const destinationItems = computed<FlowListItem[]>(() =>
   destinations.value.map((d) => ({
@@ -455,165 +558,179 @@ const destinationItems = computed<FlowListItem[]>(() =>
     rate: rateText(destinationRate(d.id)),
     value: destinationRate(d.id) ?? -1,
     dot: worstOf(
-      flowLinks.value
-        .filter((l) => l.destination === d.id)
-        .map((l) => linkSeverity.value[linkId(l)]),
+      pipelines.value
+        .filter((p) => p.exporters.some((e) => e.destination === d.id))
+        .map((p) => severityOf.value[p.id]),
     ),
   })),
 );
 
-const checkedLinks = computed(() =>
-  flowLinks.value.filter(
-    (l) =>
-      checkedConfigs.value.includes(l.config) && checkedDestinations.value.includes(l.destination),
-  ),
-);
-const visibleLinks = computed(() =>
-  checkedLinks.value.filter(
-    (l) => !issuesOnly.value || linkSeverity.value[linkId(l)] !== "healthy",
-  ),
-);
-const visibleConfigs = computed(() =>
-  fleetConfigs.value.filter(
-    (c) =>
-      checkedConfigs.value.includes(c.id) &&
-      (!issuesOnly.value ||
-        visibleLinks.value.some((l) => l.config === c.id) ||
-        (nodeIssues.value[c.id]?.length ?? 0) > 0),
-  ),
-);
-const visibleDestinations = computed(() =>
-  destinations.value.filter(
-    (d) =>
-      checkedDestinations.value.includes(d.id) &&
-      (!issuesOnly.value || visibleLinks.value.some((l) => l.destination === d.id)),
-  ),
-);
-
-const legendCounts = computed(() =>
-  checkedLinks.value.reduce<Partial<Record<PathSeverity, number>>>((acc, l) => {
-    const sev = linkSeverity.value[linkId(l)];
-    acc[sev] = (acc[sev] ?? 0) + 1;
-    return acc;
-  }, {}),
-);
-
-const nodes = computed<Node<FleetFlowNodeData>[]>(() => {
-  const left = visibleConfigs.value;
-  const right = visibleDestinations.value;
-  const offset = (a: number, b: number) => TOP + ((Math.max(a, b) - a) * ROW) / 2;
-  const leftX = Math.max(0, canvasWidth.value * 0.15 - NODE_HALF);
-  const rightX = Math.min(canvasWidth.value * 0.85 - NODE_HALF, canvasWidth.value - 2 * NODE_HALF);
-  return [
-    ...left.map((c, i) => {
-      const issues = nodeIssues.value[c.id] ?? [];
-      return {
-        id: `c:${c.id}`,
-        type: "fleet",
-        ariaLabel: raw(c.name),
-        position: { x: leftX, y: offset(left.length, right.length) + i * ROW },
-        data: {
-          label: raw(c.name),
-          icon: "tune" as const,
-          sublabel: t("fleet.flow.collectorsBadge", { count: c.collectors }),
-          selected: selection.value?.kind === "node" && selection.value.id === c.id,
-          outbound: true,
-          issueSeverity: worstSeverity(issues),
-          issueCount: issues.length,
-        },
-      };
-    }),
-    ...right.map((d, i) => ({
-      id: `d:${d.id}`,
-      type: "fleet",
-      ariaLabel: destinationLabel(d.id),
-      position: { x: rightX, y: offset(right.length, left.length) + i * ROW },
-      data: {
-        label: destinationLabel(d.id),
-        icon: DESTINATION_ICON[d.type] ?? "cloud-upload",
-        inbound: true,
-      },
+const pipelineMap = computed(() =>
+  buildPipelineMap(
+    visible.value.map((p) => ({
+      ...p,
+      exporters: p.exporters.filter((e) => checkedDestinations.value.includes(e.destination)),
     })),
-  ];
-});
+    { width: canvasWidth.value, nodeWidth: NODE_WIDTH, row: ROW, top: TOP },
+  ),
+);
+const mapNodeById = computed(() => new Map(pipelineMap.value.nodes.map((n) => [n.id, n])));
+const pipelineById = computed(() => new Map(pipelines.value.map((p) => [p.id, p])));
 
-// A config's own failure, such as a halted rollout, says more about it than its throughput.
-function sourceLabel(configId: string): I18nText {
-  const failure = (nodeIssues.value[configId] ?? []).find((i) => i.severity === "error");
-  return failure?.title ?? rateText(rateOf(configId));
+// One signal names its unit; a node serving several signals counts items.
+function nodeSignal(n: MapNode): FlowSignal {
+  const signals = new Set(n.pipelines.map((id) => pipelineById.value.get(id)?.signal));
+  return signals.size === 1 ? ([...signals][0] ?? "all") : "all";
 }
 
-const pathLabel = (l: FleetFlowLink) =>
-  t("fleet.flow.pathLabel", {
-    config: raw(l.config),
-    destination: destinationLabel(l.destination),
-  });
+function nodeLabel(n: MapNode): I18nText {
+  if (n.column === "fleet") return raw(fleetName(n.name));
+  if (n.column === "destination") return destinationLabel(n.name);
+  return raw(n.name);
+}
 
-function edgeSummary(l: FleetFlowLink) {
-  const issues = linkPathIssues(l);
-  return t("fleet.flowIssues.edgeSummary", {
-    path: pathLabel(l),
-    rate: rateText(linkRate(l)),
-    issues: issues.length
-      ? raw(issues.map((i) => i.title).join("; "))
-      : metricsRestricted.value
-        ? t("fleet.flow.metricsRestricted")
-        : t("fleet.flowIssues.noIssues"),
+function nodeRing(n: MapNode): PathSeverity | undefined {
+  if (n.column === "exporter") {
+    if (ratio(n.failed, n.rate) >= ISSUE_RATIO || n.dropped > 0) return "error";
+    if ((n.queue ?? 0) >= QUEUE_WARNING) return "warning";
+  }
+  if (n.column === "receiver" && ratio(n.refused, n.rate) >= ISSUE_RATIO) return "warning";
+  return undefined;
+}
+
+const highlighted = computed<Set<string> | null>(() => {
+  const sel = selection.value;
+  if (!sel) return null;
+  if (sel.kind === "pipeline") return new Set([sel.id]);
+  if (sel.kind === "fleet") {
+    return new Set(pipelines.value.filter((p) => p.fleet === sel.id).map((p) => p.id));
+  }
+  return new Set(mapNodeById.value.get(sel.id)?.pipelines ?? []);
+});
+
+function nodeData(n: MapNode): FleetFlowNodeData {
+  const sel = selection.value;
+  const label = nodeLabel(n);
+  if (n.column === "fleet") {
+    const issues = fleetIssueMap.value[n.name] ?? [];
+    return {
+      label,
+      icon: COLUMN_ICON.f,
+      sublabel: fleetMeta(fleetById.value.get(n.name)),
+      selected: sel?.kind === "fleet" && sel.id === n.name,
+      outbound: true,
+      issueSeverity: worstSeverity(issues),
+      issueCount: issues.length,
+    };
+  }
+  const destination = n.column === "destination";
+  return {
+    label,
+    icon: destination
+      ? (DESTINATION_ICON[destinationById.value.get(n.name)?.type ?? ""] ?? "cloud-upload")
+      : COLUMN_ICON[n.id[0]],
+    sublabel: rateText(n.rate, nodeSignal(n)),
+    compact: !destination,
+    selected: sel?.kind === "node" && sel.id === n.id,
+    inbound: true,
+    outbound: !destination,
+    ring: nodeRing(n),
+  };
+}
+
+const nodes = computed<Node<FleetFlowNodeData>[]>(() =>
+  pipelineMap.value.nodes.map((n) => ({
+    id: n.id,
+    type: n.column === "sink" ? "sink" : "fleet",
+    ariaLabel: nodeLabel(n),
+    position: { x: n.x, y: n.y },
+    data: n.column === "sink" ? { label: nodeLabel(n), icon: "send" } : nodeData(n),
+  })),
+);
+
+function edgeLabel(e: MapEdge): I18nText | undefined {
+  if (!e.branch) return undefined;
+  const value = percent(e.branch.ratio);
+  return e.branch.kind === "failed"
+    ? t("fleet.pipelines.sendFailed", { value })
+    : t("fleet.pipelines.dropped", { value });
+}
+
+function edgeSummary(e: MapEdge): I18nText {
+  const from = mapNodeById.value.get(e.source);
+  const to = mapNodeById.value.get(e.target);
+  return t("fleet.pipelines.edgeSummary", {
+    from: from ? nodeLabel(from) : raw(e.source),
+    to: e.branch ? (edgeLabel(e) ?? raw("")) : to ? nodeLabel(to) : raw(e.target),
+    rate: rateText(e.rate, e.signal),
   });
 }
 
 const edges = computed<Edge<FleetFlowEdgeData>[]>(() => {
-  const seenSource = new Set<string>();
-  const seenTarget = new Set<string>();
-  return visibleLinks.value.map((l) => {
-    const severity = linkSeverity.value[linkId(l)];
-    const highlighted =
-      (selection.value?.kind === "edge" && selection.value.id === linkId(l)) ||
-      (selection.value?.kind === "node" && selection.value.id === l.config);
-    const firstFromSource = !seenSource.has(l.config);
-    const firstIntoTarget = !seenTarget.has(l.destination);
-    seenSource.add(l.config);
-    seenTarget.add(l.destination);
+  const max = Math.max(0, ...pipelineMap.value.edges.map((e) => e.rate ?? 0));
+  const focus = highlighted.value;
+  return pipelineMap.value.edges.map((e) => {
+    const lit = !!focus && e.pipelines.some((id) => focus.has(id));
     return {
-      id: linkId(l),
-      source: `c:${l.config}`,
-      target: `d:${l.destination}`,
+      id: e.id,
+      source: e.source,
+      target: e.target,
       type: "fleet",
-      ariaLabel: pathLabel(l),
-      animated: severity === "progress",
-      zIndex: severity === "healthy" ? 0 : 1,
+      ariaLabel: edgeSummary(e),
+      zIndex: e.branch ? 2 : lit ? 1 : 0,
       data: {
-        severity,
-        highlighted,
-        dimmed: !!severityFilter.value && severityFilter.value !== severity,
-        summary: edgeSummary(l),
-        sourceLabel: firstFromSource ? sourceLabel(l.config) : undefined,
-        targetLabel: firstIntoTarget ? rateText(destinationRate(l.destination, true)) : undefined,
+        signal: e.signal,
+        width: strokeWidth(e.rate, max),
+        branch: !!e.branch,
+        label: edgeLabel(e),
+        noData: e.rate === null,
+        highlighted: lit,
+        dimmed: !!focus && !lit,
+        summary: edgeSummary(e),
       },
     };
   });
 });
 
+function uniqueIssues(list: PathIssue[]): PathIssue[] {
+  return [...new Map(list.map((i) => [i.id, i])).values()];
+}
+
 const details = computed(() => {
   const sel = selection.value;
-  // Polls keep the last data on error, so a 403 or a removed config must hide stale details.
+  // Polls keep the last data on error, so a 403 or a removed pipeline must hide stale details.
   if (!sel || forbidden.value) return null;
-  if (sel.kind === "node") {
-    if (!fleetConfigs.value.some((c) => c.id === sel.id)) return null;
+  if (sel.kind === "pipeline") {
+    const p = pipelineById.value.get(sel.id);
+    if (!p) return null;
     return {
-      title: raw(sel.id),
-      throughput: perSecond(rateOf(sel.id)),
-      issues: nodeIssues.value[sel.id] ?? [],
-      configId: sel.id,
+      title: t("fleet.pipelines.pipelineTitle", {
+        fleet: raw(fleetName(p.fleet)),
+        pipeline: raw(p.name),
+      }),
+      throughput: perSecond(p.out_rate, p.signal),
+      issues: issuesOf(p),
+      configId: fleetById.value.get(p.fleet)?.config ?? null,
     };
   }
-  const link = flowLinks.value.find((l) => linkId(l) === sel.id);
-  if (!link) return null;
+  if (sel.kind === "fleet") {
+    const f = fleetById.value.get(sel.id);
+    if (!f) return null;
+    return {
+      title: raw(f.name),
+      throughput: perSecond(fleetRate(f.id)),
+      issues: fleetIssueMap.value[f.id] ?? [],
+      configId: f.config,
+    };
+  }
+  const n = mapNodeById.value.get(sel.id);
+  if (!n) return null;
+  const through = n.pipelines.map((id) => pipelineById.value.get(id)).filter((p) => !!p);
   return {
-    title: pathLabel(link),
-    throughput: perSecond(linkRate(link)),
-    issues: linkPathIssues(link),
-    configId: link.config,
+    title: nodeLabel(n),
+    throughput: perSecond(n.rate, nodeSignal(n)),
+    issues: uniqueIssues(through.flatMap(issuesOf)),
+    configId: n.column === "destination" ? null : (fleetById.value.get(n.fleet)?.config ?? null),
   };
 });
 
@@ -649,26 +766,47 @@ function clampPopover() {
   };
 }
 
+// The viewport stays at the origin, so a node's layout position is where it sits on the canvas.
+function onRowSelect(row: PipelineRow) {
+  const same = selection.value?.kind === "pipeline" && selection.value.id === row.id;
+  selection.value = same ? null : { kind: "pipeline", id: row.id };
+  if (same) return;
+  const p = pipelineById.value.get(row.id);
+  const anchor =
+    mapNodeById.value.get(`e:${row.fleet}|${p?.exporters[0]?.name}`) ??
+    mapNodeById.value.get(`f:${row.fleet}`);
+  popover.value = anchor
+    ? { x: anchor.x + NODE_WIDTH + POPOVER_GAP, y: anchor.y }
+    : { x: POPOVER_MARGIN, y: POPOVER_MARGIN };
+  nextTick(clampPopover);
+}
+
+function select(next: Selection, event: MouseEvent | TouchEvent, anchorToNode: boolean) {
+  const same = selection.value?.kind === next.kind && selection.value.id === next.id;
+  selection.value = same ? null : next;
+  if (!same) placePopover(event, anchorToNode);
+}
+
 function onNodeClick({ node, event }: NodeMouseEvent) {
-  const [prefix, id] = node.id.split(":");
-  if (prefix !== "c") return;
-  const same = selection.value?.kind === "node" && selection.value.id === id;
-  selection.value = same ? null : { kind: "node", id };
-  if (!same) placePopover(event, true);
+  if (node.id.startsWith("x:")) return select({ kind: "node", id: node.id.slice(2) }, event, false);
+  if (node.id.startsWith("f:")) return select({ kind: "fleet", id: node.id.slice(2) }, event, true);
+  select({ kind: "node", id: node.id }, event, true);
 }
 
 function onEdgeClick({ edge, event }: EdgeMouseEvent) {
-  const same = selection.value?.kind === "edge" && selection.value.id === edge.id;
-  selection.value = same ? null : { kind: "edge", id: edge.id };
-  if (!same) placePopover(event);
+  const e = pipelineMap.value.edges.find((x) => x.id === edge.id);
+  if (!e) return;
+  if (e.branch) return select({ kind: "node", id: e.source }, event, false);
+  if (e.pipelines[0]) select({ kind: "pipeline", id: e.pipelines[0] }, event, false);
 }
 
 function onOutsidePointer(event: PointerEvent) {
   if (!selection.value) return;
   const target = event.target as globalThis.Node | null;
   if (popoverEl.value?.contains(target)) return;
-  // Clicks inside the canvas are handled by Vue Flow (pane, node and edge clicks).
+  // Clicks inside the canvas are handled by Vue Flow, and table rows select pipelines themselves.
   if (canvasEl.value?.contains(target)) return;
+  if ((target as HTMLElement | null)?.closest?.('[data-test="fleet-pipeline-table"]')) return;
   selection.value = null;
 }
 
@@ -687,7 +825,7 @@ function runAction(action: IssueAction) {
     case "rollout":
       return emit("navigate", "fleets", { rollout: action.rolloutId });
     case "collectors":
-      return emit("navigate", "fleets", { scope: "all", ...action.query });
+      return emit("navigate", "fleets", action.query);
     case "upgrades":
       return emit("outdated");
   }

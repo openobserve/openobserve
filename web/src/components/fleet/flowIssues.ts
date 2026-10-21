@@ -15,18 +15,18 @@
 
 import { computed } from "vue";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
-import type { FleetFlowIssue, FleetFlowLink } from "@/services/fleet";
+import type { FleetFlowIssue, FleetPipeline } from "@/services/fleet";
 import { FLOW_POLL_MS } from "@/services/fleet.queries";
 import { useRolloutText } from "./rolloutText";
 import { formatCount } from "./fleetFormat";
-import type { FlowSignal, Telemetry } from "./flowTypes";
+import type { Telemetry } from "./flowTypes";
 import { useFleetCollectors, useFleetRollouts } from "./useFleetApi";
 
 export type Severity = "error" | "warning" | "progress" | "info";
 // "restricted": the caller may not read some metric streams, so a path without issues is unknown, not healthy.
 export type PathSeverity = Severity | "healthy" | "restricted";
 
-/** Worst first; this order decides an edge's colour. */
+/** Worst first; this order decides a pipeline's dot. */
 export const SEVERITY_ORDER: Severity[] = ["error", "warning", "progress", "info"];
 
 export type IssueAction =
@@ -57,13 +57,19 @@ const PER_MINUTE: Record<Telemetry, I18nKey> = {
   traces: "fleet.flow.perMinute.traces",
 };
 
-export const SEVERITY_STROKE: Record<PathSeverity, string> = {
-  error: "stroke-status-error-text",
-  warning: "stroke-status-warning-text",
-  progress: "stroke-accent",
-  info: "stroke-status-info-text",
-  healthy: "stroke-border-strong",
-  restricted: "stroke-border-strong",
+export const SEVERITY_RING: Record<PathSeverity, string> = {
+  error: "border-status-error-text ring-status-error-text/30 ring-2",
+  warning: "border-status-warning-text ring-status-warning-text/30 ring-2",
+  progress: "border-accent ring-accent/30 ring-2",
+  info: "border-status-info-text ring-status-info-text/30 ring-2",
+  healthy: "",
+  restricted: "",
+};
+
+export const SIGNAL_STROKE: Record<Telemetry, string> = {
+  logs: "stroke-signal-logs",
+  metrics: "stroke-signal-metrics",
+  traces: "stroke-signal-traces",
 };
 
 export const SEVERITY_TEXT: Record<PathSeverity, string> = {
@@ -88,7 +94,7 @@ export function worstSeverity(issues: PathIssue[]): PathSeverity {
   return SEVERITY_ORDER.find((s) => issues.some((i) => i.severity === s)) ?? "healthy";
 }
 
-const percent = (ratio: number) => raw(`${Number((ratio * 100).toFixed(1))}%`);
+export const percent = (share: number) => raw(`${Number((share * 100).toFixed(1))}%`);
 
 const names = (list: { name: string }[]) =>
   raw(
@@ -98,15 +104,19 @@ const names = (list: { name: string }[]) =>
       .join(", ") + (list.length > 3 ? ` +${list.length - 3}` : ""),
   );
 
-/** Issues on configs and paths; config issues come from the collectors and rollouts, polled while mounted. */
+/** Share of `part` in `part + rest`; failed items never count in an exporter's sent rate. */
+export const ratio = (part: number, rest: number | null) =>
+  part > 0 ? part / (part + Math.max(rest ?? 0, 0)) : 0;
+
+/** Issues on fleets and pipelines; fleet issues come from the collectors and rollouts, polled while mounted. */
 export function useFlowIssues() {
   const { t } = useI18nTyped();
   const { haltClassText, progressText } = useRolloutText();
   const collectors = useFleetCollectors(() => true, FLOW_POLL_MS);
   const rollouts = useFleetRollouts(FLOW_POLL_MS);
 
-  function rolloutIssues(configId: string): PathIssue[] {
-    const latest = rollouts.rows.value.find((r) => r.config === configId);
+  function rolloutIssues(fleetId: string): PathIssue[] {
+    const latest = rollouts.rows.value.find((r) => r.fleetId === fleetId);
     if (!latest) return [];
     if (latest.status === "in_progress") {
       return [
@@ -142,8 +152,8 @@ export function useFlowIssues() {
     ];
   }
 
-  function collectorIssues(configId: string): PathIssue[] {
-    const own = collectors.rows.value.filter((c) => c.config === configId);
+  function collectorIssues(fleetId: string): PathIssue[] {
+    const own = collectors.rows.value.filter((c) => c.fleetId === fleetId);
     const out: PathIssue[] = [];
     const offline = own.filter((c) => c.status === "offline");
     if (offline.length) {
@@ -153,7 +163,7 @@ export function useFlowIssues() {
         title: t("fleet.flowIssues.offline", { count: offline.length }),
         evidence: t("fleet.flowIssues.offlineEvidence", { names: names(offline) }),
         actionLabel: t("fleet.flowIssues.viewCollectors"),
-        action: { kind: "collectors", query: { q: configId } },
+        action: { kind: "collectors", query: { fleet: fleetId, status: "offline" } },
       });
     }
     const behind = own.filter((c) => c.outdated);
@@ -170,44 +180,61 @@ export function useFlowIssues() {
     return out;
   }
 
-  function configIssues(configId: string): PathIssue[] {
-    return [...rolloutIssues(configId), ...collectorIssues(configId)];
+  function fleetIssues(fleetId: string): PathIssue[] {
+    return [...rolloutIssues(fleetId), ...collectorIssues(fleetId)];
   }
 
   function issueTitle(issue: FleetFlowIssue): I18nText {
+    const signal = t(SIGNAL_NAME[issue.signal]);
     switch (issue.kind) {
       case "export_errors":
-        return t("fleet.flowIssues.exportErrors", {
-          signal: t(SIGNAL_NAME[issue.signal]),
-          value: percent(issue.value),
-        });
+        return t("fleet.flowIssues.exportErrors", { signal, value: percent(issue.value) });
       case "dropped":
         return t("fleet.flowIssues.dropped", {
           value: t(PER_MINUTE[issue.signal], { value: raw(formatCount(issue.value)) }),
         });
+      case "receiver_refused":
+        return t("fleet.flowIssues.receiverRefused", { signal, value: percent(issue.value) });
       default:
-        return t("fleet.flowIssues.backpressure", {
-          signal: t(SIGNAL_NAME[issue.signal]),
-          value: percent(issue.value),
-        });
+        return t("fleet.flowIssues.backpressure", { signal, value: percent(issue.value) });
     }
   }
 
-  function linkIssues(link: FleetFlowLink, signal: FlowSignal, destination: I18nText): PathIssue[] {
-    return link.issues
-      .filter((issue) => signal === "all" || issue.signal === signal)
-      .map((issue): PathIssue => ({
-        id: `edge-${issue.signal}-${issue.kind}`,
-        severity: issue.kind === "backpressure" ? "warning" : "error",
-        title: issueTitle(issue),
-        evidence: t("fleet.flowIssues.edgeEvidence", { destination }),
-        actionLabel: t("fleet.flowIssues.viewCollectors"),
-        action: { kind: "collectors", query: { q: link.config } },
-      }));
+  // The payload names no component per issue, so the evidence points at the worst one of its kind.
+  function issueEvidence(
+    issue: FleetFlowIssue,
+    p: FleetPipeline,
+    destinationLabel: (id: string) => I18nText,
+  ): I18nText {
+    if (issue.kind === "receiver_refused") {
+      const worst = [...p.receivers].sort((a, b) => b.refused - a.refused)[0];
+      return t("fleet.flowIssues.receiverEvidence", { receiver: raw(worst?.name ?? p.name) });
+    }
+    const score = (e: FleetPipeline["exporters"][number]) =>
+      issue.kind === "export_errors"
+        ? ratio(e.failed, e.rate)
+        : issue.kind === "dropped"
+          ? e.dropped
+          : (e.queue ?? 0);
+    const worst = [...p.exporters].sort((a, b) => score(b) - score(a))[0];
+    return worst
+      ? t("fleet.flowIssues.edgeEvidence", { destination: destinationLabel(worst.destination) })
+      : t("fleet.flowIssues.noReason");
   }
 
-  function pathIssues(link: FleetFlowLink, signal: FlowSignal, destination: I18nText): PathIssue[] {
-    return [...configIssues(link.config), ...linkIssues(link, signal, destination)];
+  function pipelineIssues(
+    p: FleetPipeline,
+    destinationLabel: (id: string) => I18nText,
+  ): PathIssue[] {
+    return p.issues.map((issue): PathIssue => ({
+      id: `${p.id}-${issue.kind}`,
+      severity:
+        issue.kind === "backpressure" || issue.kind === "receiver_refused" ? "warning" : "error",
+      title: issueTitle(issue),
+      evidence: issueEvidence(issue, p, destinationLabel),
+      actionLabel: t("fleet.flowIssues.viewCollectors"),
+      action: { kind: "collectors", query: { fleet: p.fleet } },
+    }));
   }
 
   function refetch() {
@@ -216,8 +243,8 @@ export function useFlowIssues() {
   }
 
   return {
-    configIssues,
-    pathIssues,
+    fleetIssues,
+    pipelineIssues,
     error: computed(() => collectors.error.value ?? rollouts.error.value),
     refetch,
   };

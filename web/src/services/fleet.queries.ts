@@ -21,7 +21,7 @@ import fleet, {
   type FleetConfigIssues,
   type FleetConfigItem,
   type FleetConfigVersion,
-  type FleetFlow,
+  type FleetPipelines,
   type FleetFlowWindow,
   type FleetPlanPreview,
   type FleetPublished,
@@ -241,7 +241,7 @@ export const fleetRolloutQuery = (org: string, id: string) =>
 export const fleetFlowQuery = (org: string, window: FleetFlowWindow) =>
   queryOptions({
     queryKey: fleetKeys.flow(org, window),
-    queryFn: async (): Promise<FleetFlow> => (await fleet.getPipelines(org, window)).data,
+    queryFn: async (): Promise<FleetPipelines> => (await fleet.getPipelines(org, window)).data,
     staleTime: LIVE_STALE_TIME,
     refetchInterval: FLOW_POLL_MS,
   });

@@ -37,13 +37,19 @@ export interface FleetFlowNodeData {
   /** Worst issue on the node, shown as a corner dot. */
   issueSeverity?: PathSeverity;
   issueCount?: number;
+  /** A failing component, shown as a ring around the node. */
+  ring?: PathSeverity;
 }
 
 export interface FleetFlowEdgeData {
+  signal: Telemetry;
+  /** Stroke width in canvas units, scaled from the rate. */
+  width: number;
+  /** A failure branch: dashed, danger-coloured, labelled at its end. */
+  branch?: boolean;
+  label?: I18nText;
+  noData?: boolean;
   highlighted?: boolean;
-  severity?: PathSeverity;
   dimmed?: boolean;
   summary?: I18nText;
-  sourceLabel?: I18nText;
-  targetLabel?: I18nText;
 }

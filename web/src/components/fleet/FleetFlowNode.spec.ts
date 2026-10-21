@@ -28,4 +28,15 @@ describe("FleetFlowNode", () => {
     });
     expect(wrapper.findComponent(OTooltip).props("content")).toBe(label);
   });
+
+  it("rings a failing component in its severity colour", () => {
+    const wrapper = mount(FleetFlowNode, {
+      props: { id: "e:x", data: { label: raw("otlphttp"), icon: "send", ring: "error" } },
+      global: { stubs: { Handle: true } },
+    });
+    const box = wrapper.find('[data-test="fleet-flow-node-e:x-box"]');
+    expect(box.classes()).toEqual(
+      expect.arrayContaining(["border-status-error-text", "ring-status-error-text/30"]),
+    );
+  });
 });

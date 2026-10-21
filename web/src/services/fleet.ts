@@ -358,18 +358,9 @@ export type FleetFlowWindow = "5m" | "1h" | "24h";
 export type FleetFlowSignal = "logs" | "metrics" | "traces";
 
 export interface FleetFlowIssue {
-  kind: "export_errors" | "dropped" | "backpressure";
+  kind: "export_errors" | "dropped" | "backpressure" | "receiver_refused";
   signal: FleetFlowSignal;
   value: number;
-}
-
-/** A null rate means no telemetry, 0 a measured zero. */
-export interface FleetFlowLink {
-  config: string;
-  destination: string;
-  exporters: string[];
-  rate: Record<FleetFlowSignal, number | null>;
-  issues: FleetFlowIssue[];
 }
 
 /** `exporter` is set only when `target` is null. */
@@ -380,11 +371,54 @@ export interface FleetFlowDestination {
   exporter: string | null;
 }
 
-export interface FleetFlow {
+/** A readable fleet; one without own-metrics telemetry still lists its stable version's pipelines. */
+export interface FleetPipelineFleet {
+  id: string;
+  name: string;
+  config: string | null;
+  version: number | null;
+  collectors: number;
+}
+
+export interface FleetPipelineReceiver {
+  name: string;
+  rate: number | null;
+  /** Refused items per second over the last 5 minutes. */
+  refused: number;
+}
+
+export interface FleetPipelineExporter {
+  name: string;
+  /** Id into `destinations`. */
+  destination: string;
+  rate: number | null;
+  failed: number;
+  dropped: number;
+  queue: number | null;
+}
+
+/** One `service.pipelines` entry of one fleet; a null rate means no telemetry, 0 a measured zero. */
+export interface FleetPipeline {
+  id: string;
+  fleet: string;
+  name: string;
+  signal: FleetFlowSignal;
+  receivers: FleetPipelineReceiver[];
+  exporters: FleetPipelineExporter[];
+  in_rate: number | null;
+  out_rate: number | null;
+  failed_ratio: number | null;
+  dropped_ratio: number | null;
+  queue_ratio: number | null;
+  issues: FleetFlowIssue[];
+}
+
+export interface FleetPipelines {
   window: FleetFlowWindow;
   generated_at: number;
+  fleets: FleetPipelineFleet[];
+  pipelines: FleetPipeline[];
   destinations: FleetFlowDestination[];
-  links: FleetFlowLink[];
   /** True when the caller may not read some of the metric streams behind the rates. */
   metrics_restricted: boolean;
 }
@@ -489,7 +523,7 @@ const api = {
   previewDesired: (orgId: string, fleetId: string, body: FleetSetDesiredRequest) =>
     http().post<FleetPlanPreview>(`${fleetPath(orgId, fleetId)}/desired/preview`, body),
   getPipelines: (orgId: string, window: FleetFlowWindow) =>
-    http().get<FleetFlow>(`/api/${orgId}/fleet/pipelines`, { params: { window } }),
+    http().get<FleetPipelines>(`/api/${orgId}/fleet/pipelines`, { params: { window } }),
   getSettings: (orgId: string) => http().get<FleetOrgSettings>(`/api/${orgId}/fleet/settings`),
   updateSettings: (orgId: string, body: FleetOrgSettings) =>
     http().put<FleetOrgSettings>(`/api/${orgId}/fleet/settings`, body),

@@ -22,7 +22,8 @@ import type {
   FleetConfigDetail,
   FleetCreatedToken,
   FleetDefaults,
-  FleetFlow,
+  FleetPipelines,
+  FleetPipeline,
   FleetOrgSettings,
   FleetPlanPreview,
   FleetRollout,
@@ -563,29 +564,85 @@ function exitRollout(id: string, exit: "resume" | "skip" | "revert", skip: strin
   return reply(r);
 }
 
-function flowOf(window: FleetFlow["window"]): FleetFlow {
+const pipeline = (
+  fleet: string,
+  name: string,
+  receivers: FleetPipeline["receivers"],
+  exporters: FleetPipeline["exporters"],
+  over: Partial<FleetPipeline> = {},
+): FleetPipeline => {
+  const inRate = receivers.reduce((sum, r) => sum + (r.rate ?? 0), 0);
+  const outRate = exporters.reduce((sum, e) => sum + (e.rate ?? 0), 0);
+  return {
+    id: `${fleet}/${name}`,
+    fleet,
+    name,
+    signal: name.split("/")[0] as FleetPipeline["signal"],
+    receivers,
+    exporters,
+    in_rate: inRate,
+    out_rate: outRate,
+    failed_ratio: 0,
+    dropped_ratio: 0,
+    queue_ratio: Math.max(0, ...exporters.map((e) => e.queue ?? 0)),
+    issues: [],
+    ...over,
+  };
+};
+
+const exporter = (
+  name: string,
+  destination: string,
+  rate: number,
+  over: Partial<FleetPipeline["exporters"][number]> = {},
+) => ({ name, destination, rate, failed: 0, dropped: 0, queue: 0.1, ...over });
+
+function flowOf(window: FleetPipelines["window"]): FleetPipelines {
   return {
     window,
     generated_at: Date.now(),
+    fleets: [
+      { id: "prod-linux", name: "prod-linux", config: "base-linux", version: 3, collectors: 24 },
+      { id: "edge-k8s", name: "edge-k8s", config: "k8s-node", version: 1, collectors: 12 },
+    ],
     destinations: [
       { id: "o2", type: "otlphttp", target: "o2.example.com", exporter: null },
       { id: "s3", type: "awss3", target: "s3://archive-logs", exporter: null },
     ],
-    links: [
-      {
-        config: "base-linux",
-        destination: "o2",
-        exporters: ["otlphttp/openobserve"],
-        rate: { logs: 1200, metrics: 5400, traces: null },
-        issues: [],
-      },
-      {
-        config: "k8s-node",
-        destination: "s3",
-        exporters: ["awss3"],
-        rate: { logs: 300, metrics: null, traces: null },
-        issues: [{ kind: "export_errors", signal: "logs", value: 2.5 }],
-      },
+    pipelines: [
+      pipeline(
+        "prod-linux",
+        "metrics",
+        [{ name: "hostmetrics", rate: 5400, refused: 0 }],
+        [exporter("otlphttp/openobserve", "o2", 5400)],
+      ),
+      pipeline(
+        "prod-linux",
+        "logs",
+        [{ name: "filelog", rate: 1200, refused: 0 }],
+        [
+          exporter("otlphttp/openobserve", "o2", 1200),
+          exporter("awss3/archive", "s3", 1200, { queue: 0.86 }),
+        ],
+        { issues: [{ kind: "backpressure", signal: "logs", value: 0.86 }] },
+      ),
+      pipeline(
+        "edge-k8s",
+        "logs",
+        [
+          { name: "filelog", rate: 300, refused: 0 },
+          { name: "otlp", rate: 120, refused: 0 },
+        ],
+        [exporter("otlphttp/o2", "o2", 340, { failed: 75 })],
+        { failed_ratio: 0.18, issues: [{ kind: "export_errors", signal: "logs", value: 0.18 }] },
+      ),
+      pipeline(
+        "edge-k8s",
+        "traces",
+        [{ name: "otlp", rate: 800, refused: 12 }],
+        [exporter("otlphttp/o2", "o2", 800)],
+        { issues: [{ kind: "receiver_refused", signal: "traces", value: 0.015 }] },
+      ),
     ],
     metrics_restricted: false,
   };

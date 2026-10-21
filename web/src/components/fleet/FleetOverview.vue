@@ -31,10 +31,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :last-run-at="lastUpdatedAt || null"
         :loading="fetching"
         data-test="fleet-overview-refresh"
-        @click="refetch"
+        @click="refresh"
       />
     </div>
     <FleetFlowOverview
+      ref="flowEl"
       v-model:expanded="expanded"
       class="min-h-0 flex-1"
       @navigate="(tab, query) => emit('navigate', tab, query)"
@@ -63,6 +64,12 @@ const DASH = raw("—");
 const { t } = useI18nTyped();
 const { summary, fetching, lastUpdatedAt, refetch } = useFleetSummary(FLOW_POLL_MS);
 const expanded = ref(false);
+const flowEl = ref<InstanceType<typeof FleetFlowOverview> | null>(null);
+
+function refresh() {
+  refetch();
+  flowEl.value?.refresh();
+}
 
 // The summary already covers only the fleets the caller may read; largest count first.
 const stats = computed<StatItem[]>(() => {
