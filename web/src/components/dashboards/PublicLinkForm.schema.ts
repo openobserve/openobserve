@@ -23,9 +23,6 @@ import type {
 import type { I18nText, TranslateFn } from "@/types/i18n";
 import { parseDuration } from "@/utils/date";
 
-export const REFRESH_SECONDS = [
-  300, 900, 1800, 3600, 7200, 21600, 86400, 172800, 604800, 1209600, 2592000,
-];
 export const DEFAULT_REFRESH_SECS = 300;
 /** The operator minimum when the server does not report one (ZO_PUBLIC_DASHBOARD_MIN_REFRESH_SECS default). */
 export const DEFAULT_MIN_REFRESH_SECS = 60;
@@ -97,19 +94,6 @@ export function effectiveRefreshSecs(
 ): number {
   const floor = Math.max(selected, windowSecs / REFRESHES_PER_WINDOW, minSecs);
   return Math.ceil(floor / 60) * 60;
-}
-
-/** The relative ranges whose own floor is above the selected interval, with what they get instead. */
-export function slowerRanges(
-  ranges: PublicLinkRange[],
-  selected: number,
-  minSecs: number = DEFAULT_MIN_REFRESH_SECS,
-): Array<{ range: PublicLinkRange; secs: number }> {
-  return sortRanges(ranges).flatMap((range) => {
-    if (range.type !== "relative") return [];
-    const secs = effectiveRefreshSecs(selected, range.secs, minSecs);
-    return secs > selected ? [{ range, secs }] : [];
-  });
 }
 
 // Offered in order by Add, so a new row starts on a range the list doesn't have yet.

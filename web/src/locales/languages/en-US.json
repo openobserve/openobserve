@@ -6228,7 +6228,6 @@
       "revoke": "Revoke and delete",
       "availableRanges": "Time ranges viewers can choose",
       "defaultRange": "Default time range",
-      "refreshEvery": "Refresh every",
       "refreshMonth": "1 month",
       "defaultVariableValues": "Default variable values",
       "expiresOptional": "Expires (optional)",
@@ -7706,8 +7705,6 @@
       "addRange": "Add time range",
       "removeRange": "Remove {range}",
       "refreshOnce": "Once",
-      "refreshEveryHint": "How often the public page gets new data. A shorter time keeps it fresher but runs more queries. Absolute time ranges don't refresh.",
-      "refreshFloorHint": "{range} refreshes every {interval}, its minimum for a window that long.",
       "refreshOnNextView": "Refresh on next view",
       "refreshQueuedToast": "The link refreshes on its next view",
       "createHint": "Returns at once. Nothing is queried until someone opens the link.",
@@ -7737,7 +7734,9 @@
       "editAccessRequired": "You need edit access to this dashboard to manage its public links.",
       "actionForbidden": "You don't have permission to change public links. Ask an admin.",
       "createForbidden": "You don't have permission to create public links. Ask an admin.",
-      "editForbidden": "You don't have permission to edit public links. Ask an admin."
+      "editForbidden": "You don't have permission to edit public links. Ask an admin.",
+      "saveBeforePublish": "Save your dashboard changes, then publish.",
+      "upgradedToast": "Dashboard upgraded to the current format."
     }
   },
   "panel": {

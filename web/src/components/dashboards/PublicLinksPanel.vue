@@ -278,31 +278,6 @@
           :label="t('dashboard.publicDashboard.defaultRange')"
           data-test="dashboards-public-links-panel-default-select"
         />
-        <div v-if="ranges.some((r) => r.type === 'relative')" class="flex flex-col gap-1.5">
-          <OFormSelect
-            name="refreshSecs"
-            :options="refreshOptions"
-            required
-            :label="t('dashboard.publicDashboard.refreshEvery')"
-            data-test="dashboards-public-links-panel-refresh-select"
-          >
-            <template #tooltip>
-              <OTooltip
-                side="right"
-                max-width="20rem"
-                :content="t('dashboard.publicLinks.refreshEveryHint')"
-              />
-            </template>
-          </OFormSelect>
-          <span
-            v-for="hint in refreshFloorHints"
-            :key="hint.key"
-            class="text-input-help-text text-xs leading-snug"
-            :data-test="`dashboards-public-links-panel-refresh-floor-${hint.key}`"
-          >
-            {{ hint.text }}
-          </span>
-        </div>
         <OFormDate
           name="expires"
           clearable
@@ -645,7 +620,11 @@ import {
 } from "@/composables/dashboard/useVariablesManager";
 import DateTime from "@/components/DateTime.vue";
 import { firstFieldError } from "@/lib/forms/Form/fieldError";
-import { durationFormatter } from "@/utils/formatters";
+import {
+  hasUnsavedDashboardEdits,
+  isDashboardStoredAtOldVersion,
+  updateDashboard,
+} from "@/utils/commons";
 import type {
   PublicLink,
   PublicLinkRange,
@@ -661,7 +640,6 @@ import {
   setPublicLinkPausedMutation,
 } from "@/services/public_dashboards.queries";
 import {
-  REFRESH_SECONDS,
   expiryDate,
   makePublicLinkSchema,
   publicLinkDefaults,
@@ -674,7 +652,6 @@ import {
   rangeKey,
   DEFAULT_MIN_REFRESH_SECS,
   effectiveRefreshSecs,
-  slowerRanges,
   sortRanges,
   todayIn,
   toPublicLinkConfig,
@@ -714,10 +691,6 @@ type PanelView = "list" | "form" | "created";
 /** Where a row action was clicked, so the spinner shows on that control. */
 type RowActionSource = "inline" | "menu";
 
-interface PresetOption extends SelectOption {
-  value: number;
-}
-
 interface RangeOption extends SelectOption {
   value: string;
 }
@@ -755,6 +728,8 @@ const props = withDefaults(
     dashboardVariables?: DashboardVariables | null;
     // Open straight on this link's edit form (from the org-wide list).
     editLinkId?: string;
+    // Where the dashboard is saved when publishing upgrades its stored schema.
+    folderId?: string;
   }>(),
   { modelValue: false },
 );
@@ -979,19 +954,6 @@ const form = useOForm<PublicLinkForm>({
   onSubmit: (value) => submit(value),
 });
 const ranges = form.useStore((s) => s.values.ranges);
-const selectedRefreshSecs = form.useStore((s) => s.values.refreshSecs);
-// Nothing is refused at save; a range whose own floor is slower says what it really gets.
-const refreshFloorHints = computed(() =>
-  slowerRanges(ranges.value, selectedRefreshSecs.value, minRefreshSecs.value).map(
-    ({ range, secs }) => ({
-      key: rangeKey(range),
-      text: t("dashboard.publicLinks.refreshFloorHint", {
-        range: longRange(range, t, timezone.value),
-        interval: raw(durationFormatter(secs)),
-      }),
-    }),
-  ),
-);
 // A duplicate row is still in the list until it's fixed, but is one choice.
 const defaultOptions = computed<RangeOption[]>(() =>
   [...new Map(ranges.value.map((range) => [rangeKey(range), range])).entries()].map(
@@ -1024,15 +986,6 @@ const rowErrors = computed(() =>
     ),
   ),
 );
-// An edited link keeps an interval the list doesn't offer, so saving doesn't silently change it.
-const refreshOptions = computed<PresetOption[]>(() => {
-  const own = editing.value?.refresh_secs;
-  const secs =
-    own === undefined || REFRESH_SECONDS.includes(own)
-      ? REFRESH_SECONDS
-      : [...REFRESH_SECONDS, own].sort((a, b) => a - b);
-  return secs.map((value) => ({ value, label: refreshLabel(value, t) }));
-});
 
 // One labelled picker per tab and per panel that has its own scoped variables.
 const scopedGroups = computed(() => {
@@ -1207,8 +1160,33 @@ function closeForm() {
   else open.value = false;
 }
 
+// The public build reads only the current schema, so an older stored dashboard is saved once as the browser upgraded it.
+async function saveUpgradedDashboard(): Promise<boolean> {
+  // Publishing must never save edits the author did not ask to save.
+  if (hasUnsavedDashboardEdits(props.dashboardId, props.dashboardData)) {
+    showErrorNotification(t("dashboard.publicLinks.saveBeforePublish"));
+    return false;
+  }
+  try {
+    await updateDashboard(
+      store,
+      orgId.value,
+      props.dashboardId,
+      props.dashboardData,
+      props.folderId,
+    );
+    return true;
+  } catch (e: unknown) {
+    showErrorNotification(serverMessage(e) || t("dashboard.publicDashboard.publishFailed"));
+    return false;
+  }
+}
+
 async function submit(value: PublicLinkForm) {
   if (variablesPending.value) return;
+  const upgrade =
+    !editing.value && !!props.dashboardData && isDashboardStoredAtOldVersion(props.dashboardId);
+  if (upgrade && !(await saveUpgradedDashboard())) return;
   try {
     const saved = await saveMutation.mutateAsync({
       dashboardId: props.dashboardId,
@@ -1226,6 +1204,7 @@ async function submit(value: PublicLinkForm) {
     } else {
       createdLink.value = saved;
       view.value = "created";
+      if (upgrade) showPositiveNotification(t("dashboard.publicLinks.upgradedToast"));
     }
   } catch (e: unknown) {
     const refused = forbiddenMessage(

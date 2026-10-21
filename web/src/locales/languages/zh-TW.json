@@ -6228,7 +6228,6 @@
       "revoke": "撤銷並刪除",
       "availableRanges": "檢視者可選擇的時間範圍",
       "defaultRange": "預設時間範圍",
-      "refreshEvery": "更新頻率",
       "refreshMonth": "1 個月",
       "defaultVariableValues": "預設變數值",
       "expiresOptional": "到期時間（選填）",
@@ -7701,8 +7700,6 @@
       "addRange": "新增時間範圍",
       "removeRange": "移除 {range}",
       "refreshOnce": "一次",
-      "refreshEveryHint": "公開頁面取得新資料的頻率。時間越短，資料越即時，但會執行更多查詢。絕對時間範圍不會重新整理。",
-      "refreshFloorHint": "{range} 每 {interval} 重新整理一次，這是該時間範圍長度下的最小間隔。",
       "refreshOnNextView": "下次檢視時重新整理",
       "refreshQueuedToast": "此連結會在下次檢視時重新整理",
       "createHint": "立即傳回。在有人開啟此連結之前，不會查詢任何資料。",
@@ -7732,7 +7729,9 @@
       "editAccessRequired": "您需要此儀表板的編輯權限，才能管理其公開連結。",
       "actionForbidden": "您沒有變更公開連結的權限。請聯絡管理員。",
       "createForbidden": "您沒有建立公開連結的權限。請聯絡管理員。",
-      "editForbidden": "您沒有編輯公開連結的權限。請聯絡管理員。"
+      "editForbidden": "您沒有編輯公開連結的權限。請聯絡管理員。",
+      "saveBeforePublish": "請先儲存儀表板的變更，再發布。",
+      "upgradedToast": "儀表板已升級至目前格式。"
     }
   },
   "panel": {

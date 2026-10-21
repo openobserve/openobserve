@@ -327,6 +327,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :current-values="variablesData"
               :dashboard-data="currentDashboardData.data"
               :dashboard-variables="variablesManager"
+              :folder-id="(route.query.folder as string) ?? 'default'"
             />
             <OButton
               v-if="!isFullscreen"

@@ -6228,7 +6228,6 @@
       "revoke": "撤销并删除",
       "availableRanges": "查看者可选择的时间范围",
       "defaultRange": "默认时间范围",
-      "refreshEvery": "刷新间隔",
       "refreshMonth": "1 个月",
       "defaultVariableValues": "默认变量值",
       "expiresOptional": "过期时间（可选）",
@@ -7706,8 +7705,6 @@
       "addRange": "添加时间范围",
       "removeRange": "移除 {range}",
       "refreshOnce": "仅一次",
-      "refreshEveryHint": "公开页面获取新数据的频率。时间越短数据越新，但执行的查询越多。绝对时间范围不会刷新。",
-      "refreshFloorHint": "{range} 每 {interval} 刷新一次，这是该时间窗口允许的最短间隔。",
       "refreshOnNextView": "下次查看时刷新",
       "refreshQueuedToast": "该链接将在下次查看时刷新",
       "createHint": "立即返回。在有人打开链接之前不会执行任何查询。",
@@ -7737,7 +7734,9 @@
       "editAccessRequired": "您需要拥有此仪表盘的编辑权限才能管理其公开链接。",
       "actionForbidden": "您没有更改公开链接的权限。请联系管理员。",
       "createForbidden": "您没有创建公开链接的权限。请联系管理员。",
-      "editForbidden": "您没有编辑公开链接的权限。请联系管理员。"
+      "editForbidden": "您没有编辑公开链接的权限。请联系管理员。",
+      "saveBeforePublish": "请先保存仪表盘的更改，再发布。",
+      "upgradedToast": "仪表盘已升级到当前格式。"
     }
   },
   "panel": {

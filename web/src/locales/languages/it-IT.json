@@ -6228,7 +6228,6 @@
       "revoke": "Revoca ed elimina",
       "availableRanges": "Intervalli temporali che i visualizzatori possono scegliere",
       "defaultRange": "Intervallo temporale predefinito",
-      "refreshEvery": "Aggiorna ogni",
       "refreshMonth": "1 mese",
       "defaultVariableValues": "Valori predefiniti delle variabili",
       "expiresOptional": "Scadenza (facoltativa)",
@@ -7706,8 +7705,6 @@
       "addRange": "Aggiungi intervallo di tempo",
       "removeRange": "Rimuovi {range}",
       "refreshOnce": "Una volta",
-      "refreshEveryHint": "Ogni quanto la pagina pubblica riceve nuovi dati. Un intervallo più breve la mantiene più aggiornata ma esegue più query. Gli intervalli di tempo assoluti non si aggiornano.",
-      "refreshFloorHint": "{range} si aggiorna ogni {interval}, il suo minimo per una finestra così lunga.",
       "refreshOnNextView": "Aggiorna alla prossima visualizzazione",
       "refreshQueuedToast": "Il link si aggiorna alla prossima visualizzazione",
       "createHint": "Restituisce subito. Nessuna query viene eseguita finché qualcuno non apre il link.",
@@ -7737,7 +7734,9 @@
       "editAccessRequired": "Per gestire i link pubblici di questa dashboard è necessario l'accesso in modifica.",
       "actionForbidden": "Non hai l'autorizzazione per modificare i link pubblici. Rivolgiti a un amministratore.",
       "createForbidden": "Non hai l'autorizzazione per creare link pubblici. Rivolgiti a un amministratore.",
-      "editForbidden": "Non hai l'autorizzazione per modificare i link pubblici. Rivolgiti a un amministratore."
+      "editForbidden": "Non hai l'autorizzazione per modificare i link pubblici. Rivolgiti a un amministratore.",
+      "saveBeforePublish": "Salva le modifiche alla dashboard, poi pubblica.",
+      "upgradedToast": "Dashboard aggiornata al formato attuale."
     }
   },
   "panel": {

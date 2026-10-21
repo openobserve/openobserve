@@ -16,7 +16,6 @@
 import { describe, expect, it } from "vitest";
 import { gt } from "@/types/i18n";
 import {
-  REFRESH_SECONDS,
   effectiveRefreshSecs,
   endOfDayMicros,
   expiryDate,
@@ -28,7 +27,6 @@ import {
   rangeError,
   rangeFromPicker,
   rangeKey,
-  slowerRanges,
   sortRanges,
   todayIn,
   toPublicLinkConfig,
@@ -52,9 +50,8 @@ describe("PublicLinkForm schema", () => {
     expect(r.error?.issues[0].path).toEqual(["name"]);
   });
 
-  it("defaults the refresh to 5 minutes and offers nothing under it", () => {
+  it("defaults the refresh to 5 minutes", () => {
     expect(publicLinkDefaults().refreshSecs).toBe(300);
-    expect(REFRESH_SECONDS[0]).toBe(300);
   });
 
   it("rejects an expiry before today but allows today", () => {
@@ -100,16 +97,6 @@ describe("PublicLinkForm effective refresh", () => {
     expect(effectiveRefreshSecs(300, 1441 * 60)).toBe(360);
     // A raised operator minimum lifts every range.
     expect(effectiveRefreshSecs(300, 3600, 600)).toBe(600);
-  });
-
-  it("names only the relative ranges whose floor is above the selection", () => {
-    const ranges = [abs(1, 2), rel(30 * 86_400), rel(3600), rel(7 * 86_400)];
-    expect(slowerRanges(ranges, 300)).toEqual([
-      { range: rel(7 * 86_400), secs: 2100 },
-      { range: rel(30 * 86_400), secs: 9000 },
-    ]);
-    expect(slowerRanges(ranges, 21_600)).toEqual([]);
-    expect(slowerRanges([rel(3600)], 300, 600)).toEqual([{ range: rel(3600), secs: 600 }]);
   });
 });
 

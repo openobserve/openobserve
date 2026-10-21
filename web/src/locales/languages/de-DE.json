@@ -6228,7 +6228,6 @@
       "revoke": "Widerrufen und löschen",
       "availableRanges": "Zeitbereiche, die Betrachter auswählen können",
       "defaultRange": "Standard-Zeitbereich",
-      "refreshEvery": "Aktualisieren alle",
       "refreshMonth": "1 Monat",
       "defaultVariableValues": "Standardwerte der Variablen",
       "expiresOptional": "Läuft ab (optional)",
@@ -7706,8 +7705,6 @@
       "addRange": "Zeitbereich hinzufügen",
       "removeRange": "{range} entfernen",
       "refreshOnce": "Einmalig",
-      "refreshEveryHint": "Wie oft die öffentliche Seite neue Daten erhält. Eine kürzere Zeit hält sie aktueller, führt aber mehr Abfragen aus. Absolute Zeitbereiche werden nicht aktualisiert.",
-      "refreshFloorHint": "{range} wird alle {interval} aktualisiert; das ist das Minimum für ein so langes Zeitfenster.",
       "refreshOnNextView": "Bei der nächsten Ansicht aktualisieren",
       "refreshQueuedToast": "Der Link wird bei seiner nächsten Ansicht aktualisiert",
       "createHint": "Erfolgt sofort. Es wird nichts abgefragt, bis jemand den Link öffnet.",
@@ -7737,7 +7734,9 @@
       "editAccessRequired": "Sie benötigen Bearbeitungszugriff auf dieses Dashboard, um seine öffentlichen Links zu verwalten.",
       "actionForbidden": "Sie haben keine Berechtigung, öffentliche Links zu ändern. Wenden Sie sich an einen Administrator.",
       "createForbidden": "Sie haben keine Berechtigung, öffentliche Links zu erstellen. Wenden Sie sich an einen Administrator.",
-      "editForbidden": "Sie haben keine Berechtigung, öffentliche Links zu bearbeiten. Wenden Sie sich an einen Administrator."
+      "editForbidden": "Sie haben keine Berechtigung, öffentliche Links zu bearbeiten. Wenden Sie sich an einen Administrator.",
+      "saveBeforePublish": "Speichern Sie Ihre Dashboard-Änderungen und veröffentlichen Sie dann.",
+      "upgradedToast": "Dashboard auf das aktuelle Format aktualisiert."
     }
   },
   "panel": {

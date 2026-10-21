@@ -6228,7 +6228,6 @@
       "revoke": "取り消して削除",
       "availableRanges": "閲覧者が選択できる時間範囲",
       "defaultRange": "デフォルトの時間範囲",
-      "refreshEvery": "更新間隔",
       "refreshMonth": "1 か月",
       "defaultVariableValues": "デフォルトの変数値",
       "expiresOptional": "有効期限（任意）",
@@ -7706,8 +7705,6 @@
       "addRange": "時間範囲を追加",
       "removeRange": "{range} を削除",
       "refreshOnce": "1回",
-      "refreshEveryHint": "公開ページが新しいデータを取得する頻度です。短いほど新鮮になりますが、クエリの実行回数が増えます。絶対時間範囲は更新されません。",
-      "refreshFloorHint": "{range} は {interval} ごとに更新されます。これはその長さのウィンドウでの最小の更新間隔です。",
       "refreshOnNextView": "次回表示時に更新",
       "refreshQueuedToast": "リンクは次回表示時に更新されます",
       "createHint": "すぐに応答します。誰かがリンクを開くまでクエリは実行されません。",
@@ -7737,7 +7734,9 @@
       "editAccessRequired": "このダッシュボードの公開リンクを管理するには編集権限が必要です。",
       "actionForbidden": "公開リンクを変更する権限がありません。管理者に問い合わせてください。",
       "createForbidden": "公開リンクを作成する権限がありません。管理者に問い合わせてください。",
-      "editForbidden": "公開リンクを編集する権限がありません。管理者に問い合わせてください。"
+      "editForbidden": "公開リンクを編集する権限がありません。管理者に問い合わせてください。",
+      "saveBeforePublish": "ダッシュボードの変更を保存してから公開してください。",
+      "upgradedToast": "ダッシュボードを現在の形式にアップグレードしました。"
     }
   },
   "panel": {

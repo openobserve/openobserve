@@ -6228,7 +6228,6 @@
       "revoke": "İptal et ve sil",
       "availableRanges": "Görüntüleyenlerin seçebileceği zaman aralıkları",
       "defaultRange": "Varsayılan zaman aralığı",
-      "refreshEvery": "Yenileme aralığı",
       "refreshMonth": "1 ay",
       "defaultVariableValues": "Varsayılan değişken değerleri",
       "expiresOptional": "Sona erme (isteğe bağlı)",
@@ -7706,8 +7705,6 @@
       "addRange": "Zaman aralığı ekle",
       "removeRange": "{range} aralığını kaldır",
       "refreshOnce": "Bir kez",
-      "refreshEveryHint": "Genel sayfa ne sıklıkla yeni veri alır. Daha kısa süre sayfayı daha taze tutar ancak daha fazla sorgu çalıştırır. Mutlak zaman aralıkları yenilenmez.",
-      "refreshFloorHint": "{range} her {interval} yenilenir; bu kadar uzun bir pencere için minimum yenileme sıklığıdır.",
       "refreshOnNextView": "Sonraki görüntülemede yenile",
       "refreshQueuedToast": "Bağlantı bir sonraki görüntülemesinde yenilenir",
       "createHint": "Hemen döner. Biri bağlantıyı açana kadar hiçbir sorgu çalıştırılmaz.",
@@ -7737,7 +7734,9 @@
       "editAccessRequired": "Bu gösterge panosunun genel bağlantılarını yönetmek için düzenleme erişiminiz olmalı.",
       "actionForbidden": "Genel bağlantıları değiştirme izniniz yok. Bir yöneticiye danışın.",
       "createForbidden": "Genel bağlantı oluşturma izniniz yok. Bir yöneticiye danışın.",
-      "editForbidden": "Genel bağlantıları düzenleme izniniz yok. Bir yöneticiye danışın."
+      "editForbidden": "Genel bağlantıları düzenleme izniniz yok. Bir yöneticiye danışın.",
+      "saveBeforePublish": "Gösterge panosundaki değişiklikleri kaydedin, ardından yayımlayın.",
+      "upgradedToast": "Gösterge panosu güncel biçime yükseltildi."
     }
   },
   "panel": {

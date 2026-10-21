@@ -6228,7 +6228,6 @@
       "revoke": "Intrekken en verwijderen",
       "availableRanges": "Tijdsbereiken waaruit bezoekers kunnen kiezen",
       "defaultRange": "Standaardtijdsbereik",
-      "refreshEvery": "Vernieuwen elke",
       "refreshMonth": "1 maand",
       "defaultVariableValues": "Standaardwaarden voor variabelen",
       "expiresOptional": "Verloopt (optioneel)",
@@ -7706,8 +7705,6 @@
       "addRange": "Tijdsbereik toevoegen",
       "removeRange": "{range} verwijderen",
       "refreshOnce": "Eenmalig",
-      "refreshEveryHint": "Hoe vaak de openbare pagina nieuwe gegevens krijgt. Een kortere interval houdt de pagina actueler, maar voert meer query's uit. Absolute tijdsbereiken worden niet ververst.",
-      "refreshFloorHint": "{range} wordt elke {interval} ververst; dat is het minimum voor een venster van die lengte.",
       "refreshOnNextView": "Verversen bij volgende weergave",
       "refreshQueuedToast": "De link wordt bij de volgende weergave ververst",
       "createHint": "Komt direct terug. Er wordt niets opgevraagd totdat iemand de link opent.",
@@ -7737,7 +7734,9 @@
       "editAccessRequired": "Je hebt bewerkrechten op dit dashboard nodig om de openbare links ervan te beheren.",
       "actionForbidden": "Je hebt geen toestemming om openbare links te wijzigen. Vraag een beheerder.",
       "createForbidden": "Je hebt geen toestemming om openbare links te maken. Vraag een beheerder.",
-      "editForbidden": "Je hebt geen toestemming om openbare links te bewerken. Vraag een beheerder."
+      "editForbidden": "Je hebt geen toestemming om openbare links te bewerken. Vraag een beheerder.",
+      "saveBeforePublish": "Sla je dashboardwijzigingen op en publiceer daarna.",
+      "upgradedToast": "Dashboard bijgewerkt naar de huidige indeling."
     }
   },
   "panel": {

@@ -6228,7 +6228,6 @@
       "revoke": "Thu hồi và xóa",
       "availableRanges": "Các khoảng thời gian người xem có thể chọn",
       "defaultRange": "Khoảng thời gian mặc định",
-      "refreshEvery": "Làm mới mỗi",
       "refreshMonth": "1 tháng",
       "defaultVariableValues": "Giá trị biến mặc định",
       "expiresOptional": "Hết hạn (tùy chọn)",
@@ -7706,8 +7705,6 @@
       "addRange": "Thêm khoảng thời gian",
       "removeRange": "Xóa {range}",
       "refreshOnce": "Một lần",
-      "refreshEveryHint": "Tần suất trang công khai nhận dữ liệu mới. Thời gian ngắn hơn giúp dữ liệu mới hơn nhưng chạy nhiều truy vấn hơn. Khoảng thời gian tuyệt đối không làm mới.",
-      "refreshFloorHint": "{range} làm mới mỗi {interval}, là mức tối thiểu cho một khoảng thời gian dài như vậy.",
       "refreshOnNextView": "Làm mới ở lần xem tiếp theo",
       "refreshQueuedToast": "Liên kết sẽ làm mới ở lần xem tiếp theo",
       "createHint": "Trả về ngay lập tức. Không có gì được truy vấn cho đến khi ai đó mở liên kết.",
@@ -7737,7 +7734,9 @@
       "editAccessRequired": "Bạn cần quyền chỉnh sửa bảng điều khiển này để quản lý các liên kết công khai của nó.",
       "actionForbidden": "Bạn không có quyền thay đổi liên kết công khai. Hãy liên hệ quản trị viên.",
       "createForbidden": "Bạn không có quyền tạo liên kết công khai. Hãy liên hệ quản trị viên.",
-      "editForbidden": "Bạn không có quyền chỉnh sửa liên kết công khai. Hãy liên hệ quản trị viên."
+      "editForbidden": "Bạn không có quyền chỉnh sửa liên kết công khai. Hãy liên hệ quản trị viên.",
+      "saveBeforePublish": "Hãy lưu các thay đổi của bảng điều khiển, sau đó công bố.",
+      "upgradedToast": "Đã nâng cấp bảng điều khiển lên định dạng hiện tại."
     }
   },
   "panel": {

@@ -6228,7 +6228,6 @@
       "revoke": "Unieważnij i usuń",
       "availableRanges": "Zakresy czasu, które mogą wybierać widzowie",
       "defaultRange": "Domyślny zakres czasu",
-      "refreshEvery": "Odświeżaj co",
       "refreshMonth": "1 miesiąc",
       "defaultVariableValues": "Domyślne wartości zmiennych",
       "expiresOptional": "Wygasa (opcjonalnie)",
@@ -7706,8 +7705,6 @@
       "addRange": "Dodaj zakres czasu",
       "removeRange": "Usuń {range}",
       "refreshOnce": "Jednorazowo",
-      "refreshEveryHint": "Jak często publiczna strona otrzymuje nowe dane. Krótszy czas utrzymuje ją świeższą, ale wykonuje więcej zapytań. Bezwzględne zakresy czasu nie odświeżają się.",
-      "refreshFloorHint": "{range} odświeża się co {interval}, co jest minimum dla tak długiego okna.",
       "refreshOnNextView": "Odśwież przy następnym wyświetleniu",
       "refreshQueuedToast": "Link odświeży się przy następnym wyświetleniu",
       "createHint": "Zwraca natychmiast. Nic nie jest odpytywane, dopóki ktoś nie otworzy linku.",
@@ -7737,7 +7734,9 @@
       "editAccessRequired": "Aby zarządzać publicznymi linkami tego pulpitu, potrzebujesz uprawnień do edycji.",
       "actionForbidden": "Nie masz uprawnień do zmiany publicznych linków. Skontaktuj się z administratorem.",
       "createForbidden": "Nie masz uprawnień do tworzenia publicznych linków. Skontaktuj się z administratorem.",
-      "editForbidden": "Nie masz uprawnień do edycji publicznych linków. Skontaktuj się z administratorem."
+      "editForbidden": "Nie masz uprawnień do edycji publicznych linków. Skontaktuj się z administratorem.",
+      "saveBeforePublish": "Zapisz zmiany w pulpicie, a następnie opublikuj.",
+      "upgradedToast": "Pulpit został zaktualizowany do bieżącego formatu."
     }
   },
   "panel": {

@@ -6228,7 +6228,6 @@
       "revoke": "Revocar y eliminar",
       "availableRanges": "Rangos de tiempo que los visitantes pueden elegir",
       "defaultRange": "Rango de tiempo predeterminado",
-      "refreshEvery": "Actualizar cada",
       "refreshMonth": "1 mes",
       "defaultVariableValues": "Valores predeterminados de las variables",
       "expiresOptional": "Expira (opcional)",
@@ -7706,8 +7705,6 @@
       "addRange": "Agregar rango de tiempo",
       "removeRange": "Quitar {range}",
       "refreshOnce": "Una vez",
-      "refreshEveryHint": "Con qué frecuencia la página pública obtiene datos nuevos. Un intervalo más corto la mantiene más actualizada, pero ejecuta más consultas. Los rangos de tiempo absolutos no se actualizan.",
-      "refreshFloorHint": "{range} se actualiza cada {interval}, el mínimo para una ventana de esa duración.",
       "refreshOnNextView": "Actualizar en la próxima vista",
       "refreshQueuedToast": "El enlace se actualizará en su próxima vista",
       "createHint": "Se devuelve de inmediato. No se consulta nada hasta que alguien abra el enlace.",
@@ -7737,7 +7734,9 @@
       "editAccessRequired": "Necesitas acceso de edición a este dashboard para gestionar sus enlaces públicos.",
       "actionForbidden": "No tienes permiso para cambiar enlaces públicos. Pídeselo a un administrador.",
       "createForbidden": "No tienes permiso para crear enlaces públicos. Pídeselo a un administrador.",
-      "editForbidden": "No tienes permiso para editar enlaces públicos. Pídeselo a un administrador."
+      "editForbidden": "No tienes permiso para editar enlaces públicos. Pídeselo a un administrador.",
+      "saveBeforePublish": "Guarda los cambios del dashboard y luego publica.",
+      "upgradedToast": "Dashboard actualizado al formato actual."
     }
   },
   "panel": {

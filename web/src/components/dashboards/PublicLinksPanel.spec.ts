@@ -34,6 +34,11 @@ vi.mock("@/services/public_dashboards_admin", () => ({
   },
 }));
 const confirm = vi.hoisted(() => vi.fn());
+vi.mock("@/services/dashboards");
+vi.mock("@/utils/commons", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/utils/commons")>()),
+  updateDashboard: vi.fn(),
+}));
 vi.mock("@/composables/useConfirmDialog", () => ({ useConfirmDialog: () => ({ confirm }) }));
 const notify = vi.hoisted(() => ({ error: vi.fn(), positive: vi.fn() }));
 vi.mock("@/composables/useNotifications", () => ({
@@ -53,6 +58,9 @@ vi.mock("@/composables/useStreamingSearch", () => ({
 }));
 
 import admin, { type PublicLink } from "@/services/public_dashboards_admin";
+import dashboardService from "@/services/dashboards";
+import { getDashboard, updateDashboard } from "@/utils/commons";
+import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
 import PublicLinksPanel from "./PublicLinksPanel.vue";
 
 const ODrawerStub = {
@@ -349,6 +357,35 @@ describe("PublicLinksPanel", () => {
     const [, , linkId, cfg] = vi.mocked(admin.update).mock.calls[0];
     expect(linkId).toBe("l1");
     expect(cfg.frozen_variables).toEqual({ env: "stage" });
+  });
+
+  it("creates a link at the default 5-minute refresh, with no interval to pick", async () => {
+    vi.mocked(admin.list).mockResolvedValue({ data: { list: [] } } as never);
+    vi.mocked(admin.create).mockResolvedValue({ data: link() } as never);
+    const w = build({ variablesConfig: undefined });
+    await flushPromises();
+    expect(has(w, "dashboards-public-links-panel-refresh-select")).toBe(false);
+    (
+      w.vm as unknown as { form: { setFieldValue: (k: string, v: string) => void } }
+    ).form.setFieldValue("name", "NOC wall");
+    await submit(w);
+    expect(vi.mocked(admin.create).mock.calls[0][2].refresh_secs).toBe(300);
+  });
+
+  it("keeps an edited link's own refresh when only its name changes", async () => {
+    vi.mocked(admin.list).mockResolvedValue({
+      data: { list: [link({ refresh_secs: 600 })] },
+    } as never);
+    vi.mocked(admin.update).mockResolvedValue({ data: link() } as never);
+    const w = build({ editLinkId: "l1", variablesConfig: undefined });
+    await flushPromises();
+    expect(has(w, "dashboards-public-links-panel-refresh-select")).toBe(false);
+    (
+      w.vm as unknown as { form: { setFieldValue: (k: string, v: string) => void } }
+    ).form.setFieldValue("name", "Renamed wall");
+    await submit(w);
+    const cfg = vi.mocked(admin.update).mock.calls[0][3];
+    expect(cfg.name).toBe("Renamed wall");
     expect(cfg.refresh_secs).toBe(600);
   });
 
@@ -446,7 +483,6 @@ describe("PublicLinksPanel", () => {
     await w.find('[data-test="dashboards-public-links-panel-range-0-remove-btn"]').trigger("click");
     await flushPromises();
     expect(pickers()).toHaveLength(1);
-    expect(has(w, "dashboards-public-links-panel-refresh-select")).toBe(false);
 
     await submit(w);
     const absolute = { type: "absolute", start: 1_000_000, end: 86_401_000_000 };
@@ -471,26 +507,6 @@ describe("PublicLinksPanel", () => {
     await flushPromises();
     expect(admin.refresh).toHaveBeenCalledWith("default", "dash-1", "l1");
     expect(notify.positive).toHaveBeenCalledWith("The link refreshes on its next view");
-  });
-
-  it("offers refresh intervals from 5 minutes and keeps the link's own", async () => {
-    vi.mocked(admin.list).mockResolvedValue({ data: { list: [link()] } } as never);
-    const w = build({ editLinkId: "l1" });
-    await flushPromises();
-    const options = (
-      w.vm as unknown as {
-        refreshOptions: { value: number; label: string }[];
-      }
-    ).refreshOptions;
-    const byValue = (v: number) => options.find((o) => o.value === v);
-
-    expect(options[0].value).toBe(300);
-    expect(options.some((o) => o.value < 300)).toBe(false);
-    expect(byValue(600)?.label).toBe("10 minutes");
-    expect(byValue(2592000)?.label).toBe("1 month");
-    expect(options.map((o) => o.value)).toEqual(
-      [...options.map((o) => o.value)].sort((a, b) => a - b),
-    );
   });
 
   it.each([
@@ -684,6 +700,137 @@ describe("PublicLinksPanel", () => {
     await submit(w);
     expect(admin.create).toHaveBeenCalledTimes(1);
     expect(has(w, "dashboards-public-links-panel-created")).toBe(true);
+  });
+
+  describe("a dashboard stored at an older schema", () => {
+    const OLDER_FORMAT =
+      "This dashboard uses an older format. Open it and save it once, then publish.";
+    // No variables block, which the viewer fills in on load, so a naive comparison would see an edit.
+    const storedV3 = () => ({
+      version: 3,
+      title: "Legacy",
+      dashboardId: "dash-old",
+      tabs: [
+        {
+          tabId: "default",
+          name: "Default",
+          panels: [
+            {
+              type: "bar",
+              id: "Panel_ID1",
+              title: "Requests",
+              layout: { i: 1, x: 0, y: 0, w: 12, h: 4 },
+              queries: [{ customQuery: false, query: "", fields: { x: [], y: [], filter: [] } }],
+            },
+          ],
+        },
+        { tabId: "t2", name: "Second", panels: [] },
+      ],
+    });
+    // The viewer's own load path; its own id keeps this loaded version away from other specs' dash-1.
+    const load = async (version: number) => {
+      const doc = version === 8 ? convertDashboardSchemaVersion(storedV3()) : storedV3();
+      vi.mocked(dashboardService.get_Dashboard).mockResolvedValue({
+        data: { version, [`v${version}`]: doc, hash: 42 },
+      } as never);
+      store.state.organizationData.allDashboardData = {};
+      return getDashboard(store, "dash-old", "f1");
+    };
+    const publish = async (dashboardData: unknown) => {
+      vi.mocked(admin.list).mockResolvedValue({ data: { list: [] } } as never);
+      vi.mocked(admin.create).mockResolvedValue({ data: link() } as never);
+      const w = build({
+        dashboardId: "dash-old",
+        variablesConfig: undefined,
+        dashboardData,
+        folderId: "f1",
+      });
+      await flushPromises();
+      (
+        w.vm as unknown as { form: { setFieldValue: (k: string, v: string) => void } }
+      ).form.setFieldValue("name", "Wall");
+      await submit(w);
+      return w;
+    };
+
+    it("publishes a current dashboard without saving it", async () => {
+      const w = await publish(await load(8));
+      expect(updateDashboard).not.toHaveBeenCalled();
+      expect(admin.create).toHaveBeenCalledTimes(1);
+      expect(has(w, "dashboards-public-links-panel-created")).toBe(true);
+      expect(notify.positive).not.toHaveBeenCalled();
+    });
+
+    it("saves the upgraded copy once into its folder, then publishes and says so", async () => {
+      const dashboard = await load(3);
+      const w = await publish(dashboard);
+      expect(updateDashboard).toHaveBeenCalledTimes(1);
+      expect(updateDashboard).toHaveBeenCalledWith(store, "default", "dash-old", dashboard, "f1");
+      expect(vi.mocked(updateDashboard).mock.invocationCallOrder[0]).toBeLessThan(
+        vi.mocked(admin.create).mock.invocationCallOrder[0],
+      );
+      expect(has(w, "dashboards-public-links-panel-created")).toBe(true);
+      expect(notify.positive).toHaveBeenCalledTimes(1);
+      expect(notify.positive).toHaveBeenCalledWith("Dashboard upgraded to the current format.");
+      expect(notify.error).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ["a moved panel", (d: any) => (d.tabs[0].panels[0].layout.x = 48)],
+      ["reordered tabs", (d: any) => d.tabs.reverse()],
+    ])("refuses to save %s the author has not saved", async (_, edit) => {
+      const dashboard = await load(3);
+      edit(dashboard);
+      await publish(dashboard);
+      expect(updateDashboard).not.toHaveBeenCalled();
+      expect(admin.create).not.toHaveBeenCalled();
+      expect(notify.error).toHaveBeenCalledWith("Save your dashboard changes, then publish.");
+    });
+
+    it("does not publish when saving the dashboard fails, and shows why", async () => {
+      vi.mocked(updateDashboard).mockRejectedValueOnce({
+        response: { status: 409, data: { message: "Dashboard was modified by another user" } },
+      });
+      const w = await publish(await load(3));
+      expect(admin.create).not.toHaveBeenCalled();
+      expect(notify.error).toHaveBeenCalledWith("Dashboard was modified by another user");
+      expect(has(w, "dashboards-public-links-panel-form")).toBe(true);
+    });
+
+    it("never saves the dashboard when editing an existing link", async () => {
+      const dashboard = await load(3);
+      vi.mocked(admin.list).mockResolvedValue({ data: { list: [link()] } } as never);
+      vi.mocked(admin.update).mockResolvedValue({ data: link() } as never);
+      const w = build({
+        dashboardId: "dash-old",
+        editLinkId: "l1",
+        variablesConfig: undefined,
+        dashboardData: dashboard,
+        folderId: "f1",
+      });
+      await flushPromises();
+      await submit(w);
+      expect(admin.update).toHaveBeenCalledTimes(1);
+      expect(updateDashboard).not.toHaveBeenCalled();
+    });
+
+    it("shows the server's older-format refusal as it is", async () => {
+      vi.mocked(admin.create).mockRejectedValue({
+        response: { status: 400, data: { message: OLDER_FORMAT } },
+      });
+      vi.mocked(admin.list).mockResolvedValue({ data: { list: [] } } as never);
+      const w = build({
+        dashboardId: "dash-old",
+        variablesConfig: undefined,
+        dashboardData: await load(8),
+      });
+      await flushPromises();
+      (
+        w.vm as unknown as { form: { setFieldValue: (k: string, v: string) => void } }
+      ).form.setFieldValue("name", "Wall");
+      await submit(w);
+      expect(notify.error).toHaveBeenCalledWith(OLDER_FORMAT);
+    });
   });
 
   describe("query-based variables", () => {
@@ -890,37 +1037,28 @@ describe("PublicLinksPanel", () => {
       expect(notify.error).not.toHaveBeenCalled();
     });
 
-    it("says create runs no query, and names a range whose floor is above the interval", async () => {
+    it("says create runs no query", async () => {
       vi.mocked(admin.list).mockResolvedValue({ data: { list: [] } } as never);
       const w = build({ variablesConfig: undefined });
       await flushPromises();
       expect(w.find('[data-test="dashboards-public-links-panel-save-hint"]').text()).toBe(
         "Returns at once. Nothing is queried until someone opens the link.",
       );
-      const form = (w.vm as unknown as { form: { setFieldValue: (k: string, v: unknown) => void } })
-        .form;
-      form.setFieldValue("ranges", threeRanges.ranges);
-      await flushPromises();
-      expect(
-        w.find(`[data-test="dashboards-public-links-panel-refresh-floor-r${30 * DAY}"]`).text(),
-      ).toBe("Past 1 month refreshes every 2h 30m, its minimum for a window that long.");
-      expect(has(w, `dashboards-public-links-panel-refresh-floor-r${DAY}`)).toBe(false);
-
-      form.setFieldValue("refreshSecs", 21_600);
-      await flushPromises();
-      expect(has(w, `dashboards-public-links-panel-refresh-floor-r${30 * DAY}`)).toBe(false);
     });
 
-    it("applies the operator minimum the server reports to the hint", async () => {
+    it("applies the operator minimum the server reports to the promised interval", async () => {
       const zo = store.state.zoConfig;
       store.state.zoConfig = { ...zo, public_dashboard_min_refresh_secs: 600 };
       try {
-        vi.mocked(admin.list).mockResolvedValue({ data: { list: [] } } as never);
-        const w = build({ variablesConfig: undefined });
-        await flushPromises();
+        const w = await createLink(
+          async () => ({ data: { link_id: "l1", access_count: 0, ranges: [] } }),
+          link({ refresh_secs: 300 }),
+        );
         expect(
-          w.find('[data-test="dashboards-public-links-panel-refresh-floor-r3600"]').text(),
-        ).toBe("Past 1 hour refreshes every 10m, its minimum for a window that long.");
+          w.find('[data-test="dashboards-public-links-panel-created-build-note"]').text(),
+        ).toBe(
+          "Opening the public page builds the first result. Viewers after that share it for 10 minutes.",
+        );
       } finally {
         store.state.zoConfig = zo;
       }

@@ -6228,7 +6228,6 @@
       "revoke": "해지 및 삭제",
       "availableRanges": "뷰어가 선택할 수 있는 시간 범위",
       "defaultRange": "기본 시간 범위",
-      "refreshEvery": "새로고침 간격",
       "refreshMonth": "1개월",
       "defaultVariableValues": "기본 변수 값",
       "expiresOptional": "만료 (선택 사항)",
@@ -7706,8 +7705,6 @@
       "addRange": "시간 범위 추가",
       "removeRange": "{range} 제거",
       "refreshOnce": "한 번",
-      "refreshEveryHint": "공개 페이지가 새 데이터를 가져오는 주기입니다. 시간이 짧을수록 더 최신 데이터를 유지하지만 쿼리가 더 많이 실행됩니다. 절대 시간 범위는 새로 고치지 않습니다.",
-      "refreshFloorHint": "{range}은 {interval}마다 새로 고칩니다. 이는 해당 기간에 허용되는 최소 주기입니다.",
       "refreshOnNextView": "다음 조회 시 새로 고침",
       "refreshQueuedToast": "링크는 다음 조회 시 새로 고칩니다",
       "createHint": "즉시 반환됩니다. 누군가 링크를 열기 전까지는 아무것도 쿼리되지 않습니다.",
@@ -7737,7 +7734,9 @@
       "editAccessRequired": "이 대시보드의 공개 링크를 관리하려면 편집 액세스 권한이 필요합니다.",
       "actionForbidden": "공개 링크를 변경할 권한이 없습니다. 관리자에게 문의하세요.",
       "createForbidden": "공개 링크를 만들 권한이 없습니다. 관리자에게 문의하세요.",
-      "editForbidden": "공개 링크를 편집할 권한이 없습니다. 관리자에게 문의하세요."
+      "editForbidden": "공개 링크를 편집할 권한이 없습니다. 관리자에게 문의하세요.",
+      "saveBeforePublish": "대시보드 변경 사항을 저장한 후 게시하세요.",
+      "upgradedToast": "대시보드를 현재 형식으로 업그레이드했습니다."
     }
   },
   "panel": {
