@@ -985,4 +985,82 @@ describe("Variables Dependency Utils", () => {
       expect(detectCyclesInScopedGraph(cyclic)).not.toBeNull();
     });
   });
+
+  describe("nested filter groups", () => {
+    const group = {
+      filterType: "group" as const,
+      logicalOperator: "AND",
+      conditions: [
+        {
+          filterType: "condition" as const,
+          type: "condition" as const,
+          column: { field: "a" },
+          operator: "=",
+          value: "$region",
+          values: [],
+          logicalOperator: "AND",
+        },
+        {
+          filterType: "group" as const,
+          logicalOperator: "OR",
+          conditions: [
+            {
+              filterType: "condition" as const,
+              type: "condition" as const,
+              column: { field: "b" },
+              operator: "IN",
+              value: "${env}",
+              values: [],
+              logicalOperator: "AND",
+            },
+          ],
+        },
+      ],
+    };
+
+    it("finds $var references at any depth of filter_group", () => {
+      const graph = buildVariablesDependencyGraph([
+        { name: "region", type: "custom", query_data: undefined },
+        { name: "env", type: "custom", query_data: undefined },
+        {
+          name: "service",
+          type: "query_values",
+          query_data: { stream: "s", field: "f", filter_group: group },
+        },
+      ]);
+      expect(graph.service.parentVariables).toEqual(["region", "env"]);
+      expect(graph.env.childVariables).toEqual(["service"]);
+    });
+
+    it("links nested filter_group parents in the scoped graph and finds a cycle through them", () => {
+      const scoped = buildScopedDependencyGraph(
+        [
+          { name: "region", type: "custom", scope: "global" },
+          { name: "env", type: "custom", scope: "global" },
+          {
+            name: "service",
+            type: "query_values",
+            scope: "global",
+            query_data: { stream: "s", field: "f", filter_group: group },
+          },
+        ],
+        {},
+      );
+      expect(scoped["service@global"].parents).toEqual(["region@global", "env@global"]);
+
+      const cyclic = buildVariablesDependencyGraph([
+        {
+          name: "region",
+          type: "query_values",
+          query_data: { stream: "s", field: "f", filter: [{ name: "x", value: "$service" }] },
+        },
+        {
+          name: "service",
+          type: "query_values",
+          query_data: { stream: "s", field: "f", filter_group: group },
+        },
+      ]);
+      expect(isGraphHasCycle(cyclic)).not.toBeNull();
+    });
+  });
 });

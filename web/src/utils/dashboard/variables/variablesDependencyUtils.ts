@@ -1,5 +1,6 @@
 import { gt } from "@/types/i18n";
 import { isCustomQueryVariable } from "./queryVariableUtils";
+import { getVariableFilterValues, type VariableFilterGroup } from "./variableFilterGroupUtils";
 
 /**
  * Extract variable names from a string
@@ -78,8 +79,8 @@ export const buildVariablesDependencyGraph = (
       }
 
       // 3. Check filter values for variable references (existing logic)
-      for (let filter of isCustom ? [] : (item?.query_data?.filter ?? [])) {
-        const filterDeps = extractVariableNames(filter.value, variablesNameList);
+      for (const value of isCustom ? [] : getVariableFilterValues(item?.query_data)) {
+        const filterDeps = extractVariableNames(value, variablesNameList);
         filterDeps.forEach((dep: string) => allDependencies.add(dep));
       }
 
@@ -207,6 +208,7 @@ interface VariableRuntimeState {
       filter?: string;
       value?: string;
     }>;
+    filter_group?: VariableFilterGroup | null;
   };
 }
 
@@ -375,9 +377,8 @@ export const buildScopedDependencyGraph = (
       }
 
       // 3. Check filter values for variable references (existing logic)
-      const filters = isCustom ? [] : variable.query_data?.filter || [];
-      filters.forEach((filter) => {
-        const filterString = filter.filter || filter.value || "";
+      const filterValues = isCustom ? [] : getVariableFilterValues(variable.query_data);
+      filterValues.forEach((filterString) => {
         const filterParents = extractVariableNames(filterString);
         filterParents.forEach((name) => allParentNames.add(name));
       });

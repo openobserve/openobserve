@@ -16,6 +16,14 @@
 import { CUSTOM_VALUE, SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import { escapeSingleQuotes, splitQuotedString } from "@/utils/zincutils";
 import {
+  conditionToLegacyFilter,
+  getFilterGroupConditions,
+  getVariableFilterGroup,
+  renderFilterGroup,
+  type LegacyVariableFilter,
+  type VariableFilterGroup,
+} from "./variableFilterGroupUtils";
+import {
   normalizeVariableSyntax,
   replaceVariablePlaceholders,
   type VariableFormat,
@@ -59,7 +67,8 @@ export interface QueryVariableData {
   stream?: string;
   field?: string;
   max_record_size?: unknown;
-  filter?: { name?: string; operator?: string; value?: string }[];
+  filter?: LegacyVariableFilter[] | null;
+  filter_group?: VariableFilterGroup | null;
   query_type?: string;
   custom_query?: boolean;
   query?: string;
@@ -178,7 +187,8 @@ export const expandMultiValueFilter = <T extends { operator?: string; value?: st
 
 /** The `label_values(metric{matchers}, label)` query an auto PromQL variable runs. */
 export const buildAutoPromqlQuery = (queryData?: QueryVariableData | null): string => {
-  const matchers = (queryData?.filter ?? [])
+  const matchers = getFilterGroupConditions(getVariableFilterGroup(queryData))
+    .map(conditionToLegacyFilter)
     .filter(
       (filter) =>
         (filter?.name ?? "").trim() && PROMQL_FILTER_OPERATORS.includes(filter.operator ?? ""),
@@ -234,14 +244,24 @@ const sqlCondition = (filter: { name?: string; operator?: string; value?: string
   }
 };
 
+const usableSqlFilter = (filter: LegacyVariableFilter): boolean =>
+  !!(filter?.name ?? "").trim() || filter?.operator === "match_all";
+
+/** The WHERE expression for a filter group; `mapFilter` rewrites each condition first, e.g. `= $var` to IN. */
+export const buildFilterGroupSql = (
+  group: VariableFilterGroup,
+  mapFilter: (filter: LegacyVariableFilter) => LegacyVariableFilter = (filter) => filter,
+): string =>
+  renderFilterGroup(group, (condition) => {
+    const filter = conditionToLegacyFilter(condition);
+    return usableSqlFilter(filter) ? sqlCondition(mapFilter(filter)) : "";
+  });
+
 /** The SQL an auto variable stands for, used to prefill the custom editor. */
 export const buildAutoSqlQuery = (queryData?: QueryVariableData | null): string => {
   const base = `SELECT DISTINCT "${queryData?.field ?? ""}" FROM "${queryData?.stream ?? ""}"`;
-  const conditions = (queryData?.filter ?? [])
-    .filter((filter) => (filter?.name ?? "").trim() || filter?.operator === "match_all")
-    .map(sqlCondition)
-    .filter(Boolean);
-  return conditions.length ? `${base} WHERE ${conditions.join(" AND ")}` : base;
+  const where = buildFilterGroupSql(getVariableFilterGroup(queryData));
+  return where ? `${base} WHERE ${where}` : base;
 };
 
 /** The query text a loader-backed variable runs, before parent values are substituted. */
