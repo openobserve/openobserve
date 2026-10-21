@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <!-- dvh, not vh: mobile browser chrome overlaps a 100vh box. -->
-  <div
+  <main
     class="bg-card-glass-bg h-[100vh] w-[100vw] max-md:h-dvh max-md:w-full max-md:overflow-y-auto"
   >
     <div style="max-width: 25rem; padding-top: 6.25rem" class="mx-auto p-3">
@@ -41,6 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
         <span class="flex w-full justify-center">
           <img
+            :alt="t('common.customLogoAlt')"
             v-if="
               store.state.zoConfig.hasOwnProperty('custom_logo_img') &&
               store.state.zoConfig?.custom_logo_img != null
@@ -97,9 +98,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <div v-else>
-        <div style="font-size: var(--text-xl)" class="w-full pb-3 text-center">
+        <h1 style="font-size: var(--text-xl)" class="w-full pb-3 text-center">
           {{ t("login.login") }}
-        </div>
+        </h1>
 
         <div v-if="showSSO" class="flex justify-center">
           <OButton
@@ -114,6 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="absolute"
                 style="width: 1.875rem; left: 1rem"
                 :src="getImageURL('images/common/sso.svg')"
+                alt=""
               />
               <span class="text-center"> {{ t("login.loginWithSso") }}</span>
             </div>
@@ -121,17 +123,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div v-if="showSSO && showInternalLogin" class="py-3 text-center">
-          <a
-            class="hover:text-text-secondary cursor-pointer py-3"
-            style="text-decoration: underline"
+          <OButton
+            variant="ghost-primary"
+            type="button"
             data-test="login-as-internal-user"
-            @click="loginAsInternalUser = !loginAsInternalUser"
-            >{{ t("login.loginAsInternalUser") }}</a
+            :aria-expanded="loginAsInternalUser"
+            aria-controls="login-internal-form"
+            @click="toggleInternalLogin"
           >
+            {{ t("login.loginAsInternalUser") }}
+          </OButton>
         </div>
 
         <div
           v-if="!showSSO || (showSSO && loginAsInternalUser && showInternalLogin)"
+          id="login-internal-form"
           class="login-inputs"
         >
           <!-- Only retry_after is shown, never the attempt counters or the thresholds behind them. -->
@@ -159,6 +165,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :label="t('login.userEmail')"
               :placeholder="t('login.email')"
               type="email"
+              autocomplete="username"
               required
             />
 
@@ -169,8 +176,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :label="t('login.password')"
               :placeholder="t('login.password')"
               type="password"
+              autocomplete="current-password"
               required
             />
+
+            <p
+              v-if="loginError"
+              role="alert"
+              class="text-input-error-text text-sm"
+              data-test="login-error-message"
+            >
+              {{ loginError }}
+            </p>
 
             <OButton
               data-cy="login-sign-in"
@@ -188,11 +205,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
-  </div>
+  </main>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onBeforeMount, onBeforeUnmount, computed } from "vue";
+import { defineComponent, ref, nextTick, onBeforeMount, onBeforeUnmount, computed } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 
@@ -262,6 +279,14 @@ export default defineComponent({
     const submitting = ref(false);
 
     const loginAsInternalUser = ref(false);
+    const loginError = ref("");
+
+    const toggleInternalLogin = async () => {
+      loginAsInternalUser.value = !loginAsInternalUser.value;
+      if (!loginAsInternalUser.value) return;
+      await nextTick();
+      document.querySelector<HTMLInputElement>('[data-test="login-user-id-field"]')?.focus();
+    };
 
     // Zod schema for the internal-user login form (email + required password).
     // Built via the i18n factory and RETURNED from setup() so `:schema` resolves
@@ -329,6 +354,7 @@ export default defineComponent({
         });
       } else {
         submitting.value = true;
+        loginError.value = "";
         try {
           //authorize user using username and password
           authService
@@ -478,11 +504,7 @@ export default defineComponent({
                 startLockoutCountdown(retryAfter);
                 return;
               }
-              //if any error occurs, show error message and reset form.
-              toast({
-                variant: "error",
-                message: t("toastMessages.login.invalidUsernameOrPassword"),
-              });
+              loginError.value = t("toastMessages.login.invalidUsernameOrPassword");
             });
         } catch (e) {
           submitting.value = false;
@@ -512,6 +534,8 @@ export default defineComponent({
       store,
       getImageURL,
       loginAsInternalUser,
+      loginError,
+      toggleInternalLogin,
       showSSO,
       showInternalLogin,
       loginWithSSo,

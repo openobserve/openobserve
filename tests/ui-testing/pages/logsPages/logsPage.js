@@ -11618,9 +11618,18 @@ export class LogsPage {
      * is positioned at a location where suggestions can be provided.
      */
     async triggerEditorSuggestions() {
-        // Focus the editor's input area (click auto-waits for actionability)
-        const inputArea = this.page.locator('[data-test="logs-search-bar-query-editor"] .inputarea');
-        await inputArea.click({ force: true });
+        // A click lands wherever the textarea sits and can move the caret into a word; pin it to the end instead.
+        const placed = await this.page.evaluate((selector) => {
+            const host = document.querySelector(selector);
+            const ed = window.monaco?.editor?.getEditors?.().find((e) => host?.contains(e.getDomNode()));
+            if (!ed) return false;
+            const model = ed.getModel();
+            const lastLine = model.getLineCount();
+            ed.focus();
+            ed.setPosition({ lineNumber: lastLine, column: model.getLineMaxColumn(lastLine) });
+            return true;
+        }, this.queryEditor);
+        if (!placed) throw new Error('Monaco query editor not found to place the caret');
         // Trigger suggestion widget and wait for it to appear
         await this.page.keyboard.press('Control+Space');
         await this.waitForSuggestionWidgetVisible();

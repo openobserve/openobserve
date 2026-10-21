@@ -1847,6 +1847,14 @@ describe("IncidentDetailDrawer.vue", () => {
       ...overrides,
     });
 
+    beforeEach(() => {
+      store.state.zoConfig.oncall_enabled = true;
+    });
+
+    afterEach(() => {
+      delete store.state.zoConfig.oncall_enabled;
+    });
+
     const withRecords = async (records: unknown[]) => {
       (oncallService.listResponsesForIncident as any).mockResolvedValue({ data: records });
       (oncallService.listTeams as any).mockResolvedValue({
@@ -1922,6 +1930,15 @@ describe("IncidentDetailDrawer.vue", () => {
     it("renders nothing when on-call does not answer", async () => {
       wrapper = await createWrapper({}, {}, "1");
       await flushPromises();
+      expect(wrapper.find('[data-test="incident-oncall-panel"]').exists()).toBe(false);
+    });
+
+    /// Cloud answers the unregistered on-call route with a 401, and a 401 logs the user out.
+    it("does not ask for on-call records when on-call is off", async () => {
+      store.state.zoConfig.oncall_enabled = false;
+      wrapper = await createWrapper({}, {}, "1");
+      await flushPromises();
+      expect(oncallService.listResponsesForIncident).not.toHaveBeenCalled();
       expect(wrapper.find('[data-test="incident-oncall-panel"]').exists()).toBe(false);
     });
   });

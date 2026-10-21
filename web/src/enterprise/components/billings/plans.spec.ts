@@ -24,6 +24,7 @@ import * as zincutils from "@/utils/zincutils";
 import { nextTick } from "vue";
 import analytics from "@/services/product_analytics";
 import config from "@/aws-exports";
+import { siteURL } from "@/constants/config";
 
 vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
@@ -80,6 +81,8 @@ vi.mock("@/aws-exports", () => ({
 vi.mock("./enterprisePlan.vue", () => ({
   default: {
     name: "EnterprisePlan",
+    props: ["features", "price", "pricingError"],
+    emits: ["retry-pricing"],
     template: "<div>Enterprise Plan Component</div>",
   },
 }));
@@ -87,6 +90,21 @@ vi.mock("./enterprisePlan.vue", () => ({
 vi.mock("./proPlan.vue", () => ({
   default: {
     name: "ProPlan",
+    props: [
+      "planType",
+      "billingProvider",
+      "subscriptionType",
+      "features",
+      "pricingOptions",
+      "additionalInfo",
+      "pricingError",
+    ],
+    emits: [
+      "retry-pricing",
+      "contact-sales",
+      "update:proSubscription",
+      "update:cancelSubscription",
+    ],
     template: "<div>Pro Plan Component</div>",
   },
 }));
@@ -775,5 +793,156 @@ describe("Plans Component", () => {
     await wrapper.get('[data-test="billing-ai-contact-sales"]').trigger("click");
     expect(open).toHaveBeenCalledWith("https://openobserve.ai/contactus/", "_blank");
     open.mockRestore();
+  });
+  describe("pricing JSON", () => {
+    const proFeaturesOld = [
+      { title: "Logs, Metrics, Traces, RUM, Session Replay, Error tracking" },
+      { title: "Ingestion", price: "$0.50 per GB*", isSubItem: true },
+      { title: "Query", price: "$0.01 per GB", isSubItem: true },
+    ];
+    const enterprisePlan = {
+      title: "Enterprise",
+      price: "Custom",
+      priceNote: "volume discounts, BYOB",
+      features: [{ title: "Pipelines" }, { title: "SLAs" }],
+    };
+    const oldJson = {
+      data: [
+        {
+          cloud: [
+            {
+              title: "Cloud Professional",
+              price: "$0.50",
+              period: "/GB ingested",
+              priceNote: "+ $0.01/GB queried · billed monthly",
+              additionalInfo: "*Includes 30% discount for annual commitment",
+              features: proFeaturesOld,
+            },
+            enterprisePlan,
+          ],
+        },
+      ],
+    };
+    const newJson = {
+      data: [
+        {
+          cloud: [
+            {
+              title: "Cloud Professional",
+              price: "$0.70",
+              period: "/GB ingested",
+              pricingOptions: [
+                {
+                  label: "Pay as you go",
+                  price: "$0.70",
+                  period: "/GB ingested",
+                  note: "No commitment, billed monthly",
+                },
+                {
+                  label: "Annual contract",
+                  price: "$0.50",
+                  period: "/GB ingested",
+                  note: "12-month commitment",
+                  badge: "Save 28%",
+                },
+              ],
+              features: [
+                { title: "Logs, Metrics, Traces, RUM, Session Replay, Error tracking" },
+                {
+                  title: "Ingestion, pay as you go",
+                  price: "$0.70 per GB",
+                  isSubItem: true,
+                  inPriceBlock: true,
+                },
+                {
+                  title: "Ingestion, annual contract",
+                  price: "$0.50 per GB",
+                  isSubItem: true,
+                  inPriceBlock: true,
+                },
+                { title: "Query", price: "$0.01 per GB", isSubItem: true },
+              ],
+            },
+            enterprisePlan,
+          ],
+        },
+      ],
+    };
+    const loadPricing = async (json: unknown) => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => ({ json: async () => json })),
+      );
+      await wrapper.vm.fetchPricingData();
+      vi.unstubAllGlobals();
+    };
+
+    it("maps pricing options and skips the rows they replace", async () => {
+      await loadPricing(newJson);
+      expect(wrapper.vm.proPlanPricingOptions.map((o: any) => o.price)).toEqual(["$0.70", "$0.50"]);
+      expect(wrapper.vm.proPlanPricingOptions[1].badge).toBe("Save 28%");
+      expect(wrapper.vm.proPlanFeatures.map((f: any) => f.name)).toEqual([
+        "Logs, Metrics, Traces, RUM, Session Replay, Error tracking",
+        "Query",
+      ]);
+      expect(wrapper.vm.enterprisePlanPrice).toEqual({
+        price: "Custom",
+        note: "volume discounts, BYOB",
+      });
+      expect(wrapper.vm.enterprisePlanFeatures.map((f: any) => f.name)).toEqual([
+        "Pipelines",
+        "SLAs",
+      ]);
+      expect(wrapper.vm.proPlanAdditionalInfo).toBe("");
+    });
+
+    it("drops the footnote when pricing options replace the asterisked row", async () => {
+      const plan = { ...newJson.data[0].cloud[0], additionalInfo: "*Includes 30% discount" };
+      await loadPricing({ data: [{ cloud: [plan, enterprisePlan] }] });
+      expect(wrapper.vm.proPlanPricingOptions).toHaveLength(2);
+      expect(wrapper.vm.proPlanAdditionalInfo).toBe("");
+    });
+
+    it("passes the mapped pricing down to both plan cards", async () => {
+      await flushPromises();
+      await loadPricing(newJson);
+      await nextTick();
+      const pro = wrapper.findComponent({ name: "ProPlan" });
+      expect(pro.props("pricingOptions").map((o: any) => o.price)).toEqual(["$0.70", "$0.50"]);
+      expect(pro.props("additionalInfo")).toBe("");
+      expect(pro.props("features").map((f: any) => f.name)).toEqual([
+        "Logs, Metrics, Traces, RUM, Session Replay, Error tracking",
+        "Query",
+      ]);
+      const enterprise = wrapper.findComponent({ name: "EnterprisePlan" });
+      expect(enterprise.props("price")).toEqual({
+        price: "Custom",
+        note: "volume discounts, BYOB",
+      });
+      expect(enterprise.props("features").map((f: any) => f.name)).toEqual(["Pipelines", "SLAs"]);
+    });
+
+    it("opens the contact page when the pro card asks for sales", async () => {
+      const open = vi.spyOn(window, "open").mockImplementation(() => null);
+      await flushPromises();
+      await wrapper.findComponent({ name: "ProPlan" }).vm.$emit("contact-sales");
+      expect(open).toHaveBeenCalledWith(siteURL.contactSales, "_blank");
+      expect(analytics.track).toHaveBeenCalledWith("billing_contact_sales_clicked", {
+        plan: "annual-contract",
+      });
+      open.mockRestore();
+    });
+
+    it("keeps every row and shows no price block for the old JSON", async () => {
+      await loadPricing(oldJson);
+      expect(wrapper.vm.proPlanPricingOptions).toEqual([]);
+      expect(wrapper.vm.enterprisePlanPrice).toBeNull();
+      expect(wrapper.vm.proPlanAdditionalInfo).toBe("*Includes 30% discount for annual commitment");
+      expect(wrapper.vm.proPlanFeatures.map((f: any) => f.name)).toEqual([
+        "Logs, Metrics, Traces, RUM, Session Replay, Error tracking",
+        "Ingestion",
+        "Query",
+      ]);
+    });
   });
 });
