@@ -1,6 +1,7 @@
 """AC-5.3, AC-5.4 and AC-5.5: who may change Slack, with OpenFGA off (section 7 permission rule); row 24 with it on."""
 from __future__ import annotations
 
+import base64
 import time
 import uuid
 
@@ -223,11 +224,23 @@ def test_promql_range_exemplars_and_series_check_the_metric_for_every_user(clien
                 assert "h1" not in got.text, f"{route} {name}: {got.text[:300]}"
 
 
+def index_field(client: OpenObserveClient, org: str, stream: str, field: str) -> None:
+    keys = {"add": [field], "remove": []}
+    resp = client.put(
+        f"streams/{stream}/settings?type=logs",
+        json={"full_text_search_keys": keys},
+        org=org,
+    )
+    assert resp.status_code == 200, resp.text
+
+
 def test_stream_list_with_schema_omits_fields_of_streams_the_caller_cannot_read(client: OpenObserveClient) -> None:
     org = rbac_org(client)
     hidden, readable = f"rbac_hidden_l_{uuid.uuid4().hex[:6]}", f"rbac_readable_l_{uuid.uuid4().hex[:6]}"
     ingest_logs(client, org, hidden, {"hidden_card_bin": "4111"})
     ingest_logs(client, org, readable, {"readable_field": "r"})
+    index_field(client, org, hidden, "hidden_card_bin")
+    index_field(client, org, readable, "readable_field")
     user = role_user(client, org, [(f"logs:_all_{org}", "AllowList"), (f"logs:{readable}", "AllowAll")])
     assert user.get(f"streams/{hidden}/schema", params={"type": "logs"}, org=org).status_code == 403
 
@@ -236,9 +249,55 @@ def test_stream_list_with_schema_omits_fields_of_streams_the_caller_cannot_read(
     assert "hidden_card_bin" not in full.text
     plain = user.get("streams", params={"type": "logs"}, org=org)
     assert plain.status_code == 200, plain.text
+    assert "hidden_card_bin" not in plain.text, "stream settings name fields too"
+    assert "readable_field" in plain.text
     with_schema = {s["name"]: s for s in full.json()["list"]}
     without = {s["name"]: s for s in plain.json()["list"]}
     assert set(with_schema) == set(without), "fetchSchema must not change which streams are listed"
     assert with_schema[hidden]["schema"] == without[hidden]["schema"] == []
     assert with_schema[hidden]["total_fields"] == without[hidden]["total_fields"] == 0
     assert "readable_field" in {f["name"] for f in with_schema[readable]["schema"]}
+
+
+def test_promql_series_without_a_match_lists_nothing_for_a_user_with_a_metric_grant(client: OpenObserveClient) -> None:
+    org = rbac_org(client)
+    user = role_user(client, org, [(f"metrics:rbac_granted_m_{uuid.uuid4().hex[:6]}", "AllowAll")])
+    now = int(time.time())
+    got = user.get("prometheus/api/v1/series", params={"start": now - 600, "end": now + 60}, org=org)
+    assert got.status_code == 200, got.text
+    assert got.json()["data"] == []
+
+
+def multi_stream_body(sql: str) -> dict:
+    end = int(time.time() * 1_000_000) + 60_000_000
+    encoded = base64.urlsafe_b64encode(sql.encode()).decode()
+    return {
+        "sql": [{"sql": encoded, "start_time": end - 3_600_000_000, "end_time": end}],
+        "encoding": "base64",
+        "start_time": end - 3_600_000_000,
+        "end_time": end,
+        "from": 0,
+        "size": 10,
+    }
+
+
+def test_multi_stream_search_checks_base64_sql_after_decoding_it(client: OpenObserveClient) -> None:
+    org = rbac_org(client)
+    hidden, shared = f"rbac_hidden_ms_{uuid.uuid4().hex[:6]}", f"rbac_shared_ms_{uuid.uuid4().hex[:6]}"
+    ingest_logs(client, org, hidden, {"hidden_marker": "h"})
+    ingest_logs(client, org, shared, {"shared_marker": "s"})
+    wait_for_rows(client, org, hidden)
+    wait_for_rows(client, org, shared)
+    user = role_user(client, org, [(f"logs:{shared}", "AllowAll")])
+
+    path = "_search_multi_stream?type=logs"
+    shared_body, hidden_body = (multi_stream_body(f'SELECT * FROM "{s}"') for s in (shared, hidden))
+    for caller in (client, user):
+        got = caller.post(path, json=shared_body, org=org)
+        assert got.status_code == 200, got.text[:300]
+        assert "[[DONE]]" in got.text, got.text[:300]
+    root_hidden = client.post(path, json=hidden_body, org=org)
+    assert root_hidden.status_code == 200, root_hidden.text[:300]
+    refused = user.post(path, json=hidden_body, org=org)
+    assert refused.status_code == 403, refused.text[:300]
+    assert "hidden_marker" not in refused.text
