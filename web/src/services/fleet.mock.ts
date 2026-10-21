@@ -247,7 +247,6 @@ function configOf(id: string, description: string, versions: number): FleetConfi
   return {
     id,
     description,
-    template: false,
     latest_version: versions,
     live_version: versions > 1 ? versions - 1 : null,
     collectors: 0,

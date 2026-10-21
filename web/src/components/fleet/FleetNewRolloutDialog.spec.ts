@@ -47,7 +47,6 @@ vi.mock("@/services/fleet", () => ({
 const config = (id: string, latest: number) => ({
   id,
   description: "",
-  template: false,
   latest_version: latest,
   live_version: null,
   collectors: 0,

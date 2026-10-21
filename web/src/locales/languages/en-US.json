@@ -25069,7 +25069,10 @@
         "traces": "{value} spans/min"
       },
       "expandMap": "Expand map",
-      "collapseMap": "Collapse map"
+      "collapseMap": "Collapse map",
+      "zoomIn": "Zoom in",
+      "zoomOut": "Zoom out",
+      "fitView": "Fit to view"
     },
     "pipelines": {
       "fleets": "Fleets",
@@ -25209,9 +25212,6 @@
     },
     "configs": {
       "search": "Search configurations",
-      "configs": "Configurations",
-      "templates": "Templates",
-      "template": "Template",
       "newConfig": "New configuration",
       "validate": "Validate",
       "rolloutCreated": "Rollout created",
@@ -25571,7 +25571,8 @@
       "edgeEvidence": "Reported by the exporter to {destination}",
       "throughput": "Throughput {rate}",
       "noIssues": "No issues",
-      "openConfig": "Open config",
+      "openConfig": "View config",
+      "openFleet": "Open fleet",
       "issuesOnly": "Issues only",
       "legendError": "Error",
       "legendWarning": "Warning",

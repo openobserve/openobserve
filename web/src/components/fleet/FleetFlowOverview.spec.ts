@@ -368,6 +368,17 @@ describe("FleetFlowOverview actions", () => {
     expect(router.currentRoute.value.query).toEqual({ org_identifier: "acme" });
   });
 
+  it("opens the fleet from its node and from a pipeline, never from a destination", async () => {
+    serve(basePipelines());
+    await mountOverview();
+    await clickNode("f:prod");
+    expect(details().props("fleetId")).toBe("prod");
+    details().vm.$emit("open-fleet");
+    expect(wrapper.emitted("navigate")?.at(-1)).toEqual(["fleets", { fleet: "prod" }]);
+    await clickNode(`d:${D1.id}`);
+    expect(details().props("fleetId")).toBeNull();
+  });
+
   it("offers no configuration for a destination", async () => {
     serve(basePipelines());
     await mountOverview();

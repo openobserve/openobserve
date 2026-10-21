@@ -122,8 +122,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :nodes-focusable="false"
           :edges-focusable="false"
           :zoom-on-scroll="false"
-          :min-zoom="1"
-          :max-zoom="1.25"
+          :min-zoom="0.5"
+          :max-zoom="2"
           class="h-full w-full"
           @node-click="onNodeClick"
           @edge-click="onEdgeClick"
@@ -155,6 +155,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </VueFlow>
 
         <div
+          v-if="canvasWidth && !forbidden"
+          class="rounded-default border-border-default bg-surface-panel absolute right-3 bottom-3 z-10 flex flex-col overflow-hidden border"
+          data-test="fleet-flow-overview-zoom"
+        >
+          <OButton
+            variant="ghost"
+            size="icon-sm"
+            icon-left="add"
+            class="rounded-none"
+            :aria-label="t('fleet.flow.zoomIn')"
+            data-test="fleet-flow-overview-zoom-in"
+            @click="zoomIn({ duration: 150 })"
+          >
+            <OTooltip side="left" :content="t('fleet.flow.zoomIn')" />
+          </OButton>
+          <OSeparator />
+          <OButton
+            variant="ghost"
+            size="icon-sm"
+            icon-left="remove"
+            class="rounded-none"
+            :aria-label="t('fleet.flow.zoomOut')"
+            data-test="fleet-flow-overview-zoom-out"
+            @click="zoomOut({ duration: 150 })"
+          >
+            <OTooltip side="left" :content="t('fleet.flow.zoomOut')" />
+          </OButton>
+          <OSeparator />
+          <OButton
+            variant="ghost"
+            size="icon-sm"
+            icon-left="fullscreen"
+            class="rounded-none"
+            :aria-label="t('fleet.flow.fitView')"
+            data-test="fleet-flow-overview-fit"
+            @click="fitView({ duration: 150, padding: 0.1 })"
+          >
+            <OTooltip side="left" :content="t('fleet.flow.fitView')" />
+          </OButton>
+        </div>
+
+        <div
           v-if="details"
           ref="popoverEl"
           class="absolute top-0 left-0 z-20 [transform:var(--fleet-popover-at)] max-md:max-w-[calc(100%-1rem)]"
@@ -167,10 +209,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :restricted="metricsRestricted"
             :issues="details.issues"
             :hide-config="!details.configId"
+            :fleet-id="details.fleetId"
             class="max-h-112"
             @close="selection = null"
             @action="runAction"
             @open-config="details.configId && openConfig(details.configId)"
+            @open-fleet="details.fleetId && emit('navigate', 'fleets', { fleet: details.fleetId })"
           />
         </div>
 
@@ -246,6 +290,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
@@ -312,7 +357,7 @@ const worstOf = (list: PathSeverity[]): PathSeverity =>
   (list.includes("restricted") ? "restricted" : "healthy");
 
 const flowId = "fleet-flow-overview";
-const { setViewport } = useVueFlow(flowId);
+const { setViewport, zoomIn, zoomOut, fitView } = useVueFlow(flowId);
 // SVG fill on the background dots, the one place a token is read by var().
 const dotColor = "var(--color-border-strong)";
 // Layout is in screen pixels at zoom 1: readable text beats fitting everything on screen.
@@ -660,6 +705,7 @@ const details = computed(() => {
       throughput: perSecond(p.out_rate, p.signal),
       issues: issuesOf(p),
       configId: fleetById.value.get(p.fleet)?.config ?? null,
+      fleetId: p.fleet,
     };
   }
   if (sel.kind === "fleet") {
@@ -670,6 +716,7 @@ const details = computed(() => {
       throughput: perSecond(fleetRate(f.id)),
       issues: fleetIssueMap.value[f.id] ?? [],
       configId: f.config,
+      fleetId: f.id,
     };
   }
   const n = mapNodeById.value.get(sel.id);
@@ -680,6 +727,7 @@ const details = computed(() => {
     throughput: perSecond(n.rate, nodeSignal(n)),
     issues: uniqueIssues(through.flatMap(issuesOf)),
     configId: n.column === "destination" ? null : (fleetById.value.get(n.fleet)?.config ?? null),
+    fleetId: n.column === "destination" ? null : n.fleet,
   };
 });
 

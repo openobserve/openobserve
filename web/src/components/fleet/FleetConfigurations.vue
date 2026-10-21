@@ -35,20 +35,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <template #toolbar>
         <div class="flex w-full min-w-0 items-center gap-2 max-md:contents">
-          <OToggleGroup
-            mobile-dropdown
-            :model-value="kindFilter"
-            data-test="fleet-configurations-kind-filter"
-            @update:model-value="(v) => (kindFilter = v as string)"
-          >
-            <OToggleGroupItem value="all" size="sm">{{ t("fleet.common.all") }}</OToggleGroupItem>
-            <OToggleGroupItem value="configs" size="sm">{{
-              t("fleet.configs.configs")
-            }}</OToggleGroupItem>
-            <OToggleGroupItem value="templates" size="sm">
-              {{ t("fleet.configs.templates") }}
-            </OToggleGroupItem>
-          </OToggleGroup>
           <div class="min-w-0 flex-1 max-md:min-w-40">
             <OSearchInput
               v-model="search"
@@ -81,15 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <template #cell-name="{ row }">
         <div class="flex min-w-0 flex-col">
-          <span class="inline-flex min-w-0 items-center gap-2">
-            <span class="truncate font-medium">{{ row.name }}</span>
-            <OTag
-              v-if="row.template"
-              variant="indigo-soft"
-              size="xs"
-              :label="t('fleet.configs.template')"
-            />
-          </span>
+          <span class="truncate font-medium">{{ row.name }}</span>
           <span class="text-text-secondary truncate text-xs">{{ row.description }}</span>
         </div>
       </template>
@@ -145,12 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <template #empty>
         <div data-test="fleet-configurations-empty">
-          <OEmptyState
-            size="hero"
-            preset="no-data"
-            :filtered="!!search || kindFilter !== 'all'"
-            @action="clearFilters"
-          />
+          <OEmptyState size="hero" preset="no-data" :filtered="!!search" @action="clearFilters" />
         </div>
       </template>
 
@@ -168,8 +141,6 @@ import { computed, ref } from "vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
-import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
-import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -182,7 +153,6 @@ import { isForbidden, setPendingImport, useFleetConfigs, type ConfigRow } from "
 const { t } = useI18nTyped();
 
 const search = ref("");
-const kindFilter = ref("all");
 const fileInput = ref<HTMLInputElement | null>(null);
 const route = useRoute();
 const router = useRouter();
@@ -197,11 +167,7 @@ const loadError = computed(() =>
 const refresh = () => list.refetch();
 
 const rows = computed(() =>
-  list.rows.value.filter((c) => {
-    if (kindFilter.value === "templates" && !c.template) return false;
-    if (kindFilter.value === "configs" && c.template) return false;
-    return c.name.includes(search.value.trim().toLowerCase());
-  }),
+  list.rows.value.filter((c) => c.name.includes(search.value.trim().toLowerCase())),
 );
 
 const columns = computed<OTableColumnDef<ConfigRow>[]>(() => [
@@ -233,7 +199,6 @@ const columns = computed<OTableColumnDef<ConfigRow>[]>(() => [
 
 function clearFilters() {
   search.value = "";
-  kindFilter.value = "all";
 }
 
 // The org lives in the URL, so a link that drops it lands the editor in the default org.

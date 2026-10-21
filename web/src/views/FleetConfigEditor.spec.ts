@@ -96,7 +96,6 @@ const LOSSY = "receivers:\n  filelog:\n    include: [a.log, b.log]\n";
 const detail = (over: Record<string, unknown> = {}) => ({
   id: "edge",
   description: "Edge devices",
-  template: false,
   latest_version: 0,
   live_version: null,
   collectors: 0,

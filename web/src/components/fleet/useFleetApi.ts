@@ -118,7 +118,6 @@ export interface ConfigRow {
   /** The id; the list sorts and searches on `name`. */
   name: string;
   description: string;
-  template: boolean;
   /** The latest published version, 0 before the first publish. */
   version: number;
   liveVersion: number | null;
@@ -295,7 +294,6 @@ export function toConfigRow(c: FleetConfigItem): ConfigRow {
     id: c.id,
     name: c.id,
     description: c.description ?? "",
-    template: !!c.template,
     version: c.latest_version ?? 0,
     liveVersion: c.live_version ?? null,
     collectors: c.collectors ?? 0,

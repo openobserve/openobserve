@@ -405,7 +405,6 @@ describe("serverMessage", () => {
 const apiConfig = (over: Partial<FleetConfigItem> = {}): FleetConfigItem => ({
   id: "edge-minimal",
   description: "Edge",
-  template: false,
   latest_version: 3,
   live_version: null,
   collectors: 0,
@@ -423,7 +422,6 @@ describe("toConfigRow", () => {
       id: "edge-minimal",
       name: "edge-minimal",
       description: "Edge",
-      template: false,
       version: 3,
       liveVersion: null,
       collectors: 0,

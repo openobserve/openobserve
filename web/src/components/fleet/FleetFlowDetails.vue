@@ -69,13 +69,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <div
-      v-if="!hideConfig"
+      v-if="fleetId || !hideConfig"
       class="border-border-default flex items-center gap-2 border-t px-4 py-2.5"
     >
       <OButton
-        variant="ghost"
+        v-if="fleetId"
+        variant="outline"
         size="xs"
-        icon-left="edit"
+        icon-left="folder-open"
+        data-test="fleet-flow-details-open-fleet"
+        @click="emit('open-fleet')"
+      >
+        {{ t("fleet.flowIssues.openFleet") }}
+      </OButton>
+      <OButton
+        v-if="!hideConfig"
+        variant="outline"
+        size="xs"
+        icon-left="visibility"
         data-test="fleet-flow-details-open-config"
         @click="emit('open-config')"
       >
@@ -100,11 +111,14 @@ defineProps<{
   issues: PathIssue[];
   /** Nothing to open, such as for a destination. */
   hideConfig?: boolean;
+  /** The fleet behind the selection; a destination has none. */
+  fleetId?: string | null;
 }>();
 const emit = defineEmits<{
   close: [];
   action: [action: IssueAction];
   "open-config": [];
+  "open-fleet": [];
 }>();
 
 const { t } = useI18nTyped();

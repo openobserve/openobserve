@@ -35,7 +35,6 @@ vi.mock("@/services/fleet", () => ({ default: { listConfigs: vi.fn() } }));
 const config = (over: Record<string, unknown> = {}) => ({
   id: "edge-minimal",
   description: "Edge devices",
-  template: false,
   latest_version: 3,
   live_version: null,
   collectors: 0,
@@ -47,7 +46,7 @@ const config = (over: Record<string, unknown> = {}) => ({
 
 const items = [
   config(),
-  config({ id: "org-baseline", description: "Baseline", template: true, latest_version: 0 }),
+  config({ id: "org-baseline", description: "Baseline", latest_version: 0 }),
 ];
 
 const router = createRouter({
@@ -128,14 +127,6 @@ describe("FleetConfigurations", () => {
     expect(text).toContain("edge-minimal");
     expect(text).toContain("org-baseline");
     expect(text).toContain("v3");
-  });
-
-  it("filters templates over the API rows", async () => {
-    wrapper = await mountList();
-    wrapper.findComponent(OToggleGroup).vm.$emit("update:modelValue", "templates");
-    await settle();
-    expect(bodyText(wrapper)).toContain("org-baseline");
-    expect(bodyText(wrapper)).not.toContain("edge-minimal");
   });
 
   it("searches the API rows by name", async () => {

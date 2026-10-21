@@ -177,7 +177,6 @@ export interface FleetCreatedToken extends FleetToken {
 export interface FleetConfigItem {
   id: string;
   description: string;
-  template: boolean;
   latest_version: number;
   live_version: number | null;
   collectors: number;
