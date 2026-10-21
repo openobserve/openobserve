@@ -18,6 +18,7 @@ import {
   buildKioskQuery,
   computeFitCellHeight,
   formatAge,
+  formatClockTime,
   formatRefreshLabel,
   formatRelativePeriod,
   hungAfterMs,
@@ -29,6 +30,7 @@ import {
   retryDelayMs,
   staleAfterMs,
   stripKioskParams,
+  summarizePanelError,
 } from "./kiosk";
 import type { TranslateFn } from "@/types/i18n";
 
@@ -144,6 +146,14 @@ describe("buildKioskQuery", () => {
 });
 
 describe("kiosk helpers", () => {
+  it("formats a 24-hour clock time in the given timezone, with or without seconds", () => {
+    const at = Date.UTC(2026, 9, 14, 23, 16, 30);
+    expect(formatClockTime(at, "UTC")).toBe("23:16:30");
+    expect(formatClockTime(at, "Asia/Kolkata")).toBe("04:46:30");
+    expect(formatClockTime(at, "UTC", false)).toBe("23:16");
+    expect(formatClockTime(at, "Not/AZone")).toMatch(/^\d{2}:\d{2}:\d{2}$/);
+  });
+
   it("words the age of the last update like the app's other refresh indicators", () => {
     expect(formatAge(2000, t)).toBe("refreshButton.justNow");
     expect(formatAge(42_000, t)).toBe('refreshButton.secondsAgo:{"sec":42}');
@@ -158,6 +168,8 @@ describe("kiosk helpers", () => {
     expect(retryDelayMs(3, 60)).toBe(20000);
     expect(retryDelayMs(6, 60)).toBe(60000);
     expect(retryDelayMs(10, 0)).toBe(60000);
+    // A slow refresh must not leave the screen stale for minutes after the backend is back.
+    expect(retryDelayMs(10, 300)).toBe(60000);
   });
 
   it("only calls a cycle hung after twice the interval, and never under 30s", () => {
@@ -185,5 +197,15 @@ describe("kiosk helpers", () => {
     expect(formatRelativePeriod("2d", t)).toBe('common.pastDay:{"count":2}');
     expect(formatRelativePeriod("now-1h", t)).toBeNull();
     expect(formatRelativePeriod(undefined, t)).toBeNull();
+  });
+
+  it("summarizes a panel error to its first meaningful line", () => {
+    expect(
+      summarizePanelError('Error# SQL error: ParserError("Expected: X at Line: 1")\nmore'),
+    ).toBe("Expected: X at Line: 1");
+    expect(summarizePanelError("\n  stream k8s_events not found\n")).toBe(
+      "stream k8s_events not found",
+    );
+    expect(summarizePanelError("")).toBe("");
   });
 });

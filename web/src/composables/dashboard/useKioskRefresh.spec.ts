@@ -257,7 +257,7 @@ describe("useKioskRefresh", () => {
     const probe = vi.fn().mockResolvedValue(false);
     await setup(true, probe);
     await finishLoad();
-    await vi.advanceTimersByTimeAsync(0);
+    await vi.advanceTimersByTimeAsync(2000);
     refresh.mockClear();
     probe.mockClear();
 
@@ -268,7 +268,7 @@ describe("useKioskRefresh", () => {
     expect(api.registry.outage.value).toBe(true);
 
     probe.mockResolvedValue(true);
-    await vi.advanceTimersByTimeAsync(5000);
+    await vi.advanceTimersByTimeAsync(12000);
     expect(refresh).toHaveBeenCalledTimes(1);
   });
 
@@ -297,7 +297,20 @@ describe("useKioskRefresh", () => {
     await vi.advanceTimersByTimeAsync(10000);
     expect(refresh).toHaveBeenCalledTimes(1);
     await finishLoad();
-    await vi.advanceTimersByTimeAsync(0);
+    await vi.advanceTimersByTimeAsync(2000);
     expect(api.health.value).toMatchObject({ level: "bad", kind: "unreachable" });
+  });
+
+  it("does not call one slow health check an outage: a miss is confirmed before the screen says so", async () => {
+    const probe = vi.fn().mockResolvedValueOnce(false).mockResolvedValue(true);
+    await setup(true, probe);
+    await finishLoad();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(api.health.value.level).not.toBe("bad");
+
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(probe).toHaveBeenCalledTimes(2);
+    expect(api.health.value.level).toBe("ok");
+    expect(api.lastSuccessAt.value).not.toBeNull();
   });
 });
