@@ -231,6 +231,30 @@ def test_workflow_retry_unknown_run(create_session, base_url, workflow):
     assert resp.status_code in (400, 404), f"expected 4xx, got {resp.status_code}: {resp.text[:300]}"
 
 
+def test_trigger_returns_run_id(create_session, base_url, workflow):
+    """AC-ENG-01 — a manual trigger answers with the run id it started, next to the trace id."""
+    resp = create_session.post(
+        f"{base_url}api/{ORG_ID}/workflows/{workflow['id']}/trigger", json=[{"source": "api-test"}]
+    )
+    assert resp.status_code == 200, f"trigger failed: {resp.status_code} {resp.text[:300]}"
+    body = resp.json()
+    assert body.get("trace_id"), f"no trace_id in trigger response: {resp.text[:300]}"
+    assert isinstance(body.get("run_id"), str) and body["run_id"], f"no run_id in trigger response: {resp.text[:300]}"
+
+
+def test_trigger_on_disabled_workflow_is_409(create_session, base_url, workflow):
+    """AC-ENG-02 — triggering a disabled workflow is refused with 409 workflow_disabled and starts no run."""
+    disable = create_session.put(f"{base_url}api/{ORG_ID}/workflows/{workflow['id']}/enable?value=false")
+    assert disable.status_code == 200, f"disable failed: {disable.status_code} {disable.text[:300]}"
+    resp = create_session.post(
+        f"{base_url}api/{ORG_ID}/workflows/{workflow['id']}/trigger", json=[{"source": "api-test"}]
+    )
+    assert resp.status_code == 409, f"expected 409, got {resp.status_code}: {resp.text[:300]}"
+    body = resp.json()
+    assert body.get("error_detail") == "workflow_disabled", f"unexpected body: {resp.text[:300]}"
+    assert "run_id" not in body, f"a refused trigger must not report a run: {resp.text[:300]}"
+
+
 # --------------------------------------------------------------------------- CT-15: security / auth
 
 def test_workflows_requires_auth(base_url):
