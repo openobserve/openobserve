@@ -128,20 +128,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <OTooltip :content="t('panel.cancel')" />
             </OButton>
-            <OButton
-              v-else
-              :variant="refreshVariant"
-              :size="isMobile ? 'icon-toolbar' : 'sm-toolbar'"
-              @click="refreshData()"
-              :disabled="arePanelsLoading"
-              :loading="arePanelsLoading"
-              :aria-label="t('dashboard.viewDashboard.refresh')"
-              data-test="dashboard-refresh-btn"
-              :icon-left="isAutoRunOn ? 'autorenew' : 'refresh'"
-            >
-              <template v-if="!isMobile">{{ t("dashboard.viewDashboard.refresh") }}</template>
-              <OTooltip :content="refreshTooltip" shortcut-id="dashboardRefresh" />
-            </OButton>
+            <!-- Wrapper mode: a child-mode tooltip would hover-bind only the icon, not the labelled button. -->
+            <OTooltip v-else :content="refreshTooltip" shortcut-id="dashboardRefresh">
+              <OButton
+                :variant="refreshVariant"
+                :size="isMobile ? 'icon-toolbar' : 'sm-toolbar'"
+                @click="refreshData()"
+                :disabled="arePanelsLoading"
+                :loading="arePanelsLoading"
+                :aria-label="t('dashboard.viewDashboard.refresh')"
+                data-test="dashboard-refresh-btn"
+                :icon-left="isAutoRunOn ? 'autorenew' : 'refresh'"
+              >
+                <template v-if="!isMobile">{{ t("dashboard.viewDashboard.refresh") }}</template>
+              </OButton>
+            </OTooltip>
             <ODropdown align="end" side="bottom">
               <template #trigger>
                 <OButton

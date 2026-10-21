@@ -185,7 +185,11 @@ describe("ViewDashboard time range gate", () => {
   };
   const refreshButton = () => wrapper.findComponent('[data-test="dashboard-refresh-btn"]');
   const refreshOptions = () => wrapper.findComponent('[data-test="dashboard-refresh-options-btn"]');
-  const refreshTooltip = () => refreshButton().findComponent({ name: "OTooltip" }).props("content");
+  const refreshTooltip = () =>
+    wrapper
+      .findAllComponents({ name: "OTooltip" })
+      .find((tip) => tip.find('[data-test="dashboard-refresh-btn"]').exists())
+      ?.props("content");
   const spanOf = (time: any) => time.end_time.getTime() - time.start_time.getTime();
   const globalSpan = () => spanOf(wrapper.vm.currentTimeObjPerPanel.__global);
 
