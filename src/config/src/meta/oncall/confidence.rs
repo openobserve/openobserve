@@ -72,6 +72,9 @@ const TOOLSET_DIFF_TOOLS: [&str; 2] = ["git_show", "git_diff"];
 /// Code reads explain a mechanism but are not evidence a change happened, so they are context.
 const TOOLSET_CODE_TOOLS: [&str; 4] = ["read_file", "search_code", "list_files", "git_log"];
 
+/// Code toolset arguments that only narrow what a read covers; a citation may add or narrow them.
+const LINE_RANGE_ARGS: [&str; 2] = ["start_line", "end_line"];
+
 /// The longest key argument a tool record keeps; citations are cut the same way.
 pub const KEY_ARG_MAX_BYTES: usize = 4 * 1024;
 
@@ -545,17 +548,19 @@ pub fn cut_bytes(s: &str, max: usize) -> &str {
 }
 
 /// Same bare tool and normalized, cut key argument; earliest success wins, else `Failed`/`NotRun`.
+/// A citation of a code toolset call also matches by what the call read ([code_citation_matches]).
 pub fn match_citation<'a>(
     tool: &str,
     query: &str,
     log: &'a [ToolCallRecord],
 ) -> Result<&'a ToolCallRecord, UnverifiedReason> {
     let tool = tool.strip_prefix("o2_").unwrap_or(tool);
-    let query = MatchKey::of(query);
+    let cited = MatchKey::of(query);
     let mut matched = false;
     let mut best: Option<&ToolCallRecord> = None;
     for record in log.iter().filter(|r| {
-        (r.tool == tool || toolset_tool(&r.tool) == Some(tool)) && MatchKey::of(&r.key_arg) == query
+        (r.tool == tool || toolset_tool(&r.tool) == Some(tool))
+            && (MatchKey::of(&r.key_arg) == cited || code_citation_matches(r, &cited))
     }) {
         matched = true;
         if !record.success {
@@ -573,6 +578,55 @@ pub fn match_citation<'a>(
         None if matched => Err(UnverifiedReason::Failed),
         None => Err(UnverifiedReason::NotRun),
     }
+}
+
+/// Whether a citation names what a code toolset call read, with arguments that differ only in
+/// the line range: a bare value equal to the call's one other argument (a path, a sha), or the
+/// same other arguments with a line range inside the call's range (none read the whole file).
+fn code_citation_matches(record: &ToolCallRecord, cited: &MatchKey) -> bool {
+    let is_code_tool = toolset_tool(&record.tool)
+        .is_some_and(|t| TOOLSET_CODE_TOOLS.contains(&t) || TOOLSET_DIFF_TOOLS.contains(&t));
+    if !is_code_tool {
+        return false;
+    }
+    let MatchKey::Json(serde_json::Value::Object(call)) = MatchKey::of(&record.key_arg) else {
+        return false;
+    };
+    let (call_range, call_rest) = split_line_range(&call);
+    match cited {
+        MatchKey::Text(text) => {
+            call_rest.len() == 1
+                && call_rest
+                    .values()
+                    .next()
+                    .and_then(serde_json::Value::as_str)
+                    .is_some_and(|v| normalize_key_arg(v) == *text)
+        }
+        MatchKey::Json(serde_json::Value::Object(cited)) => {
+            let (cited_range, cited_rest) = split_line_range(cited);
+            cited_rest == call_rest
+                && (cited_range == (None, None)
+                    || (call_range.0.unwrap_or(1) <= cited_range.0.unwrap_or(1)
+                        && cited_range.1.unwrap_or(i64::MAX) <= call_range.1.unwrap_or(i64::MAX)))
+        }
+        MatchKey::Json(_) => false,
+    }
+}
+
+/// `(start_line, end_line)` and the remaining arguments of a code toolset call.
+fn split_line_range(
+    args: &serde_json::Map<String, serde_json::Value>,
+) -> (
+    (Option<i64>, Option<i64>),
+    serde_json::Map<String, serde_json::Value>,
+) {
+    let line = |key: &str| args.get(key).and_then(serde_json::Value::as_i64);
+    let rest = args
+        .iter()
+        .filter(|(k, _)| !LINE_RANGE_ARGS.contains(&k.as_str()))
+        .map(|(k, v)| (k.clone(), v.clone()))
+        .collect();
+    ((line("start_line"), line("end_line")), rest)
 }
 
 /// The lower of two bands. `Confidence` has no usable `Ord` (High is declared first).
@@ -1117,6 +1171,95 @@ mod tests {
             match_citation("kubectl", "kubectl get pods", &log),
             Err(UnverifiedReason::NotRun)
         );
+    }
+
+    /// A code toolset citation matches by what the call read: a bare path or sha, or a line range
+    /// inside the read; anything else about the read, or any other tool, still has to be exact.
+    #[test]
+    fn code_citations_match_by_what_the_call_read() {
+        let log = [
+            rec(
+                "whole",
+                "orca-demo-code_read_file",
+                r#"{"path":"src/payment/charge.js"}"#,
+                json!({"path": "src/payment/charge.js"}),
+                1,
+                true,
+            ),
+            rec(
+                "part",
+                "orca-demo-code_read_file",
+                r#"{"path":"src/checkout/main.go","start_line":300,"end_line":360}"#,
+                json!({"path": "src/checkout/main.go", "start_line": 300, "end_line": 360}),
+                2,
+                true,
+            ),
+            rec(
+                "diff",
+                "orca-demo-code_git_show",
+                r#"{"sha":"4f2c1e"}"#,
+                json!({"sha": "4f2c1e"}),
+                3,
+                true,
+            ),
+            rec(
+                "around",
+                "SearchAround",
+                r#"{"stream":"logs","key":"k1"}"#,
+                json!({"stream": "logs", "key": "k1"}),
+                4,
+                true,
+            ),
+        ];
+        for (cited_tool, cited, call) in [
+            ("read_file", "src/payment/charge.js", "whole"),
+            (
+                "read_file",
+                r#"{"path":"src/payment/charge.js","start_line":1,"end_line":88}"#,
+                "whole",
+            ),
+            ("read_file", "src/checkout/main.go", "part"),
+            (
+                "read_file",
+                r#"{"path":"src/checkout/main.go","start_line":310,"end_line":360}"#,
+                "part",
+            ),
+            ("read_file", r#"{"path":"src/checkout/main.go"}"#, "part"),
+            ("git_show", "4f2c1e", "diff"),
+        ] {
+            assert_eq!(
+                match_citation(cited_tool, cited, &log).map(|r| r.call_id.as_str()),
+                Ok(call),
+                "{cited}"
+            );
+        }
+        for (cited_tool, cited) in [
+            // A range the call did not read.
+            (
+                "read_file",
+                r#"{"path":"src/checkout/main.go","start_line":1,"end_line":40}"#,
+            ),
+            (
+                "read_file",
+                r#"{"path":"src/checkout/main.go","start_line":350,"end_line":400}"#,
+            ),
+            // Another file, or another argument changed.
+            ("read_file", "src/payment/index.js"),
+            (
+                "read_file",
+                r#"{"path":"src/payment/charge.js","ref":"main"}"#,
+            ),
+            ("git_show", "9a9a9a"),
+            // Not a code toolset: still exact.
+            ("SearchAround", r#"{"stream":"logs"}"#),
+            ("SearchAround", "logs"),
+        ] {
+            assert_eq!(
+                match_citation(cited_tool, cited, &log),
+                Err(UnverifiedReason::NotRun),
+                "{cited}"
+            );
+        }
     }
 
     /// A toolset code read verifies but adds no class; a toolset diff is a decisive `change`.
