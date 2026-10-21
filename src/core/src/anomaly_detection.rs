@@ -2705,8 +2705,8 @@ pub async fn execute_anomaly_query(
     let metadata = resolve_query_metadata(org_id, anomaly_id).await;
     let trace_id = config::ider::generate_trace_id();
     let window = (start_time, end_time);
-    match partitioned_search::supported_grid(metadata.as_ref(), query_sql, stream_type, window) {
-        Ok(grid) => {
+    match partitioned_search::supported_query(metadata.as_ref(), query_sql, stream_type, window) {
+        Ok(query) => {
             partitioned_search::execute_supported(
                 org_id,
                 query_sql,
@@ -2714,7 +2714,7 @@ pub async fn execute_anomaly_query(
                 anomaly_id,
                 stream_type,
                 &trace_id,
-                grid,
+                query,
             )
             .await
         }
