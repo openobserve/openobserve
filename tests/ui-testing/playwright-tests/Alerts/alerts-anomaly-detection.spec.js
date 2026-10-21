@@ -1376,6 +1376,9 @@ test.describe('Anomaly Detection', () => {
       // Template after the destination that references it. Both are named per
       // worker, so this only ever removes what this run created.
       await deleteTemplate(page, prerequisiteTemplateName);
+      // Seeded streams are per-worker-unique and cleanup.spec.js has no anomaly_ sweep, so delete them here or they accumulate every run.
+      await cleanupPm.apiCleanup.deleteStream(`anomaly_autolevel_${randomValue}`, 'logs').catch(() => {});
+      await cleanupPm.apiCleanup.deleteStream(`anomaly_e2e_${randomValue}`, 'logs').catch(() => {});
     } catch (error) {
       testLogger.warn('Cleanup failed', { error: error.message });
     } finally {
