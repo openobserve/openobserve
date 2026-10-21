@@ -1756,12 +1756,49 @@ describe("IncidentDetailDrawer.vue", () => {
       router.currentRoute.value = { ...router.currentRoute.value, query: {} } as any;
     });
 
-    it("without a tab query opens the Overview tab", async () => {
+    it("without a tab query opens the Incident Analysis tab", async () => {
       router.currentRoute.value = { ...router.currentRoute.value, query: {} } as any;
       wrapper = await createWrapper({}, {}, "1");
       await flushPromises();
 
-      expect(wrapper.vm.activeTab).toBe("overview");
+      expect(wrapper.vm.activeTab).toBe("incidentAnalysis");
+    });
+  });
+
+  describe("Tab order", () => {
+    afterEach(() => localStorage.removeItem("o2_incident_detail_tab_order"));
+
+    it("opens on the first tab of a saved order, dropping unknown names and appending missing ones", async () => {
+      localStorage.setItem(
+        "o2_incident_detail_tab_order",
+        JSON.stringify(["logs", "gone", "overview"]),
+      );
+      wrapper = await createWrapper({}, {}, "1");
+      await flushPromises();
+
+      expect(wrapper.vm.activeTab).toBe("logs");
+      expect(wrapper.vm.tabOrder).toEqual([
+        "logs",
+        "overview",
+        "incidentAnalysis",
+        "activity",
+        "serviceGraph",
+        "alertTriggers",
+        "metrics",
+        "traces",
+      ]);
+    });
+
+    it("applies and saves a drag reorder", async () => {
+      wrapper = await createWrapper({}, {}, "1");
+      await flushPromises();
+
+      wrapper.vm.onTabReorder({ from: "traces", to: "overview", before: false });
+
+      expect(wrapper.vm.tabOrder.slice(0, 3)).toEqual(["incidentAnalysis", "overview", "traces"]);
+      expect(JSON.parse(localStorage.getItem("o2_incident_detail_tab_order")!)).toEqual(
+        wrapper.vm.tabOrder,
+      );
     });
   });
 
@@ -1887,6 +1924,10 @@ describe("IncidentDetailDrawer.vue", () => {
   /// incident never said which team it woke, at what priority, or whether the
   /// page had been answered — while the payload behind it said all three.
   describe("on-call panel", () => {
+    // The panel is on Overview, which a saved tab order opens first.
+    beforeEach(() => localStorage.setItem("o2_incident_detail_tab_order", '["overview"]'));
+    afterEach(() => localStorage.removeItem("o2_incident_detail_tab_order"));
+
     const record = (overrides: Record<string, unknown> = {}) => ({
       id: "resp-1",
       org_id: "default",

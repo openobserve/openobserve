@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <h3 :id="headingId" class="text-text-heading m-0 text-base font-bold">
         {{ t("alerts.incidents.rcaSummary.hypotheses") }}
       </h3>
-      <span class="text-text-muted text-xs">{{ hypotheses.length }}</span>
+      <span class="text-text-secondary text-xs">{{ hypotheses.length }}</span>
     </div>
 
     <p
@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <h4 class="text-text-secondary mt-3 mb-1.5 flex items-center gap-1.5 text-xs font-bold">
         {{ rcaHypothesisGroupTitle(group.id, live) }}
         <span
-          class="bg-surface-tint-neutral text-text-muted text-3xs inline-flex h-4.5 items-center rounded-full px-1.5"
+          class="bg-surface-tint-neutral text-text-secondary text-3xs inline-flex h-4.5 items-center rounded-full px-1.5"
         >
           {{ group.items.length }}
         </span>

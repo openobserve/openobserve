@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <h3 :id="headingId" class="text-text-heading m-0 text-base font-bold">
         {{ t("alerts.incidents.rcaSummary.evidence") }}
       </h3>
-      <span class="text-text-muted text-xs">
+      <span class="text-text-secondary text-xs">
         {{
           t("alerts.incidents.rcaSummary.evidenceCount", {
             count: evidence.length,
@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
           <OIcon :name="rcaEvidenceKindIcon(entry.kind)" size="sm" class="text-icon-color" />
           <span
-            class="text-text-muted text-3xs min-w-0 truncate font-mono font-bold uppercase"
+            class="text-text-secondary text-3xs min-w-0 truncate font-mono font-bold uppercase"
             :title="entry.kind"
             >{{ entry.kind }}</span
           >
@@ -127,7 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <h4 class="text-text-heading m-0 mb-2 text-sm font-bold">
         {{ t("alerts.incidents.rcaSummary.citedNotVerified") }}
-        <span class="text-text-muted text-xs font-normal">{{ unverified.length }}</span>
+        <span class="text-text-secondary text-xs font-normal">{{ unverified.length }}</span>
       </h4>
       <ul
         class="rounded-default border-border-default bg-surface-base divide-border-default m-0 list-none divide-y border border-dashed p-0"

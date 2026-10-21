@@ -20,14 +20,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <h3 :id="headingId" class="text-text-heading m-0 text-base font-bold">
         {{ t("alerts.incidents.rcaSummary.whatHappened") }}
       </h3>
-      <span v-if="!live" class="text-text-muted text-xs">
+      <span v-if="!live" class="text-text-secondary text-xs">
         {{ t("alerts.incidents.rcaSummary.linkCount", { count: entries.length }, entries.length) }}
       </span>
       <span class="flex-1" />
       <span
         v-if="!live && entries.length > 0"
         data-test="rca-timeline-legend"
-        class="text-text-muted inline-flex flex-wrap items-center gap-3 text-xs"
+        class="text-text-secondary inline-flex flex-wrap items-center gap-3 text-xs"
       >
         <span v-for="marker in legend" :key="marker" class="inline-flex items-center gap-1.5">
           <span class="size-2.5 rounded-full" :class="MARKER[marker].dot" aria-hidden="true" />
@@ -55,7 +55,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data-status="entry.status"
         class="grid grid-cols-[4rem_1rem_minmax(0,1fr)] gap-x-3"
       >
-        <span class="text-text-muted pt-0.5 font-mono text-xs">{{ formatRcaClock(entry.at) }}</span>
+        <span class="text-text-secondary pt-0.5 font-mono text-xs">{{
+          formatRcaClock(entry.at)
+        }}</span>
         <span class="relative flex justify-center" aria-hidden="true">
           <span
             v-if="idx < entries.length - 1"

@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ entry.number }}
       </span>
       <OIcon :name="rcaEvidenceKindIcon(entry.kind)" size="sm" class="text-icon-color" />
-      <span class="text-text-muted text-3xs font-mono font-bold uppercase">
+      <span class="text-text-secondary text-3xs font-mono font-bold uppercase">
         {{ entry.kind }}
       </span>
       <span class="text-text-heading text-compact min-w-0 flex-1 font-semibold">
@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </button>
         </span>
         <span class="text-text-body">
-          <span class="text-text-muted font-semibold">{{
+          <span class="text-text-secondary font-semibold">{{
             t("alerts.incidents.rcaSummary.agentsReading")
           }}</span>
           {{ citation.observation }}
@@ -90,7 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <span data-test="rca-evidence-result" class="text-text-secondary min-w-0 flex-1">
         {{ entry.result_summary }}
-        <span v-if="source" class="text-text-muted">· {{ source }}</span>
+        <span v-if="source" class="text-text-secondary">· {{ source }}</span>
       </span>
       <OButton
         v-if="link"
