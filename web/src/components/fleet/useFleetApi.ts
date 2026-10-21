@@ -19,6 +19,7 @@ import { useOrgId } from "@/composables/query/useOrgId";
 import {
   collectorsInFlight,
   fleetAuditQuery,
+  fleetCollectorMetricsQuery,
   fleetCollectorQuery,
   fleetCollectorsQuery,
   fleetConfigQuery,
@@ -596,6 +597,23 @@ export function useFleetFlow(window: () => FleetFlowWindow) {
   );
   return {
     flow: computed(() => (isForbidden(query.error.value) ? null : (query.data.value ?? null))),
+    forbidden: computed(() => isForbidden(query.error.value)),
+    loading: query.isPending,
+    error: query.error,
+    refetch: () => query.refetch(),
+  };
+}
+
+export function useFleetCollectorMetrics(id: () => string, window: () => FleetFlowWindow) {
+  const orgId = useOrgId();
+  const query = useQuery(() =>
+    Object.assign(fleetCollectorMetricsQuery(orgId.value, id(), window()), {
+      enabled: !!orgId.value && !!id(),
+      placeholderData: keepPreviousData,
+    }),
+  );
+  return {
+    values: computed(() => (query.error.value ? null : (query.data.value ?? null))),
     forbidden: computed(() => isForbidden(query.error.value)),
     loading: query.isPending,
     error: query.error,

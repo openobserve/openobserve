@@ -47,6 +47,12 @@ vi.mock("@/services/fleet", () => ({
   },
 }));
 
+const MetricsStub = {
+  name: "FleetCollectorMetrics",
+  props: ["collectorId", "collectorName"],
+  template: '<div data-test="metrics-stub" />',
+};
+
 const EFFECTIVE = `receivers:
   otlp: {}
 extensions:
@@ -125,7 +131,12 @@ function mountDrawer(initialTab = "overview") {
     props: { open: true, collectorId: "c1", initialTab },
     global: {
       plugins: [i18n, store],
-      stubs: { ODrawer: DrawerStub, FleetCodeEditor: CodeStub, FleetMoveDialog: MoveStub },
+      stubs: {
+        ODrawer: DrawerStub,
+        FleetCodeEditor: CodeStub,
+        FleetMoveDialog: MoveStub,
+        FleetCollectorMetrics: MetricsStub,
+      },
     },
   });
 }
@@ -338,5 +349,18 @@ describe("FleetCollectorDrawer", () => {
     await wrapper.setProps({ initialTab: "history" });
     await flushPromises();
     expect(wrapper.find(sel("history")).exists()).toBe(true);
+  });
+
+  it("adds a metrics tab after health, scoped to this collector", async () => {
+    wrapper = mountDrawer();
+    await flushPromises();
+    const names = wrapper.findAllComponents({ name: "OTab" }).map((tab) => tab.props("name"));
+    expect(names).toEqual(["overview", "delivery", "health", "metrics", "config", "history"]);
+    expect(wrapper.findComponent(MetricsStub).exists()).toBe(false);
+
+    await wrapper.setProps({ initialTab: "metrics" });
+    await flushPromises();
+    const metrics = wrapper.findComponent(MetricsStub);
+    expect(metrics.props()).toEqual({ collectorId: "c1", collectorName: "prod-web-01" });
   });
 });

@@ -19,6 +19,8 @@ export const fleetKeys = {
   all: (org: string) => orgKey(org, "fleet"),
   collectors: (org: string) => orgKey(org, "fleet", "collectors"),
   collector: (org: string, id: string) => orgKey(org, "fleet", "collector", id),
+  collectorMetrics: (org: string, id: string, window: string) =>
+    orgKey(org, "fleet", "collectorMetrics", id, window),
   summary: (org: string) => orgKey(org, "fleet", "summary"),
   tokens: (org: string) => orgKey(org, "fleet", "tokens"),
   fleets: (org: string) => orgKey(org, "fleet", "fleets"),

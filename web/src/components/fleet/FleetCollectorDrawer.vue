@@ -104,6 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTab name="overview" :label="t('fleet.collectors.overview')" />
         <OTab name="delivery" :label="t('fleet.collectors.assignmentDelivery')" />
         <OTab name="health" :label="t('fleet.collectors.health')" />
+        <OTab name="metrics" :label="t('fleet.collectorMetrics.tab')" />
         <OTab name="config" :label="t('fleet.collectors.effectiveConfig')" />
         <OTab name="history" :label="t('fleet.collectors.history')" />
       </OTabs>
@@ -312,6 +313,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </ODescriptionList>
         </div>
 
+        <FleetCollectorMetrics
+          v-else-if="tab === 'metrics'"
+          :collector-id="collector.id"
+          :collector-name="collector.name"
+        />
+
         <div v-else-if="tab === 'config'" class="flex flex-col gap-3">
           <template v-if="collector.effectiveConfig && split">
             <OText v-if="collector.effectiveConfig.reportedAt" variant="meta">
@@ -395,6 +402,7 @@ import { useOrgId } from "@/composables/query/useOrgId";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import FleetCodeEditor from "./FleetCodeEditor.vue";
 import FleetMoveDialog from "./FleetMoveDialog.vue";
+import FleetCollectorMetrics from "./FleetCollectorMetrics.vue";
 import { splitSystemSections } from "./effectiveConfig";
 import { useCollectorActions } from "./useCollectorActions";
 import { isForbidden, osLabel, useFleetCollector, useFleetTokens } from "./useFleetApi";

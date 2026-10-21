@@ -37,6 +37,12 @@ import fleet, {
   type FleetToken,
 } from "./fleet";
 import { fleetKeys } from "./fleet.querykeys";
+import searchService from "./search";
+import {
+  collectorTileQueries,
+  type CollectorMetricTile,
+  type CollectorMetricValues,
+} from "@/components/fleet/collectorMetrics";
 import { LIVE_STALE_TIME } from "@/composables/query/cachePolicy";
 import { queryClient } from "@/composables/query/queryClient";
 
@@ -114,6 +120,39 @@ export const fleetCollectorQuery = (org: string, id: string) =>
     queryFn: async (): Promise<FleetCollectorDetail> => (await fleet.getCollector(org, id)).data,
     staleTime: LIVE_STALE_TIME,
     refetchInterval: (query) => (inFlight(query.state.data?.delivery) ? DELIVERY_POLL_MS : false),
+  });
+
+async function instantValue(org: string, query: string): Promise<number | null> {
+  const body = (
+    await searchService.metrics_query({
+      org_identifier: org,
+      // metrics_query interpolates the query raw into the URL.
+      query: encodeURIComponent(query),
+      end_time: Date.now() * 1000,
+    })
+  ).data;
+  if (body?.status !== "success" || !Array.isArray(body?.data?.result)) {
+    throw new Error("Malformed PromQL response");
+  }
+  const value = Number(body.data.result[0]?.value?.[1]);
+  return Number.isFinite(value) ? value : null;
+}
+
+/** The tile values: null where the collector reported no series. */
+export const fleetCollectorMetricsQuery = (org: string, id: string, window: FleetFlowWindow) =>
+  queryOptions({
+    queryKey: fleetKeys.collectorMetrics(org, id, window),
+    queryFn: async (): Promise<CollectorMetricValues> => {
+      const entries = Object.entries(collectorTileQueries(id, window)) as [
+        CollectorMetricTile,
+        string,
+      ][];
+      const values = await Promise.all(entries.map(([, q]) => instantValue(org, q)));
+      return Object.fromEntries(
+        entries.map(([tile], i) => [tile, values[i]]),
+      ) as CollectorMetricValues;
+    },
+    staleTime: LIVE_STALE_TIME,
   });
 
 /** `delivering` comes from the caller, since another query's cache change never re-evaluates this interval. */
