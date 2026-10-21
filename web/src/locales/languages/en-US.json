@@ -9450,6 +9450,7 @@
         "unavailable": "AI analysis is not available for this organization.",
         "outcome": {
           "rootCauseIdentified": "Root cause identified",
+          "multipleRootCauses": "Multiple root causes",
           "contributingFactor": "Contributing factor",
           "inconclusive": "Inconclusive",
           "blocked": "Blocked"
@@ -9550,7 +9551,6 @@
         "question": "Is this the cause?",
         "yes": "Yes",
         "no": "No",
-        "change": "Correct the cause",
         "yesSaved": "Marked as the cause.",
         "noPrompt": "What’s wrong with it?",
         "reason": {
@@ -9563,11 +9563,6 @@
         "notePlaceholder": "e.g. pool size was raised to 150 on Oct 8",
         "send": "Send feedback",
         "noSaved": "Marked as not the cause.",
-        "changeLabel": "What was the actual cause?",
-        "changeNoteLabel": "Note for the next analysis (optional)",
-        "save": "Save cause",
-        "changeSavedIncident": "Saved as a past cause for this incident.",
-        "changeSavedAlert": "Saved as a past cause for this alert.",
         "cancel": "Cancel",
         "undo": "Undo",
         "loadFailed": "Could not load your feedback.",
@@ -9575,6 +9570,21 @@
         "undoFailed": "Could not undo your feedback.",
         "forbidden": "You do not have permission to send feedback.",
         "notRateable": "Feedback opens when the run has finished."
+      },
+      "rcaCorrection": {
+        "open": "Correct the cause",
+        "label": "What was the actual cause?",
+        "noteLabel": "Note for the next analysis (optional)",
+        "save": "Save cause",
+        "cancel": "Cancel",
+        "edit": "Change",
+        "undo": "Undo",
+        "saved": "You corrected the cause to {cause}. It is saved as a past cause for this incident.",
+        "others": "{count} other responder corrected it. | {count} other responders corrected it.",
+        "loadFailed": "Could not load the cause correction.",
+        "saveFailed": "Could not save the cause.",
+        "undoFailed": "Could not undo the cause correction.",
+        "forbidden": "You do not have permission to correct the cause."
       },
       "rcaAsk": {
         "button": "Ask about this analysis",
@@ -9722,6 +9732,7 @@
         },
         "outcome": {
           "rootCauseIdentified": "Root cause identified",
+          "multipleRootCauses": "Multiple root causes",
           "contributingFactor": "Contributing factor",
           "inconclusive": "Inconclusive",
           "blocked": "Blocked"
@@ -9758,6 +9769,7 @@
         "noTranscript": "This run has no stored transcript.",
         "transcriptExpired": "The transcript of this run is no longer stored.",
         "transcriptIncomplete": "Part of this run's transcript was lost, so the thread cannot be shown.",
+        "transcriptTruncated": "The end of this transcript was lost. The thread shows the part that was saved.",
         "analysisStarted": "Analysis started",
         "contextUsed": "Context used",
         "pastCauses": "{count} past cause | {count} past causes",
@@ -9870,6 +9882,8 @@
         "suspectedNotConfirmed": "Suspected, not confirmed",
         "noHypothesisRecorded": "No hypothesis recorded",
         "noSingleRootCause": "No single root cause confirmed",
+        "rootCauses": "Root causes",
+        "causeOnset": "from {time} UTC",
         "needs": "Needs: {needs}",
         "needsInput": "Needs input",
         "cancelledBeforeVerdict": "Run cancelled before a verdict. Partial results below",

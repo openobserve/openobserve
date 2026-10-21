@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- No: reasons, an optional note, Send feedback. -->
     <div
-      v-if="panel === 'no'"
+      v-if="noOpen"
       data-test="rca-feedback-no-panel"
       class="rounded-default border-border-default bg-surface-base flex basis-full flex-col gap-2 border p-3"
     >
@@ -93,46 +93,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <!-- Correct the cause: the on-call cause form, without "still unknown". -->
-    <div
-      v-else-if="panel === 'change'"
-      data-test="rca-feedback-change-panel"
-      class="rounded-default border-border-default bg-surface-base flex basis-full flex-col gap-2 border p-3"
-    >
-      <OnCallResolveCauseForm
-        v-model:cause="cause"
-        v-model:note="note"
-        data-test-prefix="rca-feedback-change"
-        :cause-label="t('alerts.incidents.rcaFeedback.changeLabel')"
-        :cause-hint="null"
-        :note-label="t('alerts.incidents.rcaFeedback.changeNoteLabel')"
-        :exclude-causes="['still_unknown']"
-        :note-maxlength="MAX_NOTE_CHARS"
-        :disabled="busy"
-      />
-      <div class="flex justify-end gap-2">
-        <OButton
-          data-test="rca-feedback-cancel"
-          variant="ghost"
-          size="sm"
-          :disabled="busy"
-          @click="closePanel"
-        >
-          {{ t("alerts.incidents.rcaFeedback.cancel") }}
-        </OButton>
-        <OButton
-          data-test="rca-feedback-save"
-          variant="primary"
-          size="sm"
-          :disabled="!cause"
-          :loading="saving"
-          @click="cause && save({ verdict: 'change', cause, note: trimmedNote })"
-        >
-          {{ t("alerts.incidents.rcaFeedback.save") }}
-        </OButton>
-      </div>
-    </div>
-
     <p
       v-else-if="savedMessage"
       data-test="rca-feedback-message"
@@ -172,7 +132,6 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
-import OnCallResolveCauseForm from "@/components/oncall/OnCallResolveCauseForm.vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import type {
   ListRcaFeedbackResponse,
@@ -186,7 +145,6 @@ import {
   rcaFeedbackQuery,
 } from "@/services/incidents.queries";
 import { incidentKeys } from "@/services/incidents.querykeys";
-import type { ResolutionCause } from "@/ts/interfaces/oncall";
 
 const props = defineProps<{
   orgId: string;
@@ -212,7 +170,6 @@ const REASONS: RcaFeedbackReason[] = [
 const options = computed<{ verdict: RcaFeedbackVerdict; label: I18nText }[]>(() => [
   { verdict: "yes", label: t("alerts.incidents.rcaFeedback.yes") },
   { verdict: "no", label: t("alerts.incidents.rcaFeedback.no") },
-  { verdict: "change", label: t("alerts.incidents.rcaFeedback.change") },
 ]);
 
 const read = useQuery(() =>
@@ -229,10 +186,9 @@ const undoMutation = useMutation(() =>
 
 /** The caller's saved row, or null. */
 const mine = computed(() => read.data.value?.mine ?? null);
-/** The open form: No (reasons) or Correct the cause. */
-const panel = ref<"no" | "change" | null>(null);
+/** The No form (reasons and a note) is open. */
+const noOpen = ref(false);
 const reasons = ref<RcaFeedbackReason[]>([]);
-const cause = ref<ResolutionCause | "">("");
 const note = ref("");
 const saving = computed(() => saveMutation.isPending.value);
 const undoing = computed(() => undoMutation.isPending.value);
@@ -243,8 +199,8 @@ const busy = computed(() => read.isLoading.value || saving.value || undoing.valu
 
 const trimmedNote = computed(() => note.value.trim() || undefined);
 
-const pressed = computed<RcaFeedbackVerdict | null>(
-  () => panel.value ?? mine.value?.verdict ?? null,
+const pressed = computed<RcaFeedbackVerdict | null>(() =>
+  noOpen.value ? "no" : (mine.value?.verdict ?? null),
 );
 
 const savedMessage = computed<I18nText | null>(() => {
@@ -253,10 +209,6 @@ const savedMessage = computed<I18nText | null>(() => {
       return t("alerts.incidents.rcaFeedback.yesSaved");
     case "no":
       return t("alerts.incidents.rcaFeedback.noSaved");
-    case "change":
-      return mine.value.subject_type === "alert"
-        ? t("alerts.incidents.rcaFeedback.changeSavedAlert")
-        : t("alerts.incidents.rcaFeedback.changeSavedIncident");
     default:
       return null;
   }
@@ -288,7 +240,7 @@ watch(read.error, (failure) => {
 watch(
   () => [props.orgId, props.incidentId, props.runId],
   () => {
-    panel.value = null;
+    noOpen.value = false;
     writeError.value = null;
     saveMutation.reset();
     undoMutation.reset();
@@ -299,23 +251,22 @@ const choose = (verdict: RcaFeedbackVerdict) => {
   writeError.value = null;
   if (verdict === "yes") {
     if (mine.value?.verdict !== "yes") void save({ verdict: "yes" });
-    else panel.value = null;
+    else noOpen.value = false;
     return;
   }
-  if (panel.value === verdict) {
+  if (noOpen.value) {
     closePanel();
     return;
   }
-  // Reopening a saved state shows the saved values.
-  const saved = mine.value?.verdict === verdict ? mine.value : null;
-  reasons.value = verdict === "no" ? [...(saved?.reasons ?? [])] : [];
-  cause.value = verdict === "change" ? (saved?.cause ?? "") : "";
+  // Reopening a saved No shows its saved values.
+  const saved = mine.value?.verdict === "no" ? mine.value : null;
+  reasons.value = [...(saved?.reasons ?? [])];
   note.value = saved?.note ?? "";
-  panel.value = verdict;
+  noOpen.value = true;
 };
 
 const closePanel = () => {
-  panel.value = null;
+  noOpen.value = false;
   writeError.value = null;
 };
 
@@ -340,7 +291,7 @@ const save = async (body: PutRcaFeedbackRequest) => {
   try {
     const row = await saveMutation.mutateAsync(body);
     setMine(runId, row);
-    if (runId === props.runId) panel.value = null;
+    if (runId === props.runId) noOpen.value = false;
   } catch (failure) {
     console.error("Failed to save RCA feedback:", failure);
     if (runId === props.runId) {

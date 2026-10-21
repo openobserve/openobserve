@@ -2583,7 +2583,7 @@ pub(crate) fn rca_turn_failure(
 
 /// `error.reason` of a run refused by the active-turn cap.
 #[cfg(feature = "enterprise")]
-pub const TURN_LIMIT_REASON: &str = "Too many analyses running";
+const TURN_LIMIT_REASON: &str = "Too many analyses running";
 /// `error.reason` of a run whose session already had a turn running.
 #[cfg(feature = "enterprise")]
 const TURN_BUSY_REASON: &str = "The analysis session is busy";

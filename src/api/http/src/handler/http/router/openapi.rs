@@ -186,6 +186,9 @@ use crate::{
         openobserve_api_management::request::alerts::incidents::put_incident_rca_feedback,
         openobserve_api_management::request::alerts::incidents::get_incident_rca_feedback,
         openobserve_api_management::request::alerts::incidents::delete_incident_rca_feedback,
+        openobserve_api_management::request::alerts::incidents::put_incident_rca_correction,
+        openobserve_api_management::request::alerts::incidents::get_incident_rca_correction,
+        openobserve_api_management::request::alerts::incidents::delete_incident_rca_correction,
         openobserve_api_management::request::alerts::incidents::resume_incident_rca_run,
         openobserve_api_management::request::alerts::incidents::get_incident_rca_summary,
         openobserve_api_management::request::alerts::incidents::get_incident_rca_live_stream,
@@ -517,6 +520,9 @@ use crate::{
             config::meta::alerts::rca_feedback::FeedbackReason,
             config::meta::alerts::rca_feedback::PutRcaFeedbackRequest,
             config::meta::alerts::rca_feedback::ListRcaFeedbackResponse,
+            config::meta::alerts::rca_feedback::RcaCauseCorrection,
+            config::meta::alerts::rca_feedback::PutRcaCauseCorrectionRequest,
+            config::meta::alerts::rca_feedback::ListRcaCauseCorrectionResponse,
             config::meta::alerts::rca_runs::RcaSummary,
             config::meta::alerts::rca_runs::RcaDetailFields,
             config::meta::alerts::rca_runs::RunSummaryFields,
@@ -529,6 +535,7 @@ use crate::{
             config::meta::alerts::rca_runs::RunState,
             config::meta::oncall::rca_run::RcaRunSummary,
             config::meta::oncall::rca_run::SummaryCard,
+            config::meta::oncall::rca_run::SummaryCause,
             config::meta::oncall::rca_run::SummaryTimelineEntry,
             config::meta::oncall::rca_run::SummaryHypothesis,
             config::meta::oncall::rca_run::EvidenceEntry,
@@ -1654,10 +1661,11 @@ mod tests {
     }
 
     #[test]
-    fn rca_feedback_and_resume_paths_are_documented() {
+    fn rca_feedback_correction_and_resume_paths_are_documented() {
         let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
         let paths = spec["paths"].as_object().unwrap();
         let feedback = "/api/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/feedback";
+        let correction = "/api/v2/{org_id}/alerts/incidents/{incident_id}/rca/correction";
         let resume = "/api/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/resume";
         for (path, method, operation_id, ratelimit, statuses) in [
             (
@@ -1678,6 +1686,27 @@ mod tests {
                 feedback,
                 "delete",
                 "DeleteIncidentRcaFeedback",
+                "update",
+                &["204", "403", "404"][..],
+            ),
+            (
+                correction,
+                "put",
+                "PutIncidentRcaCorrection",
+                "update",
+                &["200", "400", "403", "404"][..],
+            ),
+            (
+                correction,
+                "get",
+                "GetIncidentRcaCorrection",
+                "get",
+                &["200", "404"][..],
+            ),
+            (
+                correction,
+                "delete",
+                "DeleteIncidentRcaCorrection",
                 "update",
                 &["204", "403", "404"][..],
             ),
@@ -1714,6 +1743,7 @@ mod tests {
         }
         assert!(paths[resume].get("get").is_none());
         assert!(paths[feedback].get("post").is_none());
+        assert!(paths[correction].get("post").is_none());
     }
 
     #[test]

@@ -13,7 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Per-author responder feedback on completed RCA runs.
+//! Responder feedback on completed RCA runs, and the responder's cause correction on an
+//! incident.
 
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -21,7 +22,7 @@ use utoipa::ToSchema;
 use super::rca_runs::string_enum;
 use crate::meta::oncall::ResolutionCause;
 
-/// Longest feedback note, in Unicode scalar values after trimming.
+/// Longest feedback or correction note, in Unicode scalar values after trimming.
 pub const MAX_FEEDBACK_NOTE_CHARS: usize = 1000;
 /// Most reasons a `no` verdict may carry (one per [FeedbackReason]).
 pub const MAX_FEEDBACK_REASONS: usize = 4;
@@ -31,8 +32,6 @@ string_enum! {
     FeedbackVerdict {
         Yes => "yes",
         No => "no",
-        /// The responder names the actual cause; it becomes a past-cause lead.
-        Change => "change",
     }
 }
 
@@ -58,8 +57,6 @@ pub struct RcaFeedback {
     /// Copied from the run; an alert id is stored bare (no `:group:<team>`).
     pub subject_id: String,
     pub verdict: FeedbackVerdict,
-    /// Set for `change` only.
-    pub cause: Option<ResolutionCause>,
     pub note: Option<String>,
     /// Set for `no` only.
     #[serde(default)]
@@ -74,8 +71,6 @@ pub struct RcaFeedback {
 pub struct PutRcaFeedbackRequest {
     pub verdict: FeedbackVerdict,
     #[serde(default)]
-    pub cause: Option<ResolutionCause>,
-    #[serde(default)]
     pub note: Option<String>,
     #[serde(default)]
     pub reasons: Option<Vec<FeedbackReason>>,
@@ -85,7 +80,6 @@ pub struct PutRcaFeedbackRequest {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ValidFeedback {
     pub verdict: FeedbackVerdict,
-    pub cause: Option<ResolutionCause>,
     /// Trimmed; a blank note is `None`.
     pub note: Option<String>,
     pub reasons: Vec<FeedbackReason>,
@@ -93,34 +87,15 @@ pub struct ValidFeedback {
 
 impl PutRcaFeedbackRequest {
     pub fn validate(self) -> Result<ValidFeedback, String> {
-        let note = self
-            .note
-            .as_deref()
-            .map(str::trim)
-            .filter(|n| !n.is_empty())
-            .map(str::to_string);
-        if note
-            .as_deref()
-            .is_some_and(|n| n.chars().count() > MAX_FEEDBACK_NOTE_CHARS)
-        {
-            return Err(format!(
-                "note must be at most {MAX_FEEDBACK_NOTE_CHARS} characters"
-            ));
-        }
+        let note = valid_note(self.note.as_deref())?;
         let reasons = self.reasons.unwrap_or_default();
         match self.verdict {
             FeedbackVerdict::Yes => {
-                if self.cause.is_some() {
-                    return Err("a `yes` verdict takes no cause".to_string());
-                }
                 if !reasons.is_empty() {
                     return Err("a `yes` verdict takes no reasons".to_string());
                 }
             }
             FeedbackVerdict::No => {
-                if self.cause.is_some() {
-                    return Err("a `no` verdict takes no cause".to_string());
-                }
                 if reasons.len() > MAX_FEEDBACK_REASONS {
                     return Err(format!(
                         "at most {MAX_FEEDBACK_REASONS} reasons are allowed"
@@ -132,22 +107,9 @@ impl PutRcaFeedbackRequest {
                     }
                 }
             }
-            FeedbackVerdict::Change => {
-                match self.cause {
-                    None => return Err("a `change` verdict needs a cause".to_string()),
-                    Some(ResolutionCause::StillUnknown) => {
-                        return Err("`still_unknown` is not a cause".to_string());
-                    }
-                    Some(_) => {}
-                }
-                if !reasons.is_empty() {
-                    return Err("a `change` verdict takes no reasons".to_string());
-                }
-            }
         }
         Ok(ValidFeedback {
             verdict: self.verdict,
-            cause: self.cause,
             note,
             reasons,
         })
@@ -161,6 +123,67 @@ pub struct ListRcaFeedbackResponse {
     pub items: Vec<RcaFeedback>,
     /// The caller's row.
     pub mine: Option<RcaFeedback>,
+}
+
+/// One `rca_cause_corrections` row: what a responder says caused the incident. Times are µs.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
+pub struct RcaCauseCorrection {
+    pub org_id: String,
+    pub incident_id: String,
+    pub author_email: String,
+    pub cause: ResolutionCause,
+    pub note: Option<String>,
+    pub created_at: i64,
+    pub updated_at: i64,
+}
+
+/// Body of `PUT …/incidents/{incident_id}/rca/correction`.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct PutRcaCauseCorrectionRequest {
+    pub cause: ResolutionCause,
+    #[serde(default)]
+    pub note: Option<String>,
+}
+
+/// The validated content of a [PutRcaCauseCorrectionRequest].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ValidCorrection {
+    pub cause: ResolutionCause,
+    /// Trimmed; a blank note is `None`.
+    pub note: Option<String>,
+}
+
+impl PutRcaCauseCorrectionRequest {
+    pub fn validate(self) -> Result<ValidCorrection, String> {
+        if self.cause == ResolutionCause::StillUnknown {
+            return Err("`still_unknown` is not a cause".to_string());
+        }
+        Ok(ValidCorrection {
+            cause: self.cause,
+            note: valid_note(self.note.as_deref())?,
+        })
+    }
+}
+
+/// Response of `GET …/incidents/{incident_id}/rca/correction`.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
+pub struct ListRcaCauseCorrectionResponse {
+    /// Every author's correction, oldest first.
+    pub items: Vec<RcaCauseCorrection>,
+    /// The caller's correction.
+    pub mine: Option<RcaCauseCorrection>,
+}
+
+/// The trimmed note; blank is `None`, longer than [MAX_FEEDBACK_NOTE_CHARS] is an error.
+fn valid_note(note: Option<&str>) -> Result<Option<String>, String> {
+    let note = note.map(str::trim).filter(|n| !n.is_empty());
+    if note.is_some_and(|n| n.chars().count() > MAX_FEEDBACK_NOTE_CHARS) {
+        return Err(format!(
+            "note must be at most {MAX_FEEDBACK_NOTE_CHARS} characters"
+        ));
+    }
+    Ok(note.map(str::to_string))
 }
 
 pub fn bare_subject_id(subject_id: &str) -> &str {
@@ -191,10 +214,15 @@ mod tests {
     fn req(verdict: FeedbackVerdict) -> PutRcaFeedbackRequest {
         PutRcaFeedbackRequest {
             verdict,
-            cause: None,
             note: None,
             reasons: None,
         }
+    }
+
+    fn correction(body: serde_json::Value) -> Result<ValidCorrection, String> {
+        serde_json::from_value::<PutRcaCauseCorrectionRequest>(body)
+            .expect("body parses")
+            .validate()
     }
 
     #[test]
@@ -202,26 +230,25 @@ mod tests {
         assert!(parse(serde_json::json!({"verdict": "yes", "author_email": "x"})).is_err());
         assert!(parse(serde_json::json!({"verdict": "maybe"})).is_err());
         assert!(parse(serde_json::json!({})).is_err(), "verdict is required");
-        assert!(parse(serde_json::json!({"verdict": "change", "cause": "cosmic_rays"})).is_err());
+        // The cause moved to the incident correction.
+        assert!(parse(serde_json::json!({"verdict": "change"})).is_err());
+        assert!(parse(serde_json::json!({"verdict": "no", "cause": "capacity_or_load"})).is_err());
         assert!(
             parse(serde_json::json!({"verdict": "no", "reasons": ["wrong_service", "bad_luck"]}))
                 .is_err()
         );
         // Optional fields may be omitted or null.
-        let ok = parse(
-            serde_json::json!({"verdict": "no", "cause": null, "note": null, "reasons": null}),
-        )
-        .unwrap();
+        let ok =
+            parse(serde_json::json!({"verdict": "no", "note": null, "reasons": null})).unwrap();
         assert_eq!(ok, req(FeedbackVerdict::No));
     }
 
     #[test]
-    fn yes_takes_neither_cause_nor_reasons() {
+    fn yes_takes_no_reasons() {
         assert_eq!(
             validate(serde_json::json!({"verdict": "yes"})).unwrap(),
             ValidFeedback {
                 verdict: FeedbackVerdict::Yes,
-                cause: None,
                 note: None,
                 reasons: vec![],
             }
@@ -229,15 +256,12 @@ mod tests {
         assert!(
             validate(serde_json::json!({"verdict": "yes", "reasons": ["wrong_service"]})).is_err()
         );
-        assert!(
-            validate(serde_json::json!({"verdict": "yes", "cause": "capacity_or_load"})).is_err()
-        );
         // An empty reasons list is the same as none.
         assert!(validate(serde_json::json!({"verdict": "yes", "reasons": []})).is_ok());
     }
 
     #[test]
-    fn no_takes_zero_to_four_distinct_reasons_and_no_cause() {
+    fn no_takes_zero_to_four_distinct_reasons() {
         assert_eq!(
             validate(serde_json::json!({"verdict": "no"}))
                 .unwrap()
@@ -282,36 +306,27 @@ mod tests {
                 .collect(),
         );
         assert!(five.validate().is_err(), "more than four reasons");
-        assert!(
-            validate(serde_json::json!({"verdict": "no", "cause": "capacity_or_load"})).is_err()
-        );
     }
 
     #[test]
-    fn change_needs_a_real_cause_and_takes_no_reasons() {
-        assert!(validate(serde_json::json!({"verdict": "change"})).is_err());
+    fn a_correction_needs_a_real_cause_and_no_unknown_fields() {
+        let parse = |body| serde_json::from_value::<PutRcaCauseCorrectionRequest>(body);
+        assert!(parse(serde_json::json!({})).is_err(), "cause is required");
+        assert!(parse(serde_json::json!({"cause": "cosmic_rays"})).is_err());
         assert!(
-            validate(serde_json::json!({"verdict": "change", "cause": "still_unknown"})).is_err()
+            parse(serde_json::json!({"cause": "capacity_or_load", "verdict": "no"})).is_err(),
+            "unknown field"
         );
-        assert!(
-            validate(serde_json::json!({
-                "verdict": "change",
-                "cause": "capacity_or_load",
-                "reasons": ["missed_change"],
-            }))
-            .is_err()
-        );
+        assert!(correction(serde_json::json!({"cause": "still_unknown"})).is_err());
         for cause in ResolutionCause::ALL {
-            let mut r = req(FeedbackVerdict::Change);
-            r.cause = Some(cause);
-            let got = r.validate();
+            let got = correction(serde_json::json!({"cause": cause.as_str(), "note": null}));
             if cause == ResolutionCause::StillUnknown {
                 assert!(got.is_err(), "{cause:?}");
             } else {
-                let v = got.unwrap_or_else(|e| panic!("{cause:?}: {e}"));
-                assert_eq!(v.verdict, FeedbackVerdict::Change);
-                assert_eq!(v.cause, Some(cause));
-                assert!(v.reasons.is_empty());
+                assert_eq!(
+                    got.unwrap_or_else(|e| panic!("{cause:?}: {e}")),
+                    ValidCorrection { cause, note: None }
+                );
             }
         }
     }
@@ -342,21 +357,27 @@ mod tests {
         let wide = "é".repeat(MAX_FEEDBACK_NOTE_CHARS);
         assert_eq!(note(&wide).unwrap().note, Some(wide));
         assert!(note(&"é".repeat(MAX_FEEDBACK_NOTE_CHARS + 1)).is_err());
-        // The limit applies to every verdict.
-        let mut change = req(FeedbackVerdict::Change);
-        change.cause = Some(ResolutionCause::DependencyFailure);
-        change.note = Some("x".repeat(MAX_FEEDBACK_NOTE_CHARS + 1));
-        assert!(change.validate().is_err());
+        // The same rules apply to a correction's note.
+        assert_eq!(
+            correction(serde_json::json!({"cause": "capacity_or_load", "note": "  pool  "}))
+                .unwrap()
+                .note
+                .as_deref(),
+            Some("pool")
+        );
+        assert!(
+            correction(serde_json::json!({
+                "cause": "dependency_failure",
+                "note": "x".repeat(MAX_FEEDBACK_NOTE_CHARS + 1),
+            }))
+            .is_err()
+        );
     }
 
     /// Wire values are persisted; they round-trip through `FromStr` and serde.
     #[test]
     fn verdict_and_reason_wire_values_round_trip() {
-        for v in [
-            FeedbackVerdict::Yes,
-            FeedbackVerdict::No,
-            FeedbackVerdict::Change,
-        ] {
+        for v in [FeedbackVerdict::Yes, FeedbackVerdict::No] {
             assert_eq!(v.as_str().parse::<FeedbackVerdict>().unwrap(), v);
             assert_eq!(serde_json::to_value(v).unwrap(), v.as_str());
         }
@@ -365,6 +386,7 @@ mod tests {
             assert_eq!(serde_json::to_value(r).unwrap(), r.as_str());
         }
         assert!("Yes".parse::<FeedbackVerdict>().is_err());
+        assert!("change".parse::<FeedbackVerdict>().is_err());
     }
 
     #[test]

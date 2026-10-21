@@ -3017,7 +3017,7 @@ pub static RCA_FEEDBACK_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
         Opts::new(
             "rca_feedback_total",
-            "Saved responder feedback on RCA runs, by verdict: yes, no or change",
+            "Saved responder feedback, by verdict: yes or no on an RCA run, correction on an incident",
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),

@@ -61,6 +61,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       {{ belowHeadline }}
     </p>
 
+    <!-- Several root causes: each with its onset and its own band. -->
+    <ol
+      v-if="causes.length"
+      data-test="rca-verdict-causes"
+      :aria-label="t('alerts.incidents.rcaSummary.rootCauses')"
+      class="m-0 flex max-w-225 list-none flex-col gap-1 p-0"
+    >
+      <li
+        v-for="cause in causes"
+        :key="cause.id"
+        data-test="rca-verdict-cause"
+        class="text-sm"
+      >
+        <span class="text-text-heading font-semibold">{{ cause.statement }}</span>
+        <span data-test="rca-verdict-cause-meta" class="text-text-secondary text-xs">
+          · {{ causeMeta(cause) }}
+        </span>
+      </li>
+    </ol>
+
     <!-- Confidence line: graded and partial runs only, never while live. -->
     <div
       v-if="showConfidence"
@@ -451,6 +471,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </template>
     </OBanner>
+
+    <!-- The incident-level cause correction, under any finished run. -->
+    <div v-if="$slots.correction" data-test="rca-verdict-correction">
+      <slot name="correction" />
+    </div>
   </section>
 </template>
 
@@ -471,6 +496,7 @@ import type {
   RcaRunError,
   RcaRunMode,
   RcaRunSummary,
+  RcaSummaryCause,
   RcaVerdictDetails,
 } from "@/services/incidents";
 import {
@@ -736,6 +762,24 @@ const belowHeadline = computed<I18nText | null>(() => {
 });
 
 const showConfidence = computed(() => graded.value || partial.value);
+
+/** The root causes of a run with several; empty otherwise. */
+const causes = computed(() =>
+  outcome.value === "multiple_root_causes" ? (card.value?.causes ?? []) : [],
+);
+/** "from 14:02 UTC · Medium confidence"; a cause with no onset shows only its band. */
+const causeMeta = (cause: RcaSummaryCause): I18nText => {
+  const parts: string[] = [];
+  if (typeof cause.onset_us === "number") {
+    parts.push(
+      t("alerts.incidents.rcaSummary.causeOnset", {
+        time: formatTimestampInTimezone(cause.onset_us, "HH:mm", "UTC"),
+      }),
+    );
+  }
+  parts.push(rcaBandLabel(cause.band));
+  return raw(parts.join(" · "));
+};
 const breakdown = computed(() => (graded.value ? (card.value?.confidence ?? null) : null));
 const BAND_WORD: Record<RcaBand, I18nText> = {
   high: t("alerts.incidents.aiAnalysis.band.high"),

@@ -29,4 +29,6 @@ export const incidentKeys = {
   detail: (org: string, id: string) => orgKey(org, "incidents", "detail", id),
   rcaFeedback: (org: string, id: string, runId: string) =>
     orgKey(org, "incidents", "detail", id, "rcaFeedback", runId),
+  rcaCorrection: (org: string, id: string) =>
+    orgKey(org, "incidents", "detail", id, "rcaCorrection"),
 };
