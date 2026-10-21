@@ -279,6 +279,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, onUnmounted, ref, toRef, watch } from "vue";
+import { useQueryClient } from "@tanstack/vue-query";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
@@ -299,6 +300,7 @@ import type {
   RcaThread,
   RcaVerdictDetails,
 } from "@/services/incidents";
+import { rcaFeedbackQuery } from "@/services/incidents.queries";
 import type { RcaReadStatus, RcaRefusal } from "@/composables/useIncidentRca";
 import { useRcaSteering } from "@/composables/useRcaSteering";
 import { useViewerTimezone } from "@/composables/downtimes/useViewerTimezone";
@@ -531,6 +533,20 @@ const cardError = computed<RcaRunError | null>(() => {
 });
 
 const cardRunId = computed(() => props.viewedRun?.run_id ?? props.rca?.run_id ?? "");
+
+// Feedback mounts once the live summary grades the card; a finished run with a stored
+// record will be graded, so its read starts now instead of after the summary.
+const queryClient = useQueryClient();
+watch(
+  () =>
+    cardState.value === "analyzed" && findRun(cardRunId.value)?.has_record ? cardRunId.value : "",
+  (runId) => {
+    if (runId) {
+      void queryClient.prefetchQuery(rcaFeedbackQuery(props.orgId, props.incidentId, runId));
+    }
+  },
+  { immediate: true },
+);
 
 /** The loaded report belongs to the shown run; an earlier run's report never shows for it. */
 const ownsReport = computed(() => (props.viewedRun ?? props.reportRun)?.run_id === cardRunId.value);

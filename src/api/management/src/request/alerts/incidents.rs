@@ -1886,7 +1886,12 @@ pub async fn get_incident_rca_live_stream(
         probe.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
         while !live.is_done() {
             probe.tick().await;
-            for frame in live.tick(config::utils::time::now_micros()).await {
+            let now = config::utils::time::now_micros();
+            // The head goes out before the tail reads the transcript.
+            for frame in live.head(now).await {
+                yield Ok::<bytes::Bytes, std::io::Error>(bytes::Bytes::from(frame.to_sse()));
+            }
+            for frame in live.tail(now).await {
                 yield Ok::<bytes::Bytes, std::io::Error>(bytes::Bytes::from(frame.to_sse()));
             }
         }
