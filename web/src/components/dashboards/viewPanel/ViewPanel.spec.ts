@@ -989,6 +989,40 @@ describe("ViewPanel", () => {
         config.isEnterprise = wasEnterprise;
       }
     });
+
+    it.each([true, false])(
+      "Cancel has no X icon, keeps the Refresh width, and draws the divider only before the options arrow (Auto Run available: %s)",
+      async (autoRunAvailable) => {
+        const wasEnterprise = config.isEnterprise;
+        const zoConfig = mockStore.state.zoConfig;
+        config.isEnterprise = "true";
+        mockStore.state.zoConfig = { ...zoConfig, auto_query_enabled: autoRunAvailable } as any;
+        try {
+          wrapper = createWrapper();
+          await flushPromises();
+          const loading = (wrapper.vm as any).$.provides.variablesAndPanelsDataLoadingState;
+          loading.searchRequestTraceIds = { p1: ["trace-id-1"] };
+          loading.panels = { p1: true };
+          await flushPromises();
+
+          const cancel = wrapper
+            .findAllComponents({ name: "OButton" })
+            .find((b) => b.attributes("data-test") === "dashboard-viewpanel-cancel-btn")!;
+          // The OButton stub keeps class and icon-left in $attrs rather than on the DOM.
+          expect(cancel.vm.$attrs["icon-left"]).toBeUndefined();
+          expect(cancel.find('[aria-hidden="true"]').text()).toContain(
+            "dashboard.viewDashboard.refresh",
+          );
+          expect(cancel.vm.$attrs.class).toBe(autoRunAvailable ? "border-e!" : "");
+          expect(
+            wrapper.find('[data-test="dashboard-viewpanel-refresh-options-btn"]').exists(),
+          ).toBe(autoRunAvailable);
+        } finally {
+          config.isEnterprise = wasEnterprise;
+          mockStore.state.zoConfig = zoConfig;
+        }
+      },
+    );
   });
 
   describe("Data Loading", () => {
