@@ -63,7 +63,7 @@ describe("rcaSummary helpers", () => {
       ["inconclusive", "inc", 9],
     ];
 
-    it.each(["root_cause_identified", "contributing_factor"] as const)(
+    it.each(["root_cause_identified", "multiple_root_causes", "contributing_factor"] as const)(
       "%s: Explains first (root cause, contributing, symptom), then Not confirmed by rank, Ruled out last",
       (outcome) => {
         expect(groupIds(outcome, ALL)).toEqual([
@@ -110,6 +110,7 @@ describe("rcaSummary helpers", () => {
   describe("rcaHypothesisStatusLabel (VE18)", () => {
     it.each([
       ["root_cause_identified", "Root cause"],
+      ["multiple_root_causes", "Root cause"],
       ["contributing_factor", "Root cause · not confirmed"],
       ["inconclusive", "Root cause · not confirmed"],
       ["blocked", "Root cause · not confirmed"],

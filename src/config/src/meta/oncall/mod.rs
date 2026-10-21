@@ -37,7 +37,7 @@ pub use agent::{
     update_channels, verdict_lines,
 };
 pub use confidence::{
-    ConfidenceGrade, GradeReason, SignalClass, ToolCallRecord, UnverifiedCitation,
+    CauseGrade, ConfidenceGrade, GradeReason, SignalClass, ToolCallRecord, UnverifiedCitation,
     UnverifiedReason, apply_outcome, grade_confidence, match_citation, min_band, normalize_key_arg,
     signal_class, stream_type,
 };

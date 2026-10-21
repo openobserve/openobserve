@@ -214,6 +214,15 @@ const cases: [string, Row, boolean, Expected][] = [
     { kind: "state", label: "Root cause identified", tone: "ok", detail: "High", rerunNote: "" },
   ],
   [
+    "Multiple root causes · Medium",
+    {
+      rca: rca({ state: "completed", outcome: "multiple_root_causes", confidence: "medium" }),
+      severity: "P2",
+    },
+    true,
+    { kind: "state", label: "Multiple root causes", tone: "ok", detail: "Medium", rerunNote: "" },
+  ],
+  [
     "Contributing factor · Medium",
     {
       rca: rca({ state: "completed", outcome: "contributing_factor", confidence: "medium" }),

@@ -118,6 +118,10 @@ pub struct Hypothesis {
     #[serde(default)]
     pub lead_ids: Vec<String>,
     pub first_seen_seq: i64,
+    /// When this cause's fault began, microseconds; the agent's claim, not checked against
+    /// evidence.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub onset_us: Option<i64>,
     #[serde(default)]
     pub history: Vec<StatusChange>,
 }
@@ -274,6 +278,13 @@ struct HypothesisInput {
     lead_ids: Vec<String>,
     #[serde(default)]
     trigger_steer_id: Option<String>,
+    /// Microseconds; a value that is not an integer is dropped, not the call.
+    #[serde(default, deserialize_with = "lenient_micros")]
+    onset: Option<i64>,
+}
+
+fn lenient_micros<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Option<i64>, D::Error> {
+    Ok(serde_json::Value::deserialize(d)?.as_i64())
 }
 
 #[derive(Deserialize)]
@@ -439,6 +450,7 @@ impl Builder {
                 h.reason = reason;
                 h.evidence = evidence;
                 h.lead_ids = input.lead_ids;
+                h.onset_us = input.onset;
                 self.hypothesis_cuts[i] = cuts;
             }
             None => {
@@ -452,6 +464,7 @@ impl Builder {
                     evidence,
                     lead_ids: input.lead_ids,
                     first_seen_seq: call.seq,
+                    onset_us: input.onset,
                     history: vec![change],
                 });
                 self.hypothesis_cuts.push(cuts);
@@ -689,6 +702,32 @@ mod tests {
         assert_eq!(h2.evidence[0].id, "e2");
         assert_eq!(h2.evidence[0].first_cited_seq, 12);
         assert_eq!(hypothesis(&l, "h1").first_seen_seq, 9);
+    }
+
+    /// A cause's onset is kept as given; one that is not an integer is dropped, not the call.
+    #[test]
+    fn a_hypothesis_keeps_its_onset() {
+        let with_onset = |seq, id: &str, onset: serde_json::Value| {
+            hyp_input(
+                seq,
+                json!({"id": id, "statement": "s", "status": "root_cause", "reason": "r", "onset": onset}),
+            )
+        };
+        let l = ledger(&[
+            with_onset(1, "h1", json!(1_700_000_000_000_000_i64)),
+            with_onset(2, "h2", json!("10:42")),
+            hyp(3, "h3", "root_cause", vec![]),
+        ]);
+        assert_eq!(ids(&l), ["h1", "h2", "h3"]);
+        assert_eq!(hypothesis(&l, "h1").onset_us, Some(1_700_000_000_000_000));
+        assert_eq!(hypothesis(&l, "h2").onset_us, None);
+        assert_eq!(hypothesis(&l, "h3").onset_us, None);
+        // The last call sets it, like every other field.
+        let l = ledger(&[
+            with_onset(1, "h1", json!(5)),
+            hyp(2, "h1", "root_cause", vec![]),
+        ]);
+        assert_eq!(hypothesis(&l, "h1").onset_us, None);
     }
 
     /// One evidence id on two hypotheses keeps both items with one first seq.

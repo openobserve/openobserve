@@ -55,6 +55,11 @@ export const RCA_OUTCOME_PILL: Record<
     tone: "ok",
     icon: "verified",
   },
+  multiple_root_causes: {
+    key: "alerts.incidents.rcaRun.outcome.multipleRootCauses",
+    tone: "ok",
+    icon: "verified",
+  },
   contributing_factor: {
     key: "alerts.incidents.rcaRun.outcome.contributingFactor",
     tone: "warn",
@@ -127,7 +132,9 @@ export function groupRcaHypotheses(
   outcome: RcaOutcome | undefined,
 ): RcaHypothesisGroup[] {
   const order: RcaHypothesisGroupId[] =
-    outcome === "root_cause_identified" || outcome === "contributing_factor"
+    outcome === "root_cause_identified" ||
+    outcome === "multiple_root_causes" ||
+    outcome === "contributing_factor"
       ? ["explains", "open", "out"]
       : ["open", "explains", "out"];
   return order
@@ -172,7 +179,8 @@ export function rcaHypothesisStatusLabel(
   status: RcaHypothesisStatus,
   outcome: RcaOutcome | undefined,
 ): I18nText {
-  if (status === "root_cause" && outcome !== "root_cause_identified") {
+  const confirmed = outcome === "root_cause_identified" || outcome === "multiple_root_causes";
+  if (status === "root_cause" && !confirmed) {
     return gt("alerts.incidents.rcaSummary.status.rootCauseNotConfirmed");
   }
   return rcaHypothesisStatusWord(status);

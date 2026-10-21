@@ -3538,6 +3538,7 @@ mod tests {
             unverified: vec![],
             subject_id: Some("h1".into()),
             lead_author: None,
+            causes: vec![],
         });
         let lines = verdict_lines(&state, &unchanged);
         assert_eq!(

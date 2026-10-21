@@ -85,6 +85,10 @@ const OUTCOME: Record<RcaOutcome, { key: I18nKey; tone: RcaCellTone }> = {
     key: "alerts.incidents.aiAnalysis.outcome.rootCauseIdentified",
     tone: "ok",
   },
+  multiple_root_causes: {
+    key: "alerts.incidents.aiAnalysis.outcome.multipleRootCauses",
+    tone: "ok",
+  },
   contributing_factor: {
     key: "alerts.incidents.aiAnalysis.outcome.contributingFactor",
     tone: "warn",

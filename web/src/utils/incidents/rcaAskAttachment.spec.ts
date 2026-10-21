@@ -84,6 +84,25 @@ describe("buildRcaAskAttachment (J5)", () => {
     expect(text).toContain("Deploy 4f2c1e (PR #812) rolls out to checkout-api [1]");
   });
 
+  it("several root causes: each cause with its onset and band", () => {
+    const base = rcaRunSummary();
+    const summary = rcaRunSummary({
+      card: {
+        ...base.card,
+        outcome: "multiple_root_causes",
+        causes: [
+          { id: "h1", statement: "pool exhausted", onset_us: RCA_T0, band: "high" },
+          { id: "h2", statement: "cache evicted", band: "medium" },
+        ],
+      },
+    });
+    const text = buildRcaAskAttachment(input({ summary }));
+
+    expect(text).toContain("Outcome: multiple_root_causes");
+    expect(text).toContain("Root cause h1 from 2025-10-09T08:53:20Z (high): pool exhausted");
+    expect(text).toContain("Root cause h2 (medium): cache evicted");
+  });
+
   it("a legacy run has no record sections; the report still comes after the header", () => {
     const text = buildRcaAskAttachment(input({ summary: rcaRunSummaryLegacy() }));
 

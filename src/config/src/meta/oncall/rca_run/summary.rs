@@ -29,7 +29,9 @@ use crate::meta::{
     alerts::{rca_runs::RunState, rca_steering::STEER_ID_PREFIX},
     oncall::{
         agent::{ChangeKind, Confidence},
-        confidence::{ConfidenceBreakdown, SignalClass, ToolCallRecord, UnverifiedCitation},
+        confidence::{
+            ConfidenceBreakdown, SignalClass, ToolCallRecord, UnverifiedCitation, min_band,
+        },
     },
 };
 
@@ -85,6 +87,21 @@ pub struct SummaryCard {
     /// Blocked runs: the title of the first blind spot with a fix.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub needs: Option<String>,
+    /// `multiple_root_causes` only: each root cause, in first-seen order.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub causes: Vec<SummaryCause>,
+}
+
+/// One root cause of a run with several.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct SummaryCause {
+    pub id: String,
+    pub statement: String,
+    /// Microseconds; the agent's claim.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub onset_us: Option<i64>,
+    /// This cause's own band, never above the claimed one.
+    pub band: Confidence,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
@@ -163,6 +180,9 @@ pub struct SummaryHypothesis {
     #[serde(default)]
     pub lead_ids: Vec<String>,
     pub first_seen_seq: i64,
+    /// Microseconds; the agent's claim.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub onset_us: Option<i64>,
     #[serde(default)]
     pub history: Vec<SummaryStatusChange>,
 }
@@ -256,6 +276,7 @@ fn hypotheses_view(
                 unverified_ids,
                 lead_ids: h.lead_ids.clone(),
                 first_seen_seq: h.first_seen_seq,
+                onset_us: h.onset_us,
                 history: h
                     .history
                     .iter()
@@ -330,10 +351,29 @@ pub fn summary_from_record(
     let ledger = &record.ledger;
     let headline = match record.outcome {
         Some(
-            RcaOutcome::RootCauseIdentified | RcaOutcome::ContributingFactor | RcaOutcome::Blocked,
+            RcaOutcome::RootCauseIdentified
+            | RcaOutcome::MultipleRootCauses
+            | RcaOutcome::ContributingFactor
+            | RcaOutcome::Blocked,
         ) => record.verdict.as_ref().map(|v| v.probable_cause.clone()),
         Some(RcaOutcome::Inconclusive) => subject(ledger).map(|h| h.statement.clone()),
         None => None,
+    };
+    let causes = match (record.outcome, record.grade.as_ref()) {
+        (Some(RcaOutcome::MultipleRootCauses), Some(grade)) => grade
+            .causes
+            .iter()
+            .filter_map(|c| {
+                let h = ledger.hypotheses.iter().find(|h| h.id == c.hypothesis_id)?;
+                Some(SummaryCause {
+                    id: h.id.clone(),
+                    statement: h.statement.clone(),
+                    onset_us: h.onset_us,
+                    band: min_band(grade.claimed, c.graded),
+                })
+            })
+            .collect(),
+        _ => Vec::new(),
     };
     let suspect_change = record
         .verdict
@@ -370,6 +410,7 @@ pub fn summary_from_record(
                 }
             })
             .flatten(),
+        causes,
     };
     RcaRunSummary {
         run_id: run_id.to_string(),
@@ -542,6 +583,80 @@ mod tests {
             (c.claimed, c.evidence, c.evidence_reason.as_str()),
             (Confidence::High, Confidence::Low, "no hypotheses recorded")
         );
+    }
+
+    /// Several graded root causes: the verdict's sentence heads the card, and each cause shows
+    /// with its onset and its own band.
+    #[test]
+    fn several_root_causes_list_each_cause() {
+        let root = |seq, id: &str, onset: Option<i64>, evidence| {
+            let mut input = json!({"id": id, "statement": format!("{id} statement"),
+                "status": "root_cause", "reason": "r", "evidence": evidence});
+            if let Some(onset) = onset {
+                input["onset"] = json!(onset);
+            }
+            hyp_input(seq, input)
+        };
+        let calls = [
+            root(
+                1,
+                "h1",
+                Some(1_000),
+                vec![item("e1", PROM, "pool_active", "supports", "decisive")],
+            ),
+            root(
+                2,
+                "h2",
+                None,
+                vec![item("e2", SQL, "SELECT * FROM app", "supports", "decisive")],
+            ),
+        ];
+        let r = record(
+            &calls,
+            Some(submitted(
+                "pool shrank and the app crashed",
+                Confidence::Medium,
+            )),
+            true,
+        );
+        assert_eq!(r.outcome, Some(RcaOutcome::MultipleRootCauses));
+        let s = summary_from_record("r", RunState::Completed, "v".into(), &r);
+        assert_eq!(
+            s.card.headline.as_deref(),
+            Some("pool shrank and the app crashed")
+        );
+        let causes: Vec<_> = s
+            .card
+            .causes
+            .iter()
+            .map(|c| (c.id.as_str(), c.statement.as_str(), c.onset_us, c.band))
+            .collect();
+        assert_eq!(
+            causes,
+            [
+                ("h1", "h1 statement", Some(1_000), Confidence::Medium),
+                ("h2", "h2 statement", None, Confidence::Medium),
+            ]
+        );
+        assert_eq!(s.hypotheses[0].onset_us, Some(1_000));
+        assert_eq!(
+            s.card.confidence.unwrap().evidence_reason,
+            "2 causes, each with a decisive source"
+        );
+
+        // One cause below medium: inconclusive, no cause list.
+        let r = record(
+            &[calls[0].clone(), root(2, "h2", None, vec![])],
+            Some(submitted(
+                "pool shrank and the app crashed",
+                Confidence::Medium,
+            )),
+            true,
+        );
+        assert_eq!(r.outcome, Some(RcaOutcome::Inconclusive));
+        let s = summary_from_record("r", RunState::Completed, "v".into(), &r);
+        assert!(s.card.causes.is_empty());
+        assert_eq!(s.card.headline.as_deref(), Some("h1 statement"));
     }
 
     #[test]
