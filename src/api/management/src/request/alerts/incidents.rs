@@ -640,6 +640,13 @@ async fn authorize_started_rca(
             .await
             {
                 Ok(true) => {
+                    // The guidance committed with the run is never read by a turn.
+                    openobserve_core::alerts::rca_steering::close_unread(
+                        org_id,
+                        run_id,
+                        config::meta::alerts::rca_runs::RunState::Failed,
+                    )
+                    .await;
                     o2_enterprise::enterprise::alerts::rca_service::skip_analysis_for_incident(
                         org_id,
                         incident_id,
@@ -3275,7 +3282,7 @@ mod tests {
                 trigger,
                 mode: RunMode::Fresh,
                 started_by: STEER_ROOT.to_string(),
-                guidance: None,
+                guidance: Some("Check the deploy".to_string()),
                 skip_cooldown: true,
                 oncall_subjects: None,
                 context_used: None,
@@ -3335,6 +3342,17 @@ mod tests {
             assert_eq!(run.error.as_ref().unwrap()["code"], "usage_denied");
             assert!(run.ended_at.is_some());
             assert_eq!(trial_quota::get_used(&org), 0);
+            let guidance = infra::table::rca_steering::list_for_run(&org, &run_id)
+                .await
+                .unwrap();
+            assert_eq!(guidance.len(), 1);
+            assert_eq!(
+                (guidance[0].status, guidance[0].status_reason),
+                (
+                    config::meta::alerts::rca_steering::SteerStatus::NotRead,
+                    Some(config::meta::alerts::rca_steering::SteerStatusReason::RunFailed)
+                )
+            );
             let scheduled =
                 infra::scheduler::get(&org, TriggerModule::OncallEscalation, &record.id)
                     .await
