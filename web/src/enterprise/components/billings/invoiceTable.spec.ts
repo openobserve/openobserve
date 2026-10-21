@@ -77,9 +77,9 @@ describe("InvoiceTable Component", () => {
           period_start: "2023-01-01",
           period_end: "2023-01-31",
           paid: true,
-          total: 100,
+          total: 10000,
           currency: "usd",
-          amount_paid: 100,
+          amount_paid: 10000,
           amount_due: 0,
           attempt_count: 1,
           statue: "paid",
@@ -89,10 +89,10 @@ describe("InvoiceTable Component", () => {
           period_start: "2023-02-01",
           period_end: "2023-02-28",
           paid: false,
-          total: 150,
+          total: 15050,
           currency: "eur",
           amount_paid: 0,
-          amount_due: 150,
+          amount_due: 15050,
           attempt_count: 0,
           statue: "open",
           invoice_pdf: "https://example.com/invoice2.pdf",
@@ -217,21 +217,24 @@ describe("InvoiceTable Component", () => {
       await wrapper.vm.$nextTick();
 
       const tableHtml = wrapper.html();
-      // Check formatted currency values
-      expect(tableHtml).toContain("100 USD");
-      expect(tableHtml).toContain("150 EUR");
+      expect(tableHtml).toContain("$100.00");
+      expect(tableHtml).toContain("€150.50");
+      expect(tableHtml).not.toContain("10000");
     });
   });
 
   describe("Invoice Data Formatting", () => {
-    it("formats currency as total + currency uppercase", () => {
-      const formatCurrency = (total: number, currency: string) => {
-        return total + " " + currency.toUpperCase();
-      };
+    it("does not scale zero-decimal currencies", async () => {
+      vi.mocked(BillingService.list_invoice_history).mockResolvedValue({
+        data: {
+          invoices: [{ ...mockInvoiceData.data.invoices[0], total: 5000, currency: "jpy" }],
+        },
+      });
 
-      expect(formatCurrency(100, "usd")).toBe("100 USD");
-      expect(formatCurrency(150, "eur")).toBe("150 EUR");
-      expect(formatCurrency(0, "gbp")).toBe("0 GBP");
+      wrapper = mountInvoiceTable();
+      await flushPromises();
+
+      expect(wrapper.html()).toContain("¥5,000");
     });
 
     it("formats paid status correctly", () => {
@@ -250,18 +253,6 @@ describe("InvoiceTable Component", () => {
 
       expect(processed[0].id).toBe(1);
       expect(processed[1].id).toBe(2);
-    });
-
-    it("handles multiple currency formats", () => {
-      const testCases = [
-        { total: 100, currency: "usd", expected: "100 USD" },
-        { total: 50.5, currency: "eur", expected: "50.5 EUR" },
-        { total: 0, currency: "gbp", expected: "0 GBP" },
-      ];
-
-      testCases.forEach((tc) => {
-        expect(`${tc.total} ${tc.currency.toUpperCase()}`).toBe(tc.expected);
-      });
     });
   });
 
