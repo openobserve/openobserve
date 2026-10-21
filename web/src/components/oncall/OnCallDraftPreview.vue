@@ -193,8 +193,7 @@ const tracks = computed<ScheduleTrack[]>(() =>
       return {
         key: `${row.start}-${from}`,
         offset,
-        // The hour the clocks go back repeats, so a piece inside it can end before it starts.
-        width: Math.max(0, dayFraction(to, row, props.timezone) - offset),
+        width: dayFraction(to, row, props.timezone) - offset,
         label: who ? raw(props.nameOf(who)) : t("oncall.calendarNobody"),
         ariaLabel: t("oncall.previewBandAria", {
           who: who ? raw(who) : t("oncall.calendarNobody"),

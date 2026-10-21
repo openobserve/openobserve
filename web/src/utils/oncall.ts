@@ -1060,11 +1060,44 @@ export function dayRows(
   });
 }
 
-/** Where `atMicros` sits across `row` on the wall-clock scale of its axis, 0 at its start and 1 at its end. [pure] */
+/** Where `atMicros` sits across `row`, strictly increasing: wall time / 24 h, the repeated hour's two passes sharing its slot. [pure] */
 export function dayFraction(atMicros: number, row: DayRow, timezone: string): number {
-  if (atMicros <= row.start) return 0;
+  if (atMicros < row.start) return 0;
   if (atMicros >= row.end) return 1;
-  return (wallTimeInZone(atMicros, timezone)?.minuteOfDay ?? 0) / MINUTES_PER_DAY;
+  const before = offsetMicrosAt(row.start, timezone);
+  const after = offsetMicrosAt(row.end - 1, timezone);
+  const midnight = Math.floor((row.start + before) / MICROS_PER_DAY) * MICROS_PER_DAY;
+  const wall = (micros: number, offset: number) => (micros + offset - midnight) / MICROS_PER_DAY;
+  if (before === after) return wall(atMicros, before);
+  const change = offsetChangeAt(row.start, row.end - 1, timezone);
+  const repeated = before - after;
+  const foldStart = change - repeated;
+  if (repeated > 0 && atMicros >= foldStart && atMicros < change + repeated) {
+    return wall(foldStart, before) + (atMicros - foldStart) / (2 * MICROS_PER_DAY);
+  }
+  return wall(atMicros, atMicros < change ? before : after);
+}
+
+/** The zone's UTC offset at `micros`, in micros; UTC for a zone Intl rejects, as `dayRows` cuts it. [pure] */
+function offsetMicrosAt(micros: number, timezone: string): number {
+  try {
+    return zoneOffsetMs(Math.floor(micros / 1_000_000) * 1000, timezone) * 1000;
+  } catch {
+    return 0;
+  }
+}
+
+/** The first whole second in (`from`, `to`] whose offset is `to`'s, by halving; assumes one change between them. [pure] */
+function offsetChangeAt(from: number, to: number, timezone: string): number {
+  const target = offsetMicrosAt(to, timezone);
+  let lo = Math.floor(from / 1_000_000);
+  let hi = Math.floor(to / 1_000_000);
+  while (hi - lo > 1) {
+    const mid = Math.floor((lo + hi) / 2);
+    if (offsetMicrosAt(mid * 1_000_000, timezone) === target) hi = mid;
+    else lo = mid;
+  }
+  return hi * 1_000_000;
 }
 
 /** Adjacent, touching segments of one holder joined into one stretch; the rostered member stays only where all parts agree. [pure] */
@@ -1845,7 +1878,7 @@ export function fromZonedInputValue(value: string, timezone: string): number | n
   }
 }
 
-/** The start of the `timezone` day `days` after the one holding `micros`, in micros. DST-correct. [pure] */
+/** The first instant of the `timezone` day `days` after the one holding `micros`, in micros; the clock jump where 00:00 is skipped. [pure] */
 export function zonedMidnight(micros: number, timezone: string, days = 0): number {
   const [year, month, day] = toZonedInputValue(micros, timezone)
     .slice(0, 10)
@@ -1853,9 +1886,13 @@ export function zonedMidnight(micros: number, timezone: string, days = 0): numbe
     .map(Number);
   const date = new Date(0);
   date.setUTCFullYear(year, month - 1, day + days);
-  const midnight = fromZonedInputValue(`${date.toISOString().slice(0, 10)}T00:00`, timezone);
+  const target = date.toISOString().slice(0, 10);
+  const midnight = fromZonedInputValue(`${target}T00:00`, timezone);
   if (midnight === null) throw new RangeError(`no local midnight for ${micros} in ${timezone}`);
-  return midnight;
+  if (toZonedInputValue(midnight, timezone).startsWith(target)) return midnight;
+  // A skipped 00:00 resolves to the day before; the day starts at the jump, read at the old offset.
+  const jumpedTo = date.getTime() * 1000 - offsetMicrosAt(midnight, timezone);
+  return offsetChangeAt(midnight, jumpedTo, timezone);
 }
 
 /**

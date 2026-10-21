@@ -83,6 +83,7 @@ import {
   ruleHolder,
   anchorAtWeekdayTime,
   anchorWeekdayTime,
+  dayFraction,
   dayRows,
   stopChoices,
   stopConsequence,
@@ -1592,8 +1593,23 @@ describe("zonedMidnight", () => {
     ["UTC", KOLKATA_10AM, 2, Date.UTC(2026, 7, 19)],
     // Starts in EST and lands in EDT: the step is local days, not 24-hour blocks.
     ["America/New_York", Date.UTC(2026, 2, 1, 17), 14, Date.UTC(2026, 2, 15, 4, 0)],
+    // No local 00:00 on these days: the day starts where the clocks jump to 01:00.
+    ["America/Santiago", Date.UTC(2026, 8, 5, 16), 1, Date.UTC(2026, 8, 6, 4)],
+    ["America/Havana", Date.UTC(2026, 2, 7, 17), 1, Date.UTC(2026, 2, 8, 5)],
+    ["America/Santiago", Date.UTC(2026, 8, 6, 16), 0, Date.UTC(2026, 8, 6, 4)],
   ])("%s from %i plus %i days", (zone, startMs, days, expectedMs) => {
     expect(zonedMidnight(startMs * 1000, zone, days)).toBe(expectedMs * 1000);
+  });
+
+  it("rows tile without gap or overlap across a day with no midnight", () => {
+    const rows = dayRows([], Date.UTC(2026, 8, 4, 16) * 1000, 4, "America/Santiago");
+    expect(rows.map((r) => toZonedInputValue(r.start, "America/Santiago"))).toEqual([
+      "2026-09-04T00:00",
+      "2026-09-05T00:00",
+      "2026-09-06T01:00",
+      "2026-09-07T00:00",
+    ]);
+    rows.slice(1).forEach((row, i) => expect(row.start).toBe(rows[i].end));
   });
 });
 
@@ -1799,6 +1815,81 @@ describe("rotation drawer, part B", () => {
     ]);
     expect(rows[0].pieces.map((p) => [p.from, p.to])).toEqual([[MON, MON + 24 * HOUR]]);
     expect(rows[1].pieces.map((p) => [p.from, p.to])).toEqual([[MON + 24 * HOUR, MON + 30 * HOUR]]);
+  });
+
+  // F1: an instant's place on its day row; the repeated hour holds both occurrences, half each.
+  const NY = "America/New_York";
+  const at = (zone: string, ms: number) =>
+    dayFraction(ms * 1000, dayRows([], ms * 1000, 1, zone)[0], zone);
+  it.each([
+    ["Kolkata 09:30 is wall/24", "Asia/Kolkata", Date.UTC(2026, 2, 4, 4), 9.5 / 24],
+    [
+      "Kolkata keeps micros",
+      "Asia/Kolkata",
+      Date.UTC(2026, 2, 4, 4, 0, 30, 500),
+      (570.5 + 0.5 / 60) / 1440,
+    ],
+    ["fall-back noon sits at the middle", NY, Date.UTC(2026, 10, 1, 17), 0.5],
+    [
+      "fall-back first 01:30 fills the slot's first half",
+      NY,
+      Date.UTC(2026, 10, 1, 5, 30),
+      75 / 1440,
+    ],
+    ["fall-back second 01:30 fills its second half", NY, Date.UTC(2026, 10, 1, 6, 30), 105 / 1440],
+    ["fall-back 03:00 is wall/24", NY, Date.UTC(2026, 10, 1, 8), 3 / 24],
+    ["spring-forward 01:30 EST is wall/24", NY, Date.UTC(2026, 2, 8, 6, 30), 1.5 / 24],
+    ["spring-forward 03:30 EDT is wall/24", NY, Date.UTC(2026, 2, 8, 7, 30), 3.5 / 24],
+    ["no-midnight day starts at 01:00", "America/Santiago", Date.UTC(2026, 8, 6, 4), 1 / 24],
+    ["no-midnight day noon", "America/Santiago", Date.UTC(2026, 8, 6, 15), 0.5],
+    ["no-midnight day noon in Havana", "America/Havana", Date.UTC(2026, 2, 8, 16), 0.5],
+  ])("dayFraction: %s", (_name, zone, ms, expected) => {
+    expect(at(zone, ms)).toBeCloseTo(expected, 12);
+  });
+
+  it("dayFraction strictly increases across a day with no midnight and stays below 1", () => {
+    const zone = "America/Santiago";
+    const row = dayRows([], Date.UTC(2026, 8, 6, 12) * 1000, 1, zone)[0];
+    const hours = Array.from({ length: 23 }, (_, h) => row.start + h * 3_600_000_000);
+    const positions = [...hours, row.end - 1].map((t) => dayFraction(t, row, zone));
+    positions.slice(1).forEach((p, i) => expect(p).toBeGreaterThan(positions[i]));
+    expect(positions.at(-1)).toBeLessThan(1);
+  });
+
+  it.each([
+    [
+      "fall-back cover 01:45 EDT to 01:15 EST",
+      NY,
+      Date.UTC(2026, 10, 1, 5, 45),
+      Date.UTC(2026, 10, 1, 6, 15),
+      15 / 1440,
+    ],
+    [
+      "spring-forward 01:30 EST to 03:30 EDT",
+      NY,
+      Date.UTC(2026, 2, 8, 6, 30),
+      Date.UTC(2026, 2, 8, 7, 30),
+      2 / 24,
+    ],
+    [
+      "a 30-second piece",
+      "Asia/Kolkata",
+      Date.UTC(2026, 2, 4, 4),
+      Date.UTC(2026, 2, 4, 4, 0, 30),
+      30 / 86400,
+    ],
+    [
+      "a 30-second piece in the repeated hour",
+      NY,
+      Date.UTC(2026, 10, 1, 6),
+      Date.UTC(2026, 10, 1, 6, 0, 30),
+      15 / 86400,
+    ],
+  ])("dayFraction width: %s", (_name, zone, fromMs, toMs, width) => {
+    const row = dayRows([], fromMs * 1000, 1, zone)[0];
+    const span = dayFraction(toMs * 1000, row, zone) - dayFraction(fromMs * 1000, row, zone);
+    expect(span).toBeGreaterThan(0);
+    expect(span).toBeCloseTo(width, 12);
   });
 
   // B4: the next ends of this rule's own stretches, inside the window and after now.

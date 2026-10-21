@@ -932,6 +932,64 @@ describe("OnCallScheduleEditor", () => {
       const sent = (service.setSchedule.mock.calls[0][0] as any).data.rotations[0];
       expect(sent.shift_rules[0].members).toEqual(["ana@o2.ai"]);
     });
+
+    it("F2: Discard puts back an edited window and never touches the stored schedule", async () => {
+      const stored = schedule([
+        rota("Primary", [
+          rule({ restrictions: [{ days: [5], start_minute: 540, end_minute: 1020 }] }),
+        ]),
+      ]);
+      const before = JSON.parse(JSON.stringify(stored));
+      const wrapper = render({
+        schedule: stored,
+        drawerOnly: true,
+        intent: { mode: "edit", id: "rot_primary" },
+      });
+      await flushPromises();
+      const [, from] = wrapper
+        .find('[data-test="oncall-schedule-restriction-0-0"]')
+        .findAllComponents({ name: "OSelect" });
+      from.vm.$emit("update:modelValue", 600);
+      await flushPromises();
+      expect(stored).toEqual(before);
+
+      await exits["the footer Cancel"](wrapper);
+      await flushPromises();
+      discardConfirm(wrapper).vm.$emit("update:ok");
+      await flushPromises();
+      await wrapper.setProps({ intent: { mode: "edit", id: "rot_primary" } });
+      await flushPromises();
+      await wrapper.find('[data-test="oncall-rotation-done"]').trigger("click");
+      await flushPromises();
+
+      const sent = (service.setSchedule.mock.calls[0][0] as any).data.rotations[0];
+      expect(sent.shift_rules[0].restrictions).toEqual([
+        { days: [5], start_minute: 540, end_minute: 1020 },
+      ]);
+      expect(stored).toEqual(before);
+    });
+
+    it("F2: editing a duplicate's window leaves the original's window alone", async () => {
+      const window = { days: [5], start_minute: 540, end_minute: 1020 };
+      const wrapper = render({
+        schedule: schedule([rota("Primary", [rule({ restrictions: [window] })])]),
+      });
+      await flushPromises();
+      await wrapper.setProps({ intent: { mode: "duplicate", id: "rot_primary" } });
+      await flushPromises();
+      const [, from] = wrapper
+        .find('[data-test="oncall-schedule-restriction-0-0"]')
+        .findAllComponents({ name: "OSelect" });
+      from.vm.$emit("update:modelValue", 600);
+      await flushPromises();
+      await wrapper.find('[data-test="oncall-rotation-done"]').trigger("click");
+      await flushPromises();
+
+      const sent = (service.setSchedule.mock.calls[0][0] as any).data.rotations;
+      expect(sent.map((r: any) => r.shift_rules[0].restrictions[0].start_minute)).toEqual([
+        540, 600,
+      ]);
+    });
   });
 
   /// A layer's *when* was the half the editor could not express: a

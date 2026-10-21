@@ -896,14 +896,19 @@ function setMembers(rule: ShiftRule, members: string[]) {
   peopleAsked.add(rule);
 }
 
+/** `rule` with every array and window the editor mutates copied, so edits never reach the original. [pure] */
+function copyRule(rule: ShiftRule): ShiftRule {
+  return {
+    ...rule,
+    members: [...rule.members],
+    restrictions: rule.restrictions?.map((window) => ({ ...window, days: [...window.days] })),
+  };
+}
+
 function reset() {
   draft.value = (props.schedule?.rotations ?? []).map((r) => ({
     ...r,
-    shift_rules: (r.shift_rules ?? []).map((rule) => ({
-      ...rule,
-      members: [...rule.members],
-      restrictions: rule.restrictions ? [...rule.restrictions] : undefined,
-    })),
+    shift_rules: (r.shift_rules ?? []).map(copyRule),
   }));
   for (const rule of draft.value.flatMap((r) => r.shift_rules)) {
     if (!rule.members.length) peopleAsked.add(rule);
@@ -974,11 +979,7 @@ function duplicateRotation(id: string) {
   const copy: Rotation = {
     id: mintRotationId(),
     name: String(t("oncall.railCopyName", { name: raw(source.name) })),
-    shift_rules: source.shift_rules.map((rule) => ({
-      ...rule,
-      members: [...rule.members],
-      restrictions: rule.restrictions ? [...rule.restrictions] : undefined,
-    })),
+    shift_rules: source.shift_rules.map(copyRule),
     // A copy is somebody's choice, so it is no longer the system's default.
     source: undefined,
   };
