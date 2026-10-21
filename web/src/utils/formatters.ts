@@ -472,6 +472,20 @@ export function formatOrgTime(
   return `${date} ${time}${zone}`;
 }
 
+/** A calendar day in the org zone and UI locale ("1 Nov"), for renewal dates. */
+export function formatOrgDay(ts: number): string {
+  return orgParts(ts, orgTimeZone(), uiIntlLocale(), { day: "numeric", month: "short" });
+}
+
+/** "2026-11-01" in the org zone, for text pasted outside the app. */
+export function formatOrgIsoDay(ts: number): string {
+  return orgParts(ts, orgTimeZone(), "en-CA", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+}
+
 /** "13:42–13:58 GMT+5:30": one zone, always named, en dash between the ends. */
 export function formatOrgRange(from: number, to: number, opts: { timeZone?: string } = {}): string {
   const locale = uiIntlLocale();

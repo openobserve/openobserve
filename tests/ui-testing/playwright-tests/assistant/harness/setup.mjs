@@ -294,6 +294,11 @@ async function handleAi(route, request, state) {
   if (/^\/api\/[^/]+\/ai\/actions\/[^/]+\/undo$/.test(p)) return json(route, {}), true;
   if (/^\/api\/[^/]+\/ai\/confirm\//.test(p)) return json(route, { ok: true }), true;
   if (/^\/api\/[^/]+\/ai\/toolsets/.test(p)) return json(route, m === "GET" ? TOOLSETS : { id: "ts_new" }), true;
+  if (/^\/api\/[^/]+\/ai\/usage$/.test(p) && (state.usage || state.usageStatus !== 200)) {
+    state.log.push("GET ai/usage");
+    if (state.usageStatus !== 200) return json(route, { code: state.usageStatus, message: "usage read failed" }, state.usageStatus), true;
+    return json(route, state.usage), true;
+  }
   if (/^\/api\/[^/]+\/ai\/usage/.test(p)) return json(route, { data: [], total_tokens: 0 }), true;
   if (/^\/api\/[^/]+\/quota\/[^/]+\/paid_overage$/.test(p)) {
     if (m === "PUT") {
@@ -303,6 +308,7 @@ async function handleAi(route, request, state) {
       const { enabled } = request.postDataJSON() || {};
       state.overage = { ...state.overage, effective: !!enabled, organization: { ...state.overage.organization, enabled: !!enabled } };
     }
+    if (state.overageStatus !== 200) return json(route, { code: state.overageStatus, message: "paid usage read failed" }, state.overageStatus), true;
     return json(route, state.overage), true;
   }
   return false;

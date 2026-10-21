@@ -67,7 +67,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <div
-      v-if="notice || $slots.notice"
+      v-if="notice || creditThreshold || $slots.notice"
+      ref="noticeRow"
       class="shrink-0 px-3 pt-2"
       data-test="assistant-shell-notice-row"
     >
@@ -134,6 +135,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </template>
       </OBanner>
+      <AssistantCreditNotice
+        v-else-if="creditThreshold"
+        :threshold="creditThreshold"
+        :can-manage="credits.canManage.value"
+        :resets-at="credits.usage.value?.resetsAt"
+        :org="org"
+        @dismiss="dismissCreditNotice"
+        @manage="creditNotice.noteAction('manage')"
+        @ask-admin="creditNotice.noteAction('ask_admin')"
+      />
       <slot v-else name="notice" />
     </div>
 
@@ -265,12 +276,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- ④ status strip with its one keyboard bridge (Review request or Go to answer); WP-10 adds the review bridge -->
       <slot name="status-strip">
         <div
-          v-if="strip"
-          class="border-border-default flex min-w-0 shrink-0 flex-wrap items-center gap-x-2 gap-y-1 border-t px-3 py-1"
+          v-if="strip || metered"
+          class="border-border-default @container flex min-w-0 shrink-0 flex-wrap items-center gap-x-2 gap-y-1 border-t px-3 py-1"
           data-test="assistant-status-strip"
         >
           <AssistantTurnStatus
-            v-if="strip.status && session"
+            v-if="strip?.status && session"
             variant="block"
             :turn="session.turn"
             :meta="session.turnMeta"
@@ -280,7 +291,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <span v-else class="flex-1" />
           <OButton
-            v-if="strip.jump"
+            v-if="strip?.jump"
             variant="ghost"
             size="sm"
             :icon-left="assistantGlyph.jumpToLatest"
@@ -292,7 +303,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ jumpLabel }}
           </OButton>
           <OButton
-            v-if="strip.review"
+            v-if="strip?.review"
             variant="outline"
             size="sm"
             :aria-label="t('assistant.strip.review')"
@@ -303,7 +314,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ reviewLabel }}
           </OButton>
           <OButton
-            v-if="strip.goToAnswer"
+            v-if="strip?.goToAnswer"
             variant="ghost"
             size="sm"
             class="shrink-0 max-md:min-h-11 pointer-coarse:min-h-11"
@@ -312,6 +323,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ t("assistant.strip.goToAnswer") }}
           </OButton>
+          <AssistantCreditMeter
+            v-if="metered"
+            size="compact"
+            :usage="credits.usage.value"
+            :overage="credits.overage.value"
+            :status="credits.status.value"
+            :can-manage="credits.canManage.value"
+            :org-name="org"
+            @retry="credits.retry()"
+          />
         </div>
       </slot>
       <slot name="tray">
@@ -331,6 +352,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :persistence="capability.persistence"
           :signed-in="signedIn"
           :popup-blocked="popupBlocked"
+          :credits="metered ? credits.refusal.value : undefined"
           @action="(action) => onOutcomeAction(activeSid!, action, refusalRecord!)"
           @open-here="openSignInHere"
           @retry-ready="onRetryReady"
@@ -474,6 +496,8 @@ import {
   type AssistantApprovalsHost,
 } from "@/components/ai-assistant/approvals/approvals.types";
 import AssistantConsentCard from "@/components/ai-assistant/credits/AssistantConsentCard.vue";
+import AssistantCreditMeter from "@/components/ai-assistant/credits/AssistantCreditMeter.vue";
+import AssistantCreditNotice from "@/components/ai-assistant/credits/AssistantCreditNotice.vue";
 import AssistantIconButton from "@/components/ai-assistant/common/AssistantIconButton.vue";
 import AssistantMark from "@/components/ai-assistant/common/AssistantMark.vue";
 import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
@@ -510,9 +534,11 @@ import {
   registerAssistantFocusTarget,
   turnLockKey,
   useAssistantCapability,
+  useAssistantCredits,
   useAssistantName,
   useAssistantStarters,
   useAssistantStore,
+  useCreditNotice,
   useOtherAccountSignedIn,
   useSignedOutElsewhere,
   stopElsewhere as stopHeldTurn,
@@ -542,6 +568,8 @@ import { trackAssistant } from "@/services/assistantAnalytics";
 import { refreshSession } from "@/services/http";
 import type { ChatMessage, TurnOutcomeRecord } from "@/ts/interfaces/chat";
 import { raw, useI18nTyped } from "@/types/i18n";
+import { copyToClipboard } from "@/utils/clipboard";
+import { formatCount, formatOrgIsoDay } from "@/utils/formatters";
 
 import AssistantContainerMenu from "./AssistantContainerMenu.vue";
 import AssistantStatusRegion from "./AssistantStatusRegion.vue";
@@ -576,6 +604,7 @@ const vuex = useStore();
 const { lgUp } = useBreakpoint();
 const root = ref<HTMLElement | null>(null);
 const lower = ref<HTMLElement | null>(null);
+const noticeRow = ref<HTMLElement | null>(null);
 const region = ref<InstanceType<typeof AssistantStatusRegion> | null>(null);
 const composer = ref<InstanceType<typeof AssistantComposer> | null>(null);
 const transcript = ref<InstanceType<typeof AssistantTranscript> | null>(null);
@@ -656,6 +685,23 @@ const trayCollapsed = computed(
     props.placement === "docked" ||
     (props.placement === "sidebar" && store.state.shell.sidebarWidthRem <= 24),
 );
+
+// Every credit surface is Cloud only and never on a locked door.
+const metered = computed(
+  () => capability.value.edition === "cloud" && capability.assistantCanChat.value,
+);
+const credits = useAssistantCredits(
+  () => org.value,
+  () => metered.value,
+  () => capability.value.isAdmin,
+);
+// The row shows one banner; a credit notice behind another one has not been seen.
+const creditNotice = useCreditNotice(
+  () => store.state.userOrgKey,
+  () => credits.usage.value,
+  () => metered.value && visible.value && !notice.value,
+);
+const creditThreshold = computed(() => creditNotice.threshold.value);
 
 // The fuller disclosure shows once per user+org on the first attachment, and again in a shared chat (CT-04 AC 5).
 const disclosureBanner = computed(() => {
@@ -1018,9 +1064,32 @@ function onOutcomeAction(sid: string, action: OutcomeAction, outcome: TurnOutcom
     case "manage_usage":
     case "view_plans":
       return void router.push({ name: "plans", query }).catch(() => undefined);
+    case "copy_request":
+      return copyCreditRequest();
     default:
       return;
   }
+}
+
+// What an account manager needs to add credits: the org, its count when known, and the day.
+function copyCreditRequest(): void {
+  const usage = credits.usage.value;
+  const params = { org: raw(org.value), date: raw(formatOrgIsoDay(Date.now())) };
+  const text = usage
+    ? t("assistant.credits.copyRequest", {
+        ...params,
+        used: raw(formatCount(usage.credits_used)),
+        limit: raw(formatCount(usage.credits_limit)),
+      })
+    : t("assistant.credits.copyRequestNoUsage", params);
+  void copyToClipboard(text, t, { successMessage: t("common.copied") });
+}
+
+// The notice unmounts with focus inside it; the composer takes focus back instead of the page body.
+function dismissCreditNotice(): void {
+  const hadFocus = !!noticeRow.value?.contains(document.activeElement);
+  creditNotice.dismiss();
+  if (hadFocus) void nextTick(focusEntry);
 }
 
 // An expired card asks for itself again in one short turn, never a resend of the original prompt.

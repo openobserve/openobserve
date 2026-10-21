@@ -19,7 +19,7 @@ import { ref } from "vue";
 
 import type { AssistantCapabilitiesResponse } from "@/services/assistant";
 
-import type { Tri } from "./assistantStore.types";
+import type { CreditMode, Tri } from "./assistantStore.types";
 import {
   createAssistantCapability,
   type AssistantCapabilityHandle,
@@ -46,6 +46,8 @@ interface Setup {
   /** Answer B-06 synchronously, as vue-query does from its cache. */
   cachedB06?: boolean;
   identity?: boolean;
+  /** The mode `GET /ai/usage` answers with. */
+  creditMode?: CreditMode | null;
 }
 
 const handles: AssistantCapabilityHandle[] = [];
@@ -82,6 +84,10 @@ function setup(options: Setup = {}) {
       return () => listeners.splice(listeners.indexOf(onResult), 1);
     }),
     invalidateCapabilities: vi.fn(),
+    watchUsage: vi.fn((_org, onResult) => {
+      queueMicrotask(() => onResult(options.creditMode ?? null));
+      return () => undefined;
+    }),
     storage: () => sessionStorage,
   };
   const handle = createAssistantCapability(deps);
@@ -361,5 +367,38 @@ describe("org switch", () => {
     await flushPromises();
     expect(sessionStorage.getItem("o2.assistant.denied:k2")).toBeNull();
     expect(sessionStorage.getItem("o2.assistant.denied:k1")).toBeNull();
+  });
+});
+
+describe("credit mode", () => {
+  it("reads the mode from /ai/usage on Cloud and clears it for a new org", async () => {
+    const { handle, deps } = setup({
+      edition: { isEnterprise: false, isCloud: true },
+      creditMode: "exhausted",
+    });
+    await flushPromises();
+    expect(cap(handle).creditMode).toBe("exhausted");
+    expect(deps.watchUsage).toHaveBeenCalledWith("org1", expect.any(Function));
+    handle.setIdentity({ userOrgKey: "k2", org: "org2" });
+    expect(cap(handle).creditMode).toBeUndefined();
+  });
+
+  it("drops the mode when the gate stops metering in the same org", async () => {
+    const { handle, config } = setup({
+      edition: { isEnterprise: false, isCloud: true },
+      creditMode: "pay_as_you_go",
+    });
+    await flushPromises();
+    expect(cap(handle).creditMode).toBe("pay_as_you_go");
+    config.value = { ...CONFIG, aiEnabled: false };
+    await flushPromises();
+    expect(cap(handle).creditMode).toBeUndefined();
+  });
+
+  it("sends no usage request and has no mode off Cloud", async () => {
+    const { handle, deps } = setup({ creditMode: "free" });
+    await flushPromises();
+    expect(cap(handle).creditMode).toBeUndefined();
+    expect(deps.watchUsage).not.toHaveBeenCalled();
   });
 });

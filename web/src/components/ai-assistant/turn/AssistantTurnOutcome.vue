@@ -65,7 +65,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </p>
     <!-- The one action comes before Details in reading and tab order (`30` §4.4, HT-10 AC 5) -->
     <div v-if="action" class="flex flex-wrap items-center gap-2 pt-1.5">
-      <AssistantAskAdminPopover v-if="action === 'ask_admin'" :kind="askKind" :org="org">
+      <AssistantAskAdminPopover
+        v-if="action === 'ask_admin'"
+        :kind="askKind"
+        :org="org"
+        :payer="creditCopy?.payer"
+      >
         <template #trigger>
           <OButton
             variant="secondary"
@@ -80,19 +85,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </AssistantAskAdminPopover>
       <OButton
-        v-else-if="docsLink"
+        v-else-if="newTabHref"
         variant="secondary"
         size="sm"
         as="a"
-        :href="ASSISTANT_SETUP_DOCS_URL"
+        :href="newTabHref"
         target="_blank"
         rel="noopener noreferrer"
         class="max-md:min-h-11 max-md:w-full pointer-coarse:min-h-11"
         :aria-describedby="titleId"
         data-test="assistant-turn-outcome-action"
-        data-docs=""
+        :data-docs="docsLink ? '' : undefined"
       >
-        {{ t("assistant.docs.setupGuide") }}
+        {{ actionLabel }}
         <span class="sr-only">{{ t("assistant.docs.opensInNewTab") }}</span>
         <template #icon-right><OIcon :name="newTabIcon" size="sm" /></template>
       </OButton>
@@ -136,6 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
 import type { AskAdminKind } from "@/components/ai-assistant/gate/AssistantAskAdminPopover.vue";
 import type { AssistantError, AssistantErrorAction, QueryRef } from "@/composables/assistant/pure";
+import type { CreditRefusalContext } from "@/composables/assistant";
 import type { IconName } from "@/lib/core/Icon/OIcon.types";
 import type { I18nKey, I18nText, TranslateFn } from "@/types/i18n";
 
@@ -143,7 +149,7 @@ export type OutcomeKind =
   "failed" | "refused" | "stopped" | "doneNotSaved" | "expired" | "restored" | "cancelledElsewhere";
 
 /** What an outcome's one button asks the host to do. */
-export type OutcomeAction = AssistantErrorAction | "continue";
+export type OutcomeAction = AssistantErrorAction | "continue" | "copy_request";
 
 export interface AssistantTurnOutcomeProps {
   kind: OutcomeKind;
@@ -171,6 +177,8 @@ export interface AssistantTurnOutcomeProps {
   signedIn?: boolean;
   /** The Sign in tab was blocked; the block offers Open here (`80` §1.7). */
   popupBlocked?: boolean;
+  /** The overage and usage reads a 402 is worded by; absent off Cloud. */
+  credits?: CreditRefusalContext;
   now?: () => number;
 }
 
@@ -229,6 +237,9 @@ const STARTS_TURN: ReadonlySet<OutcomeAction> = new Set([
   "edit_resend",
 ]);
 
+// Billing opens in a new tab so the open thread is never left.
+const BILLING_ACTIONS: ReadonlySet<OutcomeAction> = new Set(["manage_usage", "view_plans"]);
+
 /** Actions whose control does not exist yet; they lead to the setup guide, labelled as such (HT-02 AC 6). */
 export const DOCS_ACTIONS: ReadonlySet<OutcomeAction> = new Set(["open_settings", "change_level"]);
 
@@ -239,6 +250,7 @@ const ACTION_LABEL_KEYS: Partial<Record<OutcomeAction, I18nKey>> = {
   open_iam_roles: "assistant.outcome.actions.openIamRoles",
   manage_usage: "assistant.outcome.actions.managePaidUsage",
   view_plans: "assistant.outcome.actions.viewPlans",
+  copy_request: "assistant.error.credits_exhausted.actionCopy",
   stop_it: "assistant.outcome.actions.stopIt",
   reload_chat: "assistant.outcome.actions.reloadChat",
   send_again: "assistant.outcome.actions.sendAgain",
@@ -288,10 +300,12 @@ export function outcomeActionOf(
 
 <script setup lang="ts">
 import { computed, defineAsyncComponent, onBeforeUnmount, ref, watch } from "vue";
+import { useRouter } from "vue-router";
 
 import AssistantErrorDetails, {
   ASSISTANT_SETUP_DOCS_URL,
 } from "@/components/ai-assistant/common/AssistantErrorDetails.vue";
+import { billingHrefOf } from "@/components/ai-assistant/credits/AssistantCreditManage.vue";
 import { explorerLabel } from "@/components/ai-assistant/evidence/evidenceText";
 import {
   errorTitle,
@@ -304,8 +318,11 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { explorerOf } from "@/utils/assistant/explorerRoutes";
+import { formatOrgDay } from "@/utils/formatters";
+
+import { creditsRefusal } from "./creditsRefusal";
 
 // The request flow reads the org's members, so it loads only when a block offers Ask an admin.
 const AssistantAskAdminPopover = defineAsyncComponent(
@@ -326,6 +343,7 @@ const props = withDefaults(defineProps<AssistantTurnOutcomeProps>(), {
   persistence: false,
   signedIn: false,
   popupBlocked: false,
+  credits: undefined,
   now: undefined,
 });
 
@@ -338,6 +356,19 @@ const titleId = `assistant-turn-outcome-${outcomeSeq}`;
 const now = () => (props.now ?? Date.now)();
 
 const code = computed(() => props.error?.code);
+const router = useRouter();
+
+const creditCopy = computed(() =>
+  props.kind === "refused" || props.kind === "failed"
+    ? creditsRefusal(code.value, props.role, props.org, props.credits ?? {}, formatOrgDay)
+    : null,
+);
+const creditParams = computed(() => {
+  const params = creditCopy.value?.params;
+  return params
+    ? { org: raw(params.org), payer: raw(params.payer ?? ""), date: raw(params.date ?? "") }
+    : {};
+});
 
 const manualShown = computed(
   () =>
@@ -370,6 +401,7 @@ const title = computed<I18nText>(() => {
       return t("assistant.error.approval_expired.title");
     default: {
       if (!props.error) return t("assistant.error.unknown.title");
+      if (creditCopy.value) return t(creditCopy.value.titleKey, creditParams.value);
       const copy = { t, org: props.org, product, elapsedMs: props.elapsedMs ?? 0 };
       const { key, params } = errorTitle(props.error, copy);
       return t(key, params);
@@ -383,6 +415,7 @@ const lines = computed<I18nText[]>(() => {
   if (props.kind === "stopped" && props.cancelUnconfirmed)
     out.push(t("assistant.turn.cancelUnconfirmed"));
   if (!error || (props.kind !== "failed" && props.kind !== "refused")) return out;
+  if (creditCopy.value) return [...out, t(creditCopy.value.bodyKey, creditParams.value)];
   const bodyKey = `assistant.error.${error.code}.body`;
   const claimsFindings = FINDINGS_BODIES.has(error.code);
   if (te(bodyKey) && (!claimsFindings || props.partial)) out.push(t(bodyKey));
@@ -396,14 +429,22 @@ const readonlyLine = computed<I18nText>(() =>
     : title.value,
 );
 
-const action = computed(() =>
-  outcomeActionOf(props.kind, props.error, {
-    role: props.role,
-    persistence: props.persistence,
-    signedIn: props.signedIn,
-  }),
+const action = computed<OutcomeAction | null>(
+  () =>
+    creditCopy.value?.action ??
+    outcomeActionOf(props.kind, props.error, {
+      role: props.role,
+      persistence: props.persistence,
+      signedIn: props.signedIn,
+    }),
+);
+const billingHref = computed(() =>
+  action.value && BILLING_ACTIONS.has(action.value) ? billingHrefOf(router, props.org) : null,
 );
 const docsLink = computed(() => !!action.value && DOCS_ACTIONS.has(action.value));
+const newTabHref = computed(
+  () => billingHref.value ?? (docsLink.value ? ASSISTANT_SETUP_DOCS_URL : null),
+);
 const newTabIcon = assistantGlyph.newTab;
 
 // Retry after `retry_after` counts down once a second; the count is never announced (`80` §2.4).
@@ -421,6 +462,8 @@ const countingDown = computed(() => RETRYING.has(action.value ?? "none") && rema
 const actionLabel = computed<I18nText>(() => {
   const value = action.value;
   if (!value) return t("assistant.error.unknown.action");
+  // A 402's per-code labels name only its default action; the split may pick another.
+  if (creditCopy.value) return t(ACTION_LABEL_KEYS[value] ?? "assistant.outcome.retry");
   if (countingDown.value) {
     if (remainingMs.value > COUNTDOWN_MAX_MS) return t("assistant.outcome.tryLater");
     return t("assistant.outcome.retryIn", { s: Math.ceil(remainingMs.value / 1000) });

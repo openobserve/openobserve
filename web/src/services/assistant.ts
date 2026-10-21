@@ -15,7 +15,7 @@
 
 import type { AxiosRequestConfig } from "axios";
 
-import type { Tri } from "@/composables/assistant";
+import type { CreditMode, Tri } from "@/composables/assistant";
 import { getUUIDv7 } from "@/utils/uuid";
 
 import http from "./http";
@@ -48,6 +48,14 @@ export interface AssistantCapabilitiesResponse {
   rca_chat_mode?: boolean;
   rca_feedback?: boolean;
   gate?: string;
+}
+
+/** `GET /api/{org}/ai/usage`, validated; `resetsAt` (ms) only once the server sends `resets_at`. */
+export interface AssistantUsage {
+  mode: CreditMode;
+  credits_used: number;
+  credits_limit: number;
+  resetsAt?: number;
 }
 
 /** `POST /api/{org}/ai/capabilities/test` (B-06): no chat, no credit. */
@@ -120,6 +128,40 @@ const enc = encodeURIComponent;
 const statusOf = (err: unknown): number | undefined =>
   (err as { response?: { status?: number } })?.response?.status;
 
+const CREDIT_MODES: ReadonlySet<string> = new Set([
+  "free",
+  "consent_required",
+  "pay_as_you_go",
+  "exhausted",
+]);
+
+// A count past the safe-integer range is not a count; it would render as hundreds of digits.
+const count = (value: unknown): number | null =>
+  typeof value === "number" && Number.isSafeInteger(Math.floor(value)) && value >= 0
+    ? Math.floor(value)
+    : null;
+
+/** The server's body is untrusted: an unknown mode or a non-numeric count reads as no usage. */
+export function parseAiUsage(body: unknown): AssistantUsage | null {
+  if (!body || typeof body !== "object") return null;
+  const value = body as Record<string, unknown>;
+  const used = count(value.credits_used);
+  const limit = count(value.credits_limit);
+  const mode = typeof value.mode === "string" && CREDIT_MODES.has(value.mode) ? value.mode : null;
+  if (used === null || limit === null || !mode) return null;
+  const usage: AssistantUsage = {
+    mode: mode as CreditMode,
+    credits_used: used,
+    credits_limit: limit,
+  };
+  const resets =
+    typeof value.resets_at === "string" && value.resets_at.length <= 64
+      ? Date.parse(value.resets_at)
+      : NaN;
+  if (!Number.isNaN(resets)) usage.resetsAt = resets;
+  return usage;
+}
+
 const assistant = {
   /** `null` when the backend predates B-06 (404). */
   capabilities: async (org: string): Promise<AssistantCapabilitiesResponse | null> => {
@@ -129,6 +171,17 @@ const assistant = {
         ASSISTANT_REQUEST,
       );
       return res.data;
+    } catch (err) {
+      if (statusOf(err) === 404) return null;
+      throw err;
+    }
+  },
+
+  /** `null` where `/ai/usage` is not served (404) or its body is not a usage. */
+  usage: async (org: string): Promise<AssistantUsage | null> => {
+    try {
+      const res = await http().get<unknown>(`/api/${enc(org)}/ai/usage`, ASSISTANT_REQUEST);
+      return parseAiUsage(res.data);
     } catch (err) {
       if (statusOf(err) === 404) return null;
       throw err;
