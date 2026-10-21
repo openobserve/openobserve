@@ -623,6 +623,49 @@ pub async fn audit_middleware(request: Request, next: Next) -> Response {
     response
 }
 
+/// The assistant's REST changes (its approved deletes) run only with o2-ai's signed approval.
+pub async fn assistant_approval_middleware(request: Request, next: Next) -> Response {
+    let method = request.method().clone();
+    let changes = matches!(
+        method,
+        Method::POST | Method::PUT | Method::PATCH | Method::DELETE
+    );
+    let path = request.uri().path();
+    // `/ai/` routes are the assistant's own controls and MCP calls are checked per tool.
+    let exempt = path.contains("/ai/") || path.trim_end_matches('/').ends_with("/mcp");
+    if !changes || exempt || !request.headers().contains_key(X_O2_ASSISTANT_SESSION_ID) {
+        return next.run(request).await;
+    }
+    let origin = match openobserve_mcp::ledger::Origin::checked(request.headers()) {
+        Ok(origin) => origin,
+        Err(problem) => return common::meta::http::HttpResponse::bad_request(problem),
+    };
+    let target = format!(
+        "/api{}",
+        request
+            .uri()
+            .path_and_query()
+            .map_or(path, |target| target.as_str())
+    );
+    let mut segments = path.split('/').filter(|segment| !segment.is_empty());
+    let org_id = match segments.next() {
+        Some("v2") => segments.next(),
+        first => first,
+    }
+    .unwrap_or_default()
+    .to_string();
+    let checked =
+        openobserve_mcp::approval::check_rest(&org_id, method.as_str(), &target, origin.as_ref())
+            .await;
+    match checked {
+        Ok(()) => next.run(request).await,
+        Err(refused) => {
+            log::warn!("[ai] refused assistant {method} {target}: {refused}");
+            common::meta::http::HttpResponse::forbidden(refused.to_string())
+        }
+    }
+}
+
 /// Handler for /metrics endpoint
 pub async fn get_metrics() -> impl IntoResponse {
     let body = if config::get_config().common.prometheus_enabled {
@@ -1958,6 +2001,7 @@ pub fn service_routes() -> Router {
     router
         .layer(middleware::from_fn(blocked_orgs_middleware))
         .layer(middleware::from_fn(audit_middleware))
+        .layer(middleware::from_fn(assistant_approval_middleware))
         // Between auth and audit: it needs the email authentication resolves, and a request it
         // refuses never reached a handler, so there is nothing for the audit trail to record.
         .layer(middleware::from_fn(password_policy_middleware))

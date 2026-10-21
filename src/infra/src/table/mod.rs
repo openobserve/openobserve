@@ -21,6 +21,7 @@ use crate::{db::get_orm_client_ddl, dist_lock};
 
 pub mod ai_access_requests;
 pub mod ai_actions;
+pub mod ai_approvals;
 pub mod ai_chat_feedback;
 pub mod ai_chat_imports;
 pub mod ai_chat_sessions;

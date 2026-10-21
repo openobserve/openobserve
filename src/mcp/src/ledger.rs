@@ -98,6 +98,8 @@ pub struct Origin {
     pub user_email: String,
     pub session_id: String,
     pub turn_id: Option<String>,
+    /// o2-ai's signed approval for this call (`x-o2-approval`), checked by [`crate::approval`].
+    pub approval: Option<String>,
 }
 
 impl Origin {
@@ -112,7 +114,18 @@ impl Origin {
             turn_id: header(TURN_HEADER)
                 .filter(|t| is_uuid(t))
                 .map(str::to_ascii_lowercase),
+            approval: header(crate::approval::APPROVAL_HEADER).map(str::to_string),
         })
+    }
+
+    /// [`Self::from_headers`], but `Err` for a garbled assistant claim so it cannot skip approval.
+    pub fn checked(headers: &HeaderMap) -> Result<Option<Self>, &'static str> {
+        let claims = headers.contains_key(SESSION_HEADER)
+            || headers.contains_key(crate::approval::APPROVAL_HEADER);
+        match Self::from_headers(headers) {
+            None if claims => Err("malformed assistant session or approval header"),
+            origin => Ok(origin),
+        }
     }
 }
 
@@ -404,7 +417,9 @@ pub fn plan(
 ) -> Option<Plan> {
     let origin = origin?;
     let method = metadata.method.to_ascii_uppercase();
-    if !is_mutating(&method, &metadata.path) {
+    let read_only = super::tools::tool_class(&metadata.name)
+        .map_or_else(|| !is_mutating(&method, &metadata.path), |c| c.read_only);
+    if read_only {
         return None;
     }
     let kind = ResourceKind::ALL.into_iter().find(|kind| {
@@ -435,7 +450,11 @@ pub fn plan(
         .collect();
     Some(Plan {
         org_id: org_id.to_string(),
-        origin: origin.clone(),
+        // The approval authorized one call; the ledger never keeps it.
+        origin: Origin {
+            approval: None,
+            ..origin.clone()
+        },
         tool: metadata.name.clone(),
         op,
         kind,
@@ -509,10 +528,9 @@ pub async fn undo(target: UndoTarget<'_>, auth: &str) -> UndoOutcome {
     }
 }
 
-/// What tool `name` does, from its HTTP method and path; `None` for a tool the server lacks.
+/// What tool `name` does, from its MCP class; `None` for a tool the server lacks.
 pub fn tool_operation(name: &str) -> Option<&'static str> {
-    let metadata = super::tools::find_tool_metadata(name)?;
-    Some(operation_of(&metadata.method, &metadata.path))
+    super::tools::tool_class(name).map(|class| class.operation)
 }
 
 /// Removes every secret-bearing value; `true` when anything was removed.
@@ -588,7 +606,7 @@ fn conceal(value: &mut Value) -> bool {
     !empty
 }
 
-fn is_mutating(method: &str, path: &str) -> bool {
+pub(crate) fn is_mutating(method: &str, path: &str) -> bool {
     match method {
         "PUT" | "PATCH" | "DELETE" => true,
         "POST" => {
@@ -602,7 +620,7 @@ fn is_mutating(method: &str, path: &str) -> bool {
     }
 }
 
-fn operation_of(method: &str, path: &str) -> &'static str {
+pub(crate) fn operation_of(method: &str, path: &str) -> &'static str {
     let method = method.to_ascii_uppercase();
     let lower = path.to_ascii_lowercase();
     match method.as_str() {
@@ -959,6 +977,7 @@ mod tests {
             user_email: "a@x".to_string(),
             session_id: SESSION.to_string(),
             turn_id: None,
+            approval: None,
         }
     }
 
@@ -1017,6 +1036,22 @@ mod tests {
         assert_eq!(Origin::from_headers(&headers).unwrap().session_id, SESSION);
         headers.insert(SESSION_HEADER, "not-a-session".parse().unwrap());
         assert!(Origin::from_headers(&headers).is_none());
+    }
+
+    #[test]
+    fn a_garbled_assistant_claim_is_refused_not_ignored() {
+        let mut headers = HeaderMap::new();
+        assert_eq!(Origin::checked(&headers), Ok(None));
+        headers.insert("user_id", "a@x".parse().unwrap());
+        headers.insert(
+            crate::approval::APPROVAL_HEADER,
+            "apr_1.1.ab".parse().unwrap(),
+        );
+        assert!(Origin::checked(&headers).is_err());
+        headers.insert(SESSION_HEADER, "not-a-session".parse().unwrap());
+        assert!(Origin::checked(&headers).is_err());
+        headers.insert(SESSION_HEADER, SESSION.parse().unwrap());
+        assert!(Origin::checked(&headers).unwrap().is_some());
     }
 
     #[test]

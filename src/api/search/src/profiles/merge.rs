@@ -78,6 +78,9 @@ pub struct ProfilesMergeResponse {
         (status = 400, description = "Invalid request"),
         (status = 403, description = "Forbidden"),
         (status = 500, description = "Failure")
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"readOnlyHint": true}))
     )
 )]
 pub async fn merge_profiles(
