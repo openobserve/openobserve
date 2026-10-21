@@ -1240,6 +1240,7 @@ const fieldWidthClass = computed(() => {
             :disabled="disabled"
             :tabindex="inputTabindex"
             role="combobox"
+            :aria-label="ariaLabel"
             :aria-expanded="popoverOpen"
             :aria-invalid="hasError || undefined"
             @keydown="handleTriggerKeydown"
@@ -1889,6 +1890,7 @@ const fieldWidthClass = computed(() => {
         <SelectTrigger
           :id="inputId"
           :tabindex="inputTabindex"
+          :aria-label="ariaLabel"
           :data-test="parentDataTest ? `${parentDataTest}-trigger` : undefined"
           :class="
             isInlineAppearance

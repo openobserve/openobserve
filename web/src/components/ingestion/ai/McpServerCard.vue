@@ -37,8 +37,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   the OAuth (auth=null → no header) and token variants can never drift.
 -->
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, useId } from "vue";
 import { raw, useI18nTyped, type I18nKey } from "@/types/i18n";
+import { isAssistantV2, useAssistantName } from "@/composables/assistant";
+import { copyToClipboard } from "@/utils/clipboard";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import type { CardSubstitutions } from "./content/renderMarkdown";
@@ -63,6 +65,9 @@ const { t } = useI18nTyped();
 const store = useStore();
 const router = useRouter();
 const { generate, generating, error: genError, credential } = useMcpCredential();
+const assistantV2 = isAssistantV2();
+const assistantName = useAssistantName();
+const deepLinkNoteId = useId();
 
 const endpoint = computed(() => `${props.subs.url}/api/${props.subs.org}/mcp`);
 
@@ -87,6 +92,7 @@ const authSettled = computed(() => authMode.value === "oauth" || !!credential.va
 // Not [BASIC_PASSCODE]: CopyContent expands it to the user's real credential, which
 // then renders in cleartext because maskText is a no-op.
 const TOKEN_PLACEHOLDER = "Basic <base64 of service-account-email:token>";
+const YOUR_TOKEN = "<your-token>";
 const MASKED_AUTH = "Basic ••••••••••••••••";
 
 const SKILLS_REPO_URL = "https://www.npmjs.com/package/@openobserve/skills";
@@ -98,7 +104,9 @@ const SKILLS_INSTALL_CMD = "npx skills add openobserve/skills --skill openobserv
 const tokenAuthValue = computed(() =>
   credential.value
     ? `Basic ${b64EncodeStandard(`${credential.value.email}:${credential.value.token}`)}`
-    : TOKEN_PLACEHOLDER,
+    : assistantV2
+      ? `Basic ${YOUR_TOKEN}`
+      : TOKEN_PLACEHOLDER,
 );
 const authValue = computed(() => (authMode.value === "oauth" ? null : tokenAuthValue.value));
 
@@ -408,7 +416,9 @@ const content = computed<RichCardContent>(() => ({
     {
       id: "skills",
       title: t("ingestion.mcp.skillsLabel", { brand: raw("OpenObserve") }),
-      description: t("ingestion.mcp.skillsHint", { brand: raw("OpenObserve") }),
+      description: assistantV2
+        ? t("assistant.mcp.skillsHint", { brand: raw("OpenObserve") })
+        : t("ingestion.mcp.skillsHint", { brand: raw("OpenObserve") }),
       chip: { kind: "terminal", labelKey: "ingestion.setupCard.chipTerminal" },
       code: {
         lang: "bash",
@@ -435,6 +445,12 @@ const openDeepLink = () => {
     window.location.href = link;
   }
 };
+
+// The JSON snippet is the safe default in token mode; the deep link carries the token into an OS handler.
+const copyFirst = computed(
+  () => assistantV2 && authMode.value === "token" && !!activeDeepLink.value,
+);
+const copyConfiguration = () => copyToClipboard(activeConfig.value, t);
 
 const onGenerate = () => generate();
 
@@ -612,6 +628,27 @@ const openSkillsRepo = () => {
     <!-- The client picker drives the snippet below it, so it renders above it. -->
     <template #step-configure-controls>
       <div class="flex flex-col gap-3">
+        <i18n-t
+          v-if="assistantV2"
+          keypath="assistant.mcp.parityLine"
+          tag="p"
+          class="text-text-body text-sm"
+          data-test="mcp-server-assistant-parity"
+        >
+          <template #product>{{ assistantName.product }}</template>
+          <template #link>
+            <router-link
+              class="text-text-link hover:text-text-link-hover underline"
+              data-test="mcp-server-assistant-toolsets-link"
+              :to="{
+                name: 'assistantSettings',
+                params: { tab: 'toolsets' },
+                query: { org_identifier: store.state.selectedOrganization?.identifier },
+              }"
+              >{{ t("assistant.mcp.toolsetsPath", assistantName) }}</router-link
+            >
+          </template>
+        </i18n-t>
         <OTabs v-model="selectedClient" dense>
           <OTab
             v-for="c in CLIENTS"
@@ -622,8 +659,36 @@ const openSkillsRepo = () => {
           />
         </OTabs>
 
+        <div v-if="copyFirst" class="flex flex-col items-start gap-2">
+          <OButton
+            variant="primary"
+            size="sm-action"
+            data-test="ai-integrations-mcp-copy-config-btn"
+            @click="copyConfiguration"
+          >
+            {{ t("assistant.mcp.copyConfiguration") }}
+          </OButton>
+          <OButton
+            variant="outline"
+            size="sm-action"
+            icon-left="open-in-new"
+            :aria-describedby="deepLinkNoteId"
+            data-test="ai-integrations-mcp-install-btn"
+            @click="openDeepLink"
+          >
+            {{ t("ingestion.mcp.installOneClick", { client: t(activeClient.labelKey) }) }}
+          </OButton>
+          <OText
+            :id="deepLinkNoteId"
+            variant="meta"
+            as="p"
+            data-test="ai-integrations-mcp-deeplink-token-note"
+          >
+            {{ t("assistant.mcp.deepLinkTokenNote") }}
+          </OText>
+        </div>
         <OButton
-          v-if="activeDeepLink"
+          v-else-if="activeDeepLink"
           variant="primary"
           size="sm-action"
           icon-left="open-in-new"
@@ -634,6 +699,12 @@ const openSkillsRepo = () => {
           {{ t("ingestion.mcp.installOneClick", { client: t(activeClient.labelKey) }) }}
         </OButton>
       </div>
+    </template>
+
+    <template v-if="assistantV2 && authMode === 'token' && !credential" #step-configure>
+      <OText variant="meta" as="p" data-test="ai-integrations-mcp-token-placeholder-note">
+        {{ t("assistant.mcp.replaceToken", { token: raw(YOUR_TOKEN) }) }}
+      </OText>
     </template>
 
     <template #step-skills>

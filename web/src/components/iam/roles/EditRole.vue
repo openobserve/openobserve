@@ -272,8 +272,12 @@ import {
   ALL_MODULES_ICON,
   ALL_MODULES_KEY,
   buildRoleModules,
+  GROUP_DESC_KEYS,
   GROUP_LABEL_KEYS,
+  MODULE_COPY,
 } from "@/components/iam/roles/roleModules";
+import { focusTargetOf, useRoleFocusLink } from "@/components/iam/roles/useRoleFocusLink";
+import { isAssistantV2, useAssistantName } from "@/composables/assistant";
 import { useRouter, onBeforeRouteLeave } from "vue-router";
 import { onBeforeMount } from "vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
@@ -447,12 +451,29 @@ const grantableResources = computed(() =>
   ),
 );
 
-const roleModules = computed(() => buildRoleModules(grantableResources.value));
+const assistantV2 = isAssistantV2();
+// Product and client names are never translated, so the catalogue receives them as values.
+const moduleCopyParams = { ...useAssistantName(), clients: raw("Claude, Cursor, VS Code") };
+
+const roleModules = computed(() => buildRoleModules(grantableResources.value, { assistantV2 }));
+
+useRoleFocusLink({
+  target: assistantV2 ? focusTargetOf(router.currentRoute.value) : null,
+  ready: computed(() => !isFetchingInitialRoles.value && permissionsState.resources.length > 0),
+  moduleKeys: computed(() => roleModules.value.map((module) => module.key)),
+  open: (key) => {
+    permissionsUiType.value = "table";
+    activeModule.value = key;
+  },
+});
 
 const resourceLabel = (key: string) =>
   permissionsState.resources.find((resource: any) => resource.key === key)?.display_name ?? key;
 
-const moduleLabel = (key: string) => raw(resourceLabel(key));
+const moduleLabel = (key: string) =>
+  assistantV2 && MODULE_COPY[key]
+    ? t(MODULE_COPY[key].labelKey, moduleCopyParams)
+    : raw(resourceLabel(key));
 
 const railModules = computed<RailModule[]>(() =>
   roleModules.value.map((module) => {
@@ -473,6 +494,12 @@ const railModules = computed<RailModule[]>(() =>
       icon: module.icon,
       groupId: module.group,
       groupLabel: t(GROUP_LABEL_KEYS[module.group]),
+      ...(assistantV2 && MODULE_COPY[module.key]
+        ? { description: t(MODULE_COPY[module.key].descKey, moduleCopyParams) }
+        : {}),
+      ...(assistantV2 && GROUP_DESC_KEYS[module.group]
+        ? { groupDescription: t(GROUP_DESC_KEYS[module.group]!, moduleCopyParams) }
+        : {}),
       ...totals,
     };
   }),

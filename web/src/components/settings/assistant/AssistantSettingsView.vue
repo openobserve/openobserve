@@ -102,6 +102,9 @@ export const SETTINGS_TABS: { id: AssistantSettingsTab; labelKey: I18nKey; write
   { id: "data", labelKey: "assistant.settings.tabs.data", writes: true },
   { id: "history", labelKey: "assistant.settings.tabs.history", writes: false },
   { id: "usage", labelKey: "assistant.settings.tabs.usage", writes: false },
+  { id: "toolsets", labelKey: "assistant.settings.tabs.toolsets", writes: false },
+  { id: "permissions", labelKey: "assistant.settings.tabs.permissions", writes: false },
+  { id: "activity", labelKey: "assistant.settings.tabs.activity", writes: false },
 ];
 </script>
 
@@ -120,9 +123,12 @@ import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import { useI18nTyped } from "@/types/i18n";
 
 import AccessTab from "./AccessTab.vue";
+import ActivityTab from "./ActivityTab.vue";
 import DataTab from "./DataTab.vue";
 import HistoryTab from "./HistoryTab.vue";
+import PermissionsTab from "./PermissionsTab.vue";
 import StatusTab from "./StatusTab.vue";
+import ToolsetsTab from "./ToolsetsTab.vue";
 import UsageTab from "./UsageTab.vue";
 import { useAssistantSettingsPage } from "./useAssistantSettingsPage";
 
@@ -134,6 +140,9 @@ const TAB_COMPONENTS: Partial<Record<AssistantSettingsTab, Component>> = {
   data: DataTab,
   history: HistoryTab,
   usage: UsageTab,
+  toolsets: ToolsetsTab,
+  permissions: PermissionsTab,
+  activity: ActivityTab,
 };
 
 const props = withDefaults(defineProps<AssistantSettingsViewProps>(), { tab: undefined });

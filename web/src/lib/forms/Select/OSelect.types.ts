@@ -128,6 +128,8 @@ export interface SelectProps {
   iconKey?: string;
   /** Floating label rendered above the trigger */
   label?: I18nText;
+  /** Names the trigger for assistive tech when no visible label is rendered. */
+  ariaLabel?: I18nText;
   /** Marks the field required — renders a `*` after the label (no manual ` *`). */
   required?: boolean;
   /** Placeholder text shown when no value is selected */

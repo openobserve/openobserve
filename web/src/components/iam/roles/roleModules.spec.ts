@@ -2,6 +2,8 @@ import { describe, it, expect } from "vitest";
 import {
   buildRoleModules,
   GROUP_ORDER,
+  GROUP_ORDER_V2,
+  MODULE_COPY,
   type CatalogResource,
 } from "@/components/iam/roles/roleModules";
 
@@ -141,5 +143,54 @@ describe("buildRoleModules - grouping", () => {
     const groupIndexes = modules.map((module) => GROUP_ORDER.indexOf(module.group));
 
     expect(groupIndexes).toEqual([...groupIndexes].sort((a, b) => a - b));
+  });
+});
+
+describe("buildRoleModules - assistant v2 groups", () => {
+  const ASSISTANT = ["ai", "ai_chat_share", "ai_toolsets", "mcp"];
+  const LLM = [
+    "provider",
+    "score_config",
+    "scorer",
+    "eval_job",
+    "annotation_queue",
+    "dataset",
+    "experiment",
+    "playground",
+    "pfolder",
+    "prompt",
+    "prompt_label",
+    "model_pricing",
+  ];
+  const resources: CatalogResource[] = [...ASSISTANT, ...LLM, "alert", "role"].map(
+    (key, order) => ({
+      key,
+      order,
+    }),
+  );
+
+  it("keeps one AI group with the flag off", () => {
+    const groups = new Set(buildRoleModules(resources).map((module) => module.group));
+    expect(groups.has("ai")).toBe(true);
+    expect(groups.has("assistant")).toBe(false);
+  });
+
+  it("splits Assistant and LLM observability, Assistant right after Alerting", () => {
+    const modules = buildRoleModules(resources, { assistantV2: true });
+    const groupOf = (key: string) => modules.find((module) => module.key === key)?.group;
+    expect(ASSISTANT.map(groupOf)).toEqual(ASSISTANT.map(() => "assistant"));
+    expect(LLM.map(groupOf)).toEqual(LLM.map(() => "llmObservability"));
+    expect(GROUP_ORDER_V2.indexOf("assistant")).toBe(GROUP_ORDER_V2.indexOf("alerting") + 1);
+    expect(GROUP_ORDER_V2.indexOf("assistant")).toBeLessThan(GROUP_ORDER_V2.indexOf("access"));
+    expect(Object.keys(MODULE_COPY).sort()).toEqual([...ASSISTANT].sort());
+  });
+
+  it("never reuses an Assistant icon in LLM observability", () => {
+    const modules = buildRoleModules(resources, { assistantV2: true });
+    const icons = (group: string) =>
+      new Set(modules.filter((module) => module.group === group).map((module) => module.icon));
+    const shared = [...icons("assistant")].filter((icon) => icons("llmObservability").has(icon));
+    expect(shared).toEqual([]);
+    expect(modules.find((module) => module.key === "ai")?.icon).toBe("auto-awesome");
   });
 });

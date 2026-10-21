@@ -49,6 +49,11 @@ export function settingsHarness(zoConfig: Record<string, unknown> = {}) {
     { path: "/settings/assistant/:tab?", name: "assistantSettings", component: blank, props: true },
     { path: "/billings/plans", name: "plans", component: blank },
     { path: "/settings/organization_management", name: "orgnizationManagement", component: blank },
+    { path: "/iam/mcp", name: "mcpServer", component: blank },
+    { path: "/iam/roles/edit/:role_name", name: "editRole", component: blank },
+    { path: "/iam/roles", name: "roles", component: blank },
+    { path: "/assistant/:chatId?", name: "assistant", component: blank },
+    { path: "/logs", name: "logs", component: blank },
   ]);
   const queryClient = createTestQueryClient();
   return { store, router, queryClient, plugins: [store, router, withQueryClient(queryClient)] };
