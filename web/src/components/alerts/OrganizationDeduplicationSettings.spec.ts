@@ -233,6 +233,27 @@ describe("OrganizationDeduplicationSettings - external prop sync", () => {
 describe("OrganizationDeduplicationSettings - time_window sanitization (payload parity)", () => {
   beforeEach(() => vi.clearAllMocks());
 
+  it("submits a zero window without native bounds blocking the schema", async () => {
+    const w = await mountComp();
+    await flushPromises();
+    const input = w.find('[data-test="organizationdeduplication-default-window-input"] input');
+    await input.setValue("0");
+    await flushPromises();
+    expect((input.element as HTMLInputElement).checkValidity()).toBe(true);
+    (w.find("form").element as HTMLFormElement).requestSubmit();
+    await vi.waitFor(() =>
+      expect(alertsService.setOrganizationDeduplicationConfig).toHaveBeenCalled(),
+    );
+    expect(getForm(w).state.isValid).toBe(true);
+    expect(alertsService.setOrganizationDeduplicationConfig).toHaveBeenCalledWith("default", {
+      enabled: true,
+      alert_dedup_enabled: false,
+      alert_fingerprint_groups: [],
+      time_window_minutes: 0,
+    });
+    w.unmount();
+  });
+
   it("saves null when time_window_minutes is empty", async () => {
     const w = await mountComp();
     await flushPromises();

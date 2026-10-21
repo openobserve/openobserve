@@ -24,6 +24,7 @@ pub mod db_normalizer;
 pub mod destinations;
 pub mod downtimes;
 pub mod enrichment_table;
+pub mod eval_job_health;
 pub mod folder;
 pub mod function;
 pub mod gen_ai;
