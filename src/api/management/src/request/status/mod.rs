@@ -267,8 +267,32 @@ struct LicenseConfig {
     license_server_url: String,
     ingestion_quota_used: f64,
     ingestion_history: Vec<o2_enterprise::enterprise::license::UsageResult>,
+    #[cfg(not(feature = "cloud"))]
+    #[serde(flatten)]
+    search: LicenseSearchConfig,
+}
+
+/// Cloud never shows the licence search banner, so it does not serve these fields.
+#[cfg(all(feature = "enterprise", not(feature = "cloud")))]
+#[derive(Serialize)]
+struct LicenseSearchConfig {
     license_search_allowed: bool,
     license_waiver_until: Option<i64>,
+}
+
+#[cfg(all(feature = "enterprise", not(feature = "cloud")))]
+impl LicenseSearchConfig {
+    /// The flag is the gate `check_search_allowed` reads, never a follower's possibly newer status.
+    fn new(
+        gate_allowed: bool,
+        status: &o2_enterprise::enterprise::license::LicenseStatus,
+        now: i64,
+    ) -> Self {
+        Self {
+            license_search_allowed: gate_allowed,
+            license_waiver_until: status.search_unblock_until(now),
+        }
+    }
 }
 
 /// Unauthenticated `GET /config`: every field is public, so only what the login page consumes, plus
@@ -388,19 +412,6 @@ pub async fn schedulez() -> impl IntoResponse {
             status: status.to_string(),
         }),
     )
-}
-
-#[cfg(feature = "enterprise")]
-async fn license_config(license_server_url: String) -> LicenseConfig {
-    let status = o2_enterprise::enterprise::license::license_status().await;
-    LicenseConfig {
-        license_expiry: o2_enterprise::enterprise::license::get_expiry_time().await,
-        license_server_url,
-        ingestion_quota_used: o2_enterprise::enterprise::license::ingestion_used() * 100.0,
-        ingestion_history: o2_enterprise::enterprise::license::get_ingestion_history().await,
-        license_search_allowed: status.decision.search_allowed,
-        license_waiver_until: status.search_unblock_until(now_micros()),
-    }
 }
 
 /// Unauthenticated login-page bootstrap; the full config is served by [`zo_config`].
@@ -663,6 +674,22 @@ pub async fn zo_config(
         #[cfg(feature = "enterprise")]
         workflows_enabled,
     })
+}
+
+#[cfg(feature = "enterprise")]
+async fn license_config(license_server_url: String) -> LicenseConfig {
+    LicenseConfig {
+        license_expiry: o2_enterprise::enterprise::license::get_expiry_time().await,
+        license_server_url,
+        ingestion_quota_used: o2_enterprise::enterprise::license::ingestion_used() * 100.0,
+        ingestion_history: o2_enterprise::enterprise::license::get_ingestion_history().await,
+        #[cfg(not(feature = "cloud"))]
+        search: LicenseSearchConfig::new(
+            o2_enterprise::enterprise::license::search_allowed(),
+            &o2_enterprise::enterprise::license::license_status().await,
+            now_micros(),
+        ),
+    }
 }
 
 /// The route check of `GET /{org}/search/profile`, so the UI hides what the caller may not use.
@@ -2561,7 +2588,27 @@ mod tests {
         }
     }
 
-    #[cfg(feature = "enterprise")]
+    #[cfg(feature = "cloud")]
+    #[tokio::test]
+    async fn test_zo_config_has_no_license_search_fields_on_cloud() {
+        let json = zo_config_json().await;
+        for k in ["license_search_allowed", "license_waiver_until"] {
+            assert!(json.get(k).is_none(), "{k}");
+        }
+        assert!(json.get("license_expiry").is_some());
+    }
+
+    #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
+    #[test]
+    fn test_license_search_flag_follows_the_gate_not_the_status() {
+        let mut status = o2_enterprise::enterprise::license::LicenseStatus::default();
+        status.decision.search_allowed = true;
+        assert!(!LicenseSearchConfig::new(false, &status, 0).license_search_allowed);
+        status.decision.search_allowed = false;
+        assert!(LicenseSearchConfig::new(true, &status, 0).license_search_allowed);
+    }
+
+    #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
     #[tokio::test]
     async fn test_zo_config_serves_license_search_state() {
         let json = zo_config_json().await;

@@ -44,6 +44,9 @@ struct LicenseResponse {
     base: LicenseDecision,
     evaluated_at: i64,
     env_key_active: bool,
+    /// The check `store_license` and `refresh_license_limits` make, so the UI hides what would
+    /// 403.
+    can_update_license: bool,
 }
 
 pub struct SaveLicenseRequest {
@@ -203,6 +206,7 @@ pub async fn get_license_info(Headers(email): Headers<UserEmail>) -> Response {
         base,
         evaluated_at,
         env_key_active: env_key_active(&o2_cfg.common.license_key),
+        can_update_license: is_license_admin,
     };
     MetaHttpResponse::json(res)
 }
@@ -336,6 +340,7 @@ mod tests {
             base,
             evaluated_at,
             env_key_active: false,
+            can_update_license: is_license_admin,
         })
         .unwrap()
     }
@@ -374,7 +379,7 @@ mod tests {
                 "ends_at": 1000,
                 "note": "Search restored while you fix the log storm",
             }],
-            "waiver_source": "licence_key",
+            "waiver_source": "license_key",
             "evaluated_at": 0,
         }))
         .unwrap()
@@ -490,6 +495,7 @@ mod tests {
             base,
             evaluated_at,
             env_key_active: false,
+            can_update_license: false,
         })
         .unwrap();
         assert_eq!(json["evaluated_at"], 1_792_000_000_000_000_i64);
@@ -543,8 +549,18 @@ mod tests {
             base: LicenseDecision::default(),
             evaluated_at: 0,
             env_key_active: true,
+            can_update_license: false,
         })
         .unwrap();
         assert_eq!(json["env_key_active"], true);
+    }
+
+    #[test]
+    fn test_license_response_says_who_may_update_the_license() {
+        for (is_root, is_license_admin) in [(false, false), (false, true), (true, true)] {
+            let json: json::Value =
+                json::from_str(&response_json(is_root, is_license_admin)).unwrap();
+            assert_eq!(json["can_update_license"], is_license_admin, "{is_root}");
+        }
     }
 }
