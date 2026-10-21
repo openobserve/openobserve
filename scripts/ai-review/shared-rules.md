@@ -19,8 +19,8 @@ This is **OpenObserve**, an open-source observability platform written in **Rust
 
 - **Backend**: Rust nightly, uses `tokio` for async, `actix-web` for HTTP, `sqlx`/sqlite for storage
 - **Frontend**: Vue 3 SPA with Vite, using Vuex for state management. UI conventions live in the
-  tracked skills `.claude/skills/ui-architect/` (house rules) and
-  `.claude/skills/eslint-error-handling/SKILL.md` (lint/type-check playbook). The **Frontend UI
+  base-branch copies `.o2-review-context/skills/ui-architect/` (house rules) and
+  `.o2-review-context/skills/eslint-error-handling/SKILL.md` (lint/type-check playbook). The **Frontend UI
   Reviewer** owns the judgment half of those rules and runs on every PR touching `web/src`;
   other reviewers should stay in their own domain rather than duplicating it.
 - **The frontend gates are already red before you see the PR.** `local/no-hardcoded-px`,
