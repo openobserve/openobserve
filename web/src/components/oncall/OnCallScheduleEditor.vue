@@ -236,7 +236,7 @@
                     :can-remove="multiRule"
                     :renaming="renamingRule === rule"
                     :choices="stopChoicesFor(rule)"
-                    :consequence="stopConsequenceFor(ruleIndex)"
+                    :consequence-at="(at: number) => stopConsequenceFor(ruleIndex, at)"
                     :timezone="props.timezone"
                     :now-micros="nowMicros"
                     :name-of="nameOf"
@@ -702,10 +702,10 @@ function stopChoicesFor(rule: ShiftRule) {
   );
 }
 
-/// Who takes a stopped rule's hours, or which of them nobody covers.
-function stopConsequenceFor(index: number): { text: I18nText; gap: boolean } {
+/// Who takes a rule's hours once it stops at `at`, or which of them nobody covers.
+function stopConsequenceFor(index: number, at: number): { text: I18nText; gap: boolean } {
   const rules = namedShiftRules.value;
-  const { takers, gap } = stopConsequence(rules, index, nowMicros.value);
+  const { takers, gap } = stopConsequence(rules, index, at);
   if (gap.length) {
     return { text: t("oncall.stopGap", { hours: coverageHoursSummary(gap, t) }), gap: true };
   }

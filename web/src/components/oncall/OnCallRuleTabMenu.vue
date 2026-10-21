@@ -153,6 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </p>
 
         <p
+          v-if="consequence"
           class="text-xs"
           :class="consequence.gap ? 'text-status-warning-text' : 'text-text-secondary'"
           :data-test="`oncall-schedule-rule-stop-consequence-${ruleIndex}`"
@@ -211,7 +212,8 @@ const props = defineProps<{
   renaming: boolean;
   /** The next ends of this rule's turns in the preview, read from the server's segments. */
   choices: Array<{ email: string; at: number }>;
-  consequence: { text: I18nText; gap: boolean };
+  /** What stopping at that instant leaves behind. */
+  consequenceAt: (at: number) => { text: I18nText; gap: boolean };
   timezone: string;
   nowMicros: number;
   nameOf: (email: string) => string;
@@ -284,6 +286,10 @@ const stopAt = computed<number | null>(() => {
   const index = choice.value?.startsWith("end-") ? Number(choice.value.slice(4)) : -1;
   return props.choices[index]?.at ?? null;
 });
+
+const consequence = computed(() =>
+  stopAt.value === null ? null : props.consequenceAt(stopAt.value),
+);
 
 const stamp = (micros: number) => formatStamp(micros, props.timezone);
 

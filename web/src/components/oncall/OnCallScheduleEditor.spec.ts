@@ -411,6 +411,28 @@ describe("OnCallScheduleEditor", () => {
     expect(String(tracks[0].bands[0].ariaLabel)).toContain("Base");
   });
 
+  // D5: bands sit on the wall-clock scale of the axis, so local noon is under 12:00 on a 25-hour day.
+  it("places bands by local wall clock on a day the clocks go back", async () => {
+    vi.setSystemTime(Date.UTC(2026, 10, 1, 15));
+    const midnight = Date.UTC(2026, 10, 1, 4) * 1000;
+    const noon = Date.UTC(2026, 10, 1, 17) * 1000;
+    const at = { rotation_id: "rot_primary", rotation: "Primary" };
+    service.previewResolvedSchedule.mockResolvedValue({
+      data: [
+        { ...at, from: midnight, to: noon, user_email: "ana@o2.ai" },
+        { ...at, from: noon, to: midnight + 14 * 86_400_000_000, user_email: "bob@o2.ai" },
+      ],
+    } as any);
+    const wrapper = render({ schedule: schedule([rota("Primary")]), timezone: "America/New_York" });
+    await openRotation(wrapper);
+
+    const tracks = wrapper.findComponent({ name: "OScheduleTimeline" }).props("tracks") as any[];
+    expect(tracks[0].bands.map((b: any) => [b.offset, b.width])).toEqual([
+      [0, 0.5],
+      [0.5, 0.5],
+    ]);
+  });
+
   // A3: a refusal is said where the rows would be, not swallowed into an empty list.
   it("shows the endpoint's refusal in the list area", async () => {
     service.previewResolvedSchedule.mockRejectedValue({
@@ -1071,6 +1093,18 @@ describe("OnCallScheduleEditor — retiring a shift rule", () => {
     await flushPromises();
   }
 
+  async function pickStop(wrapper: any, index: number, date: string) {
+    await wrapper.find(`[data-test="oncall-schedule-rule-stop-pick-${index}"]`).trigger("click");
+    await flushPromises();
+    await wrapper
+      .find(`[data-test="oncall-schedule-rule-stop-date-${index}"] input`)
+      .setValue(date);
+    await wrapper
+      .find(`[data-test="oncall-schedule-rule-stop-time-${index}"] input`)
+      .setValue("09:00");
+    await flushPromises();
+  }
+
   // B4: nothing is chosen for the reader, and the confirm waits for a choice.
   it("stops a rule only once a stop is chosen", async () => {
     turns();
@@ -1159,6 +1193,8 @@ describe("OnCallScheduleEditor — retiring a shift rule", () => {
     await openRotation(wrapper);
     await openStop(wrapper, 0);
     await openStop(wrapper, 1);
+    await pickStop(wrapper, 0, "2023-11-21");
+    await pickStop(wrapper, 1, "2023-11-21");
 
     expect(wrapper.find('[data-test="oncall-schedule-rule-stop-consequence-1"]').text()).toContain(
       "Base",
@@ -1166,6 +1202,25 @@ describe("OnCallScheduleEditor — retiring a shift rule", () => {
     expect(wrapper.find('[data-test="oncall-schedule-rule-stop-consequence-0"]').text()).toContain(
       "Leaves a gap",
     );
+  });
+
+  // D1: takers are judged at the chosen stop, and with nothing chosen there is nothing to judge.
+  it("judges who takes the hours at the chosen stop, and says nothing before a choice", async () => {
+    const wrapper = render({
+      schedule: schedule([
+        rota("Weekend", [
+          rule({ name: "Primary", priority: 1 }),
+          rule({ name: "Fallback", ends_at: ANCHOR + 24 * hour }),
+        ]),
+      ]),
+    });
+    await openRotation(wrapper);
+    await openStop(wrapper, 0);
+    const line = () => wrapper.find('[data-test="oncall-schedule-rule-stop-consequence-0"]');
+    expect(line().exists()).toBe(false);
+
+    await pickStop(wrapper, 0, "2023-11-21");
+    expect(line().text()).toContain("Leaves a gap");
   });
 
   it("clears ends_at with Don't stop", async () => {

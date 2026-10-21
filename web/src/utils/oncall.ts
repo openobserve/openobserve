@@ -771,10 +771,15 @@ export function windowContains(window: TimeWindow, atMicros: number, timezone: s
  * always — the catch-all every follow-the-sun setup needs underneath.
  */
 export function ruleAppliesAt(rule: ShiftRule, atMicros: number, timezone: string): boolean {
-  if (rule.starts_at != null && atMicros < rule.starts_at) return false;
-  if (rule.ends_at != null && atMicros >= rule.ends_at) return false;
+  if (!ruleInForceAt(rule, atMicros)) return false;
   const windows = rule.restrictions ?? [];
   return windows.length === 0 || windows.some((w) => windowContains(w, atMicros, timezone));
+}
+
+/** Whether `atMicros` falls between the rule's `starts_at` and `ends_at`, ignoring its hours. [pure] */
+export function ruleInForceAt(rule: ShiftRule, atMicros: number): boolean {
+  if (rule.starts_at != null && atMicros < rule.starts_at) return false;
+  return !(rule.ends_at != null && atMicros >= rule.ends_at);
 }
 
 /**
@@ -1042,6 +1047,30 @@ export function dayRows(
   });
 }
 
+/** Where `atMicros` sits across `row` on the wall-clock scale of its axis, 0 at its start and 1 at its end. [pure] */
+export function dayFraction(atMicros: number, row: DayRow, timezone: string): number {
+  if (atMicros <= row.start) return 0;
+  if (atMicros >= row.end) return 1;
+  return (wallTimeInZone(atMicros, timezone)?.minuteOfDay ?? 0) / MINUTES_PER_DAY;
+}
+
+/** Adjacent, touching segments of one holder joined into one stretch; the rostered member stays only where all parts agree. [pure] */
+export function holderStretches(segments: readonly ResolvedSegment[]): ResolvedSegment[] {
+  const out: ResolvedSegment[] = [];
+  for (const segment of segments) {
+    const last = out[out.length - 1];
+    if (!last || !sameHolder(last, segment)) {
+      out.push({ ...segment });
+      continue;
+    }
+    last.to = segment.to;
+    if ((last.scheduled_email ?? null) !== (segment.scheduled_email ?? null)) {
+      last.scheduled_email = undefined;
+    }
+  }
+  return out;
+}
+
 /** Up to `max` ends of the rule's turns after now and before the window's end; a cover inside a turn does not end it. [pure] */
 export function stopChoices(
   segments: readonly ResolvedSegment[],
@@ -1064,17 +1093,17 @@ export function stopChoices(
     .map((turn) => ({ email: turn.email, at: turn.to }));
 }
 
-/** With `rules[index]` stopped: the in-force rules sharing its hours, and its hours nobody else covers. [pure] */
+/** With `rules[index]` stopped at `atMicros`: the rules in force then sharing its hours, and its hours nobody else covers. [pure] */
 export function stopConsequence(
   rules: ShiftRule[],
   index: number,
-  nowMicros: number,
+  atMicros: number,
 ): { takers: number[]; gap: Array<[number, number]> } {
   const mine = weekCoverage(rules[index]);
   const takers = rules.flatMap((rule, k) =>
     k !== index &&
     isShiftRuleValid(rule) &&
-    !(rule.ends_at != null && rule.ends_at <= nowMicros) &&
+    ruleInForceAt(rule, atMicros) &&
     spansMeet(mine, weekCoverage(rule))
       ? [k]
       : [],
@@ -1130,11 +1159,11 @@ export function prioritiesFor(rules: ShiftRule[], index: number, wins: boolean):
   return current.map((p, k) => (k === index ? lowered : p) + lift);
 }
 
-/** Rivals that take hours from `rules[index]`: they overlap and beat it, have people, and are not retired. [pure] */
+/** Rivals that take hours from `rules[index]`: they overlap and beat it, have people, and are in force now. [pure] */
 export function effectiveRivals(rules: ShiftRule[], index: number, nowMicros: number): number[] {
   return overlapStanding(rules, index).losesTo.filter((k) => {
     const rival = rules[k];
-    return isShiftRuleValid(rival) && !(rival.ends_at != null && rival.ends_at <= nowMicros);
+    return isShiftRuleValid(rival) && ruleInForceAt(rival, nowMicros);
   });
 }
 
@@ -1150,6 +1179,17 @@ export function effectiveWeekCoverage(
     for (const [start, end] of weekCoverage(rules[k])) minutes.fill(0, start, end);
   }
   return spansOf(minutes);
+}
+
+/** The server's merge key before `scheduled_email` joined it, for parts that touch. */
+function sameHolder(a: ResolvedSegment, b: ResolvedSegment): boolean {
+  return (
+    a.to === b.from &&
+    a.rotation_id === b.rotation_id &&
+    (a.user_email ?? null) === (b.user_email ?? null) &&
+    (a.rotation ?? null) === (b.rotation ?? null) &&
+    (a.override_id ?? null) === (b.override_id ?? null)
+  );
 }
 
 function sameWindow(a: TimeWindow, b: TimeWindow): boolean {

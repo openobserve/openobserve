@@ -35,6 +35,7 @@ import {
   formatMinuteOfDay,
   fromZonedInputValue,
   groupBySubject,
+  holderStretches,
   isEscalating,
   isOnCallUnavailable,
   speakTarget,
@@ -1818,12 +1819,49 @@ describe("rotation drawer, part B", () => {
     ]);
   });
 
+  // D4: one holder's stretch stays one even where the rostered member under it changes.
+  it.each([
+    [
+      "a cover across a roster handover is one stretch",
+      [seg(0, 2, "di", "Base", "ov", "ana"), seg(2, 5, "di", "Base", "ov", "bo")],
+      [{ ...seg(0, 5, "di", "Base", "ov"), scheduled_email: undefined }],
+    ],
+    [
+      "parts that agree on the rostered member keep it",
+      [seg(0, 2, "di", "Base", "ov", "ana"), seg(2, 5, "di", "Base", "ov", "ana")],
+      [seg(0, 5, "di", "Base", "ov", "ana")],
+    ],
+    [
+      "a different cover, person or rule is kept apart",
+      [
+        seg(0, 1, "di", "Base", "ov"),
+        seg(1, 2, "di", "Base", "ov2"),
+        seg(2, 3, "cy", "Base", "ov2"),
+        seg(3, 4, "cy", "Office", "ov2"),
+      ],
+      [
+        seg(0, 1, "di", "Base", "ov"),
+        seg(1, 2, "di", "Base", "ov2"),
+        seg(2, 3, "cy", "Base", "ov2"),
+        seg(3, 4, "cy", "Office", "ov2"),
+      ],
+    ],
+    [
+      "parts that do not touch are kept apart",
+      [seg(0, 1, "ana", "Base"), seg(2, 3, "ana", "Base")],
+      [seg(0, 1, "ana", "Base"), seg(2, 3, "ana", "Base")],
+    ],
+  ])("holderStretches: %s", (_name, segments, expected) => {
+    expect(holderStretches(segments as any)).toEqual(expected);
+  });
+
   // B4: who takes the stopped rule's hours, or which hours nobody covers.
   it.each([
     [
       "the catch-all takes them",
       [rule("Base"), rule("Office", [window([0, 1, 2, 3, 4], 540, 1020)])],
       1,
+      MON,
       [0],
       0,
     ],
@@ -1831,11 +1869,28 @@ describe("rotation drawer, part B", () => {
       "nobody takes them",
       [rule("Night", [window([], 0, 480)]), rule("Day", [window([], 480, 1440)])],
       0,
+      MON,
       [],
       7,
     ],
-  ])("stopConsequence: %s", (_name, rules, index, takers, gapSpans) => {
-    const result = stopConsequence(rules, index, MON);
+    [
+      "a rule stopped before the chosen stop takes nothing",
+      [rule("Primary"), { ...rule("Fallback"), ends_at: MON + 24 * HOUR }],
+      0,
+      MON + 7 * 24 * HOUR,
+      [],
+      1,
+    ],
+    [
+      "a rule starting after the chosen stop takes nothing",
+      [rule("Primary"), { ...rule("Fallback"), starts_at: MON + 8 * 24 * HOUR }],
+      0,
+      MON + 7 * 24 * HOUR,
+      [],
+      1,
+    ],
+  ])("stopConsequence: %s", (_name, rules, index, at, takers, gapSpans) => {
+    const result = stopConsequence(rules, index, at);
     expect(result.takers).toEqual(takers);
     expect(result.gap).toHaveLength(gapSpans);
   });
@@ -2027,6 +2082,13 @@ describe("rotation editor: how several shift rules add up", () => {
       [
         "a retired rival takes nothing",
         [india, shiftRule("Catch-all", { priority: 11, ends_at: MON })],
+        0,
+        everyDay(0, 720),
+        [],
+      ],
+      [
+        "a rival not yet started takes nothing",
+        [india, shiftRule("Catch-all", { priority: 11, starts_at: MON + 30 * MICROS_PER_DAY })],
         0,
         everyDay(0, 720),
         [],

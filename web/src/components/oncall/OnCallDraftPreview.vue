@@ -89,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <OnCallUpcomingList
       v-else
-      :segments="segments"
+      :segments="stretches"
       :window-from="windowFrom"
       :window-to="windowTo"
       :now-micros="nowMicros"
@@ -117,7 +117,13 @@ import { SCHEDULE_BAND_TONE_COUNT } from "@/lib/data/ScheduleTimeline/OScheduleT
 import type { ResolvedSegment, Rotation } from "@/ts/interfaces/oncall";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
-import { dayRows, formatInZone, rotationMembers } from "@/utils/oncall";
+import {
+  dayFraction,
+  dayRows,
+  formatInZone,
+  holderStretches,
+  rotationMembers,
+} from "@/utils/oncall";
 import { PREVIEW_DAYS } from "@/composables/useRotationPreview";
 import OnCallUpcomingList from "./OnCallUpcomingList.vue";
 
@@ -171,8 +177,10 @@ const tones = computed(() => {
   };
 });
 
+const stretches = computed(() => holderStretches(props.segments));
+
 const rows = computed(() =>
-  dayRows(props.segments, props.windowFrom, PREVIEW_DAYS, props.timezone),
+  dayRows(stretches.value, props.windowFrom, PREVIEW_DAYS, props.timezone),
 );
 
 const tracks = computed<ScheduleTrack[]>(() =>
@@ -181,10 +189,12 @@ const tracks = computed<ScheduleTrack[]>(() =>
     label: raw(dayLabel(row.start)),
     bands: row.pieces.map<ScheduleBand>(({ from, to, segment }) => {
       const who = segment.user_email ?? "";
+      const offset = dayFraction(from, row, props.timezone);
       return {
         key: `${row.start}-${from}`,
-        offset: (from - row.start) / (row.end - row.start),
-        width: (to - from) / (row.end - row.start),
+        offset,
+        // The hour the clocks go back repeats, so a piece inside it can end before it starts.
+        width: Math.max(0, dayFraction(to, row, props.timezone) - offset),
         label: who ? raw(props.nameOf(who)) : t("oncall.calendarNobody"),
         ariaLabel: t("oncall.previewBandAria", {
           who: who ? raw(who) : t("oncall.calendarNobody"),
@@ -215,7 +225,7 @@ const today = computed(() =>
 
 const nowOffset = computed(() => {
   const row = today.value;
-  return row ? (props.nowMicros - row.start) / (row.end - row.start) : null;
+  return row ? dayFraction(props.nowMicros, row, props.timezone) : null;
 });
 
 const nowLabel = computed(() => t("oncall.previewNow", { time: raw(time(props.nowMicros)) }));

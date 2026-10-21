@@ -56,6 +56,21 @@ const workerPrefix = (testInfo) => `${PREFIX}_w${testInfo.workerIndex}`;
 
 const gate = { checked: false, available: false, reason: '' };
 
+// The drawer's list joins one holder's touching segments the way `holderStretches` in web/src/utils/oncall.ts does.
+const holderRows = (segments) => {
+  const out = [];
+  for (const s of segments) {
+    const last = out[out.length - 1];
+    const same = last && last.to === s.from && last.rotation_id === s.rotation_id &&
+      (last.user_email ?? null) === (s.user_email ?? null) &&
+      (last.rotation ?? null) === (s.rotation ?? null) &&
+      (last.override_id ?? null) === (s.override_id ?? null);
+    if (same) last.to = s.to;
+    else out.push({ ...s });
+  }
+  return out.map((s) => ({ from: s.from, to: s.to, user: s.user_email ?? null }));
+};
+
 /**
  * The org's roster.
  *
@@ -424,9 +439,7 @@ test.describe('On-call schedules and rotations', {
     const previewResponse = await settled;
     expect(previewResponse.ok(), 'the preview request must succeed').toBe(true);
     const { from, to } = previewResponse.request().postDataJSON();
-    const previewed = (await previewResponse.json()).map((s) => ({
-      from: s.from, to: s.to, user: s.user_email ?? null,
-    }));
+    const previewed = holderRows(await previewResponse.json());
 
     // The list shows a run of the preview's own segments once that answer has rendered.
     await detail.showPreviewList();
@@ -451,9 +464,7 @@ test.describe('On-call schedules and rotations', {
         `?from=${from}&to=${to}&rotation_id=${encodeURIComponent(rotationId)}`,
     );
     expect(res.ok(), 'the saved schedule resolves').toBe(true);
-    const saved = (await res.json()).map((s) => ({
-      from: s.from, to: s.to, user: s.user_email ?? null,
-    }));
+    const saved = holderRows(await res.json());
     const start = saved.findIndex((s) => s.from === rows[0].from);
     expect(start, 'the first previewed row starts a saved segment').toBeGreaterThanOrEqual(0);
     expect(saved.slice(start, start + rows.length), 'preview rows equal the saved segments')
