@@ -46,8 +46,8 @@ test.describe('Billing Group remove action icon', () => {
         await pm.billingGroupPage.expectRemoveDialogVisible();
         await pm.billingGroupPage.expectRemoveDialogTitleContains('Child Corp');
         await pm.billingGroupPage.clickConfirmRemove();
-        await pm.billingGroupPage.expectDeleteTargeted('member-org-123');
         await pm.billingGroupPage.expectRemovedToast();
+        await pm.billingGroupPage.expectDeleteTargeted('member-org-123');
         await pm.billingGroupPage.expectRemoveDialogHidden();
         await pm.billingGroupPage.expectRemoveIconCount('member-org-123', 0);
         testLogger.info('Test completed');
