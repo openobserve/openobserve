@@ -118,6 +118,9 @@ pub struct PromptRequest {
     /// Optional image attachments for multimodal queries (max 2MB each, PNG/JPEG only)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub images: Option<Vec<ImageAttachment>>,
+    /// A finished turn this one regenerates or edits; the new turn is appended, the original kept.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub replaces_turn_id: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]

@@ -727,6 +727,7 @@ pub struct ApiDoc;
     openobserve_api_management::request::alert_calibration::digests::get_run_records,
     openobserve_api_management::request::alert_calibration::digests::count_findings_by_rule,
     openobserve_api_management::request::ai::chats::stream_turn,
+    openobserve_api_management::request::ai::chats::import,
     openobserve_api_management::request::ai::capabilities::get_capabilities,
     openobserve_api_management::request::ai::capabilities::test_capabilities,
     openobserve_api_management::request::ai::settings::get_settings,
