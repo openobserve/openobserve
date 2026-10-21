@@ -30,6 +30,7 @@ const SANDBOX_FLAGS = {
 
 const DEFAULT_REQUEST_HEADERS_TIMEOUT_MS = 30_000;
 const STATUS_POLL_MS = 15_000;
+const STREAM_RETRY_MS = 1_000;
 const TRANSIENT_ERROR_RE = /ECONNRESET|ECONNREFUSED|ETIMEDOUT|EPIPE|socket hang up|overloaded|rate limit|too many requests|temporarily unavailable|bad gateway|service unavailable|gateway timeout/i;
 
 export class OpencodeError extends Error {
@@ -183,6 +184,8 @@ export class OpencodeClient {
     const session = await this.json("POST", "/session", { title });
     const waiter = new SessionWaiter(this, session.id);
     this.waiters.set(session.id, waiter);
+    // Armed before the POST: a session.error can arrive before prompt_async returns, and nothing would replay it.
+    const finished = waiter.wait(timeoutMs);
     try {
       await this.json("POST", `/session/${session.id}/prompt_async`, {
         agent,
@@ -192,7 +195,7 @@ export class OpencodeClient {
         system,
         parts: [{ type: "text", text }],
       });
-      const outcome = await waiter.wait(timeoutMs);
+      const outcome = await finished;
       if (outcome.timedOut) {
         await this.request("POST", `/session/${session.id}/abort`).catch(() => {});
         throw new OpencodeError(`opencode agent ${agent} timed out after ${timeoutMs}ms`, { name: "TimeoutError" });
@@ -200,6 +203,7 @@ export class OpencodeClient {
       const messages = await this.json("GET", `/session/${session.id}/message`);
       return finalAssistantResult(messages, outcome.error, waiter.rejectedPermissions);
     } finally {
+      waiter.cancel();
       this.waiters.delete(session.id);
       await this.request("DELETE", `/session/${session.id}`).catch(() => {});
     }
@@ -244,8 +248,11 @@ class SessionWaiter {
   }
 
   onStreamLost() {
-    this.client.ensureEventStream().catch(() => {});
-    this.pollStatus().catch(() => {});
+    setTimeout(() => {
+      if (!this.settle) return;
+      this.client.ensureEventStream().catch(() => {});
+      this.pollStatus().catch(() => {});
+    }, STREAM_RETRY_MS).unref();
   }
 
   cancel() {
@@ -333,6 +340,11 @@ export function externalDirectoryProblem(ruleset) {
   if (lastDeny === -1) return "external_directory is not denied";
   const extra = ruleset.slice(lastDeny + 1).filter(r => applies(r) && r.action !== "deny" && !r.pattern.endsWith("/tool-output/*"));
   return extra.length > 0 ? `external_directory allows ${extra.map(r => r.pattern).join(", ")}` : "";
+}
+
+// A retry must leave room for its own full timeout plus whatever still has to run after it (the coordinator).
+export function shouldRetry({ err, attempt, maxRetries, remainingMs, timeoutMs, reserveMs = 0 }) {
+  return attempt <= maxRetries && isTransientError(err) && remainingMs > timeoutMs + reserveMs;
 }
 
 export function isTransientError(err) {

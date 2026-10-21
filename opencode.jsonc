@@ -1,7 +1,5 @@
 {
-  // OpenCode configuration for the PR review engine (scripts/ai-review). The workflow passes this
-  // file from the trusted base-branch checkout via OPENCODE_CONFIG and disables project config, so
-  // a PR cannot change it for its own review. Docs: https://opencode.ai/docs/
+  // Loaded from the trusted base-branch checkout via OPENCODE_CONFIG, so a PR cannot change its own review.
   "$schema": "https://opencode.ai/config.json",
 
   // Nothing here may reach into the PR tree: no `instructions`, no `skills.paths`, no plugins.
@@ -34,9 +32,7 @@
 
   "model": "deepseek-review/deepseek-v4-pro",
 
-  // Every ai-review-* agent gets the same ruleset. Rules are ordered and the last match wins, so
-  // "*": "deny" first and the three read-only tools after it. The startup self-check in
-  // scripts/ai-review/src/opencode.mjs refuses to run if any other tool resolves to allow.
+  // Last match wins, so "*": "deny" must come first; src/opencode.mjs selfCheck refuses any other allowed tool.
   "agent": {
     "ai-review-security": {
       "mode": "primary",

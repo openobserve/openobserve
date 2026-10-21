@@ -15,7 +15,7 @@ import {
   genAiResponseAttributes,
   sha256,
 } from "./telemetry.mjs";
-import { OpencodeServer, isTransientError, selfCheck } from "./src/opencode.mjs";
+import { OpencodeServer, selfCheck, shouldRetry } from "./src/opencode.mjs";
 import { fetchDiff, prefixDiffPaths } from "./src/pr-diff.mjs";
 import { sanitizePrTree } from "./src/sanitize.mjs";
 import { scrubReviewBody } from "./src/scrub.mjs";
@@ -79,6 +79,8 @@ const REVIEW_MARKER = process.env.REVIEW_MARKER || "<!-- ai-code-review -->";
 // findExistingReviewComment matches the same pattern. Keep in sync with the `marker` values in
 // .github/workflows/ai-code-review.yml.
 const ANY_REVIEW_MARKER = "<!--\\s*ai-code-review[a-z0-9-]*\\s*-->";
+// Tags the "reviewed with the paired o2-enterprise PR" note (post-paired-pointer.sh); it is replaced in place but is not a previous review.
+const PAIRED_POINTER_TAG = "<!-- o2-paired-pointer -->";
 
 // ─── Branding (presentation only) ───────────────────────────────────────────
 // The posted comment is branded "OpenObserve Code Review". These strings change ONLY how the
@@ -103,6 +105,9 @@ const CATEGORY_GLYPH = {
 const MAX_DIFF_TOKENS = 150_000;
 const AGENT_TIMEOUT_MS = 10 * 60 * 1000;
 const OVERALL_TIMEOUT_MS = 25 * 60 * 1000;
+// Kept free at the end of the run for rendering and posting the comment.
+const POST_RESERVE_MS = 2 * 60 * 1000;
+const MIN_COORDINATOR_MS = 60 * 1000;
 const TRACE_SERVICE_NAME = "github-actions.ai-code-review";
 const TRACE_SCOPE_NAME = "scripts/ai-review/run-review.mjs";
 const DEFAULT_TRACE_STREAM = "github_ai_code_review";
@@ -276,6 +281,14 @@ function pairedPrContext() {
   } catch {
     return `\nPaired PR (reviewed together; its files are under ${PAIRED.dir}/): ${PAIRED.repo}#${PAIRED.prNumber}`;
   }
+}
+
+// Trusted repo rules (base-branch AGENTS.md files) that sanitize removed from the PR tree; opencode used to attach them itself.
+function readRepoRules() {
+  const files = (process.env.REVIEW_RULES_FILES || resolve(ENGINE_DIR, "AGENTS.md")).split("\n").map(f => f.trim()).filter(Boolean);
+  const sections = files.filter(f => existsSync(f)).map(f => readFileSync(f, "utf-8").trim()).filter(Boolean);
+  if (sections.length === 0) return "";
+  return `## Repository rules (from the base branch)\n\nThese are the repository's contributor rules. Flag changed code that breaks them.\n\n${sections.join("\n\n---\n\n")}`;
 }
 
 function readPrompt(name) {
@@ -715,6 +728,10 @@ async function opencodeClient() {
   return client;
 }
 
+function remainingRunMs() {
+  return OVERALL_TIMEOUT_MS - (Date.now() - startTime);
+}
+
 async function callOpencode(agentName, systemPrompt, userPrompt, timeoutMs = AGENT_TIMEOUT_MS, traceOptions = {}) {
   const llmSpan = TRACE.startSpan("gen_ai.chat", {
     "gen_ai.operation.name": "chat",
@@ -764,8 +781,15 @@ async function callOpencode(agentName, systemPrompt, userPrompt, timeoutMs = AGE
         });
         return { text: result.text, responseId: result.responseId };
       } catch (err) {
-        const remainingMs = OVERALL_TIMEOUT_MS - (Date.now() - startTime);
-        if (attempt > MAX_TRANSIENT_RETRIES || !isTransientError(err) || remainingMs <= timeoutMs) throw err;
+        const retry = shouldRetry({
+          err,
+          attempt,
+          maxRetries: MAX_TRANSIENT_RETRIES,
+          remainingMs: remainingRunMs(),
+          timeoutMs,
+          reserveMs: traceOptions.agentKey === "coordinator" ? POST_RESERVE_MS : MIN_COORDINATOR_MS + POST_RESERVE_MS,
+        });
+        if (!retry) throw err;
         console.warn(`[${isoNow()}] ${agentName}: transient failure (${err.message}); retrying in a fresh session (attempt ${attempt + 1})`);
       }
     }
@@ -827,7 +851,7 @@ async function runReviewer(agentKey, agentDef, diff, prContext, existingReview, 
     return { agentKey, agentName: agentDef.name, findings: [], rawText: "", error: `${API_KEY_VAR_NAME} not set`, genAIResponseId: "" };
   }
 
-  const systemPrompt = readPrompt("shared-rules.md");
+  const systemPrompt = [readPrompt("shared-rules.md"), readRepoRules()].filter(Boolean).join("\n\n");
   const agentPrompt = readPrompt(agentDef.promptFile);
   if (!agentPrompt) {
     const err = new Error(`Missing agent prompt: ${agentDef.promptFile}`);
@@ -988,7 +1012,7 @@ function sanitizeReviewBody(body) {
 
 async function runCoordinator(agentResults, prContext, tier, existingReview, parentSpan) {
   const coordinatorPrompt = readPrompt("agents/coordinator.md");
-  const sharedRules = readPrompt("shared-rules.md");
+  const sharedRules = [readPrompt("shared-rules.md"), readRepoRules()].filter(Boolean).join("\n\n");
 
   const findingsSections = agentResults
     .filter(r => r.findings.length > 0)
@@ -1045,7 +1069,10 @@ async function runCoordinator(agentResults, prContext, tier, existingReview, par
   console.log(`[${isoNow()}] Running coordinator (${MODEL_SLUG}, ${coordinatorAgent})`);
 
   try {
-    const completion = await callOpencode(coordinatorAgent, `${sharedRules}\n\n${coordinatorPrompt}`, userPrompt, AGENT_TIMEOUT_MS, {
+    // Reviewer retries can eat into the run, so the coordinator gets what is left rather than a fixed slot past the watchdog.
+    const timeoutMs = Math.min(AGENT_TIMEOUT_MS, remainingRunMs() - POST_RESERVE_MS);
+    if (timeoutMs < MIN_COORDINATOR_MS) throw new Error(`only ${Math.round(remainingRunMs() / 1000)}s left in the run`);
+    const completion = await callOpencode(coordinatorAgent, `${sharedRules}\n\n${coordinatorPrompt}`, userPrompt, timeoutMs, {
       parentSpan: coordinatorSpan,
       agentKey: "coordinator",
       agentName: "Coordinator",
@@ -1189,7 +1216,8 @@ function findExistingReviewComment(prNumber) {
   try {
     const comments = ghJson(`api "repos/${process.env.GITHUB_REPOSITORY}/issues/${prNumber}/comments"`);
     const markerRe = new RegExp(ANY_REVIEW_MARKER, "i");
-    const ourComments = comments.filter(c => markerRe.test(c.body || ""));
+    // Only bot comments: a human quoting the marker must not be overwritten or fed back as the previous review.
+    const ourComments = comments.filter(c => c.user?.type === "Bot" && markerRe.test(c.body || ""));
     return ourComments.length > 0 ? ourComments[ourComments.length - 1] : null;
   } catch {
     return null;
@@ -1394,8 +1422,12 @@ async function main() {
     });
     if (existingComment) {
       existingCommentId = existingComment.id;
-      existingReview = existingComment.body;
-      console.log(`[${isoNow()}] Re-review mode: found existing review comment #${existingCommentId}`);
+      if (existingComment.body.includes(PAIRED_POINTER_TAG)) {
+        console.log(`[${isoNow()}] Replacing paired-PR pointer comment #${existingCommentId} with a review`);
+      } else {
+        existingReview = existingComment.body;
+        console.log(`[${isoNow()}] Re-review mode: found existing review comment #${existingCommentId}`);
+      }
     }
 
     // 6. Run reviewers in parallel

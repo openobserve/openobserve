@@ -9,13 +9,14 @@ import {
   httpRequest,
   isTransientError,
   selfCheck,
+  shouldRetry,
   toolEnabled,
 } from "../src/opencode.mjs";
 
 const AGENT_RUN_MS = 1500;
 const HEADERS_TIMEOUT_MS = 1000;
 
-function fakeOpencode({ idleAfterMs = AGENT_RUN_MS, finalEvent = "session.idle", error = null } = {}) {
+function fakeOpencode({ idleAfterMs = AGENT_RUN_MS, finalEvent = "session.idle", error = null, errorBeforeAck = null } = {}) {
   const calls = [];
   const streams = new Set();
   const emit = event => {
@@ -39,6 +40,11 @@ function fakeOpencode({ idleAfterMs = AGENT_RUN_MS, finalEvent = "session.idle",
       }
       if (req.method === "POST" && req.url === "/session") return send(200, { id: "s1" });
       if (req.method === "POST" && req.url === "/session/s1/prompt_async") {
+        if (errorBeforeAck) {
+          emit({ type: "session.error", properties: { sessionID: "s1", error: errorBeforeAck } });
+          setTimeout(() => { res.writeHead(204); res.end(); }, 200);
+          return;
+        }
         res.writeHead(204);
         res.end();
         setTimeout(() => emit({ type: "permission.asked", properties: { id: "p1", sessionID: "s1", permission: "bash", patterns: ["*"] } }), 50);
@@ -148,6 +154,35 @@ test("a provider 429 surfaced as session.error is transient", async () => {
   } finally {
     await fake.close();
   }
+});
+
+test("a session.error emitted before prompt_async returns is not lost", async () => {
+  const error = { name: "ProviderAuthError", data: { message: "bad key" } };
+  const fake = await fakeOpencode({ idleAfterMs: null, errorBeforeAck: error });
+  try {
+    const client = new OpencodeClient({ baseUrl: fake.baseUrl, password: "pw" });
+    const started = Date.now();
+    await assert.rejects(
+      client.prompt({ agent: "a", model: {}, system: "", text: "", title: "t", timeoutMs: 5000 }),
+      err => err.name !== "TimeoutError" && /bad key/.test(err.message),
+    );
+    assert.ok(Date.now() - started < 2000, "waited for the timeout instead of the early error");
+    client.close();
+  } finally {
+    await fake.close();
+  }
+});
+
+test("a retry needs room for its own timeout plus the work reserved after it", () => {
+  const err = Object.assign(new Error("429 Too Many Requests"), { transient: true });
+  const minute = 60_000;
+  const base = { err, maxRetries: 2, timeoutMs: 10 * minute, reserveMs: 3 * minute };
+  assert.equal(shouldRetry({ ...base, attempt: 1, remainingMs: 19 * minute }), true);
+  assert.equal(shouldRetry({ ...base, attempt: 1, remainingMs: 12 * minute }), false, "the coordinator would be pushed past the watchdog");
+  assert.equal(shouldRetry({ ...base, attempt: 3, remainingMs: 60 * minute }), false);
+  assert.equal(shouldRetry({ ...base, attempt: 1, remainingMs: 60 * minute, err: new Error("schema mismatch") }), false);
+  const timeout = Object.assign(new Error("timed out"), { name: "TimeoutError", transient: true });
+  assert.equal(shouldRetry({ ...base, attempt: 1, remainingMs: 60 * minute, err: timeout }), false);
 });
 
 test("server env is an allowlist: no GitHub, Actions or trace variables reach opencode", () => {

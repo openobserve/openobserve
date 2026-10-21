@@ -27,6 +27,7 @@ test("removes every opencode loader at any depth, and all symlinks", t => {
     "web/.opencode/plugin/x.ts": "x",
     ".claude/skills/x/SKILL.md": "x",
     ".agents/skills/x/SKILL.md": "x",
+    "src/.claude": "a plain file with a loader-dir name",
     ".o2-review-context/skills/fake.md": "planted",
     "src/main.rs": "fn main() {}",
     "README.md": "keep",
@@ -46,7 +47,7 @@ test("removes every opencode loader at any depth, and all symlinks", t => {
 
   const result = sanitizePrTree(pr, engine);
 
-  for (const gone of ["AGENTS.md", "web/AGENTS.md", "src/deep/nested/CLAUDE.md", "src/Context.md", "opencode.jsonc", "sub/opencode.json", ".opencode", "web/.opencode", ".claude", ".agents", "p", "src/passwd", "src/alias.rs"]) {
+  for (const gone of ["AGENTS.md", "web/AGENTS.md", "src/deep/nested/CLAUDE.md", "src/Context.md", "opencode.jsonc", "sub/opencode.json", ".opencode", "web/.opencode", ".claude", ".agents", "src/.claude", "p", "src/passwd", "src/alias.rs"]) {
     assert.equal(existsSync(join(pr, gone)), false, gone);
   }
   assert.ok(existsSync(join(pr, "src/main.rs")));

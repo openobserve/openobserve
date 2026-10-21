@@ -5,7 +5,8 @@ name: AI Code Review
 on:
   pull_request_target:
     branches: [main]
-    types: [opened, synchronize, reopened, labeled, ready_for_review]
+    # unlabeled/converted_to_draft start a run that only cancels the one in progress (see concurrency).
+    types: [opened, synchronize, reopened, labeled, unlabeled, ready_for_review, converted_to_draft]
   workflow_dispatch:
     inputs:
       pr_number:
@@ -25,6 +26,11 @@ on:
 
 permissions: {}
 
+# Workflow-level so a run whose job is skipped still cancels the paid one; unrelated label edits get a private group.
+concurrency:
+  group: ai-review-${{ (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) && github.event.label.name != 'ready-for-ci') && github.run_id || github.event.pull_request.number || inputs.pr_number }}
+  cancel-in-progress: true
+
 jobs:
   review:
     # Paid CI runs only on non-draft PRs carrying 'ready-for-ci'; other label events must not re-run it.
@@ -41,10 +47,6 @@ jobs:
     environment:
       name: ai-review
       deployment: false
-    # Per-job so it can see `matrix`: provider legs get independent groups and don't cancel each other.
-    concurrency:
-      group: ai-review-${{ matrix.provider.name }}-${{ github.event.pull_request.number || inputs.pr_number }}
-      cancel-in-progress: true
     permissions:
       contents: read
       pull-requests: write
@@ -113,47 +115,6 @@ jobs:
           app-id: ${{ vars.OO_REVIEWER_APP_ID }}
           private-key: ${{ secrets.OO_REVIEWER_APP_PRIVATE_KEY }}
 
-      # Paired OSS+ENT changes are reviewed once, by the o2-enterprise workflow, which pulls this PR's diff in.
-      - name: Defer to a paired o2-enterprise PR
-        if: env.REVIEW_RUN == 'true' && !inputs.ignore_paired
-        env:
-          ENT_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
-          GH_TOKEN: ${{ steps.app_token.outputs.token || github.token }}
-          REPO: ${{ github.repository }}
-          PR_NUMBER: ${{ steps.pr.outputs.number }}
-          BRANCH: ${{ steps.pr.outputs.head_ref }}
-          MARKER: ${{ matrix.provider.marker }}
-        run: |
-          set -euo pipefail
-          if [ -z "$ENT_TOKEN" ]; then
-            echo "::warning::ORG_ADMIN_TOKEN is not available; cannot look for a paired o2-enterprise PR, reviewing here."
-            exit 0
-          fi
-          ent_repo=openobserve/o2-enterprise
-          ent_pr="$(GH_TOKEN="$ENT_TOKEN" gh pr list --repo "$ent_repo" --head "$BRANCH" --state open \
-            --json number,isCrossRepository --jq '[.[] | select(.isCrossRepository == false)][0].number // ""')"
-          if [ -z "$ent_pr" ]; then
-            echo "No open o2-enterprise PR on branch '$BRANCH'; reviewing here."
-            exit 0
-          fi
-
-          echo "::notice::Paired with $ent_repo#$ent_pr; dispatching its review instead of reviewing here."
-          GH_TOKEN="$ENT_TOKEN" gh workflow run ai-code-review.yml --repo "$ent_repo" --ref main -f pr_number="$ent_pr"
-
-          body="$MARKER
-          ## 🔎 OpenObserve Code Review
-
-          > [!NOTE]
-          > This branch has a paired enterprise PR, **$ent_repo#$ent_pr**. Both PRs are reviewed together there, so this PR is not reviewed separately. Findings for files in this repository are listed there under \`openobserve/\`."
-          comment_id="$(gh api "repos/$REPO/issues/$PR_NUMBER/comments" --paginate \
-            --jq "[.[] | select(.body | contains(\"$MARKER\")) | .id] | last // empty" | tail -n1)"
-          if [ -n "$comment_id" ]; then
-            gh api -X PATCH "repos/$REPO/issues/comments/$comment_id" -f body="$body" > /dev/null
-          else
-            gh api -X POST "repos/$REPO/issues/$PR_NUMBER/comments" -f body="$body" > /dev/null
-          fi
-          echo "REVIEW_RUN=false" >> "$GITHUB_ENV"
-
       - name: Check out review engine (trusted, from main)
         if: env.REVIEW_RUN == 'true'
         uses: actions/checkout@v5
@@ -166,6 +127,51 @@ jobs:
             scripts/ai-review
             .claude/skills/ui-architect
             .claude/skills/eslint-error-handling
+
+      # Paired OSS+ENT changes are reviewed once, by the o2-enterprise workflow, which pulls this PR's diff in.
+      - name: Defer to a paired o2-enterprise PR
+        if: env.REVIEW_RUN == 'true' && !inputs.ignore_paired
+        env:
+          ENT_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
+          GH_TOKEN: ${{ steps.app_token.outputs.token || github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+          BRANCH: ${{ steps.pr.outputs.head_ref }}
+          MARKER: ${{ matrix.provider.marker }}
+        run: |
+          set -uo pipefail
+          if [ -z "$ENT_TOKEN" ]; then
+            echo "::warning::ORG_ADMIN_TOKEN is not available; cannot look for a paired o2-enterprise PR, reviewing here."
+            exit 0
+          fi
+          ent_repo=openobserve/o2-enterprise
+          # Any lookup error falls back to reviewing here: a missed pairing costs a duplicate review, a failed step costs the review.
+          if ! ent_json="$(GH_TOKEN="$ENT_TOKEN" gh pr list --repo "$ent_repo" --head "$BRANCH" --state open \
+            --json number,isCrossRepository,isDraft,labels \
+            --jq '[.[] | select(.isCrossRepository == false)][0] // {}')"; then
+            echo "::warning::Could not look up a paired $ent_repo PR; reviewing here."
+            exit 0
+          fi
+          ent_pr="$(jq -r '.number // ""' <<<"$ent_json")"
+          if [ -z "$ent_pr" ]; then
+            echo "No open $ent_repo PR on branch '$BRANCH'; reviewing here."
+            exit 0
+          fi
+          ent_ready="$(jq -r '(.isDraft | not) and ([.labels[].name] | index("ready-for-ci") != null)' <<<"$ent_json")"
+          if [ "$ent_ready" = "true" ]; then
+            if ! GH_TOKEN="$ENT_TOKEN" gh workflow run ai-code-review.yml --repo "$ent_repo" --ref main -f pr_number="$ent_pr"; then
+              echo "::warning::Could not dispatch the $ent_repo review; reviewing here."
+              exit 0
+            fi
+            state=reviewed
+            echo "::notice::Paired with $ent_repo#$ent_pr; dispatched its review instead of reviewing here."
+          else
+            state=pending
+            echo "::notice::Paired with $ent_repo#$ent_pr, which is a draft or lacks ready-for-ci; it reviews both PRs once it is ready."
+          fi
+          bash engine/scripts/ai-review/post-paired-pointer.sh "$REPO" "$PR_NUMBER" "$MARKER" "$ent_repo#$ent_pr" "$state" \
+            || echo "::warning::Could not post the pointer comment."
+          echo "REVIEW_RUN=false" >> "$GITHUB_ENV"
 
       - name: Check out PR head (data only)
         if: env.REVIEW_RUN == 'true'

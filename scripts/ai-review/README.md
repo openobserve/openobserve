@@ -33,7 +33,7 @@ A PR must never be able to run code next to the review secrets or weaken its own
 |-------|--------------|
 | `pull_request_target` | The workflow file and the engine always come from `main`. A PR's edits to `scripts/ai-review/**`, `opencode.jsonc` or the workflow take effect only after merge. |
 | Two checkouts | `./engine` = `main` (sparse: this directory, `opencode.jsonc`, the ui-architect and eslint skill references). `./pr` = the PR head SHA, data only: no `npm`, no build, no hooks; `persist-credentials: false`. |
-| `src/sanitize.mjs` | Before opencode starts, deletes from `./pr` every symlink and, at any depth, `AGENTS.md`, `CLAUDE.md`, `CONTEXT.md`, `opencode.json[c]`, `.opencode/`, `.claude/`, `.agents/`, then fails the job if any remain. Copies the base-branch skill references to `./pr/.o2-review-context/skills/`, which the prompts read. |
+| `src/sanitize.mjs` | Before opencode starts, deletes from `./pr` every symlink and, at any depth, `AGENTS.md`, `CLAUDE.md`, `CONTEXT.md`, `opencode.json[c]`, `.opencode/`, `.claude/`, `.agents/`, then fails the job if any remain. Copies the base-branch skill references to `./pr/.o2-review-context/skills/`, which the prompts read. The base-branch `AGENTS.md` (or the files in `REVIEW_RULES_FILES`, one path per line) goes into every reviewer's system prompt instead, so the repo rules still apply without the PR being able to edit them. |
 | `src/opencode.mjs` env allowlist | `opencode serve` runs in `./pr` with only `PATH`, a fresh temp `HOME`/XDG dirs, `OPENCODE_CONFIG` (this repo's `opencode.jsonc` from `./engine`), the `OPENCODE_DISABLE_*` flags, a random server password and the one provider key. No `GH_*`, `GITHUB_*`, `ACTIONS_*`, `RUNNER_*` or `O2_*` variables. |
 | `opencode.jsonc` permissions | Each `ai-review-*` agent: `"*": "deny"`, then allow `read`, `glob`, `grep`; `external_directory` denied. LSP, formatters, snapshots and sharing are off. |
 | Startup self-check | Refuses to review if `GET /experimental/tool/ids` lists any non-built-in tool, or any agent resolves to allow for a tool other than `read`/`glob`/`grep`. Permission prompts during a run are rejected. |
@@ -81,13 +81,19 @@ A change that spans both repos uses the same branch name in each. Those changes 
 in o2-enterprise:
 
 - **OSS side.** When the PR's branch has an open same-named o2-enterprise PR, this workflow does
-  not review. It dispatches the o2-enterprise review for that PR and replaces this PR's review
-  comment with a pointer to it. This needs `ORG_ADMIN_TOKEN` (o2-enterprise: Pull requests read,
-  Actions write); without it the OSS review runs as usual. To force an OSS review anyway, dispatch
-  this workflow with `ignore_paired`.
+  not review. If that PR is out of draft and labelled `ready-for-ci`, it dispatches the
+  o2-enterprise review; otherwise it waits for that PR to become ready, so a draft ENT PR never
+  gets a paid run through its OSS twin. Either way it replaces this PR's review comment with a
+  pointer (`post-paired-pointer.sh`). This needs `ORG_ADMIN_TOKEN` (o2-enterprise: Pull requests
+  read, Actions write); without it, or if any lookup or dispatch fails, the OSS review runs as
+  usual. To force an OSS review anyway, dispatch this workflow with `ignore_paired`.
 - **ENT side.** The o2-enterprise workflow checks out this engine pinned by commit SHA, finds the
   open same-named OSS PR, checks it out to `./pr/openobserve`, and reviews both diffs in one run.
-  OSS files appear with an `openobserve/` prefix in the review.
+  OSS files appear with an `openobserve/` prefix in the review. After a paired review it updates
+  the OSS PR's pointer, so the pointer is right even when the ENT PR was opened second.
+- **Windows.** If the ENT PR closes, the OSS pointer stays until the next OSS push, which reviews
+  the OSS PR on its own and replaces the pointer. If a paired ENT run fails, the failure shows on
+  the ENT PR, not the OSS one.
 
 ## The Frontend UI Reviewer
 
@@ -188,7 +194,8 @@ Delete the `OO_REVIEWER_APP_ID` variable on the repo(s). The next review instant
 
 There is no text skip marker any more: `[skip ci]`, `[skip review]` and `break glass` used to
 disable the review for anyone who could comment, including the model quoting them. The review
-runs only on non-draft PRs labelled `ready-for-ci`, and it is advisory. An audited
+runs only on non-draft PRs labelled `ready-for-ci`, and it is advisory. Removing the label or
+converting the PR to draft cancels a review in progress. An audited
 `/review skip` command arrives with v2 (WP-14).
 
 ## Testing

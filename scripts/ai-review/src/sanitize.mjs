@@ -57,7 +57,8 @@ function walk(dir, root, removed) {
       walk(path, root, removed);
       continue;
     }
-    if (LOADER_FILES.has(entry.name.toLowerCase())) {
+    const name = entry.name.toLowerCase();
+    if (LOADER_FILES.has(name) || LOADER_DIRS.has(name)) {
       unlinkSync(path);
       removed.push({ path: rel, reason: "loader" });
     }
