@@ -41,6 +41,7 @@
       <ODropdown v-model:open="showAddMenu">
         <template #trigger>
           <OButton
+            :aria-label="t('common.addCondition')"
             variant="outline"
             size="icon-chip"
             data-test="dashboard-add-condition-add"
@@ -60,6 +61,7 @@
       class="border-border-default ms-2 flex items-center justify-between border-s ps-1.5"
     >
       <OButton
+        :aria-label="t('common.remove')"
         variant="ghost"
         size="icon-chip"
         class="!w-4"

@@ -63,6 +63,10 @@ pub(super) async fn ingest_usages(mut curr_usages: Vec<UsageData>) {
                     folder.folder_id,
                 )
             };
+        }
+        #[cfg(not(feature = "enterprise"))]
+        usage_data.org_id.clear();
+        if usage_data.event == UsageEvent::Search {
             search_events.push(usage_data.clone());
             continue;
         }
@@ -218,7 +222,7 @@ pub(super) async fn ingest_usages(mut curr_usages: Vec<UsageData>) {
         for usage in &report_data {
             if let Some(org_id) = usage.get("org_id").and_then(|v| v.as_str()) {
                 // Skip meta org (already handled above)
-                if org_id == META_ORG_ID {
+                if org_id.is_empty() || org_id == META_ORG_ID {
                     continue;
                 }
                 per_org_map

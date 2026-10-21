@@ -167,6 +167,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Histogram (pinned by default — see useToolbarPins) -->
           <OButton
             v-if="showPinnedHistogram"
+            as="div"
             data-test="logs-search-bar-histogram-btn"
             size="xs"
             variant="outline"
@@ -175,6 +176,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <OSwitch
               v-model="searchObj.meta.showHistogram"
+              :aria-label="t('search.showHistogramLabel')"
               :size="toolbarToggleIconOnly ? 'sm' : 'md'"
               @click.stop
             />
@@ -192,6 +194,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- SQL Mode (pinned) -->
           <OButton
             v-if="showPinnedSqlMode"
+            as="div"
             data-test="logs-search-bar-sql-mode-pinned-btn"
             size="xs"
             variant="outline"
@@ -200,6 +203,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <OSwitch
               :model-value="searchObj.meta.sqlMode"
+              :aria-label="t('search.sqlModeLabel')"
               :disabled="isSqlModeDisabled"
               :size="toolbarToggleIconOnly ? 'sm' : 'md'"
               @click.stop="!isSqlModeDisabled && (searchObj.meta.sqlMode = !searchObj.meta.sqlMode)"
@@ -211,6 +215,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Quick Mode (pinned) -->
           <OButton
             v-if="showPinnedQuickMode"
+            as="div"
             data-test="logs-search-bar-quick-mode-pinned-btn"
             size="xs"
             variant="outline"
@@ -219,6 +224,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <OSwitch
               :model-value="searchObj.meta.quickMode"
+              :aria-label="t('search.quickModeLabel')"
               :size="toolbarToggleIconOnly ? 'sm' : 'md'"
               @click.stop="handleQuickMode"
             />
@@ -907,6 +913,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Function Editor (pinned) — sits to the left of the date picker -->
         <OButton
           v-if="showPinnedFunctionEditor"
+          as="div"
           data-test="logs-search-bar-function-editor-pinned-btn"
           size="xs"
           variant="outline"
@@ -915,6 +922,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <OSwitch
             v-model="searchObj.meta.showTransformEditor"
+            :aria-label="t('search.functionEditorLabel')"
             :size="toolbarToggleIconOnly ? 'sm' : 'md'"
             @click.stop
           />
@@ -1019,6 +1027,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OButton
                       variant="ghost"
                       size="icon-xs"
+                      :aria-label="t('search.refreshCacheAndRunQuery')"
                       data-test="logs-search-bar-refresh-cache-dropdown-trigger"
                       :class="[
                         config.isEnterprise == 'true' && visualizeSearchRequestTraceIds.length
@@ -1075,6 +1084,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OButton
                       variant="ghost"
                       size="icon-xs"
+                      :aria-label="t('search.refreshCacheAndRunQuery')"
                       data-test="logs-search-bar-refresh-cache-dropdown-trigger"
                       :class="[
                         config.isEnterprise == 'true' && visualizeSearchRequestTraceIds.length
@@ -1170,6 +1180,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OButton
                     :variant="showRunQueryPending && !isRunQueryCancelShown ? 'warning' : 'ghost'"
                     size="icon-xs"
+                    :aria-label="t('search.refreshCacheAndRunQuery')"
                     data-test="logs-search-bar-refresh-cache-dropdown-trigger"
                     :class="[
                       isRunQueryCancelShown
