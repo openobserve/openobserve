@@ -500,6 +500,8 @@ export interface OTableProps<TData = any> {
    * Pair with `wrap=false` for long, unbroken content (e.g. SQL strings).
    */
   horizontalScroll?: boolean;
+  /** Names the scroll container and makes it a focusable region, so a keyboard user can scroll a clipped table. */
+  scrollLabel?: I18nText;
   /** Fixed table width (CSS value) */
   width?: string | number;
 

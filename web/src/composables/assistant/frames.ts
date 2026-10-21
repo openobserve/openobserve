@@ -49,7 +49,8 @@ const toolResultFrameSchema = z.looseObject({
   success: z.boolean().optional(),
   message: z.string().optional(),
   call_id: z.string().optional(),
-  summary: z.string().optional(),
+  // o2-ai sends `{count, took}` for SearchSQL and similar tools, a sentence for others (WP-23).
+  summary: z.union([z.string(), z.record(z.string(), z.unknown())]).optional(),
   call_args: z.record(z.string(), z.unknown()).optional(),
   response: z.unknown().optional(),
   error_type: z.string().optional(),
@@ -139,27 +140,43 @@ const completeFrameSchema = z.looseObject({
   usage: usageCountersSchema.optional(),
   trace_id: z.string().optional(),
   persisted: z.boolean().optional(),
+  /** B-02: the turn ended with no content of its own (o2-ai's empty-turn notice). */
+  empty: z.boolean().optional(),
   /** B-09: the context keys the agent used for this turn (CT-12). */
   context_used: z.array(z.string()).optional(),
 });
 
-const cancelledFrameSchema = z.looseObject({ type: z.literal("cancelled") });
+const cancelledFrameSchema = z.looseObject({
+  type: z.literal("cancelled"),
+  turn_id: z.string().optional(),
+  /** Who stopped the turn; absent before B-02. */
+  by: z.string().optional(),
+});
 
 const turnStartedFrameSchema = z.looseObject({
   type: z.literal("turn_started"),
   turn_id: z.string(),
+  agent_type: z.string().optional(),
+  trace_id: z.string().optional(),
 });
 
 const stepFrameSchema = z.looseObject({
   type: z.literal("step"),
+  id: z.string().optional(),
+  call_id: z.string().optional(),
   kind: z.string(),
   label: z.string(),
   params: z.record(z.string(), z.unknown()).optional(),
+  /** `running` · `done` · `failed` · `interrupted`; a string so a new state never drops the frame. */
+  state: z.string().optional(),
 });
 
 const retryingFrameSchema = z.looseObject({
   type: z.literal("retrying"),
   attempt: z.number(),
+  reason: z.string().optional(),
+  /** Seconds until the next attempt, when the provider said. */
+  retry_after: z.number().optional(),
 });
 
 const compactingFrameSchema = z.looseObject({ type: z.literal("compacting") });
@@ -168,6 +185,7 @@ const permissionDeniedFrameSchema = z.looseObject({
   type: z.literal("permission_denied"),
   tool: z.string(),
   policy: z.string(),
+  detail: z.string().optional(),
 });
 
 const confirmationResolvedFrameSchema = z.looseObject({

@@ -24,6 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       aria-modal="false"
       :aria-label="ariaLabel"
       :data-test="dataTest"
+      :data-dd-privacy="privacy"
       :data-snap="snap"
       :class="[SHEET_BASE, SHEET_HEIGHT[snap]]"
     >

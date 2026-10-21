@@ -46,6 +46,12 @@
     if (frame.keepalive) return ": keepalive\n\n";
     if (frame.oversized) return `data: {"type":"message_delta","content":"${"x".repeat(1024 * 1024 + 16)}"}\n\n`;
     if (frame.raw) return `${frame.raw}\n\n`;
+    // The server's own ids (WP-18): `boundary` is an id-only message; `sseId` tags a frame with the seq it comes after.
+    if (frame.boundary !== undefined) return `id: ${frame.boundary}\n\n`;
+    if (frame.sseId !== undefined) {
+      const { sseId, ...data } = frame;
+      return `id: ${sseId}\ndata: ${JSON.stringify(data)}\n\n`;
+    }
     const id = mock.knobs.tailEnabled ? `id: ${seq}\n` : "";
     return `${id}data: ${JSON.stringify(frame)}\n\n`;
   };
@@ -150,7 +156,10 @@
       return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { "Content-Type": "application/json" } });
     }
     if (/\/api\/[^/]+\/ai\/chats\/[^/]+\/cancel/.test(url)) {
-      mock.cancels = (mock.cancels || []).concat([{ url, body: typeof init.body === "string" ? init.body : "", keepalive: !!(init.keepalive ?? input?.keepalive) }]);
+      // axios' fetch adapter passes a Request whose body is a stream, so the body and headers are read back from it.
+      const request = new Request(input, init);
+      const body = typeof init.body === "string" ? init.body : await request.clone().text().catch(() => "");
+      mock.cancels = (mock.cancels || []).concat([{ url, body, contentType: request.headers.get("content-type") || "", keepalive: !!(init.keepalive ?? input?.keepalive ?? request.keepalive) }]);
       if (mock.knobs.cancelDelayMs) await sleep(mock.knobs.cancelDelayMs);
       mock.release?.();
       const status = mock.knobs.cancelStatus || 200;

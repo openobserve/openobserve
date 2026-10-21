@@ -92,6 +92,7 @@ function setup() {
     userIndex: 0,
     newSession: true,
     input: "typed",
+    source: "composer",
     surface: "chat",
     toolCalls: 0,
     toolErrors: 0,

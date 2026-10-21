@@ -52,6 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="activeHomeTab"
           align="left"
           reorderable
+          :class="{ invisible: !homePrefsReady }"
           data-test="home-tab-bar"
           @reorder="onTabReorder"
         >
@@ -144,8 +145,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </ODrawer>
         </div>
 
+        <HomeViewSkeleton v-if="!homePrefsReady" />
         <FirstDataPanel
-          v-if="flagOn && isDataTab"
+          v-else-if="flagOn && isDataTab"
           v-slot="{ layout, statusLine }"
           signal="any"
           variant="compact"
@@ -182,7 +184,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </HomeNoDataState>
           </div>
           <div v-else-if="activeHomeTab === 'overview'" class="min-h-0 flex-1 overflow-hidden">
-            <OverviewTab />
+            <OverviewTab>
+              <template v-if="assistantV2" #top><AssistantLauncher class="mb-4" /></template>
+            </OverviewTab>
           </div>
           <div v-else class="-mx-2.5 min-h-0 flex-1 overflow-hidden">
             <UsageTab />
@@ -193,7 +197,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Overview tab (no inner card-container — the outer section panel
                already provides the border; avoids a double-bordered card). -->
           <div v-if="activeHomeTab === 'overview'" class="min-h-0 flex-1 overflow-hidden">
-            <OverviewTab />
+            <OverviewTab>
+              <template v-if="assistantV2" #top><AssistantLauncher class="mb-4" /></template>
+            </OverviewTab>
           </div>
 
           <!-- Usage tab -->
@@ -218,7 +224,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, inject, ref, watch, onMounted, onUnmounted } from "vue";
+import {
+  computed,
+  defineAsyncComponent,
+  defineComponent,
+  effectScope,
+  inject,
+  onScopeDispose,
+  ref,
+  watch,
+  onMounted,
+  onUnmounted,
+} from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -247,6 +264,54 @@ import HomeNoDataState from "@/views/HomeNoDataState.vue";
 import HomeViewSkeleton from "@/components/shared/HomeViewSkeleton.vue";
 import TrialPeriod from "@/enterprise/components/billings/TrialPeriod.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import { isAssistantV2 } from "@/composables/assistant/flags";
+
+// Past this the tabs show in their default order; a key that resolves later never reorders them.
+const HOME_PREFS_WAIT_MS = 1_500;
+
+/** Home's v2 tab state under the signed-in user+org; `ready` holds the tabs back until it is applied once. */
+function useHomeTabPrefs(apply: (prefs: { order?: string[]; active?: string | null }) => void) {
+  const ready = ref(false);
+  const scope = effectScope();
+  let key: string | null = null;
+  const pending: { order?: string[]; active?: string }[] = [];
+  let writer: ((userOrgKey: string, delta: { order?: string[]; active?: string }) => void) | null =
+    null;
+  const fallback = setTimeout(() => (ready.value = true), HOME_PREFS_WAIT_MS);
+  const settle = () => {
+    clearTimeout(fallback);
+    ready.value = true;
+  };
+  onScopeDispose(() => {
+    clearTimeout(fallback);
+    scope.stop();
+  });
+  void import("@/composables/assistant").then(({ assistantStore, migrateHome, writeHome }) => {
+    if (!scope.active) return;
+    writer = writeHome;
+    scope.run(() =>
+      watch(
+        () => assistantStore.state.userOrgKey,
+        (userOrgKey) => {
+          if (!userOrgKey || userOrgKey === key) return;
+          const orgSwitch = key !== null;
+          key = userOrgKey;
+          if (!ready.value || orgSwitch) apply(migrateHome(userOrgKey));
+          settle();
+          pending.splice(0).forEach((delta) => writeHome(userOrgKey, delta));
+        },
+        { immediate: true },
+      ),
+    );
+  }, settle);
+  return {
+    ready,
+    save(delta: { order?: string[]; active?: string }) {
+      if (key && writer) writer(key, delta);
+      else pending.push(delta);
+    },
+  };
+}
 
 export default defineComponent({
   name: "PageHome",
@@ -260,12 +325,14 @@ export default defineComponent({
     const LS_ACTIVE_TAB_KEY = "o2_home_active_tab";
 
     const isEnterpriseOrCloud = config.isEnterprise === "true" || config.isCloud === "true";
+    // The v2 assistant replaces the AI tab with the Overview launcher; the legacy tabs stay byte-identical with it off.
+    const assistantV2 = isAssistantV2();
 
     const { homeDashboard, clearHomeDashboard, updateLabel } = useHomeDashboard(t);
 
     const DEFAULT_TABS = computed(() => {
       const tabs: { id: string; label: string; closable?: boolean }[] = [];
-      if (isEnterpriseOrCloud && store.state.zoConfig.ai_enabled) {
+      if (!assistantV2 && isEnterpriseOrCloud && store.state.zoConfig.ai_enabled) {
         tabs.push({ id: "ai", label: t("home.tabAiAssistant") });
       }
       // Always reachable — Incidents/Services inside render locked (not
@@ -322,6 +389,7 @@ export default defineComponent({
     }
 
     function loadTabOrder() {
+      if (assistantV2) return [...DEFAULT_TABS.value];
       try {
         const saved = localStorage.getItem(LS_TAB_ORDER_KEY);
         if (saved) {
@@ -365,14 +433,17 @@ export default defineComponent({
       },
     );
 
-    const savedActiveTab = localStorage.getItem(LS_ACTIVE_TAB_KEY);
+    const savedActiveTab = assistantV2 ? null : localStorage.getItem(LS_ACTIVE_TAB_KEY);
     const activeHomeTab = ref(
       savedActiveTab && DEFAULT_TABS.value.find((t) => t.id === savedActiveTab)
         ? savedActiveTab
         : tabOrder.value[0].id,
     );
 
-    watch(activeHomeTab, (val) => localStorage.setItem(LS_ACTIVE_TAB_KEY, val));
+    watch(activeHomeTab, (val) => {
+      if (assistantV2) homePrefs.save({ active: val });
+      else localStorage.setItem(LS_ACTIVE_TAB_KEY, val);
+    });
 
     // When the user opens the pinned dashboard tab, re-read the authoritative
     // home_dashboard org setting so a snapshot that went stale on another system
@@ -409,8 +480,29 @@ export default defineComponent({
       order.splice(toIdx, 0, moved);
 
       tabOrder.value = order;
-      localStorage.setItem(LS_TAB_ORDER_KEY, JSON.stringify(order.map((t) => t.id)));
+      if (assistantV2) homePrefs.save({ order: order.map((t) => t.id) });
+      else localStorage.setItem(LS_TAB_ORDER_KEY, JSON.stringify(order.map((t) => t.id)));
     }
+
+    // v2: tab state is per user+org in `o2.assistant.home:{userOrgKey}`, read once the key resolves (constraint 56).
+    const homePrefs = assistantV2
+      ? useHomeTabPrefs((prefs) => {
+          const ids = prefs.order ?? [];
+          if (ids.length) {
+            const ordered = ids
+              .map((id) => DEFAULT_TABS.value.find((tab) => tab.id === id))
+              .filter(Boolean) as { id: string; label: string }[];
+            DEFAULT_TABS.value.forEach((tab) => {
+              if (!ordered.find((o) => o.id === tab.id)) ordered.push(tab);
+            });
+            tabOrder.value = ordered;
+          }
+          const active = prefs.active;
+          if (active && DEFAULT_TABS.value.find((tab) => tab.id === active))
+            activeHomeTab.value = active;
+        })
+      : { ready: ref(true), save: () => undefined };
+    const homePrefsReady = homePrefs.ready;
 
     const homeChat = ref<any>(null);
     function onLoadChat(id: number) {
@@ -450,6 +542,8 @@ export default defineComponent({
     };
 
     return {
+      assistantV2,
+      homePrefsReady,
       t,
       store,
       config,
@@ -474,6 +568,9 @@ export default defineComponent({
     };
   },
   components: {
+    AssistantLauncher: defineAsyncComponent(
+      () => import("@/components/ai-assistant/welcome/AssistantLauncher.vue"),
+    ),
     OverviewTab,
     UsageTab,
     O2AIChat,

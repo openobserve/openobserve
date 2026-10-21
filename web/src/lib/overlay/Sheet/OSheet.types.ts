@@ -27,6 +27,8 @@ export interface OSheetProps {
   snapPoints?: SheetSnap[];
   /** The dialog name; the sheet is `role="dialog" aria-modal="false"`. */
   ariaLabel: string;
+  /** Session replay masks the portalled content, which sits outside any masked ancestor. */
+  privacy?: "mask";
   /** A footer the sheet must stay above; defaults to the footer of the topmost open drawer. */
   anchorAbove?: string | HTMLElement;
   /** Swipe down past `peek` dismisses unless set. */

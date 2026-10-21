@@ -13,10 +13,21 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import type { TurnOutcomeRecord } from "@/ts/interfaces/chat";
 import type { I18nKey, I18nText, TranslateFn } from "@/types/i18n";
 
-import { ERROR_LEDGER, toAssistantError, type ProviderReason } from "./assistantErrors";
-import type { AssistantError, AssistantErrorCode, TurnMeta } from "./assistantStore.types";
+import {
+  ERROR_LEDGER,
+  isAssistantErrorCode,
+  toAssistantError,
+  type ProviderReason,
+} from "./assistantErrors";
+import type {
+  AssistantError,
+  AssistantErrorAction,
+  AssistantErrorCode,
+  TurnMeta,
+} from "./assistantStore.types";
 import type { AssistantFrame } from "./frames";
 import {
   isTerminal,
@@ -36,6 +47,12 @@ declare module "./assistantStore.types" {
     cancelUnconfirmed?: boolean;
     restored?: boolean;
     compacted?: boolean;
+    /** B-02 `retrying`: the agent is calling the provider again; cleared by the next answer frame. */
+    retrying?: { attempt: number; reason?: string; retryAfterMs?: number; at: number } | null;
+    /** B-02 `compacting`: earlier messages are being condensed; cleared by the next answer frame. */
+    compacting?: boolean;
+    /** When the turn ended; a refusal's `retry_after` counts from it in every container that shows it. */
+    endedAt?: number | null;
   }
 }
 
@@ -109,6 +126,17 @@ const ANNOUNCED: ReadonlySet<TurnState["state"]> = new Set([
 
 const NO_ELAPSED: ReadonlySet<TurnState["state"]> = new Set(["queued", "reconnecting", "stopping"]);
 
+// Frames that prove the provider answered, so a pending retry or compaction line is over.
+const PROGRESS_FRAMES: ReadonlySet<string> = new Set([
+  "message_delta",
+  "message",
+  "tool_call",
+  "tool_result",
+  "step",
+]);
+
+const STEP_ENDS: ReadonlySet<string> = new Set(["done", "failed", "interrupted"]);
+
 const STEP_KEYS: Record<string, I18nKey> = {
   SearchSQL: "assistant.step.SearchSQL",
   StreamSchema: "assistant.step.StreamSchema",
@@ -118,6 +146,32 @@ const STEP_KEYS: Record<string, I18nKey> = {
 };
 
 const TARGETED_STEPS: ReadonlySet<string> = new Set(["SearchSQL", "StreamSchema"]);
+
+// The actions a stored outcome may name; anything else falls back to its code's row.
+const OUTCOME_ACTIONS: ReadonlySet<string> = new Set<AssistantErrorAction>([
+  "retry",
+  "sign_in",
+  "ask_admin",
+  "open_iam_roles",
+  "open_settings",
+  "manage_usage",
+  "view_plans",
+  "stop_it",
+  "reload_chat",
+  "edit_resend",
+  "retry_save",
+  "ask_again",
+  "send_again",
+  "change_level",
+  "none",
+]);
+
+const REASONS: ReadonlySet<string> = new Set<ProviderReason>([
+  "overloaded",
+  "timed_out",
+  "model_unavailable",
+  "request_too_large",
+]);
 
 const REASON_KEYS: Record<ProviderReason, I18nKey> = {
   overloaded: "assistant.error.provider_error.reason.overloaded",
@@ -190,10 +244,13 @@ export function turnReducer(
   event: TurnEvent,
   ctx: TurnReducerCtx,
 ): { turn: TurnState; effects: TurnEffect[] } {
-  const next = CLIENT_EVENTS.has(event.type)
-    ? onClientEvent(turn, event as TurnClientEvent, ctx)
-    : onFrame(turn, event as AssistantFrame, ctx);
-  return { turn: next.state, effects: [...next.effects, ...entryEffects(turn, next.state)] };
+  const frame = CLIENT_EVENTS.has(event.type) ? null : (event as AssistantFrame);
+  const next = frame
+    ? onFrame(turn, frame, ctx)
+    : onClientEvent(turn, event as TurnClientEvent, ctx);
+  const meta = frame && isLive(next.state) ? lifecycleMeta(frame, ctx.now) : null;
+  const effects = [...next.effects, ...entryEffects(turn, next.state)];
+  return { turn: next.state, effects: meta ? [...effects, meta] : effects };
 }
 
 /** The only source of status copy (HT-01); `now` is injected so elapsed never comes from a component timer. */
@@ -226,6 +283,14 @@ export function stepLabel(
   return { key: "assistant.step.fallback", params: { tool } };
 }
 
+/** The step label of a stored `tool_call` block, read from its context as the live status row reads its frame. */
+export function stepLabelOf(
+  tool: string,
+  context: Record<string, unknown> | undefined,
+): { key: I18nKey; params: Record<string, unknown> } {
+  return stepLabel(tool, targetOf(context));
+}
+
 /** `ai_turn_ended.outcome` of a terminal (`99` §3.3). */
 export function outcomeOf(terminal: TurnTerminal): TurnEndOutcome {
   if (terminal.state === "done") return terminal.saved === "not_saved" ? "done_not_saved" : "done";
@@ -238,6 +303,74 @@ export function outcomeOf(terminal: TurnTerminal): TurnEndOutcome {
 export function elapsedMs(meta: TurnMeta, now: number): number {
   if (meta.startedAt === null) return 0;
   return Math.max(0, (meta.pausedAt ?? now) - meta.startedAt - (meta.pausedMs ?? 0));
+}
+
+/** The stored block of a turn that did not simply answer (`30` §4.2); `null` for an answer and a refusal, which store nothing. */
+export function outcomeRecordOf(
+  terminal: TurnTerminal,
+  ids: {
+    at: number;
+    turnId?: string;
+    sessionId?: string;
+    traceId?: string | null;
+    cancelUnconfirmed?: boolean;
+    elapsedMs?: number;
+  },
+): TurnOutcomeRecord | null {
+  if (terminal.state === "stopped")
+    return {
+      kind: "stopped",
+      steps: terminal.steps,
+      at: ids.at,
+      ...(ids.cancelUnconfirmed && { cancelUnconfirmed: true }),
+      ...(ids.turnId && { turnId: ids.turnId }),
+    };
+  if (terminal.state !== "failed") return null;
+  const { error } = terminal;
+  const kind =
+    error.code === "cancelled_elsewhere"
+      ? "cancelledElsewhere"
+      : error.code === "approval_expired"
+        ? "expired"
+        : "failed";
+  const traceId = error.traceId ?? ids.traceId ?? undefined;
+  return {
+    kind,
+    code: error.code,
+    action: error.action,
+    retryable: error.retryable,
+    at: ids.at,
+    ...(ids.elapsedMs !== undefined && { elapsedMs: ids.elapsedMs }),
+    ...(error.httpStatus !== undefined && { httpStatus: error.httpStatus }),
+    ...(traceId && { traceId }),
+    ...((error.turnId ?? ids.turnId) && { turnId: error.turnId ?? ids.turnId }),
+    ...((error.sessionId ?? ids.sessionId) && { sessionId: error.sessionId ?? ids.sessionId }),
+    ...(error.serverMessage && { serverMessage: error.serverMessage }),
+    ...(error.reason && { reason: error.reason }),
+  };
+}
+
+/** The ledger error an outcome block names; an unknown stored code reads as `unknown` (constraint 12). */
+export function outcomeError(record: TurnOutcomeRecord): AssistantError {
+  const code = isAssistantErrorCode(record.code) ? record.code : "unknown";
+  const row = ERROR_LEDGER[code];
+  const action =
+    record.action && OUTCOME_ACTIONS.has(record.action)
+      ? (record.action as AssistantErrorAction)
+      : row.action;
+  const error: AssistantError = {
+    code,
+    phase: "post_admission",
+    retryable: record.retryable ?? row.retryable,
+    action,
+  };
+  if (record.httpStatus !== undefined) error.httpStatus = record.httpStatus;
+  if (record.traceId) error.traceId = record.traceId;
+  if (record.turnId) error.turnId = record.turnId;
+  if (record.sessionId) error.sessionId = record.sessionId;
+  if (record.serverMessage) error.serverMessage = record.serverMessage;
+  if (record.reason && REASONS.has(record.reason)) error.reason = record.reason as ProviderReason;
+  return error;
 }
 
 export function errorTitleKey(code: AssistantErrorCode): I18nKey {
@@ -253,6 +386,9 @@ export function errorTitle(
   if (copy.org !== undefined) params.org = copy.org;
   if (copy.product !== undefined) params.product = copy.product;
   if (copy.t && copy.elapsedMs !== undefined) params.elapsed = elapsedText(copy.elapsedMs, copy.t);
+  // A `retry_after` countdown is on the button, so the title gives no estimate of its own.
+  if (error.code === "rate_limited" && error.retryAfterMs)
+    return { key: "assistant.error.rate_limited.titleTimed", params };
   if (error.code !== "provider_error") return { key: errorTitleKey(error.code), params };
   if (!error.reason) return { key: "assistant.error.provider_error.titleNoReason", params };
   if (copy.t) params.reason = copy.t(REASON_KEYS[error.reason]);
@@ -376,11 +512,7 @@ function onFrame(turn: TurnState, frame: AssistantFrame, ctx: TurnReducerCtx): S
     case "tool_call":
       return runningTool(frame.tool, targetOf(frame.context), frame.call_id ?? frame.tool);
     case "step":
-      return runningTool(
-        frame.kind,
-        targetOf(frame.params),
-        String(frame.params?.call_id ?? frame.kind),
-      );
+      return onStep(turn, frame);
     case "tool_result":
       return turn.state === "running_tool" && matchesCall(turn, frame.call_id, frame.tool)
         ? step({ state: "responding.thinking" })
@@ -390,9 +522,13 @@ function onFrame(turn: TurnState, frame: AssistantFrame, ctx: TurnReducerCtx): S
     case "error":
       return onErrorFrame(turn, frame, ctx);
     case "complete":
-      return onComplete(frame.persisted, ctx);
+      return onComplete(frame, ctx);
     case "cancelled":
-      return end(failure("cancelled_elsewhere", "post_admission"), ctx);
+      // B-02 names who stopped it: a sign-out elsewhere reads as that, anything else as another tab or the server.
+      return end(
+        failure(frame.by === "signed_out" ? "signed_out" : "cancelled_elsewhere", "post_admission"),
+        ctx,
+      );
     default:
       return QUIET_FRAMES.has(frame.type) && turn.state === "connecting"
         ? step({ state: "responding.thinking" })
@@ -419,10 +555,14 @@ function onErrorFrame(
   return onError(turn, { ...error, phase: "post_admission" }, ctx);
 }
 
-function onComplete(persisted: boolean | undefined, ctx: TurnReducerCtx): Step {
-  // o2-ai's empty-turn notice is not typed yet, so an answer with no text, step or card is detected here (HT-02 AC 9).
-  if (ctx.steps === 0 && ctx.partial === false)
-    return end(failure("empty_response", "post_admission"), ctx);
+function onComplete(
+  frame: Extract<AssistantFrame, { type: "complete" }>,
+  ctx: TurnReducerCtx,
+): Step {
+  // B-02 types the empty turn; before it an answer with no text, step or card is detected here (HT-02 AC 9).
+  const untyped = frame.empty === undefined && ctx.steps === 0 && ctx.partial === false;
+  if (frame.empty === true || untyped) return end(failure("empty_response", "post_admission"), ctx);
+  const persisted = frame.persisted;
   const saved = persisted === false ? "not_saved" : persisted === true ? "server" : "local";
   return step(
     { state: "done", saved },
@@ -432,6 +572,36 @@ function onComplete(persisted: boolean | undefined, ctx: TurnReducerCtx): Step {
     },
     { kind: "save" },
   );
+}
+
+// B-02 keys a step on its top-level `call_id` (params as the fallback) and says when it ended; the tool name comes from its `tool_call`.
+function onStep(turn: TurnState, frame: Extract<AssistantFrame, { type: "step" }>): Step {
+  const fromParams = frame.params?.call_id;
+  const callId =
+    frame.call_id ??
+    (typeof fromParams === "string" ? fromParams : undefined) ??
+    frame.id ??
+    frame.kind;
+  if (STEP_ENDS.has(frame.state ?? "running")) {
+    return turn.state === "running_tool" && turn.callId === callId
+      ? step({ state: "responding.thinking" })
+      : same(turn);
+  }
+  if (turn.state === "running_tool" && turn.callId === callId) return same(turn);
+  return runningTool(frame.kind, targetOf(frame.params), callId);
+}
+
+function lifecycleMeta(frame: AssistantFrame, now: number): TurnEffect | null {
+  if (frame.type === "retrying") {
+    const retryAfterMs =
+      typeof frame.retry_after === "number" ? frame.retry_after * 1000 : undefined;
+    const retrying = { attempt: frame.attempt, reason: frame.reason, retryAfterMs, at: now };
+    return { kind: "meta", patch: { retrying, compacting: false } };
+  }
+  if (frame.type === "compacting") return { kind: "meta", patch: { compacting: true } };
+  if (PROGRESS_FRAMES.has(frame.type))
+    return { kind: "meta", patch: { retrying: null, compacting: false } };
+  return null;
 }
 
 function runningTool(tool: string, target: string | null, callId: string): Step {
@@ -475,7 +645,11 @@ function withdrawn(): Step {
 // Entering a terminal: one `ai_turn_ended`, one announcement, and a save unless nothing was admitted.
 function end(terminal: TurnTerminal | AssistantError, ctx: TurnReducerCtx): Step {
   const state: TurnTerminal = "code" in terminal ? { state: "failed", error: terminal } : terminal;
-  const effects: TurnEffect[] = [endedEffect(state), terminalAnnouncement(state, ctx)];
+  const effects: TurnEffect[] = [
+    { kind: "meta", patch: { endedAt: ctx.now } },
+    endedEffect(state),
+    terminalAnnouncement(state, ctx),
+  ];
   if (state.state === "refused") effects.push({ kind: "restore_draft" });
   else effects.push({ kind: "save" });
   const error = "error" in state ? state.error : null;
@@ -492,7 +666,8 @@ function endedEffect(terminal: TurnTerminal): TurnEffect {
 
 function terminalAnnouncement(terminal: TurnTerminal, ctx: TurnReducerCtx): TurnEffect {
   if (terminal.state === "stopped") {
-    if (terminal.steps === 0) return { kind: "announce", key: "assistant.turn.stopped" };
+    if (terminal.steps === 0 || !terminal.partial)
+      return { kind: "announce", key: "assistant.turn.stopped" };
     const params = { n: terminal.steps };
     return { kind: "announce", key: "assistant.turn.stoppedWithSteps", params };
   }
@@ -536,10 +711,28 @@ function statusLine(turn: TurnState, meta: TurnMeta, t: TranslateFn, now: number
   const label = turn.state === "running_tool" ? stepLabel(turn.tool, turn.target) : null;
   const status = label
     ? t(label.key, label.params)
-    : t(STATUS_KEYS[turn.state] ?? "assistant.turn.thinking");
+    : (lifecycleLine(turn, meta, t, now) ??
+      t(STATUS_KEYS[turn.state] ?? "assistant.turn.thinking"));
   const elapsed = elapsedMs(meta, now);
   if (NO_ELAPSED.has(turn.state) || elapsed < ELAPSED_AFTER_MS) return status;
   return t("assistant.turn.withElapsed", { status, elapsed: elapsedText(elapsed, t) });
+}
+
+// The provider retry and the compaction are said only while the turn has nothing else to show.
+function lifecycleLine(
+  turn: TurnState,
+  meta: TurnMeta,
+  t: TranslateFn,
+  now: number,
+): I18nText | null {
+  if (turn.state !== "connecting" && turn.state !== "responding.thinking") return null;
+  if (meta.compacting) return t("assistant.turn.compacting");
+  const retrying = meta.retrying;
+  if (!retrying) return null;
+  const left = retrying.retryAfterMs ? retrying.at + retrying.retryAfterMs - now : 0;
+  if (left > 0)
+    return t("assistant.turn.retryingIn", { n: retrying.attempt, s: Math.ceil(left / 1000) });
+  return t("assistant.turn.retrying", { n: retrying.attempt });
 }
 
 function elapsedText(ms: number, t: TranslateFn): I18nText {

@@ -1172,7 +1172,7 @@ describe("reduce: typed phases (live)", () => {
   it("records the B-02, B-04, B-07 and EB-A2 frames without touching the transcript", () => {
     const state = makeState();
     const frames = [
-      { type: "turn_started", turn_id: "srv-1" },
+      { type: "turn_started", turn_id: "srv-1", trace_id: "tr-0" },
       { type: "step", kind: "query", label: "query_logs", params: { stream: "default" } },
       { type: "retrying", attempt: 2 },
       { type: "compacting" },
@@ -1194,6 +1194,7 @@ describe("reduce: typed phases (live)", () => {
     expect(state.messages).toEqual([]);
     expect(state.extras).toMatchObject({
       serverTurnId: "srv-1",
+      traceId: "tr-0",
       step: { kind: "query", label: "query_logs" },
       retrying: 2,
       compacting: true,

@@ -395,6 +395,7 @@ const wrapperClasses = computed(() => [
             ? 'pe-2'
             : 'pe-3',
         ]"
+        v-bind="inputAttrs"
         @input="handleInput"
         @blur="handleBlur"
         @focus="emit('focus', $event)"

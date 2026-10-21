@@ -73,6 +73,8 @@ export interface StreamState {
 /** What the typed phases keep beside the messages; the turn engine mirrors parts of it into `turnMeta`. */
 export interface StreamExtras {
   serverTurnId: string | null;
+  /** B-02 sends the trace at `turn_started`, so a turn that fails before `complete` still has one for Details. */
+  traceId: string | null;
   usage: UsageFrame["usage"] | null;
   compacted: boolean;
   persisted: boolean | null;
@@ -546,6 +548,7 @@ export function reduce(state: StreamState, data: any, ctx: ReducerCtx): StreamEf
 export function emptyExtras(): StreamExtras {
   return {
     serverTurnId: null,
+    traceId: null,
     usage: null,
     compacted: false,
     persisted: null,
@@ -610,6 +613,7 @@ function reduceExtras(extras: StreamExtras, data: any): boolean {
   switch (data?.type) {
     case "turn_started":
       extras.serverTurnId = data.turn_id;
+      if (typeof data.trace_id === "string" && data.trace_id) extras.traceId = data.trace_id;
       return true;
     case "step":
       extras.step = { kind: data.kind, label: data.label, params: data.params };

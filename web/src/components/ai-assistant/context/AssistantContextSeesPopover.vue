@@ -17,6 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OPopover
     :open="isOpen"
+    privacy="mask"
     side="top"
     :align="align"
     :aria-label="t('assistant.context.title')"

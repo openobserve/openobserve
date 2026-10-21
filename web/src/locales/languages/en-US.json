@@ -7818,6 +7818,12 @@
     "announce": {
       "closed": "{product} closed.",
       "closedRunning": "{product} closed. Still answering in the background.",
+      "failed": "Failed. {title}",
+      "failedRetryIn": "Failed. {title} Retry in {s} s.",
+      "failedWithAction": "Failed. {title} {action} available.",
+      "notSent": "Not sent. {title}",
+      "notSentRetryIn": "Not sent. {title} Retry in {s} s.",
+      "notSentWithAction": "Not sent. {title} {action} available.",
       "opened": "{product} opened.",
       "sheetCollapsed": "Collapsed.",
       "sheetExpanded": "Expanded."
@@ -7849,11 +7855,22 @@
       "title": "Ask an admin",
       "withPrompt": "{message} My question starts with: \"{prompt}\""
     },
+    "attachment": {
+      "cell": "Cell",
+      "field": "Field",
+      "logEntry": "Log entry",
+      "queryError": "Query error",
+      "span": "Span"
+    },
     "beta": "Beta",
     "client": {
       "copyManually": "Couldn't copy. Select the text and copy it.",
       "popupBlocked": "Your browser blocked the new tab. Open it here instead?",
       "storageBlocked": "Drafts won't be kept if you reload this page."
+    },
+    "closeTab": {
+      "body": "You can close this tab.",
+      "title": "You're signed in"
     },
     "composer": {
       "attachImage": "Attach image",
@@ -7894,6 +7911,7 @@
       "name": "Message {product}",
       "placeholder": "Ask about {summary}",
       "placeholderEmpty": "Ask a question or add context with {'@'}",
+      "rateLimited": "Wait for the Retry countdown to end.",
       "recalled": "Recalled prompt {n} of {count}",
       "recallHint": "↑ recalls your last prompt | ↑ recalls your last {count} prompts",
       "recentPrompts": "Recent prompts",
@@ -8003,6 +8021,13 @@
       "truncatedFields": "Cut to fit, longest values first: {fields}",
       "valueOff": "Off",
       "valueOn": "On"
+    },
+    "credits": {
+      "exhaustedTag": "Credits used up"
+    },
+    "docs": {
+      "opensInNewTab": "(opens in a new tab)",
+      "setupGuide": "Read the setup guide"
     },
     "entry": {
       "addedBehindCard": "Added to chat. Answer the pending question to send.",
@@ -8118,7 +8143,8 @@
       },
       "rate_limited": {
         "action": "Retry",
-        "title": "The AI provider is rate-limiting requests. Try again in about a minute."
+        "title": "The AI provider is rate-limiting requests. Try again in about a minute.",
+        "titleTimed": "The AI provider is rate-limiting requests."
       },
       "restore_required": {
         "action": "Reload chat",
@@ -8177,6 +8203,21 @@
         "action": "Retry",
         "title": "Couldn't reach OpenObserve. Your message wasn't sent."
       }
+    },
+    "errorDetails": {
+      "chat": "Chat",
+      "code": "Code",
+      "copied": "Details copied",
+      "copy": "Copy details",
+      "httpStatus": "HTTP status",
+      "serverMessage": "Server message",
+      "title": "Details",
+      "trace": "Trace",
+      "turn": "Turn",
+      "when": "When"
+    },
+    "footer": {
+      "notSavedHint": "This answer was given but could not be saved to history"
     },
     "gate": {
       "announce": {
@@ -8255,9 +8296,69 @@
       "tooltip": "{product}",
       "unavailableName": "{product}, unavailable"
     },
+    "message": {
+      "actionsName": "Message actions",
+      "chipsName": "Context sent with this message",
+      "codeName": "Code, {lang}",
+      "copyAnswer": "Copy answer",
+      "copyMarkdown": "Copy as Markdown",
+      "copyPrompt": "Copy",
+      "creditsUsedUp": "AI credits are used up for this organization",
+      "edit": "Edit and resend",
+      "editedFrom": "Edited from message {n}",
+      "editLabel": "Edit your message",
+      "editSend": "Send",
+      "evaluatedStamp": "Evaluated {range} · {n} query | Evaluated {range} · {n} queries",
+      "fenceSource": "stream {stream} · {range}",
+      "firstVersion": "This is the first version",
+      "imageRemoved": "Image from an external site removed",
+      "latestVersion": "This is the latest version",
+      "meta": "{who} · {time}",
+      "more": "More actions",
+      "nextVersion": "Next version",
+      "olderHidden": "Older continuation hidden",
+      "openImage": "Open image {name}",
+      "previousVersion": "Previous version",
+      "regenerate": "Regenerate",
+      "tableName": "Table",
+      "versionName": "Version {n} of {count}",
+      "versionOf": "{n} of {count}",
+      "you": "You"
+    },
     "name": "O2 Assistant",
     "outcome": {
-      "readonlyFailed": "Failed: {title}"
+      "actions": {
+        "askAdmin": "Ask an admin",
+        "managePaidUsage": "Manage paid usage",
+        "openIamRoles": "Open IAM roles",
+        "reloadChat": "Reload chat",
+        "sendAgain": "Send again",
+        "signIn": "Sign in",
+        "stopIt": "Stop it",
+        "viewPlans": "View plans"
+      },
+      "askAgain": "Ask again",
+      "backOnline": "You're back online.",
+      "canRetryNow": "You can retry now.",
+      "editResend": "Edit and resend",
+      "noSnapshot": "The original message is no longer here to retry. Send it again from the message box.",
+      "openHere": "Open here",
+      "readonlyFailed": "Failed: {title}",
+      "retry": "Retry",
+      "retryIn": "Retry in {s} s",
+      "retryOffline": "Retry when you're back online",
+      "signedIn": "Signed in. You can retry.",
+      "stopItFailed": "Couldn't stop the other answer. Try again.",
+      "stopItSent": "Asked the other answer to stop.",
+      "tryLater": "Try again later"
+    },
+    "scroll": {
+      "jumpToLatest": "Jump to latest",
+      "jumpToLatestCount": "Jump to latest · {count} new",
+      "jumpToLatestName": "Jump to latest, {count} new"
+    },
+    "share": {
+      "attachmentHidden": "Attachment hidden"
     },
     "shell": {
       "close": "Close {product}",
@@ -8288,29 +8389,43 @@
       "interrupted": "Interrupted",
       "running": "Running",
       "SearchPromQL": "Querying metrics",
-      "SearchSQL": "Querying `{stream}`",
+      "SearchSQL": "Querying {stream}",
       "StreamList": "Listing streams",
-      "StreamSchema": "Reading schema for `{stream}`",
+      "StreamSchema": "Reading schema for {stream}",
       "TraceSearch": "Searching traces",
       "update": "Updating {resource}"
+    },
+    "strip": {
+      "goToAnswer": "Go to answer"
     },
     "thread": {
       "newChatTitle": "New chat"
     },
+    "transcript": {
+      "answerName": "Answer to {prompt}",
+      "earlierCount": "{count} earlier message | {count} earlier messages",
+      "name": "Conversation with {product}",
+      "showEarlier": "Show earlier messages",
+      "turnLabel": "Turn {n}: {prompt}"
+    },
     "turn": {
       "cancelUnconfirmed": "The server may still be finishing this answer.",
       "caughtUp": "Caught up",
+      "compacting": "Condensing earlier messages",
       "connecting": "Connecting…",
       "continue": "Continue",
       "continuePrefill": "Continue",
       "done": "Done",
       "elapsedMinutes": "{m} min {s} s",
       "elapsedSeconds": "{n} s",
+      "elsewhere": "Answering in another tab",
       "messageRestored": "Your message was restored",
       "noResponse": "No response for {n} s",
       "notSaved": "Answered, but not saved to history.",
       "reconnecting": "Reconnecting…",
       "restored": "This chat moved to another server and continued.",
+      "retrying": "Retrying the AI provider · attempt {n}",
+      "retryingIn": "Retrying the AI provider in {s} s · attempt {n}",
       "retryNote": "Retrying won't undo anything already changed.",
       "retrySave": "Retry save",
       "returnedToPrevious": "Your message was returned to the previous chat",
@@ -8334,6 +8449,19 @@
       "ghostHint": "Suggestion: {label}. Press Right Arrow to use it.",
       "ghostInserted": "Suggestion inserted",
       "lastRange": "last {period}",
+      "launcher": {
+        "ask": "Ask",
+        "clear": "Clear question",
+        "disclosure": "Sends with the default time range",
+        "disclosureNoStreams": "Sends with the default time range · no streams yet",
+        "inputName": "Ask {product}",
+        "noRecent": "No chats yet",
+        "noRecentHint": "Start one above, or ask about a log row, panel or alert.",
+        "open": "Open {product}",
+        "placeholder": "Ask about your logs, alerts and dashboards…",
+        "recent": "Recent chats",
+        "running": "Answering…"
+      },
       "prefill": {
         "append": "Append",
         "cancel": "Cancel",

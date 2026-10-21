@@ -54,10 +54,17 @@ const MASK_CHAR = "\u2022";
 const props = withDefaults(defineProps<CodeBlockProps>(), {
   wrap: false,
   copyable: true,
+  highlight: true,
   lineNumbers: false,
   padded: false,
   inset: false,
   dataTest: "code-block",
+  highlightedHtml: undefined,
+  autoDetect: true,
+  highlightMaxChars: undefined,
+  scrollLabel: undefined,
+  copyButtonClass: undefined,
+  contrast: "default",
 });
 
 // Not `withDefaults` defaults: those are evaluated once at module scope, which
@@ -102,25 +109,45 @@ const displayCode = computed(() =>
 // fall back to manually-escaped text (never raw, so no injection). Highlighting
 // is CPU-heavy and the inputs rarely change, so results are memoized by
 // language + code (highlightOne is pure for a given pair).
+// Bounded: a block whose code keeps changing would otherwise keep every version it ever showed.
+const HIGHLIGHT_CACHE_LIMIT = 50;
 const highlightCache = new Map<string, string>();
-const highlightOne = (code: string, lang?: string): string => {
+const escapeCode = (code: string) =>
+  code.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+const highlightOne = (code: string, lang: string | undefined, auto: boolean): string => {
+  const known = !!lang && !!hljs.getLanguage(lang);
+  if (!known && !auto) return escapeCode(code);
   const key = `${lang ?? ""}\u0000${code}`;
   const cached = highlightCache.get(key);
-  if (cached !== undefined) return cached;
+  if (cached !== undefined) {
+    highlightCache.delete(key);
+    highlightCache.set(key, cached);
+    return cached;
+  }
   let out: string;
   try {
-    out =
-      lang && hljs.getLanguage(lang)
-        ? hljs.highlight(code, { language: lang }).value
-        : hljs.highlightAuto(code).value;
+    out = known ? hljs.highlight(code, { language: lang! }).value : hljs.highlightAuto(code).value;
   } catch {
-    out = code.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    out = escapeCode(code);
   }
   highlightCache.set(key, out);
+  if (highlightCache.size > HIGHLIGHT_CACHE_LIMIT)
+    highlightCache.delete(highlightCache.keys().next().value as string);
   return out;
 };
 // Highlights the DISPLAYED code (masked or real) — copy still uses the real `code`.
-const highlighted = computed(() => highlightOne(displayCode.value, props.lang));
+const highlighted = computed(() => {
+  if (props.highlightedHtml !== undefined && !props.codeMasked) return props.highlightedHtml;
+  const code = displayCode.value;
+  const tooLong = props.highlightMaxChars !== undefined && code.length > props.highlightMaxChars;
+  return props.highlight && !tooLong
+    ? highlightOne(code, props.lang, props.autoDetect)
+    : escapeCode(code);
+});
+
+const langLabelClass = computed(() =>
+  props.contrast === "aa" ? "text-syntax-text" : "opacity-55",
+);
 
 // Wrapping breaks the one-number-per-row assumption a gutter rests on, so the
 // two features are exclusive rather than quietly misaligned.
@@ -171,7 +198,7 @@ const onNativeCopy = () => {
 <template>
   <div
     class="o2-code-block rounded-default border-border-default bg-syntax-bg my-3 overflow-hidden border"
-    :class="chrome ? `o2-chrome-${chrome}` : ''"
+    :class="[chrome ? `o2-chrome-${chrome}` : '', contrast === 'aa' ? 'o2-code-block--aa' : '']"
     :data-test="dataTest"
   >
     <div
@@ -199,7 +226,7 @@ const onNativeCopy = () => {
           filename || lang || t("common.plainText")
         }}</span>
       </span>
-      <span v-else class="o2-code-lang text-2xs font-mono opacity-55">{{
+      <span v-else class="o2-code-lang text-2xs font-mono" :class="langLabelClass">{{
         lang || t("common.plainText")
       }}</span>
       <div class="flex items-center gap-1">
@@ -231,6 +258,8 @@ const onNativeCopy = () => {
           :data-test="`${dataTest}-copy-btn`"
           variant="ghost"
           size="icon-xs-sq"
+          :class="copyButtonClass"
+          :aria-label="t('common.copy')"
           @click="onCopy"
         >
           <OIcon name="content-copy" size="sm" />
@@ -251,8 +280,12 @@ const onNativeCopy = () => {
         wrap ? 'o2-code-pre--wrap' : '',
         showLineNumbers ? 'o2-code-pre--numbered' : '',
         padded ? 'px-3 py-2' : '',
+        scrollLabel ? 'focus-visible:ring-border-strong outline-none focus-visible:ring-2' : '',
       ]"
       :style="preStyle"
+      :tabindex="scrollLabel ? 0 : undefined"
+      :role="scrollLabel ? 'region' : undefined"
+      :aria-label="scrollLabel"
       :data-test="`${dataTest}-pre`"
       @copy="onNativeCopy"
     ><span
@@ -260,7 +293,7 @@ const onNativeCopy = () => {
       class="o2-code-gutter bg-syntax-bg text-syntax-comment sticky left-0 tabular-nums select-none"
       aria-hidden="true"
       :data-test="`${dataTest}-line-numbers`"
-    >{{ lineNumberText }}</span><code ref="codeEl" class="hljs text-syntax-text!" v-html="highlighted"></code></pre>
+    >{{ lineNumberText }}</span><code ref="codeEl" class="hljs text-syntax-text!" :class="scrollLabel ? 'overflow-visible!' : ''" v-html="highlighted"></code></pre>
   </div>
 </template>
 
@@ -385,6 +418,24 @@ const onNativeCopy = () => {
   :deep(.hljs-section) {
     color: var(--color-syntax-number);
     font-weight: 600;
+  }
+}
+
+/* Mixing toward the text colour darkens these on the light surface and lightens them on the dark one. */
+.o2-code-block--aa {
+  :deep(.hljs-keyword),
+  :deep(.hljs-doctag),
+  :deep(.hljs-type) {
+    color: color-mix(in srgb, var(--color-syntax-keyword) 80%, var(--color-syntax-text));
+  }
+  :deep(.hljs-built_in),
+  :deep(.hljs-symbol) {
+    color: color-mix(in srgb, var(--color-syntax-builtin) 70%, var(--color-syntax-text));
+  }
+  :deep(.hljs-name),
+  :deep(.hljs-quote),
+  :deep(.hljs-selector-tag) {
+    color: color-mix(in srgb, var(--color-syntax-tag) 80%, var(--color-syntax-text));
   }
 }
 </style>
