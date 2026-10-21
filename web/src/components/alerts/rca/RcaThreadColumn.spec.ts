@@ -301,6 +301,19 @@ describe("RcaThreadColumn", () => {
       expect(byTest(wrapper, "rca-thread-retry-btn").exists()).toBe(false);
     });
 
+    it("a thread whose end was lost shows the saved part under a notice", () => {
+      const wrapper = mountColumn({
+        ...SAVED,
+        thread: rcaThread({ ...SAVED.thread, truncated: true, saved_through_seq: 41 }),
+      });
+
+      expect(byTest(wrapper, "rca-thread-truncated").text()).toBe(
+        "The end of this transcript was lost. The thread shows the part that was saved.",
+      );
+      expect(wrapper.findAll('[data-test="rca-thread-step"]')).toHaveLength(2);
+      expect(byTest(mountColumn(SAVED), "rca-thread-truncated").exists()).toBe(false);
+    });
+
     it("shows the loading line on the first read", () => {
       const wrapper = mountColumn({ thread: null, status: "loading" });
 

@@ -662,6 +662,26 @@ pub async fn write_entries(
     entries: Vec<ingester::Entry>,
     fsync: bool,
 ) -> Result<RequestStats> {
+    write_entries_inner(writer, stream_name, entries, fsync, false).await
+}
+
+/// [write_entries] that returns only once the WAL bytes reached the OS, so a process kill
+/// after it cannot lose them; it never waits in the write queue.
+pub async fn write_entries_synced(
+    writer: &Arc<ingester::Writer>,
+    stream_name: &str,
+    entries: Vec<ingester::Entry>,
+) -> Result<RequestStats> {
+    write_entries_inner(writer, stream_name, entries, true, true).await
+}
+
+async fn write_entries_inner(
+    writer: &Arc<ingester::Writer>,
+    stream_name: &str,
+    entries: Vec<ingester::Entry>,
+    fsync: bool,
+    synced: bool,
+) -> Result<RequestStats> {
     let mut req_stats = RequestStats::default();
     let (entries_records, entries_size) = entries
         .iter()
@@ -675,7 +695,12 @@ pub async fn write_entries(
         .fold((0, 0), |(acc_records, acc_size), (records, size)| {
             (acc_records + records, acc_size + size)
         });
-    if let Err(e) = writer.write_batch(entries, fsync).await {
+    let written = if synced {
+        writer.write_batch_synced(entries).await
+    } else {
+        writer.write_batch(entries, fsync).await
+    };
+    if let Err(e) = written {
         log::error!(
             "ingestion write file for stream {}/{} error: {}",
             writer.get_key_str(),
