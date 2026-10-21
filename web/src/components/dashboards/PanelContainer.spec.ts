@@ -15,6 +15,7 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
+import { ref } from "vue";
 import PanelContainer from "@/components/dashboards/PanelContainer.vue";
 import PanelErrorButtons from "@/components/dashboards/PanelErrorButtons.vue";
 import i18n from "@/locales";
@@ -23,6 +24,7 @@ import router from "@/test/unit/helpers/router";
 import config from "@/aws-exports";
 import { needsConfirmation, normalizePrefill } from "@/utils/alerts/alertPrefill";
 import { getAlertSource } from "@/utils/alerts/alertSourceRegistry";
+import { KIOSK_PANEL_HEALTH_KEY } from "@/composables/dashboard/useKioskRefresh";
 
 // Mock shortURL service
 vi.mock("@/services/short_url", () => ({
@@ -197,7 +199,7 @@ describe("PanelContainer", () => {
     }
   });
 
-  const createWrapper = (props = {}, extraStubs = {}) => {
+  const createWrapper = (props = {}, extraStubs = {}, provide = {}) => {
     return mount(PanelContainer, {
       props: {
         ...defaultProps,
@@ -205,6 +207,7 @@ describe("PanelContainer", () => {
       },
       global: {
         plugins: [i18n, store, router],
+        provide,
         stubs: {
           ODialog: ODialogStub,
           ChartRenderer: { template: '<div data-test="chart-renderer"></div>' },
@@ -447,6 +450,127 @@ describe("PanelContainer", () => {
         // Check if error message is in errorData ref
         expect(wrapper.vm.errorData).toBe(errorMessage);
       }
+    });
+  });
+
+  describe("Kiosk mode", () => {
+    const emitRendererError = async (error: unknown) => {
+      wrapper.findComponent({ name: "PanelSchemaRenderer" }).vm.$emit("error", error);
+      await wrapper.vm.$nextTick();
+    };
+
+    it("shows a failed panel loudly, with the error text inside the panel", async () => {
+      wrapper = createWrapper({ kiosk: true });
+      await emitRendererError({ message: "stream k8s_events not found", code: 404 });
+
+      const overlay = wrapper.find('[data-test="dashboard-panel-kiosk-error"]');
+      expect(overlay.exists()).toBe(true);
+      expect(overlay.text()).toContain("Panel failed to load");
+      expect(overlay.text()).toContain("stream k8s_events not found");
+      expect(wrapper.attributes("data-kiosk-failed")).toBe("true");
+    });
+
+    it("keeps today's tooltip-only error outside kiosk", async () => {
+      wrapper = createWrapper();
+      await emitRendererError({ message: "stream k8s_events not found", code: 404 });
+
+      expect(wrapper.find('[data-test="dashboard-panel-kiosk-error"]').exists()).toBe(false);
+      expect(wrapper.attributes("data-kiosk-failed")).toBeUndefined();
+    });
+
+    it("reports its error and its recovery to the dashboard's health registry", async () => {
+      const registry = {
+        register: vi.fn(),
+        unregister: vi.fn(),
+        report: vi.fn(),
+        outage: ref(false),
+      };
+      wrapper = createWrapper(
+        { kiosk: true },
+        {},
+        { [KIOSK_PANEL_HEALTH_KEY as symbol]: registry },
+      );
+      const id = defaultProps.data.id;
+      expect(registry.register).toHaveBeenCalledWith(id);
+
+      await emitRendererError({ message: "502 Bad Gateway", code: 502 });
+      expect(registry.report).toHaveBeenLastCalledWith(id, {
+        message: "502 Bad Gateway",
+        code: 502,
+      });
+
+      await emitRendererError({ message: "", code: "" });
+      expect(registry.report).toHaveBeenLastCalledWith(id, { message: "", code: "" });
+      expect(wrapper.find('[data-test="dashboard-panel-kiosk-error"]').exists()).toBe(false);
+
+      wrapper.unmount();
+      expect(registry.unregister).toHaveBeenCalledWith(id);
+      wrapper = null;
+    });
+
+    it("hides the routine warning icons so only a failure draws the eye", async () => {
+      wrapper = createWrapper({ kiosk: true });
+      await emitRendererError({ message: "boom", code: 500 });
+      expect(wrapper.find('[data-test="panel-error-data"]').exists()).toBe(false);
+    });
+
+    it("dims the last render and marks it stale while the backend is unreachable", async () => {
+      const registry = {
+        register: vi.fn(),
+        unregister: vi.fn(),
+        report: vi.fn(),
+        outage: ref(false),
+      };
+      wrapper = createWrapper(
+        { kiosk: true },
+        {},
+        { [KIOSK_PANEL_HEALTH_KEY as symbol]: registry },
+      );
+      const body = () => wrapper.find('[data-test="dashboard-panel-body"]');
+      expect(wrapper.find('[data-test="dashboard-panel-kiosk-stale"]').exists()).toBe(false);
+      expect(body().classes()).not.toContain("opacity-60");
+
+      registry.outage.value = true;
+      await wrapper.vm.$nextTick();
+      expect(wrapper.find('[data-test="dashboard-panel-kiosk-stale"]').text()).toBe("Stale");
+      expect(body().classes()).toContain("opacity-60");
+      expect(wrapper.find('[data-test="panel-schema-renderer"]').exists()).toBe(true);
+    });
+
+    it("shows a loading skeleton instead of an empty body until the first result or error", async () => {
+      wrapper = createWrapper({ kiosk: true });
+      wrapper.findComponent({ name: "PanelSchemaRenderer" }).vm.setNoData("No Data");
+      await wrapper.vm.$nextTick();
+      expect(wrapper.find('[data-test="dashboard-panel-kiosk-loading"]').exists()).toBe(true);
+
+      await emitRendererError({ message: "bad query", code: 400 });
+      expect(wrapper.find('[data-test="dashboard-panel-kiosk-loading"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="dashboard-panel-kiosk-error"]').exists()).toBe(true);
+    });
+
+    it("keeps the skeleton through the first load only, never on later refreshes", async () => {
+      wrapper = createWrapper({ kiosk: true });
+      wrapper.findComponent({ name: "PanelSchemaRenderer" }).vm.setNoData("No Data");
+      const skeleton = () => wrapper.find('[data-test="dashboard-panel-kiosk-loading"]').exists();
+
+      wrapper.vm.handleLoadingStateChange(true);
+      await wrapper.vm.$nextTick();
+      expect(skeleton()).toBe(true);
+
+      wrapper.vm.handleLoadingStateChange(false);
+      await wrapper.vm.$nextTick();
+      expect(skeleton()).toBe(false);
+
+      wrapper.vm.handleLoadingStateChange(true);
+      await wrapper.vm.$nextTick();
+      expect(skeleton()).toBe(false);
+    });
+
+    it("never shows the skeleton outside kiosk", async () => {
+      wrapper = createWrapper();
+      wrapper.findComponent({ name: "PanelSchemaRenderer" }).vm.setNoData("No Data");
+      await wrapper.vm.$nextTick();
+      expect(wrapper.find('[data-test="dashboard-panel-kiosk-loading"]').exists()).toBe(false);
     });
   });
 

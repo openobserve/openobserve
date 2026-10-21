@@ -29,7 +29,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       'flex-col',
     ]"
   >
-    <header class="o2-app-header shrink-0" :class="store.state.printMode === true ? 'hidden' : ''">
+    <header
+      class="o2-app-header shrink-0"
+      :class="store.state.printMode === true || store.state.kioskMode ? 'hidden' : ''"
+    >
       <!-- Every bar that sits above the toolbar, in one measured wrapper so
            `--navbar-height` accounts for whichever of them is actually showing.
            The wrapper always renders — an unconditional ref keeps the observer
@@ -82,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div class="flex min-h-0 flex-1">
       <ONavbar
-        v-if="store.state.printMode !== true"
+        v-if="store.state.printMode !== true && !store.state.kioskMode"
         class="max-md:hidden"
         :links-list="navLinks"
         :mini-mode="miniMode"
@@ -135,10 +138,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Main Panel -->
         <main
           data-test="main-content"
-          class="bg-surface-chrome-deeper flex min-h-0 flex-col pe-2 pb-2 max-md:pe-0"
+          class="bg-surface-chrome-deeper flex min-h-0 flex-col"
+          :class="store.state.kioskMode ? '' : 'pe-2 pb-2 max-md:pe-0'"
           :style="{
             width:
-              !store.state.isAiChatEnabled || isChatOverlay
+              !store.state.isAiChatEnabled || isChatOverlay || store.state.kioskMode
                 ? '100%'
                 : store.state.isAiChatExpanded
                   ? '50%'
@@ -148,8 +152,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Content card — all pages render inside this. The border stays present in both
                themes (transparent in light) so toggling dark mode can't shift page content by 1px. -->
           <div
-            class="bg-surface-base rounded-surface flex min-h-0 flex-1 flex-col overflow-hidden border shadow-md"
-            :class="isDark ? 'border-border-default' : 'border-transparent'"
+            class="bg-surface-base flex min-h-0 flex-1 flex-col overflow-hidden"
+            :class="[
+              store.state.kioskMode ? '' : 'rounded-surface border shadow-md',
+              isDark ? 'border-border-default' : 'border-transparent',
+            ]"
           >
             <div
               v-if="isLoading"
@@ -157,7 +164,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="o2-content-scroll h-full flex-1 overflow-y-auto"
             >
               <FirstDataNotice
-                v-if="firstDataNotice.visible.value && router.currentRoute.value.name !== 'home'"
+                v-if="
+                  firstDataNotice.visible.value &&
+                  router.currentRoute.value.name !== 'home' &&
+                  !store.state.kioskMode
+                "
                 class="mx-3 mt-3"
                 :stream="firstDataNotice.stream.value"
                 :arrived-at="firstDataNotice.arrivedAt.value"
@@ -175,7 +186,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Right Panel (AI Chat - unified for both general and context-specific usage) -->
         <aside
-          v-show="store.state.isAiChatEnabled && isLoading"
+          v-show="store.state.isAiChatEnabled && isLoading && !store.state.kioskMode"
           class="o2-sidebar o2-sidebar-right bg-surface-chrome-deeper shrink-0 overflow-y-auto"
           :class="[
             isDark ? 'dark-mode-chat-container' : 'light-mode-chat-container',
