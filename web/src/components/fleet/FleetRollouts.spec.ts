@@ -41,7 +41,7 @@ vi.mock("@/services/fleet", () => ({
     listFleets: vi.fn(),
     listCollectors: vi.fn(),
     resumeRollout: vi.fn(),
-    revertRollout: vi.fn(),
+    rollbackRollout: vi.fn(),
     skipRollout: vi.fn(),
   },
 }));
@@ -59,7 +59,7 @@ const halted = apiRollout({
     class: "proven_bad",
     reason: "1 collector rejected: unknown receiver",
     at: Date.now(),
-    exits: ["revert", "fix_forward", "skip"],
+    exits: ["rollback", "fix_forward", "skip"],
   },
   phases: [
     {
@@ -225,20 +225,20 @@ describe("FleetRollouts", () => {
   it("offers the exits the server lists and explains the rest", async () => {
     wrapper = await mountDrawer("r3");
     const btn = (exit: string) => wrapper.find(`[data-test="fleet-rollout-outcome-${exit}"]`);
-    expect(btn("revert").attributes("disabled")).toBeUndefined();
+    expect(btn("rollback").attributes("disabled")).toBeUndefined();
     expect(btn("skip").attributes("disabled")).toBeUndefined();
     expect(btn("fix_forward").attributes("disabled")).toBeUndefined();
     expect(btn("resume").attributes("disabled")).toBeDefined();
   });
 
-  it("reverts after a confirmation that names the stable version", async () => {
-    vi.mocked(fleet.revertRollout).mockResolvedValue({ data: halted } as any);
+  it("rolls back after a confirmation that names the stable version", async () => {
+    vi.mocked(fleet.rollbackRollout).mockResolvedValue({ data: halted } as any);
     wrapper = await mountDrawer("r3");
-    await wrapper.find('[data-test="fleet-rollout-outcome-revert"]').trigger("click");
+    await wrapper.find('[data-test="fleet-rollout-outcome-rollback"]').trigger("click");
     await settle();
     expect(confirmMock.mock.calls[0][0].message).toContain("edge v1");
     expect(confirmMock.mock.calls[0][0].confirmVariant).toBe("destructive");
-    expect(fleet.revertRollout).toHaveBeenCalledWith(org(), "r3");
+    expect(fleet.rollbackRollout).toHaveBeenCalledWith(org(), "r3");
   });
 
   it("skips exactly the failing members after a confirmation", async () => {
@@ -253,9 +253,9 @@ describe("FleetRollouts", () => {
   it("does nothing when an exit is cancelled", async () => {
     confirmMock.mockResolvedValue(false);
     wrapper = await mountDrawer("r3");
-    await wrapper.find('[data-test="fleet-rollout-outcome-revert"]').trigger("click");
+    await wrapper.find('[data-test="fleet-rollout-outcome-rollback"]').trigger("click");
     await settle();
-    expect(fleet.revertRollout).not.toHaveBeenCalled();
+    expect(fleet.rollbackRollout).not.toHaveBeenCalled();
   });
 
   it("hands fix forward to the editor of the rollout's configuration", async () => {
@@ -280,11 +280,11 @@ describe("FleetRollouts", () => {
   });
 
   it("shows the server's reason when an exit is refused", async () => {
-    vi.mocked(fleet.revertRollout).mockRejectedValue({
+    vi.mocked(fleet.rollbackRollout).mockRejectedValue({
       response: { status: 409, data: { message: "rollout is no longer halted" } },
     });
     wrapper = await mountDrawer("r3");
-    await wrapper.find('[data-test="fleet-rollout-outcome-revert"]').trigger("click");
+    await wrapper.find('[data-test="fleet-rollout-outcome-rollback"]').trigger("click");
     await settle();
     expect(toastMock).toHaveBeenCalledWith(
       expect.objectContaining({ variant: "error", message: "rollout is no longer halted" }),

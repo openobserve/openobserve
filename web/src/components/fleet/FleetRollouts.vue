@@ -56,8 +56,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OText variant="meta">{{
             active.verify ? t("fleet.rollouts.verifyOn") : t("fleet.rollouts.verifyOff")
           }}</OText>
-          <OText v-if="active.autoRevert" variant="meta">{{
-            t("fleet.rollouts.autoRevertOn")
+          <OText v-if="active.autoRollback" variant="meta">{{
+            t("fleet.rollouts.autoRollbackOn")
           }}</OText>
           <OText variant="meta" class="ms-auto">{{
             active.status === "scheduled"
@@ -199,8 +199,8 @@ const EVENT_VARIANT: Record<string, TimelineItemVariant> = {
   halted: "destructive",
   resumed: "primary",
   skipped: "info",
-  reverted: "destructive",
-  autoReverted: "destructive",
+  rolledBack: "destructive",
+  autoRolledBack: "destructive",
   superseded: "muted",
   completed: "success",
 };
@@ -270,10 +270,10 @@ function eventTitle(ev: RolloutRow["events"][number]): I18nText {
       return t("fleet.rollouts.eventResumed");
     case "skipped":
       return t("fleet.rollouts.eventSkipped");
-    case "reverted":
-      return t("fleet.badge.reverted");
-    case "autoReverted":
-      return t("fleet.rollouts.autoReverted");
+    case "rolledBack":
+      return t("fleet.badge.rolledBack");
+    case "autoRolledBack":
+      return t("fleet.rollouts.autoRolledBack");
     case "superseded":
       return t("fleet.rollouts.eventSuperseded");
     case "completed":
@@ -292,12 +292,12 @@ async function confirmExit(r: RolloutRow, exit: FleetHaltExit): Promise<boolean>
   const failing = failingMembers(r).length;
   const stable = stableVersion(r);
   const messages: Record<FleetHaltExit, I18nText> = {
-    revert: stable
-      ? t("fleet.rollouts.confirmRevert", {
+    rollback: stable
+      ? t("fleet.rollouts.confirmRollback", {
           config: raw(stable.config),
           version: stable.version,
         })
-      : t("fleet.rollouts.confirmRevertNoStable"),
+      : t("fleet.rollouts.confirmRollbackNoStable"),
     resume: t("fleet.rollouts.confirmResume", { n: halted >= 0 ? halted + 1 : 1 }),
     fix_forward: t("fleet.rollouts.confirmFixForward", { config: raw(r.config) }),
     skip: t("fleet.rollouts.confirmSkip", { count: failing }, failing),
@@ -306,8 +306,8 @@ async function confirmExit(r: RolloutRow, exit: FleetHaltExit): Promise<boolean>
     title: t("fleet.rollouts.confirmExitTitle", { exit: exitLabel(exit) }),
     message: messages[exit],
     confirmLabel: exitLabel(exit),
-    confirmVariant: exit === "revert" ? "destructive" : "primary",
-    focusCancel: exit === "revert" || exit === "skip",
+    confirmVariant: exit === "rollback" ? "destructive" : "primary",
+    focusCancel: exit === "rollback" || exit === "skip",
   });
 }
 

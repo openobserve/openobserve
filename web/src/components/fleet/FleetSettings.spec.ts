@@ -391,7 +391,7 @@ describe("FleetSettings", () => {
     }
   });
 
-  it("shows the latest server settings once reverted edits make the form clean", async () => {
+  it("shows the latest server settings once rolled back edits make the form clean", async () => {
     await mountSettings();
     await edit(null, "0.170.0");
     vi.mocked(fleet.getSettings).mockResolvedValue({

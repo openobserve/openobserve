@@ -252,7 +252,7 @@ export interface FleetAuditList {
 }
 
 export type FleetRolloutStatus =
-  "scheduled" | "in_progress" | "halted" | "completed" | "superseded" | "reverted";
+  "scheduled" | "in_progress" | "halted" | "completed" | "superseded" | "rolled_back";
 
 export type FleetRolloutStart = { kind: "now" } | { kind: "at"; at: number };
 
@@ -269,7 +269,7 @@ export interface FleetSetDesiredRequest {
   batching: FleetRolloutBatching;
   /** The health gate runs after every phase, the last one included. */
   verify: boolean;
-  auto_revert: boolean;
+  auto_rollback: boolean;
 }
 
 export interface FleetPlanPreview {
@@ -281,7 +281,7 @@ export interface FleetPlanPreview {
 
 export type FleetHaltClass = "proven_bad" | "looks_worse" | "cannot_see";
 
-export type FleetHaltExit = "revert" | "resume" | "fix_forward" | "skip";
+export type FleetHaltExit = "rollback" | "resume" | "fix_forward" | "skip";
 
 export interface FleetRolloutHalt {
   class: FleetHaltClass;
@@ -339,7 +339,7 @@ export interface FleetRollout {
   start: FleetRolloutStart;
   batching: FleetRolloutBatching;
   verify: boolean;
-  auto_revert: boolean;
+  auto_rollback: boolean;
   status: FleetRolloutStatus;
   halt: FleetRolloutHalt | null;
   total: number;
@@ -499,8 +499,8 @@ const api = {
     http().post<FleetRollout>(`${rolloutPath(orgId, id)}/resume`),
   skipRollout: (orgId: string, id: string, collectorIds: string[]) =>
     http().post<FleetRollout>(`${rolloutPath(orgId, id)}/skip`, { collector_ids: collectorIds }),
-  revertRollout: (orgId: string, id: string) =>
-    http().post<FleetRollout>(`${rolloutPath(orgId, id)}/revert`),
+  rollbackRollout: (orgId: string, id: string) =>
+    http().post<FleetRollout>(`${rolloutPath(orgId, id)}/rollback`),
   listFleets: (orgId: string) =>
     http().get<{ items: Fleet[]; total?: number }>(`/api/${orgId}/fleet/fleets`),
   createFleet: (orgId: string, name: string) =>

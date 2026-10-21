@@ -37,7 +37,7 @@ export const makeRolloutSchema = (t: TranslateFn) =>
       multiplier: z.any(),
       max: z.any(),
       verify: z.boolean(),
-      autoRevert: z.boolean(),
+      autoRollback: z.boolean(),
     })
     .superRefine((v, ctx) => {
       const counts =
@@ -95,6 +95,6 @@ export function requestOf(v: RolloutForm): FleetSetDesiredRequest | null {
     start: v.start === "at" ? { kind: "at", at } : { kind: "now" },
     batching,
     verify: v.verify,
-    auto_revert: v.autoRevert,
+    auto_rollback: v.autoRollback,
   };
 }

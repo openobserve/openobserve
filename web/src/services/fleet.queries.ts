@@ -58,12 +58,12 @@ const inFlight = (delivery: string | null | undefined) =>
 // A scheduled rollout changes only when it becomes due, so a slow poll is enough to wake its row.
 const SCHEDULED_POLL_MS = 60_000;
 
-// An auto-revert commits in its own transaction after the halt, so the halt is not the last word.
-const revertOwed = (r: Pick<FleetRollout, "auto_revert" | "halt">) =>
-  r.auto_revert && !!r.halt && r.halt.class !== "cannot_see";
+// An auto-rollback commits in its own transaction after the halt, so the halt is not the last word.
+const rollbackOwed = (r: Pick<FleetRollout, "auto_rollback" | "halt">) =>
+  r.auto_rollback && !!r.halt && r.halt.class !== "cannot_see";
 
-const rolloutMoving = (r: Pick<FleetRollout, "status" | "auto_revert" | "halt">) =>
-  r.status === "in_progress" || (r.status === "halted" && revertOwed(r));
+const rolloutMoving = (r: Pick<FleetRollout, "status" | "auto_rollback" | "halt">) =>
+  r.status === "in_progress" || (r.status === "halted" && rollbackOwed(r));
 
 const rolloutPoll = (rollouts: FleetRollout[]) => {
   if (rollouts.some(rolloutMoving)) return DELIVERY_POLL_MS;
@@ -72,7 +72,7 @@ const rolloutPoll = (rollouts: FleetRollout[]) => {
 
 const fleetPoll = (fleets: Fleet[]) => {
   const statuses = fleets.map((f) => f.state?.rollout?.status);
-  // The fleet state cannot tell whether an auto-revert is owed, so a halted fleet keeps polling.
+  // The fleet state cannot tell whether an auto-rollback is owed, so a halted fleet keeps polling.
   if (statuses.includes("in_progress") || statuses.includes("halted")) return DELIVERY_POLL_MS;
   return statuses.includes("scheduled") ? SCHEDULED_POLL_MS : false;
 };
@@ -449,7 +449,7 @@ export const setFleetDesiredMutation = (org: string) =>
     meta: { invalidates: [fleetKeys.all(org)], silentError: true },
   });
 
-export type RolloutExit = "resume" | "skip" | "revert";
+export type RolloutExit = "resume" | "skip" | "rollback";
 
 export const rolloutExitMutation = (org: string) =>
   mutationOptions({
@@ -459,7 +459,7 @@ export const rolloutExitMutation = (org: string) =>
       collectorIds?: string[];
     }): Promise<FleetRollout> => {
       if (vars.exit === "resume") return (await fleet.resumeRollout(org, vars.id)).data;
-      if (vars.exit === "revert") return (await fleet.revertRollout(org, vars.id)).data;
+      if (vars.exit === "rollback") return (await fleet.rollbackRollout(org, vars.id)).data;
       return (await fleet.skipRollout(org, vars.id, vars.collectorIds ?? [])).data;
     },
     meta: { invalidates: [fleetKeys.all(org)], silentError: true },

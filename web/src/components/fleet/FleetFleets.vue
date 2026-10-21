@@ -306,7 +306,7 @@ const fleetName = computed(() => raw(fleet.value?.name ?? activeFleetId.value));
 const activeRollout = computed(() => {
   const id = fleet.value?.rollout?.id;
   const status = fleet.value?.rollout?.status;
-  if (!id || status === "completed" || status === "superseded" || status === "reverted")
+  if (!id || status === "completed" || status === "superseded" || status === "rolled_back")
     return null;
   return rollouts.rows.value.find((r) => r.id === id) ?? null;
 });

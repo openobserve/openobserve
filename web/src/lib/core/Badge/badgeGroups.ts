@@ -1939,7 +1939,7 @@ export const BADGE_GROUPS = {
       completed: { variant: "success-soft", labelKey: "fleet.badge.completed" },
       halted: { variant: "error-soft", labelKey: "fleet.badge.halted" },
       superseded: { variant: "default-soft", labelKey: "fleet.badge.superseded" },
-      reverted: { variant: "warning-soft", labelKey: "fleet.badge.reverted" },
+      rolledback: { variant: "warning-soft", labelKey: "fleet.badge.rolledBack" },
       // A completed rollout of an empty fleet; not a status the server sends.
       empty: { variant: "default-soft", labelKey: "fleet.rollouts.noneTargeted" },
     },

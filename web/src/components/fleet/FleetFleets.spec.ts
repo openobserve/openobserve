@@ -212,10 +212,10 @@ describe("FleetFleets", () => {
     }
   });
 
-  it("offers no retry or revert on the panel, since exits live in the rollout", async () => {
+  it("offers no retry or rollback on the panel, since exits live in the rollout", async () => {
     wrapper = await mountAt("f1", [fleetRow("f1", { rollout: { id: "r1", status: "halted" } })]);
     expect(btn(wrapper, "retry").exists()).toBe(false);
-    expect(btn(wrapper, "revert").exists()).toBe(false);
+    expect(btn(wrapper, "rollback").exists()).toBe(false);
   });
 
   it("opens the active rollout from the desired card and writes ?rollout=", async () => {

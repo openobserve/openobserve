@@ -302,13 +302,13 @@ function haltedRollout(s: Store): FleetRollout {
     start: { kind: "now" },
     batching: { kind: "progressive", initial: 3, multiplier: 3, max: 50 },
     verify: true,
-    auto_revert: false,
+    auto_rollback: false,
     status: "halted",
     halt: {
       class: "proven_bad",
       reason: "1 collector rejected the configuration: unknown field 'endpiont'",
       at: NOW - 3_600_000,
-      exits: ["revert", "fix_forward", "skip"],
+      exits: ["rollback", "fix_forward", "skip"],
     },
     total: 24,
     running: 2,
@@ -350,7 +350,7 @@ function progressRollout(s: Store): FleetRollout {
     start: { kind: "now" },
     batching: { kind: "progressive", initial: 2, multiplier: 2, max: 10 },
     verify: true,
-    auto_revert: true,
+    auto_rollback: true,
     status: "in_progress",
     halt: null,
     total: 12,
@@ -495,7 +495,7 @@ function startRollout(fleetId: string, body: FleetSetDesiredRequest): FleetRollo
     start: body.start,
     batching: body.batching,
     verify: body.verify,
-    auto_revert: body.auto_revert,
+    auto_rollback: body.auto_rollback,
     status: scheduled ? "scheduled" : eligible ? "in_progress" : "completed",
     halt: null,
     total: eligible,
@@ -528,14 +528,14 @@ function startRollout(fleetId: string, body: FleetSetDesiredRequest): FleetRollo
   return rollout;
 }
 
-function exitRollout(id: string, exit: "resume" | "skip" | "revert", skip: string[] = []) {
+function exitRollout(id: string, exit: "resume" | "skip" | "rollback", skip: string[] = []) {
   const r = store.rollouts.find((x) => x.id === id);
   if (!r) return fail(404, "rollout not found");
   if (r.status !== "halted" || !r.halt?.exits.includes(exit))
     return fail(409, `rollout cannot ${exit} from ${r.status}`);
   const state = store.fleets.find((f) => f.id === r.fleet.id)?.state;
-  if (exit === "revert") {
-    r.status = "reverted";
+  if (exit === "rollback") {
+    r.status = "rolled_back";
     r.ended_at = Date.now();
     const stable = state?.stable;
     if (stable) {
@@ -545,7 +545,7 @@ function exitRollout(id: string, exit: "resume" | "skip" | "revert", skip: strin
         start: { kind: "now" },
         batching: { kind: "one" },
         verify: false,
-        auto_revert: false,
+        auto_rollback: false,
       });
     }
     return reply(r);
@@ -773,7 +773,7 @@ export const fleetMock: FleetApi = {
   },
   resumeRollout: (_org, id) => exitRollout(id, "resume"),
   skipRollout: (_org, id, ids) => exitRollout(id, "skip", ids),
-  revertRollout: (_org, id) => exitRollout(id, "revert"),
+  rollbackRollout: (_org, id) => exitRollout(id, "rollback"),
   listFleets: () => reply({ items: store.fleets, total: store.fleets.length }),
   createFleet: (_org, name) => {
     if (store.fleets.some((f) => f.name === name)) return fail(409, `fleet ${name} exists`);

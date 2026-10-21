@@ -115,7 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="flex flex-col gap-3">
           <ul class="text-text-secondary flex list-disc flex-col gap-1 ps-5 text-sm">
             <li>{{ t("fleet.settings.alertRolloutHalted") }}</li>
-            <li>{{ t("fleet.settings.alertAutoReverted") }}</li>
+            <li>{{ t("fleet.settings.alertAutoRolledBack") }}</li>
             <li>{{ t("fleet.settings.alertOfflineRatio") }}</li>
           </ul>
           <div>

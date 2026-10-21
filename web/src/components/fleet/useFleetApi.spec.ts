@@ -94,7 +94,7 @@ const apiRollout = (over: Partial<FleetRollout> = {}): FleetRollout => ({
   start: { kind: "now" },
   batching: { kind: "canary", first: 1 },
   verify: true,
-  auto_revert: false,
+  auto_rollback: false,
   status: "in_progress",
   halt: null,
   total: 3,
@@ -471,7 +471,7 @@ describe("toRolloutRow", () => {
       start: { kind: "now" },
       batching: { kind: "canary", first: 1 },
       verify: true,
-      autoRevert: false,
+      autoRollback: false,
       status: "in_progress",
       halt: null,
       total: 3,
@@ -495,7 +495,7 @@ describe("toRolloutRow", () => {
       class: "proven_bad" as const,
       reason: "1 collector rejected",
       at: 5,
-      exits: ["revert" as const, "skip" as const],
+      exits: ["rollback" as const, "skip" as const],
     };
     expect(toRolloutRow(apiRollout({ status: "halted", halt })).halt).toEqual(halt);
   });

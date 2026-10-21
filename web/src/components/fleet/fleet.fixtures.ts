@@ -75,7 +75,7 @@ export const apiRollout = (over: Partial<FleetRollout> = {}): FleetRollout => ({
   start: { kind: "now" },
   batching: { kind: "one" },
   verify: false,
-  auto_revert: false,
+  auto_rollback: false,
   status: "completed",
   halt: null,
   total: 1,

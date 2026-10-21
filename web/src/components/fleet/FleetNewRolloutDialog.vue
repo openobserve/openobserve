@@ -176,11 +176,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div class="flex flex-col gap-0.5">
           <OFormCheckbox
-            name="autoRevert"
-            :label="t('fleet.rollouts.autoRevert')"
-            data-test="fleet-new-rollout-dialog-auto-revert"
+            name="autoRollback"
+            :label="t('fleet.rollouts.autoRollback')"
+            data-test="fleet-new-rollout-dialog-auto-rollback"
           />
-          <OText variant="meta">{{ t("fleet.rollouts.autoRevertHelp") }}</OText>
+          <OText variant="meta">{{ t("fleet.rollouts.autoRollbackHelp") }}</OText>
         </div>
       </div>
     </OForm>
@@ -264,7 +264,7 @@ const blank = (fleet: string, config: string, version: number): RolloutForm => (
   multiplier: 3,
   max: 100,
   verify: true,
-  autoRevert: true,
+  autoRollback: true,
 });
 
 const form = useOForm<RolloutForm>({
@@ -308,12 +308,12 @@ const configOptions = computed(() =>
 );
 const latestOf = (id: string) => published.value.find((c) => c.id === id)?.version ?? 0;
 
-// A version whose rollout halted or was reverted is marked, so it is not picked again by accident.
+// A version whose rollout halted or was rolled back is marked, so it is not picked again by accident.
 const failedVersions = computed(
   () =>
     new Set(
       rollouts.rows.value
-        .filter((r) => r.status === "halted" || r.status === "reverted")
+        .filter((r) => r.status === "halted" || r.status === "rolled_back")
         .map((r) => `${r.config}@${r.toVersion}`),
     ),
 );

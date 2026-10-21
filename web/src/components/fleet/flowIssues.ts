@@ -130,15 +130,15 @@ export function useFlowIssues() {
         },
       ];
     }
-    const autoReverted = latest.status === "reverted" && latest.autoRevert;
-    const failed = latest.status === "halted" || autoReverted;
+    const autoRolledBack = latest.status === "rolled_back" && latest.autoRollback;
+    const failed = latest.status === "halted" || autoRolledBack;
     if (!failed || Date.now() - latest.startedAt > RECENT_MS) return [];
     return [
       {
         id: `rollout-${latest.id}`,
         severity: "error",
-        title: autoReverted
-          ? t("fleet.flowIssues.autoReverted", { to: latest.toVersion })
+        title: autoRolledBack
+          ? t("fleet.flowIssues.autoRolledBack", { to: latest.toVersion })
           : t("fleet.flowIssues.rolloutHalted", { to: latest.toVersion }),
         evidence: latest.halt
           ? t("fleet.rollouts.haltLine", {

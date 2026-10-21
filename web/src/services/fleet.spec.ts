@@ -169,7 +169,7 @@ describe("fleet service", () => {
       start: { kind: "now" as const },
       batching: { kind: "canary" as const, first: 3 },
       verify: true,
-      auto_revert: false,
+      auto_rollback: false,
     };
     fleet.previewDesired("acme", "f1", body);
     expect(mockClient.post).toHaveBeenCalledWith("/api/acme/fleet/fleets/f1/desired/preview", body);
@@ -177,10 +177,10 @@ describe("fleet service", () => {
 
   it("posts each rollout exit to its own path", () => {
     fleet.resumeRollout("acme", "r1");
-    fleet.revertRollout("acme", "r1");
+    fleet.rollbackRollout("acme", "r1");
     fleet.skipRollout("acme", "r1", ["c1"]);
     expect(mockClient.post).toHaveBeenCalledWith("/api/acme/fleet/rollouts/r1/resume");
-    expect(mockClient.post).toHaveBeenCalledWith("/api/acme/fleet/rollouts/r1/revert");
+    expect(mockClient.post).toHaveBeenCalledWith("/api/acme/fleet/rollouts/r1/rollback");
     expect(mockClient.post).toHaveBeenCalledWith("/api/acme/fleet/rollouts/r1/skip", {
       collector_ids: ["c1"],
     });
@@ -251,7 +251,7 @@ describe("fleet service", () => {
       start: { kind: "now" as const },
       batching: { kind: "one" as const },
       verify: false,
-      auto_revert: false,
+      auto_rollback: false,
     };
     fleet.setDesired("acme", "a/b c", body);
     expect(mockClient.put).toHaveBeenCalledWith("/api/acme/fleet/fleets/a%2Fb%20c/desired", body);
@@ -269,7 +269,6 @@ describe("fleet service", () => {
       "createRollout",
       "pauseRollout",
       "stopRollout",
-      "rollbackRollout",
       "updateRollout",
       "rotateToken",
     ]) {
@@ -477,21 +476,21 @@ describe("fleet queries", () => {
     expect(interval(q, [{ status: "superseded" }])).toBe(false);
   });
 
-  it("never polls a completed, reverted or superseded rollout", () => {
-    for (const status of ["completed", "reverted", "superseded"]) {
+  it("never polls a completed, rolled back or superseded rollout", () => {
+    for (const status of ["completed", "rolled_back", "superseded"]) {
       expect(interval(fleetRolloutsQuery("acme"), [{ status }])).toBe(false);
       expect(interval(fleetRolloutQuery("acme", "r1"), { status })).toBe(false);
     }
   });
 
-  it("keeps polling a halted rollout only while its auto-revert is owed", () => {
-    const halted = { status: "halted", auto_revert: true, halt: { class: "looks_worse" } };
+  it("keeps polling a halted rollout only while its auto-rollback is owed", () => {
+    const halted = { status: "halted", auto_rollback: true, halt: { class: "looks_worse" } };
     const list = fleetRolloutsQuery("acme");
     const detail = fleetRolloutQuery("acme", "r1");
     expect(interval(list, [halted])).toBe(5000);
     expect(interval(detail, { ...halted, halt: { class: "proven_bad" } })).toBe(5000);
     expect(interval(detail, { ...halted, halt: { class: "cannot_see" } })).toBe(false);
-    expect(interval(detail, { ...halted, auto_revert: false })).toBe(false);
+    expect(interval(detail, { ...halted, auto_rollback: false })).toBe(false);
   });
 
   it("refetches a scheduled rollout every minute and never a superseded one", () => {
@@ -802,7 +801,7 @@ describe("fleet mutations", () => {
       start: { kind: "now" },
       batching: { kind: "one" },
       verify: true,
-      auto_revert: true,
+      auto_rollback: true,
     };
     expect(await run(setFleetDesiredMutation("acme"), { fleet: "f1", body })).toEqual(created);
     expect(mockClient.put).toHaveBeenCalledWith("/api/acme/fleet/fleets/f1/desired", body);
@@ -895,7 +894,7 @@ describe("fleet mutations", () => {
 
   it.each([
     ["resume", "/api/acme/fleet/rollouts/r1/resume", undefined],
-    ["revert", "/api/acme/fleet/rollouts/r1/revert", undefined],
+    ["rollback", "/api/acme/fleet/rollouts/r1/rollback", undefined],
     ["skip", "/api/acme/fleet/rollouts/r1/skip", { collector_ids: ["c1"] }],
   ] as const)("posts the %s exit and refetches every fleet read", async (exit, path, body) => {
     mockClient.post.mockResolvedValueOnce({ data: { id: "r1" } });
@@ -912,7 +911,7 @@ describe("fleet mutations", () => {
       start: { kind: "now" as const },
       batching: { kind: "one" as const },
       verify: false,
-      auto_revert: false,
+      auto_rollback: false,
     };
     const a = fleetPlanPreviewQuery("acme", "f1", body).queryKey;
     const b = fleetPlanPreviewQuery("acme", "f1", { ...body, verify: true }).queryKey;

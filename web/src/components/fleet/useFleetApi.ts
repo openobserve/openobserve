@@ -142,7 +142,7 @@ export interface RolloutRow {
   start: FleetRolloutStart;
   batching: FleetRolloutBatching;
   verify: boolean;
-  autoRevert: boolean;
+  autoRollback: boolean;
   status: FleetRolloutStatus;
   halt: FleetRolloutHalt | null;
   total: number;
@@ -184,7 +184,7 @@ export const NO_OVERRIDES: FleetSettings = {
   gate: null,
 };
 
-export const HALT_EXITS: FleetHaltExit[] = ["revert", "resume", "fix_forward", "skip"];
+export const HALT_EXITS: FleetHaltExit[] = ["rollback", "resume", "fix_forward", "skip"];
 
 const ACTIVE_ROLLOUT: FleetRolloutStatus[] = ["halted", "in_progress", "scheduled"];
 
@@ -250,7 +250,7 @@ export function toRolloutRow(r: FleetRollout): RolloutRow {
     start: r.start ?? { kind: "now" },
     batching: r.batching ?? { kind: "one" },
     verify: !!r.verify,
-    autoRevert: !!r.auto_revert,
+    autoRollback: !!r.auto_rollback,
     status: r.status,
     halt: r.halt ?? null,
     total: r.total ?? 0,
@@ -683,7 +683,7 @@ export function usePlanPreview(
     start: { kind: "now" },
     batching: { kind: "one" },
     verify: false,
-    auto_revert: false,
+    auto_rollback: false,
   };
   const query = useQuery(() =>
     Object.assign(fleetPlanPreviewQuery(orgId.value, fleetId() ?? "", body() ?? placeholder), {

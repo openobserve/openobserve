@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template v-if="rollout.status === 'halted' && rollout.halt" #actions>
       <span v-for="exit in HALT_EXITS" :key="exit" class="inline-flex">
         <OButton
-          :variant="exit === 'revert' ? 'outline-destructive' : 'outline'"
+          :variant="exit === 'rollback' ? 'outline-destructive' : 'outline'"
           size="sm"
           :icon-left="EXIT_ICON[exit]"
           :disabled="!offered(exit) || busy"
@@ -61,7 +61,7 @@ const props = defineProps<{ rollout: RolloutRow; busy?: boolean }>();
 const emit = defineEmits<{ exit: [exit: FleetHaltExit] }>();
 
 const EXIT_ICON: Record<FleetHaltExit, IconName> = {
-  revert: "undo",
+  rollback: "undo",
   resume: "play-arrow",
   fix_forward: "edit",
   skip: "fast-forward",
@@ -100,11 +100,11 @@ const outcome = computed<{
       at: at(r.halt.at),
     };
   }
-  if (r.status === "reverted") {
+  if (r.status === "rolled_back") {
     return {
       variant: "warning",
-      title: r.autoRevert ? t("fleet.rollouts.autoReverted") : t("fleet.badge.reverted"),
-      body: t("fleet.rollouts.outcomeReverted"),
+      title: r.autoRollback ? t("fleet.rollouts.autoRolledBack") : t("fleet.badge.rolledBack"),
+      body: t("fleet.rollouts.outcomeRolledBack"),
       at: at(r.endedAt),
     };
   }

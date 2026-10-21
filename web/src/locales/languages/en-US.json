@@ -929,7 +929,7 @@
     "cronEveryHourAtMinute": "every hour at minute {minute}",
     "cronNextCheckAt": "next check at {time} ({timezone})",
     "maxCharactersAllowed": "Maximum {length} characters allowed",
-    "cannotModifyProtectedField": "Cannot modify the {field} field directly. It will be reverted to the original value.",
+    "cannotModifyProtectedField": "Cannot modify the {field} field directly. It will be rolled back to the original value.",
     "backTo": "Back to {label}",
     "boolTrue": "True",
     "boolFalse": "False",
@@ -18772,7 +18772,7 @@
       "logoUpload": "Upload a logo",
       "logoUsingOrgDefault": "Using your org logo. Upload one to override it for this page.",
       "logoRemove": "Remove logo",
-      "logoRevertToOrg": "Revert to org logo",
+      "logoRevertToOrg": "Rollback to org logo",
       "logoReadFailed": "Could not read that image file",
       "accentColor": "Accent color",
       "visibility": "Visibility",
@@ -24472,12 +24472,12 @@
       },
       "gateway": {
         "title": "The API rejected 1 in 30 requests",
-        "summary": "It started after a config change. Your team reverted it, and it was back to normal 13 minutes after it began.",
+        "summary": "It started after a config change. Your team rolled back it, and it was back to normal 13 minutes after it began.",
         "notify1": "The API is rejecting about 1 in 30 requests, since 15:22.",
         "notify2": "Likely cause: a config change at 15:20 shortened how long sign-in tokens last.",
         "notify3": "Reverting that change should fix it.",
         "chartCaption": "rejected · 1 in 30 peak",
-        "chartLabel": "Rejected requests rose to 1 in 30 at 15:22 and fell back to normal when the config change was reverted at 15:34"
+        "chartLabel": "Rejected requests rose to 1 in 30 at 15:22 and fell back to normal when the config change was rolled back at 15:34"
       },
       "poolSep": {
         "title": "Checkout ran out of database connections",
@@ -24532,12 +24532,12 @@
       },
       "dnsJul": {
         "title": "Cart prices went missing for 1 in 4 people",
-        "summary": "A DNS change stopped half the cluster's DNS servers answering for internal names, so cart couldn't reach currency. Your team reverted it 31 minutes after it began.",
+        "summary": "A DNS change stopped half the cluster's DNS servers answering for internal names, so cart couldn't reach currency. Your team rolled back it 31 minutes after it began.",
         "notify1": "About 1 in 4 cart loads show no prices, since 16:22.",
         "notify2": "Cause: a DNS config change at 16:20 dropped the internal zone from 2 of the 4 cluster DNS servers, so cart can't find currency.internal on those lookups.",
         "notify3": "Reverting the DNS change should fix it. Orders still go through at checkout.",
         "chartCaption": "missing prices · 1 in 4 peak",
-        "chartLabel": "Cart loads without prices rose from 0.1% to about 1 in 4 at 16:22 and fell back to normal when the DNS change was reverted at 16:51"
+        "chartLabel": "Cart loads without prices rose from 0.1% to about 1 in 4 at 16:22 and fell back to normal when the DNS change was rolled back at 16:51"
       }
     },
     "drawer": {
@@ -25045,7 +25045,7 @@
       "superseded": "Superseded",
       "canary": "Canary",
       "progressive": "Progressive",
-      "reverted": "Reverted"
+      "rolledBack": "Rolled back"
     },
     "flow": {
       "destinations": "Destinations",
@@ -25302,10 +25302,10 @@
       "outcomeNoneTargeted": "The fleet had no collectors when v{to} was set.",
       "versionFailedBefore": "v{version} · failed before",
       "pickVersion": "Pick a version",
-      "autoRevert": "Revert automatically",
-      "autoRevertHelp": "Reverts to the stable version when a collector rejects the new one or a health gate fails; never when the rollout cannot see",
-      "autoRevertOn": "Automatic revert",
-      "autoReverted": "Automatically reverted",
+      "autoRollback": "Rollback automatically",
+      "autoRollbackHelp": "Rolls back to the stable version when a collector rejects the new one or a health gate fails; never when the rollout cannot see",
+      "autoRollbackOn": "Automatic rollback",
+      "autoRolledBack": "Automatically rolled back",
       "batching": "Batching",
       "batchingCanary": "Canary: first {first}, then the rest",
       "batchingOne": "One batch",
@@ -25314,8 +25314,8 @@
       "confirmExitTitle": "{exit}?",
       "confirmFixForward": "Opens the {config} editor. Publish a fixed version and change this fleet to it; this rollout is then superseded.",
       "confirmResume": "The same rollout continues from phase {n}.",
-      "confirmRevert": "Starts an immediate rollout back to the stable version, {config} v{version}. Collectors already on it receive nothing.",
-      "confirmRevertNoStable": "Starts an immediate rollout back to the stable version.",
+      "confirmRollback": "Starts an immediate rollout back to the stable version, {config} v{version}. Collectors already on it receive nothing.",
+      "confirmRollbackNoStable": "Starts an immediate rollout back to the stable version.",
       "confirmSkip": "Excludes {count} failing collector and continues. It is marked excluded and included again in the next rollout. | Excludes {count} failing collectors and continues. They are marked excluded and included again in the next rollout.",
       "confirmed": "Confirmed",
       "eventConverged": "Phase {n} converged",
@@ -25331,7 +25331,7 @@
       "exitFixForward": "Fix forward",
       "exitNotOffered": "Not offered for this halt",
       "exitResume": "Resume",
-      "exitRevert": "Revert",
+      "exitRollback": "Rollback",
       "exitSkip": "Skip failing",
       "firstBatch": "First batch",
       "gate": "Health gate",
@@ -25344,7 +25344,7 @@
       "members": "Members",
       "noGate": "Off",
       "oneBatch": "One batch",
-      "outcomeReverted": "An immediate rollout back to the stable version replaced this one.",
+      "outcomeRolledBack": "An immediate rollout back to the stable version replaced this one.",
       "phase": "Phase",
       "phaseConverging": "Converging",
       "phaseDeploying": "Deploying",
@@ -25449,7 +25449,7 @@
       "action": "Action",
       "target": "Target",
       "auditDisabled": "The audit trail needs O2_AUDIT_ENABLED=true on the server",
-      "alertAutoReverted": "A rollout was reverted automatically",
+      "alertAutoRolledBack": "A rollout was rolled back automatically",
       "alertOfflineRatio": "A fleet's offline share exceeded its threshold",
       "alertRolloutHalted": "A rollout halted",
       "alerts": "Alerts for fleets",
@@ -25490,7 +25490,7 @@
       "deletedConfig": "Deleted configuration",
       "updatedSettings": "Changed fleet settings",
       "setDesired": "Changed version",
-      "autoRevert": "Reverted automatically",
+      "autoRollback": "Rolled back automatically",
       "rolloutHalted": "Rollout halted",
       "movedCollectors": "Moved collectors",
       "assignedFleetConfig": "Assigned the fleet's configuration",
@@ -25504,7 +25504,7 @@
       "updatedFleetSettings": "Changed a fleet's settings",
       "resumedRollout": "Resumed rollout",
       "skippedInRollout": "Skipped collectors in rollout",
-      "revertedRollout": "Reverted rollout",
+      "rolledBackRollout": "Rolled back rollout",
       "movedByToken": "Moved by enrollment token"
     },
     "editor": {
@@ -25592,7 +25592,7 @@
     "flowIssues": {
       "rollingOut": "Rolling out v{to}",
       "rolloutHalted": "v{to} rollout halted",
-      "autoReverted": "v{to} reverted automatically",
+      "autoRolledBack": "v{to} rolled back automatically",
       "noReason": "No failure reason reported",
       "openRollout": "Open rollout",
       "offline": "{count} collector offline | {count} collectors offline",

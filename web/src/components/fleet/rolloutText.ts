@@ -70,7 +70,7 @@ export function useRolloutText() {
 
   const exitLabel = (e: FleetHaltExit): I18nText => {
     const labels: Record<FleetHaltExit, I18nText> = {
-      revert: t("fleet.rollouts.exitRevert"),
+      rollback: t("fleet.rollouts.exitRollback"),
       resume: t("fleet.rollouts.exitResume"),
       fix_forward: t("fleet.rollouts.exitFixForward"),
       skip: t("fleet.rollouts.exitSkip"),

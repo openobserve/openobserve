@@ -43,48 +43,50 @@ const exitButton = (w: ReturnType<typeof mountOutcome>, exit: string) =>
 
 describe("FleetRolloutOutcome", () => {
   it("names the halt class and shows the server's reason", () => {
-    const w = mountOutcome(halted("looks_worse", ["revert", "resume", "fix_forward"]));
+    const w = mountOutcome(halted("looks_worse", ["rollback", "resume", "fix_forward"]));
     expect(w.find('[data-test="fleet-rollout-outcome-title"]').text()).toBe("Halted: Looks worse");
     expect(w.find('[data-test="fleet-rollout-outcome-body"]').text()).toBe("why it halted");
   });
 
   it("always shows all four exits and enables only the offered ones", () => {
-    const w = mountOutcome(halted("looks_worse", ["revert", "resume", "fix_forward"]));
-    for (const exit of ["revert", "resume", "fix_forward"])
+    const w = mountOutcome(halted("looks_worse", ["rollback", "resume", "fix_forward"]));
+    for (const exit of ["rollback", "resume", "fix_forward"])
       expect(exitButton(w, exit).attributes("disabled"), exit).toBeUndefined();
     expect(exitButton(w, "skip").attributes("disabled")).toBeDefined();
   });
 
   it("disables resume for a proven-bad halt the server does not resume", () => {
-    const w = mountOutcome(halted("proven_bad", ["revert", "fix_forward", "skip"]));
+    const w = mountOutcome(halted("proven_bad", ["rollback", "fix_forward", "skip"]));
     expect(exitButton(w, "resume").attributes("disabled")).toBeDefined();
     expect(exitButton(w, "skip").attributes("disabled")).toBeUndefined();
   });
 
   it("disables skip when no member is failing, even when it is offered", () => {
     const w = mountOutcome(
-      halted("cannot_see", ["revert", "resume", "fix_forward", "skip"], false),
+      halted("cannot_see", ["rollback", "resume", "fix_forward", "skip"], false),
     );
     expect(exitButton(w, "skip").attributes("disabled")).toBeDefined();
   });
 
   it("emits the chosen exit", async () => {
-    const w = mountOutcome(halted("proven_bad", ["revert", "fix_forward", "skip"]));
-    await exitButton(w, "revert").trigger("click");
+    const w = mountOutcome(halted("proven_bad", ["rollback", "fix_forward", "skip"]));
+    await exitButton(w, "rollback").trigger("click");
     await exitButton(w, "skip").trigger("click");
-    expect(w.emitted("exit")).toEqual([["revert"], ["skip"]]);
+    expect(w.emitted("exit")).toEqual([["rollback"], ["skip"]]);
   });
 
   it("offers no exits outside a halt", () => {
     const w = mountOutcome(toRolloutRow(apiRollout({ status: "completed", total: 2, running: 2 })));
-    expect(w.find('[data-test="fleet-rollout-outcome-revert"]').exists()).toBe(false);
+    expect(w.find('[data-test="fleet-rollout-outcome-rollback"]').exists()).toBe(false);
     expect(w.find('[data-test="fleet-rollout-outcome-title"]').text()).toBe("Completed");
   });
 
-  it("says an automatic revert happened", () => {
-    const w = mountOutcome(toRolloutRow(apiRollout({ status: "reverted", auto_revert: true })));
+  it("says an automatic rollback happened", () => {
+    const w = mountOutcome(
+      toRolloutRow(apiRollout({ status: "rolled_back", auto_rollback: true })),
+    );
     expect(w.find('[data-test="fleet-rollout-outcome-title"]').text()).toBe(
-      "Automatically reverted",
+      "Automatically rolled back",
     );
   });
 

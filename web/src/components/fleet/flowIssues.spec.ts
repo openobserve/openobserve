@@ -161,12 +161,12 @@ describe("fleet issues", () => {
     expect(api.fleetIssues("default")).toEqual([]);
   });
 
-  it("shows an auto-reverted rollout as an error, and one a user superseded as nothing", async () => {
-    serve([], [rollout({ status: "reverted", auto_revert: true })]);
+  it("shows an auto-rollbacked rollout as an error, and one a user superseded as nothing", async () => {
+    serve([], [rollout({ status: "rolled_back", auto_rollback: true })]);
     let api = await mountIssues();
     const [issue] = api.fleetIssues("default");
     expect(issue.severity).toBe("error");
-    expect(String(issue.title)).toBe("v2 reverted automatically");
+    expect(String(issue.title)).toBe("v2 rolled back automatically");
     wrapper?.unmount();
     queryClient.clear();
     serve([], [rollout({ status: "superseded" })]);
@@ -179,7 +179,7 @@ describe("fleet issues", () => {
       class: "proven_bad" as const,
       reason: "1 collector rejected",
       at: Date.now(),
-      exits: ["revert" as const],
+      exits: ["rollback" as const],
     };
     serve([], [rollout({ status: "halted", halt })]);
     const api = await mountIssues();

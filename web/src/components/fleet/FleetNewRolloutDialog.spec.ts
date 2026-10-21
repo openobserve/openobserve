@@ -120,7 +120,7 @@ const base: RolloutForm = {
   multiplier: 3,
   max: 100,
   verify: true,
-  autoRevert: true,
+  autoRollback: true,
 };
 
 describe("requestOf", () => {
@@ -193,7 +193,7 @@ describe("FleetNewRolloutDialog", () => {
       start: "now",
       batching: "one",
       verify: true,
-      autoRevert: true,
+      autoRollback: true,
     });
   });
 
@@ -237,12 +237,12 @@ describe("FleetNewRolloutDialog", () => {
     );
   });
 
-  it("sends start, batching, verify and auto-revert as the contract body", async () => {
+  it("sends start, batching, verify and auto-rollback as the contract body", async () => {
     wrapper = mountDialog({ fleetId: "default", config: "edge", toVersion: 2 });
     await settlePreview();
     form(wrapper).setFieldValue("batching", "canary");
     form(wrapper).setFieldValue("first", "5");
-    form(wrapper).setFieldValue("autoRevert", false);
+    form(wrapper).setFieldValue("autoRollback", false);
     await submit(wrapper);
     expect(sent()).toEqual([
       org(),
@@ -253,7 +253,7 @@ describe("FleetNewRolloutDialog", () => {
         start: { kind: "now" },
         batching: { kind: "canary", first: 5 },
         verify: true,
-        auto_revert: false,
+        auto_rollback: false,
       },
     ]);
     expect(wrapper.emitted("update:open")?.at(-1)).toEqual([false]);
@@ -286,9 +286,9 @@ describe("FleetNewRolloutDialog", () => {
     );
   });
 
-  it("marks a version whose rollout halted or was reverted", async () => {
+  it("marks a version whose rollout halted or was rolled back", async () => {
     vi.mocked(fleet.listRollouts).mockResolvedValue({
-      data: { items: [apiRollout({ config: "edge", to_version: 2, status: "reverted" })] },
+      data: { items: [apiRollout({ config: "edge", to_version: 2, status: "rolled_back" })] },
     } as any);
     wrapper = mountDialog({ fleetId: "one" });
     await settlePreview();
