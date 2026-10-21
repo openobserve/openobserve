@@ -36,6 +36,8 @@ export interface AssistantCapabilitiesResponse {
   policy_enforced?: boolean;
   retention_days?: number;
   attachments?: boolean;
+  /** `/confirm {id, extend:true}` resets a card's expiry. */
+  approval_extend?: boolean;
   context_used?: boolean;
   answer_locale?: boolean;
   history_search?: boolean;
@@ -57,17 +59,32 @@ export interface AssistantCapabilitiesTestResponse {
 
 /** `POST /ai/confirm/{sid}`; Edit then approve resolves as a deny, so there is no `edits` (round 2 X-30). */
 export interface ConfirmBody {
-  approved: boolean;
+  approved?: boolean;
   scope?: string;
   items?: string[];
   reply?: string;
+  /** Asks for more time on the card `id` instead of deciding. */
+  id?: string;
+  extend?: boolean;
 }
 
+/** o2-ai answers a delete batch item by item; a permission or CLI answer only echoes the decision. */
 export interface ConfirmResponse {
-  deleted?: number;
+  approved?: boolean;
+  deleted?: boolean | number;
   count?: number;
   total?: number;
   results?: unknown[];
+  kind?: string;
+  /** A permission approve: false when the agent was never unblocked. */
+  replied?: boolean;
+  /** The card's new expiry after `extend`. */
+  expires_at?: number;
+}
+
+/** The restored object, when the server's action ledger can undo an entry. */
+export interface UndoResponse {
+  id?: string;
 }
 
 /** `POST /ai/feedback`; `trace_id` ties the rating to the turn's workflow trace. */
@@ -84,6 +101,9 @@ export interface FeedbackBody {
 }
 
 export const PROBE_TIMEOUT_MS = 5_000;
+
+/** A deny or an undo with no answer by then reads as unconfirmed; an approve adds time per item it acts on. */
+export const CONFIRM_TIMEOUT_MS = 15_000;
 
 // Assistant calls render their own 403 and handle 401 without the interceptor's logout-and-reload.
 const ASSISTANT_REQUEST: AxiosRequestConfig = { silentForbidden: true, assistantManaged: true };
@@ -161,12 +181,27 @@ const assistant = {
     );
   },
 
-  /** Posted on the originating session only (constraint 6). */
-  confirm: async (org: string, sid: string, body: ConfirmBody): Promise<ConfirmResponse> => {
+  /** Posted on the originating session only; keepalive, so a decision made as the page goes still lands, and bounded, so a card never hangs on it. */
+  confirm: async (
+    org: string,
+    sid: string,
+    body: ConfirmBody,
+    timeout: number = CONFIRM_TIMEOUT_MS,
+  ): Promise<ConfirmResponse> => {
     const res = await http().post<ConfirmResponse>(
       `/api/${enc(org)}/ai/confirm/${enc(sid)}`,
       body,
-      ASSISTANT_REQUEST,
+      { ...KEEPALIVE_REQUEST, timeout },
+    );
+    return res.data ?? {};
+  },
+
+  /** Undoes one entry of the server's action ledger. */
+  undo: async (org: string, ledgerId: string): Promise<UndoResponse> => {
+    const res = await http().post<UndoResponse>(
+      `/api/${enc(org)}/ai/actions/${enc(ledgerId)}/undo`,
+      {},
+      { ...ASSISTANT_REQUEST, timeout: CONFIRM_TIMEOUT_MS },
     );
     return res.data ?? {};
   },

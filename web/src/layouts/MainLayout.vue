@@ -261,7 +261,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <CommunitySlackInvite />
     <PredefinedThemes />
     <ShortcutCheatsheet v-model:open="showShortcuts" />
-    <PaidOverageConsentDialog v-if="config.isCloud == 'true'" />
+    <PaidOverageConsentDialog v-if="assistantV2 ? canBill : config.isCloud == 'true'" />
     <DashboardSaveConflictDialog
       v-if="dashboardSaveConflict.mounted"
       :key="dashboardSaveConflict.openSeq"
@@ -486,6 +486,10 @@ export default defineComponent({
     // Below lg no split leaves room for pages with a folder rail, so the chat overlays instead.
     const isChatOverlay = computed(() => !lgUp.value);
     const assistantV2 = isAssistantV2();
+    // Any edition that can bill hosts the dialog for Billing and the legacy NL bar.
+    const canBill = computed(
+      () => config.isCloud == "true" || store.state.zoConfig?.billing_enabled === true,
+    );
     const zoBackendUrl = store.state.API_ENDPOINT;
     const isLoading = ref(false);
 
@@ -1745,6 +1749,7 @@ export default defineComponent({
 
     return {
       assistantV2,
+      canBill,
       ASSISTANT_INSET_CLASSES,
       isDark,
       t,

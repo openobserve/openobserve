@@ -115,12 +115,11 @@ const STATUS_KEYS: Partial<Record<TurnState["state"], I18nKey>> = {
   stopping: "assistant.turn.stopping",
 };
 
+// The approval and consent cards announce themselves with their title, expiry and org.
 const ANNOUNCED: ReadonlySet<TurnState["state"]> = new Set([
   "queued",
   "connecting",
   "responding.writing",
-  "awaiting_approval",
-  "awaiting_consent",
   "reconnecting",
   "stopping",
 ]);

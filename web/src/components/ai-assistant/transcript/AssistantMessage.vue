@@ -189,6 +189,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :readonly="readonly"
         />
       </div>
+      <AssistantPolicyNotice
+        v-else-if="item.kind === 'policy' && item.policy"
+        :policy="item.policy"
+        :block-id="item.key"
+        :readonly="readonly"
+        :turn="turn"
+      />
       <OText
         v-else-if="item.kind === 'policy'"
         variant="meta"
@@ -260,9 +267,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { markRaw, shallowReactive, type Component } from "vue";
 
+import AssistantApprovalResult from "@/components/ai-assistant/approvals/AssistantApprovalResult.vue";
+import AssistantPlanBlock from "@/components/ai-assistant/approvals/AssistantPlanBlock.vue";
+import AssistantPolicyNotice from "@/components/ai-assistant/approvals/AssistantPolicyNotice.vue";
+import AssistantConsentNote from "@/components/ai-assistant/credits/AssistantConsentNote.vue";
 import AssistantFindings from "@/components/ai-assistant/evidence/AssistantFindings.vue";
 import AssistantTurnFooter from "@/components/ai-assistant/evidence/AssistantTurnFooter.vue";
-import type { AssistantTurnView } from "@/composables/assistant/pure";
+import type { AssistantTurnView, PolicyBlockData } from "@/composables/assistant/pure";
 import type { BlockKind } from "@/services/assistantAnalytics";
 import type { ChatMessage, ContentBlock } from "@/ts/interfaces/chat";
 
@@ -279,10 +290,16 @@ export interface AssistantMessageProps {
   turn?: AssistantTurnView | null;
 }
 
+// A decision's record replaces its card in place; the pending card itself renders in the container.
 const BUILT_IN_RENDERERS: [string, Component][] = [
   ["trail", AssistantStepTrail],
   ["findings", AssistantFindings],
   ["footer", AssistantTurnFooter],
+  ["approval", AssistantApprovalResult],
+  ["approval_result", AssistantApprovalResult],
+  ["plan", AssistantPlanBlock],
+  ["policy", AssistantPolicyNotice],
+  ["consent_note", AssistantConsentNote],
 ];
 
 const TRAIL_BLOCK: ContentBlock = { type: "trail" };
@@ -400,7 +417,7 @@ import {
 
 type Rendered =
   | { kind: "markdown"; key: string; parts: MarkdownPart[]; live: boolean; claims: string[] }
-  | { kind: "policy"; key: string; text: I18nText }
+  | { kind: "policy"; key: string; text: I18nText; policy: PolicyBlockData | null }
   | { kind: "attachment"; key: string; name: string; body: string; hidden?: boolean }
   | { kind: "query"; key: string; block: QueryBlock }
   | {
@@ -506,7 +523,7 @@ function renderBlock(block: ContentBlock, index: number, links: Set<string>): Re
   // Data for the footer, and the steps the trail already shows.
   if (block.type === "footer" || block.type === "tool_call") {
     return block.type === "tool_call" && POLICY_CODES.has(block.errorType ?? "")
-      ? [{ kind: "policy", key, text: policyText(block) }]
+      ? [{ kind: "policy", key, text: policyText(block), policy: deniedPolicy(block) }]
       : [];
   }
   if (block.type === "query" && block.query)
@@ -675,6 +692,18 @@ const footerRenderer = computed(() =>
 );
 
 const hasContent = computed(() => rendered.value.length > 0);
+
+// A tool the policy blocked is a notice with the server's detail; a data-sharing block keeps its own line.
+function deniedPolicy(block: ContentBlock): PolicyBlockData | null {
+  if (block.errorType !== "permission_denied_tool") return null;
+  const details = block.details ?? {};
+  return {
+    kind: "denied",
+    tool: block.tool ?? "",
+    ...(typeof details.detail === "string" && { detail: details.detail }),
+    ...(typeof details.policy === "string" && { policy: details.policy }),
+  };
+}
 
 function policyText(block: ContentBlock): I18nText {
   const tool = raw(block.tool ?? "");

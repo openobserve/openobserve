@@ -84,6 +84,8 @@ export function createMockState(overrides = {}) {
     usageStatus: 200,
     overageStatus: 200,
     consentPutStatus: 200,
+    // An Enable that takes this long, so a cancel can land while it is on its way.
+    consentPutDelayMs: 0,
     // B-14 settings, B-15 toolset health, B-16 grants, B-17 activity, B-11 secret merge, B-12 import.
     settingsEnabled: false,
     settings: null,
@@ -97,6 +99,10 @@ export function createMockState(overrides = {}) {
     // Stop: delay and status of POST /ai/chats/{sid}/cancel.
     cancelDelayMs: 0,
     cancelStatus: 200,
+    // /confirm: its status (500 = confirm_500) and the delete items it fails with 403.
+    confirmStatus: 200,
+    confirmFail: [],
+    confirmUndoable: false,
     // The access probe (00 §9): status (default 403 for viewer, 404 otherwise) and a delay past its 5 s timeout.
     probeStatus: null,
     probeDelayMs: 0,
@@ -285,11 +291,15 @@ async function handleAi(route, request, state) {
     return json(route, sharedChat(decodeURIComponent(mt[1]))), true;
   }
   if (/^\/api\/[^/]+\/ai\/feedback$/.test(p)) return json(route, { ok: true }), true;
+  if (/^\/api\/[^/]+\/ai\/actions\/[^/]+\/undo$/.test(p)) return json(route, {}), true;
   if (/^\/api\/[^/]+\/ai\/confirm\//.test(p)) return json(route, { ok: true }), true;
   if (/^\/api\/[^/]+\/ai\/toolsets/.test(p)) return json(route, m === "GET" ? TOOLSETS : { id: "ts_new" }), true;
   if (/^\/api\/[^/]+\/ai\/usage/.test(p)) return json(route, { data: [], total_tokens: 0 }), true;
   if (/^\/api\/[^/]+\/quota\/[^/]+\/paid_overage$/.test(p)) {
     if (m === "PUT") {
+      if (state.consentPutDelayMs) await new Promise((r) => setTimeout(r, state.consentPutDelayMs));
+      if (state.consentPutStatus !== 200) return json(route, { code: state.consentPutStatus, message: "paid usage update failed" }, state.consentPutStatus), true;
+      state.log.push(`PUT paid_overage ${p.split("/")[2]}`);
       const { enabled } = request.postDataJSON() || {};
       state.overage = { ...state.overage, effective: !!enabled, organization: { ...state.overage.organization, enabled: !!enabled } };
     }
@@ -324,8 +334,8 @@ export async function installMocks(context, state = createMockState()) {
 
 /** The knobs the stream shim reads in the page; `setKnobs` changes them after load. */
 function browserKnobs(state) {
-  const { tailEnabled, envelopeEnabled, lifecycleFramesEnabled, cancelDelayMs, cancelStatus } = state;
-  return { tailEnabled, envelopeEnabled, lifecycleFramesEnabled, cancelDelayMs, cancelStatus };
+  const { tailEnabled, envelopeEnabled, lifecycleFramesEnabled, cancelDelayMs, cancelStatus, confirmStatus, confirmFail, confirmUndoable } = state;
+  return { tailEnabled, envelopeEnabled, lifecycleFramesEnabled, cancelDelayMs, cancelStatus, confirmStatus, confirmFail, confirmUndoable };
 }
 
 /** Flips browser-side knobs on a loaded page (the init script only reads them at load). */

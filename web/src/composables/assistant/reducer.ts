@@ -31,7 +31,15 @@ import {
   type QueryBlockData,
   type StepResult,
 } from "./evidence";
-import type { FindingsFrame, QueryFrame, ResourceChangedFrame, UsageFrame } from "./frames";
+import type { ApprovalKind, ApprovalTarget } from "./assistantStore.types";
+import type {
+  ConfirmationRequiredFrame,
+  ConfirmationResolvedFrame,
+  FindingsFrame,
+  QueryFrame,
+  ResourceChangedFrame,
+  UsageFrame,
+} from "./frames";
 
 const STEP_STATES: ReadonlySet<string> = new Set(["running", "done", "failed", "interrupted"]);
 
@@ -46,6 +54,36 @@ const MAX_TOOL_CHARS = 100;
 
 const EVIDENCE_TYPES: ReadonlySet<string> = new Set(["query", "link", "findings"]);
 
+const APPROVAL_KINDS: ReadonlySet<string> = new Set<ApprovalKind>([
+  "delete",
+  "update",
+  "create",
+  "run_command",
+  "permission",
+]);
+
+// Model and tool output on a card is untrusted: every list and string is capped.
+const MAX_TARGETS = 200;
+
+const MAX_TOTAL = 100_000;
+
+const MAX_IMPACT = 20;
+
+const MAX_LINE_CHARS = 300;
+
+const MAX_QUESTION_CHARS = 2_000;
+
+const MAX_JSON_KEYS = 40;
+
+const MAX_JSON_DEPTH = 3;
+
+const DELETE_TOOL = /delete/i;
+
+const UNSAFE_KEYS: ReadonlySet<string> = new Set(["__proto__", "constructor", "prototype"]);
+
+// Until the server enforces a review step, a change made by one of these tools with no card before it is surfaced.
+const MUTATING_TOOL_PATTERNS = /^o2_(Create|Update|Delete|Set|Enable|Disable)/;
+
 // The typed phases record a step's state and its evidence on the blocks; the legacy chat keeps reading `success`.
 declare module "@/ts/interfaces/chat" {
   interface ContentBlock {
@@ -56,7 +94,68 @@ declare module "@/ts/interfaces/chat" {
     link?: LinkBlockData;
     findings?: FindingsData | null;
     footer?: FooterData;
+    approval?: ApprovalBlockData;
+    resolved?: ResolvedBlockData;
+    policy?: PolicyBlockData;
+    consentNote?: ConsentNoteData;
   }
+}
+
+/** The card a `confirmation_required` asked for, as the transcript keeps it; the runtime adds the session ids and the expiry. */
+export interface ApprovalBlockData {
+  id: string;
+  kind: ApprovalKind;
+  destructive: boolean;
+  operation: string;
+  tool: string;
+  targets: ApprovalTarget[];
+  /** How many items the server acts on, when more than `targets` lists. */
+  total?: number;
+  before?: unknown;
+  after?: unknown;
+  impact?: string[];
+  grantable: boolean;
+  editable: boolean;
+  question: string;
+  /** The tool's arguments as sent, for Details only. */
+  args?: Record<string, unknown>;
+  /** The command a CLI card runs, shown on its face; a longer one ends in "…". */
+  command?: string;
+  /** The server sent a typed payload, so `/confirm` takes `items` and `scope`. */
+  typed: boolean;
+  /** The server's own expiry, epoch ms. */
+  expiresAt?: number;
+}
+
+/** `confirmation_resolved`: another tab or device answered the card. */
+export interface ResolvedBlockData {
+  id: string;
+  approved: boolean;
+  by?: string;
+  at?: number;
+}
+
+/** A quiet notice in the turn: a policy denial or a change made without a review step. */
+export interface PolicyBlockData {
+  kind: "denied" | "unreviewed";
+  tool?: string;
+  detail?: string;
+  policy?: string;
+  /** The changed object's type and how many changed, for the unreviewed notice. */
+  resourceType?: string;
+  count?: number;
+  resourceId?: string;
+  /** How many tool results and `resource_changed` frames reported a change of this type. */
+  tools?: number;
+  frames?: number;
+}
+
+/** The line a granted consent leaves in the answer. */
+export interface ConsentNoteData {
+  org: string;
+  /** The email of whoever enabled it in this tab; a share shows "a member". */
+  by: string;
+  at: number;
 }
 
 /** `live` and `replay` are the turn engine's and the record's phases; the legacy chat passes `stream`/`tailFlush`. */
@@ -84,6 +183,8 @@ export interface ReducerCtx {
     callArgs: any,
     responseBody: any,
   ) => NavigationAction | null;
+  /** The card the session still waits on; a live frame equal to it is a redelivery. */
+  pendingApprovalId?: string | null;
 }
 
 export interface StreamState {
@@ -130,7 +231,9 @@ export type StreamEffect =
   | { kind: "animateTitle"; title: string }
   | { kind: "animateText" }
   | { kind: "syncSegments" }
-  | { kind: "finalizeText" };
+  | { kind: "finalizeText" }
+  | { kind: "approval"; frame: ConfirmationRequiredFrame }
+  | { kind: "approval_resolved"; frame: ConfirmationResolvedFrame };
 
 /** Assistant text of a stream event: o2-ai sends plain `content`; RCA proxies may send OpenAI-style shapes instead. */
 export function extractStreamText(data: any): string | null {
@@ -630,8 +733,13 @@ function reduceTyped(state: StreamState, data: any, ctx: ReducerCtx): StreamEffe
       return [];
     case "permission_denied":
       return typedPermissionDenied(state, data, extras);
+    case "confirmation_required":
+      return typedApproval(state, data, live, ctx.phase);
     case "confirmation_resolved":
-      resolveConfirmation(state, data);
+      return typedResolved(state, data, ctx.phase);
+    case "resource_changed":
+      reduceExtras(extras, data);
+      noteUnreviewed(state, String(data.resource_type ?? ""), "frames", boundedId(data.id));
       return [];
     case "status":
       return [];
@@ -747,6 +855,9 @@ function typedToolResult(
       call_id: callId,
     });
   if (!success) extras.toolErrors += 1;
+  const tool = String(data.tool ?? "");
+  if (success && MUTATING_TOOL_PATTERNS.test(tool))
+    noteUnreviewed(state, resourceOfTool(tool), "tools");
   return [{ kind: "scroll", whenActive: true }];
 }
 
@@ -886,6 +997,10 @@ function typedPermissionDenied(
     stepState: "failed",
     errorType:
       data.policy === "data_sharing_level" ? "data_level_blocked" : "permission_denied_tool",
+    details: {
+      ...(typeof data.detail === "string" && { detail: data.detail.slice(0, MAX_LINE_CHARS) }),
+      ...(typeof data.policy === "string" && { policy: data.policy.slice(0, 40) }),
+    },
   };
   const tool = String(data.tool ?? "").slice(0, MAX_TOOL_CHARS);
   // A lifecycle `step` frame may already have failed the row; the denial reuses it rather than adding one.
@@ -894,6 +1009,209 @@ function typedPermissionDenied(
   else if (stepCount(state) < MAX_STEPS) appendBlock(state, { ...denied, tool, context: {} });
   extras.toolErrors += 1;
   return [];
+}
+
+// The card itself renders where the session holds it; the block is the record that replaces it.
+function typedApproval(
+  state: StreamState,
+  data: any,
+  ctx: ReducerCtx,
+  phase: StreamPhase,
+): StreamEffect[] {
+  const effects: StreamEffect[] = [];
+  finalizeTextBlock(state, ctx, effects);
+  const approval = approvalOf(data);
+  const blocks = lastMessageOf(state)?.contentBlocks ?? [];
+  // A redelivered frame lands right after its own card while that card still waits; a card asked again after a decision is new.
+  const previous = blocks.at(-1)?.approval;
+  const redelivered = previous && previous.id === ctx.pendingApprovalId;
+  if (!approval.id && redelivered && sameCard(previous, approval)) return effects;
+  const id = approval.id || turnCardId(state);
+  if (!approval.id || !blocks.some((block) => block.approval?.id === id))
+    appendBlock(state, { type: "approval", approval: { ...approval, id } });
+  const frame = approval.id ? data : { ...data, id };
+  if (phase === "live") effects.push({ kind: "approval", frame }, { kind: "scroll" });
+  return effects;
+}
+
+function typedResolved(state: StreamState, data: any, phase: StreamPhase): StreamEffect[] {
+  resolveConfirmation(state, data);
+  const id = boundedId(data.id);
+  if (!id) return [];
+  const resolved: ResolvedBlockData = {
+    id,
+    approved: data.approved === true,
+    ...(typeof data.by === "string" && { by: data.by.slice(0, 200) }),
+    ...(typeof data.at === "number" && { at: data.at }),
+  };
+  appendBlock(state, { type: "approval_result", resolved });
+  return phase === "live" ? [{ kind: "approval_resolved", frame: data }] : [];
+}
+
+/** A delete by kind, operation or tool name: never granted for longer than once, whatever the wire says. */
+export function isDeleteCard(card: { kind: string; tool: string; operation?: string }): boolean {
+  return (
+    card.kind === "delete" || DELETE_TOOL.test(card.operation ?? "") || DELETE_TOOL.test(card.tool)
+  );
+}
+
+/** A `confirmation_required` frame as a typed card; the kind comes from `kind`, the tool or its arguments, never a name prefix. */
+export function approvalOf(data: any): ApprovalBlockData {
+  const args = isRecord(data?.args) ? data.args : {};
+  const tool = String(data?.tool ?? "").slice(0, MAX_TOOL_CHARS);
+  const kind = approvalKindOf(data, tool, args);
+  const typed = APPROVAL_KINDS.has(data?.kind) || Array.isArray(data?.targets);
+  // The wire can only make a card more careful: a delete, by kind, operation or tool, is destructive whatever it says.
+  const destructive =
+    isDeleteCard({ kind, tool, operation: String(data?.operation ?? "") }) ||
+    data?.destructive === true;
+  const items = Array.isArray(data?.targets) ? data.targets : args.items;
+  const targets = targetsOf(data, args);
+  const total = Array.isArray(items) ? Math.min(items.length, MAX_TOTAL) : targets.length;
+  const after = data?.after !== undefined ? data.after : kind === "update" ? args : undefined;
+  const impact = Array.isArray(data?.impact)
+    ? data.impact
+        .filter((line: unknown): line is string => typeof line === "string")
+        .slice(0, MAX_IMPACT)
+        .map((line: string) => line.slice(0, MAX_LINE_CHARS))
+    : undefined;
+  const expiresAt = epochMsOf(data?.expires_at);
+  const wireId = data?.call_id ?? data?.approval_id ?? data?.id;
+  return {
+    id: typeof wireId === "string" ? wireId.slice(0, 200) : "",
+    kind,
+    destructive,
+    operation: typeof data?.operation === "string" ? data.operation.slice(0, 60) : "",
+    tool,
+    targets,
+    ...(total > targets.length && { total }),
+    ...(data?.before !== undefined && { before: boundedJson(data.before) }),
+    ...(after !== undefined && { after: boundedJson(after) }),
+    ...(impact?.length && { impact }),
+    grantable: data?.grantable === true && !destructive,
+    // Only a batch edits, in its plan, and only when every item it acts on is listed there.
+    editable:
+      targets.length > 1 &&
+      total === targets.length &&
+      (data?.editable === true || kind === "delete"),
+    question: typeof data?.message === "string" ? data.message.slice(0, MAX_QUESTION_CHARS) : "",
+    ...(typeof args.command === "string" && {
+      command:
+        args.command.length > MAX_QUESTION_CHARS
+          ? `${args.command.slice(0, MAX_QUESTION_CHARS)}…`
+          : args.command,
+    }),
+    ...(Object.keys(args).length > 0 && { args: boundedJson(args) as Record<string, unknown> }),
+    typed,
+    ...(expiresAt !== null && { expiresAt }),
+  };
+}
+
+function approvalKindOf(data: any, tool: string, args: Record<string, unknown>): ApprovalKind {
+  if (APPROVAL_KINDS.has(data?.kind)) return data.kind as ApprovalKind;
+  if (tool === "o2_delete") return "delete";
+  if (typeof args.command === "string") return "run_command";
+  return "permission";
+}
+
+function targetsOf(data: any, args: Record<string, unknown>): ApprovalTarget[] {
+  const raw = Array.isArray(data?.targets)
+    ? data.targets
+    : Array.isArray(args.items)
+      ? args.items.map((item: any) => ({
+          type: item?.resource_type,
+          id: item?.id,
+          name: item?.name,
+        }))
+      : [];
+  return raw.slice(0, MAX_TARGETS).flatMap((target: any): ApprovalTarget[] => {
+    const name = typeof target?.name === "string" ? target.name.slice(0, 200) : "";
+    if (!name) return [];
+    const id = boundedId(typeof target?.id === "string" ? target.id : undefined);
+    const type = typeof target?.type === "string" ? target.type.slice(0, 40).toLowerCase() : "";
+    return [{ type: type || "object", name, ...(id && { id }) }];
+  });
+}
+
+// One notice per type and answer, none after a card; a tool result and its `resource_changed` are one change, so the larger count wins.
+function noteUnreviewed(
+  state: StreamState,
+  resourceType: string,
+  source: "tools" | "frames",
+  resourceId?: string,
+): void {
+  const blocks = lastMessageOf(state)?.contentBlocks ?? [];
+  if (blocks.some((block) => block.type === "approval")) return;
+  const type = resourceType.slice(0, 40).toLowerCase() || "object";
+  const known = blocks.find(
+    (block) => block.policy?.kind === "unreviewed" && block.policy.resourceType === type,
+  );
+  const policy: PolicyBlockData = known?.policy ?? { kind: "unreviewed", resourceType: type };
+  const seen = { tools: policy.tools ?? 0, frames: policy.frames ?? 0 };
+  seen[source] += 1;
+  const count = Math.max(seen.tools, seen.frames);
+  const id = count === 1 ? (resourceId ?? policy.resourceId) : undefined;
+  const next: PolicyBlockData = {
+    kind: "unreviewed",
+    resourceType: type,
+    count,
+    ...seen,
+    ...(id && { resourceId: id }),
+  };
+  if (known) known.policy = next;
+  else if (blocks.length < MAX_STEPS) appendBlock(state, { type: "policy", policy: next });
+}
+
+function resourceOfTool(tool: string): string {
+  const noun = tool.replace(MUTATING_TOOL_PATTERNS, "");
+  return noun.replace(/s$/i, "") || "object";
+}
+
+function boundedJson(value: unknown, depth = 0): unknown {
+  if (typeof value === "string") return value.slice(0, MAX_LINE_CHARS);
+  if (typeof value === "number" || typeof value === "boolean" || value === null) return value;
+  if (depth >= MAX_JSON_DEPTH || typeof value !== "object") return undefined;
+  if (Array.isArray(value))
+    return value.slice(0, MAX_JSON_KEYS).map((v) => boundedJson(v, depth + 1));
+  const out: Record<string, unknown> = {};
+  for (const [key, v] of Object.entries(value as Record<string, unknown>).slice(0, MAX_JSON_KEYS)) {
+    const kept = boundedJson(v, depth + 1);
+    // A parsed `__proto__` key would re-parent the object instead of adding a field.
+    if (kept !== undefined && !UNSAFE_KEYS.has(key)) out[key.slice(0, 60)] = kept;
+  }
+  return out;
+}
+
+// Seconds or milliseconds on the wire; anything else is no expiry.
+function epochMsOf(value: unknown): number | null {
+  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) return null;
+  return value < 1e12 ? value * 1000 : value;
+}
+
+// Today's frames carry no id; the turn and the card's place in its own turn make one, so the history fold of that turn gives it again.
+function turnCardId(state: StreamState): string {
+  let n = 1;
+  let turnId = "";
+  for (let i = state.messages.length - 1; i >= 0; i--) {
+    const message = state.messages[i];
+    turnId ||= message.turnId ?? "";
+    if (message.role === "user") break;
+    n += (message.contentBlocks ?? []).filter((block) => block.type === "approval").length;
+  }
+  return `${turnId || "turn"}:${n}`;
+}
+
+function sameCard(a: ApprovalBlockData | undefined, b: ApprovalBlockData): boolean {
+  return (
+    !!a &&
+    a.tool === b.tool &&
+    a.question === b.question &&
+    JSON.stringify(a.args) === JSON.stringify(b.args)
+  );
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === "object" && !Array.isArray(value);
 }
 
 function resolveConfirmation(state: StreamState, data: any): void {

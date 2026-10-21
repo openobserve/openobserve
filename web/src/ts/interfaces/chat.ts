@@ -46,7 +46,12 @@ export interface ContentBlock {
     | "query"
     | "link"
     | "findings"
-    | "footer";
+    | "footer"
+    | "approval"
+    | "approval_result"
+    | "plan"
+    | "policy"
+    | "consent_note";
   // For tool_call type:
   tool?: string;
   message?: I18nText;

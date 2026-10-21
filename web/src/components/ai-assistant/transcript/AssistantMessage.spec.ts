@@ -209,7 +209,7 @@ describe("AssistantMessage", () => {
     expect(wrapper.attributes("aria-busy")).toBeUndefined();
   });
 
-  it("says a policy refusal of a step in one quiet line (B-02 permission_denied)", () => {
+  it("says a policy refusal of a step as a quiet notice with its detail", () => {
     const wrapper = mountMessage(
       answer([
         {
@@ -217,12 +217,15 @@ describe("AssistantMessage", () => {
           tool: "o2_UpdateAlert",
           stepState: "failed",
           errorType: "permission_denied_tool",
+          details: { detail: "Writes are off for this organization.", policy: "admin" },
         },
       ]),
     );
-    expect(wrapper.get('[data-test="assistant-block-policy"]').text()).toBe(
-      "The assistant wasn't allowed to run o2_UpdateAlert.",
+    const notice = wrapper.get('[data-test="assistant-permission-denied"]');
+    expect(notice.text()).toContain(
+      "Blocked by policy: o2_UpdateAlert. Writes are off for this organization.",
     );
+    expect(notice.text()).toContain("An admin can allow it in Settings › Assistant › Permissions.");
   });
 
   it("renders a registered kind through its renderer, and counts an unregistered kind once", () => {

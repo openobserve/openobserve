@@ -101,6 +101,7 @@ export const serialize: RequestBuilder = (session, snapshot, client, turn) => {
     ...(turn?.mode && { mode: turn.mode }),
     ...(turn?.ephemeral && { ephemeral: true }),
     ...(typed && attached.length > 0 && { attachments: attached.map(toAttachment) }),
+    ...(turn?.replyToApproval && { replyToApproval: turn.replyToApproval }),
   };
   if (turn?.persisted) {
     const seq = session.record.cachedLastSeq;
