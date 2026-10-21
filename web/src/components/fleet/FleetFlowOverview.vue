@@ -102,21 +102,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </OBanner>
 
-      <div
-        v-if="!forbidden && !expanded"
-        class="border-border-default flex h-56 min-h-0 shrink-0 flex-col border-y"
-      >
-        <FleetPipelineTable
-          :rows="tableRows"
-          :selected-id="selection?.kind === 'pipeline' ? selection.id : null"
-          :filtered="filtered"
-          :loading="loading"
-          @select="onRowSelect"
-          @retry="retry"
-          @clear-filters="clearFilters"
-        />
-      </div>
-
       <div ref="canvasEl" class="relative min-h-0 flex-1 max-lg:min-h-112">
         <div
           v-if="forbidden"
@@ -271,7 +256,6 @@ import FleetFlowNode from "./FleetFlowNode.vue";
 import FleetFlowEdge from "./FleetFlowEdge.vue";
 import FleetFlowLegend from "./FleetFlowLegend.vue";
 import FleetFlowDetails from "./FleetFlowDetails.vue";
-import FleetPipelineTable, { type PipelineRow } from "./FleetPipelineTable.vue";
 import type { FleetTab } from "./fleetRoute";
 import {
   useFlowIssues,
@@ -407,23 +391,6 @@ const selection = ref<Selection | null>(null);
 const popover = ref({ x: 0, y: 0 });
 const popoverEl = ref<HTMLElement | null>(null);
 
-const filtered = computed(
-  () =>
-    issuesOnly.value ||
-    !!severityFilter.value ||
-    telemetry.value !== "all" ||
-    excludedFleets.value.length > 0 ||
-    excludedDestinations.value.length > 0,
-);
-
-function clearFilters() {
-  issuesOnly.value = false;
-  severityFilter.value = null;
-  telemetry.value = "all";
-  excludedFleets.value = [];
-  excludedDestinations.value = [];
-}
-
 // A null rate under restricted metrics means the user may not read it, not that nothing flowed.
 const metricsRestricted = computed(() => !!flowQuery.flow.value?.metrics_restricted);
 
@@ -503,24 +470,6 @@ const visible = computed(() =>
       (!issuesOnly.value || sev !== "healthy")
     );
   }),
-);
-
-const tableRows = computed<PipelineRow[]>(() =>
-  visible.value.map((p) => ({
-    id: p.id,
-    fleet: p.fleet,
-    fleetName: fleetName(p.fleet),
-    fleetMeta: fleetMeta(fleetById.value.get(p.fleet)),
-    name: p.name,
-    signal: p.signal,
-    receivers: p.receivers.map((r) => r.name).join(", "),
-    exporters: p.exporters.map((e) => e.name).join(", "),
-    inRate: p.in_rate,
-    outRate: p.out_rate,
-    failedRatio: p.failed_ratio,
-    queueRatio: p.queue_ratio,
-    severity: severityOf.value[p.id],
-  })),
 );
 
 const fleetRate = (id: string) =>
@@ -766,21 +715,6 @@ function clampPopover() {
   };
 }
 
-// The viewport stays at the origin, so a node's layout position is where it sits on the canvas.
-function onRowSelect(row: PipelineRow) {
-  const same = selection.value?.kind === "pipeline" && selection.value.id === row.id;
-  selection.value = same ? null : { kind: "pipeline", id: row.id };
-  if (same) return;
-  const p = pipelineById.value.get(row.id);
-  const anchor =
-    mapNodeById.value.get(`e:${row.fleet}|${p?.exporters[0]?.name}`) ??
-    mapNodeById.value.get(`f:${row.fleet}`);
-  popover.value = anchor
-    ? { x: anchor.x + NODE_WIDTH + POPOVER_GAP, y: anchor.y }
-    : { x: POPOVER_MARGIN, y: POPOVER_MARGIN };
-  nextTick(clampPopover);
-}
-
 function select(next: Selection, event: MouseEvent | TouchEvent, anchorToNode: boolean) {
   const same = selection.value?.kind === next.kind && selection.value.id === next.id;
   selection.value = same ? null : next;
@@ -804,9 +738,8 @@ function onOutsidePointer(event: PointerEvent) {
   if (!selection.value) return;
   const target = event.target as globalThis.Node | null;
   if (popoverEl.value?.contains(target)) return;
-  // Clicks inside the canvas are handled by Vue Flow, and table rows select pipelines themselves.
+  // Clicks inside the canvas are handled by Vue Flow.
   if (canvasEl.value?.contains(target)) return;
-  if ((target as HTMLElement | null)?.closest?.('[data-test="fleet-pipeline-table"]')) return;
   selection.value = null;
 }
 

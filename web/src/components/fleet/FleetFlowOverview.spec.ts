@@ -24,7 +24,6 @@ import fleet, { type FleetPipeline, type FleetPipelines } from "@/services/fleet
 import FleetFlowOverview from "./FleetFlowOverview.vue";
 import FleetFlowList, { type FlowListItem } from "./FleetFlowList.vue";
 import FleetFlowLegend from "./FleetFlowLegend.vue";
-import FleetPipelineTable, { type PipelineRow } from "./FleetPipelineTable.vue";
 import { apiCollector, apiRollout } from "./fleet.fixtures";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 
@@ -143,20 +142,16 @@ const lists = () => wrapper.findAllComponents(FleetFlowList);
 const items = (which: 0 | 1) => lists()[which].props("items") as FlowListItem[];
 const fleetItems = () => items(0);
 const destinationItems = () => items(1);
-const rows = () => wrapper.findComponent(FleetPipelineTable).props("rows") as PipelineRow[];
 const edges = () => wrapper.findComponent(VueFlowStub).props("edges") as any[];
+const fleetNodes = () =>
+  nodes()
+    .filter((n) => n.id.startsWith("f:"))
+    .map((n) => n.id);
 const nodes = () => wrapper.findComponent(VueFlowStub).props("nodes") as any[];
 const edge = (id: string) => edges().find((e) => e.id === id);
 const legend = () => wrapper.findComponent(FleetFlowLegend);
 const popover = () => wrapper.find('[data-test="fleet-flow-overview-popover"]');
 const details = () => wrapper.findComponent({ name: "FleetFlowDetails" });
-
-async function selectTelemetry(value: string) {
-  wrapper
-    .findComponent<any>('[data-test="fleet-flow-overview-telemetry"]')
-    .vm.$emit("update:model-value", value);
-  await flushPromises();
-}
 
 async function clickNode(id: string) {
   wrapper.findComponent(VueFlowStub).vm.$emit("node-click", {
@@ -195,59 +190,6 @@ afterEach(() => {
   vi.restoreAllMocks();
   queryClient.clear();
   vi.clearAllMocks();
-});
-
-describe("FleetFlowOverview table", () => {
-  it("lists one row per pipeline of a known fleet, fleet order first", async () => {
-    serve(basePipelines());
-    await mountOverview();
-    expect(rows().map((r) => r.id)).toEqual(["prod/logs", "prod/metrics", "edge/traces"]);
-  });
-
-  it("fills each row from its pipeline: fleet meta, components, rates and ratios", async () => {
-    serve(basePipelines());
-    await mountOverview();
-    const [logs] = rows();
-    expect(logs).toMatchObject({
-      fleetName: "prod",
-      fleetMeta: "v3 · 24 collectors",
-      name: "logs",
-      signal: "logs",
-      receivers: "filelog",
-      exporters: "otlphttp/o2, kafka/bus",
-      inRate: 100,
-      outRate: 180,
-      failedRatio: 0.2,
-      queueRatio: 0.9,
-      severity: "error",
-    });
-    expect(rows().find((r) => r.id === "edge/traces")?.fleetMeta).toBe("No version · 1 collector");
-  });
-
-  it("highlights the clicked row's pipeline on the map and opens its details", async () => {
-    serve(basePipelines());
-    await mountOverview();
-    const row = rows().find((r) => r.id === "prod/logs")!;
-    wrapper.findComponent(FleetPipelineTable).vm.$emit("select", row);
-    await flushPromises();
-    expect(wrapper.findComponent(FleetPipelineTable).props("selectedId")).toBe("prod/logs");
-    expect(edge("fr:prod|filelog|logs").data.highlighted).toBe(true);
-    expect(edge("fr:prod|hostmetrics|metrics").data.dimmed).toBe(true);
-    expect(popover().exists()).toBe(true);
-    expect(details().props("title")).toBe("prod · logs");
-    expect(
-      details()
-        .props("issues")
-        .map((i: any) => i.id),
-    ).toEqual(["prod/logs-export_errors", "prod/logs-backpressure"]);
-  });
-
-  it("filters rows by the signal toggle", async () => {
-    serve(basePipelines());
-    await mountOverview();
-    await selectTelemetry("metrics");
-    expect(rows().map((r) => r.id)).toEqual(["prod/metrics"]);
-  });
 });
 
 describe("FleetFlowOverview map", () => {
@@ -338,23 +280,21 @@ describe("FleetFlowOverview lists and legend", () => {
     ]);
   });
 
-  it("filters table and map by the checked fleets", async () => {
+  it("filters the map by the checked fleets", async () => {
     serve(basePipelines());
     await mountOverview();
     lists()[0].vm.$emit("update:modelValue", ["edge"]);
     await flushPromises();
-    expect(rows().map((r) => r.id)).toEqual(["edge/traces"]);
-    expect(nodes().some((n) => n.id === "f:prod")).toBe(false);
+    expect(fleetNodes()).toEqual(["f:edge"]);
   });
 
-  it("counts pipelines per level and filters table and map by the clicked level", async () => {
+  it("counts pipelines per level and filters the map by the clicked level", async () => {
     serve(basePipelines());
     await mountOverview();
     expect(legend().props("counts")).toEqual({ error: 1, healthy: 2 });
     legend().vm.$emit("update:modelValue", "error");
     await flushPromises();
-    expect(rows().map((r) => r.id)).toEqual(["prod/logs"]);
-    expect(nodes().some((n) => n.id === "f:edge")).toBe(false);
+    expect(fleetNodes()).toEqual(["f:prod"]);
   });
 
   it("counts a fleet's halted rollout as an error and its offline collectors as a warning", async () => {
@@ -389,7 +329,7 @@ describe("FleetFlowOverview lists and legend", () => {
       .findComponent<any>('[data-test="fleet-flow-overview-issues-only"]')
       .vm.$emit("update:modelValue", true);
     await flushPromises();
-    expect(rows().map((r) => r.id)).toEqual(["prod/logs"]);
+    expect(fleetNodes()).toEqual(["f:prod"]);
   });
 });
 
@@ -507,7 +447,7 @@ describe("FleetFlowOverview expand", () => {
     });
   }
 
-  it("flips the button label, grows the phone map pane and hides the table", async () => {
+  it("flips the button label and grows the phone map pane", async () => {
     serve(basePipelines());
     await mountBound(false);
     expect(button().attributes("aria-label")).toBe("Expand map");
@@ -517,7 +457,6 @@ describe("FleetFlowOverview expand", () => {
     expect(wrapper.emitted("update:expanded")).toEqual([[true]]);
     expect(button().attributes("aria-label")).toBe("Collapse map");
     expect(mapPane().classes()).toContain("max-lg:h-dvh");
-    expect(wrapper.findComponent(FleetPipelineTable).exists()).toBe(false);
     await button().trigger("click");
     await flushPromises();
     expect(wrapper.emitted("update:expanded")?.at(-1)).toEqual([false]);
