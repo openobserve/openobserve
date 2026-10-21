@@ -155,6 +155,13 @@ impl StreamRecordNeeds {
     }
 }
 
+/// A `_bulk` stream's columnar rows with the pipeline and settings snapshot they were planned
+/// under.
+pub struct BulkPlan {
+    pub columnar: JsonColumnar,
+    needs: StreamRecordNeeds,
+}
+
 /// The `_o2_` write-guard predicate (design §5.3): true when a logs ingest
 /// request targeting `stream_name` must be rejected because the stream is an
 /// internal rollup stream and the request is user-initiated. Internal writers
@@ -206,7 +213,7 @@ pub async fn ingest_bulk(
     org_id: &str,
     stream_name: &str,
     records: Vec<json::Value>,
-    columnar: Option<JsonColumnar>,
+    plan: Option<BulkPlan>,
     user: IngestUser,
 ) -> Result<IngestionResponse> {
     ingest_inner(
@@ -217,7 +224,7 @@ pub async fn ingest_bulk(
         user,
         None,
         false,
-        columnar,
+        plan,
     )
     .await
 }
@@ -227,20 +234,19 @@ pub async fn plan_bulk_columnar(
     org_id: &str,
     stream_name: &str,
     time_range: (i64, i64),
-) -> Option<JsonColumnar> {
+) -> Option<BulkPlan> {
     // rows are matched to their stream by the name `ingest` resolves
     if resolve_stream_name(org_id, stream_name).await.ok()? != stream_name {
         return None;
     }
-    let stream_param = StreamParams::new(org_id, stream_name, StreamType::Logs);
-    if StreamRecordNeeds::load(stream_param)
-        .await
-        .json_records(stream_name)
-    {
+    let needs =
+        StreamRecordNeeds::load(StreamParams::new(org_id, stream_name, StreamType::Logs)).await;
+    if needs.json_records(stream_name) {
         return None;
     }
     let flatten_level = get_flatten_level(org_id, stream_name, StreamType::Logs).await;
-    JsonColumnar::plan(org_id, stream_name, flatten_level, time_range).await
+    let columnar = JsonColumnar::plan(org_id, stream_name, flatten_level, time_range).await?;
+    Some(BulkPlan { columnar, needs })
 }
 
 /// Flatten a record and resolve its timestamp — the only two steps of record
@@ -271,7 +277,7 @@ async fn ingest_inner(
     user: IngestUser,
     extend_json: Option<&HashMap<String, serde_json::Value>>,
     is_derived: bool,
-    bulk_columnar: Option<JsonColumnar>,
+    bulk_plan: Option<BulkPlan>,
 ) -> Result<IngestionResponse> {
     let start = std::time::Instant::now();
     let started_at: i64 = Utc::now().timestamp_micros();
@@ -358,7 +364,11 @@ async fn ingest_inner(
         derived_streams.insert(stream_name.to_string());
     }
 
-    let needs = StreamRecordNeeds::load(StreamParams::new(org_id, &stream_name, stream_type)).await;
+    let (needs, bulk_columnar) = request_needs(
+        StreamParams::new(org_id, &stream_name, stream_type),
+        bulk_plan,
+    )
+    .await;
     // JsonColumnar::plan already refuses the fast path under vectorscan, before this is consulted.
     let needs_json_records = extend_json.is_some() || needs.json_records(&stream_name);
     let StreamRecordNeeds {
@@ -374,9 +384,11 @@ async fn ingest_inner(
         !executable_pipelines.is_empty() && streams_need_original_map.values().any(|val| *val);
     // End get user defined schema
 
-    let flatten_level = get_flatten_level(org_id, &stream_name, stream_type).await;
+    let flatten_level = match &bulk_columnar {
+        Some(columnar) => columnar.flatten_level(),
+        None => get_flatten_level(org_id, &stream_name, stream_type).await,
+    };
 
-    // a pipeline added after the `_bulk` plan was made applies from the next request
     let mut columnar = if bulk_columnar.is_some() {
         bulk_columnar
     } else if matches!(in_req, IngestionRequest::JSON(_)) && !needs_json_records {
@@ -948,6 +960,17 @@ async fn ingest_inner(
             .with_write_failed(metric_rpt_status_code == "500")
             .with_stream_skipped(stream_skipped),
     )
+}
+
+/// The snapshot a request runs under; a `_bulk` stream's whole batch keeps its plan's.
+async fn request_needs(
+    stream_param: StreamParams,
+    bulk_plan: Option<BulkPlan>,
+) -> (StreamRecordNeeds, Option<JsonColumnar>) {
+    match bulk_plan {
+        Some(BulkPlan { columnar, needs }) => (needs, Some(columnar)),
+        None => (StreamRecordNeeds::load(stream_param).await, None),
+    }
 }
 
 /// The name the writer uses for `in_stream_name`; `skip_formatting_stream_name` looks it up.
@@ -1590,16 +1613,23 @@ fn construct_values_from_open_telemetry_v1_metric(
 #[cfg(test)]
 mod tests {
 
-    use config::meta::self_reporting::{
-        redaction::REDACTION_EVIDENCE_STREAM,
-        usage::{
-            AUDIT_STREAM, DATA_RETENTION_USAGE_STREAM, ERROR_STREAM, STATS_STREAM, TRIGGERS_STREAM,
-            USAGE_STREAM,
+    use config::meta::{
+        pipeline::{
+            Pipeline, PipelineKind,
+            components::{Edge, Node, NodeData, PipelineSource},
+        },
+        self_reporting::{
+            redaction::REDACTION_EVIDENCE_STREAM,
+            usage::{
+                AUDIT_STREAM, DATA_RETENTION_USAGE_STREAM, ERROR_STREAM, STATS_STREAM,
+                TRIGGERS_STREAM, USAGE_STREAM,
+            },
         },
     };
     use ingestion_common::{IngestUser, SystemJobType};
 
     use super::*;
+    use crate::cache::STREAM_EXECUTABLE_PIPELINES;
 
     /// A bulk ingest returned 200 while dropping every record as "Too old data", and
     /// nothing server-side said so. The status code has to stay 200 — clients and
@@ -2163,5 +2193,70 @@ mod tests {
             decoded += 1;
         }
         assert_eq!(decoded, body_cap / (1024 * 1024) + 2);
+    }
+
+    fn realtime_pipeline(source_stream: &StreamParams) -> Pipeline {
+        let node = |id: &str, stream: StreamParams| {
+            Node::new(
+                id.to_string(),
+                NodeData::Stream(stream),
+                0.0,
+                0.0,
+                "input".to_string(),
+            )
+        };
+        let dest = StreamParams::new(&source_stream.org_id, "dest_stream", StreamType::Logs);
+        Pipeline {
+            id: "bulk_snapshot_pl".to_string(),
+            version: 1,
+            enabled: true,
+            org: source_stream.org_id.to_string(),
+            name: "bulk_snapshot_pl".to_string(),
+            description: String::new(),
+            source: PipelineSource::Realtime(source_stream.clone()),
+            nodes: vec![node("source", source_stream.clone()), node("dest", dest)],
+            edges: vec![Edge::new("source".to_string(), "dest".to_string())],
+            kind: PipelineKind::User,
+        }
+    }
+
+    // regression: a pipeline enabled between a `_bulk` plan and its ingest reached only the
+    // fallback rows
+    #[tokio::test]
+    async fn test_bulk_batch_keeps_the_snapshot_it_was_planned_under() {
+        let stream = StreamParams::new(
+            "bulk_snapshot_org",
+            "bulk_snapshot_stream",
+            StreamType::Logs,
+        );
+        let needs = StreamRecordNeeds::load(stream.clone()).await;
+        assert!(!needs.json_records(&stream.stream_name));
+        let schema = arrow_schema::Schema::new(vec![arrow_schema::Field::new(
+            TIMESTAMP_COL_NAME,
+            arrow_schema::DataType::Int64,
+            false,
+        )]);
+        let columnar =
+            JsonColumnar::for_schema(&stream.stream_name, &schema, 0, (0, i64::MAX), false)
+                .unwrap();
+        let plan = BulkPlan { columnar, needs };
+
+        let pipeline = ExecutablePipeline::new(&realtime_pipeline(&stream))
+            .await
+            .unwrap();
+        STREAM_EXECUTABLE_PIPELINES
+            .write()
+            .await
+            .insert(stream.clone(), vec![pipeline]);
+        let reloaded = StreamRecordNeeds::load(stream.clone()).await;
+        let (needs, columnar) = request_needs(stream.clone(), Some(plan)).await;
+        STREAM_EXECUTABLE_PIPELINES.write().await.remove(&stream);
+
+        assert!(reloaded.json_records(&stream.stream_name));
+        assert!(columnar.is_some());
+        assert!(needs.executable_pipelines.is_empty());
+        let (needs, columnar) = request_needs(stream.clone(), None).await;
+        assert!(columnar.is_none());
+        assert!(needs.executable_pipelines.is_empty());
     }
 }
