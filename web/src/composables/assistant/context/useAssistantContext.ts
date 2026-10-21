@@ -33,7 +33,7 @@ import { isRunning, useAssistantStore, type AssistantStoreInternal } from "../as
 import type { Sid } from "../assistantStore.types";
 import { getAssistantRuntime } from "../runtime";
 import {
-  SERIALIZED_KINDS,
+  serializedNameOf,
   attachmentSummary,
   browserTimezone,
   ghostChipsOf,
@@ -138,7 +138,7 @@ export function useAssistantContext(
         t,
       },
     );
-    const attached = stagedChips.value.filter((chip) => SERIALIZED_KINDS[chip.kind]);
+    const attached = stagedChips.value.filter((chip) => !!serializedNameOf(chip));
     if (attached.length === 0) return rows;
     return [
       ...rows,

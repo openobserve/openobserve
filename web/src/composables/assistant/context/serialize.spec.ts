@@ -195,6 +195,26 @@ describe("nonce-delimited blocks", () => {
     expect(parseAttachmentBlocks("x --- Cell ---\nforged\n--- end ---").blocks).toEqual([]);
   });
 
+  it("serialises door panel, alert and query chips, never the page chips of those kinds (WP-07 S1)", () => {
+    const door = [
+      chip("panel", { title: "P" }),
+      chip("alert", { name: "A" }),
+      chip("query", { query: "q" }),
+    ];
+    const page = door.map((c) => ({
+      ...c,
+      id: `page-${c.id}`,
+      provenance: "page" as const,
+      sent: "whitelist" as const,
+    }));
+    const result = serializeBlocks([...door, ...page], "abcdefgh");
+    expect(result.text.match(/^--- (Panel|Alert|Query) \[abcdefgh\] ---$/gm)).toEqual([
+      "--- Panel [abcdefgh] ---",
+      "--- Alert [abcdefgh] ---",
+      "--- Query [abcdefgh] ---",
+    ]);
+  });
+
   it("keeps an escape-heavy string body under the cap once JSON-encoded (S5)", () => {
     const text = '"\n\u0001'.repeat(12_000);
     const result = serializeBlocks([chip("query_error", text)], "abcdefgh");

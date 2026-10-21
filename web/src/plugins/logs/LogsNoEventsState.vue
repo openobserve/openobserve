@@ -75,8 +75,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ t("logs.noEvents.openHistory") }}
         </OButton>
+        <template v-if="assistantV2">
+          <slot v-if="windowHasStreamData && !jumpTarget" name="ai-door" />
+        </template>
         <OButton
-          v-if="aiEnabled && windowHasStreamData && !jumpTarget"
+          v-else-if="aiEnabled && windowHasStreamData && !jumpTarget"
           variant="ghost"
           size="sm"
           data-test="logs-no-events-ask-ai-btn"
@@ -99,6 +102,7 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { useAiIcon } from "@/composables/useAiIcon";
+import { isAssistantV2 } from "@/composables/assistant/flags";
 import { DateTime } from "luxon";
 import { periodToLabel } from "@/composables/useWidenRange";
 import DOMPurify from "dompurify";
@@ -130,6 +134,12 @@ const emit = defineEmits<{
 
 const { t } = useI18nTyped();
 const { aiIconSrc } = useAiIcon();
+const assistantV2 = isAssistantV2();
+
+defineSlots<{
+  /** With the assistant on: the page's own door in place of the legacy Ask AI button. */
+  "ai-door"?(): unknown;
+}>();
 
 // --- filter detection -------------------------------------------------------
 

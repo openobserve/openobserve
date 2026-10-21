@@ -27,9 +27,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="max-md:min-h-11 max-md:min-w-11 pointer-coarse:min-h-11 pointer-coarse:min-w-11"
     @click="emit('click', $event)"
   >
-    <OIcon :name="icon" size="sm" />
+    <span v-if="badge" class="relative inline-flex">
+      <OIcon :name="icon" size="sm" />
+      <span
+        aria-hidden="true"
+        class="rounded-default bg-surface-base text-text-secondary absolute -end-1.5 -bottom-1 inline-flex"
+      >
+        <OIcon :name="badge" size="xs" />
+      </span>
+    </span>
+    <OIcon v-else :name="icon" size="sm" />
     <template v-if="unavailable" #unavailable-reason>{{ disabledReason }}</template>
-    <OTooltip :content="tooltip" :shortcut-id="shortcutId" />
+    <OTooltip
+      v-if="!noTooltip"
+      :content="$slots.tooltip && !unavailable ? undefined : tooltip"
+      :shortcut-id="shortcutId"
+    >
+      <template v-if="$slots.tooltip && !unavailable" #content><slot name="tooltip" /></template>
+    </OTooltip>
   </OButton>
 </template>
 
@@ -43,6 +58,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type {
   AssistantIconButtonEmits,
   AssistantIconButtonProps,
+  AssistantIconButtonSlots,
 } from "./AssistantIconButton.types";
 
 const props = withDefaults(defineProps<AssistantIconButtonProps>(), {
@@ -53,9 +69,13 @@ const props = withDefaults(defineProps<AssistantIconButtonProps>(), {
   loading: false,
   disabled: false,
   disabledReason: undefined,
+  badge: undefined,
+  noTooltip: false,
 });
 
 const emit = defineEmits<AssistantIconButtonEmits>();
+
+defineSlots<AssistantIconButtonSlots>();
 
 // A disabled button with a reason stays focusable so keyboard and screen-reader users can reach why.
 const unavailable = computed(() => props.disabled && !!props.disabledReason);

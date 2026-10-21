@@ -1,15 +1,19 @@
 <!-- Copyright 2026 OpenObserve Inc. -->
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, inject, onMounted, ref } from "vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import type { CheckboxModelValue } from "@/lib/forms/Checkbox/OCheckbox.types";
+import { useI18nTyped } from "@/types/i18n";
+import { OTableFocusToolbarKey } from "../OTable.types";
 
 const props = defineProps<{
   modelValue: boolean;
   indeterminate?: boolean;
   rowId?: string;
   disabled?: boolean;
+  /** Display position (0-based), which a sorted table no longer shares with the row index. */
+  position?: number;
 }>();
 
 const emit = defineEmits<{
@@ -19,6 +23,23 @@ const emit = defineEmits<{
 const checkboxModel = computed<CheckboxModelValue>(() => {
   if (props.indeterminate) return "indeterminate";
   return props.modelValue;
+});
+
+const { t } = useI18nTyped();
+const focusCtx = inject(OTableFocusToolbarKey, null);
+// Only focus-toolbar tables name their checkboxes, so every other table renders byte-identical.
+const ariaLabel = computed(() => {
+  if (!focusCtx?.enabled.value) return undefined;
+  if (props.rowId === "all") return t("components.table.selectAllRows");
+  return t("components.table.selectRow", { n: (props.position ?? Number(props.rowId ?? 0)) + 1 });
+});
+
+// The row's cells hold the table's one tab stop and Space on a cell already selects, so a row checkbox is no extra stop.
+const root = ref<{ $el?: Element } | null>(null);
+onMounted(() => {
+  if (!focusCtx?.enabled.value || props.rowId === "all") return;
+  const box = root.value?.$el?.querySelector?.<HTMLElement>('button[role="checkbox"]');
+  if (box) box.tabIndex = -1;
 });
 
 function handleUpdate(val: CheckboxModelValue) {
@@ -33,10 +54,12 @@ function handleUpdate(val: CheckboxModelValue) {
 
 <template>
   <OCheckbox
+    ref="root"
     :model-value="checkboxModel"
     :data-test="`o2-table-select-${rowId ?? 'header'}`"
     size="sm"
     :disabled="disabled"
+    v-bind="ariaLabel ? { ariaLabel } : {}"
     @update:model-value="handleUpdate"
   />
 </template>

@@ -233,6 +233,8 @@ export interface AiEventProps {
     host?: HelperHost;
     language?: QueryLanguage;
     text_len_bucket?: LengthBucket;
+    /** The door's builder threw or went over the chip cap, so nothing opened. */
+    error?: boolean;
   };
   ai_gate_blocked: {
     reason: GateReason;

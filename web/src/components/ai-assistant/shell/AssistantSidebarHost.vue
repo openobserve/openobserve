@@ -23,6 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-show="visible"
       ref="column"
       data-test="assistant-sidebar-host"
+      :[DRAWER_INSET_ATTR]="''"
       :data-mode="floating ? 'floating' : 'pinned'"
       :class="floating ? FLOATING_CLASSES : PINNED_CLASSES"
     >
@@ -56,6 +57,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <AssistantShell placement="sidebar" sheet />
     </OSheet>
   </template>
+  <Teleport v-if="deepLink.blocked.value" defer to="main[data-test='main-content']">
+    <div class="order-first mb-2 max-md:mx-2" data-test="assistant-deep-link-gate">
+      <AssistantGateState
+        :reason="deepLink.blocked.value"
+        size="inline"
+        :is-admin="capability.isAdmin"
+        :context="{ org: deepLinkOrg }"
+      />
+    </div>
+  </Teleport>
 </template>
 
 <script lang="ts">
@@ -89,9 +100,11 @@ export function coveredBy(target: DOMRect, card: DOMRect): boolean {
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
+import { useStore } from "vuex";
 
 import AssistantMark from "@/components/ai-assistant/common/AssistantMark.vue";
 import AssistantStatusDot from "@/components/ai-assistant/common/AssistantStatusDot.vue";
+import AssistantGateState from "@/components/ai-assistant/gate/AssistantGateState.vue";
 import type { AssistantSignal } from "@/components/ai-assistant/common/AssistantStatusDot.types";
 import {
   registerContainerCloser,
@@ -100,9 +113,11 @@ import {
   useAssistantPlacement,
   useAssistantShortcuts,
   useAssistantStore,
+  useDeepLinkDoor,
 } from "@/composables/assistant";
 import useBreakpoint from "@/composables/useBreakpoint";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import { DRAWER_INSET_ATTR, setDrawerInsetEnd } from "@/lib/overlay/Drawer/drawerInset";
 import OSheet from "@/lib/overlay/Sheet/OSheet.vue";
 import type { SheetSnap } from "@/lib/overlay/Sheet/OSheet.types";
 import { trackAssistant, type AiEventProps } from "@/services/assistantAnalytics";
@@ -133,6 +148,10 @@ const { t } = useI18nTyped();
 const { product } = useAssistantName();
 const store = useAssistantStore();
 const capability = useAssistantCapability();
+// A deep link's keys are read once per visit; a blocked gate shows as a banner over the page.
+const deepLink = useDeepLinkDoor();
+const vuex = useStore();
+const deepLinkOrg = computed<string>(() => vuex.state.selectedOrganization?.identifier ?? "");
 const placement = useAssistantPlacement(store);
 const lockedPanel = useLockedPanel();
 const route = useRoute();
@@ -235,6 +254,11 @@ function writeInsetEnd(): void {
   if (el && visible.value && floating.value)
     document.documentElement.style.setProperty(INSET_END, String(Math.round(el.offsetWidth)));
   else document.documentElement.style.removeProperty(INSET_END);
+  // A pinned panel keeps a page drawer beside it, so a door that opens both leaves both usable.
+  setDrawerInsetEnd(
+    el && visible.value && !floating.value ? el.offsetWidth : 0,
+    el && visible.value ? el : null,
+  );
 }
 
 // A focused page control hidden under the floating card pins the card for this open.
@@ -265,7 +289,17 @@ watch([column, () => store.state.shell.sidebarWidthRem], writeWidth, {
   immediate: true,
   flush: "post",
 });
-watch([floating, () => store.state.shell.sidebarWidthRem], () => void nextTick(writeInsetEnd));
+// The column mounts late after a reload or a gate change, so its own arrival rewrites the inset.
+watch([column, visible, floating, () => store.state.shell.sidebarWidthRem, lgUp], writeInsetEnd, {
+  immediate: true,
+  flush: "post",
+});
+const columnSize =
+  typeof ResizeObserver === "undefined" ? null : new ResizeObserver(() => writeInsetEnd());
+watch(column, (el, old) => {
+  if (old) columnSize?.unobserve(old);
+  if (el) columnSize?.observe(el);
+});
 
 onMounted(() => {
   main = document.querySelector("main");
@@ -276,5 +310,7 @@ onBeforeUnmount(() => {
   unregisterCloser();
   main?.removeEventListener("focusin", onMainFocus);
   document.documentElement.style.removeProperty(INSET_END);
+  columnSize?.disconnect();
+  setDrawerInsetEnd(0);
 });
 </script>
