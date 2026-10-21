@@ -1062,6 +1062,10 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import { COL } from "@/lib/core/Table/OTable.types";
+import { useAssistantPanelWidth } from "@/composables/assistant/pure";
+
+// The toolbar turns icon-only once the list beside a pinned assistant is narrower than this.
+const COMPACT_TOOLBAR_MAIN_REM = 68;
 
 // import alertList from "./alerts";
 
@@ -1229,8 +1233,14 @@ export default defineComponent({
     const onWindowResize = () => {
       windowWidth.value = window.innerWidth;
     };
+    // Pinned beside the list, the panel takes width; the revamp measures `<main>` instead of guessing from the window.
+    const { panelWidthRem, mainWidthPx } = useAssistantPanelWidth();
     const isCompactToolbar = computed(
-      () => store.state.isAiChatEnabled && windowWidth.value <= 1440,
+      () =>
+        panelWidthRem.value > 0 &&
+        (assistantV2
+          ? mainWidthPx.value / 16 <= COMPACT_TOOLBAR_MAIN_REM
+          : windowWidth.value <= 1440),
     );
 
     const showImportAlertDialog = ref(false);

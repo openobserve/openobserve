@@ -15,6 +15,7 @@
 
 import { registerClipboardAppliers } from "./clipboard";
 import { registerDraftAppliers } from "./drafts";
+import { registerEditorAppliers } from "./editor";
 import { registerExplorerAppliers } from "./explorer";
 import { registerNavigationAppliers } from "./navigation";
 import { registerQueryAppliers } from "./query";
@@ -23,6 +24,7 @@ import { registerThreadAppliers } from "./thread";
 export function registerBuiltInAppliers(): void {
   registerClipboardAppliers();
   registerDraftAppliers();
+  registerEditorAppliers();
   registerExplorerAppliers();
   registerNavigationAppliers();
   registerQueryAppliers();

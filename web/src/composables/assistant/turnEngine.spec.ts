@@ -1339,6 +1339,26 @@ describe("turnEngine: round 3 follow-ups", () => {
     await expect(run).resolves.toMatchObject({ state: "stopped" });
   });
 
+  it("ends a running turn as signed out when another tab signs out, posting its cancel and never reloading", async () => {
+    const h = setup();
+    const reload = vi.fn();
+    vi.stubGlobal("location", { ...window.location, reload });
+    const { run } = await begin(h);
+    const signal = h.last().signal;
+    await h.engine.signedOutElsewhere?.();
+    expect(signal.aborted).toBe(true);
+    expect(h.client.stop).toHaveBeenCalledWith(
+      "org1",
+      expect.objectContaining({ turnId: h.last().req.turnId }),
+    );
+    await expect(run).resolves.toMatchObject({
+      state: "failed",
+      error: { code: "signed_out", action: "sign_in" },
+    });
+    expect(reload).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
+  });
+
   it("names the org, the elapsed time and the provider reason in the announcement", async () => {
     const h = setup();
     const announce = vi.spyOn(h.store, "announce");

@@ -798,6 +798,7 @@ import {
 } from "@/composables/useLogs/logsRowNav";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 import { isAssistantV2 } from "@/composables/assistant/flags";
+import { useAssistantPanelWidth } from "@/composables/assistant/pure";
 import {
   emptyResultBuild,
   logsDoorBase,
@@ -3142,8 +3143,9 @@ export default defineComponent({
 
     // Watch AI chat state and adjust splitter to give more space when chat is open
     const originalSplitterValue = ref(searchObj.config.splitterModel);
+    const { panelWidthRem: assistantPanelRem } = useAssistantPanelWidth();
     watch(
-      () => store.state.isAiChatEnabled,
+      () => assistantPanelRem.value > 0,
       (isEnabled) => {
         // Only adjust splitter if field list is shown
         if (searchObj.meta.showFields) {

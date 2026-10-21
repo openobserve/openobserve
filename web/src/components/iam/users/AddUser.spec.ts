@@ -667,7 +667,7 @@ describe("AddUser", () => {
       expect(updateOpen[updateOpen.length - 1]).toEqual([false]);
     });
 
-    it("signout() clears auth state and redirects to /logout", () => {
+    it("signout() clears auth state and redirects to /logout", async () => {
       store.state.userInfo = { ...store.state.userInfo, email: ADMIN_EMAIL };
       store.state.organizations = [];
       const dispatchSpy = vi.spyOn(store, "dispatch").mockReturnValue(undefined as any);
@@ -689,7 +689,7 @@ describe("AddUser", () => {
         },
       });
 
-      w.vm.signout();
+      await w.vm.signout();
 
       expect(invalidateLoginData).toHaveBeenCalled();
       expect(dispatchSpy).toHaveBeenCalledWith("logout");

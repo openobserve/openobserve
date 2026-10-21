@@ -234,6 +234,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :forced-language="language"
           :hide-test-panel="createButton"
           :hide-ai-assist="createButton"
+          :dock-host="!createButton"
           :default-code="editorSeed"
           @update:list="onFunctionCreation"
           @cancel:hideform="cancelFunctionCreation"

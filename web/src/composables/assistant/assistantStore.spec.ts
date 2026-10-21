@@ -27,6 +27,7 @@ import {
   UNDO_WINDOW_MS,
   createAssistantStore,
   headerLightOf,
+  withRemoteLight,
   inertAssistantDeps,
   sessionView,
   useAssistantPlacement,
@@ -43,6 +44,7 @@ import type {
 } from "./assistantStore.types";
 import type { ContextChip } from "./context/types";
 import { createDraftStore, type DraftStore } from "./drafts";
+import { sidebarWidthFor } from "./sidebarWidth";
 import { TAB_HEARTBEAT_MS, markTabAlive, pushRecall, resetPrefsForTests } from "./prefs";
 import type { TurnTerminal } from "./turnStates";
 
@@ -367,19 +369,39 @@ describe("placement", () => {
     expect(view.sidebarForcedFloating.value).toBe(false);
   });
 
-  it("forces floating at 1024–1279 px only while the width would squeeze <main>, and follows a resize", () => {
-    const viewportPx = ref(1279);
+  it("refuses every turn start in a chat under the cross-tab lock, naming why", async () => {
+    const engine = { ...inertAssistantDeps().engine, send: vi.fn(), retry: vi.fn() };
+    let lock: "signed_out" | "account_changed" | "approval_elsewhere" | null = "approval_elsewhere";
+    const { store } = makeStore({ engine }, "available", { turnLock: () => lock });
+    const sid = newSession(store);
+    await expect(store.send(sid)).resolves.toMatchObject({
+      state: "refused",
+      error: { code: "approval_elsewhere", phase: "pre_admission" },
+    });
+    await expect(store.retry(sid)).resolves.toMatchObject({ state: "refused" });
+    await expect(store.regenerate(sid)).resolves.toMatchObject({ state: "refused" });
+    await expect(
+      store.editResend(sid, { text: "x", chips: [], images: [], editedFrom: 1 }),
+    ).resolves.toMatchObject({ state: "refused" });
+    lock = "account_changed";
+    await expect(store.send(sid)).resolves.toMatchObject({ error: { code: "account_changed" } });
+    lock = "signed_out";
+    await expect(store.send(sid)).resolves.toMatchObject({ error: { code: "session_expired" } });
+    expect(engine.send).not.toHaveBeenCalled();
+    expect(engine.retry).not.toHaveBeenCalled();
+    expect(store.turnLockOf(sid)).toBe("signed_out");
+  });
+
+  it("holds a wide stored width instead of floating, and floats only where 20 rem cannot sit beside <main>", () => {
+    const viewportPx = ref(1024);
     const { store } = makeStore({}, "available", { viewportRem: () => viewportPx.value / 16 });
     const view = useAssistantPlacement(store);
     store.setSidebarWidth(32);
     expect(view.sidebarForcedFloating.value).toBe(false);
-    viewportPx.value = 1024;
+    expect(sidebarWidthFor(store.state.shell.sidebarWidthRem, 64, false)).toBe(26.5);
+    viewportPx.value = 900;
     expect(view.sidebarForcedFloating.value).toBe(true);
-    store.setSidebarWidth(22);
-    expect(view.sidebarForcedFloating.value).toBe(false);
-    store.setSidebarWidth(27);
-    expect(view.sidebarForcedFloating.value).toBe(true);
-    viewportPx.value = 1180;
+    viewportPx.value = 1100;
     expect(view.sidebarForcedFloating.value).toBe(false);
   });
 
@@ -913,6 +935,40 @@ describe("lifecycle seams", () => {
     expect(post).toHaveBeenCalledWith(expect.objectContaining({ type: "signed_out" }));
     expect(store.state.sessions).toEqual({});
     expect(store.state.shell.placement).toEqual({ kind: "hidden" });
+  });
+
+  it("posts signed_out before it stops this tab's turns, so other tabs cancel in parallel", async () => {
+    const order: string[] = [];
+    const { store } = makeStore({
+      hints: { ...inertAssistantDeps().hints, post: () => void order.push("hint") },
+      engine: {
+        ...inertAssistantDeps().engine,
+        stopAll: async () => void order.push("stop"),
+      },
+    });
+    await store.onSignOut();
+    expect(order).toEqual(["hint", "stop"]);
+  });
+
+  it("merges another tab's light: its needs-you outranks working here, its working outranks only unread and open", () => {
+    const local = (state: "needs_you" | "working" | "unread" | "open" | "idle") => ({
+      state,
+      sid: "here",
+      failed: false,
+    });
+    const working = { state: "working" as const, sid: "there" };
+    const waiting = { state: "needs_you" as const, sid: "there" };
+    expect(withRemoteLight(local("working"), waiting)).toMatchObject({
+      state: "needs_you",
+      sid: "there",
+    });
+    expect(withRemoteLight(local("needs_you"), waiting)).toMatchObject({ sid: "here" });
+    expect(withRemoteLight(local("working"), working)).toMatchObject({ sid: "here" });
+    expect(withRemoteLight(local("unread"), working)).toMatchObject({
+      state: "working",
+      sid: "there",
+    });
+    expect(withRemoteLight(local("idle"), null)).toMatchObject({ state: "idle" });
   });
 
   it("purges every org this tab used and every org's recall on sign-out", async () => {

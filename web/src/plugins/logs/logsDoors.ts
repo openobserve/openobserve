@@ -13,6 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import type { Router } from "vue-router";
+import type { Store } from "vuex";
+
 import type { OpenAssistantArgs } from "@/composables/assistant/pure";
 import type { LogRowInput } from "@/utils/assistant/prompts";
 
@@ -20,6 +23,9 @@ import type { LogRowInput } from "@/utils/assistant/prompts";
 export type LogsDoorBase = Omit<LogRowInput, "row" | "source">;
 
 type Payload = OpenAssistantArgs["payload"];
+
+// A regex is written from one value; the test input takes this much of it.
+const REGEX_SAMPLE_CHARS = 2_000;
 
 interface LogsSearchShape {
   organizationIdentifier?: string;
@@ -93,6 +99,52 @@ export function logFieldBuild(
       value,
       row,
     });
+}
+
+/** Create regex pattern from a value: the prompt waits for the regex drawer's dock, never the sidebar. */
+export async function regexFieldHandoff(
+  base: LogsDoorBase,
+  field: string,
+  sample: unknown,
+  go: (handoff: { prompt: string; sample: string }) => void,
+): Promise<void> {
+  const [{ buildRegexFieldPrompt, fieldValueOf }, { queueDockStage }] = await Promise.all([
+    import("@/utils/assistant/prompts"),
+    import("@/composables/assistant"),
+  ]);
+  // A secret-named field's value is redacted here too, since the drawer's test value reaches the model's context.
+  const value = fieldValueOf(field, sample);
+  const text = typeof value === "string" ? value : JSON.stringify(value ?? "");
+  const build = buildRegexFieldPrompt({
+    org: base.org,
+    stream: base.stream,
+    streamType: base.streamType,
+    field,
+    sample: text.slice(0, REGEX_SAMPLE_CHARS),
+    range: base.range,
+  });
+  queueDockStage(
+    "regex",
+    { chips: build.chips, text: build.text },
+    { entryKind: "object_verb", objectKind: "log_field" },
+  );
+  go({ prompt: build.text, sample: text.slice(0, REGEX_SAMPLE_CHARS) });
+}
+
+/** The regex hand-off's navigation: the drawer closes, the patterns page opens with the prompt and sample waiting. */
+export function regexPatternsOpener(
+  store: Store<any>,
+  router: Router,
+  close: () => void,
+): (handoff: { prompt: string; sample: string }) => void {
+  return (handoff) => {
+    close();
+    store.commit("setRegexPatternHandoff", { prompt: handoff.prompt, testValue: handoff.sample });
+    void router.push({
+      path: "/settings/regex_patterns",
+      query: { org_identifier: store.state.selectedOrganization.identifier, from: "logs" },
+    });
+  };
 }
 
 /** Troubleshoot empty results: every selected stream, the absolute range, the mode. */

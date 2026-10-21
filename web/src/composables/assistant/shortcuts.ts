@@ -151,6 +151,13 @@ export function runEscapeLadder(event?: KeyboardEvent): boolean {
   return false;
 }
 
+/** A keydown listener for a box inside a host's drawer or dialog: an Escape the ladder handled never reaches the host. */
+export function stopLadderEscape(event: KeyboardEvent): void {
+  if (event.key !== "Escape" || !runEscapeLadder(event)) return;
+  event.preventDefault();
+  event.stopPropagation();
+}
+
 /** `Ctrl+↑`/`⌘↑` from the composer's first line: focuses the latest answer of the visible container (round 2 X-28). */
 export function assistantGoToAnswer(): boolean {
   for (const focus of focusTargets.get("answer") ?? []) if (focus()) return true;
@@ -183,7 +190,7 @@ export function resetAssistantShortcutsForTests(): void {
   owner().value = undefined;
 }
 
-// Rung a lets an open overlay take the key; rung f closes the sidebar or sheet (the turn keeps running); rung h keeps the full view.
+// Rung a lets an open overlay take the key; rung f closes the sidebar or sheet (the turn keeps running); rung g closes only a docked chat, never its host; rung h keeps the full view.
 function registerContainerRungs(): () => void {
   const off = [
     // Reka closes the overlay on the same keydown; the DOM still shows it open while the ladder runs.
@@ -191,6 +198,14 @@ function registerContainerRungs(): () => void {
     registerEscapeRung("f", (event) => {
       if (focusedPlacement(event) !== "sidebar" || closers.size === 0) return false;
       for (const close of closers) close();
+      return true;
+    }),
+    registerEscapeRung("g", (event) => {
+      if (focusedPlacement(event) !== "docked") return false;
+      const { store } = getAssistantRuntime();
+      if (store.state.shell.placement.kind !== "docked") return true;
+      trackAssistant("ai_container_closed", { reason: "escape" });
+      store.close("escape");
       return true;
     }),
     registerEscapeRung("h", (event) => focusedPlacement(event) === "full"),

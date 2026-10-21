@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <Teleport to="body">
+  <Teleport to="body" :disabled="inline">
     <div
       v-if="open || keepMounted"
       v-show="open"
@@ -35,13 +35,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-sheet-drag
         class="h-14! shrink-0 cursor-grab touch-none justify-start! rounded-none! px-4"
         :data-test="testId('peek-row')"
-        :aria-label="expandLabel"
         @pointerdown="onPointerDown"
         @pointerup="onPointerUp"
         @pointercancel="dragStart = null"
         @click="onPeekClick"
       >
         <slot name="peek" />
+        <!-- The row's name starts with what it shows, so voice control can say it; the action follows -->
+        <span class="sr-only">{{ expandLabel }}</span>
       </OButton>
       <div v-show="!peekRow" class="flex min-h-0 flex-1 flex-col">
         <div
@@ -124,6 +125,8 @@ const props = withDefaults(defineProps<OSheetProps>(), {
   dataTest: "o-sheet",
   keepMounted: false,
   closeOnEscape: true,
+  inline: false,
+  alignTo: null,
 });
 
 const emit = defineEmits<OSheetEmits>();
@@ -132,9 +135,17 @@ defineSlots<OSheetSlots>();
 
 const DRAG_THRESHOLD = 8;
 
+// Below md every sheet spans the window; a narrower column is a tablet or desktop drawer.
+const ALIGN_MIN_VIEWPORT_PX = 768;
+
+// A target this close to the window's width is treated as the window.
+const ALIGN_FULL_SLACK_PX = 48;
+
 // The sheet sits above the keyboard and any anchored footer, so its offset and cap follow both.
 const SHEET_BASE = [
-  "fixed inset-x-0 z-6000 flex flex-col overflow-hidden",
+  "fixed z-6000 flex flex-col overflow-hidden",
+  // eslint-disable-next-line local/no-hardcoded-px -- unit conversion of the unitless offsets JS writes
+  "start-[calc(var(--o-sheet-start,0)*1px)] end-[calc(var(--o-sheet-end,0)*1px)]",
   "rounded-t-surface border-border-default bg-surface-base border-t shadow-lg",
   "pb-[env(safe-area-inset-bottom)]",
   "motion-safe:transition-[height] motion-safe:duration-200 motion-reduce:transition-none",
@@ -155,6 +166,7 @@ const root = ref<HTMLElement | null>(null);
 const dragStart = ref<number | null>(null);
 const token = Symbol("sheet");
 let resizeObserver: ResizeObserver | null = null;
+let alignObserver: ResizeObserver | null = null;
 let dragged = false;
 
 const peekRow = computed(() => props.snap === "peek" && !!slots.peek);
@@ -238,7 +250,20 @@ function updateOffsets(): void {
     : 0;
   el.style.setProperty("--o-sheet-kb", String(Math.round(keyboard)));
   el.style.setProperty("--o-sheet-anchor", String(Math.round(anchorOffset())));
+  const [start, end] = alignedEdges();
+  el.style.setProperty("--o-sheet-start", String(start));
+  el.style.setProperty("--o-sheet-end", String(end));
   updateInset();
+}
+
+// The inline edges of `alignTo` as distances from the window's start and end, in px; a phone or a full-width target spans the window.
+function alignedEdges(): [number, number] {
+  const rect = props.alignTo?.getBoundingClientRect();
+  if (!rect || window.innerWidth < ALIGN_MIN_VIEWPORT_PX) return [0, 0];
+  if (rect.width >= window.innerWidth - ALIGN_FULL_SLACK_PX) return [0, 0];
+  const left = Math.max(0, Math.round(rect.left));
+  const right = Math.max(0, Math.round(window.innerWidth - rect.right));
+  return document.dir === "rtl" ? [right, left] : [left, right];
 }
 
 function updateInset(): void {
@@ -278,6 +303,9 @@ function attach(): void {
   if (typeof ResizeObserver !== "undefined" && root.value) {
     resizeObserver = new ResizeObserver(updateInset);
     resizeObserver.observe(root.value);
+    // A drawer that widens once the sheet opens moves its edges, so the sheet follows it.
+    alignObserver = new ResizeObserver(updateOffsets);
+    if (props.alignTo) alignObserver.observe(props.alignTo);
   }
   updateOffsets();
 }
@@ -289,6 +317,8 @@ function detach(): void {
   window.removeEventListener("resize", updateOffsets);
   resizeObserver?.disconnect();
   resizeObserver = null;
+  alignObserver?.disconnect();
+  alignObserver = null;
   covered.delete(token);
   publishInset();
 }
@@ -302,6 +332,15 @@ watch(
     attach();
   },
   { immediate: true },
+);
+
+watch(
+  () => props.alignTo,
+  (target, previous) => {
+    if (previous) alignObserver?.unobserve(previous);
+    if (target) alignObserver?.observe(target);
+    if (props.open) updateOffsets();
+  },
 );
 
 watch(

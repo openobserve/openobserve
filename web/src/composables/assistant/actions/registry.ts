@@ -98,6 +98,7 @@ const ORG_BOUND_KINDS: ReadonlySet<AssistantAction["kind"]> = new Set([
   "ask_again",
   "regenerate",
   "edit_resend",
+  "insert_into_editor",
 ]);
 
 const appliers = new Map<AssistantAction["kind"], AnyApplier>();
@@ -115,12 +116,14 @@ export function registerApplier<K extends AssistantAction["kind"]>(
 /** Runs the confirmation rule, then the applier, then the action's telemetry. */
 export async function applyAction(sid: Sid, action: AssistantAction): Promise<ActionResult> {
   const applier = appliers.get(action.kind);
-  // Insert needs an editor host, which no package registers yet.
+  // Insert needs an editor host; without its applier there is none to show the diff in.
   if (!applier)
     return { ok: false, reason: action.kind === "insert_into_editor" ? "needs_host" : "failed" };
   if (!env) return { ok: false, reason: "failed" };
   if (APPROVAL_KINDS.has(action.kind)) return { ok: false, reason: "gated" };
   if (TURN_KINDS.has(action.kind) && env.capability().gate !== "available")
+    return { ok: false, reason: "gated" };
+  if (TURN_KINDS.has(action.kind) && env.store().turnLockOf(sid))
     return { ok: false, reason: "gated" };
   const session = env.store().state.sessions[sid];
   if (ORG_BOUND_KINDS.has(action.kind) && session && env.currentOrg() !== session.org) {
@@ -166,6 +169,12 @@ function trackAction(sid: Sid, action: AssistantAction, result: ActionResult): v
       return evidence("create_alert", "query", action.query.language);
     case "rerun_now":
       return evidence("rerun_now", "footer");
+    case "insert_into_editor": {
+      const decision = (result.detail as { decision?: string } | undefined)?.decision;
+      if (decision === "accepted") evidence("insert_diff", "query", action.language);
+      else if (decision === "rejected") evidence("insert_rejected", "query", action.language);
+      return;
+    }
     case "open_step":
       return evidence("open_claim_step", "claim");
     case "feedback": {

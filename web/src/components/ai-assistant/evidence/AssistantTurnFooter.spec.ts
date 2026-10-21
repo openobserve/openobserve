@@ -15,6 +15,9 @@
 
 import { flushPromises, mount } from "@vue/test-utils";
 import { afterEach, describe, expect, it } from "vitest";
+import { computed } from "vue";
+
+import { setRuntimeHandle } from "@/composables/assistant/runtimeHandle";
 
 import type { ChatMessage, ContentBlock } from "@/ts/interfaces/chat";
 import { raw } from "@/types/i18n";
@@ -99,6 +102,22 @@ describe("AssistantTurnFooter", () => {
       kind: "rerun_now",
       turnId: "t1",
     });
+  });
+
+  it("holds Re-run with the reason while another tab locks the chat", async () => {
+    setRuntimeHandle({
+      lifecycle: {
+        signedOutElsewhere: computed(() => false),
+        turnLock: () => "approval_elsewhere",
+      },
+    } as never);
+    const { wrapper, host } = mountFooter(answer([query("c3")]));
+    const rerun = wrapper.get('[data-test="assistant-rerun"]');
+    expect(rerun.attributes("aria-disabled")).toBe("true");
+    expect(wrapper.text()).toContain("Another tab is waiting for your approval on this chat.");
+    await rerun.trigger("click");
+    expect(host.dispatch).not.toHaveBeenCalled();
+    setRuntimeHandle(null);
   });
 
   it("hides Re-run while another turn of the chat runs", async () => {

@@ -50,8 +50,8 @@ const stubs = {
   ODropdownSeparator: { template: "<hr />" },
 };
 
-async function openMenu(props: AssistantContainerMenuProps, path = "/logs") {
-  fake.current = fakeAssistant();
+async function openMenu(props: AssistantContainerMenuProps, path = "/logs", viewportRem = 80) {
+  fake.current = fakeAssistant("available", {}, {}, viewportRem);
   const router = fakeRouter();
   await router.push(path);
   const wrapper = mount(AssistantContainerMenu, {
@@ -85,6 +85,8 @@ describe("AssistantContainerMenu", () => {
     expect(ids()).toEqual([
       "assistant-shell-mode-menu",
       "assistant-shell-open-in-full-view-item",
+      "assistant-shell-mode-pinned",
+      "assistant-shell-mode-floating",
       "assistant-shell-width-narrow",
       "assistant-shell-width-default",
       "assistant-shell-width-wide",
@@ -147,6 +149,41 @@ describe("AssistantContainerMenu", () => {
     item("assistant-shell-width-wide")!.click();
     await flushPromises();
     expect(store.state.shell.sidebarWidthRem).toBe(32);
+  });
+
+  it("offers Pinned and Floating with their hints and remembers a pick", async () => {
+    const { store } = await openMenu({ placement: "sidebar" });
+    store.open({ kind: "sidebar", mode: "pinned" }, { focus: "none" });
+    await flushPromises();
+    expect(item("assistant-shell-mode-pinned")!.getAttribute("aria-checked")).toBe("true");
+    expect(item("assistant-shell-mode-pinned")!.getAttribute("description")).toBe(
+      "Pushes the page aside",
+    );
+    expect(item("assistant-shell-mode-floating")!.getAttribute("description")).toBe(
+      "Sits over the page",
+    );
+    item("assistant-shell-mode-floating")!.click();
+    await flushPromises();
+    expect(store.state.shell.sidebarMode).toBe("floating");
+    expect(store.state.shell.placement).toEqual({ kind: "sidebar", mode: "floating" });
+    expect(store.hasStoredSidebarMode()).toBe(true);
+    expect(track).toHaveBeenCalledWith("ai_panel_mode_changed", {
+      mode: "floating",
+      forced: false,
+    });
+  });
+
+  it("disables Pinned with the reason while the window cannot hold 20 rem beside 32 rem", async () => {
+    await openMenu({ placement: "sidebar" }, "/logs", 56);
+    fake.current.store.setSidebarWidth(24);
+    await flushPromises();
+    const pinned = item("assistant-shell-mode-pinned")!;
+    expect(pinned.hasAttribute("disabled")).toBe(true);
+    expect(pinned.getAttribute("description")).toBe("Floating because the window is narrow");
+    pinned.click();
+    await flushPromises();
+    expect(fake.current.store.state.shell.sidebarMode).toBe("pinned");
+    expect(fake.current.store.hasStoredSidebarMode()).toBe(false);
   });
 
   it("names placement modes for telemetry", () => {

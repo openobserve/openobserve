@@ -36,6 +36,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :transform-type-options="transformTypeOptions"
         :hide-trans-type="!!forcedLanguage"
         :hide-chat="hideAiAssist"
+        :assistant="docked"
+        :dock-host="dockHost"
         @test="onTestFunction"
         @back="closeAddFunction"
         @cancel="cancelAddFunction"
@@ -43,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </OForm>
 
-    <div class="flex min-h-0 flex-1">
+    <div :ref="docked ? docked.dockSlot : undefined" class="flex min-h-0 flex-1">
       <div
         class="flex min-h-0 overflow-hidden"
         :class="[store.state.isAiChatEnabled && !isAddFunctionComponent ? 'w-3/4' : 'w-full']"
@@ -85,7 +87,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :show-expand-icon="!hideTestPanel"
                   :label-class="hideTestPanel ? 'ps-2' : ''"
                 />
-                <div v-show="expandState.functions" class="relative mb-1.5 min-h-0 flex-1">
+                <AiLabel
+                  v-if="docked?.proposal.label.value"
+                  :state="docked.proposal.label.value"
+                  class="pb-1"
+                  @revert="docked.proposal.revert"
+                  @ask-again="docked.dock.askAgain"
+                />
+                <div
+                  v-show="expandState.functions"
+                  ref="editorArea"
+                  class="relative mb-1.5 min-h-0 flex-1"
+                >
+                  <AssistantDiffBlock
+                    v-if="docked?.proposal.pending.value"
+                    :key="docked.proposal.pending.value.id"
+                    :proposal="docked.proposal.pending.value"
+                    class="absolute inset-0 z-1000"
+                  />
                   <!-- Unified Query Editor (with built-in AI bar) -->
                   <UnifiedQueryEditor
                     data-test="logs-vrl-function-editor"
@@ -175,8 +194,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </OSplitter>
       </div>
+      <AssistantDock v-if="docked && dockHost" :host="docked.adapter" />
       <div
-        v-if="store.state.isAiChatEnabled && !isAddFunctionComponent"
+        v-else-if="store.state.isAiChatEnabled && !isAddFunctionComponent"
         :class="['w-1/4 max-w-full min-w-19', heightOffset ? '[--ai-chat-offset:4.6875rem]' : '']"
       >
         <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
@@ -232,6 +252,7 @@ import { useOForm } from "@/lib/forms/Form/useOForm";
 import { makeAddFunctionSchema, type AddFunctionForm } from "./AddFunction.schema";
 import { useMutation } from "@tanstack/vue-query";
 import { useOrgId } from "@/composables/query/useOrgId";
+import { isAssistantV2, useDockedEditor, type DockedEditor } from "@/composables/assistant/pure";
 export const defaultValue: any = () => {
   return {
     name: "",
@@ -294,8 +315,21 @@ export default defineComponent({
       type: String,
       default: "",
     },
+    // Inside a pipeline node the assistant docks beside the editor; on the functions page it opens the sidebar.
+    dockHost: {
+      type: Boolean,
+      default: false,
+    },
   },
   components: {
+    // The assistant's parts load only where the revamp renders them, never in the flag-off chunk.
+    AiLabel: defineAsyncComponent(() => import("@/components/ai-assistant/entry/AiLabel.vue")),
+    AssistantDiffBlock: defineAsyncComponent(
+      () => import("@/components/ai-assistant/evidence/AssistantDiffBlock.vue"),
+    ),
+    AssistantDock: defineAsyncComponent(
+      () => import("@/components/ai-assistant/shell/AssistantDock.vue"),
+    ),
     OSplitter,
     OForm,
     UnifiedQueryEditor: defineAsyncComponent(() => import("@/components/QueryEditor.vue")),
@@ -631,6 +665,35 @@ export default defineComponent({
       formData.value.function = newFunction;
     };
 
+    const editorArea = ref<HTMLElement | null>(null);
+    const docked: DockedEditor | null = isAssistantV2()
+      ? useDockedEditor(
+          {
+            id: "function",
+            objectKind: "function",
+            objectTitle: () =>
+              nameValue.value
+                ? t("assistant.editor.title.function", { name: raw(nameValue.value) })
+                : t("assistant.editor.title.functionNew"),
+            language: () => (transType.value === "1" ? "js" : "vrl"),
+            getBuffer: () => String(formData.value.function ?? ""),
+            getContext: () => ({
+              currentVRLQuery: String(formData.value.function ?? ""),
+              ...(nameValue.value && { functionName: nameValue.value }),
+            }),
+            isDirty: () => isFunctionDataChanged.value,
+            ...(!props.hideTestPanel && { run: () => onTestFunction() }),
+            focusEditor: () => editorArea.value?.querySelector<HTMLElement>("textarea")?.focus(),
+            write(text) {
+              formData.value.function = text;
+              editorRef.value?.replaceValue?.(text);
+            },
+            area: () => editorArea.value,
+          },
+          { dock: props.dockHost },
+        )
+      : null;
+
     // Unified Query Editor: Handle language change
     const handleLanguageChange = (newLanguage: "sql" | "promql" | "vrl" | "javascript") => {
       // transType is form-owned — write it straight to the form; the useStore
@@ -713,6 +776,8 @@ export default defineComponent({
       handleGenerationStart,
       handleGenerationEnd,
       handleGenerationSuccess,
+      docked,
+      editorArea,
     };
   },
   created() {

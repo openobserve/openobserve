@@ -115,7 +115,34 @@ class ContextRegistry {
    * ```
    */
   async getActiveContext(): Promise<PageContext | null> {
-    const top = this.stack[this.stack.length - 1];
+    return this.resolve(this.stack);
+  }
+
+  /** The context a pushed provider sits on: the entries pushed before `key`, else the page's provider. */
+  async getContextBelow(key: string): Promise<PageContext | null> {
+    const index = this.stack.findIndex((entry) => entry.key === key);
+    return this.resolve(index === -1 ? this.stack : this.stack.slice(0, index));
+  }
+
+  /**
+   * Clean up registry by removing all providers and resetting active provider
+   *
+   * Example:
+   * ```typescript
+   * cleanup(); // Clears all registered providers
+   * ```
+   */
+  cleanup(): void {
+    this.providers.clear();
+    this.activeProvider = null;
+    this.stack = [];
+    this.bump();
+  }
+
+  private async resolve(
+    stack: { key: string; provider: ContextProvider }[],
+  ): Promise<PageContext | null> {
+    const top = stack[stack.length - 1];
     if (top) {
       try {
         return await top.provider.getContext();
@@ -147,21 +174,6 @@ class ContextRegistry {
     }
 
     return null;
-  }
-
-  /**
-   * Clean up registry by removing all providers and resetting active provider
-   *
-   * Example:
-   * ```typescript
-   * cleanup(); // Clears all registered providers
-   * ```
-   */
-  cleanup(): void {
-    this.providers.clear();
-    this.activeProvider = null;
-    this.stack = [];
-    this.bump();
   }
 
   private bump(): void {
