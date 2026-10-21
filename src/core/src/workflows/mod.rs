@@ -74,6 +74,18 @@ enum WorkflowExecutionStatus {
     Errored,
 }
 
+pub struct TriggeredRun {
+    pub trace_id: String,
+    pub run_id: String,
+}
+
+#[derive(Debug)]
+pub enum TriggerWorkflowError {
+    NotFound,
+    Disabled,
+    Other(anyhow::Error),
+}
+
 // this function does not return error, as we do not have retry.
 // if something fails in this attempt which is a temporary failure
 // when that sourcemap is fetched again, this will be retried
@@ -692,6 +704,32 @@ fn record_workflow_run(
     });
 }
 
+fn history_row_for(
+    org_id: &str,
+    key: String,
+    trace_id: &str,
+    start_time: i64,
+    end_time: i64,
+    error: Option<String>,
+) -> TriggerData {
+    TriggerData {
+        _timestamp: start_time,
+        org: org_id.to_string(),
+        module: TriggerDataType::Workflow,
+        key,
+        is_realtime: false,
+        is_silenced: false,
+        status: run_outcome_for(error.as_deref()),
+        start_time,
+        end_time,
+        error,
+        source_node: Some(config::cluster::LOCAL_NODE.name.clone()),
+        evaluation_took_in_secs: Some((end_time - start_time) as f64 / 1_000_000.0),
+        scheduler_trace_id: Some(trace_id.to_string()),
+        ..Default::default()
+    }
+}
+
 /// Folds a finished run into the row we persist: node errors plus the per-node input/output
 /// maps. A clean run yields an empty `data` and a fully populated map, which is what makes a
 /// successful run inspectable after the fact.
@@ -814,6 +852,7 @@ pub async fn test_workflow(
             from_node,
             WorkflowRunOptions {
                 suppress_destinations,
+                ..Default::default()
             },
         )
         .await;
@@ -848,9 +887,15 @@ pub async fn trigger_workflow(
     id: &str,
     inputs: Vec<serde_json::Value>,
     user_id: &str,
-) -> Result<String, anyhow::Error> {
-    if db::workflows::get_workflow(org_id, id).await?.is_none() {
-        return Err(anyhow::anyhow!("workflow with id {id} not found"));
+) -> Result<TriggeredRun, TriggerWorkflowError> {
+    let Some(workflow) = db::workflows::get_workflow(org_id, id)
+        .await
+        .map_err(TriggerWorkflowError::Other)?
+    else {
+        return Err(TriggerWorkflowError::NotFound);
+    };
+    if !workflow.enabled {
+        return Err(TriggerWorkflowError::Disabled);
     }
 
     let metadata = [("event_type", "manual"), ("user_id", user_id)]
@@ -863,7 +908,7 @@ pub async fn trigger_workflow(
         "received webhook trigger for workflow {org_id}/{id} from user {user_id}, assigning trace id {trace_id}"
     );
 
-    if let Err(e) = send_workflow_trigger(
+    let run_id = send_workflow_trigger(
         &trace_id,
         org_id,
         user_id.to_string(),
@@ -873,16 +918,16 @@ pub async fn trigger_workflow(
         &inputs,
     )
     .await
-    {
+    .map_err(|e| {
         log::error!(
             "error in sending webhook trigger for workflow {org_id}/{id} from user {user_id}, trace id {trace_id} error : {e}"
         );
-        return Err(e);
-    }
+        TriggerWorkflowError::Other(e)
+    })?;
     log::info!(
-        "successfully triggered workflow {org_id}/{id} from user {user_id}, with trace id {trace_id}"
+        "successfully triggered workflow {org_id}/{id} from user {user_id}, with trace id {trace_id} run id {run_id}"
     );
-    Ok(trace_id)
+    Ok(TriggeredRun { trace_id, run_id })
 }
 
 async fn execute_workflow(
@@ -1022,10 +1067,10 @@ pub async fn send_workflow_trigger(
     workflow_id: &str,
     metadata: HashMap<String, Value>,
     data: &[Value],
-) -> Result<(), anyhow::Error> {
+) -> Result<String, anyhow::Error> {
     let o2_cfg = get_o2_config();
     if !o2_cfg.common.workflows_enabled {
-        return Ok(());
+        return Ok(String::new());
     }
 
     let data = serde_json::to_string(data)?;
@@ -1058,7 +1103,7 @@ pub async fn send_workflow_trigger(
     runtime::send_workflow_trigger(trigger).await?;
     log::info!("successfully sent workflow trigger for trace id {trace_id} run id {run_id}");
 
-    Ok(())
+    Ok(run_id)
 }
 
 /// The 4-part positional run-history key. Display, not Debug: a Debug-formatted
@@ -1172,29 +1217,21 @@ pub async fn handle_workflow_trigger(trigger: WorkflowTrigger) {
         _ => None,
     };
 
-    let trigger_data_stream: TriggerData = TriggerData {
-        _timestamp: start_time,
-        org: trigger.org_id.clone(),
-        module: TriggerDataType::Workflow,
-        // this order matters in the workflow history api, as we parse this there
-        key: workflow_history_key(
-            &trigger.workflow_id,
-            trigger.trigger_type,
-            &trigger.source_id,
-            &run_id,
-        ),
-        is_realtime: false,
-        is_silenced: false,
-        status: RunOutcome::Succeeded,
+    // this order matters in the workflow history api, as we parse this there
+    let key = workflow_history_key(
+        &trigger.workflow_id,
+        trigger.trigger_type,
+        &trigger.source_id,
+        &run_id,
+    );
+    publish_triggers_usage(history_row_for(
+        &trigger.org_id,
+        key,
+        &trace_id,
         start_time,
         end_time,
         error,
-        source_node: Some(config::cluster::LOCAL_NODE.name.clone()),
-        evaluation_took_in_secs: Some((end_time - start_time) as f64 / 1_000_000.0),
-        scheduler_trace_id: Some(trace_id.clone()),
-        ..Default::default()
-    };
-    publish_triggers_usage(trigger_data_stream);
+    ));
 
     if let Err(e) = infra::table::workflows::delete_run_data(
         &trigger.org_id,
@@ -1465,5 +1502,28 @@ mod tests {
         assert_eq!(errors.data.len(), 1, "the node error must be persisted");
         assert_eq!(errors.data[0].node_id, "n1");
         assert_eq!(errors.data[0].error, vec!["boom".to_string()]);
+    }
+
+    #[test]
+    fn an_errored_run_is_recorded_with_error_status() {
+        let key = workflow_history_key("wf1", WorkflowTriggerType::AlertFired, "alert1", "run1");
+        let errored = history_row_for(
+            "org1",
+            key.clone(),
+            "trace1",
+            10,
+            20,
+            Some("some node errored during execution".to_string()),
+        );
+        assert_eq!(errored.status, RunOutcome::Error);
+        assert_eq!(errored.key, key);
+        assert_eq!(errored.scheduler_trace_id.as_deref(), Some("trace1"));
+        assert_eq!(
+            errored.error.as_deref(),
+            Some("some node errored during execution")
+        );
+
+        let clean = history_row_for("org1", key, "trace1", 10, 20, None);
+        assert_eq!(clean.status, RunOutcome::Succeeded);
     }
 }

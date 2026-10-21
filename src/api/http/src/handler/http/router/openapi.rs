@@ -2065,7 +2065,7 @@ mod tests {
             (
                 "/api/{org_id}/workflows/{id}/trigger",
                 "post",
-                &["200", "400"],
+                &["200", "400", "409"],
             ),
             (
                 "/api/{org_id}/workflows/{id}/errors/{run_id}",
