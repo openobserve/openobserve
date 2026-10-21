@@ -128,18 +128,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <OTooltip :content="t('panel.cancel')" />
             </OButton>
-            <OButton
-              v-else
-              :variant="isRefreshPending ? 'warning' : 'outline'"
-              size="icon-toolbar"
-              @click="refreshData()"
-              :disabled="arePanelsLoading"
-              :loading="arePanelsLoading"
-              data-test="dashboard-refresh-btn"
-              :icon-left="isAutoRunOn ? 'autorenew' : 'refresh'"
-            >
-              <OTooltip :content="refreshTooltip" shortcut-id="dashboardRefresh" />
-            </OButton>
+            <!-- Wrapper mode: a child-mode tooltip would hover-bind only the icon, not the labelled button. -->
+            <OTooltip v-else :content="refreshTooltip" shortcut-id="dashboardRefresh">
+              <OButton
+                :variant="refreshVariant"
+                :size="isMobile ? 'icon-toolbar' : 'sm-toolbar'"
+                @click="refreshData()"
+                :disabled="arePanelsLoading"
+                :loading="arePanelsLoading"
+                :aria-label="t('dashboard.viewDashboard.refresh')"
+                data-test="dashboard-refresh-btn"
+                :icon-left="isAutoRunOn ? 'autorenew' : 'refresh'"
+              >
+                <template v-if="!isMobile">{{ t("dashboard.viewDashboard.refresh") }}</template>
+              </OButton>
+            </OTooltip>
             <ODropdown align="end" side="bottom">
               <template #trigger>
                 <OButton
@@ -1660,9 +1663,15 @@ export default defineComponent({
       });
     };
 
+    // Refresh is the dashboard's main action, but in layout edit Save owns the primary slot.
+    const refreshVariant = computed(() => {
+      if (isRefreshPending.value) return "warning";
+      return isEditingLayout.value ? "outline" : "primary";
+    });
+
     const refreshOptionsVariant = computed(() => {
       if (config.isEnterprise == "true" && arePanelsLoading.value) return "outline-destructive";
-      return isRefreshPending.value ? "warning" : "outline";
+      return refreshVariant.value;
     });
 
     const refreshData = async (withoutCache = false) => {
@@ -2357,6 +2366,7 @@ export default defineComponent({
       isAutoRunAvailable,
       isAutoRunOn,
       toggleAutoRun,
+      refreshVariant,
       refreshOptionsVariant,
       isVariablesChanged,
       isRefreshPending,

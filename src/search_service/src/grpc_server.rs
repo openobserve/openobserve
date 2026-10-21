@@ -249,18 +249,15 @@ impl Search for Searcher {
         req: Request<CancelQueryRequest>,
     ) -> Result<Response<CancelQueryResponse>, Status> {
         let req = req.into_inner();
-        let Some(cancelled) = self.cancel(&req.org_id, &req.trace_id).await else {
-            return Ok(Response::new(CancelQueryResponse { is_success: false }));
-        };
-        for (_, senders) in cancelled {
-            for sender in senders.abort_senders.into_iter().rev() {
-                let _ = sender.send(());
-            }
+        let cancelled = self.cancel(&req.org_id, &req.trace_id);
+        if cancelled > 0 {
             metrics::QUERY_CANCELED_NUMS
                 .with_label_values(&[&req.org_id])
-                .inc();
+                .inc_by(cancelled as u64);
         }
-        Ok(Response::new(CancelQueryResponse { is_success: true }))
+        Ok(Response::new(CancelQueryResponse {
+            is_success: cancelled > 0,
+        }))
     }
 
     #[cfg(not(feature = "enterprise"))]
@@ -531,66 +528,76 @@ mod tests {
     }
 
     #[cfg(feature = "enterprise")]
+    fn leader(searcher: &Searcher, org_id: &str, trace_id: &str) -> crate::QueryRegistration {
+        let info = crate::LeaderInfo {
+            user_id: None,
+            stream_type: "logs",
+            sql: "select 1",
+            start_time: 0,
+            end_time: 0,
+            search_type: None,
+            search_event_context: None,
+        };
+        searcher.register_leader(org_id, trace_id, info)
+    }
+
+    #[cfg(feature = "enterprise")]
+    fn listed(searcher: &Searcher, org_id: &str) -> usize {
+        searcher
+            .query_manager
+            .get_task_status()
+            .iter()
+            .filter(|status| status.org_id.as_deref() == Some(org_id))
+            .count()
+    }
+
+    #[cfg(feature = "enterprise")]
     #[tokio::test]
     async fn test_cancel_scoped_to_one_org_keeps_another_orgs_query() {
-        use o2_enterprise::enterprise::search::TaskStatus;
-
         let searcher = Searcher::new();
-        let leader = || TaskStatus::new_follower(vec![], true);
-        searcher.insert("b", "t1".to_string(), leader()).await;
+        let _query = leader(&searcher, "b", "t1");
 
         assert!(!cancel_in(&searcher, "t1", "a").await);
         assert!(!cancel_in(&searcher, "t1", "").await);
-        assert!(searcher.contain_key("b", "t1").await);
+        assert_eq!(listed(&searcher, "b"), 1);
         assert!(cancel_in(&searcher, "t1", "b").await);
-        assert!(!searcher.contain_key("b", "t1").await);
+        assert_eq!(listed(&searcher, "b"), 0);
         assert!(!cancel_in(&searcher, "t1", "b").await);
     }
 
     #[cfg(feature = "enterprise")]
     #[tokio::test]
     async fn test_one_trace_id_runs_and_cancels_in_two_orgs_independently() {
-        use o2_enterprise::enterprise::search::TaskStatus;
-
         let searcher = Searcher::new();
-        let status = |is_leader| TaskStatus::new_follower(vec![], is_leader);
-        searcher.insert("a", "t".to_string(), status(true)).await;
-        searcher.insert("b", "t".to_string(), status(true)).await;
-        searcher.insert("b", "t-1".to_string(), status(false)).await;
+        let _a = leader(&searcher, "a", "t");
+        let _b = leader(&searcher, "b", "t");
+        let _b_sub = leader(&searcher, "b", "t-1");
 
         assert!(cancel_in(&searcher, "t", "a").await);
-        assert!(!searcher.contain_key("a", "t").await);
-        assert!(searcher.is_leader("b", "t").await);
-        assert!(searcher.contain_key("b", "t-1").await);
+        assert_eq!(listed(&searcher, "a"), 0);
+        assert_eq!(listed(&searcher, "b"), 2);
 
-        searcher.insert("a", "t".to_string(), status(true)).await;
+        let _a = leader(&searcher, "a", "t");
         assert!(cancel_in(&searcher, "t", "b").await);
-        assert!(!searcher.contain_key("b", "t").await);
-        assert!(!searcher.contain_key("b", "t-1").await);
-        assert!(searcher.contain_key("a", "t").await);
+        assert_eq!(listed(&searcher, "b"), 0);
+        assert_eq!(listed(&searcher, "a"), 1);
     }
 
     #[cfg(feature = "enterprise")]
     #[tokio::test]
-    async fn test_completion_after_a_cancel_keeps_the_next_orgs_entry() {
-        use o2_enterprise::enterprise::search::TaskStatus;
+    async fn test_concurrent_queries_sharing_a_trace_id_end_independently() {
+        use crate::QueryPhase;
 
         let searcher = Searcher::new();
-        let leader = || TaskStatus::new_follower(vec![], true);
-        searcher.insert("a", "t".to_string(), leader()).await;
-        assert!(cancel_in(&searcher, "t", "a").await);
-        searcher.insert("b", "t".to_string(), leader()).await;
+        let first = leader(&searcher, "a", "t");
+        let registration = leader(&searcher, "a", "t");
+        let second = registration.tracker();
 
-        assert!(searcher.remove("a", "t").await.is_none());
-        let (sender, _receiver) = tokio::sync::oneshot::channel();
-        assert!(
-            searcher
-                .insert_sender("a", "t", sender, true)
-                .await
-                .is_err()
-        );
-        assert!(searcher.contain_key("b", "t").await);
-        assert!(cancel_in(&searcher, "t", "b").await);
+        drop(first);
+        assert_eq!(listed(&searcher, "a"), 1);
+        assert!(second.abort_receiver(QueryPhase::Running).is_ok());
+        assert!(cancel_in(&searcher, second.query_id(), "a").await);
+        assert!(second.abort_receiver(QueryPhase::Running).is_err());
     }
 
     #[tokio::test]
