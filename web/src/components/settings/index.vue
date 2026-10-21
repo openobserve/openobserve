@@ -71,6 +71,8 @@ import useIsMetaOrg from "@/composables/useIsMetaOrg";
 import { getImageURL } from "@/utils/zincutils";
 import { checkFeatureAccess, buildFeatureGateContext } from "@/utils/enterpriseFeatures";
 import { isSlackSettingsVisible, readSlackOrgConfig } from "@/utils/slackSettings";
+import { isAssistantV2 } from "@/composables/assistant/flags";
+import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
 
 export default defineComponent({
   name: "AppSettings",
@@ -86,6 +88,7 @@ export default defineComponent({
     const { isDark } = useTheme();
     const router: any = useRouter();
     const route = useRoute();
+    const assistantV2 = isAssistantV2();
 
     // Maps a route name → the section key used by the hub/switcher.
     const routeToSettingsTab: Record<string, string> = {
@@ -114,6 +117,7 @@ export default defineComponent({
       correlationSettings: "correlation_settings",
       genAiAgentMapping: "gen_ai_agent_mapping",
       slack: "slack",
+      ...(assistantV2 ? { assistantSettings: "assistant" } : {}),
     };
 
     const settingsTab = ref(
@@ -208,6 +212,7 @@ export default defineComponent({
       "Access & Security",
       "Destinations",
       "Integrations",
+      ...(assistantV2 ? ["Assistant"] : []),
       "Data & AI",
       "Operations",
       "Synthetics",
@@ -240,6 +245,27 @@ export default defineComponent({
       const queryManagementAccess = checkFeatureAccess("queryManagement", featureGateCtx);
       const nodesAccess = checkFeatureAccess("nodes", featureGateCtx);
       const licenseAccess = checkFeatureAccess("license", featureGateCtx);
+      const assistantAccess = checkFeatureAccess("aiAssistant", featureGateCtx);
+      const assistantItems: (SectionHubItem & { group: string })[] = assistantV2
+        ? [
+            {
+              key: "assistant",
+              label: t("assistant.settings.title"),
+              description: t("assistant.settings.railDesc"),
+              icon: assistantGlyph.assistant,
+              to: {
+                name: "assistantSettings",
+                params: { tab: "status" },
+                query: { org_identifier: org },
+              },
+              visible: assistantAccess.visible,
+              locked: !assistantAccess.allowed,
+              lockedMessage: assistantAccess.message,
+              dataTest: "settings-assistant-tab",
+              group: "Assistant",
+            },
+          ]
+        : [];
 
       const items: (SectionHubItem & { group: string })[] = [
         {
@@ -483,6 +509,7 @@ export default defineComponent({
           dataTest: "organization-management-tab",
           group: "Account",
         },
+        ...assistantItems,
       ];
       return items;
     });
@@ -512,6 +539,7 @@ export default defineComponent({
         "Access & Security": t("settings.groupAccessSecurity"),
         Destinations: t("settings.groupDestinations"),
         Integrations: t("settings.groupIntegrations"),
+        Assistant: t("settings.groupAssistant"),
         "Data & AI": t("settings.groupDataAI"),
         Operations: t("settings.groupOperations"),
         Synthetics: t("settings.groupSynthetics"),

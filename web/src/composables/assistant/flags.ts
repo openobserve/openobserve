@@ -27,7 +27,8 @@ interface ResolvedFlag {
   source: AssistantV2Source;
 }
 
-const LOCAL_STORAGE_KEY = "o2.assistant.v2";
+/** The per-browser opt-in; "1" turns the revamp on for this browser only. */
+export const ASSISTANT_V2_STORAGE_KEY = "o2.assistant.v2";
 
 // A mount point reads the flag once in setup; a mid-session flip would split the page between two runtimes.
 let resolved: ResolvedFlag | null = null;
@@ -60,7 +61,7 @@ function readFlag(): ResolvedFlag {
 
 function readLocalOptIn(): boolean {
   try {
-    return localStorage.getItem(LOCAL_STORAGE_KEY) === "1";
+    return localStorage.getItem(ASSISTANT_V2_STORAGE_KEY) === "1";
   } catch {
     return false;
   }

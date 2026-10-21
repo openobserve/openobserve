@@ -95,6 +95,11 @@ export function createMockState(overrides = {}) {
     // B-14 settings, B-15 toolset health, B-16 grants, B-17 activity, B-11 secret merge, B-12 import.
     settingsEnabled: false,
     settings: null,
+    // Every PUT /ai/settings body, in order.
+    settingsPuts: [],
+    // POST /ai/capabilities/test answers in order (then ok), and how long each takes.
+    capabilitiesTestResults: [],
+    capabilitiesTestDelayMs: 0,
     toolsetHealthEnabled: false,
     grantsEnabled: false,
     activityEnabled: false,
@@ -227,11 +232,25 @@ async function handleAi(route, request, state) {
   // B-06: absent (404) unless `capabilitiesEnabled`; `capabilities` overrides the answer.
   if ((mt = p.match(/^\/api\/[^/]+\/ai\/capabilities(\/test)?$/))) {
     if (!state.capabilitiesEnabled) return json(route, { code: 404, message: "Not Found" }, 404), true;
-    if (mt[1]) return json(route, { ok: true, duration_ms: 120 }), true;
+    if (mt[1]) {
+      state.log.push("TEST capabilities");
+      if (state.capabilitiesTestDelayMs) await new Promise((r) => setTimeout(r, state.capabilitiesTestDelayMs));
+      return json(route, state.capabilitiesTestResults.shift() ?? { ok: true, duration_ms: 120 }), true;
+    }
     const role = ROLE_NAMES[state.role] ?? state.role;
     const admin = role === "admin";
     const history = { ...(state.historySearchEnabled && { history_search: true }), ...(state.historyPinsEnabled && { history_pins: true }) };
-    return json(route, { health: { status: "ok", checked_at: Date.now() * 1000 }, redaction_applied: false, can_chat: role !== "viewer", can_write: admin || role === "editor", can_share: admin, agents: [], toolsets: [], toolset_secret_merge: false, policy_enforced: false, ...history, ...state.capabilities }), true;
+    return json(route, { health: { status: "ok", checked_at: Date.now() * 1000 }, redaction_applied: false, can_chat: role !== "viewer", can_write: admin || role === "editor", can_share: admin, agents: [], toolsets: [], toolset_secret_merge: false, policy_enforced: state.policyEnforced, ...offForOrg(state), ...history, ...state.capabilities }), true;
+  }
+  // B-14: absent (404) unless `settingsEnabled`; a PUT keeps the five writable keys and stamps the writer.
+  if (p.match(/^\/api\/[^/]+\/ai\/settings$/)) {
+    if (!state.settingsEnabled) return json(route, { code: 404, message: "Not Found" }, 404), true;
+    if (m === "PUT") {
+      const body = request.postDataJSON() || {};
+      state.settingsPuts.push(body);
+      state.settings = { ...orgSettings(state), ...body, updated_by: ENV.user, updated_at: Date.now() * 1000 };
+    }
+    return json(route, orgSettings(state)), true;
   }
   // The access probe (00 §9) arrives by XHR (the shim answers fetch cancels); a viewer is refused, any other role reaches the handler.
   if (m === "POST" && /^\/api\/[^/]+\/ai\/chats\/[^/]+\/cancel$/.test(p)) {
@@ -385,6 +404,16 @@ function listRow(chat, state) {
       pending_approval: !!chat.pending_approval,
     }),
   };
+}
+
+/** The stored org settings, or the B-14 defaults the server starts an org with. */
+function orgSettings(state) {
+  return state.settings ?? { enabled: true, permission_tier: "act_with_approval", org_sharing: true, public_sharing: true, data_sharing_level: "raw" };
+}
+
+/** A B-14 server folds `enabled: false` into the probe's gate. */
+function offForOrg(state) {
+  return state.settingsEnabled && state.settings?.enabled === false ? { gate: "off_for_org" } : {};
 }
 
 /** Installs the streaming shim and all HTTP mocks on a browser context. */

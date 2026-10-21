@@ -127,6 +127,7 @@ export interface LifecycleDeps {
 
 export {
   GUARD_RELEASE_MS,
+  askLeaveGuard,
   askLifecycle,
   registerLifecycleDialogs,
   resetLifecycleForTests,
