@@ -126,17 +126,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="rca-verdict-confidence-why"
       class="text-compact m-0 -mt-1 grid max-w-225 grid-cols-[max-content_minmax(0,1fr)] gap-x-4 gap-y-0.5"
     >
-      <dt class="text-text-muted">{{ t("alerts.incidents.rcaSummary.confidenceClaimed") }}</dt>
+      <dt class="text-text-secondary">{{ t("alerts.incidents.rcaSummary.confidenceClaimed") }}</dt>
       <dd data-test="rca-confidence-claimed" class="text-text-heading m-0 font-semibold">
         {{ bandWord(breakdown.claimed) }}
       </dd>
-      <dt class="text-text-muted">{{ t("alerts.incidents.rcaSummary.confidenceEvidence") }}</dt>
+      <dt class="text-text-secondary">{{ t("alerts.incidents.rcaSummary.confidenceEvidence") }}</dt>
       <dd data-test="rca-confidence-evidence" class="text-text-secondary m-0">
         <span class="text-text-heading font-semibold">{{ bandWord(breakdown.evidence) }}</span>
         · {{ evidenceText }}
       </dd>
       <template v-if="breakdown.caps.length > 0">
-        <dt class="text-text-muted">
+        <dt class="text-text-secondary">
           {{ t("alerts.incidents.rcaSummary.confidenceCapped", { band: bandWord("medium") }) }}
         </dt>
         <dd data-test="rca-confidence-caps" class="text-text-secondary m-0">
@@ -152,9 +152,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
 
     <div v-if="graded" class="mt-0.5 flex flex-wrap items-end gap-x-8 gap-y-3">
-      <dl data-test="rca-verdict-facts" class="m-0 flex min-w-0 flex-wrap items-end gap-8">
+      <dl data-test="rca-verdict-facts" class="m-0 flex min-w-0 flex-wrap items-start gap-8">
         <div v-if="suspectText" class="max-w-105 min-w-0">
-          <dt class="text-text-muted text-xs">
+          <dt class="text-text-secondary text-xs">
             {{ t("alerts.incidents.rcaSummary.suspectChange") }}
           </dt>
           <dd data-test="rca-verdict-suspect" class="text-text-heading m-0 text-sm font-semibold">
@@ -162,13 +162,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </dd>
         </div>
         <div class="max-w-95 min-w-0">
-          <dt class="text-text-muted text-xs">{{ t("alerts.incidents.rcaSummary.impact") }}</dt>
+          <dt class="text-text-secondary text-xs">{{ t("alerts.incidents.rcaSummary.impact") }}</dt>
           <dd data-test="rca-verdict-impact" class="text-text-heading m-0 text-sm font-semibold">
             {{ impactText }}
           </dd>
         </div>
         <div v-if="impactedServices.length" class="max-w-105 min-w-0">
-          <dt class="text-text-muted text-xs">
+          <dt class="text-text-secondary text-xs">
             {{ t("alerts.incidents.rcaSummary.impactedServices") }}
           </dt>
           <dd
@@ -192,7 +192,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :aria-labelledby="actionsHeadingId"
       class="flex max-w-225 flex-col gap-1.5"
     >
-      <h3 :id="actionsHeadingId" class="text-text-muted m-0 text-xs font-normal">
+      <h3 :id="actionsHeadingId" class="text-text-secondary m-0 text-xs font-normal">
         {{ t("alerts.incidents.rcaSummary.proposedActions") }}
         <span class="text-text-secondary">
           · {{ t("alerts.incidents.rcaSummary.proposedActionsNote") }}

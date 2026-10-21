@@ -132,39 +132,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #header-tabs>
-        <OTabs v-model="activeTab" align="left" class="flex-1" mobile-arrows :breakpoint="0">
+        <OTabs
+          v-model="activeTab"
+          align="left"
+          class="flex-1"
+          mobile-arrows
+          :breakpoint="0"
+          reorderable
+          @reorder="onTabReorder"
+        >
           <OTab
-            name="overview"
-            :label="t('alerts.insights.tabs.overview')"
-            data-test="incident-overview-tab"
-          />
-          <OTab
-            name="activity"
-            :label="t('alerts.incidents.activityTab')"
-            data-test="incident-activity-tab"
-          />
-          <OTab
-            name="incidentAnalysis"
-            :label="t('alerts.incidents.incidentAnalysis')"
-            data-test="incident-analysis-tab"
-          />
-          <OTab
-            name="serviceGraph"
-            :label="t('alerts.incidents.alertGraph')"
-            data-test="incident-alert-graph-tab"
-          />
-          <OTab name="alertTriggers" data-test="incident-alert-triggers-tab">
-            <template #default>
+            v-for="tab in tabOrder"
+            :key="tab"
+            :name="tab"
+            :label="tab === 'alertTriggers' ? undefined : tabLabels[tab]"
+            :data-test="TAB_TEST_IDS[tab]"
+          >
+            <template v-if="tab === 'alertTriggers'" #default>
               <div class="flex items-center gap-1.5">
-                <span>{{ t("alerts.incidents.alertTriggers") }}</span>
+                <span>{{ tabLabels.alertTriggers }}</span>
                 <OTag type="countChip" value="neutral">{{ triggers.length }}</OTag>
               </div>
             </template>
           </OTab>
-
-          <OTab name="logs" :label="t('common.logs')" data-test="incident-logs-tab" />
-          <OTab name="metrics" :label="t('search.metrics')" data-test="incident-metrics-tab" />
-          <OTab name="traces" :label="t('menu.traces')" data-test="incident-traces-tab" />
         </OTabs>
       </template>
 
@@ -1500,7 +1490,7 @@ import {
   onBeforeUnmount,
   onUnmounted,
 } from "vue";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
 import { useRouter, useRoute } from "vue-router";
@@ -1548,6 +1538,46 @@ import { useIncidentRca } from "@/composables/useIncidentRca";
 import type { RcaAskPayload } from "@/utils/incidents/rcaAskAttachment";
 import BillingService, { type AiCreditCounts } from "@/services/billings";
 import config from "@/aws-exports";
+
+const LS_INCIDENT_TAB_ORDER_KEY = "o2_incident_detail_tab_order";
+const DEFAULT_INCIDENT_TAB_ORDER = [
+  "incidentAnalysis",
+  "overview",
+  "activity",
+  "serviceGraph",
+  "alertTriggers",
+  "logs",
+  "metrics",
+  "traces",
+] as const;
+type IncidentTab = (typeof DEFAULT_INCIDENT_TAB_ORDER)[number];
+const TAB_TEST_IDS: Record<IncidentTab, string> = {
+  incidentAnalysis: "incident-analysis-tab",
+  overview: "incident-overview-tab",
+  activity: "incident-activity-tab",
+  serviceGraph: "incident-alert-graph-tab",
+  alertTriggers: "incident-alert-triggers-tab",
+  logs: "incident-logs-tab",
+  metrics: "incident-metrics-tab",
+  traces: "incident-traces-tab",
+};
+
+function isIncidentTab(name: unknown): name is IncidentTab {
+  return DEFAULT_INCIDENT_TAB_ORDER.includes(name as IncidentTab);
+}
+
+/** The saved order minus unknown names, with tabs added since it was saved appended. */
+function loadIncidentTabOrder(): IncidentTab[] {
+  try {
+    const saved: unknown = JSON.parse(localStorage.getItem(LS_INCIDENT_TAB_ORDER_KEY) ?? "[]");
+    if (Array.isArray(saved)) {
+      return [...new Set([...saved.filter(isIncidentTab), ...DEFAULT_INCIDENT_TAB_ORDER])];
+    }
+  } catch {
+    /* unreadable: fall back to the default order */
+  }
+  return [...DEFAULT_INCIDENT_TAB_ORDER];
+}
 
 export default defineComponent({
   name: "IncidentDetailDrawer",
@@ -1703,8 +1733,41 @@ export default defineComponent({
     // Title editing
     const isEditingTitle = ref(false);
 
-    // Tab management
-    const activeTab = ref("overview");
+    // Tabs are drag-reorderable (OTabs `reorderable`); the page opens on the first one.
+    const tabOrder = ref<IncidentTab[]>(loadIncidentTabOrder());
+    const activeTab = ref<string>(tabOrder.value[0]);
+    const tabLabels = computed<Record<IncidentTab, I18nText>>(() => ({
+      incidentAnalysis: t("alerts.incidents.incidentAnalysis"),
+      overview: t("alerts.insights.tabs.overview"),
+      activity: t("alerts.incidents.activityTab"),
+      serviceGraph: t("alerts.incidents.alertGraph"),
+      alertTriggers: t("alerts.incidents.alertTriggers"),
+      logs: t("common.logs"),
+      metrics: t("search.metrics"),
+      traces: t("menu.traces"),
+    }));
+
+    function onTabReorder({
+      from,
+      to,
+      before = true,
+    }: {
+      from: string | number;
+      to: string | number;
+      before?: boolean;
+    }) {
+      if (from === to || !isIncidentTab(from)) return;
+      const order = tabOrder.value.filter((name) => name !== from);
+      const toIdx = order.indexOf(to as IncidentTab);
+      if (toIdx === -1) return;
+      order.splice(before ? toIdx : toIdx + 1, 0, from);
+      tabOrder.value = order;
+      try {
+        localStorage.setItem(LS_INCIDENT_TAB_ORDER_KEY, JSON.stringify(order));
+      } catch {
+        /* storage unavailable: the order still applies until reload */
+      }
+    }
 
     // Counter to trigger timeline refresh (prop-based approach)
     const timelineRefreshTrigger = ref(0);
@@ -3040,6 +3103,10 @@ export default defineComponent({
       askAboutRca,
       isDarkMode,
       activeTab,
+      tabOrder,
+      tabLabels,
+      TAB_TEST_IDS,
+      onTabReorder,
       timelineRefreshTrigger,
       correlationData,
       correlationMatchedSetId,

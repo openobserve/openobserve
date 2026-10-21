@@ -20,8 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <h3 :id="headingId" class="text-text-heading m-0 text-base font-bold">
         {{ t("alerts.incidents.rcaSummary.blindSpots") }}
       </h3>
-      <span class="text-text-muted text-xs">{{ blindSpots.length }}</span>
-      <span class="text-text-muted text-xs">
+      <span class="text-text-secondary text-xs">{{ blindSpots.length }}</span>
+      <span class="text-text-secondary text-xs">
         {{ t("alerts.incidents.rcaSummary.blindSpotsSubtitle") }}
       </span>
     </div>
