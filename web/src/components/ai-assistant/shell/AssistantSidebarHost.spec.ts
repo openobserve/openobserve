@@ -48,6 +48,7 @@ vi.mock("@/composables/assistant", async (importOriginal) => {
   return {
     ...(await importOriginal<typeof import("@/composables/assistant")>()),
     useAssistantStore: () => fake.current.store,
+    useAssistantHistory: () => fake.current.history,
     useAssistantCapability: () => fake.current.handle,
     useAssistantShortcuts: shortcuts,
     registerContainerCloser: (close: () => void) => {

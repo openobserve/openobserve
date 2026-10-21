@@ -186,6 +186,17 @@ describe("AssistantApprovalResult", () => {
     expect(wrapper.find("button, a").exists()).toBe(false);
   });
 
+  it("renders a redacted record that keeps only its kind, count and answer", () => {
+    const redacted = { id: "c9", kind: "delete", total: 2 } as ContentBlock["approval"];
+    const blocks: ContentBlock[] = [
+      { type: "approval", approval: redacted },
+      { type: "approval_result", resolved: { id: "c9", approved: true, at: 60_000 } },
+    ];
+    const { wrapper } = mountRecord(null, { readonly: true, blocks });
+    expect(wrapper.text()).not.toContain("undefined");
+    expect(wrapper.find("button, a").exists()).toBe(false);
+  });
+
   it("never offers Ask again for a delete whose outcome is unknown; it points at the list", () => {
     const { wrapper } = mountRecord({ outcome: { state: "unconfirmed", at: 1 } });
     expect(line(wrapper)).toBe("Your decision was sent, but its result couldn't be confirmed.");

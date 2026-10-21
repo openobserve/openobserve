@@ -347,6 +347,9 @@ function resolveCapability(input: CapabilityInput): AssistantCapability {
   if (input.b06?.attachments === true) capability.attachments = true;
   if (input.b06?.approval_extend === true) capability.approvalExtend = true;
   if (input.creditMode && input.edition.isCloud) capability.creditMode = input.creditMode;
+  if (input.b06?.history_search === true) capability.historySearch = true;
+  if (input.b06?.history_pins === true) capability.historyPins = true;
+  if (input.b06?.history_import === true) capability.historyImport = true;
   if (gate !== "available") return capability;
   if (!persistence) capability.reasonCode = "local_only";
   else if (canShare === "no") capability.reasonCode = "no_share";

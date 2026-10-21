@@ -19,9 +19,10 @@ import { computed, ref } from "vue";
 
 import type { AssistantCapability, GateCode, Starter } from "@/composables/assistant";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import type { HistoryDeps } from "@/composables/assistant/useAssistantHistory";
 import { raw } from "@/types/i18n";
 
-import { fakeAssistant, fakeRouter, fakeVuex } from "../__tests__/fakeAssistant";
+import { fakeAssistant, fakeRouter, fakeVuex, hintBus } from "../__tests__/fakeAssistant";
 import AssistantShell, {
   SHELL_ROUTE_CONTEXT,
   STEP_ANNOUNCE_MS,
@@ -48,6 +49,7 @@ const { fake, starters } = vi.hoisted(() => ({
 vi.mock("@/composables/assistant", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/composables/assistant")>()),
   useAssistantStore: () => fake.current.store,
+  useAssistantHistory: () => fake.current.history,
   useAssistantCapability: () => fake.current.handle,
   useAssistantStarters: (...args: unknown[]) => {
     starters(...args);
@@ -68,8 +70,9 @@ function setup(
   gate: GateCode = "available",
   over: Partial<AssistantCapability> = {},
   routed?: ShellRouteState,
+  historyDeps: Partial<HistoryDeps> = {},
 ) {
-  fake.current = fakeAssistant(gate, over);
+  fake.current = fakeAssistant(gate, over, {}, 80, false, historyDeps);
   const router = fakeRouter();
   const routeState = ref<ShellRouteState>(routed ?? "idle");
   const newChat = vi.fn();
@@ -285,7 +288,7 @@ describe("AssistantShell chrome and focus", () => {
   it("offers full view and the layout menu in the sidebar, and close in every container", () => {
     const { wrapper } = setup();
     expect(wrapper.find('[data-test="assistant-shell-open-in-full-view"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="assistant-shell-menu"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="assistant-thread-menu"]').exists()).toBe(true);
     expect(wrapper.get('[data-test="assistant-shell-close"]').attributes("aria-label")).toBe(
       "Close O2 Assistant",
     );
@@ -968,5 +971,102 @@ describe("AssistantShell decision cards", () => {
     (wrapper.vm as unknown as { $: { setupState: { newChat(): void } } }).$.setupState.newChat();
     await flushPromises();
     expect(decide).toHaveBeenCalledWith(sid, { approved: false, reason: "new_chat" });
+  });
+});
+
+describe("AssistantShell history states", () => {
+  const open = (store: ReturnType<typeof setup>["store"]) => {
+    const sid = store.createSession({
+      origin: { entryKind: "header_button", objectKind: "none", container: "sidebar" },
+    });
+    store.state.sessions[sid].messages.push({ role: "user", content: raw("q") });
+    store.open({ kind: "sidebar", mode: "pinned" }, { focus: "none" });
+    return sid;
+  };
+
+  it("renders the thread header as the chrome row, the shell's controls at its end", async () => {
+    const { wrapper, store } = setup();
+    open(store);
+    await flushPromises();
+    const header = wrapper.get('[data-test="assistant-thread-header"]');
+    expect(header.find('[data-test="assistant-shell-close"]').exists()).toBe(true);
+    expect(header.find('[data-test="assistant-thread-menu"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="assistant-shell-menu"]').exists()).toBe(false);
+  });
+
+  it("follows a turn another tab runs with its status line and Stop", async () => {
+    const { wrapper, store } = setup();
+    const sid = open(store);
+    store.state.sessions[sid].turn = { state: "responding.writing" } as never;
+    store.state.sessions[sid].turnMeta.ownedByThisTab = false;
+    await flushPromises();
+    expect(wrapper.get('[data-test="assistant-shell-elsewhere-status"]').text()).toBe(
+      "Answering in another tab",
+    );
+    expect(wrapper.find('[data-test="assistant-shell-elsewhere-stop"]').exists()).toBe(true);
+  });
+
+  it("says history is unavailable with Retry while the cached transcript stays", async () => {
+    const { wrapper, store } = setup();
+    const sid = open(store);
+    store.state.sessions[sid].record.historyUnavailable = true;
+    await flushPromises();
+    expect(wrapper.get('[data-test="assistant-shell-history-unavailable"]').text()).toContain(
+      "History unavailable",
+    );
+    expect(wrapper.find('[data-test="assistant-transcript"]').exists()).toBe(true);
+  });
+
+  it("replaces the body when another tab deletes the open chat, and writes nothing back", async () => {
+    const hints = hintBus();
+    const { wrapper, store } = setup({}, "available", {}, undefined, { hints: hints as never });
+    const sid = open(store);
+    await flushPromises();
+    hints.fire({ type: "history_changed", sid, op: "delete" });
+    await flushPromises();
+    expect(root(wrapper).attributes("data-state")).toBe("deleted_elsewhere");
+    expect(wrapper.get('[data-test="assistant-shell-deleted"]').text()).toContain(
+      "This chat was deleted in another tab",
+    );
+    expect(store.state.sessions[sid]).toBeUndefined();
+    await fake.current.history.save(sid);
+    expect(fake.current.db.rows.size).toBe(0);
+  });
+
+  it("speaks one history outcome once, from the visible shell only", async () => {
+    const { wrapper, store } = setup();
+    open(store);
+    const second = mount(AssistantShell, {
+      props: { placement: "sidebar" },
+      global: { plugins: [fakeRouter(), fakeVuex()] },
+      attachTo: document.body,
+    });
+    await flushPromises();
+    fake.current.history.announceText(raw("Chat deleted"));
+    await flushPromises();
+    const spoken = [wrapper, second].map((shell) =>
+      shell.get('[data-test="assistant-status-region"]').text(),
+    );
+    expect(spoken.filter((text) => text === "Chat deleted")).toHaveLength(1);
+    second.unmount();
+  });
+
+  it("says a chat opened from the list was deleted elsewhere, but never over a transcript", async () => {
+    const { wrapper, store } = setup();
+    store.open({ kind: "sidebar", mode: "pinned" }, { focus: "none" });
+    await flushPromises();
+    const notice = fake.current.history.deletedNotice as { value: unknown };
+    notice.value = { sid: "gone", via: "server", opening: true };
+    await flushPromises();
+    expect(root(wrapper).attributes("data-state")).toBe("deleted_elsewhere");
+    expect(wrapper.get('[data-test="assistant-shell-deleted"]').text()).toContain(
+      "This chat was deleted elsewhere",
+    );
+    await wrapper.get('[data-test="assistant-shell-deleted"] button').trigger("click");
+    open(store);
+    await flushPromises();
+    notice.value = { sid: "gone-too", via: "server", opening: true };
+    await flushPromises();
+    expect(root(wrapper).attributes("data-state")).toBe("conversation");
   });
 });

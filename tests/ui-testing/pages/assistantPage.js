@@ -140,12 +140,31 @@ export class AssistantPage {
     return this.container().locator('[data-test="assistant-approval-result"]').last();
   }
 
+  /** The history list that is showing: the full view's rail, the header popover or the dense drawer. */
   history() {
-    return notYet("WP-11");
+    return this.page.locator('[data-test="assistant-history"]').filter({ visible: true }).first();
+  }
+
+  /** One history row button by its title. */
+  historyRow(title) {
+    return this.history().locator('[data-test="assistant-history-row"]').filter({ hasText: title }).first();
+  }
+
+  /** Opens the history list from the thread header (Chats, or the overflow menu when dense). */
+  async openHistory() {
+    const chats = this.thread().locator('[data-test="assistant-thread-history"]');
+    // The header button's tooltip stays open under a resting pointer and covers the thread header.
+    await this.page.mouse.move(0, 0);
+    if (await chats.isVisible().catch(() => false)) await chats.click();
+    else {
+      await this.thread().locator('[data-test="assistant-thread-menu"]').click();
+      await this.page.locator('[data-test="assistant-thread-menu-history"]').click();
+    }
+    await this.history().waitFor({ state: "visible" });
   }
 
   thread() {
-    return notYet("WP-11");
+    return this.container().locator('[data-test="assistant-thread-header"]');
   }
 
   tray() {

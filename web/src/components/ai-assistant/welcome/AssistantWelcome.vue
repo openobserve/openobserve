@@ -117,7 +117,7 @@ export interface AssistantWelcomeProps {
 
 export interface AssistantWelcomeEmits {
   (e: "select-starter", starter: Starter): void;
-  (e: "open-chat", chatId: number): void;
+  (e: "open-chat", target: { sid: Sid } | { chatId: number }): void;
 }
 
 // Once per page session per container, however often the welcome re-renders.
@@ -208,8 +208,9 @@ function openSees(id: string): void {
 
 function select(starter: Starter, index: number): void {
   trackAssistant("ai_welcome_starter", { starter_kind: starter.kind, index, via: "click" });
+  if (starter.kind === "recent" && starter.sid) return emit("open-chat", { sid: starter.sid });
   if (starter.kind === "recent" && starter.chatId !== undefined)
-    return emit("open-chat", starter.chatId);
+    return emit("open-chat", { chatId: starter.chatId });
   emit("select-starter", starter);
 }
 

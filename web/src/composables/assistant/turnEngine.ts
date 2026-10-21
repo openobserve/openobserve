@@ -876,6 +876,10 @@ export function createTurnEngine(deps: TurnEngineDeps): TurnEngine {
       if (saved === "server" && current?.turn.state === "done")
         current.turn = { state: "done", saved };
     },
+    turnFrames(sid) {
+      const rec = runtime.get(sid)?.turn;
+      return rec ? { turnId: rec.turnId, frames: [...rec.throughSeq, ...rec.sinceSeq] } : null;
+    },
     canRetry(sid) {
       const session = sessionOf(sid);
       return !!last.get(sid) && !record(sid) && !!session && isTerminal(session.turn);

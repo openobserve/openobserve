@@ -313,6 +313,22 @@ describe("turnEngine: send", () => {
     });
   });
 
+  it("titles the chat from the title frame without beating a name the user gave", async () => {
+    const h = setup();
+    h.type("why?");
+    const run = h.store.send(h.current.sid);
+    await settle();
+    h.feed({ type: "title", title: `  ${"Checkout 5xx".padEnd(260, "!")}  ` });
+    await settle();
+    expect(String(h.session().title)).toHaveLength(200);
+    expect(h.session().titleSource).toBe("generated");
+    h.store.setTitle(h.current.sid, raw("Mine"), "renamed");
+    h.feed({ type: "title", title: "Later title" }, { type: "complete", persisted: true });
+    h.end();
+    await run;
+    expect(String(h.session().title)).toBe("Mine");
+  });
+
   it("sends only the new message and known_seq on a persisted chat (HT-07 AC 2)", async () => {
     const h = setup({ persistence: true });
     h.session().messages.push(
