@@ -14,6 +14,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { formatInTimeZone } from "date-fns-tz";
+import type { I18nKey, I18nText } from "@/types/i18n";
+import { COMPARE_OFFSET_MS, type CompareOffset } from "@/utils/metrics/explorerUrlState";
 import {
   BREAKDOWN_TOP,
   hitCounts,
@@ -26,9 +28,22 @@ import {
 const DAY_US = 86_400_000_000;
 /** Compare doubles the scan, so it is offered only up to this range. */
 export const COMPARE_MAX_US = 31 * DAY_US;
+export const COMPARE_MODE_LABEL_KEYS: Record<FunnelCompareMode, I18nKey> = {
+  prev: "rum.analytics.funnel.comparePrev",
+  "1h": "rum.analytics.funnel.compareAgo1h",
+  "1d": "rum.analytics.funnel.compareAgo1d",
+  "1w": "rum.analytics.funnel.compareAgo1w",
+};
+export const FUNNEL_COMPARE_MODES: readonly FunnelCompareMode[] = ["prev", "1h", "1d", "1w"];
 /** Below this many units at the step above, in either period, a change reads as noise. */
 export const LOW_VOLUME_MIN = 30;
 const Z95 = 1.96;
+
+/** What the funnel compares with: the previous period, or the range shifted back by a fixed offset. */
+export type FunnelCompareMode = "prev" | CompareOffset;
+
+/** Why an offset cannot be used on a range, or "ok". */
+export type CompareModeState = "ok" | "overlaps" | "same";
 
 export interface UsWindow {
   startUs: number;
@@ -75,6 +90,7 @@ export interface FunnelCompare {
 export interface FunnelCompareView {
   status: "loading" | "failed" | "ok";
   data: FunnelCompare | null;
+  label: I18nText;
   range: string;
   prevRange: string;
   rangeExact: string;
@@ -98,6 +114,7 @@ export interface ComparedBreakdownRow extends BreakdownRow {
 export interface BreakdownCompareState {
   status: "loading" | "failed" | "ok";
   total: PrevSide | null;
+  label: I18nText;
   prevRange: string;
 }
 
@@ -106,8 +123,31 @@ export function previousWindow(cur: UsWindow): UsWindow {
   return { startUs: cur.startUs - (cur.endUs - cur.startUs), endUs: cur.startUs };
 }
 
+export function compareWindow(cur: UsWindow, mode: FunnelCompareMode): UsWindow {
+  if (mode === "prev") return previousWindow(cur);
+  const off = COMPARE_OFFSET_MS[mode] * 1000;
+  return { startUs: cur.startUs - off, endUs: cur.endUs - off };
+}
+
+export function compareModeState(cur: UsWindow, mode: FunnelCompareMode): CompareModeState {
+  if (mode === "prev") return "ok";
+  const off = COMPARE_OFFSET_MS[mode] * 1000;
+  const len = cur.endUs - cur.startUs;
+  if (off < len) return "overlaps";
+  return off === len ? "same" : "ok";
+}
+
 export function compareAllowed(cur: UsWindow): boolean {
   return cur.endUs > cur.startUs && cur.endUs - cur.startUs <= COMPARE_MAX_US;
+}
+
+/** The mode a range actually compares with: an offset the range cannot use falls back to the previous period. */
+export function effectiveCompareMode(
+  cur: UsWindow | null,
+  mode: FunnelCompareMode | null,
+): FunnelCompareMode | null {
+  if (!mode || !cur || !compareAllowed(cur)) return null;
+  return compareModeState(cur, mode) === "ok" ? mode : "prev";
 }
 
 /** `x` of `n` now against `px` of `pn` before; null when either period has nobody at the step above. */

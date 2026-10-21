@@ -18,7 +18,13 @@ import type useAnalyticsSearch from "@/composables/rum/useAnalyticsSearch";
 import type { PanelState } from "@/composables/rum/useAnalyticsSearch";
 import type useProductAnalytics from "@/composables/rum/useProductAnalytics";
 import { raw, type I18nText, type TranslateFn } from "@/types/i18n";
-import { formatWindow, previousWindow, type UsWindow } from "@/utils/rum/funnelCompare";
+import {
+  COMPARE_MODE_LABEL_KEYS,
+  compareWindow,
+  formatWindow,
+  type FunnelCompareMode,
+  type UsWindow,
+} from "@/utils/rum/funnelCompare";
 import {
   alignPrevious,
   foldTrend,
@@ -59,7 +65,8 @@ interface TrendDeps {
   events: ComputedRef<NamedEvent[]>;
   timezone: ComputedRef<string>;
   funnelKey: ComputedRef<string>;
-  compareActive: ComputedRef<boolean>;
+  /** The mode the range actually compares with; null while compare is off or not allowed. */
+  compareMode: ComputedRef<FunnelCompareMode | null>;
   stepNames: ComputedRef<readonly string[]>;
   /** The step a breakdown's lines are ranked at; null while it is still unknown. */
   rankStep?: ComputedRef<number | null>;
@@ -106,7 +113,8 @@ export default function useFunnelTrend(deps: TrendDeps) {
   });
   const breakdown = computed(() => !!def.value.breakdown);
   // A breakdown's lines are its own comparison, so the previous period runs only without one.
-  const comparing = computed(() => deps.compareActive.value && !breakdown.value);
+  const comparing = computed(() => !!deps.compareMode.value && !breakdown.value);
+  const prevKey = (k: string | null) => `${k}|prev:${deps.compareMode.value}`;
 
   const rank = computed(() => (deps.rankStep ? deps.rankStep.value : 1));
 
@@ -146,17 +154,21 @@ export default function useFunnelTrend(deps: TrendDeps) {
   const previous = computed<TrendPreviousView | null>(() => {
     const r = pa.range.value;
     const p = periods.value;
-    if (!comparing.value || !r || !p) return null;
-    const prev = previousWindow(r);
+    const mode = deps.compareMode.value;
+    if (!comparing.value || !mode || !r || !p) return null;
+    const prev = compareWindow(r, mode);
     const pp = previousTrendPeriods(prev, timezone.value, nowUs.value, p.granularity);
     const range = formatWindow(prev, timezone.value);
+    const label = t(COMPARE_MODE_LABEL_KEYS[mode]);
     const k = prevPanel.value;
-    if (!pp || k.key !== `${key.value}|prev`) return { status: "loading", buckets: [], range };
+    if (!pp || k.key !== prevKey(key.value))
+      return { status: "loading", buckets: [], range, label };
     if (k.status === "error" || k.status === "forbidden")
-      return { status: "failed", buckets: [], range };
-    if (k.status !== "ok" || !series.value[0]) return { status: "loading", buckets: [], range };
+      return { status: "failed", buckets: [], range, label };
+    if (k.status !== "ok" || !series.value[0])
+      return { status: "loading", buckets: [], range, label };
     const before = foldTrend(k.rows, pp, context(prev, null), false)[0] ?? null;
-    return { status: "ok", buckets: alignPrevious(series.value[0], before), range };
+    return { status: "ok", buckets: alignPrevious(series.value[0], before), range, label };
   });
 
   const stepOption = (n: number) => {
@@ -251,8 +263,14 @@ export default function useFunnelTrend(deps: TrendDeps) {
     runner.hold("funnel-trend-prev", "idle");
   };
 
-  const runPrevious = (d: FunnelDef, k: string, cur: UsWindow, g: Period) => {
-    const prev = previousWindow(cur);
+  const runPrevious = (
+    d: FunnelDef,
+    k: string,
+    cur: UsWindow,
+    g: Period,
+    mode: FunnelCompareMode,
+  ) => {
+    const prev = compareWindow(cur, mode);
     const pp = previousTrendPeriods(prev, timezone.value, nowUs.value, g);
     if (!pp) return runner.hold("funnel-trend-prev", "idle");
     const s = pa.scope.value;
@@ -269,7 +287,7 @@ export default function useFunnelTrend(deps: TrendDeps) {
         limit: pp.boundariesUs.length,
         sampled: 1,
       },
-      `${k}|prev`,
+      prevKey(k),
     );
   };
 
@@ -309,8 +327,10 @@ export default function useFunnelTrend(deps: TrendDeps) {
         k,
       );
     }
-    if (!comparing.value) runner.hold("funnel-trend-prev", "idle");
-    else if (!done(prevPanel.value, `${k}|prev`) || force) runPrevious(d, k, cur, p.granularity);
+    const mode = deps.compareMode.value;
+    if (!comparing.value || !mode) runner.hold("funnel-trend-prev", "idle");
+    else if (!done(prevPanel.value, prevKey(k)) || force)
+      runPrevious(d, k, cur, p.granularity, mode);
   };
 
   /** A new run reads the clock again, so the still-converting bucket follows the day. */

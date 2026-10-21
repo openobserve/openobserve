@@ -78,7 +78,11 @@ import {
   type UaSuggestionRow,
 } from "@/utils/rum/productAnalyticsModel";
 import { PA_ROUTES, type AnalyticsSubTab } from "@/utils/rum/productAnalyticsRoutes";
-import { previousWindow } from "@/utils/rum/funnelCompare";
+import {
+  FUNNEL_COMPARE_MODES,
+  previousWindow,
+  type FunnelCompareMode,
+} from "@/utils/rum/funnelCompare";
 import { pairParam, parseInterval, parsePair, type FunnelView } from "@/utils/rum/funnelTrend";
 
 export type { AnalyticsScopeState } from "@/utils/rum/productAnalyticsModel";
@@ -160,7 +164,7 @@ const invalidParams = ref<string[]>([]);
 const lastSubTab = ref<AnalyticsSubTab>("overview");
 const funnel = ref<FunnelDef>(defaultFunnel());
 // Compare to the previous period lives in the link only, never in a saved funnel.
-const funnelCompare = ref(false);
+const funnelCompare = ref<FunnelCompareMode | null>(null);
 // The trend view, its step pair and its interval are link state too; a null pair is step 1 → the last step.
 const funnelView = ref<FunnelView>("steps");
 const funnelPair = ref<FunnelPair | null>(null);
@@ -247,7 +251,7 @@ export function resetProductAnalytics(): void {
   invalidParams.value = [];
   lastSubTab.value = "overview";
   funnel.value = defaultFunnel();
-  funnelCompare.value = false;
+  funnelCompare.value = null;
   funnelView.value = "steps";
   funnelPair.value = null;
   funnelInterval.value = "auto";
@@ -430,7 +434,8 @@ export default function useProductAnalytics() {
     retention.value = defaultRetention();
     if (!keepFunnel) {
       funnel.value = defaultFunnel();
-      funnelCompare.value = firstString(q.fc) === "prev";
+      const fc = firstString(q.fc);
+      funnelCompare.value = FUNNEL_COMPARE_MODES.find((m) => m === fc) ?? null;
       funnelView.value = firstString(q.fv) === "trend" ? "trend" : "steps";
       funnelPair.value = parsePair(firstString(q.fp));
       funnelInterval.value = parseInterval(firstString(q.fi));
@@ -484,7 +489,7 @@ export default function useProductAnalytics() {
     const sf = openedFunnel.value?.id ?? pendingSavedId.value;
     if (routeName !== PA_ROUTES.funnels) {
       if (funnel.value.steps.length) q.funnel = encodeDef(funnelParam(funnel.value));
-      if (funnelCompare.value) q.fc = "prev";
+      if (funnelCompare.value) q.fc = funnelCompare.value;
       if (funnelView.value === "trend") q.fv = "trend";
       if (funnelPair.value) q.fp = pairParam(funnelPair.value);
       if (funnelInterval.value !== "auto") q.fi = funnelInterval.value;

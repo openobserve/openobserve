@@ -20,13 +20,15 @@ import type { PanelState } from "@/composables/rum/useAnalyticsSearch";
 import { raw, type TranslateFn } from "@/types/i18n";
 import type { FunnelDef, FunnelPair, Granularity } from "@/utils/rum/productAnalyticsQueries";
 
+type CompareMode = "prev" | "1h" | "1d" | "1w";
+
 const DAY = 86_400_000_000;
 const START = Date.UTC(2026, 9, 8) * 1000;
 
 const steps = (n: number) =>
   Array.from({ length: n }, (_, i) => ({ kind: "p" as const, key: `/s${i + 1}` }));
 
-const setup = () => {
+const setup = (compare: Ref<CompareMode | null> = ref(null)) => {
   let release: () => void = () => {};
   const pending = new Promise<null>((r) => (release = () => r(null)));
   const panels = new Map<string, Ref<PanelState<unknown>>>();
@@ -75,10 +77,10 @@ const setup = () => {
     events: computed(() => []),
     timezone: computed(() => "UTC"),
     funnelKey: computed(() => JSON.stringify(def.value.steps)),
-    compareActive: computed(() => false),
+    compareMode: computed(() => compare.value),
     stepNames: computed(() => def.value.steps.map((s) => s.key)),
   });
-  return { trend, runner, pa, def, release };
+  return { trend, runner, pa, def, release, compare };
 };
 
 describe("useFunnelTrend", () => {
@@ -152,5 +154,37 @@ describe("useFunnelTrend", () => {
     expect(trend.pair.value).toEqual({ a: 1, b: 3 });
     expect(trend.fromOptions.value.map((o) => o.value)).toEqual([1, 2]);
     expect(trend.toOptions.value.map((o) => o.value)).toEqual([2, 3]);
+  });
+
+  it("keys the previous run by the compare mode, so switching the mode runs the new window", async () => {
+    const compare = ref<CompareMode | null>("prev");
+    const { trend, runner, pa, def, release } = setup(compare);
+    pa.range.value = { startUs: START, endUs: START + 3 * DAY };
+    release();
+    await trend.run(def.value);
+    const prevRuns = () => runner.run.mock.calls.filter((c) => c[0] === "funnel-trend-prev");
+    expect(prevRuns()).toHaveLength(1);
+    expect(prevRuns()[0][2]).toBe(`${trend.key.value}|prev:prev`);
+    expect(prevRuns()[0][1]).toMatchObject({ startUs: START - 3 * DAY, endUs: START });
+    compare.value = "1w";
+    await trend.run(def.value);
+    expect(prevRuns()).toHaveLength(2);
+    expect(prevRuns()[1][2]).toBe(`${trend.key.value}|prev:1w`);
+    expect(prevRuns()[1][1]).toMatchObject({ startUs: START - 7 * DAY, endUs: START - 4 * DAY });
+  });
+
+  it("names the previous series with the dates the mode compares with", async () => {
+    const compare = ref<CompareMode | null>("1w");
+    const { trend, pa, def, release } = setup(compare);
+    pa.range.value = { startUs: START, endUs: START + 3 * DAY };
+    release();
+    await trend.run(def.value);
+    expect(trend.previous.value?.range).toBe("1–3 Oct");
+    expect(String(trend.previous.value?.label)).toBe("rum.analytics.funnel.compareAgo1w");
+    compare.value = "prev";
+    expect(trend.previous.value?.range).toBe("5–7 Oct");
+    expect(String(trend.previous.value?.label)).toBe("rum.analytics.funnel.comparePrev");
+    compare.value = null;
+    expect(trend.previous.value).toBeNull();
   });
 });

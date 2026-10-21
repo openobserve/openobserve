@@ -438,7 +438,10 @@ const chartOptions = computed(() =>
         props.previous?.status === "ok" && !props.breakdown
           ? {
               name: String(
-                t("rum.analytics.funnel.trendPrevSeries", { range: raw(props.previous.range) }),
+                t("rum.analytics.funnel.trendPrevSeriesOf", {
+                  range: raw(props.previous.range),
+                  label: props.previous.label,
+                }),
               ),
               buckets: props.previous.buckets,
               labels: props.previous.buckets.map((b) => (b ? label(b.startUs) : "")),

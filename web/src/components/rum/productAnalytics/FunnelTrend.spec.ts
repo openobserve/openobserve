@@ -167,7 +167,12 @@ describe("FunnelTrend (P0-9)", () => {
     const prevPeriods = periodsOf(8, D8 - 8 * DAY);
     const [prev] = foldTrend([{ bk: 1, ca: 5, cb: 1 }], prevPeriods, ctx, false);
     const w = await mountTrend({
-      previous: { status: "ok", buckets: alignPrevious(cur, prev), range: "30 Sep–7 Oct" },
+      previous: {
+        status: "ok",
+        buckets: alignPrevious(cur, prev),
+        range: "30 Sep–7 Oct",
+        label: raw("Previous period"),
+      },
     });
     expect(w.find('[data-test="rum-analytics-funnel-trend-table"] thead').text()).toContain(
       "Previous period, same day",
@@ -178,9 +183,30 @@ describe("FunnelTrend (P0-9)", () => {
       "data",
     ).options;
     const last = options.series.at(-1);
-    expect(last.name).toBe("30 Sep–7 Oct (previous)");
+    expect(last.name).toBe("30 Sep–7 Oct (Previous period)");
     expect(last.lineStyle.type).toBe("dashed");
     expect(options.series[0].name).toBe("Step 1 → Step 6 · 8–15 Oct");
+  });
+
+  it("with compare set to an offset, names the dashed line with its dates and the offset", async () => {
+    const periods = periodsOf(8);
+    const [cur] = foldTrend(rows, periods, ctx, false);
+    const prevPeriods = periodsOf(8, D8 - 7 * DAY);
+    const [prev] = foldTrend([{ bk: 1, ca: 5, cb: 1 }], prevPeriods, ctx, false);
+    const w = await mountTrend({
+      previous: {
+        status: "ok",
+        buckets: alignPrevious(cur, prev),
+        range: "1–8 Oct",
+        label: "1 week ago",
+      },
+    });
+    const options = (w.findComponent({ name: "ChartRenderer" }) as unknown as ChartStub).props(
+      "data",
+    ).options;
+    const last = options.series.at(-1);
+    expect(last.name).toBe("1–8 Oct (1 week ago)");
+    expect(last.lineStyle.type).toBe("dashed");
   });
 
   it("a breakdown draws no grey bands; a value's empty day is a null point on its own line", async () => {

@@ -20,24 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :class="compare ? (hideTime ? 'md:min-w-[60rem]' : 'md:min-w-[69rem]') : ''"
     data-test="rum-analytics-funnel-steps-table"
   >
-    <div
-      v-if="compare"
-      class="text-text-secondary flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-1.5 text-xs"
-      data-test="rum-analytics-funnel-compare-legend"
-    >
-      <span>{{ t("rum.analytics.funnel.legendBars", { unit: unitNoun }) }}</span>
-      <span class="flex items-center gap-1">
-        <span class="bg-progress-bar-default inline-block h-2 w-4 rounded-full" />{{
-          t("rum.analytics.funnel.thisPeriod")
-        }}
-      </span>
-      <span class="flex items-center gap-1">
-        <span class="bg-hatch-period inline-block h-2 w-4 rounded-full" />{{
-          t("rum.analytics.funnel.previousPeriod")
-        }}
-      </span>
-      <span>{{ t("rum.analytics.funnel.legendChange") }}</span>
-    </div>
     <!-- Two rows in both states, so turning compare on or off never moves the table. -->
     <div
       class="text-text-secondary bg-surface-subtle flex flex-col gap-1 px-2 py-2 text-xs max-md:hidden"
@@ -449,7 +431,7 @@ const headerCols = computed(() => [
         },
         {
           id: "previous-period",
-          label: t("rum.analytics.funnel.previousPeriod"),
+          label: props.compare.label,
           tip: raw(props.compare.prevRangeExact),
         },
         {
@@ -477,7 +459,9 @@ const headerCols = computed(() => [
   {
     id: "of-first",
     label: t("rum.analytics.funnel.ofFirst"),
-    tip: t("rum.analytics.funnel.ofFirstTooltip"),
+    tip: props.compare
+      ? t("rum.analytics.funnel.ofFirstCompareTooltip")
+      : t("rum.analytics.funnel.ofFirstTooltip"),
   },
 ]);
 

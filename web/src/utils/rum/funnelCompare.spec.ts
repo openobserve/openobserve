@@ -21,6 +21,8 @@ import {
   compareAllowed,
   compareBreakdown,
   compareFunnel,
+  compareModeState,
+  compareWindow,
   formatWindow,
   formatWindowExact,
   previousWindow,
@@ -71,6 +73,54 @@ describe("compareAllowed", () => {
     expect(compareAllowed({ startUs: 0, endUs: COMPARE_MAX_US })).toBe(true);
     expect(compareAllowed({ startUs: 0, endUs: COMPARE_MAX_US + 1 })).toBe(false);
     expect(compareAllowed({ startUs: 5, endUs: 5 })).toBe(false);
+  });
+});
+
+describe("compareWindow", () => {
+  const week = { startUs: OCT12, endUs: OCT12 + 7 * DAY_US };
+
+  it("is the previous period for prev", () => {
+    expect(compareWindow(week, "prev")).toEqual(previousWindow(week));
+  });
+
+  it("shifts both ends back by the fixed offset, keeping the length", () => {
+    expect(compareWindow(week, "1h")).toEqual({
+      startUs: OCT12 - HOUR_US,
+      endUs: OCT12 + 7 * DAY_US - HOUR_US,
+    });
+    expect(compareWindow(week, "1d")).toEqual({
+      startUs: OCT12 - DAY_US,
+      endUs: OCT12 + 6 * DAY_US,
+    });
+    expect(compareWindow(week, "1w")).toEqual({ startUs: OCT12 - 7 * DAY_US, endUs: OCT12 });
+  });
+});
+
+describe("compareModeState", () => {
+  const span = (us: number) => ({ startUs: OCT12, endUs: OCT12 + us });
+
+  it("is always ok for prev", () => {
+    expect(compareModeState(span(7 * DAY_US), "prev")).toBe("ok");
+    expect(compareModeState(span(HOUR_US / 4), "prev")).toBe("ok");
+  });
+
+  it("is overlaps when the offset is shorter than the range", () => {
+    expect(compareModeState(span(7 * DAY_US), "1h")).toBe("overlaps");
+    expect(compareModeState(span(7 * DAY_US), "1d")).toBe("overlaps");
+    expect(compareModeState(span(DAY_US + 1), "1d")).toBe("overlaps");
+  });
+
+  it("is same when the offset equals the range", () => {
+    expect(compareModeState(span(7 * DAY_US), "1w")).toBe("same");
+    expect(compareModeState(span(DAY_US), "1d")).toBe("same");
+    expect(compareModeState(span(HOUR_US), "1h")).toBe("same");
+  });
+
+  it("is ok when the offset is longer than the range", () => {
+    expect(compareModeState(span(DAY_US), "1w")).toBe("ok");
+    expect(compareModeState(span(DAY_US), "1h")).toBe("overlaps");
+    expect(compareModeState(span(HOUR_US / 4), "1h")).toBe("ok");
+    expect(compareModeState(span(12 * HOUR_US), "1d")).toBe("ok");
   });
 });
 

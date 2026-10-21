@@ -307,10 +307,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <FunnelChangeCell :change="compareView.data.overall" :unit-noun="unitNoun" />
                   <span>{{
-                    t("rum.analytics.funnel.overallVs", {
-                      pct: pct(compareView.data.prevOverall),
-                      range: raw(compareView.prevRange),
-                    })
+                    effectiveCompare === "prev"
+                      ? t("rum.analytics.funnel.overallVs", {
+                          pct: pct(compareView.data.prevOverall),
+                          range: raw(compareView.prevRange),
+                        })
+                      : t("rum.analytics.funnel.overallVsAgo", {
+                          pct: pct(compareView.data.prevOverall),
+                          label: compareView.label,
+                          range: raw(compareView.prevRange),
+                        })
                   }}</span>
                   <span v-if="funnelPanel.sampled > 1">{{
                     t("rum.analytics.funnel.headlineEstimated")
@@ -393,25 +399,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </span>
           <span class="ms-auto flex items-center gap-2" data-test="rum-analytics-funnel-compare">
+            <label
+              for="rum-analytics-funnel-compare-select"
+              class="text-text-secondary text-xs font-semibold"
+              >{{ t("rum.analytics.funnel.compareTo") }}</label
+            >
             <span>
-              <OSwitch
-                :model-value="pa.funnelCompare.value"
-                size="sm"
-                :label="t('rum.analytics.funnel.compareSwitch')"
+              <OSelect
+                id="rum-analytics-funnel-compare-select"
+                :model-value="compareSelectValue"
+                :options="compareOptions"
                 :disabled="compareTooLong"
-                data-test="rum-analytics-funnel-compare-switch"
-                @update:model-value="(v) => setCompare(v === true)"
+                size="xs"
+                width="md"
+                data-test="rum-analytics-funnel-compare-select"
+                @update:model-value="setCompare"
               />
               <OTooltip v-if="compareTooLong" :content="t('rum.analytics.funnel.compareTooLong')" />
             </span>
-            <span
-              v-if="compareView"
-              class="text-text-secondary text-xs"
-              data-test="rum-analytics-funnel-compare-vs"
-              >{{
-                t("rum.analytics.funnel.compareVs", { range: raw(compareView.prevRange) })
-              }}</span
-            >
           </span>
         </template>
         <template #notices>
@@ -470,6 +475,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="rum-analytics-funnel-trend-interval-select"
                 @update:model-value="trend.setInterval"
               />
+            </span>
+            <span v-if="compareView && def.breakdown" class="ms-auto">
+              <OPopover
+                v-model:open="compareNoLineOpen"
+                side="bottom"
+                align="end"
+                :aria-label="t('rum.analytics.funnel.compareNoLineAbout')"
+              >
+                <template #trigger>
+                  <OButton
+                    variant="ghost-warning"
+                    size="xs"
+                    icon-left="warning-amber"
+                    :aria-label="t('rum.analytics.funnel.compareNoLineAbout')"
+                    data-test="rum-analytics-funnel-trend-compare-warning"
+                  />
+                </template>
+                <div class="flex w-96 max-w-[calc(100vw-1.5rem)] flex-col gap-3 p-3">
+                  <p class="leading-5" data-test="rum-analytics-funnel-trend-compare-warning-text">
+                    <OText variant="meta">{{
+                      t("rum.analytics.funnel.compareNoLineBreakdown", {
+                        field: dimLabel,
+                        range: raw(compareView.prevRange),
+                      })
+                    }}</OText>
+                  </p>
+                  <span class="flex justify-end">
+                    <OButton
+                      variant="outline"
+                      size="sm-action"
+                      data-test="rum-analytics-funnel-trend-compare-remove-breakdown"
+                      @click="removeBreakdownForCompare"
+                      >{{ t("rum.analytics.funnel.breakdownRemove") }}</OButton
+                    >
+                  </span>
+                </div>
+              </OPopover>
             </span>
           </div>
           <span
@@ -660,7 +702,8 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OPopover from "@/lib/overlay/Popover/OPopover.vue";
+import OText from "@/lib/core/Typography/OText.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -739,14 +782,19 @@ import {
   stepLabel,
 } from "@/utils/rum/productAnalyticsPanels";
 import {
+  COMPARE_MODE_LABEL_KEYS,
+  FUNNEL_COMPARE_MODES,
   changeDirection,
   compareAllowed,
   compareBreakdown,
   compareFunnel,
+  compareModeState,
+  compareWindow,
+  effectiveCompareMode,
   formatWindow,
   formatWindowExact,
-  previousWindow,
   type BreakdownCompareState,
+  type FunnelCompareMode,
   type FunnelCompareView,
   type RateChange,
   type UsWindow,
@@ -940,12 +988,52 @@ const removed = computed<(number | null)[]>(() =>
 
 const timezone = computed<string>(() => store.state.timezone || "UTC");
 const compareTooLong = computed(() => !!pa.range.value && !compareAllowed(pa.range.value));
-const compareActive = computed(
-  () => pa.funnelCompare.value && !!pa.range.value && !compareTooLong.value,
+// An offset the range cannot use compares with the previous period; the link keeps the offset.
+const effectiveCompare = computed(() =>
+  effectiveCompareMode(pa.range.value, pa.funnelCompare.value),
 );
-const prevKey = computed(() => `${funnelKey.value}|prev`);
+const prevKey = computed(() => `${funnelKey.value}|prev:${effectiveCompare.value}`);
+// While compare is greyed out the select keeps showing what the link asked for.
+const compareSelectValue = computed<FunnelCompareMode | "off">(() => {
+  const mode = pa.funnelCompare.value;
+  if (!mode) return "off";
+  return compareTooLong.value || !pa.range.value ? mode : (effectiveCompare.value ?? mode);
+});
+const compareOptions = computed(() => {
+  const cur = pa.range.value;
+  const tz = timezone.value;
+  return [
+    { label: t("rum.analytics.funnel.compareOff"), value: "off", disabled: false },
+    ...FUNNEL_COMPARE_MODES.map((mode) => {
+      const label = t(COMPARE_MODE_LABEL_KEYS[mode]);
+      if (!cur) return { label, value: mode, disabled: false };
+      const state = compareModeState(cur, mode);
+      if (state !== "ok")
+        return {
+          label: t("rum.analytics.funnel.compareOptionDisabled", {
+            label,
+            reason:
+              state === "same"
+                ? t("rum.analytics.funnel.compareSameAsPrev")
+                : t("rum.analytics.funnel.compareOverlaps"),
+          }),
+          value: mode,
+          disabled: true,
+        };
+      return {
+        label: t("rum.analytics.funnel.compareOption", {
+          label,
+          range: raw(formatWindow(compareWindow(cur, mode), tz)),
+        }),
+        value: mode,
+        disabled: false,
+      };
+    }),
+  ];
+});
+const compareNoLineOpen = ref(false);
 const prevRows = computed(() =>
-  compareActive.value && prevPanel.value.key === prevKey.value && prevPanel.value.status === "ok"
+  effectiveCompare.value && prevPanel.value.key === prevKey.value && prevPanel.value.status === "ok"
     ? prevPanel.value.rows
     : null,
 );
@@ -961,14 +1049,16 @@ const compareData = computed(() => {
 const compareView = computed<FunnelCompareView | null>(() => {
   const cur = pa.range.value;
   // A held or stepless funnel starts no run, so it keeps the compare-off layout.
-  if (!compareActive.value || !cur || funnelPanel.value.status === "idle") return null;
-  const prev = previousWindow(cur);
+  const mode = effectiveCompare.value;
+  if (!mode || !cur || funnelPanel.value.status === "idle") return null;
+  const prev = compareWindow(cur, mode);
   const p = prevPanel.value;
   const failed = p.key === prevKey.value && (p.status === "error" || p.status === "forbidden");
   const tz = timezone.value;
   return {
     status: compareData.value ? "ok" : failed ? "failed" : "loading",
     data: compareData.value,
+    label: t(COMPARE_MODE_LABEL_KEYS[mode]),
     range: formatWindow(cur, tz),
     prevRange: formatWindow(prev, tz),
     rangeExact: formatWindowExact(cur, tz),
@@ -993,6 +1083,7 @@ const breakdownCompareState = computed<BreakdownCompareState | null>(() => {
   return {
     status: breakdownCompare.value ? "ok" : v.status === "failed" ? "failed" : "loading",
     total: breakdownCompare.value?.total ?? null,
+    label: v.label,
     prevRange: v.prevRange,
   };
 });
@@ -1018,7 +1109,7 @@ const trend = useFunnelTrend({
   events,
   timezone,
   funnelKey: computed(() => funnelKey.value),
-  compareActive,
+  compareMode: effectiveCompare,
   rankStep: trendRank,
   stepNames,
 });
@@ -1332,11 +1423,12 @@ const compute = async (force = false) => {
 
 // The same query over the window before, so a slow or failed run only blanks the compare cells.
 const runPrevious = (d: FunnelDef, key: string, cur: UsWindow) => {
-  if (!pa.funnelCompare.value || !compareAllowed(cur)) {
+  const mode = effectiveCompareMode(cur, pa.funnelCompare.value);
+  if (!mode) {
     runner.hold("funnel-prev", "idle");
     return;
   }
-  const prev = previousWindow(cur);
+  const prev = compareWindow(cur, mode);
   const s = pa.scope.value;
   // New users of the previous period are those first seen in that period, not in this one.
   const scope = s.newSince === undefined ? s : { ...s, newSince: Math.trunc(prev.startUs / 1000) };
@@ -1348,7 +1440,7 @@ const runPrevious = (d: FunnelDef, key: string, cur: UsWindow) => {
       limit: d.breakdown ? 1000 : 1,
       sampled: 1,
     },
-    `${key}|prev`,
+    `${key}|prev:${mode}`,
   );
 };
 
@@ -1356,11 +1448,26 @@ const runPrevious = (d: FunnelDef, key: string, cur: UsWindow) => {
 const rerunPrevious = () => {
   const key = funnelKey.value;
   if (key !== lastKey || funnelPanel.value.key !== key) return;
-  runPrevious(effectiveDef.value, key, pa.resolveRange());
+  const cur = pa.resolveRange();
+  const p = prevPanel.value;
+  const mode = effectiveCompareMode(cur, pa.funnelCompare.value);
+  // A new pick that keeps the same window must not abort the run already answering it.
+  if (mode && p.key === `${key}|prev:${mode}` && (p.status === "ok" || p.status === "loading"))
+    return;
+  runPrevious(effectiveDef.value, key, cur);
 };
 
-const setCompare = (on: boolean) => {
-  pa.funnelCompare.value = on;
+const setCompare = (v: unknown) => {
+  pa.funnelCompare.value = FUNNEL_COMPARE_MODES.find((m) => m === v) ?? null;
+};
+
+const removeBreakdownForCompare = () => {
+  compareNoLineOpen.value = false;
+  update({ breakdown: null });
+  // The popover's trigger unmounts with the warning, so focus would otherwise fall to the page.
+  void nextTick(() =>
+    trendFromField.value?.querySelector<HTMLElement>('[role="combobox"]')?.focus(),
+  );
 };
 
 const setView = (v: unknown) => {

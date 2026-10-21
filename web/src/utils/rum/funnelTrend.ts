@@ -23,6 +23,7 @@ import {
 } from "@/utils/rum/productAnalyticsModel";
 import type { FunnelPair, Granularity } from "@/utils/rum/productAnalyticsQueries";
 import type { UsWindow } from "@/utils/rum/funnelCompare";
+import type { I18nText } from "@/types/i18n";
 
 const DAY_US = 86_400_000_000;
 /** Below this many entrants a bucket's rate gets the low-volume tag. */
@@ -97,6 +98,8 @@ export interface TrendPreviousView {
   status: "loading" | "failed" | "ok";
   buckets: (TrendPrevious | null)[];
   range: string;
+  /** The compare mode's name, such as "1 week ago". */
+  label: I18nText;
 }
 
 export function parsePair(raw: unknown): FunnelPair | null {
