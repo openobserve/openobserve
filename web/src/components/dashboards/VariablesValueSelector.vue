@@ -158,6 +158,7 @@ import {
   replaceVariablePlaceholders,
 } from "@/utils/dashboard/variables/variablesUtils";
 import {
+  buildFilterGroupSql,
   expandMultiValueFilter,
   getQueryVariableLanguage,
   getQueryVariableMaxRecords,
@@ -170,6 +171,13 @@ import {
   usesQueryVariableLoader,
   type QueryVariableOption,
 } from "@/utils/dashboard/variables/queryVariableUtils";
+import {
+  conditionToLegacyFilter,
+  getFilterGroupConditions,
+  getVariableFilterGroup,
+  isLegacyCompatibleFilterGroup,
+  type LegacyVariableFilter,
+} from "@/utils/dashboard/variables/variableFilterGroupUtils";
 import {
   getQueryVariableErrorMessage,
   loadQueryVariableValues,
@@ -2185,21 +2193,29 @@ export default defineComponent({
         }
       }
 
-      // Construct the filter from the query data
-      const constructedFilter = (variableObject.query_data?.filter || []).map((condition: any) =>
-        expandMultiValueFilter(
-          { name: condition.name, operator: condition.operator, value: condition.value },
-          (name) => {
-            const parent = variablesByName.get(name);
-            return parent?.isVariablePartialLoaded ? parent.value : undefined;
-          },
-        ),
-      );
+      const expandFilter = (filter: LegacyVariableFilter) =>
+        expandMultiValueFilter(filter, (name) => {
+          const parent = variablesByName.get(name);
+          return parent?.isVariablePartialLoaded ? parent.value : undefined;
+        });
+      const filterGroup = getVariableFilterGroup(variableObject.query_data);
 
-      // Add labels to the dummy query
-      let queryContext = constructedFilter.length
-        ? await addLabelsToSQlQuery(dummyQuery, constructedFilter)
-        : dummyQuery;
+      let queryContext: string;
+      if (isLegacyCompatibleFilterGroup(filterGroup)) {
+        const constructedFilter = getFilterGroupConditions(filterGroup).map((condition) =>
+          expandFilter(conditionToLegacyFilter(condition)),
+        );
+        queryContext = constructedFilter.length
+          ? await addLabelsToSQlQuery(dummyQuery, constructedFilter)
+          : dummyQuery;
+      } else {
+        const where = buildFilterGroupSql(filterGroup, expandFilter);
+        queryContext = !where
+          ? dummyQuery
+          : searchText
+            ? `${dummyQuery} AND (${where})`
+            : `${dummyQuery} WHERE ${where}`;
+      }
 
       // Normalize spaces inside variable syntax before replacement
       queryContext = normalizeVariableSyntax(queryContext);

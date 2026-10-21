@@ -24,6 +24,7 @@ import {
 } from "@/utils/dashboard/variables/variablesDependencyUtils";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import { isCustomQueryVariable } from "@/utils/dashboard/variables/queryVariableUtils";
+import type { VariableFilterGroup } from "@/utils/dashboard/variables/variableFilterGroupUtils";
 
 export const LIVE_COMMIT_DEBOUNCE_MS = 300;
 
@@ -52,6 +53,7 @@ export interface VariableConfig {
       value?: string;
       filter?: string;
     }>;
+    filter_group?: VariableFilterGroup | null;
   };
   options?: Array<{
     label: I18nText;
