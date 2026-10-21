@@ -80,6 +80,8 @@ pub mod org_storage_providers;
 pub mod org_telephony;
 pub mod org_users;
 pub mod organizations;
+#[cfg(feature = "cloud")]
+pub mod paid_overage_attribution;
 pub mod pipeline_last_errors;
 pub mod providers;
 pub mod query_history;
