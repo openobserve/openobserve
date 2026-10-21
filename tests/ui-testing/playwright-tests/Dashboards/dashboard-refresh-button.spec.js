@@ -108,6 +108,8 @@ test.describe('Dashboard Refresh Button (primary variant & label)', { tag: ['@da
 
     await autoRun.clickRefresh();
     await autoRun.waitForRuns('var', base + 1);
+    expect(autoRun.runsOf('var')[base]).toContain(`'${first}'`);
+    await autoRun.expectPanelRows('p_var', { shows: [first], hides: [initial] });
     await autoRun.expectRefreshVariant('primary');
     await autoRun.expectRefreshOptionsVariant('primary');
 
