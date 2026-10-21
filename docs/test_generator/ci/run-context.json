@@ -1,0 +1,17 @@
+{
+  "feature_slug": "invoice-currency-formatting",
+  "feature_title": "Billing Invoice Currency Formatting",
+  "area": "Management",
+  "edition": "enterprise",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "invoiceTable.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Management/invoiceTable.spec.js",
+  "playwright_group": "Management",
+  "source_files": [
+    "web/src/enterprise/components/billings/invoiceTable.vue"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": ""
+}
