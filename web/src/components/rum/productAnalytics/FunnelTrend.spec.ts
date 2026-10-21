@@ -141,7 +141,7 @@ describe("FunnelTrend (P0-9)", () => {
     expect(cell(w, "6-still").exists()).toBe(false);
   });
 
-  it("draws gaps as banded nulls and today as a separate dashed, hollow point", async () => {
+  it("draws empty days as null points with no grey bands, the table keeping their notes, and today as a separate dashed, hollow point", async () => {
     const w = await mountTrend();
     const options = (w.findComponent({ name: "ChartRenderer" }) as unknown as ChartStub).props(
       "data",
@@ -149,13 +149,11 @@ describe("FunnelTrend (P0-9)", () => {
     const [main, still] = options.series;
     expect(main.connectNulls).toBe(false);
     expect(main.data[0]).toEqual([0, null]);
+    expect(main.data[2]).toEqual([2, null]);
     expect(main.data[7]).toEqual([7, null]);
-    expect(main.markArea.data.map((a: { name: string }[]) => a[0].name)).toEqual([
-      "No sessions",
-      "No sessions",
-      "No sessions",
-      "No sessions",
-    ]);
+    for (const s of options.series) expect(s.markArea).toBeUndefined();
+    expect(cell(w, "0-note").text()).toBe("No sessions");
+    expect(cell(w, "2-note").text()).toBe("No sessions");
     expect(still.name).toBe("Still converting (today)");
     expect(still.lineStyle.type).toBe("dashed");
     expect(still.data[7]).toEqual({ value: [7, 36.4] });
@@ -163,7 +161,7 @@ describe("FunnelTrend (P0-9)", () => {
     expect(options.yAxis).toMatchObject({ min: 0, max: 100, name: "Conversion (%)" });
   });
 
-  it("with compare, adds the previous period as a dashed grey line and names each matching day", async () => {
+  it("with compare, adds the previous period as a dashed grey line, keeps the pair in the series name, and names each matching day", async () => {
     const periods = periodsOf(8);
     const [cur] = foldTrend(rows, periods, ctx, false);
     const prevPeriods = periodsOf(8, D8 - 8 * DAY);
@@ -182,10 +180,10 @@ describe("FunnelTrend (P0-9)", () => {
     const last = options.series.at(-1);
     expect(last.name).toBe("30 Sep–7 Oct (previous)");
     expect(last.lineStyle.type).toBe("dashed");
-    expect(options.series[0].name).toBe("8–15 Oct");
+    expect(options.series[0].name).toBe("Step 1 → Step 6 · 8–15 Oct");
   });
 
-  it("a breakdown gap band needs every value empty; one empty value is not a chart-wide gap", async () => {
+  it("a breakdown draws no grey bands; a value's empty day is a null point on its own line", async () => {
     const periods = periodsOf(8);
     const hits = [
       { dim: "Chrome", un: 0, tot: 90, bk: 1, ca: 10, cb: 5 },
@@ -201,12 +199,11 @@ describe("FunnelTrend (P0-9)", () => {
     const options = (w.findComponent({ name: "ChartRenderer" }) as unknown as ChartStub).props(
       "data",
     ).options;
-    const banded = options.series[0].markArea.data.map(
-      (a: { xAxis: number }[]) => a[0].xAxis + 0.5,
-    );
-    expect(banded).not.toContain(1);
-    expect(banded).not.toContain(2);
-    expect(banded).toContain(0);
+    for (const s of options.series) expect(s.markArea).toBeUndefined();
+    const line = (name: string) => options.series.find((s: { name: string }) => s.name === name);
+    expect(line("Chrome").data[0]).toEqual([0, null]);
+    expect(line("Chrome").data[2]).toEqual([2, null]);
+    expect(line("Safari").data[2]).toEqual([2, 20]);
   });
 
   it("the pivot marks every still-converting day, as Users mode's window leaves several open", async () => {

@@ -428,7 +428,10 @@ const chartOptions = computed(() =>
     {
       labels: labels.value,
       series: props.series.map((s) => ({
-        name: String(s.kind === "all" && props.previous ? raw(props.range) : seriesLabel(s)),
+        name:
+          s.kind === "all" && props.previous
+            ? `${props.pairLabel} · ${props.range}`
+            : String(seriesLabel(s)),
         data: s,
       })),
       previous:

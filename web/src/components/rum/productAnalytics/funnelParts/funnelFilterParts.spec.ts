@@ -670,6 +670,15 @@ describe("FunnelStepsTable step menu", () => {
     await w.find(dt("rum-analytics-funnel-step-1-break-down")).trigger("click");
     expect(w.emitted("break-down-step")).toEqual([[2]]);
   });
+
+  it("offers Show conversion trend from this step on every step but the last, and asks for that step's trend", async () => {
+    const w = mountTable("ok");
+    const item = w.find(dt("rum-analytics-funnel-step-0-trend-from"));
+    expect(item.text()).toBe("Show conversion trend from this step");
+    expect(w.find(dt("rum-analytics-funnel-step-1-trend-from")).exists()).toBe(false);
+    await item.trigger("click");
+    expect(w.emitted("trend-from-step")).toEqual([[1]]);
+  });
 });
 
 describe("Filter all steps notice", () => {

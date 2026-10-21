@@ -76,6 +76,7 @@ const setup = () => {
     timezone: computed(() => "UTC"),
     funnelKey: computed(() => JSON.stringify(def.value.steps)),
     compareActive: computed(() => false),
+    stepNames: computed(() => def.value.steps.map((s) => s.key)),
   });
   return { trend, runner, pa, def, release };
 };
@@ -95,20 +96,61 @@ describe("useFunnelTrend", () => {
     expect(trendRuns[0][2]).toBe(trend.key.value);
   });
 
-  it("the pair and interval setters keep only values the link can round-trip", () => {
-    const { trend, pa, def } = setup();
-    def.value = { ...def.value, steps: steps(6) };
-    trend.setPair("2-4");
-    expect(pa.funnelPair.value).toEqual({ a: 2, b: 4 });
-    trend.setPair("1-6");
-    expect(pa.funnelPair.value).toBeNull();
-    trend.setPair(42);
-    expect(pa.funnelPair.value).toBeNull();
-    trend.setPair("4-2");
-    expect(pa.funnelPair.value).toBeNull();
+  it("the interval setter keeps only values the link can round-trip", () => {
+    const { trend, pa } = setup();
     trend.setInterval("week");
     expect(pa.funnelInterval.value).toBe("week");
     trend.setInterval("hour");
     expect(pa.funnelInterval.value).toBe("auto");
+  });
+
+  it("from lists steps 1 to n-1 and to lists only the steps after from", () => {
+    const { trend, pa, def } = setup();
+    def.value = { ...def.value, steps: steps(4) };
+    const values = (o: { value: unknown }[]) => o.map((x) => x.value);
+    expect(values(trend.fromOptions.value)).toEqual([1, 2, 3]);
+    expect(values(trend.toOptions.value)).toEqual([2, 3, 4]);
+    pa.funnelPair.value = { a: 2, b: 3 };
+    expect(values(trend.fromOptions.value)).toEqual([1, 2, 3]);
+    expect(values(trend.toOptions.value)).toEqual([3, 4]);
+  });
+
+  it("setFrom and setTo write the pair, and step 1 to the last step stays out of the link", () => {
+    const { trend, pa, def } = setup();
+    def.value = { ...def.value, steps: steps(6) };
+    trend.setFrom(2);
+    expect(pa.funnelPair.value).toEqual({ a: 2, b: 6 });
+    expect(trend.pair.value).toEqual({ a: 2, b: 6 });
+    trend.setTo(4);
+    expect(pa.funnelPair.value).toEqual({ a: 2, b: 4 });
+    expect(trend.pair.value).toEqual({ a: 2, b: 4 });
+    trend.setFrom(3);
+    expect(pa.funnelPair.value).toEqual({ a: 3, b: 4 });
+    trend.setFrom(1);
+    trend.setTo(6);
+    expect(pa.funnelPair.value).toBeNull();
+    expect(trend.pair.value).toEqual({ a: 1, b: 6 });
+  });
+
+  it("moving from to or past to sets to to the last step", () => {
+    const { trend, pa, def } = setup();
+    def.value = { ...def.value, steps: steps(6) };
+    pa.funnelPair.value = { a: 2, b: 4 };
+    trend.setFrom(4);
+    expect(pa.funnelPair.value).toEqual({ a: 4, b: 6 });
+    pa.funnelPair.value = { a: 2, b: 4 };
+    trend.setFrom(5);
+    expect(pa.funnelPair.value).toEqual({ a: 5, b: 6 });
+  });
+
+  it("a removed step resets a pair the funnel can no longer hold to step 1 to the last step", () => {
+    const { trend, pa, def } = setup();
+    def.value = { ...def.value, steps: steps(4) };
+    pa.funnelPair.value = { a: 3, b: 4 };
+    expect(trend.pair.value).toEqual({ a: 3, b: 4 });
+    def.value = { ...def.value, steps: steps(3) };
+    expect(trend.pair.value).toEqual({ a: 1, b: 3 });
+    expect(trend.fromOptions.value.map((o) => o.value)).toEqual([1, 2]);
+    expect(trend.toOptions.value.map((o) => o.value)).toEqual([2, 3]);
   });
 });

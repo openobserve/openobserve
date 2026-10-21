@@ -69,6 +69,7 @@ export interface FunnelLayoutEmits {
   "load-fields": [];
   "break-down": [string];
   "break-down-step": [number];
+  "trend-from-step": [number];
 }
 
 /** A layout places the page's card header, its notices and its footer, so it decides where the card sits. */
