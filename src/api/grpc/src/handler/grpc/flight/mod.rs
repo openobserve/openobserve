@@ -339,9 +339,9 @@ async fn get_ctx_and_physical_plan(
 ) -> Result<PlanResult, infra::errors::Error> {
     if req.super_cluster_info.is_super_cluster {
         // registered only while the plan is built: that is where this node waits in its work group
-        let query_guard = SEARCH_SERVER.register_follower(&req.query_identifier.org_id, trace_id);
+        let registration = SEARCH_SERVER.register_follower(&req.query_identifier.org_id, trace_id);
         let (ctx, physical_plan, lock, scan_stats) =
-            search_service::super_cluster::follower::search(&query_guard, req).await?;
+            search_service::super_cluster::follower::search(registration.tracker(), req).await?;
         Ok((ctx, physical_plan, Some(lock), scan_stats))
     } else {
         let (ctx, physical_plan, scan_stats) = grpcFlight::search(trace_id, req).await?;

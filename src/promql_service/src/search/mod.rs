@@ -54,7 +54,7 @@ use tracing::{Instrument, info_span};
 #[cfg(feature = "enterprise")]
 use {
     o2_enterprise::enterprise::common::config::get_config as get_o2_config,
-    o2_enterprise::enterprise::search::WorkGroup,
+    o2_enterprise::enterprise::search::WorkGroup, search_service::QueryPhase,
 };
 
 use crate::MetricsQueryRequest;
@@ -92,7 +92,7 @@ pub async fn search(
     let trace_id = search_service::leader_trace_id(trace_id);
     let trace_id = trace_id.as_str();
     // callers such as Grafana share one trace_id across concurrent requests
-    let query_guard = SEARCH_SERVER.register_leader(
+    let registration = SEARCH_SERVER.register_leader(
         org_id,
         trace_id,
         LeaderInfo {
@@ -105,6 +105,7 @@ pub async fn search(
             search_event_context: None,
         },
     );
+    let query_tracker = registration.tracker();
 
     let timeout = if timeout > 0 {
         timeout as u64
@@ -154,7 +155,7 @@ pub async fn search(
     // Check work group (OSS uses dist_lock, Enterprise uses WorkGroup::Short)
     #[cfg(not(feature = "enterprise"))]
     let _lock = search_service::work_group::check_work_group(
-        &query_guard,
+        query_tracker,
         &req.org_id,
         timeout,
         &mut stop_watch,
@@ -166,7 +167,7 @@ pub async fn search(
     // Enterprise: Always use Short workgroup for metrics queries
     #[cfg(feature = "enterprise")]
     let _lock = search_service::work_group::check_work_group(
-        &query_guard,
+        query_tracker,
         &req.org_id,
         Some(user_email),
         timeout,
@@ -192,7 +193,7 @@ pub async fn search(
             let remaining_ms = (timeout * 1000).saturating_sub(elapsed_ms);
             let guard = Some(
                 o2_enterprise::enterprise::search::admission::acquire_node_slots(
-                    query_guard.id(),
+                    query_tracker.query_id(),
                     &nodes,
                     &WorkGroup::Short,
                     remaining_ms,
@@ -213,7 +214,7 @@ pub async fn search(
     log::info!("[trace_id {trace_id}] promql->search: total wait in queue took: {_took_wait} ms");
 
     #[cfg(feature = "enterprise")]
-    let Ok(abort_receiver) = query_guard.on_cancel(true) else {
+    let Ok(abort_receiver) = query_tracker.abort_receiver(QueryPhase::Running) else {
         log::info!("[trace_id {trace_id}] promql->search: search canceled before execution plan");
         return Err(Error::ErrorCode(
             infra::errors::ErrorCodes::SearchCancelQuery(format!(

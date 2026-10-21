@@ -20,7 +20,7 @@ use futures::Stream;
 use infra::errors;
 use opentelemetry::global;
 use promql_service::search as SearchService;
-use search_service::{QueryGuard, SEARCH_SERVER};
+use search_service::{QueryRegistration, SEARCH_SERVER};
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
@@ -52,12 +52,12 @@ impl Metrics for MetricsQuerier {
 
         let req = req.into_inner();
         let (_, trace_id) = query_and_trace_id(&req)?;
-        let (req, query_guard) = register_follower(req, &trace_id);
+        let (req, registration) = register_follower(req, &trace_id);
 
         let org_id = &req.org_id;
         let stream_type = StreamType::Metrics.as_str();
-        let result = SearchService::grpc::search(&req, &query_guard).await;
-        drop(query_guard);
+        let result = SearchService::grpc::search(&req, registration.tracker()).await;
+        drop(registration);
 
         let result = result.map_err(|err| {
             let time = start.elapsed().as_secs_f64();
@@ -108,14 +108,14 @@ impl Metrics for MetricsQuerier {
             query.query_data = true;
         }
 
-        let (req, query_guard) = register_follower(req, &trace_id);
+        let (req, registration) = register_follower(req, &trace_id);
 
         // spawn a task to push streaming responses
         let cap = std::cmp::max(2, config::get_config().limit.cpu_num);
         let (tx, rx) = mpsc::channel::<Result<MetricsQueryResponse, Status>>(cap);
         tokio::task::spawn(async move {
-            let result = promql_service::search::grpc::data(&req, &query_guard, tx).await;
-            drop(query_guard);
+            let result = promql_service::search::grpc::data(&req, registration.tracker(), tx).await;
+            drop(registration);
             if let Err(e) = result {
                 log::error!("[gRPC:metrics:data] get data error: req:{req:?}, error:{e:?}")
             }
@@ -130,13 +130,13 @@ impl Metrics for MetricsQuerier {
 fn register_follower(
     mut req: MetricsQueryRequest,
     trace_id: &str,
-) -> (MetricsQueryRequest, QueryGuard) {
-    let query_guard = SEARCH_SERVER.register_follower(&req.org_id, trace_id);
+) -> (MetricsQueryRequest, QueryRegistration) {
+    let registration = SEARCH_SERVER.register_follower(&req.org_id, trace_id);
     // file lists are keyed by this id, so concurrent requests need their own
     if let Some(job) = req.job.as_mut() {
-        job.trace_id = query_guard.id().to_string();
+        job.trace_id = registration.tracker().query_id().to_string();
     }
-    (req, query_guard)
+    (req, registration)
 }
 
 fn query_and_trace_id(req: &MetricsQueryRequest) -> Result<(&MetricsQueryStmt, String), Status> {

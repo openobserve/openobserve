@@ -526,7 +526,7 @@ mod tests {
     }
 
     #[cfg(feature = "enterprise")]
-    fn leader(searcher: &Searcher, org_id: &str, trace_id: &str) -> crate::QueryGuard {
+    fn leader(searcher: &Searcher, org_id: &str, trace_id: &str) -> crate::QueryRegistration {
         let info = crate::LeaderInfo {
             user_id: None,
             stream_type: "logs",
@@ -584,15 +584,18 @@ mod tests {
     #[cfg(feature = "enterprise")]
     #[tokio::test]
     async fn test_concurrent_queries_sharing_a_trace_id_end_independently() {
+        use crate::QueryPhase;
+
         let searcher = Searcher::new();
         let first = leader(&searcher, "a", "t");
-        let second = leader(&searcher, "a", "t");
+        let registration = leader(&searcher, "a", "t");
+        let second = registration.tracker();
 
         drop(first);
         assert_eq!(listed(&searcher, "a"), 1);
-        assert!(second.on_cancel(true).is_ok());
-        assert!(cancel_in(&searcher, second.id(), "a").await);
-        assert!(second.on_cancel(true).is_err());
+        assert!(second.abort_receiver(QueryPhase::Running).is_ok());
+        assert!(cancel_in(&searcher, second.query_id(), "a").await);
+        assert!(second.abort_receiver(QueryPhase::Running).is_err());
     }
 
     #[tokio::test]

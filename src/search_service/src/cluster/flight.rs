@@ -44,12 +44,13 @@ use tracing::{Instrument, info_span};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 #[cfg(feature = "enterprise")]
 use {
+    crate::QueryPhase,
     o2_enterprise::enterprise::common::config::get_config as get_o2_config,
     o2_enterprise::enterprise::search::{WorkGroup, admission},
 };
 
 use crate::{
-    QueryHandle, SearchResult,
+    QueryTracker, SearchResult,
     datafusion::{
         context::{SearchContextBuilder, register_table},
         optimizer::{
@@ -70,11 +71,11 @@ use crate::{
     fields(org_id = req.org_id)
 )]
 pub async fn search(
-    query_handle: &QueryHandle,
+    query_tracker: &QueryTracker,
     sql: Arc<Sql>,
     mut req: Request,
 ) -> Result<SearchResult> {
-    let trace_id = query_handle.trace_id();
+    let trace_id = query_tracker.trace_id();
     let mut took_watch = TookWatcher::new();
     let cfg = get_config();
     log::info!("[trace_id {trace_id}] flight->search: start {sql}");
@@ -204,7 +205,7 @@ pub async fn search(
         .inc();
 
     let _lock = crate::work_group::acquire_work_group_lock(
-        query_handle,
+        query_tracker,
         &req,
         &mut took_watch,
         "logs",
@@ -230,8 +231,13 @@ pub async fn search(
             let elapsed_ms = took_watch.total_millis();
             let remaining_ms = (timeout * 1000).saturating_sub(elapsed_ms);
             let guard = Some(
-                admission::acquire_node_slots(query_handle.id(), &nodes, &work_group, remaining_ms)
-                    .await?,
+                admission::acquire_node_slots(
+                    query_tracker.query_id(),
+                    &nodes,
+                    &work_group,
+                    remaining_ms,
+                )
+                .await?,
             );
             let took_wait = start_time.elapsed().as_millis() as usize;
             _took_wait += took_wait;
@@ -276,10 +282,10 @@ pub async fn search(
     );
 
     #[cfg(feature = "enterprise")]
-    query_handle.add_file_stats(&scan_stats);
+    query_tracker.add_file_stats(&scan_stats);
 
     #[cfg(feature = "enterprise")]
-    let Ok(abort_receiver) = query_handle.on_cancel(true) else {
+    let Ok(abort_receiver) = query_tracker.abort_receiver(QueryPhase::Running) else {
         log::info!(
             "[trace_id {trace_id}] flight->search: search canceled before call flight->search"
         );

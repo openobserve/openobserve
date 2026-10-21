@@ -87,8 +87,10 @@ use ::search::{
     datafusion::{self, distributed_plan::streaming_aggs_exec},
     index, inspector, sql, tantivy, utils,
 };
+#[cfg(feature = "enterprise")]
+pub use searcher::QueryPhase;
 use searcher::Searcher;
-pub use searcher::{LeaderInfo, QueryGuard, QueryHandle};
+pub use searcher::{LeaderInfo, QueryRegistration, QueryTracker};
 
 /// The result of search in cluster
 /// data, scan_stats, wait_in_queue, is_partial, partial_err
@@ -166,7 +168,7 @@ pub async fn search(
     let meta = Sql::new_from_req(&request, &query).await?;
 
     // callers may share one trace_id across concurrent requests, e.g. Grafana via traceparent
-    let query_guard = SEARCH_SERVER.register_leader(
+    let registration = SEARCH_SERVER.register_leader(
         org_id,
         &trace_id,
         LeaderInfo {
@@ -181,12 +183,12 @@ pub async fn search(
     );
 
     let span = tracing::span::Span::current();
-    let query_handle = query_guard.handle();
+    let query_tracker = registration.tracker().clone();
     let handle = tokio::task::spawn(
         async move {
             cluster::http::search(
                 request,
-                &query_handle,
+                &query_tracker,
                 query,
                 req_regions,
                 req_clusters,
@@ -216,7 +218,7 @@ pub async fn search(
         )
     );
 
-    let _work_group = query_guard.finish().map(|wg| wg.to_string());
+    let _work_group = registration.finish().map(|wg| wg.to_string());
 
     match res {
         Ok(mut res) => {

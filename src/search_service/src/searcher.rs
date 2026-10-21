@@ -15,9 +15,9 @@
 
 use config::meta::search::SearchEventContext;
 #[cfg(feature = "enterprise")]
-pub use o2_enterprise::enterprise::search::{QueryGuard, QueryHandle};
-#[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::search::{QueryManager, TaskStatus};
+#[cfg(feature = "enterprise")]
+pub use o2_enterprise::enterprise::search::{QueryPhase, QueryRegistration, QueryTracker};
 
 /// What query status shows for a leader query.
 pub struct LeaderInfo<'a> {
@@ -49,7 +49,7 @@ impl Searcher {
         org_id: &str,
         trace_id: &str,
         info: LeaderInfo<'_>,
-    ) -> QueryGuard {
+    ) -> QueryRegistration {
         let status = TaskStatus::new_leader(
             vec![],
             true,
@@ -65,7 +65,7 @@ impl Searcher {
         self.query_manager.register(org_id, trace_id, status)
     }
 
-    pub fn register_follower(&self, org_id: &str, trace_id: &str) -> QueryGuard {
+    pub fn register_follower(&self, org_id: &str, trace_id: &str) -> QueryRegistration {
         let status = TaskStatus::new_follower(vec![], false);
         self.query_manager.register(org_id, trace_id, status)
     }
@@ -115,15 +115,15 @@ impl Searcher {
         org_id: &str,
         trace_id: &str,
         _info: LeaderInfo<'_>,
-    ) -> QueryGuard {
+    ) -> QueryRegistration {
         self.register_follower(org_id, trace_id)
     }
 
-    pub fn register_follower(&self, org_id: &str, trace_id: &str) -> QueryGuard {
-        QueryGuard(QueryHandle {
+    pub fn register_follower(&self, org_id: &str, trace_id: &str) -> QueryRegistration {
+        QueryRegistration(QueryTracker {
             org_id: org_id.to_string(),
             trace_id: trace_id.to_string(),
-            id: config::ider::generate_query_id(trace_id),
+            query_id: config::ider::generate_query_id(trace_id),
         })
     }
 }
@@ -131,12 +131,12 @@ impl Searcher {
 /// Without enterprise there is no query manager, so a query only carries its ids.
 #[derive(Debug)]
 #[cfg(not(feature = "enterprise"))]
-pub struct QueryGuard(QueryHandle);
+pub struct QueryRegistration(QueryTracker);
 
 #[cfg(not(feature = "enterprise"))]
-impl QueryGuard {
-    pub fn handle(&self) -> QueryHandle {
-        self.0.clone()
+impl QueryRegistration {
+    pub fn tracker(&self) -> &QueryTracker {
+        &self.0
     }
 
     pub fn finish(self) -> Option<String> {
@@ -144,25 +144,16 @@ impl QueryGuard {
     }
 }
 
-#[cfg(not(feature = "enterprise"))]
-impl std::ops::Deref for QueryGuard {
-    type Target = QueryHandle;
-
-    fn deref(&self) -> &QueryHandle {
-        &self.0
-    }
-}
-
 #[derive(Clone, Debug)]
 #[cfg(not(feature = "enterprise"))]
-pub struct QueryHandle {
+pub struct QueryTracker {
     org_id: String,
     trace_id: String,
-    id: String,
+    query_id: String,
 }
 
 #[cfg(not(feature = "enterprise"))]
-impl QueryHandle {
+impl QueryTracker {
     pub fn org_id(&self) -> &str {
         &self.org_id
     }
@@ -171,8 +162,8 @@ impl QueryHandle {
         &self.trace_id
     }
 
-    pub fn id(&self) -> &str {
-        &self.id
+    pub fn query_id(&self) -> &str {
+        &self.query_id
     }
 }
 

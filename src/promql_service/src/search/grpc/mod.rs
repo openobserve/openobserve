@@ -43,7 +43,7 @@ use promql::{
 use promql_parser::{label::Matchers, parser};
 use proto::cluster_rpc;
 use rayon::slice::ParallelSliceMut;
-use search_service::QueryHandle;
+use search_service::QueryTracker;
 use tokio::sync::mpsc;
 
 mod storage;
@@ -60,7 +60,7 @@ struct GroupPlan {
 struct StorageProvider {
     trace_id: String,
     #[cfg_attr(not(feature = "enterprise"), allow(dead_code))]
-    query_handle: QueryHandle,
+    query_tracker: QueryTracker,
     need_wal: bool,
 }
 
@@ -117,7 +117,10 @@ impl TableProvider for StorageProvider {
         &self,
         trace_id: &str,
     ) -> datafusion::error::Result<Option<tokio::sync::oneshot::Receiver<()>>> {
-        let Ok(abort_receiver) = self.query_handle.on_cancel(true) else {
+        let Ok(abort_receiver) = self
+            .query_tracker
+            .abort_receiver(search_service::QueryPhase::Running)
+        else {
             log::info!("[trace_id {trace_id}] [PromQL] grpc search canceled before execution plan");
             return Err(infra::errors::ErrorCodes::SearchCancelQuery(format!(
                 "[trace_id {trace_id}] [PromQL] grpc search canceled before execution plan"
@@ -131,7 +134,7 @@ impl TableProvider for StorageProvider {
 #[tracing::instrument(name = "promql:search:grpc:search", skip_all, fields(org_id = req.org_id))]
 pub async fn search(
     req: &cluster_rpc::MetricsQueryRequest,
-    query_handle: &QueryHandle,
+    query_tracker: &QueryTracker,
 ) -> Result<cluster_rpc::MetricsQueryResponse> {
     let cfg = config::get_config();
     let start_ts = std::time::Instant::now();
@@ -145,7 +148,7 @@ pub async fn search(
 
     let mut results = Vec::new();
     if start == end {
-        results.push(search_inner(req, query_handle).await?);
+        results.push(search_inner(req, query_tracker).await?);
     } else {
         // 1. get max records stream
         let start_ts = std::time::Instant::now();
@@ -221,7 +224,7 @@ pub async fn search(
             req.need_wal = plan.window.reaches(end, wal_floor);
             req.query.as_mut().unwrap().start = start;
             req.query.as_mut().unwrap().end = end;
-            let resp = search_inner(&req, query_handle).await?;
+            let resp = search_inner(&req, query_tracker).await?;
             log::info!(
                 "[trace_id {trace_id}] promql->search->grpc: group[{start}, {end}] get resp, took: {} ms",
                 start_ts.elapsed().as_millis()
@@ -251,7 +254,7 @@ pub async fn search(
 #[tracing::instrument(name = "promql:search:grpc:data", skip_all, fields(org_id = req.org_id))]
 pub async fn data(
     req: &cluster_rpc::MetricsQueryRequest,
-    query_handle: &QueryHandle,
+    query_tracker: &QueryTracker,
     tx: mpsc::Sender<Result<cluster_rpc::MetricsQueryResponse, tonic::Status>>,
 ) -> Result<()> {
     let cfg = config::get_config();
@@ -297,7 +300,7 @@ pub async fn data(
 
     let start_ts = std::time::Instant::now();
     if start == end {
-        let ret = search_inner(req, query_handle).await?;
+        let ret = search_inner(req, query_tracker).await?;
         if let Err(e) = data_tx.send(ret).await {
             log::error!("[trace_id {trace_id}] promql->data->grpc: send data error: {e}");
         }
@@ -360,7 +363,7 @@ pub async fn data(
         req.need_wal = plan.window.reaches(end, wal_floor);
         req.query.as_mut().unwrap().start = start;
         req.query.as_mut().unwrap().end = end;
-        let resp = search_inner(&req, query_handle).await?;
+        let resp = search_inner(&req, query_tracker).await?;
         log::info!(
             "[trace_id {trace_id}] promql->data->grpc: group[{start}, {end}] get resp, took: {} ms",
             start_ts.elapsed().as_millis()
@@ -386,7 +389,7 @@ pub async fn data(
 #[tracing::instrument(name = "promql:search:grpc:search_inner", skip_all, fields(org_id = req.org_id))]
 pub async fn search_inner(
     req: &cluster_rpc::MetricsQueryRequest,
-    query_handle: &QueryHandle,
+    query_tracker: &QueryTracker,
 ) -> Result<(value::Value, String, ScanStats, i64, Vec<String>)> {
     let start = std::time::Instant::now();
     let trace_id = req.job.as_ref().unwrap().trace_id.to_string();
@@ -430,7 +433,7 @@ pub async fn search_inner(
         query_ctx,
         StorageProvider {
             trace_id: trace_id.to_string(),
-            query_handle: query_handle.clone(),
+            query_tracker: query_tracker.clone(),
             need_wal: req.need_wal,
         },
         query.label_selector.clone(),

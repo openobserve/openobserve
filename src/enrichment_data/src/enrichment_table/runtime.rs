@@ -131,7 +131,7 @@ pub async fn get_enrichment_table_data(
 
     log::info!("get enrichment table {org_id}/{name} data req start time: {start_time}");
 
-    let query_guard = search_service::SEARCH_SERVER.register_leader(
+    let registration = search_service::SEARCH_SERVER.register_leader(
         org_id,
         &trace_id,
         search_service::LeaderInfo {
@@ -146,7 +146,7 @@ pub async fn get_enrichment_table_data(
     );
     let result = search_service::cluster::http::search_inner(
         request,
-        &query_guard,
+        registration.tracker(),
         search_query,
         regions,
         vec![],
@@ -154,7 +154,7 @@ pub async fn get_enrichment_table_data(
         None,
     )
     .await;
-    drop(query_guard);
+    drop(registration);
 
     match result {
         Ok((batches, ..)) => {
