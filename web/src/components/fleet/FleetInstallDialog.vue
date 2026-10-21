@@ -231,9 +231,12 @@ const selectedId = computed<string | null>({
   set: (id) => (chosenId.value = id),
 });
 const creatingHere = ref(false);
-const secret = computed(() =>
-  selectedId.value ? heldTokenSecret(orgId.value, selectedId.value) : null,
-);
+// A create response outranks the stored value only in being fresher; both are the same token.
+const secret = computed(() => {
+  if (!selectedId.value) return null;
+  const stored = activeTokens.value.find((tok) => tok.id === selectedId.value)?.token ?? null;
+  return heldTokenSecret(orgId.value, selectedId.value) ?? stored;
+});
 const createdHere = computed(
   () => !!pendingTokenId.value && selectedId.value === pendingTokenId.value && !!secret.value,
 );

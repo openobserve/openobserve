@@ -25395,7 +25395,7 @@
       "newToken": "New token",
       "maxUses": "Max uses",
       "maxUsesHelp": "Leave empty for unlimited enrollments.",
-      "copyOnce": "Copy this token now. Until you leave this organization or sign out, the install command can still fill it in; after that it can't be shown again.",
+      "copyOnce": "Collectors enroll with this token. It stays available from this list and in Add collector.",
       "nameRequired": "Name is required",
       "maxUsesInvalid": "Enter a whole number above 0, or leave it empty",
       "revokeTitle": "Revoke {name}?",
@@ -25408,8 +25408,10 @@
       "enrollments": "Enrollments",
       "inUse": "{online} online, {offline} offline",
       "inUseHeader": "In use",
-      "prefix": "Prefix",
-      "revokeAffected": "No collector uses this token | {count} collector uses this token | {count} collectors use this token"
+      "prefix": "Token",
+      "revokeAffected": "No collector uses this token | {count} collector uses this token | {count} collectors use this token",
+      "copyToken": "Copy token",
+      "tokenCopied": "Token copied"
     },
     "tokenExpiry": {
       "title": "{count} enrollment token expires within 7 days and collectors still use it | {count} enrollment tokens expire within 7 days and collectors still use them",
@@ -25425,7 +25427,7 @@
       "waiting": "Waiting for the collector to connect…",
       "connected": "Connected: {name} enrolled and is reporting",
       "viewCollectors": "View collectors",
-      "placeholderHint": "The value of {name} was shown only when it was created and is not stored here. Paste it in place of {placeholder}, or create a new token whose value fills the command.",
+      "placeholderHint": "The value of {name} is not stored, so the command shows {placeholder}. Paste the value there, or create a new token whose value fills the command.",
       "noTokenTitle": "No active enrollment token",
       "noTokenBody": "Collectors enroll with an enrollment token. Create one for this fleet to get the install command.",
       "joinsFleet": "Collectors installed with this token join fleet {fleet} and run {config} v{version}.",

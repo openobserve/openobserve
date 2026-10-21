@@ -156,6 +156,8 @@ export interface FleetToken {
   max_uses: number | null;
   fleet: CollectorFleet;
   revoked: boolean;
+  /** The stored value; absent on tokens created before values were kept. */
+  token?: string | null;
 }
 
 export interface FleetTokenList {

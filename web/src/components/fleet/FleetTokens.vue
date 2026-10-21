@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <FleetTokenForm v-if="mode === 'create'" :fleet-id="fleetId" @created="onCreated" />
         <div v-else-if="created" class="flex flex-col gap-3">
-          <OBanner variant="warning" dense :content="t('fleet.enrollment.copyOnce')" />
+          <OBanner variant="info" dense :content="t('fleet.enrollment.copyOnce')" />
           <OCodeBlock
             :code="created.token"
             lang="plaintext"
@@ -111,11 +111,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #cell-prefix="{ row }">
-          <span
-            class="text-text-secondary font-mono text-xs"
-            :data-test="`fleet-tokens-prefix-${row.id}`"
-            >{{ masked(row.prefix) }}</span
-          >
+          <span class="flex items-center gap-1">
+            <span
+              class="text-text-secondary font-mono text-xs"
+              :data-test="`fleet-tokens-prefix-${row.id}`"
+              >{{ masked(row.prefix) }}</span
+            >
+            <OButton
+              v-if="row.token"
+              variant="ghost-muted"
+              size="icon-xs"
+              icon-left="content-copy"
+              :aria-label="t('fleet.enrollment.copyToken')"
+              :title="t('fleet.enrollment.copyToken')"
+              :data-test="`fleet-tokens-copy-${row.id}`"
+              @click="copyToken(row.token)"
+            />
+          </span>
         </template>
 
         <template #cell-inUse="{ row }">
@@ -205,6 +217,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
+import { copyToClipboard } from "@/utils/clipboard";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useOrgId } from "@/composables/query/useOrgId";
 import { revokeFleetTokenMutation } from "@/services/fleet.queries";
@@ -294,6 +307,8 @@ watch([orgId, () => props.fleetId], () => {
 
 const stateOf = (row: TokenRow) => tokenState(row, Date.now());
 const masked = (prefix: string) => raw(`${prefix}••••••••••••`);
+const copyToken = (token: string) =>
+  copyToClipboard(token, t, { successMessage: t("fleet.enrollment.tokenCopied") });
 
 function stateLabel(row: TokenRow): I18nText {
   const labels: Record<TokenState, I18nText> = {

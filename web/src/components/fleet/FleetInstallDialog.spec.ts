@@ -167,6 +167,18 @@ describe("FleetInstallDialog", () => {
     expect(tokenOptions(wrapper)).toEqual(["t1", "t4"]);
   });
 
+  it("fills the command from a token's stored value", async () => {
+    vi.mocked(fleet.listTokens).mockResolvedValue({
+      data: { items: [token({ id: "t7", name: "stored", token: "o2ft_stored_value" })] },
+    } as any);
+    wrapper = mountDialog();
+    await flushPromises();
+    expect(commandToken(wrapper)).toBe("o2ft_stored_value");
+    expect(wrapper.find('[data-test="fleet-install-dialog-placeholder-hint"]').exists()).toBe(
+      false,
+    );
+  });
+
   it("uses a <TOKEN> placeholder when the token's value is no longer held", async () => {
     wrapper = mountDialog();
     await flushPromises();
@@ -412,7 +424,7 @@ describe("FleetInstallDialog", () => {
     expect(commandToken(wrapper)).toBe("o2ft_fresh");
     expect(wrapper.find('[data-test="fleet-install-dialog-token-pending"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="fleet-install-dialog-copy-once"]').text()).toContain(
-      "Copy this token now",
+      "Collectors enroll with this token",
     );
   });
 

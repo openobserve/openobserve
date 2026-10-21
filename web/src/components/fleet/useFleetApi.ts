@@ -110,6 +110,7 @@ export interface TokenRow {
   /** Null once the fleet was deleted. */
   fleetName: string | null;
   revoked: boolean;
+  token: string | null;
 }
 
 export type TokenState = "active" | "expired" | "exhausted" | "revoked";
@@ -287,6 +288,7 @@ export function toTokenRow(t: FleetToken): TokenRow {
     fleetId: t.fleet?.id ?? "default",
     fleetName: t.fleet ? t.fleet.name : "default",
     revoked: !!t.revoked,
+    token: t.token ?? null,
   };
 }
 

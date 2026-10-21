@@ -329,6 +329,7 @@ describe("toTokenRow", () => {
       fleetId: "f1",
       fleetName: "edge",
       revoked: false,
+      token: null,
     });
   });
 
