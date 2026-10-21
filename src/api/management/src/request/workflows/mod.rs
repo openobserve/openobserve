@@ -204,7 +204,7 @@ fn workflow_delete_outcome(published_exists: bool, draft_exists: bool) -> Workfl
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "create"})),
+        ("x-o2-ratelimit" = json!({"module": "Workflows", "operation": "create"})),
     )
 )]
 pub async fn save_workflow(
@@ -307,7 +307,7 @@ pub async fn save_workflow(
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "list"})),
+        ("x-o2-ratelimit" = json!({"module": "Workflows", "operation": "list"})),
     )
 )]
 pub async fn list_workflows(
@@ -453,7 +453,7 @@ pub struct MoveWorkflowsRequestBody {
         (status = 500, description = "Error", content_type = "application/json", body = Object),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "update"})),
+        ("x-o2-ratelimit" = json!({"module": "Workflows", "operation": "update"})),
     )
 )]
 pub async fn move_workflows(
@@ -542,7 +542,7 @@ pub async fn move_workflows(
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "list"})),
+        ("x-o2-ratelimit" = json!({"module": "Workflows", "operation": "delete"})),
     )
 )]
 pub async fn delete_workflows(
@@ -646,7 +646,7 @@ pub async fn delete_workflows(
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "list"})),
+        ("x-o2-ratelimit" = json!({"module": "Workflows", "operation": "update"})),
     )
 )]
 pub async fn update_workflows(
@@ -791,7 +791,7 @@ pub async fn update_workflows(
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "create"})),
+        ("x-o2-ratelimit" = json!({"module": "Workflows", "operation": "create"})),
     )
 )]
 pub async fn test_workflow(
@@ -859,7 +859,7 @@ pub async fn test_workflow(
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "create"})),
+        ("x-o2-ratelimit" = json!({"module": "Workflows", "operation": "create"})),
     )
 )]
 pub async fn trigger_workflow(
@@ -900,7 +900,7 @@ pub async fn trigger_workflow(
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "create"})),
+        ("x-o2-ratelimit" = json!({"module": "Workflows", "operation": "get"})),
     )
 )]
 pub async fn get_workflow_errors(
@@ -966,7 +966,7 @@ pub async fn get_workflow_errors(
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "create"})),
+        ("x-o2-ratelimit" = json!({"module": "Workflows", "operation": "create"})),
     )
 )]
 pub async fn retry_workflow(
@@ -1006,7 +1006,7 @@ pub async fn retry_workflow(
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "create"})),
+        ("x-o2-ratelimit" = json!({"module": "Workflows", "operation": "update"})),
     )
 )]
 pub async fn enable_workflow(
@@ -1051,7 +1051,7 @@ pub async fn enable_workflow(
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "create"})),
+        ("x-o2-ratelimit" = json!({"module": "Workflows", "operation": "get"})),
     )
 )]
 pub async fn get_workflow_history(
@@ -1201,7 +1201,7 @@ pub async fn get_workflow_history(
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "post"})),
+        ("x-o2-ratelimit" = json!({"module": "Workflows", "operation": "update"})),
     )
 )]
 pub async fn promote_draft(

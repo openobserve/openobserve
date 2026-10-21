@@ -1062,6 +1062,27 @@ mod tests {
         ("/api/{org_id}/workflows/promote/{id}", "post"),
     ];
 
+    /// Canonical `ApiGroupOperation` values; anything else is an alias or drops the route.
+    #[cfg(feature = "enterprise")]
+    const RATELIMIT_OPERATIONS: &[&str] = &["list", "get", "create", "update", "delete"];
+
+    /// Runs stay `create` so a flood of triggers cannot throttle ordinary edits in `update`.
+    #[cfg(feature = "enterprise")]
+    const WORKFLOWS_RATELIMIT: &[(&str, &str, &str)] = &[
+        ("/api/{org_id}/workflows", "post", "create"),
+        ("/api/{org_id}/workflows", "get", "list"),
+        ("/api/v2/{org_id}/workflows/move", "patch", "update"),
+        ("/api/{org_id}/workflows/{id}", "delete", "delete"),
+        ("/api/{org_id}/workflows/{id}", "put", "update"),
+        ("/api/{org_id}/workflows/test", "post", "create"),
+        ("/api/{org_id}/workflows/{id}/trigger", "post", "create"),
+        ("/api/{org_id}/workflows/{id}/errors/{run_id}", "get", "get"),
+        ("/api/{org_id}/workflows/{id}/retry", "post", "create"),
+        ("/api/{org_id}/workflows/{id}/enable", "put", "update"),
+        ("/api/{org_id}/workflows/{id}/history", "get", "get"),
+        ("/api/{org_id}/workflows/promote/{id}", "post", "update"),
+    ];
+
     // Ends at the column-0 close brace, so an item after the body is never scraped into it.
     #[cfg(feature = "enterprise")]
     fn service_routes_body() -> &'static str {
@@ -1604,6 +1625,40 @@ mod tests {
         let body = &spec["paths"]["/api/{org_id}/workflows/{id}/trigger"]["post"]["requestBody"];
         let schema = &body["content"]["application/json"]["schema"];
         assert_eq!(schema["type"], "array", "{body}");
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn workflows_ratelimit_labels_name_their_own_module_and_a_canonical_operation() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let paths = spec.get("paths").unwrap().as_object().unwrap();
+        let mut wrong = Vec::new();
+        for (path, method, operation) in WORKFLOWS_RATELIMIT {
+            let Some(op) = paths.get(*path).and_then(|p| p.get(*method)) else {
+                wrong.push(format!("{method} {path}: absent from the spec"));
+                continue;
+            };
+            let label = &op["x-o2-ratelimit"];
+            if label["module"] != "Workflows" || label["operation"] != *operation {
+                wrong.push(format!(
+                    "{method} {path}: {label}, expected Workflows/{operation}"
+                ));
+            }
+        }
+        // Other modules already use labels outside the five, so only workflows paths are checked.
+        for (path, item) in paths.iter().filter(|(path, _)| path.contains("/workflows")) {
+            for (method, op) in item.as_object().unwrap() {
+                let Some(operation) = op["x-o2-ratelimit"]["operation"].as_str() else {
+                    continue;
+                };
+                if !RATELIMIT_OPERATIONS.contains(&operation) {
+                    wrong.push(format!(
+                        "{method} {path}: operation {operation:?} is not canonical"
+                    ));
+                }
+            }
+        }
+        assert!(wrong.is_empty(), "{wrong:#?}");
     }
 
     #[cfg(feature = "enterprise")]
