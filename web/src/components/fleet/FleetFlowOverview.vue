@@ -411,24 +411,12 @@ function retry() {
 
 defineExpose({ refresh: retry });
 
-// Stored as exclusions, so fleets and destinations that arrive later start checked.
-const excludedFleets = ref<string[]>([]);
-const excludedDestinations = ref<string[]>([]);
-const checkedFleets = computed<string[]>({
-  get: () => fleets.value.map((f) => f.id).filter((id) => !excludedFleets.value.includes(id)),
-  set: (ids) => {
-    excludedFleets.value = fleets.value.map((f) => f.id).filter((id) => !ids.includes(id));
-  },
-});
-const checkedDestinations = computed<string[]>({
-  get: () =>
-    destinations.value.map((d) => d.id).filter((id) => !excludedDestinations.value.includes(id)),
-  set: (ids) => {
-    excludedDestinations.value = destinations.value
-      .map((d) => d.id)
-      .filter((id) => !ids.includes(id));
-  },
-});
+// An empty selection is no filter: everything shows until something is ticked.
+const checkedFleets = ref<string[]>([]);
+const checkedDestinations = ref<string[]>([]);
+const fleetShown = (id: string) => !checkedFleets.value.length || checkedFleets.value.includes(id);
+const destinationShown = (id: string) =>
+  !checkedDestinations.value.length || checkedDestinations.value.includes(id);
 const issuesOnly = ref(false);
 const severityFilter = ref<PathSeverity | null>(null);
 type Selection = { kind: "pipeline" | "fleet" | "node"; id: string };
@@ -492,10 +480,9 @@ const severityOf = computed<Record<string, PathSeverity>>(() =>
 const scoped = computed(() =>
   pipelines.value.filter(
     (p) =>
-      checkedFleets.value.includes(p.fleet) &&
+      fleetShown(p.fleet) &&
       (telemetry.value === "all" || p.signal === telemetry.value) &&
-      (!p.exporters.length ||
-        p.exporters.some((e) => checkedDestinations.value.includes(e.destination))),
+      (!p.exporters.length || p.exporters.some((e) => destinationShown(e.destination))),
   ),
 );
 
@@ -563,7 +550,7 @@ const pipelineMap = computed(() =>
   buildPipelineMap(
     visible.value.map((p) => ({
       ...p,
-      exporters: p.exporters.filter((e) => checkedDestinations.value.includes(e.destination)),
+      exporters: p.exporters.filter((e) => destinationShown(e.destination)),
     })),
     { width: canvasWidth.value, nodeWidth: NODE_WIDTH, row: ROW, top: TOP },
   ),

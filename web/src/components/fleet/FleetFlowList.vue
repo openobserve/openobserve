@@ -134,8 +134,9 @@ function toggle(id: string) {
   checked.value = isChecked(id) ? checked.value.filter((x) => x !== id) : [...checked.value, id];
 }
 
+// Any selection clears back to "no filter"; from nothing, tick everything.
 function toggleAll() {
-  checked.value = checked.value.length === props.items.length ? [] : props.items.map((i) => i.id);
+  checked.value = checked.value.length ? [] : props.items.map((i) => i.id);
 }
 
 function showTop() {
