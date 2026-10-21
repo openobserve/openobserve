@@ -49,13 +49,12 @@ use promql::{
 };
 use promql_parser::parser;
 use proto::cluster_rpc;
-use search_service::server_internal_error;
+use search_service::{LeaderInfo, SEARCH_SERVER, server_internal_error};
 use tracing::{Instrument, info_span};
 #[cfg(feature = "enterprise")]
 use {
     o2_enterprise::enterprise::common::config::get_config as get_o2_config,
-    o2_enterprise::enterprise::search::{TaskStatus, WorkGroup},
-    search_service::SEARCH_SERVER,
+    o2_enterprise::enterprise::search::WorkGroup, search_service::QueryPhase,
 };
 
 use crate::MetricsQueryRequest;
@@ -92,31 +91,21 @@ pub async fn search(
 ) -> Result<SearchResponse> {
     let trace_id = search_service::leader_trace_id(trace_id);
     let trace_id = trace_id.as_str();
-    #[cfg(feature = "enterprise")]
-    {
-        let query = Some(req.query.clone());
-        let start_time = Some(req.start);
-        let end_time = Some(req.end);
-
-        SEARCH_SERVER
-            .insert(
-                org_id,
-                trace_id.to_string(),
-                TaskStatus::new_leader(
-                    vec![],
-                    true,
-                    Some(user_email.to_string()),
-                    Some(org_id.to_string()),
-                    Some(StreamType::Metrics.to_string()),
-                    query,
-                    start_time,
-                    end_time,
-                    None,
-                    None,
-                ),
-            )
-            .await;
-    }
+    // callers such as Grafana share one trace_id across concurrent requests
+    let registration = SEARCH_SERVER.register_leader(
+        org_id,
+        trace_id,
+        LeaderInfo {
+            user_id: Some(user_email),
+            stream_type: StreamType::Metrics.as_str(),
+            sql: &req.query,
+            start_time: req.start,
+            end_time: req.end,
+            search_type: None,
+            search_event_context: None,
+        },
+    );
+    let query_tracker = registration.tracker();
 
     let timeout = if timeout > 0 {
         timeout as u64
@@ -166,7 +155,7 @@ pub async fn search(
     // Check work group (OSS uses dist_lock, Enterprise uses WorkGroup::Short)
     #[cfg(not(feature = "enterprise"))]
     let _lock = search_service::work_group::check_work_group(
-        trace_id,
+        query_tracker,
         &req.org_id,
         timeout,
         &mut stop_watch,
@@ -178,7 +167,7 @@ pub async fn search(
     // Enterprise: Always use Short workgroup for metrics queries
     #[cfg(feature = "enterprise")]
     let _lock = search_service::work_group::check_work_group(
-        trace_id,
+        query_tracker,
         &req.org_id,
         Some(user_email),
         SearchEventType::try_from(req.search_event_type.as_str()).ok(),
@@ -226,20 +215,14 @@ pub async fn search(
     log::info!("[trace_id {trace_id}] promql->search: total wait in queue took: {_took_wait} ms");
 
     #[cfg(feature = "enterprise")]
-    let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
-    #[cfg(feature = "enterprise")]
-    if SEARCH_SERVER
-        .insert_sender(org_id, trace_id, abort_sender, true)
-        .await
-        .is_err()
-    {
+    let Ok(abort_receiver) = query_tracker.abort_receiver(QueryPhase::Running) else {
         log::info!("[trace_id {trace_id}] promql->search: search canceled before execution plan");
         return Err(Error::ErrorCode(
             infra::errors::ErrorCodes::SearchCancelQuery(format!(
                 "[trace_id {trace_id}] promql->search: search canceled before execution plan"
             )),
         ));
-    }
+    };
 
     let trace_id_move = trace_id.to_string();
     let user_email_move = user_email.to_string();
@@ -278,10 +261,6 @@ pub async fn search(
 
     // release lock
     drop(_lock);
-
-    // Clean up task record before returning
-    #[cfg(feature = "enterprise")]
-    SEARCH_SERVER.remove(org_id, trace_id).await;
 
     match task {
         Ok(Ok(ret)) => Ok(ret),

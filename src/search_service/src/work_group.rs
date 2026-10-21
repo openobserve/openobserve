@@ -23,14 +23,14 @@ use infra::{
 };
 #[cfg(feature = "enterprise")]
 use {
-    crate::SEARCH_SERVER,
+    crate::QueryPhase,
     config::meta::search::SearchEventType,
     infra::{dist_lock, errors::ErrorCodes},
     o2_enterprise::enterprise::search::{WorkGroup, work_group::ConcurrencyStatus},
     tokio::sync::oneshot,
 };
 
-use super::utils::AsyncDefer;
+use super::{QueryTracker, utils::AsyncDefer};
 
 /// Guard that automatically releases work group lock when dropped
 pub struct DeferredLock {
@@ -115,12 +115,13 @@ impl Admission for QueueAdmission<'_> {
     fields(caller = caller)
 )]
 pub async fn check_work_group(
-    trace_id: &str,
+    query_tracker: &QueryTracker,
     org_id: &str,
     timeout: u64,
     stop_watch: &mut TookWatcher,
     caller: &str,
 ) -> Result<DeferredLock> {
+    let trace_id = query_tracker.trace_id();
     let cfg = get_config();
     let work_group_str = "global".to_string();
 
@@ -168,7 +169,7 @@ pub async fn check_work_group(
     fields(caller = caller, work_group = ?work_group)
 )]
 pub async fn check_work_group(
-    trace_id: &str,
+    query_tracker: &QueryTracker,
     org_id: &str,
     user_id: Option<&str>,
     search_type: Option<SearchEventType>,
@@ -177,12 +178,13 @@ pub async fn check_work_group(
     stop_watch: &mut TookWatcher,
     caller: &str,
 ) -> Result<DeferredLock> {
+    let trace_id = query_tracker.trace_id();
     let work_group_str = work_group.to_string();
     let locker_key = format!("/search/cluster_queue/{work_group_str}");
 
     // Check all three concurrency levels (global, org, user) and add to the workgroup queue
     work_group_checking(
-        trace_id,
+        query_tracker,
         stop_watch,
         org_id,
         timeout,
@@ -235,7 +237,7 @@ pub async fn check_work_group(
 #[allow(clippy::too_many_arguments)]
 #[tracing::instrument(name = "service:search:work_group:checking", skip_all, fields(user_id = user_id))]
 pub async fn work_group_checking(
-    trace_id: &str,
+    query_tracker: &QueryTracker,
     stop_watch: &mut TookWatcher,
     org_id: &str,
     timeout: u64,
@@ -245,21 +247,21 @@ pub async fn work_group_checking(
     search_type: Option<SearchEventType>,
     caller: &str,
 ) -> Result<()> {
-    let (abort_sender, abort_receiver) = oneshot::channel();
-    if let Err(err) = SEARCH_SERVER
-        .insert_sender(org_id, trace_id, abort_sender, false)
-        .await
-    {
-        metrics::QUERY_PENDING_NUMS
-            .with_label_values(&[org_id])
-            .dec();
-        log::warn!(
-            "[trace_id {trace_id}] search->cluster: request canceled, missing work-group registration: {err}"
-        );
-        return Err(Error::ErrorCode(ErrorCodes::SearchCancelQuery(format!(
-            "[trace_id {trace_id}] search->cluster: request canceled, missing work-group registration: {err}"
-        ))));
-    }
+    let trace_id = query_tracker.trace_id();
+    let abort_receiver = match query_tracker.abort_receiver(QueryPhase::Queued) {
+        Ok(receiver) => receiver,
+        Err(err) => {
+            metrics::QUERY_PENDING_NUMS
+                .with_label_values(&[org_id])
+                .dec();
+            log::warn!(
+                "[trace_id {trace_id}] search->cluster: request canceled, missing work-group registration: {err}"
+            );
+            return Err(Error::ErrorCode(ErrorCodes::SearchCancelQuery(format!(
+                "[trace_id {trace_id}] search->cluster: request canceled, missing work-group registration: {err}"
+            ))));
+        }
+    };
     let admission = QueueAdmission {
         trace_id,
         locker_key,
@@ -297,7 +299,7 @@ pub async fn work_group_checking(
 /// - Acquiring the work group lock
 #[cfg(not(feature = "enterprise"))]
 pub async fn acquire_work_group_lock(
-    trace_id: &str,
+    query_tracker: &QueryTracker,
     req: &Request,
     stop_watch: &mut TookWatcher,
     caller: &str,
@@ -305,7 +307,7 @@ pub async fn acquire_work_group_lock(
     _file_id_list_vec: &[&FileId],
 ) -> Result<DeferredLock> {
     check_work_group(
-        trace_id,
+        query_tracker,
         &req.org_id,
         req.timeout as u64,
         stop_watch,
@@ -316,7 +318,7 @@ pub async fn acquire_work_group_lock(
 
 #[cfg(feature = "enterprise")]
 pub async fn acquire_work_group_lock(
-    trace_id: &str,
+    query_tracker: &QueryTracker,
     req: &Request,
     stop_watch: &mut TookWatcher,
     caller: &str,
@@ -335,14 +337,12 @@ pub async fn acquire_work_group_lock(
         is_background_task,
     );
 
-    SEARCH_SERVER
-        .add_work_group(&req.org_id, trace_id, Some(work_group.clone()))
-        .await;
+    query_tracker.set_work_group(work_group.clone());
 
     let user_id = req.user_id.as_deref();
 
     check_work_group(
-        trace_id,
+        query_tracker,
         &req.org_id,
         user_id,
         search_type,

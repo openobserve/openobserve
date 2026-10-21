@@ -8454,6 +8454,7 @@ dependencies = [
  "sea-orm",
  "search",
  "search_service",
+ "serde",
  "serde_json",
  "stream",
  "tantivy_utils",

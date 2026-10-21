@@ -51,7 +51,7 @@ use usage_reporting::report_request_usage_stats;
 #[cfg(feature = "enterprise")]
 use {
     infra::{client::grpc::make_grpc_search_client, cluster::get_cached_online_query_nodes},
-    o2_enterprise::enterprise::{common::config::get_config as get_o2_config, search::TaskStatus},
+    o2_enterprise::enterprise::common::config::get_config as get_o2_config,
     tracing::info_span,
 };
 
@@ -87,7 +87,10 @@ use ::search::{
     datafusion::{self, distributed_plan::streaming_aggs_exec},
     index, inspector, sql, tantivy, utils,
 };
+#[cfg(feature = "enterprise")]
+pub use searcher::QueryPhase;
 use searcher::Searcher;
+pub use searcher::{LeaderInfo, QueryRegistration, QueryTracker};
 
 /// The result of search in cluster
 /// data, scan_stats, wait_in_queue, is_partial, partial_err
@@ -164,39 +167,36 @@ pub async fn search(
     request.mark_chat_history_reader();
     let meta = Sql::new_from_req(&request, &query).await?;
 
-    #[cfg(feature = "enterprise")]
-    {
-        let sql = Some(in_req.query.sql.clone());
-        let start_time = Some(in_req.query.start_time);
-        let end_time = Some(in_req.query.end_time);
-        let s_event_type = in_req
-            .search_type
-            .map(|s_event_type| s_event_type.to_string());
-        // set search task
-        SEARCH_SERVER
-            .insert(
-                org_id,
-                trace_id.clone(),
-                TaskStatus::new_leader(
-                    vec![],
-                    true,
-                    user_id.clone(),
-                    Some(org_id.to_string()),
-                    Some(stream_type.to_string()),
-                    sql,
-                    start_time,
-                    end_time,
-                    s_event_type,
-                    in_req.search_event_context.clone(),
-                ),
-            )
-            .await;
-    }
+    // callers may share one trace_id across concurrent requests, e.g. Grafana via traceparent
+    let registration = SEARCH_SERVER.register_leader(
+        org_id,
+        &trace_id,
+        LeaderInfo {
+            user_id: user_id.as_deref(),
+            stream_type: stream_type.as_str(),
+            sql: &in_req.query.sql,
+            start_time: in_req.query.start_time,
+            end_time: in_req.query.end_time,
+            search_type: in_req.search_type.map(|t| t.to_string()),
+            search_event_context: in_req.search_event_context.as_ref(),
+        },
+    );
 
     let span = tracing::span::Span::current();
+    let query_tracker = registration.tracker().clone();
     let handle = tokio::task::spawn(
-        async move { cluster::http::search(request, query, req_regions, req_clusters, true).await }
-            .instrument(span),
+        async move {
+            cluster::http::search(
+                request,
+                &query_tracker,
+                query,
+                req_regions,
+                req_clusters,
+                true,
+            )
+            .await
+        }
+        .instrument(span),
     );
     let res = match handle.await {
         Ok(Ok(res)) => Ok(res),
@@ -218,16 +218,7 @@ pub async fn search(
         )
     );
 
-    // remove task because task if finished
-    let mut _work_group = None;
-    #[cfg(feature = "enterprise")]
-    {
-        if let Some((_, stat)) = SEARCH_SERVER.remove(org_id, &trace_id).await
-            && let Some(wg) = stat.work_group.as_ref()
-        {
-            _work_group = Some(wg.to_string());
-        };
-    }
+    let _work_group = registration.finish();
 
     match res {
         Ok(mut res) => {
@@ -791,13 +782,7 @@ pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
 /// Aborts this node's `trace_id` search and its `{trace_id}-` children in `org_id`; OSS no-op.
 pub async fn abort_trace_family(org_id: &str, trace_id: &str) {
     #[cfg(feature = "enterprise")]
-    if let Some(cancelled) = SEARCH_SERVER.cancel(org_id, trace_id).await {
-        for (_, status) in cancelled {
-            for sender in status.abort_senders.into_iter().rev() {
-                let _ = sender.send(());
-            }
-        }
-    }
+    SEARCH_SERVER.cancel(org_id, trace_id);
     #[cfg(not(feature = "enterprise"))]
     let _ = (org_id, trace_id);
 }
@@ -1333,5 +1318,59 @@ mod tests {
         ));
         assert!(!is_license_exempt_stream(META_ORG_ID, Some("logs")));
         assert!(!is_license_exempt_stream(META_ORG_ID, None));
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_abort_trace_family_reaches_every_child_and_delta() {
+        let org = "abort_family_org";
+        let family = ider::generate_trace_id();
+        let other = ider::generate_trace_id();
+        let leader = |trace_id: &str| {
+            SEARCH_SERVER.register_leader(
+                org,
+                trace_id,
+                LeaderInfo {
+                    user_id: None,
+                    stream_type: "logs",
+                    sql: "select 1",
+                    start_time: 0,
+                    end_time: 0,
+                    search_type: Some("public_dashboard".to_string()),
+                    search_event_context: None,
+                },
+            )
+        };
+        let child = leader(&format!("{family}-0"));
+        let sibling = leader(&format!("{family}-1"));
+        let delta = leader(&format!("{family}-0-1"));
+        let unrelated = leader(&other);
+        let receiver = |r: &QueryRegistration, phase| r.tracker().abort_receiver(phase).unwrap();
+        let aborts = [
+            receiver(&child, QueryPhase::Queued),
+            receiver(&sibling, QueryPhase::Running),
+            receiver(&delta, QueryPhase::Queued),
+        ];
+        let mut unrelated_abort = receiver(&unrelated, QueryPhase::Queued);
+
+        abort_trace_family(org, &family).await;
+
+        for abort in aborts {
+            tokio::time::timeout(std::time::Duration::from_secs(1), abort)
+                .await
+                .expect("every family search is aborted")
+                .unwrap();
+        }
+        assert!(unrelated_abort.try_recv().is_err());
+        assert!(
+            child.tracker().abort_receiver(QueryPhase::Queued).is_err(),
+            "a cancelled child cannot start afterwards"
+        );
+        assert!(
+            unrelated
+                .tracker()
+                .abort_receiver(QueryPhase::Queued)
+                .is_ok()
+        );
     }
 }

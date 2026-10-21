@@ -15,6 +15,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { convertLogData, convertStackedLogData, formatDate, formatCount } from "./convertLogData";
+import { getDefaultTheme } from "@/constants/themes";
 
 // Stub the color-palette module so tests are not coupled to palette values.
 vi.mock("@/utils/dashboard/colorPalette", () => ({
@@ -22,23 +23,32 @@ vi.mock("@/utils/dashboard/colorPalette", () => ({
   classicColorPaletteDarkTheme: ["#111", "#222", "#333"],
 }));
 
+// Accent per element, so a lookup on the wrong element returns the wrong value.
+const accentByElement = new Map<Element, string>();
+const setAccents = (root: string, body: string) => {
+  accentByElement.set(document.documentElement, root);
+  accentByElement.set(document.body, body);
+};
+
 describe("convertLogData.ts", () => {
+  let computedStyleSpy: ReturnType<typeof vi.spyOn>;
+
   beforeEach(() => {
     vi.clearAllMocks();
-
-    Object.defineProperty(window, "getComputedStyle", {
-      value: () => ({
-        getPropertyValue: (prop: string) => {
-          if (prop === "--color-theme-accent") return "#7A80C2";
-          return "";
-        },
-      }),
-      writable: true,
-      configurable: true,
-    });
+    setAccents("#7A80C2", "#7A80C2");
+    computedStyleSpy = vi.spyOn(window, "getComputedStyle").mockImplementation(
+      (el: Element) =>
+        ({
+          getPropertyValue: (prop: string) =>
+            prop === "--color-theme-accent" ? (accentByElement.get(el) ?? "") : "",
+        }) as unknown as CSSStyleDeclaration,
+    );
   });
 
   afterEach(() => {
+    computedStyleSpy.mockRestore();
+    accentByElement.clear();
+    document.documentElement.classList.remove("dark");
     vi.clearAllTimers();
   });
 
@@ -215,17 +225,7 @@ describe("convertLogData.ts", () => {
 
     it("reads theme color from body CSS property in dark mode", () => {
       document.documentElement.classList.add("dark");
-      Object.defineProperty(window, "getComputedStyle", {
-        value: (el: Element) => ({
-          getPropertyValue: (prop: string) => {
-            if (el === document.body && prop === "--color-theme-accent") return "#5A60A2";
-            if (prop === "--color-theme-accent") return "#7A80C2";
-            return "";
-          },
-        }),
-        writable: true,
-        configurable: true,
-      });
+      setAccents("#7A80C2", "#5A60A2");
       const { options } = convertLogData([1], [10], {
         title: "",
         unparsed_x_data: [],
@@ -233,7 +233,6 @@ describe("convertLogData.ts", () => {
         itemStyle: null,
       });
       expect(options.series[0].itemStyle.color).toBe("#5A60A2");
-      document.documentElement.classList.remove("dark");
     });
 
     it("handles empty x and y arrays", () => {
@@ -695,6 +694,192 @@ describe("convertLogData.ts", () => {
         ]);
         expect(result).toContain("2022-01-01");
       });
+    });
+  });
+
+  describe("theme accent for the flat histogram and the (empty) series", () => {
+    const ts1 = 1640995200000;
+    const ts2 = 1640998800000;
+    const params = { title: "", timezone: "UTC", breakdownField: "level" };
+    const flatParams = { title: "", unparsed_x_data: [], timezone: "UTC", itemStyle: null };
+    const lightPalette = ["#aaa", "#bbb", "#ccc"];
+
+    const flatColor = () =>
+      convertLogData([ts1], [1], flatParams).options.series[0].itemStyle.color;
+    const stackedSeries = (entries: [unknown, number[]][], isDark: boolean, xData = [ts1]) =>
+      convertStackedLogData(xData, new Map(entries as [string, number[]][]), params, isDark).options
+        .series;
+    const emptyColor = (isDark: boolean) =>
+      stackedSeries([["", [1]]], isDark).find((s: any) => s.name === "(empty)").itemStyle.color;
+
+    it("uses the root element accent in light mode for both converters", () => {
+      setAccents("rgba(107, 118, 227, 1)", "rgba(1, 1, 1, 1)");
+
+      expect(flatColor()).toBe("rgba(107, 118, 227, 1)");
+      expect(emptyColor(false)).toBe("rgba(107, 118, 227, 1)");
+      expect(computedStyleSpy).toHaveBeenCalledWith(document.documentElement);
+      expect(computedStyleSpy).not.toHaveBeenCalledWith(document.body);
+    });
+
+    it("uses the body accent in dark mode for both converters", () => {
+      document.documentElement.classList.add("dark");
+      setAccents("rgba(1, 1, 1, 1)", "rgba(139, 141, 240, 1)");
+
+      expect(flatColor()).toBe("rgba(139, 141, 240, 1)");
+      expect(emptyColor(true)).toBe("rgba(139, 141, 240, 1)");
+      expect(computedStyleSpy).toHaveBeenCalledWith(document.body);
+      expect(computedStyleSpy).not.toHaveBeenCalledWith(document.documentElement);
+    });
+
+    it("trims a custom accent identically in both converters", () => {
+      setAccents("  #5b4cf0  ", "");
+
+      expect(flatColor()).toBe("#5b4cf0");
+      expect(emptyColor(false)).toBe("#5b4cf0");
+    });
+
+    it.each([
+      ["blank", ""],
+      ["whitespace", "   "],
+    ])("falls back to the default theme color for a %s light accent", (_kind, value) => {
+      setAccents(value, "rgba(1, 1, 1, 1)");
+      const expected = getDefaultTheme().light.themeColor;
+
+      expect(flatColor()).toBe(expected);
+      expect(emptyColor(false)).toBe(expected);
+    });
+
+    it.each([
+      ["blank", ""],
+      ["whitespace", " \n "],
+    ])("falls back to the default theme color for a %s dark accent", (_kind, value) => {
+      document.documentElement.classList.add("dark");
+      setAccents("rgba(1, 1, 1, 1)", value);
+      const expected = getDefaultTheme().dark.themeColor;
+
+      expect(flatColor()).toBe(expected);
+      expect(emptyColor(true)).toBe(expected);
+    });
+
+    it("preserves an explicit flat itemStyle without reading the accent", () => {
+      const itemStyle = { color: "#123456", opacity: 0.4 };
+      const { options } = convertLogData([ts1], [1], { ...flatParams, itemStyle });
+
+      expect(options.series[0].itemStyle).toBe(itemStyle);
+      expect(computedStyleSpy).not.toHaveBeenCalled();
+    });
+
+    it("renders all-empty results as one accent series with the legend hidden", () => {
+      setAccents("#5b4cf0", "");
+      const { options } = convertStackedLogData([ts1, ts2], new Map([["", [3, 4]]]), params, false);
+
+      expect(options.series).toHaveLength(1);
+      expect(options.series[0].name).toBe("(empty)");
+      expect(options.series[0].stack).toBe("total");
+      expect(options.series[0].itemStyle.color).toBe("#5b4cf0");
+      expect(options.series[0].data.map((d: any) => d[1])).toEqual([3, 4]);
+      expect(options.legend.show).toBe(false);
+    });
+
+    it.each([
+      [false, "#EF5350", "#1E88E5", lightPalette],
+      [true, "#D95C5C", "#4D8FD4", ["#111", "#222", "#333"]],
+    ])(
+      "keeps populated colors and counts beside an accent (empty) series (dark=%s)",
+      (isDark, errorColor, infoColor, palette) => {
+        if (isDark) document.documentElement.classList.add("dark");
+        setAccents("#5b4cf0", "#8b8df0");
+        const { options } = convertStackedLogData(
+          [ts1, ts2],
+          new Map([
+            ["error", [1, 0]],
+            ["info", [2, 5]],
+            ["unknownXYZ", [0, 7]],
+            ["", [9, 1]],
+          ]),
+          params,
+          isDark,
+        );
+        const byName = Object.fromEntries(options.series.map((s: any) => [s.name, s]));
+
+        expect(byName["(empty)"].itemStyle.color).toBe(isDark ? "#8b8df0" : "#5b4cf0");
+        expect(byName.error.itemStyle.color).toBe(errorColor);
+        expect(byName.info.itemStyle.color).toBe(infoColor);
+        expect(palette).toContain(byName.unknownXYZ.itemStyle.color);
+        expect(byName["(empty)"].data.map((d: any) => d[1])).toEqual([9, 1]);
+        expect(byName.unknownXYZ.data.map((d: any) => d[1])).toEqual([0, 7]);
+        expect(options.legend.show).toBe(true);
+      },
+    );
+
+    it("does not read the accent when no empty group is present", () => {
+      const series = stackedSeries(
+        [
+          ["error", [1]],
+          ["unknownXYZ", [2]],
+        ],
+        false,
+      );
+
+      expect(series.map((s: any) => s.itemStyle.color)).toEqual([
+        "#EF5350",
+        convertStackedLogData([ts1], new Map([["unknownXYZ", [2]]]), params, false).options
+          .series[0].itemStyle.color,
+      ]);
+      expect(computedStyleSpy).not.toHaveBeenCalled();
+    });
+
+    it("treats null and undefined keys as the (empty) group", () => {
+      setAccents("#5b4cf0", "");
+      const series = stackedSeries(
+        [
+          [null, [1]],
+          [undefined, [2]],
+        ],
+        false,
+      );
+
+      series.forEach((s: any) => {
+        expect(s.name).toBe("(empty)");
+        expect(s.itemStyle.color).toBe("#5b4cf0");
+      });
+    });
+
+    it("keeps numeric 0 and boolean false as real categories, not the accent", () => {
+      setAccents("#5b4cf0", "");
+      const series = stackedSeries(
+        [
+          [0, [1]],
+          [false, [2]],
+        ],
+        false,
+      );
+
+      expect(series.map((s: any) => s.name)).toEqual(["0", "false"]);
+      series.forEach((s: any) => expect(lightPalette).toContain(s.itemStyle.color));
+    });
+
+    it("does not give a populated category literally named (empty) the accent", () => {
+      setAccents("#5b4cf0", "");
+      const [series] = stackedSeries([["(empty)", [1]]], false);
+
+      expect(lightPalette).toContain(series.itemStyle.color);
+    });
+
+    it("keeps the (empty) color when populated categories arrive in a later partition", () => {
+      setAccents("#5b4cf0", "");
+      const before = emptyColor(false);
+      const after = stackedSeries(
+        [
+          ["", [4, 0]],
+          ["error", [0, 2]],
+        ],
+        false,
+        [ts1, ts2],
+      ).find((s: any) => s.name === "(empty)").itemStyle.color;
+
+      expect(before).toBe("#5b4cf0");
+      expect(after).toBe(before);
     });
   });
 
