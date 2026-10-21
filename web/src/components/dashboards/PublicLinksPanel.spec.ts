@@ -473,24 +473,11 @@ describe("PublicLinksPanel", () => {
     expect(notify.positive).toHaveBeenCalledWith("The link refreshes on its next view");
   });
 
-  it("offers refresh intervals from 5 minutes and keeps the link's own", async () => {
+  it("shows no refresh field; the link keeps its stored interval", async () => {
     vi.mocked(admin.list).mockResolvedValue({ data: { list: [link()] } } as never);
     const w = build({ editLinkId: "l1" });
     await flushPromises();
-    const options = (
-      w.vm as unknown as {
-        refreshOptions: { value: number; label: string }[];
-      }
-    ).refreshOptions;
-    const byValue = (v: number) => options.find((o) => o.value === v);
-
-    expect(options[0].value).toBe(300);
-    expect(options.some((o) => o.value < 300)).toBe(false);
-    expect(byValue(600)?.label).toBe("10 minutes");
-    expect(byValue(2592000)?.label).toBe("1 month");
-    expect(options.map((o) => o.value)).toEqual(
-      [...options.map((o) => o.value)].sort((a, b) => a - b),
-    );
+    expect(has(w, "dashboards-public-links-panel-refresh-select")).toBe(false);
   });
 
   it.each([
@@ -890,40 +877,13 @@ describe("PublicLinksPanel", () => {
       expect(notify.error).not.toHaveBeenCalled();
     });
 
-    it("says create runs no query, and names a range whose floor is above the interval", async () => {
+    it("says create runs no query", async () => {
       vi.mocked(admin.list).mockResolvedValue({ data: { list: [] } } as never);
       const w = build({ variablesConfig: undefined });
       await flushPromises();
       expect(w.find('[data-test="dashboards-public-links-panel-save-hint"]').text()).toBe(
         "Returns at once. Nothing is queried until someone opens the link.",
       );
-      const form = (w.vm as unknown as { form: { setFieldValue: (k: string, v: unknown) => void } })
-        .form;
-      form.setFieldValue("ranges", threeRanges.ranges);
-      await flushPromises();
-      expect(
-        w.find(`[data-test="dashboards-public-links-panel-refresh-floor-r${30 * DAY}"]`).text(),
-      ).toBe("Past 1 month refreshes every 2h 30m, its minimum for a window that long.");
-      expect(has(w, `dashboards-public-links-panel-refresh-floor-r${DAY}`)).toBe(false);
-
-      form.setFieldValue("refreshSecs", 21_600);
-      await flushPromises();
-      expect(has(w, `dashboards-public-links-panel-refresh-floor-r${30 * DAY}`)).toBe(false);
-    });
-
-    it("applies the operator minimum the server reports to the hint", async () => {
-      const zo = store.state.zoConfig;
-      store.state.zoConfig = { ...zo, public_dashboard_min_refresh_secs: 600 };
-      try {
-        vi.mocked(admin.list).mockResolvedValue({ data: { list: [] } } as never);
-        const w = build({ variablesConfig: undefined });
-        await flushPromises();
-        expect(
-          w.find('[data-test="dashboards-public-links-panel-refresh-floor-r3600"]').text(),
-        ).toBe("Past 1 hour refreshes every 10m, its minimum for a window that long.");
-      } finally {
-        store.state.zoConfig = zo;
-      }
     });
 
     it("promises the default range's effective interval in the created view", async () => {
