@@ -14,8 +14,9 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { computed, type Ref } from "vue";
-import { raw } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useTypewriterPlaceholder } from "@/components/ai-assistant/welcome/useTypewriterPlaceholder";
+import { isAssistantV2 } from "@/composables/assistant/flags";
 
 /**
  * The typewriter hint on the empty filter row.
@@ -47,6 +48,7 @@ export function useFilterHint(
   /** Paused unless the row is idle and unfiltered — see the call site. */
   enabled: Ref<boolean>,
 ) {
+  if (isAssistantV2()) return { placeholder: staticFilterHint(labelNames) };
   const prompts = computed(() => {
     const names = labelNames.value;
     if (!names.length) return EXAMPLES;
@@ -63,4 +65,14 @@ export function useFilterHint(
   });
 
   return useTypewriterPlaceholder(prompts, { enabled });
+}
+
+// Internal labels (`__name__`, `_o2_*`) make a poor example of a filter.
+function staticFilterHint(labelNames: Ref<string[]>) {
+  const { t } = useI18nTyped();
+  return computed<string>(() => {
+    if (!labelNames.value.length) return t("metrics.filter.placeholderEmpty");
+    const label = labelNames.value.find((name) => !name.startsWith("_")) ?? "status";
+    return t("metrics.filter.placeholder", { label: raw(label) });
+  });
 }

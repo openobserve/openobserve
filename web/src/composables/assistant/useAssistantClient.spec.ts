@@ -431,3 +431,74 @@ describe("useAssistantClient: tail, stop, confirm, feedback", () => {
     );
   });
 });
+
+describe("useAssistantClient: incident analysis", () => {
+  const rca = (reanalysis: boolean) =>
+    request({
+      mode: "rca",
+      incident: { id: "inc-1", reanalysis, buildOnPrevious: false },
+    } as never);
+  const follow = (events: object[][], report = "## Saved") => {
+    let read = 0;
+    return {
+      events: vi.fn(async () => events[Math.min(read++, events.length - 1)] as never),
+      report: vi.fn(async () => report),
+      wait: async () => undefined,
+    };
+  };
+
+  it("follows a 202 re-analysis through the event log instead of reading it as an empty stream", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(json(202, { message: "Analysis started" }));
+    const deps = follow([
+      [{ type: "ai_analysis_begin", timestamp: 1 }],
+      [
+        { type: "ai_analysis_begin", timestamp: 1 },
+        { type: "ai_analysis_complete", timestamp: 2 },
+      ],
+    ]);
+    const s = sink();
+    const result = await useAssistantClient({ fetchImpl, follow: deps }).send(
+      rca(true),
+      s,
+      signal(),
+    );
+    expect(result.ok).toBe(true);
+    await expect(s.done).resolves.toBe("eof");
+    expect(String(fetchImpl.mock.calls[0][0])).toContain("reanalysis=true");
+    expect(s.frames).toEqual([
+      { type: "status" },
+      { type: "message_delta", content: "## Saved" },
+      { type: "complete" },
+    ]);
+  });
+
+  it("reconnects through the log when a stream drops before its terminal frame", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(sse([{ type: "message_delta", content: "## Sa" }]));
+    const deps = follow(
+      [
+        [
+          { type: "ai_analysis_begin", timestamp: 1 },
+          { type: "ai_analysis_complete", timestamp: 2 },
+        ],
+      ],
+      "## Saved",
+    );
+    const s = sink();
+    await useAssistantClient({ fetchImpl, follow: deps }).send(rca(false), s, signal());
+    await expect(s.done).resolves.toBe("eof");
+    expect(s.frames).toEqual([
+      { type: "message_delta", content: "## Sa" },
+      { type: "message_delta", content: "ved" },
+      { type: "complete" },
+    ]);
+  });
+
+  it("does not follow a stream that ended with its own terminal frame", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(sse([{ type: "complete" }]));
+    const deps = follow([[]]);
+    const s = sink();
+    await useAssistantClient({ fetchImpl, follow: deps }).send(rca(false), s, signal());
+    await expect(s.done).resolves.toBe("eof");
+    expect(deps.events).not.toHaveBeenCalled();
+  });
+});

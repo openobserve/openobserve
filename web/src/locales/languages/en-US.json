@@ -8207,19 +8207,28 @@
       "announce": "Proposed {language}, {added} lines added, {removed} removed",
       "applied": "Editor updated. Revert available.",
       "current": "Current {language}",
+      "fixFirst": "Fix the query before running it",
       "from": "from {product}",
       "notChecked": "not checked",
+      "parseFailed": "doesn't parse",
       "region": {
+        "alert": "Proposed change to the alert query",
         "alert_query": "Proposed change to the alert query",
+        "anomaly": "Proposed change to the detection query",
+        "dashboard": "Proposed change to the panel query",
         "function": "Proposed change to the function",
         "json_editor": "Proposed change to the JSON",
+        "logs": "Proposed change to the query",
         "regex": "Proposed change to the pattern",
         "scheduled_query": "Proposed change to the node's query"
       },
       "reject": "Reject",
       "removed": "removed:",
       "reviewInEditor": "Review the change in the editor",
-      "title": "Proposed {language}"
+      "title": "Proposed {language}",
+      "unknownCount": "{count} field unknown | {count} fields unknown",
+      "validated": "validated",
+      "unknownMark": "Unknown field"
     },
     "docs": {
       "opensInNewTab": "(opens in a new tab)",
@@ -8747,9 +8756,98 @@
       "unavailableName": "{product}, unavailable"
     },
     "helper": {
+      "alreadyDoes": "The query already does that.",
+      "alsoSends": "Also sends: {items}",
+      "answerInChat": "Answer in chat",
+      "askToFix": "Ask to fix",
+      "busy": "Another answer is still running. Your request wasn't sent.",
+      "checking": "Checking…",
+      "chip": {
+        "noStream": "No stream selected",
+        "noTime": "No time range",
+        "time": "Time · {range}"
+      },
+      "close": "Close Ask AI",
+      "cost": "Uses 1 AI credit",
+      "creditsExhaustedNoDate": "AI credits are used up for this organization.",
       "discarded": "Proposal discarded. Ask again to get a new one.",
+      "door": "Ask AI",
+      "doorTooltip": "Ask the assistant to write or change this query",
+      "dropped": "Connection lost after {seconds} s. Nothing was changed.",
+      "editPrompt": "Edit prompt",
+      "editorPlaceholder": {
+        "js": "Write a JavaScript function, for example: return event",
+        "promql": "Write a PromQL query, for example: rate(http_requests_total[5m])",
+        "vrl": "Write a VRL function, for example: .status = \"active\""
+      },
+      "example": {
+        "js1": "Add a severity field from level",
+        "js2": "Remove empty fields",
+        "js3": "Lower-case the message field",
+        "promql1": "Request rate per service",
+        "promql2": "95th percentile latency over 5 minutes",
+        "promql3": "Memory used by each pod",
+        "refine1": "Only show errors",
+        "refine2": "Group by service",
+        "refine3": "Limit to 100 rows",
+        "sql1": "Errors per service in the last hour",
+        "sql2": "Top 10 slowest requests",
+        "sql3": "Count logs by status code",
+        "vrl1": "Parse the message field as JSON",
+        "vrl2": "Drop debug-level events",
+        "vrl3": "Rename host to hostname"
+      },
+      "group": "Ask AI",
+      "hint": "Looks like plain language. Ask the assistant to write this as {language}?",
+      "hintAsk": "Ask",
+      "hintDismiss": "Dismiss",
       "inserted": "Inserted",
-      "noChange": "The editor already has this."
+      "keepMyRange": "Keep mine",
+      "mode": {
+        "edit": "Edits current query",
+        "replace": "Replaces current query",
+        "replaceText": "Replaces current text"
+      },
+      "name": "Ask the assistant to write a query",
+      "needsChat": "This needs the assistant.",
+      "needsDetail": "The assistant needs more detail: {question}",
+      "noChange": "The editor already has this.",
+      "noStream": "Select a stream to ask the assistant",
+      "notChecked": "Wrote {language} for {stream} · not checked",
+      "notCheckedNoStream": "Wrote {language} · not checked",
+      "notSent": "Not sent.",
+      "offline": "You're offline. Nothing was sent.",
+      "openInChat": "Open in chat",
+      "parseError": "This {language} doesn't parse: {message}",
+      "placeholder": "Describe the query you want, for example: errors per service in the last hour",
+      "rangeDiffers": "Time · {proposed} (proposed) · picker: {picker}",
+      "rateLimited": "Too many requests. Try again in {seconds} s.",
+      "rateLimitedNow": "Too many requests. Try again now.",
+      "scanRangeOnly": "Over {range}",
+      "signedOut": "Signed out. Sign in to continue.",
+      "sqlMode": "SQL mode",
+      "stopName": "Stop generating",
+      "stopped": "Stopped. Nothing changed.",
+      "syntax": {
+        "missing": "Missing {char}",
+        "unclosed": "Unclosed {char}",
+        "unexpected": "Unexpected {char} at line {line}, column {column}"
+      },
+      "tabFocusHint": "Press {keys} so Tab leaves the editor.",
+      "try": "Try:",
+      "unknown": "Something failed. Nothing was changed.",
+      "unknownField": "{field} isn't a field in {stream}",
+      "unknownFields": "{count} fields aren't in {stream}: {fields}",
+      "unreachable": "Couldn't reach the AI service. Nothing was changed.",
+      "useProposedRange": "Use proposed range",
+      "wantedChange": "The assistant wanted to make a change. Continue in chat to review it.",
+      "writeMyself": "Write it myself",
+      "wrote": "Wrote {language} for {stream} · {range} · checked",
+      "wroteNoStream": "Wrote {language} · checked",
+      "generating": "Generating… {seconds} s",
+      "scan": "Scans about {size} over {range}",
+      "overBudget": "Larger than the usual budget",
+      "checkStatus": "Check assistant status"
     },
     "history": {
       "account": "Saved to your account · kept {retention}",
@@ -9441,6 +9539,70 @@
       "streams": "no streams yet | {count} stream | {count} streams",
       "suggestions": "Suggestions",
       "try": "Try: \"{prompt}\""
+    },
+    "rca": {
+      "analyze": "Analyze incident",
+      "analyzeHint": "Usually takes 2–4 minutes",
+      "analyzeHintMetered": "Usually takes 2–4 minutes · uses AI credits",
+      "askAbout": "Ask about this report",
+      "askAboutTooltip": "Opens {product} with this incident and report attached",
+      "askAboutWait": "Available when the analysis finishes",
+      "buildOnPrevious": "Build on previous report",
+      "done": "Analysed in {elapsed}",
+      "fresh": "Fresh analysis",
+      "gate": {
+        "off": "Incident analysis is off for this organization.",
+        "offAdmin": "Turn it on with O2_INCIDENTS_RCA_ENABLED and restart.",
+        "offMember": "Ask an admin to turn it on."
+      },
+      "stopped": "Stopped after {elapsed}. Findings so far are kept below.",
+      "tag": "Incident analysis",
+      "prompt": "Explain this incident analysis report",
+      "modeFallback": "Sent as text. Interactive incident mode isn't available on this server yet.",
+      "jumpTo": "Jump to",
+      "reportRegion": "Incident analysis report",
+      "moreActions": "More actions",
+      "reanalyze": "Re-analyze",
+      "severityChanged": "Severity changed to {severity}. Re-analyze with the new severity?",
+      "rerunSuggested": "Re-analysis suggested",
+      "status": {
+        "starting": "Starting analysis… {elapsed}",
+        "analysing": "Analysing · {elapsed}",
+        "running": "Analysis running"
+      },
+      "runningStarted": "Started {time}",
+      "stale": "Still running after {elapsed}. It may have stopped. You can stop it and start again.",
+      "stop": "Stop analysis",
+      "stopFailed": "Couldn't stop the analysis.",
+      "tryAgain": "Try again",
+      "stoppedByYou": "Stopped by you after {elapsed}",
+      "priorityOff": "Analysis is turned off for this incident's priority.",
+      "openLogs": "Open logs for this incident",
+      "partial": "Partial · stopped at {time}",
+      "analyzedAgo": "Analysed {time}",
+      "version": "Report {n} · {time}",
+      "reportChip": "{version} · {size}",
+      "rerunTimed": "{action} · ~3 min",
+      "rerunMetered": "{action} · ~3 min · uses AI credits",
+      "announce": {
+        "started": "Analysis started",
+        "stopped": "Analysis stopped. Findings so far are kept.",
+        "done": "Analysis done",
+        "failed": "Analysis failed"
+      },
+      "timeline": {
+        "started": "Incident analysis started",
+        "finished": "Incident analysis finished"
+      },
+      "versionOnly": "Report {n}"
+    },
+    "oncall": {
+      "continue": "Continue in the assistant",
+      "prompt": "Explain this on-call verdict and what to do next"
+    },
+    "autoobserve": {
+      "askChip": "AutoObserve ask · {name}",
+      "continueTooltip": "Opens {product} with this ask attached"
     }
   },
   "llmObservability": {
@@ -10715,7 +10877,8 @@
         "minuteAgo": "{count} minute ago | {count} minutes ago",
         "hourAgo": "{count} hour ago | {count} hours ago",
         "dayAgo": "{count} day ago | {count} days ago"
-      }
+      },
+      "byAssistant": "Incident analysis · by {product}"
     },
     "alertDetails": {
       "sql": "SQL",
@@ -13055,6 +13218,10 @@
       "empty": "No queries yet",
       "noMatch": "No queries match the search or starred filter",
       "loadMore": "Load more"
+    },
+    "filter": {
+      "placeholder": "Filter, for example: {label} =~ \"500{'|'}503\"",
+      "placeholderEmpty": "Filter metrics by label"
     }
   },
   "settings": {
@@ -24914,7 +25081,14 @@
     "scopeClaimServiceEverywhere": "{service} pages this team in every cluster and namespace, whoever owns the ones around it.",
     "scopeClaimServiceHere": "{service} pages this team in {scope} only. Elsewhere it falls to whoever owns the scope around it.",
     "scopeNothingDiscovered": "Nothing has been discovered yet, so there is no estate to pick from. Use Advanced to write the rule by field, or send some telemetry first.",
-    "scopeAdvancedHint": "Match on any field and value, including ones the levels above do not cover."
+    "scopeAdvancedHint": "Match on any field and value, including ones the levels above do not cover.",
+    "verdictByAssistant": "On-call verdict · by {product}",
+    "reportByAssistant": "On-call report · by {product}",
+    "reportNone": "No report for this response.",
+    "reportFailed": "Couldn't load the report.",
+    "reportTryAgain": "Try again",
+    "severityRaised": "Severity raised to {severity}",
+    "verdictArrived": "Verdict arrived: {sentence}"
   },
   "paidUsage": {
     "consentTitle": "Turn on paid AI usage?",
@@ -25659,7 +25833,9 @@
         "fromNowOn": "Let me handle this",
         "retune": "Quieter alert"
       },
-      "needsOk": "Needs your OK"
+      "needsOk": "Needs your OK",
+      "sampleApplied": "Sample fix applied · {headline}",
+      "sampleComplete": "Sample fix complete"
     },
     "footer": {
       "text": "I check myself too: if I stop working, you'll hear about it.",
@@ -26016,7 +26192,10 @@
     "suggestions": {
       "title": "Suggestions",
       "subtitle": "When you have a minute — these cut noise or save you time."
-    }
+    },
+    "previewLabel": "Preview",
+    "previewStrip": "Preview with sample data. Nothing here changes your organization.",
+    "previewHeader": "AutoObserve · Preview"
   },
   "telephony": {
     "title": "Telephony",

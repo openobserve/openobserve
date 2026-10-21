@@ -184,6 +184,24 @@
         headers: { "Content-Type": "text/event-stream" },
       });
     }
+    // The incident analysis streams its report on its own route, not through chat_stream.
+    if (/\/api\/v2\/[^/]+\/alerts\/incidents\/[^/]+\/rca\?(.*&)?stream=true/.test(url) && (init.method || "GET").toUpperCase() === "POST") {
+      mock.rcaRequests = (mock.rcaRequests || []).concat([{ url, headers: init.headers }]);
+      // A re-analysis answers 202 and runs in the background until the server streams it (knob `rcaReanalysisStreams`).
+      if (/[?&]reanalysis=true/.test(url) && !mock.knobs.rcaReanalysisStreams) {
+        await sleep(150);
+        mock.rcaBackgroundStartedAt = Date.now();
+        return new Response(JSON.stringify({ message: "Analysis started" }), { status: 202, headers: { "Content-Type": "application/json" } });
+      }
+      const name = mock.rcaScenario || "rca_stream";
+      const httpErr = HTTP_SCENARIOS[name];
+      if (httpErr) {
+        await sleep(150);
+        return new Response(JSON.stringify(httpErr.body), { status: httpErr.status, headers: { "Content-Type": "application/json" } });
+      }
+      const scenario = SCENARIOS[name] || SCENARIOS.rca_stream;
+      return new Response(sseStream(scenario, init.signal), { status: 200, headers: { "Content-Type": "text/event-stream" } });
+    }
     // B-03 resumable tail: 404 while `tailEnabled` is off, else the scenario's `tailFrames` after `from_seq`.
     const tail = url.match(/\/api\/[^/]+\/ai\/chats\/[^/]+\/turns\/[^/]+\/stream\?from_seq=(\d+)/);
     if (tail) {

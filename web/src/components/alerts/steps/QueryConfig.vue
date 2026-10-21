@@ -1077,6 +1077,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :query="localTab === 'sql' ? localSqlQuery : editorPromqlQuery"
                         editor-height="100%"
                         :disable-ai="!streamName"
+                        :assistant="alertAssistant"
+                        :placeholder="assistantV2 ? inlineEditorPlaceholder : undefined"
                         :keywords="effectiveKeywords"
                         :suggestions="effectiveSuggestions"
                         :field-value-resolver="resolveFieldValues"
@@ -1087,6 +1089,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                     <div
                       v-if="
+                        !assistantV2 &&
                         (localTab === 'sql' ? !localSqlQuery : !editorPromqlQuery) &&
                         queryEditorPlaceholderFlag
                       "
@@ -1811,6 +1814,8 @@ import {
 import useSqlSuggestions from "@/composables/useSuggestions";
 import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
 import { useVrlPlaceholder } from "@/composables/useVrlPlaceholder";
+import { isAssistantV2 } from "@/composables/assistant/flags";
+import type { QueryEditorAssistant } from "@/composables/assistant/pure";
 import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
 import useStreams from "@/composables/useStreams";
 import { useTimezoneOptions } from "@/composables/useTimezoneOptions";
@@ -2219,15 +2224,43 @@ export default defineComponent({
     const promqlPlaceholderEnabled = computed(
       () => localTab.value === "promql" && promqlSamples.value.length > 0,
     );
-    const { placeholder: promqlEditorPlaceholder } = useTypewriterPlaceholder(
-      computed(() => promqlSamples.value.map((s) => s.query)),
-      { enabled: promqlPlaceholderEnabled },
-    );
-    const inlineEditorPlaceholder = computed(() =>
-      localTab.value === "promql" && promqlSamples.value.length
+    // The v2 path never types samples out: one static line names the language instead.
+    const { placeholder: promqlEditorPlaceholder } = isAssistantV2()
+      ? { placeholder: computed<string>(() => t("assistant.helper.editorPlaceholder.promql")) }
+      : useTypewriterPlaceholder(
+          computed(() => promqlSamples.value.map((s) => s.query)),
+          { enabled: promqlPlaceholderEnabled },
+        );
+    const inlineEditorPlaceholder = computed(() => {
+      if (isAssistantV2() && localTab.value === "promql") return promqlEditorPlaceholder.value;
+      return localTab.value === "promql" && promqlSamples.value.length
         ? promqlEditorPlaceholder.value
-        : sqlEditorPlaceholder.value,
-    );
+        : sqlEditorPlaceholder.value;
+    });
+
+    const assistantV2 = isAssistantV2();
+    const alertAssistant: QueryEditorAssistant = {
+      id: "alert",
+      get stream() {
+        return String(props.streamName ?? "");
+      },
+      get streamType() {
+        return props.streamType;
+      },
+      schemaFields: () =>
+        (props.columns as any[])
+          .map((c: any) => (typeof c === "string" ? c : String(c?.value ?? c?.label ?? "")))
+          .filter(Boolean),
+      // The query runs over the alert's period, so that is the range its chip names.
+      get timeRange() {
+        const minutes = Number(fv("trigger_condition.period"));
+        if (!Number.isFinite(minutes) || minutes <= 0) return undefined;
+        const to = Date.now();
+        return { from: to - minutes * 60_000, to, period: `${minutes}m` };
+      },
+      // The preview follows the query; running it also checks it on the server, as a blur does.
+      run: () => emit("validate-sql"),
+    };
 
     // Chips insert only into an EMPTY editor — silently replacing a
     // half-written query is the one way this feature makes someone angry.
@@ -3831,6 +3864,8 @@ export default defineComponent({
     // re-homed in useAlertForm.runImperativeQueryChecks (same messages).
 
     return {
+      assistantV2,
+      alertAssistant,
       raw,
       t,
       store,

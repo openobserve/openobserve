@@ -263,6 +263,33 @@ const incidents = {
       });
   },
 
+  /** The analysis as a server-sent event stream (`?stream=true`); the assistant's client reads it with the shared parser. */
+  streamRca: (
+    org_identifier: string,
+    incident_id: string,
+    signal: AbortSignal,
+    opts: {
+      params?: { reanalysis?: boolean; build_on_previous?: boolean };
+      headers?: Record<string, string>;
+      baseUrl?: string;
+      fetchImpl?: typeof fetch;
+    } = {},
+  ): Promise<Response> => {
+    const query = new URLSearchParams({ stream: "true" });
+    if (opts.params?.reanalysis) query.set("reanalysis", "true");
+    if (opts.params?.build_on_previous) query.set("build_on_previous", "true");
+    const base = opts.baseUrl ?? "";
+    const url =
+      `${base}/api/v2/${encodeURIComponent(org_identifier)}/alerts/incidents/` +
+      `${encodeURIComponent(incident_id)}/rca?${query.toString()}`;
+    return (opts.fetchImpl ?? fetch)(url, {
+      method: "POST",
+      credentials: "include",
+      headers: opts.headers,
+      signal,
+    });
+  },
+
   /**
    * Fetch the current RCA report plus any superseded reports retained for this
    * incident, newest first. Loaded on demand so the incident list stays light.

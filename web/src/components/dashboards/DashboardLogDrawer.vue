@@ -874,6 +874,7 @@ function openInLogs() {
               :languages="['sql']"
               editor-height="4rem"
               hide-nl-toggle
+              helper="off"
               data-test-prefix="log-explorer-editor"
               @update:query="customSql = $event"
               @run-query="runQuery"

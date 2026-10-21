@@ -211,8 +211,11 @@ const visible = computed(() => placement.isVisible.value || !!lockedPanel.value)
 const shortcutId = computed(() =>
   capability.assistantCanChat.value ? "assistantOpen" : undefined,
 );
+// Ephemeral turns answer in their own surface, so they never toast or light the header.
 const mine = computed(() =>
-  Object.values(store.state.sessions).filter((s) => s.userOrgKey === store.state.userOrgKey),
+  Object.values(store.state.sessions).filter(
+    (s) => s.userOrgKey === store.state.userOrgKey && !s.record.ephemeral,
+  ),
 );
 
 const view = computed<HeaderView>(() => gateView() ?? lightView());

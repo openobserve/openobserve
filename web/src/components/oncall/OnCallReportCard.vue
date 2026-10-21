@@ -20,7 +20,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OCard v-if="loading || report" variant="glass" data-test="oncall-report-card">
+  <template v-if="assistantV2">
+    <AssistantAgentOutput
+      v-if="!loading && report"
+      kind="oncall_report"
+      :title="t('oncall.reportByAssistant', { product })"
+      :byline="byline"
+      :model="report.model || undefined"
+      :report="prose"
+      :report-id="String(report.generated_at)"
+      data-test="oncall-report-card"
+    />
+    <OCard v-else data-test="oncall-report-card">
+      <OCardSection role="body" dense class="flex flex-col gap-2">
+        <div v-if="loading" class="flex flex-col gap-2" data-test="oncall-report-loading">
+          <OSkeleton type="text" class="h-4 w-1/2" />
+          <OSkeleton type="text" class="h-4 w-5/6" />
+          <OSkeleton type="text" class="h-4 w-2/3" />
+        </div>
+        <div
+          v-else-if="error === 'failed'"
+          class="flex flex-wrap items-center gap-2"
+          data-test="oncall-report-error"
+        >
+          <OText variant="body">{{ t("oncall.reportFailed") }}</OText>
+          <OButton
+            variant="outline"
+            size="sm"
+            data-test="oncall-report-retry"
+            @click="emit('retry')"
+            >{{ t("oncall.reportTryAgain") }}</OButton
+          >
+        </div>
+        <OText v-else variant="body" class="text-text-secondary" data-test="oncall-report-empty">{{
+          t("oncall.reportNone")
+        }}</OText>
+      </OCardSection>
+    </OCard>
+  </template>
+  <OCard v-else-if="loading || report" variant="glass" data-test="oncall-report-card">
     <OCardSection role="header" dense class="flex-wrap">
       <OText variant="card-title">{{ t("oncall.reportTitle") }}</OText>
       <span v-if="report" class="text-text-secondary text-xs">
@@ -45,7 +83,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import DOMPurify from "dompurify";
 import { marked } from "marked";
-import { computed } from "vue";
+import { computed, defineAsyncComponent } from "vue";
+import { isAssistantV2 } from "@/composables/assistant/flags";
+import { useAssistantName } from "@/composables/assistant/pure";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
@@ -54,10 +95,22 @@ import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import type { OnCallResponseReport } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
+import { formatOrgTime } from "@/utils/formatters";
 
-const props = defineProps<{ report: OnCallResponseReport | null; loading?: boolean }>();
+const props = defineProps<{
+  report: OnCallResponseReport | null;
+  loading?: boolean;
+  /** Why there is no report: none was written (404) or the read failed. */
+  error?: "missing" | "failed" | null;
+}>();
+const emit = defineEmits<{ retry: [] }>();
 
 const { t } = useI18nTyped();
+const { product } = useAssistantName();
+
+const byline = computed(() =>
+  props.report ? raw(formatOrgTime(props.report.generated_at / 1000)) : undefined,
+);
 
 // The same tag set the incident drawer allows, so one report reads the same
 // whichever subject carried it.
@@ -66,13 +119,19 @@ const ALLOWED_TAGS =
     " ",
   );
 
+const AssistantAgentOutput = defineAsyncComponent(
+  () => import("@/components/ai-assistant/blocks/AssistantAgentOutput.vue"),
+);
+const assistantV2 = isAssistantV2();
+
+// The card above already renders the verdict block as a sentence, so its JSON is dropped here.
+const prose = computed(() =>
+  (props.report?.report ?? "").replace(/```json\s+verdict[\s\S]*?```/g, "").trim(),
+);
+
 const rendered = computed(() => {
-  const body = props.report?.report;
-  if (!body) return "";
-  // The verdict block is machine input that the card above already renders as
-  // a sentence; showing the raw JSON again would bury the report's own prose.
-  const prose = body.replace(/```json\s+verdict[\s\S]*?```/g, "").trim();
-  return DOMPurify.sanitize(marked.parse(prose, { async: false }) as string, {
+  if (!prose.value) return "";
+  return DOMPurify.sanitize(marked.parse(prose.value, { async: false }) as string, {
     ALLOWED_TAGS,
     ALLOWED_ATTR: ["id"],
     KEEP_CONTENT: true,

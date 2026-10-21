@@ -24,7 +24,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="bg-surface-base border-border-default rounded-default flex min-h-0 flex-col overflow-hidden border max-md:fixed max-md:inset-x-0 max-md:top-14 max-md:bottom-14 max-md:rounded-none max-md:border-x-0"
   >
     <div
-      class="border-border-default flex min-w-0 shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b px-2 py-1.5"
+      :class="[
+        'border-border-default flex min-w-0 shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b px-2 py-1.5',
+        reserveEnd && 'pe-10',
+      ]"
       data-test="assistant-diff-bar"
     >
       <OText
@@ -49,23 +52,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           variant="primary"
           size="sm"
+          :disabled="checking"
+          focusable-unavailable
           :class="['max-md:flex-1', TOUCH_TARGET_CLASS]"
           data-test="assistant-diff-accept"
           @click="proposal.accept()"
         >
           {{ t("assistant.diff.accept") }}
+          <template v-if="checking" #unavailable-reason>{{
+            t("assistant.helper.checking")
+          }}</template>
         </OButton>
         <OButton
           v-if="proposal.canRun"
           variant="outline"
           size="sm"
+          :disabled="checking || !!runBlocked"
+          focusable-unavailable
           :class="['max-md:flex-1', TOUCH_TARGET_CLASS]"
           data-test="assistant-diff-accept-run"
           @click="proposal.acceptAndRun()"
         >
           {{ t("assistant.diff.acceptRun") }}
+          <OTooltip v-if="runBlocked" :content="runBlocked" />
+          <template v-if="checking || runBlocked" #unavailable-reason>{{
+            runBlocked ?? t("assistant.helper.checking")
+          }}</template>
         </OButton>
       </div>
+      <OText
+        v-if="proposal.canRun && proposal.checks?.runNote"
+        variant="meta"
+        as="p"
+        class="w-full text-end break-words"
+        data-test="assistant-diff-run-note"
+      >
+        {{ proposal.checks.runNote }}
+      </OText>
     </div>
     <div
       v-if="view !== 'lines'"
@@ -93,7 +116,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <span aria-hidden="true">{{ raw(MARKS[line.kind]) }}</span
         ><span v-if="line.kind !== 'same'" class="sr-only">{{ markName(line.kind) }} </span
-        >{{ raw(line.text) }}
+        ><template v-for="(part, k) in segmentsOf(line)" :key="k"
+          ><span
+            v-if="part.unknown"
+            class="underline decoration-wavy"
+            data-test="assistant-diff-unknown-field"
+            >{{ raw(part.text)
+            }}<span class="sr-only"> {{ t("assistant.diff.unknownMark") }}</span></span
+          ><template v-else>{{ raw(part.text) }}</template></template
+        >
       </li>
     </ol>
   </section>
@@ -104,6 +135,8 @@ import type { PendingProposal } from "@/composables/assistant";
 
 export interface AssistantDiffBlockProps {
   proposal: PendingProposal;
+  /** Leaves room for a host button pinned to the editor's end corner. */
+  reserveEnd?: boolean;
 }
 
 /** Side by side only on a wide window; a narrower one stacks before over after. */
@@ -121,6 +154,7 @@ import { PROPOSAL_LANGUAGE_NAMES, diffLines } from "@/composables/assistant/pure
 import useBreakpoint from "@/composables/useBreakpoint";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OText from "@/lib/core/Typography/OText.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 
 type DiffEditor = {
@@ -128,7 +162,21 @@ type DiffEditor = {
   dispose(): void;
 };
 
-const props = defineProps<AssistantDiffBlockProps>();
+type MarkedEditor = {
+  getModel(): {
+    findMatches(
+      search: string,
+      all: boolean,
+      regex: boolean,
+      matchCase: boolean,
+      separators: string | null,
+      capture: boolean,
+    ): { range: unknown }[];
+  } | null;
+  createDecorationsCollection(decorations: unknown[]): { clear(): void };
+};
+
+const props = withDefaults(defineProps<AssistantDiffBlockProps>(), { reserveEnd: false });
 
 const { t } = useI18nTyped();
 const { product } = useAssistantName();
@@ -140,6 +188,9 @@ const monacoReady = ref(false);
 const windowWidth = ref(typeof window === "undefined" ? 0 : window.innerWidth);
 let editor: DiffEditor | null = null;
 let models: { dispose(): void }[] = [];
+let labelWatchers: { dispose(): void }[] = [];
+let modifiedEditor: MarkedEditor | null = null;
+let unknownMarks: { clear(): void } | null = null;
 let disposed = false;
 let offRung: (() => void) | null = null;
 
@@ -153,12 +204,22 @@ const sideBySide = computed(() => windowWidth.value >= SIDE_BY_SIDE_MIN_PX);
 const view = computed(() => (!mdUp.value ? "lines" : sideBySide.value ? "side" : "stacked"));
 const lines = computed(() => diffLines(props.proposal.before, props.proposal.after) ?? []);
 
+const checking = computed(() => props.proposal.checks?.state === "checking");
+const unknownFields = computed(() => props.proposal.checks?.unknownFields ?? []);
+const runBlocked = computed(() => props.proposal.checks?.runBlocked);
+
+const checkLine = computed<I18nText>(() => {
+  const checks = props.proposal.checks;
+  if (checks?.state === "checking") return t("assistant.helper.checking");
+  if (checks?.state === "ok") return t("assistant.diff.validated");
+  if (checks?.state === "error" && checks.unknownCount)
+    return t("assistant.diff.unknownCount", { count: checks.unknownCount }, checks.unknownCount);
+  if (checks?.state === "error") return t("assistant.diff.parseFailed");
+  return t("assistant.diff.notChecked");
+});
+
 const statusLine = computed<I18nText>(() =>
-  raw(
-    [title.value, t("assistant.diff.notChecked"), t("assistant.diff.from", { product })].join(
-      " · ",
-    ),
-  ),
+  raw([title.value, checkLine.value, t("assistant.diff.from", { product })].join(" · ")),
 );
 
 // Reject is first in focus, so Enter on arrival never changes the editor.
@@ -179,12 +240,67 @@ onBeforeUnmount(() => {
   disposeMonaco();
 });
 
-watch(sideBySide, (side) => editor?.updateOptions({ renderSideBySide: side }));
-watch(lgUp, (wide) => editor?.updateOptions({ lineNumbers: wide ? "on" : "off" }));
+watch(sideBySide, (side) => editor?.updateOptions({ ...editorLabels(), renderSideBySide: side }));
+watch(unknownFields, () => markUnknownFields());
+watch(lgUp, (wide) =>
+  editor?.updateOptions({ ...editorLabels(), lineNumbers: wide ? "on" : "off" }),
+);
 watch(view, (next, was) => {
   if (next === "lines") disposeMonaco();
   else if (was === "lines") void nextTick(mountMonaco);
 });
+
+// Monaco's narrow-width inline fallback re-applies inner options without a label, so it is put back.
+function keepLabel(
+  inner: {
+    getOption(id: number): unknown;
+    updateOptions(options: Record<string, unknown>): void;
+    onDidChangeConfiguration(listener: () => void): { dispose(): void };
+  },
+  option: number,
+  label: string,
+): void {
+  const restore = () => {
+    if (editor && !inner.getOption(option)) inner.updateOptions({ ariaLabel: label });
+  };
+  labelWatchers.push(inner.onDidChangeConfiguration(restore));
+  restore();
+}
+
+// Every diff option update rewrites the inner editors' labels, so each one carries them again.
+function editorLabels(): Record<string, string> {
+  return {
+    ariaLabel: title.value,
+    originalAriaLabel: t("assistant.diff.current", { language: languageName.value }),
+    modifiedAriaLabel: title.value,
+  };
+}
+
+// Whole-word matches only, so `status` inside `http_status` is never marked.
+function segmentsOf(line: { kind: string; text: string }): { text: string; unknown: boolean }[] {
+  const fields = line.kind === "removed" ? [] : unknownFields.value;
+  if (!fields.length) return [{ text: line.text, unknown: false }];
+  const names = new Set(fields);
+  return line.text
+    .split(/([A-Za-z_][A-Za-z0-9_.]*)/)
+    .filter((part) => part !== "")
+    .map((part) => ({ text: part, unknown: names.has(part) }));
+}
+
+function markUnknownFields(): void {
+  unknownMarks?.clear();
+  unknownMarks = null;
+  const model = modifiedEditor?.getModel();
+  if (!modifiedEditor || !model || !unknownFields.value.length) return;
+  const hover = { value: t("assistant.diff.unknownMark") };
+  const decorations = unknownFields.value.flatMap((field) =>
+    model.findMatches(field, false, false, true, " ,()=<>!+-*/'\"`", false).map((match) => ({
+      range: match.range,
+      options: { inlineClassName: "underline decoration-wavy", hoverMessage: hover },
+    })),
+  );
+  unknownMarks = modifiedEditor.createDecorationsCollection(decorations);
+}
 
 function markName(kind: "added" | "removed"): I18nText {
   return t(kind === "added" ? "assistant.diff.added" : "assistant.diff.removed");
@@ -207,6 +323,11 @@ function rejectFromBar(event: KeyboardEvent): boolean {
 }
 
 function disposeMonaco(): void {
+  labelWatchers.forEach((watcher) => watcher.dispose());
+  labelWatchers = [];
+  unknownMarks?.clear();
+  unknownMarks = null;
+  modifiedEditor = null;
   editor?.dispose();
   editor = null;
   models.forEach((model) => model.dispose());
@@ -234,15 +355,16 @@ async function mountMonaco(): Promise<void> {
       diffWordWrap: "on",
       lineNumbers: lgUp.value ? "on" : "off",
       glyphMargin: false,
-      ariaLabel: title.value,
+      ...editorLabels(),
     });
     diff.setModel({ original, modified });
-    // The inner editors ignore the diff's own label options, and their text areas need a name.
-    diff.getOriginalEditor().updateOptions({
-      ariaLabel: t("assistant.diff.current", { language: languageName.value }),
-    });
-    diff.getModifiedEditor().updateOptions({ ariaLabel: title.value });
     editor = diff as unknown as DiffEditor;
+    const labels = editorLabels();
+    const option = monaco.editor.EditorOption.ariaLabel;
+    keepLabel(diff.getOriginalEditor(), option, labels.originalAriaLabel);
+    keepLabel(diff.getModifiedEditor(), option, labels.modifiedAriaLabel);
+    modifiedEditor = diff.getModifiedEditor() as unknown as MarkedEditor;
+    markUnknownFields();
     monacoReady.value = true;
   } catch {
     monacoReady.value = false;

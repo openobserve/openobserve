@@ -152,6 +152,27 @@ describe("useAssistantContext", () => {
     expect(view.noScope.value).toBe(true);
   });
 
+  it("shows a door's chip for the page's own incident once, in place of the page's copy", async () => {
+    const view = mountContext(async () => ({
+      ...PAGE_CONTEXTS.logs,
+      incident_id: "inc-1",
+      incident_title: "Checkout latency",
+    }));
+    await flushPromises();
+    const incidents = () => view.chips.value.filter((chip) => chip.kind === "incident");
+    expect(incidents()).toHaveLength(1);
+    store.addChip(sid, {
+      id: "door:incident:1",
+      kind: "incident",
+      label: raw("Incident · Checkout latency"),
+      ref: { type: "incident", id: "inc-1", org: "default" },
+      sizeBytes: 0,
+      provenance: "door",
+      sent: "serialized",
+    });
+    expect(incidents().map((chip) => chip.id)).toEqual(["door:incident:1"]);
+  });
+
   it("adds an attachments row and the shared disclosure", async () => {
     const view = mountContext(async () => PAGE_CONTEXTS.logs);
     await flushPromises();

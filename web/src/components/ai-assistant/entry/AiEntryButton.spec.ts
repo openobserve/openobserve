@@ -659,7 +659,7 @@ describe("door registry (DG-12 AC 1)", () => {
     const ids = AI_ENTRY_DOORS.map((d) => d.dataTest);
     expect(new Set(ids).size).toBe(ids.length);
     for (const id of ids)
-      expect(id).toMatch(/^ai-entry-[a-z-]+-(explain|troubleshoot|add|ask|fix)$/);
+      expect(id).toMatch(/^ai-entry-[a-z-]+-(explain|troubleshoot|add|ask|fix|generate)$/);
   });
 
   it("registers every ai-entry id used in src, and the id's verb matches its registration", () => {

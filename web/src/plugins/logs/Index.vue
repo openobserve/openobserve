@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-model="splitterModel"
         :horizontal="true"
         unit="px"
-        :limits="[85, 400]"
+        :limits="[85, 400 + helperSpace]"
         :separatorStyle="{
           height: '0.625rem',
           marginTop: '-0.3125rem',
@@ -64,6 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @on-auto-interval-trigger="onAutoIntervalTrigger"
               @showSearchHistory="showSearchHistoryfn"
               @extractPatterns="extractPatternsForCurrentQuery"
+              @helper-space="onHelperSpace"
               @buildModeToggle="onBuildModeToggle"
               @sendToAiChat="sendToAiChat"
             />
@@ -3061,6 +3062,14 @@ export default defineComponent({
       },
     );
 
+    // Rows the inline query helper adds to the search bar; the pane grows by them so the editor keeps its lines.
+    const helperSpace = ref(0);
+    const onHelperSpace = (px: number) => {
+      const delta = px - helperSpace.value;
+      helperSpace.value = px;
+      splitterModel.value = Math.min(400 + px, Math.max(85, splitterModel.value + delta));
+    };
+
     // Auto-expand the splitter when either editor has >2 lines; never overrides a larger user-set value.
     watch(
       [() => searchObj.data.editorValue, () => searchObj.data.tempFunctionContent, isMobile],
@@ -3068,8 +3077,8 @@ export default defineComponent({
         const queryLines = (queryValue || "").split("\n").length;
         const fnLines = (fnValue || "").split("\n").length;
         const hasMoreThanTwoLines = queryLines > 2 || fnLines > 2;
-        const baseHeight = mobile ? 165 : 83;
-        const expandedHeight = mobile ? 205 : 130;
+        const baseHeight = (mobile ? 165 : 83) + helperSpace.value;
+        const expandedHeight = (mobile ? 205 : 130) + helperSpace.value;
 
         if (hasMoreThanTwoLines && splitterModel.value < expandedHeight) {
           splitterModel.value = expandedHeight;
@@ -4149,6 +4158,8 @@ export default defineComponent({
       expandedLogs,
       fieldValues,
       onSplitterUpdate,
+      onHelperSpace,
+      helperSpace,
       updateGridColumns,
       updateUrlQueryParams,
       patchUrlViewState,
