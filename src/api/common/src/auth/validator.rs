@@ -314,8 +314,10 @@ pub(crate) async fn blocked_external(user: &config::meta::user::User) -> bool {
 /// password reset — who has to be told what password will satisfy the policy regardless of which
 /// org the console happens to be pointed at. Neither response contains org-scoped data, so nothing
 /// cross-tenant leaks by admitting a non-member.
+///
+/// `license/refresh` is the one write: the route table and the handler check it against `_meta`.
 fn is_org_agnostic_read(path: &str) -> bool {
-    if path == "license" {
+    if path == "license" || path == "license/refresh" {
         return true;
     }
     let segments: Vec<&str> = path.split('/').filter(|s| !s.is_empty()).collect();
@@ -2743,6 +2745,7 @@ CN5lTowpVXP2OIiiNTGa75Fj
     #[test]
     fn org_agnostic_reads_cover_license_and_password_complexity() {
         assert!(is_org_agnostic_read("license"));
+        assert!(is_org_agnostic_read("license/refresh"));
         assert!(is_org_agnostic_read("acme/password_complexity"));
         assert!(is_org_agnostic_read("_meta/password_complexity"));
         // An org literally named "api" still resolves as an org.
@@ -2761,6 +2764,8 @@ CN5lTowpVXP2OIiiNTGa75Fj
         assert!(!is_org_agnostic_read("acme/streams"));
         assert!(!is_org_agnostic_read("password_complexity"));
         assert!(!is_org_agnostic_read("license/keys"));
+        assert!(!is_org_agnostic_read("license/refresh/now"));
+        assert!(!is_org_agnostic_read("acme/license/refresh"));
     }
 
     #[tokio::test]

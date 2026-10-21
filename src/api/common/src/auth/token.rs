@@ -60,6 +60,16 @@ fn is_top_level_org_list(path_columns: &[&str], method: &str) -> bool {
     matches!(path_columns, ["organizations"]) && method == "LIST"
 }
 
+/// `license/refresh` names no org, and like the other license writes it needs a `_meta` member.
+#[cfg(any(feature = "enterprise", test))]
+fn user_lookup_org<'a>(path_columns: &[&'a str]) -> &'a str {
+    if matches!(path_columns, ["license", "refresh"]) {
+        config::META_ORG_ID
+    } else {
+        openobserve_core::auth::org_from_path(path_columns)
+    }
+}
+
 /// Foreign-`aud` MCP tokens pass only on /{org}/mcp or our own loopback calls.
 #[cfg(any(feature = "enterprise", test))]
 fn relaxes_audience_check(path_columns: &[&str], mcp_marker: Option<&[u8]>) -> bool {
@@ -75,10 +85,7 @@ pub async fn token_validator(
     req_data: &RequestData,
     auth_info: &AuthExtractor,
 ) -> Result<AuthValidationResult, AuthError> {
-    use openobserve_core::{
-        auth::{org_from_path, routed_path},
-        authz::check_permissions,
-    };
+    use openobserve_core::{auth::routed_path, authz::check_permissions};
 
     let user;
     let keys = get_dex_jwks().await;
@@ -164,7 +171,7 @@ pub async fn token_validator(
                 } else {
                     user = match path.find('/') {
                         Some(_) => {
-                            users::get_user(Some(org_from_path(&path_columns)), user_id).await
+                            users::get_user(Some(user_lookup_org(&path_columns)), user_id).await
                         }
                         None => {
                             if path_columns.len() == 1 && path_columns[0] == "license" {
@@ -362,6 +369,14 @@ mod tests {
                 Some(forged)
             ));
         }
+    }
+
+    #[test]
+    fn license_refresh_looks_the_user_up_in_meta() {
+        assert_eq!(user_lookup_org(&["license", "refresh"]), "_meta");
+        assert_eq!(user_lookup_org(&["acme", "license", "refresh"]), "acme");
+        assert_eq!(user_lookup_org(&["acme", "streams"]), "acme");
+        assert_eq!(user_lookup_org(&["v2", "acme", "downtimes"]), "acme");
     }
 
     #[test]
