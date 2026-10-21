@@ -1089,8 +1089,8 @@ pub async fn check_and_add_to_org(
             vec![]
         }
     };
-    let pending_invites = pending_invites
-        .into_iter()
+    let mut has_pending_invites = pending_invites
+        .iter()
         .any(|invite| invite.status == OrgInviteStatus::Pending && invite.expires_at > now);
     if db_user.is_none() {
         is_new_user = true;
@@ -1118,7 +1118,7 @@ pub async fn check_and_add_to_org(
             }
             Err(e) => {
                 log::error!("Error adding user to the database: {}", e);
-                return Ok((is_new_user, pending_invites));
+                return Ok((is_new_user, has_pending_invites));
             }
         }
     }
@@ -1127,15 +1127,48 @@ pub async fn check_and_add_to_org(
     match process_domain_org_mapping(user_email, claims, is_new_user).await {
         Ok(processed) => {
             if processed {
-                // domain based adding is done, so do not treat as a new user
-                let orgs = org_users::list_orgs_by_user(user_email).await?;
-                if orgs.is_empty() {
-                    log::warn!(
-                        "user {user_email} was domain mapped and is now associated with 0 orgs, logging him out"
-                    );
-                    return Err(anyhow::anyhow!("Please log in again"));
+                let user_record = db::user::get_user_by_email(user_email).await;
+                if user_record.is_none() {
+                    is_new_user = true;
+                    has_pending_invites = false;
+                    match create_new_user(DBUser {
+                        email: user_email.to_owned(),
+                        first_name: first_name.to_owned(),
+                        last_name: last_name.to_owned(),
+                        password: "".to_owned(),
+                        salt: "".to_owned(),
+                        organizations: vec![], // No org
+                        is_external: true,
+                        password_ext: Some("".to_owned()),
+                    })
+                    .await
+                    {
+                        Ok(_) => {
+                            let mut tuples = vec![];
+                            get_new_user_creation_tuple(user_email, &mut tuples);
+                            tuples_to_add.insert(user_email.to_string(), tuples);
+                            log::info!("User added to the database");
+                        }
+                        Err(e) => {
+                            log::error!(
+                                "Error adding user to the database after domain mapping: {}",
+                                e
+                            );
+                            return Ok((is_new_user, has_pending_invites));
+                        }
+                    }
+                } else {
+                    // domain based adding is done, so do not treat as a new user
+                    let orgs = org_users::list_orgs_by_user(user_email).await?;
+                    if orgs.is_empty() {
+                        is_new_user = true;
+                        has_pending_invites = pending_invites.iter().any(|invite| {
+                            invite.status == OrgInviteStatus::Pending && invite.expires_at > now
+                        });
+                    } else {
+                        return Ok((false, has_pending_invites));
+                    }
                 }
-                return Ok((false, pending_invites));
             }
         }
         Err(e) => log::error!(
@@ -1164,8 +1197,8 @@ pub async fn check_and_add_to_org(
             existing_orgs[0].role.to_string(),
         ),
         // if there are some pending invites, we do not want to create any orgs for the user
-        _ if pending_invites => {
-            return Ok((is_new_user, pending_invites));
+        _ if has_pending_invites => {
+            return Ok((is_new_user, has_pending_invites));
         }
         _ => {
             // Create a default org for the user
@@ -1265,7 +1298,7 @@ pub async fn check_and_add_to_org(
             .await;
     }
 
-    Ok((is_new_user, pending_invites))
+    Ok((is_new_user, has_pending_invites))
 }
 
 /// Process custom claim parsing and populate source_orgs and custom_roles
