@@ -44,11 +44,13 @@ import assistantService, {
 import type { PaidOverageFeature } from "@/services/paidOverage";
 import { paidOverageQuery, setPaidOverageMutation } from "@/services/paidOverage.queries";
 import searchService from "@/services/search";
+import { toast } from "@/lib/feedback/Toast/useToast";
 import { gt } from "@/types/i18n";
 import { copyToClipboard } from "@/utils/clipboard";
 import { assistantUsageQuery, capabilitiesQuery } from "@/services/assistant.queries";
 import { assistantKeys } from "@/services/assistant.querykeys";
 import type { TelemetryContextGetters, TelemetryRole } from "@/services/assistantAnalytics";
+import { orgTimeZone } from "@/utils/formatters";
 import { computeUserOrgKey } from "@/utils/userOrgKey";
 
 import { requestDashboardDraft } from "./actions/appliers/drafts";
@@ -71,7 +73,9 @@ import type {
 import { cancelConsentOnClose, createConsentRuntime, type ConsentRuntime } from "./consent";
 import { serialize } from "./context/serialize";
 import { createHintChannel, type AssistantHintChannel } from "./hints";
+import { createIndexedDbHistory } from "./historyDb";
 import { createLifecycle, type AssistantLifecycleRuntime } from "./lifecycle";
+import { forgetHistoryKeys, historyKeysOf, markKeptOnSignOut, readClearOnSignOut } from "./prefs";
 import { createOpenAssistant, type OpenAssistantCall } from "./openAssistant";
 import { setRuntimeHandle } from "./runtimeHandle";
 import { createTurnEngine, type TurnEngineDeps } from "./turnEngine";
@@ -82,6 +86,7 @@ import {
   type CapabilityDeps,
 } from "./useAssistantCapability";
 import { createApprovalsRuntime, type ApprovalsRuntime } from "./useAssistantApprovals";
+import { createAssistantHistory, type AssistantHistory } from "./useAssistantHistory";
 import { useAssistantClient } from "./useAssistantClient";
 import { assistantKeydownAt } from "./useAssistantIdleFocus";
 
@@ -119,6 +124,7 @@ export interface AssistantRuntime {
   lifecycle: AssistantLifecycleRuntime;
   approvals: ApprovalsRuntime;
   consent: ConsentRuntime;
+  history: AssistantHistory;
   context: ShallowRef<AssistantRuntimeContext | null>;
   /** Set by `telemetryContext`; the `context.client.ui_version` of every turn (B-13). */
   uiVersion: ShallowRef<string>;
@@ -143,6 +149,7 @@ export function getAssistantRuntime(): AssistantRuntime {
 /** Drops the singleton so a spec builds a fresh runtime; never called by app code. */
 export function resetAssistantRuntimeForTests(): void {
   runtime?.capability.dispose();
+  runtime?.history.dispose();
   runtime = null;
   setRuntimeHandle(null);
 }
@@ -230,7 +237,10 @@ function buildRuntime(): AssistantRuntime {
     registerSessionConsentSurface(consent.promptFor);
     const store = createAssistantStore(deps, {
       signOutKeys: () => orgKeysOf(context.value),
-      remoteLight: () => lifecycle.remoteLight(),
+      remoteLight: () =>
+        lifecycle.remoteLight() ??
+        (deps.history as Partial<AssistantHistory>).listLight?.value ??
+        null,
       turnLock: (sid) => lifecycle.turnLock(sid),
     });
     flushDraftsOnLeave(store);
@@ -246,6 +256,15 @@ function buildRuntime(): AssistantRuntime {
       (sids) => pruneQueryRuns(new Set(sids)),
     );
     const capability = createAssistantCapability(capabilityDeps(context));
+    const history = createAssistantHistory(
+      historyDeps(
+        context,
+        () => store,
+        () => capability,
+        deps,
+      ),
+    );
+    deps.history = history;
     const hosts = createHostRegistry();
     // Synchronous, so `state.ready` never lags the gate a door just read.
     watch(capability.capability, (value) => store.syncCapability(value), {
@@ -264,6 +283,7 @@ function buildRuntime(): AssistantRuntime {
       currentOrg: () => context.value?.getOrg()?.identifier ?? null,
       currentEmail: () => context.value?.getUser()?.email ?? null,
       onTurnEnded: refreshUsage,
+      purge: () => purgeOnSignOut(context.value, capability, hints, history),
     });
     // The hint arrives on both the org and the user channel; one refresh per turn.
     const endedTurns = new Set<string>();
@@ -295,11 +315,61 @@ function buildRuntime(): AssistantRuntime {
       lifecycle,
       approvals,
       consent,
+      history,
       context,
       uiVersion,
       openAssistant,
     };
   })!;
+}
+
+// History is built after the store and the capability, which take it lazily through `deps`.
+function historyDeps(
+  context: ShallowRef<AssistantRuntimeContext | null>,
+  store: () => AssistantStoreInternal,
+  capability: () => AssistantCapabilityHandle,
+  deps: AssistantStoreDeps,
+): Parameters<typeof createAssistantHistory>[0] {
+  const locks = typeof navigator !== "undefined" && navigator.locks ? navigator.locks : null;
+  return {
+    store,
+    capability: () => capability().capability.value,
+    org: () => context.value?.getOrg()?.identifier ?? null,
+    db: createIndexedDbHistory(),
+    queryClient,
+    engine: () => deps.engine,
+    hints: deps.hints,
+    now: () => Date.now(),
+    t: gt,
+    timezone: orgTimeZone,
+    writer: deps.uuid(),
+    locks,
+    hidden: () => typeof document !== "undefined" && document.visibilityState === "hidden",
+    onVisibility(cb) {
+      if (typeof document === "undefined") return () => undefined;
+      document.addEventListener("visibilitychange", cb);
+      return () => document.removeEventListener("visibilitychange", cb);
+    },
+    toast: (options) => void toast(options),
+    userHash: () => (deps.hints as AssistantHintChannel).userHash(),
+  };
+}
+
+// Server mode always purges the browser cache; local mode only when the user asked; every org this user wrote goes.
+async function purgeOnSignOut(
+  context: AssistantRuntimeContext | null,
+  capability: AssistantCapabilityHandle,
+  hints: AssistantHintChannel,
+  history: AssistantHistory,
+): Promise<void> {
+  const hash = hints.userHash();
+  if (!capability.capability.value.persistence && !(hash && readClearOnSignOut(hash))) {
+    if (hash && history.localRecords().length > 0) markKeptOnSignOut(hash);
+    return;
+  }
+  const keys = new Set([...(await orgKeysOf(context)), ...(hash ? historyKeysOf(hash) : [])]);
+  await history.purge([...keys]);
+  if (hash) forgetHistoryKeys(hash);
 }
 
 // Getters, because the engine is registered before the store and the capability it calls exist.

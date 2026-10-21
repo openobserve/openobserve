@@ -48,6 +48,7 @@ vi.mock("@/composables/assistant", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/composables/assistant")>()),
   useAssistantStore: () => fake.current.store,
   useAssistantCapability: () => fake.current.handle,
+  useAssistantHistory: () => fake.current.history,
   openAssistant,
 }));
 vi.mock("@/services/assistantAnalytics", async (importOriginal) => ({
@@ -59,8 +60,12 @@ vi.mock("@/lib/feedback/Toast/useToast", async (importOriginal) => ({
   toast,
 }));
 
-function setup(gate: GateCode = "available", over: Partial<AssistantCapability> = {}) {
-  fake.current = fakeAssistant(gate, over);
+function setup(
+  gate: GateCode = "available",
+  over: Partial<AssistantCapability> = {},
+  remote: { state: "needs_you" | "working"; sid: string } | null = null,
+) {
+  fake.current = fakeAssistant(gate, over, {}, 80, false, {}, { remoteLight: () => remote });
   const wrapper = mount(AssistantHeaderButton, {
     global: { plugins: [fakeRouter(), fakeVuex()] },
     attachTo: document.body,
@@ -225,6 +230,35 @@ describe("AssistantHeaderButton light", () => {
     store.state.sessions[b].turn = { state: "queued" };
     await flushPromises();
     expect(tooltip(wrapper)).toBe("2 answers running");
+  });
+
+  it("names another tab's answer by its history row, else claims no title", async () => {
+    const remote = { state: "working" as const, sid: "0190ffff-c3d4-7e5f-8a9b-000000000001" };
+    const unknown = setup("available", {}, remote);
+    await flushPromises();
+    expect(button(unknown.wrapper).attributes("data-state")).toBe("working");
+    expect(tooltip(unknown.wrapper)).toBe("O2 Assistant, answering");
+    unknown.wrapper.unmount();
+    const known = setup("available", { persistence: false }, remote);
+    known.store.setIdentity({ userOrgKey: "k1", org: "default" });
+    fake.current.db.rows.set(1, {
+      id: 1,
+      timestamp: new Date().toISOString(),
+      title: "Remote chat",
+      messages: [{ role: "user", content: raw("q") }],
+      sessionId: remote.sid,
+      userOrgKey: "k1",
+    });
+    fake.current.history.ensureLoaded();
+    await flushPromises();
+    expect(tooltip(known.wrapper)).toBe("Answering: Remote chat");
+  });
+
+  it("shows no count badge for another tab's waiting chat", async () => {
+    const { wrapper } = setup("available", {}, { state: "needs_you", sid: "elsewhere" });
+    await flushPromises();
+    expect(button(wrapper).attributes("data-state")).toBe("needs_you");
+    expect(wrapper.find('[data-test="assistant-header-status-light"]').text()).toBe("");
   });
 
   it("ranks needs you above working and shows the count", async () => {

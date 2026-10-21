@@ -416,7 +416,8 @@ export function approvalClock(ms: number): string {
 
 /** The plural entity noun key of a card's targets; mixed or unknown types read "object". */
 export function approvalEntity(card: Pick<ApprovalBlockData, "targets">): string {
-  const types = new Set(card.targets.map((target) => target.type));
+  // A redacted record keeps no targets.
+  const types = new Set((card.targets ?? []).map((target) => target.type));
   return types.size === 1 ? entityKeyOf([...types][0]) : "object";
 }
 

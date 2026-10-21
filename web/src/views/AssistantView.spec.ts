@@ -35,6 +35,7 @@ const { fake } = vi.hoisted(() => ({ fake: { current: null as any } }));
 vi.mock("@/composables/assistant", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/composables/assistant")>()),
   useAssistantStore: () => fake.current.store,
+  useAssistantHistory: () => fake.current.history,
   useAssistantCapability: () => fake.current.handle,
   useAssistantStarters: () => ({
     starters: computed(() => []),

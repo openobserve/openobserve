@@ -41,6 +41,7 @@ const STARTERS: Starter[] = [0, 1, 2, 3].map((i) => ({
 vi.mock("@/composables/assistant", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/composables/assistant")>()),
   useAssistantStore: () => fake.current.store,
+  useAssistantHistory: () => fake.current.history,
   useAssistantCapability: () => fake.current.handle,
   openAssistant: (...args: unknown[]) => open(...args),
   useAssistantStarters: () => ({

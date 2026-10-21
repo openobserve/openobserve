@@ -8204,6 +8204,7 @@
       "moreTime": "More time",
       "needsOk": "Needs your OK",
       "newValues": "New values",
+      "noDecision": "No answer was recorded for this request",
       "nothingSelected": "Nothing selected",
       "open": "Open",
       "reason": {
@@ -8887,6 +8888,22 @@
       "stopped": "Stopped",
       "windowCapped": "{window} (cut to the last 7 days)"
     },
+    "export": {
+      "approved": "Approved by you at {time}",
+      "attachment": "[attachment: {name}]",
+      "denied": "Denied by you at {time}",
+      "doneOf": {
+        "create": "Created {done} of {total}",
+        "delete": "Deleted {done} of {total}",
+        "update": "Updated {done} of {total}"
+      },
+      "ended": "This answer didn't finish",
+      "exportedLine": "Exported {time} {zone} · {org}",
+      "image": "[image: {name}]",
+      "steps": "Worked through {n} step ({names}) | Worked through {n} steps ({names})",
+      "stopped": "Stopped at {time} · findings kept",
+      "you": "You"
+    },
     "feedback": {
       "addDetail": "Add detail (optional)",
       "cancel": "Cancel",
@@ -9039,6 +9056,142 @@
       "inserted": "Inserted",
       "noChange": "The editor already has this."
     },
+    "history": {
+      "account": "Saved to your account · kept {retention}",
+      "accountNoRetention": "Saved to your account",
+      "allPinned": "All 100 chats are pinned. Unpin or delete one to save new chats.",
+      "clearAll": {
+        "action": "Delete all chats",
+        "bodyLocal": "This removes the chat saved in this browser for {org}. Pinned chats are deleted too. | This removes the {count} chats saved in this browser for {org}. Pinned chats are deleted too.",
+        "bodyServer": "This deletes them from every device and revokes {links} share links. Chats that are still answering are stopped. Pinned chats are deleted too.",
+        "confirm": "Delete {count} chat | Delete {count} chats",
+        "confirmAll": "Delete all chats",
+        "confirmWord": "delete",
+        "deleting": "Deleting…",
+        "done": "Deleted {count} chat | Deleted {count} chats",
+        "doneAll": "Deleted all your chats",
+        "failed": "Couldn't delete your chats",
+        "linksUnknown": "Couldn't count share links. Any that exist are revoked.",
+        "title": "Delete {count} chat? | Delete all {count} chats?",
+        "titleAll": "Delete all your chats in {org}?",
+        "typeToConfirm": "Type delete to confirm"
+      },
+      "clearOnSignOut": "Delete my browser chats when I sign out",
+      "clearSearch": "Clear search",
+      "copied": "Copied",
+      "current": "Open now",
+      "delete": {
+        "bodyLocal": "This removes the chat from this browser.",
+        "bodyServer": "This deletes the chat from every device and stops any answer still running.",
+        "links": {
+          "checking": "Checking share links…",
+          "count": "Its {count} active link stops working | Its {count} active links stop working",
+          "none": "No active links",
+          "unknown": "Couldn't check its share links. Deleting still revokes any that exist."
+        },
+        "running": "This chat is still answering. Deleting stops the answer.",
+        "title": "Delete “{title}”?"
+      },
+      "deleteAction": "Delete",
+      "deleteFailed": "Couldn't delete the chat",
+      "deleted": "Chat deleted",
+      "details": "Details",
+      "download": "Download",
+      "downloadAll": "Download all",
+      "downloadFailed": "Couldn't build the download",
+      "downloaded": "Downloaded",
+      "empty": {
+        "body": "Start one from the composer, or ask about a log row, panel or alert.",
+        "title": "No chats yet"
+      },
+      "filter": {
+        "alert": "Alert",
+        "all": "All",
+        "editor": "Editor",
+        "incident": "Incident",
+        "label": "Show",
+        "pinned": "Pinned"
+      },
+      "filterEmpty": "No chats in this view",
+      "group": {
+        "browser": "In this browser",
+        "older": "Older",
+        "pinned": "Pinned",
+        "today": "Today",
+        "week": "Previous 7 days",
+        "yesterday": "Yesterday"
+      },
+      "import": {
+        "dismiss": "Dismiss",
+        "download": "Download",
+        "error": "Something went wrong while moving your chats. The ones not moved stay in this browser.",
+        "failed": "{count} chat couldn't be moved | {count} chats couldn't be moved",
+        "forbidden": "Your role can't create chats. Ask an admin for AI access.",
+        "move": "Move chats",
+        "moved": "Moved {done} of {count}",
+        "never": "Don't ask again",
+        "notNow": "Not now",
+        "offer": "You have {count} chats saved in this browser. Move them to your account so they appear on every device?",
+        "offline": "You're offline. The chats stay in this browser until you try again.",
+        "progress": "Moving {done} of {count}…",
+        "retry": "Retry",
+        "unavailable": "You have {count} chats saved in this browser. History is now saved to your account, but these can't be moved yet."
+      },
+      "loadOlder": "Load older",
+      "loadedOlder": "Loaded {count} older chat | Loaded {count} older chats",
+      "localOnly": {
+        "adminHelp": "To turn it on, set O2_AI_CHAT_PERSISTENCE_ENABLED. Settings › Assistant explains the options.",
+        "adminLink": "Read the docs",
+        "description": "Chats, saved in this browser only, {count} of {cap}",
+        "help": "Chats stay in this browser. Signing out keeps them unless you choose otherwise below; clearing site data removes them. An admin can turn on account history in Settings › Assistant.",
+        "info": "About browser history",
+        "keptOnSignOut": "Your browser chats were kept when you signed out.",
+        "title": "Saved in this browser only · {count} of {cap}"
+      },
+      "matchCount": "{count} chat matches | {count} chats match",
+      "needsYou": "Waiting for your approval",
+      "new": "New chat",
+      "noMatch": "No chats match “{q}”",
+      "offline": "You're offline · showing chats saved in this browser",
+      "open": "Open",
+      "openFailed": "Couldn't open this chat",
+      "origin": {
+        "alert": "Alert",
+        "browser": "Browser",
+        "editor": "Editor",
+        "incident": "Incident"
+      },
+      "pending": {
+        "delete": "Deleting…",
+        "pin": "Pinning…",
+        "rename": "Renaming…"
+      },
+      "pin": "Pin",
+      "pinFailed": "Couldn't pin the chat",
+      "pinLocal": "Pin (in this browser)",
+      "pinned": "Pinned",
+      "prune": "{count} of {cap} · the oldest unpinned chat is removed when you reach {cap}",
+      "pruned": "Removed the oldest chat to make room: “{title}”",
+      "readOnly": "You can read your chats. Starting or continuing one needs AI access.",
+      "rename": "Rename",
+      "retention": "Chats are kept for {days} days",
+      "retentionDays": "{count} day | {count} days",
+      "retentionNone": "Chats are kept until you delete them",
+      "rowMenu": "Actions for {title}",
+      "running": "Answering…",
+      "search": "Search chats",
+      "searchPartial": "Searching the chats loaded so far · Load older to search more",
+      "serverError": "Couldn't load your chats",
+      "serverErrorCached": "Showing chats saved in this browser · Couldn't reach the server",
+      "sharedByMe": "Shared by me",
+      "showAll": "Show all",
+      "storageBlocked": "Couldn't save to this browser. Private windows and full storage block history.",
+      "title": "Chats",
+      "traceId": "Trace ID {id}",
+      "unpin": "Unpin",
+      "unpinLocal": "Unpin (in this browser)",
+      "unpinned": "Unpinned"
+    },
     "label": {
       "acceptedAt": "Accepted {time}",
       "askAgain": "Ask again",
@@ -9166,6 +9319,10 @@
       "running": "Running… · {n} s",
       "stop": "Stop"
     },
+    "record": {
+      "compacted": "Earlier context was summarised by the assistant at {time}",
+      "theModel": "the model"
+    },
     "scroll": {
       "jumpToLatest": "Jump to latest",
       "jumpToLatestCount": "Jump to latest · {count} new",
@@ -9175,9 +9332,13 @@
       "attachmentHidden": "Attachment hidden"
     },
     "shell": {
+      "answeringElsewhere": "Answering in another tab",
+      "answeringElsewherePolling": "Still answering in another tab. This view refreshes every few seconds.",
       "approvalElsewhere": "Another tab is waiting for your approval on this chat. Decide there first.",
+      "approvalNotAnswerableHere": "Waiting for your approval in the tab where you asked. Approve or deny it there, or stop this answer.",
       "close": "Close {product}",
       "deletedElsewhere": "This chat was deleted elsewhere",
+      "deletedInAnotherTab": "This chat was deleted in another tab",
       "discardChanges": "Discard changes",
       "keep": "Keep",
       "keepEditing": "Keep editing",
@@ -9186,6 +9347,7 @@
       "leaveGuardThisAlert": "this alert",
       "leaveGuardThisPattern": "this pattern",
       "leaveGuardTitle": "Unsaved changes",
+      "loadFailed": "Couldn't load this chat",
       "loadingChat": "Loading your chat…",
       "modeFloating": "Floating",
       "modeFloatingForcedHint": "Floating because the window is narrow",
@@ -9202,6 +9364,7 @@
       "orgSwitchRunningTitle": "Answers are still running in {org}",
       "orgSwitchWithdrawn": "Keeping withdraws {count} waiting approval. | Keeping withdraws {count} waiting approvals.",
       "otherAccount": "Another account signed in. Reload to continue with it; this tab's chats stay with the account that signed out.",
+      "refresh": "Refresh",
       "reload": "Reload",
       "resizeHandle": "Resize assistant",
       "resizeHandleValue": "{width} rem",
@@ -9211,12 +9374,17 @@
       "signOutRunningTitle": "Answers are still running",
       "signedOutElsewhere": "You signed out in another tab.",
       "skipLink": "Skip to {product}",
+      "startNewChat": "Start a new chat",
+      "stillRunningRefresh": "Still running. Refresh to check again.",
       "stop": "Stop",
       "stopAndSignOut": "Stop and sign out",
       "width": "Width",
       "widthDefault": "Default",
       "widthNarrow": "Narrow",
       "widthWide": "Wide"
+    },
+    "signout": {
+      "deleteLocal": "Also delete my browser chats on this device"
     },
     "step": {
       "create": "Creating {resource}",
@@ -9270,7 +9438,33 @@
       "reviewExpires": "Review request · expires in {time}"
     },
     "thread": {
-      "newChatTitle": "New chat"
+      "chats": "Chats",
+      "delete": "Delete chat",
+      "download": "Download chat",
+      "downloadJson": "JSON",
+      "downloadMarkdown": "Markdown",
+      "draftKept": "Your draft is kept in “{title}”",
+      "historyUnavailable": "History unavailable",
+      "loadToContinue": "Load the chat to continue it",
+      "menu": "Chat actions",
+      "new": "New",
+      "newAnnounce": "New chat",
+      "newChat": "New chat",
+      "newChatTitle": "New chat",
+      "newWhileRunningBody": "The current answer keeps running in the background. You can come back to it from Chats.",
+      "newWhileRunningTitle": "Start a new chat?",
+      "notSaved": "Not saved",
+      "notSavedSuffix": "· not saved",
+      "pin": "Pin",
+      "rename": "Rename",
+      "renameDisabled": "Send a message first",
+      "renameFailed": "Couldn't rename the chat",
+      "renameLabel": "Chat title",
+      "renamed": "Renamed",
+      "renaming": "Renaming…",
+      "start": "Start",
+      "titleCounter": "{count}/200",
+      "unpin": "Unpin"
     },
     "transcript": {
       "answerName": "Answer to {prompt}",

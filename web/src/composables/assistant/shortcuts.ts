@@ -61,10 +61,21 @@ const closers = new Set<() => void>();
 
 let ownerRef: ShallowRef<symbol | undefined> | null = null;
 
+// Mounted history triggers answer the `assistantHistory` chord, the rail before any header.
+const historyTargets: HistoryTarget[] = [];
+
 export type EscapeRung = (typeof ESCAPE_RUNGS)[number];
 
 /** `answer` is the latest assistant article, the target of `assistantGoToAnswer` (`30` §1.6). */
 export type FocusTarget = "card" | "composer" | "answer";
+
+/** A history trigger: the thread header's Chats (toggles its list) or the full view's rail (focuses its search). */
+export interface HistoryTarget {
+  el(): HTMLElement | null;
+  /** The rail outranks a header on the same page. */
+  priority: number;
+  run(): void;
+}
 
 export interface AssistantShortcutsOptions {
   /** Overrides the runtime's gate, for specs. */
@@ -90,6 +101,9 @@ export function useAssistantShortcuts(options: AssistantShortcutsOptions = {}): 
   useShortcuts([{ id: "assistantOpen", handler: onAssistantOpen }], undefined, {
     active: computed(() => registered.value && canChat.value),
   });
+  useShortcuts([{ id: "assistantHistory", handler: runHistoryTarget }], undefined, {
+    active: registered,
+  });
   // The `assistant` scope is acquired only while focus is inside, so global `closeDialog` never fires with it.
   useShortcuts([{ id: "assistantClose", handler: runEscapeLadder }], undefined, {
     active: computed(() => registered.value && focusInside.value),
@@ -109,6 +123,32 @@ export function useAssistantShortcuts(options: AssistantShortcutsOptions = {}): 
     document.removeEventListener("focusin", syncFocus);
     document.removeEventListener("focusout", syncFocus);
   });
+}
+
+/** A mounted history trigger registers for the chord; returns the unregister. */
+export function registerHistoryTarget(target: HistoryTarget): () => void {
+  historyTargets.push(target);
+  return () => {
+    const index = historyTargets.indexOf(target);
+    if (index >= 0) historyTargets.splice(index, 1);
+  };
+}
+
+/** Whether a mounted trigger outranks this one, so a header's Chats hands over to the rail. */
+export function historyTargetAbove(priority: number): boolean {
+  return historyTargets.some((target) => target.priority > priority && target.el()?.isConnected);
+}
+
+/** Runs the chord on the highest-priority trigger; among equals the one next to focus, else the newest. */
+export function runHistoryTarget(): boolean {
+  const live = historyTargets.filter((target) => target.el()?.isConnected);
+  if (live.length === 0) return false;
+  const top = Math.max(...live.map((target) => target.priority));
+  const ranked = live.filter((target) => target.priority === top);
+  const root = document.activeElement?.closest(ASSISTANT_ROOT_SELECTOR);
+  const focused = root ? ranked.find((target) => root.contains(target.el())) : undefined;
+  (focused ?? ranked.at(-1)!).run();
+  return true;
 }
 
 /** A component that owns a ladder rung registers it while mounted; returns the unregister. */

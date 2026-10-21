@@ -24,11 +24,14 @@ import { streamNameListQuery } from "@/services/stream.queries";
 import { gt, raw, type I18nKey, type I18nText } from "@/types/i18n";
 import { formatOrgRange, uiIntlLocale } from "@/utils/formatters";
 
-import type { AssistantHostAdapter, ObjectKind, Tri } from "./assistantStore.types";
+import type { AssistantHostAdapter, ObjectKind, Sid, Tri } from "./assistantStore.types";
 import type { ContextChip, PageContext } from "./context/types";
 import { getAssistantRuntime } from "./runtime";
 
 export const STARTER_COUNT = 3;
+
+/** How far down the history the "Continue" starter looks for a chat other than the open one. */
+const RECENT_LOOKUP = 5;
 
 // SI symbols for clock units, as `formatElapsed` writes them; calendar units take the locale's short form.
 const PERIOD_SYMBOLS: Record<string, string> = { s: "s", m: "min", h: "h" };
@@ -54,6 +57,8 @@ export interface Starter {
   chips: ContextChip[];
   /** `recent` only: opens that chat instead of staging. */
   chatId?: number;
+  /** `recent` only: the chat's session id, which opens it even when this browser never saved it. */
+  sid?: Sid;
   dataTest: `assistant-starter-${number}`;
 }
 
@@ -83,6 +88,7 @@ interface StarterDraft {
   kind: StarterKind;
   chips?: ContextChip[];
   chatId?: number;
+  sid?: Sid;
 }
 
 interface StarterFacts {
@@ -178,21 +184,19 @@ export function useAssistantStarters(input: AssistantStartersInput): {
     };
   });
 
+  // History rows, so a chat from another tab or device can be continued too.
   function recentDraft(): StarterDraft | null {
-    const { state } = runtime.store;
-    const sid = state.recent.find(
-      (id) =>
-        id !== state.shell.activeSid &&
-        state.sessions[id]?.userOrgKey === state.userOrgKey &&
-        !!state.sessions[id]?.title,
-    );
-    const session = sid ? state.sessions[sid] : null;
-    if (!session?.title || session.chatId === null) return null;
+    const active = runtime.store.state.shell.activeSid;
+    const row = runtime.history.rows.value
+      .slice(0, RECENT_LOOKUP)
+      .find((candidate) => candidate.sid !== active);
+    if (!row) return null;
     return {
       key: "assistant.welcome.starter.recent",
-      params: { title: session.title },
+      params: { title: row.title },
       kind: "recent",
-      chatId: session.chatId,
+      sid: row.sid,
+      ...(row.chatId !== null && { chatId: row.chatId }),
     };
   }
 
@@ -353,6 +357,7 @@ function finish(drafts: StarterDraft[]): Starter[] {
     prompt: englishPrompt(d.key, d.promptParams ?? d.params ?? {}),
     chips: d.chips ?? [],
     ...(d.chatId !== undefined && { chatId: d.chatId }),
+    ...(d.sid !== undefined && { sid: d.sid }),
     dataTest: `assistant-starter-${index}`,
   }));
 }

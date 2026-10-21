@@ -195,3 +195,12 @@ describe("AssistantContainerMenu", () => {
     expect(defaultWidthRem(120)).toBe(32);
   });
 });
+
+describe("AssistantContainerMenu bare", () => {
+  it("renders only its groups for a host menu that owns the trigger", async () => {
+    await openMenu({ placement: "sidebar", bare: true });
+    expect(item("assistant-shell-menu")).toBeNull();
+    expect(item("assistant-shell-mode-menu")).not.toBeNull();
+    expect(item("assistant-shell-mode-pinned")).not.toBeNull();
+  });
+});

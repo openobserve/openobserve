@@ -15,8 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODropdown align="end">
-    <template #trigger>
+  <component :is="bare ? BareMenu : ODropdown" v-bind="bare ? {} : { align: 'end' }">
+    <template v-if="!bare" #trigger>
       <AssistantIconButton
         :label="t('assistant.shell.moreActions')"
         :icon="assistantGlyph.more"
@@ -96,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </ODropdownItem>
       </ODropdownGroup>
     </template>
-  </ODropdown>
+  </component>
 </template>
 
 <script lang="ts">
@@ -106,6 +106,8 @@ export interface AssistantContainerMenuProps {
   placement: "sidebar" | "full" | "docked";
   /** The sidebar rendered as the phone or tablet sheet. */
   sheet?: boolean;
+  /** Only the groups, for a host menu (the thread header's overflow) that owns the trigger. */
+  bare?: boolean;
 }
 
 /** Narrow and Wide of the Width group (`20` §2.2, round 2 X-37); Default is the clamp of the viewport. */
@@ -132,7 +134,7 @@ export function placementMode(
 </script>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, type FunctionalComponent } from "vue";
 import { useRoute, useRouter } from "vue-router";
 
 import AssistantIconButton from "@/components/ai-assistant/common/AssistantIconButton.vue";
@@ -150,7 +152,12 @@ import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import { trackAssistant } from "@/services/assistantAnalytics";
 import { useI18nTyped } from "@/types/i18n";
 
-const props = withDefaults(defineProps<AssistantContainerMenuProps>(), { sheet: false });
+const props = withDefaults(defineProps<AssistantContainerMenuProps>(), {
+  sheet: false,
+  bare: false,
+});
+
+const BareMenu: FunctionalComponent = (_props, { slots }) => slots.default?.();
 
 const { t } = useI18nTyped();
 const store = useAssistantStore();

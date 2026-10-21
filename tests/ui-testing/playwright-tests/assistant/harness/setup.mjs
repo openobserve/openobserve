@@ -94,6 +94,16 @@ export function createMockState(overrides = {}) {
     activityEnabled: false,
     secretMergeEnabled: false,
     importEnabled: false,
+    // B-12 server search (`q` on GET /ai/chats) and server pins (`pinned` on rows and PATCH); B-03 list markers.
+    historySearchEnabled: false,
+    historyPinsEnabled: false,
+    listMarkersEnabled: false,
+    // POST /ai/chats/import refuses these chat titles one by one (per-chat failures).
+    importFailTitles: [],
+    // DELETE /ai/chats/{sid} answers this status.
+    deleteStatus: 200,
+    // GET /ai/chats/{sid} leaves out approval cards, as today's o2-ai history projection does.
+    historyDropsCards: false,
     // Two orgs for org-switch flows.
     orgs: null,
     // Stop: delay and status of POST /ai/chats/{sid}/cancel.
@@ -174,20 +184,29 @@ async function handleAi(route, request, state) {
   // Enterprise-only endpoints the OSS backend refuses with 403; the UI treats [] as "none configured".
   if (/^\/api\/[^/]+\/alerts\/deduplication\/semantic-groups$/.test(p)) return json(route, []), true;
   if (/^\/api\/[^/]+\/re_patterns(\/built_in)?$/.test(p) && request.method() === "GET") return json(route, { patterns: [] }), true;
-  if (p === "/config" || /^\/api\/[^/]+\/config$/.test(p)) return patchedConfig(route, request, state), true;
-  if (state.role !== "admin" && m === "POST" && /\/auth\/login$/.test(p)) return patchedLogin(route, request, state), true;
+  // A page that closes mid-request rejects the fetch; that must not fail the test that already ended.
+  if (p === "/config" || /^\/api\/[^/]+\/config$/.test(p)) return patchedConfig(route, request, state).catch(() => {}), true;
+  if (state.role !== "admin" && m === "POST" && /\/auth\/login$/.test(p)) return patchedLogin(route, request, state).catch(() => {}), true;
 
   if ((mt = p.match(/^\/api\/public\/ai_chats\/([^/]+)$/))) {
     if (state.sharedChatStatus !== 200) return json(route, { code: state.sharedChatStatus, message: "Share not found or expired" }, state.sharedChatStatus), true;
     return json(route, sharedChat(decodeURIComponent(mt[1]))), true;
   }
+  if (p === "/__o2mock/turn_end") {
+    const { session_id: sid } = request.postDataJSON() || {};
+    const chat = state.chats.find((c) => c.session_id === sid);
+    if (chat) chat.running = false;
+    return route.fulfill({ status: 204, headers: { "access-control-allow-origin": "*" } }), true;
+  }
   if (p === "/__o2mock/turn") {
     const turn = request.postDataJSON() || {};
+    const known = state.chats.find((c) => c.session_id === turn.session_id);
+    if (known) Object.assign(known, { running: true, turn_id: turn.turn_id || known.turn_id });
     if (turn.session_id && !state.chats.some((c) => c.session_id === turn.session_id)) {
       const nowUs = Date.now() * 1000;
       const sc = SCENARIOS[turn.scenario] || SCENARIOS.complete;
       const title = (sc.frames.find((fr) => fr.type === "title") || {}).title || turn.text.slice(0, 40);
-      state.chats.unshift({ session_id: turn.session_id, title, user: turn.text, frames: sc.frames.filter((fr) => !fr.waitForConfirm && fr.boundary === undefined).map(({ sseId, ...fr }) => fr), created_at: nowUs, updated_at: nowUs, last_committed_seq: sc.frames.length });
+      state.chats.unshift({ session_id: turn.session_id, turn_id: turn.turn_id, running: true, title, user: turn.text, frames: sc.frames.filter((fr) => !fr.waitForConfirm && fr.boundary === undefined).map(({ sseId, ...fr }) => fr), created_at: nowUs, updated_at: nowUs, last_committed_seq: sc.frames.length });
     }
     return route.fulfill({ status: 204, headers: { "access-control-allow-origin": "*" } }), true;
   }
@@ -205,7 +224,8 @@ async function handleAi(route, request, state) {
     if (mt[1]) return json(route, { ok: true, duration_ms: 120 }), true;
     const role = ROLE_NAMES[state.role] ?? state.role;
     const admin = role === "admin";
-    return json(route, { health: { status: "ok", checked_at: Date.now() * 1000 }, redaction_applied: false, can_chat: role !== "viewer", can_write: admin || role === "editor", can_share: admin, agents: [], toolsets: [], toolset_secret_merge: false, policy_enforced: false, ...state.capabilities }), true;
+    const history = { ...(state.historySearchEnabled && { history_search: true }), ...(state.historyPinsEnabled && { history_pins: true }) };
+    return json(route, { health: { status: "ok", checked_at: Date.now() * 1000 }, redaction_applied: false, can_chat: role !== "viewer", can_write: admin || role === "editor", can_share: admin, agents: [], toolsets: [], toolset_secret_merge: false, policy_enforced: false, ...history, ...state.capabilities }), true;
   }
   // The access probe (00 §9) arrives by XHR (the shim answers fetch cancels); a viewer is refused, any other role reaches the handler.
   if (m === "POST" && /^\/api\/[^/]+\/ai\/chats\/[^/]+\/cancel$/.test(p)) {
@@ -217,7 +237,9 @@ async function handleAi(route, request, state) {
   if ((mt = p.match(/^\/api\/[^/]+\/ai\/chats$/))) {
     if (m === "DELETE") return json(route, { deleted: state.chats.length }), true;
     if (state.historyStatus !== 200) return json(route, { code: state.historyStatus, message: "history store unavailable" }, state.historyStatus), true;
-    return json(route, { chats: state.chats.map(chatSummary) }), true;
+    const q = state.historySearchEnabled ? (url.searchParams.get("q") || "").trim().toLowerCase() : "";
+    const chats = q ? state.chats.filter((c) => `${c.title} ${c.user}`.toLowerCase().includes(q)) : state.chats;
+    return json(route, { chats: chats.map((c) => listRow(c, state)) }), true;
   }
   if ((mt = p.match(/^\/api\/[^/]+\/ai\/chats\/([^/]+)\/shares$/))) {
     const sid = decodeURIComponent(mt[1]);
@@ -246,6 +268,22 @@ async function handleAi(route, request, state) {
     }
     return json(route, { shares: state.shares.filter((s) => s.session_id === sid) }), true;
   }
+  if (m === "POST" && /^\/api\/[^/]+\/ai\/chats\/import$/.test(p)) {
+    if (!state.importEnabled) return json(route, { code: 404, message: "Not Found" }, 404), true;
+    const { chats = [] } = request.postDataJSON() || {};
+    const result = { imported: [], skipped: [], failed: [] };
+    for (const chat of chats) {
+      if (state.importFailTitles.includes(chat.title)) {
+        result.failed.push({ client_id: chat.client_id, code: "invalid_chat" });
+        continue;
+      }
+      const nowUs = Date.now() * 1000;
+      const sessionId = `imp-${chat.client_id}`;
+      state.chats.unshift({ session_id: sessionId, title: chat.title, user: chat.turns?.[0]?.user?.text || chat.title, frames: chat.turns?.[0]?.frames || [], created_at: nowUs, updated_at: nowUs, last_committed_seq: 1 });
+      result.imported.push({ client_id: chat.client_id, session_id: sessionId });
+    }
+    return json(route, result), true;
+  }
   if ((mt = p.match(/^\/api\/[^/]+\/ai\/chats\/([^/]+)\/cancel$/))) {
     if (state.cancelDelayMs) await new Promise((r) => setTimeout(r, state.cancelDelayMs));
     const status = state.cancelStatus || 200;
@@ -255,15 +293,21 @@ async function handleAi(route, request, state) {
     const sid = decodeURIComponent(mt[1]);
     const chat = state.chats.find((c) => c.session_id === sid);
     if (m === "DELETE") {
+      if (state.deleteStatus !== 200) return json(route, { code: state.deleteStatus, message: "delete failed" }, state.deleteStatus), true;
       state.chats = state.chats.filter((c) => c.session_id !== sid);
       return json(route, { deleted: true }), true;
     }
     if (m === "PATCH") {
-      if (chat) chat.title = (request.postDataJSON() || {}).title || chat.title;
-      return json(route, chat ? chatSummary(chat) : {}), true;
+      const body = request.postDataJSON() || {};
+      if (chat) chat.title = body.title || chat.title;
+      if (chat && state.historyPinsEnabled && typeof body.pinned === "boolean") chat.pinned = body.pinned;
+      return json(route, chat ? listRow(chat, state) : {}), true;
     }
     if (!chat) return json(route, { code: 404, message: "chat not found" }, 404), true;
-    return json(route, chatDetail(chat)), true;
+    const detail = chatDetail(chat);
+    if (state.historyDropsCards)
+      detail.turns = detail.turns.map((t) => ({ ...t, frames: t.frames.filter((fr) => fr.type !== "confirmation_required") }));
+    return json(route, detail), true;
   }
   if ((mt = p.match(/^\/api\/[^/]+\/ai\/shares$/))) {
     if (state.sharesStatus !== 200) return json(route, { code: state.sharesStatus, message: "forbidden" }, state.sharesStatus), true;
@@ -312,6 +356,19 @@ async function handleAi(route, request, state) {
     return json(route, state.overage), true;
   }
   return false;
+}
+
+// A list row carries pins and the running and waiting markers only while their knob is on.
+function listRow(chat, state) {
+  return {
+    ...chatSummary(chat),
+    ...(state.historyPinsEnabled && { pinned: !!chat.pinned }),
+    ...(state.listMarkersEnabled && {
+      active_turn: !!chat.running,
+      ...(chat.running && chat.turn_id && { active_turn_id: chat.turn_id }),
+      pending_approval: !!chat.pending_approval,
+    }),
+  };
 }
 
 /** Installs the streaming shim and all HTTP mocks on a browser context. */
@@ -418,13 +475,14 @@ export async function readAnnouncements(page) {
   return page.locator('[role="status"]').allTextContents();
 }
 
-export async function login(page) {
-  if (!ENV.user || !ENV.pass) throw new Error("Set ZO_ROOT_USER_EMAIL and ZO_ROOT_USER_PASSWORD (as for every tests/ui-testing suite).");
+/** Signs in as the root user, or as `as` (a user `createUser` made). */
+export async function login(page, as = { user: ENV.user, pass: ENV.pass }) {
+  if (!as.user || !as.pass) throw new Error("Set ZO_ROOT_USER_EMAIL and ZO_ROOT_USER_PASSWORD (as for every tests/ui-testing suite).");
   await page.goto(`${ENV.appUrl}/login`, { waitUntil: "domcontentloaded" });
   const internal = page.locator('[data-test="login-as-internal-user"]');
   if (await internal.isVisible({ timeout: 3000 }).catch(() => false)) await internal.click();
-  await page.locator('[data-test="login-user-id-field"]').fill(ENV.user);
-  await page.locator('[data-test="login-password-field"]').fill(ENV.pass);
+  await page.locator('[data-test="login-user-id-field"]').fill(as.user);
+  await page.locator('[data-test="login-password-field"]').fill(as.pass);
   await page.locator('[data-test="login-sign-in"]').click();
   await page.waitForURL((u) => !u.pathname.endsWith("/login"), { timeout: 30000 });
   await page.waitForLoadState("networkidle").catch(() => {});
@@ -440,6 +498,15 @@ async function rootApi(method, path, body) {
   });
   if (!response.ok) throw new Error(`${method} ${path} answered ${response.status}`);
   return response.json();
+}
+
+/** A new admin of the test org with a random password, for flows that switch users in one browser. */
+export async function createUser(prefix = "second") {
+  const stamp = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+  const user = `${prefix}-${stamp}@example.com`;
+  const pass = `Pw#${Math.random().toString(36).slice(2)}${stamp}`;
+  await rootApi("POST", `/api/${ENV.org}/users`, { email: user, password: pass, role: "admin", first_name: "Second", last_name: "User" });
+  return { user, pass };
 }
 
 /** The identifier of the organization named `name`, created once per backend (organizations cannot be deleted here). */

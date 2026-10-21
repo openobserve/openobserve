@@ -220,7 +220,7 @@ const view = computed<ApprovalResultView | null>(() => {
   return { state: "unconfirmed", outcome: null, result: null };
 });
 
-const total = computed(() => card.value?.total ?? card.value?.targets.length ?? 0);
+const total = computed(() => card.value?.total ?? card.value?.targets?.length ?? 0);
 
 const line = computed<I18nText>(() => {
   const current = view.value;
@@ -260,8 +260,9 @@ const line = computed<I18nText>(() => {
     case "delivery_failed":
       return t("assistant.approval.result.deliveryFailed");
     case "unconfirmed":
-      return current.outcome
-        ? t("assistant.approval.result.unconfirmed")
+      if (current.outcome) return t("assistant.approval.result.unconfirmed");
+      return card.value?.noDecision
+        ? t("assistant.approval.noDecision")
         : t("assistant.approval.result.unknown");
     case "approved_elsewhere":
       return t("assistant.approval.result.approvedElsewhere", { time });
@@ -389,15 +390,15 @@ function doneLine(): I18nText {
   if (current.kind === "update")
     return t("assistant.approval.result.done.update", {
       entity: entityNoun(1),
-      name: raw(current.targets[0]?.name ?? ""),
+      name: raw(current.targets?.[0]?.name ?? ""),
     });
   if (current.kind === "create")
     return t("assistant.approval.result.done.create", { entity: entityNoun(1) });
   if (current.kind === "run_command")
     return t("assistant.approval.result.done.runCommand", {
-      toolset: raw(String(current.args?.toolset ?? current.tool)),
+      toolset: raw(String(current.args?.toolset ?? current.tool ?? "")),
     });
-  return t("assistant.approval.result.done.permission", { tool: raw(current.tool) });
+  return t("assistant.approval.result.done.permission", { tool: raw(current.tool ?? "") });
 }
 
 function partialLine(): I18nText {

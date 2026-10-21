@@ -1,0 +1,22 @@
+[
+  {
+    "role": "user",
+    "content": "Which model are you?",
+    "sentAt": 1772418240000,
+    "turnId": "t-model-1"
+  },
+  {
+    "role": "assistant",
+    "content": "I run on the model and sometimes the model.",
+    "contentBlocks": [
+      {
+        "type": "text",
+        "text": "I run on the model and sometimes the model."
+      },
+      {
+        "type": "footer",
+        "footer": {}
+      }
+    ]
+  }
+]

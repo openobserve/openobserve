@@ -50,6 +50,10 @@ const LOCAL_KEYS = {
   hints: (k: string) => `o2.assistant.hints:${k}`,
   creditNotice: (k: string, threshold: number) => `o2.assistant.creditNotice:${k}:${threshold}`,
   importDismissed: (k: string) => `o2.assistant.importDismissed:${k}`,
+  importSnoozed: (k: string) => `o2.assistant.importSnoozed:${k}`,
+  clearOnSignOut: (userHash: string) => `o2.assistant.clearOnSignOut:${userHash}`,
+  keptOnSignOut: (userHash: string) => `o2.assistant.keptOnSignOut:${userHash}`,
+  historyKeys: (userHash: string) => `o2.assistant.historyKeys:${userHash}`,
   annotations: (k: string) => `o2.assistant.annotations:${k}`,
 };
 
@@ -89,6 +93,8 @@ const DENY_REASONS: ReadonlySet<unknown> = new Set([
 ]);
 
 const MAX_KEPT_ROWS = 200;
+
+const MAX_HISTORY_KEYS = 50;
 
 // A stored vote reason is only ever one of the bar's reasons or a findings outcome.
 const FEEDBACK_REASONS: ReadonlySet<unknown> = new Set([
@@ -278,6 +284,60 @@ export function isImportDismissed(userOrgKey: string): boolean {
 
 export function dismissImport(userOrgKey: string): void {
   writeRaw("local", LOCAL_KEYS.importDismissed(userOrgKey), "1");
+}
+
+/** "Not now" on the import offer: asked again after `until` (epoch ms). */
+export function snoozeImport(userOrgKey: string, until: number): void {
+  writeRaw("local", LOCAL_KEYS.importSnoozed(userOrgKey), String(until));
+}
+
+export function importSnoozedUntil(userOrgKey: string): number {
+  const value = Number(readRaw("local", LOCAL_KEYS.importSnoozed(userOrgKey)));
+  return Number.isFinite(value) ? value : 0;
+}
+
+/** Local-only mode: delete this user's browser chats on every sign-out (default off). */
+export function readClearOnSignOut(userHash: string): boolean {
+  return readRaw("local", LOCAL_KEYS.clearOnSignOut(userHash)) === "1";
+}
+
+export function writeClearOnSignOut(userHash: string, on: boolean): void {
+  if (on) writeRaw("local", LOCAL_KEYS.clearOnSignOut(userHash), "1");
+  else removeKey("local", LOCAL_KEYS.clearOnSignOut(userHash));
+}
+
+/** Set by a sign-out that kept the browser chats, read once by the next list ("the footer says so next time"). */
+export function markKeptOnSignOut(userHash: string): void {
+  writeRaw("local", LOCAL_KEYS.keptOnSignOut(userHash), "1");
+}
+
+export function takeKeptOnSignOut(userHash: string): boolean {
+  const kept = readRaw("local", LOCAL_KEYS.keptOnSignOut(userHash)) === "1";
+  if (kept) removeKey("local", LOCAL_KEYS.keptOnSignOut(userHash));
+  return kept;
+}
+
+/** Every user+org key this user wrote browser chats under, so a sign-out reaches orgs they have since left. */
+export function rememberHistoryKey(userHash: string, userOrgKey: string): void {
+  const known = historyKeysOf(userHash);
+  if (known.includes(userOrgKey)) return;
+  const next = [userOrgKey, ...known].slice(0, MAX_HISTORY_KEYS);
+  writeRaw("local", LOCAL_KEYS.historyKeys(userHash), JSON.stringify(next));
+}
+
+export function historyKeysOf(userHash: string): string[] {
+  try {
+    const value: unknown = JSON.parse(readRaw("local", LOCAL_KEYS.historyKeys(userHash)) ?? "[]");
+    return Array.isArray(value)
+      ? value.filter((key): key is string => typeof key === "string" && key.length <= 256)
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+export function forgetHistoryKeys(userHash: string): void {
+  removeKey("local", LOCAL_KEYS.historyKeys(userHash));
 }
 
 /** The chat this tab had open for the user+org before a reload, once per page load. */

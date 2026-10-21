@@ -137,7 +137,11 @@ Working today: `historyStatus` (500 → history unavailable), `sharesStatus`,
 and the access probe `POST …/ai/chats/{id}/cancel` answers 403 for `viewer`, 404 otherwise),
 `probeStatus` (overrides that answer, e.g. 403 for a custom role) and `probeDelayMs` (a delay
 past the probe's 5 s timeout leaves `canChat` unknown), `capabilitiesEnabled` (B-06 `GET …/ai/capabilities` and `POST …/capabilities/test`; 404 while
-off) and `capabilities` (fields merged over the role-derived answer).
+off) and `capabilities` (fields merged over the role-derived answer), `historySearchEnabled`
+(B-12: `GET …/ai/chats` filters by `q` and the capabilities answer advertises `history_search`),
+`historyPinsEnabled` (B-12: rows carry `pinned`, `PATCH …/ai/chats/{sid}` stores it, advertised as
+`history_pins`) and `listMarkersEnabled` (B-03: rows carry `active_turn`, `active_turn_id` and
+`pending_approval` from the chat's `running` and `pending_approval`).
 
 Read by the stream shim in the page (set at `installMocks`, changed later with
 `setKnobs(page, knobs)`): `envelopeEnabled` (B-01 bodies for the HTTP scenarios that carry an
