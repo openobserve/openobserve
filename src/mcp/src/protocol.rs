@@ -19,9 +19,13 @@ use anyhow::{Result, anyhow};
 use serde_json::{Value, json};
 
 use super::{
+    approval,
     ledger::{self, Origin},
     response_filter::filter_response,
-    tools::{get_pinned_tools, get_shared_http_client, get_tool_metadata, tool_search},
+    tools::{
+        get_pinned_tools, get_shared_http_client, get_tool_metadata, requires_confirmation,
+        tool_search,
+    },
     types::*,
 };
 
@@ -101,12 +105,7 @@ pub async fn route_request(
             }
             Ok(MCPResponse::success(request.id, value))
         }
-        Err(e) => Ok(MCPResponse::error(
-            request.id,
-            MCPErrorCode::InternalError,
-            e.to_string(),
-            None,
-        )),
+        Err(e) => Ok(error_response(request.id, e)),
     }
 }
 
@@ -222,6 +221,7 @@ fn handle_tools_list() -> Result<Value> {
             }),
             output_schema: None,
             annotations: None,
+            meta: None,
             http_method: String::new(),
             http_path: String::new(),
             category: None,
@@ -254,6 +254,7 @@ fn handle_tools_list() -> Result<Value> {
             }),
             output_schema: None,
             annotations: None,
+            meta: None,
             http_method: String::new(),
             http_path: String::new(),
             category: None,
@@ -286,6 +287,8 @@ fn handle_tool_search(query: &str, limit: Option<usize>) -> Result<Value> {
             title: tool.title,
             description: tool.description,
             input_schema: tool.input_schema,
+            annotations: tool.annotations,
+            meta: tool.meta,
             requires_confirmation: if tool.requires_confirmation {
                 Some(true)
             } else {
@@ -309,6 +312,14 @@ async fn handle_direct_call(
     // Find the tool metadata for execution
     let tool_metadata =
         get_tool_metadata(tool_name).ok_or_else(|| anyhow!("Tool '{}' not found", tool_name))?;
+    approval::check(
+        org_id,
+        &tool_metadata.name,
+        requires_confirmation(&tool_metadata),
+        origin,
+        &args,
+    )
+    .await?;
 
     // Execute the tool using shared HTTP client
     let result = execute_tool(org_id, &tool_metadata, args, detail, auth_token, origin).await?;
@@ -562,6 +573,31 @@ async fn execute_tool(
         content: vec![ToolContent::Text { text: content_text }],
         is_error: if is_error { Some(true) } else { None },
         structured_content,
+    })
+}
+
+/// An unapproved write is a typed refusal o2-ai can card; anything else is an internal error.
+fn error_response(id: Option<Value>, error: anyhow::Error) -> MCPResponse {
+    match error.downcast_ref::<approval::ApprovalRequired>() {
+        Some(refused) => MCPResponse::error(
+            id,
+            MCPErrorCode::Custom(approval::APPROVAL_REQUIRED_RPC_CODE),
+            refused.to_string(),
+            Some(refusal_data(refused)),
+        ),
+        None => MCPResponse::error(id, MCPErrorCode::InternalError, error.to_string(), None),
+    }
+}
+
+/// What o2-ai needs to card the refused call: its class as the listing announces it.
+fn refusal_data(refused: &approval::ApprovalRequired) -> Value {
+    let class = crate::tools::tool_class(&refused.tool);
+    json!({
+        "code": approval::APPROVAL_REQUIRED,
+        "tool": refused.tool,
+        "reason": refused.refusal.reason(),
+        "operation": class.map_or("update", |c| c.operation),
+        "destructive": class.is_some_and(|c| c.destructive),
     })
 }
 
@@ -1083,6 +1119,26 @@ mod tests {
         assert!(value.is_object());
         let obj = value.as_object().unwrap();
         assert!(obj.contains_key("tools"));
+    }
+
+    #[test]
+    fn an_unapproved_write_is_a_typed_json_rpc_refusal() {
+        let refused = anyhow::Error::new(approval::ApprovalRequired {
+            tool: "UpdateAlert".into(),
+            refusal: approval::Refusal::Missing,
+        });
+        let response = serde_json::to_value(error_response(Some(json!(3)), refused)).unwrap();
+        assert_eq!(
+            response["error"]["code"],
+            approval::APPROVAL_REQUIRED_RPC_CODE
+        );
+        assert_eq!(response["error"]["data"]["code"], "approval_required");
+        assert_eq!(response["error"]["data"]["tool"], "UpdateAlert");
+        assert_eq!(response["error"]["data"]["reason"], "missing");
+        assert_eq!(response["error"]["data"]["operation"], "update");
+        assert_eq!(response["error"]["data"]["destructive"], false);
+        let other = serde_json::to_value(error_response(None, anyhow!("boom"))).unwrap();
+        assert_eq!(other["error"]["code"], -32603);
     }
 
     #[tokio::test]

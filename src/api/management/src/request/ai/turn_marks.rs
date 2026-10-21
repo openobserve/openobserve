@@ -13,22 +13,36 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Cluster-visible marks of a turn: whose turn runs a session, and what it asked to confirm.
+//! Cluster-visible marks of a turn: whose turn runs a session, and the approvals it asked.
 
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    sync::{
+        Mutex,
+        atomic::{AtomicI64, Ordering},
+    },
+};
 
 use config::utils::time::now_micros;
-use infra::table::ai_turn_marks::{self, KIND_ANSWERED, KIND_CONFIRMATION, KIND_TURN, NewMark};
+use infra::table::{
+    ai_approvals::{self, Decision, NewApproval},
+    ai_turn_marks::{self, KIND_ANSWERED, KIND_TURN, NewMark},
+};
 use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
 use serde_json::Value;
 
 const MICROS_PER_SEC: i64 = 1_000_000;
 const TURN_GRACE_SECS: i64 = 60;
-// A pending delete outlives its turn in o2-ai, so its confirmation may come this much later.
-const CONFIRMATION_TTL_SECS: i64 = 3600;
 // Outlives the 24 h a chat's newest turn may report a pending approval.
 const ANSWERED_TTL_SECS: i64 = 25 * 3600;
 const CONFIRMATION_REQUIRED: &str = "confirmation_required";
+const CONFIRMATION_RESOLVED: &str = "confirmation_resolved";
+// A frame line longer than this is not an approval frame worth buffering.
+const MAX_PENDING_LINE: usize = 1 << 20;
+// Each node sweeps expired and old approvals at most this often, when a new card arrives.
+const PURGE_EVERY_MICROS: i64 = 3600 * MICROS_PER_SEC;
+
+static LAST_PURGE: AtomicI64 = AtomicI64::new(0);
 
 /// The mark of one running turn; dropping it at the turn's end removes the mark.
 pub(crate) struct TurnMark {
@@ -56,11 +70,13 @@ impl Drop for TurnMark {
     }
 }
 
-/// Records each `confirmation_required` frame's tool, so `/confirm` grants only what was asked.
+/// Stores each approval card a turn raises and each decision it streams in `ai_approvals`.
 pub(crate) struct ConfirmationWatch {
     org_id: String,
     session_id: String,
     user_email: String,
+    // The unterminated tail of the last chunk; a frame split across chunks is joined here.
+    partial: Mutex<String>,
 }
 
 impl ConfirmationWatch {
@@ -69,29 +85,35 @@ impl ConfirmationWatch {
             org_id: org_id.to_string(),
             session_id: session_id.to_string(),
             user_email: user_email.to_string(),
+            partial: Mutex::new(String::new()),
         }
     }
 
-    /// Returns at once; the marks are written in the background.
+    /// Returns at once; the approvals are written in the background.
     pub(crate) fn note(&self, chunk: &[u8]) {
-        for tool in confirmation_tools(chunk) {
+        for frame in self.frames(chunk) {
             let (org_id, session_id) = (self.org_id.clone(), self.session_id.clone());
             let user_email = self.user_email.clone();
             tokio::spawn(async move {
-                let now = now_micros();
-                let mark = NewMark {
-                    org_id: &org_id,
-                    session_id: &session_id,
-                    user_email: &user_email,
-                    kind: KIND_CONFIRMATION,
-                    value: Some(&tool),
-                    expires_at: now + CONFIRMATION_TTL_SECS * MICROS_PER_SEC,
-                };
-                if let Err(e) = ai_turn_marks::insert(&mark, now).await {
-                    log::warn!("[org_id:{org_id}] confirmation of {tool} not recorded: {e}");
-                }
+                record_frame(&org_id, &session_id, &user_email, &frame).await;
             });
         }
+    }
+
+    fn frames(&self, chunk: &[u8]) -> Vec<Value> {
+        let mut partial = self
+            .partial
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        partial.push_str(&String::from_utf8_lossy(chunk));
+        let complete = match partial.rfind('\n') {
+            Some(end) => partial.drain(..=end).collect::<String>(),
+            None => String::new(),
+        };
+        if partial.len() > MAX_PENDING_LINE {
+            partial.clear();
+        }
+        approval_frames(&complete)
     }
 }
 
@@ -185,52 +207,114 @@ pub(crate) async fn turn_runs(org_id: &str, session_id: &str, user_email: &str) 
     })
 }
 
-/// Consumes the confirmation of `tool` the member's turn asked; `false` when it asked none.
-pub(crate) async fn take_confirmation(
-    org_id: &str,
-    session_id: &str,
-    user_email: &str,
-    tool: &str,
-) -> bool {
-    ai_turn_marks::take(
-        org_id,
-        session_id,
-        user_email,
-        KIND_CONFIRMATION,
-        Some(tool),
-        now_micros(),
-    )
-    .await
-    .unwrap_or_else(|e| {
-        log::warn!("[org_id:{org_id}] confirmations of {session_id} unreadable: {e}");
-        false
-    })
+/// The stored decision a `confirmation_resolved` frame (`resolved`) reports.
+pub(crate) fn decision_of<'a>(frame: &'a Value, resolved: &'a str) -> Decision<'a> {
+    let status = if frame["approved"] == true {
+        ai_approvals::STATUS_APPROVED
+    } else if frame["expired"] == true {
+        ai_approvals::STATUS_EXPIRED
+    } else {
+        ai_approvals::STATUS_DENIED
+    };
+    Decision {
+        status,
+        scope: frame["scope"].as_str(),
+        resolved,
+    }
 }
 
-/// The `tool` of each `confirmation_required` frame in `chunk`; a frame split in two is missed.
-fn confirmation_tools(chunk: &[u8]) -> Vec<String> {
-    String::from_utf8_lossy(chunk)
-        .lines()
+/// Stores a card as pending or a decision on one; a decided card is never overwritten.
+async fn record_frame(org_id: &str, session_id: &str, user_email: &str, frame: &Value) {
+    let Some(id) = frame["id"].as_str().filter(|id| id.starts_with("apr_")) else {
+        return;
+    };
+    let now = now_micros();
+    let stored = if frame["type"] == CONFIRMATION_REQUIRED {
+        let approval = NewApproval {
+            id,
+            org_id,
+            session_id,
+            user_email,
+            tool: frame["tool"].as_str().filter(|t| !t.is_empty()),
+            card: &frame.to_string(),
+            expires_at: frame["expires_at"]
+                .as_i64()
+                .unwrap_or(0)
+                .saturating_mul(1000),
+        };
+        maybe_purge(now);
+        ai_approvals::insert_pending(&approval, now).await
+    } else {
+        let resolved = frame.to_string();
+        ai_approvals::decide(org_id, id, &decision_of(frame, &resolved), now).await
+    };
+    if let Err(e) = stored {
+        log::warn!("[org_id:{org_id}] approval {id} of {session_id} not stored: {e}");
+    }
+}
+
+fn maybe_purge(now: i64) {
+    let last = LAST_PURGE.load(Ordering::Relaxed);
+    let due = now - last >= PURGE_EVERY_MICROS;
+    if due
+        && LAST_PURGE
+            .compare_exchange(last, now, Ordering::Relaxed, Ordering::Relaxed)
+            .is_ok()
+    {
+        tokio::spawn(async move {
+            if let Err(e) = ai_approvals::purge(now).await {
+                log::warn!("[AI-CHAT] approval purge failed: {e}");
+            }
+        });
+    }
+}
+
+/// Each complete `confirmation_required` or `confirmation_resolved` frame in `text`.
+fn approval_frames(text: &str) -> Vec<Value> {
+    text.lines()
         .filter_map(|line| line.strip_prefix("data:"))
         .filter_map(|data| serde_json::from_str::<Value>(data.trim()).ok())
-        .filter(|frame| frame["type"] == CONFIRMATION_REQUIRED)
-        .filter_map(|frame| frame["tool"].as_str().map(str::to_string))
-        .filter(|tool| !tool.is_empty())
+        .filter(|frame| {
+            frame["type"] == CONFIRMATION_REQUIRED || frame["type"] == CONFIRMATION_RESOLVED
+        })
         .collect()
 }
 
 #[cfg(test)]
 mod tests {
+    use serde_json::json;
+
     use super::*;
 
     #[test]
-    fn only_the_tool_of_a_confirmation_frame_is_recorded() {
-        let chunk = concat!(
+    fn approval_frames_split_across_chunks_are_joined() {
+        let watch = ConfirmationWatch::new("o", "s", "a@x");
+        let first = concat!(
             "data: {\"type\":\"status\",\"tool\":\"SearchSQL\"}\n\n",
-            "data: {\"type\":\"confirmation_required\",\"tool\":\"UpdateDashboard\"}\n\n",
-            "data: {\"type\":\"confirmation_required\"}\n\n",
-            "data: {\"type\":\"confirmation_requi",
+            "data: {\"type\":\"confirmation_required\",\"id\":\"apr_1\",\"tool\":\"Upd",
         );
-        assert_eq!(confirmation_tools(chunk.as_bytes()), ["UpdateDashboard"]);
+        assert!(watch.frames(first.as_bytes()).is_empty());
+        let rest = "ateDashboard\"}\n\ndata: {\"type\":\"confirmation_resolved\",\"id\":\"apr_1\",\"approved\":true}\n";
+        let frames = watch.frames(rest.as_bytes());
+        assert_eq!(frames.len(), 2);
+        assert_eq!(frames[0]["tool"], "UpdateDashboard");
+        assert_eq!(frames[1]["type"], CONFIRMATION_RESOLVED);
+    }
+
+    #[test]
+    fn a_resolved_frame_maps_to_its_stored_status() {
+        let status = |frame: Value| decision_of(&frame, "").status;
+        assert_eq!(
+            status(json!({"approved": true, "scope": "chat"})),
+            ai_approvals::STATUS_APPROVED
+        );
+        assert_eq!(
+            status(json!({"approved": false, "expired": true})),
+            ai_approvals::STATUS_EXPIRED
+        );
+        assert_eq!(
+            status(json!({"approved": false, "withdrawn": true})),
+            ai_approvals::STATUS_DENIED
+        );
     }
 }

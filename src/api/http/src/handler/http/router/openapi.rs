@@ -23,6 +23,7 @@ use openobserve_api_management::request::{
 };
 use openobserve_api_pipelines::request::{enrichment_table, functions, pipeline, pipelines};
 use openobserve_api_search::search::patterns;
+use openobserve_mcp::tools::{McpExtension, ToolClass};
 use utoipa::{
     Modify, OpenApi,
     openapi::security::{Http, HttpAuthScheme, SecurityScheme},
@@ -32,6 +33,24 @@ use crate::{
     common::meta,
     handler::http::request::{mcp, ratelimit},
 };
+
+// The assistant never changes these from chat (IAM, billing, org-wide access, its own policy).
+const MCP_OPT_OUT_TAGS: [&str; 12] = [
+    "Roles",
+    "Groups",
+    "Users",
+    "ServiceAccounts",
+    "Billings",
+    "Marketing",
+    "AWS Marketplace",
+    "Azure Marketplace",
+    "Organizations",
+    "AI",
+    "Domain Management",
+    "GenAI Settings",
+];
+const MCP_OPT_OUT_SEGMENTS: [&str; 4] = ["billings", "billing_group", "quota", "retention"];
+const MCP_OPT_OUT_CATEGORIES: [&str; 2] = ["authorization", "users"];
 
 #[derive(OpenApi)]
 #[openapi(
@@ -810,6 +829,7 @@ impl Modify for SecurityAddon {
                 components.responses.extend(cloud_components.responses);
             }
         }
+        opt_out_of_mcp(openapi);
         let cfg = get_config();
         if !cfg.common.base_uri.is_empty() {
             openapi.servers = Some(vec![utoipa::openapi::Server::new(&cfg.common.base_uri)]);
@@ -897,6 +917,60 @@ pub async fn openapi_info() -> OpenapiInfo {
     tag_operations
 }
 
+/// Marks every change the assistant may not make `x-o2-mcp: {"enabled": false}`.
+fn opt_out_of_mcp(openapi: &mut utoipa::openapi::OpenApi) {
+    for (path, path_item) in openapi.paths.paths.iter_mut() {
+        for (method, operation) in [
+            ("GET", path_item.get.as_mut()),
+            ("POST", path_item.post.as_mut()),
+            ("PUT", path_item.put.as_mut()),
+            ("DELETE", path_item.delete.as_mut()),
+            ("PATCH", path_item.patch.as_mut()),
+        ] {
+            let Some(operation) = operation else {
+                continue;
+            };
+            if opted_out_of_mcp(method, path, operation) {
+                operation
+                    .extensions
+                    .get_or_insert_with(Default::default)
+                    .insert(
+                        "x-o2-mcp".to_string(),
+                        serde_json::json!({"enabled": false}),
+                    );
+            }
+        }
+    }
+}
+
+/// A change (never a read) whose tag, route or MCP category is one the assistant stays out of.
+fn opted_out_of_mcp(
+    method: &str,
+    path: &str,
+    operation: &utoipa::openapi::path::Operation,
+) -> bool {
+    let extension = operation
+        .extensions
+        .as_ref()
+        .and_then(|extensions| extensions.get("x-o2-mcp"))
+        .and_then(|value| serde_json::from_value::<McpExtension>(value.clone()).ok());
+    if ToolClass::of(method, path, extension.as_ref()).read_only {
+        return false;
+    }
+    let tagged = operation
+        .tags
+        .iter()
+        .flatten()
+        .any(|tag| MCP_OPT_OUT_TAGS.contains(&tag.as_str()));
+    let routed = path
+        .split('/')
+        .any(|segment| MCP_OPT_OUT_SEGMENTS.contains(&segment) || segment.ends_with("settings"));
+    let categorized = extension
+        .and_then(|e| e.category)
+        .is_some_and(|category| MCP_OPT_OUT_CATEGORIES.contains(&category.as_str()));
+    tagged || routed || categorized
+}
+
 #[cfg(all(test, feature = "enterprise"))]
 mod experiment_tests {
     use super::*;
@@ -954,9 +1028,131 @@ mod experiment_tests {
 
 #[cfg(test)]
 mod tests {
+    use openobserve_mcp::tools::{McpExtension, ToolClass};
     use utoipa::OpenApi;
 
     use super::ApiDoc;
+
+    // Writes the rule must keep out of MCP; some only exist in enterprise or cloud builds.
+    const MUST_OPT_OUT: [&str; 39] = [
+        "SetPaidOverageStatus",
+        "SetQuotaUsageLimit",
+        "CreateRoles",
+        "UpdateRoles",
+        "DeleteRole",
+        "CreateGroup",
+        "UpdateGroup",
+        "DeleteGroup",
+        "UserSave",
+        "UserUpdate",
+        "AddUserToOrg",
+        "RemoveUserFromOrg",
+        "BulkRemoveUserFromOrg",
+        "InviteOrganizationMembers",
+        "RemoveOrganizationInvite",
+        "ServiceAccountSave",
+        "ServiceAccountUpdate",
+        "RemoveServiceAccount",
+        "RemoveServiceAccountBulk",
+        "AssumeServiceAccount",
+        "SetPasswordPolicy",
+        "RenameOrganization",
+        "UpdateStreamSettings",
+        "OrganizationSettingCreate",
+        "UpdateAiSettings",
+        "SaveGenAiAgentMapping",
+        "DeleteGroupBulk",
+        "DeleteRoleBulk",
+        "LeaveBillingGroup",
+        "RejectBillingGroupInvite",
+        "RemoveBillingGroupMember",
+        "AcceptBillingGroupInvite",
+        "BillingGroupInvite",
+        "LinkAwsMarketplaceSubscription",
+        "LinkAzureMarketplaceSubscription",
+        "HandleUserAttributionEvent",
+        "AcceptOrganizationInvite",
+        "CreateOrganization",
+        "UpdateOrganizationUserIngestToken",
+    ];
+    // Present in every build, so their absence means the rule or the spec changed.
+    const OSS_OPT_OUT: [&str; 6] = [
+        "UserSave",
+        "AddUserToOrg",
+        "CreateRoles",
+        "ServiceAccountSave",
+        "UpdateStreamSettings",
+        "OrganizationSettingCreate",
+    ];
+
+    // (operation id, operation), each operation carrying its `method` and `path`.
+    fn operations() -> Vec<(String, serde_json::Value)> {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let mut operations = Vec::new();
+        for (path, item) in spec["paths"].as_object().unwrap() {
+            for (method, operation) in item.as_object().unwrap() {
+                if let Some(id) = operation["operationId"].as_str() {
+                    let mut operation = operation.clone();
+                    operation["method"] = method.as_str().into();
+                    operation["path"] = path.as_str().into();
+                    operations.push((id.to_string(), operation));
+                }
+            }
+        }
+        operations
+    }
+
+    fn enabled(operation: &serde_json::Value) -> bool {
+        operation["x-o2-mcp"]["enabled"] != false
+    }
+
+    #[test]
+    fn billing_iam_and_policy_writes_are_not_mcp_tools() {
+        let operations = operations();
+        let ids: Vec<&str> = operations.iter().map(|(id, _)| id.as_str()).collect();
+        for id in OSS_OPT_OUT {
+            assert!(ids.contains(&id), "{id} is missing from the ApiDoc");
+        }
+        for (id, operation) in &operations {
+            if MUST_OPT_OUT.contains(&id.as_str()) {
+                assert!(!enabled(operation), "{id} is still an MCP tool");
+            }
+        }
+    }
+
+    #[test]
+    fn reads_under_an_opted_out_tag_stay_mcp_tools() {
+        let operations = operations();
+        let user_list = operations
+            .iter()
+            .find(|(id, _)| id == "UserList")
+            .expect("UserList is documented");
+        assert!(enabled(&user_list.1));
+    }
+
+    #[test]
+    fn post_reads_are_announced_as_reads() {
+        let operations = operations();
+        for id in [
+            "GenerateSql",
+            "ExtractPatterns",
+            "ProfilesMerge",
+            "DowntimeValues",
+        ] {
+            let (_, operation) = operations
+                .iter()
+                .find(|(op, _)| op == id)
+                .unwrap_or_else(|| panic!("{id} is documented"));
+            let extension =
+                serde_json::from_value::<McpExtension>(operation["x-o2-mcp"].clone()).ok();
+            let class = ToolClass::of(
+                operation["method"].as_str().unwrap(),
+                operation["path"].as_str().unwrap(),
+                extension.as_ref(),
+            );
+            assert!(class.read_only && enabled(operation), "{id}");
+        }
+    }
 
     // Handlers that gained a folder-destination authorization check must
     // advertise the 403 it returns, or clients cannot distinguish it from a bug.
