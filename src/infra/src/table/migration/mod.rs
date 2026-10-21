@@ -236,6 +236,11 @@ mod m20261020_000002_create_ai_grants;
 mod m20261020_000003_create_ai_actions;
 mod m20261020_000004_create_ai_access_requests;
 mod m20261020_000005_create_ai_turn_marks;
+mod m20261021_000001_add_history_to_ai_chat_sessions;
+mod m20261021_000002_add_versions_to_ai_chat_turns;
+mod m20261021_000003_add_hide_attachments_to_ai_chat_shares;
+mod m20261021_000004_create_ai_chat_feedback;
+mod m20261021_000005_create_ai_chat_imports;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
 
@@ -610,6 +615,11 @@ impl MigratorTrait for Migrator {
             Box::new(m20261020_000003_create_ai_actions::Migration),
             Box::new(m20261020_000004_create_ai_access_requests::Migration),
             Box::new(m20261020_000005_create_ai_turn_marks::Migration),
+            Box::new(m20261021_000001_add_history_to_ai_chat_sessions::Migration),
+            Box::new(m20261021_000002_add_versions_to_ai_chat_turns::Migration),
+            Box::new(m20261021_000003_add_hide_attachments_to_ai_chat_shares::Migration),
+            Box::new(m20261021_000004_create_ai_chat_feedback::Migration),
+            Box::new(m20261021_000005_create_ai_chat_imports::Migration),
         ]
     }
 }
@@ -686,6 +696,7 @@ mod tests {
         (115, "m20261018_000001_create_rca_steering"),
         (116, "m20261016_000001_add_first_event_at_to_ai_chat_turns"),
         (117, "m20261020_000005_create_ai_turn_marks"),
+        (118, "m20261021_000005_create_ai_chat_imports"),
     ];
 
     // Two branches that each claim the next version merge cleanly, so a reused number must fail
@@ -839,6 +850,18 @@ mod tests {
             (
                 "m20260414_000002_create_org_ai_toolsets",
                 "m20261020_000001_add_health_to_org_ai_toolsets",
+            ),
+            (
+                "m20261007_000001_create_ai_chat_turns",
+                "m20261021_000002_add_versions_to_ai_chat_turns",
+            ),
+            (
+                "m20261007_000002_add_redact_tools_to_ai_chat_shares",
+                "m20261021_000003_add_hide_attachments_to_ai_chat_shares",
+            ),
+            (
+                "m20260923_000001_create_ai_chat_sessions",
+                "m20261021_000001_add_history_to_ai_chat_sessions",
             ),
         ] {
             assert!(

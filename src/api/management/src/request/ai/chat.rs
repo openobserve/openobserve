@@ -67,9 +67,26 @@ use crate::{
     models::ai::{PromptRequest, PromptResponse},
 };
 
-/// Context flag telling o2-ai that `history` is a forked share's transcript, not the caller's own.
-#[cfg(feature = "enterprise")]
+/// Context flag telling o2-ai that `history` is a fork's or an import's transcript, not new turns.
+#[cfg(any(feature = "enterprise", test))]
 const FORK_SEED_CONTEXT_KEY: &str = "o2_fork_seed";
+// Set only by the server, like the fork seed: o2-ai answers it from the history before that turn.
+#[cfg(feature = "enterprise")]
+const REPLACES_TURN_CONTEXT_KEY: &str = "o2_replaces_turn_id";
+#[cfg(feature = "enterprise")]
+const NOT_STORED_DISABLED: &str = "history_disabled";
+#[cfg(feature = "enterprise")]
+const NOT_STORED_NO_VOTE: &str = "not_a_vote";
+#[cfg(feature = "enterprise")]
+const NOT_STORED_NO_SESSION: &str = "no_session";
+#[cfg(feature = "enterprise")]
+const NOT_STORED_UNKNOWN_TURN: &str = "unknown_turn";
+#[cfg(feature = "enterprise")]
+const NOT_STORED_UNAVAILABLE: &str = "unavailable";
+#[cfg(any(feature = "enterprise", test))]
+const MAX_DECISION_ITEMS: usize = 32;
+#[cfg(any(feature = "enterprise", test))]
+const MAX_DECISION_ITEMS_BYTES: usize = 4096;
 /// How long a cancel waits for o2-ai before stopping the turn on this node.
 #[cfg(feature = "enterprise")]
 const UPSTREAM_CANCEL_WAIT: std::time::Duration = std::time::Duration::from_secs(5);
@@ -576,6 +593,8 @@ struct StreamTurn {
     trace_id: String,
     /// The browser's `x-o2-assistant-turn-id`, unvalidated.
     turn_id: Option<String>,
+    /// The stored turn this one regenerates or edits, unvalidated.
+    replaces_turn_id: Option<String>,
     agent_type: &'static str,
     query: QueryRequest,
     auth: String,
@@ -856,6 +875,8 @@ fn agent_context(
     let mut context = serde_json::Value::Object(context.clone());
     if let Some(obj) = context.as_object_mut() {
         obj.insert("org_id".to_string(), org_id.into());
+        // Only the server sets the regenerated turn, from `replaces_turn_id`.
+        obj.remove(REPLACES_TURN_CONTEXT_KEY);
         if !delegated {
             obj.remove(FORK_SEED_CONTEXT_KEY);
         }
@@ -1133,6 +1154,238 @@ fn approval_delivery_failed_error() -> Response {
         "The confirmation did not reach the assistant; please send it again",
     )
     .into_response()
+}
+
+/// Stores an up or down vote with its turn of this chat, else says why it was not stored.
+#[cfg(feature = "enterprise")]
+async fn store_feedback(
+    org_id: &str,
+    session_id: &str,
+    headers: &axum::http::HeaderMap,
+    body: &Value,
+) -> Result<(), &'static str> {
+    use infra::table::ai_chat_feedback;
+
+    if !o2_enterprise::enterprise::ai::chat::is_enabled() {
+        return Err(NOT_STORED_DISABLED);
+    }
+    let Some(rating) = feedback_rating(body) else {
+        return Err(NOT_STORED_NO_VOTE);
+    };
+    let email = headers
+        .get("user_id")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or_default();
+    let owner = openobserve_core::ai_chat::admission::resolve_owner(email)
+        .await
+        .map_err(|_| NOT_STORED_UNAVAILABLE)?;
+    let raw_turn = body
+        .get("turn_id")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    let turn_id = voted_turn(org_id, session_id, raw_turn).await?;
+    let vote = ai_chat_feedback::NewFeedback {
+        org_id,
+        session_id,
+        turn_id: &turn_id,
+        user_id: &owner,
+        rating,
+        comment: body.get("comment").and_then(Value::as_str),
+    };
+    ai_chat_feedback::upsert(&vote, config::utils::time::now_micros())
+        .await
+        .map_err(|e| {
+            log::error!("[AI-CHAT] cannot store feedback on {org_id}/{session_id}: {e}");
+            NOT_STORED_UNAVAILABLE
+        })
+}
+
+/// The stored id of the turn a vote names: a recorded turn, or one the chat was imported with.
+#[cfg(feature = "enterprise")]
+async fn voted_turn(org_id: &str, session_id: &str, raw: &str) -> Result<String, &'static str> {
+    use infra::table::{ai_chat_imports, ai_chat_turns};
+
+    if let Some(turn_id) = openobserve_core::ai_chat::admission::normalize_uuid(raw) {
+        match ai_chat_turns::get(org_id, session_id, &turn_id).await {
+            Ok(Some(_)) => return Ok(turn_id),
+            Ok(None) => {}
+            Err(e) => {
+                log::warn!("[AI-CHAT] cannot read turn {turn_id} of {org_id}/{session_id}: {e}");
+                return Err(NOT_STORED_UNAVAILABLE);
+            }
+        }
+    }
+    let imported = ai_chat_imports::turns_for_session(org_id, session_id)
+        .await
+        .map_err(|_| NOT_STORED_UNAVAILABLE)?;
+    let known = imported
+        .as_ref()
+        .and_then(Value::as_array)
+        .is_some_and(|turns| !raw.is_empty() && turns.iter().any(|t| t["turn_id"] == raw));
+    // A vote attaches to a turn the chat holds, so no id can grow the table for nothing.
+    known
+        .then(|| raw.to_string())
+        .ok_or(NOT_STORED_UNKNOWN_TURN)
+}
+
+/// o2-ai's feedback answer with whether the vote was stored with the chat, and why not.
+#[cfg(any(feature = "enterprise", test))]
+fn with_stored(response: Value, stored: Result<(), &str>) -> Value {
+    let mut body = match response {
+        Value::Object(map) => map,
+        other => serde_json::Map::from_iter([("result".to_string(), other)]),
+    };
+    body.insert("stored".into(), stored.is_ok().into());
+    if let Err(reason) = stored {
+        body.insert("stored_reason".into(), reason.into());
+    }
+    Value::Object(body)
+}
+
+/// `up` or `down` from `rating`, else from a thumbs `feedback_type`; a 1-5 rating is not a vote.
+#[cfg(any(feature = "enterprise", test))]
+fn feedback_rating(body: &serde_json::Value) -> Option<&'static str> {
+    use infra::table::ai_chat_feedback::{RATING_DOWN, RATING_UP};
+
+    let named = body
+        .get("rating")
+        .and_then(serde_json::Value::as_str)
+        .or_else(|| {
+            body.get("feedback_type")
+                .and_then(serde_json::Value::as_str)
+        })?;
+    match named.to_ascii_lowercase().as_str() {
+        "up" | "thumbs_up" | "positive" => Some(RATING_UP),
+        "down" | "thumbs_down" | "negative" => Some(RATING_DOWN),
+        _ => None,
+    }
+}
+
+/// Keeps a successful `/confirm` with the turn that asked, so the decision shows after a reload.
+#[cfg(feature = "enterprise")]
+async fn record_decision(org_id: &str, session_id: &str, caller: &str, request: &[u8]) {
+    let Some(decision) = decision_of(request, caller, config::utils::time::now_micros() / 1000)
+    else {
+        return;
+    };
+    if let Err(e) = infra::table::ai_chat_turns::add_decision(org_id, session_id, decision).await {
+        log::warn!("[AI-CHAT] decision on {org_id}/{session_id} not recorded: {e}");
+    }
+}
+
+/// The `confirmation_resolved` record of a `/confirm` body; `None` without an `approved` flag.
+#[cfg(any(feature = "enterprise", test))]
+fn decision_of(request: &[u8], caller: &str, at_ms: i64) -> Option<serde_json::Value> {
+    let body: serde_json::Value = serde_json::from_slice(request).ok()?;
+    let approved = body.get("approved")?.as_bool()?;
+    let mut decision = serde_json::json!({"approved": approved, "by": caller, "at": at_ms});
+    for key in ["id", "scope"] {
+        if let Some(value) = body.get(key).and_then(serde_json::Value::as_str) {
+            decision[key] = value.chars().take(128).collect::<String>().into();
+        }
+    }
+    // Kept only while small: every detail and share read returns it.
+    if let Some(items) = body
+        .get("items")
+        .and_then(serde_json::Value::as_array)
+        .filter(|items| items.len() <= MAX_DECISION_ITEMS)
+        .filter(|items| {
+            serde_json::to_vec(items).is_ok_and(|b| b.len() <= MAX_DECISION_ITEMS_BYTES)
+        })
+    {
+        decision["items"] = items.clone().into();
+    }
+    Some(decision)
+}
+
+/// The finished turn of the caller's chat a new version replaces; another member's chat is a 404.
+#[cfg(feature = "enterprise")]
+async fn replaced_turn(
+    org_id: &str,
+    user_email: &str,
+    session_id: Option<&str>,
+    replaces: Option<&str>,
+) -> Result<Option<infra::table::ai_chat_turns::Model>, Response> {
+    let Some(replaces) = replaces else {
+        return Ok(None);
+    };
+    let (Some(session_id), Some(replaces)) = (
+        session_id.and_then(openobserve_core::ai_chat::admission::normalize_uuid),
+        openobserve_core::ai_chat::admission::normalize_uuid(replaces),
+    ) else {
+        return Err(error::invalid_request("Invalid replaces_turn_id"));
+    };
+    let owner = openobserve_core::ai_chat::admission::resolve_owner(user_email)
+        .await
+        .map_err(super::chats::admit_error_response)?;
+    super::chats::owned_chat(org_id, &session_id, &owner).await?;
+    match infra::table::ai_chat_turns::get(org_id, &session_id, &replaces).await {
+        Ok(Some(turn)) if turn.status != infra::table::ai_chat_turns::TURN_RUNNING => {
+            Ok(Some(turn))
+        }
+        Ok(_) => Err(error::invalid_request(
+            "replaces_turn_id names no finished turn of this chat",
+        )),
+        Err(e) => {
+            log::error!("[AI-CHAT] cannot read turn {replaces} of {org_id}/{session_id}: {e}");
+            Err(error::history_unavailable(
+                "Chat persistence is unavailable; please retry",
+            ))
+        }
+    }
+}
+
+/// Marks the admitted turn a version and seeds o2-ai with the history before the replaced one.
+#[cfg(feature = "enterprise")]
+async fn version_turn(
+    row: &infra::table::ai_chat_sessions::Model,
+    turn_id: &str,
+    replaced: &infra::table::ai_chat_turns::Model,
+    query: &mut QueryRequest,
+) {
+    let (org_id, session_id) = (&row.org_id, &row.session_id);
+    if let Err(e) =
+        infra::table::ai_chat_turns::set_version_of(org_id, session_id, turn_id, &replaced.turn_id)
+            .await
+    {
+        // The turn still runs; it lists as a turn of its own instead of a version.
+        log::error!("[AI-CHAT] cannot mark {turn_id} of {org_id}/{session_id} as a version: {e}");
+    }
+    let before = replaced.start_seq.unwrap_or(row.last_committed_seq + 1);
+    let Some(context) = query.context.as_object_mut() else {
+        return;
+    };
+    context.insert(
+        REPLACES_TURN_CONTEXT_KEY.to_string(),
+        replaced.turn_id.clone().into(),
+    );
+    let built = super::shares::history_before(row, before).await.ok();
+    if built.is_none() {
+        log::warn!("[AI-CHAT] version {turn_id} of {session_id} has no seed");
+    }
+    set_version_history(&mut query.history, context, built);
+}
+
+/// Puts a version's server-built history on the query; when empty, only a first-turn seed stays.
+#[cfg(any(feature = "enterprise", test))]
+fn set_version_history(
+    history: &mut Option<Vec<Value>>,
+    context: &mut serde_json::Map<String, Value>,
+    built: Option<(Vec<Value>, bool)>,
+) {
+    match built {
+        Some((built, seeded)) if !built.is_empty() => {
+            *history = Some(built);
+            if seeded {
+                context.insert(FORK_SEED_CONTEXT_KEY.to_string(), true.into());
+            } else {
+                context.remove(FORK_SEED_CONTEXT_KEY);
+            }
+        }
+        // The seed flag is the server's own; any other history came from the client.
+        _ if context.contains_key(FORK_SEED_CONTEXT_KEY) => {}
+        _ => *history = None,
+    }
 }
 
 /// Refuses a stop or confirmation on someone else's or an unknown persisted chat.
@@ -1726,7 +1979,7 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
     response
 }
 
-/// Forwards feedback on an AI response to o2-ai, which records it.
+/// Forwards feedback to o2-ai and stores a vote with its chat; the answer carries `stored`.
 pub async fn feedback(Path(org_id): Path<String>, in_req: axum::extract::Request) -> Response {
     let (parts, body) = in_req.into_parts();
     if let Err(resp) = require_json(&parts.headers) {
@@ -1775,6 +2028,18 @@ pub async fn feedback(Path(org_id): Path<String>, in_req: axum::extract::Request
             return error::invalid_request(format!("Invalid JSON body: {}", e));
         }
     };
+    // The header wins; a body that names its chat is routed and stored the same way.
+    if !forward_headers.contains_key(X_O2_ASSISTANT_SESSION_ID.as_str())
+        && let Some(val) = feedback_body.get("session_id").and_then(Value::as_str)
+    {
+        if !is_valid_session_id(val) {
+            return error::invalid_request("Invalid session id");
+        }
+        forward_headers.insert(
+            X_O2_ASSISTANT_SESSION_ID.as_str().to_string(),
+            val.to_ascii_lowercase(),
+        );
+    }
 
     #[cfg(feature = "enterprise")]
     {
@@ -1797,6 +2062,12 @@ pub async fn feedback(Path(org_id): Path<String>, in_req: axum::extract::Request
         {
             return resp;
         }
+        let stored = match forward_headers.get(X_O2_ASSISTANT_SESSION_ID.as_str()) {
+            Some(session_id) => {
+                store_feedback(&org_id, session_id, &parts.headers, &feedback_body).await
+            }
+            None => Err(NOT_STORED_NO_SESSION),
+        };
 
         // Extract user auth from headers to pass to the agent
         let auth_str = openobserve_core::auth::extract_auth_str_from_headers(&parts.headers).await;
@@ -1817,7 +2088,12 @@ pub async fn feedback(Path(org_id): Path<String>, in_req: axum::extract::Request
                     trace_id,
                     org_id
                 );
-                Json(response).into_response()
+                Json(with_stored(response, stored)).into_response()
+            }
+            // Stored with the turn, the vote survives; evaluation only misses this one.
+            Err(e) if stored.is_ok() => {
+                log::warn!("[trace_id:{trace_id}] Feedback stored but not forwarded: {e}");
+                Json(serde_json::json!({"stored": true, "forwarded": false})).into_response()
             }
             Err(e) => {
                 log::error!("[trace_id:{}] Feedback submission failed: {}", trace_id, e);
@@ -1955,6 +2231,7 @@ pub async fn confirm_action(
                     .await;
                     // The chat index stops reporting the confirmation as pending.
                     super::turn_marks::mark_answered(&org_id, &session_id, caller).await;
+                    record_decision(&org_id, &session_id, caller, &body_bytes).await;
                     (StatusCode::OK, axum::Json(answer)).into_response()
                 } else {
                     log::error!(
@@ -2526,6 +2803,7 @@ async fn stream_turn(
 
         let auth_str = openobserve_core::auth::extract_auth_str_from_headers(&parts.headers).await;
         // Auth header is passed directly to agent - no need to extract user_token
+        let replaces_turn_id = prompt_body.replaces_turn_id.clone();
 
         // Transform PromptRequest -> QueryRequest
         let last_user_message = prompt_body
@@ -2618,6 +2896,7 @@ async fn stream_turn(
             user_id,
             trace_id,
             turn_id: persist_turn_id,
+            replaces_turn_id,
             agent_type,
             query: query_req,
             auth: auth_str,
@@ -2660,6 +2939,7 @@ async fn persisted_turn(turn: StreamTurn) -> Response {
         user_id,
         trace_id,
         turn_id,
+        replaces_turn_id,
         agent_type,
         query: mut query_req,
         auth,
@@ -2677,8 +2957,20 @@ async fn persisted_turn(turn: StreamTurn) -> Response {
         return error::invalid_request("The message is empty");
     }
     // Read before admission so a failed read leaves the turn retryable.
-    let fork_seed = match super::shares::fork_seed(&org_id, session_id.as_deref(), &user_id).await {
-        Ok(seed) => seed,
+    let fork_seed =
+        match super::shares::first_turn_seed(&org_id, session_id.as_deref(), &user_id).await {
+            Ok(seed) => seed,
+            Err(resp) => return resp,
+        };
+    let replaced = match replaced_turn(
+        &org_id,
+        &user_id,
+        session_id.as_deref(),
+        replaces_turn_id.as_deref(),
+    )
+    .await
+    {
+        Ok(replaced) => replaced,
         Err(resp) => return resp,
     };
     // The switch is read again at admission, so no caller skips it.
@@ -2741,6 +3033,9 @@ async fn persisted_turn(turn: StreamTurn) -> Response {
         if let Some(context) = query_req.context.as_object_mut() {
             context.insert(FORK_SEED_CONTEXT_KEY.to_string(), true.into());
         }
+    }
+    if let Some(replaced) = &replaced {
+        version_turn(&row, &turn_id, replaced, &mut query_req).await;
     }
 
     let meter = TurnMeter::new(
@@ -4836,5 +5131,62 @@ mod tests {
             (json["code"].as_str(), json["action"].as_str()),
             (Some("agent_unavailable"), Some("retry"))
         );
+    }
+
+    #[test]
+    fn feedback_votes_read_rating_or_thumbs() {
+        use infra::table::ai_chat_feedback::{RATING_DOWN, RATING_UP};
+
+        assert_eq!(
+            feedback_rating(&serde_json::json!({"rating": "UP"})),
+            Some(RATING_UP)
+        );
+        assert_eq!(
+            feedback_rating(&serde_json::json!({"feedback_type": "thumbs_down"})),
+            Some(RATING_DOWN)
+        );
+        assert_eq!(feedback_rating(&serde_json::json!({"rating": 4})), None);
+        assert_eq!(feedback_rating(&serde_json::json!({"rating": "meh"})), None);
+    }
+
+    #[test]
+    fn confirm_bodies_become_bounded_decisions() {
+        let body = serde_json::json!({"approved": true, "id": "x".repeat(200), "scope": "session", "items": [1]});
+        let decision = decision_of(body.to_string().as_bytes(), "u@x", 1700).unwrap();
+        assert_eq!(decision["approved"], true);
+        assert_eq!(decision["by"], "u@x");
+        assert_eq!(decision["at"], 1700);
+        assert_eq!(decision["id"].as_str().unwrap().chars().count(), 128);
+        assert_eq!(decision["scope"], "session");
+        assert_eq!(decision["items"], serde_json::json!([1]));
+        assert!(decision_of(br#"{"id":"c1"}"#, "u@x", 1).is_none());
+        assert!(decision_of(b"not json", "u@x", 1).is_none());
+    }
+
+    #[test]
+    fn a_version_answers_only_from_server_built_history() {
+        let msg = |c: &str| serde_json::json!({"role": "user", "content": c});
+        let mut context = serde_json::Map::new();
+        let mut history = Some(vec![msg("sent by the client")]);
+        set_version_history(&mut history, &mut context, Some((Vec::new(), false)));
+        assert_eq!(history, None);
+        let mut history = Some(vec![msg("sent by the client")]);
+        set_version_history(&mut history, &mut context, None);
+        assert_eq!(history, None);
+
+        context.insert(FORK_SEED_CONTEXT_KEY.to_string(), true.into());
+        let mut history = Some(vec![msg("fork seed")]);
+        set_version_history(&mut history, &mut context, Some((Vec::new(), false)));
+        assert_eq!(history, Some(vec![msg("fork seed")]));
+
+        set_version_history(
+            &mut history,
+            &mut context,
+            Some((vec![msg("before")], false)),
+        );
+        assert_eq!(history, Some(vec![msg("before")]));
+        assert!(!context.contains_key(FORK_SEED_CONTEXT_KEY));
+        set_version_history(&mut history, &mut context, Some((vec![msg("seed")], true)));
+        assert_eq!(context[FORK_SEED_CONTEXT_KEY], true);
     }
 }

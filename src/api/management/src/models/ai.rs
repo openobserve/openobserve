@@ -121,6 +121,9 @@ pub struct PromptRequest {
     /// Seconds the agent waits for a tool approval before denying it (capped at 600).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub confirm_timeout_secs: Option<u32>,
+    /// A finished turn this one regenerates or edits; the new turn is appended, the original kept.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub replaces_turn_id: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]

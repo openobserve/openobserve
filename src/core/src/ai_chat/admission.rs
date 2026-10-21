@@ -299,6 +299,13 @@ async fn admit_under_lease(turn: &NewTurn<'_>) -> Result<Model, AdmitError> {
     if let Err(e) = ai_chat_sessions::begin_turn(org_id, session_id, turn_id, now).await {
         log::warn!("[AI-CHAT] cannot record the last turn of {session_id}: {e}");
     }
+    let (typed, _) = crate::ai_chat::projection::split_attachment_blocks(turn.prompt);
+    if !typed.is_empty()
+        && let Err(e) = ai_chat_sessions::append_search_text(org_id, session_id, &typed).await
+    {
+        // Search misses this prompt; the title still matches.
+        log::warn!("[AI-CHAT] cannot index the prompt of {session_id}: {e}");
+    }
     if row.title_source.is_empty()
         && let Some(title) = initial_title(turn.agent_type, turn.user_email, turn.prompt)
         && let Err(e) = ai_chat_sessions::set_prompt_title(org_id, session_id, &title, now).await

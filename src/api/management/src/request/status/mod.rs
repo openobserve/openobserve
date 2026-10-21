@@ -206,6 +206,8 @@ struct ConfigResponse<'a> {
     public_ai_chat_enabled: bool,
     /// Longest expiry, in days, a public AI chat link may have.
     public_ai_chat_max_expiry_days: u64,
+    /// AI chat shares accept `hide_attachments` (CT-B2); clients send it only when this is true.
+    ai_share_redact_attachments: bool,
     /// The caller is root or an admin of the URL org (may list and revoke every AI chat share).
     is_org_admin: bool,
     /// Days a soft-deleted org stays recoverable; `0` (every OSS build) means none.
@@ -616,6 +618,7 @@ pub async fn zo_config(
         ai_chat_persistence_enabled,
         public_ai_chat_enabled: ai_chat_persistence_enabled && cfg.public_ai_chat.enabled,
         public_ai_chat_max_expiry_days: cfg.public_ai_chat.expiry_limit_days(),
+        ai_share_redact_attachments: ai_chat_persistence_enabled,
         is_org_admin,
         org_deletion_grace_period_days: openobserve_core::org_cleanup::grace_period_days(),
         dashboard_placeholder: cfg.common.dashboard_placeholder.to_string(),
