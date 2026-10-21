@@ -130,14 +130,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
             <OButton
               v-else
-              :variant="isRefreshPending ? 'warning' : 'outline'"
-              size="icon-toolbar"
+              :variant="refreshVariant"
+              :size="isMobile ? 'icon-toolbar' : 'sm-toolbar'"
               @click="refreshData()"
               :disabled="arePanelsLoading"
               :loading="arePanelsLoading"
+              :aria-label="t('dashboard.viewDashboard.refresh')"
               data-test="dashboard-refresh-btn"
               :icon-left="isAutoRunOn ? 'autorenew' : 'refresh'"
             >
+              <template v-if="!isMobile">{{ t("dashboard.viewDashboard.refresh") }}</template>
               <OTooltip :content="refreshTooltip" shortcut-id="dashboardRefresh" />
             </OButton>
             <ODropdown align="end" side="bottom">
@@ -1655,9 +1657,15 @@ export default defineComponent({
       });
     };
 
+    // Refresh is the dashboard's main action, but in layout edit Save owns the primary slot.
+    const refreshVariant = computed(() => {
+      if (isRefreshPending.value) return "warning";
+      return isEditingLayout.value ? "outline" : "primary";
+    });
+
     const refreshOptionsVariant = computed(() => {
       if (config.isEnterprise == "true" && arePanelsLoading.value) return "outline-destructive";
-      return isRefreshPending.value ? "warning" : "outline";
+      return refreshVariant.value;
     });
 
     const refreshData = async (withoutCache = false) => {
@@ -2352,6 +2360,7 @@ export default defineComponent({
       isAutoRunAvailable,
       isAutoRunOn,
       toggleAutoRun,
+      refreshVariant,
       refreshOptionsVariant,
       isVariablesChanged,
       isRefreshPending,
