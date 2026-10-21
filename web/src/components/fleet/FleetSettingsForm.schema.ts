@@ -23,9 +23,9 @@ export type SettingsForm = {
   offlineHeartbeats: string;
   retentionDays: string;
   offlineRatio: string;
-  phaseTimeoutMin: string;
-  observeMin: string;
-  windowMin: string;
+  phaseTimeoutSecs: string;
+  observeSecs: string;
+  windowSecs: string;
   passPercent: string;
 };
 
@@ -36,16 +36,15 @@ const BOUNDS: Record<Field, [number, number]> = {
   offlineHeartbeats: [1, 100],
   retentionDays: [0, 3650],
   offlineRatio: [1, 100],
-  phaseTimeoutMin: [1, 1440],
-  observeMin: [0, 1440],
-  windowMin: [1, 1440],
+  phaseTimeoutSecs: [60, 86400],
+  observeSecs: [0, 86400],
+  windowSecs: [30, 86400],
   passPercent: [1, 100],
 };
 
-const GATE: Field[] = ["observeMin", "windowMin", "passPercent"];
+const GATE: Field[] = ["observeSecs", "windowSecs", "passPercent"];
 
 const text = (v: number | null | undefined) => (v == null ? "" : String(v));
-const minutes = (secs: number | null | undefined) => (secs == null ? "" : String(secs / 60));
 
 export function toForm(s: Partial<FleetSettings> | null | undefined): SettingsForm {
   return {
@@ -53,9 +52,9 @@ export function toForm(s: Partial<FleetSettings> | null | undefined): SettingsFo
     offlineHeartbeats: text(s?.offline_heartbeats),
     retentionDays: text(s?.retention_days),
     offlineRatio: text(s?.offline_ratio_percent),
-    phaseTimeoutMin: minutes(s?.phase_timeout_secs),
-    observeMin: minutes(s?.gate?.observe_secs),
-    windowMin: minutes(s?.gate?.window_secs),
+    phaseTimeoutSecs: text(s?.phase_timeout_secs),
+    observeSecs: text(s?.gate?.observe_secs),
+    windowSecs: text(s?.gate?.window_secs),
     passPercent: text(s?.gate?.pass_percent),
   };
 }
@@ -63,7 +62,6 @@ export function toForm(s: Partial<FleetSettings> | null | undefined): SettingsFo
 // A number input may emit a number or its text, so both are read as text.
 const str = (v: unknown) => String(v ?? "").trim();
 const num = (v: unknown) => (str(v) === "" ? null : Number(str(v)));
-const secs = (v: unknown) => (str(v) === "" ? null : Math.round(Number(str(v)) * 60));
 
 /** A gate is overridden as a whole: any gate field set takes the rest from the defaults. */
 export function fromForm(v: SettingsForm, defaults: FleetDefaults | null): FleetSettings {
@@ -73,11 +71,11 @@ export function fromForm(v: SettingsForm, defaults: FleetDefaults | null): Fleet
     offline_heartbeats: num(v.offlineHeartbeats),
     retention_days: num(v.retentionDays),
     offline_ratio_percent: num(v.offlineRatio),
-    phase_timeout_secs: secs(v.phaseTimeoutMin),
+    phase_timeout_secs: num(v.phaseTimeoutSecs),
     gate: anyGate
       ? {
-          observe_secs: secs(v.observeMin) ?? defaults?.gate.observe_secs ?? 600,
-          window_secs: secs(v.windowMin) ?? defaults?.gate.window_secs ?? 300,
+          observe_secs: num(v.observeSecs) ?? defaults?.gate.observe_secs ?? 600,
+          window_secs: num(v.windowSecs) ?? defaults?.gate.window_secs ?? 300,
           pass_percent: num(v.passPercent) ?? defaults?.gate.pass_percent ?? 95,
         }
       : null,
@@ -92,9 +90,9 @@ export const makeSettingsSchema = (t: TranslateFn, required: boolean) =>
       offlineHeartbeats: z.any(),
       retentionDays: z.any(),
       offlineRatio: z.any(),
-      phaseTimeoutMin: z.any(),
-      observeMin: z.any(),
-      windowMin: z.any(),
+      phaseTimeoutSecs: z.any(),
+      observeSecs: z.any(),
+      windowSecs: z.any(),
       passPercent: z.any(),
     })
     .superRefine((v, ctx) => {

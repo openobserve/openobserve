@@ -114,29 +114,6 @@ describe("FleetSettings", () => {
     await settle();
   }
 
-  const auditText = (w: VueWrapper) => w.find('[data-test="fleet-settings-audit-table"]').text();
-
-  it("reads the audit rows from the API", async () => {
-    await mountSettings();
-    expect(fleet.listAudit).toHaveBeenCalledWith(store.state.selectedOrganization.identifier);
-    expect(auditText(wrapper)).toContain("edge-minimal v1");
-    expect(auditText(wrapper)).toContain("ana@acme.io");
-  });
-
-  it("says the audit trail needs O2_AUDIT_ENABLED when the server has it off", async () => {
-    vi.mocked(fleet.listAudit).mockResolvedValue({
-      data: { items: [], audit_disabled: true },
-    } as any);
-    await mountSettings();
-    expect(auditText(wrapper)).toContain("O2_AUDIT_ENABLED");
-  });
-
-  it("translates a known action key and shows an unknown one raw", async () => {
-    await mountSettings();
-    expect(auditText(wrapper)).toContain("Published version");
-    expect(auditText(wrapper)).toContain("fleet.audit.someFutureAction");
-  });
-
   it("offers no compliance export, which has no API", async () => {
     await mountSettings();
     expect(wrapper.find('[data-test="fleet-settings-export-audit"]').exists()).toBe(false);
@@ -429,20 +406,6 @@ describe("FleetSettings", () => {
     expect(saveButton().attributes("disabled")).toBeDefined();
   });
 
-  it("shows the audit load error with a retry when it fails", async () => {
-    vi.mocked(fleet.listAudit).mockRejectedValue(new Error("boom"));
-    await mountSettings();
-    expect(wrapper.find('[data-test="fleet-settings-audit-error"]').exists()).toBe(true);
-    vi.mocked(fleet.listAudit).mockResolvedValue({ data: { items: [event()] } } as any);
-    wrapper
-      .find('[data-test="fleet-settings-audit-error"]')
-      .findComponent({ name: "OEmptyState" })
-      .vm.$emit("action", "retry");
-    await settle();
-    expect(fleet.listAudit).toHaveBeenCalledTimes(2);
-    expect(wrapper.find('[data-test="fleet-settings-audit-error"]').exists()).toBe(false);
-  });
-
   describe("fleet defaults and alerts", () => {
     const defaults = {
       heartbeat_interval_secs: 30,
@@ -469,8 +432,8 @@ describe("FleetSettings", () => {
         wrapper.find(`[data-test="fleet-settings-defaults-form-${n}-field"]`)
           .element as HTMLInputElement;
       expect(field("heartbeat").value).toBe("30");
-      expect(field("phaseTimeoutMin").value).toBe("30");
-      expect(field("observeMin").value).toBe("10");
+      expect(field("phaseTimeoutSecs").value).toBe("1800");
+      expect(field("observeSecs").value).toBe("600");
     });
 
     it("saves changed defaults inside the full settings body", async () => {

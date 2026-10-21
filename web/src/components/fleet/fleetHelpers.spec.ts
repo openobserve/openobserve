@@ -92,7 +92,7 @@ describe("fleet settings form", () => {
       gate: { observe_secs: 600, window_secs: 300, pass_percent: 95 },
     };
     const form = toForm(settings);
-    expect(form.phaseTimeoutMin).toBe("30");
+    expect(form.phaseTimeoutSecs).toBe("1800");
     expect(form.retentionDays).toBe("0");
     expect(fromForm(form, null)).toEqual(settings);
   });

@@ -48,6 +48,7 @@ const stubs = {
   FleetFleets: creatable("FleetFleets"),
   FleetConfigurations: creatable("FleetConfigurations"),
   FleetSettings: true,
+  FleetAudit: true,
 };
 
 async function mountAt(tab: string) {
@@ -87,7 +88,7 @@ describe("FleetManager", () => {
     },
   );
 
-  it.each(["overview", "settings"])("offers no create action on %s", async (tab) => {
+  it.each(["overview", "settings", "audit"])("offers no create action on %s", async (tab) => {
     wrapper = await mountAt(tab);
     expect(wrapper.find('[data-test^="fleet-manager-create-"]').exists()).toBe(false);
     expect(wrapper.text()).not.toContain("Add collector");
@@ -103,10 +104,10 @@ describe("FleetManager", () => {
     },
   );
 
-  it("has one row of four tabs, with no Enrollment, and no sub-tabs", async () => {
+  it("has one row of five tabs, with no Enrollment, and no sub-tabs", async () => {
     wrapper = await mountAt("fleets");
     const tabs = wrapper.findAll('[data-test^="fleet-manager-tab-"]').map((t) => t.text());
-    expect(tabs).toEqual(["Overview", "Fleets", "Configurations", "Settings"]);
+    expect(tabs).toEqual(["Overview", "Fleets", "Configurations", "Settings", "Audit"]);
     expect(wrapper.findAllComponents({ name: "OTabs" })).toHaveLength(1);
     expect(wrapper.find('[data-test="fleet-manager-subnav"]').exists()).toBe(false);
   });

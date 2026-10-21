@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <ODrawer
     :open="open"
-    size="md"
+    size="xl"
     :title="t('fleet.fleets.settingsTitle')"
     :sub-title="fleetName"
     :form-id="ready ? FORM_ID : undefined"

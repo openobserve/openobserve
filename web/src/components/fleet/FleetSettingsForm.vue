@@ -24,18 +24,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :data-test="dataTest"
     @submit="onSubmit"
   >
-    <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-      <OFormInput
-        v-for="field in fields"
-        :key="field.name"
-        :name="field.name"
-        type="number"
-        :label="field.label"
-        :help-text="field.help"
-        :placeholder="field.placeholder"
-        :disabled="disabled"
-        :data-test="`${dataTest}-${field.name}`"
-      />
+    <div v-for="group in groups" :key="group.key" class="flex flex-col gap-3">
+      <OText variant="panel-title">{{ group.title }}</OText>
+      <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <OFormInput
+          v-for="field in group.fields"
+          :key="field.name"
+          :name="field.name"
+          type="number"
+          :label="field.label"
+          :help-text="field.help"
+          :placeholder="field.placeholder"
+          :disabled="disabled"
+          :data-test="`${dataTest}-${field.name}`"
+        />
+      </div>
     </div>
     <div v-if="inlineSubmit">
       <OButton
@@ -57,6 +60,7 @@ import { computed } from "vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OText from "@/lib/core/Typography/OText.vue";
 import type { FleetDefaults, FleetSettings } from "@/services/fleet";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import {
@@ -100,55 +104,70 @@ const inherit = (value: number | undefined) =>
     ? undefined
     : t("fleet.settings.inheritPlaceholder", { value: raw(String(value)) });
 
-const fields = computed<
-  { name: keyof SettingsForm; label: I18nText; help?: I18nText; placeholder?: I18nText }[]
->(() => {
+type Field = { name: keyof SettingsForm; label: I18nText; help?: I18nText; placeholder?: I18nText };
+
+const groups = computed<{ key: string; title: I18nText; fields: Field[] }[]>(() => {
   const d = props.defaults;
   return [
     {
-      name: "heartbeat",
-      label: t("fleet.settings.heartbeat"),
-      placeholder: inherit(d?.heartbeat_interval_secs),
+      key: "heartbeat",
+      title: t("fleet.settings.groupHeartbeat"),
+      fields: [
+        {
+          name: "heartbeat",
+          label: t("fleet.settings.heartbeat"),
+          help: t("fleet.settings.heartbeatHelp"),
+          placeholder: inherit(d?.heartbeat_interval_secs),
+        },
+        {
+          name: "offlineHeartbeats",
+          label: t("fleet.settings.offlineHeartbeats"),
+          help: t("fleet.settings.offlineHeartbeatsHelp"),
+          placeholder: inherit(d?.offline_heartbeats),
+        },
+        {
+          name: "offlineRatio",
+          label: t("fleet.settings.offlineRatio"),
+          help: t("fleet.settings.offlineRatioHelp"),
+          placeholder: inherit(d?.offline_ratio_percent),
+        },
+        {
+          name: "retentionDays",
+          label: t("fleet.settings.retentionDays"),
+          help: t("fleet.settings.retentionDaysHelp"),
+          placeholder: inherit(d?.retention_days),
+        },
+      ],
     },
     {
-      name: "offlineHeartbeats",
-      label: t("fleet.settings.offlineHeartbeats"),
-      help: t("fleet.settings.offlineHeartbeatsHelp"),
-      placeholder: inherit(d?.offline_heartbeats),
-    },
-    {
-      name: "retentionDays",
-      label: t("fleet.settings.retentionDays"),
-      help: t("fleet.settings.retentionDaysHelp"),
-      placeholder: inherit(d?.retention_days),
-    },
-    {
-      name: "offlineRatio",
-      label: t("fleet.settings.offlineRatio"),
-      help: t("fleet.settings.offlineRatioHelp"),
-      placeholder: inherit(d?.offline_ratio_percent),
-    },
-    {
-      name: "phaseTimeoutMin",
-      label: t("fleet.settings.phaseTimeout"),
-      help: t("fleet.settings.phaseTimeoutHelp"),
-      placeholder: inherit(d ? d.phase_timeout_secs / 60 : undefined),
-    },
-    {
-      name: "observeMin",
-      label: t("fleet.settings.gateObserve"),
-      placeholder: inherit(d ? d.gate.observe_secs / 60 : undefined),
-    },
-    {
-      name: "windowMin",
-      label: t("fleet.settings.gateWindow"),
-      placeholder: inherit(d ? d.gate.window_secs / 60 : undefined),
-    },
-    {
-      name: "passPercent",
-      label: t("fleet.settings.gatePass"),
-      help: t("fleet.settings.gatePassHelp"),
-      placeholder: inherit(d?.gate.pass_percent),
+      key: "gate",
+      title: t("fleet.settings.groupGate"),
+      fields: [
+        {
+          name: "phaseTimeoutSecs",
+          label: t("fleet.settings.phaseTimeout"),
+          help: t("fleet.settings.phaseTimeoutHelp"),
+          placeholder: inherit(d?.phase_timeout_secs),
+        },
+        {
+          name: "observeSecs",
+          label: t("fleet.settings.gateObserve"),
+          help: t("fleet.settings.gateObserveHelp"),
+          placeholder: inherit(d?.gate.observe_secs),
+        },
+        {
+          name: "windowSecs",
+          label: t("fleet.settings.gateWindow"),
+          help: t("fleet.settings.gateWindowHelp"),
+          placeholder: inherit(d?.gate.window_secs),
+        },
+        {
+          name: "passPercent",
+          label: t("fleet.settings.gatePass"),
+          help: t("fleet.settings.gatePassHelp"),
+          placeholder: inherit(d?.gate.pass_percent),
+        },
+      ],
     },
   ];
 });

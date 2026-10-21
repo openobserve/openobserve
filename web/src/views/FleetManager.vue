@@ -57,6 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <FleetFleets v-else-if="activeTab === 'fleets'" ref="createTarget" />
     <FleetConfigurations v-else-if="activeTab === 'configurations'" ref="createTarget" />
     <FleetSettings v-else-if="activeTab === 'settings'" />
+    <FleetAudit v-else-if="activeTab === 'audit'" />
   </OPageLayout>
 </template>
 
@@ -74,6 +75,7 @@ import FleetOverview from "@/components/fleet/FleetOverview.vue";
 import FleetFleets from "@/components/fleet/FleetFleets.vue";
 import FleetConfigurations from "@/components/fleet/FleetConfigurations.vue";
 import FleetSettings from "@/components/fleet/FleetSettings.vue";
+import FleetAudit from "@/components/fleet/FleetAudit.vue";
 import { fleetLocation, resolveFleetTab, type FleetTab } from "@/components/fleet/fleetRoute";
 
 const { t } = useI18nTyped();
@@ -87,6 +89,7 @@ const tabs = computed<{ name: FleetTab; label: I18nText; icon: IconName }[]>(() 
   { name: "fleets", label: t("fleet.tabs.fleets"), icon: "folder" },
   { name: "configurations", label: t("fleet.tabs.configurations"), icon: "tune" },
   { name: "settings", label: t("fleet.tabs.settings"), icon: "admin-panel-settings" },
+  { name: "audit", label: t("fleet.tabs.audit"), icon: "receipt-long" },
 ]);
 
 const activeTab = computed(() => resolveFleetTab(route.query));

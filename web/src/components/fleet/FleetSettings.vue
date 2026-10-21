@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <OContent y class="min-h-0 flex-1 overflow-auto" data-test="fleet-settings">
-    <div class="mx-auto flex max-w-6xl flex-col gap-4">
+    <div class="flex flex-col gap-4">
       <OFormSection :title="t('fleet.settings.governance')" data-test="fleet-settings-governance">
         <template v-if="loaded && !forbidden && !loadFailed" #actions>
           <OButton
@@ -133,36 +133,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OFormSection>
 
       <FleetCollectorVersions class="shrink-0" />
-
-      <OFormSection :title="t('fleet.settings.auditTrail')" data-test="fleet-settings-audit">
-        <OTable
-          :data="auditRows"
-          :columns="auditColumns"
-          row-key="id"
-          pagination="none"
-          :frame="false"
-          :loading="auditLoading"
-          :forbidden="auditForbidden"
-          :error="auditError"
-          :empty-message="audit.disabled.value ? t('fleet.settings.auditDisabled') : undefined"
-          data-test="fleet-settings-audit-table"
-        >
-          <template #cell-at="{ row }">
-            <OTimeCell :value="row.at" unit="ms" mode="relative" />
-          </template>
-          <template #cell-action="{ row }">
-            {{ te(row.action) ? t(row.action) : raw(row.action) }}
-          </template>
-          <template #cell-target="{ row }">
-            <OText variant="mono">{{ row.target }}</OText>
-          </template>
-          <template #error>
-            <div data-test="fleet-settings-audit-error">
-              <OEmptyState size="block" preset="load-error" @action="audit.refetch()" />
-            </div>
-          </template>
-        </OTable>
-      </OFormSection>
     </div>
   </OContent>
 </template>
@@ -176,10 +146,6 @@ import OSettingRow from "@/lib/core/SettingRow/OSettingRow.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import OText from "@/lib/core/Typography/OText.vue";
-import OTable from "@/lib/core/Table/OTable.vue";
-import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
-import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -187,23 +153,13 @@ import { useOrgId } from "@/composables/query/useOrgId";
 import { updateFleetSettingsMutation } from "@/services/fleet.queries";
 import { useRoute, useRouter } from "vue-router";
 import { raw, useI18nTyped } from "@/types/i18n";
-import type { FleetAuditEvent, FleetOrgSettings, FleetSettings } from "@/services/fleet";
+import type { FleetOrgSettings, FleetSettings } from "@/services/fleet";
 import FleetCollectorVersions from "./FleetCollectorVersions.vue";
 import FleetSettingsForm from "./FleetSettingsForm.vue";
-import { isForbidden, serverMessage, useFleetAudit, useFleetSettings } from "./useFleetApi";
+import { serverMessage, useFleetSettings } from "./useFleetApi";
 
-const { t, te } = useI18nTyped();
+const { t } = useI18nTyped();
 const orgId = useOrgId();
-
-const audit = useFleetAudit();
-const auditRows = audit.rows;
-const auditLoading = audit.loading;
-const auditForbidden = computed(() => isForbidden(audit.error.value));
-const auditError = computed(() =>
-  audit.error.value && !auditForbidden.value && !auditRows.value.length
-    ? String(audit.error.value)
-    : null,
-);
 
 const current = useFleetSettings();
 const forbidden = current.forbidden;
@@ -302,11 +258,4 @@ async function put(next: FleetOrgSettings) {
     });
   }
 }
-
-const auditColumns = computed<OTableColumnDef<FleetAuditEvent>[]>(() => [
-  { id: "at", header: t("fleet.settings.when"), accessorKey: "at", size: 120 },
-  { id: "actor", header: t("fleet.settings.actor"), accessorKey: "actor", size: 180 },
-  { id: "action", header: t("fleet.settings.action"), accessorKey: "action", size: 220 },
-  { id: "target", header: t("fleet.settings.target"), accessorKey: "target", size: 240 },
-]);
 </script>
