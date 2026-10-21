@@ -302,7 +302,7 @@ pub async fn save_workflow(
         ("search_substring" = Option<String>, Query, description = "Case-insensitive substring the workflow name or description must contain."),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = inline(Object)),
+        (status = 200, description = "Success", content_type = "application/json", body = Vec<Object>),
         (status = 403, description = "The caller's workflow listing was refused", content_type = "application/json", body = ()),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = ()),
     ),
@@ -1046,7 +1046,7 @@ pub async fn enable_workflow(
         ("end_time" = Option<i64>, Query, description = "End time in Unix timestamp microseconds, defaults to now"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = Vec<Object>),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = ()),
     ),

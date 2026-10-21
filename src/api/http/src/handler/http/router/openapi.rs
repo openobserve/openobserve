@@ -1663,6 +1663,21 @@ mod tests {
 
     #[cfg(feature = "enterprise")]
     #[test]
+    fn workflow_list_and_history_document_an_array_of_objects() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        for path in [
+            "/api/{org_id}/workflows",
+            "/api/{org_id}/workflows/{id}/history",
+        ] {
+            let ok = &spec["paths"][path]["get"]["responses"]["200"];
+            let schema = &ok["content"]["application/json"]["schema"];
+            assert_eq!(schema["type"], "array", "{path}: {ok}");
+            assert_eq!(schema["items"]["type"], "object", "{path}: {ok}");
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
     fn the_scrape_stops_at_the_end_of_service_routes() {
         let body = service_routes_body();
         for item in ["\nfn ", "\npub fn ", "\npub(crate) fn ", "\nasync fn "] {
