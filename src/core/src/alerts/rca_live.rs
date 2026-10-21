@@ -40,9 +40,7 @@ use infra::table::{
     rca_runs::{self as runs_table, Model as RunRow},
     rca_steering as steering_table,
 };
-use o2_enterprise::enterprise::{
-    ai::chat::batcher::DurableEvent, common::config::get_config as get_o2_config,
-};
+use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
 use serde::{Deserialize, Serialize};
 use tokio::sync::OnceCell;
 
@@ -52,10 +50,10 @@ use super::{
     rca_turn::RcaTurnError,
 };
 use crate::ai_chat::{
-    ReadError,
+    CommittedPrefix, ReadError,
     rca_ledger::{RunTranscript, decode_run},
     rca_thread::{self, RcaThread, Transcript},
-    read_committed_events,
+    read_committed_prefix,
 };
 
 /// How often the node that holds a live stream reads the change markers.
@@ -87,12 +85,12 @@ pub enum RunSession {
     Present(Box<SessionRow>),
 }
 
-/// Reads the committed events of a session.
+/// Reads the committed events of a session; a lost tail returns the prefix before it.
 pub trait TranscriptReader: Sync {
     fn read(
         &self,
         session: &SessionRow,
-    ) -> impl Future<Output = Result<Vec<DurableEvent>, ReadError>> + Send;
+    ) -> impl Future<Output = Result<CommittedPrefix, ReadError>> + Send;
 }
 
 /// The chat-events stream of this cluster.
@@ -104,7 +102,7 @@ pub struct RunParts<'a, R> {
     run: &'a RunRow,
     session: &'a RunSession,
     reader: &'a R,
-    events: OnceCell<Result<Vec<DurableEvent>, ReadError>>,
+    events: OnceCell<Result<CommittedPrefix, ReadError>>,
     decoded: OnceLock<RunTranscript>,
 }
 
@@ -235,7 +233,7 @@ impl PartError {
         }
     }
 
-    /// An unreadable transcript: 410 for a terminal run's incomplete events, else 503.
+    /// An unreadable transcript: 410 for a terminal run's corrupt or holed events, else 503.
     pub fn read(run_id: &str, session_id: &str, terminal: bool, error: &ReadError) -> Self {
         match error {
             ReadError::Gap { .. } | ReadError::Divergence { .. } | ReadError::Corrupt(_)
@@ -291,8 +289,8 @@ impl RunSession {
 }
 
 impl TranscriptReader for StoreReader {
-    async fn read(&self, session: &SessionRow) -> Result<Vec<DurableEvent>, ReadError> {
-        read_committed_events(session, -1).await
+    async fn read(&self, session: &SessionRow) -> Result<CommittedPrefix, ReadError> {
+        read_committed_prefix(session, -1).await
     }
 }
 
@@ -300,8 +298,25 @@ impl<T: TranscriptReader> TranscriptReader for &T {
     fn read(
         &self,
         session: &SessionRow,
-    ) -> impl Future<Output = Result<Vec<DurableEvent>, ReadError>> + Send {
+    ) -> impl Future<Output = Result<CommittedPrefix, ReadError>> + Send {
         (**self).read(session)
+    }
+}
+
+/// A lost tail is final only once the run ended; a running run may still be writing it.
+fn settle_lost_tail(
+    read: Result<CommittedPrefix, ReadError>,
+    terminal: bool,
+) -> Result<CommittedPrefix, ReadError> {
+    match read {
+        Ok(CommittedPrefix {
+            lost_from: Some(expected),
+            ..
+        }) if !terminal => Err(ReadError::Gap {
+            expected,
+            found: None,
+        }),
+        other => other,
     }
 }
 
@@ -343,7 +358,7 @@ impl<'a, R: TranscriptReader> RunParts<'a, R> {
             RunSession::Present(session) => session,
         };
         let terminal = state.is_some_and(|state| state.is_terminal());
-        let events = self
+        let prefix = self
             .events(session)
             .await
             .as_ref()
@@ -351,9 +366,14 @@ impl<'a, R: TranscriptReader> RunParts<'a, R> {
         let turns = ai_chat_turns::list_for_session(self.org_id, &session.session_id)
             .await
             .map_err(PartError::internal)?;
-        let mut thread = rca_thread::project_rca_thread(events, &turns, active, show_tool_io);
+        let mut thread =
+            rca_thread::project_rca_thread(&prefix.events, &turns, active, show_tool_io);
         thread.run_id = run_id.clone();
         thread.state_version = session_version(session, self.run, show_tool_io);
+        if let Some(lost_from) = prefix.lost_from {
+            thread.truncated = true;
+            thread.saved_through_seq = Some(lost_from - 1);
+        }
         Ok(thread)
     }
 
@@ -464,13 +484,18 @@ impl<'a, R: TranscriptReader> RunParts<'a, R> {
         self.run.state.parse().ok()
     }
 
-    async fn events(&self, session: &SessionRow) -> &Result<Vec<DurableEvent>, ReadError> {
-        self.events.get_or_init(|| self.reader.read(session)).await
+    async fn events(&self, session: &SessionRow) -> &Result<CommittedPrefix, ReadError> {
+        let terminal = self.state().is_some_and(|state| state.is_terminal());
+        self.events
+            .get_or_init(
+                || async move { settle_lost_tail(self.reader.read(session).await, terminal) },
+            )
+            .await
     }
 
     async fn decoded(&self, session: &SessionRow) -> Result<&RunTranscript, &ReadError> {
-        let events = self.events(session).await.as_ref()?;
-        Ok(self.decoded.get_or_init(|| decode_run(events)))
+        let prefix = self.events(session).await.as_ref()?;
+        Ok(self.decoded.get_or_init(|| decode_run(&prefix.events)))
     }
 }
 
@@ -997,6 +1022,7 @@ pub(crate) mod tests {
         rca_runs::RunUpdate,
         rca_steering::SteerPatch,
     };
+    use o2_enterprise::enterprise::ai::chat::batcher::DurableEvent;
     use parking_lot::Mutex;
     use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, sea_query::Expr};
 
@@ -1035,13 +1061,34 @@ pub(crate) mod tests {
     }
 
     impl TranscriptReader for Reader {
-        async fn read(&self, _session: &SessionRow) -> Result<Vec<DurableEvent>, ReadError> {
+        async fn read(&self, _session: &SessionRow) -> Result<CommittedPrefix, ReadError> {
             self.reads.fetch_add(1, Ordering::SeqCst);
             match self.failures.lock().pop_front() {
                 Some(error) => Err(error),
-                None => Ok(self.events.lock().clone()),
+                None => Ok(CommittedPrefix {
+                    events: self.events.lock().clone(),
+                    lost_from: None,
+                }),
             }
         }
+    }
+
+    #[test]
+    fn a_lost_tail_is_served_only_once_the_run_ended() {
+        let lost = || {
+            Ok(CommittedPrefix {
+                events: Vec::new(),
+                lost_from: Some(4),
+            })
+        };
+        assert!(matches!(
+            settle_lost_tail(lost(), false),
+            Err(ReadError::Gap {
+                expected: 4,
+                found: None
+            })
+        ));
+        assert_eq!(settle_lost_tail(lost(), true).unwrap().lost_from, Some(4));
     }
 
     fn spec(org: &str, inc: &str, run_id: Option<&str>) -> LiveSpec {

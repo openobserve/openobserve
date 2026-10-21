@@ -330,6 +330,44 @@ pub async fn read_committed_events(
         .collect())
 }
 
+/// The verified, contiguous committed events a read could get, and where they stop.
+#[derive(Debug, Default)]
+pub struct CommittedPrefix {
+    pub events: Vec<DurableEvent>,
+    /// The first committed seq that is not stored; every later one is missing too. `None` when
+    /// the history is whole.
+    pub lost_from: Option<i64>,
+}
+
+/// [`read_committed_events`], but a lost tail (events missing from some seq up to the
+/// watermark, as after a kill before the store flushed) returns the prefix before it.
+/// A hole with stored events after it, divergence and corruption stay errors.
+pub async fn read_committed_prefix(
+    row: &ai_chat_sessions::Model,
+    after_seq: i64,
+) -> std::result::Result<CommittedPrefix, ReadError> {
+    let (events, lost_from) = logged(
+        row,
+        after_seq,
+        read_committed_inner(row, after_seq, true).await,
+    )?;
+    if let Some(seq) = lost_from {
+        metrics::AI_CHAT_READ_INTEGRITY_ERRORS_TOTAL
+            .with_label_values(&[&row.org_id, "tail"])
+            .inc();
+        log::warn!(
+            "[AI-CHAT] committed history of {}/{} lost its tail: seq {seq} to {} are not stored",
+            row.org_id,
+            row.session_id,
+            row.last_committed_seq
+        );
+    }
+    Ok(CommittedPrefix {
+        events: events.into_iter().map(|(_, event)| event).collect(),
+        lost_from,
+    })
+}
+
 /// Rewrites committed rows with fresh timestamps (caller holds the lease); returns how many.
 pub async fn refresh_chat_history(
     org_id: &str,
@@ -467,7 +505,15 @@ async fn read_verified(
     row: &ai_chat_sessions::Model,
     after_seq: i64,
 ) -> std::result::Result<Vec<StoredEvent>, ReadError> {
-    let result = read_committed_inner(row, after_seq).await;
+    let result = read_committed_inner(row, after_seq, false).await;
+    Ok(logged(row, after_seq, result)?.0)
+}
+
+fn logged<T>(
+    row: &ai_chat_sessions::Model,
+    after_seq: i64,
+    result: std::result::Result<T, ReadError>,
+) -> std::result::Result<T, ReadError> {
     if let Err(e) = &result {
         metrics::AI_CHAT_READ_INTEGRITY_ERRORS_TOTAL
             .with_label_values(&[&row.org_id, e.reason()])
@@ -483,13 +529,15 @@ async fn read_verified(
     result
 }
 
+/// The events past `after_seq` and, with `allow_lost_tail`, the first seq of a lost tail.
 async fn read_committed_inner(
     row: &ai_chat_sessions::Model,
     after_seq: i64,
-) -> std::result::Result<Vec<StoredEvent>, ReadError> {
+    allow_lost_tail: bool,
+) -> std::result::Result<(Vec<StoredEvent>, Option<i64>), ReadError> {
     let last = row.last_committed_seq;
     if last <= after_seq.max(NO_SEQ) {
-        return Ok(Vec::new());
+        return Ok((Vec::new(), None));
     }
     let (Some(first_at), Some(last_at)) = (row.first_event_at, row.last_event_at) else {
         return Err(ReadError::NoTimeRange);
@@ -504,21 +552,44 @@ async fn read_committed_inner(
     while lo < last {
         let hi = (lo + READ_WINDOW).min(last);
         let mut attempt = 0;
-        let window = loop {
+        let (window, next) = loop {
             let rows = search_window(row, lo, hi, first_at, last_at).await?;
-            match verify_window(rows, lo, hi, &resolver) {
-                // Visibility lag: what was acknowledged may not be searchable yet.
-                Err(ReadError::Gap { .. }) if attempt < READ_RETRIES => {
-                    attempt += 1;
-                    tokio::time::sleep(Duration::from_millis(100 << attempt)).await;
-                }
-                other => break other?,
+            let result = verify_window_prefix(rows, lo, hi, &resolver);
+            let short = match &result {
+                Ok((_, next)) => *next <= hi,
+                Err(e) => matches!(e, ReadError::Gap { .. }),
+            };
+            // Visibility lag: what was acknowledged may not be searchable yet.
+            if short && attempt < READ_RETRIES {
+                attempt += 1;
+                tokio::time::sleep(Duration::from_millis(100 << attempt)).await;
+                continue;
             }
+            break result?;
         };
         events.extend(window);
+        if next <= hi {
+            if !allow_lost_tail {
+                return Err(ReadError::Gap {
+                    expected: next,
+                    found: None,
+                });
+            }
+            // Only a lost tail is served: anything stored past the hole makes it a gap.
+            if hi < last {
+                let rows = search_window(row, hi, last, first_at, last_at).await?;
+                if let Some(found) = first_stored_seq(rows, hi, last, &resolver)? {
+                    return Err(ReadError::Gap {
+                        expected: next,
+                        found: Some(found),
+                    });
+                }
+            }
+            return Ok((events, Some(next)));
+        }
         lo = hi;
     }
-    Ok(events)
+    Ok((events, None))
 }
 
 async fn search_window(
@@ -597,19 +668,32 @@ fn decode_row(mut hit: json::Value) -> std::result::Result<AiChatEventRecord, Re
 }
 
 /// Resolve one window's rows to the committed event of each seq and check `(lo, hi]` is covered.
+#[cfg(test)]
 fn verify_window(
     rows: Vec<AiChatEventRecord>,
     lo: i64,
     hi: i64,
     resolver: &Resolver,
 ) -> std::result::Result<Vec<StoredEvent>, ReadError> {
-    let mut by_seq: BTreeMap<i64, Vec<Version>> = BTreeMap::new();
-    for row in rows {
-        if row.seq <= lo || row.seq > hi || !resolver.admits(&row) {
-            continue;
-        }
-        add_part(by_seq.entry(row.seq).or_default(), row)?;
+    let (events, expected) = verify_window_prefix(rows, lo, hi, resolver)?;
+    if expected <= hi {
+        return Err(ReadError::Gap {
+            expected,
+            found: None,
+        });
     }
+    Ok(events)
+}
+
+/// [`verify_window`] that accepts a short tail: the contiguous events from `lo + 1` and the
+/// first seq they do not reach. A hole followed by a stored event is still a gap.
+fn verify_window_prefix(
+    rows: Vec<AiChatEventRecord>,
+    lo: i64,
+    hi: i64,
+    resolver: &Resolver,
+) -> std::result::Result<(Vec<StoredEvent>, i64), ReadError> {
+    let by_seq = group_window(rows, lo, hi, resolver)?;
     let mut events = Vec::with_capacity(by_seq.len());
     let mut expected = lo + 1;
     for (seq, mut versions) in by_seq {
@@ -628,13 +712,39 @@ fn verify_window(
         events.push((rows, event));
         expected += 1;
     }
-    if expected <= hi {
-        return Err(ReadError::Gap {
-            expected,
-            found: None,
-        });
+    Ok((events, expected))
+}
+
+/// The first seq in `(lo, hi]` with a committed version stored, if any.
+fn first_stored_seq(
+    rows: Vec<AiChatEventRecord>,
+    lo: i64,
+    hi: i64,
+    resolver: &Resolver,
+) -> std::result::Result<Option<i64>, ReadError> {
+    for (seq, mut versions) in group_window(rows, lo, hi, resolver)? {
+        versions.retain(Version::is_complete);
+        if resolver.pick(seq, &versions)?.is_some() {
+            return Ok(Some(seq));
+        }
     }
-    Ok(events)
+    Ok(None)
+}
+
+fn group_window(
+    rows: Vec<AiChatEventRecord>,
+    lo: i64,
+    hi: i64,
+    resolver: &Resolver,
+) -> std::result::Result<BTreeMap<i64, Vec<Version>>, ReadError> {
+    let mut by_seq: BTreeMap<i64, Vec<Version>> = BTreeMap::new();
+    for row in rows {
+        if row.seq <= lo || row.seq > hi || !resolver.admits(&row) {
+            continue;
+        }
+        add_part(by_seq.entry(row.seq).or_default(), row)?;
+    }
+    Ok(by_seq)
 }
 
 /// File `row` under its version of the event; a retried write repeats parts byte for byte.
@@ -938,6 +1048,28 @@ mod tests {
                 found: None
             })
         ));
+    }
+
+    #[test]
+    fn a_lost_tail_keeps_its_prefix_but_a_hole_does_not() {
+        let resolver = resolver(1, &[]);
+        let (events, next) =
+            verify_window_prefix(vec![stored(1, "a"), stored(2, "b")], 0, 5, &resolver).unwrap();
+        assert_eq!(data_of(&events), vec!["a", "b"]);
+        assert_eq!(next, 3);
+        assert!(matches!(
+            verify_window_prefix(vec![stored(1, "a"), stored(3, "c")], 0, 5, &resolver),
+            Err(ReadError::Gap {
+                expected: 2,
+                found: Some(3)
+            })
+        ));
+        // Past the window that ends short, any stored event turns the tail into a hole.
+        assert_eq!(first_stored_seq(vec![], 5, 9, &resolver).unwrap(), None);
+        assert_eq!(
+            first_stored_seq(vec![stored(8, "h")], 5, 9, &resolver).unwrap(),
+            Some(8)
+        );
     }
 
     #[test]

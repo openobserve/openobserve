@@ -230,6 +230,11 @@ pub struct RcaThread {
     pub questions: Vec<ThreadQuestion>,
     pub report_submitted: bool,
     pub stats: ThreadStats,
+    /// The end of the transcript was lost; the thread shows the part that was saved.
+    pub truncated: bool,
+    /// With `truncated`: the last seq that was saved (-1: none).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub saved_through_seq: Option<i64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, ToSchema)]
@@ -359,6 +364,8 @@ impl RcaThread {
             questions: Vec::new(),
             report_submitted: false,
             stats: ThreadStats::default(),
+            truncated: false,
+            saved_through_seq: None,
         }
     }
 }
@@ -722,6 +729,8 @@ impl Builder {
                 tokens: self.tokens,
             },
             steps,
+            truncated: false,
+            saved_through_seq: None,
         }
     }
 }

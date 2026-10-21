@@ -37,9 +37,9 @@ use super::{
     rca_turn::RcaTurnError,
 };
 use crate::ai_chat::{
-    ReadError,
+    CommittedPrefix, ReadError,
     fork::{ResumeRefusal, plan_resume},
-    read_committed_events,
+    read_committed_prefix,
 };
 
 /// Error codes that leave no reusable transcript.
@@ -118,7 +118,7 @@ pub async fn prepare_resume(
         org_id,
         incident_id,
         run_id,
-        async |source: &ai_chat_sessions::Model| read_committed_events(source, NO_SEQ).await,
+        async |source: &ai_chat_sessions::Model| read_committed_prefix(source, NO_SEQ).await,
     )
     .await
 }
@@ -200,7 +200,7 @@ async fn prepare_resume_with<R>(
     read_events: R,
 ) -> Result<ResumeSeed, ResumeError>
 where
-    R: AsyncFnOnce(&ai_chat_sessions::Model) -> Result<Vec<DurableEvent>, ReadError>,
+    R: AsyncFnOnce(&ai_chat_sessions::Model) -> Result<CommittedPrefix, ReadError>,
 {
     // The primary: the run may have ended just now.
     let primary = infra::db::get_orm_client_rw().await;
@@ -234,13 +234,20 @@ where
     if source.last_committed_seq == NO_SEQ {
         return Err(ResumeError::NothingToResume);
     }
-    let mut events = read_events(&source).await.map_err(|e| match e {
-        // An ended run's history never grows again: a missing or bad event is final.
+    let read = read_events(&source).await.map_err(|e| match e {
+        // An ended run's history never grows again: a hole or a bad event is final.
         ReadError::Gap { .. } | ReadError::Divergence { .. } | ReadError::Corrupt(_) => {
             ResumeError::TranscriptExpired
         }
         ReadError::NoTimeRange | ReadError::Search(_) => ResumeError::Unavailable(e.to_string()),
     })?;
+    // A lost tail leaves the saved prefix; the cut is its last finished step.
+    if let Some(lost_from) = read.lost_from {
+        log::warn!(
+            "[RCA_RESUME] run {run_id} lost its transcript from seq {lost_from}; resuming from the saved part"
+        );
+    }
+    let mut events = read.events;
     let plan = plan_resume(&events).map_err(|refusal| match refusal {
         ResumeRefusal::ReportSubmitted => ResumeError::NotResumable(
             "This analysis already submitted its report; re-analyze instead".to_string(),
@@ -496,12 +503,26 @@ pub(crate) mod tests {
         run_id
     }
 
-    /// [prepare_resume_with] reading `read`, and how often it read.
+    /// [prepare_resume_with] reading `read` as a whole history, and how often it read.
     async fn prepare(
         org_id: &str,
         incident_id: &str,
         run_id: &str,
         read: Result<Vec<DurableEvent>, ReadError>,
+    ) -> (Prepared, usize) {
+        let read = read.map(|events| CommittedPrefix {
+            events,
+            lost_from: None,
+        });
+        prepare_read(org_id, incident_id, run_id, read).await
+    }
+
+    /// [prepare_resume_with] reading `read`, and how often it read.
+    async fn prepare_read(
+        org_id: &str,
+        incident_id: &str,
+        run_id: &str,
+        read: Result<CommittedPrefix, ReadError>,
     ) -> (Prepared, usize) {
         let reads = AtomicUsize::new(0);
         let result = prepare_resume_with(
@@ -711,6 +732,24 @@ pub(crate) mod tests {
         let single: Vec<DurableEvent> = three_steps()[..=8].to_vec();
         let (result, _) = prepare(&org, &inc, &run, Ok(single)).await;
         assert_eq!(result.unwrap_err(), ResumeError::NothingToResume);
+    }
+
+    #[tokio::test]
+    async fn a_lost_tail_resumes_from_the_saved_prefix() {
+        let _db = db().await;
+        let (org, inc) = new_incident(None).await;
+        let run = stopped(&org, &inc, Some(ERROR_TIMEOUT)).await;
+        // The watermark says more was committed than the store kept.
+        let mut saved = three_steps();
+        saved.pop();
+        let lost_from = saved.len() as i64;
+        let read = Ok(CommittedPrefix {
+            events: saved.clone(),
+            lost_from: Some(lost_from),
+        });
+        let seed = prepare_read(&org, &inc, &run, read).await.0.unwrap();
+        assert_eq!(seed.cut_seq, THREE_STEPS_CUT);
+        assert_eq!(seed.prefix, saved[..=THREE_STEPS_CUT as usize]);
     }
 
     async fn detail_resume_run_id(org_id: &str, incident_id: &str) -> Option<String> {

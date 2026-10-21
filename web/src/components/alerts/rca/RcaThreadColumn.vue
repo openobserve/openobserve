@@ -102,6 +102,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <ol v-else-if="thread" class="m-0 flex list-none flex-col gap-3.5 p-0">
+        <li
+          v-if="thread.truncated"
+          data-test="rca-thread-truncated"
+          class="text-text-secondary text-compact flex items-start gap-2"
+        >
+          <OIcon name="info" size="sm" class="mt-0.5 shrink-0" />
+          {{ t("alerts.incidents.rcaThread.transcriptTruncated") }}
+        </li>
         <!-- Start entry: trigger, time, the prompt, and the leads it was given. -->
         <li
           v-if="thread.started"
