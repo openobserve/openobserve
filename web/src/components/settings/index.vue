@@ -185,12 +185,19 @@ export default defineComponent({
       ),
     );
 
+    // With the assistant in its own group, "Data & AI" splits so the LLM tooling is never read as the assistant.
+    const LLM_OBSERVABILITY_KEYS = new Set([
+      "model_pricing",
+      "llm_providers",
+      "gen_ai_agent_mapping",
+    ]);
+
     // Order the section groups appear in (hub + switcher).
     const settingsGroupOrder = [
       "General",
       "Access & Security",
       "Destinations",
-      ...(assistantV2 ? ["Assistant"] : []),
+      ...(assistantV2 ? ["Assistant", "Data", "LLM observability"] : []),
       "Data & AI",
       "Operations",
       "Synthetics",
@@ -479,7 +486,12 @@ export default defineComponent({
         },
         ...assistantItems,
       ];
-      return items;
+      if (!assistantV2) return items;
+      return items.map((item) =>
+        item.group === "Data & AI"
+          ? { ...item, group: LLM_OBSERVABILITY_KEYS.has(item.key) ? "LLM observability" : "Data" }
+          : item,
+      );
     });
 
     // The active section's metadata (label + description) — drives the shell-owned
@@ -508,6 +520,8 @@ export default defineComponent({
         Destinations: t("settings.groupDestinations"),
         Assistant: t("settings.groupAssistant"),
         "Data & AI": t("settings.groupDataAI"),
+        Data: t("settings.groups.data"),
+        "LLM observability": t("settings.groups.llmObservability"),
         Operations: t("settings.groupOperations"),
         Synthetics: t("settings.groupSynthetics"),
         Account: t("settings.groupAccount"),

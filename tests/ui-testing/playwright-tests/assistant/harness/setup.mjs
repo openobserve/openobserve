@@ -9,7 +9,11 @@ import {
   HTTP_SCENARIOS,
   SCENARIOS,
   SHARES,
+  ACTIVITY,
+  GRANTS,
   TOOLSETS,
+  TOOLSET_HEALTH,
+  TOOLSET_RECORDS,
   chatDetail,
   chatSummary,
   overageStatus,
@@ -101,8 +105,17 @@ export function createMockState(overrides = {}) {
     capabilitiesTestResults: [],
     capabilitiesTestDelayMs: 0,
     toolsetHealthEnabled: false,
+    // GET /ai/toolsets: status, delay and rows (null keeps TOOLSETS); every write lands in toolsetWrites as { method, id, body }.
+    toolsetsStatus: 200,
+    toolsetsDelayMs: 0,
+    toolsets: null,
+    toolsetWrites: [],
+    // POST /ai/toolsets/{id}/test answers in order (then ok).
+    toolsetTestResults: [],
     grantsEnabled: false,
+    grants: null,
     activityEnabled: false,
+    activity: null,
     secretMergeEnabled: false,
     importEnabled: false,
     // B-12 server search (`q` on GET /ai/chats) and server pins (`pinned` on rows and PATCH); B-03 list markers.
@@ -240,7 +253,7 @@ async function handleAi(route, request, state) {
     const role = ROLE_NAMES[state.role] ?? state.role;
     const admin = role === "admin";
     const history = { ...(state.historySearchEnabled && { history_search: true }), ...(state.historyPinsEnabled && { history_pins: true }) };
-    return json(route, { health: { status: "ok", checked_at: Date.now() * 1000 }, redaction_applied: false, can_chat: role !== "viewer", can_write: admin || role === "editor", can_share: admin, agents: [], toolsets: [], toolset_secret_merge: false, policy_enforced: state.policyEnforced, ...offForOrg(state), ...history, ...state.capabilities }), true;
+    return json(route, { health: { status: "ok", checked_at: Date.now() * 1000 }, redaction_applied: false, can_chat: role !== "viewer", can_write: admin || role === "editor", can_share: admin, agents: [], toolsets: [], toolset_secret_merge: state.secretMergeEnabled, policy_enforced: state.policyEnforced, ...offForOrg(state), ...history, ...state.capabilities }), true;
   }
   // B-14: absent (404) unless `settingsEnabled`; a PUT keeps the five writable keys and stamps the writer.
   if (p.match(/^\/api\/[^/]+\/ai\/settings$/)) {
@@ -372,7 +385,9 @@ async function handleAi(route, request, state) {
   if (/^\/api\/[^/]+\/ai\/feedback$/.test(p)) return json(route, { ok: true }), true;
   if (/^\/api\/[^/]+\/ai\/actions\/[^/]+\/undo$/.test(p)) return json(route, {}), true;
   if (/^\/api\/[^/]+\/ai\/confirm\//.test(p)) return json(route, { ok: true }), true;
-  if (/^\/api\/[^/]+\/ai\/toolsets/.test(p)) return json(route, m === "GET" ? TOOLSETS : { id: "ts_new" }), true;
+  if ((mt = p.match(/^\/api\/[^/]+\/ai\/toolsets(?:\/([^/]+))?(\/test)?$/))) return toolsetRoute(route, state, m, mt), true;
+  if (/^\/api\/[^/]+\/ai\/grants/.test(p)) return grantRoute(route, state, m, p), true;
+  if (/^\/api\/[^/]+\/ai\/activity/.test(p)) return activityRoute(route, state, m, p), true;
   if (/^\/api\/[^/]+\/ai\/usage$/.test(p) && (state.usage || state.usageStatus !== 200)) {
     state.log.push("GET ai/usage");
     if (state.usageStatus !== 200) return json(route, { code: state.usageStatus, message: "usage read failed" }, state.usageStatus), true;
@@ -380,14 +395,20 @@ async function handleAi(route, request, state) {
   }
   if (/^\/api\/[^/]+\/ai\/usage/.test(p)) return json(route, { data: [], total_tokens: 0 }), true;
   if (/^\/api\/[^/]+\/quota\/[^/]+\/paid_overage$/.test(p)) {
+    if (m === "GET" && state.overageStatus !== 200) return json(route, { code: state.overageStatus, message: "paid usage status unavailable" }, state.overageStatus), true;
     if (m === "PUT") {
       if (state.consentPutDelayMs) await new Promise((r) => setTimeout(r, state.consentPutDelayMs));
       if (state.consentPutStatus !== 200) return json(route, { code: state.consentPutStatus, message: "paid usage update failed" }, state.consentPutStatus), true;
       state.log.push(`PUT paid_overage ${p.split("/")[2]}`);
       const { enabled } = request.postDataJSON() || {};
-      state.overage = { ...state.overage, effective: !!enabled, organization: { ...state.overage.organization, enabled: !!enabled } };
+      // A PUT on the payer's own path flips the payer row; any other org is this org.
+      if (state.overage.payer && p.split("/")[2] === state.overage.payer.org_id)
+        state.overage = { ...state.overage, payer: { ...state.overage.payer, enabled: !!enabled } };
+      else state.overage = { ...state.overage, effective: !!enabled, organization: { ...state.overage.organization, enabled: !!enabled } };
     }
     if (state.overageStatus !== 200) return json(route, { code: state.overageStatus, message: "paid usage read failed" }, state.overageStatus), true;
+    if (m === "GET" && state.overage.payer && p.split("/")[2] === state.overage.payer.org_id)
+      return json(route, { ...state.overage, organization: state.overage.payer, payer: null }), true;
     return json(route, state.overage), true;
   }
   return false;
@@ -404,6 +425,73 @@ function listRow(chat, state) {
       pending_approval: !!chat.pending_approval,
     }),
   };
+}
+
+/** The toolset list, records, writes and the health test; health fields only while `toolsetHealthEnabled`. */
+async function toolsetRoute(route, state, m, [, id, test]) {
+  const request = route.request();
+  state.toolsets ??= TOOLSETS.toolsets.map((t) => ({ ...TOOLSET_RECORDS[t.id] }));
+  const withHealth = (t) => (state.toolsetHealthEnabled ? { ...t, ...TOOLSET_HEALTH[t.id] } : t);
+  if (test) {
+    if (!state.toolsetHealthEnabled) return json(route, { code: 404, message: "Not Found" }, 404);
+    return json(route, state.toolsetTestResults.shift() ?? { ok: true, duration_ms: 140 });
+  }
+  if (m === "GET" && state.toolsetsDelayMs) await new Promise((r) => setTimeout(r, state.toolsetsDelayMs));
+  if (m === "GET" && state.toolsetsStatus !== 200) return json(route, { code: state.toolsetsStatus, message: "toolsets unavailable" }, state.toolsetsStatus);
+  const found = id && state.toolsets.find((t) => t.id === decodeURIComponent(id));
+  if (m === "GET") {
+    if (!id) return json(route, { toolsets: state.toolsets.map(({ data, ...row }) => withHealth({ ...row, data: { allowed_subcommands: data?.allowed_subcommands, requires_confirmation: data?.requires_confirmation } })) });
+    return found ? json(route, withHealth(found)) : json(route, { code: 404, message: "toolset not found" }, 404);
+  }
+  const body = request.postDataJSON() || {};
+  state.toolsetWrites.push({ method: m, id: id ? decodeURIComponent(id) : null, body });
+  const refused = m === "PUT" && found && state.secretMergeEnabled ? keptSecretRefusal(found, body) : null;
+  if (refused) return json(route, { code: "invalid_request", error_code: "destination_changed", fields: refused, message: "Re-enter every secret: a kept secret cannot go with a changed destination or credential entry" }, 400);
+  if (m === "DELETE") state.toolsets = state.toolsets.filter((t) => t !== found);
+  else if (m === "PATCH" && found) Object.assign(found, body);
+  else if (m === "PUT" && found) Object.assign(found, body);
+  else if (m === "POST") state.toolsets.push({ ...body, id: `ts_new_${state.toolsets.length}` });
+  return json(route, m === "POST" ? { id: `ts_new_${state.toolsets.length - 1}` } : {});
+}
+
+/** The server keeps `***` only when no destination field and no other secret in the update changed. */
+function keptSecretRefusal(stored, body) {
+  const SECRET = ["headers", "env", "credential_files"];
+  const DEST = ["url", "command", "allowed_subcommands", "blocked_subcommands", "requires_confirmation"];
+  const incoming = body.data || {};
+  const was = stored.data || {};
+  const maps = SECRET.filter((f) => incoming[f] && typeof incoming[f] === "object");
+  if (!maps.some((f) => Object.values(incoming[f]).includes("***"))) return null;
+  const same = (a, b) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+  const fields = DEST.filter((f) => f in incoming && !same(incoming[f], was[f] ?? (f === "requires_confirmation" ? false : undefined)));
+  for (const f of maps) if (Object.entries(incoming[f]).some(([k, v]) => v !== "***" && was[f]?.[k] !== v)) fields.push(f);
+  return fields.length ? fields : null;
+}
+
+/** Grants: 404 while `grantsEnabled` is off; DELETE removes the row. */
+function grantRoute(route, state, m, p) {
+  if (!state.grantsEnabled) return json(route, { code: 404, message: "Not Found" }, 404);
+  state.grants ??= GRANTS.map((g) => ({ ...g }));
+  const id = p.match(/\/grants\/([^/]+)$/)?.[1];
+  if (m === "DELETE" && id) {
+    state.log.push(`REVOKE grant ${decodeURIComponent(id)}`);
+    state.grants = state.grants.filter((g) => g.id !== decodeURIComponent(id));
+    return json(route, {});
+  }
+  return json(route, state.grants);
+}
+
+/** Activity: 404 while `activityEnabled` is off; undo marks the row undone. */
+function activityRoute(route, state, m, p) {
+  if (!state.activityEnabled) return json(route, { code: 404, message: "Not Found" }, 404);
+  state.activity ??= { rows: ACTIVITY.rows.map((a) => ({ ...a })) };
+  const id = p.match(/\/activity\/([^/]+)\/undo$/)?.[1];
+  if (m === "POST" && id) {
+    const row = state.activity.rows.find((a) => a.id === decodeURIComponent(id));
+    if (row) Object.assign(row, { result: { state: "undone" }, undo: { available: false, reason: "already_undone" } });
+    return json(route, { id: `undo_${id}`, undone: id, target: row?.target });
+  }
+  return json(route, state.activity);
 }
 
 /** The stored org settings, or the B-14 defaults the server starts an org with. */

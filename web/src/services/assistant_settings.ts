@@ -42,6 +42,7 @@ export type OrgAiSettingsUpdate = Pick<
 export interface ToolsetTestResult {
   ok: boolean;
   duration_ms?: number;
+  /** The server's fixed sentence for why the test failed. */
   error?: string;
 }
 
@@ -68,22 +69,27 @@ export interface AssistantGrant {
   granted_at: number;
 }
 
+export type ActivityApprovalKind = "approved" | "standing" | "none";
+
+export type ActivityResultState = "done" | "failed" | "undone";
+
 export interface AssistantActivityEntry {
   id: string;
   at: number;
   action: string;
-  actor: string;
+  /** The member the assistant acted for. */
+  on_behalf_of: string;
   target?: { type?: string; id?: string; name?: string; link?: string; deleted?: boolean };
-  approval?: "user" | "standing" | "none";
-  approved_by?: string;
-  result?: { state: "done" | "failed" | "partial"; cause?: string; done?: number; total?: number };
-  undoable?: boolean;
-  undone_at?: number;
+  approval?: { kind: ActivityApprovalKind; by?: string };
+  result?: { state: ActivityResultState; message?: string };
+  undo: { available: boolean; until?: number; reason?: string };
+  /** On an undo's own row, the row it reverted. */
+  undo_of?: string;
   chat_id?: string;
 }
 
 export interface AssistantActivityPage {
-  items: AssistantActivityEntry[];
+  rows: AssistantActivityEntry[];
   next_cursor?: string;
 }
 
@@ -147,10 +153,11 @@ export function parseCapabilityStatus(body: unknown): CapabilityStatus | null {
   };
 }
 
-/** A body that is not an object, or has no boolean `ok`, reads as a failed test. */
+/** A body that is not an object, or has no boolean `ok`, reads as a failed test; `error` may be `{code, message}`. */
 export function parseTestResult(body: unknown): CapabilityTestResult {
   if (!isRecord(body) || typeof body.ok !== "boolean") return { ok: false };
-  return { ok: body.ok, duration_ms: time(body.duration_ms), error: clip(body.error, MAX_TEXT) };
+  const error = isRecord(body.error) ? body.error.message : body.error;
+  return { ok: body.ok, duration_ms: time(body.duration_ms), error: clip(error, MAX_TEXT) };
 }
 
 /** The body is untrusted: a missing flag or an unknown enum reads as no settings at all. */
@@ -198,38 +205,47 @@ function parseGrant(value: unknown): AssistantGrant | null {
   return grant;
 }
 
+const APPROVAL_KINDS: ReadonlySet<string> = new Set(["approved", "standing", "none"]);
+
+const RESULT_STATES: ReadonlySet<string> = new Set(["done", "failed", "undone"]);
+
+function parseActivityTarget(t: Record<string, unknown>): AssistantActivityEntry["target"] {
+  return {
+    type: text(t.type),
+    id: text(t.id),
+    name: text(t.name),
+    link: text(t.link),
+    deleted: t.deleted === true,
+  };
+}
+
 function parseActivityEntry(value: unknown): AssistantActivityEntry | null {
   if (!isRecord(value)) return null;
   const id = text(value.id);
   const at = time(value.at);
   const action = text(value.action);
-  const actor = text(value.actor);
+  const actor = text(value.on_behalf_of);
   if (!id || at === undefined || !action || !actor) return null;
-  const entry: AssistantActivityEntry = { id, at, action, actor };
-  if (isRecord(value.target)) {
-    const t = value.target;
-    entry.target = {
-      type: text(t.type),
-      id: text(t.id),
-      name: text(t.name),
-      link: text(t.link),
-      deleted: t.deleted === true,
-    };
-  }
-  if (value.approval === "user" || value.approval === "standing" || value.approval === "none")
-    entry.approval = value.approval;
-  entry.approved_by = text(value.approved_by);
+  const undo = isRecord(value.undo) ? value.undo : {};
+  const entry: AssistantActivityEntry = {
+    id,
+    at,
+    action,
+    on_behalf_of: actor,
+    undo: {
+      available: undo.available === true,
+      until: time(undo.until),
+      reason: text(undo.reason),
+    },
+  };
+  if (isRecord(value.target)) entry.target = parseActivityTarget(value.target);
+  const approval = value.approval;
+  if (isRecord(approval) && APPROVAL_KINDS.has(approval.kind as string))
+    entry.approval = { kind: approval.kind as ActivityApprovalKind, by: text(approval.by) };
   const result = value.result;
-  if (isRecord(result) && ["done", "failed", "partial"].includes(result.state as string)) {
-    entry.result = {
-      state: result.state as "done" | "failed" | "partial",
-      cause: text(result.cause),
-      done: time(result.done),
-      total: time(result.total),
-    };
-  }
-  entry.undoable = value.undoable === true;
-  entry.undone_at = time(value.undone_at);
+  if (isRecord(result) && RESULT_STATES.has(result.state as string))
+    entry.result = { state: result.state as ActivityResultState, message: text(result.message) };
+  entry.undo_of = text(value.undo_of);
   entry.chat_id = text(value.chat_id);
   return entry;
 }
@@ -304,9 +320,9 @@ const assistantSettings = {
         params: definedOnly(filter),
       });
       const body = isRecord(res.data) ? res.data : {};
-      const rows = Array.isArray(body.items) ? body.items.slice(0, MAX_ACTIVITY_PAGE) : [];
+      const rows = Array.isArray(body.rows) ? body.rows.slice(0, MAX_ACTIVITY_PAGE) : [];
       const page: AssistantActivityPage = {
-        items: rows.map(parseActivityEntry).filter((e): e is AssistantActivityEntry => e !== null),
+        rows: rows.map(parseActivityEntry).filter((e): e is AssistantActivityEntry => e !== null),
       };
       const cursor = text(body.next_cursor);
       if (cursor) page.next_cursor = cursor;

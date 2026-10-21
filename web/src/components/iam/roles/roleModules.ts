@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import type { I18nKey } from "@/types/i18n";
 
@@ -23,6 +24,8 @@ export type ModuleGroupId =
   | "pipelines"
   | "monitoring"
   | "ai"
+  | "assistant"
+  | "llmObservability"
   | "access"
   | "platform"
   | "other";
@@ -49,6 +52,9 @@ export type RoleModule = {
   countedKeys: string[];
 };
 
+/** Client copy for a module until the server sends translated labels. */
+export type ModuleCopy = { labelKey: I18nKey; descKey: I18nKey };
+
 /** Rail key of the view that lists every module's own grant row; no resource key starts with `__`. */
 export const ALL_MODULES_KEY = "__all__";
 
@@ -69,6 +75,20 @@ export const GROUP_ORDER: ModuleGroupId[] = [
   "other",
 ];
 
+/** The assistant's own modules sit next to alerting; LLM observability stays with the data tools. */
+export const GROUP_ORDER_V2: ModuleGroupId[] = [
+  "data",
+  "dashboards",
+  "alerting",
+  "assistant",
+  "pipelines",
+  "monitoring",
+  "llmObservability",
+  "access",
+  "platform",
+  "other",
+];
+
 export const GROUP_LABEL_KEYS: Record<ModuleGroupId, I18nKey> = {
   data: "iam.editRole.moduleGroupData",
   dashboards: "iam.editRole.moduleGroupDashboards",
@@ -76,6 +96,8 @@ export const GROUP_LABEL_KEYS: Record<ModuleGroupId, I18nKey> = {
   pipelines: "iam.editRole.moduleGroupPipelines",
   monitoring: "iam.editRole.moduleGroupMonitoring",
   ai: "iam.editRole.moduleGroupAi",
+  assistant: "iam.modules.groups.assistant",
+  llmObservability: "iam.modules.groups.llmObservability",
   access: "iam.editRole.moduleGroupAccess",
   platform: "iam.editRole.moduleGroupPlatform",
   other: "iam.editRole.moduleGroupOther",
@@ -220,12 +242,43 @@ const ICON_OF: Record<string, IconName> = {
   remote_task: "cloud",
 };
 
+const ASSISTANT_KEYS: ReadonlySet<string> = new Set(["ai", "ai_chat_share", "ai_toolsets", "mcp"]);
+
+// The assistant group uses its own glyphs, none shared with LLM observability.
+const ASSISTANT_ICON_OF: Record<string, IconName> = {
+  ai: assistantGlyph.assistant,
+  ai_chat_share: "share",
+  ai_toolsets: "extension",
+  mcp: "link",
+};
+
+// A client catalogue until GET /resources returns its own `group` and `description`.
+export const MODULE_COPY: Record<string, ModuleCopy> = {
+  ai: { labelKey: "iam.modules.labels.ai", descKey: "iam.modules.descriptions.ai" },
+  ai_chat_share: {
+    labelKey: "iam.modules.labels.ai_chat_share",
+    descKey: "iam.modules.descriptions.ai_chat_share",
+  },
+  ai_toolsets: {
+    labelKey: "iam.modules.labels.ai_toolsets",
+    descKey: "iam.modules.descriptions.ai_toolsets",
+  },
+  mcp: { labelKey: "iam.modules.labels.mcp", descKey: "iam.modules.descriptions.mcp" },
+};
+
+export const GROUP_DESC_KEYS: Partial<Record<ModuleGroupId, I18nKey>> = {
+  llmObservability: "iam.modules.descriptions.llmObservability",
+};
+
 const FALLBACK_ICON: IconName = "category";
 
 export const moduleIcon = (key: string): IconName => ICON_OF[key] ?? FALLBACK_ICON;
 
 /** Rail modules from the catalogue, one per resource; children open from inside their parent. */
-export const buildRoleModules = (resources: CatalogResource[]): RoleModule[] => {
+export const buildRoleModules = (
+  resources: CatalogResource[],
+  options: { assistantV2?: boolean } = {},
+): RoleModule[] => {
   const visible = resources
     .filter((resource) => resource.visible !== false)
     .slice()
@@ -233,6 +286,14 @@ export const buildRoleModules = (resources: CatalogResource[]): RoleModule[] => 
   const keys = new Set(visible.map((resource) => resource.key));
   const childrenOf = (key: string) =>
     visible.filter((child) => child.parent === key).map((child) => child.key);
+  const groupOf = (key: string): ModuleGroupId | undefined => {
+    const group = GROUP_OF[key];
+    if (!options.assistantV2 || group !== "ai") return group;
+    return ASSISTANT_KEYS.has(key) ? "assistant" : "llmObservability";
+  };
+  const iconOf = (key: string): IconName | undefined =>
+    (options.assistantV2 ? ASSISTANT_ICON_OF[key] : undefined) ?? ICON_OF[key];
+  const order = options.assistantV2 ? GROUP_ORDER_V2 : GROUP_ORDER;
 
   const modules: RoleModule[] = visible
     // A child whose parent is listed is reached by opening that parent, like a folder.
@@ -240,12 +301,12 @@ export const buildRoleModules = (resources: CatalogResource[]): RoleModule[] => 
     .map((resource) => ({
       key: resource.key,
       // A child listed without its parent still belongs where that parent would have been; the API sends `parent: ""` at top level.
-      group: GROUP_OF[resource.key] || GROUP_OF[resource.parent ?? ""] || "other",
-      icon: ICON_OF[resource.key] || ICON_OF[resource.parent ?? ""] || FALLBACK_ICON,
+      group: groupOf(resource.key) || groupOf(resource.parent ?? "") || "other",
+      icon: iconOf(resource.key) || iconOf(resource.parent ?? "") || FALLBACK_ICON,
       hasEntities: resource.has_entities !== false,
       scopeKeys: [resource.key],
       countedKeys: [resource.key, ...childrenOf(resource.key)],
     }));
 
-  return modules.sort((a, b) => GROUP_ORDER.indexOf(a.group) - GROUP_ORDER.indexOf(b.group));
+  return modules.sort((a, b) => order.indexOf(a.group) - order.indexOf(b.group));
 };

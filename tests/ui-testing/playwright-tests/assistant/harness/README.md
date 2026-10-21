@@ -156,11 +156,17 @@ Read by the stream shim in the page (set at `installMocks`, changed later with
 `cancelStatus` (the `POST …/cancel` answer, also on the Node-side XHR route;
 `window.__o2mock.cancels` records each cancel).
 
+Toolsets, grants, activity and credits: `toolsets` (rows behind `GET …/ai/toolsets`, default
+`TOOLSET_RECORDS`), `toolsetsStatus`, `toolsetsDelayMs`, `toolsetWrites` (every POST/PUT/PATCH/DELETE
+as `{ method, id, body }`), `toolsetHealthEnabled` (B-15 fields from `TOOLSET_HEALTH` and the
+`…/test` route, 404 while off), `toolsetTestResults`, `secretMergeEnabled` (the capabilities
+answer's `toolset_secret_merge`), `grantsEnabled` / `grants` (B-16, 404 while off; a revoke logs
+`REVOKE grant {id}`), `activityEnabled` / `activity` (B-17, 404 while off; undo marks the row undone),
+`usage` / `usageStatus` (`GET …/ai/usage`) and `overageStatus` (`GET …/paid_overage`).
+
 Declared with a no-op default, filled in by the WP that owns the behaviour:
-`decisionFramesEnabled`, `policyEnforced`, `ephemeralEnabled`, `usage`,
-`usageStatus`, `overageStatus`, `consentPutStatus`, `settingsEnabled`, `settings`,
-`toolsetHealthEnabled`, `grantsEnabled`, `activityEnabled`, `secretMergeEnabled`,
-`importEnabled`, `orgs`.
+`decisionFramesEnabled`, `policyEnforced`, `ephemeralEnabled`, `consentPutStatus`,
+`settingsEnabled`, `settings`, `importEnabled`, `orgs`.
 
 ## Helpers (`setup.mjs`)
 

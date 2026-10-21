@@ -1193,7 +1193,18 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
     scope: "ai-toolsets",
     visible: enterprise,
     shortcuts: [
-      { id: "aiToolsetsRefresh", key: "r", descriptionKey: "shortcuts.actions.aiToolsetsRefresh" },
+      {
+        id: "aiToolsetsRefresh",
+        key: "r",
+        descriptionKey: "shortcuts.actions.aiToolsetsRefresh",
+        visible: () => !isAssistantV2(),
+      },
+      {
+        id: "assistantToolsetsRefresh",
+        key: "r",
+        descriptionKey: "shortcuts.actions.assistantToolsetsRefresh",
+        visible: () => isAssistantV2(),
+      },
     ],
   },
 

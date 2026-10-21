@@ -96,7 +96,16 @@ describe("AssistantSettingsView", () => {
     const { w } = await mountView("/settings/assistant/status");
     wrapper = w;
     expect(w.find('[data-test="settings-assistant-page-title"]').text()).toBe("O2 Assistant");
-    for (const id of ["status", "access", "data", "history", "usage"]) {
+    for (const id of [
+      "status",
+      "access",
+      "data",
+      "history",
+      "usage",
+      "toolsets",
+      "permissions",
+      "activity",
+    ]) {
       expect(w.find(`[data-test="settings-assistant-tab-${id}"]`).exists()).toBe(true);
     }
   });

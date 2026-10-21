@@ -1412,6 +1412,7 @@
   "menu": {
     "alertCalibration": "Alert Calibration",
     "autoobserve": "AutoObserve",
+    "llmObservability": "LLM observability",
     "upgradeToProPlan": "Upgrade to PRO Plan",
     "home": "Home",
     "about": "About",
@@ -3252,8 +3253,22 @@
     "indices": "Indices",
     "roleAdmin": "Admin",
     "modules": {
+      "descriptions": {
+        "ai": "Chat with the assistant, use AI query help and run incident analysis.",
+        "ai_chat_share": "Share chats inside the organization and open chats others shared. Admin-only until granted.",
+        "ai_toolsets": "Add and change the tools the assistant can use.",
+        "llmObservability": "Tracing, evaluation and prompts for your own LLM applications. Not {product}.",
+        "mcp": "Connect external AI clients ({clients}) to this organization through MCP."
+      },
       "groups": {
-        "assistant": "Assistant"
+        "assistant": "Assistant",
+        "llmObservability": "LLM observability"
+      },
+      "labels": {
+        "ai": "{product}",
+        "ai_chat_share": "Chat sharing",
+        "ai_toolsets": "Toolsets",
+        "mcp": "MCP access"
       }
     }
   },
@@ -7836,6 +7851,45 @@
       "undone": "Undone · {name} restored",
       "you": "you"
     },
+    "activity": {
+      "actor": "Filter by person",
+      "approved": "Approved",
+      "approvedBy": "Approved by {user}",
+      "columns": {
+        "action": "Action",
+        "actions": "Actions",
+        "actor": "On behalf of",
+        "approval": "Approved",
+        "result": "Result",
+        "target": "Target",
+        "when": "When"
+      },
+      "done": "Done",
+      "empty": "No assistant actions in this period.",
+      "failed": "Failed: {cause}",
+      "failedPlain": "Failed",
+      "loadFailed": "Activity could not be loaded.",
+      "next": "Next",
+      "noApproval": "No approval needed",
+      "openAudit": "Open the audit stream in Logs",
+      "openChat": "Open chat",
+      "previous": "Previous",
+      "rangeLabel": "Time range",
+      "ranges": {
+        "day": "Last 24 hours",
+        "month": "Last 30 days",
+        "week": "Last 7 days"
+      },
+      "search": "Search activity",
+      "standing": "Standing approval",
+      "undo": "Undo",
+      "undoDone": "Undid: {action}",
+      "undoMessage": "Undo \"{action}\" on {target} from the saved copy. Notifications already sent can't be undone.",
+      "undoNamed": "Undo {action}",
+      "undoTitle": "Undo this action?",
+      "undoneState": "Undone",
+      "unsupported": "Activity history needs a newer server version."
+    },
     "announce": {
       "approval": "Waiting for your approval: {title}.",
       "approvalExpires": "Waiting for your approval: {title}. Expires in {duration}.",
@@ -7973,6 +8027,54 @@
       "span": "Span"
     },
     "beta": "Beta",
+    "billing": {
+      "allowance": {
+        "confirm": "Set limit",
+        "confirmMessage": "Set the AI credit limit for {org} to {limit}, below its {used} used? The organization is blocked immediately.",
+        "confirmTitle": "Set a limit below current usage?",
+        "floorWarning": "Below current usage ({used}). The organization is blocked immediately unless paid usage is on.",
+        "limit": "Limit",
+        "mode": "Mode",
+        "modeUnavailable": "Mode unavailable",
+        "setAnyway": "Set limit anyway",
+        "used": "Used"
+      },
+      "managePaidUsage": "Manage paid usage",
+      "mode": {
+        "consentRequired": "Included credits are used up. Allow paid usage to keep using the assistant.",
+        "exhaustedContract": "AI credits are used up. Contact your account manager.",
+        "exhaustedContractMember": "AI credits are used up. Ask an organization admin to contact your account manager.",
+        "exhaustedSubscribe": "AI credits are used up. Subscribe to continue.",
+        "freeNoRenew": "Included credits don't renew.",
+        "freeResets": "Resets {date}"
+      },
+      "paidUsage": {
+        "allow": "Allow paid usage",
+        "allowFor": "Allow paid usage for {org}",
+        "allowed": "Allowed",
+        "creditsFirst": "Additional credits are required",
+        "effectiveOff": "In effect: paid usage off",
+        "effectiveOn": "In effect: paid usage on",
+        "effectiveWaiting": "In effect: paid usage off. Waiting for {org}",
+        "enabledBy": "Enabled by {email} on {date}",
+        "managedBy": "Managed by {org}'s admins",
+        "notAllowed": "Not allowed",
+        "offConfirm": "Turn off",
+        "offMessage": "Everyone in the organization stops at the included credits. Running requests finish.",
+        "offTitle": "Turn off paid AI usage for {org}?",
+        "payerOrg": "Payer organization ({org})",
+        "subscribeFirst": "Subscribe to allow paid usage",
+        "thisOrg": "This organization ({org})",
+        "title": "Paid usage",
+        "unavailable": "Paid usage status unavailable.",
+        "updateFailed": "Paid usage could not be updated."
+      },
+      "subscribe": "Subscribe",
+      "title": "AI credits",
+      "usageUnavailable": "Credit usage unavailable",
+      "usedBilled": "{limit} included credits used · {billed} billed",
+      "usedOf": "{used} of {limit} included credits used"
+    },
     "claim": {
       "name": "Evidence {n}, {step}",
       "notAvailable": "Evidence not available in this view"
@@ -8728,6 +8830,29 @@
       },
       "whereToGrant": "{iam} › {roles} › {group}"
     },
+    "grants": {
+      "always": "Always",
+      "alwaysAsk": "Deletes and billing, IAM and retention changes always ask.",
+      "browserEmpty": "This browser keeps no standing approvals.",
+      "columns": {
+        "actions": "Actions",
+        "grantedAt": "Granted",
+        "grantedBy": "Granted by",
+        "scope": "Scope",
+        "tool": "Tool or operation"
+      },
+      "empty": "No standing approvals.",
+      "loadFailed": "Standing approvals could not be loaded.",
+      "openChat": "Open chat",
+      "revoke": "Revoke",
+      "revokeNamed": "Revoke always-allow for {tool}",
+      "revoked": "Approval revoked. The assistant will ask next time.",
+      "thisChat": "This chat",
+      "title": "Standing approvals",
+      "unsupported": "Organization-wide approvals need a newer server version.",
+      "yours": "Your approvals",
+      "yoursInBrowser": "Your approvals in this browser"
+    },
     "header": {
       "announceFailed": "Answer failed: {title}.",
       "announceNeedsYou": "{product} needs you: {title}.",
@@ -9026,6 +9151,15 @@
       "openIn": "Open in {explorer}",
       "unsupported": "This destination isn't supported in this version"
     },
+    "mcp": {
+      "copyConfiguration": "Copy configuration",
+      "deepLinkTokenNote": "This link includes your access token.",
+      "headerSubtitle": "Use OpenObserve from your own agent, such as {claude}, {cursor} or {vscode}.",
+      "parityLine": "Your agent gets the same tools and permissions as {product}. Tools {product} itself can use are set up in {link}.",
+      "replaceToken": "Replace {token} with the token you generate above, or with the Base64 of a service account's email:token.",
+      "skillsHint": "Teaches your agent how to query, alert and build dashboards in {brand}.",
+      "toolsetsPath": "Settings › {product} › Toolsets"
+    },
     "message": {
       "actionsName": "Message actions",
       "chipsName": "Context sent with this message",
@@ -9143,6 +9277,17 @@
         "publicSharingDeploymentOff": "Public links are off for this deployment (ZO_PUBLIC_AI_CHAT_ENABLED).",
         "publicSharingLine": "Public link options disappear from the share dialog.",
         "rbacOff": "Role-based access is off in this deployment, so every user is an admin and can use the assistant.",
+        "roles": {
+          "allRoles": "IAM › Roles",
+          "capped": "Showing {shown} of {total} roles. See all roles in {link}.",
+          "chat": "Can chat",
+          "grant": "Grant chat",
+          "grantNamed": "Grant chat to {role}",
+          "loadFailed": "Roles could not be loaded.",
+          "noChat": "No chat",
+          "title": "Roles in this organization",
+          "unknown": "Unknown"
+        },
         "save": "Save",
         "saved": "Assistant settings saved",
         "sharing": "Sharing",
@@ -9207,7 +9352,7 @@
       "leaveName": "the assistant settings of {org}",
       "offInDeployment": "The assistant is off in this deployment, so these settings have no effect yet.",
       "pageTitle": "{product}",
-      "railDesc": "Status, access, data, history and usage",
+      "railDesc": "Status, access, data, history, usage, toolsets, permissions and activity",
       "status": {
         "agentEnabled": "Assistant enabled",
         "agentHa": "High availability",
@@ -9234,9 +9379,12 @@
       },
       "tabs": {
         "access": "Access",
+        "activity": "Activity",
         "data": "Data",
         "history": "History",
+        "permissions": "Permissions",
         "status": "Status",
+        "toolsets": "Toolsets",
         "usage": "Usage"
       },
       "test": {
@@ -9548,6 +9696,113 @@
       "start": "Start",
       "titleCounter": "{count}/200",
       "unpin": "Unpin"
+    },
+    "toolsets": {
+      "add": "New toolset",
+      "clash": "Name clash",
+      "clashTip": "Both reach the assistant as {agent}; one hides the other.",
+      "columns": {
+        "actions": "Actions",
+        "enabled": "Enabled",
+        "kind": "Kind",
+        "lastUsed": "Last used",
+        "name": "Name",
+        "status": "Status"
+      },
+      "deleteFailed": "{name} could not be deleted.",
+      "deleteMessage": "{product} and incident analysis lose this tool from the next answer. Chats that used it keep their history.",
+      "deleteNamed": "Delete {name}",
+      "deleteTitle": "Delete {name}?",
+      "deleted": "{name} deleted",
+      "editNamed": "Edit {name}",
+      "empty": "No toolsets yet. Add an MCP server, a CLI tool or a skill the assistant can use.",
+      "emptyTitle": "No toolsets yet",
+      "enableFailed": "{name} could not be updated.",
+      "enabledFor": "Enabled, {name}",
+      "form": {
+        "aboutCli": "Each run stops after {timeout} seconds and keeps at most {bytes} bytes of output.",
+        "aboutCliLabel": "About CLI tools",
+        "added": "Toolset added. {product} and incident analysis in {org} can use it from the next answer.",
+        "agentName": "The assistant calls this {agent}",
+        "allowHelp": "Only these subcommands can run. Separate with commas.",
+        "allowRequired": "Enter at least one subcommand",
+        "approvalOff": "The assistant runs this command without asking. Only turn this off for read-only commands.",
+        "approvalOffConfirm": "Turn off approval",
+        "approvalOffMessage": "Allowed subcommands: {allow}",
+        "approvalOffTitle": "Let the assistant run {command} without asking?",
+        "approvalOn": "Members see an approval card with the exact command before it runs.",
+        "back": "Back to toolsets",
+        "cliSection": "CLI tool",
+        "descriptionHelp": "The assistant reads this to decide when to call the tool. Say what it does and when to use it, e.g. 'Look up who is on call and page them for PagerDuty services.'",
+        "descriptionLabel": "What the assistant should use this tool for",
+        "editTitle": "Edit toolset",
+        "enterAgain": "Enter the value again",
+        "insertTemplate": "Insert template",
+        "kindLocked": "The kind can't change after creation; create a new toolset instead.",
+        "leaveName": "changes to {name} in {org}",
+        "loadFailed": "This toolset could not be loaded.",
+        "maskValue": "*** is how a kept secret is sent. Enter the real value.",
+        "mcpSection": "MCP server",
+        "nameClash": "Another toolset already reaches the assistant as {agent}",
+        "newTitle": "New toolset",
+        "presets": "Quick fill",
+        "reenterDestination": "The stored secrets can't be kept when the URL, command, allowed subcommands or approval change. Enter every secret again before saving.",
+        "reenterRefused": "The server dropped the stored secrets for this change. Enter every secret again, then save.",
+        "reenterSecret": "The stored secrets can't be kept next to a new or replaced one. Enter every secret again before saving.",
+        "requireApproval": "Require approval before each run",
+        "retypeNotice": "This server version needs every secret entered again when you save.",
+        "saveFailed": "The toolset could not be saved.",
+        "scope": "Runs on the OpenObserve server as the credentials below, on behalf of the member who asked.",
+        "skillTemplate": "## When to use\n\n## Steps\n\n## Examples\n",
+        "updated": "Toolset updated"
+      },
+      "healthUnsupported": "Status, last used and per-toolset enable need a newer server version.",
+      "kinds": {
+        "cli": "CLI tool",
+        "generic": "Generic",
+        "mcp": "MCP server",
+        "skill": "Skill"
+      },
+      "loadFailed": "Toolsets could not be loaded.",
+      "mcpLine": "To use OpenObserve from your own agent, see {link}.",
+      "mcpLink": "MCP server",
+      "moreFor": "More actions for {name}",
+      "notSetUp": "Toolsets take effect once the assistant is set up.",
+      "runtimeRule": "Enabled toolsets are available to {product} and to incident analysis in this organization.",
+      "search": "Search toolsets",
+      "secret": {
+        "hide": "Hide value",
+        "keep": "Keep current",
+        "keyLocked": "Replace the value to rename",
+        "remove": "Remove",
+        "removeEnv": "Remove variable {key}",
+        "removeFile": "Remove credential file {key}",
+        "removeHeader": "Remove header {key}",
+        "replace": "Replace",
+        "show": "Show value",
+        "unchanged": "Unchanged",
+        "willReplace": "Will be replaced on save"
+      },
+      "status": {
+        "disabled": "Disabled",
+        "failing": "Failing",
+        "failingNow": "Failing since just now · {cause}",
+        "failingNowPlain": "Failing since just now",
+        "failingSince": "Failing since {when}",
+        "never": "Never used",
+        "ok": "OK",
+        "okIn": "OK · {ms} ms"
+      },
+      "test": "Test",
+      "testFailed": "Test failed for {name}: {cause}",
+      "testFailedPlain": "Test failed for {name}",
+      "testFailedRequest": "the test could not run",
+      "testNamed": "Test {name}",
+      "testPassed": "Test passed for {name} in {ms} ms",
+      "testUnsupported": "testing needs a newer server version",
+      "testing": "Testing",
+      "unguarded": "Runs without approval",
+      "viewOnly": "You can view toolsets. Editing needs the Toolsets permission in IAM › Roles."
     },
     "transcript": {
       "answerName": "Answer to {prompt}",
@@ -13375,6 +13630,10 @@
     }
   },
   "settings": {
+    "groups": {
+      "data": "Data",
+      "llmObservability": "LLM observability"
+    },
     "header": "Settings",
     "correlationSettings": "Correlation Settings",
     "generalLabel": "General Settings",
@@ -20516,6 +20775,7 @@
       "actionsRefresh": "Refresh list",
       "llmProvidersRefresh": "Refresh list",
       "aiToolsetsRefresh": "Refresh list",
+      "assistantToolsetsRefresh": "Refresh toolsets",
       "orgManagementRefresh": "Refresh list",
       "rumErrorsRefresh": "Refresh list",
       "rumErrorsCopyUrl": "Copy error tracking share URL",
@@ -25247,6 +25507,7 @@
     "consentBillingPayer": "After free credits run out, AI usage is billed at your plan's rate on the invoice of {payer}.",
     "organizationBillingCycle": "Paid AI usage is billed on this organization's invoice.",
     "payerBillingCycle": "Paid AI usage is billed on the payer organization's invoice.",
+    "readOnlyAdmin": "Only an organization administrator can change this setting.",
     "viewBilling": "View billing",
     "memberAndPayerRequired": "{payer} must also turn on paid AI usage before {organization} can use it.",
     "contactPayerAdmin": "Ask an admin of {payer} to turn on paid AI usage.",

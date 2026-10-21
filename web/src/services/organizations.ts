@@ -102,7 +102,7 @@ const organizations = {
   set_quota_usage_limit: (
     orgIdentifier: string,
     pool: string,
-    data: { org_id: string; limit: number },
+    data: { org_id: string; limit: number; force?: boolean },
   ) => {
     return http().put(`/api/${orgIdentifier}/quota/${pool}/usage_limit`, data);
   },

@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         role="status"
         class="border-status-warning-text bg-status-warning-bg text-status-warning-text rounded-default border px-4 py-3 text-sm"
       >
-        {{ t("billing.aiContractExhaustedMessage") }}
+        {{ assistantV2 ? t(exhaustedLine) : t("billing.aiContractExhaustedMessage") }}
       </div>
       <!-- tab-info-section -->
       <!-- this will be unlocked when we get the rum sessions , error tracking from BE -->
@@ -140,7 +140,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ "$" + usageCost[tile.key] }}
           </div>
+          <div
+            v-if="assistantV2 && tile.key === 'ai_credits' && sharedAiUsage"
+            class="flex flex-wrap items-center gap-1 max-lg:hidden"
+            data-test="billings-usage-ai-summary"
+          >
+            <OTag type="aiMode" :value="sharedAiUsage.mode" />
+            <span class="text-text-secondary text-(length:--text-xs)">{{ aiCreditsLine }}</span>
+          </div>
         </div>
+      </div>
+      <!-- Below lg the tiles are compact chips, so the AI summary wraps on its own row under them. -->
+      <div
+        v-if="assistantV2 && sharedAiUsage && !dataLoading && Object.keys(usageData).length > 0"
+        class="flex flex-wrap items-center gap-1 lg:hidden"
+        data-test="billings-usage-ai-summary-compact"
+      >
+        <OTag type="aiMode" :value="sharedAiUsage.mode" />
+        <span class="text-text-secondary text-(length:--text-xs)">{{ aiCreditsLine }}</span>
       </div>
       <!-- charts section -->
       <div></div>
@@ -228,7 +245,7 @@ import { useI18nTyped, type I18nText } from "@/types/i18n";
 import useBreakpoint from "@/composables/useBreakpoint";
 import BillingService from "@/services/billings";
 import { updateOrgSettingsMutation } from "@/services/organizations.queries";
-import { useMutation } from "@tanstack/vue-query";
+import { useMutation, useQuery } from "@tanstack/vue-query";
 import { useRouter } from "vue-router";
 import { getImageURL } from "@/utils/zincutils";
 import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue";
@@ -236,9 +253,13 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { buildUsageCombinedLinePanelSchema } from "./usageDailyPanelSchema";
 import config from "@/aws-exports";
+import { isAssistantV2, useAssistantCapability } from "@/composables/assistant";
+import { creditsLineOf, exhaustedContractKey } from "./assistantBilling";
+import { assistantUsageQuery } from "@/services/assistant.queries";
 
 export default defineComponent({
   name: "Usage",
@@ -248,6 +269,7 @@ export default defineComponent({
     OEmptyState,
     OTruncatedText,
     ConfirmDialog,
+    OTag,
   },
   setup() {
     const { t } = useI18nTyped();
@@ -830,7 +852,29 @@ export default defineComponent({
       },
     });
 
+    const assistantV2 = isAssistantV2();
+    // The runtime exists only with v2 on, so the legacy page never starts it.
+    const capability = assistantV2 ? useAssistantCapability() : null;
+    // The same words as the credits card, aimed at whoever is reading.
+    const exhaustedLine = computed(() => exhaustedContractKey(capability?.value.isAdmin ?? false));
+    // One shared usage read with the credits card and the assistant, so all of them agree.
+    const sharedUsage = assistantV2
+      ? useQuery(
+          computed(() => assistantUsageQuery(store.state.selectedOrganization?.identifier ?? "")),
+        )
+      : null;
+    const sharedAiUsage = computed(() => sharedUsage?.data.value ?? null);
+    const aiCreditsLine = computed(() => {
+      if (!sharedAiUsage.value) return "";
+      const line = creditsLineOf(sharedAiUsage.value);
+      return t(line.key, line.params);
+    });
+
     return {
+      assistantV2,
+      exhaustedLine,
+      sharedAiUsage,
+      aiCreditsLine,
       lgUp,
       t,
       store,

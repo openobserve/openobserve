@@ -17,6 +17,7 @@ import { describe, it, expect, vi, beforeEach, afterEach, beforeAll, afterAll } 
 import { mount, flushPromises } from "@vue/test-utils";
 import { createRouter, createWebHistory } from "vue-router";
 import OrganizationManagement from "./OrganizationManagement.vue";
+import { resetAssistantV2ForTests } from "@/composables/assistant/flags";
 import { makeAiCreditsSchema, makeExtendTrialSchema } from "./OrganizationManagement.schema";
 import i18nInstance from "@/locales";
 import type { TranslateFn } from "@/types/i18n";
@@ -1418,6 +1419,44 @@ describe("OrganizationManagement.vue", () => {
         message: "limit update failed",
         timeout: 5000,
       });
+    });
+  });
+
+  describe("assistant allowance floor", () => {
+    afterEach(() => {
+      delete window.__O2_ASSISTANT_V2__;
+      resetAssistantV2ForTests();
+    });
+
+    it("keeps loading until the forced retry after a 409 below_usage resolves", async () => {
+      window.__O2_ASSISTANT_V2__ = true;
+      resetAssistantV2ForTests();
+      let finish: (value: unknown) => void = () => {};
+      mockSetQuotaUsageLimit
+        .mockRejectedValueOnce({
+          response: { status: 409, data: { code: "below_usage", used: 900, limit: 500 } },
+        })
+        .mockImplementationOnce(() => new Promise((resolve) => (finish = resolve)));
+      mockConfirmFn.mockResolvedValue(true);
+      wrapper = createWrapper();
+      wrapper.vm.toggleUsageLimitsDialog({
+        name: "Acme",
+        identifier: "acme",
+        credits_used: 100,
+        credits_limit: 5000,
+      });
+      const pending = wrapper.vm.submitAiCredits({ creditsLimit: 500 });
+      await vi.waitFor(() => expect(mockSetQuotaUsageLimit).toHaveBeenCalledTimes(2));
+      expect(mockSetQuotaUsageLimit).toHaveBeenLastCalledWith("default", "ai_credits", {
+        org_id: "acme",
+        limit: 500,
+        force: true,
+      });
+      expect(wrapper.vm.loading).toBe(true);
+      finish({ data: { used: 900, limit: 500 } });
+      await pending;
+      expect(wrapper.vm.loading).toBe(false);
+      expect(wrapper.vm.usageLimitsRow.credits_limit).toBe(500);
     });
   });
 
