@@ -843,6 +843,15 @@ pub async fn resume_link(
         .into());
     }
     current_dashboard(&link.org_id, &link.dashboard_id).await?;
+    // Resuming would serve again only until the next view pauses it for the same reason.
+    if publisher_left(&link).await {
+        return Err(Invalid(format!(
+            "{} has left this organization, and this link runs queries with their access; \
+             revoke it and publish a new link",
+            link.published_by
+        ))
+        .into());
+    }
     edit(&link.org_id, &link.id, |l| {
         l.enabled = true;
         l.updated_by = Some(user_id.to_string());
