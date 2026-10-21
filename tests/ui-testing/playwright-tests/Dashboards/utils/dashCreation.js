@@ -2,6 +2,7 @@ import { expect } from "playwright/test";
 import logData from "../../../fixtures/log.json";
 import testLogger from '../../utils/test-logger.js';
 import { SELECTORS } from "../../../pages/dashboardPages/dashboard-selectors.js";
+import { safeWaitForNetworkIdle } from "../../utils/wait-helpers.js";
 
 // Function to wait for the dashboard page to load
 export const waitForDashboardPage = async function (page) {
@@ -407,11 +408,12 @@ export async function createLoadedDashboardWithPanel(page, pm, suffix) {
   await pm.dashboardCreate.waitForDashboardUIStable();
   await pm.dashboardCreate.createDashboard(dashboardName);
 
-  await pm.dashboardVariablesScoped.waitForAddPanelBtn();
+  await waitForEmptyDashboardReady(page, dashboardName);
   await addSimplePanel(pm, "Panel1");
 
   await pm.dashboardVariablesScoped.getAnyPanel(0).waitFor({ state: "visible", timeout: 15000 });
   await pm.dashboardVariablesScoped.waitForDashboardReady();
+  await safeWaitForNetworkIdle(page, { timeout: 5000 });
   await pm.dashboardVariablesScoped.waitForPanelIdle("Panel1");
 
   return dashboardName;
