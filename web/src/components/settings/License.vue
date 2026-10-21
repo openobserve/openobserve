@@ -579,9 +579,8 @@ export default defineComponent({
 
     // Only the first load may swap the page for the spinner; later reloads would unmount the form.
     const loadLicenseData = async ({ background = false } = {}) => {
-      const busy = background ? refreshing : loading;
       try {
-        busy.value = true;
+        if (!background) loading.value = true;
         licenseData.value = await queryClient.fetchQuery(licenseQuery());
         if (!background) checkAndAutoFillLicenseFromUrl();
       } catch (error) {
@@ -591,7 +590,7 @@ export default defineComponent({
           message: t("about.failed_to_load_license_info"),
         });
       } finally {
-        busy.value = false;
+        if (!background) loading.value = false;
       }
     };
 
@@ -652,7 +651,13 @@ export default defineComponent({
     };
 
     const triggerLimitRefresh = async () => {
-      if (await refreshLicenseLimits(reloadLicenseData)) await reloadLicenseData();
+      if (refreshing.value) return;
+      refreshing.value = true;
+      try {
+        if (await refreshLicenseLimits(reloadLicenseData)) await reloadLicenseData();
+      } finally {
+        refreshing.value = false;
+      }
     };
 
     const maskKey = (key: string) => {
@@ -744,10 +749,13 @@ export default defineComponent({
       return 3;
     });
 
-    // A pause for a report failure or an LV verdict must not claim the days went over the limit.
+    // Only an evaluated decision names its blocks; a synthesised one (evaluated_at 0) has the counters.
     const pausedOverLimit = computed(() => {
       const decision = licenseData.value.decision;
-      if (decision) return (decision.blocks ?? []).includes("usage_over_limit");
+      if (decision?.search_allowed) return false;
+      if (decision && licenseData.value.evaluated_at !== 0) {
+        return (decision.blocks ?? []).includes("usage_over_limit");
+      }
       return licenseData.value.ingestion_exceeded > limitBreachAllowedCount.value;
     });
 

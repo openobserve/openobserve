@@ -516,6 +516,33 @@ describe("License.vue", () => {
       expect(field().element.value).toBe("half-typed-key");
     });
 
+    it("refresh sends one request per click burst and spins only while it runs", async () => {
+      let resolveRefresh: (v: unknown) => void = () => {};
+      vi.mocked(licenseServer.refresh_license_limits).mockImplementation(
+        () => new Promise((r) => (resolveRefresh = r)) as never,
+      );
+      const first = wrapper.vm.triggerLimitRefresh();
+      const second = wrapper.vm.triggerLimitRefresh();
+      await flushPromises();
+      expect(licenseServer.refresh_license_limits).toHaveBeenCalledTimes(1);
+      expect(wrapper.vm.refreshing).toBe(true);
+
+      resolveRefresh(createAxiosResponse({}));
+      await Promise.all([first, second]);
+      await flushPromises();
+      expect(wrapper.vm.refreshing).toBe(false);
+
+      let resolveReload: (v: unknown) => void = () => {};
+      vi.mocked(licenseServer.get_license).mockImplementation(
+        () => new Promise((r) => (resolveReload = r)) as never,
+      );
+      await vi.advanceTimersByTimeAsync(LICENSE_REFRESH_SETTLE_MS);
+      expect(licenseServer.get_license).toHaveBeenCalled();
+      expect(wrapper.vm.refreshing).toBe(false);
+      resolveReload(createAxiosResponse(mockLicenseData));
+      await flushPromises();
+    });
+
     it("unmounting before the delay cancels the reload", async () => {
       vi.mocked(licenseServer.update_license).mockResolvedValue(
         createAxiosResponse({ success: true }),
@@ -1134,6 +1161,31 @@ describe("License.vue", () => {
 
       expect(wrapper.html()).toContain("allowance left of 3 max");
       expect(wrapper.html()).not.toContain("some application features may be temporarily");
+    });
+
+    it("days over the limit with search still on claim no restriction", async () => {
+      vi.mocked(licenseServer.get_license).mockResolvedValue(
+        createAxiosResponse(
+          withDecision({ search_allowed: true, blocks: ["usage_over_limit"], exceeded_days: 4 }),
+        ),
+      );
+      wrapper = createWrapper();
+      await flushPromises();
+
+      expect(wrapper.html()).not.toContain("some application features may be temporarily");
+    });
+
+    it("an unevaluated pause states the limit from the counters", async () => {
+      vi.mocked(licenseServer.get_license).mockResolvedValue(
+        createAxiosResponse({
+          ...withDecision({ search_allowed: false, blocks: [], exceeded_days: 4 }),
+          evaluated_at: 0,
+        }),
+      );
+      wrapper = createWrapper();
+      await flushPromises();
+
+      expect(wrapper.html()).toContain("some application features may be temporarily");
     });
 
     it("a pause for days over the limit states the limit", async () => {
