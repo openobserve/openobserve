@@ -23,6 +23,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OIcon name="dashboard" size="md" class="text-accent shrink-0" />
         <OTruncatedText data-test="dashboard-kiosk-title">{{ title }}</OTruncatedText>
       </span>
+      <OBadge
+        v-if="position"
+        variant="default-outline"
+        size="lg"
+        class="shrink-0 tabular-nums"
+        data-test="dashboard-kiosk-position"
+        >{{ position }}</OBadge
+      >
       <span class="flex-1" />
       <OBadge
         v-if="status"
@@ -59,14 +67,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :class="ringState === 'spinning' ? 'text-accent' : undefined"
             />
           </KioskCountdownRing>
-          <span
-            class="text-text-heading font-medium whitespace-nowrap tabular-nums"
-            :tabindex="lastSuccessAt ? 0 : undefined"
+          <KioskUpdatedAt
+            :last-success-at="lastSuccessAt"
+            :timezone="timezone"
             data-test="dashboard-kiosk-updated"
-          >
-            {{ updatedText }}
-            <OTooltip v-if="lastSuccessAt" :content="exactTimeText" />
-          </span>
+          />
         </span>
       </div>
       <OButton
@@ -84,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed } from "vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -93,8 +98,9 @@ import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import type { KioskCountdown, KioskHealth } from "@/composables/dashboard/useKioskRefresh";
-import { formatAge } from "@/utils/dashboard/kiosk";
+import { formatClockTime } from "@/utils/dashboard/kiosk";
 import KioskCountdownRing from "./KioskCountdownRing.vue";
+import KioskUpdatedAt from "./KioskUpdatedAt.vue";
 
 const props = withDefaults(
   defineProps<{
@@ -106,6 +112,8 @@ const props = withDefaults(
     timezone?: string;
     loading?: boolean;
     countdown?: KioskCountdown | null;
+    /** "2 of 5" when this screen is one slide of a TV playlist. */
+    position?: I18nText | null;
   }>(),
   {
     title: "",
@@ -114,6 +122,7 @@ const props = withDefaults(
     timezone: undefined,
     loading: false,
     countdown: null,
+    position: null,
   },
 );
 
@@ -121,42 +130,7 @@ const emit = defineEmits<{ exit: [] }>();
 
 const { t } = useI18nTyped();
 
-const now = ref(Date.now());
-let ageTimer: ReturnType<typeof setInterval> | null = null;
-onMounted(() => {
-  ageTimer = setInterval(() => (now.value = Date.now()), 10_000);
-});
-onBeforeUnmount(() => {
-  if (ageTimer) clearInterval(ageTimer);
-});
-watch(
-  () => props.lastSuccessAt,
-  () => (now.value = Date.now()),
-);
-
-const formatTime = (ms: number) => {
-  const options: Intl.DateTimeFormatOptions = {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hourCycle: "h23",
-  };
-  try {
-    return new Intl.DateTimeFormat(undefined, { ...options, timeZone: props.timezone }).format(ms);
-  } catch {
-    return new Intl.DateTimeFormat(undefined, options).format(ms);
-  }
-};
-
-const updatedText = computed(() =>
-  props.lastSuccessAt
-    ? t("dashboard.kiosk.updatedAt", { time: formatAge(now.value - props.lastSuccessAt, t) })
-    : t("common.loading"),
-);
-
-const exactTimeText = computed(() =>
-  t("refreshButton.lastRefreshed", { time: formatTime(props.lastSuccessAt ?? 0) }),
-);
+const formatTime = (ms: number) => formatClockTime(ms, props.timezone);
 
 type RingState = "running" | "spinning" | "paused" | "off";
 
