@@ -357,6 +357,28 @@ describe("TestModelMatchDialog", () => {
       await nextTick();
       expect(wrapper.find('[data-test="test-match-result"]').exists()).toBe(true);
       expect(wrapper.text()).toContain("Match Found");
+      expect(wrapper.find('[data-test="test-match-approximate"]').exists()).toBe(false);
+    });
+
+    it("labels an approximate match and explains it", async () => {
+      wrapper = mountDialog({ modelValue: true });
+      // Script-setup state the template reads; not part of the component's public type.
+      const vm = wrapper.vm as unknown as { testModelName: string; testResult: unknown };
+      vm.testModelName = "gpt-5.4-mini";
+      vm.testResult = {
+        matched: {
+          name: "GPT-5.4",
+          source: "built_in",
+          tiers: [{ name: "Default", prices: { input: 0.0000025 } }],
+        },
+        match_kind: "approximate",
+        tier: "Default",
+      };
+      await nextTick();
+      expect(wrapper.text()).toContain("Approximate Match");
+      expect(wrapper.find('[data-test="test-match-approximate"]').text()).toContain(
+        'This rule matches only part of "gpt-5.4-mini"',
+      );
     });
   });
 

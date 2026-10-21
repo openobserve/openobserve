@@ -37,7 +37,7 @@ use crate::{
 };
 
 /// Valid job states.
-pub const VALID_STATUSES: &[&str] = &["draft", "active", "paused", "degraded", "archived"];
+pub const VALID_STATUSES: &[&str] = &["draft", "active", "paused", "archived"];
 
 pub type ScorerInputMapping = BTreeMap<String, String>;
 pub type JobInputMapping = BTreeMap<String, ScorerInputMapping>;
@@ -145,13 +145,7 @@ impl std::fmt::Display for TargetScope {
 pub fn is_valid_transition(from: &str, to: &str) -> bool {
     matches!(
         (from, to),
-        ("draft", "active")
-            | ("active", "paused")
-            | ("active", "degraded")
-            | ("paused", "active")
-            | ("degraded", "paused")
-            | ("degraded", "active")
-            | (_, "archived")
+        ("draft", "active") | ("active", "paused") | ("paused", "active") | (_, "archived")
     )
 }
 
@@ -571,6 +565,21 @@ pub async fn get_active_trace_session() -> Result<Vec<OnlineEvalJob>, errors::Er
     Ok(records)
 }
 
+/// Jobs the health pass measures, across all orgs; paused ones settle to "no recent runs".
+pub async fn get_running_or_paused() -> Result<Vec<OnlineEvalJob>, errors::Error> {
+    let client = get_orm_client_ro().await;
+
+    let records = Entity::find()
+        .filter(Column::Status.is_in(["active", "paused"]))
+        .all(client)
+        .await?
+        .into_iter()
+        .map(OnlineEvalJob::from)
+        .collect();
+
+    Ok(records)
+}
+
 pub async fn get_by_stream(
     org_id: &str,
     stream: &str,
@@ -845,13 +854,11 @@ mod tests {
         assert!(is_valid_transition("draft", "active"));
         assert!(is_valid_transition("active", "paused"));
         assert!(is_valid_transition("paused", "active"));
-        assert!(is_valid_transition("active", "degraded"));
-        assert!(is_valid_transition("degraded", "paused"));
-        assert!(is_valid_transition("degraded", "active"));
+        assert!(!is_valid_transition("active", "degraded"));
         assert!(is_valid_transition("draft", "archived"));
         assert!(is_valid_transition("active", "archived"));
         assert!(is_valid_transition("paused", "archived"));
-        assert!(is_valid_transition("degraded", "archived"));
+        assert!(!is_valid_transition("archived", "active"));
     }
 
     #[test]
