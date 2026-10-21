@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ODialog
     :open="open"
     size="md"
-    :title="t('fleet.fleets.changeVersion')"
+    :title="t('fleet.fleets.deployVersion')"
     :form-id="FORM_ID"
     :primary-button-label="t('fleet.fleets.changeVersion')"
     :primary-button-disabled="!seeded || listsForbidden || listsFailed"

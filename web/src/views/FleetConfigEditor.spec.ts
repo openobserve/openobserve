@@ -1099,7 +1099,7 @@ describe("FleetConfigEditor", () => {
     expect(canvasMounts.mock.calls.length).toBe(before + 2);
   });
 
-  it("opens the rollout dialog for the config's latest version from Change version", async () => {
+  it("opens the rollout dialog for the config's latest version from Deploy", async () => {
     vi.mocked(fleet.getConfig).mockResolvedValue({
       data: detail({ latest_version: 2, versions: [published(2), published(1)] }),
     } as any);
@@ -1111,7 +1111,7 @@ describe("FleetConfigEditor", () => {
     expect(dialog.props()).toMatchObject({ open: true, config: "edge", toVersion: 2 });
   });
 
-  it("keeps the desktop header order: Save draft, Publish version, Change version", async () => {
+  it("keeps the desktop header order: Save draft, Publish version, Deploy", async () => {
     vi.mocked(fleet.getConfig).mockResolvedValue({
       data: detail({ latest_version: 1, versions: [published(1)] }),
     } as any);
@@ -1177,7 +1177,7 @@ describe("FleetConfigEditor", () => {
     }
   });
 
-  it("offers Change version to everyone, leaving the fleet to pick in the dialog", async () => {
+  it("offers Deploy to everyone, leaving the fleet to pick in the dialog", async () => {
     vi.mocked(fleet.getConfig).mockResolvedValue({
       data: detail({ latest_version: 1, versions: [published(1)] }),
     } as any);

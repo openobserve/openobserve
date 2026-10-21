@@ -114,17 +114,17 @@ describe("FleetConfigHistory", () => {
 
   const dialog = () => wrapper.findComponent({ name: "FleetNewRolloutDialog" });
 
-  it.each([2, 1])("opens the Change version dialog for version %s", async (version) => {
+  it.each([2, 1])("opens the Deploy dialog for version %s", async (version) => {
     await mountHistory([summary(2), summary(1)]);
     expect(dialog().props("open")).toBe(false);
     const btn = wrapper.find(`[data-test="fleet-config-history-start-${version}"]`);
-    expect(btn.text()).toBe("Change version");
+    expect(btn.text()).toBe("Deploy");
     await btn.trigger("click");
     await flushPromises();
     expect(dialog().props()).toMatchObject({ open: true, config: "edge", toVersion: version });
   });
 
-  it("offers Change version to everyone, leaving the fleet to pick, and no second name for it", async () => {
+  it("offers Deploy to everyone, leaving the fleet to pick, and no second name for it", async () => {
     await mountHistory([summary(2), summary(1)]);
     for (const sel of ["start-2", "start-1"]) {
       const btn = wrapper.find(`[data-test="fleet-config-history-${sel}"]`);
@@ -152,7 +152,7 @@ describe("FleetConfigHistory", () => {
     expect(tag(1).exists()).toBe(false);
   });
 
-  it("offers no Change version on a version that is rolling out", async () => {
+  it("offers no Deploy on a version that is rolling out", async () => {
     await mountHistory([
       summary(2, { state: "rolling_out" }),
       summary(1, { live: true, state: null }),
@@ -160,7 +160,7 @@ describe("FleetConfigHistory", () => {
     expect(has("start-2")).toBe(false);
   });
 
-  it("offers no Change version on the live version", async () => {
+  it("offers no Deploy on the live version", async () => {
     await mountHistory([summary(2), summary(1, { live: true })]);
     expect(has("start-1")).toBe(false);
   });
