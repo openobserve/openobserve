@@ -16,6 +16,9 @@
 import { load } from "js-yaml";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 
+/** The settings value standing for an empty YAML map. */
+export const EMPTY_MAP = "{}";
+
 export type EditorKind = "receiver" | "processor" | "exporter" | "extension";
 
 export interface CatalogItem {
@@ -237,7 +240,7 @@ function nest(settings: Record<string, string>): Record<string, unknown> {
       cur[part] = (cur[part] as Record<string, unknown>) ?? {};
       cur = cur[part] as Record<string, unknown>;
     });
-    cur[parts[parts.length - 1]] = value;
+    cur[parts[parts.length - 1]] = value === EMPTY_MAP ? {} : value;
   }
   return out;
 }
@@ -248,6 +251,10 @@ function emit(obj: Record<string, unknown>, indent: number, lines: string[]) {
   const pad = " ".repeat(indent);
   for (const [k, v] of Object.entries(obj)) {
     if (typeof v === "object" && v !== null) {
+      if (!Object.keys(v).length) {
+        lines.push(`${pad}${k}: {}`);
+        continue;
+      }
       lines.push(`${pad}${k}:`);
       emit(v as Record<string, unknown>, indent + 2, lines);
     } else lines.push(`${pad}${k}: ${scalar(String(v))}`);
@@ -308,7 +315,9 @@ function flatten(obj: Record<string, unknown>, prefix = "", out: Record<string, 
     const path = prefix ? `${prefix}.${k}` : k;
     if (v === null || Array.isArray(v)) return null;
     if (isMap(v)) {
-      if (!Object.keys(v).length || !flatten(v, path, out)) return null;
+      // An empty map is a real setting (`cpu: {}` enables a scraper), kept as the literal `{}`.
+      if (!Object.keys(v).length) out[path] = EMPTY_MAP;
+      else if (!flatten(v, path, out)) return null;
     } else out[path] = String(v);
   }
   return out;

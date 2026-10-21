@@ -61,6 +61,31 @@ describe("yamlToGraph", () => {
     });
   });
 
+  it("keeps an empty map such as a hostmetrics scraper and writes it back as {}", () => {
+    const yaml = `receivers:
+  hostmetrics:
+    collection_interval: 30s
+    scrapers:
+      cpu: {}
+      memory: {}
+exporters:
+  otlphttp:
+    endpoint: \${env:O2_ENDPOINT}
+service:
+  pipelines:
+    metrics:
+      receivers: [hostmetrics]
+      exporters: [otlphttp]
+`;
+    const graph = yamlToGraph(yaml);
+    expect(graph?.components["receiver:hostmetrics"].settings).toEqual({
+      collection_interval: "30s",
+      "scrapers.cpu": "{}",
+      "scrapers.memory": "{}",
+    });
+    expect(load(graphToYaml(graph!))).toEqual(load(yaml));
+  });
+
   it("reads an empty document as an empty graph", () => {
     expect(yamlToGraph("")).toEqual({ components: {}, pipelines: [], extensions: [] });
   });
@@ -76,10 +101,6 @@ describe("yamlToGraph", () => {
     ],
     ["a null component", MINIMAL.replace("debug: {}", "debug:")],
     ["a list in settings", MINIMAL.replace("debug: {}", "debug:\n    include: [a, b]")],
-    [
-      "an empty mapping in settings",
-      MINIMAL.replace("grpc:\n        endpoint: 0.0.0.0:4317", "grpc: {}"),
-    ],
     ["a null leaf in settings", MINIMAL.replace("debug: {}", "debug:\n    timeout: null")],
     ["connectors", MINIMAL + "connectors:\n  count: {}\n"],
     ["service.telemetry", MINIMAL + "  telemetry:\n    logs:\n      level: debug\n"],
