@@ -125,12 +125,42 @@
          wide panel is what lets a shift rule read as one row of decisions
          instead of a column of wrapped paragraphs. -->
     <ODrawer
-      v-model:open="editing"
+      :open="editing"
       :width="60"
       :title="isNew ? t('oncall.rotationAddTitle') : t('oncall.rotationTitle')"
       :subtitle="t('oncall.rotationDrawerHint')"
+      :persistent="wouldDiscardEdits"
+      :show-close="false"
       data-test="oncall-rotation-drawer"
+      @update:open="cancelDrawer()"
     >
+      <!-- ODrawer closes itself before it emits, so its own ✕ could not be held back for the confirm. -->
+      <template #header-right>
+        <button
+          type="button"
+          :aria-label="t('components.drawer.closeDrawer')"
+          data-test="o-drawer-close-btn"
+          @mousedown.prevent
+          @click="cancelDrawer"
+          class="rounded-default text-dialog-close-text hover:bg-dialog-close-hover-bg active:bg-dialog-close-active-bg focus-visible:ring-dialog-focus-ring flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center transition-colors duration-150 focus-visible:ring-2 focus-visible:outline-none"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+      </template>
       <div v-if="active" class="flex flex-col gap-6">
         <div class="flex flex-col gap-1.5">
           <OInput
@@ -314,7 +344,7 @@
             icon-left="delete-outline"
             :loading="saving"
             data-test="oncall-rotation-delete"
-            @click="deleteActive"
+            @click="confirmRemove = true"
           >
             {{ t("oncall.removeRotation") }}
           </OButton>
@@ -334,6 +364,26 @@
         </div>
       </template>
     </ODrawer>
+
+    <ConfirmDialog
+      v-model="confirmDiscard"
+      data-test="oncall-rotation-discard-confirm"
+      :title="t('common.unsavedChanges')"
+      :message="t('oncall.rotationDiscardMessage', { name: raw(active?.name ?? '') })"
+      :ok-label="t('common.discardChanges')"
+      :cancel-label="t('dashboard.layoutEdit.keepEditing')"
+      focus-cancel
+      @update:ok="discardAndClose"
+    />
+    <ConfirmDialog
+      v-model="confirmRemove"
+      data-test="oncall-rotation-remove-confirm"
+      :title="t('oncall.removeRotationTitle', { name: raw(active?.name ?? '') })"
+      :message="t('oncall.removeRotationMessage')"
+      :ok-label="t('oncall.removeRotation')"
+      focus-cancel
+      @update:ok="deleteActive"
+    />
   </div>
 </template>
 
@@ -341,6 +391,7 @@
 import { computed, reactive, ref, watch } from "vue";
 import { useStore } from "vuex";
 
+import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -430,6 +481,12 @@ const draft = ref<Rotation[]>([]);
 const saving = ref(false);
 const editing = ref(false);
 const active = ref<Rotation | null>(null);
+const confirmRemove = ref(false);
+const confirmDiscard = ref(false);
+/// The roster link opened the confirm, so a Discard also hands over to the roster.
+const membersAfterDiscard = ref(false);
+/// The open rotation as it was when the drawer opened, to tell an edit from a look.
+const openedAs = ref("");
 
 /// Which rule's tab is showing. Keyed by index rather than a rule id — shift
 /// rules don't carry one. Reset every time the drawer OPENS, not on `active`
@@ -557,8 +614,16 @@ function shortDate(micros: number): string {
 
 function editRotation(rotation: Rotation) {
   active.value = rotation;
+  openedAs.value = JSON.stringify(rotation);
   editing.value = true;
 }
+
+// Bulk mode keeps an edited existing rotation in the table's draft, so only a discarding close counts.
+const wouldDiscardEdits = computed(() => {
+  const rotation = active.value;
+  if (!rotation || !(props.drawerOnly || isNew.value)) return false;
+  return JSON.stringify(rotation) !== openedAs.value;
+});
 
 /// Two rotations with one name is a screen where "page the Secondary" names
 /// two things. The server keys on the id, so this is a legibility rule rather
@@ -594,7 +659,12 @@ const activeIsSavable = computed(() => {
 });
 
 function openMembers() {
-  cancelDrawer();
+  if (wouldDiscardEdits.value) {
+    membersAfterDiscard.value = true;
+    confirmDiscard.value = true;
+    return;
+  }
+  editing.value = false;
   emit("open-members");
 }
 
@@ -917,10 +987,17 @@ function duplicateRotation(id: string) {
   editRotation(copy);
 }
 
-/// Cancel closes; the watcher below discards. Routing every dismissal through
-/// one place is the point.
+/// Every way out but Save and Remove comes here; the watcher below discards.
 function cancelDrawer() {
+  membersAfterDiscard.value = false;
+  if (wouldDiscardEdits.value) confirmDiscard.value = true;
+  else editing.value = false;
+}
+
+function discardAndClose() {
   editing.value = false;
+  if (membersAfterDiscard.value) emit("open-members");
+  membersAfterDiscard.value = false;
 }
 
 /// EVERY way out of the drawer has to discard an unfinished rotation, not just

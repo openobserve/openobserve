@@ -1036,7 +1036,7 @@ pub async fn list_schedule_presets(
     context_path = "/api",
     tag = "OnCall",
     operation_id = "ApplyOnCallSchedulePreset",
-    summary = "Replace a team's schedule with one built from a preset",
+    summary = "Replace the shift rules of a team's primary rotation with ones built from a preset",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
@@ -1056,7 +1056,7 @@ pub async fn apply_schedule_preset(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        // A full replace of the rotations, so the same authority as `PUT /schedule`.
+        // It replaces the primary rotation's rules via `PUT /schedule`, so the same authority.
         if !allowed(&org_id, &user_email.user_id, CONFIG, "POST").await {
             return MetaHttpResponse::forbidden("Forbidden");
         }

@@ -20,7 +20,11 @@ import OnCallScheduleEditor from "@/components/oncall/OnCallScheduleEditor.vue";
 import i18n from "@/locales";
 import oncallService from "@/services/oncall";
 import store from "@/test/unit/helpers/store";
-import type { OnCallSchedule, OnCallTeamMember } from "@/ts/interfaces/oncall";
+import type {
+  OnCallSchedule,
+  OnCallTeamMember,
+  ScheduleEditorIntent,
+} from "@/ts/interfaces/oncall";
 import { MICROS_PER_WEEK } from "@/ts/interfaces/oncall";
 
 vi.mock("@/services/oncall", () => ({
@@ -90,6 +94,17 @@ async function removePerson(wrapper: any, ruleIndex: number, position: number) {
   await flushPromises();
 }
 
+/// The editor has two confirms, told apart by their data-test.
+function confirmFor(wrapper: any, dataTest: string) {
+  const found = wrapper
+    .findAllComponents({ name: "ConfirmDialog" })
+    .find(
+      (c: any) => c.attributes("data-test") === dataTest || c.vm.$attrs["data-test"] === dataTest,
+    );
+  if (!found) throw new Error(`no ConfirmDialog ${dataTest}`);
+  return found;
+}
+
 const drawerRules = (wrapper: any) =>
   (wrapper.findComponent({ name: "OTable" }).props("data") as any[])[0].shift_rules;
 
@@ -101,8 +116,8 @@ async function showList(wrapper: any) {
 const stubs = {
   ODrawer: {
     name: "ODrawer",
-    props: ["open", "title"],
-    template: "<div v-if='open'><slot /><slot name='footer' /></div>",
+    props: ["open", "title", "persistent"],
+    template: "<div v-if='open'><slot name='header-right' /><slot /><slot name='footer' /></div>",
   },
   // Renders the real cell slots, so the tests exercise what the page draws.
   OTable: {
@@ -115,6 +130,12 @@ const stubs = {
       </div>
       <slot name='empty' />
     </div>`,
+  },
+  ConfirmDialog: {
+    name: "ConfirmDialog",
+    props: ["modelValue", "title", "message"],
+    emits: ["update:ok", "update:cancel", "update:modelValue"],
+    template: "<div v-if='modelValue'>{{ title }} {{ message }}</div>",
   },
   OEmptyState: { name: "OEmptyState", props: ["description"], template: "<div />" },
   OUserCell: { name: "OUserCell", props: ["value"], template: "<span>{{ value }}</span>" },
@@ -215,6 +236,8 @@ function render(
     members?: OnCallTeamMember[];
     schedule?: OnCallSchedule | null;
     timezone?: string;
+    drawerOnly?: boolean;
+    intent?: ScheduleEditorIntent | null;
   } = {},
 ) {
   return mount(OnCallScheduleEditor, {
@@ -223,6 +246,8 @@ function render(
       timezone: opts.timezone ?? "UTC",
       schedule: opts.schedule ?? null,
       members: opts.members ?? members("ana@o2.ai", "bob@o2.ai"),
+      drawerOnly: opts.drawerOnly,
+      intent: opts.intent ?? null,
     },
     global: { plugins: [i18n, store], stubs },
   });
@@ -642,6 +667,232 @@ describe("OnCallScheduleEditor", () => {
     const rows = wrapper.findComponent({ name: "OTable" }).props("data") as any[];
     expect(rows).toHaveLength(1);
     expect(rows[0].shift_rules[0].members).toEqual(["ana@o2.ai", "bob@o2.ai"]);
+  });
+
+  // C2: removing saves at once for everyone, so it is confirmed first.
+  describe("removing a rotation", () => {
+    async function askToRemove() {
+      const wrapper = render({ schedule: schedule([rota("Primary"), rota("Secondary")]) });
+      await flushPromises();
+      await openRotation(wrapper);
+      await wrapper.find('[data-test="oncall-rotation-delete"]').trigger("click");
+      await flushPromises();
+      return wrapper;
+    }
+
+    it("asks first, naming the rotation, and writes nothing on cancel", async () => {
+      const wrapper = await askToRemove();
+      const confirm = confirmFor(wrapper, "oncall-rotation-remove-confirm");
+      expect(confirm.text()).toBe("Remove Primary? It is deleted now, for everyone on this team.");
+
+      confirm.vm.$emit("update:modelValue", false);
+      confirm.vm.$emit("update:cancel");
+      await flushPromises();
+
+      expect(service.setSchedule).not.toHaveBeenCalled();
+      expect(wrapper.findComponent({ name: "ODrawer" }).props("open")).toBe(true);
+    });
+
+    it("writes the schedule without the rotation once confirmed", async () => {
+      const wrapper = await askToRemove();
+      expect(service.setSchedule).not.toHaveBeenCalled();
+
+      confirmFor(wrapper, "oncall-rotation-remove-confirm").vm.$emit("update:ok");
+      await flushPromises();
+
+      expect(service.setSchedule).toHaveBeenCalledTimes(1);
+      const sent = (service.setSchedule.mock.calls[0][0] as any).data.rotations;
+      expect(sent.map((r: any) => r.name)).toEqual(["Secondary"]);
+    });
+  });
+
+  // C1: a close that would throw edits away asks first; one that would not closes at once.
+  describe("closing with unsaved edits", () => {
+    const drawer = (wrapper: any) => wrapper.findComponent({ name: "ODrawer" });
+    const discardConfirm = (wrapper: any) => confirmFor(wrapper, "oncall-rotation-discard-confirm");
+
+    const exits: Record<string, (wrapper: any) => Promise<void>> = {
+      "Esc or backdrop (update:open)": async (wrapper) => {
+        drawer(wrapper).vm.$emit("update:open", false);
+      },
+      "the drawer's ✕": async (wrapper) => {
+        await wrapper.find('[data-test="o-drawer-close-btn"]').trigger("click");
+      },
+      "the footer Cancel": async (wrapper) => {
+        const cancel = drawer(wrapper)
+          .findAll("button")
+          .find((b: any) => b.text() === "Cancel");
+        await cancel.trigger("click");
+      },
+    };
+
+    async function openDrawerOnly() {
+      const wrapper = render({
+        schedule: schedule([rota("Primary")]),
+        drawerOnly: true,
+        intent: { mode: "edit", id: "rot_primary" },
+      });
+      await flushPromises();
+      return wrapper;
+    }
+
+    for (const [exit, close] of Object.entries(exits)) {
+      it(`drawer-only, unedited: ${exit} closes at once`, async () => {
+        const wrapper = await openDrawerOnly();
+        expect(drawer(wrapper).props("persistent")).toBe(false);
+
+        await close(wrapper);
+        await flushPromises();
+
+        expect(drawer(wrapper).props("open")).toBe(false);
+        expect(discardConfirm(wrapper).props("modelValue")).toBe(false);
+      });
+
+      it(`drawer-only, edited: ${exit} asks before discarding`, async () => {
+        const wrapper = await openDrawerOnly();
+        await addPerson(wrapper, 0, "bob@o2.ai");
+        expect(drawer(wrapper).props("persistent")).toBe(true);
+
+        await close(wrapper);
+        await flushPromises();
+
+        expect(drawer(wrapper).props("open")).toBe(true);
+        expect(discardConfirm(wrapper).props("modelValue")).toBe(true);
+      });
+    }
+
+    it("asks before dropping an edited new rotation in the bulk editor", async () => {
+      const wrapper = render({ schedule: null });
+      await flushPromises();
+      await wrapper.find('[data-test="oncall-schedule-add-rotation"]').trigger("click");
+      await flushPromises();
+      await addPerson(wrapper, 0, "ana@o2.ai");
+
+      await exits["the footer Cancel"](wrapper);
+      await flushPromises();
+
+      expect(drawer(wrapper).props("open")).toBe(true);
+      expect(discardConfirm(wrapper).props("modelValue")).toBe(true);
+    });
+
+    it("closes an unedited new rotation in the bulk editor at once", async () => {
+      const wrapper = render({ schedule: null });
+      await flushPromises();
+      await wrapper.find('[data-test="oncall-schedule-add-rotation"]').trigger("click");
+      await flushPromises();
+
+      await exits["the footer Cancel"](wrapper);
+      await flushPromises();
+
+      expect(drawer(wrapper).props("open")).toBe(false);
+      expect(wrapper.findComponent({ name: "OTable" }).props("data")).toHaveLength(0);
+    });
+
+    it("Keep editing leaves the drawer open with the edits intact", async () => {
+      const wrapper = await openDrawerOnly();
+      await addPerson(wrapper, 0, "bob@o2.ai");
+      await exits["the footer Cancel"](wrapper);
+      await flushPromises();
+
+      const confirm = discardConfirm(wrapper);
+      confirm.vm.$emit("update:modelValue", false);
+      confirm.vm.$emit("update:cancel");
+      await flushPromises();
+
+      expect(drawer(wrapper).props("open")).toBe(true);
+      await wrapper.find('[data-test="oncall-rotation-done"]').trigger("click");
+      await flushPromises();
+      const sent = (service.setSchedule.mock.calls[0][0] as any).data.rotations[0];
+      expect(sent.shift_rules[0].members).toEqual(["ana@o2.ai", "bob@o2.ai"]);
+    });
+
+    // The roster link is a way out too; a team with nobody on it is when it shows.
+    async function openEmptyTeamDrawer() {
+      const wrapper = render({
+        members: [],
+        schedule: schedule([rota("Primary")]),
+        drawerOnly: true,
+        intent: { mode: "edit", id: "rot_primary" },
+      });
+      await flushPromises();
+      return wrapper;
+    }
+    const openMembersLink = (wrapper: any) =>
+      wrapper.find('[data-test="oncall-rotation-open-members"]').trigger("click");
+
+    it("the roster link without edits closes and opens the roster at once", async () => {
+      const wrapper = await openEmptyTeamDrawer();
+
+      await openMembersLink(wrapper);
+      await flushPromises();
+
+      expect(drawer(wrapper).props("open")).toBe(false);
+      expect(discardConfirm(wrapper).props("modelValue")).toBe(false);
+      expect(wrapper.emitted("open-members")).toHaveLength(1);
+    });
+
+    it("the roster link with edits asks first; Keep editing stays, Discard opens the roster", async () => {
+      const wrapper = await openEmptyTeamDrawer();
+      await wrapper.findComponent({ name: "OInput" }).vm.$emit("update:modelValue", "Renamed");
+      await flushPromises();
+
+      await openMembersLink(wrapper);
+      await flushPromises();
+      expect(drawer(wrapper).props("open")).toBe(true);
+      expect(discardConfirm(wrapper).props("modelValue")).toBe(true);
+      expect(wrapper.emitted("open-members")).toBeUndefined();
+
+      discardConfirm(wrapper).vm.$emit("update:modelValue", false);
+      discardConfirm(wrapper).vm.$emit("update:cancel");
+      await flushPromises();
+      expect(drawer(wrapper).props("open")).toBe(true);
+      expect(wrapper.findComponent({ name: "OInput" }).props("modelValue")).toBe("Renamed");
+      expect(wrapper.emitted("open-members")).toBeUndefined();
+
+      await openMembersLink(wrapper);
+      await flushPromises();
+      discardConfirm(wrapper).vm.$emit("update:ok");
+      await flushPromises();
+      expect(drawer(wrapper).props("open")).toBe(false);
+      expect(wrapper.emitted("open-members")).toHaveLength(1);
+    });
+
+    it("a Discard reached through Cancel does not open the roster", async () => {
+      const wrapper = await openEmptyTeamDrawer();
+      await wrapper.findComponent({ name: "OInput" }).vm.$emit("update:modelValue", "Renamed");
+      await flushPromises();
+
+      await openMembersLink(wrapper);
+      await flushPromises();
+      discardConfirm(wrapper).vm.$emit("update:modelValue", false);
+      discardConfirm(wrapper).vm.$emit("update:cancel");
+      await flushPromises();
+
+      await exits["the footer Cancel"](wrapper);
+      await flushPromises();
+      discardConfirm(wrapper).vm.$emit("update:ok");
+      await flushPromises();
+      expect(drawer(wrapper).props("open")).toBe(false);
+      expect(wrapper.emitted("open-members")).toBeUndefined();
+    });
+
+    it("Discard closes and puts the rotation back as stored", async () => {
+      const wrapper = await openDrawerOnly();
+      await addPerson(wrapper, 0, "bob@o2.ai");
+      await exits["the footer Cancel"](wrapper);
+      await flushPromises();
+
+      discardConfirm(wrapper).vm.$emit("update:ok");
+      await flushPromises();
+      expect(drawer(wrapper).props("open")).toBe(false);
+
+      await wrapper.setProps({ intent: { mode: "edit", id: "rot_primary" } });
+      await flushPromises();
+      await wrapper.find('[data-test="oncall-rotation-done"]').trigger("click");
+      await flushPromises();
+      const sent = (service.setSchedule.mock.calls[0][0] as any).data.rotations[0];
+      expect(sent.shift_rules[0].members).toEqual(["ana@o2.ai"]);
+    });
   });
 
   /// A layer's *when* was the half the editor could not express: a
