@@ -66,29 +66,32 @@
           <OButton
             v-if="config.isEnterprise == 'true' && searchRequestTraceIds.length && disable"
             variant="outline-destructive"
-            size="icon-sm"
+            size="icon-toolbar"
             @click="cancelViewPanelQuery"
             data-test="dashboard-viewpanel-cancel-btn"
             icon-left="cancel"
           >
             <OTooltip :content="t('panel.cancel')" />
           </OButton>
-          <OButton
-            v-else
-            :variant="showApplyHint ? 'warning' : 'outline'"
-            size="icon-sm"
-            @click="refreshData"
-            :disabled="disable"
-            data-test="dashboard-viewpanel-refresh-data-btn"
-            :icon-left="isAutoRunOn ? 'autorenew' : 'refresh'"
-          >
-            <OTooltip :content="refreshTooltip" />
-          </OButton>
+          <!-- Wrapper mode: a child-mode tooltip would hover-bind only the icon, not the labelled button. -->
+          <OTooltip v-else :content="refreshTooltip">
+            <OButton
+              :variant="refreshVariant"
+              :size="isMobile ? 'icon-toolbar' : 'sm-toolbar'"
+              @click="refreshData"
+              :disabled="disable"
+              :aria-label="t('dashboard.viewDashboard.refresh')"
+              data-test="dashboard-viewpanel-refresh-data-btn"
+              :icon-left="isAutoRunOn ? 'autorenew' : 'refresh'"
+            >
+              <template v-if="!isMobile">{{ t("dashboard.viewDashboard.refresh") }}</template>
+            </OButton>
+          </OTooltip>
           <ODropdown v-if="isAutoRunAvailable" align="end" side="bottom">
             <template #trigger>
               <OButton
-                :variant="showApplyHint ? 'warning' : 'outline'"
-                size="icon-sm"
+                :variant="refreshVariant"
+                size="icon-toolbar"
                 class="w-5!"
                 :disabled="disable"
                 :aria-label="t('dashboard.viewDashboard.moreRefreshOptions')"
@@ -278,6 +281,7 @@ import type { PanelNoticeActionId } from "@/utils/dashboard/panelNotices";
 import { useVariablesManager } from "@/composables/dashboard/useVariablesManager";
 import { useAutoRunToggle } from "@/composables/dashboard/useAutoRunToggle";
 import { useDashboardTimeGate } from "@/composables/dashboard/useDashboardTimeGate";
+import useBreakpoint from "@/composables/useBreakpoint";
 import {
   DASHBOARD_FRESH_PANEL_TIME,
   freshTimeFromAppliedRange,
@@ -666,6 +670,9 @@ export default defineComponent({
       () => (isVariablesChanged.value && !isAutoRunOn.value) || timeGate.needsRefresh.value,
     );
 
+    const { isMobile } = useBreakpoint();
+    const refreshVariant = computed(() => (showApplyHint.value ? "warning" : "primary"));
+
     const refreshTooltip = computed(() => {
       if (isAutoRunOn.value) return t("dashboard.viewDashboard.autoRunDescription");
       if (timeGate.needsRefresh.value) {
@@ -976,6 +983,8 @@ export default defineComponent({
 
     return {
       t,
+      isMobile,
+      refreshVariant,
       setTimeForVariables,
       dateTimeForVariables,
       updateDateTime,

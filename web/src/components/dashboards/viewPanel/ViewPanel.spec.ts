@@ -1143,9 +1143,9 @@ describe("ViewPanel", () => {
     };
     const refreshTooltip = () =>
       wrapper
-        .findComponent('[data-test="dashboard-viewpanel-refresh-data-btn"]')
-        .findComponent({ name: "OTooltip" })
-        .props("content");
+        .findAllComponents({ name: "OTooltip" })
+        .find((tip) => tip.find('[data-test="dashboard-viewpanel-refresh-data-btn"]').exists())
+        ?.props("content");
     const chartSpan = () => {
       const time = wrapper.vm.dashboardPanelData.meta.dateTime;
       return time.end_time.getTime() - time.start_time.getTime();
@@ -1262,6 +1262,11 @@ describe("ViewPanel", () => {
       await flushPromises();
     };
 
+    const refreshButton = () =>
+      wrapper
+        .findAllComponents({ name: "OButton" })
+        .find((b) => b.attributes("data-test") === "dashboard-viewpanel-refresh-data-btn")!;
+
     afterEach(() => {
       localStorage.removeItem("oo_toggle_auto_run");
       setAutoQuery(false);
@@ -1275,6 +1280,8 @@ describe("ViewPanel", () => {
 
       expect(wrapper.vm.isVariablesChanged).toBe(false);
       expect(wrapper.vm.showApplyHint).toBe(false);
+      expect(refreshButton().props("variant")).toBe("primary");
+      expect(refreshButton().text()).toContain("dashboard.viewDashboard.refresh");
     });
 
     it("Refresh turns amber on an unapplied change and clears after Refresh", async () => {
@@ -1282,11 +1289,13 @@ describe("ViewPanel", () => {
       await flushPromises();
       await changeAppliedVariables();
       expect(wrapper.vm.showApplyHint).toBe(true);
+      expect(refreshButton().props("variant")).toBe("warning");
 
       wrapper.vm.disable = false;
       wrapper.vm.refreshData();
       await flushPromises();
       expect(wrapper.vm.showApplyHint).toBe(false);
+      expect(refreshButton().props("variant")).toBe("primary");
     });
 
     it("hides the Auto Run menu when the server flag is off", async () => {
@@ -1310,6 +1319,7 @@ describe("ViewPanel", () => {
       );
       expect(wrapper.vm.isAutoRunOn).toBe(true);
       expect(wrapper.vm.showApplyHint).toBe(false);
+      expect(refreshButton().props("variant")).toBe("primary");
     });
 
     it("uses the dashboard Auto Run copy for the Refresh tooltip while Auto Run is on", async () => {
@@ -1318,9 +1328,9 @@ describe("ViewPanel", () => {
       await flushPromises();
 
       const tooltip = wrapper
-        .findComponent('[data-test="dashboard-viewpanel-refresh-data-btn"]')
-        .findComponent({ name: "OTooltip" })
-        .props("content");
+        .findAllComponents({ name: "OTooltip" })
+        .find((tip) => tip.find('[data-test="dashboard-viewpanel-refresh-data-btn"]').exists())
+        ?.props("content");
       expect(tooltip).toBe("dashboard.viewDashboard.autoRunDescription");
     });
 
