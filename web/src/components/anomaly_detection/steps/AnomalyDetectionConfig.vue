@@ -503,7 +503,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Sensitivity -->
         <div class="mb-4! flex flex-row flex-wrap items-start gap-2 pb-0!">
-          <div class="min-h-8 w-42.5 min-w-42.5 text-[length:inherit] leading-[1.4] font-semibold">
+          <div
+            class="min-h-8 w-42.5 min-w-42.5 text-[length:inherit] leading-[1.4] font-semibold"
+            :class="{ 'flex items-center': !budgetMode }"
+          >
             {{ t("alerts.sensitivity") }}
             <span class="text-status-error-text ms-1">*</span>
             <OIcon name="info" size="sm" class="text-icon-color ms-1 cursor-pointer">
@@ -515,7 +518,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </OIcon>
           </div>
-          <div class="flex min-w-0 flex-1 basis-60 flex-col gap-1">
+          <div
+            class="flex min-w-0 flex-1 basis-60 flex-col"
+            :class="budgetMode ? 'gap-1' : 'gap-2'"
+          >
             <!-- In budget mode the budget IS the contract, so the control is the delivered-alert cap. -->
             <div v-if="budgetMode" class="flex flex-wrap items-start gap-3">
               <OToggleGroup
@@ -557,7 +563,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </div>
             </div>
-            <div v-else class="flex flex-wrap items-center gap-3">
+            <div v-else class="flex flex-col items-start gap-2">
               <OToggleGroup
                 :model-value="bandTier"
                 :aria-label="t('alerts.sensitivity')"
@@ -575,29 +581,60 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ tier.label }}
                 </OToggleGroupItem>
               </OToggleGroup>
-              <!-- Inline, not OFormInput's `label` prop: a stacked label would push the
-                   whole control row a label-height below the Sensitivity heading. -->
-              <div class="flex items-center gap-2">
-                <span
-                  class="o-input-label text-compact text-input-label-text flex items-center gap-1 leading-tight font-medium whitespace-nowrap"
+              <div
+                v-if="autoSensitivity"
+                class="flex min-h-8.5 flex-wrap items-center gap-x-2 gap-y-1"
+                role="status"
+                aria-live="polite"
+                data-test="anomaly-sensitivity-auto-level"
+              >
+                <span class="text-input-label-text text-xs font-medium">{{ autoLevelLabel }}</span>
+                <output class="text-sm font-medium tabular-nums">{{ autoLevelValue }}</output>
+              </div>
+              <div
+                v-else
+                class="grid w-full grid-cols-[auto_minmax(0,1fr)] items-start gap-x-2 gap-y-1"
+              >
+                <label
+                  for="anomaly-manual-level"
+                  class="text-input-label-text flex min-h-8.5 items-center text-xs font-medium"
                 >
                   {{ t("alerts.anomaly.level") }}
-                </span>
-                <OFormInput
-                  name="band_width"
-                  type="number"
-                  suffix="σ"
-                  :model-modifiers="{ number: true }"
-                  :aria-label="t('alerts.anomaly.level')"
-                  class="max-w-21.75 min-w-21.75"
-                  data-test="anomaly-sensitivity-level"
+                </label>
+                <div class="flex min-w-0 flex-wrap items-start gap-x-2 gap-y-1">
+                  <OFormInput
+                    id="anomaly-manual-level"
+                    name="band_width"
+                    type="number"
+                    suffix="σ"
+                    :model-modifiers="{ number: true }"
+                    :aria-label="t('alerts.anomaly.level')"
+                    :aria-describedby="sensitivityError ? 'anomaly-manual-level-error' : undefined"
+                    class="max-w-21.75 min-w-21.75"
+                    data-test="anomaly-sensitivity-level"
+                  >
+                    <template #error />
+                  </OFormInput>
+                  <span
+                    v-if="customSensitivity"
+                    class="text-text-secondary flex min-h-8.5 items-center text-xs"
+                    data-test="anomaly-sensitivity-custom"
+                    >{{ t("alerts.anomaly.customSensitivity") }}</span
+                  >
+                </div>
+                <div
+                  v-if="sensitivityError"
+                  id="anomaly-manual-level-error"
+                  class="text-input-error-text col-start-2 text-xs"
+                  data-test="anomaly-sensitivity-error"
+                  role="alert"
                 >
-                  <template #error />
-                </OFormInput>
+                  {{ sensitivityError }}
+                </div>
               </div>
             </div>
             <div
-              v-if="sensitivityError"
+              v-if="budgetMode && sensitivityError"
               class="text-input-error-text pt-1 text-xs"
               data-test="anomaly-sensitivity-error"
               role="alert"
@@ -608,6 +645,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="sensitivityHint"
               class="text-text-secondary text-xs"
               data-test="anomaly-sensitivity-hint"
+              role="status"
+              aria-live="polite"
             >
               {{ sensitivityHint }}
             </span>
@@ -670,7 +709,8 @@ import {
   createAnomalyDetectionConfigSchema,
   anomalyDetectionConfigDefaults,
   anomalyIntervalSeconds,
-  anomalyTrainedK,
+  anomalySensitivityModel,
+  anomalyModelQuery,
   formatAnomalySeconds,
   hasTimestampAliasInSql,
   lookBackWindowFloorSeconds,
@@ -758,16 +798,10 @@ export default defineComponent({
       { label: t("alerts.anomaly.retrainSevenDays"), value: 7 },
       { label: t("alerts.anomaly.retrainFourteenDays"), value: 14 },
     ]);
-    const trainedK = computed(() => anomalyTrainedK(props.config));
-    // Preset values stay numbers — reka-ui matches the active item with ohash.isEqual.
+    const modelQuery = ref(anomalyModelQuery(props.config));
+    const modelState = computed(() => anomalySensitivityModel(props.config));
     const sensitivityTiers = computed(() => [
-      {
-        value: "auto" as const,
-        label:
-          trainedK.value === null
-            ? t("alerts.anomaly.sensitivityAuto")
-            : t("alerts.anomaly.sensitivityAutoTrained", { k: trainedK.value }),
-      },
+      { value: "auto" as const, label: t("alerts.anomaly.sensitivityAuto") },
       { value: 4, label: t("alerts.anomaly.sensitivityConservative") },
       { value: ANOMALY_BALANCED_BAND_WIDTH, label: t("alerts.anomaly.sensitivityBalanced") },
       { value: 2.5, label: t("alerts.anomaly.sensitivityAggressive") },
@@ -869,7 +903,7 @@ export default defineComponent({
 
     const bandTier = computed(() => {
       const value = bandWidth.value;
-      if (value === "" || value === null || value === undefined) return "auto";
+      if (value === null || value === undefined) return "auto";
       return sensitivityTiers.value.find((tier) => tier.value === Number(value))?.value ?? "";
     });
 
@@ -878,6 +912,44 @@ export default defineComponent({
       if (!tier) return;
       form.setFieldValue("band_width", tier.value === "auto" ? null : tier.value);
     };
+
+    const autoSensitivity = computed(() => bandWidth.value == null);
+    const customSensitivity = computed(
+      () =>
+        !autoSensitivity.value &&
+        bandTier.value === "" &&
+        String(bandWidth.value).trim() !== "" &&
+        Number.isFinite(Number(bandWidth.value)) &&
+        Number(bandWidth.value) >= 1 &&
+        Number(bandWidth.value) <= 10,
+    );
+    const autoLevelLabel = computed(() =>
+      modelState.value.level === null
+        ? t("alerts.anomaly.autoLevel")
+        : modelState.value.current
+          ? t("alerts.anomaly.currentLevel")
+          : t("alerts.anomaly.lastTrainedLevel"),
+    );
+    const autoLevelValue = computed(() =>
+      modelState.value.level === null
+        ? t(
+            modelState.value.state === "training"
+              ? "alerts.anomaly.autoLearning"
+              : modelState.value.state === "failed"
+                ? "alerts.anomaly.autoUnavailable"
+                : "alerts.anomaly.autoAfterTraining",
+          )
+        : raw(`${modelState.value.level}σ`),
+    );
+    const modelHelpKeys = {
+      trained: "alerts.anomaly.autoLearnedHelp",
+      untrained: "alerts.anomaly.autoUntrainedHelp",
+      training: "alerts.anomaly.autoTrainingHelp",
+      failed: "alerts.anomaly.autoFailedHelp",
+      retraining: "alerts.anomaly.autoRetrainingHelp",
+      retrainFailed: "alerts.anomaly.autoRetrainFailedHelp",
+      unconfirmed: "alerts.anomaly.autoUnconfirmedHelp",
+    } as const;
 
     // Suppressed on bad input: the error is the feedback.
     const sensitivityHint = computed(() => {
@@ -888,9 +960,13 @@ export default defineComponent({
           ? t("alerts.anomaly.budgetHintPerWeek", { count })
           : t("alerts.anomaly.budgetHintPerDay", { count });
       }
+      if (autoSensitivity.value) return t(modelHelpKeys[modelState.value.state]);
+      if (sensitivityError.value) return raw("");
+      // The range error only renders after save, so an invalid draft must not show the model note.
       const k = Number(bandWidth.value);
       if (bandWidth.value === "" || !Number.isFinite(k) || k < 1 || k > 10) return raw("");
-      return t("alerts.anomaly.bandWidthHint", { k });
+      if (!modelState.value.current) return t("alerts.anomaly.manualModelRequired");
+      return t("alerts.anomaly.manualSensitivityHelp");
     });
 
     // §4.6: the floor is computed locally from the form's own values — no server dependency.
@@ -987,8 +1063,7 @@ export default defineComponent({
           // Switching to band mode must clear a previously stored budget, or the
           // save payload keeps sending the stale value.
           cfg.alert_budget_per_day = undefined;
-          cfg.band_width =
-            v.band_width === "" || v.band_width == null ? null : toModelNumber(v.band_width);
+          cfg.band_width = v.band_width == null ? null : toModelNumber(v.band_width);
         }
       },
       { deep: true },
@@ -999,7 +1074,16 @@ export default defineComponent({
     watch(
       () => props.config,
       (cfg) => {
+        modelQuery.value = anomalyModelQuery(cfg);
         form.reset(anomalyDetectionConfigDefaults(cfg));
+      },
+    );
+
+    watch(
+      () => anomalyModelQuery(props.config),
+      (query) => {
+        const cfg = props.config;
+        cfg.sensitivity_model_stale = query !== modelQuery.value;
       },
     );
 
@@ -1242,6 +1326,10 @@ export default defineComponent({
       lookBackWindowHint,
       legacyWindowWarning,
       sensitivityTiers,
+      autoSensitivity,
+      customSensitivity,
+      autoLevelLabel,
+      autoLevelValue,
       bandTier,
       onBandTier,
       sensitivityHint,
