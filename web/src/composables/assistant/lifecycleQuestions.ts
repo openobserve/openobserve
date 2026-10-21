@@ -57,7 +57,7 @@ export interface OpenQuestion {
 
 /** A host whose unsaved changes a navigation, an org switch or a sign-out must ask about first. */
 export interface LeaveGuard {
-  host: DockHostId | "alert";
+  host: DockHostId | "alert" | "settings";
   isDirty(): boolean;
   name(): I18nText;
 }
@@ -130,6 +130,12 @@ export async function runLeaveGuards(): Promise<boolean> {
     setTimeout(() => released.delete(guard), GUARD_RELEASE_MS);
   }
   return true;
+}
+
+/** Asks one dirty guard only, for a move inside its own page; true when the user chose to discard. */
+export async function askLeaveGuard(guard: LeaveGuard): Promise<boolean> {
+  if (!guard.isDirty()) return true;
+  return (await askGuard(guard)) === "discard";
 }
 
 /** Lets a spec start with no open question or guard; never called by app code. */

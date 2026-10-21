@@ -268,7 +268,7 @@ export interface AiEventProps {
   ai_sheet_snap: { snap: "peek" | "half" | "full" };
   ai_toast: { kind: "ready" | "needs_you"; action: "open" | "dismiss" };
   ai_turn_busy: Record<string, never>;
-  ai_leave_guard: { host: DockHostId | "alert"; choice: "keep" | "discard" };
+  ai_leave_guard: { host: DockHostId | "alert" | "settings"; choice: "keep" | "discard" };
   ai_status_light: { state: "needs_you" | "working" | "unread" | "failed" | "open" | "idle" };
   ai_context_changed: {
     action: "add" | "remove" | "swap_time" | "trim" | "mention" | "add_back";
