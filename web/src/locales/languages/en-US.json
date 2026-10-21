@@ -25389,7 +25389,7 @@
       "waiting": "Waiting for the collector to connect…",
       "connected": "Connected: {name} enrolled and is reporting",
       "viewCollectors": "View collectors",
-      "placeholderHint": "A token's value is shown only when it is created. Replace {placeholder} with it, or create a new token from this fleet's Tokens.",
+      "placeholderHint": "The value of {name} was shown only when it was created and is not stored here. Paste it in place of {placeholder}, or create a new token whose value fills the command.",
       "noTokenTitle": "No active enrollment token",
       "noTokenBody": "Collectors enroll with an enrollment token. Create one for this fleet to get the install command.",
       "joinsFleet": "Collectors installed with this token join fleet {fleet} and run {config} v{version}.",

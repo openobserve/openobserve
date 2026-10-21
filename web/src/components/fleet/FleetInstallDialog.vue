@@ -82,7 +82,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="!secret"
           variant="warning"
           dense
-          :content="t('fleet.install.placeholderHint', { placeholder: TOKEN_PLACEHOLDER })"
+          :content="
+            t('fleet.install.placeholderHint', {
+              name: raw(selectedTokenName),
+              placeholder: TOKEN_PLACEHOLDER,
+            })
+          "
           data-test="fleet-install-dialog-placeholder-hint"
         >
           <template #actions>
@@ -231,6 +236,10 @@ const secret = computed(() =>
 );
 const createdHere = computed(
   () => !!pendingTokenId.value && selectedId.value === pendingTokenId.value && !!secret.value,
+);
+
+const selectedTokenName = computed(
+  () => activeTokens.value.find((tok) => tok.id === selectedId.value)?.name ?? "",
 );
 
 // A new collector lands in its token's fleet and takes that fleet's stable version.
