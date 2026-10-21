@@ -7629,8 +7629,9 @@
       "endTimeFieldNone": "Nessuno (linea verticale)",
       "panels": "Pannelli",
       "panelsFieldLabel": "Pannelli (opzionale)",
-      "panelsTooltip": "Lascia vuoto per disegnare i marcatori su tutti i pannelli di serie temporali, oppure scegli pannelli specifici.",
+      "panelsTooltip": "Scegli Seleziona tutto per disegnare i marcatori su ogni pannello di serie temporali, compresi quelli aggiunti in seguito, oppure scegli pannelli specifici.",
       "allTimeSeriesPanels": "Tutti i pannelli di serie temporali",
+      "selectPanelsPlaceholder": "Seleziona pannelli",
       "panelsCount": "{n} pannello | {n} pannelli",
       "previewSection": "Anteprima",
       "run": "Esegui",
@@ -7648,6 +7649,7 @@
       "streamTypeRequired": "Seleziona un tipo di stream",
       "streamRequired": "Seleziona uno stream",
       "queryRequired": "Inserisci una query",
+      "panelsRequired": "Seleziona almeno un pannello, oppure scegli Seleziona tutto",
       "edit": "Modifica",
       "delete": "Elimina",
       "deleteTitle": "Elimina origine di annotazioni",
@@ -7674,7 +7676,7 @@
       "invalidFilters": "I filtri devono essere un gruppo di condizioni",
       "timestampMissing": "La query non restituisce _timestamp, quindi le sue righe non possono essere collocate sull'asse del tempo.",
       "noPanels": "Nessun pannello",
-      "panelsDeletedHint": "I suoi pannelli sono stati eliminati, quindi al momento non viene disegnata su alcun pannello. Lascia questo campo invariato per mantenere questo stato, oppure modifica la selezione — anche svuotandola — perché torni a essere disegnata su tutti i pannelli di serie temporali.",
+      "panelsDeletedHint": "I suoi pannelli sono stati eliminati, quindi al momento non viene disegnato su alcun pannello. Seleziona i pannelli, oppure scegli Seleziona tutto, per risolvere il problema.",
       "blankFiltersHint": "Le condizioni senza valore vengono ignorate."
     }
   },

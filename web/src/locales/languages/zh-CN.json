@@ -7629,8 +7629,9 @@
       "endTimeFieldNone": "无(垂直线)",
       "panels": "面板",
       "panelsFieldLabel": "面板（可选）",
-      "panelsTooltip": "留空以在所有时间序列面板上绘制标记，或选择特定面板。",
+      "panelsTooltip": "选择“全选”可在每个时间序列面板（包括之后添加的面板）上绘制标记，或选择特定面板。",
       "allTimeSeriesPanels": "所有时间序列面板",
+      "selectPanelsPlaceholder": "选择面板",
       "panelsCount": "{n} 个面板 | {n} 个面板",
       "previewSection": "预览",
       "run": "运行",
@@ -7648,6 +7649,7 @@
       "streamTypeRequired": "请选择流类型",
       "streamRequired": "请选择流",
       "queryRequired": "请输入查询",
+      "panelsRequired": "请至少选择一个面板，或选择“全选”",
       "edit": "编辑",
       "delete": "删除",
       "deleteTitle": "删除注释来源",
@@ -7674,7 +7676,7 @@
       "invalidFilters": "筛选条件必须是一个条件组",
       "timestampMissing": "查询未返回 _timestamp,因此其行无法放到时间轴上。",
       "noPanels": "无面板",
-      "panelsDeletedHint": "其面板已被删除，因此目前不会绘制在任何面板上。保持此字段不变可维持该状态；更改所选内容（即使清空它）将使其重新绘制在所有时间序列面板上。",
+      "panelsDeletedHint": "其面板已被删除，因此当前不会绘制在任何面板上。请选择面板，或选择“全选”以解决此问题。",
       "blankFiltersHint": "没有值的条件将被忽略。"
     }
   },

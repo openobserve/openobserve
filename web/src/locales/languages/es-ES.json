@@ -7629,8 +7629,9 @@
       "endTimeFieldNone": "Ninguno (línea vertical)",
       "panels": "Paneles",
       "panelsFieldLabel": "Paneles (opcional)",
-      "panelsTooltip": "Déjalo vacío para dibujar marcadores en todos los paneles de series temporales, o elige paneles específicos.",
+      "panelsTooltip": "Elige Seleccionar todo para dibujar marcadores en todos los paneles de series temporales, incluidos los añadidos más adelante, o elige paneles específicos.",
       "allTimeSeriesPanels": "Todos los paneles de series temporales",
+      "selectPanelsPlaceholder": "Seleccionar paneles",
       "panelsCount": "{n} panel | {n} paneles",
       "previewSection": "Vista previa",
       "run": "Ejecutar",
@@ -7648,6 +7649,7 @@
       "streamTypeRequired": "Selecciona un tipo de stream",
       "streamRequired": "Selecciona un stream",
       "queryRequired": "Introduce una consulta",
+      "panelsRequired": "Selecciona al menos un panel, o elige Seleccionar todo",
       "edit": "Editar",
       "delete": "Eliminar",
       "deleteTitle": "Eliminar fuente de anotaciones",
@@ -7674,7 +7676,7 @@
       "invalidFilters": "Los filtros deben ser un grupo de condiciones",
       "timestampMissing": "La consulta no devuelve _timestamp, así que sus filas no se pueden situar en el eje de tiempo.",
       "noPanels": "Ningún panel",
-      "panelsDeletedHint": "Sus paneles se eliminaron, así que actualmente no se dibuja en ningún panel. Deja este campo sin cambios para mantenerlo así, o cambia la selección —incluso vaciándola— para que vuelva a dibujarse en todos los paneles de series temporales.",
+      "panelsDeletedHint": "Sus paneles se eliminaron, por lo que actualmente no se dibuja en ningún panel. Selecciona paneles, o elige Seleccionar todo, para solucionarlo.",
       "blankFiltersHint": "Las condiciones sin valor se ignoran."
     }
   },

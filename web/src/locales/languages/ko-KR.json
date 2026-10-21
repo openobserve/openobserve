@@ -7629,8 +7629,9 @@
       "endTimeFieldNone": "없음 (세로선)",
       "panels": "패널",
       "panelsFieldLabel": "패널 (선택 사항)",
-      "panelsTooltip": "비워 두면 모든 시계열 패널에 마커가 표시됩니다. 특정 패널을 선택할 수도 있습니다.",
+      "panelsTooltip": "모두 선택을 선택하면 나중에 추가되는 패널을 포함해 모든 시계열 패널에 마커가 표시됩니다. 특정 패널을 선택할 수도 있습니다.",
       "allTimeSeriesPanels": "모든 시계열 패널",
+      "selectPanelsPlaceholder": "패널 선택",
       "panelsCount": "패널 {n}개 | 패널 {n}개",
       "previewSection": "미리보기",
       "run": "실행",
@@ -7648,6 +7649,7 @@
       "streamTypeRequired": "스트림 유형을 선택하세요",
       "streamRequired": "스트림을 선택하세요",
       "queryRequired": "쿼리를 입력하세요",
+      "panelsRequired": "패널을 하나 이상 선택하거나 모두 선택을 선택하세요",
       "edit": "편집",
       "delete": "삭제",
       "deleteTitle": "주석 소스 삭제",
@@ -7674,7 +7676,7 @@
       "invalidFilters": "필터는 조건 그룹이어야 합니다",
       "timestampMissing": "쿼리가 _timestamp를 반환하지 않아 행을 시간 축에 배치할 수 없습니다.",
       "noPanels": "패널 없음",
-      "panelsDeletedHint": "패널이 삭제되어 현재 어떤 패널에도 그려지지 않습니다. 이 필드를 그대로 두면 그 상태가 유지되고, 선택을 변경하면(비우는 경우도 포함) 다시 모든 시계열 패널에 그려집니다.",
+      "panelsDeletedHint": "해당 패널이 삭제되어 현재 어떤 패널에도 표시되지 않습니다. 패널을 선택하거나 모두 선택을 선택하여 이 문제를 해결하세요.",
       "blankFiltersHint": "값이 없는 조건은 무시됩니다."
     }
   },

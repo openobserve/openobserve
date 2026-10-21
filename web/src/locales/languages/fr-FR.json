@@ -7629,8 +7629,9 @@
       "endTimeFieldNone": "Aucun (ligne verticale)",
       "panels": "Panneaux",
       "panelsFieldLabel": "Panneaux (facultatif)",
-      "panelsTooltip": "Laissez vide pour afficher les marqueurs sur tous les panneaux de séries temporelles, ou choisissez des panneaux spécifiques.",
+      "panelsTooltip": "Choisissez Tout sélectionner pour afficher des marqueurs sur chaque panneau de séries temporelles, y compris ceux ajoutés plus tard, ou choisissez des panneaux spécifiques.",
       "allTimeSeriesPanels": "Tous les panneaux de séries temporelles",
+      "selectPanelsPlaceholder": "Sélectionner des panneaux",
       "panelsCount": "{n} panneau | {n} panneaux",
       "previewSection": "Aperçu",
       "run": "Exécuter",
@@ -7648,6 +7649,7 @@
       "streamTypeRequired": "Sélectionnez un type de flux",
       "streamRequired": "Sélectionnez un flux",
       "queryRequired": "Saisissez une requête",
+      "panelsRequired": "Sélectionnez au moins un panneau, ou choisissez Tout sélectionner",
       "edit": "Modifier",
       "delete": "Supprimer",
       "deleteTitle": "Supprimer la source d'annotations",
@@ -7674,7 +7676,7 @@
       "invalidFilters": "Les filtres doivent être un groupe de conditions",
       "timestampMissing": "La requête ne renvoie pas _timestamp, ses lignes ne peuvent donc pas être placées sur l'axe du temps.",
       "noPanels": "Aucun panneau",
-      "panelsDeletedHint": "Ses panneaux ont été supprimés, elle ne s'affiche donc actuellement sur aucun panneau. Laissez ce champ inchangé pour conserver cet état, ou modifiez la sélection — même en la vidant — pour qu'elle s'affiche à nouveau sur tous les panneaux de séries temporelles.",
+      "panelsDeletedHint": "Ses panneaux ont été supprimés, il ne s'affiche donc actuellement sur aucun panneau. Sélectionnez des panneaux, ou choisissez Tout sélectionner, pour corriger cela.",
       "blankFiltersHint": "Les conditions sans valeur sont ignorées."
     }
   },

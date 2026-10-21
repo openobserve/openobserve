@@ -7629,8 +7629,9 @@
       "endTimeFieldNone": "None (vertical line)",
       "panels": "Panels",
       "panelsFieldLabel": "Panels (optional)",
-      "panelsTooltip": "Leave empty to draw markers on every time-series panel, or pick specific panels.",
+      "panelsTooltip": "Select all to draw markers on every time-series panel, including ones added later, or pick specific panels.",
       "allTimeSeriesPanels": "All time-series panels",
+      "selectPanelsPlaceholder": "Select panels",
       "panelsCount": "{n} panel | {n} panels",
       "previewSection": "Preview",
       "run": "Run",
@@ -7648,6 +7649,7 @@
       "streamTypeRequired": "Select a stream type",
       "streamRequired": "Select a stream",
       "queryRequired": "Enter a query",
+      "panelsRequired": "Select at least one panel, or choose Select all",
       "edit": "Edit",
       "delete": "Delete",
       "deleteTitle": "Delete annotation source",
@@ -7674,7 +7676,7 @@
       "invalidFilters": "Filters must be a condition group",
       "timestampMissing": "The query does not return _timestamp, so its rows cannot be placed on the time axis.",
       "noPanels": "No panels",
-      "panelsDeletedHint": "Its panels were deleted, so it currently draws on no panel. Leave this unchanged to keep it that way, or change the selection — even clearing it — to have it draw on all time-series panels again.",
+      "panelsDeletedHint": "Its panels were deleted, so it currently draws on no panel. Select panels, or choose Select all, to fix this.",
       "blankFiltersHint": "Conditions with no value are ignored."
     }
   },

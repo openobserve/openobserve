@@ -118,7 +118,7 @@ const form = useOForm<AnnotationSourceFormValues>({
     // Save runs the same check as Run; a problem blocks the save outright, shown inline.
     if ((await checkSource()) === "problems") return;
     const id = props.source?.id ?? `source_${getUUID()}`;
-    await props.onSave?.(formValuesToAnnotationSource(id, value, keepEmptyPanelScope.value));
+    await props.onSave?.(formValuesToAnnotationSource(id, value));
   },
 });
 
@@ -254,6 +254,8 @@ watch(
   },
 );
 
+// A source whose loaded panels were already empty (every one later deleted) explains
+// why, until the user fixes it by picking panels or Select all.
 const panelsHelp = computed(() =>
   props.source?.panels?.length === 0 && values.value.panels.length === 0
     ? t("dashboard.annotationSources.panelsDeletedHint")
@@ -264,39 +266,26 @@ const allPanelValues = computed(() =>
   props.panelOptions.filter((option) => !option.header).map((option) => option.value),
 );
 
-// The field's own `[]` sentinel means "every panel", but OSelect only knows a
-// panel is selected if its id is actually in the model value — feed it every
-// current id so the Select All row and each checkbox read as checked.
+// "Select all" has no stored list of its own, so OSelect only knows a panel is
+// selected if its id is actually in the model value — feed it every current id
+// so the Select All row and each checkbox read as checked.
 const panelsDisplayValue = computed(() =>
-  values.value.panels.length === 0 ? allPanelValues.value : values.value.panels,
+  values.value.panelsAll ? allPanelValues.value : values.value.panels,
 );
 
-// The native select-all checkbox writes the explicit list of every current panel;
-// collapse that back to the empty-array sentinel so panels added later also get markers.
+// Mirrors every current panel id (Select All, or manually checking all of them) into
+// the `panelsAll` flag instead of storing them, so future panels are included too.
+// Anything short of that — including the native "deselect all" branch, which emits
+// `[]` — is saved as the explicit list it is, and an empty one blocks Save.
 const onPanelsUpdate = (value: unknown) => {
   const next = Array.isArray(value) ? (value as string[]) : [];
   const isEveryPanel =
     allPanelValues.value.length > 0 &&
     next.length === allPanelValues.value.length &&
     allPanelValues.value.every((panelValue) => next.includes(panelValue));
+  setField("panelsAll", isEveryPanel);
   setField("panels", isEveryPanel ? [] : next);
 };
-
-// Was the loaded source already restricted (even to zero panels)? `null` means unrestricted too, matching AnnotationSettings.vue's livePanels.
-const panelsScoped = computed(() => Array.isArray(props.source?.panels));
-
-// Any edit to this field is a deliberate choice; its own result then decides what an empty value means.
-const panelsTouched = ref(false);
-const initialPanelsSignature = JSON.stringify(values.value.panels);
-watch(
-  () => JSON.stringify(values.value.panels),
-  (signature) => {
-    if (signature !== initialPanelsSignature) panelsTouched.value = true;
-  },
-);
-
-// Untouched and still empty keeps "scoped to no panel"; touching it (even back to empty) means "all panels" again.
-const keepEmptyPanelScope = computed(() => panelsScoped.value && !panelsTouched.value);
 
 onMounted(async () => {
   await loadStreams(values.value.streamType);
@@ -381,11 +370,14 @@ const runCheck = async (): Promise<"ok" | "problems"> => {
     previewError.value = t("dashboard.annotationSources.queryRequired");
     return "problems";
   }
-  const source = formValuesToAnnotationSource(
-    props.source?.id ?? "preview",
-    { ...value, enabled: true },
-    keepEmptyPanelScope.value,
-  );
+  if (!value.panelsAll && value.panels.length === 0) {
+    previewError.value = t("dashboard.annotationSources.panelsRequired");
+    return "problems";
+  }
+  const source = formValuesToAnnotationSource(props.source?.id ?? "preview", {
+    ...value,
+    enabled: true,
+  });
   const window = previewWindow();
   isPreviewing.value = true;
   try {
@@ -686,7 +678,7 @@ const title = computed(() =>
                 <OSelect
                   :model-value="panelsDisplayValue"
                   :label="t('dashboard.annotationSources.panelsFieldLabel')"
-                  :placeholder="t('dashboard.annotationSources.allTimeSeriesPanels')"
+                  :placeholder="t('dashboard.annotationSources.selectPanelsPlaceholder')"
                   :all-selected-label="t('dashboard.annotationSources.allTimeSeriesPanels')"
                   :options="panelOptions"
                   :help-text="panelsHelp"

@@ -7629,8 +7629,9 @@
       "endTimeFieldNone": "なし (垂直線)",
       "panels": "パネル",
       "panelsFieldLabel": "パネル (オプション)",
-      "panelsTooltip": "空のままにするとすべての時系列パネルにマーカーが描画されます。特定のパネルを選択することもできます。",
+      "panelsTooltip": "すべて選択を選ぶと、後で追加されるものも含めすべての時系列パネルにマーカーが描画されます。特定のパネルを選ぶこともできます。",
       "allTimeSeriesPanels": "すべての時系列パネル",
+      "selectPanelsPlaceholder": "パネルを選択",
       "panelsCount": "{n} 個のパネル | {n} 個のパネル",
       "previewSection": "プレビュー",
       "run": "実行",
@@ -7648,6 +7649,7 @@
       "streamTypeRequired": "ストリームタイプを選択してください",
       "streamRequired": "ストリームを選択してください",
       "queryRequired": "クエリを入力してください",
+      "panelsRequired": "パネルを1つ以上選択するか、すべて選択を選んでください",
       "edit": "編集",
       "delete": "削除",
       "deleteTitle": "アノテーションソースを削除",
@@ -7674,7 +7676,7 @@
       "invalidFilters": "フィルターは条件グループである必要があります",
       "timestampMissing": "クエリが _timestamp を返さないため、行を時間軸に配置できません。",
       "noPanels": "パネルなし",
-      "panelsDeletedHint": "パネルが削除されたため、現在どのパネルにも描画されません。このフィールドを変更せずにそのままにすると現状が保たれます。選択内容を変更する(空にする場合も含む)と、再びすべての時系列パネルに描画されます。",
+      "panelsDeletedHint": "そのパネルは削除されたため、現在どのパネルにも描画されません。パネルを選択するか、すべて選択を選んで修正してください。",
       "blankFiltersHint": "値のない条件は無視されます。"
     }
   },

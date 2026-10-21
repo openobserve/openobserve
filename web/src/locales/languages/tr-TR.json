@@ -7629,8 +7629,9 @@
       "endTimeFieldNone": "Yok (dikey çizgi)",
       "panels": "Paneller",
       "panelsFieldLabel": "Paneller (isteğe bağlı)",
-      "panelsTooltip": "Tüm zaman serisi panellerinde işaretleyici çizmek için boş bırakın veya belirli panelleri seçin.",
+      "panelsTooltip": "Daha sonra eklenenler dahil her zaman serisi panelinde işaretleyici çizmek için Tümünü seç'i, ya da belirli panelleri seçin.",
       "allTimeSeriesPanels": "Tüm zaman serisi panelleri",
+      "selectPanelsPlaceholder": "Panel seçin",
       "panelsCount": "{n} panel | {n} panel",
       "previewSection": "Önizleme",
       "run": "Çalıştır",
@@ -7648,6 +7649,7 @@
       "streamTypeRequired": "Bir akış türü seçin",
       "streamRequired": "Bir akış seçin",
       "queryRequired": "Bir sorgu girin",
+      "panelsRequired": "En az bir panel seçin veya Tümünü seç'i tercih edin",
       "edit": "Düzenle",
       "delete": "Sil",
       "deleteTitle": "Ek açıklama kaynağını sil",
@@ -7674,7 +7676,7 @@
       "invalidFilters": "Filtreler bir koşul grubu olmalı",
       "timestampMissing": "Sorgu _timestamp döndürmüyor, bu yüzden satırları zaman eksenine yerleştirilemez.",
       "noPanels": "Panel yok",
-      "panelsDeletedHint": "Panelleri silindiği için şu anda hiçbir panelde çizilmiyor. Bu alanı değiştirmeden bırakırsanız bu durum korunur; seçimi değiştirirseniz (temizlemek dahil) yeniden tüm zaman serisi panellerinde çizilir.",
+      "panelsDeletedHint": "Panelleri silindiği için şu anda hiçbir panelde çizilmiyor. Bunu düzeltmek için panel seçin veya Tümünü seç'i tercih edin.",
       "blankFiltersHint": "Değeri olmayan koşullar yok sayılır."
     }
   },

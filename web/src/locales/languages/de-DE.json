@@ -7629,8 +7629,9 @@
       "endTimeFieldNone": "Keines (vertikale Linie)",
       "panels": "Panels",
       "panelsFieldLabel": "Panels (optional)",
-      "panelsTooltip": "Leer lassen, um Markierungen auf allen Zeitreihen-Panels anzuzeigen, oder bestimmte Panels auswählen.",
+      "panelsTooltip": "Wählen Sie „Alle auswählen“, um Markierungen auf jedem Zeitreihen-Panel anzuzeigen, auch auf später hinzugefügten, oder wählen Sie bestimmte Panels aus.",
       "allTimeSeriesPanels": "Alle Zeitreihen-Panels",
+      "selectPanelsPlaceholder": "Panels auswählen",
       "panelsCount": "{n} Panel | {n} Panels",
       "previewSection": "Vorschau",
       "run": "Ausführen",
@@ -7648,6 +7649,7 @@
       "streamTypeRequired": "Wählen Sie einen Stream-Typ",
       "streamRequired": "Wählen Sie einen Stream",
       "queryRequired": "Geben Sie eine Abfrage ein",
+      "panelsRequired": "Wählen Sie mindestens ein Panel aus, oder wählen Sie „Alle auswählen“",
       "edit": "Bearbeiten",
       "delete": "Löschen",
       "deleteTitle": "Annotationsquelle löschen",
@@ -7674,7 +7676,7 @@
       "invalidFilters": "Filter müssen eine Bedingungsgruppe sein",
       "timestampMissing": "Die Abfrage gibt _timestamp nicht zurück, daher können ihre Zeilen nicht auf der Zeitachse platziert werden.",
       "noPanels": "Keine Panels",
-      "panelsDeletedHint": "Seine Panels wurden gelöscht, daher zeichnet er aktuell auf keinem Panel. Lassen Sie dieses Feld unverändert, um das so zu belassen, oder ändern Sie die Auswahl — auch durch Leeren — damit er wieder auf allen Zeitreihen-Panels zeichnet.",
+      "panelsDeletedHint": "Seine Panels wurden gelöscht, daher wird er derzeit auf keinem Panel gezeichnet. Wählen Sie Panels aus, oder wählen Sie „Alle auswählen“, um dies zu beheben.",
       "blankFiltersHint": "Bedingungen ohne Wert werden ignoriert."
     }
   },

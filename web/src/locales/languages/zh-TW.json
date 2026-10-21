@@ -7624,8 +7624,9 @@
       "endTimeFieldNone": "無(垂直線)",
       "panels": "面板",
       "panelsFieldLabel": "面板 (選填)",
-      "panelsTooltip": "留空以在所有時間序列面板上繪製標記，或選擇特定面板。",
+      "panelsTooltip": "選擇「全選」可在每個時間序列面板（包括之後新增的面板）上繪製標記，或選擇特定面板。",
       "allTimeSeriesPanels": "所有時間序列面板",
+      "selectPanelsPlaceholder": "選擇面板",
       "panelsCount": "{n} 個面板 | {n} 個面板",
       "previewSection": "預覽",
       "run": "執行",
@@ -7643,6 +7644,7 @@
       "streamTypeRequired": "請選擇串流類型",
       "streamRequired": "請選擇串流",
       "queryRequired": "請輸入查詢",
+      "panelsRequired": "請至少選擇一個面板，或選擇「全選」",
       "edit": "編輯",
       "delete": "刪除",
       "deleteTitle": "刪除註解來源",
@@ -7669,7 +7671,7 @@
       "invalidFilters": "篩選條件必須是一個條件群組",
       "timestampMissing": "查詢未傳回 _timestamp,因此其資料列無法放到時間軸上。",
       "noPanels": "沒有面板",
-      "panelsDeletedHint": "其面板已被刪除，因此目前不會繪製在任何面板上。保持此欄位不變可維持該狀態；變更所選內容（即使清空它）將使其重新繪製在所有時間序列面板上。",
+      "panelsDeletedHint": "其面板已被刪除，因此目前不會繪製在任何面板上。請選擇面板，或選擇「全選」以修正此問題。",
       "blankFiltersHint": "沒有值的條件會被忽略。"
     }
   },

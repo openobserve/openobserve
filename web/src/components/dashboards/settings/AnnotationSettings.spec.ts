@@ -850,38 +850,7 @@ describe("AnnotationSettings", () => {
     );
   });
 
-  it("keeps a pruned source's panels empty on save, even when only the title is edited", async () => {
-    vi.mocked(getDashboard).mockResolvedValue(
-      dashboardWith([{ ...deploys, panels: ["Panel_ID485510"] }]),
-    );
-    vi.mocked(searchService.search).mockResolvedValue({ data: { hits: [] } } as never);
-    await mountSettings();
-
-    await wrapper!.find('[data-test="dashboard-annotation-source-edit-deploys"]').trigger("click");
-    await flushPromises();
-    await typeInto("dashboard-annotation-source-title", "{service} updated");
-    await submit();
-    await vi.waitFor(() => expect(updateDashboard).toHaveBeenCalledTimes(1), { timeout: 3000 });
-
-    expect(lastSavedSources()?.find((source) => source.id === "deploys")?.panels).toEqual([]);
-  });
-
-  it("reopens a pruned-to-empty source and saves it with no edits at all, panels stays []", async () => {
-    vi.mocked(getDashboard).mockResolvedValue(
-      dashboardWith([{ ...deploys, panels: ["Panel_ID485510"] }]),
-    );
-    vi.mocked(searchService.search).mockResolvedValue({ data: { hits: [] } } as never);
-    await mountSettings();
-
-    await wrapper!.find('[data-test="dashboard-annotation-source-edit-deploys"]').trigger("click");
-    await flushPromises();
-    await submit();
-    await vi.waitFor(() => expect(updateDashboard).toHaveBeenCalledTimes(1), { timeout: 3000 });
-
-    expect(lastSavedSources()?.find((source) => source.id === "deploys")?.panels).toEqual([]);
-  });
-
-  it("restores all panels when the panel field is touched and left empty, even on a pruned source", async () => {
+  it("blocks Save on a pruned source until the user picks panels or Select all", async () => {
     // Two time-series panels so picking just "p1" is a genuine partial selection,
     // not the full set (which the select-all collapse would treat as "all").
     const dashboard = dashboardWith([{ ...deploys, panels: ["Panel_ID485510"] }]);
@@ -892,17 +861,69 @@ describe("AnnotationSettings", () => {
 
     await wrapper!.find('[data-test="dashboard-annotation-source-edit-deploys"]').trigger("click");
     await flushPromises();
+    expect(wrapper!.text()).toContain("Its panels were deleted");
+
+    // Editing an unrelated field doesn't fix the empty panels selection.
+    await typeInto("dashboard-annotation-source-title", "{service} updated");
+    await submit();
+
+    expect(updateDashboard).not.toHaveBeenCalled();
+    expect(wrapper!.text()).toContain("Select at least one panel, or choose Select all");
 
     const panelsField = form().findComponent('[data-test="dashboard-annotation-source-panels"]');
     panelsField.vm.$emit("update:modelValue", ["p1"]);
     await flushPromises();
-    panelsField.vm.$emit("update:modelValue", []);
-    await flushPromises();
-
     await submit();
     await vi.waitFor(() => expect(updateDashboard).toHaveBeenCalledTimes(1), { timeout: 3000 });
 
-    expect(lastSavedSources()?.find((source) => source.id === "deploys")?.panels).toBeUndefined();
+    expect(lastSavedSources()?.find((source) => source.id === "deploys")?.panels).toEqual(["p1"]);
+  });
+
+  it("unchecking Select All clears the selection instead of round-tripping back to all", async () => {
+    const dashboard = dashboardWith([deploys]);
+    dashboard.tabs[0].panels.push({ id: "p3", type: "bar", title: "Errors" });
+    vi.mocked(getDashboard).mockResolvedValue(dashboard);
+    vi.mocked(searchService.search).mockResolvedValue({ data: { hits: [] } } as never);
+    await mountSettings();
+
+    await wrapper!.find('[data-test="dashboard-annotation-source-edit-deploys"]').trigger("click");
+    await flushPromises();
+
+    const panelsField = form().findComponent('[data-test="dashboard-annotation-source-panels"]');
+    // Select All on: mirrors OSelect's toggleAllSelections, every selectable value.
+    panelsField.vm.$emit("update:modelValue", ["p1", "p3"]);
+    await flushPromises();
+    expect(wrapper!.text()).toContain("All time-series panels");
+
+    // Select All off: OSelect's own "deselect all" branch emits [].
+    panelsField.vm.$emit("update:modelValue", []);
+    await flushPromises();
+    expect(wrapper!.text()).toContain("Select panels");
+    expect(wrapper!.text()).not.toContain("All time-series panels");
+
+    await submit();
+
+    expect(updateDashboard).not.toHaveBeenCalled();
+    expect(wrapper!.text()).toContain("Select at least one panel, or choose Select all");
+  });
+
+  it("Run shows the same panels error as Save, without needing a submit attempt first", async () => {
+    vi.mocked(getDashboard).mockResolvedValue(dashboardWith([deploys]));
+    vi.mocked(searchService.search).mockResolvedValue({ data: { hits: [] } } as never);
+    await mountSettings();
+
+    await wrapper!.find('[data-test="dashboard-annotation-source-edit-deploys"]').trigger("click");
+    await flushPromises();
+
+    const panelsField = form().findComponent('[data-test="dashboard-annotation-source-panels"]');
+    panelsField.vm.$emit("update:modelValue", []);
+    await flushPromises();
+
+    await wrapper!.find('[data-test="dashboard-annotation-source-run"]').trigger("click");
+    await flushPromises();
+
+    expect(wrapper!.text()).toContain("Select at least one panel, or choose Select all");
+    expect(searchService.search).not.toHaveBeenCalled();
   });
 
   it("selects every time-series panel through the Select All row, saving panels as absent", async () => {

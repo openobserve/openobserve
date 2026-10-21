@@ -7629,8 +7629,9 @@
       "endTimeFieldNone": "Nenhum (linha vertical)",
       "panels": "Painéis",
       "panelsFieldLabel": "Painéis (opcional)",
-      "panelsTooltip": "Deixe em branco para desenhar marcadores em todos os painéis de séries temporais, ou escolha painéis específicos.",
+      "panelsTooltip": "Escolha Selecionar tudo para desenhar marcadores em todos os painéis de séries temporais, incluindo os adicionados mais tarde, ou escolha painéis específicos.",
       "allTimeSeriesPanels": "Todos os painéis de séries temporais",
+      "selectPanelsPlaceholder": "Selecionar painéis",
       "panelsCount": "{n} painel | {n} painéis",
       "previewSection": "Pré-visualização",
       "run": "Executar",
@@ -7648,6 +7649,7 @@
       "streamTypeRequired": "Selecione um tipo de stream",
       "streamRequired": "Selecione um stream",
       "queryRequired": "Introduza uma consulta",
+      "panelsRequired": "Selecione pelo menos um painel, ou escolha Selecionar tudo",
       "edit": "Editar",
       "delete": "Eliminar",
       "deleteTitle": "Eliminar origem de anotações",
@@ -7674,7 +7676,7 @@
       "invalidFilters": "Os filtros devem ser um grupo de condições",
       "timestampMissing": "A consulta não devolve _timestamp, por isso as linhas não podem ser colocadas no eixo do tempo.",
       "noPanels": "Nenhum painel",
-      "panelsDeletedHint": "Os seus painéis foram eliminados, por isso atualmente não é desenhada em nenhum painel. Deixe este campo inalterado para manter esse estado, ou altere a seleção — mesmo que a limpe — para voltar a ser desenhada em todos os painéis de séries temporais.",
+      "panelsDeletedHint": "Os seus painéis foram eliminados, por isso atualmente não é desenhada em nenhum painel. Selecione painéis, ou escolha Selecionar tudo, para corrigir isto.",
       "blankFiltersHint": "As condições sem valor são ignoradas."
     }
   },

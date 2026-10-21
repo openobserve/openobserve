@@ -79,6 +79,8 @@ export const makeAnnotationSourceSchema = (
       description: z.string(),
       endTimeField: z.string(),
       panels: z.array(z.string()),
+      // Whether "Select all" is active — panels is only the explicit list when false.
+      panelsAll: z.boolean(),
     })
     .superRefine((value, ctx) => {
       const takenNames = new Set(siblingNames.map((name) => name.trim().toLowerCase()));
@@ -87,6 +89,13 @@ export const makeAnnotationSourceSchema = (
           code: "custom",
           path: ["name"],
           message: t("dashboard.annotationSources.duplicateName"),
+        });
+      }
+      if (!value.panelsAll && value.panels.length === 0) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["panels"],
+          message: t("dashboard.annotationSources.panelsRequired"),
         });
       }
       if (value.mode === "sql") {
@@ -130,6 +139,7 @@ export const annotationSourceDefaults = (colorIndex = 0): AnnotationSourceFormVa
   description: "",
   endTimeField: "",
   panels: [],
+  panelsAll: true,
 });
 
 /** A saved tree may be missing client-only ids (groupId/id) or carry the backend's operator casing. */
@@ -153,14 +163,13 @@ export const annotationSourceToFormValues = (
   description: source.description ?? "",
   endTimeField: source.endTimeField ?? "",
   panels: source.panels ?? [],
+  panelsAll: !Array.isArray(source.panels),
 });
 
 /** The saved source: explicit keys, empty optionals dropped, and no panel list meaning every panel. */
 export const formValuesToAnnotationSource = (
   id: string,
   value: AnnotationSourceFormValues,
-  // True only for an untouched, already-empty panels field; keeps it `[]` instead of reading as "all panels". Not form input, so a param, not a schema field.
-  keepEmptyPanelScope = false,
 ): AnnotationSource => {
   const description = value.description.trim();
   const endTimeField = value.endTimeField.trim();
@@ -178,6 +187,6 @@ export const formValuesToAnnotationSource = (
     title: value.title.trim(),
     ...(description ? { description } : {}),
     ...(endTimeField ? { endTimeField } : {}),
-    ...(keepEmptyPanelScope || value.panels.length ? { panels: [...value.panels] } : {}),
+    ...(value.panelsAll ? {} : { panels: [...value.panels] }),
   };
 };

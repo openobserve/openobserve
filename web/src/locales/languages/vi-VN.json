@@ -7629,8 +7629,9 @@
       "endTimeFieldNone": "Không có (đường dọc)",
       "panels": "Bảng",
       "panelsFieldLabel": "Bảng (tùy chọn)",
-      "panelsTooltip": "Để trống để vẽ điểm đánh dấu trên mọi bảng chuỗi thời gian, hoặc chọn các bảng cụ thể.",
+      "panelsTooltip": "Chọn Chọn tất cả để vẽ điểm đánh dấu trên mọi bảng chuỗi thời gian, kể cả những bảng được thêm sau này, hoặc chọn các bảng cụ thể.",
       "allTimeSeriesPanels": "Tất cả bảng chuỗi thời gian",
+      "selectPanelsPlaceholder": "Chọn bảng",
       "panelsCount": "{n} bảng | {n} bảng",
       "previewSection": "Xem trước",
       "run": "Chạy",
@@ -7648,6 +7649,7 @@
       "streamTypeRequired": "Chọn loại stream",
       "streamRequired": "Chọn một stream",
       "queryRequired": "Nhập truy vấn",
+      "panelsRequired": "Chọn ít nhất một bảng, hoặc chọn Chọn tất cả",
       "edit": "Sửa",
       "delete": "Xóa",
       "deleteTitle": "Xóa nguồn chú thích",
@@ -7674,7 +7676,7 @@
       "invalidFilters": "Bộ lọc phải là một nhóm điều kiện",
       "timestampMissing": "Truy vấn không trả về _timestamp nên các hàng không thể đặt lên trục thời gian.",
       "noPanels": "Không có bảng",
-      "panelsDeletedHint": "Các bảng của nguồn này đã bị xóa nên hiện tại nó không vẽ trên bảng nào. Giữ nguyên trường này để duy trì trạng thái đó, hoặc thay đổi lựa chọn — kể cả xóa trống — để nó vẽ trên tất cả bảng chuỗi thời gian trở lại.",
+      "panelsDeletedHint": "Các bảng của nó đã bị xóa, nên hiện tại không vẽ trên bảng nào. Chọn bảng, hoặc chọn Chọn tất cả, để khắc phục.",
       "blankFiltersHint": "Các điều kiện không có giá trị sẽ bị bỏ qua."
     }
   },

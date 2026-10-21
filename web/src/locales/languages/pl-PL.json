@@ -7629,8 +7629,9 @@
       "endTimeFieldNone": "Brak (linia pionowa)",
       "panels": "Panele",
       "panelsFieldLabel": "Panele (opcjonalnie)",
-      "panelsTooltip": "Pozostaw puste, aby rysować znaczniki na wszystkich panelach szeregów czasowych, lub wybierz konkretne panele.",
+      "panelsTooltip": "Wybierz Zaznacz wszystko, aby rysować znaczniki na każdym panelu szeregów czasowych, w tym dodanych później, lub wybierz konkretne panele.",
       "allTimeSeriesPanels": "Wszystkie panele szeregów czasowych",
+      "selectPanelsPlaceholder": "Wybierz panele",
       "panelsCount": "{n} panel | {n} panele",
       "previewSection": "Podgląd",
       "run": "Uruchom",
@@ -7648,6 +7649,7 @@
       "streamTypeRequired": "Wybierz typ strumienia",
       "streamRequired": "Wybierz strumień",
       "queryRequired": "Wpisz zapytanie",
+      "panelsRequired": "Wybierz co najmniej jeden panel lub wybierz Zaznacz wszystko",
       "edit": "Edytuj",
       "delete": "Usuń",
       "deleteTitle": "Usuń źródło adnotacji",
@@ -7674,7 +7676,7 @@
       "invalidFilters": "Filtry muszą być grupą warunków",
       "timestampMissing": "Zapytanie nie zwraca _timestamp, więc jego wierszy nie można umieścić na osi czasu.",
       "noPanels": "Brak paneli",
-      "panelsDeletedHint": "Jego panele zostały usunięte, więc obecnie nie rysuje się na żadnym panelu. Pozostaw to pole bez zmian, aby tak zostało, albo zmień wybór — nawet wyczyszczenie go — aby znów rysował się na wszystkich panelach szeregów czasowych.",
+      "panelsDeletedHint": "Jego panele zostały usunięte, więc obecnie nie jest rysowany na żadnym panelu. Wybierz panele lub wybierz Zaznacz wszystko, aby to naprawić.",
       "blankFiltersHint": "Warunki bez wartości są pomijane."
     }
   },

@@ -7629,8 +7629,9 @@
       "endTimeFieldNone": "Geen (verticale lijn)",
       "panels": "Panelen",
       "panelsFieldLabel": "Panelen (optioneel)",
-      "panelsTooltip": "Laat leeg om markeringen op alle tijdreekspanelen te tekenen, of kies specifieke panelen.",
+      "panelsTooltip": "Kies Alles selecteren om markeringen op elk tijdreekspaneel te tekenen, ook op later toegevoegde panelen, of kies specifieke panelen.",
       "allTimeSeriesPanels": "Alle tijdreekspanelen",
+      "selectPanelsPlaceholder": "Panelen selecteren",
       "panelsCount": "{n} paneel | {n} panelen",
       "previewSection": "Voorbeeld",
       "run": "Uitvoeren",
@@ -7648,6 +7649,7 @@
       "streamTypeRequired": "Selecteer een streamtype",
       "streamRequired": "Selecteer een stream",
       "queryRequired": "Voer een query in",
+      "panelsRequired": "Selecteer ten minste één paneel, of kies Alles selecteren",
       "edit": "Bewerken",
       "delete": "Verwijderen",
       "deleteTitle": "Annotatiebron verwijderen",
@@ -7674,7 +7676,7 @@
       "invalidFilters": "Filters moeten een voorwaardegroep zijn",
       "timestampMissing": "De query geeft geen _timestamp terug, dus de rijen kunnen niet op de tijdas worden geplaatst.",
       "noPanels": "Geen panelen",
-      "panelsDeletedHint": "De panelen van deze bron zijn verwijderd, dus ze tekent momenteel op geen enkel paneel. Laat dit veld ongewijzigd om dat zo te houden, of wijzig de selectie — ook door deze te legen — om weer op alle tijdreekspanelen te tekenen.",
+      "panelsDeletedHint": "De panelen zijn verwijderd, dus er wordt momenteel op geen enkel paneel getekend. Selecteer panelen, of kies Alles selecteren, om dit op te lossen.",
       "blankFiltersHint": "Voorwaarden zonder waarde worden genegeerd."
     }
   },
