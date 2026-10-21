@@ -35,6 +35,29 @@ use crate::{
     errors::{self, DbError, Error},
 };
 
+/// The `detail` column: the parts of a [`ResponseEvent`] only an `AiVerdict` carries.
+#[derive(Debug, Default, serde::Serialize, serde::Deserialize)]
+pub(super) struct EventDetail {
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    evidence: Vec<config::meta::oncall::VerdictEvidence>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    confidence: Option<config::meta::oncall::Confidence>,
+}
+
+impl EventDetail {
+    /// `None` when there is nothing to keep, so every other entry stays a null column.
+    pub(super) fn of(event: &ResponseEvent) -> Option<String> {
+        if event.evidence.is_empty() && event.confidence.is_none() {
+            return None;
+        }
+        let detail = EventDetail {
+            evidence: event.evidence.clone(),
+            confidence: event.confidence,
+        };
+        serde_json::to_string(&detail).ok()
+    }
+}
+
 /// Rows whose stored discriminants this build cannot interpret are dropped. A
 /// record whose state we cannot read must not be shown as `triggered` and
 /// re-escalated.
@@ -117,6 +140,12 @@ async fn save(
 }
 
 fn to_event(m: oncall_response_events::Model) -> Option<ResponseEvent> {
+    // An unreadable detail costs the entry its evidence chips, never the entry itself.
+    let detail: EventDetail = m
+        .detail
+        .as_deref()
+        .and_then(|raw| serde_json::from_str(raw).ok())
+        .unwrap_or_default();
     Some(ResponseEvent {
         kind: ResponseEventKind::from_i32(m.kind)?,
         at: m.at,
@@ -128,6 +157,8 @@ fn to_event(m: oncall_response_events::Model) -> Option<ResponseEvent> {
         // A channel this build cannot name loses its dedup key, not its existence: one page twice.
         channel: m.channel.and_then(Channel::from_i32),
         delivered: m.delivered,
+        evidence: detail.evidence,
+        confidence: detail.confidence,
     })
 }
 
@@ -967,6 +998,7 @@ pub(super) async fn add_event_in<C: ConnectionTrait>(
         recipient: Set(event.recipient.clone()),
         channel: Set(event.channel.map(|c| c.to_i32())),
         delivered: Set(event.delivered),
+        detail: Set(EventDetail::of(event)),
     };
     let Err(e) = model.insert(conn).await else {
         return Ok(());
@@ -1684,6 +1716,7 @@ mod tests {
             recipient: None,
             channel: None,
             delivered: None,
+            detail: None,
         }
     }
 
@@ -1858,5 +1891,33 @@ mod tests {
         .into_iter()
         .collect();
         assert_eq!(health, expected);
+    }
+
+    #[test]
+    fn a_verdict_keeps_its_evidence_and_confidence_and_other_entries_keep_a_null_detail() {
+        use config::meta::oncall::{Confidence, VerdictEvidence, VerdictEvidenceKind};
+        let evidence = vec![VerdictEvidence {
+            kind: VerdictEvidenceKind::Link,
+            label: "fd ratio".into(),
+            query: None,
+            stream: None,
+            from: None,
+            to: None,
+            href: Some("https://o2.example/m".into()),
+        }];
+        let verdict = ResponseEvent::new(ResponseEventKind::AiVerdict, 1, "o2-sre", "cause")
+            .with_verdict_facts(evidence.clone(), Some(Confidence::Medium));
+        let mut m = event_model(ResponseEventKind::AiVerdict);
+        m.detail = EventDetail::of(&verdict);
+        let back = to_event(m).unwrap();
+        assert_eq!(back.evidence, evidence);
+        assert_eq!(back.confidence, Some(Confidence::Medium));
+
+        let page = ResponseEvent::new(ResponseEventKind::Page, 1, "o2-engine", "paged");
+        assert_eq!(EventDetail::of(&page), None);
+        let mut broken = event_model(ResponseEventKind::AiVerdict);
+        broken.detail = Some("{not json".into());
+        let read = to_event(broken).unwrap();
+        assert!(read.evidence.is_empty() && read.confidence.is_none());
     }
 }

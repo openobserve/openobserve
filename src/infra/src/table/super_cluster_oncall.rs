@@ -543,6 +543,7 @@ async fn put_event_in<C: ConnectionTrait>(
         recipient: Set(event.recipient.clone()),
         channel: Set(channel),
         delivered: Set(event.delivered),
+        detail: Set(super::oncall_responses::EventDetail::of(event)),
     }
     .insert(conn)
     .await?;

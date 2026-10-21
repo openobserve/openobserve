@@ -1319,6 +1319,7 @@ mod tests {
             related_incident_ids: vec![],
             suggested_root_cause: Some("# RCA Analysis\n\nTest markdown".to_string()),
             previous_analyses: vec![],
+            current_report: None,
         };
 
         // Serialize to JSON

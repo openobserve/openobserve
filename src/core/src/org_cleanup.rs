@@ -471,6 +471,9 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     incident_events::delete_by_org(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/incident_events: {e}"))?;
+    infra::table::rca_feedback::delete_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/rca_feedback: {e}"))?;
     // SLOs go BEFORE alerts, deliberately: an alert-based SLO reads from a source
     // alert, and a later PR refuses to delete an alert a live SLO still depends
     // on. An org teardown must never stall on that guard.

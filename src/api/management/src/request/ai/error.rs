@@ -55,10 +55,12 @@ pub enum AiErrorCode {
     ChangedSince,
     UndoExpired,
     BelowUsage,
+    RcaDisabled,
+    AnalysisInProgress,
 }
 
 impl AiErrorCode {
-    pub const ALL: [AiErrorCode; 29] = [
+    pub const ALL: [AiErrorCode; 31] = [
         AiErrorCode::SessionExpired,
         AiErrorCode::PermissionDenied,
         AiErrorCode::NotEnabled,
@@ -88,6 +90,8 @@ impl AiErrorCode {
         AiErrorCode::ChangedSince,
         AiErrorCode::UndoExpired,
         AiErrorCode::BelowUsage,
+        AiErrorCode::RcaDisabled,
+        AiErrorCode::AnalysisInProgress,
     ];
 
     pub fn as_str(self) -> &'static str {
@@ -121,6 +125,8 @@ impl AiErrorCode {
             AiErrorCode::ChangedSince => "changed_since",
             AiErrorCode::UndoExpired => "undo_expired",
             AiErrorCode::BelowUsage => "below_usage",
+            AiErrorCode::RcaDisabled => "rca_disabled",
+            AiErrorCode::AnalysisInProgress => "analysis_in_progress",
         }
     }
 
@@ -177,7 +183,10 @@ impl AiErrorCode {
         match self {
             AiErrorCode::SessionExpired | AiErrorCode::SignedOut => StatusCode::UNAUTHORIZED,
             AiErrorCode::PermissionDenied => StatusCode::FORBIDDEN,
-            AiErrorCode::NotEnabled | AiErrorCode::InvalidRequest => StatusCode::BAD_REQUEST,
+            AiErrorCode::NotEnabled
+            | AiErrorCode::InvalidRequest
+            | AiErrorCode::RcaDisabled
+            | AiErrorCode::AnalysisInProgress => StatusCode::BAD_REQUEST,
             AiErrorCode::CreditsExhausted | AiErrorCode::SubscriptionRequired => {
                 StatusCode::PAYMENT_REQUIRED
             }
@@ -223,7 +232,7 @@ impl AiErrorCode {
     /// The one action the client offers; `None` leaves the choice to the client's code mapping.
     pub fn default_action(self) -> Option<AiErrorAction> {
         match self {
-            AiErrorCode::PermissionDenied | AiErrorCode::NotEnabled => {
+            AiErrorCode::PermissionDenied | AiErrorCode::NotEnabled | AiErrorCode::RcaDisabled => {
                 Some(AiErrorAction::AskAdmin)
             }
             AiErrorCode::CreditsExhausted | AiErrorCode::SubscriptionRequired => {
@@ -243,7 +252,8 @@ impl AiErrorCode {
             | AiErrorCode::Internal
             | AiErrorCode::ChangedSince
             | AiErrorCode::UndoExpired
-            | AiErrorCode::BelowUsage => Some(AiErrorAction::None),
+            | AiErrorCode::BelowUsage
+            | AiErrorCode::AnalysisInProgress => Some(AiErrorAction::None),
             AiErrorCode::AlreadySubmitted
             | AiErrorCode::RestoreRequired
             | AiErrorCode::StaleEpoch
@@ -559,6 +569,8 @@ mod tests {
                 "changed_since",
                 "undo_expired",
                 "below_usage",
+                "rca_disabled",
+                "analysis_in_progress",
             ]
         );
         for code in AiErrorCode::ALL {

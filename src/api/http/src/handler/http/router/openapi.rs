@@ -198,6 +198,7 @@ const MCP_OPT_OUT_CATEGORIES: [&str; 2] = ["authorization", "users"];
         openobserve_api_management::request::alerts::incidents::trigger_incident_rca,
         openobserve_api_management::request::alerts::incidents::cancel_incident_rca,
         openobserve_api_management::request::alerts::incidents::get_incident_rca_history,
+        openobserve_api_management::request::alerts::incidents::post_incident_rca_feedback,
         openobserve_api_management::request::alerts::templates::list_templates,
         openobserve_api_management::request::alerts::templates::get_template,
         openobserve_api_management::request::alerts::templates::save_template,

@@ -2139,6 +2139,7 @@ pub async fn get_prior_causes(
     tag = "OnCall",
     operation_id = "OnCallResponseReport",
     summary = "The full agent report this page carried",
+    description = "`report`, `model`, `generated_at`, and `incident_id` when the record belongs to an incident.",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
@@ -2159,11 +2160,19 @@ pub async fn get_response_report(
             // A record with no report is the ordinary case — no agent, or it never answered.
             Ok(None) => MetaHttpResponse::error(StatusCode::NOT_FOUND.as_u16(), "Report not found")
                 .into_response(),
-            Ok(Some(report)) => MetaHttpResponse::json(serde_json::json!({
-                "report": report.report,
-                "model": report.model,
-                "generated_at": report.generated_at,
-            })),
+            Ok(Some(report)) => {
+                let incident_id = infra::table::oncall_responses::get(&org_id, &response_id)
+                    .await
+                    .ok()
+                    .flatten()
+                    .and_then(|record| record.incident_id);
+                MetaHttpResponse::json(report_body(
+                    report.report,
+                    report.model,
+                    report.generated_at,
+                    incident_id,
+                ))
+            }
             Err(e) => internal_error("get_response_report", &e),
         }
     }
@@ -4668,6 +4677,25 @@ pub async fn delete_telephony(
     }
 }
 
+/// The report endpoint's body; `incident_id` only when the record belongs to an incident.
+#[cfg(any(feature = "enterprise", test))]
+fn report_body(
+    report: String,
+    model: Option<String>,
+    generated_at: i64,
+    incident_id: Option<String>,
+) -> serde_json::Value {
+    let mut body = serde_json::json!({
+        "report": report,
+        "model": model,
+        "generated_at": generated_at,
+    });
+    if let Some(id) = incident_id {
+        body["incident_id"] = id.into();
+    }
+    body
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -5637,5 +5665,15 @@ mod tests {
     #[tokio::test]
     async fn test_delete_telephony_is_not_supported_without_enterprise() {
         assert_not_supported(delete_telephony(Path("default".to_string())).await).await;
+    }
+
+    #[test]
+    fn the_report_names_its_incident_only_when_it_has_one() {
+        let with = report_body("r".into(), None, 1, Some("inc_1".into()));
+        assert_eq!(with["incident_id"], "inc_1");
+        assert_eq!(with["report"], "r");
+        let without = report_body("r".into(), Some("m".into()), 1, None);
+        assert!(without.get("incident_id").is_none());
+        assert_eq!(without["model"], "m");
     }
 }
