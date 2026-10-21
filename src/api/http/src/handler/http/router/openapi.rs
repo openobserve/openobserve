@@ -183,16 +183,9 @@ use crate::{
         openobserve_api_management::request::alerts::incidents::get_incident_rca_thread,
         openobserve_api_management::request::alerts::incidents::steer_incident_rca_run,
         openobserve_api_management::request::alerts::incidents::get_incident_rca_steering,
-        openobserve_api_management::request::alerts::incidents::put_incident_rca_feedback,
-        openobserve_api_management::request::alerts::incidents::get_incident_rca_feedback,
-        openobserve_api_management::request::alerts::incidents::delete_incident_rca_feedback,
-        openobserve_api_management::request::alerts::incidents::put_incident_rca_correction,
-        openobserve_api_management::request::alerts::incidents::get_incident_rca_correction,
-        openobserve_api_management::request::alerts::incidents::delete_incident_rca_correction,
         openobserve_api_management::request::alerts::incidents::resume_incident_rca_run,
         openobserve_api_management::request::alerts::incidents::get_incident_rca_summary,
         openobserve_api_management::request::alerts::incidents::get_incident_rca_live_stream,
-        openobserve_api_management::request::alerts::incidents::run_incident_rca_backtest,
         openobserve_api_management::request::alerts::templates::list_templates,
         openobserve_api_management::request::alerts::templates::get_template,
         openobserve_api_management::request::alerts::templates::save_template,
@@ -515,14 +508,6 @@ use crate::{
             config::meta::alerts::rca_steering::SteerStatus,
             config::meta::alerts::rca_steering::SteerAction,
             config::meta::alerts::rca_steering::SteerStatusReason,
-            config::meta::alerts::rca_feedback::RcaFeedback,
-            config::meta::alerts::rca_feedback::FeedbackVerdict,
-            config::meta::alerts::rca_feedback::FeedbackReason,
-            config::meta::alerts::rca_feedback::PutRcaFeedbackRequest,
-            config::meta::alerts::rca_feedback::ListRcaFeedbackResponse,
-            config::meta::alerts::rca_feedback::RcaCauseCorrection,
-            config::meta::alerts::rca_feedback::PutRcaCauseCorrectionRequest,
-            config::meta::alerts::rca_feedback::ListRcaCauseCorrectionResponse,
             config::meta::alerts::rca_runs::RcaSummary,
             config::meta::alerts::rca_runs::RcaDetailFields,
             config::meta::alerts::rca_runs::RunSummaryFields,
@@ -1661,63 +1646,17 @@ mod tests {
     }
 
     #[test]
-    fn rca_feedback_correction_and_resume_paths_are_documented() {
+    fn rca_resume_path_is_documented() {
         let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
         let paths = spec["paths"].as_object().unwrap();
-        let feedback = "/api/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/feedback";
-        let correction = "/api/v2/{org_id}/alerts/incidents/{incident_id}/rca/correction";
         let resume = "/api/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/resume";
-        for (path, method, operation_id, ratelimit, statuses) in [
-            (
-                feedback,
-                "put",
-                "PutIncidentRcaFeedback",
-                "update",
-                &["200", "400", "403", "404", "409"][..],
-            ),
-            (
-                feedback,
-                "get",
-                "GetIncidentRcaFeedback",
-                "get",
-                &["200", "404"][..],
-            ),
-            (
-                feedback,
-                "delete",
-                "DeleteIncidentRcaFeedback",
-                "update",
-                &["204", "403", "404"][..],
-            ),
-            (
-                correction,
-                "put",
-                "PutIncidentRcaCorrection",
-                "update",
-                &["200", "400", "403", "404"][..],
-            ),
-            (
-                correction,
-                "get",
-                "GetIncidentRcaCorrection",
-                "get",
-                &["200", "404"][..],
-            ),
-            (
-                correction,
-                "delete",
-                "DeleteIncidentRcaCorrection",
-                "update",
-                &["204", "403", "404"][..],
-            ),
-            (
-                resume,
-                "post",
-                "ResumeIncidentRcaRun",
-                "update",
-                &["202", "404", "409", "410", "503"][..],
-            ),
-        ] {
+        for (path, method, operation_id, ratelimit, statuses) in [(
+            resume,
+            "post",
+            "ResumeIncidentRcaRun",
+            "update",
+            &["202", "404", "409", "410", "503"][..],
+        )] {
             let op = &paths[path][method];
             assert!(op.is_object(), "{method} {path} missing");
             assert_eq!(op["operationId"], operation_id, "{method} {path}");
@@ -1742,8 +1681,6 @@ mod tests {
             }
         }
         assert!(paths[resume].get("get").is_none());
-        assert!(paths[feedback].get("post").is_none());
-        assert!(paths[correction].get("post").is_none());
     }
 
     #[test]

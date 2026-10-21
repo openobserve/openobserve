@@ -3012,19 +3012,7 @@ pub static RCA_ANSWER_WAIT_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
     )
     .expect("Metric created")
 });
-// RCA feedback and resume
-pub static RCA_FEEDBACK_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
-    IntCounterVec::new(
-        Opts::new(
-            "rca_feedback_total",
-            "Saved responder feedback, by verdict: yes or no on an RCA run, correction on an incident",
-        )
-        .namespace(NAMESPACE)
-        .const_labels(create_const_labels()),
-        &["organization", "verdict"],
-    )
-    .expect("Metric created")
-});
+// RCA resume
 pub static RCA_RESUME_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
         Opts::new(
@@ -3752,7 +3740,6 @@ pub(crate) fn register(registry: &Registry) {
         Box::new(RCA_STEERING_ACKS_TOTAL.clone()),
         Box::new(RCA_QUESTIONS_TOTAL.clone()),
         Box::new(RCA_ANSWER_WAIT_SECONDS.clone()),
-        Box::new(RCA_FEEDBACK_TOTAL.clone()),
         Box::new(RCA_RESUME_TOTAL.clone()),
         Box::new(RCA_LIVE_STREAMS.clone()),
     ] {

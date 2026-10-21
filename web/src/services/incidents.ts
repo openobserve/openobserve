@@ -17,7 +17,6 @@ import http, { attemptTokenRefresh } from "./http";
 import store from "@/stores";
 import analytics from "./product_analytics";
 import type { TranslateFn } from "@/types/i18n";
-import type { ResolutionCause } from "@/ts/interfaces/oncall";
 import serviceStreamsApi, {
   type CorrelationRequest,
   type CorrelationResponse,
@@ -644,63 +643,6 @@ export interface CancelRcaResponse {
   cancelled: boolean;
 }
 
-/** A responder's verdict on a finished run. */
-export type RcaFeedbackVerdict = "yes" | "no";
-
-/** Why a run is not the cause (`no` only). */
-export type RcaFeedbackReason =
-  "wrong_service" | "symptom_not_cause" | "evidence_does_not_hold" | "missed_change";
-
-/** One `rca_feedback` row: one per run and author. Times are microseconds. */
-export interface RcaFeedback {
-  run_id: string;
-  author_email: string;
-  incident_id: string | null;
-  subject_type: RcaRunSubjectType;
-  subject_id: string;
-  verdict: RcaFeedbackVerdict;
-  note: string | null;
-  reasons: RcaFeedbackReason[];
-  created_at: number;
-  updated_at: number;
-}
-
-/** Body of `PUT …/rca/runs/{run_id}/feedback`. */
-export interface PutRcaFeedbackRequest {
-  verdict: RcaFeedbackVerdict;
-  note?: string;
-  reasons?: RcaFeedbackReason[];
-}
-
-/** `GET …/rca/runs/{run_id}/feedback`: every author's row and the caller's own. */
-export interface ListRcaFeedbackResponse {
-  items: RcaFeedback[];
-  mine: RcaFeedback | null;
-}
-
-/** One responder's correction of an incident's cause: one per incident and author. Times are microseconds. */
-export interface RcaCauseCorrection {
-  org_id: string;
-  incident_id: string;
-  author_email: string;
-  cause: ResolutionCause;
-  note: string | null;
-  created_at: number;
-  updated_at: number;
-}
-
-/** Body of `PUT …/rca/correction`; any cause but `still_unknown`. */
-export interface PutRcaCauseCorrectionRequest {
-  cause: ResolutionCause;
-  note?: string;
-}
-
-/** `GET …/rca/correction`: every author's correction (oldest first) and the caller's own. */
-export interface ListRcaCauseCorrectionResponse {
-  items: RcaCauseCorrection[];
-  mine: RcaCauseCorrection | null;
-}
-
 /** `POST …/rca/runs/{run_id}/resume`: 202 (J7). */
 export interface ResumeRcaResponse {
   message: string;
@@ -1010,59 +952,6 @@ const incidents = {
     return http().post<RcaSteerResponse>(
       `/api/v2/${org_identifier}/alerts/incidents/${incident_id}/rca/runs/${run_id}/steer`,
       body,
-    );
-  },
-
-  /** Read the feedback rows of one run; `mine` is the caller's. */
-  getRcaFeedback: (org_identifier: string, incident_id: string, run_id: string) => {
-    return http().get<ListRcaFeedbackResponse>(
-      `/api/v2/${org_identifier}/alerts/incidents/${incident_id}/rca/runs/${run_id}/feedback`,
-    );
-  },
-
-  /** Save the caller's feedback on a finished run; the latest write wins. */
-  putRcaFeedback: (
-    org_identifier: string,
-    incident_id: string,
-    run_id: string,
-    body: PutRcaFeedbackRequest,
-  ) => {
-    return http().put<RcaFeedback>(
-      `/api/v2/${org_identifier}/alerts/incidents/${incident_id}/rca/runs/${run_id}/feedback`,
-      body,
-    );
-  },
-
-  /** Undo: delete the caller's own feedback row (204). */
-  deleteRcaFeedback: (org_identifier: string, incident_id: string, run_id: string) => {
-    return http().delete(
-      `/api/v2/${org_identifier}/alerts/incidents/${incident_id}/rca/runs/${run_id}/feedback`,
-    );
-  },
-
-  /** Read the cause corrections of an incident; `mine` is the caller's. */
-  getRcaCorrection: (org_identifier: string, incident_id: string) => {
-    return http().get<ListRcaCauseCorrectionResponse>(
-      `/api/v2/${org_identifier}/alerts/incidents/${incident_id}/rca/correction`,
-    );
-  },
-
-  /** Save the caller's cause correction; it replaces their earlier one. */
-  putRcaCorrection: (
-    org_identifier: string,
-    incident_id: string,
-    body: PutRcaCauseCorrectionRequest,
-  ) => {
-    return http().put<RcaCauseCorrection>(
-      `/api/v2/${org_identifier}/alerts/incidents/${incident_id}/rca/correction`,
-      body,
-    );
-  },
-
-  /** Undo: delete the caller's own correction (204). */
-  deleteRcaCorrection: (org_identifier: string, incident_id: string) => {
-    return http().delete(
-      `/api/v2/${org_identifier}/alerts/incidents/${incident_id}/rca/correction`,
     );
   },
 

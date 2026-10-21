@@ -68,12 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :aria-label="t('alerts.incidents.rcaSummary.rootCauses')"
       class="m-0 flex max-w-225 list-none flex-col gap-1 p-0"
     >
-      <li
-        v-for="cause in causes"
-        :key="cause.id"
-        data-test="rca-verdict-cause"
-        class="text-sm"
-      >
+      <li v-for="cause in causes" :key="cause.id" data-test="rca-verdict-cause" class="text-sm">
         <span class="text-text-heading font-semibold">{{ cause.statement }}</span>
         <span data-test="rca-verdict-cause-meta" class="text-text-secondary text-xs">
           · {{ causeMeta(cause) }}
@@ -171,39 +166,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :stage="stage"
     />
 
-    <div v-if="graded" class="mt-0.5 flex flex-wrap items-end gap-x-8 gap-y-3">
-      <dl data-test="rca-verdict-facts" class="m-0 flex min-w-0 flex-wrap items-start gap-8">
-        <div v-if="suspectText" class="max-w-105 min-w-0">
-          <dt class="text-text-secondary text-xs">
-            {{ t("alerts.incidents.rcaSummary.suspectChange") }}
-          </dt>
-          <dd data-test="rca-verdict-suspect" class="text-text-heading m-0 text-sm font-semibold">
-            {{ suspectText }}
-          </dd>
-        </div>
-        <div class="max-w-95 min-w-0">
-          <dt class="text-text-secondary text-xs">{{ t("alerts.incidents.rcaSummary.impact") }}</dt>
-          <dd data-test="rca-verdict-impact" class="text-text-heading m-0 text-sm font-semibold">
-            {{ impactText }}
-          </dd>
-        </div>
-        <div v-if="impactedServices.length" class="max-w-105 min-w-0">
-          <dt class="text-text-secondary text-xs">
-            {{ t("alerts.incidents.rcaSummary.impactedServices") }}
-          </dt>
-          <dd
-            data-test="rca-verdict-services"
-            class="text-text-heading m-0 text-sm font-semibold break-words"
-          >
-            {{ impactedServices.join(", ") }}
-          </dd>
-        </div>
-      </dl>
-      <!-- `contents`: the slot's control and panels are items of this wrapping row. -->
-      <div v-if="$slots.feedback" data-test="rca-verdict-feedback" class="contents">
-        <slot name="feedback" />
+    <dl
+      v-if="graded"
+      data-test="rca-verdict-facts"
+      class="m-0 mt-0.5 flex min-w-0 flex-wrap items-start gap-8"
+    >
+      <div v-if="suspectText" class="max-w-105 min-w-0">
+        <dt class="text-text-secondary text-xs">
+          {{ t("alerts.incidents.rcaSummary.suspectChange") }}
+        </dt>
+        <dd data-test="rca-verdict-suspect" class="text-text-heading m-0 text-sm font-semibold">
+          {{ suspectText }}
+        </dd>
       </div>
-    </div>
+      <div class="max-w-95 min-w-0">
+        <dt class="text-text-secondary text-xs">{{ t("alerts.incidents.rcaSummary.impact") }}</dt>
+        <dd data-test="rca-verdict-impact" class="text-text-heading m-0 text-sm font-semibold">
+          {{ impactText }}
+        </dd>
+      </div>
+      <div v-if="impactedServices.length" class="max-w-105 min-w-0">
+        <dt class="text-text-secondary text-xs">
+          {{ t("alerts.incidents.rcaSummary.impactedServices") }}
+        </dt>
+        <dd
+          data-test="rca-verdict-services"
+          class="text-text-heading m-0 text-sm font-semibold break-words"
+        >
+          {{ impactedServices.join(", ") }}
+        </dd>
+      </div>
+    </dl>
 
     <!-- Proposed actions: inert text; nothing runs from here (README non-goal). -->
     <section
@@ -471,11 +464,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </template>
     </OBanner>
-
-    <!-- The incident-level cause correction, under any finished run. -->
-    <div v-if="$slots.correction" data-test="rca-verdict-correction">
-      <slot name="correction" />
-    </div>
   </section>
 </template>
 

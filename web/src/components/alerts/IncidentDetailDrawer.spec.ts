@@ -68,8 +68,6 @@ vi.mock("@/services/incidents", async (importOriginal) => {
       triggerRca: vi.fn(),
       resumeRca: vi.fn(),
       cancelRca: vi.fn(),
-      getRcaFeedback: vi.fn(),
-      getRcaCorrection: vi.fn(),
       getRcaRun: vi.fn(),
       openRcaLiveStream: vi.fn(),
       getCorrelatedStreams: vi.fn(),
@@ -273,10 +271,6 @@ describe("IncidentDetailDrawer.vue", () => {
     (incidentsService.triggerRca as any).mockResolvedValue({
       data: { message: "started", run_id: "run-1" },
     });
-
-    vi.mocked(incidentsService.getRcaCorrection).mockResolvedValue({
-      data: { items: [], mine: null },
-    } as never);
 
     vi.mocked(incidentsService.getRcaRun).mockImplementation((_org, _id, runId) =>
       Promise.resolve({
@@ -1539,7 +1533,6 @@ describe("IncidentDetailDrawer.vue", () => {
         "Report of v1-0",
       );
       expect(connections.every((c) => c.runId === null)).toBe(true);
-      expect(incidentsService.getRcaFeedback).not.toHaveBeenCalled();
     });
 
     it("v1: picking a pre-upgrade report shows it and streams no thread or summary for it", async () => {
@@ -1618,9 +1611,6 @@ describe("IncidentDetailDrawer.vue", () => {
     beforeEach(() => {
       awsConfig.isEnterprise = "true";
       store.state.zoConfig.ai_enabled = true;
-      vi.mocked(incidentsService.getRcaFeedback).mockResolvedValue({
-        data: { items: [], mine: null },
-      } as never);
       vi.mocked(incidentsService.get).mockResolvedValue({
         data: createIncidentWithAlerts({ id: "1", title: "checkout 5xx", rca: completed }),
       } as never);
