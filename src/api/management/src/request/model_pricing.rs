@@ -811,7 +811,7 @@ fn captured_models(
             })
         })
         .collect();
-    captured.sort_by(|a, b| b.primary.cmp(&a.primary));
+    captured.sort_by_key(|c| std::cmp::Reverse(c.primary));
     captured
 }
 
@@ -903,7 +903,7 @@ pub async fn test_model_match(
     };
     let match_kind = resolved.as_ref().map(|r| r.match_kind);
     let matched = resolved.map(|r| match r.pricing {
-        ResolvedPricing::Definition(definition) => definition,
+        ResolvedPricing::Definition(definition) => *definition,
         ResolvedPricing::Compiled(pricing) => pricing.to_definition(),
     });
 

@@ -43,8 +43,9 @@ pub fn calculate_token_count(model_name: &str, prompt: &str) -> i64 {
 /// The price [`resolve_pricing`] selected for a model name.
 #[derive(Debug)]
 pub enum ResolvedPricing {
-    /// A definition from the org / meta-org / built-in pricing tables.
-    Definition(ModelPricingDefinition),
+    /// A definition from the org / meta-org / built-in pricing tables; boxed, as it is far
+    /// larger than the compiled-in reference.
+    Definition(Box<ModelPricingDefinition>),
     /// An entry of the compiled-in [`MODEL_PRICING`] fallback table.
     Compiled(&'static ModelPricing),
 }
@@ -86,7 +87,7 @@ pub fn resolve_pricing(
     match definition {
         Some(d) if compiled.is_none_or(|(_, kind)| kind <= d.match_kind) => {
             Some(PricingResolution {
-                pricing: ResolvedPricing::Definition(d.definition),
+                pricing: ResolvedPricing::Definition(Box::new(d.definition)),
                 match_kind: d.match_kind,
             })
         }
