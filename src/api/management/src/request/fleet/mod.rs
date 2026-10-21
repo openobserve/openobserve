@@ -1574,11 +1574,11 @@ pub async fn skip_rollout(
 
 #[utoipa::path(
     post,
-    path = "/{org_id}/fleet/rollouts/{id}/revert",
+    path = "/{org_id}/fleet/rollouts/{id}/rollback",
     context_path = "/api",
     tag = "Fleet",
-    operation_id = "RevertFleetRollout",
-    summary = "Start an immediate rollout back to stable and mark this one reverted",
+    operation_id = "RollbackFleetRollout",
+    summary = "Start an immediate rollout back to stable and mark this one rolled back",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
@@ -1591,7 +1591,7 @@ pub async fn skip_rollout(
         (status = 409, description = "Not halted, or the halt does not offer this exit", content_type = "application/json", body = Object),
     ),
 )]
-pub async fn revert_rollout(
+pub async fn rollback_rollout(
     Path((org_id, id)): Path<(String, String)>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
 ) -> Response {
@@ -1603,7 +1603,7 @@ pub async fn revert_rollout(
         if let Err(refused) = rollout_write(&org_id, user_id, &id).await {
             return refused;
         }
-        match rollouts::revert(&org_id, &id, user_id).await {
+        match rollouts::rollback(&org_id, &id, user_id).await {
             Ok(rollout) => MetaHttpResponse::json(rollout),
             Err(e) => to_response(e),
         }
@@ -2554,7 +2554,7 @@ mod tests {
             start: Default::default(),
             batching,
             verify: true,
-            auto_revert: false,
+            auto_rollback: false,
         };
         let progressive = |initial, multiplier, max| Batching::Progressive {
             initial,

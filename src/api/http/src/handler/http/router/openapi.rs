@@ -351,7 +351,7 @@ use crate::{
         openobserve_api_management::request::fleet::get_rollout,
         openobserve_api_management::request::fleet::resume_rollout,
         openobserve_api_management::request::fleet::skip_rollout,
-        openobserve_api_management::request::fleet::revert_rollout,
+        openobserve_api_management::request::fleet::rollback_rollout,
         openobserve_api_management::request::fleet::summary,
         openobserve_api_management::request::fleet::get_pipelines,
         openobserve_api_management::request::fleet::list_audit,

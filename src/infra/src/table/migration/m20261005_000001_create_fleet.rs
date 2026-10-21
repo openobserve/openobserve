@@ -564,8 +564,8 @@ mod tests {
         ("fleet_collectors", "labels"),
         ("fleet_tokens", "labels"),
         ("fleet_rollouts", "target_kind"),
-        ("fleet_rollout_members", "revert_rev"),
-        ("fleet_rollout_members", "reverted_at"),
+        ("fleet_rollout_members", "rollback_rev"),
+        ("fleet_rollout_members", "rolled_back_at"),
     ];
 
     async fn one(db: &DatabaseConnection, sql: &str) -> sea_orm::QueryResult {

@@ -689,9 +689,9 @@ pub struct SetDesiredRequest {
     /// Health gate after every phase, the last one included.
     #[serde(default)]
     pub verify: bool,
-    /// Pre-authorizes Revert for the `proven_bad` and `looks_worse` halts.
+    /// Pre-authorizes Rollback for the `proven_bad` and `looks_worse` halts.
     #[serde(default)]
-    pub auto_revert: bool,
+    pub auto_rollback: bool,
 }
 
 /// The expanded plan for the fleet's current size.
@@ -711,7 +711,7 @@ pub enum RolloutStatus {
     Halted,
     Completed,
     Superseded,
-    Reverted,
+    RolledBack,
 }
 
 impl RolloutStatus {
@@ -720,7 +720,7 @@ impl RolloutStatus {
     }
 }
 
-/// The evidence class of a halt (§9.5); only the first two may revert automatically.
+/// The evidence class of a halt (§9.5); only the first two may roll back automatically.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum HaltClass {
@@ -730,7 +730,7 @@ pub enum HaltClass {
 }
 
 impl HaltClass {
-    pub fn auto_revertible(self) -> bool {
+    pub fn can_auto_rollback(self) -> bool {
         !matches!(self, Self::CannotSee)
     }
 }
@@ -738,7 +738,7 @@ impl HaltClass {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum HaltExit {
-    Revert,
+    Rollback,
     Resume,
     FixForward,
     Skip,
@@ -831,7 +831,7 @@ pub struct Rollout {
     pub start: RolloutStart,
     pub batching: Batching,
     pub verify: bool,
-    pub auto_revert: bool,
+    pub auto_rollback: bool,
     pub status: RolloutStatus,
     pub halt: Option<RolloutHalt>,
     /// Members fixed at creation, so the denominator never changes.
@@ -1045,13 +1045,13 @@ mod tests {
             start: RolloutStart::At { at: 5 },
             batching: Batching::Canary { first: 2 },
             verify: true,
-            auto_revert: false,
+            auto_rollback: false,
             status: RolloutStatus::Halted,
             halt: Some(RolloutHalt {
                 class: HaltClass::ProvenBad,
                 reason: "rejected".to_string(),
                 at: 1,
-                exits: vec![HaltExit::Revert, HaltExit::FixForward, HaltExit::Skip],
+                exits: vec![HaltExit::Rollback, HaltExit::FixForward, HaltExit::Skip],
             }),
             total: 2,
             running: 0,
@@ -1194,7 +1194,7 @@ mod tests {
         assert_eq!(json["halt"]["class"], "proven_bad");
         assert_eq!(
             json["halt"]["exits"],
-            serde_json::json!(["revert", "fix_forward", "skip"])
+            serde_json::json!(["rollback", "fix_forward", "skip"])
         );
         assert_eq!(json["phases"][0]["status"], "timed_out");
         assert_eq!(json["members"][0]["state"], "rejected");
@@ -1205,12 +1205,12 @@ mod tests {
             (RolloutStatus::Scheduled, "scheduled"),
             (RolloutStatus::InProgress, "in_progress"),
             (RolloutStatus::Superseded, "superseded"),
-            (RolloutStatus::Reverted, "reverted"),
+            (RolloutStatus::RolledBack, "rolled_back"),
         ] {
             assert_eq!(serde_json::to_value(status).unwrap(), text);
         }
-        assert!(HaltClass::LooksWorse.auto_revertible());
-        assert!(!HaltClass::CannotSee.auto_revertible());
+        assert!(HaltClass::LooksWorse.can_auto_rollback());
+        assert!(!HaltClass::CannotSee.can_auto_rollback());
     }
 
     #[test]
@@ -1220,14 +1220,14 @@ mod tests {
         }))
         .unwrap();
         assert_eq!(
-            (ok.start, ok.batching, ok.verify, ok.auto_revert),
+            (ok.start, ok.batching, ok.verify, ok.auto_rollback),
             (RolloutStart::Now, Batching::One, false, false)
         );
         let staged: SetDesiredRequest = serde_json::from_value(serde_json::json!({
             "config": "edge", "version": 2,
             "start": {"kind": "at", "at": 10},
             "batching": {"kind": "progressive", "initial": 3, "multiplier": 3, "max": 27},
-            "verify": true, "auto_revert": true
+            "verify": true, "auto_rollback": true
         }))
         .unwrap();
         assert_eq!(staged.start, RolloutStart::At { at: 10 });

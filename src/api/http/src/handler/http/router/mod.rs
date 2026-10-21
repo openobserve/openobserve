@@ -2323,8 +2323,8 @@ fn fleet_routes(router: Router) -> Router {
             post(fleet::skip_rollout),
         )
         .route(
-            "/{org_id}/fleet/rollouts/{id}/revert",
-            post(fleet::revert_rollout),
+            "/{org_id}/fleet/rollouts/{id}/rollback",
+            post(fleet::rollback_rollout),
         )
         .route("/{org_id}/fleet/summary", get(fleet::summary))
         .route("/{org_id}/fleet/pipelines", get(fleet::get_pipelines))
