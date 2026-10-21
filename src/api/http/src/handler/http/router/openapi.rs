@@ -320,6 +320,40 @@ use crate::{
         openobserve_api_management::request::downtimes::extend_downtime,
         openobserve_api_management::request::downtimes::move_downtimes,
         openobserve_api_management::request::downtimes::delete_downtime,
+        openobserve_api_management::request::slack::installations::install_start,
+        openobserve_api_management::request::slack::installations::install_exchange,
+        openobserve_api_management::request::slack::installations::prerequisites,
+        openobserve_api_management::request::slack::installations::connectivity,
+        openobserve_api_management::request::slack::installations::manifest,
+        openobserve_api_management::request::slack::installations::create_installation,
+        openobserve_api_management::request::slack::installations::install_url,
+        openobserve_api_management::request::slack::installations::update_credentials,
+        openobserve_api_management::request::slack::installations::list_installations,
+        openobserve_api_management::request::slack::installations::test_installation,
+        openobserve_api_management::request::slack::installations::connection_start,
+        openobserve_api_management::request::slack::installations::connection_confirm,
+        openobserve_api_management::request::slack::installations::connect,
+        openobserve_api_management::request::slack::installations::disconnect,
+        openobserve_api_management::request::slack::installations::uninstall,
+        openobserve_api_management::request::slack::installations::get_org_access,
+        openobserve_api_management::request::slack::installations::put_org_access,
+        openobserve_api_management::request::slack::settings::get_linking,
+        openobserve_api_management::request::slack::settings::put_linking,
+        openobserve_api_management::request::slack::settings::link_matches,
+        openobserve_api_management::request::slack::settings::link_all,
+        openobserve_api_management::request::slack::settings::channels,
+        openobserve_api_management::request::slack::settings::channel_defaults,
+        openobserve_api_management::request::slack::settings::get_channel_default,
+        openobserve_api_management::request::slack::settings::put_channel_default,
+        openobserve_api_management::request::slack::settings::delete_channel_default,
+        openobserve_api_management::request::slack::settings::get_help_contact,
+        openobserve_api_management::request::slack::settings::put_help_contact,
+        openobserve_api_management::request::slack::links::start,
+        openobserve_api_management::request::slack::links::confirm,
+        openobserve_api_management::request::slack::links::resend,
+        openobserve_api_management::request::slack::links::links_me,
+        openobserve_api_management::request::slack::links::delete_link,
+        openobserve_api_management::request::slack::links::list_links,
         synthetics::list_synthetics,
         synthetics::create_synthetic,
         synthetics::get_synthetic,
@@ -670,6 +704,7 @@ use crate::{
         (name = "Patterns", description = "Log pattern extraction operations (enterprise)"),
         (name = "Service Streams", description = "Multi-signal correlation across logs, traces, and metrics (enterprise)"),
         (name = "Synthetics", description = "Synthetic monitoring — uptime and browser checks (enterprise)"),
+        (name = "Slack", description = "Slack app install, workspace connections and settings (enterprise)"),
         (name = "Downtimes", description = "Scheduled windows that keep evaluating alerts, anomaly detections, synthetics checks and SLOs but notify nobody (enterprise)"),
         (name = "Announcements", description = "Operator-authored announcement banners shown across organizations (enterprise)"),
         (name = "Alert Calibration", description = "Per-org alert calibration settings and on-demand runs (enterprise)"),
@@ -1083,6 +1118,109 @@ mod tests {
         ("/api/{org_id}/workflows/promote/{id}", "post", "update"),
     ];
 
+    const SLACK_OPERATIONS: &[(&str, &str)] = &[
+        ("post", "/api/{org_id}/slack/install/start"),
+        ("post", "/api/{org_id}/slack/install/exchange"),
+        ("get", "/api/{org_id}/slack/prerequisites"),
+        ("post", "/api/{org_id}/slack/connectivity"),
+        ("get", "/api/{org_id}/slack/manifest"),
+        ("get", "/api/{org_id}/slack/installations"),
+        ("post", "/api/{org_id}/slack/installations"),
+        (
+            "post",
+            "/api/{org_id}/slack/installations/{installation_id}/install-url",
+        ),
+        (
+            "put",
+            "/api/{org_id}/slack/installations/{installation_id}/credentials",
+        ),
+        (
+            "post",
+            "/api/{org_id}/slack/installations/{installation_id}/test",
+        ),
+        (
+            "get",
+            "/api/{org_id}/slack/installations/{installation_id}/linking",
+        ),
+        (
+            "put",
+            "/api/{org_id}/slack/installations/{installation_id}/linking",
+        ),
+        (
+            "get",
+            "/api/{org_id}/slack/installations/{installation_id}/links/matches",
+        ),
+        (
+            "post",
+            "/api/{org_id}/slack/installations/{installation_id}/link-all",
+        ),
+        (
+            "post",
+            "/api/{org_id}/slack/installations/{installation_id}/connection/start",
+        ),
+        ("post", "/api/{org_id}/slack/connection/confirm"),
+        (
+            "post",
+            "/api/{org_id}/slack/installations/{installation_id}/connection",
+        ),
+        (
+            "delete",
+            "/api/{org_id}/slack/installations/{installation_id}/connection",
+        ),
+        (
+            "delete",
+            "/api/{org_id}/slack/installations/{installation_id}",
+        ),
+        (
+            "get",
+            "/api/{org_id}/slack/installations/{installation_id}/channels",
+        ),
+        (
+            "get",
+            "/api/{org_id}/slack/installations/{installation_id}/channel-defaults",
+        ),
+        (
+            "get",
+            "/api/{org_id}/slack/installations/{installation_id}/channel-defaults/{channel_id}",
+        ),
+        (
+            "put",
+            "/api/{org_id}/slack/installations/{installation_id}/channel-defaults/{channel_id}",
+        ),
+        (
+            "delete",
+            "/api/{org_id}/slack/installations/{installation_id}/channel-defaults/{channel_id}",
+        ),
+        (
+            "get",
+            "/api/{org_id}/slack/installations/{installation_id}/help-contact",
+        ),
+        (
+            "put",
+            "/api/{org_id}/slack/installations/{installation_id}/help-contact",
+        ),
+        (
+            "get",
+            "/api/{org_id}/slack/installations/{installation_id}/org-access",
+        ),
+        (
+            "put",
+            "/api/{org_id}/slack/installations/{installation_id}/org-access",
+        ),
+        (
+            "post",
+            "/api/{org_id}/slack/link-requests/{request_id}/start",
+        ),
+        ("post", "/api/{org_id}/slack/link-requests/confirm"),
+        (
+            "post",
+            "/api/{org_id}/slack/link-requests/{request_id}/resend",
+        ),
+        ("get", "/api/{org_id}/slack/links/me"),
+        ("delete", "/api/{org_id}/slack/links/{link_id}"),
+        ("get", "/api/{org_id}/slack/links"),
+    ];
+
     // Ends at the column-0 close brace, so an item after the body is never scraped into it.
     #[cfg(feature = "enterprise")]
     fn service_routes_body() -> &'static str {
@@ -1293,6 +1431,80 @@ mod tests {
                 .unwrap_or_else(|| panic!("{method} {path} is not documented"));
             assert_eq!(op["x-o2-ratelimit"]["module"], "Query History");
             assert_eq!(op["x-o2-mcp"]["enabled"], false, "{method} {path}");
+        }
+    }
+
+    #[test]
+    fn slack_paths_are_rate_limited_and_hidden_from_mcp() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let paths = spec["paths"].as_object().unwrap();
+        let mut documented = Vec::new();
+        for (path, item) in paths.iter().filter(|(p, _)| p.contains("/slack/")) {
+            for (method, op) in item.as_object().unwrap() {
+                documented.push((method.clone(), path.clone()));
+                assert_eq!(op["x-o2-ratelimit"]["module"], "Slack", "{method} {path}");
+                let want = match method.as_str() {
+                    "get" => &["list", "get"][..],
+                    "post" => &["create"][..],
+                    "put" => &["update"][..],
+                    _ => &["delete"][..],
+                };
+                let operation = op["x-o2-ratelimit"]["operation"].as_str().unwrap_or("");
+                assert!(want.contains(&operation), "{method} {path}: {operation}");
+                assert_eq!(op["x-o2-mcp"]["enabled"], false, "{method} {path}");
+                assert_eq!(op["tags"], serde_json::json!(["Slack"]), "{method} {path}");
+            }
+        }
+        documented.sort();
+        let mut want: Vec<(String, String)> = SLACK_OPERATIONS
+            .iter()
+            .map(|(m, p)| (m.to_string(), p.to_string()))
+            .collect();
+        want.sort();
+        assert_eq!(documented, want);
+    }
+
+    #[test]
+    fn slack_status_codes_are_documented() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let paths = &spec["paths"];
+        for (method, path) in SLACK_OPERATIONS {
+            let responses = &paths[*path][*method]["responses"];
+            for status in ["403", "404"] {
+                assert!(responses.get(status).is_some(), "{method} {path} {status}");
+            }
+        }
+        assert!(
+            paths["/api/{org_id}/slack/installations"]["post"]["responses"]
+                .get("201")
+                .is_some()
+        );
+        assert!(
+            paths["/api/{org_id}/slack/installations/{installation_id}/channel-defaults/{channel_id}"]
+                ["delete"]["responses"]
+                .get("204")
+                .is_some()
+        );
+        assert!(
+            paths["/api/{org_id}/slack/links/{link_id}"]["delete"]["responses"]
+                .get("204")
+                .is_some()
+        );
+        assert!(
+            paths["/api/{org_id}/slack/link-requests/{request_id}/resend"]["post"]["responses"]
+                .get("202")
+                .is_some()
+        );
+        for path in [
+            "/api/{org_id}/slack/link-requests/{request_id}/start",
+            "/api/{org_id}/slack/link-requests/confirm",
+        ] {
+            for status in ["400", "410", "429"] {
+                assert!(
+                    paths[path]["post"]["responses"].get(status).is_some(),
+                    "{path} {status}"
+                );
+            }
         }
     }
 

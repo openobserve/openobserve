@@ -57,7 +57,8 @@ export type FeatureKey =
   | "remoteTasks"
   | "evaluations"
   | "scheduledSearch"
-  | "customBranding";
+  | "customBranding"
+  | "slack";
 
 /**
  * The flags every predicate below reads — EDITION-only, plus RBAC's own
@@ -311,6 +312,11 @@ const FEATURE_GATES: Record<FeatureKey, FeatureGateDefinition> = {
     labelKey: "settings.customLogoText",
     pitchKey: "enterpriseFeature.pitch.customBranding",
     cloudOffers: false,
+  },
+  // The edition gate only: whether this org has Slack turned on is the org config's `slack_enabled`.
+  slack: {
+    predicate: (c) => c.isEnterprise || c.isCloud,
+    labelKey: "settings.slackApp",
   },
 };
 
