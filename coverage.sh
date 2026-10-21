@@ -27,7 +27,9 @@ EOF
 _cov_test() {
     cargo llvm-cov --version >/dev/null || cargo install cargo-llvm-cov
     cargo nextest --version >/dev/null || cargo install cargo-nextest
-    cargo run -- init-db
+    # cargo run -- init-db
+    curl -L https://raw.githubusercontent.com/openobserve/openobserve/main/downloadO2.sh | sh -s opensource
+    ./openobserve init-db
 
     cargo llvm-cov nextest \
         --workspace \
