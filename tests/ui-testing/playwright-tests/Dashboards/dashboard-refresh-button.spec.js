@@ -40,6 +40,11 @@ test.describe('Dashboard Refresh Button (primary variant & label)', { tag: ['@da
     testLogger.info('Test setup completed');
   });
 
+  test.afterEach(async ({ page }) => {
+    // pinAutoQuery leaves a /config route in flight; unroute before fixture teardown races it closed.
+    await page.unrouteAll({ behavior: 'ignoreErrors' });
+  });
+
   test.afterAll(async () => {
     await deleteCreatedDashboards();
   });
