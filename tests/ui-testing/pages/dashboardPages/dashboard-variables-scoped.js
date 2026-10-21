@@ -871,6 +871,9 @@ export default class DashboardVariablesScoped {
    */
   async clickAddFilter() {
     await this.page.locator(SELECTORS.ADD_FILTER_BTN).click();
+    // The add button opens a condition/group menu; the new condition opens from its chip.
+    await this.page.locator('[data-test="dashboard-variable-filter-add-condition"]').click();
+    await this.page.locator('[data-test^="dashboard-variable-filter-condition-"]').last().click();
   }
 
   /**
@@ -1280,6 +1283,9 @@ export default class DashboardVariablesScoped {
     // Wait for element to be stable before clicking
     await addFilterBtn.waitFor({ state: "attached", timeout: 5000 });
     await addFilterBtn.click({ force: false, timeout: 15000 });
+    // The add button opens a condition/group menu; the new condition opens from its chip.
+    await this.page.locator('[data-test="dashboard-variable-filter-add-condition"]').click();
+    await this.page.locator('[data-test^="dashboard-variable-filter-condition-"]').last().click();
 
     // Select the filter field name
     const filterNameSelector = this.page.locator('[data-test="dashboard-query-values-filter-name-selector"]').last();
@@ -1419,6 +1425,9 @@ export default class DashboardVariablesScoped {
     const addFilterBtn = this.page.locator('[data-test="dashboard-add-filter-btn"]');
     await addFilterBtn.waitFor({ state: "visible", timeout: 5000 });
     await addFilterBtn.click();
+    // The add button opens a condition/group menu; the new condition opens from its chip.
+    await this.page.locator('[data-test="dashboard-variable-filter-add-condition"]').click();
+    await this.page.locator('[data-test^="dashboard-variable-filter-condition-"]').last().click();
 
     const filterNameSelector = this.page.locator('[data-test="dashboard-query-values-filter-name-selector"]');
     await filterNameSelector.waitFor({ state: "visible", timeout: 10000 });

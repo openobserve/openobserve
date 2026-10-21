@@ -127,6 +127,9 @@ export default class DashboardVariables {
       const addFilterBtn = this.page.locator('[data-test="dashboard-add-filter-btn"]');
       await addFilterBtn.waitFor({ state: "visible", timeout: 5000 });
       await addFilterBtn.click();
+      // The add button opens a condition/group menu; the new condition opens from its chip.
+      await this.page.locator('[data-test="dashboard-variable-filter-add-condition"]').click();
+      await this.page.locator('[data-test^="dashboard-variable-filter-condition-"]').last().click();
       
       // Wait for and interact with Filter Name selector
       const filterNameSelector = this.page.locator('[data-test="dashboard-query-values-filter-name-selector"]');
