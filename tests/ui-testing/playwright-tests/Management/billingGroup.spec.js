@@ -1,12 +1,10 @@
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
-const { isCloudEnvironment } = require('../../pages/cloudPages/cloud-env.js');
 const { getOrgIdentifier } = require('../utils/cloud-auth.js');
 
 test.describe('Billing Group remove action icon', () => {
     test.describe.configure({ mode: 'parallel' });
-    test.skip(!isCloudEnvironment(), 'Billing Group is Cloud-only');
 
     let pm;
 

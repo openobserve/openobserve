@@ -44,21 +44,21 @@ export class BillingGroupPage {
             route.fulfill({
                 status: 200,
                 contentType: 'application/json',
-                body: JSON.stringify({ data: { membership } }),
+                body: JSON.stringify({ membership }),
             }),
         );
         await this.page.route(/\/api\/[^/]+\/billing_group\/members(\?.*)?$/, (route) =>
             route.fulfill({
                 status: 200,
                 contentType: 'application/json',
-                body: JSON.stringify({ data: members }),
+                body: JSON.stringify(members),
             }),
         );
         await this.page.route(/\/api\/[^/]+\/billing_group\/invites(\?.*)?$/, (route) =>
             route.fulfill({
                 status: 200,
                 contentType: 'application/json',
-                body: JSON.stringify({ data: invites }),
+                body: JSON.stringify(invites),
             }),
         );
     }

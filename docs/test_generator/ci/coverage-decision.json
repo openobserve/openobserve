@@ -1,9 +1,0 @@
-{
-  "action": "new",
-  "target_spec": "tests/ui-testing/playwright-tests/Management/billingGroup.spec.js",
-  "existing_tests_considered": [
-    "tests/ui-testing/playwright-tests/Onboarding/billing.spec.js"
-  ],
-  "needs_registration": true,
-  "rationale": "No existing spec covers the billing-group member remove flow. The only billing E2E (Onboarding/billing.spec.js) covers the billing landing/trial strip and tab presence, never the /billings/billing_group payer view, the remove icon, its confirmation dialog, or the DELETE member call. The feature is its own page/route, so a new spec at the run-context spec_path (Management/billingGroup.spec.js, playwright_group Management) is correct. Register it in the Management testfolder of ci_matrix.json."
-}
