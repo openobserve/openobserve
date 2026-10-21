@@ -247,6 +247,9 @@ pub struct ExtendTrialPeriodRequest {
 pub struct SetQuotaUsageLimitRequest {
     pub org_id: String,
     pub limit: u64,
+    /// Confirms a limit below the pool's current usage, which is refused without it.
+    #[serde(default)]
+    pub force: bool,
 }
 
 #[cfg(feature = "cloud")]

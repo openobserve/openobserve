@@ -116,7 +116,8 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 116: add first_event_at to ai_chat_turns.
 // 117: org_ai_toolsets health; create ai_grants, ai_actions, ai_access_requests, ai_turn_marks.
 // 118: chat pins, seeds, turn versions, decisions, hide_attachments, ai_chat_feedback/imports.
-pub const DB_SCHEMA_VERSION: u64 = 118;
+// 119: create paid_overage_attribution.
+pub const DB_SCHEMA_VERSION: u64 = 119;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
