@@ -293,17 +293,29 @@ test.describe("assistant honest turns", () => {
     await log.hover();
     await page.mouse.wheel(0, -300);
     await page.waitForTimeout(300);
-    const read = await log.evaluate((el) => el.scrollTop);
-    await page.waitForTimeout(1_500);
-    const after = await log.evaluate((el) => ({ top: el.scrollTop, gap: el.scrollHeight - el.scrollTop - el.clientHeight }));
-    expect(Math.abs(after.top - read)).toBeLessThan(5);
-    expect(after.gap).toBeGreaterThan(100);
+    // Scroll anchoring moves scrollTop when rows above the reader change at the turn's end, so the reader's view is the line under the viewport's middle.
+    const line = () =>
+      log.evaluate((el) => {
+        const box = el.getBoundingClientRect();
+        // The log itself never moves relative to itself, so only an element inside it can show the reader's line moving.
+        window.__ht08Line ??= document
+          .elementsFromPoint(box.left + box.width / 2, box.top + box.height / 2)
+          .find((node) => node !== el && el.contains(node));
+        return window.__ht08Line ? window.__ht08Line.getBoundingClientRect().top - box.top : null;
+      });
+    const read = await line();
+    expect(read).not.toBeNull();
+    await expect(log).not.toHaveAttribute("aria-busy", "true", { timeout: 30_000 });
+    await page.waitForTimeout(500);
+    expect(await page.evaluate(() => window.__ht08Line.isConnected)).toBe(true);
+    expect(Math.abs((await line()) - read)).toBeLessThan(5);
+    expect(await log.evaluate((el) => el.scrollHeight - el.scrollTop - el.clientHeight)).toBeGreaterThan(100);
     const jump = assistant.container().locator('[data-test="assistant-scroll-latest"]');
     await expect(jump).toBeVisible();
     await jump.click();
     await expect.poll(() => log.evaluate((el) => el.scrollHeight - el.scrollTop - el.clientHeight)).toBeLessThan(3);
     await expect(assistant.outcome().or(assistant.answer())).toBeVisible();
-    await expect(jump).toHaveCount(0, { timeout: 20_000 });
+    await expect(jump).toHaveCount(0);
   });
 
   test("HT-08 Jump to latest during a stream that grows in steps keeps following through its smooth scroll", async ({ page }) => {
@@ -318,7 +330,20 @@ test.describe("assistant honest turns", () => {
     await jump.click();
     await page.waitForTimeout(1_500);
     await expect(jump).toHaveCount(0);
+    // A read between a mid-stream DOM change and the frame that re-pins can see a few px; a reader left behind never reaches the bottom.
+    await expect.poll(() => log.evaluate((el) => el.scrollHeight - el.scrollTop - el.clientHeight)).toBeLessThan(3);
+  });
+
+  test("HT-08 a turn that ends while following leaves the view at the bottom", async ({ page }) => {
+    await openOnLogs(page);
+    await ask(page, "long_answer", "why 5xx?", { speed: 0.5 });
+    const log = assistant.transcript();
+    await expect.poll(() => log.evaluate((el) => el.scrollHeight - el.clientHeight), { timeout: 20_000 }).toBeGreaterThan(600);
+    await expect(log).not.toHaveAttribute("aria-busy", "true", { timeout: 30_000 });
+    await expect(assistant.outcome().or(assistant.answer())).toBeVisible();
+    await page.waitForTimeout(500);
     expect(await log.evaluate((el) => el.scrollHeight - el.scrollTop - el.clientHeight)).toBeLessThan(3);
+    await expect(assistant.container().locator('[data-test="assistant-scroll-latest"]')).toHaveCount(0);
   });
 
   test("EB-09 Regenerate shows the new attempt as version 2 and gives focus to the composer", async ({ page }) => {

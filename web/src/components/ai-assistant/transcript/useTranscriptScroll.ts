@@ -62,6 +62,8 @@ export function useTranscriptScroll(opts: TranscriptScrollOptions): TranscriptSc
   let pointerDown = false;
   // A smooth scroll of ours: its frames move toward the target until it lands or the reader takes over.
   let smoothTo: { target: number; at: number } | null = null;
+  // A block that reveal or a new turn brought into view; re-pins keep its top in view until the next batch.
+  let held: HTMLElement | null = null;
 
   const el = () => opts.container.value;
   const behavior = (): ScrollBehavior => (opts.reducedMotion?.() ? "auto" : "smooth");
@@ -96,6 +98,14 @@ export function useTranscriptScroll(opts: TranscriptScrollOptions): TranscriptSc
     if (node) setTop(node.scrollHeight, smooth);
   };
 
+  const pin = () => {
+    const node = el();
+    if (!node) return;
+    if (held?.isConnected)
+      setTop(Math.min(node.scrollHeight, node.scrollTop + offsetIn(held, node)));
+    else toBottom();
+  };
+
   // Markdown parts fill in frame slices after the commit that added them; a following transcript stays at the bottom as they grow.
   // Many parts fill in one frame; one scroll after them reads the layout once.
   let fillQueued = false;
@@ -104,8 +114,40 @@ export function useTranscriptScroll(opts: TranscriptScrollOptions): TranscriptSc
     fillQueued = true;
     queueMicrotask(() => {
       fillQueued = false;
-      if (opts.follow() && !smoothTo) toBottom();
+      if (opts.follow() && !smoothTo) pin();
     });
+  };
+
+  // The log shrinking under a growing strip, or a row growing with no batch (a lazy action bar), fires no scroll event.
+  let resizes: ResizeObserver | null = null;
+  // The last height each observed box reported; null until its first report, which only records it.
+  const heights = new Map<Element, number | null>();
+  const onResize = (entries: ResizeObserverEntry[]) => {
+    let changed = false;
+    for (const entry of entries) {
+      const before = heights.get(entry.target);
+      if (before !== undefined && before !== null && before !== entry.contentRect.height)
+        changed = true;
+      heights.set(entry.target, entry.contentRect.height);
+    }
+    if (changed) onFill();
+  };
+
+  const observe = (box: Element) => {
+    if (!resizes || heights.has(box)) return;
+    heights.set(box, null);
+    resizes.observe(box);
+  };
+
+  const observeRows = () => {
+    const node = el();
+    if (!node || !resizes) return;
+    for (const box of heights.keys())
+      if (!box.isConnected) {
+        resizes.unobserve(box);
+        heights.delete(box);
+      }
+    for (const row of Array.from(node.children)) observe(row);
   };
 
   const endFollow = () => {
@@ -130,7 +172,10 @@ export function useTranscriptScroll(opts: TranscriptScrollOptions): TranscriptSc
     // A resize that lands on the bottom is a clamp (a sheet snap, the strip's own row), never the reader.
     const readerUp = top < lastTop && !(resized && bottom) && (readerActive() || !resized);
     if (!own && readerUp) endFollow();
-    else if (!own && !opts.follow() && bottom) opts.setFollow(true);
+    else if (!own && !opts.follow() && bottom) {
+      held = null;
+      opts.setFollow(true);
+    }
     lastTop = top;
     lastSize = size;
   };
@@ -139,7 +184,11 @@ export function useTranscriptScroll(opts: TranscriptScrollOptions): TranscriptSc
   const ownSmoothStep = (smooth: { target: number; at: number }, top: number, bottom: boolean) => {
     if (pointerDown || inputAt > smooth.at) return false;
     if (Math.abs(smooth.target - top) > Math.abs(smooth.target - lastTop) + 1) return false;
-    if (Math.abs(top - smooth.target) < 1 || bottom) smoothTo = null;
+    if (Math.abs(top - smooth.target) < 1 || bottom) {
+      smoothTo = null;
+      // Rows that mounted during the animation sit past its fixed target, so a following reader lands on the real bottom.
+      if (!bottom) onFill();
+    }
     return true;
   };
 
@@ -167,10 +216,13 @@ export function useTranscriptScroll(opts: TranscriptScrollOptions): TranscriptSc
     const node = el();
     if (!node || !opts.follow()) return;
     const offset = offsetIn(target, node);
-    if (offset < 0) setTop(Math.max(0, node.scrollTop + offset));
+    if (offset >= 0) return;
+    held = target;
+    setTop(Math.max(0, node.scrollTop + offset));
   };
 
   const jumpToLatest = () => {
+    held = null;
     opts.setFollow(true);
     toBottom(true);
   };
@@ -210,6 +262,8 @@ export function useTranscriptScroll(opts: TranscriptScrollOptions): TranscriptSc
   watch(
     opts.content,
     () => {
+      held = null;
+      observeRows();
       if (opts.follow()) toBottom();
     },
     { flush: "post" },
@@ -223,7 +277,9 @@ export function useTranscriptScroll(opts: TranscriptScrollOptions): TranscriptSc
       const article = Array.from(node.querySelectorAll<HTMLElement>("[data-turn-id]")).find(
         (el) => el.dataset.turnId === turn,
       );
-      if (article) setTop(Math.max(0, offsetIn(article, node) + node.scrollTop));
+      if (!article) return;
+      held = article;
+      setTop(Math.max(0, offsetIn(article, node) + node.scrollTop));
     },
     { flush: "post" },
   );
@@ -237,6 +293,9 @@ export function useTranscriptScroll(opts: TranscriptScrollOptions): TranscriptSc
     if (!node) return;
     node.addEventListener("scroll", onScroll, { passive: true });
     node.addEventListener(MARKDOWN_FILL_EVENT, onFill);
+    resizes = typeof ResizeObserver === "function" ? new ResizeObserver(onResize) : null;
+    observe(node);
+    observeRows();
     node.addEventListener("wheel", onWheel, { passive: true });
     node.addEventListener("touchmove", onInput, { passive: true });
     node.addEventListener("pointerdown", onPointerDown, { passive: true });
@@ -249,6 +308,9 @@ export function useTranscriptScroll(opts: TranscriptScrollOptions): TranscriptSc
   });
 
   onBeforeUnmount(() => {
+    resizes?.disconnect();
+    resizes = null;
+    heights.clear();
     const node = el();
     if (!node) return;
     node.removeEventListener("scroll", onScroll);
