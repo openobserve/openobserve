@@ -315,7 +315,18 @@ describe("OnCallScheduleEditor", () => {
     expect(rows.filter((r) => r.text().includes("Now"))).toHaveLength(1);
   });
 
-  // B1: paging asks for the next fortnight once; switching Picture/List asks nothing.
+  // B1: the rules come first; the picture of their result follows them.
+  it("puts the shift rules above the who's-on-call picture", async () => {
+    const wrapper = render({ schedule: schedule([rota("Primary")]) });
+    await openRotation(wrapper);
+    const html = wrapper.html();
+    expect(html.indexOf('data-test="oncall-schedule-rule-add"')).toBeGreaterThan(-1);
+    expect(html.indexOf('data-test="oncall-schedule-rule-add"')).toBeLessThan(
+      html.indexOf('data-test="oncall-draft-preview"'),
+    );
+  });
+
+  // B1: paging moves a week with one request; switching Picture/List asks nothing.
   it("pages the preview with one request and toggles views with none", async () => {
     const wrapper = render({ schedule: schedule([rota("Primary")]) });
     await openRotation(wrapper);
@@ -330,10 +341,11 @@ describe("OnCallScheduleEditor", () => {
     await flushPromises();
     expect(service.previewResolvedSchedule).toHaveBeenCalledTimes(2);
     const [first, second] = service.previewResolvedSchedule.mock.calls.map(([args]) => args);
-    expect(second.from).toBe(first.to);
+    expect(second.from).toBe(first.from + 7 * 86_400_000_000);
+    expect(second.to - second.from).toBe(first.to - first.from);
   });
 
-  // B1: one row per team day; the open tab's rule is solid, other rules soft, gaps a gap.
+  // B1: one row per team day for a week; the open tab's rule is solid, other rules soft, gaps a gap.
   it("draws the picture one day per row with the open rule in full colour", async () => {
     const day = 86_400_000_000;
     const from = Date.UTC(2023, 10, 14) * 1000;
@@ -364,7 +376,8 @@ describe("OnCallScheduleEditor", () => {
     await openRotation(wrapper);
 
     const tracks = wrapper.findComponent({ name: "OScheduleTimeline" }).props("tracks") as any[];
-    expect(tracks).toHaveLength(14);
+    expect(tracks).toHaveLength(7);
+    expect(wrapper.find('[data-test="oncall-draft-preview-zone"]').text()).toContain("Mon, Nov 20");
     expect(tracks[0].bands.map((b: any) => [b.variant, b.tone])).toEqual([
       ["solid", 1],
       ["soft", 2],
@@ -1249,7 +1262,7 @@ describe("OnCallScheduleEditor — explaining several shift rules", () => {
     expect(drawerRules(wrapper)[0].members).toEqual(["cy@o2.ai", "ana@o2.ai", "bob@o2.ai"]);
   });
 
-  // F1: paging does not move who is on now; the line reads the current fortnight.
+  // F1: paging does not move who is on now; the line reads the first page.
   it("keeps the people line on the current turn while paging", async () => {
     service.previewResolvedSchedule.mockImplementation(
       async ({ from }: any) =>
@@ -1279,8 +1292,8 @@ describe("OnCallScheduleEditor — explaining several shift rules", () => {
     expect(wrapper.find('[data-test="oncall-rule-people-line-0"]').text()).toMatch(/^cy@o2\.ai/);
   });
 
-  // F1: an edit returns the picture to the current fortnight.
-  it("returns to the current fortnight on any edit", async () => {
+  // F1: an edit returns the picture to the first page.
+  it("returns to the first page on any edit", async () => {
     const wrapper = render({ schedule: schedule([rota("Primary")]) });
     await openRotation(wrapper);
     await wrapper.find('[data-test="oncall-draft-preview-next"]').trigger("click");

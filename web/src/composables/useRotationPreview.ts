@@ -23,10 +23,12 @@ import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { isShiftRuleValid, zonedMidnight } from "@/utils/oncall";
 
-export const PREVIEW_DAYS = 14;
+export const PREVIEW_DAYS = 7;
+// A page fetches a week past what it draws, so stop choices and "next up" reach the next weekly turn.
+const FETCH_DAYS = 14;
 const PREVIEW_DEBOUNCE_MS = 400;
 
-/** The drawer's one preview of a draft rotation, as the server resolves it, paged by 14 team-local days. */
+/** The drawer's one preview of a draft rotation, as the server resolves it, paged by 7 team-local days. */
 export function useRotationPreview(options: {
   /** The draft being edited; null while the drawer is closed, which makes no request. */
   rotation: () => Rotation | null;
@@ -48,14 +50,14 @@ export function useRotationPreview(options: {
     draft.value = snapshot();
   }, PREVIEW_DEBOUNCE_MS);
   const page = ref(0);
-  // Opening a rotation shows it at once and from this fortnight; only edits wait for typing to stop.
+  // Opening a rotation shows it at once and from today; only edits wait for typing to stop.
   watch(options.rotation, (now, before) => {
     if (now === before) return;
     settle.cancel();
     draft.value = snapshot();
     page.value = 0;
   });
-  // An edit is judged against the present, so the picture goes back to this fortnight.
+  // An edit is judged against the present, so the picture goes back to the first page.
   watch(
     options.rotation,
     () => {
@@ -68,7 +70,7 @@ export function useRotationPreview(options: {
 
   const windowAt = (offset: number) => ({
     from: zonedMidnight(options.nowMicros(), options.timezone(), offset * PREVIEW_DAYS),
-    to: zonedMidnight(options.nowMicros(), options.timezone(), (offset + 1) * PREVIEW_DAYS),
+    to: zonedMidnight(options.nowMicros(), options.timezone(), offset * PREVIEW_DAYS + FETCH_DAYS),
   });
   const windowFrom = computed(() => windowAt(page.value).from);
   const windowTo = computed(() => windowAt(page.value).to);
@@ -98,7 +100,7 @@ export function useRotationPreview(options: {
     );
 
   const shown = previewOf(() => windowAt(page.value));
-  // Who holds a turn now is a fact about this fortnight; on page 0 it is the same cached query.
+  // Who holds a turn now is a fact about the first page; on page 0 it is the same cached query.
   const current = previewOf(() => windowAt(0));
 
   const segments = computed<ResolvedSegment[]>(() =>

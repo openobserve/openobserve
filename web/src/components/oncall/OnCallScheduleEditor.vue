@@ -150,22 +150,6 @@
           </p>
         </div>
 
-        <OnCallDraftPreview
-          v-if="active.shift_rules.length"
-          v-model:page="preview.page.value"
-          class="border-border-default border-t pt-6"
-          :rotation="active"
-          :active-rule-name="activeRule?.name ?? ''"
-          :segments="preview.segments.value"
-          :window-from="preview.windowFrom.value"
-          :window-to="preview.windowTo.value"
-          :now-micros="nowMicros"
-          :timezone="props.timezone"
-          :error="preview.error.value"
-          :show-empty="!preview.hasValidRule.value || preview.loaded.value"
-          :name-of="nameOf"
-        />
-
         <!-- The rules. Always tabbed, even with just one — the Base rule
              gets a tab of its own like any other, so there's one layout to
              read rather than a plain form that turns into tabs the moment a
@@ -302,6 +286,22 @@
             </OTabPanels>
           </template>
         </section>
+
+        <OnCallDraftPreview
+          v-if="active.shift_rules.length"
+          v-model:page="preview.page.value"
+          class="border-border-default border-t pt-6"
+          :rotation="active"
+          :active-rule-name="activeRule?.name ?? ''"
+          :segments="preview.segments.value"
+          :window-from="preview.windowFrom.value"
+          :window-to="preview.windowTo.value"
+          :now-micros="nowMicros"
+          :timezone="props.timezone"
+          :error="preview.error.value"
+          :show-empty="!preview.hasValidRule.value || preview.loaded.value"
+          :name-of="nameOf"
+        />
       </div>
       <template #footer>
         <div class="flex items-center gap-2">

@@ -157,7 +157,7 @@ const time = (micros: number) =>
 const rangeLine = computed<I18nText>(() =>
   t("oncall.previewRange", {
     from: raw(dayLabel(props.windowFrom)),
-    to: raw(dayLabel(props.windowTo - 1)),
+    to: raw(dayLabel(rows.value[rows.value.length - 1].start)),
     zone: raw(props.timezone),
   }),
 );
