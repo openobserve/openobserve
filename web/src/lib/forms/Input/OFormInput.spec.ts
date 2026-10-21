@@ -28,6 +28,20 @@ describe("OFormInput", () => {
     expect(wrapper.find("input").exists()).toBe(true);
   });
 
+  it("preserves legacy numeric constraint forwarding", () => {
+    wrapper = mount(OForm, {
+      props: { defaultValues: { count: 0 } },
+      slots: {
+        default: () => h(OFormInput, { name: "count", type: "number", min: 1, max: 10, step: 2 }),
+      },
+    });
+    const input = wrapper.find("input");
+    expect(input.attributes("min")).toBeUndefined();
+    expect(input.attributes("max")).toBeUndefined();
+    expect(input.attributes("step")).toBeUndefined();
+    expect(input.element.checkValidity()).toBe(true);
+  });
+
   it("renders a label when provided", () => {
     wrapper = mount(OForm, {
       props: { defaultValues: { email: "" } },
@@ -85,7 +99,7 @@ describe("OFormInput", () => {
     expect(wrapper.text()).not.toContain("Name is required");
   });
 
-  it("renders custom #error slot content while suppressing the built-in error", async () => {
+  it("associates a custom #error slot with the native input while suppressing built-in text", async () => {
     wrapper = mount(OForm, {
       props: {
         defaultValues: { name: "" },
@@ -97,9 +111,10 @@ describe("OFormInput", () => {
         default: () =>
           h(
             OFormInput,
-            { name: "name" },
+            { name: "name", "aria-describedby": "external-error" },
             {
-              error: () => h("div", { class: "external-error" }, "custom error"),
+              error: () =>
+                h("div", { id: "external-error", class: "external-error" }, "custom error"),
             },
           ),
       },
@@ -110,7 +125,9 @@ describe("OFormInput", () => {
     ).form.handleSubmit();
     await flushPromises();
     expect(wrapper.find('[role="alert"]').exists()).toBe(false);
-    expect(wrapper.find(".external-error").text()).toBe("custom error");
+    const input = wrapper.find("input");
+    expect(input.attributes("aria-invalid")).toBe("true");
+    expect(wrapper.find(`#${input.attributes("aria-describedby")}`).text()).toBe("custom error");
   });
 
   it("forwards model-modifiers to OInput so a number field stores a number", async () => {

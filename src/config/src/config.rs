@@ -108,9 +108,10 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 108: create oncall_phone_verifications and org_telephony.
 // 109: add last_run columns to reports.
 // 110: create rum_pa_app_settings; add rules_hash to rum_pa_funnels.
-// 111: create public_dashboards, public_dashboard_org_settings and public_dashboard_outbox.
-// 112: add search_type to search_queue.
-pub const DB_SCHEMA_VERSION: u64 = 112;
+// 111: create eval_job_states and eval_job_state_transitions.
+// 112: create public_dashboards, public_dashboard_org_settings and public_dashboard_outbox.
+// 113: add search_type to search_queue.
+pub const DB_SCHEMA_VERSION: u64 = 113;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -1285,8 +1286,8 @@ pub struct Synthetics {
     /// synthetics_enabled).
     #[env_config(
         name = "ZO_SYNTHETICS_ENABLED",
-        default = false,
-        help = "Master switch for synthetic monitoring. Off by default; the background workers and HTTP routes only exist when this is true."
+        default = true,
+        help = "Master switch for synthetic monitoring background workers and HTTP routes; changes require a restart."
     )]
     pub enabled: bool,
     /// Super-cluster only: how long a parent may reference a child that has not replicated yet.

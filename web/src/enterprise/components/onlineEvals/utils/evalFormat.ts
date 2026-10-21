@@ -72,10 +72,24 @@ export function formatDate(value: number) {
   });
 }
 
+/** "12s ago" / "5m ago" / "3h ago" / "2d ago"; "—" for a future or invalid time. */
+export function relativeTime(timestampMs: number, t: TranslateFn): string {
+  const diff = Date.now() - timestampMs;
+  if (diff < 0 || !Number.isFinite(diff)) return "—";
+  const sec = Math.floor(diff / 1000);
+  if (sec < 60) return t("refreshButton.secondsAgo", { sec });
+  const min = Math.floor(sec / 60);
+  if (min < 60) return t("refreshButton.minutesAgo", { min });
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return t("refreshButton.hoursAgo", { h: hr });
+  const day = Math.floor(hr / 24);
+  return t("onlineEvals.quality.overview.relativeTime.daysAgo", { day });
+}
+
 export function statusClass(status: string) {
   return {
     "is-good": ["active", "default", "configured"].includes(status),
-    "is-warn": ["draft", "paused", "degraded"].includes(status),
+    "is-warn": ["draft", "paused"].includes(status),
     "is-muted": ["archived", "inactive"].includes(status),
   };
 }

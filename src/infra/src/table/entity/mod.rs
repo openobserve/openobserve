@@ -27,6 +27,8 @@ pub mod downtime_notifications;
 pub mod downtimes;
 pub mod enrichment_table_urls;
 pub mod enrichment_tables;
+pub mod eval_job_state_transitions;
+pub mod eval_job_states;
 pub mod external_alerts;
 pub mod folders;
 pub mod gen_ai_agents;
