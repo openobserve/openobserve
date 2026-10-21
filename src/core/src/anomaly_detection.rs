@@ -153,6 +153,8 @@ type QueryMetadataCache = HashMap<(String, String), (partitioned_search::QueryMe
 pub struct CreateAnomalyConfigRequest {
     pub name: String,
     pub description: Option<String>,
+    /// The stream the detector reads. Required in filters mode. In custom_sql mode it can be
+    /// left blank when the SQL reads exactly one stream, which then names it.
     pub stream_name: String,
     pub stream_type: String,
     pub query_mode: String,
@@ -912,6 +914,14 @@ pub async fn update_config(
         };
         retryable_change |= rows(previous.filters.as_ref()) != rows(Some(&filters));
         active_model.filters = Set(Some(filters));
+    }
+    // A row saved before the create gate existed carries no stream. The next edit repairs it
+    // from the SQL it will run, so the row stops reaching the UI with a blank stream.
+    if previous.stream_name.trim().is_empty()
+        && let Some(sql) = req.custom_sql.as_deref().or(previous.custom_sql.as_deref())
+        && let Ok(stream_name) = stream_name_from_sql(sql)
+    {
+        active_model.stream_name = Set(stream_name);
     }
     if let Some(custom_sql) = req.custom_sql {
         retryable_change |= previous.custom_sql.as_deref() != Some(custom_sql.as_str());
@@ -1905,10 +1915,49 @@ fn validation_error(e: anyhow::Error) -> anyhow::Error {
 /// Normalizes and validates a create body; returns its normalized tags.
 fn checked_create_body(req: &mut CreateAnomalyConfigRequest) -> Result<Vec<String>> {
     req.filters = normalize_request_filters(req.filters.take()).map_err(validation_error)?;
+    // Before the rules: the denominator rule reads the stream name, so it must see the real one.
+    req.stream_name = resolved_stream_name(req).map_err(validation_error)?;
     validate_config_request(req).map_err(validation_error)?;
 
     // Feature 2 (PT-7): normalized as the alerts path does, kept typed so the API answers 400.
     config::meta::alerts::tags::normalize_tags(&req.tags).map_err(anyhow::Error::new)
+}
+
+/// The stream a create body is about: the named one, or in custom_sql mode the one its SQL
+/// reads when the body left the name blank.
+///
+/// A client that builds the body from a query (the AI assistant does) can send an empty
+/// `stream_name`. The row then saved with a 200 and reached the UI with no stream, so the
+/// preview, the edit form and the stream-scoped access check all read a blank name.
+fn resolved_stream_name(req: &CreateAnomalyConfigRequest) -> Result<String> {
+    let named = req.stream_name.trim();
+    if !named.is_empty() {
+        return Ok(req.stream_name.clone());
+    }
+    if req.query_mode != "custom_sql" {
+        anyhow::bail!("stream_name is required");
+    }
+    let Some(sql) = req.custom_sql.as_deref().filter(|s| !s.trim().is_empty()) else {
+        anyhow::bail!("stream_name is required");
+    };
+    stream_name_from_sql(sql).map_err(|e| anyhow::anyhow!("stream_name is required: {e}"))
+}
+
+/// The one stream a custom query reads. A query over several streams has no single
+/// stream to name, so the caller must say which one the config belongs to.
+fn stream_name_from_sql(sql: &str) -> Result<String> {
+    let mut streams = config::meta::sql::resolve_stream_names(sql)
+        .map_err(|e| anyhow::anyhow!("custom_sql could not be parsed: {e}"))?;
+    streams.sort();
+    streams.dedup();
+    match streams.as_slice() {
+        [one] => Ok(one.clone()),
+        [] => anyhow::bail!("custom_sql reads no stream"),
+        many => anyhow::bail!(
+            "custom_sql reads several streams ({}), so name the one the config is for",
+            many.join(", ")
+        ),
+    }
 }
 
 fn create_folder_name(req: &CreateAnomalyConfigRequest) -> &str {
@@ -3716,6 +3765,92 @@ mod tests {
         req.filters = None;
         req.custom_sql = None;
         assert!(validate_config_request(&req).is_err());
+    }
+
+    mod stream_name_gate {
+        use super::*;
+
+        fn custom_sql_req(sql: &str) -> CreateAnomalyConfigRequest {
+            let mut req = make_valid_filters_req();
+            req.query_mode = "custom_sql".to_string();
+            req.filters = None;
+            req.custom_sql = Some(sql.to_string());
+            req.stream_name = String::new();
+            req
+        }
+
+        /// The body the AI assistant sent: a complete query and a blank stream_name.
+        #[test]
+        fn a_blank_stream_name_is_filled_from_the_custom_sql() {
+            let mut req = custom_sql_req(
+                "SELECT histogram(_timestamp, '5 minute') AS time_bucket, count(*) AS value \
+                 FROM prod WHERE service_name = 'payments' GROUP BY time_bucket \
+                 ORDER BY time_bucket",
+            );
+            checked_create_body(&mut req).expect("the stream is readable from the SQL");
+            assert_eq!(req.stream_name, "prod");
+        }
+
+        #[test]
+        fn a_quoted_stream_in_the_sql_is_read_unquoted() {
+            let mut req = custom_sql_req(
+                "SELECT histogram(_timestamp, '5m') AS time_bucket, count(*) AS value \
+                 FROM \"k8s_logs\" GROUP BY time_bucket",
+            );
+            checked_create_body(&mut req).unwrap();
+            assert_eq!(req.stream_name, "k8s_logs");
+        }
+
+        #[test]
+        fn whitespace_counts_as_blank() {
+            let mut req = custom_sql_req("SELECT count(*) FROM prod");
+            req.stream_name = "   ".to_string();
+            checked_create_body(&mut req).unwrap();
+            assert_eq!(req.stream_name, "prod");
+        }
+
+        /// A named stream is the caller's choice; the SQL does not override it.
+        #[test]
+        fn a_named_stream_is_kept() {
+            let mut req = custom_sql_req("SELECT count(*) FROM prod");
+            req.stream_name = "other".to_string();
+            checked_create_body(&mut req).unwrap();
+            assert_eq!(req.stream_name, "other");
+        }
+
+        #[test]
+        fn filters_mode_cannot_leave_the_stream_blank() {
+            let mut req = make_valid_filters_req();
+            req.stream_name = String::new();
+            let err = checked_create_body(&mut req).unwrap_err().to_string();
+            assert!(err.contains("validation error"), "got: {err}");
+            assert!(err.contains("stream_name is required"), "got: {err}");
+        }
+
+        #[test]
+        fn a_query_over_several_streams_needs_the_name() {
+            let mut req = custom_sql_req("SELECT count(*) FROM a JOIN b ON a.id = b.id");
+            let err = checked_create_body(&mut req).unwrap_err().to_string();
+            assert!(err.contains("stream_name is required"), "got: {err}");
+            assert!(err.contains("several streams"), "got: {err}");
+        }
+
+        #[test]
+        fn an_unparsable_query_names_the_stream_as_the_missing_piece() {
+            let mut req = custom_sql_req("SELECT count(*) FROM");
+            let err = checked_create_body(&mut req).unwrap_err().to_string();
+            assert!(err.contains("stream_name is required"), "got: {err}");
+        }
+
+        /// The repair the update path runs on a row saved before this gate existed.
+        #[test]
+        fn the_sql_names_its_stream_for_the_update_repair() {
+            assert_eq!(
+                stream_name_from_sql("SELECT count(*) FROM prod WHERE x = 1").unwrap(),
+                "prod"
+            );
+            assert!(stream_name_from_sql("SELECT 1").is_err());
+        }
     }
 
     #[test]
