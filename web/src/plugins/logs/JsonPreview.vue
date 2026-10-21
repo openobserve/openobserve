@@ -164,7 +164,13 @@
               <OIcon name="lock" size="xs" class="text-warning-600 shrink-0" />
             </template>
           </ODropdownItem>
+          <AiEntryButton
+            v-if="assistantV2"
+            v-bind="regexDoor(String(key), value[key])"
+            appearance="menu-item"
+          />
           <ODropdownItem
+            v-else
             data-test="redirect-to-regex-pattern-btn"
             @select.stop="createRegexPatternFromLogs(key, value[key])"
           >
@@ -214,8 +220,10 @@
           {{ t("logs.jsonPreview.copy") }}
         </div>
         <div
+          v-if="!assistantV2 || regexDoorShown"
           class="hover:bg-dropdown-item-hover-bg flex cursor-pointer items-center px-3 py-1.5 [transition:background-color_0.2s]"
-          @click="handleCreateRegex"
+          :data-test="assistantV2 ? 'ai-entry-regex-field-ask-menu' : undefined"
+          @click="assistantV2 ? handoffSelection() : handleCreateRegex()"
         >
           <img
             :src="regexIconForContextMenu"
@@ -272,8 +280,16 @@ import searchService from "@/services/search";
 import { generateTraceContext } from "@/utils/zincutils";
 import { defineAsyncComponent, type PropType } from "vue";
 import { isAssistantV2 } from "@/composables/assistant/flags";
+import { useAssistantGate } from "@/composables/assistant/pure";
 import { useLoadedOrg } from "@/utils/assistant/doorBinding";
-import { logFieldBuild, logsDoorBase, rowKeyOf, type LogsDoorBase } from "@/plugins/logs/logsDoors";
+import {
+  logFieldBuild,
+  logsDoorBase,
+  regexFieldHandoff,
+  regexPatternsOpener,
+  rowKeyOf,
+  type LogsDoorBase,
+} from "@/plugins/logs/logsDoors";
 import config from "@/aws-exports";
 import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 import { checkFeatureAccess, buildFeatureGateContext } from "@/utils/enterpriseFeatures";
@@ -831,6 +847,37 @@ export default {
       objectKey: `${rowKeyOf(props.value)}:${key}`,
     });
 
+    // The selection menu's AI item follows the live gate; plain Copy always stays.
+    const gate = assistantV2 ? useAssistantGate() : null;
+    const regexDoorShown = computed(() => ["available", "unhealthy"].includes(gate?.value ?? ""));
+    // The regex drawer receives the prompt in its own dock; the sidebar never also gets it.
+    const openRegexPatterns = regexPatternsOpener(store, router, () => emit("closeTable"));
+    const regexHandoff = (field: string, sample: unknown) => {
+      if (!regexPatternsAccess.value.allowed) return openUpgradeDialog();
+      return regexFieldHandoff(fieldDoorBase(), field, sample, openRegexPatterns);
+    };
+    const regexDoor = (key: string, fieldValue: unknown) => ({
+      verb: "ask" as const,
+      entryKind: "object_verb" as const,
+      boundOrg: props.boundOrg ?? loadedOrg?.value,
+      objectKind: "log_field" as const,
+      label: t("assistant.entry.createRegex"),
+      tooltip: t("assistant.entry.tooltip.createRegex"),
+      dataTest: "ai-entry-regex-field-ask" as const,
+      build: () => undefined,
+      handoff: () => regexHandoff(key, fieldValue),
+    });
+    const handoffSelection = () => {
+      showMenu.value = false;
+      const bound = props.boundOrg ?? loadedOrg?.value;
+      // A row left on screen after an org switch never hands its text to the next org's regex editor.
+      if (bound && bound !== store.state.selectedOrganization?.identifier) {
+        toast({ variant: "default", message: t("assistant.entry.orgChanged") });
+        return;
+      }
+      void regexHandoff("", selectedText.value);
+    };
+
     const sendToAiChat = (value: string, append: boolean = true) => {
       if (!aiAssistantAccess.value.allowed) {
         openUpgradeDialog();
@@ -994,6 +1041,9 @@ export default {
       getTracesStreams,
       addOrRemoveLabel,
       assistantV2,
+      regexDoor,
+      regexDoorShown,
+      handoffSelection,
       fieldDoor,
       sendToAiChat,
       getBtnLogo,

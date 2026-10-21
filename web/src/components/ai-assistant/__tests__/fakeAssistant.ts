@@ -31,6 +31,7 @@ export function fakeAssistant(
   gate: GateCode = "available",
   over: Partial<AssistantCapability> = {},
   deps: Partial<AssistantStoreDeps> = {},
+  viewportRem = 80,
 ) {
   let n = 0;
   const store = createAssistantStore(
@@ -40,7 +41,7 @@ export function fakeAssistant(
       uuid: () => `0190a1b2-c3d4-7e5f-8a9b-${String(++n).padStart(12, "0")}`,
       ...deps,
     }),
-    { viewportRem: () => 80 },
+    { viewportRem: () => viewportRem },
   );
   const capability = ref<AssistantCapability>({
     gate,

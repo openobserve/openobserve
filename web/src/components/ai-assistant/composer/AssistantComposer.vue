@@ -254,7 +254,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import type { AssistantHostAdapter, ContextChip, Sid } from "@/composables/assistant";
+import type { AssistantHostAdapter, ContextChip, Sid, TurnTerminal } from "@/composables/assistant";
 import type { StarterKind } from "@/services/assistantAnalytics";
 import type { I18nText } from "@/types/i18n";
 
@@ -311,6 +311,7 @@ import {
   refreshPageContext,
   registerAssistantFocusTarget,
   registerEscapeRung,
+  turnLockKey,
   useAssistantContext,
   useAssistantPlacement,
   useAssistantStore,
@@ -801,7 +802,20 @@ function trySend(): void {
   if (usedSendIds.has(sendId)) return;
   usedSendIds.add(sendId);
   blockedLine.value = null;
-  void store.send(id).finally(refreshRecall);
+  void store
+    .send(id)
+    .then((result) => onRefused(id, sendId, result))
+    .finally(refreshRecall);
+}
+
+// A cross-tab lock that landed between render and click refuses the send; the draft stays and the same click works once it lifts.
+function onRefused(id: Sid, sendId: string, result: TurnTerminal): void {
+  const lock = result.state === "refused" ? store.turnLockOf(id) : null;
+  if (!lock) return;
+  usedSendIds.delete(sendId);
+  const line = t(turnLockKey(lock));
+  if (blockedLine.value !== line) say(line);
+  emphasise(line);
 }
 
 // A sent draft keeps its id until it is edited or its turn ends, so a repeated Enter is one send.

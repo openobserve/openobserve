@@ -84,6 +84,11 @@ describe("toAssistantError: the thirteen wire shapes", () => {
     if (fixture.status) expect(error.httpStatus).toBe(fixture.status);
   });
 
+  it("never reads this tab's own lock refusals from the wire", () => {
+    for (const code of ["approval_elsewhere", "account_changed"])
+      expect(toAssistantError({ code, message: "x" }).code).not.toBe(code);
+  });
+
   it("keeps the raw server sentence for Details only", () => {
     const error = toAssistantError(read("wire", "A.lease_409.json"));
     expect(error.serverMessage).toBe("Another turn is already running in this conversation");

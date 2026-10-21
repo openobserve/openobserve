@@ -25,8 +25,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="assistant-sidebar-host"
       :[DRAWER_INSET_ATTR]="''"
       :data-mode="floating ? 'floating' : 'pinned'"
-      :class="floating ? FLOATING_CLASSES : PINNED_CLASSES"
+      :data-dragging="liveWidth !== null ? '' : undefined"
+      :class="[floating ? FLOATING_CLASSES : PINNED_CLASSES, liveWidth === null ? MOTION : '']"
     >
+      <AssistantResizeHandle
+        :width-rem="shownWidthRem"
+        :min-rem="SIDEBAR_MIN_REM"
+        :max-rem="maxWidthRem"
+        :edge="floating ? 'inside' : 'straddle'"
+        @resize="(rem) => (liveWidth = rem)"
+        @commit="commitWidth"
+        @reset="resetWidth"
+      />
       <AssistantShell placement="sidebar" />
     </div>
     <OSheet
@@ -57,6 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <AssistantShell placement="sidebar" sheet />
     </OSheet>
   </template>
+  <AssistantLifecycleDialogs />
   <Teleport v-if="deepLink.blocked.value" defer to="main[data-test='main-content']">
     <div class="order-first mb-2 max-md:mx-2" data-test="assistant-deep-link-gate">
       <AssistantGateState
@@ -74,9 +85,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 const WIDTH = "w-[calc(var(--o-assistant-sidebar-width,24)*1rem)] max-w-[50vw] min-w-80";
 
 const PINNED_CLASSES = [
-  "bg-surface-base border-border-default h-full shrink-0 border-s",
+  "bg-surface-base border-border-default relative h-full shrink-0 border-s",
   WIDTH,
 ].join(" ");
+
+// Off while dragging, so the column follows the pointer instead of easing after it.
+const MOTION = "motion-safe:transition-[width] motion-safe:duration-150";
+
+/** A burst of key steps or a drag reports its width once it settles. */
+export const RESIZE_REPORT_MS = 600;
+
+const SOURCE_CLASSES = ["ring-2", "ring-inset", "ring-focus-ring-accent"];
 
 const FLOATING_CLASSES = [
   "bg-surface-base border-border-default rounded-surface fixed end-2 bottom-2 z-5000 border shadow-lg",
@@ -107,13 +126,17 @@ import AssistantStatusDot from "@/components/ai-assistant/common/AssistantStatus
 import AssistantGateState from "@/components/ai-assistant/gate/AssistantGateState.vue";
 import type { AssistantSignal } from "@/components/ai-assistant/common/AssistantStatusDot.types";
 import {
+  SIDEBAR_MIN_REM,
+  readSidebar,
   registerContainerCloser,
+  sidebarWidthFor,
   useAssistantCapability,
   useAssistantName,
   useAssistantPlacement,
   useAssistantShortcuts,
   useAssistantStore,
   useDeepLinkDoor,
+  useSidebarFloating,
 } from "@/composables/assistant";
 import useBreakpoint from "@/composables/useBreakpoint";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
@@ -123,6 +146,9 @@ import type { SheetSnap } from "@/lib/overlay/Sheet/OSheet.types";
 import { trackAssistant, type AiEventProps } from "@/services/assistantAnalytics";
 import { useI18nTyped } from "@/types/i18n";
 
+import { defaultWidthRem } from "./AssistantContainerMenu.vue";
+import AssistantLifecycleDialogs from "./AssistantLifecycleDialogs.vue";
+import AssistantResizeHandle from "./AssistantResizeHandle.vue";
 import AssistantShell from "./AssistantShell.vue";
 import AssistantStatusRegion from "./AssistantStatusRegion.vue";
 import { closeLockedPanel, lockedPanelMoved, useLockedPanel } from "./lockedPanel";
@@ -158,6 +184,10 @@ const route = useRoute();
 const { lgUp } = useBreakpoint();
 const column = ref<HTMLElement | null>(null);
 const region = ref<InstanceType<typeof AssistantStatusRegion> | null>(null);
+const liveWidth = ref<number | null>(null);
+const viewportRem = ref(window.innerWidth / 16);
+let reportTimer: ReturnType<typeof setTimeout> | null = null;
+let marked: HTMLElement | null = null;
 let returnFocusTo: HTMLElement | null = null;
 let main: HTMLElement | null = null;
 
@@ -171,14 +201,7 @@ const visible = computed(
     !onAssistantRoute.value &&
     (placement.placement.value.kind === "sidebar" || !!lockedPanel.value),
 );
-const floating = computed(() => {
-  const current = placement.placement.value;
-  const mode = current.kind === "sidebar" ? current.mode : store.state.shell.sidebarMode;
-  return (
-    (mode === "floating" || placement.sidebarForcedFloating.value) &&
-    !placement.sidebarForcedPinned.value
-  );
-});
+const floating = useSidebarFloating(store);
 
 const activeSession = computed(
   () => store.state.sessions[store.state.shell.activeSid ?? ""] ?? null,
@@ -242,11 +265,71 @@ async function onClose(): Promise<void> {
   returnFocusTo = null;
 }
 
+// The drawn width, which the handle also reports: a stored width too wide for this window is held, never floated.
+const shownWidthRem = computed(() =>
+  sidebarWidthFor(
+    liveWidth.value ?? store.state.shell.sidebarWidthRem,
+    viewportRem.value,
+    floating.value,
+  ),
+);
+
+// Pinned, the page keeps 32 rem beside the panel, so a drag never pushes the panel into forced floating.
+const maxWidthRem = computed(() =>
+  sidebarWidthFor(Number.POSITIVE_INFINITY, viewportRem.value, floating.value),
+);
+
 function writeWidth(): void {
-  column.value?.style.setProperty(
-    "--o-assistant-sidebar-width",
-    String(store.state.shell.sidebarWidthRem),
-  );
+  column.value?.style.setProperty("--o-assistant-sidebar-width", String(shownWidthRem.value));
+}
+
+function commitWidth(rem: number): void {
+  liveWidth.value = null;
+  store.setSidebarWidth(rem);
+  if (reportTimer) clearTimeout(reportTimer);
+  reportTimer = setTimeout(() => {
+    reportTimer = null;
+    trackAssistant("ai_panel_resized", {
+      width_rem: store.state.shell.sidebarWidthRem,
+      viewport: "desktop",
+    });
+  }, RESIZE_REPORT_MS);
+}
+
+function resetWidth(): void {
+  commitWidth(defaultWidthRem(viewportRem.value));
+}
+
+function onViewport(): void {
+  viewportRem.value = window.innerWidth / 16;
+}
+
+// The legacy expanded chat was half the window; the first v2 open keeps that width once.
+function adoptLegacyWidth(): void {
+  const key = store.state.userOrgKey;
+  if (!key || vuex.state.isAiChatExpanded !== true) return;
+  if (typeof readSidebar(key).widthRem === "number") return;
+  store.setSidebarWidth(viewportRem.value / 2);
+}
+
+// The page element the chat was asked about keeps a ring while the pinned card stays beside it.
+function markSource(): void {
+  const invoker = store.state.shell.invoker;
+  const el = invoker?.el.deref() ?? null;
+  const active =
+    visible.value &&
+    placement.sidebarForcedPinned.value &&
+    !!el?.isConnected &&
+    invoker?.sid === store.state.shell.activeSid &&
+    !el.closest("[data-assistant-root]");
+  // A door inside a panel's toolbar rings the whole panel, which is what the chat explains.
+  const next = active ? (el.closest<HTMLElement>("[data-assistant-source-scope]") ?? el) : null;
+  if (marked === next) return;
+  marked?.removeAttribute("data-assistant-source");
+  marked?.classList.remove(...SOURCE_CLASSES);
+  marked = next;
+  marked?.setAttribute("data-assistant-source", "");
+  marked?.classList.add(...SOURCE_CLASSES);
 }
 
 function writeInsetEnd(): void {
@@ -285,7 +368,7 @@ watch(capability.gate, (gate) => {
   if (!LOCKED_GATES.has(gate)) closeLockedPanel();
 });
 
-watch([column, () => store.state.shell.sidebarWidthRem], writeWidth, {
+watch([column, shownWidthRem], writeWidth, {
   immediate: true,
   flush: "post",
 });
@@ -300,17 +383,38 @@ watch(column, (el, old) => {
   if (old) columnSize?.unobserve(old);
   if (el) columnSize?.observe(el);
 });
+watch(
+  [
+    visible,
+    () => placement.sidebarForcedPinned.value,
+    () => store.state.shell.activeSid,
+    () => store.state.shell.invoker,
+  ],
+  markSource,
+  { flush: "post" },
+);
+watch(
+  () => store.state.userOrgKey,
+  () => adoptLegacyWidth(),
+  { immediate: true },
+);
 
 onMounted(() => {
   main = document.querySelector("main");
   main?.addEventListener("focusin", onMainFocus);
+  window.addEventListener("resize", onViewport, { passive: true });
 });
 
 onBeforeUnmount(() => {
   unregisterCloser();
   main?.removeEventListener("focusin", onMainFocus);
+  window.removeEventListener("resize", onViewport);
   document.documentElement.style.removeProperty(INSET_END);
   columnSize?.disconnect();
   setDrawerInsetEnd(0);
+  if (reportTimer) clearTimeout(reportTimer);
+  marked?.removeAttribute("data-assistant-source");
+  marked?.classList.remove(...SOURCE_CLASSES);
+  marked = null;
 });
 </script>

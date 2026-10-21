@@ -34,6 +34,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <ODropdownItem v-else data-test="assistant-shell-open-in-sidebar" @select="openInSidebar">
         {{ t("assistant.shell.openInSidebar") }}
       </ODropdownItem>
+      <template v-if="placement === 'sidebar' && !sheet">
+        <ODropdownItem
+          role="menuitemradio"
+          :aria-checked="!floating"
+          :disabled="forcedFloating"
+          :focusable-unavailable="forcedFloating"
+          :description="pinnedHint"
+          data-test="assistant-shell-mode-pinned"
+          @select="setMode('pinned')"
+        >
+          <template #icon-left>
+            <span
+              class="inline-flex size-4 shrink-0 items-center justify-center"
+              aria-hidden="true"
+            >
+              <OIcon v-if="!floating" :name="assistantGlyph.done" size="sm" />
+            </span>
+          </template>
+          {{ t("assistant.shell.modePinned") }}
+        </ODropdownItem>
+        <ODropdownItem
+          role="menuitemradio"
+          :aria-checked="floating"
+          :description="floatingHint"
+          data-test="assistant-shell-mode-floating"
+          @select="setMode('floating')"
+        >
+          <template #icon-left>
+            <span
+              class="inline-flex size-4 shrink-0 items-center justify-center"
+              aria-hidden="true"
+            >
+              <OIcon v-if="floating" :name="assistantGlyph.done" size="sm" />
+            </span>
+          </template>
+          {{ t("assistant.shell.modeFloating") }}
+        </ODropdownItem>
+      </template>
     </ODropdownGroup>
     <template v-if="placement === 'sidebar' && !sheet">
       <ODropdownSeparator />
@@ -99,7 +137,11 @@ import { useRoute, useRouter } from "vue-router";
 
 import AssistantIconButton from "@/components/ai-assistant/common/AssistantIconButton.vue";
 import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
-import { useAssistantStore } from "@/composables/assistant";
+import {
+  useAssistantPlacement,
+  useAssistantStore,
+  useSidebarFloating,
+} from "@/composables/assistant";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
@@ -114,6 +156,23 @@ const { t } = useI18nTyped();
 const store = useAssistantStore();
 const router = useRouter();
 const route = useRoute();
+
+const view = useAssistantPlacement(store);
+const floating = useSidebarFloating(store);
+const forcedFloating = computed(() => view.sidebarForcedFloating.value);
+
+const pinnedHint = computed(() => {
+  if (forcedFloating.value) return t("assistant.shell.modeFloatingForcedHint");
+  return view.sidebarForcedPinned.value
+    ? t("assistant.shell.modeForcedPinnedHint")
+    : t("assistant.shell.modePinnedHint");
+});
+
+const floatingHint = computed(() =>
+  forcedFloating.value
+    ? t("assistant.shell.modeFloatingForcedHint")
+    : t("assistant.shell.modeFloatingHint"),
+);
 
 const widths = computed(() => {
   const current = store.state.shell.sidebarWidthRem;
@@ -154,6 +213,15 @@ function openInSidebar(): void {
   if (route.name !== "assistant") return;
   if (window.history.state?.back) router.back();
   else void router.push("/");
+}
+
+function setMode(mode: "pinned" | "floating"): void {
+  if (mode === "pinned" && forcedFloating.value) return;
+  store.setSidebarMode(mode);
+  const current = store.state.shell.placement;
+  if (current.kind === "sidebar" && current.mode !== mode)
+    store.open({ kind: "sidebar", mode }, { focus: "none" });
+  trackAssistant("ai_panel_mode_changed", { mode, forced: forcedFloating.value });
 }
 
 function setWidth(rem: number): void {

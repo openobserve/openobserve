@@ -35,13 +35,14 @@ import {
   useAssistantShortcuts,
 } from "./shortcuts";
 
-const { placement, openAssistant } = vi.hoisted(() => ({
+const { placement, openAssistant, storeClose } = vi.hoisted(() => ({
   placement: { kind: "hidden" } as { kind: string },
   openAssistant: vi.fn(),
+  storeClose: vi.fn(),
 }));
 
 vi.mock("./runtime", () => ({
-  getAssistantRuntime: () => ({ store: { state: { shell: { placement } } } }),
+  getAssistantRuntime: () => ({ store: { state: { shell: { placement } }, close: storeClose } }),
 }));
 
 vi.mock("./openAssistant", () => ({ openAssistant }));
@@ -289,15 +290,20 @@ describe("container rungs f and h", () => {
     wrapper.unmount();
   });
 
-  it("leaves a docked container to rung g and an IME candidate list alone", async () => {
+  it("closes only a docked chat on rung g, and leaves an IME candidate list alone", async () => {
     const { wrapper } = mountShortcuts("available");
     await flushPromises();
     const close = vi.fn();
     registerContainerCloser(close);
-    expect(runEscapeLadder(escapeFrom(rootWith("docked")))).toBe(false);
+    placement.kind = "docked";
+    storeClose.mockClear();
+    expect(runEscapeLadder(escapeFrom(rootWith("docked")))).toBe(true);
+    expect(storeClose).toHaveBeenCalledWith("escape");
+    expect(close).not.toHaveBeenCalled();
     const composing = new KeyboardEvent("keydown", { key: "Escape", isComposing: true });
     expect(runEscapeLadder(composing)).toBe(false);
-    expect(close).not.toHaveBeenCalled();
+    expect(storeClose).toHaveBeenCalledTimes(1);
+    placement.kind = "hidden";
     wrapper.unmount();
   });
 

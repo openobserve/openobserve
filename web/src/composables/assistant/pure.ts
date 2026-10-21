@@ -23,6 +23,7 @@ import type { ActionResult, AssistantAction } from "./actions/types";
 import type {
   AssistantCapability,
   AssistantErrorAction,
+  AssistantHostAdapter,
   AssistantSession,
   Sid,
 } from "./assistantStore.types";
@@ -42,6 +43,36 @@ export {
   STALL_MS,
 } from "./turnStateMachine";
 export { isTerminal } from "./turnStates";
+export { diffCounts, diffLines, type DiffLine } from "./lineDiff";
+export {
+  assistantObjectNameKey,
+  isDockOpen,
+  focusDockComposer,
+  queueDockStage,
+  useAssistantDockToggle,
+  useDockedEditor,
+  type AssistantDockHost,
+  type DockedEditor,
+  type DockedEditorConfig,
+} from "./hostAdapter";
+export {
+  scheduleResizeSignal,
+  useAssistantPanelWidth,
+  useSidebarFloating,
+  type AssistantPanelWidth,
+} from "./useAssistantPanelWidth";
+export { useAssistantLeaveGuard, type LeaveGuard } from "./lifecycleQuestions";
+export {
+  markSignedIn,
+  useAssistantGate,
+  useOtherAccountSignedIn,
+  useSignedOutElsewhere,
+  turnLockKey,
+  useTurnLock,
+} from "./runtimeHandle";
+export type { InsertOutcome } from "./actions/appliers/editor";
+export { PROPOSAL_LANGUAGE_NAMES, proposalFor } from "./useEditorProposal";
+export type { AiLabelState, PendingProposal, ProposalProvenance } from "./useEditorProposal";
 export {
   MAX_HIT_ROWS,
   chipOpenQuery,
@@ -131,6 +162,8 @@ export interface AssistantEvidenceHost {
   toggleStep(sid: Sid, callId: string): void;
   /** Speaks through the composer's status region, the one the container owns. */
   announce(sid: Sid, text: I18nText): void;
+  /** The editor a docked container sits beside, whose Insert previews a diff there. */
+  host?(): AssistantHostAdapter | null;
 }
 
 /** What an answer's evidence knows of its turn; the transcript builds it. */

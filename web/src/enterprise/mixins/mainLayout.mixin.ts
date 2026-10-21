@@ -14,6 +14,7 @@ import {
 import organizationService from "@/services/organizations";
 import userService from "@/services/users";
 import { withDisambiguatedOrgLabels } from "@/utils/organizationLabel";
+import { assistantSignOut } from "@/utils/assistant/assistantSignOut";
 
 const MainLayoutCloudMixin = {
   setup() {
@@ -131,6 +132,8 @@ const MainLayoutCloudMixin = {
     };
 
     const signout = async () => {
+      // A 403 forces this sign-out, so the assistant asks nothing but still cancels and purges.
+      await assistantSignOut({ forced: true });
       if (config.isEnterprise == "true") {
         invalidateLoginData();
       }

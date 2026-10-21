@@ -8033,9 +8033,46 @@
     "credits": {
       "exhaustedTag": "Credits used up"
     },
+    "diff": {
+      "accept": "Accept",
+      "acceptRun": "Accept and run",
+      "added": "added:",
+      "announce": "Proposed {language}, {added} lines added, {removed} removed",
+      "applied": "Editor updated. Revert available.",
+      "current": "Current {language}",
+      "from": "from {product}",
+      "notChecked": "not checked",
+      "region": {
+        "alert_query": "Proposed change to the alert query",
+        "function": "Proposed change to the function",
+        "json_editor": "Proposed change to the JSON",
+        "regex": "Proposed change to the pattern",
+        "scheduled_query": "Proposed change to the node's query"
+      },
+      "reject": "Reject",
+      "removed": "removed:",
+      "reviewInEditor": "Review the change in the editor",
+      "title": "Proposed {language}"
+    },
     "docs": {
       "opensInNewTab": "(opens in a new tab)",
       "setupGuide": "Read the setup guide"
+    },
+    "editor": {
+      "protectedFields": "Kept the saved name, organization and id",
+      "title": {
+        "alert": "Alert · {name}",
+        "alertNew": "Alert · new alert",
+        "function": "Function · {name}",
+        "functionNew": "Function · new function",
+        "pipeline": "Pipeline · {name}",
+        "pipelineNew": "Pipeline · new pipeline",
+        "queryNode": "Pipeline · {pipeline} · query node",
+        "queryNodeNew": "New pipeline · query node",
+        "regex": "Regex pattern · {name}",
+        "regexNew": "Regex pattern · new"
+      },
+      "tooNarrow": "Opened in the sidebar: this editor is too narrow for a docked chat"
     },
     "entry": {
       "addField": "Add field to chat",
@@ -8054,6 +8091,7 @@
       "addedToDraft": "Added to your message. Press Send when ready.",
       "addedToast": "Added to chat",
       "ask": "Ask {product}",
+      "assistant": "Assistant",
       "buildFailed": "Couldn't prepare this request",
       "capReached": "Not added: the message is at its limit of 20 rows or 32 KB. Remove a chip and try again.",
       "chip": {
@@ -8069,6 +8107,7 @@
       },
       "clearSelection": "Clear selection",
       "cost": "Uses {count} credit | Uses {count} credits",
+      "createRegex": "Create regex pattern",
       "deepLinkMissing": "Couldn't find that item to ask about",
       "dependencies": "Dependencies",
       "englishPromptNote": "The request is sent in English.",
@@ -8105,6 +8144,8 @@
       "tooManyRows": "Select up to {max} rows to explain at once",
       "tooltip": {
         "add": "Attaches this to the chat without sending",
+        "createRegex": "Opens a new regex pattern with the assistant beside it, ready to write one for this field",
+        "dockedAsk": "Opens the assistant for this editor",
         "emptyResult": "Sends the query, streams and time range and asks why nothing matched",
         "explain": "Sends this and asks the assistant to explain it",
         "explainAlert": "Sends the alert, its query and threshold and asks what it watches",
@@ -8121,6 +8162,7 @@
         "fix": "Sends this finding and asks how to fix it",
         "ingestion": "Sends this guide's check result and asks how to get the first data in",
         "noStream": "Asks how to send the first data to this organization",
+        "sidebarAsk": "Opens the assistant in the sidebar with this function",
         "troubleshootAlert": "Sends the alert, its query, threshold and last firing and asks why it fired",
         "troubleshootQuery": "Sends the query, the error and the time range and asks what to change",
         "troubleshootSpan": "Sends this failing span and asks why it failed"
@@ -8132,6 +8174,9 @@
       "troubleshootSpan": "Troubleshoot this span"
     },
     "error": {
+      "account_changed": {
+        "title": "Another account signed in. Your message wasn't sent; reload to continue with that account."
+      },
       "agent_unavailable": {
         "action": "Retry",
         "body": "Nothing was changed.",
@@ -8144,6 +8189,9 @@
       "approval_delivery_failed": {
         "action": "Send again",
         "title": "Your decision didn't reach the assistant. Nothing was changed."
+      },
+      "approval_elsewhere": {
+        "title": "Another tab is waiting for your approval on this chat. Your message wasn't sent."
       },
       "approval_expired": {
         "action": "Ask again",
@@ -8479,6 +8527,26 @@
       "tooltip": "{product}",
       "unavailableName": "{product}, unavailable"
     },
+    "helper": {
+      "discarded": "Proposal discarded. Ask again to get a new one.",
+      "inserted": "Inserted",
+      "noChange": "The editor already has this."
+    },
+    "label": {
+      "acceptedAt": "Accepted {time}",
+      "askAgain": "Ask again",
+      "edited": "Edited after {product}",
+      "provenance": "About this change",
+      "restoredAssistant": "Restored the assistant's version.",
+      "restoredOriginal": "Restored your original.",
+      "revert": "Revert",
+      "revertAi": "Revert to the assistant's version",
+      "revertMine": "Revert to my original",
+      "revertName": "Revert assistant's change",
+      "short": "AI",
+      "shortName": "AI, {label}",
+      "written": "Written by {product}"
+    },
     "link": {
       "cantOpen": "Can't open this here",
       "fromAnswer": "Link in the answer",
@@ -8582,20 +8650,44 @@
       "attachmentHidden": "Attachment hidden"
     },
     "shell": {
+      "approvalElsewhere": "Another tab is waiting for your approval on this chat. Decide there first.",
       "close": "Close {product}",
       "deletedElsewhere": "This chat was deleted elsewhere",
+      "discardChanges": "Discard changes",
+      "keep": "Keep",
+      "keepEditing": "Keep editing",
       "layout": "Layout",
+      "leaveGuardBody": "Leaving discards your changes to {name}.",
+      "leaveGuardThisAlert": "this alert",
+      "leaveGuardThisPattern": "this pattern",
+      "leaveGuardTitle": "Unsaved changes",
       "loadingChat": "Loading your chat…",
+      "modeFloating": "Floating",
+      "modeFloatingForcedHint": "Floating because the window is narrow",
+      "modeFloatingHint": "Sits over the page",
       "modeForcedPinnedHint": "Pinned so the page stays reachable",
+      "modePinned": "Pinned",
       "modePinnedHint": "Pushes the page aside",
       "moreActions": "More actions",
       "newChat": "New chat",
       "notFound": "This chat isn't available",
       "openInFullView": "Open in full view",
       "openInSidebar": "Open in sidebar",
+      "orgSwitchRunningBody": "{count} answer is still running in {org}. Stop it, or keep it running there? | {count} answers are still running in {org}. Stop them, or keep them running there?",
+      "orgSwitchRunningTitle": "Answers are still running in {org}",
+      "orgSwitchWithdrawn": "Keeping withdraws {count} waiting approval. | Keeping withdraws {count} waiting approvals.",
+      "otherAccount": "Another account signed in. Reload to continue with it; this tab's chats stay with the account that signed out.",
+      "reload": "Reload",
+      "resizeHandle": "Resize assistant",
+      "resizeHandleValue": "{width} rem",
       "sheetExpand": "Show more",
       "sheetPeek": "Show less",
+      "signOutRunningBody": "{count} answer is still running. Signing out stops it. | {count} answers are still running. Signing out stops them.",
+      "signOutRunningTitle": "Answers are still running",
+      "signedOutElsewhere": "You signed out in another tab.",
       "skipLink": "Skip to {product}",
+      "stop": "Stop",
+      "stopAndSignOut": "Stop and sign out",
       "width": "Width",
       "widthDefault": "Default",
       "widthNarrow": "Narrow",
@@ -8722,9 +8814,16 @@
       },
       "scope": "Sees:",
       "scopeObject": {
-        "dashboard": "dashboard {name}"
+        "dashboard": "dashboard {name}",
+        "js": "this JavaScript",
+        "json": "this JSON",
+        "promql": "this PromQL",
+        "regex": "this pattern",
+        "sql": "this SQL",
+        "vrl": "this VRL"
       },
       "scopeOrg": "org {org}",
+      "scopeStream": "stream {stream}",
       "sentWithFirst": "Sent with your first message",
       "starter": {
         "alerts": {

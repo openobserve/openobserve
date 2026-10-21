@@ -609,7 +609,9 @@
       "perf.spec.js",
       "security.spec.js",
       "doors.spec.js",
-      "evidence.spec.js"
+      "evidence.spec.js",
+      "editors.spec.js",
+      "lifecycle.spec.js"
     ],
     "disabled": []
   }

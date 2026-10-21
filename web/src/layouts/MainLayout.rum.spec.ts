@@ -175,7 +175,7 @@ describe("MainLayout — RUM identity and account", () => {
     wrapper = mountMainLayout();
     await flushPromises();
 
-    (wrapper.vm as any).signout();
+    await (wrapper.vm as any).signout();
 
     expect(openobserveRum.stopSessionReplayRecording).toHaveBeenCalled();
     expect(openobserveRum.clearUser).toHaveBeenCalled();

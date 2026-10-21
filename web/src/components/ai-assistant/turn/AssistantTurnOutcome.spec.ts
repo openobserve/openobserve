@@ -15,6 +15,7 @@
 
 import { flushPromises, mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { computed } from "vue";
 
 import {
   ERROR_LEDGER,
@@ -22,6 +23,7 @@ import {
   toAssistantError,
 } from "@/composables/assistant/assistantErrors";
 import type { AssistantError, AssistantErrorCode } from "@/composables/assistant/pure";
+import { setRuntimeHandle } from "@/composables/assistant/runtimeHandle";
 
 import { ASSISTANT_SETUP_DOCS_URL } from "@/components/ai-assistant/common/AssistantErrorDetails.vue";
 
@@ -256,6 +258,35 @@ describe("AssistantTurnOutcome", () => {
     expect(offline.emitted("action")).toBeUndefined();
     const gone = mountOutcome({ error: error("unknown"), retrySnapshotAvailable: false });
     expect(buttons(gone)[0].attributes("aria-disabled")).toBe("true");
+  });
+
+  it("disables Continue and Retry while another tab signed out, saying why; Sign in stays", async () => {
+    setRuntimeHandle({
+      lifecycle: { signedOutElsewhere: computed(() => true), turnLock: () => "signed_out" },
+    } as never);
+    const stopped = mountOutcome({ kind: "stopped", steps: 3, partial: true });
+    expect(buttons(stopped)[0].attributes("aria-disabled")).toBe("true");
+    expect(stopped.text()).toContain("You signed out in another tab.");
+    await buttons(stopped)[0].trigger("click");
+    expect(stopped.emitted("action")).toBeUndefined();
+    const failed = mountOutcome({ error: error("unknown") });
+    expect(buttons(failed)[0].attributes("aria-disabled")).toBe("true");
+    setRuntimeHandle(null);
+  });
+
+  it("disables Continue while another tab holds this chat's approval card", () => {
+    setRuntimeHandle({
+      lifecycle: {
+        signedOutElsewhere: computed(() => false),
+        turnLock: (sid: string | null) => (sid === "s1" ? "approval_elsewhere" : null),
+      },
+    } as never);
+    const held = mountOutcome({ kind: "stopped", steps: 3, partial: true, sid: "s1" });
+    expect(buttons(held)[0].attributes("aria-disabled")).toBe("true");
+    expect(held.text()).toContain("Another tab is waiting for your approval on this chat.");
+    const free = mountOutcome({ kind: "stopped", steps: 3, partial: true, sid: "s2" });
+    expect(buttons(free)[0].attributes("aria-disabled")).toBeUndefined();
+    setRuntimeHandle(null);
   });
 
   it("emits its one action, Continue on a stop and Retry save only in server mode", async () => {

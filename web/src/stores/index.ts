@@ -328,6 +328,10 @@ const store = createStore({
     setModulesToDisplay(state, payload) {
       state.modulesToDisplay = payload;
     },
+    setRegexPatternHandoff(state, payload: { prompt: string; testValue: string }) {
+      state.organizationData.regexPatternPrompt = payload.prompt;
+      state.organizationData.regexPatternTestValue = payload.testValue;
+    },
     setIsAiChatEnabled(state, payload) {
       state.isAiChatEnabled = payload;
     },
