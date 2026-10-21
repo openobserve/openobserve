@@ -216,16 +216,43 @@ describe("useProductAnalytics", () => {
     const pa = useProductAnalytics();
     const funnel = encodeDef({ s: [["p", "/a"]], u: "sessions", w: "session" });
     pa.initFromRoute({ app: "web", funnel, fc: "prev" });
-    expect(pa.funnelCompare.value).toBe(true);
+    expect(pa.funnelCompare.value).toBe("prev");
     const q = pa.toQuery("productAnalyticsFunnelBuilder");
     expect(q.fc).toBe("prev");
     expect(decodeDef(q.funnel as string)).not.toHaveProperty("fc");
     expect(pa.toQuery("productAnalyticsFunnels")).not.toHaveProperty("fc");
     resetProductAnalytics();
     pa.initFromRoute(q);
-    expect(pa.funnelCompare.value).toBe(true);
+    expect(pa.funnelCompare.value).toBe("prev");
     pa.initFromRoute({ app: "web", funnel });
-    expect(pa.funnelCompare.value).toBe(false);
+    expect(pa.funnelCompare.value).toBeNull();
+    expect(pa.toQuery("productAnalyticsFunnelBuilder")).not.toHaveProperty("fc");
+  });
+
+  it.each(["1h", "1d", "1w"] as const)(
+    "round-trips compare to %s ago as fc, never inside the funnel",
+    (mode) => {
+      const pa = useProductAnalytics();
+      const funnel = encodeDef({ s: [["p", "/a"]], u: "sessions", w: "session" });
+      pa.initFromRoute({ app: "web", funnel, fc: mode });
+      expect(pa.funnelCompare.value).toBe(mode);
+      const q = pa.toQuery("productAnalyticsFunnelBuilder");
+      expect(q.fc).toBe(mode);
+      expect(decodeDef(q.funnel as string)).not.toHaveProperty("fc");
+      resetProductAnalytics();
+      expect(pa.funnelCompare.value).toBeNull();
+      pa.initFromRoute(q);
+      expect(pa.funnelCompare.value).toBe(mode);
+    },
+  );
+
+  it("writes fc from the chosen mode and drops it when compare is off", () => {
+    const pa = useProductAnalytics();
+    const funnel = encodeDef({ s: [["p", "/a"]], u: "sessions", w: "session" });
+    pa.initFromRoute({ app: "web", funnel });
+    pa.funnelCompare.value = "1d";
+    expect(pa.toQuery("productAnalyticsFunnelBuilder").fc).toBe("1d");
+    pa.funnelCompare.value = null;
     expect(pa.toQuery("productAnalyticsFunnelBuilder")).not.toHaveProperty("fc");
   });
 
@@ -275,8 +302,10 @@ describe("useProductAnalytics", () => {
 
   it("ignores an unknown fc value without flagging the link", () => {
     const pa = useProductAnalytics();
-    pa.initFromRoute({ app: "web", fc: "week" });
-    expect(pa.funnelCompare.value).toBe(false);
+    for (const fc of ["week", "1m", "true", ""]) {
+      pa.initFromRoute({ app: "web", fc });
+      expect(pa.funnelCompare.value).toBeNull();
+    }
     expect(pa.invalidParams.value).toEqual([]);
   });
 

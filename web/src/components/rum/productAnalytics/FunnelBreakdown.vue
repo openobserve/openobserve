@@ -363,7 +363,7 @@ const columns = computed<OTableColumnDef<TableRow>[]>(() => [
     ? [
         {
           id: "prev",
-          header: t("rum.analytics.funnel.previousPeriod"),
+          header: props.compare.label,
           accessorFn: (r: TableRow) => r.prev?.conversion ?? null,
           size: 110,
           meta: { align: "right" as const },
