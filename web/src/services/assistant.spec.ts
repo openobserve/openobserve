@@ -15,7 +15,7 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import assistant, { PROBE_TIMEOUT_MS } from "./assistant";
+import assistant, { parseAiUsage, PROBE_TIMEOUT_MS } from "./assistant";
 import http from "./http";
 
 vi.mock("./http", () => ({ default: vi.fn() }));
@@ -40,6 +40,38 @@ describe("assistant service", () => {
   it("reads B-06 capabilities as an assistant-managed request", async () => {
     await expect(assistant.capabilities("org 1")).resolves.toEqual({ can_chat: true });
     expect(api.get).toHaveBeenCalledWith("/api/org%201/ai/capabilities", managed);
+  });
+
+  it("reads usage as a validated, assistant-managed request and null where it is not served", async () => {
+    api.get.mockResolvedValue({
+      data: { mode: "free", credits_used: 412, credits_limit: 1000, credits_remaining: 588 },
+    });
+    await expect(assistant.usage("org1")).resolves.toEqual({
+      mode: "free",
+      credits_used: 412,
+      credits_limit: 1000,
+    });
+    expect(api.get).toHaveBeenCalledWith("/api/org1/ai/usage", managed);
+    api.get.mockRejectedValue(httpError(404));
+    await expect(assistant.usage("org1")).resolves.toBeNull();
+  });
+
+  it("rejects a usage body it cannot trust and keeps only a valid renewal date", () => {
+    expect(parseAiUsage({ mode: "free", credits_used: "412", credits_limit: 1000 })).toBeNull();
+    expect(parseAiUsage({ mode: "gratis", credits_used: 1, credits_limit: 2 })).toBeNull();
+    expect(parseAiUsage(JSON.parse('{"__proto__":{"mode":"free"},"credits_used":1}'))).toBeNull();
+    expect(parseAiUsage({ mode: "free", credits_used: 1e300, credits_limit: 2 })).toBeNull();
+    expect(
+      parseAiUsage({ mode: "free", credits_used: 1, credits_limit: 2, resets_at: "not a date" }),
+    ).toEqual({ mode: "free", credits_used: 1, credits_limit: 2 });
+    expect(
+      parseAiUsage({
+        mode: "free",
+        credits_used: 1,
+        credits_limit: 2,
+        resets_at: "2026-11-01T00:00:00Z",
+      }),
+    ).toEqual({ mode: "free", credits_used: 1, credits_limit: 2, resetsAt: Date.UTC(2026, 10, 1) });
   });
 
   it("answers null when the backend predates B-06 (404)", async () => {

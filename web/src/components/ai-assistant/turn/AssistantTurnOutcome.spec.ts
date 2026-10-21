@@ -27,6 +27,7 @@ import { setRuntimeHandle } from "@/composables/assistant/runtimeHandle";
 
 import { ASSISTANT_SETUP_DOCS_URL } from "@/components/ai-assistant/common/AssistantErrorDetails.vue";
 
+import { fakeRouter } from "../__tests__/fakeAssistant";
 import AssistantTurnOutcome, { type AssistantTurnOutcomeProps } from "./AssistantTurnOutcome.vue";
 
 vi.mock("@/components/ai-assistant/gate/AssistantAskAdminPopover.vue", () => ({
@@ -384,6 +385,38 @@ describe("AssistantTurnOutcome", () => {
     });
     await flushPromises();
     expect(wrapper.find('[data-test="ask-admin-stub"]').exists()).toBe(true);
+  });
+
+  it("words a 402 by the overage read: billing in a new tab, contract copy, payer", async () => {
+    const plans = [{ path: "/billings/plans", name: "plans", component: {} }];
+    const withRouter = (credits: AssistantTurnOutcomeProps["credits"]) =>
+      mount(AssistantTurnOutcome, {
+        props: {
+          kind: "refused",
+          role: "admin",
+          retrySnapshotAvailable: true,
+          org: "acme",
+          error: error("credits_exhausted"),
+          credits,
+        },
+        global: { plugins: [fakeRouter(plans)] },
+      });
+    const eligible = withRouter({ canManage: true, billingStatus: "eligible" });
+    const link = eligible.get('[data-test="assistant-turn-outcome-action"]');
+    expect(link.attributes("target")).toBe("_blank");
+    expect(link.text()).toContain("Manage paid usage");
+    expect(eligible.text()).toContain("Included credits don't renew.");
+    const contract = withRouter({ canManage: true, billingStatus: "additional_credits_required" });
+    const copy = contract.get('[data-test="assistant-turn-outcome-action"]');
+    expect(copy.text()).toBe("Copy request");
+    await copy.trigger("click");
+    expect(contract.emitted("action")).toEqual([["copy_request"]]);
+    expect(contract.text()).toContain("Contact your account manager to add credits.");
+    const payer = withRouter({ canManage: false, payer: "acme-billing" });
+    expect(payer.get('[data-test="assistant-turn-outcome-title"]').text()).toBe(
+      "AI credits are used up for acme, billed to acme-billing.",
+    );
+    expect(payer.text()).toContain("An admin of acme-billing can allow paid usage.");
   });
 
   it("flips Sign in to Retry once the new-tab sign-in re-probed (`80` §2.3)", () => {
