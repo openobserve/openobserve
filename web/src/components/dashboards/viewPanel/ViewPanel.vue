@@ -67,7 +67,6 @@
             <OButton
               variant="cancel-query"
               :size="isMobile ? 'icon-toolbar' : 'sm-toolbar'"
-              :class="isAutoRunAvailable ? 'border-e!' : undefined"
               @click="cancelViewPanelQuery"
               :aria-label="t('panel.cancel')"
               data-test="dashboard-viewpanel-cancel-btn"

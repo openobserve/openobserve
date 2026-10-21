@@ -598,15 +598,13 @@ async fn write_logs(
                 status.successful += 1;
             }
             IngestionStatus::Bulk(bulk_res) => {
-                bulk::add_record_status(
-                    stream_name.to_string(),
-                    doc_id,
-                    "".to_string(),
-                    None,
-                    bulk_res,
-                    None,
-                    None,
-                );
+                if !cfg.common.bulk_api_response_errors_only {
+                    bulk_res.items.push(bulk::success_item(
+                        "index".to_string(),
+                        stream_name,
+                        doc_id.unwrap_or_default(),
+                    ));
+                }
             }
         }
     }
@@ -636,10 +634,14 @@ async fn write_logs(
 fn columnar_entries(
     org_id: &str,
     status: &mut IngestionStatus,
-    columnar: columnar::JsonColumnar,
+    mut columnar: columnar::JsonColumnar,
 ) -> Result<Vec<ingester::Entry>> {
-    if let IngestionStatus::Record(status) = status {
-        status.successful += columnar.rows() as u32;
+    match status {
+        IngestionStatus::Record(status) => status.successful += columnar.rows() as u32,
+        IngestionStatus::Bulk(bulk_res) => {
+            let doc_ids = columnar.take_bulk_ids();
+            bulk::add_success_items(columnar.stream_name(), doc_ids, bulk_res);
+        }
     }
     columnar.into_entries(org_id)
 }

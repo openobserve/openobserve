@@ -468,6 +468,7 @@ async fn send_incident_notifications_inner(
                     continue;
                 };
                 match crate::alerts::alert::dispatch_notification(
+                    org_id,
                     &destination_type,
                     &subject,
                     msg.clone(),

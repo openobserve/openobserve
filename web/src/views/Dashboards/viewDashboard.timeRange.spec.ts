@@ -403,10 +403,9 @@ describe("ViewDashboard time range gate", () => {
       expect(cancel.text()).toContain("Cancel");
       expect(refreshOptions().props("variant")).toBe("cancel-query");
       expect(wrapper.find('[data-test="dashboard-refresh-btn"]').exists()).toBe(false);
-      // No X icon on wide screens, the hidden Refresh label keeps the width, and the divider stays.
+      // No X icon on wide screens; a hidden Refresh label keeps the button width.
       expect(cancel.props("iconLeft")).toBeUndefined();
       expect(cancel.find('[aria-hidden="true"]').text()).toContain("Refresh");
-      expect(cancel.classes()).toContain("border-e!");
     } finally {
       config.isEnterprise = wasEnterprise;
     }

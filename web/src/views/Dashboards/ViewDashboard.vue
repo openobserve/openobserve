@@ -118,6 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm"
           />
           <OButtonGroup v-show="store.state.printMode !== true">
+            <!-- Wrapper mode: a child-mode tooltip would hover-bind only the icon, not the labelled button. -->
             <OTooltip
               v-if="config.isEnterprise == 'true' && arePanelsLoading"
               :content="t('panel.cancel')"
@@ -126,7 +127,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 variant="cancel-query"
                 :size="isMobile ? 'icon-toolbar' : 'sm-toolbar'"
-                class="border-e!"
                 @click="cancelQuery"
                 :aria-label="t('panel.cancel')"
                 data-test="dashboard-cancel-btn"
@@ -144,7 +144,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </span>
               </OButton>
             </OTooltip>
-            <!-- Wrapper mode: a child-mode tooltip would hover-bind only the icon, not the labelled button. -->
             <OTooltip v-else :content="refreshTooltip" shortcut-id="dashboardRefresh">
               <OButton
                 :variant="refreshVariant"
