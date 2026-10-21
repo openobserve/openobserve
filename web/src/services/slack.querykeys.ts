@@ -32,13 +32,10 @@ export const slackKeys = {
     ),
   installation: (org: string, id: string) => orgKey(org, "slack", "installation", id),
   linking: (org: string, id: string) => orgKey(org, "slack", "installation", id, "linking"),
-  linkMatches: (org: string, id: string) => orgKey(org, "slack", "installation", id, "matches"),
   channels: (org: string, id: string, q: string) =>
     orgKey(org, "slack", "installation", id, "channels", q),
   channelDefaults: (org: string, id: string) =>
     orgKey(org, "slack", "installation", id, "channelDefaults"),
-  channelDefault: (org: string, id: string, channelId: string) =>
-    orgKey(org, "slack", "installation", id, "channelDefaults", channelId),
   helpContact: (org: string, id: string) => orgKey(org, "slack", "installation", id, "helpContact"),
   orgAccess: (org: string, id: string) => orgKey(org, "slack", "installation", id, "orgAccess"),
   linkLists: (org: string) => orgKey(org, "slack", "links", "list"),

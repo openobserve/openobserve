@@ -72,15 +72,6 @@ export const slackLinkingQuery = (org: string, id: string) =>
     staleTime: LIVE_STALE_TIME,
   });
 
-export const slackLinkMatchesQuery = (org: string, id: string) =>
-  infiniteQueryOptions({
-    queryKey: slackKeys.linkMatches(org, id),
-    queryFn: async ({ pageParam }) => (await slack.listLinkMatches(org, id, pageParam)).data,
-    initialPageParam: "",
-    getNextPageParam: nextCursor,
-    staleTime: LIVE_STALE_TIME,
-  });
-
 export const slackChannelsQuery = (org: string, id: string, q: string) =>
   infiniteQueryOptions({
     queryKey: slackKeys.channels(org, id, q),
@@ -96,13 +87,6 @@ export const slackChannelDefaultsQuery = (org: string, id: string) =>
   queryOptions({
     queryKey: slackKeys.channelDefaults(org, id),
     queryFn: async () => (await slack.listChannelDefaults(org, id)).data,
-    staleTime: NORMAL_STALE_TIME,
-  });
-
-export const slackChannelDefaultQuery = (org: string, id: string, channelId: string) =>
-  queryOptions({
-    queryKey: slackKeys.channelDefault(org, id, channelId),
-    queryFn: async () => (await slack.getChannelDefault(org, id, channelId)).data,
     staleTime: NORMAL_STALE_TIME,
   });
 

@@ -13,12 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pub mod bridge_error_codes {
-    pub const SESSION_OWNER_UNAVAILABLE: &str = "session_owner_unavailable";
-    pub const SESSION_NOT_FOUND: &str = "session_not_found";
-    pub const TURN_ALREADY_RUNNING: &str = "turn_already_running";
-}
-
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 

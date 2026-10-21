@@ -42,7 +42,6 @@ import type {
   SlackInstallUrlResponse,
   SlackLinkAllResult,
   SlackLinkingUpdateRequest,
-  SlackLinkMatchesResponse,
   SlackLinkRequestConfirmResponse,
   SlackLinkRequestStartResponse,
   SlackLinksParams,
@@ -115,11 +114,6 @@ const slack = {
   updateLinking: (org: string, id: string, body: SlackLinkingUpdateRequest) =>
     http().put<LinkingView>(`${installation(org, id)}/linking`, body),
 
-  listLinkMatches: (org: string, id: string, cursor?: string) =>
-    http().get<SlackLinkMatchesResponse>(`${installation(org, id)}/links/matches`, {
-      params: definedParams({ cursor }),
-    }),
-
   linkAll: (org: string, id: string) =>
     http().post<SlackLinkAllResult>(`${installation(org, id)}/link-all`),
 
@@ -149,11 +143,6 @@ const slack = {
 
   listChannelDefaults: (org: string, id: string) =>
     http().get<SlackChannelDefaultsResponse>(`${installation(org, id)}/channel-defaults`),
-
-  getChannelDefault: (org: string, id: string, channelId: string) =>
-    http().get<SlackChannelDefaultRow>(
-      `${installation(org, id)}/channel-defaults/${encodeURIComponent(channelId)}`,
-    ),
 
   putChannelDefault: (
     org: string,

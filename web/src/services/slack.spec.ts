@@ -110,12 +110,6 @@ const cases: Case[] = [
     [`${BASE}/installations/${ID}/linking`, { enabled: true, domains: ["acme.com"] }],
   ],
   [
-    "row 12 link matches",
-    () => slack.listLinkMatches(ORG, ID, "cur"),
-    "get",
-    [`${BASE}/installations/${ID}/links/matches`, { params: { cursor: "cur" } }],
-  ],
-  [
     "row 13 link-all",
     () => slack.linkAll(ORG, ID),
     "post",
@@ -162,12 +156,6 @@ const cases: Case[] = [
     () => slack.listChannelDefaults(ORG, ID),
     "get",
     [`${BASE}/installations/${ID}/channel-defaults`],
-  ],
-  [
-    "row 22 GET channel default",
-    () => slack.getChannelDefault(ORG, ID, "C1"),
-    "get",
-    [`${BASE}/installations/${ID}/channel-defaults/C1`],
   ],
   [
     "row 22 PUT channel default",
@@ -262,27 +250,25 @@ describe("slack service", () => {
   });
 
   it("encodes org, installation, channel and link ids into the path", async () => {
-    await slack.getChannelDefault("a/b", "i d", "C#1");
+    await slack.putChannelDefault("a/b", "i d", "C#1", { org_id: ORG, answer_mode: "private" });
     await slack.deleteLink("a/b", "l?1");
 
-    expect(client.get).toHaveBeenCalledWith(
+    expect(client.put).toHaveBeenCalledWith(
       "/api/a%2Fb/slack/installations/i%20d/channel-defaults/C%231",
+      { org_id: ORG, answer_mode: "private" },
+      { silentForbidden: true },
     );
     expect(client.delete).toHaveBeenCalledWith("/api/a%2Fb/slack/links/l%3F1");
   });
 
   it("omits absent or first-page paging params instead of sending empty strings", async () => {
-    await slack.listLinkMatches(ORG, ID, "");
     await slack.listChannels(ORG, ID, { q: "", cursor: "" });
     await slack.listLinks(ORG, { cursor: "" });
 
-    expect(client.get).toHaveBeenNthCalledWith(1, `${BASE}/installations/${ID}/links/matches`, {
+    expect(client.get).toHaveBeenNthCalledWith(1, `${BASE}/installations/${ID}/channels`, {
       params: {},
     });
-    expect(client.get).toHaveBeenNthCalledWith(2, `${BASE}/installations/${ID}/channels`, {
-      params: {},
-    });
-    expect(client.get).toHaveBeenNthCalledWith(3, `${BASE}/links`, { params: {} });
+    expect(client.get).toHaveBeenNthCalledWith(2, `${BASE}/links`, { params: {} });
   });
 
   it("returns the response untouched so callers read `data`", async () => {

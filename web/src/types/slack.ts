@@ -21,19 +21,7 @@ export type SlackMode = "http" | "socket";
 
 export type SlackLinkMethod = "oidc" | "email" | "admin_bulk";
 
-export type SlackRevokedReason =
-  | "unlinked"
-  | "user_removed"
-  | "slack_user_deleted"
-  | "email_changed"
-  | "uninstalled"
-  | "bot_tokens_revoked"
-  | "org_deleted"
-  | "org_removed";
-
 export type SlackAnswerMode = "thread" | "private";
-
-export type SlackThreadKind = "question" | "link";
 
 export type SlackSetFrom = "settings" | "install" | "destination";
 

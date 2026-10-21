@@ -34,7 +34,6 @@ import {
   previewOrgAccessMutation,
   slackChannelsQuery,
   slackInstallationsQuery,
-  slackLinkMatchesQuery,
   slackLinksQuery,
   slackManifestQuery,
   slackMyLinksQuery,
@@ -56,7 +55,6 @@ vi.mock("./slack", () => {
     "updateCredentials",
     "listInstallations",
     "updateLinking",
-    "listLinkMatches",
     "linkAll",
     "confirmConnection",
     "connectInstallation",
@@ -96,9 +94,7 @@ const seeded = [
   slackKeys.installations(ORG),
   slackKeys.linking(ORG, ID),
   slackKeys.linking(ORG, ID2),
-  slackKeys.linkMatches(ORG, ID),
   slackKeys.channelDefaults(ORG, ID),
-  slackKeys.channelDefault(ORG, ID, "C1"),
   slackKeys.channelDefaults(ORG, ID2),
   slackKeys.helpContact(ORG, ID),
   slackKeys.linksMe(ORG),
@@ -110,7 +106,7 @@ const seeded = [
 describe("slackKeys", () => {
   it("roots every key at the org and under the domain's `all` scope", () => {
     const all = slackKeys.all(ORG);
-    for (const key of seeded.slice(0, 10)) {
+    for (const key of seeded.slice(0, 8)) {
       expect(key.slice(0, all.length)).toEqual([...all]);
     }
     expect(all).toEqual(["org", ORG, "slack"]);
@@ -162,11 +158,7 @@ describe("slack queries", () => {
   });
 
   it("pages cursor lists by `next_cursor` and stops on an empty cursor", () => {
-    for (const options of [
-      slackLinkMatchesQuery(ORG, ID),
-      slackChannelsQuery(ORG, ID, "ale"),
-      slackLinksQuery(ORG, ID),
-    ]) {
+    for (const options of [slackChannelsQuery(ORG, ID, "ale"), slackLinksQuery(ORG, ID)]) {
       const next = options.getNextPageParam as (last: { next_cursor: string | null }) => unknown;
       expect(options.initialPageParam).toBe("");
       expect(next({ next_cursor: "c2" })).toBe("c2");
@@ -181,9 +173,6 @@ describe("slack queries", () => {
     } as any);
     await (slackChannelsQuery(ORG, ID, "ale").queryFn as any)({ pageParam: "c2" });
     expect(slack.listChannels).toHaveBeenCalledWith(ORG, ID, { q: "ale", cursor: "c2" });
-
-    await (slackLinkMatchesQuery(ORG, ID).queryFn as any)({ pageParam: "" });
-    expect(slack.listLinkMatches).toHaveBeenCalledWith(ORG, ID, "");
 
     await (slackLinksQuery(ORG, ID).queryFn as any)({ pageParam: "c3" });
     expect(slack.listLinks).toHaveBeenCalledWith(ORG, { installation_id: ID, cursor: "c3" });
@@ -257,11 +246,10 @@ describe("slack mutations", () => {
   it.each([
     ["linking", () => updateLinkingMutation(ORG, ID), { enabled: true }],
     ["link all", () => linkAllMutation(ORG, ID), undefined],
-  ])("%s drops that installation's linking, matches and the links list", async (_l, build, v) => {
+  ])("%s drops that installation's linking and the links list", async (_l, build, v) => {
     await run(build(), v);
 
     expect(isInvalidated(slackKeys.linking(ORG, ID))).toBe(true);
-    expect(isInvalidated(slackKeys.linkMatches(ORG, ID))).toBe(true);
     expect(isInvalidated(slackKeys.links(ORG, ID))).toBe(true);
     expect(isInvalidated(slackKeys.linking(ORG, ID2))).toBe(false);
     expect(isInvalidated(slackKeys.channelDefaults(ORG, ID))).toBe(true);
@@ -277,10 +265,7 @@ describe("slack mutations", () => {
   ])("%s channel default drops only that installation's defaults", async (_l, build, vars) => {
     await run(build(), vars);
 
-    expect(invalidatedOf()).toEqual([
-      slackKeys.channelDefaults(ORG, ID),
-      slackKeys.channelDefault(ORG, ID, "C1"),
-    ]);
+    expect(invalidatedOf()).toEqual([slackKeys.channelDefaults(ORG, ID)]);
   });
 
   it("putOrgAccessMutation invalidates org access and installations", async () => {

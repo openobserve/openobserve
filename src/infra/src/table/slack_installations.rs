@@ -59,10 +59,6 @@ pub async fn list() -> Result<Vec<SlackInstallation>, Error> {
     list_with(get_orm_client_ro().await).await
 }
 
-pub async fn list_by_ids(ids: &[String]) -> Result<Vec<SlackInstallation>, Error> {
-    list_by_ids_with(get_orm_client_ro().await, ids).await
-}
-
 /// Sets `revoked_at` and nulls every `*_enc` column.
 pub async fn revoke(id: &str, at: i64) -> Result<(), Error> {
     revoke_with(get_orm_client_rw().await, id, at).await
@@ -106,21 +102,6 @@ pub async fn get_by_team_with<C: ConnectionTrait>(
 
 pub async fn list_with<C: ConnectionTrait>(conn: &C) -> Result<Vec<SlackInstallation>, Error> {
     open_all(live().order_by_asc(Column::Id).all(conn).await?).await
-}
-
-pub async fn list_by_ids_with<C: ConnectionTrait>(
-    conn: &C,
-    ids: &[String],
-) -> Result<Vec<SlackInstallation>, Error> {
-    if ids.is_empty() {
-        return Ok(vec![]);
-    }
-    let models = live()
-        .filter(Column::Id.is_in(ids.iter().map(String::as_str)))
-        .order_by_asc(Column::Id)
-        .all(conn)
-        .await?;
-    open_all(models).await
 }
 
 pub async fn revoke_with<C: ConnectionTrait>(conn: &C, id: &str, at: i64) -> Result<(), Error> {
@@ -549,12 +530,10 @@ mod tests {
         );
         let ids = |rows: Vec<SlackInstallation>| rows.into_iter().map(|r| r.id).collect::<Vec<_>>();
         assert_eq!(ids(list_with(&db).await.unwrap()), ["i1"]);
-        let wanted = ["i1".to_string(), "i2".to_string()];
-        assert_eq!(ids(list_by_ids_with(&db, &wanted).await.unwrap()), ["i1"]);
     }
 
     #[tokio::test]
-    async fn lookups_by_team_and_ids_and_delete() {
+    async fn lookups_by_team_and_delete() {
         let db = db().await;
         for (id, team) in [("i1", "T1"), ("i2", "T2"), ("i3", "T3")] {
             put_with(&db, &installation(id, team)).await.unwrap();
@@ -567,16 +546,6 @@ mod tests {
                 .unwrap()
                 .is_none()
         );
-        let wanted = ["i3".to_string(), "i1".to_string(), "nope".to_string()];
-        let mut ids: Vec<String> = list_by_ids_with(&db, &wanted)
-            .await
-            .unwrap()
-            .into_iter()
-            .map(|r| r.id)
-            .collect();
-        ids.sort();
-        assert_eq!(ids, ["i1", "i3"]);
-        assert!(list_by_ids_with(&db, &[]).await.unwrap().is_empty());
         delete_with(&db, "i2").await.unwrap();
         assert!(get_with(&db, "i2").await.unwrap().is_none());
         assert_eq!(list_with(&db).await.unwrap().len(), 2);

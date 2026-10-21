@@ -61,23 +61,6 @@ pub async fn touch(
     touch_with(get_orm_client_rw().await, key, last_activity_at, expires_at).await
 }
 
-/// `touch` that also stamps `origin_region`, the form every v1 write goes through.
-pub async fn touch_in_region(
-    key: &SlackThreadKey,
-    last_activity_at: i64,
-    expires_at: i64,
-    origin_region: &str,
-) -> Result<(), Error> {
-    touch_in_region_with(
-        get_orm_client_rw().await,
-        key,
-        last_activity_at,
-        expires_at,
-        origin_region,
-    )
-    .await
-}
-
 pub async fn list_expired(before: i64, limit: u64) -> Result<Vec<SlackThread>, Error> {
     list_expired_with(get_orm_client_ro().await, before, limit).await
 }
@@ -92,13 +75,6 @@ pub async fn delete_by_org(org_id: &str) -> Result<u64, Error> {
 
 pub async fn delete_by_installation(installation_id: &str) -> Result<u64, Error> {
     delete_by_installation_with(get_orm_client_rw().await, installation_id).await
-}
-
-pub async fn delete_by_installation_and_org(
-    installation_id: &str,
-    org_id: &str,
-) -> Result<u64, Error> {
-    delete_by_installation_and_org_with(get_orm_client_rw().await, installation_id, org_id).await
 }
 
 /// Marks the org's live rows in the installation as removed; they keep their expiry.
@@ -220,19 +196,6 @@ pub async fn delete_by_installation_with<C: ConnectionTrait>(
 ) -> Result<u64, Error> {
     let result = Entity::delete_many()
         .filter(Column::InstallationId.eq(installation_id))
-        .exec(conn)
-        .await?;
-    Ok(result.rows_affected)
-}
-
-pub async fn delete_by_installation_and_org_with<C: ConnectionTrait>(
-    conn: &C,
-    installation_id: &str,
-    org_id: &str,
-) -> Result<u64, Error> {
-    let result = Entity::delete_many()
-        .filter(Column::InstallationId.eq(installation_id))
-        .filter(Column::OrgId.eq(org_id))
         .exec(conn)
         .await?;
     Ok(result.rows_affected)
@@ -571,27 +534,6 @@ mod tests {
         assert_eq!(get_with(&db, "i1", "C1", "1.2").await.unwrap(), None);
         assert_eq!(get_with(&db, "i2", "C1", "1.1").await.unwrap(), Some(other));
         assert_eq!(delete_by_installation_with(&db, "i1").await.unwrap(), 0);
-    }
-
-    #[tokio::test]
-    async fn delete_by_installation_and_org_leaves_other_orgs_and_installations() {
-        let db = db().await;
-        put_with(&db, &thread("1.1", "acme", 100)).await.unwrap();
-        put_with(&db, &thread("1.2", "globex", 100)).await.unwrap();
-        let other = SlackThread {
-            installation_id: "i2".to_string(),
-            ..thread("1.1", "acme", 100)
-        };
-        put_with(&db, &other).await.unwrap();
-        assert_eq!(
-            delete_by_installation_and_org_with(&db, "i1", "acme")
-                .await
-                .unwrap(),
-            1
-        );
-        assert_eq!(get_with(&db, "i1", "C1", "1.1").await.unwrap(), None);
-        assert!(get_with(&db, "i1", "C1", "1.2").await.unwrap().is_some());
-        assert_eq!(get_with(&db, "i2", "C1", "1.1").await.unwrap(), Some(other));
     }
 
     #[tokio::test]

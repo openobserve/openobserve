@@ -69,11 +69,6 @@ pub async fn delete_finished_before(at: i64) -> Result<u64, Error> {
     delete_finished_before_with(get_orm_client_rw().await, at).await
 }
 
-/// `mark_redeemed` that also stamps `origin_region`, the form every v1 write goes through.
-pub async fn mark_redeemed_in_region(id: &str, at: i64, origin_region: &str) -> Result<(), Error> {
-    mark_redeemed_in_region_with(get_orm_client_rw().await, id, at, origin_region).await
-}
-
 pub async fn mark_discarded_in_region(id: &str, at: i64, origin_region: &str) -> Result<(), Error> {
     mark_discarded_in_region_with(get_orm_client_rw().await, id, at, origin_region).await
 }
