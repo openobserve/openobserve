@@ -63,6 +63,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ props.data.title }}
         </OTruncatedText>
+        <!-- Wrapper mode: in child mode the tooltip would bind to the dot span instead of the button. -->
+        <OTooltip v-if="showDraftDot" :content="t('dashboard.panelDraft.panelDot')" side="bottom">
+          <OButton
+            variant="ghost"
+            size="icon-xs-circle"
+            class="shrink-0 in-[.fullscreen]:hidden"
+            :aria-label="t('dashboard.panelDraft.panelDot')"
+            data-test="dashboard-panel-draft-dot"
+            @click="onResumeDraft"
+          >
+            <span class="bg-accent size-2 rounded-full" aria-hidden="true" />
+            <span class="sr-only">{{ t("dashboard.panelDraft.panelDot") }}</span>
+          </OButton>
+        </OTooltip>
         <!-- Icon-only on a narrow bar and gone on a tiny one: the dimmed body and page banner still say it is stale. -->
         <OTag
           v-if="curatedBadge"
@@ -560,6 +574,7 @@ import {
 } from "@/composables/dashboard/usePanelEditorFocus";
 import type { PanelNoticeActionId } from "@/utils/dashboard/panelNotices";
 import { usePanelNotices } from "@/composables/dashboard/usePanelNotices";
+import { hasPanelDraft } from "@/composables/dashboard/usePanelDraft";
 
 const QueryInspector = defineAsyncComponent(() => {
   return import("@/components/dashboards/QueryInspector.vue");
@@ -846,7 +861,11 @@ export default defineComponent({
     });
 
     //for edit panel
-    const onEditPanel = (data: any, focus?: PanelEditorFocusTarget) => {
+    const onEditPanel = (
+      data: any,
+      focus?: PanelEditorFocusTarget,
+      extraQuery: Record<string, string> = {},
+    ) => {
       return router.push({
         path: "/dashboards/add_panel",
         query: {
@@ -856,9 +875,29 @@ export default defineComponent({
           folder: route.query.folder ?? "default",
           tab: route.query.tab ?? data.panels[0]?.tabId,
           ...(focus ? { [PANEL_EDITOR_FOCUS_PARAM]: focus } : {}),
+          ...extraQuery,
         },
       });
     };
+
+    // Only where the panel can be edited; print mode, layout editing and full screen are for viewing.
+    const showDraftDot = computed(
+      () =>
+        !props.viewOnly &&
+        !props.simplifiedPanelView &&
+        !isLayoutEditing.value &&
+        store.state.printMode !== true &&
+        !!props.data?.id &&
+        hasPanelDraft({
+          userEmail: String(store.state.userInfo?.email ?? ""),
+          org: String(store.state.selectedOrganization?.identifier ?? ""),
+          dashboardId: String(route.query.dashboard ?? props.dashboardId ?? ""),
+          panelId: String(props.data.id),
+        }),
+    );
+
+    // The editor skips its restore dialog for this flag, since the click already chose to continue.
+    const onResumeDraft = () => onEditPanel(props.data, undefined, { draft: "resume" });
 
     // A notice's fix action deep-links into the editor on the setting that resolves it.
     const NOTICE_EDITOR_FOCUS: Partial<Record<PanelNoticeActionId, PanelEditorFocusTarget>> = {
@@ -1244,6 +1283,8 @@ export default defineComponent({
       alertDisabledReason,
       onEditPanel,
       onNoticeEditPanel,
+      showDraftDot,
+      onResumeDraft,
       onLogPanel,
       onDuplicatePanel,
       deletePanelDialog,

@@ -23,6 +23,12 @@ import router from "@/test/unit/helpers/router";
 import config from "@/aws-exports";
 import { needsConfirmation, normalizePrefill } from "@/utils/alerts/alertPrefill";
 import { getAlertSource } from "@/utils/alerts/alertSourceRegistry";
+import {
+  deletePanelDraft,
+  panelDraftKey,
+  panelDraftRevision,
+  writePanelDraft,
+} from "@/composables/dashboard/usePanelDraft";
 
 // Mock shortURL service
 vi.mock("@/services/short_url", () => ({
@@ -2661,6 +2667,123 @@ describe("PanelContainer", () => {
       );
       await flushPromises();
       expect(wrapper.find('[data-test="errors-stub"]').text()).toBe("scan failed");
+    });
+  });
+
+  describe("Unsaved draft dot", () => {
+    const draftScope = {
+      userEmail: "me@x.io",
+      org: "test-org",
+      dashboardId: "test-dashboard-id",
+      panelId: "panel-1",
+    };
+    const seed = () =>
+      writePanelDraft(draftScope, {
+        tabId: "default-tab",
+        data: { ...mockPanelData, title: "Draft" },
+        layout: { currentQueryIndex: 0, vrlFunctionToggle: false },
+        sessionVariables: [],
+        variablesWithCurrentPanel: [],
+      });
+    const dot = () => wrapper.find('[data-test="dashboard-panel-draft-dot"]');
+
+    beforeEach(() => {
+      localStorage.clear();
+      (store.state as any).userInfo = { email: "me@x.io" };
+      store.state.printMode = false;
+    });
+
+    afterEach(() => {
+      store.state.printMode = false;
+    });
+
+    it("shows next to the title when this browser holds a draft for the panel", async () => {
+      seed();
+      wrapper = createWrapper({ layoutMode: "view" });
+      await flushPromises();
+
+      expect(dot().exists()).toBe(true);
+      expect(dot().attributes("aria-label")).toBe(
+        "Unsaved changes in this browser — click to continue",
+      );
+    });
+
+    it("is a named, focusable button whose decorative dot is hidden from assistive tech", async () => {
+      seed();
+      wrapper = createWrapper({ layoutMode: "view" }, { OTooltip: { template: "<slot />" } });
+      await flushPromises();
+
+      const button = dot().element as HTMLElement;
+      expect(button.tagName).toBe("BUTTON");
+      expect(button.getAttribute("aria-hidden")).toBeNull();
+      expect(button.tabIndex).toBe(0);
+      expect(button.textContent?.trim()).toBe(
+        "Unsaved changes in this browser — click to continue",
+      );
+      expect(button.querySelector(".bg-accent")?.getAttribute("aria-hidden")).toBe("true");
+    });
+
+    it("appears and disappears as drafts are written and deleted, including from another tab", async () => {
+      wrapper = createWrapper({ layoutMode: "view" });
+      await flushPromises();
+      expect(dot().exists()).toBe(false);
+
+      seed();
+      await flushPromises();
+      expect(dot().exists()).toBe(true);
+
+      deletePanelDraft(draftScope);
+      await flushPromises();
+      expect(dot().exists()).toBe(false);
+
+      // Another tab writes straight to storage; only its storage event reaches this one.
+      localStorage.setItem(
+        panelDraftKey(draftScope),
+        JSON.stringify({ v: 1, savedAt: Date.now(), data: {} }),
+      );
+      const before = panelDraftRevision.value;
+      window.dispatchEvent(new StorageEvent("storage", { key: panelDraftKey(draftScope) }));
+      expect(panelDraftRevision.value).toBe(before + 1);
+      await flushPromises();
+      expect(dot().exists()).toBe(true);
+    });
+
+    it.each([
+      ["view only", { viewOnly: true }],
+      ["simplified panel view", { simplifiedPanelView: true }],
+      ["layout editing", { layoutMode: "edit" }],
+    ])("is hidden in %s", async (_label, props) => {
+      seed();
+      wrapper = createWrapper({ layoutMode: "view", ...props });
+      await flushPromises();
+
+      expect(dot().exists()).toBe(false);
+    });
+
+    it("is hidden in print mode", async () => {
+      seed();
+      store.state.printMode = true;
+      wrapper = createWrapper({ layoutMode: "view" });
+      await flushPromises();
+
+      expect(dot().exists()).toBe(false);
+    });
+
+    it("opens the editor with draft=resume", async () => {
+      const routerPushSpy = vi.spyOn(router, "push").mockResolvedValue(undefined as any);
+      seed();
+      wrapper = createWrapper({ layoutMode: "view" });
+      await flushPromises();
+
+      await dot().trigger("click");
+
+      expect(routerPushSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          path: "/dashboards/add_panel",
+          query: expect.objectContaining({ panelId: "panel-1", draft: "resume" }),
+        }),
+      );
+      routerPushSpy.mockRestore();
     });
   });
 });

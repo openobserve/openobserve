@@ -72,8 +72,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="addPanelData"
             data-test="dashboard-panel-add"
             icon-left="add"
+            :aria-label="hasNewPanelDraft ? t('dashboard.panelDraft.addPanelDot') : t('panel.add')"
           >
-            <OTooltip :content="t('panel.add')" shortcut-id="dashboardAddPanel" />
+            <OTooltip
+              :content="hasNewPanelDraft ? t('dashboard.panelDraft.addPanelDot') : t('panel.add')"
+              shortcut-id="dashboardAddPanel"
+            />
+            <!-- A button's children are presentational, so the draft state is also in the button's own name. -->
+            <span
+              v-if="hasNewPanelDraft"
+              role="img"
+              :aria-label="t('dashboard.panelDraft.addPanelDot')"
+              class="bg-accent pointer-events-none absolute -end-0.5 -top-0.5 size-2 rounded-full"
+              data-test="dashboard-panel-add-draft-dot"
+            />
           </OButton>
           <!-- <DateTimePicker 
             class="ms-2"
@@ -631,6 +643,7 @@ import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import { useLayoutEditDraft } from "@/composables/dashboard/useLayoutEditDraft";
+import { hasPanelDraft } from "@/composables/dashboard/usePanelDraft";
 import { useLoading } from "@/composables/useLoading";
 import { isEqual } from "lodash-es";
 import { panelIdToBeRefreshed } from "@/utils/dashboard/convertCustomChartData";
@@ -1659,6 +1672,14 @@ export default defineComponent({
       }),
     });
 
+    const hasNewPanelDraft = computed(() =>
+      hasPanelDraft({
+        userEmail: String(store.state.userInfo?.email ?? ""),
+        org: String(store.state.selectedOrganization?.identifier ?? ""),
+        dashboardId: String(route.query.dashboard ?? ""),
+      }),
+    );
+
     //add panel
     const addPanelData = () => {
       return router.push({
@@ -2358,6 +2379,7 @@ export default defineComponent({
       isFullscreen,
       goBackToDashboardList,
       addPanelData,
+      hasNewPanelDraft,
       toggleHomeDashboard,
       isHome,
       t,
