@@ -113,6 +113,10 @@ impl JsonColumnar {
         self.buckets.rows()
     }
 
+    pub fn flatten_level(&self) -> u32 {
+        self.flatten_level
+    }
+
     /// What `estimate_json_bytes` counts over the accepted records as the client sent them.
     pub fn input_bytes(&self) -> usize {
         self.input_bytes
@@ -184,7 +188,7 @@ impl JsonColumnar {
             .into_entries(org_id, &self.stream_name, Some(columns))
     }
 
-    fn for_schema(
+    pub(super) fn for_schema(
         stream_name: &str,
         schema: &Schema,
         flatten_level: u32,

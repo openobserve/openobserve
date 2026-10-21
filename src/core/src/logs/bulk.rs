@@ -36,7 +36,7 @@ use transform::TRANSFORM_FAILED;
 
 use crate::{
     ingestion::check_ingestion_allowed,
-    logs::{columnar::JsonColumnar, ingestion_log_enabled, log_failed_record},
+    logs::{columnar::JsonColumnar, ingest::BulkPlan, ingestion_log_enabled, log_failed_record},
 };
 pub const TS_PARSE_FAILED: &str = "timestamp_parsing_failed";
 pub const SCHEMA_CONFORMANCE_FAILED: &str = "schema_conformance_failed";
@@ -74,7 +74,7 @@ pub async fn ingest(
 
     let mut stream_key_cache: HashMap<String, String> = HashMap::new();
     let mut streams_data: HashMap<String, Vec<json::Value>> = HashMap::new();
-    let mut columnars: HashMap<String, Option<JsonColumnar>> = HashMap::new();
+    let mut plans: HashMap<String, Option<BulkPlan>> = HashMap::new();
     let mut next_line_is_data = false;
     // Read lines as bytes to handle potential invalid UTF-8 characters
     let mut line_buffer = Vec::new();
@@ -97,7 +97,7 @@ pub async fn ingest(
 
         let is_data = std::mem::take(&mut next_line_is_data);
         if is_data
-            && stream_columnar(&mut columnars, org_id, &stream_name, (min_ts, max_ts))
+            && stream_columnar(&mut plans, org_id, &stream_name, (min_ts, max_ts))
                 .await
                 .is_some_and(|c| c.parse_bulk_line(&line_buffer, doc_id.as_deref()))
         {
@@ -241,8 +241,8 @@ pub async fn ingest(
         tokio::task::coop::consume_budget().await;
     }
 
-    columnars.retain(|_, columnar| columnar.as_ref().is_some_and(|c| c.rows() > 0));
-    for stream in columnars.keys() {
+    plans.retain(|_, plan| plan.as_ref().is_some_and(|p| p.columnar.rows() > 0));
+    for stream in plans.keys() {
         streams_data.entry(stream.clone()).or_default();
     }
 
@@ -270,13 +270,13 @@ pub async fn ingest(
     for (stream_name, records) in streams_data {
         #[cfg(feature = "vectorscan")]
         let record_count = records.len();
-        let columnar = columnars.remove(&stream_name).flatten();
+        let plan = plans.remove(&stream_name).flatten();
         match super::ingest::ingest_bulk(
             thread_id,
             org_id,
             &stream_name,
             records,
-            columnar,
+            plan,
             user.clone(),
         )
         .await
@@ -495,18 +495,18 @@ pub(super) fn resolve_bulk_timestamp(
     Ok((timestamp, has_valid_timestamp))
 }
 
-/// The stream's columnar plan, made on its first data line of the request.
+/// The stream's columnar rows, planned on its first data line of the request.
 async fn stream_columnar<'a>(
-    columnars: &'a mut HashMap<String, Option<JsonColumnar>>,
+    plans: &'a mut HashMap<String, Option<BulkPlan>>,
     org_id: &str,
     stream_name: &str,
     time_range: (i64, i64),
 ) -> Option<&'a mut JsonColumnar> {
-    if !columnars.contains_key(stream_name) {
+    if !plans.contains_key(stream_name) {
         let plan = super::ingest::plan_bulk_columnar(org_id, stream_name, time_range).await;
-        columnars.insert(stream_name.to_string(), plan);
+        plans.insert(stream_name.to_string(), plan);
     }
-    columnars.get_mut(stream_name)?.as_mut()
+    Some(&mut plans.get_mut(stream_name)?.as_mut()?.columnar)
 }
 
 #[cfg(test)]
