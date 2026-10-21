@@ -1255,43 +1255,6 @@ pub async fn search_multi_stream(
         }
     };
 
-    #[cfg(feature = "enterprise")]
-    for sql_query in &multi_req.sql {
-        if let Some(res) = super::check_sql_stream_permissions(
-            &sql_query.sql,
-            &org_id,
-            &user_id,
-            stream_type,
-            crate::search::utils::StreamPermissionResourceType::Search,
-            &trace_id,
-        )
-        .await
-        {
-            let reason = if res.status() == StatusCode::FORBIDDEN {
-                "Unauthorized Access"
-            } else {
-                "Failed to parse SQL"
-            };
-            report_to_audit(
-                user_id.clone(),
-                org_id.clone(),
-                trace_id.clone(),
-                res.status().into(),
-                Some(reason.to_string()),
-                "POST".to_string(),
-                format!("/api/{}/_search_multi_stream", org_id),
-                query
-                    .iter()
-                    .map(|(k, v)| format!("{}={}", k, v))
-                    .collect::<Vec<_>>()
-                    .join("&"),
-                body_bytes.clone(),
-            )
-            .await;
-            return res;
-        }
-    }
-
     // Extract top-level query_fn (VRL function) and per_query_response, mirroring
     // search_multi(). Decode the base64-encoded VRL and ensure it ends with '.' for
     // correct VRL evaluation.
@@ -1387,6 +1350,41 @@ pub async fn search_multi_stream(
                 .await;
             }
             return http_response;
+        }
+
+        #[cfg(feature = "enterprise")]
+        if let Some(res) = super::check_sql_stream_permissions(
+            &req.query.sql,
+            &org_id,
+            &user_id,
+            stream_type,
+            crate::search::utils::StreamPermissionResourceType::Search,
+            &trace_id,
+        )
+        .await
+        {
+            let reason = if res.status() == StatusCode::FORBIDDEN {
+                "Unauthorized Access"
+            } else {
+                "Failed to parse SQL"
+            };
+            report_to_audit(
+                user_id.clone(),
+                org_id.clone(),
+                trace_id.clone(),
+                res.status().into(),
+                Some(reason.to_string()),
+                "POST".to_string(),
+                format!("/api/{}/_search_multi_stream", org_id),
+                query
+                    .iter()
+                    .map(|(k, v)| format!("{}={}", k, v))
+                    .collect::<Vec<_>>()
+                    .join("&"),
+                body_bytes.clone(),
+            )
+            .await;
+            return res;
         }
     }
 
@@ -1572,6 +1570,25 @@ mod tests {
     use openobserve_core::auth::UserEmail;
 
     use super::around_multi;
+
+    #[test]
+    fn multi_stream_checks_each_query_after_decoding_it() {
+        let text = include_str!("multi_streams.rs");
+        let start = text
+            .find("pub async fn search_multi_stream(")
+            .expect("handler");
+        let body = &text[start..];
+        let body = &body[..body.find("\n}\n").expect("handler end")];
+        let decode = body.find("req.decode()").expect("decode");
+        let check = body
+            .find("check_sql_stream_permissions(")
+            .expect("permission check");
+        assert!(
+            decode < check,
+            "base64 SQL must be decoded before it is parsed for permissions"
+        );
+        assert!(body[check..].contains("&req.query.sql"));
+    }
 
     #[test]
     fn test_multi_stream_request_structure() {
