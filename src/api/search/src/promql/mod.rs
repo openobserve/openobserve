@@ -787,18 +787,10 @@ async fn series(
     }
 
     #[cfg(feature = "enterprise")]
+    if let Some(res) =
+        check_metric_permissions(org_id, _user_email, series_metric_names(selector.as_ref())).await
     {
-        let metric_name = match selector
-            .as_ref()
-            .and_then(metrics::prom::try_into_metric_name)
-        {
-            Some(name) => name,
-            None => "".to_string(),
-        };
-
-        if let Some(res) = check_metric_permissions(org_id, _user_email, [metric_name]).await {
-            return res;
-        }
+        return res;
     }
 
     match metrics::prom::get_series(org_id, selector, start, end).await {
@@ -1338,6 +1330,15 @@ async fn check_metric_permissions(
     None
 }
 
+/// No `match[]` reads no metric (`get_series` answers `[]`), so it needs no grant.
+#[cfg(any(feature = "enterprise", test))]
+fn series_metric_names(selector: Option<&parser::VectorSelector>) -> Vec<String> {
+    selector
+        .and_then(metrics::prom::try_into_metric_name)
+        .into_iter()
+        .collect()
+}
+
 fn search_timeout(timeout: Option<String>) -> i64 {
     match timeout {
         None => 0,
@@ -1759,6 +1760,16 @@ mod tests {
             !flat.contains(concat!("if user.is_external", " && !")),
             "a metric permission check must not depend on how the user signed in"
         );
+    }
+
+    #[test]
+    fn series_without_match_checks_no_metric() {
+        assert!(series_metric_names(None).is_empty());
+        let selector = match parser::parse("up{job=\"x\"}").unwrap() {
+            parser::Expr::VectorSelector(selector) => selector,
+            other => panic!("unexpected {other:?}"),
+        };
+        assert_eq!(series_metric_names(Some(&selector)), ["up"]);
     }
 
     async fn parse_tree_response(query: &str) -> (StatusCode, serde_json::Value) {
