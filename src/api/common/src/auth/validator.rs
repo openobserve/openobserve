@@ -34,8 +34,8 @@ pub use openobserve_core::auth::get_user_email_from_auth_str;
 pub use openobserve_core::authz::{check_permissions, list_objects_for_user};
 use openobserve_core::{
     auth::{
-        AuthExtractor, SESSION_AUTH_MARKER, get_hash, get_user_details, org_from_path, routed_path,
-        try_get_hash,
+        AuthExtractor, SESSION_AUTH_MARKER, get_hash, get_user_details,
+        is_license_path_without_org, org_from_path, routed_path, try_get_hash,
     },
     users,
 };
@@ -307,17 +307,9 @@ pub(crate) async fn blocked_external(user: &config::meta::user::User) -> bool {
         )
 }
 
-/// Reads whose answer is instance-wide, so membership in the org named by the path is irrelevant.
-///
-/// `license` carries no org at all. `password_complexity` carries one but ignores it: the policy is
-/// the same for every organization, and the caller who most needs it is a user blocked for a forced
-/// password reset — who has to be told what password will satisfy the policy regardless of which
-/// org the console happens to be pointed at. Neither response contains org-scoped data, so nothing
-/// cross-tenant leaks by admitting a non-member.
-///
-/// `license/refresh` is the one write: the route table and the handler check it against `_meta`.
-fn is_org_agnostic_read(path: &str) -> bool {
-    if path == "license" || path == "license/refresh" {
+/// A non-member may be looked up here: license routes name no org, password_complexity ignores it.
+fn is_org_agnostic_path(path: &str) -> bool {
+    if is_license_path_without_org(&path.split('/').collect::<Vec<_>>()) {
         return true;
     }
     let segments: Vec<&str> = path.split('/').filter(|s| !s.is_empty()).collect();
@@ -580,7 +572,7 @@ pub async fn validate_credentials(
         // rest of api calls will get blocked anyways, but without this,
         // native users get stuck in logout loop if they go to any page calling license
         // api call
-        if is_org_agnostic_read(path)
+        if is_org_agnostic_path(path)
             && let Ok(v) = db::user::get_user_record(user_id).await
         {
             // we set the record manually with minimal permission,
@@ -2744,28 +2736,29 @@ CN5lTowpVXP2OIiiNTGa75Fj
 
     #[test]
     fn org_agnostic_reads_cover_license_and_password_complexity() {
-        assert!(is_org_agnostic_read("license"));
-        assert!(is_org_agnostic_read("license/refresh"));
-        assert!(is_org_agnostic_read("acme/password_complexity"));
-        assert!(is_org_agnostic_read("_meta/password_complexity"));
+        assert!(is_org_agnostic_path("license"));
+        assert!(is_org_agnostic_path("license/refresh"));
+        assert!(is_org_agnostic_path("acme/password_complexity"));
+        assert!(is_org_agnostic_path("_meta/password_complexity"));
         // An org literally named "api" still resolves as an org.
-        assert!(is_org_agnostic_read("api/password_complexity"));
+        assert!(is_org_agnostic_path("api/password_complexity"));
     }
 
     #[test]
     fn org_agnostic_reads_do_not_widen_anything_else() {
         // Authoring the policy keeps its org-membership requirement.
-        assert!(!is_org_agnostic_read("acme/settings/password_policy"));
-        assert!(!is_org_agnostic_read("_meta/settings/password_policy"));
+        assert!(!is_org_agnostic_path("acme/settings/password_policy"));
+        assert!(!is_org_agnostic_path("_meta/settings/password_policy"));
         // Neither do neighbouring or deeper paths.
-        assert!(!is_org_agnostic_read("acme/password_complexity/detail"));
+        assert!(!is_org_agnostic_path("acme/password_complexity/detail"));
         // The path arrives nest-stripped, so a leading `api` is an org name, not the mount.
-        assert!(!is_org_agnostic_read("api/kv/password_complexity"));
-        assert!(!is_org_agnostic_read("acme/streams"));
-        assert!(!is_org_agnostic_read("password_complexity"));
-        assert!(!is_org_agnostic_read("license/keys"));
-        assert!(!is_org_agnostic_read("license/refresh/now"));
-        assert!(!is_org_agnostic_read("acme/license/refresh"));
+        assert!(!is_org_agnostic_path("api/kv/password_complexity"));
+        assert!(!is_org_agnostic_path("acme/streams"));
+        assert!(!is_org_agnostic_path("password_complexity"));
+        assert!(!is_org_agnostic_path("license/keys"));
+        assert!(!is_org_agnostic_path("license/refresh/now"));
+        assert!(!is_org_agnostic_path("license/refresh/"));
+        assert!(!is_org_agnostic_path("acme/license/refresh"));
     }
 
     #[tokio::test]

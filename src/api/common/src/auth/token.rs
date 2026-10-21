@@ -60,10 +60,10 @@ fn is_top_level_org_list(path_columns: &[&str], method: &str) -> bool {
     matches!(path_columns, ["organizations"]) && method == "LIST"
 }
 
-/// `license/refresh` names no org, and like the other license writes it needs a `_meta` member.
+/// A license path names no org, and like the other license writes it needs a `_meta` member.
 #[cfg(any(feature = "enterprise", test))]
 fn user_lookup_org<'a>(path_columns: &[&'a str]) -> &'a str {
-    if matches!(path_columns, ["license", "refresh"]) {
+    if openobserve_core::auth::is_license_path_without_org(path_columns) {
         config::META_ORG_ID
     } else {
         openobserve_core::auth::org_from_path(path_columns)
@@ -375,6 +375,7 @@ mod tests {
     fn license_refresh_looks_the_user_up_in_meta() {
         assert_eq!(user_lookup_org(&["license", "refresh"]), "_meta");
         assert_eq!(user_lookup_org(&["acme", "license", "refresh"]), "acme");
+        assert_eq!(user_lookup_org(&["license", "refresh", ""]), "license");
         assert_eq!(user_lookup_org(&["acme", "streams"]), "acme");
         assert_eq!(user_lookup_org(&["v2", "acme", "downtimes"]), "acme");
     }
