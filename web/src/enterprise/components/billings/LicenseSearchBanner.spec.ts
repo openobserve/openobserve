@@ -62,6 +62,7 @@ const pausedLicense = {
   license: { license_id: "2HbQ7f3aZk" },
   decision: { blocks: ["usage_over_limit"], exceeded_days: 4, allowed_days: 3 },
   waivers: [],
+  can_update_license: true,
 };
 
 let store: ReturnType<typeof makeStore>;
@@ -121,6 +122,22 @@ describe("LicenseSearchBanner", () => {
     expect(copyToClipboard).toHaveBeenCalledWith("2HbQ7f3aZk", expect.any(Function));
     await w.find('[data-test="license-banner-refresh"]').trigger("click");
     expect(licenseServer.refresh_license_limits).toHaveBeenCalledTimes(1);
+  });
+
+  it("paused hides refresh from a user who may not update the license", async () => {
+    vi.mocked(licenseServer.get_license).mockResolvedValue({
+      data: { ...pausedLicense, can_update_license: false },
+    } as never);
+    const w = await mountBanner(PAUSED);
+    expect(w.find('[data-test="license-banner-copy"]').exists()).toBe(true);
+    expect(w.find('[data-test="license-banner-refresh"]').exists()).toBe(false);
+  });
+
+  it("paused hides refresh when the server does not say the user may update", async () => {
+    const { can_update_license: _omit, ...older } = pausedLicense;
+    vi.mocked(licenseServer.get_license).mockResolvedValue({ data: older } as never);
+    const w = await mountBanner(PAUSED);
+    expect(w.find('[data-test="license-banner-refresh"]').exists()).toBe(false);
   });
 
   it("paused without a known license ID uses the no-id text and hides copy", async () => {

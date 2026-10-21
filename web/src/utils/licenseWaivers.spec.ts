@@ -16,8 +16,10 @@
 import { describe, it, expect } from "vitest";
 import {
   DAY_US,
+  MAX_TIMEOUT_MS,
   activeSearchUnblock,
   bannerSignature,
+  boundaryDelayMs,
   formatUtc,
   knownWaivers,
   lastCoveredDayUs,
@@ -131,5 +133,15 @@ describe("licenseWaivers", () => {
       waiver_ids_applied: [],
     };
     expect(quotaPercent(d)).toBe(50);
+  });
+});
+
+describe("boundaryDelayMs", () => {
+  it("wakes 1 ms past the boundary", () => {
+    expect(boundaryDelayMs(5_000_000, 1_000_000)).toBe(4_001);
+  });
+
+  it("clamps a far boundary to the longest timeout a browser honours", () => {
+    expect(boundaryDelayMs(40 * DAY_US, 0)).toBe(MAX_TIMEOUT_MS);
   });
 });

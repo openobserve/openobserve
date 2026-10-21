@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
@@ -55,6 +55,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import {
+  boundaryDelayMs,
   formatUtc,
   knownWaivers,
   lastCoveredDayUs,
@@ -66,9 +67,30 @@ const props = defineProps<{ waivers: LicenseWaiver[] | undefined }>();
 
 const { t, locale } = useI18nTyped();
 
-const nowUs = Date.now() * 1000;
+const nowUs = ref(Date.now() * 1000);
 
 const rows = computed(() => knownWaivers(props.waivers));
+
+let boundaryTimer: ReturnType<typeof setTimeout> | undefined;
+
+const clearBoundaryTimer = () => {
+  if (boundaryTimer !== undefined) clearTimeout(boundaryTimer);
+  boundaryTimer = undefined;
+};
+
+const armBoundaryTimer = () => {
+  clearBoundaryTimer();
+  nowUs.value = Date.now() * 1000;
+  const upcoming = rows.value
+    .flatMap((w) => [w.starts_at, w.ends_at])
+    .filter((b) => b > nowUs.value);
+  if (!upcoming.length) return;
+  boundaryTimer = setTimeout(armBoundaryTimer, boundaryDelayMs(Math.min(...upcoming), nowUs.value));
+};
+
+watch(rows, armBoundaryTimer, { immediate: true });
+
+onBeforeUnmount(clearBoundaryTimer);
 
 const columns = computed<OTableColumnDef[]>(() => [
   { id: "waiver", header: t("about.waiver_col_waiver"), cell: " ", size: 240 },

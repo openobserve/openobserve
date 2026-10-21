@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { mount, flushPromises } from "@vue/test-utils";
+import { mount, flushPromises, enableAutoUnmount } from "@vue/test-utils";
 import License from "./License.vue";
 import { makeLicenseSchema } from "./License.schema";
 import licenseServer from "@/services/license_server";
@@ -110,6 +110,8 @@ const mockDialog = vi.fn().mockReturnValue({
   onOk: vi.fn().mockReturnThis(),
   onCancel: vi.fn().mockReturnThis(),
 });
+
+enableAutoUnmount(afterEach);
 
 describe("License.vue", () => {
   let store: any;
@@ -495,6 +497,25 @@ describe("License.vue", () => {
       expect(vi.mocked(licenseServer.get_license).mock.calls.length).toBe(before + 1);
     });
 
+    it("text typed into the update form survives the immediate and scheduled reloads", async () => {
+      vi.mocked(licenseServer.refresh_license_limits).mockResolvedValue(createAxiosResponse({}));
+      wrapper.vm.showUpdateForm = true;
+      await flushPromises();
+      const field = () => wrapper.find('textarea[data-test="update-license-key-input-field"]');
+      await field().setValue("half-typed-key");
+
+      await wrapper.vm.triggerLimitRefresh();
+      await flushPromises();
+      expect(field().element.value).toBe("half-typed-key");
+
+      const before = vi.mocked(licenseServer.get_license).mock.calls.length;
+      await vi.advanceTimersByTimeAsync(LICENSE_REFRESH_SETTLE_MS);
+      await flushPromises();
+      expect(vi.mocked(licenseServer.get_license).mock.calls.length).toBe(before + 1);
+      expect(wrapper.text()).not.toContain("Loading license information");
+      expect(field().element.value).toBe("half-typed-key");
+    });
+
     it("unmounting before the delay cancels the reload", async () => {
       vi.mocked(licenseServer.update_license).mockResolvedValue(
         createAxiosResponse({ success: true }),
@@ -522,7 +543,10 @@ describe("License.vue", () => {
   });
 
   describe("Update License Functionality", () => {
+    afterEach(() => vi.useRealTimers());
+
     beforeEach(async () => {
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
       vi.mocked(licenseServer.get_license).mockResolvedValue(createAxiosResponse(mockLicenseData));
       wrapper = createWrapper();
       await flushPromises();
@@ -825,6 +849,9 @@ describe("License.vue", () => {
   });
 
   describe("URL Auto-fill License Key", () => {
+    beforeEach(() => vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] }));
+    afterEach(() => vi.useRealTimers());
+
     it("should auto-fill license key from URL parameters", async () => {
       window.location.search = "?installation_id=test-installation-123&license_key=auto-filled-key";
 
@@ -1093,6 +1120,32 @@ describe("License.vue", () => {
       await flushPromises();
 
       expect(wrapper.html()).not.toContain("some application features may be temporarily");
+    });
+
+    it("a pause for a report failure under the day limit claims no over-limit days", async () => {
+      vi.mocked(licenseServer.get_license).mockResolvedValue(
+        createAxiosResponse({
+          ...withDecision({ search_allowed: false, blocks: ["report_failure"], exceeded_days: 2 }),
+          ingestion_exceeded: 2,
+        }),
+      );
+      wrapper = createWrapper();
+      await flushPromises();
+
+      expect(wrapper.html()).toContain("allowance left of 3 max");
+      expect(wrapper.html()).not.toContain("some application features may be temporarily");
+    });
+
+    it("a pause for days over the limit states the limit", async () => {
+      vi.mocked(licenseServer.get_license).mockResolvedValue(
+        createAxiosResponse(
+          withDecision({ search_allowed: false, blocks: ["usage_over_limit"], exceeded_days: 4 }),
+        ),
+      );
+      wrapper = createWrapper();
+      await flushPromises();
+
+      expect(wrapper.html()).toContain("some application features may be temporarily");
     });
 
     it("renders the status card when the backend sends a decision", async () => {

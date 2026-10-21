@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OBanner
         v-if="envKeyActive"
         variant="warning"
-        icon="info"
+        icon="warning"
         class="mb-3"
         :content="t('about.license_status_env_key')"
         data-test="license-status-env-key"

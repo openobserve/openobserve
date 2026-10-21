@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { mount } from "@vue/test-utils";
+import { mount, enableAutoUnmount } from "@vue/test-utils";
 import LicenseWaiversCard from "./LicenseWaiversCard.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import i18n from "@/locales";
@@ -23,9 +23,11 @@ const mountCard = (waivers: LicenseWaiver[] | undefined) =>
     global: { plugins: [i18n] },
   });
 
+enableAutoUnmount(afterEach);
+
 describe("LicenseWaiversCard", () => {
   beforeEach(() => {
-    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.useFakeTimers({ toFake: ["Date", "setTimeout", "clearTimeout"] });
     vi.setSystemTime(NOW);
   });
   afterEach(() => vi.useRealTimers());
@@ -88,6 +90,27 @@ describe("LicenseWaiversCard", () => {
     expect(text("s")).toContain("Scheduled");
     expect(text("e")).toContain("Ended");
     expect(text("p")).toContain("Past days");
+  });
+
+  it("badges move on at each waiver boundary without a reload", async () => {
+    const HOUR_MS = 3_600_000;
+    const startUs = (NOW + HOUR_MS) * 1000;
+    const w = mountCard([
+      waiver({ id: "t", starts_at: startUs, ends_at: startUs + 2 * HOUR_MS * 1000 }),
+    ]);
+    const text = () => w.find("[data-test=license-waiver-row-t]").text();
+    expect(text()).toContain("Scheduled");
+    await vi.advanceTimersByTimeAsync(HOUR_MS + 1);
+    expect(text()).toContain("Active");
+    await vi.advanceTimersByTimeAsync(2 * HOUR_MS);
+    expect(text()).toContain("Ended");
+  });
+
+  it("unmounting clears the boundary timer", () => {
+    const w = mountCard([waiver({ id: "t", starts_at: (NOW + 60_000) * 1000 })]);
+    expect(vi.getTimerCount()).toBe(1);
+    w.unmount();
+    expect(vi.getTimerCount()).toBe(0);
   });
 
   it("an Unlimited ingestion waiver is labelled Unlimited ingestion", () => {

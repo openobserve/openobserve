@@ -42,6 +42,7 @@ export interface LicenseWaiverFields {
   /** 0 until the backend has evaluated the licence itself; its decision then holds only search state. */
   evaluated_at?: number;
   env_key_active?: boolean;
+  can_update_license?: boolean;
 }
 
 export type WaiverStatus = "scheduled" | "active" | "past" | "ended";
@@ -52,6 +53,8 @@ export type LicenseBannerState =
 export const DAY_US = 86_400_000_000;
 export const LICENSE_REFRESH_SETTLE_MS = 15_000;
 export const LICENSE_BANNER_POLL_MS = 300_000;
+/** Longer delays overflow setTimeout and fire at once, so far boundaries are re-armed in steps. */
+export const MAX_TIMEOUT_MS = 2 ** 31 - 1;
 
 const KNOWN_WAIVER_TYPES = ["search_unblock", "ingestion_limit"];
 
@@ -64,6 +67,11 @@ export function waiverStatus(w: LicenseWaiver, nowUs: number): WaiverStatus {
   if (nowUs < w.starts_at) return "scheduled";
   if (nowUs >= w.ends_at) return w.type === "search_unblock" ? "ended" : "past";
   return "active";
+}
+
+/** Lands 1 ms past `nextUs`, so a strict comparison at the boundary has already flipped. */
+export function boundaryDelayMs(nextUs: number, nowUs: number): number {
+  return Math.min(Math.ceil((nextUs - nowUs) / 1000) + 1, MAX_TIMEOUT_MS);
 }
 
 /** `ends_at` is exclusive, so the last day a day-kind waiver covers is the one before it. */

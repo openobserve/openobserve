@@ -110,6 +110,7 @@ describe("LicenseStatusCard", () => {
   it("env key notice shows only when the env key is active", () => {
     const on = mountCard({ envKeyActive: true });
     expect(on.find("[data-test=license-status-env-key]").text()).toContain("O2_LICENSE_KEY");
+    expect(on.findComponent({ name: "OBanner" }).props("icon")).toBe("warning");
     const off = mountCard({ envKeyActive: false });
     expect(off.find("[data-test=license-status-env-key]").exists()).toBe(false);
   });

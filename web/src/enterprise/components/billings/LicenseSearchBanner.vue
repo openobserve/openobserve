@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("about.copyLicenseId") }}
         </OButton>
         <OButton
-          v-if="isPaused"
+          v-if="isPaused && canUpdateLicense"
           variant="banner-dismiss"
           size="sm"
           data-test="license-banner-refresh"
@@ -75,6 +75,7 @@ import {
   activeSearchUnblock,
   DAY_US,
   bannerSignature,
+  boundaryDelayMs,
   formatUtc,
   LICENSE_BANNER_POLL_MS,
   licenseBannerState,
@@ -115,6 +116,7 @@ const licenseData = computed(
       (LicenseWaiverFields & { license?: { license_id?: string } | null }) | undefined,
 );
 const licenseId = computed(() => licenseData.value?.license?.license_id ?? "");
+const canUpdateLicense = computed(() => licenseData.value?.can_update_license === true);
 
 const variant = computed(() => {
   if (state.value.kind === "paused") return "error";
@@ -185,7 +187,6 @@ watch(
   { immediate: true },
 );
 
-const MAX_TIMEOUT_MS = 2 ** 31 - 1;
 let boundaryTimer: ReturnType<typeof setTimeout> | undefined;
 
 const clearBoundaryTimer = () => {
@@ -199,7 +200,6 @@ const waiverUntilUs = (): number | null => {
   return zo?.license_search_allowed === true && typeof until === "number" ? until : null;
 };
 
-// The ends-soon flip is strict (< one day), so the wake-up lands 1 ms past the boundary.
 const armBoundaryTimer = () => {
   clearBoundaryTimer();
   nowUs.value = Date.now() * 1000;
@@ -207,8 +207,7 @@ const armBoundaryTimer = () => {
   if (until === null) return;
   const next = [until - DAY_US, until].find((b) => b > nowUs.value);
   if (next === undefined) return;
-  const delayMs = Math.ceil((next - nowUs.value) / 1000) + 1;
-  boundaryTimer = setTimeout(onBoundary, Math.min(delayMs, MAX_TIMEOUT_MS));
+  boundaryTimer = setTimeout(onBoundary, boundaryDelayMs(next, nowUs.value));
 };
 
 function onBoundary() {

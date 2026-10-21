@@ -229,6 +229,7 @@
                   variant="primary"
                   size="sm-action"
                   v-if="licenseData.license != null"
+                  :loading="refreshing"
                   @click="triggerLimitRefresh"
                 >
                   {{ t("about.refresh_license_limits") }}
@@ -343,7 +344,7 @@
                   <!-- Line 2: Exceeded Status -->
                   <div v-if="!isIngestionUnlimited" class="flex items-center gap-2">
                     <OIcon
-                      v-if="licenseData?.ingestion_exceeded && searchPaused"
+                      v-if="licenseData?.ingestion_exceeded && pausedOverLimit"
                       name="warning"
                       size="sm"
                       class="text-status-error-text flex-shrink-0"
@@ -386,7 +387,7 @@
                           "
                         ></span
                         ><span
-                          v-if="searchPaused"
+                          v-if="pausedOverLimit"
                           class="inline-flex items-center font-semibold text-inherit"
                           v-html="
                             DOMPurify.sanitize(
@@ -544,6 +545,7 @@ export default defineComponent({
     const { t } = useI18nTyped();
     const { confirm } = useConfirmDialog();
     const loading = ref(false);
+    const refreshing = ref(false);
     const licenseData = ref<any>({});
     const licenseKey = ref("");
     const showUpdateForm = ref(false);
@@ -575,11 +577,13 @@ export default defineComponent({
       updateLicenseForm.value?.form?.reset({ licenseKey: v ?? "" });
     });
 
-    const loadLicenseData = async () => {
+    // Only the first load may swap the page for the spinner; later reloads would unmount the form.
+    const loadLicenseData = async ({ background = false } = {}) => {
+      const busy = background ? refreshing : loading;
       try {
-        loading.value = true;
+        busy.value = true;
         licenseData.value = await queryClient.fetchQuery(licenseQuery());
-        checkAndAutoFillLicenseFromUrl();
+        if (!background) checkAndAutoFillLicenseFromUrl();
       } catch (error) {
         console.error("Error loading license data:", error);
         toast({
@@ -587,9 +591,11 @@ export default defineComponent({
           message: t("about.failed_to_load_license_info"),
         });
       } finally {
-        loading.value = false;
+        busy.value = false;
       }
     };
+
+    const reloadLicenseData = () => loadLicenseData({ background: true });
 
     // @submit handler — fires only once the schema passes (licenseKey required +
     // trim), so the `:disabled` gate is gone (R3). Still callable directly with
@@ -613,8 +619,8 @@ export default defineComponent({
         url.searchParams.delete("license_key");
         window.history.replaceState({}, document.title, url.toString());
 
-        await loadLicenseData();
-        scheduleReload(loadLicenseData);
+        await reloadLicenseData();
+        scheduleReload(reloadLicenseData);
       } catch (error) {
         const e = error as { response?: { data?: { message?: string } } };
         console.error("Error updating license:", error);
@@ -646,7 +652,7 @@ export default defineComponent({
     };
 
     const triggerLimitRefresh = async () => {
-      if (await refreshLicenseLimits(loadLicenseData)) await loadLicenseData();
+      if (await refreshLicenseLimits(reloadLicenseData)) await reloadLicenseData();
     };
 
     const maskKey = (key: string) => {
@@ -738,9 +744,10 @@ export default defineComponent({
       return 3;
     });
 
-    const searchPaused = computed(() => {
+    // A pause for a report failure or an LV verdict must not claim the days went over the limit.
+    const pausedOverLimit = computed(() => {
       const decision = licenseData.value.decision;
-      if (decision) return !decision.search_allowed;
+      if (decision) return (decision.blocks ?? []).includes("usage_over_limit");
       return licenseData.value.ingestion_exceeded > limitBreachAllowedCount.value;
     });
 
@@ -1008,6 +1015,7 @@ export default defineComponent({
       raw,
       store,
       loading,
+      refreshing,
       licenseData,
       licenseKey,
       showUpdateForm,
@@ -1039,7 +1047,7 @@ export default defineComponent({
       ingestionLimitGB,
       generateUsageDashboard,
       limitBreachAllowedCount,
-      searchPaused,
+      pausedOverLimit,
       DOMPurify,
     };
   },
