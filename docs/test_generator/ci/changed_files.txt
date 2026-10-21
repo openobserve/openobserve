@@ -1,2 +1,0 @@
-web/src/enterprise/components/billings/invoiceTable.spec.ts
-web/src/enterprise/components/billings/invoiceTable.vue
