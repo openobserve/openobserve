@@ -71,7 +71,8 @@ export type BadgeVariant =
   | "indigo-soft";
 
 /** Size controls padding and font-size only. */
-export type BadgeSize = "xs" | "sm" | "md";
+/** `lg` is for read-at-a-distance status, such as the dashboard TV-mode strip. */
+export type BadgeSize = "xs" | "sm" | "md" | "lg";
 
 /**
  * Corner shape:
