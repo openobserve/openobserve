@@ -3,9 +3,10 @@
 /** True when a button has no visible text and no aria name, so assistive tech announces just "button". */
 export function isUnnamedIconOnly(el: Element): boolean {
   if (
+    el.getAttribute("aria-hidden") === "true" ||
     el.hasAttribute("aria-label") ||
     el.hasAttribute("aria-labelledby") ||
-    el.hasAttribute("title")
+    el.getAttribute("title")?.trim()
   ) {
     return false;
   }

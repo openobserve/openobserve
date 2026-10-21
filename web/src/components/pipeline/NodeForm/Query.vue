@@ -72,7 +72,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </OButton>
       <OButton
-        :aria-label="t('common.fullscreen')"
+        :aria-label="
+          scheduledPipelineRef?.isFullscreen ? t('common.exitFullscreen') : t('common.fullscreen')
+        "
         data-test="add-function-fullscreen-btn"
         variant="ghost"
         size="icon-xs-sq"

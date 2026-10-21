@@ -541,7 +541,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                            push the value input / this button downward). -->
                         <div class="flex h-8.5 items-center">
                           <OButton
-                            :aria-label="t('common.delete')"
+                            :aria-label="t('common.remove')"
                             variant="outline-destructive"
                             size="icon"
                             type="button"

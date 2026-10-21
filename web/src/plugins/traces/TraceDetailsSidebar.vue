@@ -667,7 +667,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <span class="me-1 inline-flex shrink-0">
                       <OButton
-                        :aria-label="$t('traces.applyAndSearch')"
+                        :aria-label="
+                          action.operator === '='
+                            ? t('traces.applyAndSearchEquals')
+                            : t('traces.applyAndSearchNotEquals')
+                        "
                         variant="ghost"
                         size="icon-xs-circle"
                       >
@@ -722,7 +726,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       >
                         <span class="me-1 inline-flex shrink-0">
                           <OButton
-                            :aria-label="$t('traces.applyAndSearch')"
+                            :aria-label="
+                              action.operator === '='
+                                ? t('traces.applyAndSearchEquals')
+                                : t('traces.applyAndSearchNotEquals')
+                            "
                             variant="ghost"
                             size="icon-xs-circle"
                           >

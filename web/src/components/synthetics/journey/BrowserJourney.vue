@@ -1981,7 +1981,7 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
       </span>
       <span class="flex-1" />
       <OButton
-        :aria-label="t('common.clear')"
+        :aria-label="t('synthetics.journey.clearResults')"
         variant="ghost"
         size="xs"
         data-test="synthetics-journey-clear-results-btn"
@@ -2031,7 +2031,7 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
         </template>
       </div>
       <OButton
-        :aria-label="t('common.clear')"
+        :aria-label="t('synthetics.journey.clearResults')"
         variant="ghost"
         size="xs"
         data-test="synthetics-journey-clear-results-btn"
@@ -2065,7 +2065,7 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
         {{ t("synthetics.journey.reRun") }}
       </OButton>
       <OButton
-        :aria-label="t('common.clear')"
+        :aria-label="t('synthetics.journey.clearResults')"
         variant="ghost"
         size="xs"
         data-test="synthetics-journey-clear-results-btn"

@@ -152,7 +152,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <span class="inline-flex">
             <OButton
-              :aria-label="t('synthetics.variables.promote')"
+              :aria-label="t('synthetics.promote.toGlobal')"
               variant="ghost"
               size="icon-sm"
               icon-left="drive-file-move"

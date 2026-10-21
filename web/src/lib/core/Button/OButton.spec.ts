@@ -551,6 +551,13 @@ describe("OButton", () => {
     const mountIconOnly = (attrs: Record<string, string> = {}) =>
       mount(OButton, { props: { size: "icon" }, attrs, slots: { default: () => h("svg") } });
 
+    it("schedules nothing under test", () => {
+      vi.useFakeTimers();
+      const wrapper = mountIconOnly();
+      expect(vi.getTimerCount()).toBe(0);
+      wrapper.unmount();
+    });
+
     it("warns after the delay for a button nothing names", () => {
       vi.stubEnv("MODE", "development");
       vi.useFakeTimers();

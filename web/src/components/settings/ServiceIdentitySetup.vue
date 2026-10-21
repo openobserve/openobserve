@@ -748,7 +748,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("settings.serviceIdentitySetup.apply") }}
             </OButton>
             <OButton
-              :aria-label="t('common.cancel')"
+              :aria-label="t('common.dismiss')"
               variant="ghost"
               size="icon"
               class="opacity-40 hover:opacity-100"

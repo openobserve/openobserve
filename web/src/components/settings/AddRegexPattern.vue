@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </OButton>
         <OButton
-          :aria-label="t('common.fullscreen')"
+          :aria-label="isFullScreen ? t('common.exitFullscreen') : t('common.fullscreen')"
           data-test="add-regex-pattern-fullscreen-btn"
           variant="ghost"
           size="icon-xs-sq"

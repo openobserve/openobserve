@@ -42,7 +42,6 @@
               <ODropdown>
                 <template #trigger>
                   <OButton
-                    :aria-label="t('common.moreOptions')"
                     variant="ghost"
                     size="chip-12"
                     class="!ps-1 !pe-1"
