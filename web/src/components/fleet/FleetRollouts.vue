@@ -260,6 +260,10 @@ function eventTitle(ev: RolloutRow["events"][number]): I18nText {
     }
     case "timedOut":
       return t("fleet.rollouts.eventTimedOut");
+    case "skippedOffline": {
+      const count = Number(ev.detail) || 1;
+      return t("fleet.rollouts.eventSkippedOffline", { count }, count);
+    }
     case "halted":
       return t("fleet.rollouts.eventHalted");
     case "resumed":

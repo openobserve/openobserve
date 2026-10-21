@@ -25325,6 +25325,7 @@
       "eventSkipped": "Failing collectors skipped",
       "eventStarted": "Started",
       "eventTimedOut": "Phase timed out",
+      "eventSkippedOffline": "Left out {count} collector that was offline at the start; it takes the version when it reconnects | Left out {count} collectors that were offline at the start; they take the version when they reconnect",
       "excluded": "Excluded",
       "exitDone": "{exit} requested",
       "exitFixForward": "Fix forward",
