@@ -25535,7 +25535,7 @@
       "publishedToast": "Published v{version}. Change a fleet's version when you are ready to send it out.",
       "draftSaved": "Draft saved",
       "more": "More",
-      "deleteConfig": "Delete configuration",
+      "deleteConfig": "Delete",
       "publishMessage": "Message (optional)",
       "visualUnavailable": "The visual editor cannot show this YAML without losing parts of it",
       "publishedWithWarnings": "Published v{version} with {count} warning | Published v{version} with {count} warnings",
