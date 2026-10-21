@@ -63,7 +63,7 @@ use super::{
 };
 use crate::{
     ingestion::check_ingestion_allowed, logs::handle_timestamp_for_value,
-    service::get_formatted_stream_name,
+    pipeline::batch_execution::ExecutablePipeline, service::get_formatted_stream_name,
 };
 
 /// A misbehaving client can wholly fail thousands of batches a second per stream.
@@ -100,6 +100,61 @@ pub enum PrepareRecordError {
     Timestamp(json::Value, anyhow::Error),
 }
 
+/// A stream's pipelines and the settings they and the stream impose on each record.
+struct StreamRecordNeeds {
+    executable_pipelines: Vec<ExecutablePipeline>,
+    user_defined_schema_map: HashMap<String, Option<HashSet<String>>>,
+    streams_need_original_map: HashMap<String, bool>,
+    streams_need_all_values_map: HashMap<String, bool>,
+}
+
+impl StreamRecordNeeds {
+    async fn load(stream_param: StreamParams) -> Self {
+        // Chat history is replayed verbatim and hash-checked; no user pipeline may
+        // read (copy elsewhere) or rewrite it.
+        let executable_pipelines =
+            if config::meta::self_reporting::ai_chat::is_protected_ai_chat_stream(
+                &stream_param.stream_name,
+            ) {
+                Vec::new()
+            } else {
+                crate::ingestion::get_stream_executable_pipelines(&stream_param).await
+            };
+        let mut stream_params = vec![stream_param];
+        for exec_pl in &executable_pipelines {
+            stream_params.extend(exec_pl.get_all_destination_streams());
+        }
+        let mut needs = Self {
+            executable_pipelines,
+            user_defined_schema_map: HashMap::new(),
+            streams_need_original_map: HashMap::new(),
+            streams_need_all_values_map: HashMap::new(),
+        };
+        crate::ingestion::get_uds_and_original_data_streams(
+            &stream_params,
+            &mut needs.user_defined_schema_map,
+            &mut needs.streams_need_original_map,
+            &mut needs.streams_need_all_values_map,
+        )
+        .await;
+        needs
+    }
+
+    /// Whether the stream's records must keep their JSON form, ruling out the columnar path.
+    fn json_records(&self, stream_name: &str) -> bool {
+        !self.executable_pipelines.is_empty()
+            || matches!(self.user_defined_schema_map.get(stream_name), Some(Some(_)))
+            || self
+                .streams_need_original_map
+                .get(stream_name)
+                .is_some_and(|v| *v)
+            || self
+                .streams_need_all_values_map
+                .get(stream_name)
+                .is_some_and(|v| *v)
+    }
+}
+
 /// The `_o2_` write-guard predicate (design §5.3): true when a logs ingest
 /// request targeting `stream_name` must be rejected because the stream is an
 /// internal rollup stream and the request is user-initiated. Internal writers
@@ -132,6 +187,92 @@ pub async fn ingest(
     extend_json: Option<&HashMap<String, serde_json::Value>>,
     is_derived: bool,
 ) -> Result<IngestionResponse> {
+    ingest_inner(
+        thread_id,
+        org_id,
+        in_stream_name,
+        in_req,
+        user,
+        extend_json,
+        is_derived,
+        None,
+    )
+    .await
+}
+
+/// Ingests one stream's `_bulk` records beside the rows its data lines already built.
+pub async fn ingest_bulk(
+    thread_id: usize,
+    org_id: &str,
+    stream_name: &str,
+    records: Vec<json::Value>,
+    columnar: Option<JsonColumnar>,
+    user: IngestUser,
+) -> Result<IngestionResponse> {
+    ingest_inner(
+        thread_id,
+        org_id,
+        stream_name,
+        IngestionRequest::JsonValues(IngestionValueType::Bulk, records),
+        user,
+        None,
+        false,
+        columnar,
+    )
+    .await
+}
+
+/// The columnar plan for a `_bulk` stream, under the preconditions `ingest` applies to `_json`.
+pub async fn plan_bulk_columnar(
+    org_id: &str,
+    stream_name: &str,
+    time_range: (i64, i64),
+) -> Option<JsonColumnar> {
+    // rows are matched to their stream by the name `ingest` resolves
+    if resolve_stream_name(org_id, stream_name).await.ok()? != stream_name {
+        return None;
+    }
+    let stream_param = StreamParams::new(org_id, stream_name, StreamType::Logs);
+    if StreamRecordNeeds::load(stream_param)
+        .await
+        .json_records(stream_name)
+    {
+        return None;
+    }
+    let flatten_level = get_flatten_level(org_id, stream_name, StreamType::Logs).await;
+    JsonColumnar::plan(org_id, stream_name, flatten_level, time_range).await
+}
+
+/// Flatten a record and resolve its timestamp — the only two steps of record
+/// preparation that can reject an event.
+///
+/// Shared with the HEC collector's pre-write validation pass, which must reach
+/// the same verdict as the write does; a second implementation would drift.
+pub fn prepare_record(
+    item: json::Value,
+    flatten_level: u32,
+    min_ts: i64,
+    max_ts: i64,
+) -> std::result::Result<(json::Value, i64), PrepareRecordError> {
+    let mut res =
+        flatten::flatten_with_level(item, flatten_level).map_err(PrepareRecordError::Flatten)?;
+    match handle_timestamp_for_value(&mut res, min_ts, max_ts) {
+        Ok(ts) => Ok((res, ts)),
+        Err(e) => Err(PrepareRecordError::Timestamp(res, e)),
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn ingest_inner(
+    thread_id: usize,
+    org_id: &str,
+    in_stream_name: &str,
+    in_req: IngestionRequest,
+    user: IngestUser,
+    extend_json: Option<&HashMap<String, serde_json::Value>>,
+    is_derived: bool,
+    bulk_columnar: Option<JsonColumnar>,
+) -> Result<IngestionResponse> {
     let start = std::time::Instant::now();
     let started_at: i64 = Utc::now().timestamp_micros();
     let cfg = config::get_config();
@@ -157,11 +298,7 @@ pub async fn ingest(
     let stream_type = StreamType::Logs;
 
     // check stream
-    let stream_name = if cfg.common.skip_formatting_stream_name {
-        get_formatted_stream_name(StreamParams::new(org_id, in_stream_name, stream_type)).await?
-    } else {
-        format_stream_name(in_stream_name.to_string())
-    };
+    let stream_name = resolve_stream_name(org_id, in_stream_name).await?;
     if stream_name.is_empty() {
         return Err(Error::IngestionError("Stream name is empty".to_string()));
     }
@@ -221,39 +358,17 @@ pub async fn ingest(
         derived_streams.insert(stream_name.to_string());
     }
 
-    // Start retrieve associated pipeline and construct pipeline components
-    let stream_param = StreamParams::new(org_id, &stream_name, stream_type);
-    // Chat history is replayed verbatim and hash-checked; no user pipeline may
-    // read (copy elsewhere) or rewrite it.
-    let executable_pipelines =
-        if config::meta::self_reporting::ai_chat::is_protected_ai_chat_stream(&stream_name) {
-            Vec::new()
-        } else {
-            crate::ingestion::get_stream_executable_pipelines(&stream_param).await
-        };
-    let mut stream_params = vec![stream_param];
-    let mut pipeline_inputs = Vec::with_capacity(stream_params.len());
-    let mut original_options = Vec::with_capacity(stream_params.len());
-    // End pipeline params construction
-
-    if !executable_pipelines.is_empty() {
-        for exec_pl in &executable_pipelines {
-            let pl_destinations = exec_pl.get_all_destination_streams();
-            stream_params.extend(pl_destinations);
-        }
-    }
-
-    // Start get user defined schema
-    let mut user_defined_schema_map: HashMap<String, Option<HashSet<String>>> = HashMap::new();
-    let mut streams_need_original_map: HashMap<String, bool> = HashMap::new();
-    let mut streams_need_all_values_map: HashMap<String, bool> = HashMap::new();
-    crate::ingestion::get_uds_and_original_data_streams(
-        &stream_params,
-        &mut user_defined_schema_map,
-        &mut streams_need_original_map,
-        &mut streams_need_all_values_map,
-    )
-    .await;
+    let needs = StreamRecordNeeds::load(StreamParams::new(org_id, &stream_name, stream_type)).await;
+    // JsonColumnar::plan already refuses the fast path under vectorscan, before this is consulted.
+    let needs_json_records = extend_json.is_some() || needs.json_records(&stream_name);
+    let StreamRecordNeeds {
+        executable_pipelines,
+        mut user_defined_schema_map,
+        mut streams_need_original_map,
+        mut streams_need_all_values_map,
+    } = needs;
+    let mut pipeline_inputs = Vec::new();
+    let mut original_options = Vec::new();
     // with pipeline, we need to store original if any of the destinations requires original
     let store_original_when_pipeline_exists =
         !executable_pipelines.is_empty() && streams_need_original_map.values().any(|val| *val);
@@ -261,17 +376,10 @@ pub async fn ingest(
 
     let flatten_level = get_flatten_level(org_id, &stream_name, stream_type).await;
 
-    // JsonColumnar::plan already refuses the fast path under vectorscan, before this is consulted.
-    let needs_json_records = !executable_pipelines.is_empty()
-        || extend_json.is_some()
-        || matches!(user_defined_schema_map.get(&stream_name), Some(Some(_)))
-        || streams_need_original_map
-            .get(&stream_name)
-            .is_some_and(|v| *v)
-        || streams_need_all_values_map
-            .get(&stream_name)
-            .is_some_and(|v| *v);
-    let mut columnar = if matches!(in_req, IngestionRequest::JSON(_)) && !needs_json_records {
+    // a pipeline added after the `_bulk` plan was made applies from the next request
+    let mut columnar = if bulk_columnar.is_some() {
+        bulk_columnar
+    } else if matches!(in_req, IngestionRequest::JSON(_)) && !needs_json_records {
         JsonColumnar::plan(org_id, &stream_name, flatten_level, (min_ts, max_ts)).await
     } else {
         None
@@ -842,23 +950,14 @@ pub async fn ingest(
     )
 }
 
-/// Flatten a record and resolve its timestamp — the only two steps of record
-/// preparation that can reject an event.
-///
-/// Shared with the HEC collector's pre-write validation pass, which must reach
-/// the same verdict as the write does; a second implementation would drift.
-pub fn prepare_record(
-    item: json::Value,
-    flatten_level: u32,
-    min_ts: i64,
-    max_ts: i64,
-) -> std::result::Result<(json::Value, i64), PrepareRecordError> {
-    let mut res =
-        flatten::flatten_with_level(item, flatten_level).map_err(PrepareRecordError::Flatten)?;
-    match handle_timestamp_for_value(&mut res, min_ts, max_ts) {
-        Ok(ts) => Ok((res, ts)),
-        Err(e) => Err(PrepareRecordError::Timestamp(res, e)),
-    }
+/// The name the writer uses for `in_stream_name`; `skip_formatting_stream_name` looks it up.
+pub(super) async fn resolve_stream_name(org_id: &str, in_stream_name: &str) -> Result<String> {
+    Ok(if config::get_config().common.skip_formatting_stream_name {
+        get_formatted_stream_name(StreamParams::new(org_id, in_stream_name, StreamType::Logs))
+            .await?
+    } else {
+        format_stream_name(in_stream_name.to_string())
+    })
 }
 
 /// A body is an array of records or a single record.
