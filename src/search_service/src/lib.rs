@@ -218,7 +218,7 @@ pub async fn search(
         )
     );
 
-    let _work_group = registration.finish().map(|wg| wg.to_string());
+    let _work_group = registration.finish();
 
     match res {
         Ok(mut res) => {

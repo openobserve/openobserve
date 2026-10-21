@@ -119,18 +119,24 @@ impl Searcher {
         self.register_follower(org_id, trace_id)
     }
 
-    pub fn register_follower(&self, org_id: &str, trace_id: &str) -> QueryRegistration {
+    pub fn register_follower(&self, _org_id: &str, trace_id: &str) -> QueryRegistration {
         QueryRegistration(QueryTracker {
-            org_id: org_id.to_string(),
             trace_id: trace_id.to_string(),
             query_id: config::ider::generate_query_id(trace_id),
         })
     }
 }
 
+impl Default for Searcher {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Without enterprise there is no query manager, so a query only carries its ids.
 #[derive(Debug)]
 #[cfg(not(feature = "enterprise"))]
+#[must_use = "dropping the registration removes the query at once"]
 pub struct QueryRegistration(QueryTracker);
 
 #[cfg(not(feature = "enterprise"))]
@@ -147,29 +153,18 @@ impl QueryRegistration {
 #[derive(Clone, Debug)]
 #[cfg(not(feature = "enterprise"))]
 pub struct QueryTracker {
-    org_id: String,
     trace_id: String,
     query_id: String,
 }
 
 #[cfg(not(feature = "enterprise"))]
 impl QueryTracker {
-    pub fn org_id(&self) -> &str {
-        &self.org_id
-    }
-
     pub fn trace_id(&self) -> &str {
         &self.trace_id
     }
 
     pub fn query_id(&self) -> &str {
         &self.query_id
-    }
-}
-
-impl Default for Searcher {
-    fn default() -> Self {
-        Self::new()
     }
 }
 

@@ -185,4 +185,25 @@ mod tests {
             assert_eq!(status.code(), tonic::Code::InvalidArgument);
         }
     }
+
+    #[test]
+    fn test_follower_runs_under_its_own_id_below_the_trace() {
+        let req = |trace_id: &str| MetricsQueryRequest {
+            org_id: "org".to_string(),
+            job: Some(Job {
+                trace_id: trace_id.to_string(),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        let (first, first_registration) = register_follower(req("t"), "t");
+        let (second, second_registration) = register_follower(req("t"), "t");
+
+        let first_id = first.job.unwrap().trace_id;
+        let second_id = second.job.unwrap().trace_id;
+        assert_ne!(first_id, second_id);
+        assert!(first_id.starts_with("t-"));
+        assert_eq!(first_id, first_registration.tracker().query_id());
+        assert_eq!(second_id, second_registration.tracker().query_id());
+    }
 }
