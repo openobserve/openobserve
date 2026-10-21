@@ -74,7 +74,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="flex flex-wrap items-center gap-2"
       :data-test="`oncall-schedule-handover-${ruleIndex}`"
     >
-      <OText variant="body" as="span">{{ t("oncall.handoverEvery") }}</OText>
       <OSelect
         v-model="rule.shift_micros"
         width="sm"

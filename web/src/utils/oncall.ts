@@ -199,13 +199,26 @@ export function colorIndexFor(email: string, buckets = 8): number {
   return Math.abs(hash) % buckets;
 }
 
+// `phraseKey` is the whole "Every …" phrase: a split "every" + unit cannot agree in other languages.
 export const SHIFT_PRESETS = [
-  { micros: 8 * MICROS_PER_HOUR, labelKey: "oncall.shift8h" },
-  { micros: 12 * MICROS_PER_HOUR, labelKey: "oncall.shift12h" },
-  { micros: MICROS_PER_DAY, labelKey: "oncall.shiftDaily" },
-  { micros: MICROS_PER_WEEK, labelKey: "oncall.shiftWeekly" },
-  { micros: 2 * MICROS_PER_WEEK, labelKey: "oncall.shiftFortnightly" },
-] as const satisfies ReadonlyArray<{ micros: number; labelKey: I18nKey }>;
+  { micros: 8 * MICROS_PER_HOUR, labelKey: "oncall.shift8h", phraseKey: "oncall.handoverEvery8h" },
+  {
+    micros: 12 * MICROS_PER_HOUR,
+    labelKey: "oncall.shift12h",
+    phraseKey: "oncall.handoverEvery12h",
+  },
+  { micros: MICROS_PER_DAY, labelKey: "oncall.shiftDaily", phraseKey: "oncall.handoverEveryDay" },
+  {
+    micros: MICROS_PER_WEEK,
+    labelKey: "oncall.shiftWeekly",
+    phraseKey: "oncall.handoverEveryWeek",
+  },
+  {
+    micros: 2 * MICROS_PER_WEEK,
+    labelKey: "oncall.shiftFortnightly",
+    phraseKey: "oncall.handoverEvery2Weeks",
+  },
+] as const satisfies ReadonlyArray<{ micros: number; labelKey: I18nKey; phraseKey: I18nKey }>;
 
 /**
  * Priority as `P1`..`P5`. Out-of-range values render as `—` rather than a

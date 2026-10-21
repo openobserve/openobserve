@@ -465,6 +465,23 @@ describe("OnCallScheduleEditor", () => {
     expect(drawerRules(wrapper)[0].anchor_micros).toBe(Date.UTC(2023, 10, 13, 9) * 1000);
   });
 
+  // E1: each option reads as a whole phrase, so no standalone "every" sits before the select.
+  it("offers the handover length as whole phrases with no loose every", async () => {
+    const wrapper = render({ schedule: schedule([rota("Primary")]) });
+    await openRotation(wrapper);
+    const row = wrapper.find('[data-test="oncall-schedule-handover-0"]');
+    const length = wrapper.findComponent('[data-test="oncall-schedule-handover-0-length"]');
+    expect((length.props("options") as any[]).map((o) => o.label)).toEqual([
+      "Every 8 hours",
+      "Every 12 hours",
+      "Every day",
+      "Every week",
+      "Every 2 weeks",
+    ]);
+    const words = row.findAll("span").map((s) => s.text());
+    expect(words).not.toContain("every");
+  });
+
   it("asks no weekday of a daily handover", async () => {
     const wrapper = render({
       schedule: schedule([rota("Primary", [rule({ shift_micros: 86_400_000_000 })])]),

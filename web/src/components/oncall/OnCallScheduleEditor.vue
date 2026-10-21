@@ -714,7 +714,7 @@ function stopConsequenceFor(index: number, at: number): { text: I18nText; gap: b
 }
 
 const shiftOptions = computed(() =>
-  SHIFT_PRESETS.map((preset) => ({ label: t(preset.labelKey), value: preset.micros })),
+  SHIFT_PRESETS.map((preset) => ({ label: t(preset.phraseKey), value: preset.micros })),
 );
 
 /// 0 = Monday .. 6 = Sunday, matching the engine's own numbering.
