@@ -3254,21 +3254,25 @@ mod tests {
         };
 
         let response = ai_authorization_error_response(
-            AiUsageAuthorizationError::PaidOverageConsentRequired(PaidOverageStatus {
+            AiUsageAuthorizationError::PaidOverageConsentRequired(Box::new(PaidOverageStatus {
                 feature: "ai_credits".to_string(),
                 organization: PaidOverageOrganizationStatus {
                     org_id: "member".to_string(),
                     enabled: false,
                     can_manage: true,
+                    enabled_by: None,
+                    disabled_by: None,
                 },
                 payer: Some(PaidOverageOrganizationStatus {
                     org_id: "payer".to_string(),
                     enabled: false,
                     can_manage: false,
+                    enabled_by: None,
+                    disabled_by: None,
                 }),
                 effective: false,
                 billing_status: PaidOverageBillingStatus::Eligible,
-            }),
+            })),
         );
 
         assert_eq!(response.status(), StatusCode::PRECONDITION_FAILED);
