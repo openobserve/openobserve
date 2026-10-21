@@ -53,8 +53,14 @@ export const publicLinksStatusBatchQuery = (org: string, ids: string[]) =>
   queryOptions({
     queryKey: publicLinkKeys.statusBatch(org, ids),
     queryFn: async (): Promise<Record<string, PublicLinkStatusReport>> => {
-      const list = (await admin.statusBatch(org, ids.slice(0, STATUS_BATCH_MAX))).data?.list ?? [];
-      return Object.fromEntries(list.map((report) => [report.link_id, report]));
+      // The server takes at most STATUS_BATCH_MAX ids per call, so a longer list is split.
+      const batches = Array.from({ length: Math.ceil(ids.length / STATUS_BATCH_MAX) }, (_, i) =>
+        ids.slice(i * STATUS_BATCH_MAX, (i + 1) * STATUS_BATCH_MAX),
+      );
+      const lists = await Promise.all(
+        batches.map(async (batch) => (await admin.statusBatch(org, batch)).data?.list ?? []),
+      );
+      return Object.fromEntries(lists.flat().map((report) => [report.link_id, report]));
     },
     staleTime: LIVE_STALE_TIME,
   });

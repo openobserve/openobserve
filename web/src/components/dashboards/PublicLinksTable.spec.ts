@@ -475,16 +475,25 @@ describe("PublicLinksTable", () => {
     expect(admin.statusBatch).toHaveBeenCalledTimes(2);
   });
 
-  it("asks the batch status only for the links on the table's current page", async () => {
-    const many = Array.from({ length: 25 }, (_, i) => link({ id: `m${i}` }));
+  it("asks the batch status for every link, in calls of at most 50", async () => {
+    const many = Array.from({ length: 60 }, (_, i) => link({ id: `m${i}` }));
     vi.mocked(admin.listOrg).mockResolvedValue({ data: { list: many } } as never);
+    build();
+    await flushPromises();
+    expect(admin.statusBatch).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(admin.statusBatch).mock.calls.map((c) => c[1])).toEqual([
+      many.slice(0, 50).map((l) => l.id),
+      many.slice(50).map((l) => l.id),
+    ]);
+  });
+
+  it("keeps a needs-attention link out of the Live filter without re-asking its status", async () => {
     const w = build();
     await flushPromises();
+    await selectTile(w, "live");
+    expect(find(w, "dashboards-public-links-l5-status").exists()).toBe(false);
+    expect(find(w, "dashboards-public-links-summary-attention").text()).toContain("1");
     expect(admin.statusBatch).toHaveBeenCalledTimes(1);
-    expect(vi.mocked(admin.statusBatch).mock.calls[0][1]).toEqual(
-      many.slice(0, 20).map((l) => l.id),
-    );
-    expect(rows(w)).toHaveLength(25);
   });
 
   it("omits needs attention and its tile when the batch status call fails", async () => {

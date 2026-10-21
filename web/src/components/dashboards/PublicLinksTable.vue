@@ -16,7 +16,6 @@
 <template>
   <div class="flex h-full flex-col" data-test="dashboards-public-links">
     <OTable
-      ref="tableRef"
       class="min-h-0 flex-1"
       :data="visibleLinks"
       :columns="columns"
@@ -365,7 +364,6 @@ import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { PublicLink, PublicLinkStatus } from "@/services/public_dashboards_admin";
 import {
-  STATUS_BATCH_MAX,
   publicLinksListQuery,
   publicLinksStatusBatchQuery,
   refreshPublicLinkMutation,
@@ -424,20 +422,12 @@ const forbidden = computed(
 );
 const loadFailed = computed(() => !!linksQuery.error.value && !forbidden.value);
 
-// The rows the table shows on its current page, after its own sorting and paging.
-const tableRef = ref<{
-  table?: { getRowModel: () => { rows: Array<{ original: PublicLink }> } };
-} | null>(null);
-// One batch call for the links on the page; "needs attention" exists only when it answers.
-const statusIds = computed(() =>
-  (tableRef.value?.table?.getRowModel().rows ?? [])
-    .slice(0, STATUS_BATCH_MAX)
-    .map((row) => row.original.id),
-);
+// Every link, not the shown rows: the status filter reads these reports, so scoping them to it loops.
+const statusIds = computed(() => links.value.map((link) => link.id));
 const statusQuery = useQuery(() =>
   Object.assign(publicLinksStatusBatchQuery(orgId.value, statusIds.value), {
     enabled: !!orgId.value && statusIds.value.length > 0,
-    // Paging or filtering changes the ids; the tile stays while the next page's answer loads.
+    // A new or revoked link changes the ids; the tiles stay while the next answer loads.
     placeholderData: keepPreviousData,
   }),
 );
