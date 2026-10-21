@@ -30,7 +30,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <span class="h-2 w-2 shrink-0 rounded-full" :class="SEVERITY_DOT[item.key]" />
       {{ item.label }}
-      <span class="text-text-secondary tabular-nums">{{ counts[item.key] ?? 0 }}</span>
+      <span
+        class="tabular-nums"
+        :class="filter === item.key ? 'opacity-80' : 'text-text-secondary'"
+        >{{ counts[item.key] ?? 0 }}</span
+      >
     </OButton>
   </div>
 </template>
