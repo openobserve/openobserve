@@ -74,7 +74,8 @@ use svix_ksuid::Ksuid;
 use crate::auth::{check_folder_write_permissions, check_permissions};
 use crate::{
     alerts::{
-        QueryConditionExt, build_sql, destinations,
+        QueryConditionExt, build_sql,
+        destinations::{self, note_skipped, org_member_split},
         notifications::{
             NotificationContext, RenderedMessage, apply_custom_template, build_row_columns, chart,
             custom::{VarValue, process_variable_replace},
@@ -3160,9 +3161,12 @@ async fn send_to_destination(
             match dest_type {
                 DestinationType::Http(endpoint) => send_http_notification(endpoint, msg).await,
                 DestinationType::Email(email) => {
+                    let (email, skipped) = org_member_email(&alert.org_id, email).await?;
                     // Same string for both parts: identical to the MIME this
                     // path emitted before the signature took two bodies.
-                    send_email_notification(&email_subject, email, msg.clone(), msg).await
+                    send_email_notification(&email_subject, &email, msg.clone(), msg)
+                        .await
+                        .map(|resp| note_skipped(resp, &skipped))
                 }
                 DestinationType::Sns(aws_sns) => {
                     send_sns_notification(&alert.name, aws_sns, msg).await
@@ -3199,14 +3203,16 @@ async fn send_to_destination(
                     },
                     DestinationType::Email(email),
                 ) => {
+                    let (email, skipped) = org_member_email(&alert.org_id, email).await?;
                     send_email_notification_with_inline_png(
                         &subject,
-                        email,
+                        &email,
                         text,
                         html,
                         ctx.chart_png.clone(),
                     )
                     .await
+                    .map(|resp| note_skipped(resp, &skipped))
                 }
                 (
                     RenderedMessage::Sns {
@@ -3229,6 +3235,7 @@ async fn send_to_destination(
 /// going through the alert template system.
 #[cfg(feature = "enterprise")]
 pub(crate) async fn dispatch_notification(
+    org_id: &str,
     dest_type: &DestinationType,
     subject: &str,
     msg: String,
@@ -3239,7 +3246,10 @@ pub(crate) async fn dispatch_notification(
         // split, so both parts carry the same string — byte-identical to the
         // MIME this path emitted before the signature took two bodies.
         DestinationType::Email(email) => {
-            send_email_notification(subject, email, msg.clone(), msg).await
+            let (email, skipped) = org_member_email(org_id, email).await?;
+            send_email_notification(subject, &email, msg.clone(), msg)
+                .await
+                .map(|resp| note_skipped(resp, &skipped))
         }
         DestinationType::Sns(aws_sns) => send_sns_notification(subject, aws_sns, msg).await,
     }
@@ -3264,6 +3274,7 @@ pub(crate) async fn dispatch_notification(
 /// itself, so the enterprise-only incident-notification call sites are
 /// untouched.
 pub(crate) async fn dispatch_test_message(
+    org_id: &str,
     dest_type: &DestinationType,
     title: &str,
     rendered: RenderedMessage,
@@ -3279,7 +3290,12 @@ pub(crate) async fn dispatch_test_message(
                 text,
             },
             DestinationType::Email(email),
-        ) => send_email_notification(&subject, email, text, html).await,
+        ) => {
+            let (email, skipped) = org_member_email(org_id, email).await?;
+            send_email_notification(&subject, &email, text, html)
+                .await
+                .map(|resp| note_skipped(resp, &skipped))
+        }
         (RenderedMessage::Http { body }, DestinationType::Sns(aws_sns)) => {
             send_sns_notification(title, aws_sns, body).await
         }
@@ -3290,6 +3306,26 @@ pub(crate) async fn dispatch_test_message(
             "Rendered message {rendered:?} does not match destination type {dest_type:?}"
         )),
     }
+}
+
+/// Narrows an email destination to org members and returns the skipped ones. [strong]
+async fn org_member_email(
+    org_id: &str,
+    email: &Email,
+) -> Result<(Email, Vec<String>), anyhow::Error> {
+    let (kept, skipped) = org_member_split(org_id, &email.recipients).await?;
+    Ok((members_to_send(kept, &skipped)?, skipped))
+}
+
+/// Email to the kept members, or an error naming the skipped when none is left. [pure]
+fn members_to_send(kept: Vec<String>, skipped: &[String]) -> Result<Email, anyhow::Error> {
+    if kept.is_empty() && !skipped.is_empty() {
+        return Err(anyhow::anyhow!(
+            "Email not sent: no recipient is part of this org (skipped: {})",
+            skipped.join(", ")
+        ));
+    }
+    Ok(Email { recipients: kept })
 }
 
 async fn send_http_notification(endpoint: &Endpoint, msg: String) -> Result<String, anyhow::Error> {
@@ -5135,6 +5171,28 @@ mod tests {
     use serde_json::json;
 
     use super::*;
+
+    #[test]
+    fn test_members_to_send() {
+        let to = |list: &[&str]| list.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        type Expected = Result<Vec<String>, String>;
+        let cases: Vec<(Vec<String>, Vec<String>, Expected)> = vec![
+            (to(&["a@x.com"]), vec![], Ok(to(&["a@x.com"]))),
+            (to(&["a@x.com"]), to(&["gone@x.com"]), Ok(to(&["a@x.com"]))),
+            (vec![], vec![], Ok(vec![])),
+            (
+                vec![],
+                to(&["gone@x.com", "left@x.com"]),
+                Err("Email not sent: no recipient is part of this org (skipped: gone@x.com, left@x.com)".to_string()),
+            ),
+        ];
+        for (kept, skipped, expected) in cases {
+            let got = members_to_send(kept, &skipped)
+                .map(|email| email.recipients)
+                .map_err(|e| e.to_string());
+            assert_eq!(got, expected, "skipped {skipped:?}");
+        }
+    }
 
     #[test]
     fn test_with_incident_notify_error() {
