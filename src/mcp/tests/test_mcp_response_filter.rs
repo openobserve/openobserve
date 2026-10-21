@@ -646,6 +646,7 @@ fn test_search_sql_token_reduction() {
     assert!(parsed.get("from").is_some());
     assert!(parsed.get("size").is_some());
     assert!(parsed.get("scan_size").is_some());
+    assert_eq!(parsed["is_partial"], false);
 
     // Dropped fields
     assert!(parsed.get("took_detail").is_none());
@@ -654,7 +655,6 @@ fn test_search_sql_token_reduction() {
     assert!(parsed.get("scan_files").is_none());
     assert!(parsed.get("scan_records").is_none());
     assert!(parsed.get("trace_id").is_none());
-    assert!(parsed.get("is_partial").is_none());
     assert!(parsed.get("peak_memory_usage").is_none());
     assert!(parsed.get("work_group").is_none());
     assert!(parsed.get("order_by").is_none());
