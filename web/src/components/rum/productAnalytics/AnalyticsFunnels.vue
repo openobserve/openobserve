@@ -164,6 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <FunnelLayoutRail
         v-else
+        ref="rail"
         :def="def"
         :result="result"
         :removed="removed"
@@ -180,7 +181,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :app="pa.state.app"
         :app-filters="appFilters.counts.value"
         :include-hidden="pa.state.includeExcluded"
-        :settings="layoutSettings"
         :filter-fields="filterFields"
         :filter-field-types="pa.schemaTypes.value"
         :filter-values="filterValues"
@@ -201,9 +201,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @hide-hidden="appFilters.setIncludeHidden(router, false)"
         @edit-app-filters="emit('open-exclusions')"
       >
+        <template #breakdown>
+          <FunnelBreakdownControl
+            ref="breakdownControl"
+            :def="def"
+            :dims="breakdownDims"
+            :fields="filterFields"
+            :sample="fieldSample.sample.value"
+            :sample-state="fieldSample.state.value"
+            :start="breakdown?.start ?? null"
+            :step-names="stepNames"
+            @update:def="applyDef"
+            @load-fields="fieldSample.load()"
+          />
+        </template>
         <template #header>
           <span
-            class="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2 max-md:basis-full"
+            class="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1 max-md:basis-full"
             data-test="rum-analytics-funnel-overall"
           >
             <span class="text-text-heading text-sm font-semibold">{{
@@ -213,21 +227,66 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span class="text-text-heading text-xl font-semibold tabular-nums">{{
                 pct(overallRate)
               }}</span>
-              <span class="text-text-secondary text-xs">{{
-                t("rum.analytics.funnel.overallOf", {
-                  last: formatCount(lastUnits, 1),
-                  first: formatCount(firstUnits, 1),
-                  unit: unitNoun,
-                })
-              }}</span>
-              <template v-if="compareView">
-                <span
-                  class="text-text-secondary text-xs"
-                  data-test="rum-analytics-funnel-overall-range"
+              <OBadge
+                variant="default-soft"
+                size="sm"
+                data-test="rum-analytics-funnel-overall-count"
+                >{{
+                  t("rum.analytics.funnel.overallOf", {
+                    last: formatCount(lastUnits, 1),
+                    first: formatCount(firstUnits, 1),
+                    unit: unitNoun,
+                  })
+                }}</OBadge
+              >
+              <span
+                v-if="compareView"
+                class="text-text-secondary text-xs"
+                data-test="rum-analytics-funnel-overall-range"
+                >{{
+                  t("rum.analytics.funnel.overallRange", { range: raw(compareView.range) })
+                }}</span
+              >
+              <OBadge
+                v-if="windowBadge"
+                variant="default-soft"
+                size="sm"
+                data-test="rum-analytics-funnel-overall-window"
+                >{{ windowBadge }}</OBadge
+              >
+              <OBadge
+                v-if="def.breakdown"
+                variant="primary-soft"
+                size="sm"
+                clickable
+                :aria-expanded="!railCollapsed"
+                data-test="rum-analytics-funnel-overall-breakdown"
+                @click="showBreakdownSection"
+                >{{ t("rum.analytics.funnel.breakdownBy", { field: dimLabel }) }}</OBadge
+              >
+              <template v-if="!def.breakdown && def.steps.length > 1 && lastUnits > 0">
+                <OBadge
+                  variant="default-soft"
+                  size="sm"
+                  data-test="rum-analytics-funnel-overall-median"
                   >{{
-                    t("rum.analytics.funnel.overallRange", { range: raw(compareView.range) })
-                  }}</span
+                    t("rum.analytics.funnel.headlineMedian", {
+                      value: raw(formatDuration(result.steps[result.steps.length - 1].medianMs)),
+                    })
+                  }}</OBadge
                 >
+                <OBadge
+                  variant="default-soft"
+                  size="sm"
+                  data-test="rum-analytics-funnel-overall-p90"
+                  >{{
+                    t("rum.analytics.funnel.p90", {
+                      value: raw(formatDuration(result.steps[result.steps.length - 1].p90Ms)),
+                    })
+                  }}</OBadge
+                >
+              </template>
+              <template v-if="compareView">
                 <span
                   v-if="compareView.data?.empty"
                   class="text-text-secondary text-xs"
@@ -239,31 +298,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     })
                   }}</span
                 >
-                <span
+                <OBadge
                   v-else-if="compareView.data?.overall && compareView.data.prevOverall !== null"
-                  class="flex items-baseline gap-1 text-xs"
+                  :variant="changeTone(compareView.data.overall)"
+                  size="sm"
                   data-test="rum-analytics-funnel-overall-change"
                 >
                   <FunnelChangeCell :change="compareView.data.overall" :unit-noun="unitNoun" />
-                  <span class="text-text-secondary">{{
+                  <span>{{
                     t("rum.analytics.funnel.overallVs", {
                       pct: pct(compareView.data.prevOverall),
                       range: raw(compareView.prevRange),
                     })
                   }}</span>
-                </span>
+                  <span v-if="funnelPanel.sampled > 1">{{
+                    t("rum.analytics.funnel.headlineEstimated")
+                  }}</span>
+                </OBadge>
               </template>
-              <span
-                v-if="!def.breakdown && def.steps.length > 1 && lastUnits > 0"
-                class="text-text-secondary text-xs"
-                data-test="rum-analytics-funnel-overall-time"
-                >{{
-                  t("rum.analytics.funnel.overallTime", {
-                    median: raw(formatDuration(result.steps[result.steps.length - 1].medianMs)),
-                    p90: raw(formatDuration(result.steps[result.steps.length - 1].p90Ms)),
-                  })
-                }}</span
-              >
               <WhyEnteredPopover
                 v-if="!usersMode && def.steps.length > 1"
                 :count="firstUnits"
@@ -282,7 +334,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OToggleGroup
             :model-value="pa.funnelView.value"
             type="single"
-            :label="t('rum.analytics.funnel.view')"
+            :label="t('rum.analytics.funnel.viewAs')"
             label-position="left"
             mobile-dropdown
             data-test="rum-analytics-funnel-view"
@@ -323,38 +375,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >{{ pa.usersUnit.value.label }}</OToggleGroupItem
             >
           </OToggleGroup>
-          <span class="border-border-default h-5 border-s max-md:hidden" aria-hidden="true" />
-          <OSelect
-            v-if="usersMode"
-            :model-value="def.window"
-            :options="windowOptions"
-            size="xs"
-            width="sm"
-            data-test="rum-analytics-funnel-window-select"
-            @update:model-value="(v) => update({ window: v as FunnelWindow })"
-          />
-          <OTag
-            v-else
-            :label="t('rum.analytics.funnel.windowSession')"
-            variant="default-outline"
-            size="sm"
-            data-test="rum-analytics-funnel-window-fixed"
-          />
-          <span class="border-border-default h-5 border-s max-md:hidden" aria-hidden="true" />
-          <FunnelBreakdownControl
-            ref="breakdownControl"
-            :def="def"
-            :dims="breakdownDims"
-            :fields="filterFields"
-            :sample="fieldSample.sample.value"
-            :sample-state="fieldSample.state.value"
-            :start="breakdown?.start ?? null"
-            :step-names="stepNames"
-            @update:def="applyDef"
-            @load-fields="fieldSample.load()"
-          />
-          <span class="border-border-default h-5 border-s max-md:hidden" aria-hidden="true" />
+          <span v-if="usersMode" class="flex items-center gap-2">
+            <label
+              for="rum-analytics-funnel-window-select"
+              class="text-text-secondary text-xs font-semibold"
+              >{{ t("rum.analytics.funnel.whoFinishIn") }}</label
+            >
+            <OSelect
+              id="rum-analytics-funnel-window-select"
+              :model-value="def.window"
+              :options="windowOptions"
+              size="xs"
+              width="sm"
+              data-test="rum-analytics-funnel-window-select"
+              @update:model-value="(v) => update({ window: v as FunnelWindow })"
+            />
+          </span>
           <template v-if="trend.shown.value">
+            <span class="border-border-default h-5 border-s max-md:hidden" aria-hidden="true" />
             <span class="flex items-center gap-2" data-test="rum-analytics-funnel-trend-pair">
               <label
                 for="rum-analytics-funnel-trend-pair"
@@ -387,9 +425,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @update:model-value="trend.setInterval"
               />
             </span>
-            <span class="border-border-default h-5 border-s max-md:hidden" aria-hidden="true" />
           </template>
-          <span class="flex items-center gap-2" data-test="rum-analytics-funnel-compare">
+          <span class="ms-auto flex items-center gap-2" data-test="rum-analytics-funnel-compare">
             <span>
               <OSwitch
                 :model-value="pa.funnelCompare.value"
@@ -412,28 +449,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
         </template>
         <template #notices>
-          <span
-            v-if="breakdownSummary"
-            class="text-text-secondary flex flex-wrap items-center gap-x-1.5 px-4 text-xs"
-            :aria-label="t('rum.analytics.funnel.breakdownBy', { field: dimLabel })"
-            data-test="rum-analytics-funnel-breakdown-summary"
-          >
-            <template v-for="(item, i) in breakdownSummary.items" :key="i">
-              <span v-if="i > 0" aria-hidden="true">{{ separator }}</span>
-              <span
-                ><span class="text-text-body" :class="breakdownSummary.mono ? 'font-mono' : ''">{{
-                  item.value
-                }}</span>
-                {{ item.pct }}</span
-              >
-            </template>
-            <template v-if="breakdownSummary.from">
-              <span aria-hidden="true">{{ separator }}</span>
-              <span>{{
-                t("rum.analytics.funnel.summaryFromStep", { step: breakdownSummary.from })
-              }}</span>
-            </template>
-          </span>
           <span
             v-if="usersMode && result && result.step1Sessions !== null"
             class="text-text-secondary flex items-center gap-1 px-4 text-xs"
@@ -604,6 +619,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import {
   computed,
   defineAsyncComponent,
+  nextTick,
   onActivated,
   onBeforeUnmount,
   onDeactivated,
@@ -615,7 +631,8 @@ import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OTag from "@/lib/core/Badge/OTag.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
+import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
@@ -657,7 +674,6 @@ import useAppFilterCounts from "@/composables/rum/useAppFilterCounts";
 import useFunnelTrend from "@/composables/rum/useFunnelTrend";
 import useFunnelFieldSample from "@/composables/rum/useFunnelFieldSample";
 import FunnelLayoutRail from "@/components/rum/productAnalytics/funnelLayouts/rail/FunnelLayoutRail.vue";
-import type { FunnelLayoutSetting } from "@/components/rum/productAnalytics/funnelLayouts/types";
 import { PA_ROUTES } from "@/utils/rum/productAnalyticsRoutes";
 import useAnalyticsSearch, { type PanelState } from "@/composables/rum/useAnalyticsSearch";
 import useNamedEvents from "@/composables/rum/useNamedEvents";
@@ -700,6 +716,7 @@ import {
   stepLabel,
 } from "@/utils/rum/productAnalyticsPanels";
 import {
+  changeDirection,
   compareAllowed,
   compareBreakdown,
   compareFunnel,
@@ -708,6 +725,7 @@ import {
   previousWindow,
   type BreakdownCompareState,
   type FunnelCompareView,
+  type RateChange,
   type UsWindow,
 } from "@/utils/rum/funnelCompare";
 import { requestAlertCreation } from "@/composables/alerts/useAlertCreation";
@@ -786,12 +804,34 @@ const usersTooltip = computed<I18nText | undefined>(() => {
     : undefined;
 });
 
+const windowLengths = computed<Record<Exclude<FunnelWindow, "session">, I18nText>>(() => ({
+  "1h": t("rum.analytics.funnel.window1h"),
+  "1d": t("rum.analytics.funnel.window1d"),
+  "7d": t("rum.analytics.funnel.window7d"),
+}));
+
 const windowOptions = computed(() => [
   { label: t("rum.analytics.funnel.windowSession"), value: "session" },
-  { label: t("rum.analytics.funnel.window1h"), value: "1h" },
-  { label: t("rum.analytics.funnel.window1d"), value: "1d" },
-  { label: t("rum.analytics.funnel.window7d"), value: "7d" },
+  ...(Object.entries(windowLengths.value) as [FunnelWindow, I18nText][]).map(([value, w]) => ({
+    label: t("rum.analytics.funnel.windowOfStep1", { window: w }),
+    value,
+  })),
 ]);
+
+const windowBadge = computed<I18nText | null>(() => {
+  const w = effectiveDef.value.window;
+  return w === "session"
+    ? null
+    : t("rum.analytics.funnel.headlineWithin", { window: windowLengths.value[w] });
+});
+
+// Same rules as FunnelChangeCell: low volume outranks the direction.
+const changeTone = (c: RateChange): BadgeVariant => {
+  if (c.lowVolume) return "default-soft";
+  const d = changeDirection(c);
+  if (d === "up") return "success-soft";
+  return d === "down" ? "error-soft" : "default-soft";
+};
 
 const dimLabels = computed<Record<BreakdownDim, I18nText>>(() => ({
   browser: t("rum.analytics.funnel.dims.browser"),
@@ -808,8 +848,6 @@ const breakdownDims = computed(() =>
     .filter((d) => (d === "app" ? !!pa.scope.value.apps?.length : pa.schema.value[DIMENSIONS[d]]))
     .map((d) => ({ dim: d, label: dimLabels.value[d] })),
 );
-
-const separator = raw("·");
 
 const dimLabel = computed(() => {
   const b = def.value.breakdown;
@@ -857,18 +895,6 @@ const breakdownMissingNote = computed<I18nText | null>(() => {
     field: dimLabel.value,
     unit: unitNoun.value,
   });
-});
-
-// The values' conversion in one line under the toolbar, so the answer shows before the table is scrolled to.
-const breakdownSummary = computed(() => {
-  const fold = breakdown.value;
-  if (!fold || trend.shown.value) return null;
-  const items = fold.rows
-    .filter((r) => r.value !== null)
-    .map((r) => ({ value: r.value as string, pct: pct(r.conversion) }));
-  if (!items.length) return null;
-  const from = fold.start && !fold.start.anyStep && fold.start.step > 1 ? fold.start.step : null;
-  return { items, from, mono: !!fold.start };
 });
 
 const stepNames = computed(() =>
@@ -1025,22 +1051,6 @@ const why = computed<WhyLines | null>(() => {
     hasFilters: !!def.value.f?.length,
   });
 });
-
-const layoutSettings = computed<FunnelLayoutSetting[]>(() => [
-  { id: "unit", label: t("rum.analytics.funnel.countBy"), value: unitLabel.value },
-  {
-    id: "window",
-    label: t("rum.analytics.funnel.railWindow"),
-    value:
-      windowOptions.value.find((o) => o.value === effectiveDef.value.window)?.label ??
-      t("rum.analytics.funnel.windowSession"),
-  },
-  {
-    id: "breakdown",
-    label: t("rum.analytics.funnel.railBreakdown"),
-    value: def.value.breakdown ? dimLabel.value : t("rum.analytics.funnel.noBreakdown"),
-  },
-]);
 
 const firstUnits = computed(() => result.value?.steps[0]?.units ?? 0);
 const lastUnits = computed(() => result.value?.steps[result.value.steps.length - 1]?.units ?? 0);
@@ -1422,9 +1432,24 @@ const breakDownBy = (field: string) =>
   applyDef({ ...removeFilter(def.value, field), breakdown: { f: field } });
 
 const breakdownControl = ref<InstanceType<typeof FunnelBreakdownControl> | null>(null);
+const rail = ref<InstanceType<typeof FunnelLayoutRail> | null>(null);
+const railCollapsed = computed(() => !!rail.value?.collapsed);
+
+// Below lg the rail never collapses; it stacks above the card, so the section may be off screen.
+const revealBreakdownSection = () => {
+  rail.value?.expand();
+  (breakdownControl.value?.$el as HTMLElement | undefined)?.scrollIntoView?.({ block: "nearest" });
+};
+
+const showBreakdownSection = async () => {
+  revealBreakdownSection();
+  await nextTick();
+  breakdownControl.value?.focus();
+};
 
 // The step menu closes and hands focus back to its button first, which would dismiss a picker opened in the same tick.
 const breakDownAtStep = (step: number) => {
+  revealBreakdownSection();
   setTimeout(() => breakdownControl.value?.openForStep(step), MENU_CLOSE_MS);
 };
 

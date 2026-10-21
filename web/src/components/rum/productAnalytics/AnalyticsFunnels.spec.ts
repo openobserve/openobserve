@@ -76,6 +76,7 @@ import useProductAnalytics, { resetProductAnalytics } from "@/composables/rum/us
 import AnalyticsFunnels from "./AnalyticsFunnels.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import i18n from "@/locales";
 import { assertJoinFree } from "@/utils/rum/productAnalyticsQueries";
@@ -441,7 +442,8 @@ describe("AnalyticsFunnels", () => {
     expect(
       wrapper!.find('[data-test="rum-analytics-funnel-count-by-users"]').attributes("disabled"),
     ).toBeDefined();
-    expect(wrapper!.find('[data-test="rum-analytics-funnel-window-fixed"]').exists()).toBe(true);
+    expect(wrapper!.find('[data-test="rum-analytics-funnel-window-fixed"]').exists()).toBe(false);
+    expect(wrapper!.find('[data-test="rum-analytics-funnel-window-select"]').exists()).toBe(false);
     await wrapper!.find('[data-test="rum-analytics-funnel-identity-hint-link"]').trigger("click");
     await flushPromises();
     expect(router.currentRoute.value.name).toBe("productAnalyticsRetention");
@@ -609,7 +611,8 @@ describe("AnalyticsFunnels", () => {
     expect(text("rum-analytics-funnel-step-0-time")).toBe("—");
     expect(text("rum-analytics-funnel-step-1-time")).toContain("24 s");
     expect(text("rum-analytics-funnel-step-1-time")).toContain("2.0 min");
-    expect(text("rum-analytics-funnel-overall-time")).toContain("36 s");
+    expect(text("rum-analytics-funnel-overall-median")).toBe("median 36 s to convert");
+    expect(text("rum-analytics-funnel-overall-p90")).toBe("p90 3.0 min");
   });
 
   it("splits by a breakdown dimension into rows summing to the total and keeps it in the URL (AC-47)", async () => {
@@ -629,8 +632,8 @@ describe("AnalyticsFunnels", () => {
     expect(text("rum-analytics-funnel-breakdown")).toContain("200");
     expect(funnelSqls().at(-1)).toContain("AS mt1");
     expect(wrapper!.text()).not.toContain("Time to convert is shown");
-    expect(text("rum-analytics-funnel-breakdown-summary")).toMatch(
-      /^Chrome 40\.0%\s*·\s*Firefox 40\.0%$/,
+    expect(wrapper!.find('[data-test="rum-analytics-funnel-breakdown-summary"]').exists()).toBe(
+      false,
     );
     expect(wrapper!.find('[data-test="rum-analytics-funnel-step-1-time"]').exists()).toBe(false);
     expect((decodeDef(router.currentRoute.value.query.funnel as string) as { b: string }).b).toBe(
@@ -2209,7 +2212,7 @@ describe("AnalyticsFunnels", () => {
       });
     });
 
-    it("a step menu's break-down opens the toolbar picker on that step's fields and pins the pick", async () => {
+    it("a step menu's break-down opens the rail's Breakdown picker on that step's fields and pins the pick", async () => {
       const PAY = "context_payment_method";
       withSchema(["usr_email", PAY]);
       routes = [[/AS s1, ROW_NUMBER\(\) OVER/, [{ s1: 0, s2: 1, [PAY]: "card" }]], ...baseRoutes()];
@@ -2219,13 +2222,38 @@ describe("AnalyticsFunnels", () => {
       layout().vm.$emit("load-fields");
       layout().vm.$emit("break-down-step", 2);
       await settle();
-      const picker = wrapper!.find('[data-test="rum-analytics-funnel-field-picker"]');
+      const picker = wrapper!
+        .find("aside")
+        .find('[data-test="rum-analytics-funnel-breakdown-section"]')
+        .find('[data-test="rum-analytics-funnel-field-picker"]');
       expect(picker.text()).toContain("On step 2 (1)");
       await wrapper!
         .find(`[data-test="rum-analytics-funnel-field-picker-field-${PAY}"]`)
         .trigger("click");
       await settle();
       expect(useProductAnalytics().funnel.value.breakdown).toEqual({ f: PAY, s: 2 });
+    });
+
+    it("a step menu's break-down expands a collapsed rail first, then opens the picker on that step", async () => {
+      const PAY = "context_payment_method";
+      withSchema(["usr_email", PAY]);
+      routes = [[/AS s1, ROW_NUMBER\(\) OVER/, [{ s1: 0, s2: 1, [PAY]: "card" }]], ...baseRoutes()];
+      respond();
+      window.localStorage.setItem("o2.rum.analytics.funnelRailCollapsed", "1");
+      await mountFunnels();
+      await twoSteps();
+      const toggle = () => wrapper!.find('[data-test="rum-analytics-funnel-rail-collapse-btn"]');
+      expect(toggle().attributes("aria-expanded")).toBe("false");
+      layout().vm.$emit("load-fields");
+      layout().vm.$emit("break-down-step", 2);
+      await settle();
+      expect(toggle().attributes("aria-expanded")).toBe("true");
+      const section = wrapper!
+        .find("aside")
+        .find('[data-test="rum-analytics-funnel-breakdown-section"]');
+      expect(section.find('[data-test="rum-analytics-funnel-field-picker"]').text()).toContain(
+        "On step 2 (1)",
+      );
     });
 
     it("Why N? runs its own query only when opened, and its lines add up to the entry count", async () => {
@@ -2310,6 +2338,235 @@ describe("AnalyticsFunnels", () => {
         queries: { query: string }[];
       }[];
       expect(panels[0].queries[0].query).not.toContain("env IN");
+    });
+  });
+
+  describe("toolbar and rail: count, window, breakdown section, headline badges", () => {
+    const at = (dt: string) => wrapper!.find(`[data-test="${dt}"]`);
+    const controls = () => at("rum-analytics-funnel-toolbar-controls");
+    const badge = (dt: string) =>
+      wrapper!.findAllComponents(OBadge).find((b) => b.attributes("data-test") === dt);
+    const threeSteps = async () => {
+      await setSteps([
+        ["p", "/a"],
+        ["c", "b"],
+        ["p", "/c"],
+      ]);
+    };
+    const patch = async (d: Record<string, unknown>) => {
+      const pa = useProductAnalytics();
+      pa.funnel.value = { ...pa.funnel.value, ...d };
+      await settle();
+    };
+    const COLLAPSED_KEY = "o2.rum.analytics.funnelRailCollapsed";
+    const BREAKDOWN_SECTION = '[data-test="rum-analytics-funnel-breakdown-section"]';
+    const follows = (a: Element, b: Element) =>
+      !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+
+    it("reads View as and Count by, with Compare to pushed to the end; Sessions has no window control", async () => {
+      await mountFunnels();
+      await threeSteps();
+      const row = controls();
+      expect(row.text()).toContain("View as");
+      expect(row.text()).toContain("Count by");
+      expect(at("rum-analytics-funnel-window-select").exists()).toBe(false);
+      expect(at("rum-analytics-funnel-window-fixed").exists()).toBe(false);
+      expect(row.text()).not.toContain("Same session");
+      expect(row.text()).not.toContain("who finish steps in");
+      const compare = row.find('[data-test="rum-analytics-funnel-compare"]');
+      expect(compare.classes()).toContain("ms-auto");
+      expect(row.element.lastElementChild).toBe(compare.element);
+    });
+
+    it("Visitors adds who finish steps in after Count by, its menu naming what each clock starts from", async () => {
+      await mountFunnels();
+      await threeSteps();
+      await at("rum-analytics-funnel-count-by-users").trigger("click");
+      await settle();
+      expect(controls().text()).toContain("who finish steps in");
+      const select = wrapper!.findComponent('[data-test="rum-analytics-funnel-window-select"]');
+      expect(select.exists()).toBe(true);
+      expect(follows(at("rum-analytics-funnel-count-by").element, select.element)).toBe(true);
+      const options = select.props("options") as { label: string; value: string }[];
+      expect(options.map((o) => [String(o.label), o.value])).toEqual([
+        ["the same session · one visit", "session"],
+        ["1 hour · of step 1", "1h"],
+        ["1 day · of step 1", "1d"],
+        ["7 days · of step 1", "7d"],
+      ]);
+    });
+
+    it("Breakdown is the rail's first section, not a toolbar control, and its + sets the breakdown", async () => {
+      await mountFunnels();
+      await threeSteps();
+      expect(controls().find('[data-test="rum-analytics-funnel-breakdown-select"]').exists()).toBe(
+        false,
+      );
+      expect(controls().find(BREAKDOWN_SECTION).exists()).toBe(false);
+      const aside = wrapper!.find("aside");
+      const section = aside.find(BREAKDOWN_SECTION);
+      expect(section.exists()).toBe(true);
+      expect(
+        follows(
+          section.element,
+          aside.find('[data-test="rum-analytics-funnel-filter-all"]').element,
+        ),
+      ).toBe(true);
+      await section.find('[data-test="rum-analytics-funnel-add-breakdown-btn"]').trigger("click");
+      await settle();
+      await section
+        .find('[data-test="rum-analytics-funnel-field-picker-dim-browser"]')
+        .trigger("click");
+      await settle();
+      expect(useProductAnalytics().funnel.value.breakdown).toBe("browser");
+      expect(aside.find('[data-test="rum-analytics-funnel-breakdown-chip"]').text()).toContain(
+        "Browser",
+      );
+    });
+
+    it("the Sessions headline shows count, median and p90 as badges, then Why N?", async () => {
+      await mountFunnels();
+      await threeSteps();
+      const ids = [
+        "rum-analytics-funnel-overall-count",
+        "rum-analytics-funnel-overall-median",
+        "rum-analytics-funnel-overall-p90",
+      ];
+      for (const id of ids) {
+        expect(badge(id)?.props("variant")).toBe("default-soft");
+        expect(badge(id)?.props("size")).toBe("sm");
+      }
+      expect(text("rum-analytics-funnel-overall-count")).toBe("40 of 200 sessions");
+      expect(at("rum-analytics-funnel-overall-window").exists()).toBe(false);
+      expect(at("rum-analytics-funnel-overall-breakdown").exists()).toBe(false);
+      const order = at("rum-analytics-funnel-overall")
+        .findAll("[data-test]")
+        .map((e) => e.attributes("data-test"))
+        .filter((id) => [...ids, "rum-analytics-funnel-why-btn"].includes(id!));
+      expect(order).toEqual([...ids, "rum-analytics-funnel-why-btn"]);
+    });
+
+    it("Visitors with a window adds within 1 day of step 1, and the same-session window adds none", async () => {
+      await mountFunnels();
+      await threeSteps();
+      await patch({ unit: "users", window: "1d" });
+      expect(badge("rum-analytics-funnel-overall-window")?.props("variant")).toBe("default-soft");
+      expect(text("rum-analytics-funnel-overall-window")).toBe("within 1 day of step 1");
+      expect(
+        follows(
+          at("rum-analytics-funnel-overall-count").element,
+          at("rum-analytics-funnel-overall-window").element,
+        ),
+      ).toBe(true);
+      expect(at("rum-analytics-funnel-why-btn").exists()).toBe(false);
+      await patch({ window: "session" });
+      expect(at("rum-analytics-funnel-overall-window").exists()).toBe(false);
+    });
+
+    it("a breakdown adds a clickable by-field badge tied to the rail, and drops median and p90", async () => {
+      await mountFunnels();
+      await threeSteps();
+      await patch({ breakdown: "browser" });
+      const by = badge("rum-analytics-funnel-overall-breakdown")!;
+      expect(by).toBeDefined();
+      expect(by.text()).toMatch(/^by Browser$/i);
+      expect(by.props("clickable")).toBe(true);
+      expect(by.props("variant")).toBe("primary-soft");
+      expect(by.element.tagName).toBe("BUTTON");
+      expect(by.attributes("aria-expanded")).toBe("true");
+      expect(at("rum-analytics-funnel-overall-median").exists()).toBe(false);
+      expect(at("rum-analytics-funnel-overall-p90").exists()).toBe(false);
+      await at("rum-analytics-funnel-rail-collapse-btn").trigger("click");
+      expect(at("rum-analytics-funnel-overall-breakdown").attributes("aria-expanded")).toBe(
+        "false",
+      );
+    });
+
+    it("the by-field badge expands a collapsed rail and moves focus to the Breakdown section", async () => {
+      window.localStorage.setItem(COLLAPSED_KEY, "1");
+      await mountFunnels();
+      await threeSteps();
+      await patch({ breakdown: "browser" });
+      const toggle = () => at("rum-analytics-funnel-rail-collapse-btn");
+      expect(toggle().attributes("aria-expanded")).toBe("false");
+      await at("rum-analytics-funnel-overall-breakdown").trigger("click");
+      await settle();
+      expect(toggle().attributes("aria-expanded")).toBe("true");
+      expect(at("rum-analytics-funnel-overall-breakdown").attributes("aria-expanded")).toBe("true");
+      const section = wrapper!.find("aside").find(BREAKDOWN_SECTION).element;
+      expect(section.contains(document.activeElement)).toBe(true);
+    });
+
+    it("the by-field badge on an expanded rail keeps it expanded and moves focus to the Breakdown section", async () => {
+      await mountFunnels();
+      await threeSteps();
+      await patch({ breakdown: "browser" });
+      const toggle = () => at("rum-analytics-funnel-rail-collapse-btn");
+      expect(toggle().attributes("aria-expanded")).toBe("true");
+      await at("rum-analytics-funnel-overall-breakdown").trigger("click");
+      await settle();
+      expect(toggle().attributes("aria-expanded")).toBe("true");
+      expect(at("rum-analytics-funnel-overall-breakdown").attributes("aria-expanded")).toBe("true");
+      const section = wrapper!.find("aside").find(BREAKDOWN_SECTION).element;
+      expect(section.contains(document.activeElement)).toBe(true);
+    });
+
+    it("the by-field badge still shows in Trend view", async () => {
+      await mountFunnels();
+      await threeSteps();
+      await patch({ breakdown: "browser" });
+      await at("rum-analytics-funnel-view-trend").trigger("click");
+      await settle();
+      expect(router.currentRoute.value.query.fv).toBe("trend");
+      expect(text("rum-analytics-funnel-overall-breakdown")).toMatch(/^by Browser$/i);
+    });
+
+    it("orders the badges count, window, breakdown, change for Visitors with a window, a breakdown and compare", async () => {
+      await mountFunnels({ fc: "prev" });
+      await threeSteps();
+      await patch({ unit: "users", window: "1d", breakdown: "browser" });
+      const ids = ["count", "window", "breakdown", "change"].map(
+        (k) => `rum-analytics-funnel-overall-${k}`,
+      );
+      const order = at("rum-analytics-funnel-overall")
+        .findAll("[data-test]")
+        .map((e) => e.attributes("data-test"))
+        .filter((id) => ids.includes(id!));
+      expect(order).toEqual(ids);
+    });
+
+    it("the by-field badge and a step menu's break-down scroll the Breakdown section into view", async () => {
+      const scroll = vi.fn();
+      Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+        configurable: true,
+        value: scroll,
+      });
+      try {
+        await mountFunnels();
+        await threeSteps();
+        await patch({ breakdown: "browser" });
+        const section = () => wrapper!.find("aside").find(BREAKDOWN_SECTION).element;
+        await at("rum-analytics-funnel-overall-breakdown").trigger("click");
+        await settle();
+        expect(scroll).toHaveBeenCalledWith({ block: "nearest" });
+        expect(scroll.mock.contexts.at(-1)).toBe(section());
+        scroll.mockClear();
+        wrapper!.findComponent({ name: "FunnelLayoutRail" }).vm.$emit("break-down-step", 2);
+        await settle();
+        expect(scroll).toHaveBeenCalledWith({ block: "nearest" });
+        expect(scroll.mock.contexts.at(-1)).toBe(section());
+      } finally {
+        delete (HTMLElement.prototype as { scrollIntoView?: unknown }).scrollIntoView;
+      }
+    });
+
+    it("shows no breakdown values line above the steps table", async () => {
+      await mountFunnels();
+      await threeSteps();
+      await patch({ breakdown: "browser" });
+      expect(text("rum-analytics-funnel-breakdown-row-0")).toContain("Chrome");
+      expect(at("rum-analytics-funnel-breakdown-summary").exists()).toBe(false);
+      expect(wrapper!.text()).not.toMatch(/Chrome 40\.0%\s*·\s*Firefox/);
     });
   });
 
@@ -2431,6 +2688,39 @@ describe("AnalyticsFunnels", () => {
       const funnelRuns = calls().filter((q) => isFunnel(q.sql));
       expect(funnelRuns.at(-1)!.end_time).toBe(useProductAnalytics().range.value!.startUs);
       expect(funnelRuns.at(-2)!.end_time).toBe(useProductAnalytics().range.value!.endUs);
+    });
+
+    it.each([
+      ["down", [100, 60, 30], "error-soft"],
+      ["up", [100, 60, 10], "success-soft"],
+      ["low volume", [10, 6, 3], "default-soft"],
+    ] as const)(
+      "the headline change is a badge toned by its direction (%s)",
+      async (kind, counts, tone) => {
+        answerPrevious(prevHit([...counts]));
+        await mountFunnels({ fc: "prev" });
+        await setSteps(threeSteps);
+        const change = wrapper!
+          .findAllComponents(OBadge)
+          .find((b) => b.attributes("data-test") === "rum-analytics-funnel-overall-change");
+        expect(change?.props("variant")).toBe(tone);
+        expect(change?.props("size")).toBe("sm");
+        if (kind === "low volume") expect(change!.text()).toMatch(/low volume/i);
+      },
+    );
+
+    it("the headline change badge keeps its ±CI tooltip", async () => {
+      answerPrevious(prevHit([100, 60, 30]));
+      await mountFunnels({ fc: "prev" });
+      await setSteps(threeSteps);
+      const headline = wrapper!.find('[data-test="rum-analytics-funnel-overall"]').element;
+      const change = wrapper!.find('[data-test="rum-analytics-funnel-overall-change"]');
+      expect(change.exists()).toBe(true);
+      const tips = wrapper!
+        .findAllComponents(OTooltip)
+        .filter((t) => headline.contains(t.element))
+        .map((t) => String(t.props("content")));
+      expect(tips.some((c) => /95% interval: ±/.test(c))).toBe(true);
     });
 
     it("a one-step funnel shows only the current range in the headline", async () => {

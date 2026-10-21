@@ -66,7 +66,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="rum-analytics-funnel-filter-notice-break-down"
             @click="emit('break-down', notice.field)"
             >{{
-              t("rum.analytics.funnel.filterNoticeAction", { field: raw(notice.field) })
+              t(
+                def.breakdown
+                  ? "rum.analytics.funnel.breakdownReplace"
+                  : "rum.analytics.funnel.filterNoticeAction",
+                { field: raw(notice.field) },
+              )
             }}</OButton
           >
         </template>

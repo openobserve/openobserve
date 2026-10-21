@@ -40,6 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="flex h-full min-w-0 flex-col gap-4 lg:overflow-y-auto lg:py-3"
           data-test="rum-analytics-funnel-rail-sections"
         >
+          <slot name="breakdown" />
           <FunnelFilterBar
             :def="def"
             :fields="filterFields"
@@ -74,24 +75,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @edit="emit('edit-app-filters')"
             />
           </div>
-          <FunnelSectionRow
-            :title="t('rum.analytics.funnel.railSettings')"
-            stacked
-            boxed
-            test-id="rum-analytics-funnel-rail-settings"
-          >
-            <template v-for="(s, i) in settings" :key="s.id">
-              <span v-if="i > 0" class="text-text-secondary" aria-hidden="true">{{
-                separator
-              }}</span>
-              <span
-                class="text-text-secondary"
-                :title="s.label"
-                :data-test="`rum-analytics-funnel-rail-setting-${s.id}`"
-                >{{ s.value }}</span
-              >
-            </template>
-          </FunnelSectionRow>
         </aside>
       </template>
       <template #separator>
@@ -217,7 +200,6 @@ import FunnelStepsTable from "@/components/rum/productAnalytics/funnelParts/Funn
 import FunnelAddStep from "@/components/rum/productAnalytics/funnelParts/FunnelAddStep.vue";
 import ExclusionSection from "@/components/rum/productAnalytics/funnelParts/ExclusionSection.vue";
 import FunnelFilterBar from "@/components/rum/productAnalytics/funnelParts/FunnelFilterBar.vue";
-import FunnelSectionRow from "@/components/rum/productAnalytics/funnelParts/FunnelSectionRow.vue";
 import AppFiltersSummary from "@/components/rum/productAnalytics/funnelParts/AppFiltersSummary.vue";
 import { removedByStep } from "@/components/rum/productAnalytics/funnelParts/funnelEdits";
 import type {
@@ -225,7 +207,7 @@ import type {
   FunnelLayoutProps,
   FunnelLayoutSlots,
 } from "@/components/rum/productAnalytics/funnelLayouts/types";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { useI18nTyped } from "@/types/i18n";
 
 defineOptions({ name: "FunnelLayoutRail" });
 
@@ -233,7 +215,6 @@ const props = defineProps<FunnelLayoutProps>();
 const emit = defineEmits<FunnelLayoutEmits>();
 defineSlots<FunnelLayoutSlots>();
 const { t } = useI18nTyped();
-const separator = raw("·");
 const COLLAPSED_KEY = "o2.rum.analytics.funnelRailCollapsed";
 const WIDTH_KEY = "o2.rum.analytics.funnelRailWidth";
 // Widths in rem, measured: below 17 the rail's switch label wraps; past 30 no chip gains anything.
@@ -267,6 +248,10 @@ const toggleCollapsed = () => {
   } catch {
     // Non-fatal; the state just does not persist.
   }
+};
+
+const expand = () => {
+  if (collapsed.value) toggleCollapsed();
 };
 
 const rem = () => parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
@@ -325,4 +310,6 @@ watch(
     if (n > was) adding.value = false;
   },
 );
+
+defineExpose({ expand, collapsed: computed(() => collapsed.value) });
 </script>

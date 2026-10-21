@@ -14,8 +14,9 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { afterEach, describe, expect, it } from "vitest";
-import { mount, type VueWrapper } from "@vue/test-utils";
+import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import FunnelBreakdownControl from "./FunnelBreakdownControl.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { BreakdownStart } from "@/utils/rum/productAnalyticsModel";
 import type { FieldSample } from "@/utils/rum/funnelFields";
 import type { FunnelDef } from "@/utils/rum/productAnalyticsQueries";
@@ -43,7 +44,7 @@ const START: BreakdownStart = {
   auto: 2,
 };
 const popoverStub = {
-  props: ["open"],
+  props: ["open", "side"],
   emits: ["update:open"],
   template:
     '<div><div @click="$emit(\'update:open\', !open)"><slot name="trigger" /></div><slot v-if="open" /></div>',
@@ -83,26 +84,49 @@ const mountControl = (props: Record<string, unknown> = {}) => {
   });
   return wrapper;
 };
+const SECTION = "rum-analytics-funnel-breakdown-section";
+const ADD = "rum-analytics-funnel-add-breakdown-btn";
+const CHIP = "rum-analytics-funnel-breakdown-chip";
+const PICKER = "rum-analytics-funnel-field-picker";
 const openPicker = async (w: VueWrapper) => {
-  await w.find(dt("rum-analytics-funnel-breakdown-select")).trigger("click");
+  await w.find(dt(ADD)).trigger("click");
+};
+const openForStep = async (w: VueWrapper, k: number) => {
+  (w.vm as unknown as { openForStep: (k: number) => void }).openForStep(k);
+  await w.vm.$nextTick();
 };
 const row = (w: VueWrapper, id: string) => w.find(dt(`rum-analytics-funnel-field-picker-${id}`));
 const lastDef = (w: VueWrapper) => (w.emitted("update:def") as [FunnelDef][]).at(-1)![0];
+const removeBtn = (w: VueWrapper) => w.find(dt(CHIP)).find('button[aria-label="Remove breakdown"]');
 
-describe("FunnelBreakdownControl", () => {
-  it("reads Breakdown: None and asks for the step fields when the picker opens", async () => {
+describe("FunnelBreakdownControl, the rail's Breakdown section", () => {
+  it("is a titled section with a caption and a +, with no chip and no toolbar select", () => {
     const w = mountControl();
-    expect(w.find(dt("rum-analytics-funnel-breakdown-select")).text()).toMatch(
-      /^Breakdown:\s*None$/,
-    );
+    const section = w.find(dt(SECTION));
+    expect(section.exists()).toBe(true);
+    expect(section.text()).toContain("Breakdown");
+    expect(
+      section
+        .find('[aria-label="Split every step by one field, such as browser or payment method"]')
+        .exists(),
+    ).toBe(true);
+    expect(section.find(dt(ADD)).exists()).toBe(true);
+    expect(w.find(dt("rum-analytics-funnel-breakdown-select")).exists()).toBe(false);
+    expect(w.find(dt(CHIP)).exists()).toBe(false);
+  });
+
+  it("the + opens the picker beside the rail and asks for the step fields", async () => {
+    const w = mountControl();
     await openPicker(w);
+    expect(w.find(dt(PICKER)).exists()).toBe(true);
     expect(w.emitted("load-fields")).toHaveLength(1);
+    expect(w.findComponent(popoverStub).props("side")).toBe("right");
   });
 
   it("bands fields: on these steps with step and values, key fields, user disabled, and all fields", async () => {
     const w = mountControl();
     await openPicker(w);
-    const text = w.find(dt("rum-analytics-funnel-field-picker")).text();
+    const text = w.find(dt(PICKER)).text();
     expect(text).toContain("On these steps (1)");
     expect(text).toContain("Key fields (1)");
     expect(text).toContain("User (1)");
@@ -119,7 +143,7 @@ describe("FunnelBreakdownControl", () => {
     expect(row(w, "dim-browser").exists()).toBe(false);
     await row(w, `field-${PAY}`).trigger("click");
     expect(lastDef(w).breakdown).toEqual({ f: PAY });
-    expect(w.find(dt("rum-analytics-funnel-field-picker")).exists()).toBe(false);
+    expect(w.find(dt(PICKER)).exists()).toBe(false);
   });
 
   it("picking a key field keeps today's built-in breakdown", async () => {
@@ -136,12 +160,57 @@ describe("FunnelBreakdownControl", () => {
     expect(w.emitted("update:def")).toBeUndefined();
   });
 
-  it("after a pick shows the field and From step k, whose menu writes bs or goes back to automatic", async () => {
+  it("a set breakdown is one chip; the + is greyed with One breakdown at a time", async () => {
+    const w = mountControl({ def: { ...DEF, breakdown: "browser" } });
+    expect(w.find(dt(CHIP)).text()).toContain("Browser");
+    const add = w.find(dt(ADD));
+    expect(add.attributes("disabled")).toBeDefined();
+    expect(
+      w.findAllComponents(OTooltip).some((c) => c.props("content") === "One breakdown at a time"),
+    ).toBe(true);
+    await add.trigger("click");
+    expect(w.find(dt(PICKER)).exists()).toBe(false);
+  });
+
+  it("clicking the chip reopens the picker to change the field", async () => {
+    const w = mountControl({ def: { ...DEF, breakdown: "browser" } });
+    await w.find(dt(CHIP)).trigger("click");
+    expect(w.find(dt(PICKER)).exists()).toBe(true);
+    expect(w.emitted("load-fields")).toHaveLength(1);
+    await row(w, `field-${PAY}`).trigger("click");
+    expect(lastDef(w).breakdown).toEqual({ f: PAY });
+  });
+
+  it("keeps keyboard focus in the section after a pick and after a remove", async () => {
+    const w: VueWrapper = mountControl({
+      "onUpdate:def": (d: FunnelDef) => w.setProps({ def: d }),
+    });
+    await openPicker(w);
+    await row(w, "dim-browser").trigger("click");
+    await flushPromises();
+    expect(document.activeElement).toBe(w.find(dt(CHIP)).element);
+    await removeBtn(w).trigger("click");
+    await flushPromises();
+    expect(document.activeElement).toBe(w.find(dt(ADD)).element);
+  });
+
+  it("the chip's remove control clears the breakdown", async () => {
+    const w = mountControl({ def: { ...DEF, breakdown: "browser" } });
+    expect(removeBtn(w).exists()).toBe(true);
+    await removeBtn(w).trigger("click");
+    expect(lastDef(w).breakdown).toBeNull();
+    expect(w.find(dt(PICKER)).exists()).toBe(false);
+  });
+
+  it("a field breakdown shows Value from under the chip, writing bs or going back to automatic", async () => {
     const w = mountControl({ def: { ...DEF, breakdown: { f: PAY } }, start: START });
-    expect(w.find(dt("rum-analytics-funnel-breakdown-select")).text()).toMatch(
-      new RegExp(`^Breakdown:\\s*${PAY}$`),
-    );
-    expect(w.find(dt("rum-analytics-funnel-breakdown-from-step")).text()).toBe("From step 2");
+    expect(w.find(dt(CHIP)).text()).toContain(PAY);
+    const from = w.find(dt("rum-analytics-funnel-breakdown-from-step"));
+    expect(from.text()).toBe("From step 2");
+    expect(
+      w.find(dt(CHIP)).element.compareDocumentPosition(from.element) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
     expect(w.find(dt("rum-analytics-funnel-breakdown-from-auto")).text()).toBe(
       "Automatic (step 2)",
     );
@@ -165,34 +234,27 @@ describe("FunnelBreakdownControl", () => {
     );
   });
 
-  it("a built-in breakdown has no From step menu, and the clear removes any breakdown", async () => {
+  it("a key-field breakdown has no Value from", () => {
     const w = mountControl({ def: { ...DEF, breakdown: "browser" } });
-    expect(w.find(dt("rum-analytics-funnel-breakdown-select")).text()).toMatch(
-      /^Breakdown:\s*Browser$/,
-    );
     expect(w.find(dt("rum-analytics-funnel-breakdown-from-step")).exists()).toBe(false);
-    await w.find(dt("rum-analytics-funnel-breakdown-clear")).trigger("click");
-    expect(lastDef(w).breakdown).toBeNull();
   });
 
   it("opened for a step, lists only that step's fields and pins the pick to it", async () => {
     const w = mountControl();
-    (w.vm as unknown as { openForStep: (k: number) => void }).openForStep(3);
-    await w.vm.$nextTick();
-    const text = w.find(dt("rum-analytics-funnel-field-picker")).text();
+    await openForStep(w, 3);
+    const text = w.find(dt(PICKER)).text();
     expect(text).toContain("On step 3 (1)");
     expect(text).not.toContain("Key fields");
     expect(row(w, `field-${PAY}`).text()).toContain("card, upi, cod +1");
     await row(w, `field-${PAY}`).trigger("click");
     expect(lastDef(w).breakdown).toEqual({ f: PAY, s: 3 });
     await openPicker(w);
-    expect(w.find(dt("rum-analytics-funnel-field-picker")).text()).toContain("Key fields");
+    expect(w.find(dt(PICKER)).text()).toContain("Key fields");
   });
 
   it("opened for a step the sample saw nothing on, says so", async () => {
     const w = mountControl();
-    (w.vm as unknown as { openForStep: (k: number) => void }).openForStep(1);
-    await w.vm.$nextTick();
+    await openForStep(w, 1);
     expect(w.find(dt("rum-analytics-funnel-field-picker-note")).text()).toBe(
       "No fields seen on this step",
     );
