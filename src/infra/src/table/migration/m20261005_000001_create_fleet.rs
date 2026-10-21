@@ -111,6 +111,7 @@ enum FleetTokens {
     Name,
     Prefix,
     TokenHash,
+    Token,
     Scope,
     ExpiresAt,
     MaxUses,
@@ -332,6 +333,7 @@ fn tokens_table() -> TableCreateStatement {
         .col(ColumnDef::new(T::Name).string_len(256).not_null())
         .col(ColumnDef::new(T::Prefix).string_len(9).not_null())
         .col(ColumnDef::new(T::TokenHash).string_len(64).not_null())
+        .col(ColumnDef::new(T::Token).string_len(128))
         .col(ColumnDef::new(T::Scope).string_len(32).not_null())
         .col(big(T::ExpiresAt))
         .col(big(T::MaxUses))
@@ -545,12 +547,13 @@ mod tests {
         "fleet_rollouts",
         "fleet_rollout_members",
     ];
-    const COLUMNS: [(&str, &str); 13] = [
+    const COLUMNS: [(&str, &str); 14] = [
         ("fleet_collectors", "fleet_id"),
         ("fleet_collectors", "heartbeats"),
         ("fleet_collectors", "assignment_rev"),
         ("fleet_collectors", "effective_config_version"),
         ("fleet_tokens", "fleet_id"),
+        ("fleet_tokens", "token"),
         ("fleet_configs", "live_version"),
         ("fleets", "stable_config_id"),
         ("fleets", "stable_config_version"),

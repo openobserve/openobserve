@@ -267,6 +267,8 @@ pub struct EnrollmentToken {
     pub max_uses: Option<i64>,
     pub fleet: CollectorFleet,
     pub revoked: bool,
+    /// The stored value; `None` on tokens created before values were kept.
+    pub token: Option<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, ToSchema)]
@@ -289,12 +291,11 @@ pub struct CreateTokenRequest {
     pub fleet: String,
 }
 
-/// The only response that carries the plaintext token.
+/// The created token, whose `token` field always carries the value.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, ToSchema)]
 pub struct CreatedToken {
     #[serde(flatten)]
     pub item: EnrollmentToken,
-    pub token: String,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, ToSchema)]
@@ -1147,8 +1148,8 @@ mod tests {
                     name: None,
                 },
                 revoked: false,
+                token: Some("o2ft_secret".to_string()),
             },
-            token: "o2ft_secret".to_string(),
         };
         let json = serde_json::to_value(&created).unwrap();
         assert_eq!(json["id"], "t1");

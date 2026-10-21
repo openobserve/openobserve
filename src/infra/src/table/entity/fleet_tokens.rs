@@ -24,6 +24,7 @@ pub struct Model {
     pub name: String,
     pub prefix: String,
     pub token_hash: String,
+    pub token: Option<String>,
     pub scope: String,
     pub expires_at: Option<i64>,
     pub max_uses: Option<i64>,
