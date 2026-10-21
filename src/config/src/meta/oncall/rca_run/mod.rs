@@ -36,9 +36,9 @@ pub use outcome::{EndedBy, OutcomeReason, derive_outcome};
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use serde_json::{Map, Value};
 pub use summary::{
-    RcaRunSummary, ShownChangeState, SummaryCard, SummaryHypothesis, SummaryStatusChange,
-    SummarySuspectChange, SummaryTimelineEntry, TimelineView, VerdictSoFar, VerdictSoFarLabel,
-    summary_from_record, summary_legacy, summary_live,
+    RcaRunSummary, ShownChangeState, SummaryCard, SummaryCause, SummaryHypothesis,
+    SummaryStatusChange, SummarySuspectChange, SummaryTimelineEntry, TimelineView, VerdictSoFar,
+    VerdictSoFarLabel, summary_from_record, summary_legacy, summary_live,
 };
 use utoipa::ToSchema;
 
@@ -180,6 +180,8 @@ pub enum TimelineStatus {
 #[serde(rename_all = "snake_case")]
 pub enum RcaOutcome {
     RootCauseIdentified,
+    /// Two or more independent root causes, each graded on its own evidence.
+    MultipleRootCauses,
     ContributingFactor,
     Inconclusive,
     Blocked,
@@ -190,6 +192,7 @@ impl RcaOutcome {
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::RootCauseIdentified => "root_cause_identified",
+            Self::MultipleRootCauses => "multiple_root_causes",
             Self::ContributingFactor => "contributing_factor",
             Self::Inconclusive => "inconclusive",
             Self::Blocked => "blocked",
@@ -1458,7 +1461,25 @@ mod tests {
                     shown: Some(Low),
                 },
                 Case {
-                    name: "T4",
+                    name: "T4 two root causes, each graded",
+                    calls: vec![
+                        with_metric(1, "h1", "root_cause", "decisive"),
+                        hyp(
+                            2,
+                            "h2",
+                            "root_cause",
+                            vec![decisive("e3", SQL, "SELECT * FROM app")],
+                        ),
+                    ],
+                    cause: named,
+                    ended_by: Agent,
+                    completed: true,
+                    graded: Some(Medium),
+                    outcome: Some((O::MultipleRootCauses, R::RootCausesGraded)),
+                    shown: Some(Medium),
+                },
+                Case {
+                    name: "T4 two root causes, one with no evidence",
                     calls: vec![
                         with_metric(1, "h1", "root_cause", "decisive"),
                         h(2, "h2", "root_cause"),
@@ -1467,7 +1488,31 @@ mod tests {
                     ended_by: Agent,
                     completed: true,
                     graded: Some(Low),
-                    outcome: Some((O::Inconclusive, R::AmbiguousCause)),
+                    outcome: Some((O::Inconclusive, R::CauseBelowMedium)),
+                    shown: Some(Low),
+                },
+                Case {
+                    name: "T4 two root causes, one below medium",
+                    calls: vec![
+                        with_metric(1, "h1", "root_cause", "decisive"),
+                        hyp(
+                            2,
+                            "h2",
+                            "root_cause",
+                            vec![item(
+                                "e3",
+                                SQL,
+                                "SELECT * FROM app",
+                                "supports",
+                                "supporting",
+                            )],
+                        ),
+                    ],
+                    cause: named,
+                    ended_by: Agent,
+                    completed: true,
+                    graded: Some(Low),
+                    outcome: Some((O::Inconclusive, R::CauseBelowMedium)),
                     shown: Some(Low),
                 },
                 Case {
@@ -1762,12 +1807,28 @@ mod tests {
             assert!(r.record.blind_spots.iter().all(|b| b.id != "run_end"));
         }
 
+        /// Old records keep reading after the ambiguous-cause rule went away.
+        #[test]
+        fn old_outcome_reasons_still_read() {
+            let reason: OutcomeReason = serde_json::from_value(json!("ambiguous_cause")).unwrap();
+            assert_eq!(reason, OutcomeReason::CauseBelowMedium);
+            let outcome: RcaOutcome =
+                serde_json::from_value(json!("multiple_root_causes")).unwrap();
+            assert_eq!(outcome, RcaOutcome::MultipleRootCauses);
+            assert_eq!(outcome.as_str(), "multiple_root_causes");
+            assert_eq!(
+                OutcomeReason::RootCausesGraded.as_str(),
+                "root_causes_graded"
+            );
+        }
+
         /// The claimed outcome never changes the outcome or the band; it is stored.
         #[test]
         fn the_claimed_outcome_never_changes_the_outcome() {
             let calls = [h(1, "h1", "inconclusive"), h(2, "h2", "symptom")];
             for claimed in [
                 RcaOutcome::RootCauseIdentified,
+                RcaOutcome::MultipleRootCauses,
                 RcaOutcome::ContributingFactor,
                 RcaOutcome::Inconclusive,
                 RcaOutcome::Blocked,

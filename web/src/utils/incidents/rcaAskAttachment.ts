@@ -72,6 +72,10 @@ function structuredSections(summary: RcaRunSummary): string[] {
     if (c.caps.length) verdict.push(`Capped to medium: ${c.caps.join(", ")}`);
   }
   if (card.headline) verdict.push(`Probable cause: ${card.headline}`);
+  for (const cause of card.causes ?? []) {
+    const onset = cause.onset_us === undefined ? "" : ` from ${isoUtc(cause.onset_us)}`;
+    verdict.push(`Root cause ${cause.id}${onset} (${cause.band}): ${cause.statement}`);
+  }
   if (card.suspect_change) {
     const change = card.suspect_change;
     verdict.push(

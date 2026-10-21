@@ -35,9 +35,13 @@ pub enum EndedBy {
 pub enum OutcomeReason {
     AnswerDeadline,
     RootCauseGraded,
-    AmbiguousCause,
+    /// Two or more root causes, each graded medium or higher.
+    RootCausesGraded,
     LeadingBlocked,
     ContributingGraded,
+    /// The one root cause, or one of several, graded below medium. Old records'
+    /// `ambiguous_cause` (more than one root cause, inconclusive) read as this.
+    #[serde(alias = "ambiguous_cause")]
     CauseBelowMedium,
     NoHypothesis,
     NoConfirmedCause,
@@ -48,7 +52,7 @@ impl OutcomeReason {
         match self {
             Self::AnswerDeadline => "answer_deadline",
             Self::RootCauseGraded => "root_cause_graded",
-            Self::AmbiguousCause => "ambiguous_cause",
+            Self::RootCausesGraded => "root_causes_graded",
             Self::LeadingBlocked => "leading_blocked",
             Self::ContributingGraded => "contributing_graded",
             Self::CauseBelowMedium => "cause_below_medium",
@@ -81,6 +85,7 @@ pub fn derive_outcome(
             .filter(|h| h.status == HypothesisStatus::RootCause)
             .count()
     };
+    // With several root causes the grade is the lowest cause's, so "graded" holds for every one.
     let graded = matches!(grade.band, Confidence::Medium | Confidence::High);
 
     if root_causes == 1 && graded {
@@ -89,8 +94,11 @@ pub fn derive_outcome(
             OutcomeReason::RootCauseGraded,
         );
     }
-    if root_causes > 1 {
-        return (RcaOutcome::Inconclusive, OutcomeReason::AmbiguousCause);
+    if root_causes > 1 && graded {
+        return (
+            RcaOutcome::MultipleRootCauses,
+            OutcomeReason::RootCausesGraded,
+        );
     }
     if root_causes == 0 {
         let leading_blocked = ledger
@@ -109,7 +117,7 @@ pub fn derive_outcome(
             );
         }
     }
-    if root_causes == 1 {
+    if root_causes >= 1 {
         return (RcaOutcome::Inconclusive, OutcomeReason::CauseBelowMedium);
     }
     if hypotheses.is_empty() {

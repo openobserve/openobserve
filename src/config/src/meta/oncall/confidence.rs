@@ -167,8 +167,9 @@ pub struct UnverifiedCitation {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum GradeReason {
+    /// Old records' `ambiguous_cause` (more than one root cause) read as this floor.
+    #[serde(alias = "ambiguous_cause")]
     NoConfirmedCause,
-    AmbiguousCause,
     NoLedger,
     NoVerifiedEvidence,
     VerifiedSupport,
@@ -187,7 +188,6 @@ impl GradeReason {
     fn floor_text(&self) -> Option<&'static str> {
         match self {
             Self::NoConfirmedCause => Some("no confirmed cause"),
-            Self::AmbiguousCause => Some("more than one root cause"),
             Self::NoLedger => Some("no hypotheses recorded"),
             Self::NoVerifiedEvidence => Some("no verified evidence"),
             _ => None,
@@ -216,15 +216,25 @@ impl GradeReason {
     }
 }
 
+/// One root cause's own grade, in a run with several.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct CauseGrade {
+    pub hypothesis_id: String,
+    /// What the rules allow for this cause alone, after caps.
+    pub graded: Confidence,
+    #[serde(default)]
+    pub decisive_classes: Vec<SignalClass>,
+}
+
 /// The band that code allows for a verdict, and why.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct ConfidenceGrade {
     /// `min(claimed, graded)`, then lowered by the outcome.
     pub band: Confidence,
     pub claimed: Confidence,
-    /// What the rules allow, after caps.
+    /// What the rules allow, after caps; with several root causes, the lowest cause's.
     pub graded: Confidence,
-    /// The rules that fired, in order.
+    /// The rules that fired, in order; with several root causes, the lowest cause's.
     #[serde(default)]
     pub reasons: Vec<GradeReason>,
     #[serde(default)]
@@ -234,12 +244,15 @@ pub struct ConfidenceGrade {
     pub ruled_out: Vec<String>,
     #[serde(default)]
     pub unverified: Vec<UnverifiedCitation>,
-    /// The subject hypothesis.
+    /// The subject hypothesis: the earliest root cause when there are several.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub subject_id: Option<String>,
     /// Author email of the cause's first steering lead, named by a `human_lead` cap.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub lead_author: Option<String>,
+    /// Each root cause's own grade, in first-seen order; empty unless there are two or more.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub causes: Vec<CauseGrade>,
 }
 
 /// Claim, evidence level with its reason, and the caps that lowered it.
@@ -264,7 +277,6 @@ impl ConfidenceGrade {
         [
             GradeReason::NoLedger,
             GradeReason::NoConfirmedCause,
-            GradeReason::AmbiguousCause,
             GradeReason::NoVerifiedEvidence,
         ]
         .into_iter()
@@ -300,13 +312,16 @@ impl ConfidenceGrade {
             .collect()
     }
 
-    /// The breakdown the verdict card shows.
+    /// The breakdown the verdict card shows. With several root causes, the run level is the
+    /// weakest cause's, so the reason counts the causes and the next level is what it needs.
     pub fn breakdown(&self) -> ConfidenceBreakdown {
         let evidence = self.evidence_level();
         let floor = self.floor().and_then(|r| r.floor_text());
         let classes: Vec<&str> = self.decisive_classes.iter().map(|c| c.as_str()).collect();
+        let several = self.causes.len() > 1;
         let mut evidence_reason = match (floor, classes.len()) {
             (Some(text), _) => text.to_string(),
+            (None, _) if several => self.causes_reason(),
             (None, 0) => "supporting evidence, none decisive".to_string(),
             (None, 1) => format!("1 decisive source ({})", classes[0]),
             (None, n) => format!("{n} decisive sources ({})", classes.join(" + ")),
@@ -322,11 +337,18 @@ impl ConfidenceGrade {
         }
         let next_level = match evidence {
             _ if floor.is_some() => None,
+            Confidence::Low if several => {
+                Some("Medium needs a decisive source for every cause".to_string())
+            }
             Confidence::Low => Some("Medium needs a decisive source".to_string()),
             Confidence::Medium => {
                 let mut missing = Vec::new();
                 if classes.len() < 2 {
-                    missing.push("a second decisive source");
+                    missing.push(if several {
+                        "a second decisive source for every cause"
+                    } else {
+                        "a second decisive source"
+                    });
                 }
                 if self.ruled_out.is_empty() {
                     missing.push("a ruled-out alternative");
@@ -350,6 +372,26 @@ impl ConfidenceGrade {
             evidence_reason,
             next_level,
             caps: self.applied_caps(),
+        }
+    }
+
+    /// "2 causes, each with a decisive source"; "2 causes, 1 with a decisive source".
+    fn causes_reason(&self) -> String {
+        let n = self.causes.len();
+        let decisive = |c: &&CauseGrade| !c.decisive_classes.is_empty();
+        let weakest = self
+            .causes
+            .iter()
+            .map(|c| c.decisive_classes.len())
+            .min()
+            .unwrap_or(0);
+        match weakest {
+            0 => format!(
+                "{n} causes, {} with a decisive source",
+                self.causes.iter().filter(decisive).count()
+            ),
+            1 => format!("{n} causes, each with a decisive source"),
+            _ => format!("{n} causes, each with 2 or more decisive sources"),
         }
     }
 
@@ -378,6 +420,9 @@ impl ConfidenceGrade {
                 n => line.push_str(&format!(" · {n} citations did not run")),
             }
             return line;
+        }
+        if self.causes.len() > 1 {
+            line.push_str(&format!(" · {} causes", self.causes.len()));
         }
         if !self.decisive_classes.is_empty() {
             let classes: Vec<&str> = self.decisive_classes.iter().map(|c| c.as_str()).collect();
@@ -576,40 +621,41 @@ pub fn grade_confidence(
         .collect();
 
     let subject_id = ledger.and_then(subject).map(|h| h.id.clone());
-    let cause = subject_id
+    let subject = subject_id
         .as_deref()
         .and_then(|id| hypotheses.iter().position(|h| h.id == id));
 
-    // Verified items of the cause hypothesis with their signal class.
-    let cause_items: Vec<(Polarity, Strength, SignalClass)> = cause
-        .map(|i| {
-            hypotheses[i]
-                .evidence
-                .iter()
-                .zip(&verified[i])
-                .filter_map(|(item, rec)| rec.map(|r| (item.polarity, item.strength, r.signal)))
-                .collect()
-        })
-        .unwrap_or_default();
+    let cause_unknown = verdict
+        .probable_cause
+        .trim()
+        .eq_ignore_ascii_case("cause unknown");
+    // Two or more root causes are graded one by one; otherwise the subject is the one cause.
+    let mut roots: Vec<usize> = (0..hypotheses.len())
+        .filter(|&i| hypotheses[i].status == HypothesisStatus::RootCause)
+        .collect();
+    roots.sort_by_key(|&i| hypotheses[i].first_seen_seq);
+    let several = roots.len() > 1 && !cause_unknown;
+    let graded_ids: Vec<usize> = if several {
+        roots
+    } else {
+        subject.into_iter().collect()
+    };
 
-    // Decisive classes.
-    let mut decisive_classes: Vec<SignalClass> = Vec::new();
-    for (polarity, strength, signal) in &cause_items {
-        if *polarity == Polarity::Supports
-            && *strength == Strength::Decisive
-            && signal.counts()
-            && !decisive_classes.contains(signal)
-        {
-            decisive_classes.push(*signal);
-        }
-    }
+    // Verified items of one hypothesis with their signal class.
+    let items_of = |i: usize| {
+        hypotheses[i]
+            .evidence
+            .iter()
+            .zip(&verified[i])
+            .filter_map(|(item, rec)| rec.map(|r| (item.polarity, item.strength, r.signal)))
+    };
 
     let ruled_out: Vec<String> = hypotheses
         .iter()
         .zip(&verified)
         .enumerate()
         .filter(|(i, (h, recs))| {
-            Some(*i) != cause
+            !graded_ids.contains(i)
                 && h.status == HypothesisStatus::RuledOut
                 && h.evidence.iter().zip(recs.iter()).any(|(item, rec)| {
                     rec.is_some()
@@ -619,97 +665,129 @@ pub fn grade_confidence(
         .map(|(_, (h, _))| h.statement.chars().take(RULED_OUT_MAX_CHARS).collect())
         .collect();
 
-    let has_support = cause_items.iter().any(|(p, ..)| *p == Polarity::Supports);
-    let has_contradiction = cause_items
-        .iter()
-        .any(|(p, ..)| *p == Polarity::Contradicts);
-
-    // Floors, then the basis.
-    let cause_unknown = verdict
-        .probable_cause
-        .trim()
-        .eq_ignore_ascii_case("cause unknown");
-    let root_causes = hypotheses
-        .iter()
-        .filter(|h| h.status == HypothesisStatus::RootCause)
-        .count();
+    // Floors every cause shares.
     let has_confirmed = hypotheses.iter().any(|h| {
         matches!(
             h.status,
             HypothesisStatus::RootCause | HypothesisStatus::Contributing
         )
     });
-
-    let mut reasons = Vec::new();
+    let mut shared_floors = Vec::new();
     if cause_unknown || !has_confirmed {
-        reasons.push(GradeReason::NoConfirmedCause);
-    }
-    if root_causes > 1 {
-        reasons.push(GradeReason::AmbiguousCause);
+        shared_floors.push(GradeReason::NoConfirmedCause);
     }
     if ledger.is_none() {
-        reasons.push(GradeReason::NoLedger);
+        shared_floors.push(GradeReason::NoLedger);
     }
-    if ledger.is_some() && !has_support {
-        reasons.push(GradeReason::NoVerifiedEvidence);
-    }
+    // The suspect change belongs to one of the causes, so a read by any cause counts.
+    let change_read = graded_ids
+        .iter()
+        .any(|&i| items_of(i).any(|(_, _, signal)| signal == SignalClass::Change));
+    let change_unreachable = blind_spots.iter().any(|b| b.axis == BlindSpotAxis::Change);
+    let impact_outside =
+        impact_outside_evidence(verdict, verified.iter().flatten().flatten().copied());
 
-    let mut graded = if !reasons.is_empty() {
-        Confidence::Low
-    } else if decisive_classes.len() >= 2 && !ruled_out.is_empty() && !has_contradiction {
-        reasons.push(GradeReason::TwoDecisiveClassesAndRuledOut);
-        Confidence::High
-    } else if !decisive_classes.is_empty() {
-        reasons.push(GradeReason::DecisiveClass);
-        Confidence::Medium
-    } else {
-        reasons.push(GradeReason::VerifiedSupport);
-        Confidence::Low
-    };
-
-    // Caps, in order. They matter only above the floor.
-    if graded != Confidence::Low {
-        let change_read = cause_items
-            .iter()
-            .any(|(_, _, signal)| *signal == SignalClass::Change);
-        let human_lead = cause.is_some_and(|i| {
-            hypotheses[i]
-                .lead_ids
-                .iter()
-                .any(|l| l.starts_with(STEER_ID_PREFIX))
-        });
-        let caps = [
-            (
-                verdict.suspect_change.is_some() && !change_read,
-                GradeReason::SuspectChangeNotRead,
-            ),
-            (
-                blind_spots.iter().any(|b| b.axis == BlindSpotAxis::Change),
-                GradeReason::ChangeHistoryUnreachable,
-            ),
-            (has_contradiction, GradeReason::ContradictingEvidence),
-            (human_lead, GradeReason::HumanLead),
-            (
-                impact_outside_evidence(verdict, verified.iter().flatten().flatten().copied()),
-                GradeReason::ImpactOutsideObservedData,
-            ),
-        ];
-        for (fired, reason) in caps {
-            if fired {
-                reasons.push(reason);
-                graded = min_band(graded, Confidence::Medium);
+    let grade_cause = |cause: Option<usize>| {
+        let items: Vec<(Polarity, Strength, SignalClass)> =
+            cause.map(|i| items_of(i).collect()).unwrap_or_default();
+        let mut decisive_classes: Vec<SignalClass> = Vec::new();
+        for (polarity, strength, signal) in &items {
+            if *polarity == Polarity::Supports
+                && *strength == Strength::Decisive
+                && signal.counts()
+                && !decisive_classes.contains(signal)
+            {
+                decisive_classes.push(*signal);
             }
         }
-    }
+        let has_support = items.iter().any(|(p, ..)| *p == Polarity::Supports);
+        let has_contradiction = items.iter().any(|(p, ..)| *p == Polarity::Contradicts);
 
-    // The first steering lead of the cause whose author is known.
-    let lead_author = cause.and_then(|i| {
-        hypotheses[i]
-            .lead_ids
+        // Floors, then the basis.
+        let mut reasons = shared_floors.clone();
+        if ledger.is_some() && !has_support {
+            reasons.push(GradeReason::NoVerifiedEvidence);
+        }
+        let mut graded = if !reasons.is_empty() {
+            Confidence::Low
+        } else if decisive_classes.len() >= 2 && !ruled_out.is_empty() && !has_contradiction {
+            reasons.push(GradeReason::TwoDecisiveClassesAndRuledOut);
+            Confidence::High
+        } else if !decisive_classes.is_empty() {
+            reasons.push(GradeReason::DecisiveClass);
+            Confidence::Medium
+        } else {
+            reasons.push(GradeReason::VerifiedSupport);
+            Confidence::Low
+        };
+
+        let steer_leads = || {
+            cause
+                .into_iter()
+                .flat_map(|i| &hypotheses[i].lead_ids)
+                .filter(|l| l.starts_with(STEER_ID_PREFIX))
+        };
+        // Caps, in order. They matter only above the floor.
+        if graded != Confidence::Low {
+            let caps = [
+                (
+                    verdict.suspect_change.is_some() && !change_read,
+                    GradeReason::SuspectChangeNotRead,
+                ),
+                (change_unreachable, GradeReason::ChangeHistoryUnreachable),
+                (has_contradiction, GradeReason::ContradictingEvidence),
+                (steer_leads().next().is_some(), GradeReason::HumanLead),
+                (impact_outside, GradeReason::ImpactOutsideObservedData),
+            ];
+            for (fired, reason) in caps {
+                if fired {
+                    reasons.push(reason);
+                    graded = min_band(graded, Confidence::Medium);
+                }
+            }
+        }
+        // The first steering lead of the cause whose author is known.
+        let lead_author = steer_leads().find_map(|l| steer_authors.get(l).cloned());
+        CauseGrading {
+            graded,
+            reasons,
+            decisive_classes,
+            lead_author,
+        }
+    };
+
+    // The run takes the weakest cause's grade; on a tie, the earliest cause's.
+    let (weakest, causes) = if several {
+        let grades: Vec<(usize, CauseGrading)> = graded_ids
             .iter()
-            .filter(|l| l.starts_with(STEER_ID_PREFIX))
-            .find_map(|l| steer_authors.get(l).cloned())
-    });
+            .map(|&i| (i, grade_cause(Some(i))))
+            .collect();
+        let causes = grades
+            .iter()
+            .map(|(i, g)| CauseGrade {
+                hypothesis_id: hypotheses[*i].id.clone(),
+                graded: g.graded,
+                decisive_classes: g.decisive_classes.clone(),
+            })
+            .collect();
+        let weakest = grades.into_iter().map(|(_, g)| g).reduce(|a, b| {
+            if min_band(a.graded, b.graded) == a.graded {
+                a
+            } else {
+                b
+            }
+        });
+        (weakest, causes)
+    } else {
+        (None, Vec::new())
+    };
+    let CauseGrading {
+        graded,
+        reasons,
+        decisive_classes,
+        lead_author,
+    } = weakest.unwrap_or_else(|| grade_cause(subject));
+
     let claimed = verdict.claimed_confidence;
     ConfidenceGrade {
         band: min_band(claimed, graded),
@@ -721,7 +799,16 @@ pub fn grade_confidence(
         unverified,
         subject_id,
         lead_author,
+        causes,
     }
+}
+
+/// The grade of one cause hypothesis, before the run takes it.
+struct CauseGrading {
+    graded: Confidence,
+    reasons: Vec<GradeReason>,
+    decisive_classes: Vec<SignalClass>,
+    lead_author: Option<String>,
 }
 
 /// Context calls are not observations of the failure, so only runtime evidence bounds the window.
@@ -752,21 +839,20 @@ fn impact_outside_evidence<'a>(
     })
 }
 
-/// An `inconclusive` or `blocked` outcome lowers the band to `low`; it never raises it. A single
-/// cause graded below medium is already `low` and its basis says why (no decisive source), so it
-/// gains no floor: "no confirmed cause" would deny the cause the card shows.
+/// An `inconclusive` or `blocked` outcome lowers the band to `low`; it never raises it. A cause
+/// graded below medium (the only cause, or the weakest of several) is already `low` and its basis
+/// says why (no decisive source), so it gains no floor: "no confirmed cause" would deny the cause
+/// the card shows.
 pub fn apply_outcome(grade: &mut ConfidenceGrade, outcome: RcaOutcome, reason: OutcomeReason) {
     if !matches!(outcome, RcaOutcome::Inconclusive | RcaOutcome::Blocked) {
         return;
     }
     grade.band = Confidence::Low;
-    let reason = match reason {
-        OutcomeReason::AmbiguousCause => GradeReason::AmbiguousCause,
-        OutcomeReason::CauseBelowMedium => return,
-        _ => GradeReason::NoConfirmedCause,
-    };
-    if !grade.reasons.contains(&reason) {
-        grade.reasons.push(reason);
+    if reason == OutcomeReason::CauseBelowMedium {
+        return;
+    }
+    if !grade.reasons.contains(&GradeReason::NoConfirmedCause) {
+        grade.reasons.push(GradeReason::NoConfirmedCause);
     }
 }
 
@@ -1255,7 +1341,7 @@ mod tests {
                 vec![SignalClass::Metrics],
             ),
             (
-                "two root causes",
+                "two root causes, one with no verified evidence",
                 vec![
                     hyp(
                         1,
@@ -1268,8 +1354,8 @@ mod tests {
                 named(h),
                 Low,
                 Low,
-                vec![AmbiguousCause],
-                vec![SignalClass::Metrics],
+                vec![NoVerifiedEvidence],
+                vec![],
             ),
             (
                 "no ledger",
@@ -1511,6 +1597,170 @@ mod tests {
         assert_eq!(g.subject_id.as_deref(), Some("h1"));
     }
 
+    /// Each root cause is graded on its own evidence; the run takes the lowest cause band.
+    #[test]
+    fn several_root_causes_are_graded_one_by_one() {
+        use Confidence::*;
+        use SignalClass as S;
+        let ruled_out = hyp(
+            9,
+            "h3",
+            "ruled_out",
+            vec![item("e9", PROM, "pool_waiting", "rules_out", "supporting")],
+        );
+        let root = |seq, id: &str, evidence| hyp(seq, id, "root_cause", evidence);
+        let two_classes = || {
+            vec![
+                decisive("e1", PROM, "pool_active"),
+                decisive("e2", TRACES, "slow"),
+            ]
+        };
+        let cause = |id: &str, graded, classes: Vec<SignalClass>| CauseGrade {
+            hypothesis_id: id.into(),
+            graded,
+            decisive_classes: classes,
+        };
+        // (case, calls, run graded, run reasons, run classes, causes, evidence reason, next)
+        type SeveralCase<'a> = (
+            &'a str,
+            Vec<LedgerCall>,
+            Confidence,
+            Vec<GradeReason>,
+            Vec<SignalClass>,
+            Vec<CauseGrade>,
+            &'a str,
+            Option<&'a str>,
+        );
+        let cases: Vec<SeveralCase> = vec![
+            (
+                "high and medium",
+                vec![
+                    root(1, "h1", two_classes()),
+                    root(2, "h2", vec![decisive("e3", SQL, "SELECT * FROM app")]),
+                    ruled_out.clone(),
+                ],
+                Medium,
+                vec![GradeReason::DecisiveClass],
+                vec![S::Logs],
+                vec![
+                    cause("h1", High, vec![S::Metrics, S::Traces]),
+                    cause("h2", Medium, vec![S::Logs]),
+                ],
+                "2 causes, each with a decisive source, 1 alternative ruled out",
+                Some("High needs a second decisive source for every cause"),
+            ),
+            (
+                "both high",
+                vec![
+                    root(1, "h1", two_classes()),
+                    root(
+                        2,
+                        "h2",
+                        vec![
+                            decisive("e3", SQL, "SELECT * FROM app"),
+                            decisive("e4", PROM, "pool_active"),
+                        ],
+                    ),
+                    ruled_out.clone(),
+                ],
+                High,
+                vec![GradeReason::TwoDecisiveClassesAndRuledOut],
+                vec![S::Metrics, S::Traces],
+                vec![
+                    cause("h1", High, vec![S::Metrics, S::Traces]),
+                    cause("h2", High, vec![S::Logs, S::Metrics]),
+                ],
+                "2 causes, each with 2 or more decisive sources, 1 alternative ruled out",
+                None,
+            ),
+            (
+                "one below medium",
+                vec![
+                    root(1, "h1", vec![decisive("e1", PROM, "pool_active")]),
+                    root(
+                        2,
+                        "h2",
+                        vec![item(
+                            "e3",
+                            SQL,
+                            "SELECT * FROM app",
+                            "supports",
+                            "supporting",
+                        )],
+                    ),
+                ],
+                Low,
+                vec![GradeReason::VerifiedSupport],
+                vec![],
+                vec![
+                    cause("h1", Medium, vec![S::Metrics]),
+                    cause("h2", Low, vec![]),
+                ],
+                "2 causes, 1 with a decisive source",
+                Some("Medium needs a decisive source for every cause"),
+            ),
+            (
+                "one with no verified evidence",
+                vec![
+                    root(1, "h1", vec![decisive("e1", PROM, "pool_active")]),
+                    root(2, "h2", vec![]),
+                ],
+                Low,
+                vec![GradeReason::NoVerifiedEvidence],
+                vec![],
+                vec![
+                    cause("h1", Medium, vec![S::Metrics]),
+                    cause("h2", Low, vec![]),
+                ],
+                "no verified evidence",
+                None,
+            ),
+        ];
+        for (case, calls, graded, reasons, classes, causes, reason, next) in cases {
+            let g = grade(&calls, &named(High));
+            assert_eq!(g.graded, graded, "{case}: graded");
+            assert_eq!(g.band, graded, "{case}: band");
+            assert_eq!(g.reasons, reasons, "{case}: reasons");
+            assert_eq!(g.decisive_classes, classes, "{case}: classes");
+            assert_eq!(g.causes, causes, "{case}: causes");
+            assert_eq!(g.subject_id.as_deref(), Some("h1"), "{case}: subject");
+            let b = g.breakdown();
+            assert_eq!(b.evidence_reason, reason, "{case}: evidence reason");
+            assert_eq!(b.next_level.as_deref(), next, "{case}: next level");
+        }
+
+        let g = grade(
+            &[
+                root(1, "h1", two_classes()),
+                root(2, "h2", vec![decisive("e3", SQL, "SELECT * FROM app")]),
+                ruled_out,
+            ],
+            &named(High),
+        );
+        assert_eq!(
+            g.reason_line(),
+            "medium · claimed high · 2 causes · decisive: logs · ruled out: h3 statement"
+        );
+        // "cause unknown" grades no cause, so no cause list.
+        let g = grade(
+            &[
+                root(1, "h1", two_classes()),
+                root(2, "h2", vec![decisive("e3", SQL, "SELECT * FROM app")]),
+            ],
+            &submitted("cause unknown", High),
+        );
+        assert!(g.causes.is_empty());
+        assert_eq!(g.reasons, [GradeReason::NoConfirmedCause]);
+        // A stored grade from before several causes were graded still reads.
+        let old: ConfidenceGrade = serde_json::from_value(json!({
+            "band": "low", "claimed": "high", "graded": "low",
+            "reasons": ["ambiguous_cause"], "decisive_classes": ["metrics"],
+        }))
+        .unwrap();
+        assert_eq!(old.reasons, [GradeReason::NoConfirmedCause]);
+        assert!(old.causes.is_empty());
+    }
+
     /// The example reason lines, adapted to the contract's texts.
     #[test]
     fn reason_lines_match_the_examples() {
@@ -1540,6 +1790,7 @@ mod tests {
                 .collect(),
             subject_id: Some("h1".into()),
             lead_author: None,
+            causes: vec![],
         };
         let cases = [
             (
@@ -1703,10 +1954,6 @@ mod tests {
         // Each floor text.
         for (reason, text) in [
             (GradeReason::NoConfirmedCause, "low · no confirmed cause"),
-            (
-                GradeReason::AmbiguousCause,
-                "low · more than one root cause",
-            ),
             (GradeReason::NoLedger, "low · no hypotheses recorded"),
         ] {
             assert_eq!(
@@ -1779,22 +2026,38 @@ mod tests {
         apply_outcome(
             &mut g,
             RcaOutcome::Inconclusive,
-            OutcomeReason::AmbiguousCause,
+            OutcomeReason::NoConfirmedCause,
         );
         assert_eq!(g.band, Confidence::Low);
-        assert_eq!(g.reasons.last(), Some(&GradeReason::AmbiguousCause));
+        assert_eq!(g.reasons.last(), Some(&GradeReason::NoConfirmedCause));
         apply_outcome(
             &mut g,
             RcaOutcome::Inconclusive,
-            OutcomeReason::AmbiguousCause,
+            OutcomeReason::NoConfirmedCause,
         );
         assert_eq!(
             g.reasons
                 .iter()
-                .filter(|r| **r == GradeReason::AmbiguousCause)
+                .filter(|r| **r == GradeReason::NoConfirmedCause)
                 .count(),
             1
         );
+        // Several graded causes keep their band; one below medium lowers it with no floor.
+        let mut g = medium.clone();
+        apply_outcome(
+            &mut g,
+            RcaOutcome::MultipleRootCauses,
+            OutcomeReason::RootCausesGraded,
+        );
+        assert_eq!(g, medium);
+        let mut g = medium.clone();
+        apply_outcome(
+            &mut g,
+            RcaOutcome::Inconclusive,
+            OutcomeReason::CauseBelowMedium,
+        );
+        assert_eq!(g.band, Confidence::Low);
+        assert_eq!(g.reasons, medium.reasons);
 
         let low = grade(&[], &named(Confidence::Low));
         let mut g = low.clone();
