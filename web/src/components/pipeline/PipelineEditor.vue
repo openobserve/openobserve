@@ -151,7 +151,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :title="t('pipeline.editPipelineJSON')"
     persistent
   >
-    <template v-if="jsonEditorAiButtonVisible" #header-right>
+    <template v-if="assistantV2" #header-right>
+      <AiEntryButton
+        appearance="toggle"
+        verb="ask"
+        entry-kind="editor_toggle"
+        object-kind="pipeline_node"
+        thread="current"
+        dock-host="json_editor"
+        :label="t('assistant.entry.assistant')"
+        :tooltip="t('assistant.entry.tooltip.dockedAsk')"
+        :pressed="jsonDock?.pressed.value"
+        :build="() => jsonDock?.build()"
+        data-test="ai-entry-json-editor-ask"
+        @closed="jsonDock?.close()"
+      />
+    </template>
+    <template v-else-if="jsonEditorAiButtonVisible" #header-right>
       <OButton
         variant="ghost"
         size="icon-toolbar"
@@ -249,6 +265,7 @@ import { MarkerType, useVueFlow } from "@vue-flow/core";
 import ExternalDestination from "./NodeForm/ExternalDestination.vue";
 import { contextRegistry, createPipelinesContextProvider } from "@/composables/contextProviders";
 import JsonEditor from "../common/JsonEditor.vue";
+import { isAssistantV2, useAssistantDockToggle } from "@/composables/assistant/pure";
 import { validatePipeline as validatePipelineUtil } from "../../utils/validatePipeline";
 import { useReo } from "@/services/reodotdev_analytics";
 
@@ -474,6 +491,12 @@ const { getStreams } = useStreams(t);
 const confirmDialogBasicPipeline = ref(false);
 const showJsonEditorDialog = ref(false);
 const associatedFunctions: Ref<string[]> = ref([]);
+const assistantV2 = isAssistantV2();
+const jsonDock = assistantV2 ? useAssistantDockToggle("json_editor") : null;
+// The assistant's door loads only where the revamp renders it, never in the flag-off chunk.
+const AiEntryButton = defineAsyncComponent(
+  () => import("@/components/ai-assistant/entry/AiEntryButton.vue"),
+);
 
 // Edition check via the registry (fixes a missing-Cloud bug the old raw
 // `config.isEnterprise` check had for free); `ai_enabled` stays a separate

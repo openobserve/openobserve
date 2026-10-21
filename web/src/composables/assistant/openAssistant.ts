@@ -23,7 +23,13 @@ import {
 } from "@/services/assistantAnalytics";
 import { gt, raw, type I18nKey } from "@/types/i18n";
 
-import { containerOf, isRunning, type AssistantStoreInternal } from "./assistantStore";
+import {
+  MAIN_MIN_REM,
+  SIDEBAR_MIN_REM,
+  containerOf,
+  isRunning,
+  type AssistantStoreInternal,
+} from "./assistantStore";
 import type {
   AssistantCapability,
   AssistantSession,
@@ -36,7 +42,10 @@ import type {
   Placement,
   Sid,
 } from "./assistantStore.types";
+import type { TurnLockReason } from "./lifecycle";
 import { getAssistantRuntime } from "./runtime";
+import { turnLockKey } from "./runtimeHandle";
+import { sidebarWidthFor } from "./sidebarWidth";
 
 /** Layout-route query keys a deep link may carry: they stage and never send, and never carry text (DG-13). */
 export const ASSISTANT_QUERY_KEYS = ["assistant", "object", "ref"] as const;
@@ -48,6 +57,11 @@ export const DEFAULT_TITLE_CHARS = 40;
 
 /** A second activation of the same door inside this window returns the first one's result. */
 export const DOOR_REPEAT_MS = 1_000;
+
+// The floating card's inset from the window edge and its top below the header, as `AssistantSidebarHost` draws it.
+const FLOATING_GAP_REM = 0.5;
+
+const FLOATING_TOP_REM = 2.75;
 
 const SEND_VERBS: ReadonlySet<OpenAssistantArgs["entryVerb"]> = new Set([
   "explain",
@@ -112,6 +126,7 @@ export interface OpenAssistantEnv {
   pushRoute(to: RouteLocationRaw): void;
   lgUp(): boolean;
   viewportPx(): number;
+  viewportHeightPx?(): number;
   currentOrg(): string | null;
   now(): number;
   notify?(message: I18nKey, action?: { label: I18nKey; handler: () => void }): void;
@@ -123,6 +138,8 @@ interface DoorPlan {
   forcePinned: boolean;
   session: AssistantSession | null;
   sends: boolean;
+  /** Why a send door only stages: this tab may not start a turn in its chat. */
+  lock: TurnLockReason | null;
   queued: boolean;
   carded: boolean;
   drafted: boolean;
@@ -165,7 +182,9 @@ function runDoor(env: OpenAssistantEnv, args: OpenAssistantCall): OpenAssistantR
     notify(env, "assistant.entry.orgChanged");
     return { ok: false, reason: "org_changed" };
   }
-  const plan = planDoor(env, args);
+  // A host that cannot give the dock its minimum beside the editor opens the sidebar instead.
+  const narrow = !!args.dockHost && args.container !== "sidebar" && !dockFits(env, args.dockHost);
+  const plan = planDoor(env, narrow ? { ...args, container: "sidebar" } : args);
   trackAssistant("ai_entry_clicked", entryProps(args, plan, gate));
   const container = containerOf(plan.target, env.lgUp()) ?? "sidebar";
   // A door names only a thread it starts; staging into a chat already in use keeps that chat's title.
@@ -178,14 +197,17 @@ function runDoor(env: OpenAssistantEnv, args: OpenAssistantCall): OpenAssistantR
     store.setActive(sid);
     return { ok: true, sid, container, staged, sent: false, queued: false };
   }
+  const { sends, lock } = plan;
   // A send into a visible container leaves focus on the source page (`95` §4).
-  const focus = plan.sends && wasVisible ? "none" : "composer";
+  const focus = sends && wasVisible ? "none" : "composer";
   store.open(plan.target, { sid, focus, invoker: args.invoker, forcePinned: plan.forcePinned });
   if (plan.target.kind === "full" && env.routeName() !== "assistant")
     env.pushRoute({ name: "assistant", params: { chatId: sid } });
-  if (plan.sends) void store.send(sid, args.mode ? { mode: args.mode } : undefined);
+  if (lock) notify(env, turnLockKey(lock));
+  if (sends) void store.send(sid, args.mode ? { mode: args.mode } : undefined);
   if (plan.carded && args.payload) notify(env, "assistant.entry.addedBehindCard", OPEN_ACTION);
-  return { ok: true, sid, container, staged, sent: plan.sends, queued: plan.queued };
+  if (narrow) notify(env, "assistant.editor.tooNarrow");
+  return { ok: true, sid, container, staged, sent: sends, queued: plan.queued };
 }
 
 function planDoor(env: OpenAssistantEnv, args: OpenAssistantCall): DoorPlan {
@@ -195,11 +217,15 @@ function planDoor(env: OpenAssistantEnv, args: OpenAssistantCall): DoorPlan {
   const running = !!session && isRunning(session.turn);
   const carded = !!session && (!!session.pendingApproval || !!session.pendingConsent);
   const wantsSend = args.intent === "send";
+  const free = wantsSend && composerEmpty && !running && !carded;
+  // A door never starts a turn this tab may not start; its prompt stays staged and the door says why.
+  const lock = free ? env.store.turnLockOf(session?.sid ?? null) : null;
   return {
     target,
     forcePinned: target.kind === "sidebar" && coversInvoker(env, target, args.invoker),
     session,
-    sends: wantsSend && composerEmpty && !running && !carded,
+    sends: free && !lock,
+    lock,
     queued: wantsSend && running,
     carded,
     drafted: wantsSend && !composerEmpty,
@@ -227,7 +253,7 @@ function sidebarMode(env: OpenAssistantEnv): "pinned" | "floating" {
   return !store.hasStoredSidebarMode() && env.routePrefersFloating() ? "floating" : remembered;
 }
 
-// A floating card that would hide the door's source opens pinned for this open only (`20` §2.1, round 1 X-14).
+// A floating card that would hide the door's source opens pinned for this open only.
 function coversInvoker(
   env: OpenAssistantEnv,
   target: Extract<Placement, { kind: "sidebar" }>,
@@ -236,8 +262,37 @@ function coversInvoker(
   const { shell } = env.store.state;
   if (target.mode === "pinned" || shell.placement.kind === "sidebar" || !env.lgUp() || !invoker)
     return false;
-  const cardLeft = env.viewportPx() - shell.sidebarWidthRem * 16;
-  return invoker.getBoundingClientRect().right > cardLeft;
+  const viewport = env.viewportPx();
+  const gap = FLOATING_GAP_REM * 16;
+  const width = sidebarWidthFor(shell.sidebarWidthRem, viewport / 16, true) * 16;
+  const card = {
+    left: viewport - gap - width,
+    right: viewport - gap,
+    top: FLOATING_TOP_REM * 16,
+    bottom: (env.viewportHeightPx?.() ?? Number.POSITIVE_INFINITY) - gap,
+  };
+  const rect = invoker.getBoundingClientRect();
+  return (
+    rect.right > card.left &&
+    rect.left < card.right &&
+    rect.bottom > card.top &&
+    rect.top < card.bottom
+  );
+}
+
+// Below `lg` the dock is a sheet over a full-width host, so only a desktop row is measured.
+function dockFits(
+  env: OpenAssistantEnv,
+  hostId: NonNullable<OpenAssistantArgs["dockHost"]>,
+): boolean {
+  const adapter = env.hosts.get(hostId);
+  const placement = env.store.state.shell.placement;
+  if (!adapter || !env.lgUp()) return true;
+  if (placement.kind === "docked" && placement.hostId === hostId) return true;
+  const slot = adapter.dockSlot.value;
+  const rowRem = adapter.dockRowRem?.() ?? (slot ? slot.getBoundingClientRect().width / 16 : 0);
+  if (rowRem <= 0) return true;
+  return rowRem - MAIN_MIN_REM >= (adapter.minWidthRem ?? SIDEBAR_MIN_REM);
 }
 
 /** `new` for titled verbs, `current` for add-to-chat, else append within 30 min of the last turn. */
@@ -247,7 +302,9 @@ function resolveThread(
   target: Placement,
 ): AssistantSession | null {
   const { store } = env;
-  const current = containerSession(store, target);
+  const found = containerSession(store, target);
+  // A dock's thread belongs to one object: the same editor on another alert starts its own chat.
+  const current = found && sameObject(env, found, target) ? found : null;
   const thread = args.thread ?? defaultThread(args.entryVerb);
   if (thread === "current" || !current) return current;
   if (thread === "new") return isBlank(current) ? current : null;
@@ -273,6 +330,13 @@ function containerSession(
     if (session && dockOf(session) === dock) return session;
   }
   return null;
+}
+
+function sameObject(env: OpenAssistantEnv, session: AssistantSession, target: Placement): boolean {
+  if (target.kind !== "docked" || session.titleSource !== "object" || session.title === null)
+    return true;
+  const adapter = env.hosts.get(target.hostId);
+  return !adapter || String(adapter.objectTitle()) === String(session.title);
 }
 
 function sameContainer(current: Placement, target: Placement): boolean {

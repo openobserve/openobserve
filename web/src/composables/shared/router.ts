@@ -22,7 +22,12 @@ import {
 } from "@/utils/zincutils";
 import { watch } from "vue";
 import { isAssistantV2 } from "@/composables/assistant/flags";
-import type { LocationQuery, LocationQueryRaw, RouteLocationRaw } from "vue-router";
+import type {
+  LocationQuery,
+  LocationQueryRaw,
+  RouteLocationNormalizedLoaded,
+  RouteLocationRaw,
+} from "vue-router";
 import config from "@/aws-exports";
 import { resolveTraceSearchMode, type TraceSearchMode } from "@/ts/interfaces/traces/trace.types";
 import store from "@/stores";
@@ -501,6 +506,8 @@ const useRoutes = () => {
       name: "traces",
       component: AppTraces,
       meta: {
+        assistantPrefersFloating: (route: RouteLocationNormalizedLoaded) =>
+          route.query.tab === "service-graph",
         keepAlive: true,
         titleKey: "menu.traces",
         allowOnEmptyData: true,
@@ -681,6 +688,7 @@ const useRoutes = () => {
       name: "traceDetails",
       component: TraceDetails,
       meta: {
+        assistantPrefersFloating: true,
         titleKey: "routeTitles.traceDetails",
       },
       beforeEnter(to: any, from: any, next: any) {
@@ -754,6 +762,7 @@ const useRoutes = () => {
       component: ViewDashboard,
       props: true,
       meta: {
+        assistantPrefersFloating: true,
         titleKey: "routeTitles.viewDashboard",
       },
       beforeEnter(to: any, from: any, next: any) {
@@ -778,6 +787,7 @@ const useRoutes = () => {
       component: AddPanel,
       props: true,
       meta: {
+        assistantPrefersFloating: true,
         titleKey: "panel.addPanel",
       },
       beforeEnter(to: any, from: any, next: any) {

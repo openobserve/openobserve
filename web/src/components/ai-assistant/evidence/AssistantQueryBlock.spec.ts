@@ -15,6 +15,13 @@
 
 import { flushPromises, mount } from "@vue/test-utils";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { effectScope, ref } from "vue";
+
+import type { AssistantHostAdapter } from "@/composables/assistant/pure";
+import {
+  resetEditorProposalsForTests,
+  useEditorProposal,
+} from "@/composables/assistant/useEditorProposal";
 
 import { fakeEvidence } from "../__tests__/fakeEvidence";
 import { fakeRouter } from "../__tests__/fakeAssistant";
@@ -249,6 +256,40 @@ describe("AssistantQueryBlock", () => {
       block: { ...block, query: { ...block.query, streamType: "traces" } },
     });
     expect(traces.wrapper.get('[data-test="assistant-query-open"]').text()).toBe("Open in Traces");
+  });
+
+  it("reads Inserted until the editor's label goes, then offers Insert again", async () => {
+    const editorHost = {
+      id: "alert_query",
+      language: "sql",
+      getBuffer: () => text.value,
+      focusEditor: vi.fn(),
+    } as unknown as AssistantHostAdapter;
+    const text = ref("SELECT 1");
+    const scope = effectScope();
+    const proposal = scope.run(() =>
+      useEditorProposal(editorHost, { write: (next) => void (text.value = next) }),
+    )!;
+    const { wrapper, host } = mountBlock({ host: editorHost });
+    host.dispatch.mockImplementationOnce(async () => {
+      const handle = await proposal.propose(block.query.text, {
+        mode: "replace",
+        provenance: { prompt: "" },
+        canRun: false,
+      });
+      handle.accept();
+      return { ok: true, detail: { decision: "accepted", note: null } } as never;
+    });
+    const insert = () => wrapper.get('[data-test="assistant-query-insert"]');
+    await insert().trigger("click");
+    await flushPromises();
+    expect(insert().attributes("data-state")).toBe("inserted");
+    proposal.revert("original");
+    await flushPromises();
+    expect(insert().attributes("data-state")).toBe("idle");
+    expect(insert().attributes("aria-disabled")).toBeUndefined();
+    scope.stop();
+    resetEditorProposalsForTests();
   });
 
   it("drops Run, Insert and the overflow on a shared page; Open opens a new tab", () => {

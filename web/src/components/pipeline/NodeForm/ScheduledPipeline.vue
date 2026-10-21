@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="scheduled-pipeline-container h-full w-full">
     <!-- <OSeparator /> -->
 
-    <div class="stepper-header mb-2 flex h-full w-full">
+    <div :ref="docked ? docked.dockSlot : undefined" class="stepper-header mb-2 flex h-full w-full">
       <div
         :class="store.state.isAiChatEnabled ? 'w-[75%]' : 'w-full'"
         class="flex"
@@ -725,7 +725,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :label="tab === 'sql' ? t('pipeline.sqlQuery') : t('pipeline.promqlQuery')"
                     />
                   </span>
-                  <div class="relative">
+                  <AiLabel
+                    v-if="docked?.proposal.label.value"
+                    :state="docked.proposal.label.value"
+                    class="px-2 py-1"
+                    @revert="docked.proposal.revert"
+                    @ask-again="docked.dock.askAgain"
+                  />
+                  <div ref="editorArea" class="relative">
+                    <AssistantDiffBlock
+                      v-if="docked?.proposal.pending.value"
+                      :key="docked.proposal.pending.value.id"
+                      :proposal="docked.proposal.pending.value"
+                      class="absolute inset-0 z-1000"
+                    />
                     <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
                     <UnifiedQueryEditor
                       v-show="expandState.query"
@@ -936,10 +949,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- query-eidtor-part -->
       </div>
 
+      <AssistantDock v-if="docked" :host="docked.adapter" />
       <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
       <div
         class="ms-2 w-1/4 max-w-full"
-        v-if="store.state.isAiChatEnabled"
+        v-else-if="store.state.isAiChatEnabled"
         style="min-width: 4.6875rem; height: calc(100vh - 70px) !important"
       >
         <O2AIChat
@@ -985,6 +999,7 @@ import CronExpressionParser from "cron-parser";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import FullViewContainer from "@/components/functions/FullViewContainer.vue";
 import O2AIChat from "@/components/O2AIChat.vue";
+import { useDockedEditor, type DockedEditor } from "@/composables/assistant/pure";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
@@ -1480,7 +1495,7 @@ watch(selectedStreamName, (newStreamName) => {
     selectedStreamType.value,
     tab.value,
   );
-  contextRegistry.register("pipelines", contextProvider);
+  if (!assistantV2) contextRegistry.register("pipelines", contextProvider);
 });
 
 // Watch for stream type changes and update context provider
@@ -1492,7 +1507,7 @@ watch(selectedStreamType, (newStreamType) => {
     newStreamType,
     tab.value,
   );
-  contextRegistry.register("pipelines", contextProvider);
+  if (!assistantV2) contextRegistry.register("pipelines", contextProvider);
 });
 
 // Watch for query type changes and update context provider
@@ -1504,7 +1519,7 @@ watch(tab, (newTab) => {
     selectedStreamType.value,
     newTab,
   );
-  contextRegistry.register("pipelines", contextProvider);
+  if (!assistantV2) contextRegistry.register("pipelines", contextProvider);
 });
 
 onBeforeMount(async () => {
@@ -1522,8 +1537,11 @@ onMounted(async () => {
     selectedStreamType.value,
     tab.value,
   );
-  contextRegistry.register("pipelines", contextProvider);
-  contextRegistry.setActive("pipelines");
+  // The revamped assistant pushes this node's context over the editor's instead of replacing it.
+  if (!assistantV2) {
+    contextRegistry.register("pipelines", contextProvider);
+    contextRegistry.setActive("pipelines");
+  }
 
   setTimeout(() => {
     if (tab.value === "sql" && query.value != "") {
@@ -1547,6 +1565,7 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   removeAiContextHandler();
+  if (assistantV2) return;
   contextRegistry.unregister("pipelines");
   contextRegistry.setActive("");
 });
@@ -2562,6 +2581,14 @@ const loadedOrg = assistantV2
       () => store.state.selectedOrganization?.identifier ?? "",
     )
   : null;
+// The assistant's parts load only where the revamp renders them, never in the flag-off chunk.
+const AiLabel = defineAsyncComponent(() => import("@/components/ai-assistant/entry/AiLabel.vue"));
+const AssistantDiffBlock = defineAsyncComponent(
+  () => import("@/components/ai-assistant/evidence/AssistantDiffBlock.vue"),
+);
+const AssistantDock = defineAsyncComponent(
+  () => import("@/components/ai-assistant/shell/AssistantDock.vue"),
+);
 const AiEntryButton = defineAsyncComponent(
   () => import("@/components/ai-assistant/entry/AiEntryButton.vue"),
 );
@@ -2612,6 +2639,46 @@ const sendToAiChat = (value: any, append: boolean = true) => {
     aiChatInputContext.value = "";
   });
 };
+
+const editorArea = ref<HTMLElement | null>(null);
+const openedWithQuery = query.value ?? "";
+const docked: DockedEditor | null = assistantV2 ? scheduledQueryHost() : null;
+
+function scheduledQueryHost(): DockedEditor {
+  const nodeEdited = form.useStore((s: { isDirty: boolean }) => s.isDirty);
+  return useDockedEditor({
+    id: "scheduled_query",
+    objectKind: "pipeline_node",
+    objectTitle: () => {
+      const pipeline = String(pipelineObj.currentSelectedPipeline?.name ?? "");
+      return pipeline
+        ? t("assistant.editor.title.queryNode", { pipeline: raw(pipeline) })
+        : t("assistant.editor.title.queryNodeNew");
+    },
+    language: () => (tab.value === "promql" ? "promql" : "sql"),
+    getBuffer: () => String(query.value ?? ""),
+    getContext: () => ({
+      ...createPipelinesContextProvider(
+        pipelineObj,
+        store,
+        selectedStreamName.value,
+        selectedStreamType.value,
+        tab.value,
+      ).getContext(),
+      ...(tab.value === "sql"
+        ? { currentSQLQuery: String(query.value ?? "") }
+        : { currentQuery: String(query.value ?? "") }),
+    }),
+    isDirty: () => !!nodeEdited.value || String(query.value ?? "") !== openedWithQuery,
+    run: () => void runQuery(),
+    focusEditor: () => editorArea.value?.querySelector<HTMLElement>("textarea")?.focus(),
+    write(text) {
+      updateQueryValue(text);
+      pipelineEditorRef.value?.replaceValue?.(text);
+    },
+    area: () => editorArea.value,
+  });
+}
 
 defineExpose({
   tab,

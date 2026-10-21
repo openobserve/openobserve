@@ -10,7 +10,6 @@ const GAPS = [
   ["PERF-06 open and close x50 and 30 chat_300 records from history", "WP-11"],
   ["DOOR log-row Explain sends through openAssistant", "WP-07"],
   ["EVID query block runs inline and opens in Logs", "WP-08"],
-  ["DOCK alert editor docks the chat with Insert as diff", "WP-09"],
   ["APPR approval card from the confirmation scenario", "WP-10"],
   ["CONS consent as a turn state (CONS-*) @edition", "WP-10"],
   ["HIST history list, thread header and local-only mode", "WP-11"],
@@ -18,7 +17,6 @@ const GAPS = [
   ["RCA incident analysis card before ?stream=true", "WP-13"],
   ["HELPER inline query helper proposes a diff", "WP-13"],
   ["ADMIN-14 Settings › Assistant status @edition", "WP-14"],
-  ["XTAB two-tab scenarios 3b and 3e", "WP-09"],
 ];
 
 test.describe("assistant states not reachable yet", () => {

@@ -54,17 +54,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         variant="primary"
         size="sm"
-        :disabled="!draft.trim() || running"
-        :focusable-unavailable="running"
+        :disabled="!draft.trim() || !!editBlocked"
+        :focusable-unavailable="!!editBlocked"
         class="max-md:min-h-11 pointer-coarse:min-h-11"
         data-test="assistant-msg-edit-send"
         @click="sendEdit"
       >
         {{ t("assistant.message.editSend") }}
-        <template v-if="running" #unavailable-reason>{{
-          t("assistant.composer.running")
-        }}</template>
-        <OTooltip v-if="running" :content="t('assistant.composer.running')" />
+        <template v-if="editBlocked" #unavailable-reason>{{ editBlocked }}</template>
+        <OTooltip v-if="editBlocked" :content="editBlocked" />
       </OButton>
     </div>
   </div>
@@ -290,7 +288,13 @@ import {
   type ContextChip,
 } from "@/composables/assistant";
 import { stepCitation } from "@/components/ai-assistant/evidence/evidenceText";
-import { assistantTranscriptHostKey, stepLabelOf, stepsOf } from "@/composables/assistant/pure";
+import {
+  assistantTranscriptHostKey,
+  stepLabelOf,
+  stepsOf,
+  turnLockKey,
+  useTurnLock,
+} from "@/composables/assistant/pure";
 import useBreakpoint from "@/composables/useBreakpoint";
 import type { IconName } from "@/lib/core/Icon/OIcon.types";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -338,8 +342,16 @@ const editChips = ref<ContextChip[]>(
 const editorRoot = ref<HTMLElement | null>(null);
 let copiedTimer: ReturnType<typeof setTimeout> | null = null;
 
-const creditsExhausted = computed(() => capability.value.creditMode === "exhausted");
-const creditsReason = computed(() => t("assistant.message.creditsUsedUp"));
+const turnLock = useTurnLock(() => props.sid);
+const turnLocked = computed(() => capability.value.creditMode === "exhausted" || !!turnLock.value);
+// The open editor's Send waits for a running turn, and for the cross-tab lock that arrived while it was open.
+const editBlocked = computed(() => {
+  if (running.value) return t("assistant.composer.running");
+  return turnLock.value ? turnLockedReason.value : null;
+});
+const turnLockedReason = computed(() =>
+  turnLock.value ? t(turnLockKey(turnLock.value)) : t("assistant.message.creditsUsedUp"),
+);
 const isUser = computed(() => props.message.role === "user");
 // A turn started from the composer while the editor was open; the edit waits rather than being dropped.
 const running = computed(() => {
@@ -355,8 +367,8 @@ const items = computed<ActionItem[]>(() => {
         label: t("assistant.message.edit"),
         icon: assistantGlyph.edit,
         dataTest: "assistant-msg-edit",
-        disabled: creditsExhausted.value,
-        reason: creditsReason.value,
+        disabled: turnLocked.value,
+        reason: turnLockedReason.value,
         run: () => emit("edit"),
       },
       copyItem("prompt", t("assistant.message.copyPrompt"), "assistant-msg-copy-prompt", () =>
@@ -371,8 +383,8 @@ const items = computed<ActionItem[]>(() => {
       label: t("assistant.message.regenerate"),
       icon: assistantGlyph.regenerate,
       dataTest: "assistant-msg-regenerate",
-      disabled: creditsExhausted.value,
-      reason: creditsReason.value,
+      disabled: turnLocked.value,
+      reason: turnLockedReason.value,
       run: startRegenerate,
     });
   answer.push(
@@ -484,7 +496,7 @@ function removeChip(id: string): void {
 
 function sendEdit(): void {
   const text = draft.value.trim();
-  if (!text || running.value) return;
+  if (!text || editBlocked.value) return;
   trackAssistant("ai_thread_action", { action: "edit_resend" });
   void store.editResend(props.sid, {
     text,

@@ -102,6 +102,7 @@ import userService from "@/services/users";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { reuseRejection } from "@/utils/passwordComplexity";
 import { invalidateLoginData, useLocalCurrentUser, useLocalUserInfo } from "@/utils/zincutils";
+import { assistantSignOut } from "@/utils/assistant/assistantSignOut";
 
 import PasswordRequirementList from "./PasswordRequirementList.vue";
 import {
@@ -156,7 +157,9 @@ watch(
   { immediate: true },
 );
 
-const signOut = () => {
+const signOut = async () => {
+  // The changed password ends this session either way, so the assistant asks nothing and still cancels and purges.
+  await assistantSignOut({ forced: true });
   invalidateLoginData();
   store.dispatch("logout");
   useLocalCurrentUser("", true);
@@ -192,6 +195,6 @@ const submit = async (values: UpdatePasswordForm) => {
 
   // The session cookie IS the password, so the browser's credential went stale the moment the change landed.
   toast({ variant: "success", message: t("passwordReset.updated") });
-  signOut();
+  await signOut();
 };
 </script>

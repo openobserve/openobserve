@@ -322,7 +322,7 @@ describe("event catalogue", () => {
   });
 
   it("uses exactly the 99 §3.5 codes plus stopped_before_send for error_code", () => {
-    const codes: AiErrorCode[] = [
+    const codes = [
       "offline",
       "unreachable",
       "session_expired",
@@ -352,11 +352,16 @@ describe("event catalogue", () => {
       "approval_delivery_failed",
       "stream_oversized",
       "unknown",
-    ];
+    ] as const satisfies readonly AiErrorCode[];
     expect(new Set(codes).size).toBe(29);
     expectTypeOf<AiErrorCode>().toEqualTypeOf<(typeof codes)[number]>();
     expectTypeOf<Exclude<AssistantErrorCode, AiErrorCode>>().toEqualTypeOf<
-      "history_unavailable" | "off_for_org" | "data_level_blocked" | "permission_denied_tool"
+      | "history_unavailable"
+      | "off_for_org"
+      | "data_level_blocked"
+      | "permission_denied_tool"
+      | "approval_elsewhere"
+      | "account_changed"
     >();
   });
 });

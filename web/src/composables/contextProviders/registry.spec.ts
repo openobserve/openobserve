@@ -231,3 +231,17 @@ describe("ContextRegistry", () => {
     });
   });
 });
+
+describe("ContextRegistry getContextBelow", () => {
+  beforeEach(() => contextRegistry.cleanup());
+
+  it("reads what a pushed provider sits on: the entries pushed before it, else the page's", async () => {
+    contextRegistry.register("logs", { getContext: () => ({ currentPage: "logs" }) });
+    contextRegistry.setActive("logs");
+    expect(await contextRegistry.getContextBelow("dock")).toEqual({ currentPage: "logs" });
+    contextRegistry.push("pipeline", { getContext: () => ({ currentPage: "pipeline" }) });
+    contextRegistry.push("dock", { getContext: () => ({ currentPage: "dock" }) });
+    expect(await contextRegistry.getContextBelow("dock")).toEqual({ currentPage: "pipeline" });
+    expect(await contextRegistry.getActiveContext()).toEqual({ currentPage: "dock" });
+  });
+});

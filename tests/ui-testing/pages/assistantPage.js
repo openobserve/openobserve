@@ -159,6 +159,39 @@ export class AssistantPage {
     return notYet("WP-13");
   }
 
+  /** A host's docked chat; `hostId` is the dock's `data-host`. */
+  dock(hostId) {
+    return this.page.locator(`[data-test="assistant-shell-docked"][data-host="${hostId}"]`).filter({ visible: true });
+  }
+
+  /** The editor host's assistant toggle (`ai-entry-<host>-ask`). */
+  dockToggle(id) {
+    return this.page.locator(`[data-test="ai-entry-${id}-ask"]`).filter({ visible: true });
+  }
+
+  diff() {
+    return this.page.locator('[data-test="assistant-diff-block"]').filter({ visible: true });
+  }
+
+  aiLabel() {
+    return this.page.locator('[data-test="ai-label-editor"]').filter({ visible: true });
+  }
+
+  resizeHandle() {
+    return this.page.locator('[data-test="assistant-shell-resize-handle"]').filter({ visible: true });
+  }
+
+  /** The column or card around the sidebar shell, which carries `data-mode` and the width variable. */
+  sidebarHost() {
+    return this.page.locator('[data-test="assistant-sidebar-host"]');
+  }
+
+  /** The one lifecycle question shown (sign-out, org switch or leave guard). */
+  lifecycleDialog(kind) {
+    const ids = { sign_out: "assistant-shell-sign-out-dialog", org_switch: "assistant-shell-org-switch-dialog", leave_guard: "assistant-shell-leave-guard" };
+    return this.page.locator(`[data-test="${ids[kind]}"]`);
+  }
+
   settings(_tab) {
     return notYet("WP-14");
   }

@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div
       v-if="run?.status !== 'running'"
-      class="flex min-w-0 flex-nowrap items-center gap-2"
+      class="flex min-w-0 flex-wrap items-center gap-2"
       data-test="assistant-query-actions"
     >
       <OButton
@@ -113,11 +113,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="canInsert && mdUp"
         variant="ghost"
         size="sm"
+        :disabled="insertState !== 'idle'"
+        :focusable-unavailable="insertState !== 'idle'"
+        :icon-left="insertState === 'inserted' ? assistantGlyph.done : undefined"
         :class="['shrink-0', TOUCH_TARGET_CLASS]"
         data-test="assistant-query-insert"
+        :data-state="insertState"
         @click="insert"
       >
-        {{ t("assistant.query.insert") }}
+        {{ insertLabel }}
       </OButton>
       <ODropdown v-if="menuItems.length" align="end" privacy="mask">
         <template #trigger>
@@ -139,6 +143,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </ODropdownItem>
       </ODropdown>
     </div>
+
+    <OText
+      v-if="insertNote"
+      variant="meta"
+      as="p"
+      class="break-words"
+      data-test="assistant-query-insert-note"
+    >
+      {{ insertNote }}
+    </OText>
 
     <OInput
       v-if="manualCopy"
@@ -233,13 +247,19 @@ export interface AssistantQueryBlockProps {
 </script>
 
 <script setup lang="ts">
-import { computed, inject, nextTick, onBeforeUnmount, ref, watch } from "vue";
+import { computed, inject, nextTick, onBeforeUnmount, ref, shallowRef, watch, type Ref } from "vue";
 import { useRouter } from "vue-router";
 
 import AssistantIconButton from "@/components/ai-assistant/common/AssistantIconButton.vue";
 import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
 import { TOUCH_TARGET_CLASS } from "@/components/ai-assistant/common/touchTarget";
-import { assistantEvidenceHostKey, type AssistantAction } from "@/composables/assistant/pure";
+import {
+  assistantEvidenceHostKey,
+  proposalFor,
+  type AiLabelState,
+  type AssistantAction,
+  type InsertOutcome,
+} from "@/composables/assistant/pure";
 import useBreakpoint from "@/composables/useBreakpoint";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -320,9 +340,31 @@ const canRun = computed(
     run.value?.status !== "forbidden",
 );
 const canOpen = computed(() => !otherOrg.value && props.openable);
+const editorHost = computed(() => props.host ?? evidence?.host?.() ?? null);
 const canInsert = computed(
-  () => live.value && !!props.host && props.host.language === props.block.query.language,
+  () =>
+    live.value &&
+    !otherOrg.value &&
+    !!editorHost.value &&
+    editorHost.value.language === props.block.query.language,
 );
+// Insert reads as a review until the user decides in the editor, then as done and spent.
+const reviewing = ref(false);
+// The accepted text this block landed, by its label; a revert, an edit or a tab switch frees Insert again.
+const landed = shallowRef<{ label: Readonly<Ref<AiLabelState | null>>; at: number } | null>(null);
+const insertState = computed<"idle" | "review" | "inserted">(() => {
+  if (reviewing.value) return "review";
+  const label = landed.value?.label.value;
+  return label && label.acceptedAt === landed.value?.at && label.status === "written"
+    ? "inserted"
+    : "idle";
+});
+const insertNote = ref<I18nText | null>(null);
+const insertLabel = computed<I18nText>(() => {
+  if (insertState.value === "review") return t("assistant.diff.reviewInEditor");
+  if (insertState.value === "inserted") return t("assistant.helper.inserted");
+  return t("assistant.query.insert");
+});
 const openInNewTab = computed(() => !live.value || evidence?.prefersNewTab() === true);
 
 const openHref = computed(() => {
@@ -508,20 +550,41 @@ async function copyQuery(): Promise<void> {
   );
 }
 
-function insert(): void {
+async function insert(): Promise<void> {
+  const host = editorHost.value;
+  if (!host || insertState.value !== "idle") return;
   const { stream, from, to } = props.block.query;
-  void dispatch({
+  reviewing.value = true;
+  insertNote.value = null;
+  const result = await act({
     kind: "insert_into_editor",
     text: props.block.query.text,
     language: props.block.query.language,
-    hostId: props.host?.id ?? "inline",
+    hostId: host.id,
     mode: "replace",
     provenance: {
-      prompt: "",
+      prompt: promptOfTurn(),
       ...(stream && { stream }),
       ...(from && to && { range: { from, to } }),
     },
   });
+  const outcome = result.ok ? (result.detail as InsertOutcome | undefined) : undefined;
+  reviewing.value = false;
+  const label = proposalFor(host.id)?.label;
+  landed.value =
+    outcome?.decision === "accepted" && label?.value ? { label, at: label.value.acceptedAt } : null;
+  if (outcome?.decision === "no_change") insertNote.value = t("assistant.helper.noChange");
+  else if (outcome?.decision === "discarded") insertNote.value = t("assistant.helper.discarded");
+  else if (outcome?.note) insertNote.value = t(outcome.note);
+}
+
+// The provenance line quotes the user's own prompt of this turn, never the model's text.
+function promptOfTurn(): string {
+  const session = props.sid && evidence ? evidence.session(props.sid) : null;
+  const prompt = session?.messages.find(
+    (message) => message.role === "user" && message.turnId === props.turnId,
+  );
+  return String(prompt?.content ?? "");
 }
 
 function openSource(): void {

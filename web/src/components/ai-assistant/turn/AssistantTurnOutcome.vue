@@ -161,6 +161,8 @@ export interface AssistantTurnOutcomeProps {
   cancelUnconfirmed?: boolean;
   /** The values titles name: the org of `credits_exhausted`, the elapsed of `stream_dropped`. */
   org?: string;
+  /** The chat this outcome belongs to; its cross-tab lock disables the actions that start a turn. */
+  sid?: string;
   elapsedMs?: number;
   online?: boolean;
   /** Server mode: Retry save can apply (`80` §1.3). */
@@ -219,6 +221,13 @@ const ROLE_SPLIT_KINDS: Record<string, AskAdminKind> = {
 };
 
 const RETRYING: ReadonlySet<OutcomeAction> = new Set(["retry", "ask_again"]);
+
+const STARTS_TURN: ReadonlySet<OutcomeAction> = new Set([
+  "retry",
+  "ask_again",
+  "continue",
+  "edit_resend",
+]);
 
 /** Actions whose control does not exist yet; they lead to the setup guide, labelled as such (HT-02 AC 6). */
 export const DOCS_ACTIONS: ReadonlySet<OutcomeAction> = new Set(["open_settings", "change_level"]);
@@ -284,7 +293,12 @@ import AssistantErrorDetails, {
   ASSISTANT_SETUP_DOCS_URL,
 } from "@/components/ai-assistant/common/AssistantErrorDetails.vue";
 import { explorerLabel } from "@/components/ai-assistant/evidence/evidenceText";
-import { errorTitle, useAssistantName } from "@/composables/assistant/pure";
+import {
+  errorTitle,
+  turnLockKey,
+  useAssistantName,
+  useTurnLock,
+} from "@/composables/assistant/pure";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
@@ -414,7 +428,12 @@ const actionLabel = computed<I18nText>(() => {
   return outcomeActionLabel(value, code.value ?? "unknown", props.role, t, te);
 });
 
+// A signed-out tab, or another tab holding this chat's approval, may not start a turn from here.
+const turnLock = useTurnLock(() => props.sid ?? null);
+
 const disabledReason = computed<I18nText | null>(() => {
+  if (turnLock.value && STARTS_TURN.has(action.value ?? "none"))
+    return t(turnLockKey(turnLock.value));
   if (!RETRYING.has(action.value ?? "none")) return null;
   if (!props.online) return t("assistant.outcome.retryOffline");
   if (!props.retrySnapshotAvailable) return t("assistant.outcome.noSnapshot");
