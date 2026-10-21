@@ -2829,6 +2829,18 @@ describe("AnalyticsFunnels", () => {
       ["c", "d"],
     ];
 
+    const fourPages = [
+      ["p", "/a"],
+      ["p", "/b"],
+      ["p", "/c"],
+      ["p", "/d"],
+    ];
+    const FROM = "rum-analytics-funnel-trend-from-select";
+    const TO = "rum-analytics-funnel-trend-to-select";
+    const sel = (dt: string) => wrapper!.findComponent(`[data-test="${dt}"]`);
+    const follows = (a: Element, b: Element) =>
+      !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+
     beforeEach(() => {
       routes.unshift([/ AS bk, | AS gd, /, () => [{ bk: 1, ca: 20, cb: 5 }]]);
     });
@@ -2838,7 +2850,7 @@ describe("AnalyticsFunnels", () => {
       await setSteps(fourSteps);
       expect(trendCalls()).toHaveLength(0);
       expect(wrapper!.find('[data-test="rum-analytics-funnel-trend"]').exists()).toBe(false);
-      expect(wrapper!.find('[data-test="rum-analytics-funnel-trend-pair"]').exists()).toBe(false);
+      expect(wrapper!.find('[data-test="rum-analytics-funnel-trend-steps"]').exists()).toBe(false);
     });
 
     it("Trend runs once, writes fv=trend, holds Alert me back, and Steps comes back without a rerun", async () => {
@@ -2899,10 +2911,140 @@ describe("AnalyticsFunnels", () => {
       expect(trendCalls().at(-1)!.sql).toMatch(
         /SUM\(r2\) AS ca, SUM\(r3\) AS cb FROM ps WHERE r2 = 1/,
       );
-      expect(text("rum-analytics-funnel-trend-pair")).toContain("Step 2 → Step 3");
+      expect(sel(FROM).props("modelValue")).toBe(2);
+      expect(sel(TO).props("modelValue")).toBe(3);
       useProductAnalytics().funnelPair.value = { a: 3, b: 9 };
       await settle();
       expect(trendCalls().at(-1)!.sql).toMatch(/SUM\(r1\) AS ca, SUM\(r4\) AS cb/);
+      expect(sel(FROM).props("modelValue")).toBe(1);
+      expect(sel(TO).props("modelValue")).toBe(4);
+    });
+
+    it("removing a step resets a pair it breaks to step 1 → the last step", async () => {
+      await mountFunnels({ fv: "trend", fp: "3-4" });
+      await setSteps(fourSteps);
+      expect(sel(FROM).props("modelValue")).toBe(3);
+      await setSteps(fourSteps.slice(0, 3));
+      expect(sel(FROM).props("modelValue")).toBe(1);
+      expect(sel(TO).props("modelValue")).toBe(3);
+      expect(trendCalls().at(-1)!.sql).toMatch(/SUM\(r1\) AS ca, SUM\(r3\) AS cb/);
+    });
+
+    it("Trend puts Conversion from, to and Interval in a row under the toolbar, with no pair select left in the toolbar", async () => {
+      await mountFunnels({ fv: "trend" });
+      await setSteps(fourSteps);
+      const row = wrapper!.find('[data-test="rum-analytics-funnel-trend-steps"]');
+      expect(row.exists()).toBe(true);
+      expect(row.text()).toContain("Conversion from");
+      expect(row.text()).toContain("Interval");
+      const fromId = sel(FROM).props("id") as string;
+      expect(fromId).toBeTruthy();
+      expect(row.find(`label[for="${fromId}"]`).text()).toBe("Conversion from");
+      const toId = sel(TO).props("id") as string;
+      expect(toId).toBeTruthy();
+      expect(row.find(`label[for="${toId}"]`).text()).toBe("to");
+      for (const dt of [FROM, TO, "rum-analytics-funnel-trend-interval-select"])
+        expect(row.find(`[data-test="${dt}"]`).exists()).toBe(true);
+      const controls = wrapper!.find('[data-test="rum-analytics-funnel-toolbar-controls"]');
+      expect(controls.find(`[data-test="${FROM}"]`).exists()).toBe(false);
+      expect(
+        controls.find('[data-test="rum-analytics-funnel-trend-interval-select"]').exists(),
+      ).toBe(false);
+      expect(wrapper!.find('[data-test="rum-analytics-funnel-trend-pair"]').exists()).toBe(false);
+      expect(wrapper!.find('[data-test="rum-analytics-funnel-trend-pair-select"]').exists()).toBe(
+        false,
+      );
+      expect(controls.text()).not.toContain("Conversion from");
+      const chart = wrapper!.find('[data-test="rum-analytics-funnel-trend"]');
+      expect(follows(controls.element, row.element)).toBe(true);
+      expect(follows(row.element, chart.element)).toBe(true);
+    });
+
+    it("from lists steps 1 to n-1 and to the later steps, as N · step name, with the last step marked", async () => {
+      await mountFunnels({ fv: "trend" });
+      await setSteps(fourPages);
+      const labels = (dt: string) =>
+        (sel(dt).props("options") as { label: unknown }[]).map((o) => String(o.label));
+      const values = (dt: string) =>
+        (sel(dt).props("options") as { value: unknown }[]).map((o) => o.value);
+      expect(labels(FROM)).toEqual(["1 · /a", "2 · /b", "3 · /c"]);
+      expect(values(FROM)).toEqual([1, 2, 3]);
+      expect(values(TO)).toEqual([2, 3, 4]);
+      const to = labels(TO);
+      expect(to[0]).toBe("2 · /b");
+      expect(to[1]).toBe("3 · /c");
+      expect(to[2]).toContain("4 · /d");
+      expect(to[2]).toContain("last step");
+      expect(sel(FROM).props("modelValue")).toBe(1);
+      expect(sel(TO).props("modelValue")).toBe(4);
+    });
+
+    it("picking from and to writes fp, from at or past to moves to to the last step, and step 1 → last drops fp", async () => {
+      await mountFunnels({ fv: "trend" });
+      await setSteps(fourSteps);
+      const pick = async (dt: string, v: number) => {
+        sel(dt).vm.$emit("update:modelValue", v);
+        await settle();
+      };
+      await pick(FROM, 2);
+      expect(router.currentRoute.value.query.fp).toBe("2-4");
+      expect((sel(TO).props("options") as { value: unknown }[]).map((o) => o.value)).toEqual([
+        3, 4,
+      ]);
+      expect(trendCalls().at(-1)!.sql).toMatch(/SUM\(r2\) AS ca, SUM\(r4\) AS cb/);
+      await pick(TO, 3);
+      expect(router.currentRoute.value.query.fp).toBe("2-3");
+      await pick(FROM, 3);
+      expect(router.currentRoute.value.query.fp).toBe("3-4");
+      expect(sel(TO).props("modelValue")).toBe(4);
+      await pick(FROM, 1);
+      expect(router.currentRoute.value.query.fp).toBeUndefined();
+      expect(sel(TO).props("modelValue")).toBe(4);
+    });
+
+    it("a 2-step funnel shows both step selects disabled", async () => {
+      await mountFunnels({ fv: "trend" });
+      await setSteps(fourSteps.slice(0, 2));
+      expect(sel(FROM).props("disabled")).toBe(true);
+      expect(sel(TO).props("disabled")).toBe(true);
+      await setSteps(fourSteps.slice(0, 3));
+      expect(sel(FROM).props("disabled")).toBeFalsy();
+      expect(sel(TO).props("disabled")).toBeFalsy();
+    });
+
+    it("a step's Show conversion trend from this step opens Trend from that step to the last", async () => {
+      await mountFunnels();
+      await setSteps(fourSteps);
+      expect(wrapper!.find('[data-test="rum-analytics-funnel-step-3-trend-from"]').exists()).toBe(
+        false,
+      );
+      await wrapper!.find('[data-test="rum-analytics-funnel-step-1-trend-from"]').trigger("click");
+      await settle();
+      expect(router.currentRoute.value.query.fv).toBe("trend");
+      expect(router.currentRoute.value.query.fp).toBe("2-4");
+      expect(sel(FROM).props("modelValue")).toBe(2);
+      expect(sel(TO).props("modelValue")).toBe(4);
+      expect(trendCalls().at(-1)!.sql).toMatch(/SUM\(r2\) AS ca, SUM\(r4\) AS cb/);
+    });
+
+    it("Show conversion trend from this step moves focus to the Conversion from select", async () => {
+      await mountFunnels();
+      await setSteps(fourSteps);
+      await wrapper!.find('[data-test="rum-analytics-funnel-step-1-trend-from"]').trigger("click");
+      await settle();
+      expect(document.activeElement).not.toBe(document.body);
+      expect(sel(FROM).element.contains(document.activeElement)).toBe(true);
+    });
+
+    it("trend-from-step on step 1 opens Trend at the default pair, clearing a picked one", async () => {
+      await mountFunnels({ fp: "2-3" });
+      await setSteps(fourSteps);
+      wrapper!.findComponent({ name: "FunnelLayoutRail" }).vm.$emit("trend-from-step", 1);
+      await settle();
+      expect(router.currentRoute.value.query.fv).toBe("trend");
+      expect(router.currentRoute.value.query.fp).toBeUndefined();
+      expect(sel(FROM).props("modelValue")).toBe(1);
+      expect(sel(TO).props("modelValue")).toBe(4);
     });
 
     it("with compare on, runs the trend again over the window before", async () => {
@@ -2928,6 +3070,26 @@ describe("AnalyticsFunnels", () => {
       }[];
       expect(panels[0].type).toBe("line");
       expect(panels[0].queries[0].query).toContain("histogram(entry_ts, '1 day')");
+    });
+
+    it("Add to dashboard from Trend bakes the picked steps and interval into the panel", async () => {
+      await mountFunnels({ fv: "trend", period: "30d" });
+      await setSteps(fourSteps);
+      sel(FROM).vm.$emit("update:modelValue", 2);
+      await settle();
+      sel(TO).vm.$emit("update:modelValue", 3);
+      await settle();
+      sel("rum-analytics-funnel-trend-interval-select").vm.$emit("update:modelValue", "week");
+      await settle();
+      expect(useProductAnalytics().funnelPair.value).toEqual({ a: 2, b: 3 });
+      await wrapper!.find('[data-test="rum-analytics-funnel-add-dashboard-btn"]').trigger("click");
+      await flushPromises();
+      const panels = wrapper!.findComponent({ name: "AddToDashboard" }).props("panels") as {
+        title: string;
+        queries: { query: string }[];
+      }[];
+      expect(String(panels[0].title)).toBe("Conversion over time: b → /c");
+      expect(panels[0].queries[0].query).toContain("histogram(entry_ts, '1 week')");
     });
   });
 });

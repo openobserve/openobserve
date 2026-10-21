@@ -195,6 +195,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @load-fields="fieldSample.load()"
         @break-down="breakDownBy"
         @break-down-step="breakDownAtStep"
+        @trend-from-step="trendFromStep"
         @dropoff="openDropoff"
         @suggestions-retry="retrySuggestions"
         @include-hidden="appFilters.setIncludeHidden(router, true)"
@@ -391,41 +392,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @update:model-value="(v) => update({ window: v as FunnelWindow })"
             />
           </span>
-          <template v-if="trend.shown.value">
-            <span class="border-border-default h-5 border-s max-md:hidden" aria-hidden="true" />
-            <span class="flex items-center gap-2" data-test="rum-analytics-funnel-trend-pair">
-              <label
-                for="rum-analytics-funnel-trend-pair"
-                class="text-text-secondary text-xs font-semibold"
-                >{{ t("rum.analytics.funnel.trendPair") }}</label
-              >
-              <OSelect
-                id="rum-analytics-funnel-trend-pair"
-                :model-value="trend.pairValue.value"
-                :options="trend.pairOptions.value"
-                size="xs"
-                width="sm"
-                data-test="rum-analytics-funnel-trend-pair-select"
-                @update:model-value="trend.setPair"
-              />
-            </span>
-            <span class="flex items-center gap-2" data-test="rum-analytics-funnel-trend-interval">
-              <label
-                for="rum-analytics-funnel-trend-interval"
-                class="text-text-secondary text-xs font-semibold"
-                >{{ t("rum.analytics.funnel.trendInterval") }}</label
-              >
-              <OSelect
-                id="rum-analytics-funnel-trend-interval"
-                :model-value="pa.funnelInterval.value"
-                :options="trend.intervalOptions.value"
-                size="xs"
-                width="xs"
-                data-test="rum-analytics-funnel-trend-interval-select"
-                @update:model-value="trend.setInterval"
-              />
-            </span>
-          </template>
           <span class="ms-auto flex items-center gap-2" data-test="rum-analytics-funnel-compare">
             <span>
               <OSwitch
@@ -449,6 +415,63 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
         </template>
         <template #notices>
+          <div
+            v-if="trend.shown.value"
+            class="flex flex-wrap items-center gap-3 px-4 pt-2.5"
+            data-test="rum-analytics-funnel-trend-steps"
+          >
+            <span ref="trendFromField" class="flex items-center gap-2">
+              <label
+                for="rum-analytics-funnel-trend-from"
+                class="text-text-secondary text-xs font-semibold"
+                >{{ t("rum.analytics.funnel.trendFrom") }}</label
+              >
+              <OSelect
+                id="rum-analytics-funnel-trend-from"
+                :model-value="trend.pair.value.a"
+                :options="trend.fromOptions.value"
+                :disabled="def.steps.length < 3"
+                size="xs"
+                width="sm"
+                data-test="rum-analytics-funnel-trend-from-select"
+                @update:model-value="trend.setFrom"
+              />
+            </span>
+            <span class="flex items-center gap-2">
+              <label
+                for="rum-analytics-funnel-trend-to"
+                class="text-text-secondary text-xs font-semibold"
+                >{{ t("rum.analytics.funnel.trendTo") }}</label
+              >
+              <OSelect
+                id="rum-analytics-funnel-trend-to"
+                :model-value="trend.pair.value.b"
+                :options="trend.toOptions.value"
+                :disabled="def.steps.length < 3"
+                size="xs"
+                width="sm"
+                data-test="rum-analytics-funnel-trend-to-select"
+                @update:model-value="trend.setTo"
+              />
+            </span>
+            <span class="border-border-default h-5 border-s max-md:hidden" aria-hidden="true" />
+            <span class="flex items-center gap-2" data-test="rum-analytics-funnel-trend-interval">
+              <label
+                for="rum-analytics-funnel-trend-interval"
+                class="text-text-secondary text-xs font-semibold"
+                >{{ t("rum.analytics.funnel.trendInterval") }}</label
+              >
+              <OSelect
+                id="rum-analytics-funnel-trend-interval"
+                :model-value="pa.funnelInterval.value"
+                :options="trend.intervalOptions.value"
+                size="xs"
+                width="xs"
+                data-test="rum-analytics-funnel-trend-interval-select"
+                @update:model-value="trend.setInterval"
+              />
+            </span>
+          </div>
           <span
             v-if="usersMode && result && result.step1Sessions !== null"
             class="text-text-secondary flex items-center gap-1 px-4 text-xs"
@@ -997,6 +1020,7 @@ const trend = useFunnelTrend({
   funnelKey: computed(() => funnelKey.value),
   compareActive,
   rankStep: trendRank,
+  stepNames,
 });
 
 const fieldSample = useFunnelFieldSample({ pa, runner, def, events });
@@ -1451,6 +1475,19 @@ const showBreakdownSection = async () => {
 const breakDownAtStep = (step: number) => {
   revealBreakdownSection();
   setTimeout(() => breakdownControl.value?.openForStep(step), MENU_CLOSE_MS);
+};
+
+const trendFromField = ref<HTMLElement | null>(null);
+
+const trendFromStep = (step: number) => {
+  trend.setFrom(step);
+  trend.setTo(def.value.steps.length);
+  setView("trend");
+  // The step menu's trigger unmounts with the table, so focus would otherwise fall to the page.
+  setTimeout(
+    () => trendFromField.value?.querySelector<HTMLElement>('[role="combobox"]')?.focus(),
+    MENU_CLOSE_MS,
+  );
 };
 
 const onWhyOpen = (open: boolean) => {

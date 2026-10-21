@@ -177,6 +177,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @filter-values="(f) => emit('filter-values', f)"
                   @load-fields="emit('load-fields')"
                   @break-down-step="(k) => emit('break-down-step', k)"
+                  @trend-from-step="(k) => emit('trend-from-step', k)"
                 />
               </div>
               <slot name="footer" />

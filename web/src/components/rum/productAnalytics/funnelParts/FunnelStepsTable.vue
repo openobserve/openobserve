@@ -266,6 +266,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @select="emit('break-down-step', i + 1)"
                 >{{ t("rum.analytics.funnel.breakDownByStep") }}</ODropdownItem
               >
+              <ODropdownItem
+                v-if="i < def.steps.length - 1"
+                icon-left="show-chart"
+                :data-test="`rum-analytics-funnel-step-${i}-trend-from`"
+                @select="emit('trend-from-step', i + 1)"
+                >{{ t("rum.analytics.funnel.trendFromHere") }}</ODropdownItem
+              >
             </ODropdown>
             <OButton
               variant="ghost"
@@ -401,6 +408,7 @@ const emit = defineEmits<{
   "filter-values": [string];
   "load-fields": [];
   "break-down-step": [number];
+  "trend-from-step": [number];
 }>();
 const { t } = useI18nTyped();
 const { labelOf, kindLabel, kindVariant, filterChips } = useStepLabels(

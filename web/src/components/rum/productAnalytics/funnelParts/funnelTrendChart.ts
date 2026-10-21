@@ -52,14 +52,6 @@ const stillConvertingData = (
       : null;
   });
 
-// A bucket is a gap only when no series has entrants there; before-data is the same for every series.
-const bands = (input: TrendChartInput) =>
-  (input.series[0]?.data.buckets ?? []).flatMap((b, i) => {
-    const gap = b.beforeData || input.series.every((s) => s.data.buckets[i]?.empty);
-    const label = gap ? input.bandLabel(b) : null;
-    return label ? [[{ name: label, xAxis: i - 0.5 }, { xAxis: i + 0.5 }]] : [];
-  });
-
 const tooltipFor = (input: TrendChartInput, t: TranslateFn) => (raw: unknown) => {
   const params = (Array.isArray(raw) ? raw : [raw]) as { dataIndex: number }[];
   const i = params[0]?.dataIndex ?? 0;
@@ -97,11 +89,10 @@ const tooltipFor = (input: TrendChartInput, t: TranslateFn) => (raw: unknown) =>
   return lines.join("<br/>");
 };
 
-/** ECharts options drawn like the dashboard line panel, plus the gap bands and the still-converting segment. */
+/** ECharts options drawn like the dashboard line panel, plus the still-converting segment. */
 export function trendChartOptions(input: TrendChartInput, t: TranslateFn): Record<string, unknown> {
   const palette = getColorPalette();
   const grey = chartColor("--color-text-secondary");
-  const band = chartColor("--color-surface-subtle");
   const anyRunning = input.series.some((s) => s.data.buckets.some((b) => b.stillConverting));
   const series: Record<string, unknown>[] = input.series.flatMap((s, k) => {
     const color = palette[k % palette.length];
@@ -115,16 +106,6 @@ export function trendChartOptions(input: TrendChartInput, t: TranslateFn): Recor
       color,
       lineStyle: { width: LINE_WIDTH },
       data: s.data.buckets.map((b, i) => [i, point(b)]),
-      ...(k === 0
-        ? {
-            markArea: {
-              silent: true,
-              itemStyle: { color: band },
-              label: { color: grey, position: "insideTop" },
-              data: bands(input),
-            },
-          }
-        : {}),
     };
     if (!anyRunning) return [main];
     return [

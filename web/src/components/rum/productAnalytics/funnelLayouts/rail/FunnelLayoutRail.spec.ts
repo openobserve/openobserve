@@ -30,6 +30,7 @@ vi.mock("@/composables/rum/useStepOptions", async (importOriginal) => {
 
 import { resetStepOptions } from "@/utils/rum/__fixtures__/stepOptionsMock";
 import FunnelLayoutRail from "./FunnelLayoutRail.vue";
+import FunnelStepsTable from "../../funnelParts/FunnelStepsTable.vue";
 
 const store = createStore({
   state: { selectedOrganization: { identifier: "org1" }, timezone: "UTC", zoConfig: {} },
@@ -144,6 +145,13 @@ describe("FunnelLayoutRail", () => {
     const w = mountRail();
     expect(w.find('[data-test="rum-analytics-funnel-rail-settings"]').exists()).toBe(false);
     expect(w.find("aside").text()).not.toContain("Settings");
+  });
+
+  it("forwards a step row's trend-from-step to the page", async () => {
+    const w = mountRail();
+    w.findComponent(FunnelStepsTable).vm.$emit("trend-from-step", 1);
+    await w.vm.$nextTick();
+    expect(w.emitted("trend-from-step")).toEqual([[1]]);
   });
 
   it("renders the breakdown slot as the rail's first section, above Filter all steps", () => {

@@ -17,14 +17,13 @@ import { computed, ref, type ComputedRef, type Ref } from "vue";
 import type useAnalyticsSearch from "@/composables/rum/useAnalyticsSearch";
 import type { PanelState } from "@/composables/rum/useAnalyticsSearch";
 import type useProductAnalytics from "@/composables/rum/useProductAnalytics";
-import type { I18nText, TranslateFn } from "@/types/i18n";
+import { raw, type I18nText, type TranslateFn } from "@/types/i18n";
 import { formatWindow, previousWindow, type UsWindow } from "@/utils/rum/funnelCompare";
 import {
   alignPrevious,
   foldTrend,
   pairParam,
   parseInterval,
-  parsePair,
   previousTrendPeriods,
   resolveInterval,
   resolvePair,
@@ -61,6 +60,7 @@ interface TrendDeps {
   timezone: ComputedRef<string>;
   funnelKey: ComputedRef<string>;
   compareActive: ComputedRef<boolean>;
+  stepNames: ComputedRef<readonly string[]>;
   /** The step a breakdown's lines are ranked at; null while it is still unknown. */
   rankStep?: ComputedRef<number | null>;
 }
@@ -159,15 +159,26 @@ export default function useFunnelTrend(deps: TrendDeps) {
     return { status: "ok", buckets: alignPrevious(series.value[0], before), range };
   });
 
-  const pairOptions = computed(() => {
-    const n = def.value.steps.length;
-    return Array.from({ length: n }, (_, i) => i + 1).flatMap((a) =>
-      Array.from({ length: n - a }, (_, j) => a + j + 1).map((b) => ({
-        label: t("rum.analytics.funnel.trendPairOption", { a, b }),
-        value: pairParam({ a, b }),
-      })),
-    );
-  });
+  const stepOption = (n: number) => {
+    const label = raw(`${n} · ${deps.stepNames.value[n - 1] ?? ""}`);
+    return {
+      label:
+        n === def.value.steps.length
+          ? t("rum.analytics.funnel.trendLastStep", { step: label })
+          : label,
+      value: n,
+    };
+  };
+
+  const fromOptions = computed(() =>
+    Array.from({ length: Math.max(0, def.value.steps.length - 1) }, (_, i) => stepOption(i + 1)),
+  );
+
+  const toOptions = computed(() =>
+    Array.from({ length: def.value.steps.length - pair.value.a }, (_, i) =>
+      stepOption(pair.value.a + i + 1),
+    ),
+  );
 
   const pairLabel = computed<I18nText>(() =>
     t("rum.analytics.funnel.trendPairOption", { a: pair.value.a, b: pair.value.b }),
@@ -213,9 +224,22 @@ export default function useFunnelTrend(deps: TrendDeps) {
     });
   });
 
-  const setPair = (v: unknown) => {
-    const p = parsePair(v);
-    pa.funnelPair.value = p && !(p.a === 1 && p.b === def.value.steps.length) ? p : null;
+  // Step 1 to the last step is the default, so it stays out of the link.
+  const writePair = (a: number, b: number) => {
+    pa.funnelPair.value = a === 1 && b === def.value.steps.length ? null : { a, b };
+  };
+
+  const setFrom = (v: unknown) => {
+    const a = Number(v);
+    const n = def.value.steps.length;
+    if (!Number.isInteger(a) || a < 1 || a >= n) return;
+    writePair(a, pair.value.b > a ? pair.value.b : n);
+  };
+
+  const setTo = (v: unknown) => {
+    const b = Number(v);
+    if (!Number.isInteger(b) || b <= pair.value.a || b > def.value.steps.length) return;
+    writePair(pair.value.a, b);
   };
 
   const setInterval = (v: unknown) => {
@@ -304,7 +328,6 @@ export default function useFunnelTrend(deps: TrendDeps) {
     key,
     pair,
     pairLabel,
-    pairValue: computed(() => pairParam(pair.value)),
     interval,
     periods,
     issue,
@@ -312,10 +335,12 @@ export default function useFunnelTrend(deps: TrendDeps) {
     series,
     previous,
     breakdown,
-    pairOptions,
+    fromOptions,
+    toOptions,
     intervalOptions,
     rangeText,
-    setPair,
+    setFrom,
+    setTo,
     setInterval,
     hold,
     run,
