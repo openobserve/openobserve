@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
         </span>
         <span />
-        <span />
+        <span class="bg-surface-subtle self-stretch md:sticky md:end-0" />
       </div>
     </div>
     <VueDraggableNext
@@ -220,7 +220,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template v-else>
             <OSkeleton v-for="n in numberCols" :key="n" type="text" class="h-5 w-full" />
           </template>
-          <span class="flex items-center justify-end gap-0.5">
+          <span class="md:bg-surface-base flex items-center justify-end gap-0.5 md:sticky md:end-0">
             <StepConditionPopover
               :step="step"
               :index="i"

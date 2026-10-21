@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import FunnelBreakdownControl from "./FunnelBreakdownControl.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -194,6 +194,23 @@ describe("FunnelBreakdownControl, the rail's Breakdown section", () => {
     expect(document.activeElement).toBe(w.find(dt(ADD)).element);
   });
 
+  it("focus() shows the focus ring on the chip, or on the + when there is no breakdown", async () => {
+    const focus = vi.spyOn(HTMLElement.prototype, "focus");
+    try {
+      const w = mountControl({ def: { ...DEF, breakdown: "browser" } });
+      (w.vm as unknown as { focus: () => void }).focus();
+      expect(document.activeElement).toBe(w.find(dt(CHIP)).element);
+      expect(focus.mock.contexts.at(-1)).toBe(w.find(dt(CHIP)).element);
+      expect(focus.mock.calls.at(-1)).toEqual([{ focusVisible: true }]);
+      await w.setProps({ def: DEF });
+      (w.vm as unknown as { focus: () => void }).focus();
+      expect(focus.mock.contexts.at(-1)).toBe(w.find(dt(ADD)).element);
+      expect(focus.mock.calls.at(-1)).toEqual([{ focusVisible: true }]);
+    } finally {
+      focus.mockRestore();
+    }
+  });
+
   it("the chip's remove control clears the breakdown", async () => {
     const w = mountControl({ def: { ...DEF, breakdown: "browser" } });
     expect(removeBtn(w).exists()).toBe(true);
@@ -206,7 +223,7 @@ describe("FunnelBreakdownControl, the rail's Breakdown section", () => {
     const w = mountControl({ def: { ...DEF, breakdown: { f: PAY } }, start: START });
     expect(w.find(dt(CHIP)).text()).toContain(PAY);
     const from = w.find(dt("rum-analytics-funnel-breakdown-from-step"));
-    expect(from.text()).toBe("From step 2");
+    expect(from.text()).toBe("Automatic (step 2)");
     expect(
       w.find(dt(CHIP)).element.compareDocumentPosition(from.element) &
         Node.DOCUMENT_POSITION_FOLLOWING,
@@ -219,9 +236,21 @@ describe("FunnelBreakdownControl, the rail's Breakdown section", () => {
     );
     await w.find(dt("rum-analytics-funnel-breakdown-from-3")).trigger("click");
     expect(lastDef(w).breakdown).toEqual({ f: PAY, s: 3 });
-    await w.setProps({ def: { ...DEF, breakdown: { f: PAY, s: 3 } } });
+    await w.setProps({
+      def: { ...DEF, breakdown: { f: PAY, s: 3 } },
+      start: { ...START, step: 3, pinned: true },
+    });
+    expect(w.find(dt("rum-analytics-funnel-breakdown-from-step")).text()).toBe("From step 3");
     await w.find(dt("rum-analytics-funnel-breakdown-from-auto")).trigger("click");
     expect(lastDef(w).breakdown).toEqual({ f: PAY });
+  });
+
+  it("without a start, Value from names a pinned step or reads Automatic", () => {
+    const w = mountControl({ def: { ...DEF, breakdown: { f: PAY, s: 3 } } });
+    expect(w.find(dt("rum-analytics-funnel-breakdown-from-step")).text()).toBe("From step 3");
+    wrapper!.unmount();
+    const a = mountControl({ def: { ...DEF, breakdown: { f: PAY } } });
+    expect(a.find(dt("rum-analytics-funnel-breakdown-from-step")).text()).toBe("Automatic");
   });
 
   it("from any step names the share that carries a value", () => {

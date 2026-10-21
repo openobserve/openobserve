@@ -231,15 +231,24 @@ describe("trend ranking for an attribute breakdown", () => {
 });
 
 describe("per-step field sample", () => {
+  const p = (key: string): StepRef => ({ kind: "p", key });
+  const pageSteps = [p("/cart"), c("checkout_started"), p("/checkout/shipping")];
+  // The step-flag subquery: everything from its SELECT up to the _rumdata scan.
+  const flagScan = (sql: string) => {
+    const scan = sql.indexOf('FROM "_rumdata"');
+    return sql.slice(sql.lastIndexOf("(SELECT ", scan), scan);
+  };
+
   it("ranks each step's own rows, so a row matching two steps is sampled for both", () => {
     const sql = stepFieldSampleSql(s, def(), [], [PAY, "context_plan", "context_missing"], 200);
     assertJoinFree(sql);
     expect(sql).toContain(
       "CASE WHEN (type = 'action' AND action_target_name <> '' AND regexp_replace(",
     );
-    expect(sql).toMatch(/THEN 1 ELSE 0 END AS s1, ROW_NUMBER\(\) OVER \(PARTITION BY CASE WHEN/);
-    expect(sql).toContain("ORDER BY _timestamp DESC) AS r3");
-    expect(sql).toContain(`AS r3, "${PAY}", "context_plan" FROM "_rumdata"`);
+    for (const i of [1, 2, 3])
+      expect(sql).toContain(
+        `ROW_NUMBER() OVER (PARTITION BY s${i} ORDER BY _timestamp DESC) AS r${i}`,
+      );
     expect(sql.startsWith(`SELECT s1, s2, s3, "${PAY}", "context_plan" FROM (`)).toBe(true);
     expect(sql).not.toContain("context_missing");
     expect(
@@ -249,10 +258,33 @@ describe("per-step field sample", () => {
     ).toBe(true);
   });
 
+  it("flags the steps in an inner subquery and partitions by the flag columns, so page steps plan", () => {
+    const sql = stepFieldSampleSql(s, def({ steps: pageSteps }), [], [PAY], 200);
+    assertJoinFree(sql);
+    expect(sql).not.toMatch(/PARTITION BY CASE/);
+    for (const i of [1, 2, 3])
+      expect(sql).toContain(
+        `ROW_NUMBER() OVER (PARTITION BY s${i} ORDER BY _timestamp DESC) AS r${i}`,
+      );
+    const inner = flagScan(sql);
+    expect(inner).toMatch(/^\(SELECT CASE WHEN .+ THEN 1 ELSE 0 END AS s1, /);
+    expect(inner).toMatch(/ THEN 1 ELSE 0 END AS s3, /);
+    expect(inner).toContain("_timestamp");
+    expect(inner).toContain(`"${PAY}"`);
+    expect(inner).not.toContain("ROW_NUMBER");
+    expect(sql.indexOf("ROW_NUMBER")).toBeLessThan(sql.lastIndexOf("(SELECT CASE WHEN"));
+    expect(sql.startsWith(`SELECT s1, s2, s3, "${PAY}" FROM (`)).toBe(true);
+    expect(
+      sql.endsWith(
+        "WHERE (s1 = 1 AND r1 <= 200) OR (s2 = 1 AND r2 <= 200) OR (s3 = 1 AND r3 <= 200)",
+      ),
+    ).toBe(true);
+  });
+
   it("reads only the step flags when no field is sampled", () => {
     const sql = stepFieldSampleSql(s, def(), [], [], 200);
-    expect(sql.startsWith("SELECT s1, s2, s3 FROM (SELECT CASE")).toBe(true);
-    expect(sql).toContain(' AS r3 FROM "_rumdata"');
+    expect(sql.startsWith("SELECT s1, s2, s3 FROM (SELECT s1, s2, s3, ROW_NUMBER()")).toBe(true);
+    expect(flagScan(sql)).toMatch(/ END AS s3, _timestamp $/);
   });
 });
 
