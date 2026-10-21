@@ -19,7 +19,7 @@ use axum::{
     Json,
     extract::{Path, Query},
     http::StatusCode,
-    response::Response,
+    response::{IntoResponse, Response},
 };
 use common::utils::sql::escape_like;
 use config::{
@@ -49,7 +49,7 @@ use crate::{
     common::{meta::http::HttpResponse as MetaHttpResponse, utils::http::get_or_create_trace_id},
     service::{
         auth::check_folder_write_permissions,
-        workflows::{self, InputMap},
+        workflows::{self, InputMap, TriggerWorkflowError},
     },
 };
 
@@ -85,6 +85,13 @@ pub struct WorkflowRetryDetails {
     from_node: Option<String>,
 }
 
+#[derive(Serialize, ToSchema)]
+pub struct WorkflowTriggerResponse {
+    #[serde(flatten)]
+    pub base: MetaHttpResponse,
+    pub run_id: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WorkflowHistoryQuery {
     /// Start time in Unix timestamp microseconds
@@ -110,6 +117,8 @@ struct WorkflowHistoryRow {
     source_id: String,
     #[serde(default)]
     run_id: String,
+    #[serde(default)]
+    status: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -875,8 +884,9 @@ pub async fn test_workflow(
     ),
     request_body(content = Vec<serde_json::Value>, description = "Workflow inputs, one JSON value per input event", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = WorkflowTriggerResponse),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
+        (status = 409, description = "The workflow is disabled", content_type = "application/json", body = ()),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Workflows", "operation": "create"})),
@@ -888,11 +898,27 @@ pub async fn trigger_workflow(
     Json(inputs): Json<Vec<serde_json::Value>>,
 ) -> Response {
     match workflows::trigger_workflow(&org_id, &workflow_id, inputs, &user_email.user_id).await {
-        Ok(trace_id) => MetaHttpResponse::json(
-            MetaHttpResponse::message(StatusCode::OK, "Workflow triggered successfully")
-                .with_trace_id(trace_id),
-        ),
-        Err(e) => MetaHttpResponse::bad_request(e),
+        Ok(run) => {
+            let mut base =
+                MetaHttpResponse::message(StatusCode::OK, "Workflow triggered successfully");
+            base.with_trace_id(run.trace_id);
+            MetaHttpResponse::json(WorkflowTriggerResponse {
+                base,
+                run_id: run.run_id,
+            })
+        }
+        Err(TriggerWorkflowError::Disabled) => {
+            let mut body = MetaHttpResponse::error(
+                StatusCode::CONFLICT,
+                "workflow is disabled, enable it before triggering a run",
+            );
+            body.error_detail = Some("workflow_disabled".to_string());
+            body.into_response()
+        }
+        Err(TriggerWorkflowError::NotFound) => {
+            MetaHttpResponse::bad_request(format!("workflow with id {workflow_id} not found"))
+        }
+        Err(TriggerWorkflowError::Other(e)) => MetaHttpResponse::bad_request(e),
     }
 }
 
@@ -1111,17 +1137,7 @@ pub async fn get_workflow_history(
 
     let trace_id = get_or_create_trace_id(req.headers(), &tracing::Span::current());
 
-    let data_sql = format!(
-        "SELECT _timestamp, org, key,  \
-         start_time, end_time, \
-         evaluation_took_in_secs, \
-         source_node, error \
-         FROM \"{TRIGGERS_STREAM}\" \
-         WHERE module = 'workflow' AND org = '{org_id}' \
-         AND key like '{}/%'\
-         AND _timestamp >= {start_time} AND _timestamp <= {end_time}",
-        escape_like(&workflow_id).replace("'", "''")
-    );
+    let data_sql = history_sql(&org_id, &workflow_id, start_time, end_time);
 
     let data_req = SearchRequest {
         query: SearchQuery {
@@ -1177,17 +1193,17 @@ pub async fn get_workflow_history(
     let ret: Vec<_> = parsed_results
         .into_iter()
         .map(|mut v| {
-            let Some((event_type, source_id, run_id)) = parse_workflow_history_key(&v.key) else {
+            if let Some((event_type, source_id, run_id)) = parse_workflow_history_key(&v.key) {
+                v.run_id = run_id;
+                v.source_id = source_id;
+                v.event_type = event_type;
+            } else {
                 log::warn!(
                     "unexpected key for workflow history of {org_id}/{workflow_id} : {}",
                     v.key
                 );
-                return v;
-            };
-
-            v.run_id = run_id;
-            v.source_id = source_id;
-            v.event_type = event_type;
+            }
+            normalise_history_status(&mut v);
             v
         })
         .collect();
@@ -1308,6 +1324,38 @@ pub async fn promote_draft(
     MetaHttpResponse::created("converted to workflow successfully")
 }
 
+fn history_sql(org_id: &str, workflow_id: &str, start_time: i64, end_time: i64) -> String {
+    format!(
+        "SELECT _timestamp, org, key,  \
+         start_time, end_time, \
+         evaluation_took_in_secs, \
+         source_node, error, status \
+         FROM \"{TRIGGERS_STREAM}\" \
+         WHERE module = 'workflow' AND org = '{org_id}' \
+         AND key like '{}/%'\
+         AND _timestamp >= {start_time} AND _timestamp <= {end_time}",
+        escape_like(workflow_id).replace("'", "''")
+    )
+}
+
+/// Rows written before the stored-status fix say `succeeded` even when the run errored.
+fn normalise_history_status(row: &mut WorkflowHistoryRow) {
+    let errored = row.error.is_some();
+    let status = match row.status.as_deref() {
+        Some("queued" | "running" | "expired" | "failed") => return,
+        Some("error") => "failed",
+        Some("succeeded" | "completed")
+            if errored && row.event_type != WorkflowTriggerType::Webhook =>
+        {
+            "failed"
+        }
+        Some("succeeded" | "completed") => "succeeded",
+        _ if errored => "failed",
+        _ => "succeeded",
+    };
+    row.status = Some(status.to_string());
+}
+
 /// Splits the 4-part run-history key. `rsplit_once` on the tail, not a
 /// left-to-right split: a source_id may itself contain '/' (a user email or an
 /// org/name pair), which would otherwise shift run_id into a source fragment.
@@ -1414,6 +1462,91 @@ mod tests {
         assert_eq!(
             workflow_delete_outcome(true, true),
             WorkflowDeleteOutcome::DeletePublished
+        );
+    }
+
+    fn history_row(
+        event_type: WorkflowTriggerType,
+        status: Option<&str>,
+        error: Option<&str>,
+    ) -> WorkflowHistoryRow {
+        WorkflowHistoryRow {
+            _timestamp: 0,
+            org: "org1".to_string(),
+            start_time: 0,
+            end_time: 0,
+            evaluation_took_in_secs: 0.0,
+            source_node: String::new(),
+            key: String::new(),
+            error: error.map(str::to_string),
+            event_type,
+            source_id: String::new(),
+            run_id: String::new(),
+            status: status.map(str::to_string),
+        }
+    }
+
+    #[test]
+    fn an_errored_row_stored_as_succeeded_renders_failed() {
+        let mut row = history_row(
+            WorkflowTriggerType::AlertFired,
+            Some("succeeded"),
+            Some("some node errored during execution"),
+        );
+        normalise_history_status(&mut row);
+        assert_eq!(row.status.as_deref(), Some("failed"));
+    }
+
+    #[test]
+    fn stream_error_maps_to_failed() {
+        let mut row = history_row(WorkflowTriggerType::Manual, Some("error"), Some("boom"));
+        normalise_history_status(&mut row);
+        assert_eq!(row.status.as_deref(), Some("failed"));
+    }
+
+    #[test]
+    fn a_clean_row_stays_succeeded() {
+        let mut row = history_row(WorkflowTriggerType::AlertFired, Some("succeeded"), None);
+        normalise_history_status(&mut row);
+        assert_eq!(row.status.as_deref(), Some("succeeded"));
+    }
+
+    #[test]
+    fn every_normalised_status_is_in_the_history_vocabulary() {
+        let vocabulary = ["queued", "running", "succeeded", "failed", "expired"];
+        let stored = [
+            None,
+            Some("succeeded"),
+            Some("completed"),
+            Some("error"),
+            Some("failed"),
+            Some("skipped"),
+            Some("queued"),
+            Some("running"),
+            Some("expired"),
+        ];
+        for event_type in ["AlertFired", "Webhook"] {
+            for status in stored {
+                for error in [None, Some("boom")] {
+                    let mut row = history_row(WorkflowTriggerType::from(event_type), status, error);
+                    normalise_history_status(&mut row);
+                    let got = row.status.as_deref().unwrap_or("<none>");
+                    assert!(
+                        vocabulary.contains(&got),
+                        "{status:?} with error {error:?} on {event_type} normalised to {got}"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn the_history_query_selects_the_stored_status() {
+        let sql = history_sql("org1", "wf1", 1, 2);
+        let select = sql.split(" FROM ").next().unwrap();
+        assert!(
+            select.split(',').any(|column| column.trim() == "status"),
+            "the history SELECT must return status, got {select}"
         );
     }
 }

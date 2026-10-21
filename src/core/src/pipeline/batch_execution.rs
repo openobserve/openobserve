@@ -49,6 +49,7 @@ use proto::cluster_rpc;
 #[cfg(feature = "enterprise")]
 use tokio::sync::Mutex;
 use tokio::sync::mpsc::{Receiver, Sender, channel};
+use tokio_util::sync::CancellationToken;
 use transform::{
     QUERY_FUNCTIONS, apply_vrl_fn, compile_vrl_function,
     js::{JSRuntimeConfig, apply_js_fn, compile_js_function},
@@ -70,12 +71,24 @@ struct BatchBuffer {
     last_write: Instant,
 }
 
-/// Per-run switches; only the Test path sets these, so triggers and retries are unchanged.
-#[derive(Default, Clone, Copy)]
+/// Only the Test path sets `suppress_destinations` and only the hook worker sets `cancel`.
+#[derive(Default, Clone)]
 pub struct WorkflowRunOptions {
     /// Destination nodes report the routing they resolved instead of dispatching.
     pub suppress_destinations: bool,
+    pub cancel: Option<CancellationToken>,
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RunCancelled;
+
+impl std::fmt::Display for RunCancelled {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "workflow run cancelled")
+    }
+}
+
+impl std::error::Error for RunCancelled {}
 
 #[derive(Default)]
 pub struct WorkflowResult {
@@ -83,6 +96,14 @@ pub struct WorkflowResult {
     pub errors: HashMap<String, NodeErrors>,
     pub inputs: HashMap<String, Vec<Value>>,
     pub outputs: HashMap<String, Vec<Value>>,
+}
+
+enum NodeTaskOutput {
+    Node(Result<()>),
+    Results(HashMap<StreamParams, Vec<(usize, Value)>>),
+    Errors(Option<PipelineError>),
+    Inputs(HashMap<String, Vec<Value>>),
+    Outputs(HashMap<String, Vec<Value>>),
 }
 
 #[cfg(feature = "enterprise")]
@@ -599,7 +620,8 @@ impl ExecutablePipeline {
                 leaf_dest_stream: _leaf_dest_stream,
                 return_value_for_error: false, // pipelines do not support this
                 suppress_destinations: false,  // pipelines have no destination nodes
-                flatten_records: true,         // ingest depends on flattened records
+                cancel: None,
+                flatten_records: true, // ingest depends on flattened records
             };
             let channels = ProcessChannels {
                 receiver: node_receiver,
@@ -840,7 +862,7 @@ impl ExecutablePipeline {
         }
 
         // Spawn tasks for each node
-        let mut node_tasks = Vec::with_capacity(self.sorted_nodes.len());
+        let mut tasks = tokio::task::JoinSet::new();
         for (idx, node_id) in self.sorted_nodes.iter().enumerate() {
             let pl_id_cp = self.id.to_string();
             let org_id_cp = org_id.to_string();
@@ -888,6 +910,7 @@ impl ExecutablePipeline {
                 leaf_dest_stream: _leaf_dest_stream,
                 return_value_for_error: true,
                 suppress_destinations: options.suppress_destinations,
+                cancel: options.cancel.clone(),
                 flatten_records: false,
                 source_stream_name: "system_workflow_trigger".to_string(),
             };
@@ -915,20 +938,17 @@ impl ExecutablePipeline {
                         .collect()
                 })
                 .unwrap_or_default();
-            let task = tokio::spawn(process_node(
-                metadata,
-                node,
-                function_runtime,
-                channels,
-                handle_routes,
-            ));
-            node_tasks.push(task);
+            tasks.spawn(async move {
+                NodeTaskOutput::Node(
+                    process_node(metadata, node, function_runtime, channels, handle_routes).await,
+                )
+            });
         }
 
         // task to collect results
         let pl_name_for_results = pipeline_name.clone();
         let inv_id_for_results = inv_id.clone();
-        let result_task = tokio::spawn(async move {
+        tasks.spawn(async move {
             log::debug!(
                 "[Workflow] {pl_name_for_results} [inv={inv_id_for_results}]: starts result collecting job"
             );
@@ -945,13 +965,13 @@ impl ExecutablePipeline {
                     .or_insert(Vec::new())
                     .push((idx, record));
             }
-            results
+            NodeTaskOutput::Results(results)
         });
 
         // task to collect errors
         let mut pipeline_error = PipelineError::new(&self.id, &self.name);
         let inv_id_for_errors = inv_id.clone();
-        let error_task = tokio::spawn(async move {
+        tasks.spawn(async move {
             log::debug!("[Workflow] [inv={inv_id_for_errors}]: starts error collecting job");
             let mut count = 0;
             while let Some((node_id, node_type, error, fn_name, val)) = error_receiver.recv().await
@@ -960,27 +980,23 @@ impl ExecutablePipeline {
                 count += 1;
             }
             log::debug!("[Workflow] [inv={inv_id_for_errors}]: collected {count} errors");
-            if count > 0 {
-                Some(pipeline_error)
-            } else {
-                None
-            }
+            NodeTaskOutput::Errors((count > 0).then_some(pipeline_error))
         });
 
-        let inputs_task = tokio::spawn(async move {
+        tasks.spawn(async move {
             let mut input_map = HashMap::new();
             while let Some((node_id, val)) = inputs_receiver.recv().await {
                 input_map.entry(node_id).or_insert(vec![]).push(val);
             }
-            input_map
+            NodeTaskOutput::Inputs(input_map)
         });
 
-        let outputs_task = tokio::spawn(async move {
+        tasks.spawn(async move {
             let mut outputs_map = HashMap::new();
             while let Some((node_id, val)) = outputs_receiver.recv().await {
                 outputs_map.entry(node_id).or_insert(vec![]).push(val);
             }
-            outputs_map
+            NodeTaskOutput::Outputs(outputs_map)
         });
 
         // Send records to the source node to begin processing
@@ -1024,34 +1040,32 @@ impl ExecutablePipeline {
         log::debug!(
             "[Workflow] {pipeline_name} [inv={inv_id}]: waiting for all node tasks to complete"
         );
-        if let Err(e) = try_join_all(node_tasks).await {
-            log::error!(
-                "[Workflow] {pipeline_name} [inv={inv_id}]: node processing jobs failed: {e}"
-            );
-        }
+        let task_outputs = join_node_tasks(tasks, options.cancel.as_ref())
+            .await
+            .inspect_err(|_| {
+                log::info!(
+                    "[Workflow] {pipeline_name} [inv={inv_id}]: run cancelled after every task drained"
+                );
+            })?;
         log::debug!("[Workflow] {pipeline_name} [inv={inv_id}]: all node tasks completed");
 
-        // Publish errors if received any
-        log::debug!("[Workflow] {pipeline_name} [inv={inv_id}]: awaiting error task");
-        let errors = error_task.await.map_err(|e| {
-            log::error!(
-                "[Workflow] {pipeline_name} [inv={inv_id}]: error collecting job failed: {e}"
-            );
-            anyhow!("[Workflow] error collecting job failed: {}", e)
-        })?;
+        let (mut results, mut errors, mut inputs, mut outputs) = (None, None, None, None);
+        for output in task_outputs {
+            match output {
+                NodeTaskOutput::Node(Err(e)) => {
+                    log::debug!("[Workflow] {pipeline_name} [inv={inv_id}]: node returned {e}");
+                }
+                NodeTaskOutput::Node(Ok(())) => {}
+                NodeTaskOutput::Results(v) => results = Some(v),
+                NodeTaskOutput::Errors(v) => errors = Some(v),
+                NodeTaskOutput::Inputs(v) => inputs = Some(v),
+                NodeTaskOutput::Outputs(v) => outputs = Some(v),
+            }
+        }
 
-        let inputs = inputs_task.await.map_err(|e| {
-            log::error!(
-                "[Workflow] {pipeline_name} [inv={inv_id}]: input collecting job failed: {e}"
-            );
-            anyhow!("[Workflow] input collecting job failed: {}", e)
-        })?;
-        let outputs = outputs_task.await.map_err(|e| {
-            log::error!(
-                "[Workflow] {pipeline_name} [inv={inv_id}]: output collecting job failed: {e}"
-            );
-            anyhow!("[Workflow] output collecting job failed: {}", e)
-        })?;
+        let errors = errors.ok_or_else(|| anyhow!("[Workflow] error collecting job failed"))?;
+        let inputs = inputs.ok_or_else(|| anyhow!("[Workflow] input collecting job failed"))?;
+        let outputs = outputs.ok_or_else(|| anyhow!("[Workflow] output collecting job failed"))?;
 
         let node_errors = errors
             .as_ref()
@@ -1078,13 +1092,7 @@ impl ExecutablePipeline {
             publish_error(error_data).await;
         }
 
-        log::debug!("[Workflow] {pipeline_name} [inv={inv_id}]: awaiting result collector");
-        let results = result_task.await.map_err(|e| {
-            log::error!(
-                "[Workflow] {pipeline_name} [inv={inv_id}]: result collecting job failed: {e}"
-            );
-            anyhow!("[Workflow] result collecting job failed: {}", e)
-        })?;
+        let results = results.ok_or_else(|| anyhow!("[Workflow] result collecting job failed"))?;
         log::debug!(
             "[Workflow] {pipeline_name} [inv={inv_id}]: result collector returned {} stream groups",
             results.len()
@@ -1234,6 +1242,7 @@ struct ProcessMetadata {
     leaf_dest_stream: Option<StreamParams>,
     return_value_for_error: bool,
     suppress_destinations: bool,
+    cancel: Option<CancellationToken>,
     /// Ingest flattens so conditions can index a flat row; a workflow's event shape is a
     /// user-facing contract, so it is preserved and columns are resolved against it.
     flatten_records: bool,
@@ -1273,6 +1282,33 @@ impl ProcessChannels {
                 metadata.pipeline_name,
                 metadata.inv_id
             );
+        }
+    }
+}
+
+async fn join_node_tasks(
+    mut tasks: tokio::task::JoinSet<NodeTaskOutput>,
+    cancel: Option<&CancellationToken>,
+) -> Result<Vec<NodeTaskOutput>, RunCancelled> {
+    let mut outputs = Vec::with_capacity(tasks.len());
+    loop {
+        let next = match cancel {
+            Some(cancel) => tokio::select! {
+                biased;
+                _ = cancel.cancelled() => None,
+                next = tasks.join_next() => Some(next),
+            },
+            None => Some(tasks.join_next().await),
+        };
+        match next {
+            None => {
+                tasks.abort_all();
+                while tasks.join_next().await.is_some() {}
+                return Err(RunCancelled);
+            }
+            Some(None) => return Ok(outputs),
+            Some(Some(Ok(output))) => outputs.push(output),
+            Some(Some(Err(e))) => log::error!("[Workflow] node processing job failed: {e}"),
         }
     }
 }
@@ -2945,7 +2981,15 @@ async fn process_destination_node(
                     for (name, val) in headers {
                         req = req.header(name, val);
                     }
-                    req.body(send_data).send().await.map_err(|e| e.to_string())
+                    let send = req.body(send_data).send();
+                    match metadata.cancel.as_ref() {
+                        Some(cancel) => tokio::select! {
+                            biased;
+                            _ = cancel.cancelled() => return Err(RunCancelled.into()),
+                            res = send => res.map_err(|e| e.to_string()),
+                        },
+                        None => send.await.map_err(|e| e.to_string()),
+                    }
                 }
                 Err(e) => Err(e),
             };
@@ -3247,7 +3291,7 @@ mod tests {
         collections::HashMap,
         sync::{
             Arc,
-            atomic::{AtomicU64, Ordering},
+            atomic::{AtomicU64, AtomicUsize, Ordering},
         },
     };
 
@@ -3348,6 +3392,7 @@ mod tests {
             leaf_dest_stream: None,
             return_value_for_error: false,
             suppress_destinations: false,
+            cancel: None,
             flatten_records: true,
         };
         let (input_tx, input_rx) = tokio::sync::mpsc::channel(1);
@@ -3915,6 +3960,7 @@ mod tests {
             leaf_dest_stream: None,
             return_value_for_error: false,
             suppress_destinations: false,
+            cancel: None,
             flatten_records: true,
         }
     }
@@ -4227,6 +4273,7 @@ mod tests {
             leaf_dest_stream: None,
             return_value_for_error: false,
             suppress_destinations: false,
+            cancel: None,
             flatten_records: false,
         }
     }
@@ -4845,6 +4892,7 @@ mod tests {
                 None,
                 WorkflowRunOptions {
                     suppress_destinations: true,
+                    ..Default::default()
                 },
             )
             .await
@@ -4935,6 +4983,7 @@ mod tests {
                 None,
                 WorkflowRunOptions {
                     suppress_destinations: true,
+                    ..Default::default()
                 },
             )
             .await
@@ -4970,6 +5019,7 @@ mod tests {
                 None,
                 WorkflowRunOptions {
                     suppress_destinations: true,
+                    ..Default::default()
                 },
             )
             .await
@@ -5006,6 +5056,7 @@ mod tests {
                 None,
                 WorkflowRunOptions {
                     suppress_destinations: false,
+                    ..Default::default()
                 },
             )
             .await
@@ -5038,6 +5089,7 @@ mod tests {
                 None,
                 WorkflowRunOptions {
                     suppress_destinations: false,
+                    ..Default::default()
                 },
             )
             .await
@@ -5082,6 +5134,7 @@ mod tests {
                         None,
                         WorkflowRunOptions {
                             suppress_destinations: false,
+                            ..Default::default()
                         },
                     )
                     .await
@@ -5532,6 +5585,177 @@ mod tests {
         assert!(
             woke_after < BURN_MS / 2,
             "the sleeping task only woke after {woke_after}ms, so the JavaScript eval held the worker"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_cancelled_run_returns_only_after_every_node_task_has_drained() {
+        struct CountsDrop(Arc<AtomicUsize>);
+        impl Drop for CountsDrop {
+            fn drop(&mut self) {
+                self.0.fetch_add(1, Ordering::SeqCst);
+            }
+        }
+        let dropped = Arc::new(AtomicUsize::new(0));
+        let mut tasks = tokio::task::JoinSet::new();
+        for _ in 0..3 {
+            let guard = CountsDrop(dropped.clone());
+            tasks.spawn(async move {
+                let _guard = guard;
+                std::future::pending::<()>().await;
+                NodeTaskOutput::Node(Ok(()))
+            });
+        }
+        let cancel = CancellationToken::new();
+        let trigger = cancel.clone();
+        tokio::spawn(async move {
+            tokio::time::sleep(Duration::from_millis(20)).await;
+            trigger.cancel();
+        });
+
+        let res = join_node_tasks(tasks, Some(&cancel)).await;
+
+        assert!(
+            matches!(res, Err(RunCancelled)),
+            "a cancelled join must report the cancel"
+        );
+        assert_eq!(
+            dropped.load(Ordering::SeqCst),
+            3,
+            "every node task must be dropped before the join returns"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_run_without_a_cancel_token_is_unchanged() {
+        let workflow = test_workflow(
+            vec![
+                Node::new(
+                    "t1".to_string(),
+                    NodeData::WorkflowTrigger,
+                    0.0,
+                    0.0,
+                    "input".to_string(),
+                ),
+                Node::new(
+                    "c1".to_string(),
+                    NodeData::Condition(pass_all_condition()),
+                    0.0,
+                    0.0,
+                    "default".to_string(),
+                ),
+            ],
+            vec![Edge::new("t1".to_string(), "c1".to_string())],
+        );
+        let executable = ExecutablePipeline::new_from_workflow(&workflow)
+            .await
+            .expect("condition workflow must build");
+        let record = json::json!({"severity": "high"});
+
+        let without = executable
+            .process_workflow("org-1", vec![record.clone()], None, Default::default())
+            .await
+            .expect("a run without a token must not fail");
+        let with_idle_token = executable
+            .process_workflow(
+                "org-1",
+                vec![record.clone()],
+                None,
+                WorkflowRunOptions {
+                    cancel: Some(CancellationToken::new()),
+                    ..Default::default()
+                },
+            )
+            .await
+            .expect("a run whose token never fires must not fail");
+
+        assert!(without.errors.is_empty());
+        assert_eq!(
+            without.outputs.get("c1").and_then(|o| o.first()),
+            Some(&record),
+            "the condition must still forward the record"
+        );
+        assert_eq!(without.inputs, with_idle_token.inputs);
+        assert_eq!(without.outputs, with_idle_token.outputs);
+    }
+
+    /// Holds every connection open without answering, counting each one as it arrives.
+    #[cfg(feature = "enterprise")]
+    async fn hanging_server(seen: Arc<AtomicUsize>, arrived: Arc<tokio::sync::Notify>) -> String {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        tokio::spawn(async move {
+            let mut held = Vec::new();
+            while let Ok((sock, _)) = listener.accept().await {
+                seen.fetch_add(1, Ordering::SeqCst);
+                arrived.notify_one();
+                held.push(sock);
+            }
+        });
+        format!("http://127.0.0.1:{port}")
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn a_cancelled_run_sends_nothing_to_the_destination_after_abort() {
+        crate::ssrf_test_support::isolated(
+            concat!(
+                module_path!(),
+                "::a_cancelled_run_sends_nothing_to_the_destination_after_abort"
+            ),
+            &[("ZO_SSRF_ALLOWED_CIDRS", "127.0.0.1/32")],
+            || async {
+                let seen = Arc::new(AtomicUsize::new(0));
+                let arrived = Arc::new(tokio::sync::Notify::new());
+                let base = hanging_server(seen.clone(), arrived.clone()).await;
+                seed_pipeline_destination_with_url("org-1", "hanging", &format!("{base}/hold"));
+                let executable =
+                    ExecutablePipeline::new_from_workflow(&destination_workflow("hanging"))
+                        .await
+                        .expect("workflow must build");
+                let cancel = CancellationToken::new();
+                let options = WorkflowRunOptions {
+                    cancel: Some(cancel.clone()),
+                    ..Default::default()
+                };
+
+                let run = executable.process_workflow(
+                    "org-1",
+                    vec![json::json!({"n": 1})],
+                    None,
+                    options.clone(),
+                );
+                let cancel_on_arrival = async {
+                    arrived.notified().await;
+                    cancel.cancel();
+                };
+                let (res, ()) = tokio::time::timeout(Duration::from_secs(10), async {
+                    tokio::join!(run, cancel_on_arrival)
+                })
+                .await
+                .expect("a cancelled run must return without waiting for the destination");
+                let err = res.err().expect("a cancelled run must not report success");
+                assert!(
+                    err.downcast_ref::<RunCancelled>().is_some(),
+                    "the run must end as cancelled, got {err}"
+                );
+
+                let again = executable
+                    .process_workflow("org-1", vec![json::json!({"n": 2})], None, options)
+                    .await;
+                assert!(
+                    again
+                        .err()
+                        .is_some_and(|e| e.downcast_ref::<RunCancelled>().is_some()),
+                    "a run whose token is already cancelled must end as cancelled"
+                );
+                tokio::time::sleep(Duration::from_millis(200)).await;
+                assert_eq!(
+                    seen.load(Ordering::SeqCst),
+                    1,
+                    "no destination request may start after the cancel"
+                );
+            },
         );
     }
 }
