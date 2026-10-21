@@ -1,0 +1,17 @@
+{
+  "feature_slug": "billing-group-remove-icon",
+  "feature_title": "Billing Group Remove Action Icon",
+  "area": "Management",
+  "edition": "enterprise",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "billingGroup.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Management/billingGroup.spec.js",
+  "playwright_group": "Management",
+  "source_files": [
+    "web/src/enterprise/components/billings/BillingGroup.vue"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": ""
+}
