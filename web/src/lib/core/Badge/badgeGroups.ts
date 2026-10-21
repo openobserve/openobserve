@@ -400,8 +400,19 @@ export const BADGE_GROUPS = {
       active: { variant: "success-soft" },
       draft: { variant: "default-soft" },
       paused: { variant: "warning-soft" },
-      degraded: { variant: "orange-soft" },
       archived: { variant: "default-soft" },
+    },
+  },
+
+  // No labelKeys: EvalJobList always passes the translated `label`.
+  evalJobHealth: {
+    mode: "dot",
+    shape: "pill",
+    values: {
+      healthy: { variant: "success-soft" },
+      degraded: { variant: "orange-soft" },
+      waitingforcredentials: { variant: "error-soft" },
+      norecentruns: { variant: "default-soft" },
     },
   },
 

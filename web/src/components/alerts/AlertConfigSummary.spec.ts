@@ -355,6 +355,14 @@ describe("AlertConfigSummary — anomaly detection configs", () => {
     expect(field(wrapper, "band-width").exists()).toBe(false);
   });
 
+  it.each(["failed", "training", "waiting"])(
+    "does not present a stale learned level as active when %s",
+    (status) => {
+      const wrapper = mountSummary(anomalyConfig({ status, band_k: 3.4567 }));
+      expect(value(wrapper, "sensitivity")).toBe(translated("alerts.anomaly.sensitivityAuto"));
+    },
+  );
+
   it("shows the set band width as the sensitivity, over the trained k", () => {
     const wrapper = mountSummary(anomalyConfig({ band_width: 3.5, band_k: 3.2 }));
     expect(value(wrapper, "sensitivity")).toBe("3.5σ");
