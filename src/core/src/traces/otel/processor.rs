@@ -278,10 +278,6 @@ impl OtelIngestionProcessor {
             // than as 1970-01-01, which would land every such span in a time-of-day tier.
             let span_ts_micros = (span_start_nanos != 0)
                 .then(|| i64::try_from(span_start_nanos / 1_000).unwrap_or(i64::MAX));
-            let resolved_pricing = extracted
-                .model_name
-                .as_ref()
-                .and_then(|mn| pricing::resolve_pricing(org_pricing_entries, mn, span_ts_micros));
             let tokenizer_key: &str = extracted.model_name.as_deref().unwrap_or("");
 
             if let Some(v) = &extracted.input
@@ -309,8 +305,11 @@ impl OtelIngestionProcessor {
 
             let (billable_usage, tier_usage) = build_pricing_usage(&usage, input_includes_cache);
 
+            // Resolve only for spans without a client-reported cost; the lookup runs regexes.
             if cost.is_empty()
-                && let Some(resolved) = resolved_pricing
+                && let Some(resolved) = extracted.model_name.as_ref().and_then(|mn| {
+                    pricing::resolve_pricing(org_pricing_entries, mn, span_ts_micros)
+                })
             {
                 match resolved.pricing {
                     pricing::ResolvedPricing::Definition(pricing_def) => {

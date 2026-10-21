@@ -111,7 +111,7 @@
           <span v-else class="inline-flex min-w-0 items-center gap-1.5">
             <span class="truncate">{{ lastErrorKind(row) }}</span>
             <span class="text-text-secondary shrink-0">{{ lastErrorAgo(row) }}</span>
-            <OTooltip :content="lastErrorMessage(row)" max-width="480px" hoverable />
+            <OTooltip :content="lastErrorMessage(row)" max-width="30rem" hoverable />
           </span>
         </template>
 

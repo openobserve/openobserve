@@ -19,8 +19,7 @@ use config::meta::eval_job_health::{
     EvalJobHealth, EvalJobLastError, EvalJobState, EvalJobStateTransition, EvalJobStateUpdate,
 };
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set, TransactionTrait,
-    sea_query::OnConflict,
+    ColumnTrait, EntityTrait, QueryFilter, Set, TransactionTrait, sea_query::OnConflict,
 };
 
 use super::entity::{eval_job_state_transitions, eval_job_states};
@@ -51,21 +50,23 @@ pub async fn get_many_with<C: sea_orm::ConnectionTrait>(
         .collect())
 }
 
-/// Writes the state and its transition in one transaction so `since` and the log never disagree.
-pub async fn persist(update: &EvalJobStateUpdate) -> Result<(), errors::Error> {
+/// Writes a pass's states and transitions in one transaction, so `since` and the log never
+/// disagree: a single upsert covers all the states and a single insert all the transitions.
+pub async fn persist(updates: &[EvalJobStateUpdate]) -> Result<(), errors::Error> {
     let client = get_orm_client_rw().await;
-    persist_with(client, update).await
+    persist_with(client, updates).await
 }
 
 pub async fn persist_with<C: sea_orm::ConnectionTrait + TransactionTrait>(
     conn: &C,
-    update: &EvalJobStateUpdate,
+    updates: &[EvalJobStateUpdate],
 ) -> Result<(), errors::Error> {
-    let txn = conn.begin().await?;
-    upsert_state(&txn, &update.state).await?;
-    if let Some(transition) = update.transition.as_ref() {
-        insert_transition(&txn, transition).await?;
+    if updates.is_empty() {
+        return Ok(());
     }
+    let txn = conn.begin().await?;
+    upsert_states(&txn, updates.iter().map(|u| &u.state)).await?;
+    insert_transitions(&txn, updates.iter().filter_map(|u| u.transition.as_ref())).await?;
     txn.commit().await?;
     Ok(())
 }
@@ -134,11 +135,11 @@ fn count_to_db(value: u64) -> i64 {
     i64::try_from(value).unwrap_or(i64::MAX)
 }
 
-async fn upsert_state<C: sea_orm::ConnectionTrait>(
+async fn upsert_states<'a, C: sea_orm::ConnectionTrait>(
     conn: &C,
-    state: &EvalJobState,
+    states: impl Iterator<Item = &'a EvalJobState>,
 ) -> Result<(), errors::Error> {
-    let model = eval_job_states::ActiveModel {
+    let models = states.map(|state| eval_job_states::ActiveModel {
         job_id: Set(state.job_id.clone()),
         org_id: Set(state.org_id.clone()),
         health: Set(state.health.to_i32()),
@@ -151,8 +152,8 @@ async fn upsert_state<C: sea_orm::ConnectionTrait>(
         last_error_kind: Set(state.last_error.as_ref().map(|e| e.kind.clone())),
         last_error_message: Set(state.last_error.as_ref().map(|e| e.message.clone())),
         last_error_at: Set(state.last_error.as_ref().map(|e| e.at)),
-    };
-    eval_job_states::Entity::insert(model)
+    });
+    eval_job_states::Entity::insert_many(models)
         .on_conflict(
             OnConflict::column(eval_job_states::Column::JobId)
                 .update_columns([
@@ -174,20 +175,26 @@ async fn upsert_state<C: sea_orm::ConnectionTrait>(
     Ok(())
 }
 
-async fn insert_transition<C: sea_orm::ConnectionTrait>(
+async fn insert_transitions<'a, C: sea_orm::ConnectionTrait>(
     conn: &C,
-    t: &EvalJobStateTransition,
+    transitions: impl Iterator<Item = &'a EvalJobStateTransition>,
 ) -> Result<(), errors::Error> {
-    eval_job_state_transitions::ActiveModel {
-        job_id: Set(t.job_id.clone()),
-        org_id: Set(t.org_id.clone()),
-        from_health: Set(t.from_health.map(EvalJobHealth::to_i32)),
-        to_health: Set(t.to_health.to_i32()),
-        at: Set(t.at),
-        ..Default::default()
+    let models = transitions
+        .map(|t| eval_job_state_transitions::ActiveModel {
+            job_id: Set(t.job_id.clone()),
+            org_id: Set(t.org_id.clone()),
+            from_health: Set(t.from_health.map(EvalJobHealth::to_i32)),
+            to_health: Set(t.to_health.to_i32()),
+            at: Set(t.at),
+            ..Default::default()
+        })
+        .collect::<Vec<_>>();
+    if models.is_empty() {
+        return Ok(());
     }
-    .insert(conn)
-    .await?;
+    eval_job_state_transitions::Entity::insert_many(models)
+        .exec(conn)
+        .await?;
     Ok(())
 }
 
@@ -239,7 +246,9 @@ mod tests {
             .unwrap()
             .pop();
         let update = apply_health(job_id, "org", prev.as_ref(), observed(health), at);
-        persist_with(db, &update).await.unwrap();
+        persist_with(db, std::slice::from_ref(&update))
+            .await
+            .unwrap();
         get_many_with(db, &[job_id.to_string()])
             .await
             .unwrap()
@@ -284,7 +293,9 @@ mod tests {
             EvalJobHealthObservation::no_runs(),
             200,
         );
-        persist_with(&db, &update).await.unwrap();
+        persist_with(&db, std::slice::from_ref(&update))
+            .await
+            .unwrap();
         let row = get_many_with(&db, &["job-1".to_string()])
             .await
             .unwrap()
@@ -312,6 +323,44 @@ mod tests {
                 .await
                 .unwrap()
                 .is_empty()
+        );
+    }
+
+    #[tokio::test]
+    async fn one_batch_updates_existing_rows_and_inserts_new_ones() {
+        let db = db().await;
+        let healthy = pass(&db, "job-1", EvalJobHealth::Healthy, 100).await;
+        let updates = [
+            apply_health(
+                "job-1",
+                "org",
+                Some(&healthy),
+                observed(EvalJobHealth::Healthy),
+                200,
+            ),
+            apply_health("job-2", "org", None, observed(EvalJobHealth::Degraded), 200),
+        ];
+        persist_with(&db, &updates).await.unwrap();
+
+        let ids = ["job-1".to_string(), "job-2".to_string()];
+        let mut rows = get_many_with(&db, &ids).await.unwrap();
+        rows.sort_by(|a, b| a.job_id.cmp(&b.job_id));
+        assert_eq!(
+            rows.iter()
+                .map(|r| (r.job_id.as_str(), r.health, r.since, r.evaluated_at))
+                .collect::<Vec<_>>(),
+            [
+                ("job-1", EvalJobHealth::Healthy, 100, 200),
+                ("job-2", EvalJobHealth::Degraded, 200, 200),
+            ]
+        );
+        assert_eq!(
+            eval_job_state_transitions::Entity::find()
+                .count(&db)
+                .await
+                .unwrap(),
+            2,
+            "job-1's first measurement and job-2's; the steady job-1 pass logs none"
         );
     }
 

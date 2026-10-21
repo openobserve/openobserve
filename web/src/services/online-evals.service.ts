@@ -257,10 +257,7 @@ export interface ManualEvalJobResult {
 }
 
 export type EvalJobHealthState =
-  | "healthy"
-  | "degraded"
-  | "waiting_for_credentials"
-  | "no_recent_runs";
+  "healthy" | "degraded" | "waiting_for_credentials" | "no_recent_runs";
 
 export interface EvalJobLastError {
   /** e.g. provider_auth, rate_limited, timeout, provider_5xx, parse_error,

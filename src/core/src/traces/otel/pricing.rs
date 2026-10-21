@@ -28,7 +28,7 @@ use config::meta::model_pricing::{
     TierOperator, UtcTimeWindow, windows_match,
 };
 use db::model_pricing::{CachedModelPricing, find_pricing_sync_at};
-use regex::Regex;
+use regex::{Regex, RegexSet};
 use tiktoken_rs::{get_bpe_from_model, o200k_base};
 
 pub fn calculate_token_count(model_name: &str, prompt: &str) -> i64 {
@@ -81,7 +81,7 @@ pub fn resolve_pricing(
         {
             None
         }
-        _ => find_compiled(&MODEL_PRICING, model_name),
+        _ => find_model_pricing(model_name),
     };
     match definition {
         Some(d) if compiled.is_none_or(|(_, kind)| kind <= d.match_kind) => {
@@ -108,7 +108,7 @@ pub fn resolve_pricing(
 /// Returns `None` if no known pattern matches (caller should fall back to the
 /// raw string).
 pub fn canonical_model_pattern(model_name: &str) -> Option<&'static str> {
-    find_compiled(&MODEL_PRICING, model_name).map(|(p, _)| p.pattern.as_str())
+    find_model_pricing(model_name).map(|(p, _)| p.pattern.as_str())
 }
 
 /// All known model-name patterns in match priority order (most specific
@@ -118,15 +118,24 @@ pub fn model_patterns() -> impl Iterator<Item = &'static str> {
     MODEL_PRICING.iter().map(|p| p.pattern.as_str())
 }
 
+/// Best match for `model_name` in the compiled-in [`MODEL_PRICING`] table.
+fn find_model_pricing(model_name: &str) -> Option<(&'static ModelPricing, MatchKind)> {
+    find_compiled(&MODEL_PRICING, &MODEL_PRICING_SET, model_name)
+}
+
 /// Best match for `model_name` in a compiled-in table: the first exact match, else the first
 /// approximate one. The table is ordered most specific first, so among approximate matches that
 /// order decides (e.g. `claude-sonnet-4-5` before `claude-sonnet-4` for a dated snapshot name).
+///
+/// `set` holds the table's patterns in table order. It finds every entry that matches at all in
+/// one pass over the name, so only those entries are tested for an exact match.
 fn find_compiled<'a>(
     table: &'a [ModelPricing],
+    set: &RegexSet,
     model_name: &str,
 ) -> Option<(&'a ModelPricing, MatchKind)> {
     let mut approximate = None;
-    for pricing in table {
+    for pricing in set.matches(model_name).into_iter().map(|i| &table[i]) {
         match pricing.match_kind(model_name) {
             Some(MatchKind::Exact) => return Some((pricing, MatchKind::Exact)),
             Some(MatchKind::Approximate) if approximate.is_none() => {
@@ -136,6 +145,12 @@ fn find_compiled<'a>(
         }
     }
     approximate
+}
+
+/// The patterns of `table`, in table order, as one [`RegexSet`] for [`find_compiled`].
+fn pattern_set(table: &[ModelPricing]) -> RegexSet {
+    RegexSet::new(table.iter().map(|p| p.pattern.as_str()))
+        .expect("invalid regex in model pricing pattern")
 }
 
 /// Pricing tier based on token count or other conditions
@@ -572,6 +587,9 @@ pub static MODEL_PRICING: Lazy<Vec<ModelPricing>> = Lazy::new(|| {
     ]
 });
 
+/// [`MODEL_PRICING`]'s patterns as one set, so a lookup scans the model name once.
+static MODEL_PRICING_SET: Lazy<RegexSet> = Lazy::new(|| pattern_set(&MODEL_PRICING));
+
 /// `(pattern, canonical)` pairs in match priority order; only `canonical` is safe to display.
 pub fn model_canonical_names() -> impl Iterator<Item = (&'static str, &'static str)> {
     MODEL_PRICING
@@ -590,7 +608,7 @@ mod tests {
         output_tokens: i64,
         ts_micros: Option<i64>,
     ) -> Option<(f64, f64, f64)> {
-        let (pricing, _) = find_compiled(&MODEL_PRICING, model_name)?;
+        let (pricing, _) = find_model_pricing(model_name)?;
         Some(pricing.cost(input_tokens, output_tokens, ts_micros))
     }
 
@@ -962,8 +980,10 @@ mod tests {
             ModelPricing::simple("claude-opus-5", "claude-opus-5", 5.00, 25.00),
             ModelPricing::simple("claude-opus-5-5", "claude-opus-5-5", 6.00, 30.00),
         ];
-        let kind_of =
-            |model: &str| find_compiled(&table, model).map(|(p, k)| (p.canonical.as_str(), k));
+        let set = pattern_set(&table);
+        let kind_of = |model: &str| {
+            find_compiled(&table, &set, model).map(|(p, k)| (p.canonical.as_str(), k))
+        };
 
         assert_eq!(
             kind_of("gpt-5.4-mini"),
@@ -1075,9 +1095,7 @@ mod tests {
 
     #[test]
     fn test_to_definition_prices_like_the_compiled_entry() {
-        let sonnet = find_compiled(&MODEL_PRICING, "claude-sonnet-4-6")
-            .unwrap()
-            .0;
+        let sonnet = find_model_pricing("claude-sonnet-4-6").unwrap().0;
         let def = sonnet.to_definition();
         assert_eq!(def.source, PricingSource::BuiltIn);
         assert_eq!(def.match_pattern, "claude-sonnet-4-6");
