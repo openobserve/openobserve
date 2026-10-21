@@ -65,6 +65,7 @@ import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { useQuery } from "@tanstack/vue-query";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
+import useIsMetaOrg from "@/composables/useIsMetaOrg";
 import { useLicenseRefresh } from "@/composables/useLicenseRefresh";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
@@ -79,6 +80,7 @@ import {
   formatUtc,
   LICENSE_BANNER_POLL_MS,
   licenseBannerState,
+  type LicenseBannerState,
   type LicenseWaiverFields,
 } from "@/utils/licenseWaivers";
 
@@ -88,6 +90,7 @@ const { t, locale } = useI18nTyped();
 const store = useStore();
 const router = useRouter();
 const { refreshLicenseLimits, reloadLicenseState } = useLicenseRefresh();
+const { isMetaOrg } = useIsMetaOrg();
 
 const readDismissed = (): string | null => {
   try {
@@ -100,7 +103,10 @@ const readDismissed = (): string | null => {
 const dismissedSignature = ref<string | null>(readDismissed());
 
 const nowUs = ref(Date.now() * 1000);
-const state = computed(() => licenseBannerState(store.state.zoConfig ?? {}, nowUs.value));
+// Self-hosted licences are managed from the meta org, so other orgs never fetch or poll for this.
+const state = computed<LicenseBannerState>(() =>
+  isMetaOrg.value ? licenseBannerState(store.state.zoConfig ?? {}, nowUs.value) : { kind: "none" },
+);
 const isPaused = computed(() => state.value.kind === "paused");
 const visible = computed(
   () => state.value.kind !== "none" && dismissedSignature.value !== bannerSignature(state.value),
@@ -195,6 +201,7 @@ const clearBoundaryTimer = () => {
 };
 
 const waiverUntilUs = (): number | null => {
+  if (!isMetaOrg.value) return null;
   const zo = store.state.zoConfig;
   const until = zo?.license_waiver_until;
   return zo?.license_search_allowed === true && typeof until === "number" ? until : null;
@@ -217,7 +224,15 @@ function onBoundary() {
   if (expired) reloadLicenseState();
 }
 
-watch(() => store.state.zoConfig, armBoundaryTimer, { immediate: true });
+watch([() => store.state.zoConfig, isMetaOrg], armBoundaryTimer, { immediate: true });
+
+// The layout serves each org's /config from a session cache, so its licence fields can be stale.
+watch(
+  () => store.state.selectedOrganization?.identifier,
+  (org, prev) => {
+    if (prev && org !== prev && isMetaOrg.value) reloadLicenseState();
+  },
+);
 
 onBeforeUnmount(() => {
   stopPolling();

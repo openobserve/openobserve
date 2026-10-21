@@ -51,9 +51,11 @@ import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import LicenseSearchBanner from "./LicenseSearchBanner.vue";
 
 const DISMISS_KEY = "license_search_banner_dismissed";
-const PAUSED = { license_search_allowed: false };
+const META = "acme";
+const PAUSED = { meta_org: META, license_search_allowed: false };
 const NOW = Date.UTC(2026, 9, 20, 12, 0, 0);
 const restoredConfig = (untilMs: number) => ({
+  meta_org: META,
   license_search_allowed: true,
   license_waiver_until: untilMs * 1000,
 });
@@ -68,10 +70,13 @@ const pausedLicense = {
 let store: ReturnType<typeof makeStore>;
 let wrapper: VueWrapper | undefined;
 
-function makeStore(zoConfig: Record<string, unknown>) {
+function makeStore(zoConfig: Record<string, unknown>, org = META) {
   return createStore({
-    state: { zoConfig, selectedOrganization: { identifier: "acme" } },
+    state: { zoConfig, selectedOrganization: { identifier: org } },
     mutations: {
+      setSelectedOrganization(state: { selectedOrganization: unknown }, payload: unknown) {
+        state.selectedOrganization = payload;
+      },
       setConfig(state: { zoConfig: Record<string, unknown> }, payload: Record<string, unknown>) {
         state.zoConfig = payload;
       },
@@ -84,8 +89,8 @@ function makeStore(zoConfig: Record<string, unknown>) {
   });
 }
 
-async function mountBanner(zoConfig: Record<string, unknown>) {
-  store = makeStore(zoConfig);
+async function mountBanner(zoConfig: Record<string, unknown>, org = META) {
+  store = makeStore(zoConfig, org);
   wrapper = mount(LicenseSearchBanner, { global: { plugins: [store, i18n] } });
   await flushPromises();
   return wrapper;
@@ -106,8 +111,62 @@ describe("LicenseSearchBanner", () => {
   });
 
   it("renders nothing when /config has no license fields", async () => {
-    const w = await mountBanner({});
+    const w = await mountBanner({ meta_org: META });
     expect(w.find('[data-test="license-search-banner"]').exists()).toBe(false);
+    expect(licenseServer.get_license).not.toHaveBeenCalled();
+  });
+
+  it("shows the banner in the meta org", async () => {
+    const w = await mountBanner(PAUSED);
+    expect(w.find('[data-test="license-search-banner"]').exists()).toBe(true);
+    expect(licenseServer.get_license).toHaveBeenCalledTimes(1);
+  });
+
+  it("renders nothing and makes no request outside the meta org", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+    for (const cfg of [PAUSED, restoredConfig(NOW + 3600_000)]) {
+      const w = await mountBanner(cfg, "default");
+      expect(w.html()).toBe("<!--v-if-->");
+      await vi.advanceTimersByTimeAsync(LICENSE_BANNER_POLL_MS * 3);
+      w.unmount();
+      wrapper = undefined;
+    }
+    expect(licenseServer.get_license).not.toHaveBeenCalled();
+    expect(zoConfigService.get_config_full).not.toHaveBeenCalled();
+  });
+
+  it("hides on a switch away from the meta org and shows fresh data on return", async () => {
+    vi.useFakeTimers();
+    vi.mocked(zoConfigService.get_config_full).mockResolvedValue({ data: PAUSED } as never);
+    const w = await mountBanner(PAUSED);
+    expect(w.find('[data-test="license-search-banner"]').exists()).toBe(true);
+    expect(licenseServer.get_license).toHaveBeenCalledTimes(1);
+
+    store.commit("setSelectedOrganization", { identifier: "default" });
+    await flushPromises();
+    expect(w.find('[data-test="license-search-banner"]').exists()).toBe(false);
+    await vi.advanceTimersByTimeAsync(LICENSE_BANNER_POLL_MS * 2);
+    expect(licenseServer.get_license).toHaveBeenCalledTimes(1);
+    expect(zoConfigService.get_config_full).not.toHaveBeenCalled();
+
+    store.commit("setSelectedOrganization", { identifier: META });
+    await flushPromises();
+    expect(w.find('[data-test="license-search-banner"]').exists()).toBe(true);
+    expect(licenseServer.get_license).toHaveBeenCalledTimes(2);
+    expect(zoConfigService.get_config_full).toHaveBeenCalledTimes(1);
+  });
+
+  it("follows a custom meta org name instead of _meta", async () => {
+    const custom = { ...PAUSED, meta_org: "ops-admin" };
+    const w = await mountBanner(custom, "ops-admin");
+    expect(w.find('[data-test="license-search-banner"]').exists()).toBe(true);
+    w.unmount();
+    wrapper = undefined;
+    queryClient.clear();
+    vi.mocked(licenseServer.get_license).mockClear();
+    const other = await mountBanner(custom, "_meta");
+    expect(other.find('[data-test="license-search-banner"]').exists()).toBe(false);
     expect(licenseServer.get_license).not.toHaveBeenCalled();
   });
 
@@ -296,13 +355,13 @@ describe("LicenseSearchBanner", () => {
     }) as never);
     await mountBanner(PAUSED);
     expect(live.size).toBe(1);
-    store.commit("setConfig", { license_search_allowed: true });
+    store.commit("setConfig", { meta_org: META, license_search_allowed: true });
     await flushPromises();
     expect(live.size).toBe(0);
     store.commit("setConfig", PAUSED);
     await flushPromises();
     expect(live.size).toBe(1);
-    store.commit("setConfig", { license_search_allowed: false, extra: 1 });
+    store.commit("setConfig", { ...PAUSED, extra: 1 });
     await flushPromises();
     expect(live.size).toBe(1);
     wrapper?.unmount();
