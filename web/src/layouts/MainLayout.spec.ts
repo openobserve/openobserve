@@ -2052,7 +2052,10 @@ describe("MainLayout — AI Observability menu visibility (isAiObservabilityMenu
   // The rail is built inside setup() from literals, so the icon set is pinned on the source.
   describe("rail icons (AC-20)", () => {
     const source = readFileSync(resolve(__dirname, "./MainLayout.vue"), "utf8");
-    const icons = [...source.matchAll(/^\s*icon: "([^"]+)",/gm)].map((m) => m[1]);
+    // A v2 ternary contributes its flag-off icon, so this list stays the flag-off rail.
+    const icons = [...source.matchAll(/^\s*icon: (?:assistantV2 \? "[^"]+" : )?"([^"]+)",/gm)].map(
+      (m) => m[1],
+    );
 
     it("keeps every rail icon from BASE except Profiles, which moves to memory", () => {
       expect(icons).toEqual([
@@ -2078,6 +2081,10 @@ describe("MainLayout — AI Observability menu visibility (isAiObservabilityMenu
         "memory",
         "description",
       ]);
+    });
+
+    it("gives the v2 LLM observability item its own icon, never the assistant glyph", () => {
+      expect(source).toMatch(/icon: assistantV2 \? "insights" : "auto-awesome",/);
     });
 
     it("gives Traces and Profiles different icons from the existing set", () => {

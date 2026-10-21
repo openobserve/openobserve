@@ -17,6 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="flex flex-col gap-6" data-test="settings-assistant-access-tab">
     <AssistantOrgPolicyForm ref="policy" />
+    <AssistantRoleChatAccess ref="roles" />
   </div>
 </template>
 
@@ -24,11 +25,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref } from "vue";
 
 import AssistantOrgPolicyForm from "./AssistantOrgPolicyForm.vue";
+import AssistantRoleChatAccess from "./AssistantRoleChatAccess.vue";
 
 const policy = ref<InstanceType<typeof AssistantOrgPolicyForm> | null>(null);
+const roles = ref<InstanceType<typeof AssistantRoleChatAccess> | null>(null);
 
 function refresh() {
-  return policy.value?.refresh();
+  return Promise.all([policy.value?.refresh(), roles.value?.refresh()]);
 }
 
 defineExpose({ refresh });

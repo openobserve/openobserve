@@ -136,7 +136,7 @@ describe("assistant settings service", () => {
   it("pages activity with only the filters that are set", async () => {
     api.get.mockResolvedValue({
       data: {
-        items: [{ id: "a1", at: 5, action: "Updated alert", actor: "ada@example.com" }, {}],
+        rows: [{ id: "a1", at: 5, action: "Updated alert", on_behalf_of: "ada@example.com" }, {}],
         next_cursor: "c2",
       },
     });
@@ -145,10 +145,49 @@ describe("assistant settings service", () => {
       silentForbidden: true,
       params: { from: 1, cursor: "c1" },
     });
-    expect(page?.items.map((e) => e.id)).toEqual(["a1"]);
+    expect(page?.rows.map((e) => e.id)).toEqual(["a1"]);
     expect(page?.next_cursor).toBe("c2");
     api.get.mockRejectedValue(httpError(404));
     await expect(assistantSettings.activity("acme")).resolves.toBeNull();
+  });
+
+  it("reads activity rows in the server's shape", async () => {
+    const serverRow = {
+      id: "r1",
+      at: 1_700_000_000_000_000,
+      action: "Deleted alert",
+      target: { type: "alert", id: "a9", name: "cpu", deleted: true },
+      on_behalf_of: "ada@example.com",
+      approval: { kind: "approved", by: "bob@example.com" },
+      result: { state: "done" },
+      undo: { available: true, until: 1_700_000_900_000_000 },
+      chat_id: "c1",
+      turn_id: "t1",
+    };
+    const undone = {
+      ...serverRow,
+      id: "r2",
+      approval: { kind: "standing" },
+      result: { state: "undone", message: "Reverted" },
+      undo: { available: false, reason: "already_undone" },
+    };
+    const undoRow = { ...serverRow, id: "r3", undo_of: "r2", approval: { kind: "bogus" } };
+    api.get.mockResolvedValue({ data: { rows: [serverRow, undone, undoRow] } });
+    const page = await assistantSettings.activity("acme");
+    expect(page?.rows).toHaveLength(3);
+    expect(page?.rows[0]).toMatchObject({
+      on_behalf_of: "ada@example.com",
+      approval: { kind: "approved", by: "bob@example.com" },
+      result: { state: "done" },
+      undo: { available: true, until: 1_700_000_900_000_000 },
+      target: { name: "cpu", deleted: true },
+      chat_id: "c1",
+    });
+    expect(page?.rows[1].result).toEqual({ state: "undone", message: "Reverted" });
+    expect(page?.rows[1].undo).toMatchObject({ available: false, reason: "already_undone" });
+    expect(page?.rows[2].undo_of).toBe("r2");
+    expect(page?.rows[2].approval).toBeUndefined();
+    expect(page?.next_cursor).toBeUndefined();
   });
 
   it("revokes a grant and undoes an activity entry", async () => {
@@ -185,5 +224,12 @@ describe("capability and test parsing", () => {
     expect(parseTestResult({ ok: false, error: "e".repeat(900) }).error).toHaveLength(500);
     expect(parseTestResult(null)).toEqual({ ok: false });
     expect(parseTestResult({ ok: "yes" })).toEqual({ ok: false });
+    expect(
+      parseTestResult({
+        ok: false,
+        duration_ms: 3,
+        error: { code: "timeout", message: "No answer." },
+      }),
+    ).toEqual({ ok: false, duration_ms: 3, error: "No answer." });
   });
 });

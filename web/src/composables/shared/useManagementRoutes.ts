@@ -359,6 +359,19 @@ const useManagementRoutes = () => {
       ],
     );
   }
+  // The legacy page's links and bookmarks keep working; `?action=` and `?id=` open the same form in the tab.
+  const toolsets = routes[0].children.find((route: any) => route.name === "aiToolsets");
+  if (isAssistantV2() && toolsets) {
+    delete toolsets.component;
+    delete toolsets.meta;
+    delete toolsets.beforeEnter;
+    toolsets.redirect = (to: any) => ({
+      name: "assistantSettings",
+      params: { tab: "toolsets" },
+      query: to.query,
+    });
+  }
+
   return routes;
 };
 
