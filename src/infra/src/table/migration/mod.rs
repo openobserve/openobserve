@@ -225,6 +225,7 @@ mod m20261013_000001_create_oncall_phone_verifications;
 mod m20261013_000002_create_org_telephony;
 mod m20261015_000001_reports_add_last_run_columns;
 mod m20261016_000001_create_rum_pa_app_settings;
+mod m20261020_000001_alter_alert_recovery_destinations_to_json;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
 
@@ -582,6 +583,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20261013_000002_create_org_telephony::Migration),
             Box::new(m20261015_000001_reports_add_last_run_columns::Migration),
             Box::new(m20261016_000001_create_rum_pa_app_settings::Migration),
+            Box::new(m20261020_000001_alter_alert_recovery_destinations_to_json::Migration),
         ]
     }
 }
@@ -651,6 +653,10 @@ mod tests {
         (108, "m20261013_000002_create_org_telephony"),
         (109, "m20261015_000001_reports_add_last_run_columns"),
         (110, "m20261016_000001_create_rum_pa_app_settings"),
+        (
+            111,
+            "m20261020_000001_alter_alert_recovery_destinations_to_json",
+        ),
     ];
 
     // Two branches that each claim the next version merge cleanly, so a reused number must fail
@@ -784,6 +790,10 @@ mod tests {
             (
                 "m20260923_000001_create_ai_chat_sessions",
                 "m20261007_000001_create_ai_chat_turns",
+            ),
+            (
+                "m20260928_000001_add_alert_recovery_destinations",
+                "m20261020_000001_alter_alert_recovery_destinations_to_json",
             ),
         ] {
             assert!(
