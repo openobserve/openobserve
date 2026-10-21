@@ -1188,8 +1188,8 @@ pub struct Synthetics {
     /// synthetics_enabled).
     #[env_config(
         name = "ZO_SYNTHETICS_ENABLED",
-        default = false,
-        help = "Master switch for synthetic monitoring. Off by default; the background workers and HTTP routes only exist when this is true."
+        default = true,
+        help = "Master switch for synthetic monitoring background workers and HTTP routes; changes require a restart."
     )]
     pub enabled: bool,
     /// Super-cluster only: how long a parent may reference a child that has not replicated yet.
