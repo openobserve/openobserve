@@ -116,7 +116,11 @@ pub fn resolve_content(
     // default ("View alert" is an i18n/FE concern, Task 12), not this layer.
     links.push((String::new(), ctx.alert_url.clone()));
 
-    let max = spec.rows.max as usize;
+    let max = if spec.rows.enabled {
+        spec.rows.max as usize
+    } else {
+        0
+    };
     let rows: Vec<Vec<(String, String)>> = ctx
         .rows
         .iter()
@@ -135,13 +139,18 @@ pub fn resolve_content(
         })
         .collect();
 
-    let row_lines = spec.rows.format.as_ref().map(|fmt| {
-        ctx.rows
-            .iter()
-            .take(max)
-            .map(|row| substitute_raw_row(fmt, row, &mut unknown_variables))
-            .collect()
-    });
+    let row_lines = spec
+        .rows
+        .format
+        .as_ref()
+        .filter(|_| spec.rows.enabled)
+        .map(|fmt| {
+            ctx.rows
+                .iter()
+                .take(max)
+                .map(|row| substitute_raw_row(fmt, row, &mut unknown_variables))
+                .collect()
+        });
 
     RenderedContent {
         title,
@@ -592,6 +601,25 @@ mod tests {
             r.row_lines.as_ref().unwrap(),
             &vec!["web-1 at 92.5".to_string()]
         );
+    }
+
+    #[test]
+    fn rows_disabled_emits_no_rows() {
+        use config::meta::alerts::content_spec::{ContentSpec, RowsSpec};
+
+        for format in [None, Some("{host} at {cpu}".to_string())] {
+            let spec = ContentSpec {
+                rows: RowsSpec {
+                    enabled: false,
+                    format: format.clone(),
+                    ..Default::default()
+                },
+                ..Default::default()
+            };
+            let r = resolve_content(&spec, &fixture_ctx(), "email");
+            assert!(r.rows.is_empty(), "format {format:?}");
+            assert_eq!(r.row_lines, None, "format {format:?}");
+        }
     }
 
     #[test]

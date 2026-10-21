@@ -55,7 +55,7 @@ use infra::{db::get_orm_client_ro, schema::unwrap_stream_settings, table};
 use itertools::Itertools;
 use lettre::{
     AsyncTransport, Message,
-    message::{Attachment, MultiPart, SinglePart},
+    message::{Attachment, MessageBuilder, MultiPart, SinglePart},
 };
 #[cfg(feature = "enterprise")]
 use o2_openfga::{
@@ -3160,9 +3160,7 @@ async fn send_to_destination(
             match dest_type {
                 DestinationType::Http(endpoint) => send_http_notification(endpoint, msg).await,
                 DestinationType::Email(email) => {
-                    // Same string for both parts: identical to the MIME this
-                    // path emitted before the signature took two bodies.
-                    send_email_notification(&email_subject, email, msg.clone(), msg).await
+                    send_email_notification(&email_subject, email, None, msg).await
                 }
                 DestinationType::Sns(aws_sns) => {
                     send_sns_notification(&alert.name, aws_sns, msg).await
@@ -3202,7 +3200,7 @@ async fn send_to_destination(
                     send_email_notification_with_inline_png(
                         &subject,
                         email,
-                        text,
+                        Some(text),
                         html,
                         ctx.chart_png.clone(),
                     )
@@ -3239,7 +3237,7 @@ pub(crate) async fn dispatch_notification(
         // split, so both parts carry the same string — byte-identical to the
         // MIME this path emitted before the signature took two bodies.
         DestinationType::Email(email) => {
-            send_email_notification(subject, email, msg.clone(), msg).await
+            send_email_notification(subject, email, Some(msg.clone()), msg).await
         }
         DestinationType::Sns(aws_sns) => send_sns_notification(subject, aws_sns, msg).await,
     }
@@ -3279,7 +3277,7 @@ pub(crate) async fn dispatch_test_message(
                 text,
             },
             DestinationType::Email(email),
-        ) => send_email_notification(&subject, email, text, html).await,
+        ) => send_email_notification(&subject, email, Some(text), html).await,
         (RenderedMessage::Http { body }, DestinationType::Sns(aws_sns)) => {
             send_sns_notification(title, aws_sns, body).await
         }
@@ -3423,21 +3421,17 @@ async fn send_http_notification(endpoint: &Endpoint, msg: String) -> Result<Stri
     send_outcome(resp_status, &resp_body, hide_body)
 }
 
-/// Send a multipart/alternative email.
+/// Send an email; with `text_body: None` it carries only the HTML part.
 ///
 /// Parameter order is `(text_body, html_body)` to MATCH
 /// `MultiPart::alternative_plain_html`, whose first argument is the plaintext
 /// part. Keeping the two orderings identical is deliberate: the failure mode of
 /// swapping them — HTML delivered as the plaintext part, so every alert email
 /// shows raw markup — is silent and customer-visible.
-///
-/// The custom-template path passes the SAME string for both, which reproduces
-/// exactly the MIME this function emitted when it took one `msg`. The
-/// Phase-1b renderers pass genuinely distinct parts.
 pub async fn send_email_notification(
     email_subject: &str,
     email: &Email,
-    text_body: String,
+    text_body: Option<String>,
     html_body: String,
 ) -> Result<String, anyhow::Error> {
     send_email_notification_with_inline_png(email_subject, email, text_body, html_body, None).await
@@ -3449,12 +3443,11 @@ pub async fn send_email_notification(
 /// `alternative(plain, related(html, image))` — the HTML part references the
 /// image as `cid:` ([`render::email::CHART_CONTENT_ID`]) and the bytes travel
 /// inside this same email, so the chart renders even in clients that block
-/// remote images and nothing is hosted anywhere. Without a PNG the MIME is
-/// byte-identical to what this function always emitted.
+/// remote images and nothing is hosted anywhere.
 pub async fn send_email_notification_with_inline_png(
     email_subject: &str,
     email: &Email,
-    text_body: String,
+    text_body: Option<String>,
     html_body: String,
     inline_png: Option<std::sync::Arc<Vec<u8>>>,
 ) -> Result<String, anyhow::Error> {
@@ -3476,32 +3469,43 @@ pub async fn send_email_notification_with_inline_png(
         email = email.reply_to(cfg.smtp.smtp_reply_to.parse()?);
     }
 
-    let multipart = match inline_png {
-        None => MultiPart::alternative_plain_html(text_body, html_body),
-        Some(png) => MultiPart::alternative()
-            .singlepart(SinglePart::plain(text_body))
-            .multipart(
-                MultiPart::related()
-                    .singlepart(SinglePart::html(html_body))
-                    .singlepart(
-                        Attachment::new_inline(
-                            crate::alerts::notifications::render::email::CHART_CONTENT_ID
-                                .to_string(),
-                        )
-                        .body(
-                            png.as_ref().clone(),
-                            "image/png".parse().expect("static mime type"),
-                        ),
-                    ),
-            ),
-    };
-    let email = email.multipart(multipart).unwrap();
+    let email = with_email_body(email, text_body, html_body, inline_png)?;
 
     // Send the email
     match SMTP_CLIENT.as_ref().unwrap().send(email).await {
         Ok(resp) => Ok(format!("sent email response code: {}", resp.code())),
         Err(e) => Err(anyhow::anyhow!("Error sending email: {e}")),
     }
+}
+
+/// Attach `alternative(plain, html)`, or the HTML alone when `text_body` is `None`.
+fn with_email_body(
+    builder: MessageBuilder,
+    text_body: Option<String>,
+    html_body: String,
+    inline_png: Option<std::sync::Arc<Vec<u8>>>,
+) -> Result<Message, lettre::error::Error> {
+    match (text_body, inline_png) {
+        (Some(text), None) => builder.multipart(MultiPart::alternative_plain_html(text, html_body)),
+        (Some(text), Some(png)) => builder.multipart(
+            MultiPart::alternative()
+                .singlepart(SinglePart::plain(text))
+                .multipart(html_with_inline_png(html_body, &png)),
+        ),
+        (None, None) => builder.singlepart(SinglePart::html(html_body)),
+        (None, Some(png)) => builder.multipart(html_with_inline_png(html_body, &png)),
+    }
+}
+
+fn html_with_inline_png(html_body: String, png: &[u8]) -> MultiPart {
+    MultiPart::related()
+        .singlepart(SinglePart::html(html_body))
+        .singlepart(
+            Attachment::new_inline(
+                crate::alerts::notifications::render::email::CHART_CONTENT_ID.to_string(),
+            )
+            .body(png.to_vec(), "image/png".parse().expect("static mime type")),
+        )
 }
 
 /// Discord webhook send with the chart PNG uploaded in the same request
@@ -5135,6 +5139,28 @@ mod tests {
     use serde_json::json;
 
     use super::*;
+
+    #[test]
+    fn email_body_is_html_only_without_text() {
+        let builder = || {
+            Message::builder()
+                .from("o2@example.com".parse().unwrap())
+                .to("on-call@example.com".parse().unwrap())
+                .subject("s")
+        };
+        let html = "<p>hi</p>".to_string();
+        let html_only = with_email_body(builder(), None, html.clone(), None).unwrap();
+        let html_only = String::from_utf8(html_only.formatted()).unwrap();
+        assert!(!html_only.contains("text/plain"));
+        assert!(!html_only.contains("multipart/alternative"));
+        assert!(html_only.contains("text/html"));
+
+        let both = with_email_body(builder(), Some("hi".into()), html, None).unwrap();
+        let both = String::from_utf8(both.formatted()).unwrap();
+        assert!(both.contains("multipart/alternative"));
+        assert!(both.contains("text/plain"));
+        assert!(both.contains("text/html"));
+    }
 
     #[test]
     fn test_with_incident_notify_error() {
