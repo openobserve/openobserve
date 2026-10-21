@@ -35,11 +35,10 @@ _cov_test() {
         --no-cfg-coverage \
         --no-cfg-coverage-nightly \
         --no-report \
-        --ignore-filename-regex 'job|.*generated.*' \
         --test-threads=1 \
         --no-fail-fast \
         --retries 1 \
-        users::tests bootstrap cache::file_data::disk
+        users::tests bootstrap cache::file_data::disk sourcemaps
 
     cargo llvm-cov nextest \
         --workspace \
@@ -57,6 +56,7 @@ _cov_test() {
         --skip users::tests \
         --skip bootstrap \
         --skip cache::file_data::disk \
+        --skip sourcemaps \
         "$@"
         
 }
