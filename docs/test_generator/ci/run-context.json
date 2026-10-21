@@ -1,0 +1,21 @@
+{
+  "feature_slug": "refresh-cancel-buttons",
+  "feature_title": "Labelled Refresh & Cancel Query Buttons",
+  "area": "Dashboards",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "refreshCancelButtons.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Dashboards/refreshCancelButtons.spec.js",
+  "playwright_group": "Dashboards",
+  "source_files": [
+    "web/src/components/dashboards/viewPanel/ViewPanel.vue",
+    "web/src/views/Dashboards/ViewDashboard.vue",
+    "web/src/views/PinnedDashboardTab.vue",
+    "web/src/plugins/metrics/Index.vue",
+    "web/src/views/RUM/AppPerformance.vue"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": ""
+}

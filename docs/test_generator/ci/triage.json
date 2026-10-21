@@ -1,0 +1,29 @@
+{
+  "feature_slug": "refresh-cancel-buttons",
+  "feature_title": "Labelled Refresh & Cancel Query Buttons",
+  "area": "Dashboards",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "refreshCancelButtons.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Dashboards/refreshCancelButtons.spec.js",
+  "playwright_group": "Dashboards",
+  "source_files": [
+    "web/src/components/dashboards/viewPanel/ViewPanel.vue",
+    "web/src/views/Dashboards/ViewDashboard.vue",
+    "web/src/views/PinnedDashboardTab.vue",
+    "web/src/plugins/metrics/Index.vue",
+    "web/src/views/RUM/AppPerformance.vue"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "All ten changed paths live under web/src/ (the openobserve frontend tree): ViewPanel, ViewDashboard, PinnedDashboardTab, metrics/Index, and RUM AppPerformance. None sit under enterprise/, o2_enterprise/, or any o2-enterprise-owned path, so this is an OSS change. The code does reference config.isEnterprise to gate the query-Cancel button, but that is an OSS-hosted gating flag, not enterprise-owned code — the paths decide it as oss.",
+    "skip": "Not skipping. The change rewires user-facing toolbar controls (Refresh and Cancel buttons) across several real views, so it is not docs/CI/comment-only. The trigger comment is empty and no tests-added label was passed, so there is no explicit opt-out.",
+    "e2e": "E2E is warranted. The diff turns icon-only Refresh buttons into labelled ones and swaps the enterprise Cancel-query button to a labelled cancel-query variant, changing variants (outline/ghost-warning to primary/warning), sizes, mobile vs desktop icon/label behaviour, and tooltip enablement across dashboard panels, the dashboard header, the pinned-dashboard tab, the metrics add-panel toolbar, and the RUM performance view. These are user-visible interaction and state changes worth verifying.",
+    "area": "Dashboards. The bulk of the UI changes live in dashboard components — ViewPanel.vue, ViewDashboard.vue, and PinnedDashboardTab.vue — with the metrics Index.vue and RUM AppPerformance.vue changes being sibling toolbar refactors of the same pattern. Dashboards is where the core component (ViewPanel) lives and where the E2E spec belongs.",
+    "group": "Dashboards is the closest existing ci-matrix shard for a dashboard-toolbar spec; the change is centred on the dashboard view panel. The OSS ci_matrix.json is not present in this repo (only the enterprise overlay and cloud/env variants are), so the Engineer should confirm the exact testfolder name against ci_matrix.json.",
+    "existing_tests": "No E2E specs in the diff. The changed test files are Vitest unit specs under web/src/** (*.spec.ts: ViewPanel.spec.ts, viewDashboard.timeRange.spec.ts, PinnedDashboardTab.spec.ts, AppAnalytics.spec.ts, AppPerformance.spec.ts), which are unit coverage, not Playwright E2E — so existing_tests_in_diff is false and the Architect should author the E2E spec fresh."
+  }
+}

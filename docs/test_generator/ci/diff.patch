@@ -1,0 +1,694 @@
+===== COMPLETE LIST OF CHANGED FILES (10 files) =====
+# AUTHORITATIVE: this list is never truncated. The diff BODY below may be trimmed for
+# very large PRs, so decide WHICH files/areas changed (e.g. web/src frontend) from THIS list.
+web/src/components/dashboards/viewPanel/ViewPanel.spec.ts
+web/src/components/dashboards/viewPanel/ViewPanel.vue
+web/src/plugins/metrics/Index.vue
+web/src/views/Dashboards/ViewDashboard.vue
+web/src/views/Dashboards/viewDashboard.timeRange.spec.ts
+web/src/views/PinnedDashboardTab.spec.ts
+web/src/views/PinnedDashboardTab.vue
+web/src/views/RUM/AppAnalytics.spec.ts
+web/src/views/RUM/AppPerformance.spec.ts
+web/src/views/RUM/AppPerformance.vue
+===== END CHANGED FILES =====
+
+diff --git a/web/src/components/dashboards/viewPanel/ViewPanel.spec.ts b/web/src/components/dashboards/viewPanel/ViewPanel.spec.ts
+index bcf2b0126dfc..67f22da7288e 100644
+--- a/web/src/components/dashboards/viewPanel/ViewPanel.spec.ts
++++ b/web/src/components/dashboards/viewPanel/ViewPanel.spec.ts
+@@ -16,6 +16,7 @@
+ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+ import { flushPromises, mount, VueWrapper } from "@vue/test-utils";
+ import ViewPanel from "./ViewPanel.vue";
++import config from "@/aws-exports";
+ import PanelErrorButtons from "@/components/dashboards/PanelErrorButtons.vue";
+ 
+ // Mock vue-router
+@@ -966,6 +967,34 @@ describe("ViewPanel", () => {
+ 
+       expect(wrapper.find('[data-test="dashboard-viewpanel-cancel-btn"]').exists()).toBe(false);
+     });
++
++    it("shows a labelled Cancel while an enterprise query runs, with the options arrow to match", async () => {
++      const wasEnterprise = config.isEnterprise;
++      config.isEnterprise = "true";
++      try {
++        wrapper = createWrapper();
++        await flushPromises();
++        const loading = (wrapper.vm as any).$.provides.variablesAndPanelsDataLoadingState;
++        loading.searchRequestTraceIds = { p1: ["trace-id-1"] };
++        loading.panels = { p1: true };
++        await flushPromises();
++
++        const cancel = wrapper
++          .findAllComponents({ name: "OButton" })
++          .find((b) => b.attributes("data-test") === "dashboard-viewpanel-cancel-btn")!;
++        expect(cancel.props("variant")).toBe("cancel-query");
++        expect(cancel.text()).toContain("Cancel");
++        expect(wrapper.vm.refreshOptionsVariant).toBe("cancel-query");
++        // No X icon on wide screens; a hidden Refresh label keeps the button width. The OButton
++        // stub keeps icon-left in $attrs rather than on the DOM.
++        expect(cancel.vm.$attrs["icon-left"]).toBeUndefined();
++        expect(cancel.find('[aria-hidden="true"]').text()).toContain(
++          "dashboard.viewDashboard.refresh",
++        );
++      } finally {
++        config.isEnterprise = wasEnterprise;
++      }
++    });
+   });
+ 
+   describe("Data Loading", () => {
+@@ -1143,9 +1172,9 @@ describe("ViewPanel", () => {
+     };
+     const refreshTooltip = () =>
+       wrapper
+-        .findComponent('[data-test="dashboard-viewpanel-refresh-data-btn"]')
+-        .findComponent({ name: "OTooltip" })
+-        .props("content");
++        .findAllComponents({ name: "OTooltip" })
++        .find((tip) => tip.find('[data-test="dashboard-viewpanel-refresh-data-btn"]').exists())
++        ?.props("content");
+     const chartSpan = () => {
+       const time = wrapper.vm.dashboardPanelData.meta.dateTime;
+       return time.end_time.getTime() - time.start_time.getTime();
+@@ -1262,6 +1291,15 @@ describe("ViewPanel", () => {
+       await flushPromises();
+     };
+ 
++    const refreshButton = () =>
++      wrapper
++        .findAllComponents({ name: "OButton" })
++        .find((b) => b.attributes("data-test") === "dashboard-viewpanel-refresh-data-btn")!;
++    const refreshTooltipWrapper = () =>
++      wrapper
++        .findAllComponents({ name: "OTooltip" })
++        .find((tip) => tip.find('[data-test="dashboard-viewpanel-refresh-data-btn"]').exists())!;
++
+     afterEach(() => {
+       localStorage.removeItem("oo_toggle_auto_run");
+       setAutoQuery(false);
+@@ -1275,6 +1313,9 @@ describe("ViewPanel", () => {
+ 
+       expect(wrapper.vm.isVariablesChanged).toBe(false);
+       expect(wrapper.vm.showApplyHint).toBe(false);
++      expect(refreshButton().props("variant")).toBe("primary");
++      expect(refreshButton().text()).toContain("dashboard.viewDashboard.refresh");
++      expect(refreshTooltipWrapper().props("disabled")).toBe(true);
+     });
+ 
+     it("Refresh turns amber on an unapplied change and clears after Refresh", async () => {
+@@ -1282,11 +1323,14 @@ describe("ViewPanel", () => {
+       await flushPromises();
+       await changeAppliedVariables();
+       expect(wrapper.vm.showApplyHint).toBe(true);
++      expect(refreshButton().props("variant")).toBe("warning");
++      expect(refreshTooltipWrapper().props("disabled")).toBe(false);
+ 
+       wrapper.vm.disable = false;
+       wrapper.vm.refreshData();
+       await flushPromises();
+       expect(wrapper.vm.showApplyHint).toBe(false);
++      expect(refreshButton().props("variant")).toBe("primary");
+     });
+ 
+     it("hides the Auto Run menu when the server flag is off", async () => {
+@@ -1310,6 +1354,7 @@ describe("ViewPanel", () => {
+       );
+       expect(wrapper.vm.isAutoRunOn).toBe(true);
+       expect(wrapper.vm.showApplyHint).toBe(false);
++      expect(refreshButton().props("variant")).toBe("primary");
+     });
+ 
+     it("uses the dashboard Auto Run copy for the Refresh tooltip while Auto Run is on", async () => {
+@@ -1318,9 +1363,9 @@ describe("ViewPanel", () => {
+       await flushPromises();
+ 
+       const tooltip = wrapper
+-        .findComponent('[data-test="dashboard-viewpanel-refresh-data-btn"]')
+-        .findComponent({ name: "OTooltip" })
+-        .props("content");
++        .findAllComponents({ name: "OTooltip" })
++        .find((tip) => tip.find('[data-test="dashboard-viewpanel-refresh-data-btn"]').exists())
++        ?.props("content");
+       expect(tooltip).toBe("dashboard.viewDashboard.autoRunDescription");
+     });
+ 
+diff --git a/web/src/components/dashboards/viewPanel/ViewPanel.vue b/web/src/components/dashboards/viewPanel/ViewPanel.vue
+index 1a890aa73a68..2bf0c6f66de1 100644
+--- a/web/src/components/dashboards/viewPanel/ViewPanel.vue
++++ b/web/src/components/dashboards/viewPanel/ViewPanel.vue
+@@ -38,7 +38,7 @@
+         <HistogramIntervalDropDown
+           v-if="!promqlMode && histogramFields.length"
+           v-model="histogramInterval"
+-          class="hover:bg-interactive-hover-bg h-8 w-37.5 transition-all duration-200"
++          class="hover:bg-interactive-hover-bg h-7.5 w-37.5 transition-all duration-200"
+           data-test="dashboard-viewpanel-histogram-interval-dropdown"
+         />
+ 
+@@ -46,7 +46,7 @@
+           :model-value="pickedDate ?? selectedDate"
+           :auto-apply-dashboard="true"
+           ref="dateTimePickerRef"
+-          class="hover:bg-interactive-hover-bg h-8 min-h-8 transition-all duration-200"
++          class="hover:bg-interactive-hover-bg h-7.5 min-h-7.5 transition-all duration-200"
+           data-test="dashboard-viewpanel-date-time-picker"
+           :disable="disable"
+           @update:model-value="timeGate.onPick"
+@@ -59,36 +59,54 @@
+           trigger
+           :min-refresh-interval="store.state?.zoConfig?.min_auto_refresh_interval || 5"
+           @trigger="refreshData"
+-          class="hover:bg-interactive-hover-bg h-8 transition-all duration-200"
++          class="hover:bg-interactive-hover-bg h-7.5 transition-all duration-200"
+           data-test="dashboard-viewpanel-refresh-interval"
+         />
+         <OButtonGroup class="shrink-0">
+-          <OButton
+-            v-if="config.isEnterprise == 'true' && searchRequestTraceIds.length && disable"
+-            variant="outline-destructive"
+-            size="icon-sm"
+-            @click="cancelViewPanelQuery"
+-            data-test="dashboard-viewpanel-cancel-btn"
+-            icon-left="cancel"
+-          >
+-            <OTooltip :content="t('panel.cancel')" />
+-          </OButton>
+-          <OButton
++          <OTooltip v-if="isCancelShown" :content="t('panel.cancel')" :disabled="!isMobile">
++            <OButton
++              variant="cancel-query"
++              :size="isMobile ? 'icon-toolbar' : 'sm-toolbar'"
++              @click="cancelViewPanelQuery"
++              :aria-label="t('panel.cancel')"
++              data-test="dashboard-viewpanel-cancel-btn"
++              :icon-left="isMobile ? 'cancel' : undefined"
++            >
++              <!-- Both labels share one grid cell: Cancel keeps the Refresh width and still fits a longer translation. -->
++              <span v-if="!isMobile" class="grid items-center justify-items-center">
++                <span
++                  class="invisible col-start-1 row-start-1 flex items-center gap-1.5"
++                  aria-hidden="true"
++                >
++                  <OIcon name="refresh" size="sm" />{{ t("dashboard.viewDashboard.refresh") }}
++                </span>
++                <span class="col-start-1 row-start-1">{{ t("panel.cancel") }}</span>
++              </span>
++            </OButton>
++          </OTooltip>
++          <!-- Wrapper mode: a child-mode tooltip would hover-bind only the icon, not the labelled button. -->
++          <OTooltip
+             v-else
+-            :variant="showApplyHint ? 'warning' : 'outline'"
+-            size="icon-sm"
+-            @click="refreshData"
+-            :disabled="disable"
+-            data-test="dashboard-viewpanel-refresh-data-btn"
+-            :icon-left="isAutoRunOn ? 'autorenew' : 'refresh'"
++            :content="refreshTooltip"
++            :disabled="!isMobile && !isAutoRunOn && !showApplyHint"
+           >
+-            <OTooltip :content="refreshTooltip" />
+-          </OButton>
++            <OButton
++              :variant="refreshVariant"
++              :size="isMobile ? 'icon-toolbar' : 'sm-toolbar'"
++              @click="refreshData"
++              :disabled="disable"
++              :aria-label="t('dashboard.viewDashboard.refresh')"
++              data-test="dashboard-viewpanel-refresh-data-btn"
++              :icon-left="isAutoRunOn ? 'autorenew' : 'refresh'"
++            >
++              <template v-if="!isMobile">{{ t("dashboard.viewDashboard.refresh") }}</template>
++            </OButton>
++          </OTooltip>
+           <ODropdown v-if="isAutoRunAvailable" align="end" side="bottom">
+             <template #trigger>
+               <OButton
+-                :variant="showApplyHint ? 'warning' : 'outline'"
+-                size="icon-sm"
++                :variant="refreshOptionsVariant"
++                size="icon-toolbar"
+                 class="w-5!"
+                 :disabled="disable"
+                 :aria-label="t('dashboard.viewDashboard.moreRefreshOptions')"
+@@ -136,7 +154,7 @@
+         <OButton
+           :aria-label="t('common.close')"
+           variant="outline"
+-          size="icon-sm"
++          size="icon-toolbar"
+           @click="goBack"
+           data-test="dashboard-viewpanel-close-btn"
+           icon-left="close"
+@@ -278,6 +296,7 @@ import type { PanelNoticeActionId } from "@/utils/dashboard/panelNotices";
+ import { useVariablesManager } from "@/composables/dashboard/useVariablesManager";
+ import { useAutoRunToggle } from "@/composables/dashboard/useAutoRunToggle";
+ import { useDashboardTimeGate } from "@/composables/dashboard/useDashboardTimeGate";
++import useBreakpoint from "@/composables/useBreakpoint";
+ import {
+   DASHBOARD_FRESH_PANEL_TIME,
+   freshTimeFromAppliedRange,
+@@ -666,6 +685,9 @@ export default defineComponent({
+       () => (isVariablesChanged.value && !isAutoRunOn.value) || timeGate.needsRefresh.value,
+     );
+ 
++    const { isMobile } = useBreakpoint();
++    const refreshVariant = computed(() => (showApplyHint.value ? "warning" : "primary"));
++
+     const refreshTooltip = computed(() => {
+       if (isAutoRunOn.value) return t("dashboard.viewDashboard.autoRunDescription");
+       if (timeGate.needsRefresh.value) {
+@@ -913,6 +935,13 @@ export default defineComponent({
+     };
+ 
+     const disable = ref(false);
++    const isCancelShown = computed(
++      () =>
++        config.isEnterprise == "true" && searchRequestTraceIds.value.length > 0 && disable.value,
++    );
++    const refreshOptionsVariant = computed(() =>
++      isCancelShown.value ? "cancel-query" : refreshVariant.value,
++    );
+ 
+     watch(variablesAndPanelsDataLoadingState, () => {
+       const panelsValues = Object.values(variablesAndPanelsDataLoadingState.panels);
+@@ -976,6 +1005,10 @@ export default defineComponent({
+ 
+     return {
+       t,
++      isMobile,
++      isCancelShown,
++      refreshVariant,
++      refreshOptionsVariant,
+       setTimeForVariables,
+       dateTimeForVariables,
+       updateDateTime,
+diff --git a/web/src/plugins/metrics/Index.vue b/web/src/plugins/metrics/Index.vue
+index a3a426198000..66e05cad84dc 100644
+--- a/web/src/plugins/metrics/Index.vue
++++ b/web/src/plugins/metrics/Index.vue
+@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+       <template v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type)">
+         <OButton
+           v-if="config.isEnterprise == 'true' && searchRequestTraceIds.length"
+-          variant="outline-destructive"
++          variant="cancel-query"
+           size="sm-toolbar"
+           data-test="metrics-cancel"
+           @click="cancelAddPanelQuery"
+diff --git a/web/src/views/Dashboards/ViewDashboard.vue b/web/src/views/Dashboards/ViewDashboard.vue
+index fcbacb193155..7659a84b7e4f 100644
+--- a/web/src/views/Dashboards/ViewDashboard.vue
++++ b/web/src/views/Dashboards/ViewDashboard.vue
+@@ -122,6 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+             <OTooltip
+               v-if="config.isEnterprise == 'true' && arePanelsLoading"
+               :content="t('panel.cancel')"
++              :disabled="!isMobile"
+             >
+               <OButton
+                 variant="cancel-query"
+@@ -129,9 +130,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+                 @click="cancelQuery"
+                 :aria-label="t('panel.cancel')"
+                 data-test="dashboard-cancel-btn"
+-                icon-left="cancel"
++                :icon-left="isMobile ? 'cancel' : undefined"
+               >
+-                <template v-if="!isMobile">{{ t("panel.cancel") }}</template>
++                <!-- Both labels share one grid cell: Cancel keeps the Refresh width and still fits a longer translation. -->
++                <span v-if="!isMobile" class="grid items-center justify-items-center">
++                  <span
++                    class="invisible col-start-1 row-start-1 flex items-center gap-1.5"
++                    aria-hidden="true"
++                  >
++                    <OIcon name="refresh" size="sm" />{{ t("dashboard.viewDashboard.refresh") }}
++                  </span>
++                  <span class="col-start-1 row-start-1">{{ t("panel.cancel") }}</span>
++                </span>
+               </OButton>
+             </OTooltip>
+             <OTooltip v-else :content="refreshTooltip" shortcut-id="dashboardRefresh">
+diff --git a/web/src/views/Dashboards/viewDashboard.timeRange.spec.ts b/web/src/views/Dashboards/viewDashboard.timeRange.spec.ts
+index 23d6bcbe3b39..17e91cc6a0f4 100644
+--- a/web/src/views/Dashboards/viewDashboard.timeRange.spec.ts
++++ b/web/src/views/Dashboards/viewDashboard.timeRange.spec.ts
+@@ -92,6 +92,7 @@ vi.mock("moment-timezone", () => ({
+ }));
+ 
+ import ViewDashboard from "@/views/Dashboards/ViewDashboard.vue";
++import config from "@/aws-exports";
+ import i18n from "@/locales";
+ 
+ const relative = (period: string) => ({
+@@ -389,6 +390,27 @@ describe("ViewDashboard time range gate", () => {
+     expect(refreshButton().props("variant")).toBe("primary");
+   });
+ 
++  it("swaps Refresh for a labelled Cancel while enterprise panels load, with the options arrow to match", async () => {
++    const wasEnterprise = config.isEnterprise;
++    config.isEnterprise = "true";
++    try {
++      await mountDashboard();
++      wrapper.vm.arePanelsLoading = true;
++      await flushPromises();
++
++      const cancel = wrapper.findComponent('[data-test="dashboard-cancel-btn"]');
++      expect(cancel.props("variant")).toBe("cancel-query");
++      expect(cancel.text()).toContain("Cancel");
++      expect(refreshOptions().props("variant")).toBe("cancel-query");
++      expect(wrapper.find('[data-test="dashboard-refresh-btn"]').exists()).toBe(false);
++      // No X icon on wide screens; a hidden Refresh label keeps the button width.
++      expect(cancel.props("iconLeft")).toBeUndefined();
++      expect(cancel.find('[aria-hidden="true"]').text()).toContain("Refresh");
++    } finally {
++      config.isEnterprise = wasEnterprise;
++    }
++  });
++
+   it("shows the labelled Refresh with the plain refresh icon while Auto Run is off", async () => {
+     await mountDashboard();
+ 
+diff --git a/web/src/views/PinnedDashboardTab.spec.ts b/web/src/views/PinnedDashboardTab.spec.ts
+new file mode 100644
+index 000000000000..f3f821a6a261
+--- /dev/null
++++ b/web/src/views/PinnedDashboardTab.spec.ts
+@@ -0,0 +1,83 @@
++// Copyright 2026 OpenObserve Inc.
++//
++// This program is free software: you can redistribute it and/or modify
++// it under the terms of the GNU Affero General Public License as published by
++// the Free Software Foundation, either version 3 of the License, or
++// (at your option) any later version.
++//
++// This program is distributed in the hope that it will be useful
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU Affero General Public License for more details.
++//
++// You should have received a copy of the GNU Affero General Public License
++// along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++import { describe, it, expect, vi, afterEach } from "vitest";
++import { flushPromises, mount, VueWrapper } from "@vue/test-utils";
++import { createStore } from "vuex";
++import { createI18n } from "vue-i18n";
++import PinnedDashboardTab from "./PinnedDashboardTab.vue";
++
++vi.mock("@/utils/commons", () => ({
++  getDashboard: vi.fn(async () => ({ title: "Pinned", tabs: [{ tabId: "t1", panels: [] }] })),
++}));
++
++describe("PinnedDashboardTab", () => {
++  let wrapper: VueWrapper<any>;
++
++  const mountTab = async () => {
++    wrapper = mount(PinnedDashboardTab, {
++      props: { dashboardId: "d1", folderId: "default" },
++      global: {
++        plugins: [
++          createStore({ state: { zoConfig: {}, selectedOrganization: { identifier: "o1" } } }),
++          createI18n({
++            legacy: false,
++            locale: "en",
++            messages: { en: { common: { refresh: "Refresh" } } },
++          }),
++        ],
++        stubs: {
++          RenderDashboardCharts: true,
++          DateTimePickerDashboard: true,
++          AutoRefreshInterval: true,
++          OSkeleton: true,
++          OTooltip: { name: "OTooltip", props: ["content", "disabled"], template: "<slot />" },
++          OButton: {
++            name: "OButton",
++            props: ["variant", "size", "iconLeft"],
++            template: '<button v-bind="$attrs" @click="$emit(\'click\')"><slot /></button>',
++          },
++        },
++      },
++    });
++    await flushPromises();
++  };
++
++  const refreshButton = () =>
++    wrapper
++      .findAllComponents({ name: "OButton" })
++      .find((b) => b.attributes("data-test") === "pinned-dashboard-refresh-btn")!;
++
++  afterEach(() => {
++    wrapper?.unmount();
++  });
++
++  it("shows Refresh as a labelled primary button", async () => {
++    await mountTab();
++
++    expect(refreshButton().props("variant")).toBe("primary");
++    expect(refreshButton().props("size")).toBe("sm-toolbar");
++    expect(refreshButton().text()).toContain("Refresh");
++  });
++
++  it("keeps the tooltip off while the label is visible", async () => {
++    await mountTab();
++
++    const tooltip = wrapper
++      .findAllComponents({ name: "OTooltip" })
++      .find((tip) => tip.find('[data-test="pinned-dashboard-refresh-btn"]').exists())!;
++    expect(tooltip.props("disabled")).toBe(true);
++  });
++});
+diff --git a/web/src/views/PinnedDashboardTab.vue b/web/src/views/PinnedDashboardTab.vue
+index dcfb94f4d10e..09e029d2fcc7 100644
+--- a/web/src/views/PinnedDashboardTab.vue
++++ b/web/src/views/PinnedDashboardTab.vue
+@@ -59,15 +59,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+           @trigger="refreshData"
+           size="sm"
+         />
+-        <OButton
+-          variant="outline"
+-          size="icon-toolbar"
+-          icon-left="refresh"
+-          data-test="pinned-dashboard-refresh-btn"
+-          @click="refreshData"
+-        >
+-          <OTooltip :content="t('common.refresh')" />
+-        </OButton>
++        <!-- The tooltip would only repeat the visible label, so it shows on phones alone. -->
++        <OTooltip :content="t('common.refresh')" :disabled="!isMobile">
++          <OButton
++            variant="primary"
++            :size="isMobile ? 'icon-toolbar' : 'sm-toolbar'"
++            icon-left="refresh"
++            :aria-label="t('common.refresh')"
++            data-test="pinned-dashboard-refresh-btn"
++            @click="refreshData"
++          >
++            <template v-if="!isMobile">{{ t("common.refresh") }}</template>
++          </OButton>
++        </OTooltip>
+       </div>
+       <div class="min-h-0 flex-1 overflow-auto">
+         <RenderDashboardCharts
+@@ -96,8 +100,10 @@ import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+ import OButton from "@/lib/core/Button/OButton.vue";
+ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+ import { useI18nTyped } from "@/types/i18n";
++import useBreakpoint from "@/composables/useBreakpoint";
+ 
+ const { t } = useI18nTyped();
++const { isMobile } = useBreakpoint();
+ 
+ const props = defineProps<{ dashboardId: string; folderId: string }>();
+ const emit = defineEmits<{
+diff --git a/web/src/views/RUM/AppAnalytics.spec.ts b/web/src/views/RUM/AppAnalytics.spec.ts
+index 500365b3f5b0..19b328d4b0a4 100644
+--- a/web/src/views/RUM/AppAnalytics.spec.ts
++++ b/web/src/views/RUM/AppAnalytics.spec.ts
+@@ -1055,6 +1055,17 @@ describe("pa gap fixes (scope bar and Exclusions drawer)", () => {
+     [...root.querySelectorAll<HTMLButtonElement>("button, a, [role='button']")].find(
+       (b) => b.textContent?.trim() === label,
+     );
++  // Submit validates on timers before the PUT, so a fixed settle can miss it and leak the call into the next test.
++  const clickSave = async (d: HTMLElement) => {
++    const before = settingsApi.putAppSettings.mock.calls.length;
++    buttonIn(d, "Save")!.click();
++    await vi.waitFor(
++      () => expect(settingsApi.putAppSettings.mock.calls.length).toBeGreaterThan(before),
++      { timeout: 5000 },
++    );
++    await Promise.resolve(settingsApi.putAppSettings.mock.results.at(-1)!.value).catch(() => {});
++    await settle();
++  };
+   const drawer = () =>
+     [...document.querySelectorAll<HTMLElement>("[role='dialog']")].find((d) =>
+       d.textContent?.includes("Built-in bot rule"),
+@@ -1293,8 +1304,7 @@ describe("pa gap fixes (scope bar and Exclusions drawer)", () => {
+     const d = drawer()!;
+     botSwitch(d).click();
+     await settle();
+-    buttonIn(d, "Save")!.click();
+-    await settle();
++    await clickSave(d);
+     expect(settingsApi.putAppSettings).toHaveBeenCalledTimes(1);
+     const [org, app, body] = settingsApi.putAppSettings.mock.calls[0];
+     expect([org, app]).toEqual(["org1", "web"]);
+@@ -1320,8 +1330,7 @@ describe("pa gap fixes (scope bar and Exclusions drawer)", () => {
+     expect(d.querySelector('[data-test="rum-analytics-exclusions-page-0"]')?.textContent).toContain(
+       "Page is /health",
+     );
+-    buttonIn(d, "Save")!.click();
+-    await settle();
++    await clickSave(d);
+     const body = settingsApi.putAppSettings.mock.calls[0][2];
+     expect(body).toMatchObject({ pages: [{ op: "eq", value: "/health" }] });
+   });
+@@ -1340,8 +1349,7 @@ describe("pa gap fixes (scope bar and Exclusions drawer)", () => {
+       .querySelector<HTMLElement>('[data-test="rum-analytics-funnel-field-picker-apply"]')!
+       .click();
+     await settle();
+-    buttonIn(d, "Save")!.click();
+-    await settle();
++    await clickSave(d);
+     expect(settingsApi.putAppSettings.mock.calls[0][2]).toMatchObject({ sessions: [rule] });
+   });
+ 
+@@ -1366,8 +1374,7 @@ describe("pa gap fixes (scope bar and Exclusions drawer)", () => {
+     const d = drawer()!;
+     botSwitch(d).click();
+     await settle();
+-    buttonIn(d, "Save")!.click();
+-    await settle();
++    await clickSave(d);
+     expect(settingsApi.getAppSettings.mock.calls.length).toBeGreaterThan(reads);
+     const scope = useProductAnalytics().scope.value as unknown as { exclusions: unknown };
+     expect(scope.exclusions).toMatchObject({ bots: false, rulesHash: "fedcba9876543210" });
+@@ -1411,8 +1418,7 @@ describe("pa gap fixes (scope bar and Exclusions drawer)", () => {
+     const d = drawer()!;
+     botSwitch(d).click();
+     await settle();
+-    buttonIn(d, "Save")!.click();
+-    await settle();
++    await clickSave(d);
+     expect(settingsApi.putAppSettings).toHaveBeenCalledTimes(1);
+     expect(drawer()!.textContent).toContain(
+       "Reloaded with the latest app filters, re-apply your change",
+@@ -1487,8 +1493,7 @@ describe("pa gap fixes (scope bar and Exclusions drawer)", () => {
+     const d = drawer()!;
+     botSwitch(d).click();
+     await settle();
+-    buttonIn(d, "Save")!.click();
+-    await settle();
++    await clickSave(d);
+     expect(settingsApi.putAppSettings).toHaveBeenCalledTimes(1);
+     expect(uaSearches()).toBe(1);
+     await useProductAnalytics().refresh();
+diff --git a/web/src/views/RUM/AppPerformance.spec.ts b/web/src/views/RUM/AppPerformance.spec.ts
+index c3e75cb33d7b..c63f8786890b 100644
+--- a/web/src/views/RUM/AppPerformance.spec.ts
++++ b/web/src/views/RUM/AppPerformance.spec.ts
+@@ -67,6 +67,15 @@ vi.mock("@/utils/rum/overview.json", () => ({
+ }));
+ 
+ describe("AppPerformance.vue", () => {
++  const refreshButton = () =>
++    wrapper
++      .findAllComponents({ name: "OButton" })
++      .find((b) => b.attributes("data-test") === "rum-performance-refresh")!;
++  const refreshTooltip = () =>
++    wrapper
++      .findAllComponents({ name: "OTooltip" })
++      .find((tip) => tip.find('[data-test="rum-performance-refresh"]').exists())!;
++
+   let wrapper: VueWrapper<any>;
+   let store: any;
+   let router: any;
+@@ -157,6 +166,7 @@ describe("AppPerformance.vue", () => {
+         plugins: [store, router, i18n],
+         stubs: {
+           OButton: {
++            name: "OButton",
+             template: '<button v-bind="$attrs" @click="$emit(\'click\')"><slot /></button>',
+             props: ["variant", "size", "disabled"],
+           },
+@@ -237,6 +247,13 @@ describe("AppPerformance.vue", () => {
+       expect(refreshBtn.exists()).toBe(true);
+     });
+ 
++    it("shows Refresh as a labelled primary button while nothing waits", () => {
++      const refreshBtn = refreshButton();
++      expect(refreshBtn.props("variant")).toBe("primary");
++      expect(refreshBtn.text()).toContain("dashboard.refresh");
++      expect(refreshTooltip().props("disabled")).toBe(true);
++    });
++
+     it("shares a URL carrying the active tab and its time range", () => {
+       const shareButton = wrapper.findComponent(ShareButton);
+ 
+@@ -646,6 +663,8 @@ describe("AppPerformance.vue", () => {
+ 
+       expect(wrapper.vm.isAutoRunOn).toBe(false);
+       expect(wrapper.vm.isVariablesChanged).toBe(true);
++      expect(refreshButton().props("variant")).toBe("warning");
++      expect(refreshTooltip().props("disabled")).toBe(false);
+     });
+   });
+ });
+diff --git a/web/src/views/RUM/AppPerformance.vue b/web/src/views/RUM/AppPerformance.vue
+index 3b3062768774..272eb81cb081 100644
+--- a/web/src/views/RUM/AppPerformance.vue
++++ b/web/src/views/RUM/AppPerformance.vue
+@@ -61,27 +61,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+           @trigger="refreshData"
+         />
+         <OButtonGroup>
+-          <OButton
+-            :icon-left="isAutoRunOn ? 'autorenew' : 'refresh'"
+-            :variant="isVariablesChanged ? 'ghost-warning' : 'outline'"
+-            size="icon-toolbar"
+-            data-test="rum-performance-refresh"
+-            @click="refreshData"
++          <!-- Wrapper mode: a child-mode tooltip would hover-bind only the icon, not the labelled button. -->
++          <OTooltip
++            :content="
++              isAutoRunOn
++                ? t('search.autoRunEnabled')
++                : isVariablesChanged
++                  ? t('dashboard.refreshToApplyVariableChanges')
++                  : t('dashboard.refresh')
++            "
++            :disabled="!isMobile && !isAutoRunOn && !isVariablesChanged"
+           >
+-            <OTooltip
+-              :content="
+-                isAutoRunOn
+-                  ? t('search.autoRunEnabled')
+-                  : isVariablesChanged
+-                    ? t('dashboard.refreshToApplyVariableChanges')
+-                    : t('dashboard.refresh')
+-              "
+-            />
+-          </OButton>
++            <OButton
++              :icon-left="isAutoRunOn ? 'autorenew' : 'refresh'"
++              :variant="isVariablesChanged ? 'warning' : 'primary'"
++              :size="isMobile ? 'icon-toolbar' : 'sm-toolbar'"
++              :aria-label="t('dashboard.refresh')"
++              data-test="rum-performance-refresh"
++              @click="refreshData"
++            >
++              <template v-if="!isMobile">{{ t("dashboard.refresh") }}</template>
++            </OButton>
++          </OTooltip>
+           <ODropdown v-if="isAutoRunAvailable" align="end" side="bottom">
+             <template #trigger>
+               <OButton
+-                :variant="isVariablesChanged ? 'ghost-warning' : 'outline'"
++                :variant="isVariablesChanged ? 'warning' : 'primary'"
+                 size="icon-toolbar"
+                 class="w-5"
+                 :aria-label="t('dashboard.viewDashboard.moreRefreshOptions')"

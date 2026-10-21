@@ -389,6 +389,35 @@ export async function cleanupTestDashboard(page, pm, dashboardName) {
 }
 
 /**
+ * Create a fresh dashboard with one single-query line panel (Panel1) over
+ * `e2e_automate` / `kubernetes_pod_name`, and wait for it to finish loading.
+ * Every test mutates only this freshly created dashboard; the shared
+ * `e2e_automate` stream stays read-only.
+ *
+ * @param {import('@playwright/test').Page} page - Playwright page
+ * @param {import('../../pages/page-manager.js')} pm - PageManager instance
+ * @param {string} suffix - unique per-test dashboard-name suffix
+ * @returns {Promise<string>} the created dashboard name
+ */
+export async function createLoadedDashboardWithPanel(page, pm, suffix) {
+  const dashboardName = `RefreshCancel_${suffix}_${Date.now()}`;
+
+  await pm.dashboardList.menuItem("dashboards-item");
+  await waitForDashboardPage(page);
+  await pm.dashboardCreate.waitForDashboardUIStable();
+  await pm.dashboardCreate.createDashboard(dashboardName);
+
+  await pm.dashboardVariablesScoped.waitForAddPanelBtn();
+  await addSimplePanel(pm, "Panel1");
+
+  await pm.dashboardVariablesScoped.getAnyPanel(0).waitFor({ state: "visible", timeout: 15000 });
+  await pm.dashboardVariablesScoped.waitForDashboardReady();
+  await pm.dashboardVariablesScoped.waitForPanelIdle("Panel1");
+
+  return dashboardName;
+}
+
+/**
  * Add a simple panel with basic configuration
  * Consolidates the common pattern of:
  * - addPanel() -> selectChartType() -> selectStream() -> searchAndAddField(y) -> addPanelName() -> savePanel()
