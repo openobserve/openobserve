@@ -68,7 +68,7 @@ describe("FleetInstallCommand", () => {
 
   it("runs the install script for the current org with the token", () => {
     const text = code(mountCommand());
-    expect(text).toContain("/agents/main/linux/install.sh");
+    expect(text).toContain("/agents/main/fleet/install.sh");
     expect(text).toContain(`--org '${store.state.selectedOrganization.identifier}'`);
     expect(text).toContain("--token 'o2ft_abc123'");
   });
@@ -103,7 +103,7 @@ describe("FleetInstallCommand", () => {
     const w = mountCommand();
     await flushPromises();
     await choose(w, "kubernetes");
-    expect(code(w)).toContain("ghcr.io/openobserve/otel-fleet-collector");
+    expect(code(w)).toContain("o2cr.ai/openobserve/otel-fleet-collector");
     expect(w.find('[data-test="fleet-install-command-http"]').exists()).toBe(false);
   });
 });

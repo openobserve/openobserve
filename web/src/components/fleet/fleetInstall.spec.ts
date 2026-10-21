@@ -28,7 +28,7 @@ describe("installCommand", () => {
   it("pipes the Linux script from the agents repository into sudo bash with the target", () => {
     const cmd = installCommand("linux", target);
     expect(cmd).toContain(
-      "curl -fsSL https://raw.githubusercontent.com/openobserve/agents/main/linux/install.sh | sudo bash -s --",
+      "curl -fsSL https://raw.githubusercontent.com/openobserve/agents/main/fleet/install.sh | sudo bash -s --",
     );
     expect(cmd).toContain("--url 'https://o2.example.com'");
     expect(cmd).toContain("--org 'acme'");
@@ -38,7 +38,7 @@ describe("installCommand", () => {
   });
 
   it("uses the macOS script on macOS", () => {
-    expect(installCommand("macos", target)).toContain("/agents/main/macos/install.sh");
+    expect(installCommand("macos", target)).toContain("/agents/main/fleet/install.sh");
   });
 
   it("adds --transport http only when the proxy cannot carry WebSocket", () => {
@@ -57,7 +57,7 @@ describe("installCommand", () => {
   it("runs the PowerShell script on Windows", () => {
     const cmd = installCommand("windows", target);
     expect(cmd).toContain(
-      "irm https://raw.githubusercontent.com/openobserve/agents/main/windows/install.ps1",
+      "irm https://raw.githubusercontent.com/openobserve/agents/main/fleet/install.ps1",
     );
     expect(cmd).toContain("-Token 'o2ft_abc123'");
   });
@@ -65,7 +65,7 @@ describe("installCommand", () => {
   it("installs the Helm chart with the fleet collector image at the target version", () => {
     const cmd = installCommand("kubernetes", target);
     expect(cmd).toContain("helm upgrade --install");
-    expect(cmd).toContain("--set image.repository=ghcr.io/openobserve/otel-fleet-collector");
+    expect(cmd).toContain("--set image.repository=o2cr.ai/openobserve/otel-fleet-collector");
     expect(cmd).toContain("--set image.tag='0.163.1'");
     expect(cmd).toContain("--set opamp.endpoint='wss://o2.example.com/api/acme/v1/opamp'");
   });

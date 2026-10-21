@@ -28,7 +28,7 @@ export interface InstallTarget {
 }
 
 const SCRIPT_BASE = "https://raw.githubusercontent.com/openobserve/agents/main";
-const IMAGE = "ghcr.io/openobserve/otel-fleet-collector";
+const IMAGE = "o2cr.ai/openobserve/otel-fleet-collector";
 
 /** The OpAMP endpoint the supervisor connects to; the scheme picks the transport. */
 export function opampEndpoint(target: Pick<InstallTarget, "baseUrl" | "org" | "http">): string {
@@ -41,7 +41,8 @@ export function opampEndpoint(target: Pick<InstallTarget, "baseUrl" | "org" | "h
 // Single quotes keep url, org and token literal in the user's shell.
 const q = (v: string) => `'${v.replace(/'/g, `'\\''`)}'`;
 
-function unixCommand(os: "linux" | "macos", t: InstallTarget): string {
+// One script serves Linux and macOS; it detects the OS and the service manager itself.
+function unixCommand(t: InstallTarget): string {
   const args = [
     `--url ${q(t.baseUrl)}`,
     `--org ${q(t.org)}`,
@@ -50,7 +51,7 @@ function unixCommand(os: "linux" | "macos", t: InstallTarget): string {
     ...(t.http ? ["--transport http"] : []),
   ];
   return [
-    `curl -fsSL ${SCRIPT_BASE}/${os}/install.sh | sudo bash -s -- \\`,
+    `curl -fsSL ${SCRIPT_BASE}/fleet/install.sh | sudo bash -s -- \\`,
     ...args.map((a, i) => `  ${a}${i < args.length - 1 ? " \\" : ""}`),
   ].join("\n");
 }
@@ -65,7 +66,7 @@ function windowsCommand(t: InstallTarget): string {
     ...(t.http ? ["-Transport http"] : []),
   ];
   return [
-    `& ([scriptblock]::Create((irm ${SCRIPT_BASE}/windows/install.ps1))) \``,
+    `& ([scriptblock]::Create((irm ${SCRIPT_BASE}/fleet/install.ps1))) \``,
     ...args.map((a, i) => `  ${a}${i < args.length - 1 ? " `" : ""}`),
   ].join("\n");
 }
@@ -89,7 +90,7 @@ function helmCommand(t: InstallTarget): string {
 export function installCommand(platform: InstallPlatform, target: InstallTarget): string {
   if (platform === "windows") return windowsCommand(target);
   if (platform === "kubernetes") return helmCommand(target);
-  return unixCommand(platform, target);
+  return unixCommand(target);
 }
 
 /** Absolute base URL; a relative endpoint means the app's own origin. */
