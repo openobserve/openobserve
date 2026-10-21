@@ -58,11 +58,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span aria-hidden="true">·</span>
         <span>{{ t("assistant.footer.queries", { count: queries }, queries) }}</span>
       </template>
-      <span v-else data-test="assistant-turn-footer-no-query">{{
+      <span v-else-if="!stopped" data-test="assistant-turn-footer-no-query">{{
         t("assistant.footer.noQuery")
       }}</span>
       <template v-if="credits">
-        <span aria-hidden="true">·</span>
+        <span v-if="windows.length || !stopped" aria-hidden="true">·</span>
         <OPopover
           v-if="tokensLine"
           side="top"
@@ -220,8 +220,8 @@ const stopped = computed(() => outcome.value === "stopped" || outcome.value === 
 const notSaved = computed(
   () => outcome.value === "done_not_saved" || footer.value?.persisted === false,
 );
-// An ended turn with nothing evaluated and no steps says nothing beyond its outcome block.
-const hasLine = computed(() => !stopped.value || windows.value.length > 0);
+// An ended turn says nothing beyond its outcome block, except what it evaluated and the credit it was charged.
+const hasLine = computed(() => !stopped.value || windows.value.length > 0 || !!credits.value);
 const capability = computed(() => evidence?.capability() ?? null);
 const exhausted = computed(() => capability.value?.creditMode === "exhausted");
 // A re-run starts a turn, so the cross-tab lock holds it like every other turn start.
@@ -265,6 +265,8 @@ const credits = computed<I18nText | null>(() => {
   const mode = capability.value?.creditMode;
   if (!mode || props.readonly) return null;
   const count = footer.value?.usage?.credits ?? 1;
+  // Only a server count of 0 on a failed or stopped turn is a refund; the flat rule never claims one.
+  if (count === 0 && stopped.value) return t("assistant.footer.refunded");
   return mode === "free"
     ? t("assistant.footer.includedCredits", { count: formatCount(count) }, count)
     : t("assistant.footer.credits", { count: formatCount(count) }, count);

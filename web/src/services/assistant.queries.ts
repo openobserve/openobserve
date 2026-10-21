@@ -15,7 +15,7 @@
 
 import { queryOptions } from "@tanstack/vue-query";
 
-import { SESSION_STALE_TIME } from "@/composables/query/cachePolicy";
+import { LIVE_STALE_TIME, SESSION_STALE_TIME } from "@/composables/query/cachePolicy";
 
 import assistant from "./assistant";
 import { assistantKeys } from "./assistant.querykeys";
@@ -29,4 +29,15 @@ export const capabilitiesQuery = (org: string, enabled = true) =>
     refetchOnWindowFocus: true,
     retry: false,
     enabled: enabled && !!org,
+  });
+
+/** Cloud only: every caller gates the read on the edition; every turn end invalidates it. */
+export const assistantUsageQuery = (org: string) =>
+  queryOptions({
+    queryKey: assistantKeys.usage(org),
+    queryFn: () => assistant.usage(org),
+    staleTime: LIVE_STALE_TIME,
+    refetchOnWindowFocus: true,
+    retry: false,
+    enabled: !!org,
   });

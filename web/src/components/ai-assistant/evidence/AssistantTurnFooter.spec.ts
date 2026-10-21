@@ -153,6 +153,24 @@ describe("AssistantTurnFooter", () => {
     );
   });
 
+  it("charges a failed turn that ran no query, and says refunded only on a server count of 0", () => {
+    const failed = mountFooter(answer([]), { outcome: "failed" }, { creditMode: "free" });
+    expect(failed.wrapper.get('[data-test="assistant-turn-footer-credits"]').text()).toBe(
+      "1 included credit",
+    );
+    expect(failed.wrapper.find('[data-test="assistant-turn-footer-no-query"]').exists()).toBe(
+      false,
+    );
+    const refunded = mountFooter(
+      answer([], { usage: { credits: 0 } }),
+      { outcome: "failed" },
+      { creditMode: "pay_as_you_go" },
+    );
+    expect(refunded.wrapper.get('[data-test="assistant-turn-footer-credits"]').text()).toBe(
+      "0 credits · refunded",
+    );
+  });
+
   it("names several windows as one sentence that opens the list", () => {
     const { wrapper } = mountFooter(answer([query("c2"), query("c3", FROM - 3_600_000, TO)]));
     expect(wrapper.get('[data-test="assistant-turn-footer-windows"]').text()).toMatch(

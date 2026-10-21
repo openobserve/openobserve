@@ -515,6 +515,9 @@ const helper = computed<I18nText | null>(() => {
       { count: droppedImages.value },
       droppedImages.value,
     );
+  // Send stays enabled: the server is the gate, the line only predicts a refusal not yet shown above.
+  if (store.state.capability.creditMode === "exhausted" && session.value?.turn.state !== "refused")
+    return t("assistant.credits.predictedExhausted", { org: raw(org.value) });
   return recallHint.value;
 });
 
