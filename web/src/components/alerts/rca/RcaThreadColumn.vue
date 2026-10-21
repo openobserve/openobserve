@@ -630,6 +630,7 @@ const latestEntryKey = computed(() => {
     case "steer":
       return `${entries.value.length}:${last.key}:${last.item.status}`;
   }
+  return "";
 });
 
 // While live, a reader at the bottom keeps seeing the newest entry.
