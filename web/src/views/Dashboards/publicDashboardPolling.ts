@@ -16,6 +16,10 @@
 /** How often an open, visible page re-checks the link, so a pause, revoke or edit reaches it within a minute. */
 export const LIFECYCLE_MS = 60_000;
 const LIFECYCLE_JITTER = 0.1;
+/** How long after fresh_until a read lands, so the server already sees the result stale. */
+export const STALE_GRACE_MS = 1_000;
+/** Spreads the reads that open pages aim at fresh_until, so a wall screen's browsers don't arrive at once. */
+export const STALE_SPREAD_MS = 5_000;
 /** The floor of the server's Retry-After hint while a refresh runs. */
 export const REFRESH_POLL_MIN_MS = 3_000;
 /** Waits for a failure that names no Retry-After. */
@@ -70,8 +74,8 @@ export function setLongTimeout(fn: () => void, ms: number): () => void {
 
 /** What one read of /data told the poller. Times are local epoch ms. */
 export type PollOutcome =
-  /** 200 or 304. `hintMs` is the server's Retry-After while a refresh runs. */
-  | { kind: "body"; refreshing: boolean; hintMs: number | null }
+  /** 200 or 304. `hintMs` is the server's Retry-After while a refresh runs; `freshForMs` the wait until fresh_until. */
+  | { kind: "body"; refreshing: boolean; hintMs: number | null; freshForMs?: number | null }
   /** 202, 503 or 429. `client` marks a limit on this viewer rather than on one range. */
   | { kind: "wait"; retryAfterMs: number | null; client?: boolean }
   | { kind: "error" }
@@ -127,7 +131,13 @@ export function createPoller(options: PollerOptions): Poller {
     failures = 0;
     // Jitter only shortens the lifecycle check, so it stays at most a minute.
     const lifecycle = LIFECYCLE_MS * (1 - LIFECYCLE_JITTER * random());
-    if (!outcome.refreshing) return lifecycle;
+    if (!outcome.refreshing) {
+      // The read after fresh_until starts the next build, so it must not wait out a whole lifecycle tick.
+      const fresh = outcome.freshForMs;
+      return fresh !== null && fresh !== undefined && fresh > 0
+        ? Math.min(lifecycle, fresh + STALE_GRACE_MS + STALE_SPREAD_MS * random())
+        : lifecycle;
+    }
     // The server already jitters its hint; a slow build's long hint still yields to the lifecycle check.
     return Math.min(Math.max(REFRESH_POLL_MIN_MS, outcome.hintMs ?? 0), lifecycle);
   };

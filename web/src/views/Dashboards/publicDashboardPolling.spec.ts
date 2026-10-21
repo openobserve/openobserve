@@ -20,6 +20,8 @@ import {
   LIFECYCLE_MS,
   MAX_TIMER_MS,
   REFRESH_POLL_MIN_MS,
+  STALE_GRACE_MS,
+  STALE_SPREAD_MS,
   clockOffsetMs,
   createPoller,
   retryAfterMs,
@@ -87,12 +89,60 @@ describe("viewer polling (design 4.7)", () => {
       poller.stop();
     });
 
-    it("has only the lifecycle cadence for a quiet body, whatever the refresh interval", async () => {
-      // A 30-day interval and a 1-minute one read alike: nothing is aimed at fresh_until.
+    it("has only the lifecycle cadence for a quiet body whose fresh_until is past or unknown", async () => {
       const { check, poller } = setup([quiet]);
       poller.start();
       await vi.advanceTimersByTimeAsync(10 * LIFECYCLE_MS);
       expect(check).toHaveBeenCalledTimes(11);
+      poller.stop();
+    });
+
+    it("reads just after fresh_until when that comes before the lifecycle check", async () => {
+      const fresh: PollOutcome = {
+        kind: "body",
+        refreshing: false,
+        hintMs: null,
+        freshForMs: 20_000,
+      };
+      const { check, poller } = setup([fresh, quiet]);
+      poller.start();
+      await vi.advanceTimersByTimeAsync(0);
+      await vi.advanceTimersByTimeAsync(20_000 + STALE_GRACE_MS - 1);
+      expect(check).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(check).toHaveBeenCalledTimes(2);
+      poller.stop();
+    });
+
+    it("spreads the read after fresh_until over a few seconds", async () => {
+      const fresh: PollOutcome = {
+        kind: "body",
+        refreshing: false,
+        hintMs: null,
+        freshForMs: 20_000,
+      };
+      const { check, poller } = setup([fresh, quiet], () => 0.5);
+      poller.start();
+      await vi.advanceTimersByTimeAsync(0);
+      await vi.advanceTimersByTimeAsync(20_000 + STALE_GRACE_MS + STALE_SPREAD_MS / 2 - 1);
+      expect(check).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(check).toHaveBeenCalledTimes(2);
+      poller.stop();
+    });
+
+    it("keeps the lifecycle check when fresh_until is further away than a minute", async () => {
+      const fresh: PollOutcome = {
+        kind: "body",
+        refreshing: false,
+        hintMs: null,
+        freshForMs: DAY_MS,
+      };
+      const { check, poller } = setup([fresh]);
+      poller.start();
+      await vi.advanceTimersByTimeAsync(0);
+      await vi.advanceTimersByTimeAsync(LIFECYCLE_MS);
+      expect(check).toHaveBeenCalledTimes(2);
       poller.stop();
     });
   });

@@ -236,7 +236,7 @@ describe("PublicDashboard viewer", () => {
     expect(service.getData).toHaveBeenCalledTimes(3);
   });
 
-  it("reads only on the lifecycle check, not at fresh_until", async () => {
+  it("reads within a few seconds after fresh_until, not a lifecycle tick later", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(1_800_000_020_000);
     (service.getConfig as any).mockResolvedValue({ data: CONFIG, status: 200 });
@@ -246,9 +246,9 @@ describe("PublicDashboard viewer", () => {
     });
     buildWrapper();
     await flushPromises();
-    await vi.advanceTimersByTimeAsync(59_999);
+    await vi.advanceTimersByTimeAsync(10_999);
     expect(service.getData).toHaveBeenCalledTimes(1);
-    await vi.advanceTimersByTimeAsync(1);
+    await vi.advanceTimersByTimeAsync(5_001);
     expect(service.getData).toHaveBeenCalledTimes(2);
   });
 

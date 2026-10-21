@@ -602,6 +602,7 @@ const bodyOutcome = (b: DataBody, hintMs: number | null): PollOutcome => ({
   kind: "body",
   refreshing: !!b.refreshing,
   hintMs,
+  freshForMs: msUntil(b.fresh_until),
 });
 
 const hold = (kind: "ratelimited" | "cooldown", untilMs: number | null, localNow: number) => {
