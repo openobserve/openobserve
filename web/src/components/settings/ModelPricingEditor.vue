@@ -99,6 +99,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OButton>
               </div>
             </div>
+            <!-- Known models the pattern would price if saved -->
+            <div
+              v-if="capturedPreview.pattern"
+              class="flex flex-col gap-2 px-4 pb-3"
+              data-test="model-pricing-captured-models"
+            >
+              <OText variant="meta" class="text-2xs block">
+                {{ t("modelPricing.capturedModelsTitle") }}
+              </OText>
+              <div v-if="capturedPreview.models.length" class="flex flex-wrap gap-1.5">
+                <OTag
+                  v-for="m in visibleCapturedModels"
+                  :key="m.model_name"
+                  :variant="m.primary ? 'default-soft' : 'warning-soft'"
+                  :data-test="`model-pricing-captured-${m.model_name}`"
+                >
+                  {{ m.model_name }}
+                  <OTooltip side="top" :content="capturedTooltip(m)" />
+                </OTag>
+                <OTag v-if="hiddenCapturedCount" variant="default-soft">
+                  {{ t("modelPricing.capturedModelsMore", { count: hiddenCapturedCount }) }}
+                </OTag>
+              </div>
+              <OText v-else variant="meta" class="text-2xs block">
+                {{ t("modelPricing.capturedModelsEmpty") }}
+              </OText>
+              <OBanner
+                v-if="otherCapturedModels.length"
+                variant="warning"
+                icon="warning"
+                data-test="model-pricing-captured-warning"
+                :content="
+                  t('modelPricing.capturedOtherModelsWarning', {
+                    count: otherCapturedModels.length,
+                    example: raw('^gpt-4o$'),
+                  })
+                "
+              />
+            </div>
           </div>
 
           <!-- Pattern Examples Dialog -->
@@ -731,17 +770,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </div>
     </OForm>
+
+    <ConfirmDialog
+      v-model="otherModelsConfirm.show"
+      :title="t('modelPricing.confirmOtherModelsTitle')"
+      :message="otherModelsConfirm.message"
+      :ok-label="t('modelPricing.confirmOtherModelsOk')"
+      focus-cancel
+      @update:ok="settleOtherModels(true)"
+      @update:cancel="settleOtherModels(false)"
+    />
   </OPageLayout>
 </template>
 
 <script lang="ts" setup>
-import { ref, computed, onBeforeMount } from "vue";
-import { useI18nTyped, raw } from "@/types/i18n";
+import { ref, computed, onBeforeMount, onBeforeUnmount, watch } from "vue";
+import { useI18nTyped, raw, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import ConfirmDialog from "@/components/ConfirmDialog.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import modelPricingService from "@/services/model_pricing";
 import { saveModelPricingMutation } from "@/services/model_pricing.queries";
 import { useMutation } from "@tanstack/vue-query";
@@ -770,6 +821,7 @@ import {
   NUMERIC_RULE_OPS,
   splitList,
   SET_RULE_OPS,
+  stripInlineFlags,
   type ModelPricingForm,
   type ModelPricingTier,
   type ModelPricingTierRule,
@@ -839,6 +891,110 @@ const form = useOForm<ModelPricingForm>({
 const formTiers = form.useStore((s): ModelPricingTier[] => s.values.tiers ?? []);
 const ambiguousTierPairs = computed(() => findAmbiguousTiers(formTiers.value));
 const unreachableTierPairs = computed(() => findUnreachableTiers(formTiers.value));
+
+// ── Known models the pattern would price ─────────────────────────────────────
+// An org rule wins every model its pattern matches, even partly, so a loose
+// pattern such as `^gpt-4o` also prices `gpt-4o-mini` at this rule's price. The
+// editor previews those models as the pattern is typed, and save asks the user
+// to confirm before the rule takes over models other than the one it names.
+interface CapturedModel {
+  model_name: string;
+  match_kind: "exact" | "approximate";
+  /** The model the pattern itself names; every other one is caught on the side. */
+  primary: boolean;
+  replaces: { name: string; source: string } | null;
+}
+
+const CAPTURED_SHOWN = 24;
+const patternValue = form.useStore((s): string => s.values.match_pattern ?? "");
+const capturedPreview = ref<{ pattern: string; models: CapturedModel[] }>({
+  pattern: "",
+  models: [],
+});
+const visibleCapturedModels = computed(() => capturedPreview.value.models.slice(0, CAPTURED_SHOWN));
+const hiddenCapturedCount = computed(() =>
+  Math.max(0, capturedPreview.value.models.length - CAPTURED_SHOWN),
+);
+const otherCapturedModels = computed(() => capturedPreview.value.models.filter((m) => !m.primary));
+
+function capturedTooltip(m: CapturedModel) {
+  const parts = [
+    m.replaces
+      ? t("modelPricing.capturedReplaces", { name: m.replaces.name })
+      : t("modelPricing.capturedUnpriced"),
+  ];
+  if (m.match_kind === "approximate") parts.unshift(t("modelPricing.capturedPartialMatch"));
+  return raw(parts.join(" "));
+}
+
+function isPreviewablePattern(pattern: string) {
+  if (!pattern.trim()) return false;
+  try {
+    new RegExp(stripInlineFlags(pattern));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** The known models `pattern` would price if saved; null when it cannot be previewed. */
+async function fetchCapturedModels(pattern: string): Promise<CapturedModel[] | null> {
+  if (!isPreviewablePattern(pattern)) return null;
+  try {
+    const res = await modelPricingService.test(orgIdentifier.value, {
+      model_name: "",
+      match_pattern: pattern,
+      rule_id: model.value.id || undefined,
+    });
+    return res.data?.captured_models ?? [];
+  } catch {
+    return null;
+  }
+}
+
+let previewTimer: ReturnType<typeof setTimeout> | undefined;
+watch(patternValue, (pattern) => {
+  clearTimeout(previewTimer);
+  previewTimer = setTimeout(async () => {
+    const models = await fetchCapturedModels(pattern);
+    if (pattern !== patternValue.value) return; // superseded by a newer pattern
+    capturedPreview.value = models ? { pattern, models } : { pattern: "", models: [] };
+  }, 400);
+});
+onBeforeUnmount(() => clearTimeout(previewTimer));
+
+const otherModelsConfirm = ref<{ show: boolean; message?: I18nText }>({ show: false });
+let resolveOtherModelsConfirm: ((ok: boolean) => void) | null = null;
+
+function settleOtherModels(ok: boolean) {
+  resolveOtherModelsConfirm?.(ok);
+  resolveOtherModelsConfirm = null;
+}
+
+// Closing the dialog any other way (Esc, overlay) counts as cancel. The OK path
+// settles synchronously first, so this later watcher finds nothing to settle.
+watch(
+  () => otherModelsConfirm.value.show,
+  (show) => {
+    if (!show) settleOtherModels(false);
+  },
+);
+
+function confirmOtherModels(names: string[]): Promise<boolean> {
+  const LISTED = 10;
+  const listed = names.slice(0, LISTED).join(", ");
+  const models =
+    names.length > LISTED
+      ? t("modelPricing.confirmOtherModelsMore", { models: listed, count: names.length - LISTED })
+      : listed;
+  otherModelsConfirm.value = {
+    show: true,
+    message: t("modelPricing.confirmOtherModelsMessage", { models }),
+  };
+  return new Promise((resolve) => {
+    resolveOtherModelsConfirm = resolve;
+  });
+}
 
 function createEmptyModel() {
   return {
@@ -1354,6 +1510,13 @@ async function save(value?: ModelPricingForm) {
     match_pattern: value?.match_pattern ?? model.value.match_pattern,
     tiers: formToModelTiers(tiers),
   };
+
+  // Ask before the rule takes over models other than the one it names. A failed
+  // preview does not block the save; the server still validates the pattern.
+  const others = ((await fetchCapturedModels(m.match_pattern)) ?? []).filter((c) => !c.primary);
+  if (others.length && !(await confirmOtherModels(others.map((c) => c.model_name)))) {
+    return;
+  }
 
   // Warn if another enabled org entry has the same pattern and higher priority
   // (same valid_from context — it will shadow this entry at runtime).

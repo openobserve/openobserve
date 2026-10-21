@@ -3,7 +3,7 @@
 
 import type { InputProps, InputEmits, InputSlots } from "./OInput.types";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import { mergeDescribedBy, splitControlAttrs, warnIfUnlabelled } from "@/lib/forms/controlAttrs";
+import { splitControlAttrs, warnIfUnlabelled } from "@/lib/forms/controlAttrs";
 import { useI18nTyped } from "@/types/i18n";
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, useAttrs, useId, watch } from "vue";
 
@@ -77,15 +77,15 @@ const effectiveError = computed(() => {
 });
 const hasError = computed(() => !!effectiveError.value);
 
-// `aria-invalid` alone tells a screen reader THAT the field is wrong but never
-// WHAT is wrong. Point the control at the message element so the reason is
-// announced with the field. Only set when a message is actually rendered —
-// `effectiveError` is " " when the text lives in OFormInput's #error slot, and
-// a dangling `aria-describedby` would reference a node that does not exist.
 const errorId = computed(() => `${inputId.value}-error`);
-const describedBy = computed(() =>
-  effectiveError.value && effectiveError.value.trim() ? errorId.value : undefined,
-);
+const describedBy = computed(() => {
+  const ids = String($attrs["aria-describedby"] ?? "")
+    .split(/\s+/)
+    .filter(Boolean);
+  // An external error slot has no built-in message node to reference.
+  if (effectiveError.value?.trim()) ids.push(errorId.value);
+  return [...new Set(ids)].join(" ") || undefined;
+});
 
 const isTextarea = computed(() => props.type === "textarea");
 
@@ -345,7 +345,7 @@ const wrapperClasses = computed(() => [
         :autocomplete="autocomplete"
         :tabindex="inputTabindex"
         v-bind="controlAttrs"
-        :aria-describedby="mergeDescribedBy(describedBy, controlAttrs)"
+        :aria-describedby="describedBy"
         :style="autogrow ? { overflow: 'hidden' } : undefined"
         :class="[
           'min-w-0 flex-1 rounded-[inherit] bg-transparent outline-none',
@@ -390,7 +390,7 @@ const wrapperClasses = computed(() => [
         :tabindex="inputTabindex"
         :aria-invalid="hasError || undefined"
         v-bind="controlAttrs"
-        :aria-describedby="mergeDescribedBy(describedBy, controlAttrs)"
+        :aria-describedby="describedBy"
         :class="[
           'min-w-0 flex-1 rounded-[inherit] bg-transparent outline-none',
           'text-input-text placeholder:text-input-placeholder',

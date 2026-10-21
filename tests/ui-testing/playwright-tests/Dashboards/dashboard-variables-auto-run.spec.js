@@ -67,7 +67,7 @@ test.describe('Dashboard variables Auto Run', { tag: ['@dashboards', '@dashboard
     await autoRun.waitForRuns('var', base + 1);
     expect(autoRun.runsOf('var')[base]).toContain(`'${first}'`);
     await autoRun.expectPanelRows('p_var', { shows: [first], hides: [initial] });
-    await autoRun.expectRefreshVariant('outline');
+    await autoRun.expectRefreshVariant('primary');
   });
 
   test('Auto Run on: a variable change re-runs only the panels that use it, once each', { tag: ['@P0'] }, async ({ page }) => {
