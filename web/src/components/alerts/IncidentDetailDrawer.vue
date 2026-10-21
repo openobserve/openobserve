@@ -1666,6 +1666,8 @@ export default defineComponent({
     /// answers "who has it now". A failure leaves the panel hidden rather than
     /// claiming nobody was paged.
     async function loadOnCallResponse(org: string, incidentId: string) {
+      // With on-call off the route is unregistered, and cloud answers it with a 401 that logs the user out.
+      if (store.state.zoConfig?.oncall_enabled !== true) return;
       try {
         const records = await queryClient.fetchQuery(responsesForIncidentQuery(org, incidentId));
         oncallResponses.value = records;

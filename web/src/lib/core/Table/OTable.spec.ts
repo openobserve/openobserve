@@ -318,6 +318,36 @@ describe("OTable", () => {
       expect(events.at(-1)![0]).toEqual({ page: 2, size: 20 });
     });
 
+    it("gives every pagination control an accessible name", () => {
+      wrapper = mount(OTable, {
+        props: {
+          data: makeRows(20),
+          columns: makeColumns(),
+          pagination: "server",
+          totalCount: 100,
+          totalCountExact: true,
+          pageSize: 20,
+          currentPage: 2,
+        },
+      });
+
+      const names = {
+        first: "First page",
+        prev: "Previous page",
+        next: "Next page",
+        last: "Last page",
+      };
+      for (const [id, name] of Object.entries(names)) {
+        expect(wrapper.find(`[data-test="o2-table-${id}-page-btn"]`).attributes("aria-label")).toBe(
+          name,
+        );
+      }
+      expect(wrapper.find("nav[aria-label]").exists()).toBe(true);
+      expect(
+        wrapper.find('[data-test="o2-table-page-size-select-trigger"]').attributes("aria-label"),
+      ).toBe("Records per page");
+    });
+
     it("should reflect a pageSize prop change in the footer", async () => {
       wrapper = mount(OTable, {
         props: {
@@ -885,6 +915,16 @@ describe("OTable", () => {
         },
       });
       expect(wrapper.find('[data-test="o2-table-select-cell"]').exists()).toBe(true);
+    });
+
+    it("names the select-all and row checkboxes", () => {
+      wrapper = mount(OTable, {
+        props: { data: makeRows(3), columns: makeColumns(), selection: "multiple" },
+      });
+      const all = wrapper.find('[data-test="o2-table-select-all"] [role="checkbox"]');
+      expect(all.attributes("aria-label")).toBe("Select all rows");
+      const row = wrapper.find('[data-test="o2-table-select-0"] [role="checkbox"]');
+      expect(row.attributes("aria-label")).toMatch(/^Select row /);
     });
 
     it("does not render checkbox column when selection is none", () => {

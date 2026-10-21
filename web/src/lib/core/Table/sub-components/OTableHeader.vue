@@ -5,7 +5,7 @@ import type { HeaderGroup, Table } from "@tanstack/vue-table";
 import { FlexRender } from "@tanstack/vue-table";
 import { computed, inject, reactive, useId } from "vue";
 import type { I18nText } from "@/types/i18n";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { VueDraggableNext as VueDraggable } from "vue-draggable-next";
 import OTableSelectCheckbox from "./OTableSelectCheckbox.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -550,6 +550,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
           :model-value="isAllSelected ?? false"
           :indeterminate="isIndeterminate ?? false"
           row-id="all"
+          :label="t('components.table.selectAllRows')"
           @update:model-value="emit('toggle-all-rows')"
         />
       </th>
@@ -909,6 +910,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
                   <OCheckbox
                     :model-value="colFilterValues(header.column.id).includes(rawVal)"
                     size="sm"
+                    :aria-label="raw(filterDisplayValue(header.column.id, rawVal))"
                     @update:model-value="toggleColFilterValue(header.column.id, rawVal)"
                     @click.stop
                   />
@@ -1005,6 +1007,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
           :model-value="isAllSelected ?? false"
           :indeterminate="isIndeterminate ?? false"
           row-id="all"
+          :label="t('components.table.selectAllRows')"
           @update:model-value="emit('toggle-all-rows')"
         />
       </th>
@@ -1321,6 +1324,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
                   <OCheckbox
                     :model-value="colFilterValues(header.column.id).includes(rawVal)"
                     size="sm"
+                    :aria-label="raw(filterDisplayValue(header.column.id, rawVal))"
                     @update:model-value="toggleColFilterValue(header.column.id, rawVal)"
                     @click.stop
                   />

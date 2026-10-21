@@ -39,6 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
             <OFormInput
               name="scrape_interval"
+              :aria-label="t('settings.scrapintervalLabel')"
               type="number"
               min="0"
               class="ms-2 w-30!"

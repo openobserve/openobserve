@@ -30,6 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       searchable
       :search-placeholder="t('dashboard.searchFolder')"
       :disabled="disable"
+      :aria-label="t('dashboard.folder')"
       data-test="inline-select-folder-dropdown"
       @update:model-value="$emit('update:modelValue', $event)"
     >
