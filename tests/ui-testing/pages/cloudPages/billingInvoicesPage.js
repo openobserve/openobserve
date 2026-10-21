@@ -3,10 +3,10 @@ const { getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js
 
 const baseUrl = () => process.env.ZO_BASE_URL.replace(/\/$/, '');
 
-// Page object for the Cloud-only billing invoice history table. Billing is
-// Stripe-only, so the invoice tab is gated on billingProvider === 'stripe';
-// both routes are stubbed so the suite runs on any Cloud org without a real
-// Stripe subscription.
+// Page object for the Cloud-only billing invoice history table. The
+// invoice-history tab is Stripe-gated (billingProvider === 'stripe'); both
+// routes are stubbed so the suite runs on any Cloud org without a real Stripe
+// subscription.
 class BillingInvoicesPage {
     constructor(page) {
         this.page = page;
