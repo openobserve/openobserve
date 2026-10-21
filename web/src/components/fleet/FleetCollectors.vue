@@ -563,7 +563,7 @@ const statusStats = computed<StatItem[]>(() => {
       label: t("fleet.stats.outdated"),
       value: n("outdated"),
       icon: "update",
-      tone: "info",
+      tone: "neutral",
     },
   ];
   return items.map((item) => ({ ...item, dataTest: `fleet-collectors-stat-${item.key}` }));
