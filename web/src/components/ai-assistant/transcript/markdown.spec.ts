@@ -1123,6 +1123,9 @@ describe("markdown.ts strict profile", () => {
     vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) =>
       frames.push(callback),
     );
+    // A frozen clock keeps the time slice from ending a frame on a loaded machine; these specs weigh parts by size.
+    const clock = vi.spyOn(performance, "now").mockReturnValue(0);
+    onTestFinished(() => clock.mockRestore());
     const run = () => {
       const pending = frames.splice(0);
       pending.forEach((frame) => frame(0));
