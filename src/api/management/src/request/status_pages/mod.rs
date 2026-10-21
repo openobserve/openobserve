@@ -96,14 +96,15 @@ mod shell_tests {
     }
 
     #[test]
-    fn shell_header_keeps_the_freshness_line_beside_the_brand() {
+    fn shell_header_keeps_the_freshness_line_under_the_brand() {
         assert!(!SHELL.contains("Service status"));
-        let side = SHELL
-            .split(r#"<div class="header-side">"#)
+        let meta = SHELL
+            .split(r#"<div class="header-meta">"#)
             .nth(1)
-            .and_then(|s| s.split("</header>").next())
-            .expect("header side");
-        assert!(side.contains(r#"id="stamp""#));
-        assert!(side.contains(r#"id="latest-down""#));
+            .and_then(|s| s.split("</div>").next())
+            .expect("header meta");
+        assert!(meta.contains(r#"id="stamp""#));
+        assert!(meta.contains(r#"id="latest-down""#));
+        assert!(!meta.contains(r#"id="tz-select""#));
     }
 }
