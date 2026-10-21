@@ -81,7 +81,7 @@ pub async fn reconcile(job: &OnlineEvalJob) -> Result<Option<String>, ReconcileE
             Ok(None)
         }
         "active" => Ok(Some(ensure_pipeline(job, true).await?)),
-        "paused" | "degraded" => Ok(Some(ensure_pipeline(job, false).await?)),
+        "paused" => Ok(Some(ensure_pipeline(job, false).await?)),
         other => Err(ReconcileError::Other(format!(
             "unknown job status '{other}' — cannot reconcile"
         ))),
@@ -119,7 +119,7 @@ async fn best_effort_delete(pipeline_id: &str) {
 ///
 /// This is the central reconciliation entry point for both first-time pipeline
 /// provisioning and later drift correction. `desired_enabled` reflects the
-/// job lifecycle state: active jobs should run, while paused/degraded jobs keep
+/// job lifecycle state: active jobs should run, while paused jobs keep
 /// their pipeline definition but disable execution.
 ///
 /// Returns the pipeline_id.
@@ -138,7 +138,7 @@ async fn ensure_pipeline(
             // save_pipeline persists `enabled` as-is, so no separate enable_pipeline call
             // is needed for the create path. If we later want to be defensive against
             // future changes in save_pipeline semantics, we can re-assert enable state
-            // here for paused/degraded (enable=false is already the default we wrote).
+            // here for paused (enable=false is already the default we wrote).
             Ok(new_id)
         }
         Some(pipeline_id) => {

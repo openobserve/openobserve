@@ -432,7 +432,7 @@ const activateOnSave = ref(false);
 
 // A draft has never run, so both create and draft-edit offer the same explicit
 // choice: keep it a draft, or promote it to active. Editing a job that already
-// has a run state (active/paused/degraded) shows a single Save that preserves
+// has a run state (active/paused) shows a single Save that preserves
 // that state — a config edit must never silently flip enablement.
 const isDraft = computed(() => (props.row?.status ?? "draft") === "draft");
 const showActivateChoice = computed(
