@@ -16,6 +16,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <OContent y class="flex min-h-0 flex-1 flex-col gap-3" data-test="fleet-overview">
+    <FleetTokenExpiryBanner
+      v-show="!expanded"
+      class="shrink-0"
+      @open-collector="(c) => emit('navigate', 'fleets', { fleet: c.fleetId, collector: c.id })"
+      @open-tokens="(fleetId) => emit('navigate', 'fleets', { fleet: fleetId, tokens: '1' })"
+    />
     <div v-show="!expanded" class="flex shrink-0 items-start gap-2">
       <OStatStrip
         class="min-w-0 flex-1"
@@ -53,6 +59,7 @@ import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { FLOW_POLL_MS } from "@/services/fleet.queries";
 import FleetFlowOverview from "./FleetFlowOverview.vue";
+import FleetTokenExpiryBanner from "./FleetTokenExpiryBanner.vue";
 import type { FleetTab } from "./fleetRoute";
 import { useFleetSummary } from "./useFleetApi";
 

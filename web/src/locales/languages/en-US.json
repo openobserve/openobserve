@@ -25411,6 +25411,14 @@
       "prefix": "Prefix",
       "revokeAffected": "No collector uses this token | {count} collector uses this token | {count} collectors use this token"
     },
+    "tokenExpiry": {
+      "title": "{count} enrollment token expires within 7 days and collectors still use it | {count} enrollment tokens expire within 7 days and collectors still use them",
+      "expiresIn": "expires in {count} day | expires in {count} days",
+      "expired": "expired",
+      "usedBy": "still used by {count} collector: | still used by {count} collectors:",
+      "more": "+{count} more",
+      "manage": "Manage tokens"
+    },
     "install": {
       "subtitle": "Pick a token and platform, then run the command on the host",
       "token": "Enrollment token",

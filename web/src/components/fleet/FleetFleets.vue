@@ -297,6 +297,16 @@ const rolloutsOpen = ref(false);
 const activeFleetId = computed(() =>
   typeof route.query.fleet === "string" && route.query.fleet ? route.query.fleet : "default",
 );
+// The Overview's expiring-token banner lands here with the tokens drawer open.
+watch(
+  () => route.query.tokens,
+  (tokens) => {
+    if (tokens !== "1") return;
+    tokensOpen.value = true;
+    router.replace({ query: { ...route.query, tokens: undefined } });
+  },
+  { immediate: true },
+);
 const allFleets = computed({
   get: () => route.query.scope === "all",
   set: (v: boolean) => router.replace({ query: { ...route.query, scope: v ? "all" : undefined } }),

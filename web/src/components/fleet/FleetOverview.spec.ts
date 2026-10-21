@@ -27,7 +27,7 @@ vi.mock("@/aws-exports", async (importOriginal) => {
 });
 
 vi.mock("@/services/fleet", () => ({
-  default: { listCollectors: vi.fn(), summary: vi.fn() },
+  default: { listCollectors: vi.fn(), listTokens: vi.fn(), summary: vi.fn() },
 }));
 
 const summary = {
@@ -58,6 +58,8 @@ describe("FleetOverview", () => {
 
   beforeEach(() => {
     queryClient.clear();
+    vi.mocked(fleet.listTokens).mockResolvedValue({ data: { items: [] } } as any);
+    vi.mocked(fleet.listCollectors).mockResolvedValue({ data: { items: [] } } as any);
   });
 
   afterEach(() => {
