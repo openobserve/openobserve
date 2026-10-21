@@ -14131,6 +14131,19 @@
     "tip2": "Verifique que exista y esté habilitada una regla con un patrón de expresiones regulares coincidente",
     "tip3": "Crea una nueva regla de precios de modelo a partir de la lista",
     "matchFound": "Se encontró una coincidencia",
+    "approximateMatchFound": "Coincidencia aproximada",
+    "approximateMatchDesc": "Esta regla coincide solo con parte de \"{modelName}\", por lo que su precio puede corresponder a otro modelo. Añade una regla que coincida con el nombre completo.",
+    "capturedModelsTitle": "Modelos a los que esta regla pondrá precio",
+    "capturedModelsEmpty": "Ningún modelo conocido coincide con este patrón.",
+    "capturedModelsMore": "+{count} más",
+    "capturedPartialMatch": "Coincidencia parcial: el patrón cubre solo parte de este nombre.",
+    "capturedReplaces": "Ahora con el precio de {name}.",
+    "capturedUnpriced": "Ninguna regla le asigna precio todavía.",
+    "capturedOtherModelsWarning": "Esta regla también pone precio a otros modelos ({count}) con su propio precio, sustituyendo el suyo. Para poner precio a un solo modelo, ancla el patrón, por ejemplo {example}.",
+    "confirmOtherModelsTitle": "¿Poner precio a otros modelos con esta regla?",
+    "confirmOtherModelsMessage": "Esta regla también pondrá precio a {models}. Se facturarán con el precio de esta regla en lugar del suyo.",
+    "confirmOtherModelsMore": "{models} y {count} más",
+    "confirmOtherModelsOk": "Guardar de todos modos",
     "matchPriority": "Prioridad de coincidencia",
     "defaultPricingTier": "Nivel de precios predeterminado",
     "pricePerMTokens": "Precio: 1 millón de fichas",
@@ -16139,7 +16152,6 @@
       "draft": "Borrador",
       "active": "Activo",
       "paused": "En pausa",
-      "degraded": "Degradado",
       "archived": "Archivado"
     },
     "summaryAll": "Todos",
@@ -16608,8 +16620,29 @@
         "stream": "Stream",
         "targetScope": "Ámbito",
         "scorers": "Evaluadores",
+        "health": "Salud",
+        "lastError": "Último error",
         "created": "Creado",
         "actions": "Acciones"
+      },
+      "health": {
+        "healthy": "Saludable",
+        "degraded": "Degradado",
+        "waitingForCredentials": "Esperando credenciales",
+        "noRecentRuns": "Sin ejecuciones recientes",
+        "summary": "{errors} de {runs} ejecuciones fallaron en los últimos 15 minutos",
+        "since": "Entró en este estado {time}",
+        "checked": "Última comprobación: {time}"
+      },
+      "errorKinds": {
+        "providerAuth": "Autenticación del proveedor",
+        "rateLimited": "Límite de tasa",
+        "timeout": "Tiempo de espera agotado",
+        "provider5xx": "Error del proveedor",
+        "parseError": "Salida no analizable",
+        "mappingError": "Error de mapeo",
+        "scorerMissing": "Evaluador no encontrado",
+        "executionError": "Error de ejecución"
       },
       "empty": {
         "title": "Aún no hay trabajos de evaluación"

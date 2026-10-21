@@ -14131,6 +14131,19 @@
     "tip2": "Xác minh quy tắc có mẫu regex khớp tồn tại và được kích hoạt",
     "tip3": "Tạo quy tắc giá mô hình mới từ danh sách",
     "matchFound": "Đã tìm thấy kết quả khớp",
+    "approximateMatchFound": "Khớp gần đúng",
+    "approximateMatchDesc": "Quy tắc này chỉ khớp một phần của \"{modelName}\", vì vậy giá có thể thuộc về một mô hình khác. Hãy thêm quy tắc khớp với tên đầy đủ.",
+    "capturedModelsTitle": "Các mô hình quy tắc này sẽ định giá",
+    "capturedModelsEmpty": "Không có mô hình đã biết nào khớp với mẫu này.",
+    "capturedModelsMore": "+{count} khác",
+    "capturedPartialMatch": "Khớp một phần: mẫu chỉ bao gồm một phần của tên này.",
+    "capturedReplaces": "Hiện được định giá bởi {name}.",
+    "capturedUnpriced": "Chưa có quy tắc nào định giá.",
+    "capturedOtherModelsWarning": "Quy tắc này cũng định giá các mô hình khác ({count}) theo giá của nó, thay cho giá riêng của chúng. Để chỉ định giá một mô hình, hãy neo mẫu, ví dụ {example}.",
+    "confirmOtherModelsTitle": "Định giá các mô hình khác bằng quy tắc này?",
+    "confirmOtherModelsMessage": "Quy tắc này cũng sẽ định giá {models}. Chúng sẽ bị tính theo giá của quy tắc này thay vì giá riêng.",
+    "confirmOtherModelsMore": "{models} và {count} khác",
+    "confirmOtherModelsOk": "Vẫn lưu",
     "matchPriority": "Ưu tiên khớp",
     "defaultPricingTier": "Bậc giá mặc định",
     "pricePerMTokens": "Giá / 1M token",
@@ -16139,7 +16152,6 @@
       "draft": "Bản nháp",
       "active": "Hoạt động",
       "paused": "Tạm dừng",
-      "degraded": "Suy giảm",
       "archived": "Đã lưu trữ"
     },
     "summaryAll": "Tất cả",
@@ -16608,8 +16620,29 @@
         "stream": "Stream",
         "targetScope": "Phạm vi",
         "scorers": "Bộ chấm điểm",
+        "health": "Tình trạng",
+        "lastError": "Lỗi gần nhất",
         "created": "Đã tạo",
         "actions": "Hành động"
+      },
+      "health": {
+        "healthy": "Bình thường",
+        "degraded": "Suy giảm",
+        "waitingForCredentials": "Đang chờ thông tin xác thực",
+        "noRecentRuns": "Không có lần chạy gần đây",
+        "summary": "{errors} trong {runs} lần chạy đã thất bại trong 15 phút qua",
+        "since": "Chuyển sang trạng thái này {time}",
+        "checked": "Kiểm tra lần cuối {time}"
+      },
+      "errorKinds": {
+        "providerAuth": "Xác thực nhà cung cấp",
+        "rateLimited": "Bị giới hạn tốc độ",
+        "timeout": "Hết thời gian chờ",
+        "provider5xx": "Lỗi nhà cung cấp",
+        "parseError": "Đầu ra không phân tích được",
+        "mappingError": "Lỗi ánh xạ",
+        "scorerMissing": "Thiếu bộ chấm điểm",
+        "executionError": "Lỗi thực thi"
       },
       "empty": {
         "title": "Chưa có tác vụ đánh giá nào"

@@ -14131,6 +14131,19 @@
     "tip2": "正規表現パターンが一致するルールが存在し、有効になっていることを確認します",
     "tip3": "リストから新しいモデル価格設定ルールを作成する",
     "matchFound": "一致するものが見つかりました",
+    "approximateMatchFound": "近似一致",
+    "approximateMatchDesc": "このルールは \"{modelName}\" の一部にのみ一致するため、価格が別のモデルのものである可能性があります。完全な名前に一致するルールを追加してください。",
+    "capturedModelsTitle": "このルールで価格設定されるモデル",
+    "capturedModelsEmpty": "このパターンに一致する既知のモデルはありません。",
+    "capturedModelsMore": "他 {count} 件",
+    "capturedPartialMatch": "部分一致：パターンはこの名前の一部にしか一致しません。",
+    "capturedReplaces": "現在は {name} で価格設定されています。",
+    "capturedUnpriced": "まだどのルールでも価格設定されていません。",
+    "capturedOtherModelsWarning": "このルールは他のモデル（{count} 件）にも自身の価格を適用し、それらの価格を置き換えます。1 つのモデルだけを対象にするには、{example} のようにパターンをアンカーしてください。",
+    "confirmOtherModelsTitle": "このルールで他のモデルも価格設定しますか？",
+    "confirmOtherModelsMessage": "このルールは {models} にも価格を設定します。これらは本来の価格ではなく、このルールの価格で課金されます。",
+    "confirmOtherModelsMore": "{models} ほか {count} 件",
+    "confirmOtherModelsOk": "このまま保存",
     "matchPriority": "マッチプライオリティ",
     "defaultPricingTier": "デフォルト価格階層",
     "pricePerMTokens": "価格/100万トークン",
@@ -16139,7 +16152,6 @@
       "draft": "ドラフト",
       "active": "アクティブ",
       "paused": "一時停止",
-      "degraded": "劣化しました",
       "archived": "アーカイブ済み"
     },
     "summaryAll": "すべて",
@@ -16608,8 +16620,29 @@
         "stream": "ストリーム",
         "targetScope": "スコープ",
         "scorers": "スコアラー",
+        "health": "ヘルス",
+        "lastError": "直近のエラー",
         "created": "作成日",
         "actions": "操作"
+      },
+      "health": {
+        "healthy": "正常",
+        "degraded": "劣化しました",
+        "waitingForCredentials": "認証情報を待機中",
+        "noRecentRuns": "最近の実行なし",
+        "summary": "過去 15 分間に {runs} 回の実行のうち {errors} 回が失敗しました",
+        "since": "{time}にこの状態になりました",
+        "checked": "最終確認: {time}"
+      },
+      "errorKinds": {
+        "providerAuth": "プロバイダー認証",
+        "rateLimited": "レート制限",
+        "timeout": "タイムアウト",
+        "provider5xx": "プロバイダーエラー",
+        "parseError": "解析できない出力",
+        "mappingError": "マッピングエラー",
+        "scorerMissing": "スコアラーが見つかりません",
+        "executionError": "実行エラー"
       },
       "empty": {
         "title": "まだ評価ジョブがありません"

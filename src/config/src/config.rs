@@ -108,7 +108,8 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 108: create oncall_phone_verifications and org_telephony.
 // 109: add last_run columns to reports.
 // 110: create rum_pa_app_settings; add rules_hash to rum_pa_funnels.
-pub const DB_SCHEMA_VERSION: u64 = 110;
+// 111: create eval_job_states and eval_job_state_transitions.
+pub const DB_SCHEMA_VERSION: u64 = 111;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables

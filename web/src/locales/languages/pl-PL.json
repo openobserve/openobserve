@@ -14131,6 +14131,19 @@
     "tip2": "Upewnij się, że istnieje reguła z pasującym wzorcem regex i jest włączona",
     "tip3": "Utwórz nową regułę cenową modelu z listy",
     "matchFound": "Znaleziono dopasowanie",
+    "approximateMatchFound": "Przybliżone dopasowanie",
+    "approximateMatchDesc": "Ta reguła pasuje tylko do części \"{modelName}\", więc jej cena może należeć do innego modelu. Dodaj regułę pasującą do pełnej nazwy.",
+    "capturedModelsTitle": "Modele, którym ta reguła nada cenę",
+    "capturedModelsEmpty": "Żaden znany model nie pasuje do tego wzorca.",
+    "capturedModelsMore": "+{count} więcej",
+    "capturedPartialMatch": "Częściowe dopasowanie: wzorzec obejmuje tylko część tej nazwy.",
+    "capturedReplaces": "Obecnie wyceniany przez {name}.",
+    "capturedUnpriced": "Żadna reguła jeszcze go nie wycenia.",
+    "capturedOtherModelsWarning": "Ta reguła wycenia też inne modele ({count}) według własnej ceny, zastępując ich ceny. Aby wycenić tylko jeden model, zakotwicz wzorzec, na przykład {example}.",
+    "confirmOtherModelsTitle": "Wycenić inne modele tą regułą?",
+    "confirmOtherModelsMessage": "Ta reguła wyceni także {models}. Będą rozliczane według ceny tej reguły zamiast własnej.",
+    "confirmOtherModelsMore": "{models} i {count} więcej",
+    "confirmOtherModelsOk": "Zapisz mimo to",
     "matchPriority": "Priorytet dopasowania",
     "defaultPricingTier": "Domyślny poziom cenowy",
     "pricePerMTokens": "Cena / 1M tokenów",
@@ -16139,7 +16152,6 @@
       "draft": "Szkic",
       "active": "Aktywny",
       "paused": "Wstrzymany",
-      "degraded": "Obniżony",
       "archived": "Zarchiwizowany"
     },
     "summaryAll": "Wszystkie",
@@ -16608,8 +16620,29 @@
         "stream": "Strumień",
         "targetScope": "Zakres",
         "scorers": "Ewaluatory",
+        "health": "Stan",
+        "lastError": "Ostatni błąd",
         "created": "Utworzono",
         "actions": "Akcje"
+      },
+      "health": {
+        "healthy": "Prawidłowy",
+        "degraded": "Obniżony",
+        "waitingForCredentials": "Oczekiwanie na dane uwierzytelniające",
+        "noRecentRuns": "Brak ostatnich uruchomień",
+        "summary": "{errors} z {runs} uruchomień nie powiodło się w ciągu ostatnich 15 minut",
+        "since": "Przeszedł w ten stan {time}",
+        "checked": "Ostatnio sprawdzono {time}"
+      },
+      "errorKinds": {
+        "providerAuth": "Uwierzytelnianie u dostawcy",
+        "rateLimited": "Przekroczony limit zapytań",
+        "timeout": "Przekroczono limit czasu",
+        "provider5xx": "Błąd dostawcy",
+        "parseError": "Nieczytelne dane wyjściowe",
+        "mappingError": "Błąd mapowania",
+        "scorerMissing": "Brak ewaluatora",
+        "executionError": "Błąd wykonania"
       },
       "empty": {
         "title": "Brak zadań ewaluacji"

@@ -14131,6 +14131,19 @@
     "tip2": "Verifique se existe uma regra com um padrão regex correspondente e se está ativada",
     "tip3": "Crie uma nova regra de preço do modelo a partir da lista",
     "matchFound": "Correspondência encontrada",
+    "approximateMatchFound": "Correspondência aproximada",
+    "approximateMatchDesc": "Esta regra corresponde apenas a parte de \"{modelName}\", pelo que o preço pode pertencer a outro modelo. Adicione uma regra que corresponda ao nome completo.",
+    "capturedModelsTitle": "Modelos a que esta regra atribuirá preço",
+    "capturedModelsEmpty": "Nenhum modelo conhecido corresponde a este padrão.",
+    "capturedModelsMore": "+{count} mais",
+    "capturedPartialMatch": "Correspondência parcial: o padrão cobre apenas parte deste nome.",
+    "capturedReplaces": "Atualmente com preço de {name}.",
+    "capturedUnpriced": "Ainda sem preço atribuído por nenhuma regra.",
+    "capturedOtherModelsWarning": "Esta regra também atribui o seu preço a outros modelos ({count}), substituindo o deles. Para atribuir preço a um único modelo, ancore o padrão, por exemplo {example}.",
+    "confirmOtherModelsTitle": "Atribuir preço a outros modelos com esta regra?",
+    "confirmOtherModelsMessage": "Esta regra também atribuirá preço a {models}. Serão faturados ao preço desta regra em vez do seu.",
+    "confirmOtherModelsMore": "{models} e mais {count}",
+    "confirmOtherModelsOk": "Guardar mesmo assim",
     "matchPriority": "Prioridade de correspondência",
     "defaultPricingTier": "Nível de preço padrão",
     "pricePerMTokens": "Preço/ 1M de tokens",
@@ -16139,7 +16152,6 @@
       "draft": "Rascunho",
       "active": "Ativo",
       "paused": "Pausado",
-      "degraded": "Degradado",
       "archived": "Arquivado"
     },
     "summaryAll": "Todos",
@@ -16608,8 +16620,29 @@
         "stream": "Stream",
         "targetScope": "Âmbito",
         "scorers": "Avaliadores",
+        "health": "Estado",
+        "lastError": "Último erro",
         "created": "Criado",
         "actions": "Ações"
+      },
+      "health": {
+        "healthy": "Bom estado",
+        "degraded": "Degradado",
+        "waitingForCredentials": "A aguardar credenciais",
+        "noRecentRuns": "Sem execuções recentes",
+        "summary": "{errors} de {runs} execuções falharam nos últimos 15 minutos",
+        "since": "Entrou neste estado {time}",
+        "checked": "Última verificação {time}"
+      },
+      "errorKinds": {
+        "providerAuth": "Autenticação do fornecedor",
+        "rateLimited": "Limite de taxa atingido",
+        "timeout": "Tempo limite excedido",
+        "provider5xx": "Erro do fornecedor",
+        "parseError": "Saída não interpretável",
+        "mappingError": "Erro de mapeamento",
+        "scorerMissing": "Avaliador em falta",
+        "executionError": "Erro de execução"
       },
       "empty": {
         "title": "Ainda Não Há Trabalhos de Avaliação"

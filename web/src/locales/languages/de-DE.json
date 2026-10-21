@@ -14131,6 +14131,19 @@
     "tip2": "Stellen Sie sicher, dass eine Regel mit einem passenden Regex-Muster existiert und aktiviert ist",
     "tip3": "Erstellen Sie eine neue Modellpreisregel aus der Liste",
     "matchFound": "Spiel gefunden",
+    "approximateMatchFound": "Ungefähre Übereinstimmung",
+    "approximateMatchDesc": "Diese Regel stimmt nur mit einem Teil von „{modelName}“ überein, daher kann ihr Preis zu einem anderen Modell gehören. Fügen Sie eine Regel hinzu, die den vollständigen Namen abdeckt.",
+    "capturedModelsTitle": "Modelle, die diese Regel bepreist",
+    "capturedModelsEmpty": "Kein bekanntes Modell entspricht diesem Muster.",
+    "capturedModelsMore": "+{count} weitere",
+    "capturedPartialMatch": "Teilübereinstimmung: Das Muster deckt nur einen Teil dieses Namens ab.",
+    "capturedReplaces": "Derzeit bepreist durch {name}.",
+    "capturedUnpriced": "Noch von keiner Regel bepreist.",
+    "capturedOtherModelsWarning": "Diese Regel bepreist auch andere Modelle ({count}) zu ihrem eigenen Preis und ersetzt deren Preise. Um nur ein Modell zu bepreisen, verankern Sie das Muster, zum Beispiel {example}.",
+    "confirmOtherModelsTitle": "Andere Modelle mit dieser Regel bepreisen?",
+    "confirmOtherModelsMessage": "Diese Regel bepreist auch {models}. Sie werden zum Preis dieser Regel statt zu ihrem eigenen abgerechnet.",
+    "confirmOtherModelsMore": "{models} und {count} weitere",
+    "confirmOtherModelsOk": "Trotzdem speichern",
     "matchPriority": "Priorität des Spiels",
     "defaultPricingTier": "Standard-Preisstufe",
     "pricePerMTokens": "Preis//1 Million Tokens",
@@ -16139,7 +16152,6 @@
       "draft": "Entwurf",
       "active": "Aktiv",
       "paused": "Pausiert",
-      "degraded": "Degradiert",
       "archived": "Archiviert"
     },
     "summaryAll": "Alle",
@@ -16608,8 +16620,29 @@
         "stream": "Stream",
         "targetScope": "Bereich",
         "scorers": "Scorer",
+        "health": "Zustand",
+        "lastError": "Letzter Fehler",
         "created": "Erstellt",
         "actions": "Aktionen"
+      },
+      "health": {
+        "healthy": "In Ordnung",
+        "degraded": "Degradiert",
+        "waitingForCredentials": "Warte auf Anmeldedaten",
+        "noRecentRuns": "Keine aktuellen Ausführungen",
+        "summary": "{errors} von {runs} Ausführungen sind in den letzten 15 Minuten fehlgeschlagen",
+        "since": "In diesen Zustand gewechselt: {time}",
+        "checked": "Zuletzt geprüft: {time}"
+      },
+      "errorKinds": {
+        "providerAuth": "Anbieter-Authentifizierung",
+        "rateLimited": "Ratenbegrenzung",
+        "timeout": "Zeitüberschreitung",
+        "provider5xx": "Anbieterfehler",
+        "parseError": "Nicht parsbare Ausgabe",
+        "mappingError": "Zuordnungsfehler",
+        "scorerMissing": "Scorer fehlt",
+        "executionError": "Ausführungsfehler"
       },
       "empty": {
         "title": "Noch keine Bewertungsaufträge"
