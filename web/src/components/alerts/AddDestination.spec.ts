@@ -143,7 +143,7 @@ function mountComp(props: Record<string, any> = {}) {
         DestinationPreview: {
           name: "DestinationPreview",
           template: '<div data-test="destination-preview-stub"></div>',
-          props: ["modelValue", "type", "templateContent"],
+          props: ["modelValue", "type", "templateContent", "recipients"],
         },
         AppTabs: {
           template: '<div data-test="app-tabs-stub"></div>',
@@ -1345,6 +1345,63 @@ describe("AddDestination — email recipients are org users", () => {
     expect(usersService.getRoles).toHaveBeenCalled();
     expect(wrapper.findComponent({ name: "AddUser" }).props("roles")).toEqual([
       { label: "Admin", value: "admin" },
+    ]);
+  });
+});
+
+describe("AddDestination — email destinations", () => {
+  const TEMPLATES = [
+    { name: "email_tpl", type: "email", body: "" },
+    { name: "raw_http_tpl", type: "http", kind: "custom", body: "" },
+    { name: "content_tpl", type: "http", kind: "content", body: "" },
+  ];
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(usersService.orgUsers).mockResolvedValue({ data: { data: [] } } as any);
+    vi.mocked(usersService.getRoles).mockResolvedValue({ data: [] } as any);
+  });
+
+  const toPrebuiltEmail = async (w: any) => {
+    const form = getForm(w);
+    form.setFieldValue("destination_type", "email");
+    form.setFieldValue("type", "email");
+    form.setFieldValue("credentials", { recipients: ["a@acme.io", "b@acme.io"] });
+    await flushPromises();
+    return form;
+  };
+
+  it("offers content templates alongside email templates, on both paths", async () => {
+    wrapper = mountComp({ templates: TEMPLATES });
+    const form = getForm(wrapper);
+    form.setFieldValue("destination_type", "custom");
+    form.setFieldValue("type", "email");
+    await nextTick();
+    expect(wrapper.vm.getFormattedTemplates).toEqual(["email_tpl", "content_tpl"]);
+
+    await toPrebuiltEmail(wrapper);
+    expect(wrapper.vm.prebuiltTemplateOptions.map((o: any) => o.value)).toEqual([
+      "prebuilt_email",
+      "email_tpl",
+      "content_tpl",
+    ]);
+  });
+
+  it("hides Skip TLS Verify in the prebuilt email settings", async () => {
+    wrapper = mountComp();
+    await toPrebuiltEmail(wrapper);
+    expect(wrapper.find('[data-test="prebuilt-additional-settings"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="add-destination-skip-tls-verify-toggle"]').exists()).toBe(
+      false,
+    );
+  });
+
+  it("passes the entered recipients to the preview", async () => {
+    wrapper = mountComp();
+    await toPrebuiltEmail(wrapper);
+    expect(wrapper.findComponent({ name: "DestinationPreview" }).props("recipients")).toEqual([
+      "a@acme.io",
+      "b@acme.io",
     ]);
   });
 });

@@ -191,11 +191,8 @@ limitations under the License.
           >
             {{ raw("Subject: 🚨 OpenObserve Alert Notification") }}
           </div>
-          <div data-test="email-from" class="email-from text-brand-msg-meta mb-1 text-sm">
-            {{ raw("From: alerts@openobserve.ai") }}
-          </div>
-          <div class="email-to text-brand-msg-meta mb-1 text-sm">
-            {{ raw("To: admin@example.com") }}
+          <div data-test="email-to" class="email-to text-brand-msg-meta mb-1 text-sm">
+            {{ raw(`To: ${recipients.join(", ")}`) }}
           </div>
           <div class="email-time text-brand-msg-meta mb-1 text-sm">
             {{ getCurrentTime() }}
@@ -443,11 +440,13 @@ interface Props {
   modelValue?: boolean;
   type: string;
   templateContent?: string;
+  recipients?: string[];
 }
 
 const props = withDefaults(defineProps<Props>(), {
   modelValue: false,
   templateContent: "",
+  recipients: () => [],
 });
 
 const emit = defineEmits(["update:modelValue"]);

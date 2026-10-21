@@ -199,7 +199,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <!-- Skip TLS Verify Toggle -->
-              <div class="py-2">
+              <div v-if="dtVal !== 'email'" class="py-2">
                 <OFormSwitch
                   data-test="add-destination-skip-tls-verify-toggle"
                   name="skip_tls_verify"
@@ -479,6 +479,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model="showPreviewModal"
       :type="dtVal"
       :template-content="previewContent"
+      :recipients="previewRecipients"
       data-test="destination-preview-modal"
     />
   </OPageLayout>
@@ -706,6 +707,9 @@ const prebuiltCredentials = form.useStore(
 const destinationSearchQuery = ref("");
 const showPreviewModal = ref(false);
 const previewContent = ref("");
+const previewRecipients = computed(() =>
+  Array.isArray(prebuiltCredentials.value.recipients) ? prebuiltCredentials.value.recipients : [],
+);
 
 // A test result is stale once anything it was sent with changes; an in-flight
 // test is discarded too.
@@ -1147,7 +1151,8 @@ const extractPrebuiltCredentials = (typeId: string): Record<string, any> => {
 const getFormattedTemplates = computed(() =>
   props.templates
     .filter((template) => {
-      if (typeVal.value === "email" && template.type === "email") return true;
+      if (typeVal.value === "email" && (template.type === "email" || template.kind === "content"))
+        return true;
       else if (typeVal.value !== "email") return true;
       return false;
     })
@@ -1168,13 +1173,13 @@ const defaultPrebuiltTemplateName = computed(() => templateNameFor(dtVal.value))
 
 // Template choices for a prebuilt destination: the API-sourced prebuilt
 // template for this type as the first (default) option, followed by any
-// user-created custom templates of the matching kind (email vs http).
+// user-created templates that fit the channel (email or content for email).
 // Other prebuilt types are excluded to prevent cross-type mismatches.
 const prebuiltTemplateOptions = computed(() => {
   const isEmailType = dtVal.value === "email";
   const matching = props.templates.filter((template) => {
     if (template.isPrebuilt) return false;
-    if (isEmailType) return template.type === "email";
+    if (isEmailType) return template.type === "email" || template.kind === "content";
     return template.type !== "email";
   });
 
