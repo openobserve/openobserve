@@ -14899,7 +14899,7 @@
         "userPromptLabel": "Сообщение пользователя",
         "userPromptPlaceholder": "Ссылайтесь на поля набора данных с помощью {'{{ input }}'}.",
         "variablesLabel": "Вставить переменную:",
-        "expectedOutputScorersOnly": "{token} · только скореры",
+        "expectedOutputScorersOnly": "{token} · только для оценщиков",
         "scorersPlaceholder": "Выберите оценщиков",
         "scorersHelp": "Версии оценщиков закреплены — последующие изменения оценщиков никогда не изменят результаты этого эксперимента.",
         "scorersEmpty": "Нет доступных оценщиков. Сначала создайте его в разделе Evaluate.",
