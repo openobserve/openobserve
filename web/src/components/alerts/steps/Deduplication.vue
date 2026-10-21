@@ -53,6 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="relative">
               <OFormSelect
                 name="deduplication.fingerprint_fields"
+                :aria-label="t('alerts.deduplication.fingerprintFields')"
                 :options="props.columns || []"
                 multiple
                 creatable
@@ -85,6 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="ms-0 w-52.5">
                 <OFormInput
                   name="deduplication.time_window_minutes"
+                  :aria-label="t('alerts.deduplication.timeWindow')"
                   type="number"
                   min="1"
                   data-test="alert-dedup-time-window"

@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="relative flex h-full w-full flex-col" dir="ltr" v-bind="$attrs">
     <div
       data-test="query-editor"
-      class="logs-query-editor bg-card-glass-bg min-h-0 flex-1"
+      class="logs-query-editor bg-card-glass-bg focus-within:ring-focus-ring-accent min-h-0 flex-1 focus-within:ring-2 focus-within:ring-inset"
       :class="{
         'promql-mode': language === 'promql',
         [queryEditorClass]: language === 'sql' || language === 'promql',
@@ -364,6 +364,7 @@ import useNotifications from "@/composables/useNotifications";
 import { getImageURL } from "@/utils/zincutils";
 import { isAuthError } from "@/utils/authErrors";
 import { getFontMono } from "@/utils/fonts";
+import { escapeEditor } from "@/utils/focusNextControl";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -894,6 +895,7 @@ export default defineComponent({
       editorObj = monaco.editor.create(editorElement as HTMLElement, {
         value: props.query?.trim(),
         language: props.language,
+        ariaLabel: t("common.queryEditorAriaLabel"),
         // Monaco paints its own text and ignores the CSS cascade — without this it
         // falls back to its built-in Menlo/Monaco/Courier New stack, which differs
         // per OS and from the rest of the app.
@@ -964,6 +966,14 @@ export default defineComponent({
         groupsHeaders(suggestMode.value),
       );
       valueQuoteKey = editorObj.createContextKey(VALUE_QUOTE_CONTEXT_KEY, false);
+      editorObj.addAction?.({
+        id: "o2.editor.escapeToNextControl",
+        label: t("common.queryEditorEscapeAction"),
+        keybindings: [monaco.KeyCode.Escape],
+        precondition:
+          "textInputFocus && !suggestWidgetVisible && !findWidgetVisible && !parameterHintsVisible && !editorHasSelection && !editorHasMultipleSelections && !inSnippetMode && !inlineSuggestionVisible && !renameInputVisible",
+        run: () => escapeEditor(editorElement as HTMLElement),
+      });
       editorObj.addAction?.({
         id: "o2.suggest.closeValueQuote",
         label: t("sqlEditor.completion.closeValueQuote"),
