@@ -52,7 +52,7 @@ async function ensureDestination(page, destinationName, templateName) {
   return true;
 }
 
-async function createHistoryTestAlert(page, alertName, destinationName) {
+async function createHistoryTestAlert(page, alertName, destinationName, { enabled = true } = {}) {
   const org = getOrgIdentifier();
   const payload = {
     name: alertName,
@@ -76,7 +76,7 @@ async function createHistoryTestAlert(page, alertName, destinationName) {
       frequency_type: 'minutes'
     },
     destinations: [destinationName],
-    enabled: true,
+    enabled,
     description: 'Alert history E2E test',
     context_attributes: {}
   };
@@ -273,7 +273,8 @@ test.describe("Alert History Page", () => {
     testLogger.info('Creating alert with no history to guarantee empty results', { alertName });
     await ensureTemplate(page, templateName);
     await ensureDestination(page, destinationName, templateName);
-    const createResp = await createHistoryTestAlert(page, alertName, destinationName);
+    // Disabled so the scheduler never evaluates it: COUNT(*) >= 1 on the shared stream would fire within a minute.
+    const createResp = await createHistoryTestAlert(page, alertName, destinationName, { enabled: false });
     if (createResp.status !== 200) {
       throw new Error(`Setup: failed to create alert: status ${createResp.status} — ${JSON.stringify(createResp.data)}`);
     }

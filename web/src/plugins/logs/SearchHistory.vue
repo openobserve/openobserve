@@ -146,6 +146,7 @@
                              accent lives on the block's left border, which marks
                              which language you're looking at. -->
                     <OButton
+                      :aria-label="t('common.copyToClipboard')"
                       data-test="search-history-copy-sql-btn"
                       variant="outline"
                       size="icon-chip"
@@ -218,6 +219,7 @@
                   <span>
                     <!-- Same neutral copy affordance as the SQL block above. -->
                     <OButton
+                      :aria-label="t('common.copyToClipboard')"
                       data-test="search-history-copy-function-btn"
                       variant="outline"
                       size="icon-chip"

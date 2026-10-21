@@ -51,20 +51,17 @@ impl Metrics for MetricsQuerier {
             global::get_text_map_propagator(|prop| prop.extract(&MetadataMap(req.metadata())));
         let _ = tracing::Span::current().set_parent(parent_cx);
 
-        let req: &MetricsQueryRequest = req.get_ref();
+        let req = req.into_inner();
         #[cfg_attr(not(feature = "enterprise"), allow(unused_variables))]
-        let (_, trace_id) = query_and_trace_id(req)?;
+        let (_, trace_id) = query_and_trace_id(&req)?;
+        #[cfg(feature = "enterprise")]
+        let (req, trace_id) = register_follower(req, &trace_id).await;
         let org_id = &req.org_id;
         let stream_type = StreamType::Metrics.as_str();
+        let result = SearchService::grpc::search(&req).await;
         #[cfg(feature = "enterprise")]
-        SEARCH_SERVER
-            .insert_or_join(
-                org_id,
-                trace_id.to_string(),
-                TaskStatus::new_follower(vec![], false),
-            )
-            .await;
-        let result = SearchService::grpc::search(req).await.map_err(|err| {
+        SEARCH_SERVER.remove(org_id, &trace_id).await;
+        let result = result.map_err(|err| {
             let time = start.elapsed().as_secs_f64();
             metrics::GRPC_RESPONSE_TIME
                 .with_label_values(&["/metrics/query", "500", org_id, stream_type, "", ""])
@@ -87,10 +84,6 @@ impl Metrics for MetricsQuerier {
         metrics::GRPC_INCOMING_REQUESTS
             .with_label_values(&["/metrics/query", "200", org_id, stream_type, "", ""])
             .inc();
-
-        // Clean up task record before returning
-        #[cfg(feature = "enterprise")]
-        SEARCH_SERVER.remove_follower(org_id, &trace_id).await;
 
         Ok(Response::new(result))
     }
@@ -122,13 +115,7 @@ impl Metrics for MetricsQuerier {
         // insert_sender — without this the engine returns SearchCancelQuery
         // immediately (same registration the `query` handler performs).
         #[cfg(feature = "enterprise")]
-        SEARCH_SERVER
-            .insert_or_join(
-                &req.org_id,
-                trace_id.clone(),
-                TaskStatus::new_follower(vec![], false),
-            )
-            .await;
+        let (req, trace_id) = register_follower(req, &trace_id).await;
 
         // spawn a task to push streaming responses
         tokio::task::spawn(async move {
@@ -136,12 +123,33 @@ impl Metrics for MetricsQuerier {
                 log::error!("[gRPC:metrics:data] get data error: req:{req:?}, error:{e:?}")
             }
             #[cfg(feature = "enterprise")]
-            SEARCH_SERVER.remove_follower(&req.org_id, &trace_id).await;
+            SEARCH_SERVER.remove(&req.org_id, &trace_id).await;
         });
 
         let out_stream = ReceiverStream::new(rx);
         Ok(Response::new(Box::pin(out_stream) as Self::DataStream))
     }
+}
+
+/// Registers the request under a `{trace_id}-{suffix}` id that a cancel of `trace_id` reaches.
+#[cfg(feature = "enterprise")]
+async fn register_follower(
+    mut req: MetricsQueryRequest,
+    trace_id: &str,
+) -> (MetricsQueryRequest, String) {
+    // one query sends a request per selector, so concurrent requests must not share an entry
+    let follower_id = format!("{trace_id}-{}", config::ider::generate_span_id());
+    if let Some(job) = req.job.as_mut() {
+        job.trace_id = follower_id.clone();
+    }
+    SEARCH_SERVER
+        .insert(
+            &req.org_id,
+            follower_id.clone(),
+            TaskStatus::new_follower(vec![], false),
+        )
+        .await;
+    (req, follower_id)
 }
 
 fn query_and_trace_id(req: &MetricsQueryRequest) -> Result<(&MetricsQueryStmt, String), Status> {

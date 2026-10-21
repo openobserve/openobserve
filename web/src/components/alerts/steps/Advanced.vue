@@ -54,6 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="flex items-center gap-2">
               <OFormSelect
                 name="template"
+                :aria-label="t('alerts.template')"
                 :options="formattedTemplates"
                 clearable
                 :placeholder="t('alerts.advanced.selectTemplate')"
@@ -129,6 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="alert-variables-delete-variable-btn"
                   variant="ghost"
                   size="icon-circle-sm"
+                  :aria-label="t('common.delete')"
                   @click="removeVariable(index)"
                 >
                   <OIcon name="delete-outline" size="sm" />
@@ -158,6 +160,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <OFormSelect
                 name="priority"
+                :aria-label="t('alerts.priority')"
                 :options="priorityOptions"
                 :searchable="false"
                 clearable
@@ -178,6 +181,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <OFormSelect
                 name="oncall_team"
+                :aria-label="t('alerts.oncallTeam')"
                 :options="oncallTeamOptions"
                 clearable
                 width="md"

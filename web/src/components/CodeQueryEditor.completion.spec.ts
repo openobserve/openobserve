@@ -2068,6 +2068,25 @@ describe("value quotes, late values, the empty-values copy and the typed prefix"
   const triggers = (editor: any) =>
     editor.trigger.mock.calls.filter((c: any[]) => c[1] === "editor.action.triggerSuggest");
 
+  describe("Escape as the keyboard exit", () => {
+    it("binds Escape only while no widget or selection owns it", { timeout: 30000 }, async () => {
+      const { api, editor } = await mountWith("q-escape");
+      const action = editor.addAction.mock.calls
+        .map((c: any[]) => c[0])
+        .find((a: any) => a.id === "o2.editor.escapeToNextControl");
+      expect(action.keybindings).toEqual([api.KeyCode.Escape]);
+      for (const guard of [
+        "!suggestWidgetVisible",
+        "!findWidgetVisible",
+        "!inSnippetMode",
+        "!inlineSuggestionVisible",
+        "!editorHasSelection",
+      ]) {
+        expect(action.precondition).toContain(guard);
+      }
+    });
+  });
+
   describe("Enter in an unclosed value quote", () => {
     const enterAction = (editor: any) =>
       editor.addAction.mock.calls

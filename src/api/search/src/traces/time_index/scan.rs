@@ -122,7 +122,23 @@ impl BatchScanner {
         hint_ts: Option<i64>,
         key_uuid_ts: &[Option<i64>],
     ) -> Self {
-        let margin = kind.expand_window();
+        Self::with_margin(
+            kind.expand_window(),
+            key_count,
+            bounds,
+            hint_ts,
+            key_uuid_ts,
+        )
+    }
+
+    /// `margin` is how long a key may stay silent past its rows before it counts as complete.
+    pub(super) fn with_margin(
+        margin: i64,
+        key_count: usize,
+        bounds: ScanBounds,
+        hint_ts: Option<i64>,
+        key_uuid_ts: &[Option<i64>],
+    ) -> Self {
         let mut probes = Vec::new();
         if let Some(hint) = hint_ts {
             probes.push((hint.saturating_sub(margin), hint.saturating_add(margin)));
@@ -519,6 +535,41 @@ mod tests {
             scanner.ingest(rows);
         }
         windows
+    }
+
+    #[test]
+    fn partition_scan_grows_only_the_keys_touching_the_window_edges() {
+        // Scan bounds are the partition plus one margin; the hard bounds stay wide.
+        let bounds = ScanBounds {
+            scan_start: 90,
+            scan_end: 210,
+            hard_start: 0,
+            hard_end: 300,
+        };
+        let mut scanner = BatchScanner::with_margin(10, 3, bounds, None, &[]);
+        let data = [
+            (0usize, range(120, 150)),
+            (1usize, range(95, 105)),
+            (1usize, range(78, 88)),
+        ];
+        let windows = drive(&mut scanner, &data);
+        assert_eq!(windows, [(90, 210), (85, 90), (68, 85)]);
+        let outcomes = scanner.finish();
+        assert_eq!(
+            outcomes[0],
+            Some(ScanOutcome::Found {
+                range: range(120, 150),
+                partial: false,
+            })
+        );
+        assert_eq!(
+            outcomes[1],
+            Some(ScanOutcome::Found {
+                range: range(78, 105),
+                partial: false,
+            })
+        );
+        assert_eq!(outcomes[2], Some(ScanOutcome::NotFound));
     }
 
     #[test]

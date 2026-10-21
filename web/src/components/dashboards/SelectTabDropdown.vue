@@ -27,6 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
 
     <OButton
+      :aria-label="t('dashboard.newTab')"
       data-test="dashboard-tab-new-add"
       variant="outline"
       size="icon-xs-sq"

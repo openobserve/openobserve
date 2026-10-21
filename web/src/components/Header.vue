@@ -60,6 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <a :href="homeUrl" @click.prevent="goToHome" class="inline-flex items-center">
           <!-- Dark mode: Show dark logo, fallback to light logo -->
           <img
+            :alt="t('common.customLogoAlt')"
             v-if="
               isDark &&
               store.state.zoConfig.hasOwnProperty('custom_logo_dark_img') &&
@@ -70,6 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <!-- Light mode: Show light logo, fallback to dark logo -->
           <img
+            :alt="t('common.customLogoAlt')"
             v-else-if="
               !isDark &&
               store.state.zoConfig.hasOwnProperty('custom_logo_img') &&
@@ -80,6 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <!-- Fallback: Show whichever logo exists (dark or light) -->
           <img
+            :alt="t('common.customLogoAlt')"
             v-else-if="
               store.state.zoConfig.hasOwnProperty('custom_logo_dark_img') &&
               store.state.zoConfig?.custom_logo_dark_img != null
@@ -88,6 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             style="max-width: 9.375rem; max-height: 2rem"
           />
           <img
+            :alt="t('common.customLogoAlt')"
             v-else-if="
               store.state.zoConfig.hasOwnProperty('custom_logo_img') &&
               store.state.zoConfig?.custom_logo_img != null
@@ -238,6 +242,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @mouseleave="handleMouseLeave"
             >
               <img
+                alt=""
                 :src="getBtnLogo"
                 class="h-5 w-5 shrink-0 [transition:transform_0.6s_ease] group-hover:rotate-180 group-hover:brightness-0 group-hover:invert group-hover:[transition:filter_0.3s_ease]"
               />
