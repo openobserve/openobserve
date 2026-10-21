@@ -34,6 +34,8 @@ export interface AlertLibraryEntry {
   stream: string;
   stream_type: string;
   query_type: "promql" | "sql";
+  /** Absent on manifests older than 1.1, where every entry is scheduled. */
+  alert_type?: "scheduled" | "anomaly_detection";
   /** Every stream that must exist for this alert to be installable. */
   required_streams: string[];
   /** Repo-relative path; resolve with `alertFileUrl()`. */
@@ -63,8 +65,12 @@ export interface AlertLibraryManifest {
   /** Compatibility gate; see SUPPORTED_MANIFEST_MAJOR. */
   format_version: string;
   alert_count: number;
+  /** Scheduled alerts only; pack and category counts cover these alone. */
   packs: AlertLibraryPack[];
   alerts: AlertLibraryEntry[];
+  /** Absent before format 1.1. */
+  anomaly_alert_count?: number;
+  anomaly_alerts?: AlertLibraryEntry[];
 }
 
 /**

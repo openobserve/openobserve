@@ -25,7 +25,9 @@ vi.mock("@/enterprise/components/billings/plans.vue", () => ({ default: { name: 
 vi.mock("@/enterprise/components/billings/invoiceHistory.vue", () => ({
   default: { name: "InvoiceHistory" },
 }));
-vi.mock("@/enterprise/components/billings/usage.vue", () => ({ default: { name: "Usage" } }));
+vi.mock("@/enterprise/components/billings/usage/UsageView.vue", () => ({
+  default: { name: "Usage" },
+}));
 vi.mock("@/enterprise/components/billings/BillingGroup.vue", () => ({
   default: { name: "BillingGroup" },
 }));

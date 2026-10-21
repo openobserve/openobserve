@@ -2854,6 +2854,12 @@ export class PipelinesPage {
         await this.dashboardsMenuLink.click();
     }
 
+    async acceptUnsavedChangesPromptAndExpectDashboards() {
+        await expect(this.discardChangesOkBtn, 'Leaving an unsaved pipeline must show the confirm dialog').toBeVisible({ timeout: 10000 });
+        await this.discardChangesOkBtn.click();
+        await expect(this.page).toHaveURL(/dashboards/, { timeout: 15000 });
+    }
+
     /**
      * Verify connection error is displayed
      */

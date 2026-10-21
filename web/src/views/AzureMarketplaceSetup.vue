@@ -18,6 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="azure-marketplace-setup bg-surface-base min-h-screen">
     <div class="relative-position flex px-3 pt-2">
       <img
+        :alt="t('login.openObserveLogoAlt')"
         data-test="azure-marketplace-setup-logo"
         class="h-10"
         loading="lazy"

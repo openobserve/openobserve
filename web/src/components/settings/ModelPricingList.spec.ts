@@ -250,6 +250,7 @@ const mockI18n = createI18n({
     en: {
       modelPricing: {
         header: "LLM Model Pricing",
+        ruleOpIn: "is one of",
         matchingPriorityTooltip: "Your Org > Global > Built-in",
         searchPlaceholder: "Search models...",
         refresh: "Refresh",
@@ -728,6 +729,61 @@ describe("ModelPricingList.vue", () => {
       wrapper = mountComponent();
       await flushPromises();
       expect(wrapper.vm.getDefaultTier({ tiers: [] })).toBeUndefined();
+    });
+
+    it("skips tiers restricted only by attribute rules", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+      const model = {
+        tiers: [
+          {
+            condition: null,
+            rules: [{ keys: ["service_tier"], op: "in", values: ["flex"] }],
+            prices: { input: 0.1 },
+          },
+          { condition: null, prices: { input: 0.5 } },
+        ],
+      };
+      expect(wrapper.vm.getDefaultTier(model).prices.input).toBe(0.5);
+    });
+  });
+
+  describe("attribute-rule (service tier) pricing", () => {
+    const flexModel = () => ({
+      id: "flex",
+      name: "GPT-6 Sol",
+      match_pattern: "(?i)gpt-6-sol",
+      enabled: true,
+      source: "org",
+      tiers: [
+        { name: "Default", condition: null, prices: { input: 0.000002 } },
+        {
+          name: "Flex",
+          condition: null,
+          rules: [
+            {
+              keys: ["openai.response.service_tier", "openai.request.service_tier"],
+              op: "in",
+              values: ["flex"],
+            },
+          ],
+          prices: { input: 0.000001 },
+        },
+      ],
+    });
+
+    it("renders each rule of a tier in the drawer and no always-active label for it", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+
+      wrapper.vm.openPricingDialog(flexModel());
+      await nextTick();
+
+      const rules = wrapper.findAll('[data-test="model-pricing-drawer-tier-rule"]');
+      expect(rules).toHaveLength(1);
+      expect(rules[0].text()).toBe("openai.response.service_tier +1 is one of flex");
+      const drawer = wrapper.findComponent(ODrawerStub);
+      expect(drawer.text().match(/Always active \(default\)/g)).toHaveLength(1);
     });
   });
 

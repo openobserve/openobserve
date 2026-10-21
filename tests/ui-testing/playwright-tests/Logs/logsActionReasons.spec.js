@@ -36,14 +36,15 @@ async function open(page) {
   await navigateToBase(page);
   await page.goto(`/web/logs?org_identifier=${ORG}&stream=${STREAM}&stream_type=logs&period=15m&refresh=0&sql_mode=false&quick_mode=false&show_histogram=false`);
   await page.locator('[data-test="logs-search-bar-query-editor"]').waitFor();
-  await page.locator(run).click();
+  // The stream URL runs its own search on entry; clicking the shared run/cancel button mid-flight cancels it.
   await expect(page.locator(`${table} tbody tr[data-test^="o2-table-row-"]`)).toHaveCount(2);
+  await expect(page.locator(run)).toHaveAttribute('title', 'Run query');
   await expect(page.locator(run)).toContainText('Run query');
 }
 async function settleMenu(page) {
-  await page.locator('[role="menu"]').first().evaluate(async (element) => {
-    await Promise.all(element.getAnimations({ subtree: true }).map((animation) => animation.finished));
-  });
+  // A closing menu stays mounted for its exit animation, and a cancelled animation rejects `finished`.
+  const menu = page.locator('[role="menu"][data-state="open"]').first();
+  await expect.poll(() => menu.evaluate((element) => element.getAnimations({ subtree: true }).filter((animation) => animation.playState === 'running').length)).toBe(0);
 }
 
 test.describe.configure({ mode: 'serial' });
