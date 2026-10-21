@@ -24,7 +24,9 @@ use hashbrown::HashMap;
 use openobserve_api_common::extractors::Headers;
 use openobserve_core::{
     auth::UserEmail,
-    profiles::query::{MergeResult, build_merge_result, resolve_max_nodes},
+    profiles::query::{
+        MergeResult, build_merge_result, is_snapshot_profile_type, resolve_max_nodes,
+    },
 };
 use serde::Serialize;
 use tracing::Span;
@@ -32,8 +34,9 @@ use utoipa::ToSchema;
 
 use super::{
     ProfilesQueryBody, ProfilesSqlParams, build_where_clause, check_stream_permission,
-    default_result_size, hit_i64, hit_string, parse_required_time_range,
-    require_profile_type_and_unit, resolve_query_body, resolve_timeout, run_profiles_sql,
+    default_result_size, hit_i64, hit_string, instance_key_expr, load_schema_field_names,
+    parse_required_time_range, require_profile_type_and_unit, resolve_query_body, resolve_timeout,
+    run_profiles_sql,
 };
 use crate::common::utils::http::get_or_create_trace_id;
 
@@ -47,6 +50,8 @@ pub struct ProfilesMergeResponse {
     pub merged_total: i64,
     /// True when unique stacks exceeded the query size limit.
     pub truncated: bool,
+    /// True when the call tree was cut to `max_nodes` and light nodes folded into `other`.
+    pub tree_truncated: bool,
     /// Call tree root (`name` / `self` / `total` / `children`).
     #[schema(value_type = Object)]
     pub root: openobserve_core::profiles::query::TreeNode,
@@ -54,6 +59,15 @@ pub struct ProfilesMergeResponse {
     #[schema(value_type = Vec<Object>)]
     pub top: Vec<openobserve_core::profiles::query::TopFunction>,
     pub took: u64,
+}
+
+/// Unique stacks of one query, with snapshot types already averaged per snapshot.
+pub(crate) struct StackSet {
+    pub stacks: Vec<(String, i64)>,
+    /// True when unique stacks exceeded the result size.
+    pub truncated: bool,
+    /// Divisor applied to every value: average snapshots per instance for in-use types, else 1.
+    pub snapshots: f64,
 }
 
 /// ProfilesMerge
@@ -185,14 +199,11 @@ async fn merge_profiles_impl(
         Err(response) => return response,
     };
     let max_nodes = resolve_max_nodes(body.max_nodes);
-    let result_size = default_result_size();
 
     let http_span = Span::none();
     let request_trace_id = get_or_create_trace_id(&headers, &http_span);
     let started = std::time::Instant::now();
     let stream = quote_identifier(&stream_name);
-    let stack_q = quote_identifier("stack");
-    let value_q = quote_identifier("value");
     let sql_params = ProfilesSqlParams {
         request_trace_id: &request_trace_id,
         org_id: &org_id,
@@ -201,58 +212,34 @@ async fn merge_profiles_impl(
         end_time,
         timeout,
     };
-    let sql = if where_clause.is_empty() {
-        format!(
-            "SELECT {stack_q} AS stack, sum({value_q}) AS value FROM {stream} \
-             WHERE {stack_q} IS NOT NULL GROUP BY stack ORDER BY value DESC"
-        )
-    } else {
-        format!(
-            "SELECT {stack_q} AS stack, sum({value_q}) AS value FROM {stream} \
-             WHERE {stack_q} IS NOT NULL AND ({where_clause}) \
-             GROUP BY stack ORDER BY value DESC"
-        )
-    };
-
-    let response = match run_profiles_sql(
+    let snapshot_key = snapshot_instance_key(&org_id, &stream_name, &profile_type).await;
+    let StackSet {
+        stacks,
+        truncated,
+        snapshots,
+    } = match load_stacks(
         &sql_params,
-        sql,
-        // Fetch one extra row so we can distinguish "exactly N stacks" from truncation.
-        result_size + 1,
+        &stream,
+        &where_clause,
+        snapshot_key.as_deref(),
         http_span.clone(),
     )
     .await
     {
-        Ok(r) => r,
+        Ok(v) => v,
         Err(response) => return response,
     };
-
-    let truncated = response.hits.len() as i64 > result_size;
-    let stacks: Vec<(String, i64)> = response
-        .hits
-        .iter()
-        .take(result_size as usize)
-        .filter_map(|hit| {
-            // Keep empty stacks: fold_stacks attributes them to root.self so
-            // merged_total stays aligned with series / load_full_total.
-            let stack = hit_string(hit, "stack")?;
-            let value = hit_i64(hit, "value").unwrap_or(0);
-            if value == 0 {
-                return None;
-            }
-            Some((stack, value))
-        })
-        .collect();
 
     let MergeResult {
         total: merged_total,
         root,
         top,
+        tree_truncated,
     } = build_merge_result(&stacks, max_nodes);
 
     let total = if truncated {
         match load_full_total(&sql_params, &stream, &where_clause, http_span).await {
-            Ok(v) => v,
+            Ok(v) => per_snapshot(v, snapshots),
             Err(response) => return response,
         }
     } else {
@@ -265,11 +252,138 @@ async fn merge_profiles_impl(
         total,
         merged_total,
         truncated,
+        tree_truncated,
         root,
         top,
         took: started.elapsed().as_millis() as u64,
     })
     .into_response()
+}
+
+/// Instance key for snapshot averaging; None for types whose values add up over time.
+pub(crate) async fn snapshot_instance_key(
+    org_id: &str,
+    stream_name: &str,
+    profile_type: &str,
+) -> Option<String> {
+    if !is_snapshot_profile_type(profile_type) {
+        return None;
+    }
+    Some(instance_key_expr(
+        &load_schema_field_names(org_id, stream_name).await,
+    ))
+}
+
+/// Unique stacks with summed values, capped at the result size.
+pub(crate) async fn load_stacks(
+    params: &ProfilesSqlParams<'_>,
+    stream: &str,
+    where_clause: &str,
+    snapshot_key: Option<&str>,
+    http_span: Span,
+) -> Result<StackSet, Response> {
+    let result_size = default_result_size();
+    let stack_q = quote_identifier("stack");
+    let value_q = quote_identifier("value");
+    let sql = if where_clause.is_empty() {
+        format!(
+            "SELECT {stack_q} AS stack, sum({value_q}) AS value FROM {stream} \
+             WHERE {stack_q} IS NOT NULL GROUP BY stack ORDER BY value DESC"
+        )
+    } else {
+        format!(
+            "SELECT {stack_q} AS stack, sum({value_q}) AS value FROM {stream} \
+             WHERE {stack_q} IS NOT NULL AND ({where_clause}) \
+             GROUP BY stack ORDER BY value DESC"
+        )
+    };
+    // Concurrent searches need their own ids: the query manager keys running searches by trace_id.
+    let snapshot_trace_id = format!("{}-snapshots", params.request_trace_id);
+    let snapshot_params = ProfilesSqlParams {
+        request_trace_id: &snapshot_trace_id,
+        ..*params
+    };
+    let snapshots_fut = async {
+        match snapshot_key {
+            Some(key) => {
+                load_avg_snapshots(
+                    &snapshot_params,
+                    stream,
+                    where_clause,
+                    key,
+                    http_span.clone(),
+                )
+                .await
+            }
+            None => Ok(1.0),
+        }
+    };
+    // Fetch one extra row so we can distinguish "exactly N stacks" from truncation.
+    let (response, snapshots) = tokio::join!(
+        run_profiles_sql(params, sql, result_size + 1, http_span.clone()),
+        snapshots_fut
+    );
+    let (response, snapshots) = (response?, snapshots?);
+    let truncated = response.hits.len() as i64 > result_size;
+    let stacks = response
+        .hits
+        .iter()
+        .take(result_size as usize)
+        .filter_map(|hit| {
+            // Keep empty stacks: fold_stacks puts them in root.self so merged_total matches series.
+            let stack = hit_string(hit, "stack")?;
+            let value = per_snapshot(hit_i64(hit, "value").unwrap_or(0), snapshots);
+            if value == 0 {
+                return None;
+            }
+            Some((stack, value))
+        })
+        .collect();
+    Ok(StackSet {
+        stacks,
+        truncated,
+        snapshots,
+    })
+}
+
+/// Average distinct snapshot timestamps per instance, at least 1.
+async fn load_avg_snapshots(
+    params: &ProfilesSqlParams<'_>,
+    stream: &str,
+    where_clause: &str,
+    instance_key: &str,
+    http_span: Span,
+) -> Result<f64, Response> {
+    let filter = if where_clause.is_empty() {
+        String::new()
+    } else {
+        format!(" WHERE {where_clause}")
+    };
+    let sql = format!(
+        "SELECT count(DISTINCT concat({instance_key}, '|', _timestamp)) AS zo_snapshots, \
+         count(DISTINCT {instance_key}) AS zo_instances FROM {stream}{filter}"
+    );
+    let response = run_profiles_sql(params, sql, 1, http_span).await?;
+    let hit = response.hits.first();
+    Ok(average_snapshots(
+        hit.and_then(|h| hit_i64(h, "zo_snapshots")).unwrap_or(0),
+        hit.and_then(|h| hit_i64(h, "zo_instances")).unwrap_or(0),
+    ))
+}
+
+fn average_snapshots(snapshots: i64, instances: i64) -> f64 {
+    if instances <= 0 {
+        return 1.0;
+    }
+    (snapshots as f64 / instances as f64).max(1.0)
+}
+
+fn per_snapshot(value: i64, snapshots: f64) -> i64 {
+    if snapshots <= 1.0 {
+        value
+    } else {
+        (value as f64 / snapshots).round() as i64
+    }
 }
 
 async fn load_full_total(
@@ -294,4 +408,18 @@ async fn load_full_total(
         .first()
         .and_then(|h| hit_i64(h, "total"))
         .unwrap_or(0))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn snapshot_divisor_is_the_average_per_instance_and_never_below_one() {
+        assert_eq!(average_snapshots(236, 2), 118.0);
+        assert_eq!(average_snapshots(0, 0), 1.0);
+        assert_eq!(average_snapshots(1, 3), 1.0);
+        assert_eq!(per_snapshot(1_000, 4.0), 250);
+        assert_eq!(per_snapshot(1_000, 1.0), 1_000);
+    }
 }

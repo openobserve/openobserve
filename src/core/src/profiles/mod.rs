@@ -19,7 +19,11 @@ mod otlp_json_compat;
 pub mod query;
 mod validation;
 
-use std::{collections::HashMap, io::BufReader, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    io::BufReader,
+    sync::Arc,
+};
 
 use axum::{http, response::Response as HttpResponse};
 use bytes::Bytes;
@@ -677,6 +681,7 @@ fn build_sample_records(
 
     let mut records = Vec::with_capacity(profile.samples.len());
     let mut rejected = 0_i64;
+    let mut timed_instances = HashSet::new();
     for (sample_idx, sample) in profile.samples.iter().enumerate() {
         let (stack, frame_count) = resolve_stack(sample.stack_index, dictionary);
         let (trace_id, span_id) = resolve_link(sample.link_index, dictionary);
@@ -764,10 +769,31 @@ fn build_sample_records(
             );
             record.insert("event_id".to_string(), json::Value::String(event_id));
 
+            // One row per process carries the profiled time so per-instance rates count it once.
+            if profile.duration_nano > 0 && timed_instances.insert(instance_identity(&record)) {
+                record.insert(
+                    query::PROFILE_DURATION_COLUMN.to_string(),
+                    json::Value::Number((profile.duration_nano as i64).into()),
+                );
+            }
+
             records.push(record);
         }
     }
     (records, rejected)
+}
+
+fn instance_identity(record: &json::Map<String, json::Value>) -> Vec<String> {
+    query::INSTANCE_KEY_COLUMNS
+        .iter()
+        .map(|col| {
+            record
+                .get(*col)
+                .and_then(|v| v.as_str())
+                .unwrap_or_default()
+                .to_string()
+        })
+        .collect()
 }
 
 /// Expand one OTLP Sample into `(timestamp_micros, value)` observations.
@@ -1253,6 +1279,7 @@ mod tests {
                 unit_strindex: 2,
             }),
             time_unix_nano: ok_ts_nano,
+            duration_nano: 5_000_000_000,
             samples: vec![Sample {
                 stack_index: 1,
                 // First observation is out of window; later ones must still be kept.
@@ -1281,6 +1308,91 @@ mod tests {
         assert_eq!(
             records[0].get(TIMESTAMP_COL_NAME).and_then(|v| v.as_i64()),
             Some((ok_ts_nano / 1000) as i64)
+        );
+        // The rejected observation must not swallow the profiled-time marker.
+        assert_eq!(
+            records[0]
+                .get(query::PROFILE_DURATION_COLUMN)
+                .and_then(|v| v.as_i64()),
+            Some(5_000_000_000)
+        );
+        assert!(!records[1].contains_key(query::PROFILE_DURATION_COLUMN));
+    }
+
+    #[test]
+    fn build_sample_records_marks_profiled_time_once_per_process() {
+        let pid_attr = |value_strindex: i32| KeyValueAndUnit {
+            key_strindex: 3,
+            value: Some(AnyValue {
+                value: Some(any_value::Value::StringValueStrindex(value_strindex)),
+            }),
+            ..Default::default()
+        };
+        let dictionary = ProfilesDictionary {
+            string_table: ["", "cpu", "nanoseconds", "process.pid", "11", "22"]
+                .map(String::from)
+                .to_vec(),
+            attribute_table: vec![KeyValueAndUnit::default(), pid_attr(4), pid_attr(5)],
+            ..Default::default()
+        };
+        let sample = |attr: i32, value: i64| Sample {
+            values: vec![value],
+            attribute_indices: vec![attr],
+            ..Default::default()
+        };
+        let now = now_micros();
+        let profile = Profile {
+            sample_type: Some(ValueType {
+                type_strindex: 1,
+                unit_strindex: 2,
+            }),
+            time_unix_nano: (now as u64).saturating_mul(1000),
+            duration_nano: 5_000_000_000,
+            samples: vec![sample(1, 10), sample(1, 20), sample(2, 30)],
+            ..Default::default()
+        };
+        let build = |profile: &Profile| {
+            build_sample_records(
+                "default",
+                "default",
+                &ResourceProfiles::default(),
+                &ScopeProfiles::default(),
+                profile,
+                Some(&dictionary),
+                now - 3_600_000_000,
+                now + 3_600_000_000,
+            )
+            .0
+        };
+
+        let records = build(&profile);
+        let timed: Vec<(Option<&str>, Option<i64>)> = records
+            .iter()
+            .map(|r| {
+                (
+                    r.get("process_pid").and_then(|v| v.as_str()),
+                    r.get(query::PROFILE_DURATION_COLUMN)
+                        .and_then(|v| v.as_i64()),
+                )
+            })
+            .collect();
+        assert_eq!(
+            timed,
+            vec![
+                (Some("11"), Some(5_000_000_000)),
+                (Some("11"), None),
+                (Some("22"), Some(5_000_000_000)),
+            ]
+        );
+
+        let untimed = Profile {
+            duration_nano: 0,
+            ..profile
+        };
+        assert!(
+            build(&untimed)
+                .iter()
+                .all(|r| !r.contains_key(query::PROFILE_DURATION_COLUMN))
         );
     }
 

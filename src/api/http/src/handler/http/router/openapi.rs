@@ -89,6 +89,7 @@ use crate::{
         openobserve_api_search::profiles::series::profiles_series,
         openobserve_api_search::profiles::merge::merge_profiles_get,
         openobserve_api_search::profiles::merge::merge_profiles,
+        openobserve_api_search::profiles::diff::diff_profiles,
         metrics::ingest::json,
         openobserve_api_search::promql::remote_write,
         openobserve_api_search::promql::query_get,

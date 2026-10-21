@@ -1183,6 +1183,7 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/{stream_name}/profiles/tag_values", get(profiles_query::get_profiles_tag_values))
         .route("/{org_id}/{stream_name}/profiles/series", get(profiles_query::profiles_series_get).post(profiles_query::profiles_series))
         .route("/{org_id}/{stream_name}/profiles/merge", get(profiles_query::merge_profiles_get).post(profiles_query::merge_profiles))
+        .route("/{org_id}/{stream_name}/profiles/diff", post(profiles_query::diff_profiles))
 
         // Database Monitoring — its own top-level module, not under /traces.
         // The path segment must stay `db_monitoring` to match the OFGA resource
