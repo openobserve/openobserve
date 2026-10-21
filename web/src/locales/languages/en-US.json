@@ -25139,7 +25139,7 @@
       "lastConnectedFrom": "Last connected from",
       "lastHeartbeat": "Last heartbeat",
       "marker": "Version marker",
-      "nickname": "Nickname",
+      "nickname": "Name",
       "nicknameHelp": "Shown instead of the host name; leave the host name to keep the default",
       "noConfigAssigned": "No configuration assigned",
       "noHistory": "No events recorded yet",
