@@ -1661,11 +1661,11 @@ pub async fn summary(
     context_path = "/api",
     tag = "Fleet",
     operation_id = "GetFleetPipelines",
-    summary = "Throughput and export issues per (configuration, destination) for the Pipelines page",
+    summary = "Throughput and issues per OTel pipeline of each readable fleet for the Pipelines page",
     security(("Authorization" = [])),
     params(("org_id" = String, Path, description = "Organization name"), FlowQuery),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = config::meta::fleet::FlowResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = config::meta::fleet::PipelinesResponse),
         (status = 400, description = "Invalid window", content_type = "application/json", body = Object),
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
     ),
@@ -1686,9 +1686,10 @@ pub async fn get_pipelines(
             Err(refused) => return refused,
         };
         let window = query.window.unwrap_or_default();
-        match openobserve_core::fleet::get_flow(&org_id, user_id, window, permitted.as_ref()).await
+        match openobserve_core::fleet::get_pipelines(&org_id, user_id, window, permitted.as_ref())
+            .await
         {
-            Ok(flow) => MetaHttpResponse::json(flow),
+            Ok(pipelines) => MetaHttpResponse::json(pipelines),
             Err(e) => to_response(e),
         }
     }

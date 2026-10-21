@@ -914,6 +914,7 @@ pub enum FlowIssueKind {
     ExportErrors,
     Dropped,
     Backpressure,
+    ReceiverRefused,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, ToSchema)]
@@ -921,14 +922,6 @@ pub struct FlowIssue {
     pub kind: FlowIssueKind,
     pub signal: FlowSignal,
     pub value: f64,
-}
-
-/// Items per second; null means no telemetry for that signal on the link, 0 a measured zero.
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, ToSchema)]
-pub struct SignalRates {
-    pub logs: Option<f64>,
-    pub metrics: Option<f64>,
-    pub traces: Option<f64>,
 }
 
 /// `exporter` is set only on a config-scoped destination, so the UI can label it.
@@ -942,23 +935,68 @@ pub struct FlowDestination {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, ToSchema)]
-pub struct FlowLink {
-    pub config: String,
-    pub destination: String,
-    pub exporters: Vec<String>,
-    pub rate: SignalRates,
+pub struct PipelinesResponse {
+    pub window: FlowWindow,
+    /// Epoch milliseconds.
+    pub generated_at: i64,
+    pub fleets: Vec<PipelineFleet>,
+    pub pipelines: Vec<Pipeline>,
+    pub destinations: Vec<FlowDestination>,
+    /// Some throughput queries were skipped because the caller may not read their metric streams.
+    pub metrics_restricted: bool,
+}
+
+/// A readable fleet; without telemetry it lists its stable (else desired) version's pipelines.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, ToSchema)]
+pub struct PipelineFleet {
+    pub id: String,
+    pub name: String,
+    pub config: Option<String>,
+    pub version: Option<i64>,
+    pub collectors: usize,
+}
+
+/// One `service.pipelines` entry of a fleet; collectors on older versions add to the same name.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, ToSchema)]
+pub struct Pipeline {
+    /// `{fleet}/{name}`.
+    pub id: String,
+    pub fleet: String,
+    pub name: String,
+    pub signal: FlowSignal,
+    pub receivers: Vec<PipelineReceiver>,
+    pub exporters: Vec<PipelineExporter>,
+    /// Items per second over the window; null means no telemetry, 0 a measured zero.
+    pub in_rate: Option<f64>,
+    pub out_rate: Option<f64>,
+    /// `send_failed / (sent + send_failed)` over the last 5m.
+    pub failed_ratio: Option<f64>,
+    /// `enqueue_failed / (sent + enqueue_failed)` over the last 5m.
+    pub dropped_ratio: Option<f64>,
+    /// The fullest exporter queue over the last 45s.
+    pub queue_ratio: Option<f64>,
     pub issues: Vec<FlowIssue>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, ToSchema)]
-pub struct FlowResponse {
-    pub window: FlowWindow,
-    /// Epoch milliseconds.
-    pub generated_at: i64,
-    pub destinations: Vec<FlowDestination>,
-    pub links: Vec<FlowLink>,
-    /// Some throughput queries were skipped because the caller may not read their metric streams.
-    pub metrics_restricted: bool,
+pub struct PipelineReceiver {
+    pub name: String,
+    pub rate: Option<f64>,
+    /// Refused items per second over the last 5m.
+    pub refused: f64,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, ToSchema)]
+pub struct PipelineExporter {
+    pub name: String,
+    /// An id in `destinations`.
+    pub destination: String,
+    pub rate: Option<f64>,
+    /// Items per second that failed to send over the last 5m.
+    pub failed: f64,
+    /// Items per second that failed to enqueue over the last 5m.
+    pub dropped: f64,
+    pub queue: Option<f64>,
 }
 
 fn default_fleet() -> String {

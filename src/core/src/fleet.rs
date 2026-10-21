@@ -20,7 +20,7 @@ use std::collections::HashSet;
 use config::{
     META_ORG_ID,
     meta::{
-        fleet::{AuditList, AuditQuery, FlowResponse, FlowWindow},
+        fleet::{AuditList, AuditQuery, FlowWindow, PipelinesResponse},
         promql::value::{InstantValue, Value},
         search,
         stream::StreamType,
@@ -40,14 +40,14 @@ pub fn enabled() -> bool {
 }
 
 /// Region-local, because fleet state is region-local too; the queries run as the caller (N7).
-pub async fn get_flow(
+pub async fn get_pipelines(
     org_id: &str,
     user_id: &str,
     window: FlowWindow,
     fleets: Option<&HashSet<String>>,
-) -> Result<FlowResponse, anyhow::Error> {
+) -> Result<PipelinesResponse, anyhow::Error> {
     let now_us = now_micros();
-    o2_enterprise::enterprise::fleet::flow::get_flow(
+    o2_enterprise::enterprise::fleet::pipelines::get_pipelines(
         org_id,
         window,
         now_us,
@@ -91,13 +91,13 @@ async fn instant(
     let trace_id = config::ider::generate_trace_id();
     let resp = promql_service::search::search(&trace_id, org_id, &req, user_id, 0, false)
         .await
-        .map_err(|e| anyhow::anyhow!("fleet flow query failed: {e}: {query}"))?;
+        .map_err(|e| anyhow::anyhow!("fleet pipelines query failed: {e}: {query}"))?;
     match resp.value {
         Value::Vector(v) => Ok(Some(v)),
         Value::Instant(i) => Ok(Some(vec![i])),
         Value::None => Ok(Some(vec![])),
         other => anyhow::bail!(
-            "fleet flow query returned {} instead of a vector: {query}",
+            "fleet pipelines query returned {} instead of a vector: {query}",
             other.get_type()
         ),
     }
