@@ -140,7 +140,7 @@ describe("FleetSettings", () => {
     expect(wrapper.find(sel("restricted-trigger")).text()).toContain(
       "None, all components are allowed",
     );
-    expect(targetField().attributes("placeholder")).toBe("Latest supported (e.g. 0.162.0)");
+    expect(targetField().attributes("placeholder")).toBe("Latest supported (e.g. 0.163.1)");
   });
 
   it("has no drift or offline rows", async () => {

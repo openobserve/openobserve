@@ -25409,7 +25409,7 @@
       "restrictedPlaceholder": "None, all components are allowed",
       "targetVersion": "Target collector version",
       "targetVersionDesc": "Collectors older than this are outdated. Leave empty to use the latest version OpenObserve supports.",
-      "targetVersionPlaceholder": "Latest supported (e.g. 0.162.0)",
+      "targetVersionPlaceholder": "Latest supported (e.g. 0.163.1)",
       "save": "Save",
       "saved": "Fleet Manager settings saved",
       "noAccess": "You do not have access to Fleet Manager settings",

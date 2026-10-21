@@ -18,18 +18,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OContent y class="min-h-0 flex-1 overflow-auto" data-test="fleet-settings">
     <div class="flex flex-col gap-4">
       <OFormSection :title="t('fleet.settings.governance')" data-test="fleet-settings-governance">
-        <template v-if="loaded && !forbidden && !loadFailed" #actions>
-          <OButton
-            variant="primary"
-            size="sm"
-            :disabled="!dirty"
-            :loading="update.isPending.value"
-            data-test="fleet-settings-save"
-            @click="save"
-          >
-            {{ t("fleet.settings.save") }}
-          </OButton>
-        </template>
         <div v-if="forbidden" class="py-3" data-test="fleet-settings-no-access">
           <OEmptyState size="inline" preset="no-access" :title="t('fleet.settings.noAccess')" />
         </div>
@@ -83,6 +71,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="fleet-settings-target-version"
             />
           </OSettingRow>
+          <div v-if="editable" class="pt-1">
+            <OButton
+              variant="primary"
+              size="sm-action"
+              :disabled="!dirty"
+              :loading="update.isPending.value"
+              data-test="fleet-settings-save"
+              @click="save"
+            >
+              {{ t("fleet.settings.save") }}
+            </OButton>
+          </div>
         </template>
       </OFormSection>
 
