@@ -83,9 +83,27 @@ mod shell_tests {
     }
 
     #[test]
-    fn shell_sets_the_favicon_from_the_brand_image() {
+    fn shell_sets_the_favicon_from_its_own_image_not_the_logo() {
         assert!(SHELL.contains(r#"rel="icon""#));
-        assert!(SHELL.contains("faviconFrom"));
         assert!(SHELL.contains("data:image/svg+xml"));
+        let favicon = SHELL
+            .split("function faviconFrom(data) {")
+            .nth(1)
+            .and_then(|s| s.split("\n  }").next())
+            .expect("faviconFrom");
+        assert!(favicon.contains("data.favicon_img"));
+        assert!(!favicon.contains("logo_img"));
+    }
+
+    #[test]
+    fn shell_header_keeps_the_freshness_line_beside_the_brand() {
+        assert!(!SHELL.contains("Service status"));
+        let side = SHELL
+            .split(r#"<div class="header-side">"#)
+            .nth(1)
+            .and_then(|s| s.split("</header>").next())
+            .expect("header side");
+        assert!(side.contains(r#"id="stamp""#));
+        assert!(side.contains(r#"id="latest-down""#));
     }
 }
