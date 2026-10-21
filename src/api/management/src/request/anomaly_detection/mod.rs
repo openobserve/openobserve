@@ -74,6 +74,7 @@ fn disabled_response() -> Option<Response> {
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Vec<AnomalyConfigResponse>),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = MetaHttpResponse),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = MetaHttpResponse),
     ),
     extensions(
@@ -164,6 +165,7 @@ async fn add_active_downtimes(_org_id: &str, _configs: &mut [serde_json::Value])
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = AnomalyConfigResponse),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = MetaHttpResponse),
         (status = 404, description = "Not Found", content_type = "application/json", body = MetaHttpResponse),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = MetaHttpResponse),
     ),
@@ -407,6 +409,7 @@ pub async fn update_config(
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = DeleteResponse),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = MetaHttpResponse),
         (status = 404, description = "Not Found", content_type = "application/json", body = MetaHttpResponse),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = MetaHttpResponse),
     ),
@@ -452,6 +455,7 @@ pub async fn delete_config(Path((org_id, anomaly_id)): Path<(String, String)>) -
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = MetaHttpResponse),
         (status = 404, description = "Not Found", content_type = "application/json", body = MetaHttpResponse),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = MetaHttpResponse),
     ),
@@ -500,6 +504,7 @@ pub async fn train_model(
     ),
     responses(
         (status = 200, description = "Training cancelled"),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = MetaHttpResponse),
         (status = 404, description = "Not Found", content_type = "application/json", body = MetaHttpResponse),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = MetaHttpResponse),
     ),
@@ -540,6 +545,7 @@ pub async fn cancel_training(Path((org_id, anomaly_id)): Path<(String, String)>)
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = MetaHttpResponse),
         (status = 404, description = "Not Found", content_type = "application/json", body = MetaHttpResponse),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = MetaHttpResponse),
     ),
@@ -589,6 +595,7 @@ pub async fn detect_anomalies(
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Vec<DetectionHistoryItem>),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = MetaHttpResponse),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = MetaHttpResponse),
     ),
     extensions(
