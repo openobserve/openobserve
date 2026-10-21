@@ -16615,13 +16615,29 @@
         "stream": "串流",
         "targetScope": "範圍",
         "scorers": "評分器",
+        "health": "健康狀態",
+        "lastError": "最近錯誤",
         "created": "建立時間",
         "actions": "動作"
       },
       "health": {
+        "healthy": "健康",
         "degraded": "已降級",
+        "waitingForCredentials": "等待憑證",
+        "noRecentRuns": "近期沒有執行紀錄",
+        "summary": "過去 15 分鐘內，{runs} 次執行中有 {errors} 次失敗",
         "since": "{time}進入此狀態",
         "checked": "上次檢查：{time}"
+      },
+      "errorKinds": {
+        "providerAuth": "供應商驗證",
+        "rateLimited": "受到速率限制",
+        "timeout": "逾時",
+        "provider5xx": "供應商錯誤",
+        "parseError": "無法解析的輸出",
+        "mappingError": "對應錯誤",
+        "scorerMissing": "缺少評分器",
+        "executionError": "執行錯誤"
       },
       "empty": {
         "title": "尚無評估作業"

@@ -16620,13 +16620,29 @@
         "stream": "스트림",
         "targetScope": "범위",
         "scorers": "스코어러",
+        "health": "상태",
+        "lastError": "마지막 오류",
         "created": "생성됨",
         "actions": "작업"
       },
       "health": {
+        "healthy": "정상",
         "degraded": "저하됨",
+        "waitingForCredentials": "자격 증명 대기 중",
+        "noRecentRuns": "최근 실행 없음",
+        "summary": "최근 15분 동안 {runs}회 실행 중 {errors}회 실패했습니다",
         "since": "{time}에 이 상태가 되었습니다",
         "checked": "마지막 확인: {time}"
+      },
+      "errorKinds": {
+        "providerAuth": "공급자 인증",
+        "rateLimited": "속도 제한됨",
+        "timeout": "시간 초과",
+        "provider5xx": "공급자 오류",
+        "parseError": "출력 구문 분석 실패",
+        "mappingError": "매핑 오류",
+        "scorerMissing": "스코어러 없음",
+        "executionError": "실행 오류"
       },
       "empty": {
         "title": "아직 평가 작업이 없습니다"

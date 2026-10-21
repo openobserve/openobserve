@@ -16620,13 +16620,29 @@
         "stream": "Stream",
         "targetScope": "Phạm vi",
         "scorers": "Bộ chấm điểm",
+        "health": "Tình trạng",
+        "lastError": "Lỗi gần nhất",
         "created": "Đã tạo",
         "actions": "Hành động"
       },
       "health": {
+        "healthy": "Bình thường",
         "degraded": "Suy giảm",
+        "waitingForCredentials": "Đang chờ thông tin xác thực",
+        "noRecentRuns": "Không có lần chạy gần đây",
+        "summary": "{errors} trong {runs} lần chạy đã thất bại trong 15 phút qua",
         "since": "Chuyển sang trạng thái này {time}",
         "checked": "Kiểm tra lần cuối {time}"
+      },
+      "errorKinds": {
+        "providerAuth": "Xác thực nhà cung cấp",
+        "rateLimited": "Bị giới hạn tốc độ",
+        "timeout": "Hết thời gian chờ",
+        "provider5xx": "Lỗi nhà cung cấp",
+        "parseError": "Đầu ra không phân tích được",
+        "mappingError": "Lỗi ánh xạ",
+        "scorerMissing": "Thiếu bộ chấm điểm",
+        "executionError": "Lỗi thực thi"
       },
       "empty": {
         "title": "Chưa có tác vụ đánh giá nào"

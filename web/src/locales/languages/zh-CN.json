@@ -16620,13 +16620,29 @@
         "stream": "数据流",
         "targetScope": "范围",
         "scorers": "评分器",
+        "health": "健康状态",
+        "lastError": "最近错误",
         "created": "创建于",
         "actions": "操作"
       },
       "health": {
+        "healthy": "健康",
         "degraded": "已降级",
+        "waitingForCredentials": "等待凭证",
+        "noRecentRuns": "近期无运行",
+        "summary": "{runs} 次运行中有 {errors} 次在最近 15 分钟内失败",
         "since": "{time}进入此状态",
         "checked": "上次检查：{time}"
+      },
+      "errorKinds": {
+        "providerAuth": "提供商认证失败",
+        "rateLimited": "触发速率限制",
+        "timeout": "超时",
+        "provider5xx": "提供商错误",
+        "parseError": "输出无法解析",
+        "mappingError": "映射错误",
+        "scorerMissing": "缺少评分器",
+        "executionError": "执行错误"
       },
       "empty": {
         "title": "尚无评估任务"

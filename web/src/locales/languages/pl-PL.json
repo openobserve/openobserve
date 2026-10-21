@@ -16620,13 +16620,29 @@
         "stream": "Strumień",
         "targetScope": "Zakres",
         "scorers": "Ewaluatory",
+        "health": "Stan",
+        "lastError": "Ostatni błąd",
         "created": "Utworzono",
         "actions": "Akcje"
       },
       "health": {
+        "healthy": "Prawidłowy",
         "degraded": "Obniżony",
+        "waitingForCredentials": "Oczekiwanie na dane uwierzytelniające",
+        "noRecentRuns": "Brak ostatnich uruchomień",
+        "summary": "{errors} z {runs} uruchomień nie powiodło się w ciągu ostatnich 15 minut",
         "since": "Przeszedł w ten stan {time}",
         "checked": "Ostatnio sprawdzono {time}"
+      },
+      "errorKinds": {
+        "providerAuth": "Uwierzytelnianie u dostawcy",
+        "rateLimited": "Przekroczony limit zapytań",
+        "timeout": "Przekroczono limit czasu",
+        "provider5xx": "Błąd dostawcy",
+        "parseError": "Nieczytelne dane wyjściowe",
+        "mappingError": "Błąd mapowania",
+        "scorerMissing": "Brak ewaluatora",
+        "executionError": "Błąd wykonania"
       },
       "empty": {
         "title": "Brak zadań ewaluacji"

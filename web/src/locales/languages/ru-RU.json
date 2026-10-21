@@ -16620,13 +16620,29 @@
         "stream": "Поток",
         "targetScope": "Область действия",
         "scorers": "Оценщики",
+        "health": "Состояние",
+        "lastError": "Последняя ошибка",
         "created": "Создан",
         "actions": "Действия"
       },
       "health": {
+        "healthy": "Исправно",
         "degraded": "Ухудшен",
+        "waitingForCredentials": "Ожидание учётных данных",
+        "noRecentRuns": "Нет недавних запусков",
+        "summary": "{errors} из {runs} запусков завершились ошибкой за последние 15 минут",
         "since": "Перешёл в это состояние {time}",
         "checked": "Последняя проверка: {time}"
+      },
+      "errorKinds": {
+        "providerAuth": "Аутентификация провайдера",
+        "rateLimited": "Превышен лимит запросов",
+        "timeout": "Тайм-аут",
+        "provider5xx": "Ошибка провайдера",
+        "parseError": "Не удалось разобрать вывод",
+        "mappingError": "Ошибка сопоставления",
+        "scorerMissing": "Оценщик отсутствует",
+        "executionError": "Ошибка выполнения"
       },
       "empty": {
         "title": "Пока нет заданий оценки"

@@ -16620,13 +16620,29 @@
         "stream": "Akış",
         "targetScope": "Kapsam",
         "scorers": "Puanlayıcılar",
+        "health": "Sağlık",
+        "lastError": "Son hata",
         "created": "Oluşturuldu",
         "actions": "İşlemler"
       },
       "health": {
+        "healthy": "Sağlıklı",
         "degraded": "Bozulmuş",
+        "waitingForCredentials": "Kimlik bilgileri bekleniyor",
+        "noRecentRuns": "Yakın zamanda çalıştırma yok",
+        "summary": "Son 15 dakikada {runs} çalıştırmanın {errors} tanesi başarısız oldu",
         "since": "{time} bu duruma geçti",
         "checked": "Son kontrol: {time}"
+      },
+      "errorKinds": {
+        "providerAuth": "Sağlayıcı kimlik doğrulaması",
+        "rateLimited": "Hız sınırına takıldı",
+        "timeout": "Zaman aşımı",
+        "provider5xx": "Sağlayıcı hatası",
+        "parseError": "Ayrıştırılamayan çıktı",
+        "mappingError": "Eşleme hatası",
+        "scorerMissing": "Puanlayıcı eksik",
+        "executionError": "Yürütme hatası"
       },
       "empty": {
         "title": "Henüz Değerlendirme İşi Yok"

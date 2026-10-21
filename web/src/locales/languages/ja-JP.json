@@ -16620,13 +16620,29 @@
         "stream": "ストリーム",
         "targetScope": "スコープ",
         "scorers": "スコアラー",
+        "health": "ヘルス",
+        "lastError": "直近のエラー",
         "created": "作成日",
         "actions": "操作"
       },
       "health": {
+        "healthy": "正常",
         "degraded": "劣化しました",
+        "waitingForCredentials": "認証情報を待機中",
+        "noRecentRuns": "最近の実行なし",
+        "summary": "過去 15 分間に {runs} 回の実行のうち {errors} 回が失敗しました",
         "since": "{time}にこの状態になりました",
         "checked": "最終確認: {time}"
+      },
+      "errorKinds": {
+        "providerAuth": "プロバイダー認証",
+        "rateLimited": "レート制限",
+        "timeout": "タイムアウト",
+        "provider5xx": "プロバイダーエラー",
+        "parseError": "解析できない出力",
+        "mappingError": "マッピングエラー",
+        "scorerMissing": "スコアラーが見つかりません",
+        "executionError": "実行エラー"
       },
       "empty": {
         "title": "まだ評価ジョブがありません"

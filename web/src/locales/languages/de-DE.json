@@ -16620,13 +16620,29 @@
         "stream": "Stream",
         "targetScope": "Bereich",
         "scorers": "Scorer",
+        "health": "Zustand",
+        "lastError": "Letzter Fehler",
         "created": "Erstellt",
         "actions": "Aktionen"
       },
       "health": {
+        "healthy": "In Ordnung",
         "degraded": "Degradiert",
+        "waitingForCredentials": "Warte auf Anmeldedaten",
+        "noRecentRuns": "Keine aktuellen Ausführungen",
+        "summary": "{errors} von {runs} Ausführungen sind in den letzten 15 Minuten fehlgeschlagen",
         "since": "In diesen Zustand gewechselt: {time}",
         "checked": "Zuletzt geprüft: {time}"
+      },
+      "errorKinds": {
+        "providerAuth": "Anbieter-Authentifizierung",
+        "rateLimited": "Ratenbegrenzung",
+        "timeout": "Zeitüberschreitung",
+        "provider5xx": "Anbieterfehler",
+        "parseError": "Nicht parsbare Ausgabe",
+        "mappingError": "Zuordnungsfehler",
+        "scorerMissing": "Scorer fehlt",
+        "executionError": "Ausführungsfehler"
       },
       "empty": {
         "title": "Noch keine Bewertungsaufträge"

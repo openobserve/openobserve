@@ -16620,13 +16620,29 @@
         "stream": "Stream",
         "targetScope": "Bereik",
         "scorers": "Scorers",
+        "health": "Gezondheid",
+        "lastError": "Laatste fout",
         "created": "Aangemaakt",
         "actions": "Acties"
       },
       "health": {
+        "healthy": "Gezond",
         "degraded": "Gedegradeerd",
+        "waitingForCredentials": "Wachten op inloggegevens",
+        "noRecentRuns": "Geen recente uitvoeringen",
+        "summary": "{errors} van {runs} uitvoeringen mislukt in de afgelopen 15 minuten",
         "since": "In deze status gekomen {time}",
         "checked": "Laatst gecontroleerd {time}"
+      },
+      "errorKinds": {
+        "providerAuth": "Provider-authenticatie",
+        "rateLimited": "Snelheidslimiet bereikt",
+        "timeout": "Time-out",
+        "provider5xx": "Providerfout",
+        "parseError": "Niet-parseerbare uitvoer",
+        "mappingError": "Toewijzingsfout",
+        "scorerMissing": "Scorer ontbreekt",
+        "executionError": "Uitvoeringsfout"
       },
       "empty": {
         "title": "Nog geen evaluatietaken"

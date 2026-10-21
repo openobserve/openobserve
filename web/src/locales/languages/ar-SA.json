@@ -16620,13 +16620,29 @@
         "stream": "التدفق",
         "targetScope": "النطاق",
         "scorers": "أدوات التقييم",
+        "health": "الحالة الصحية",
+        "lastError": "آخر خطأ",
         "created": "تأسيس",
         "actions": "الإجراءات"
       },
       "health": {
+        "healthy": "سليم",
         "degraded": "متدهورة",
+        "waitingForCredentials": "بانتظار بيانات الاعتماد",
+        "noRecentRuns": "لا توجد عمليات تشغيل حديثة",
+        "summary": "فشل {errors} من {runs} من عمليات التشغيل خلال آخر 15 دقيقة",
         "since": "دخل هذه الحالة {time}",
         "checked": "آخر فحص {time}"
+      },
+      "errorKinds": {
+        "providerAuth": "مصادقة المزوّد",
+        "rateLimited": "تقييد المعدل",
+        "timeout": "انتهاء المهلة",
+        "provider5xx": "خطأ المزوّد",
+        "parseError": "مخرجات غير قابلة للتحليل",
+        "mappingError": "خطأ في التعيين",
+        "scorerMissing": "أداة التقييم مفقودة",
+        "executionError": "خطأ في التنفيذ"
       },
       "empty": {
         "title": "لا توجد مهام تقييم حتى الآن"

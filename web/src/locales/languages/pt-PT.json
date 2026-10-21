@@ -16620,13 +16620,29 @@
         "stream": "Stream",
         "targetScope": "Âmbito",
         "scorers": "Avaliadores",
+        "health": "Estado",
+        "lastError": "Último erro",
         "created": "Criado",
         "actions": "Ações"
       },
       "health": {
+        "healthy": "Bom estado",
         "degraded": "Degradado",
+        "waitingForCredentials": "A aguardar credenciais",
+        "noRecentRuns": "Sem execuções recentes",
+        "summary": "{errors} de {runs} execuções falharam nos últimos 15 minutos",
         "since": "Entrou neste estado {time}",
         "checked": "Última verificação {time}"
+      },
+      "errorKinds": {
+        "providerAuth": "Autenticação do fornecedor",
+        "rateLimited": "Limite de taxa atingido",
+        "timeout": "Tempo limite excedido",
+        "provider5xx": "Erro do fornecedor",
+        "parseError": "Saída não interpretável",
+        "mappingError": "Erro de mapeamento",
+        "scorerMissing": "Avaliador em falta",
+        "executionError": "Erro de execução"
       },
       "empty": {
         "title": "Ainda Não Há Trabalhos de Avaliação"

@@ -16620,13 +16620,29 @@
         "stream": "Flux",
         "targetScope": "Portée",
         "scorers": "Évaluateurs",
+        "health": "Santé",
+        "lastError": "Dernière erreur",
         "created": "Créé",
         "actions": "Actions"
       },
       "health": {
+        "healthy": "Sain",
         "degraded": "Dégradé",
+        "waitingForCredentials": "En attente d'identifiants",
+        "noRecentRuns": "Aucune exécution récente",
+        "summary": "{errors} exécutions sur {runs} ont échoué au cours des 15 dernières minutes",
         "since": "Entré dans cet état {time}",
         "checked": "Dernière vérification : {time}"
+      },
+      "errorKinds": {
+        "providerAuth": "Authentification du fournisseur",
+        "rateLimited": "Limite de débit",
+        "timeout": "Délai dépassé",
+        "provider5xx": "Erreur du fournisseur",
+        "parseError": "Sortie non analysable",
+        "mappingError": "Erreur de mappage",
+        "scorerMissing": "Évaluateur manquant",
+        "executionError": "Erreur d'exécution"
       },
       "empty": {
         "title": "Aucune tâche d'évaluation pour l'instant"
