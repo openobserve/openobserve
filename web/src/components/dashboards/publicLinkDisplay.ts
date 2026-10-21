@@ -233,7 +233,7 @@ export function publicLinkColumns(
           },
         ]
       : []),
-    col("status", t("dashboard.publicLinks.status"), 110, "status"),
+    col("status", t("dashboard.publicLinks.status"), 120, "status"),
     col("ranges", t("dashboard.publicLinks.timeRanges"), 190),
     col("refresh", t("dashboard.publicLinks.refresh"), 90, "refresh_secs"),
     col("expires", t("dashboard.publicLinks.expires"), 115, "expires_at"),
