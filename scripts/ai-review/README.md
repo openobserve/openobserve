@@ -33,10 +33,11 @@ A PR must never be able to run code next to the review secrets or weaken its own
 |-------|--------------|
 | `pull_request_target` | The workflow file and the engine always come from `main`. A PR's edits to `scripts/ai-review/**`, `opencode.jsonc` or the workflow take effect only after merge. |
 | Two checkouts | `./engine` = `main` (sparse: this directory, `opencode.jsonc`, the ui-architect and eslint skill references). `./pr` = the PR head SHA, data only: no `npm`, no build, no hooks; `persist-credentials: false`. |
-| `src/sanitize.mjs` | Before opencode starts, deletes from `./pr` every symlink and, at any depth, `AGENTS.md`, `CLAUDE.md`, `CONTEXT.md`, `opencode.json[c]`, `.opencode/`, `.claude/`, `.agents/`, then fails the job if any remain. Copies the base-branch skill references to `./pr/.o2-review-context/skills/`, which the prompts read. The base-branch `AGENTS.md` (or the files in `REVIEW_RULES_FILES`, one path per line) goes into every reviewer's system prompt instead, so the repo rules still apply without the PR being able to edit them. |
+| `src/sanitize.mjs` | Before opencode starts, deletes from `./pr` every symlink and, at any depth, `AGENTS.md`, `CLAUDE.md`, `CONTEXT.md`, `opencode.json[c]`, `.opencode/`, `.claude/`, `.agents/`, then fails the job if any remain. Copies the base-branch skill references to `./pr/.o2-review-context/skills/`, which the prompts read. The base-branch `AGENTS.md` and `web/AGENTS.md` (listed by the workflow in `REVIEW_RULES_FILES`, one path per line; without it, the engine's `AGENTS.md`) go into every reviewer's system prompt instead, so the repo rules still apply without the PR being able to edit them. |
 | `src/opencode.mjs` env allowlist | `opencode serve` runs in `./pr` with only `PATH`, a fresh temp `HOME`/XDG dirs, `OPENCODE_CONFIG` (this repo's `opencode.jsonc` from `./engine`), the `OPENCODE_DISABLE_*` flags, a random server password and the one provider key. No `GH_*`, `GITHUB_*`, `ACTIONS_*`, `RUNNER_*` or `O2_*` variables. |
 | `opencode.jsonc` permissions | Each `ai-review-*` agent: `"*": "deny"`, then allow `read`, `glob`, `grep`; `external_directory` denied. LSP, formatters, snapshots and sharing are off. |
 | Startup self-check | Refuses to review if `GET /experimental/tool/ids` lists any non-built-in tool, or any agent resolves to allow for a tool other than `read`/`glob`/`grep`. Permission prompts during a run are rejected. |
+| `src/comments.mjs` | The previous review is only ever a marker comment by the reviewer app (`REVIEW_BOT_LOGIN` = `<app-slug>[bot]`), read across every page; anyone else's comment carrying the marker is never fed to the reviewers or edited. When the app token cannot be minted the review posts as `github-actions[bot]`, which any same-repo PR workflow can also post as, so that run uses no previous review and posts a fresh comment. |
 | `src/scrub.mjs` | Before posting: redacts values of secret-named env vars and token-shaped strings (inside code too), breaks forged `<!-- o2-review` markers, and neutralises `@mentions` outside code. |
 
 Sanitize is load-bearing, not belt and braces: opencode 1.18.x still imports plugins from a
@@ -68,12 +69,21 @@ branches → `main`**, in both repos, then:
 
 - Move `OO_REVIEWER_APP_PRIVATE_KEY` into it and delete the repo-level copy (only this workflow
   uses it).
-- Add a `DEEPSEEK_API_KEY` environment secret holding a key dedicated to the reviewer. An
-  environment secret overrides the repo secret of the same name for this job only; the repo-level
-  key stays for the other workflows that use it.
-- Leave `O2_TRACE_*` at repo level; other AI workflows export to the same stream.
+- Add an `AI_REVIEW_DEEPSEEK_API_KEY` environment secret holding a key used by nothing else. The
+  org-level `DEEPSEEK_API_KEY` stays for the other workflows; any same-repo PR can add a workflow
+  that reads it, which is why the review does not use it.
+- Rotate `O2_TRACE_*` to an ingest-only credential; they stay at repo level because other AI
+  workflows export to the same stream.
+- Give the reviewer app *Actions: write* and *Pull requests: read* on o2-enterprise and
+  *Issues: write* on openobserve, installed on both repos, for paired PRs (below). A new
+  permission waits for an org owner to accept it on the installation; until then the token cannot
+  be minted and paired OSS PRs are reviewed on their own as well.
 
-Until the environment has its secrets, the job keeps working with the repo-level ones.
+Without `AI_REVIEW_DEEPSEEK_API_KEY` the job posts a "not reviewed: key not set" comment, so create
+the environment before merging. Set the **organization** variable `AI_REVIEW_ENABLED` to `false`
+to stop every review run in both repos (the job never starts, so no secret is read); unset or any
+other value runs. Set it on one repo only and paired OSS PRs still defer to an ENT review that
+never runs.
 
 ## Paired o2-enterprise PRs
 
@@ -84,13 +94,14 @@ in o2-enterprise:
   not review. If that PR is out of draft and labelled `ready-for-ci`, it dispatches the
   o2-enterprise review; otherwise it waits for that PR to become ready, so a draft ENT PR never
   gets a paid run through its OSS twin. Either way it replaces this PR's review comment with a
-  pointer (`post-paired-pointer.sh`). This needs `ORG_ADMIN_TOKEN` (o2-enterprise: Pull requests
-  read, Actions write); without it, or if any lookup or dispatch fails, the OSS review runs as
-  usual. To force an OSS review anyway, dispatch this workflow with `ignore_paired`.
+  pointer (`post-paired-pointer.sh`). This uses a reviewer-app token scoped to o2-enterprise
+  (Pull requests read, Actions write); if it cannot be minted, or any lookup or dispatch fails,
+  the OSS review runs as usual. To force an OSS review anyway, dispatch this workflow with `ignore_paired`.
 - **ENT side.** The o2-enterprise workflow checks out this engine pinned by commit SHA, finds the
   open same-named OSS PR, checks it out to `./pr/openobserve`, and reviews both diffs in one run.
-  OSS files appear with an `openobserve/` prefix in the review. After a paired review it updates
-  the OSS PR's pointer, so the pointer is right even when the ENT PR was opened second.
+  OSS files appear with an `openobserve/` prefix in the review, and the OSS `AGENTS.md` and
+  `web/AGENTS.md` at the pinned commit join the rules. After a paired review it updates the OSS
+  PR's pointer as the reviewer app, so the pointer is right even when the ENT PR was opened second.
 - **Windows.** If the ENT PR closes, the OSS pointer stays until the next OSS push, which reviews
   the OSS PR on its own and replaces the pointer. If a paired ENT run fails, the failure shows on
   the ENT PR, not the OSS one.

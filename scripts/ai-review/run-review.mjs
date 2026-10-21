@@ -15,6 +15,7 @@ import {
   genAiResponseAttributes,
   sha256,
 } from "./telemetry.mjs";
+import { selectOwnReviewComment } from "./src/comments.mjs";
 import { OpencodeServer, selfCheck, shouldRetry } from "./src/opencode.mjs";
 import { fetchDiff, prefixDiffPaths } from "./src/pr-diff.mjs";
 import { sanitizePrTree } from "./src/sanitize.mjs";
@@ -81,6 +82,10 @@ const REVIEW_MARKER = process.env.REVIEW_MARKER || "<!-- ai-code-review -->";
 const ANY_REVIEW_MARKER = "<!--\\s*ai-code-review[a-z0-9-]*\\s*-->";
 // Tags the "reviewed with the paired o2-enterprise PR" note (post-paired-pointer.sh); it is replaced in place but is not a previous review.
 const PAIRED_POINTER_TAG = "<!-- o2-paired-pointer -->";
+// Tags the "not reviewed: key not set" notice, which is likewise replaced but never fed back as a previous review.
+const NOTICE_TAG = "<!-- o2-review-notice -->";
+// Login of the token that posts the review; anyone else's comment carrying the marker must never become <previous_review>.
+const REVIEW_BOT_LOGIN = process.env.REVIEW_BOT_LOGIN || "";
 
 // ─── Branding (presentation only) ───────────────────────────────────────────
 // The posted comment is branded "OpenObserve Code Review". These strings change ONLY how the
@@ -1213,13 +1218,15 @@ ${failedAgents.length > 0 ? `- Failed reviewers: ${failedAgents.map(r => r.agent
 // ─── GitHub integration ────────────────────────────────────────────────────
 
 function findExistingReviewComment(prNumber) {
+  if (!REVIEW_BOT_LOGIN) {
+    console.log(`[${isoNow()}] REVIEW_BOT_LOGIN is not set; not looking for a previous review`);
+    return null;
+  }
   try {
-    const comments = ghJson(`api "repos/${process.env.GITHUB_REPOSITORY}/issues/${prNumber}/comments"`);
-    const markerRe = new RegExp(ANY_REVIEW_MARKER, "i");
-    // Only bot comments: a human quoting the marker must not be overwritten or fed back as the previous review.
-    const ourComments = comments.filter(c => c.user?.type === "Bot" && markerRe.test(c.body || ""));
-    return ourComments.length > 0 ? ourComments[ourComments.length - 1] : null;
-  } catch {
+    const pages = JSON.parse(gh(`api --paginate --slurp "repos/${process.env.GITHUB_REPOSITORY}/issues/${prNumber}/comments"`));
+    return selectOwnReviewComment(pages.flat(), REVIEW_BOT_LOGIN, ANY_REVIEW_MARKER);
+  } catch (err) {
+    console.warn(`[${isoNow()}] Could not list PR comments, so no previous review is used: ${execErrorText(err).slice(0, 300)}`);
     return null;
   }
 }
@@ -1312,7 +1319,10 @@ async function main() {
       try {
         // The key's env var name is named in the log but not in the comment: it carries the
         // provider name, and the posted comment must not.
-        postReviewComment(prNumber, `${REVIEW_MARKER}\n${REVIEW_HEADING}\n\n> [!CAUTION]\n> ### ⛔ Not reviewed\n> The review API key is not set. OpenObserve Code Review did not run for this PR — this is a CI misconfiguration, not a skip. Please confirm the review secrets are provisioned.`);
+        const notice = `${REVIEW_MARKER}\n${NOTICE_TAG}\n${REVIEW_HEADING}\n\n> [!CAUTION]\n> ### ⛔ Not reviewed\n> The review API key is not set. OpenObserve Code Review did not run for this PR — this is a CI misconfiguration, not a skip. Please confirm the review secrets are provisioned.`;
+        const existing = findExistingReviewComment(prNumber);
+        if (existing) updateReviewComment(prNumber, existing.id, notice);
+        else postReviewComment(prNumber, notice);
       } catch (postErr) {
         console.error(`[${isoNow()}] Also failed to post the misconfiguration notice: ${postErr.message}`);
       }
@@ -1422,8 +1432,8 @@ async function main() {
     });
     if (existingComment) {
       existingCommentId = existingComment.id;
-      if (existingComment.body.includes(PAIRED_POINTER_TAG)) {
-        console.log(`[${isoNow()}] Replacing paired-PR pointer comment #${existingCommentId} with a review`);
+      if (existingComment.body.includes(PAIRED_POINTER_TAG) || existingComment.body.includes(NOTICE_TAG)) {
+        console.log(`[${isoNow()}] Replacing pointer/notice comment #${existingCommentId} with a review`);
       } else {
         existingReview = existingComment.body;
         console.log(`[${isoNow()}] Re-review mode: found existing review comment #${existingCommentId}`);

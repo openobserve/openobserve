@@ -33,13 +33,13 @@ concurrency:
 
 jobs:
   review:
-    # Paid CI runs only on non-draft PRs carrying 'ready-for-ci'; other label events must not re-run it.
+    # Paid CI runs only on non-draft 'ready-for-ci' PRs, and never when vars.AI_REVIEW_ENABLED is 'false' (the kill switch).
     if: >-
-      ${{ github.event_name == 'workflow_dispatch' || (
+      ${{ vars.AI_REVIEW_ENABLED != 'false' && (github.event_name == 'workflow_dispatch' || (
         contains(github.event.pull_request.labels.*.name, 'ready-for-ci') &&
         github.event.pull_request.draft == false &&
         (github.event.action != 'labeled' || github.event.label.name == 'ready-for-ci')
-      ) }}
+      )) }}
     # Explicit name: without it GitHub serializes the whole matrix object (api_key_env, marker) into the public check name.
     name: review (${{ matrix.provider.name }})
     runs-on: ubuntu-latest
@@ -115,6 +115,20 @@ jobs:
           app-id: ${{ vars.OO_REVIEWER_APP_ID }}
           private-key: ${{ secrets.OO_REVIEWER_APP_PRIVATE_KEY }}
 
+      # Without it (app not installed on o2-enterprise, or no actions:write) the pairing check is skipped and the PR is reviewed here.
+      - name: Generate app token for the paired o2-enterprise lookup
+        id: ent_token
+        if: env.REVIEW_RUN == 'true' && vars.OO_REVIEWER_APP_ID != '' && !inputs.ignore_paired
+        continue-on-error: true
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ vars.OO_REVIEWER_APP_ID }}
+          private-key: ${{ secrets.OO_REVIEWER_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: o2-enterprise
+          permission-actions: write
+          permission-pull-requests: read
+
       - name: Check out review engine (trusted, from main)
         if: env.REVIEW_RUN == 'true'
         uses: actions/checkout@v5
@@ -132,8 +146,9 @@ jobs:
       - name: Defer to a paired o2-enterprise PR
         if: env.REVIEW_RUN == 'true' && !inputs.ignore_paired
         env:
-          ENT_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
+          ENT_TOKEN: ${{ steps.ent_token.outputs.token }}
           GH_TOKEN: ${{ steps.app_token.outputs.token || github.token }}
+          BOT_LOGIN: ${{ steps.app_token.outputs.token && format('{0}[bot]', steps.app_token.outputs.app-slug) || 'github-actions[bot]' }}
           REPO: ${{ github.repository }}
           PR_NUMBER: ${{ steps.pr.outputs.number }}
           BRANCH: ${{ steps.pr.outputs.head_ref }}
@@ -141,7 +156,7 @@ jobs:
         run: |
           set -uo pipefail
           if [ -z "$ENT_TOKEN" ]; then
-            echo "::warning::ORG_ADMIN_TOKEN is not available; cannot look for a paired o2-enterprise PR, reviewing here."
+            echo "::warning::No app token for o2-enterprise; cannot look for a paired PR, reviewing here."
             exit 0
           fi
           ent_repo=openobserve/o2-enterprise
@@ -169,7 +184,7 @@ jobs:
             state=pending
             echo "::notice::Paired with $ent_repo#$ent_pr, which is a draft or lacks ready-for-ci; it reviews both PRs once it is ready."
           fi
-          bash engine/scripts/ai-review/post-paired-pointer.sh "$REPO" "$PR_NUMBER" "$MARKER" "$ent_repo#$ent_pr" "$state" \
+          bash engine/scripts/ai-review/post-paired-pointer.sh "$REPO" "$PR_NUMBER" "$MARKER" "$ent_repo#$ent_pr" "$state" "$BOT_LOGIN" \
             || echo "::warning::Could not post the pointer comment."
           echo "REVIEW_RUN=false" >> "$GITHUB_ENV"
 
@@ -193,6 +208,27 @@ jobs:
           auth="$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
           git -C pr -c http.extraheader="AUTHORIZATION: basic $auth" fetch --no-tags --depth=1 origin "$MERGE_BASE" \
             || echo "::warning::Could not fetch merge base $MERGE_BASE; diffs over the API limit will fail."
+
+      # Sanitize deletes the PR's AGENTS.md files, so the engine gets the rules of the engine's commit from outside ./pr.
+      - name: Fetch repo rules (base branch)
+        if: env.REVIEW_RUN == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          rules="$RUNNER_TEMP/review-rules"
+          mkdir -p "$rules"
+          files="$GITHUB_WORKSPACE/engine/AGENTS.md"
+          if gh api "repos/$REPO/contents/web/AGENTS.md?ref=$GITHUB_SHA" -H "Accept: application/vnd.github.raw" > "$rules/web.AGENTS.txt"; then
+            files="$files"$'\n'"$rules/web.AGENTS.txt"
+          else
+            echo "::warning::Could not fetch web/AGENTS.md at $GITHUB_SHA; reviewing without the frontend rules."
+          fi
+          {
+            echo "REVIEW_RULES_FILES<<EOF_REVIEW_RULES"
+            echo "$files"
+            echo "EOF_REVIEW_RULES"
+          } >> "$GITHUB_ENV"
 
       - name: Set up Node.js
         if: env.REVIEW_RUN == 'true'
@@ -233,8 +269,10 @@ jobs:
           REVIEW_MODEL_VARIANT: ${{ matrix.provider.model_variant }}
           REVIEW_API_KEY_ENV: ${{ matrix.provider.api_key_env }}
           REVIEW_MARKER: ${{ matrix.provider.marker }}
-          # The engine passes only the key named by REVIEW_API_KEY_ENV on to opencode.
-          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          # Empty under the github.token fallback: any workflow a same-repo PR adds can also post as github-actions[bot].
+          REVIEW_BOT_LOGIN: ${{ steps.app_token.outputs.token && format('{0}[bot]', steps.app_token.outputs.app-slug) || '' }}
+          # Review-only key held in the ai-review environment (the org-wide key is readable by any same-repo PR workflow).
+          DEEPSEEK_API_KEY: ${{ secrets.AI_REVIEW_DEEPSEEK_API_KEY }}
           O2_TRACE_INGEST_URL: ${{ secrets.O2_TRACE_INGEST_URL }}
           O2_TRACE_ORG: ${{ secrets.O2_TRACE_ORG }}
           O2_TRACE_USERNAME: ${{ secrets.O2_TRACE_USERNAME }}

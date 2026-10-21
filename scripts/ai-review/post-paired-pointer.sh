@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Usage (GH_TOKEN set): post-paired-pointer.sh <repo> <pr-number> <marker> <paired-pr-ref> <pending|reviewed>
+# Usage (GH_TOKEN set): post-paired-pointer.sh <repo> <pr-number> <marker> <paired-pr-ref> <pending|reviewed> <login of the GH_TOKEN identity>
 set -euo pipefail
 
 repo="$1"
@@ -7,6 +7,7 @@ pr="$2"
 marker="$3"
 paired="$4"
 state="$5"
+bot_login="$6"
 
 case "$state" in
   pending)
@@ -26,7 +27,7 @@ body="$marker
 $note"
 
 comment_id="$(gh api "repos/$repo/issues/$pr/comments" --paginate \
-  | jq -rs --arg m "$marker" '[.[][] | select(.user.type == "Bot" and (.body | contains($m))) | .id] | last // empty')"
+  | jq -rs --arg m "$marker" --arg login "$bot_login" '[.[][] | select(.user.login == $login and (.body | contains($m))) | .id] | last // empty')"
 if [ -n "$comment_id" ]; then
   gh api -X PATCH "repos/$repo/issues/comments/$comment_id" -f body="$body" > /dev/null
 else
