@@ -1159,7 +1159,7 @@ describe("pa gap fixes (scope bar and Exclusions drawer)", { timeout: 20000 }, (
   it("P7-R2: the chip says likely bot found when the Overview banner fires for a user agent", async () => {
     withHits([[UA_RE, BOT_UA]]);
     await mountAt("/product-analytics/overview?app=web&period=7d", true);
-    expect(chip()?.text()).toContain("likely bot found");
+    await until(() => expect(chip()?.text()).toContain("likely bot found"));
   });
 
   it("P7-R2: the App filters button shows a warning icon when it says likely bot found", async () => {
@@ -1188,9 +1188,8 @@ describe("pa gap fixes (scope bar and Exclusions drawer)", { timeout: 20000 }, (
   it("P7-R2: no likely bot found without a banner", async () => {
     withHits([[UA_RE, [{ ua: "Chrome", dev: "Other", sessions: 1500 }]]]);
     await mountAt("/product-analytics/overview?app=web&period=7d", true);
-    expect(
-      vi.mocked(searchService.search).mock.calls.some((c) => UA_RE.test(c[0].query.query.sql)),
-    ).toBe(true);
+    await until(() => expect(uaSearches()).toBe(1));
+    await settle();
     expect(chip()?.text()).not.toContain("likely bot found");
   });
 
@@ -1200,7 +1199,7 @@ describe("pa gap fixes (scope bar and Exclusions drawer)", { timeout: 20000 }, (
     await openDrawer();
     const view = () =>
       document.querySelector<HTMLElement>('[data-test="rum-analytics-exclusions-view"]')!;
-    expect(view().textContent).toContain("Built-in bot rule 12,256");
+    await until(() => expect(view().textContent).toContain("Built-in bot rule 12,256"));
     expect(view().textContent).toContain("Saved rules 79");
     expect(view().textContent).toContain("Synthetic tests 7 · always excluded");
     expect(view().textContent).toContain("Include hidden sessions in this view");
@@ -1230,7 +1229,7 @@ describe("pa gap fixes (scope bar and Exclusions drawer)", { timeout: 20000 }, (
       [/total_s/, [{ u: "staff@x.com", s: 40, total_s: 150, n_values: 50 }]],
     ]);
     await mountAt("/product-analytics/overview?app=web&period=7d", true);
-    expect(buttonIn(document.body, "Review app filters")).toBeDefined();
+    await until(() => expect(buttonIn(document.body, "Review app filters")).toBeDefined());
     expect(chip()?.text()).not.toContain("likely bot found");
   });
 
@@ -1241,7 +1240,7 @@ describe("pa gap fixes (scope bar and Exclusions drawer)", { timeout: 20000 }, (
     const d = drawer()!;
     expect(d).toBeDefined();
     expect(d.querySelector("[role='switch']")).not.toBeNull();
-    expect(d.textContent).toContain("12,256");
+    await until(() => expect(d.textContent).toContain("12,256"));
     expect(d.innerHTML).toContain("BuiltinListedFamily");
   });
 
@@ -1259,7 +1258,7 @@ describe("pa gap fixes (scope bar and Exclusions drawer)", { timeout: 20000 }, (
     await mountAt("/product-analytics/overview?app=web&period=7d");
     await openDrawer();
     const d = drawer()!;
-    expect(d.textContent).toMatch(/1,673 of 14,008 sessions remain/);
+    await until(() => expect(d.textContent).toMatch(/1,673 of 14,008 sessions remain/));
     expect(buttonIn(d, "Cancel")).toBeDefined();
     expect(buttonIn(d, "Save")).toBeDefined();
   });
@@ -1271,6 +1270,7 @@ describe("pa gap fixes (scope bar and Exclusions drawer)", { timeout: 20000 }, (
       await mountAt("/product-analytics/overview?app=web&period=7d");
       await openDrawer();
       const d = drawer()!;
+      await until(() => expect(previewLine(d)).toBeDefined());
       const line = previewLine(d);
       const out = {
         text: line.textContent ?? "",
@@ -1371,10 +1371,12 @@ describe("pa gap fixes (scope bar and Exclusions drawer)", { timeout: 20000 }, (
     await openDrawer();
     const reads = settingsApi.getAppSettings.mock.calls.length;
     const probes = searchCount(/AS app, COUNT/);
-    const summaries = searchCount(/va_rows/);
+    const before = searchCount(/va_rows/);
     const d = drawer()!;
     botSwitch(d).click();
-    await settle();
+    // The drawer's preview runs the summary SQL too, so the baseline is taken after it.
+    await until(() => expect(searchCount(/va_rows/)).toBe(before + 1));
+    const summaries = searchCount(/va_rows/);
     buttonIn(d, "Save")!.click();
     const scope = () => useProductAnalytics().scope.value as unknown as { exclusions: unknown };
     await until(() =>
@@ -1455,7 +1457,7 @@ describe("pa gap fixes (scope bar and Exclusions drawer)", { timeout: 20000 }, (
     }));
     const anchor = encodeDef(stepRefParam({ kind: "p", key: "/web/login" }));
     await mountAt(`/product-analytics/paths?app=web&period=7d&anchor=${anchor}`, true);
-    expect(body()).toContain("This page is hidden by the app filters");
+    await until(() => expect(body()).toContain("This page is hidden by the app filters"));
     buttonIn(document.body, "Edit app filters")!.click();
     await until(() => expect(drawer()).toBeDefined());
   });
