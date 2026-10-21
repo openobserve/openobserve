@@ -1658,7 +1658,10 @@ mod tests {
         assert_eq!(op["x-o2-ratelimit"]["operation"], "update");
         #[cfg(feature = "enterprise")]
         for status in ["202", "404", "409", "410", "503"] {
-            assert!(op["responses"].get(status).is_some(), "post {resume} {status}");
+            assert!(
+                op["responses"].get(status).is_some(),
+                "post {resume} {status}"
+            );
         }
         assert!(paths[resume].get("get").is_none());
     }
