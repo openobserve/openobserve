@@ -267,6 +267,14 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
     "focus-visible:ring-3 focus-visible:ring-button-ghost-focus-ring",
     "disabled:opacity-50",
   ].join(" "),
+  // cell: table-cell content that is itself the action; overrides the size box so the lines stack.
+  cell: [
+    "bg-transparent border-0 text-inherit text-left font-normal rounded-default",
+    "h-auto! w-full p-0! flex-col! items-stretch! justify-center! gap-1! whitespace-normal!",
+    "enabled:hover:opacity-80",
+    "focus-visible:ring-3 focus-visible:ring-button-ghost-focus-ring",
+    "disabled:opacity-60",
+  ].join(" "),
   // pricing-chip: Pill-shaped toggle chip for model pricing quick-setup template selection
   "pricing-chip": [
     "bg-transparent text-inherit border border-border-default",
@@ -310,6 +318,7 @@ const disabledVariantClasses: Record<NonNullable<ButtonProps["variant"]>, string
   "outline-primary": "opacity-50",
   dashed: "opacity-50",
   "pricing-chip": "opacity-60",
+  cell: "opacity-60",
 };
 
 const unavailableClasses = computed(() => {

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 // Tests for useAiDateRange — the shared date-range singleton used by LLM
-// Insights, LLM Sessions, and Quality. Covers:
+// Insights and LLM Sessions. Covers:
 //   • initial load from localStorage (defaults, malformed JSON, garbled
 //     field types, valid persisted state)
 //   • writes mirror back to localStorage (incl. quota / private-mode
