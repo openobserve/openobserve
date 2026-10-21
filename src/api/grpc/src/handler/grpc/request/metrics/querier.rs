@@ -114,7 +114,9 @@ impl Metrics for MetricsQuerier {
         let cap = std::cmp::max(2, config::get_config().limit.cpu_num);
         let (tx, rx) = mpsc::channel::<Result<MetricsQueryResponse, Status>>(cap);
         tokio::task::spawn(async move {
-            if let Err(e) = promql_service::search::grpc::data(&req, &query_guard, tx).await {
+            let result = promql_service::search::grpc::data(&req, &query_guard, tx).await;
+            drop(query_guard);
+            if let Err(e) = result {
                 log::error!("[gRPC:metrics:data] get data error: req:{req:?}, error:{e:?}")
             }
         });
