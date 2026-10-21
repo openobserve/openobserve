@@ -895,9 +895,13 @@ pub async fn process_domain_org_mapping(
         }
 
         for org in orgs_to_remove {
-            if let Err(e) =
-                users::remove_user_from_org(&org, &user_email, &get_config().auth.root_user_email)
-                    .await
+            if let Err(e) = users::remove_user_from_org(
+                &org,
+                &user_email,
+                &get_config().auth.root_user_email,
+                users::RemovalTarget::User,
+            )
+            .await
             {
                 log::error!(
                     "error user {user_email} was blocked from org {org_id}, but failed to remove from org {org} : {e}"
@@ -1045,9 +1049,13 @@ pub async fn process_domain_org_mapping(
 
         removed = orgs_to_remove.len();
         for org in orgs_to_remove {
-            if let Err(e) =
-                users::remove_user_from_org(&org, &user_email, &get_config().auth.root_user_email)
-                    .await
+            if let Err(e) = users::remove_user_from_org(
+                &org,
+                &user_email,
+                &get_config().auth.root_user_email,
+                users::RemovalTarget::User,
+            )
+            .await
             {
                 log::error!(
                     "error user {user_email} was domain mapped from org {org_id}, but failed to remove from extra org {org} : {e}"

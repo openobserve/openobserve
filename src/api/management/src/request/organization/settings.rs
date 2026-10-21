@@ -28,7 +28,6 @@ use {
 };
 #[cfg(feature = "cloud")]
 use {
-    config::META_ORG_ID,
     o2_enterprise::enterprise::cloud::{
         billing_group::list_billing_group_members_of, billings::MeteringProvider, customer_billings,
     },
@@ -263,24 +262,24 @@ async fn check_domain_org_mappings(
     org_id: &str,
     mut settings: OrganizationSettingPayload,
 ) -> Result<OrganizationSettingPayload, String> {
+    use hashbrown::HashSet;
     let Some(mut mappings) = settings.domain_org_mappings.take() else {
         return Ok(settings);
     };
-    use hashbrown::HashSet;
     let child_orgs =
         o2_enterprise::enterprise::cloud::billing_group::list_billing_group_members_of(&org_id)
             .await
             .unwrap_or_default();
 
     let mut allowed_orgs: HashSet<_> = child_orgs.into_iter().map(|v| v.member_org_id).collect();
-    allowed_orgs.insert(org_id.clone());
+    allowed_orgs.insert(org_id.to_string());
     for mapping in &mut mappings {
         use openobserve_core::org_domain_ownership;
 
         let domain = mapping.domain.trim().to_lowercase();
 
         if !allowed_orgs.contains(&mapping.org_id) {
-            return MetaHttpResponse::bad_request(format!(
+            return Err(format!(
                 "Not allowed to setup a mapping for org {}",
                 mapping.org_id
             ));
@@ -290,14 +289,11 @@ async fn check_domain_org_mappings(
             .await
             .is_none()
         {
-            return MetaHttpResponse::bad_request(format!(
-                "No org with org id {} found",
-                mapping.org_id
-            ));
+            return Err(format!("No org with org id {} found", mapping.org_id));
         }
 
         if mapping.domain.is_empty() || mapping.domain.contains(' ') {
-            return MetaHttpResponse::bad_request(format!(
+            return Err(format!(
                 "domain cannot have space or be empty, bad domain '{}'",
                 mapping.domain
             ));
@@ -307,32 +303,30 @@ async fn check_domain_org_mappings(
             mapping.base_role.as_str(),
             "admin" | "editor" | "viewer" | "allowed_user"
         ) {
-            return MetaHttpResponse::bad_request(format!(
+            return Err(format!(
                 "base role {} for org {} is not a valid base role - only admin, editor, viewer, allowed_user are supported",
                 mapping.base_role, mapping.org_id
             ));
         }
         if let Some(claim) = mapping.role_claim_name.as_mut() {
             if claim.trim().is_empty() {
-                return MetaHttpResponse::bad_request("role claim name must not be empty");
+                return Err("role claim name must not be empty".to_string());
             }
             *claim = claim.trim().to_string();
         }
 
         match org_domain_ownership::get_domain_org_record(&org_id, &domain).await {
             Ok(None) => {
-                return MetaHttpResponse::bad_request("This domain is not linked yet");
+                return Err("This domain is not linked yet".to_string());
             }
             Err(e) => {
-                return MetaHttpResponse::internal_error(format!(
-                    "error getting domain mappings : {e}"
-                ));
+                return Err(format!("error getting domain mappings : {e}"));
             }
             Ok(Some(v)) => {
                 use infra::table::org_domain_ownership::OwnershipState;
 
                 if v.verification_state != OwnershipState::Verified as i32 {
-                    return MetaHttpResponse::bad_request("This domain is not verified yet");
+                    return Err("This domain is not verified yet".to_string());
                 }
             }
         }

@@ -27,8 +27,6 @@ use config::get_config;
 use openobserve_api_common::X_O2_ASSISTANT_SESSION_ID;
 use openobserve_api_ingest::request::{clusters, logs, metrics, profiles, rum};
 #[cfg(feature = "cloud")]
-use openobserve_api_management::request::cloud;
-#[cfg(feature = "cloud")]
 use openobserve_api_management::request::org_domains;
 #[cfg(feature = "profiling")]
 use openobserve_api_management::request::profiling;
