@@ -1227,6 +1227,18 @@ export function formatInZone(
   }
 }
 
+/** Weekday, date and 24-hour time in the schedule's timezone: the drawer's one stamp for an instant. [pure] */
+export function formatStamp(micros: number, timezone: string): string {
+  return formatInZone(micros, timezone, {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  });
+}
+
 /** Minutes in a day — the exclusive upper bound `end_minute` allows. */
 export const MINUTES_PER_DAY = 1440;
 

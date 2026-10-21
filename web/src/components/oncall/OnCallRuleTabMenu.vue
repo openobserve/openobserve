@@ -73,7 +73,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @keydown.enter="renameOpen = false"
         />
         <div class="flex justify-end">
-          <OButton variant="primary" size="sm-action" @click="renameOpen = false">
+          <OButton
+            variant="primary"
+            size="sm-action"
+            :data-test="`oncall-schedule-rule-rename-done-${ruleIndex}`"
+            @click="renameOpen = false"
+          >
             {{ t("oncall.peopleDone") }}
           </OButton>
         </div>
@@ -194,7 +199,7 @@ import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import type { ShiftRule } from "@/ts/interfaces/oncall";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
-import { formatInZone, fromZonedInputValue } from "@/utils/oncall";
+import { formatStamp, fromZonedInputValue } from "@/utils/oncall";
 
 const props = defineProps<{
   rule: ShiftRule;
@@ -280,15 +285,7 @@ const stopAt = computed<number | null>(() => {
   return props.choices[index]?.at ?? null;
 });
 
-const stamp = (micros: number) =>
-  formatInZone(micros, props.timezone, {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-  });
+const stamp = (micros: number) => formatStamp(micros, props.timezone);
 
 function confirmStop() {
   if (stopAt.value === null) return;

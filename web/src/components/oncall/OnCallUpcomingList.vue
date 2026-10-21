@@ -66,7 +66,7 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import type { ResolvedSegment } from "@/ts/interfaces/oncall";
-import { formatInZone } from "@/utils/oncall";
+import { formatStamp } from "@/utils/oncall";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
 
@@ -96,16 +96,8 @@ function isCurrent(segment: ResolvedSegment): boolean {
 
 // The window's edges are where the fetch stopped, not handovers, so a segment touching one is open there.
 function segmentRange(segment: ResolvedSegment): I18nText {
-  const opts: Intl.DateTimeFormatOptions = {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-  };
-  const start = raw(formatInZone(segment.from, props.timezone, opts));
-  const end = raw(formatInZone(segment.to, props.timezone, opts));
+  const start = raw(formatStamp(segment.from, props.timezone));
+  const end = raw(formatStamp(segment.to, props.timezone));
   const openStart = segment.from <= props.windowFrom;
   const openEnd = segment.to >= props.windowTo;
   if (openStart && openEnd) return t("oncall.upcomingNoChange");

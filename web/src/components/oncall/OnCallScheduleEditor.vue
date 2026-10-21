@@ -386,8 +386,8 @@ import {
   coverageHoursSummary,
   effectiveRivals,
   effectiveWeekCoverage,
-  formatInZone,
   formatMinuteOfDay,
+  formatStamp,
   overlappingRules,
   overlapStanding,
   prioritiesFor,
@@ -547,15 +547,7 @@ function awayClashesFor(rule: ShiftRule): Unavailability[] {
   return editorAbsences.value.filter((a) => chosen.has(a.user_email.toLowerCase()));
 }
 
-const stamp = (micros: number) =>
-  formatInZone(micros, props.timezone, {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-  });
+const stamp = (micros: number) => formatStamp(micros, props.timezone);
 
 function shortDate(micros: number): string {
   return new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short" }).format(

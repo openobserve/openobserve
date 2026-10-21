@@ -850,12 +850,12 @@ export interface ResolvedSegment {
    * by layer. Not the rotation: that is `rotation_id`, and every segment in one
    * response shares it.
    *
-   * Null on a gap, where no rule won and therefore none named anybody.
+   * Null on a gap no rule covers; a gap left by an away rostered member keeps its rule.
    */
   rotation?: string | null;
   /** Present when a cover took this span from the rotation. */
   override_id?: string | null;
-  /** Whom the roster puts on here before absences and covers; present only when someone else holds it. */
+  /** Whom the roster puts on here before absences and covers; present only when it differs from `user_email`. */
   scheduled_email?: string | null;
 }
 
