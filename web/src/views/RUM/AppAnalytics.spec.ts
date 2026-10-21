@@ -1069,6 +1069,12 @@ describe("pa gap fixes (scope bar and Exclusions drawer)", { timeout: 20000 }, (
     await chip()!.trigger("click");
     await until(() => expect(drawer()).toBeDefined());
   };
+  // With no bot found nothing changes on the page, so the drawer's empty note is the proof the result arrived.
+  const suggestionsShown = async (bot: boolean) => {
+    if (bot) return until(() => expect(chip()?.text()).toContain("likely bot found"));
+    await openDrawer();
+    await until(() => expect(drawer()!.textContent).toContain("Nothing stands out in this range"));
+  };
   const botSwitch = (d: HTMLElement) =>
     d.querySelector<HTMLElement>('[data-test="rum-analytics-exclusions-builtin-switch-btn"]')!;
   const isDisabled = (el: Element | undefined) =>
@@ -1097,6 +1103,20 @@ describe("pa gap fixes (scope bar and Exclusions drawer)", { timeout: 20000 }, (
   const uaSearches = () =>
     vi.mocked(searchService.search).mock.calls.filter((c) => UA_RE.test(c[0].query.query.sql))
       .length;
+  const persistPuts = () => {
+    let stored = appSettings();
+    settingsApi.getAppSettings.mockImplementation(async () => ({ data: stored }));
+    settingsApi.putAppSettings.mockImplementation(
+      async (_o: string, _a: string, body: Record<string, unknown>) => {
+        stored = appSettings({
+          ...body,
+          version: Number(body.version) + 1,
+          rulesHash: "fedcba9876543210",
+        });
+        return { data: stored };
+      },
+    );
+  };
 
   beforeEach(() => {
     api.reset();
@@ -1163,10 +1183,11 @@ describe("pa gap fixes (scope bar and Exclusions drawer)", { timeout: 20000 }, (
   });
 
   it("P7-R2: the App filters button shows a warning icon when it says likely bot found", async () => {
-    const chipTone = async (rows: Record<string, unknown>[]) => {
+    const chipTone = async (rows: Record<string, unknown>[], bot: boolean) => {
       resetProductAnalytics();
       withHits([[UA_RE, rows]]);
       await mountAt("/product-analytics/overview?app=web&period=7d", true);
+      await suggestionsShown(bot);
       const btn = wrapper!.find('[data-test="rum-analytics-exclusions-chip"]');
       const out = {
         text: btn.text(),
@@ -1177,8 +1198,8 @@ describe("pa gap fixes (scope bar and Exclusions drawer)", { timeout: 20000 }, (
       document.body.innerHTML = "";
       return out;
     };
-    const normal = await chipTone([{ ua: "Chrome", dev: "Other", sessions: 1500 }]);
-    const warned = await chipTone(BOT_UA);
+    const normal = await chipTone([{ ua: "Chrome", dev: "Other", sessions: 1500 }], false);
+    const warned = await chipTone(BOT_UA, true);
     expect(normal.text).toMatch(/^\s*App filters/);
     expect(warned.text).toContain("likely bot found");
     expect(normal.icons).toContain("filter-alt");
@@ -1188,8 +1209,7 @@ describe("pa gap fixes (scope bar and Exclusions drawer)", { timeout: 20000 }, (
   it("P7-R2: no likely bot found without a banner", async () => {
     withHits([[UA_RE, [{ ua: "Chrome", dev: "Other", sessions: 1500 }]]]);
     await mountAt("/product-analytics/overview?app=web&period=7d", true);
-    await until(() => expect(uaSearches()).toBe(1));
-    await settle();
+    await suggestionsShown(false);
     expect(chip()?.text()).not.toContain("likely bot found");
   });
 
@@ -1206,9 +1226,8 @@ describe("pa gap fixes (scope bar and Exclusions drawer)", { timeout: 20000 }, (
     document
       .querySelector<HTMLElement>('[data-test="rum-analytics-app-filters-include-switch-btn"]')!
       .click();
-    await settle();
+    await until(() => expect(router.currentRoute.value.query.xall).toBe("1"));
     expect(useProductAnalytics().state.includeExcluded).toBe(true);
-    expect(router.currentRoute.value.query.xall).toBe("1");
   });
 
   it("while hidden sessions are included every tab shows the banner, and Hide hidden sessions drops xall", async () => {
@@ -1217,9 +1236,8 @@ describe("pa gap fixes (scope bar and Exclusions drawer)", { timeout: 20000 }, (
       document.querySelector<HTMLElement>('[data-test="rum-analytics-included-banner"]');
     expect(banner()?.textContent).toContain("hidden by app filters in this view only");
     buttonIn(document.body, "Hide hidden sessions")!.click();
-    await settle();
+    await until(() => expect(router.currentRoute.value.query.xall).toBeUndefined());
     expect(useProductAnalytics().state.includeExcluded).toBe(false);
-    expect(router.currentRoute.value.query.xall).toBeUndefined();
     expect(banner()).toBeNull();
   });
 
@@ -1354,18 +1372,7 @@ describe("pa gap fixes (scope bar and Exclusions drawer)", { timeout: 20000 }, (
   });
 
   it("P6-R6: a drawer Save reloads the settings into scope.exclusions and re-runs the summary without re-probing apps", async () => {
-    let stored = appSettings();
-    settingsApi.getAppSettings.mockImplementation(async () => ({ data: stored }));
-    settingsApi.putAppSettings.mockImplementation(
-      async (_o: string, _a: string, body: Record<string, unknown>) => {
-        stored = appSettings({
-          ...body,
-          version: Number(body.version) + 1,
-          rulesHash: "fedcba9876543210",
-        });
-        return { data: stored };
-      },
-    );
+    persistPuts();
     await mountAt("/product-analytics/overview?app=web&period=7d");
     await until(() => expect(searchCount(/va_rows/)).toBeGreaterThan(0));
     await openDrawer();
@@ -1490,16 +1497,19 @@ describe("pa gap fixes (scope bar and Exclusions drawer)", { timeout: 20000 }, (
   });
 
   it("P6-R8: the user-agent query runs once for Overview and the drawer, survives a Save, and reruns after refresh", async () => {
+    persistPuts();
     withHits([[UA_RE, [{ ua: "Chrome", dev: "Other", sessions: 1500 }]]]);
     await mountAt("/product-analytics/overview?app=web&period=7d", true);
     await until(() => expect(uaSearches()).toBe(1));
     await openDrawer();
     expect(uaSearches()).toBe(1);
+    const before = searchCount(/va_rows/);
     const d = drawer()!;
     botSwitch(d).click();
-    await settle();
+    await until(() => expect(searchCount(/va_rows/)).toBe(before + 1));
+    const summaries = searchCount(/va_rows/);
     buttonIn(d, "Save")!.click();
-    await until(() => expect(drawer()).toBeUndefined());
+    await until(() => expect(searchCount(/va_rows/)).toBeGreaterThan(summaries));
     expect(settingsApi.putAppSettings).toHaveBeenCalledTimes(1);
     expect(uaSearches()).toBe(1);
     await useProductAnalytics().refresh();
