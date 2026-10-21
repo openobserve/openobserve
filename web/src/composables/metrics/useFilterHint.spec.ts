@@ -13,8 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { mount } from "@vue/test-utils";
 import { describe, it, expect, vi } from "vitest";
-import { ref } from "vue";
+import { defineComponent, ref } from "vue";
+
+import i18n from "@/locales";
 
 /**
  * Only the PROMPT SELECTION is this file's logic; the typing loop is the shared
@@ -29,6 +32,9 @@ vi.mock("@/components/ai-assistant/welcome/useTypewriterPlaceholder", () => ({
     return { placeholder: ref("") };
   },
 }));
+
+const flag = vi.hoisted(() => ({ v2: false }));
+vi.mock("@/composables/assistant/flags", () => ({ isAssistantV2: () => flag.v2 }));
 
 import { useFilterHint } from "./useFilterHint";
 
@@ -90,5 +96,27 @@ describe("useFilterHint", () => {
     const enabled = ref(false);
     useFilterHint(ref([]), enabled);
     expect(captured.options.enabled).toBe(enabled);
+  });
+
+  describe("on the v2 path", () => {
+    it("is a static placeholder with the org's first real label, or the empty-org line", () => {
+      flag.v2 = true;
+      const names = ref<string[]>([]);
+      const hint: { placeholder?: { value: string } } = {};
+      mount(
+        defineComponent({
+          setup() {
+            hint.placeholder = useFilterHint(names, ref(true)).placeholder;
+            return () => null;
+          },
+        }),
+        { global: { plugins: [i18n] } },
+      );
+      const placeholder = hint.placeholder!;
+      expect(placeholder.value).toBe("Filter metrics by label");
+      names.value = ["__name__", "job"];
+      expect(placeholder.value).toContain("job =~");
+      flag.v2 = false;
+    });
   });
 });

@@ -340,7 +340,11 @@
             <!-- Renders nothing until a verdict event exists (§G.7) — the
                  default deployment has no agent and must not show an
                  analysis panel that sits empty forever. -->
-            <OnCallVerdictCard :events="events" />
+            <OnCallVerdictCard
+              :events="events"
+              :subject-id="responseId"
+              :subject-name="response?.title ?? ''"
+            />
 
             <!-- Activity, deliveries and prior causes used to be a card and two
                  collapsibles stacked on top of each other — only the first was
@@ -369,7 +373,7 @@
                   <!-- Absent on a deployment with no agent, rather than a tab
                        that opens on nothing. -->
                   <OTab
-                    v-if="report"
+                    v-if="report || reportTabKept"
                     name="report"
                     :label="t('oncall.tabReport')"
                     data-test="oncall-response-tab-report"
@@ -429,7 +433,12 @@
 
                   <!-- The working behind the verdict card's one sentence. -->
                   <OTabPanel name="report" data-test="oncall-response-report">
-                    <OnCallReportCard :report="report" :loading="reportLoading" />
+                    <OnCallReportCard
+                      :report="report"
+                      :loading="reportLoading"
+                      :error="reportError"
+                      @retry="fetchReport"
+                    />
                   </OTabPanel>
                 </OTabPanels>
               </OCardSection>
@@ -697,6 +706,7 @@ import OnCallReportCard from "@/components/oncall/OnCallReportCard.vue";
 import OnCallActivityTimeline from "@/components/oncall/OnCallActivityTimeline.vue";
 import OnCallResolveCauseForm from "@/components/oncall/OnCallResolveCauseForm.vue";
 import OnCallVerdictCard from "@/components/oncall/OnCallVerdictCard.vue";
+import { isAssistantV2 } from "@/composables/assistant/flags";
 import OnCallResponseDetailSkeleton from "./OnCallResponseDetailSkeleton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -901,6 +911,17 @@ const firingHistory = ref<OnCallResponse[]>([]);
 const priorCausesLoading = ref(false);
 const report = ref<OnCallResponseReport | null>(null);
 const reportLoading = ref(false);
+const reportError = ref<"missing" | "failed" | null>(null);
+const assistantV2 = isAssistantV2();
+// The v2 tab stays while it loads, fails, is open, or a verdict points at a report.
+const reportTabKept = computed(
+  () =>
+    assistantV2 &&
+    (reportLoading.value ||
+      reportError.value === "failed" ||
+      activeDetailTab.value === "report" ||
+      events.value.some((event) => event.kind === "ai_verdict")),
+);
 /// Only the fields the page shows — the stream, and the condition that
 /// tripped it; the rest of the payload belongs on the alert's own screen,
 /// which the subject row links to. `query_condition`/`condition` is `any`
@@ -1391,8 +1412,13 @@ async function fetchReport() {
       responseReportQuery(orgId.value, responseId.value),
       false,
     );
-  } catch {
+    reportError.value = report.value ? null : "missing";
+  } catch (error) {
     report.value = null;
+    reportError.value =
+      (error as { response?: { status?: number } })?.response?.status === 404
+        ? "missing"
+        : "failed";
   } finally {
     reportLoading.value = false;
   }

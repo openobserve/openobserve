@@ -351,6 +351,7 @@ import { purgeOrgQueries, queryClient } from "@/composables/query/queryClient";
 import { useShortcuts, ShortcutCheatsheet } from "@/lib/vue-shortcut-manager";
 import { useHomeDashboard } from "@/composables/useHomeDashboard";
 import { isAssistantV2 } from "@/composables/assistant/flags";
+import { isAutoObserveEnabled } from "@/components/autoobserve/autoObserveGate";
 
 // Product Analytics hands off to RUM's Session Viewer, and Back must land on the same panels without rerunning them.
 const KEPT_ALIVE_VIEWS = ["AppAnalytics"];
@@ -930,7 +931,10 @@ export default defineComponent({
 
     const updateAutoObserveMenu = () => {
       const existingIndex = linksList.value.findIndex((link) => link.name === "autoobserve");
-      if (config.isEnterprise != "true" || !isExperimentalEnabled.value) {
+      const enabled = assistantV2
+        ? isAutoObserveEnabled(config.isEnterprise, store.state.zoConfig)
+        : config.isEnterprise == "true" && isExperimentalEnabled.value;
+      if (!enabled) {
         if (existingIndex !== -1) linksList.value.splice(existingIndex, 1);
         return;
       }

@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </span>
     </div>
     <OButton
-      v-if="variant !== 'block'"
+      v-if="variant !== 'block' && stoppable"
       :variant="status.tone === 'warning' ? 'secondary' : 'outline'"
       size="sm"
       :disabled="turn.state === 'stopping'"
@@ -59,6 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import type { TurnMeta, TurnState } from "@/composables/assistant/pure";
+import type { I18nText } from "@/types/i18n";
 
 export interface AssistantTurnStatusProps {
   turn: TurnState;
@@ -70,6 +71,12 @@ export interface AssistantTurnStatusProps {
   trailShown?: boolean;
   /** Injected by specs; elapsed is computed from it, never from a counter. */
   now?: () => number;
+  /** False where the host owns Stop in its own slot (the helper's Send ↔ Stop). */
+  stoppable?: boolean;
+  /** The words a running turn reads in where no step names it: the chat's, the helper's or the analysis's. */
+  copy?: "chat" | "helper" | "rca";
+  /** The host's own reading of a state the turn cannot see, such as reconnecting to a run through its event log. */
+  line?: I18nText | null;
 }
 
 export interface AssistantTurnStatusEmits {
@@ -78,23 +85,36 @@ export interface AssistantTurnStatusEmits {
 
 /** Elapsed redraws this often while a turn runs; the text changes, nothing moves (HT-01 AC 11). */
 export const STATUS_TICK_MS = 1_000;
+
+// States whose own words stay in every copy set: a step, a wait on the user, a reconnect, a stop.
+const OWN_WORDS: ReadonlySet<string> = new Set([
+  "running_tool",
+  "awaiting_approval",
+  "awaiting_consent",
+  "reconnecting",
+  "stopping",
+]);
 </script>
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 
 import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
-import { isTerminal, stepLabel, turnStatusText } from "@/composables/assistant/pure";
+import { elapsedMs, isTerminal, stepLabel, turnStatusText } from "@/composables/assistant/pure";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
+import { formatElapsed } from "@/utils/formatters";
 
 const props = withDefaults(defineProps<AssistantTurnStatusProps>(), {
   trailShown: false,
   now: undefined,
+  stoppable: true,
+  copy: "chat",
+  line: null,
 });
 
 const emit = defineEmits<AssistantTurnStatusEmits>();
@@ -115,7 +135,10 @@ const status = computed(() => {
   if (!live.value) return null;
   if (!props.ownedByThisTab)
     return { line: t("assistant.turn.elsewhere"), tone: "neutral" as const };
-  const text = turnStatusText(props.turn, props.meta, t, clock());
+  const now = clock();
+  const shared = turnStatusText(props.turn, props.meta, t, now);
+  const own = shared ? (props.line ?? hostLine(now, shared.line)) : null;
+  const text = shared && own ? { ...shared, line: own } : shared;
   // A tool with no label of its own would only read "Running {tool}" beside the trail's real row.
   const repeatsTrail =
     props.variant === "block" &&
@@ -124,6 +147,21 @@ const status = computed(() => {
     stepLabel(props.turn.tool, props.turn.target).key === "assistant.step.fallback";
   return repeatsTrail && !text?.second ? null : text;
 });
+
+function hostLine(now: number, shared: I18nText): I18nText | null {
+  if (props.copy === "chat" || OWN_WORDS.has(props.turn.state)) return null;
+  if (shared === t("assistant.turn.caughtUp")) return null;
+  const ms = elapsedMs(props.meta, now);
+  const starting = props.turn.state === "queued" || props.turn.state === "connecting";
+  if (props.copy === "helper")
+    return starting
+      ? t("assistant.turn.sending")
+      : t("assistant.helper.generating", { seconds: Math.floor(ms / 1000) });
+  const elapsed = raw(ms < 1_000 ? "0 s" : formatElapsed(ms));
+  return starting
+    ? t("assistant.rca.status.starting", { elapsed })
+    : t("assistant.rca.status.analysing", { elapsed });
+}
 
 // No motion while the turn waits on the user, and a static glyph under reduced motion (HT-01 AC 4, AC 11).
 const glyph = computed(() => {

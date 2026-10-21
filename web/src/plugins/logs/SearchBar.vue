@@ -1302,7 +1302,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :debounce-time="100"
                 :nlp-mode="searchObj.meta.nlpMode"
                 :has-expand-button="!showFunctionEditor"
-                :show-ai-icon="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
+                :assistant="logsAssistant"
+                helper-layout="inline"
+                :placeholder="assistantV2 ? editorPlaceholder : undefined"
                 :disable-ai="!searchObj.data.stream.selectedStream.length || isSqlModeDisabled"
                 :disable-ai-reason="
                   !searchObj.data.stream.selectedStream.length
@@ -1327,6 +1329,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @user-edit="onEditorUserEdit"
                 @update:nlp-mode="(val) => (searchObj.meta.nlpMode = val)"
                 @run-query="handleRunQueryFn"
+                @helper-space="(px: number) => $emit('helper-space', px)"
                 @keydown="handleKeyDown"
                 @focus="onQueryEditorFocus"
                 @blur="handleQueryEditorBlur"
@@ -1334,6 +1337,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Query editor placeholder overlay — shown when editor is empty and unfocused -->
               <div
                 v-if="
+                  !assistantV2 &&
                   searchObj.data.editorValue == '' &&
                   searchObj.meta.queryEditorPlaceholderFlag &&
                   !searchObj.meta.nlpMode
@@ -1830,6 +1834,8 @@ import OTree from "@/lib/data/Tree/OTree.vue";
 import { makeSavedViewSchema, type SavedViewForm } from "./SearchBar.SavedView.schema";
 import { sortSavedViews } from "@/components/savedViews/savedViewsSort";
 import SavedViewsListDialog from "@/components/savedViews/SavedViewsListDialog.vue";
+import type { QueryEditorAssistant } from "@/composables/assistant/pure";
+import { isAssistantV2 } from "@/composables/assistant/flags";
 import { useFavoriteSavedViews } from "@/composables/useFavoriteSavedViews";
 import { makeSavedFunctionSchema, type SavedFunctionForm } from "./SearchBar.SavedFunction.schema";
 
@@ -1934,6 +1940,7 @@ export default defineComponent({
     "showSearchHistory",
     "extractPatterns",
     "buildModeToggle",
+    "helper-space",
   ],
   methods: {
     searchData() {
@@ -2192,6 +2199,50 @@ export default defineComponent({
 
     const { isStreamExists, isStreamFetched, getStreams, getStream } = useStreams(t);
     const queryEditorRef = ref(null);
+
+    // Logs keeps datetime in microseconds; the helper's chips and provenance read milliseconds.
+    const logsAssistant: QueryEditorAssistant = {
+      id: "logs",
+      get stream() {
+        return (searchObj.data.stream.selectedStream ?? []).join(", ");
+      },
+      get streams() {
+        return [...(searchObj.data.stream.selectedStream ?? [])];
+      },
+      get streamType() {
+        return searchObj.data.stream.streamType;
+      },
+      get timeRange() {
+        const { startTime, endTime, type, relativeTimePeriod } = searchObj.data.datetime;
+        const from = Number(startTime) / 1000;
+        const to = Number(endTime) / 1000;
+        if (!Number.isFinite(from) || !Number.isFinite(to) || !from || !to) return undefined;
+        return {
+          from,
+          to,
+          ...(type === "relative" && relativeTimePeriod && { period: relativeTimePeriod }),
+        };
+      },
+      schemaFields: () =>
+        (searchObj.data.stream.selectedStreamFields ?? [])
+          .map((field: { name?: unknown }) => String(field?.name ?? ""))
+          .filter(Boolean),
+      run: () => handleRunQueryFn(),
+      alsoSends: () => (searchObj.meta.sqlMode ? [t("assistant.helper.sqlMode")] : []),
+      focusPicker: (kind) => {
+        const target =
+          kind === "time"
+            ? (dateTimeRef.value as { $el?: HTMLElement } | null)?.$el
+            : document.querySelector<HTMLElement>(
+                '[data-test="log-search-index-list-select-stream"]',
+              );
+        target?.querySelector<HTMLElement>("button, input")?.focus();
+      },
+      setTimeRange: ({ from, to }) =>
+        (
+          dateTimeRef.value as { setAbsoluteTime?(from: number, to: number): void } | null
+        )?.setAbsoluteTime?.(from * 1000, to * 1000),
+    };
     const syntaxGuideRef = ref(null);
 
     const {
@@ -4926,7 +4977,11 @@ export default defineComponent({
       t("search.askAIPlaceholderRotation.three"),
       t("search.askAIPlaceholderRotation.four"),
     ]);
-    const { placeholder: aiQueryPlaceholder } = useTypewriterPlaceholder(aiQueryPlaceholderPrompts);
+    const assistantV2 = isAssistantV2();
+    // The rotating prompts belong to the legacy bar only; the v2 path has none to animate.
+    const { placeholder: aiQueryPlaceholder } = assistantV2
+      ? { placeholder: ref("") }
+      : useTypewriterPlaceholder(aiQueryPlaceholderPrompts);
     // [END] typewriter placeholder for AI query input
 
     return {
@@ -5145,6 +5200,8 @@ export default defineComponent({
       currentToggleOption,
       toggleLiveMode,
       aiQueryPlaceholder,
+      logsAssistant,
+      assistantV2,
       editorPlaceholder,
       vrlPlaceholder,
       patternsState,

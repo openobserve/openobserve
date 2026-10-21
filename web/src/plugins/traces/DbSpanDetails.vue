@@ -168,7 +168,6 @@ const metadataRows = computed(() =>
           :language="editorLanguage"
           :readOnly="true"
           :showAutoComplete="false"
-          :showAiIcon="false"
           editorId="db-span-query-editor"
           class="flex-1"
         />

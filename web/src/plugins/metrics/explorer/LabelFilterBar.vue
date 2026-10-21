@@ -280,7 +280,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            BOUNDS the width. As a bare inline flex item it took its full intrinsic
            width instead and pushed `+ Filter` along the row — the hint is the one
            thing here that must yield, never the control. -->
-        <span class="query-editor-placeholder-typewriter block">{{ filterHint }}</span>
+        <span v-if="assistantV2" class="text-text-placeholder block truncate text-sm">{{
+          filterHint
+        }}</span>
+        <span v-else class="query-editor-placeholder-typewriter block">{{ filterHint }}</span>
       </span>
 
       <OButton
@@ -308,6 +311,7 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { useFilterHint } from "@/composables/metrics/useFilterHint";
+import { isAssistantV2 } from "@/composables/assistant/flags";
 import { labelFilterKey, type LabelFilter } from "@/composables/metrics/useMetricsExplorerGrid";
 
 /** The PromQL selector builder throws on anything else, so an invalid name is
@@ -455,6 +459,7 @@ const labelError = ref("");
  * screen. The loop is a chain of timers, so leaving it armed behind a committed
  * chip or an open picker would burn them for something nobody can see.
  */
+const assistantV2 = isAssistantV2();
 const hintEnabled = computed(() => step.value === "idle" && !props.filters.length);
 const { placeholder: filterHint } = useFilterHint(
   computed(() => props.labelNames ?? []),

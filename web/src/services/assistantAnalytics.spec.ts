@@ -34,6 +34,8 @@ import {
   type AiErrorCode,
   type AiEventName,
   type AiEventProps,
+  type HelperHost,
+  type QueryLanguage,
 } from "./assistantAnalytics";
 
 const TURN = { sid: "0199e7b2-6f0c-7a3e-a1b2-c3d4e5f60718", turnId: "t-1", traceId: "trace-1" };
@@ -312,6 +314,19 @@ describe("event catalogue", () => {
     expect(
       assistantEventProblems(name, SAMPLES[name] as Record<string, unknown>, scopeFor(name)),
     ).toEqual([]);
+  });
+
+  it("takes the alert inline editor as a helper host and JavaScript as a query language", () => {
+    const proposal: AiEventProps["ai_nl_proposal"] = {
+      ...SAMPLES.ai_nl_proposal,
+      host: "alert",
+      language: "js",
+    };
+    expect(assistantEventProblems("ai_nl_proposal", proposal, scopeFor("ai_nl_proposal"))).toEqual(
+      [],
+    );
+    expectTypeOf<"alert">().toMatchTypeOf<HelperHost>();
+    expectTypeOf<"js">().toMatchTypeOf<QueryLanguage>();
   });
 
   it("rejects an unknown property at compile time", () => {

@@ -19,10 +19,12 @@ import assistantService, {
   type FeedbackBody,
 } from "@/services/assistant";
 import { refreshSession as httpRefreshSession } from "@/services/http";
+import incidentsService from "@/services/incidents";
 import store from "@/stores";
 import type { ImageAttachment } from "@/ts/interfaces/chat";
 import { getUUID, getUUIDv7 } from "@/utils/uuid";
 
+import { followAnalysis, type AnalysisEvent, type FollowDeps } from "./analysisFollow";
 import { ERROR_LEDGER, toAssistantError } from "./assistantErrors";
 import type { AssistantError, AssistantSession, SendRequest, Sid } from "./assistantStore.types";
 import type { AssistantFrame } from "./frames";
@@ -83,6 +85,21 @@ export interface AssistantClient {
   feedback(org: string, sid: Sid, body: FeedbackBody): Promise<void>;
 }
 
+/** Opens one incident analysis run; the v2 RCA panel's seam until it reads `rca/runs`. */
+export interface IncidentAnalysisTransport {
+  streamRca(
+    org: string,
+    incidentId: string,
+    signal: AbortSignal,
+    opts: {
+      params?: { reanalysis?: boolean; build_on_previous?: boolean };
+      headers?: Record<string, string>;
+      baseUrl?: string;
+      fetchImpl?: typeof fetch;
+    },
+  ): Promise<Response>;
+}
+
 export interface AssistantClientOptions {
   fetchImpl?: typeof fetch;
   /** The non-destructive refresh of `services/http.ts`; injected by specs. */
@@ -91,6 +108,10 @@ export interface AssistantClientOptions {
     typeof assistantService,
     "cancelTurn" | "cancelIncidentAnalysis" | "confirm" | "feedback"
   >;
+  /** The incident analysis transport; without one an RCA-mode send is refused as unavailable. */
+  incidents?: IncidentAnalysisTransport;
+  /** How a run the server does not stream is followed; the incident event log by default. */
+  follow?: FollowDeps;
   /** API origin; the store's `API_ENDPOINT` by default. */
   baseUrl?: () => string;
 }
@@ -100,7 +121,9 @@ export function useAssistantClient(opts: AssistantClientOptions = {}): Assistant
   const fetchImpl = opts.fetchImpl ?? ((input, init) => fetch(input, init));
   const refresh = opts.refreshSession ?? (() => httpRefreshSession());
   const services = opts.services ?? assistantService;
+  const incidents = opts.incidents;
   const baseUrl = opts.baseUrl ?? (() => String(store.state.API_ENDPOINT ?? ""));
+  const follow = opts.follow ?? incidentFollowDeps;
 
   // One refresh per request and the same turn id on the resend (constraint 16); never the logout path.
   const open = async (
@@ -145,8 +168,81 @@ export function useAssistantClient(opts: AssistantClientOptions = {}): Assistant
     return admitted;
   };
 
+  // A re-analysis answers 202 JSON and runs in the background; a dropped stream may still finish on the server.
+  const streamAnalysis = async (
+    org: string,
+    incidentId: string,
+    request: () => Promise<Response>,
+    sink: FrameSink,
+    signal: AbortSignal,
+    turnId: string,
+  ): Promise<SendResult> => {
+    let opened: Response | SendResult;
+    try {
+      opened = await open(request, "session_expired", turnId);
+    } catch (err) {
+      return rejected(err, signal, turnId);
+    }
+    if (!(opened instanceof Response)) return opened;
+    if (!opened.ok) {
+      const body = await readJson(opened);
+      return {
+        ok: false,
+        error: toAssistantError({ status: opened.status, body }, { turnId }),
+        body,
+      };
+    }
+    const admitted = {
+      ok: true as const,
+      status: opened.status,
+      traceId: opened.headers.get(TRACE_HEADER),
+    };
+    sink.onAdmitted(admitted);
+    const following = (reason: "background" | "reconnect", streamed: string) =>
+      followAnalysis(org, incidentId, sink, signal, { reason, streamed }, follow).then((end) =>
+        sink.onEnd(end),
+      );
+    const type = opened.headers.get("content-type") ?? "";
+    if (opened.status === 202 || !opened.body || !type.includes("text/event-stream")) {
+      void opened.body?.cancel().catch(() => undefined);
+      void following("background", "");
+      return admitted;
+    }
+    let ended = false;
+    let streamed = "";
+    const watched: FrameSink = {
+      ...sink,
+      onFrame(frame, id) {
+        if (frame.type === "complete" || frame.type === "error" || frame.type === "cancelled")
+          ended = true;
+        if (frame.type === "message_delta") streamed += frame.content;
+        sink.onFrame(frame, id);
+      },
+    };
+    void parseStream(opened.body, handlersOf(watched), signal).then((end) => {
+      if (ended || end === "abort" || signal.aborted) sink.onEnd(end);
+      else void following("reconnect", streamed);
+    });
+    return admitted;
+  };
+
   return {
     send(req, sink, signal) {
+      if (req.mode === "rca" && req.incident?.id) {
+        if (!incidents) return Promise.resolve(analysisUnavailable(req.turnId));
+        const incident = req.incident;
+        const analysis = () =>
+          incidents.streamRca(req.org, incident.id, signal, {
+            params: {
+              ...(incident.reanalysis && { reanalysis: true }),
+              ...(incident.buildOnPrevious && { build_on_previous: true }),
+            },
+            headers: streamHeaders(req.sid, req.turnId, false),
+            baseUrl: baseUrl(),
+            fetchImpl,
+          });
+        return streamAnalysis(req.org, incident.id, analysis, sink, signal, req.turnId);
+      }
       const url = `${baseUrl()}/api/${enc(req.org)}/ai/chat_stream`;
       const body = JSON.stringify(wireBody(req));
       const request = () =>
@@ -216,6 +312,24 @@ function streamHeaders(sid: Sid, turnId: string, json: boolean): Record<string, 
 
 function traceparent(): string {
   return `00-${getUUIDv7(true)}-${getUUID().replace(/-/g, "").slice(0, 16)}-01`;
+}
+
+const incidentFollowDeps: FollowDeps = {
+  events: async (org, incidentId) => {
+    const response = await incidentsService.getEvents(org, incidentId);
+    const events = (response.data as { events?: unknown } | undefined)?.events;
+    return Array.isArray(events) ? (events as AnalysisEvent[]) : [];
+  },
+  // No live route serves this report shape, so a followed run ends with what it streamed.
+  report: async () => null,
+};
+
+function analysisUnavailable(turnId: string): SendResult {
+  const error = toAssistantError({ status: 0, body: null }, { turnId });
+  return {
+    ok: false,
+    error: { ...error, code: "agent_unavailable", ...ERROR_LEDGER.agent_unavailable },
+  };
 }
 
 function handlersOf(sink: FrameSink) {

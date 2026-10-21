@@ -184,8 +184,16 @@ export class AssistantPage {
     return this.tray().locator("[data-assistant-chip]");
   }
 
-  helper(_hostId) {
-    return notYet("WP-13");
+  /** An editor's inline helper row; `hostId` is the editor host's id (`logs`, `alert`, `alert_query`…). */
+  helper(hostId) {
+    return this.page.locator(`[data-test="inline-helper"][data-host="${hostId}"]`).filter({ visible: true });
+  }
+
+  /** The helper's door in an editor's toolbar. */
+  helperDoor(hostId) {
+    return this.page
+      .locator(`[data-test="inline-helper-toolbar"][data-host="${hostId}"] [data-test="ai-entry-query-generate"]`)
+      .filter({ visible: true });
   }
 
   /** A host's docked chat; `hostId` is the dock's `data-host`. */

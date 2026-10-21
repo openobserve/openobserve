@@ -326,6 +326,53 @@ export const SCENARIOS = {
     ],
     delayMs: 60,
   },
+  // The same proposal over the harness's ingested stream, so Accept keeps the Logs stream selection.
+  nl_sql_e2e: {
+    frames: [
+      f.status("Generating query"),
+      ...chunk("```sql\nSELECT service_name, count(*) AS errors FROM \"e2e_automate\" WHERE level = 'error' GROUP BY service_name\n```").map(f.delta),
+      f.complete(),
+    ],
+    delayMs: 40,
+  },
+  // The inline helper's "needs chat" outcome: prose with no query and no question.
+  nl_needs_chat: {
+    frames: [
+      f.status("Thinking"),
+      ...chunk("Comparing this week's error rate with last week's takes two queries and a chart, which one query cannot answer.").map(f.delta),
+      f.complete(),
+    ],
+    delayMs: 40,
+  },
+  // The analysis stream drops after two chunks with no terminal frame; the run finishes on the server.
+  rca_dropped: {
+    frames: [
+      { type: "start" },
+      { type: "chunk", content: "## Root cause\n\n" },
+      { type: "chunk", content: "The **checkout** service started timing out at 10:02 " },
+    ],
+    delayMs: 200,
+  },
+  // The incident analysis route (`/alerts/incidents/{id}/rca?stream=true`): start, chunk… complete.
+  rca_stream: {
+    frames: [
+      { type: "start" },
+      ...[
+        "## Root cause\n\n",
+        "The **checkout** service started timing out at 10:02 ",
+        "after its database pool hit the 50-connection limit.\n\n",
+        "## Evidence\n\n",
+        "- p95 latency rose from 180 ms to 4.2 s on `checkout`\n",
+        "- `db_pool_wait` errors began at 10:01 on all three pods\n",
+        "- No deploy in the hour before the spike\n\n",
+        "## Next steps\n\n",
+        "1. Raise the pool limit or shed load on `checkout`\n",
+        "2. Alert on pool saturation before latency moves\n",
+      ].map((content) => ({ type: "chunk", content })),
+      { type: "complete" },
+    ],
+    delayMs: 350,
+  },
   promql: { frames: completeFrames(PROMQL_ANSWER, "PromQL for p95 latency by service"), delayMs: 20 },
   vrl: {
     frames: [
@@ -650,6 +697,10 @@ function longAnswerDeltas() {
 
 // HTTP-level scenarios: the chat_stream request itself is refused before streaming.
 export const HTTP_SCENARIOS = {
+  // The incident route's own 400 refusals (src/api/management/src/request/alerts/incidents.rs).
+  rca_in_progress: { status: 400, body: { code: 400, message: "Analysis already in progress" } },
+  rca_priority_off: { status: 400, body: { code: 400, message: "AI SRE is turned off for this incident's priority" } },
+  rca_not_enabled: { status: 400, body: { code: 400, message: "RCA is not enabled" } },
   // 412: free credits depleted, consent needed (src/api/management/src/request/ai/chat.rs:228-236)
   consent: {
     status: 412,

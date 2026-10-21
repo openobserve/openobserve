@@ -208,9 +208,9 @@ export type LengthBucket = "0" | "1_20" | "21_100" | "101_500" | "500_plus";
 
 export type StarterKind = "ingest" | "page" | "recent" | "object" | "learn";
 
-export type QueryLanguage = "sql" | "promql" | "vrl" | "json" | "regex";
+export type QueryLanguage = "sql" | "promql" | "vrl" | "json" | "regex" | "js";
 
-export type HelperHost = DockHostId | "logs" | "dashboard" | "anomaly";
+export type HelperHost = DockHostId | "logs" | "dashboard" | "anomaly" | "alert";
 
 export type BlockKind =
   | "approval"
