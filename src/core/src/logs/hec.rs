@@ -15,11 +15,8 @@
 use axum::body::Bytes;
 use config::{
     get_config,
-    meta::{
-        self_reporting::usage::is_internal_rollup_stream,
-        stream::{StreamParams, StreamType},
-    },
-    utils::{json, schema::format_stream_name},
+    meta::{self_reporting::usage::is_internal_rollup_stream, stream::StreamType},
+    utils::json,
 };
 use hashbrown::HashMap;
 use infra::{
@@ -34,7 +31,6 @@ use serde::{Deserialize, Deserializer};
 use crate::{
     ingestion::check_ingestion_allowed,
     logs::ingest::{PrepareRecordError, prepare_record},
-    service::get_formatted_stream_name,
 };
 
 /// Cap on events in one request: each is held decoded and flattened in memory,
@@ -481,23 +477,14 @@ fn parse_hec_time(value: &json::Value) -> std::result::Result<i64, HecParseError
     Ok(micros.round() as i64)
 }
 
-/// Resolve an index to the stream name the writer will actually use.
-///
-/// Note the branch reads inverted against its own name: `skip_formatting_stream_name`
-/// selects `get_formatted_stream_name`. This mirrors `logs::ingest::ingest` so the
-/// grouping key matches what is written.
+/// Resolve an index to the stream name the writer will actually use, so grouping matches it.
 async fn resolve_stream_name(
     org_id: &str,
     index: &str,
 ) -> std::result::Result<String, HecParseError> {
-    let cfg = get_config();
-    let name = if cfg.common.skip_formatting_stream_name {
-        get_formatted_stream_name(StreamParams::new(org_id, index, StreamType::Logs))
-            .await
-            .map_err(|e| HecParseError::InvalidFormat(e.to_string()))?
-    } else {
-        format_stream_name(index.to_string())
-    };
+    let name = super::ingest::resolve_stream_name(org_id, index)
+        .await
+        .map_err(|e| HecParseError::InvalidFormat(e.to_string()))?;
     if name.is_empty() {
         return Err(HecParseError::InvalidIndex);
     }
