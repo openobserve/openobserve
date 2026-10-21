@@ -71,6 +71,10 @@ describe("AppPerformance.vue", () => {
     wrapper
       .findAllComponents({ name: "OButton" })
       .find((b) => b.attributes("data-test") === "rum-performance-refresh")!;
+  const refreshTooltip = () =>
+    wrapper
+      .findAllComponents({ name: "OTooltip" })
+      .find((tip) => tip.find('[data-test="rum-performance-refresh"]').exists())!;
 
   let wrapper: VueWrapper<any>;
   let store: any;
@@ -247,6 +251,7 @@ describe("AppPerformance.vue", () => {
       const refreshBtn = refreshButton();
       expect(refreshBtn.props("variant")).toBe("primary");
       expect(refreshBtn.text()).toContain("dashboard.refresh");
+      expect(refreshTooltip().props("disabled")).toBe(true);
     });
 
     it("shares a URL carrying the active tab and its time range", () => {
@@ -659,6 +664,7 @@ describe("AppPerformance.vue", () => {
       expect(wrapper.vm.isAutoRunOn).toBe(false);
       expect(wrapper.vm.isVariablesChanged).toBe(true);
       expect(refreshButton().props("variant")).toBe("warning");
+      expect(refreshTooltip().props("disabled")).toBe(false);
     });
   });
 });

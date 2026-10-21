@@ -1289,6 +1289,10 @@ describe("ViewPanel", () => {
       wrapper
         .findAllComponents({ name: "OButton" })
         .find((b) => b.attributes("data-test") === "dashboard-viewpanel-refresh-data-btn")!;
+    const refreshTooltipWrapper = () =>
+      wrapper
+        .findAllComponents({ name: "OTooltip" })
+        .find((tip) => tip.find('[data-test="dashboard-viewpanel-refresh-data-btn"]').exists())!;
 
     afterEach(() => {
       localStorage.removeItem("oo_toggle_auto_run");
@@ -1305,6 +1309,7 @@ describe("ViewPanel", () => {
       expect(wrapper.vm.showApplyHint).toBe(false);
       expect(refreshButton().props("variant")).toBe("primary");
       expect(refreshButton().text()).toContain("dashboard.viewDashboard.refresh");
+      expect(refreshTooltipWrapper().props("disabled")).toBe(true);
     });
 
     it("Refresh turns amber on an unapplied change and clears after Refresh", async () => {
@@ -1313,6 +1318,7 @@ describe("ViewPanel", () => {
       await changeAppliedVariables();
       expect(wrapper.vm.showApplyHint).toBe(true);
       expect(refreshButton().props("variant")).toBe("warning");
+      expect(refreshTooltipWrapper().props("disabled")).toBe(false);
 
       wrapper.vm.disable = false;
       wrapper.vm.refreshData();

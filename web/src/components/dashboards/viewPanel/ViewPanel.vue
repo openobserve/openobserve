@@ -38,7 +38,7 @@
         <HistogramIntervalDropDown
           v-if="!promqlMode && histogramFields.length"
           v-model="histogramInterval"
-          class="hover:bg-interactive-hover-bg h-8 w-37.5 transition-all duration-200"
+          class="hover:bg-interactive-hover-bg h-7.5 w-37.5 transition-all duration-200"
           data-test="dashboard-viewpanel-histogram-interval-dropdown"
         />
 
@@ -46,7 +46,7 @@
           :model-value="pickedDate ?? selectedDate"
           :auto-apply-dashboard="true"
           ref="dateTimePickerRef"
-          class="hover:bg-interactive-hover-bg h-8 min-h-8 transition-all duration-200"
+          class="hover:bg-interactive-hover-bg h-7.5 min-h-7.5 transition-all duration-200"
           data-test="dashboard-viewpanel-date-time-picker"
           :disable="disable"
           @update:model-value="timeGate.onPick"
@@ -59,7 +59,7 @@
           trigger
           :min-refresh-interval="store.state?.zoConfig?.min_auto_refresh_interval || 5"
           @trigger="refreshData"
-          class="hover:bg-interactive-hover-bg h-8 transition-all duration-200"
+          class="hover:bg-interactive-hover-bg h-7.5 transition-all duration-200"
           data-test="dashboard-viewpanel-refresh-interval"
         />
         <OButtonGroup class="shrink-0">
@@ -76,7 +76,11 @@
             </OButton>
           </OTooltip>
           <!-- Wrapper mode: a child-mode tooltip would hover-bind only the icon, not the labelled button. -->
-          <OTooltip v-else :content="refreshTooltip">
+          <OTooltip
+            v-else
+            :content="refreshTooltip"
+            :disabled="!isMobile && !isAutoRunOn && !showApplyHint"
+          >
             <OButton
               :variant="refreshVariant"
               :size="isMobile ? 'icon-toolbar' : 'sm-toolbar'"
@@ -141,7 +145,7 @@
         <OButton
           :aria-label="t('common.close')"
           variant="outline"
-          size="icon-sm"
+          size="icon-toolbar"
           @click="goBack"
           data-test="dashboard-viewpanel-close-btn"
           icon-left="close"

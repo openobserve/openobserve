@@ -70,6 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ? t('dashboard.refreshToApplyVariableChanges')
                   : t('dashboard.refresh')
             "
+            :disabled="!isMobile && !isAutoRunOn && !isVariablesChanged"
           >
             <OButton
               :icon-left="isAutoRunOn ? 'autorenew' : 'refresh'"
