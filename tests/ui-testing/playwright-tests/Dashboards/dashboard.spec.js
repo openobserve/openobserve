@@ -679,7 +679,7 @@ test.describe("dashboard UI testcases", () => {
     await deleteDashboard(page, randomDashboardName);
   });
 
-  test("should display a confirmation popup message for unsaved changes when clicking the Discard button", async ({
+  test("should ask before discarding unsaved panel changes when clicking the Discard button", async ({
     page,
   }) => {
     const pm = new PageManager(page);
@@ -714,12 +714,8 @@ test.describe("dashboard UI testcases", () => {
 
     // Verify the gauge chart is visible
     await pm.dashboardPanelActions.waitForChartToRender();
+    // discardPanel answers the in-app "Leave with unsaved changes?" dialog with Discard
     await pm.dashboardPanelActions.discardPanel();
-
-    // Listen for the dialog and assert its message
-    page.once("dialog", async (dialog) => {
-      await dialog.accept();
-    });
     await pm.dashboardList.menuItem("logs-item");
   });
   test("should update the chart correctly when used camel case in custom sql query", async ({
