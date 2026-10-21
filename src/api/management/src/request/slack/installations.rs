@@ -621,7 +621,7 @@ pub async fn connect(
         ("installation_id" = String, Path, description = "Slack installation id"),
     ),
     responses(
-        (status = 200, description = "`{\"stopped_destinations\": [{\"id\", \"name\"}]}`", content_type = "application/json", body = Object),
+        (status = 200, description = "`{\"stopped_destinations\": [{\"org_id\", \"id\", \"name\"}]}`", content_type = "application/json", body = Object),
         (status = 403, description = "Not an admin, or the OSS build", content_type = "application/json", body = ()),
         (status = 404, description = "Slack is not enabled for this organization, unknown installation or not connected", content_type = "application/json", body = ()),
     ),
