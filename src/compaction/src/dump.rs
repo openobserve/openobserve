@@ -47,6 +47,8 @@ use parquet::{arrow::AsyncArrowWriter, file::properties::WriterProperties};
 use search_service::file_list_dump::*;
 use tokio::sync::mpsc;
 
+use crate::bloom::compact::bloom_files_deleted;
+
 #[derive(Clone)]
 pub struct DumpJob {
     pub org_id: String,
@@ -445,6 +447,14 @@ pub async fn delete_by_time_range(
 
     // Create deleted items for file_list_deleted table
     let mut del_items: Vec<_> = files_to_delete.iter().map(deleted_data_file).collect();
+    del_items.extend(bloom_files_deleted(
+        org_id,
+        stream_type,
+        stream_name,
+        files_to_delete
+            .iter()
+            .map(|f| (f.date.clone(), f.bloom_ver)),
+    ));
 
     // we also need to delete the dump files
     del_items.extend(dump_files.iter().map(|f| FileListDeleted {
