@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       :class="[
         'border-border-default flex shrink-0 items-center gap-2 border-b px-3',
-        placement === 'docked' ? 'h-15' : 'h-12',
+        placement === 'docked' ? 'h-15' : 'h-12 max-md:h-auto max-md:min-h-12 max-md:flex-wrap',
       ]"
       data-test="assistant-shell-chrome"
     >
@@ -63,6 +63,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template #menu-layout>
           <AssistantContainerMenu bare :placement="placement" :sheet="sheet" />
+        </template>
+        <template v-if="activeSid && state === 'conversation'" #share>
+          <AssistantShareControl
+            :sid="activeSid"
+            variant="header"
+            @manage="shareManagerOpen = true"
+          />
+        </template>
+        <template v-if="activeSid && state === 'conversation'" #menu-share>
+          <AssistantShareControl
+            :sid="activeSid"
+            variant="menu-item"
+            @manage="shareManagerOpen = true"
+          />
         </template>
       </AssistantThreadHeader>
       <template v-else>
@@ -202,6 +216,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       ]"
       data-test="assistant-shell-body"
     >
+      <AssistantForkSource
+        v-if="activeSid && (state === 'empty' || state === 'conversation')"
+        :key="activeSid"
+        :sid="activeSid"
+      />
       <AssistantGateState
         v-if="state === 'gate'"
         :reason="gateReason"
@@ -519,6 +538,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </slot>
     </div>
 
+    <AssistantShareManager
+      v-if="activeSid"
+      v-model:open="shareManagerOpen"
+      :sid="activeSid"
+      initial-scope="chat"
+    />
+
     <ODialog
       :open="learnOpen"
       size="md"
@@ -621,6 +647,9 @@ import AssistantGateState, {
 import AssistantThreadHeader, {
   assistantThreadHostKey,
 } from "@/components/ai-assistant/thread/AssistantThreadHeader.vue";
+import AssistantShareControl from "@/components/ai-assistant/share/AssistantShareControl.vue";
+import AssistantShareManager from "@/components/ai-assistant/share/AssistantShareManager.vue";
+import AssistantForkSource from "@/components/ai-assistant/thread/AssistantForkSource.vue";
 import AssistantTranscript from "@/components/ai-assistant/transcript/AssistantTranscript.vue";
 import AssistantTurnOutcome, {
   outcomeActionLabel,
@@ -730,6 +759,7 @@ const signedIn = ref(false);
 const popupBlocked = ref(false);
 const dismissedRefusal = shallowRef<unknown>(null);
 const learnOpen = ref(false);
+const shareManagerOpen = ref(false);
 const openedByUser = ref(false);
 const disclosureDismissed = ref(false);
 
