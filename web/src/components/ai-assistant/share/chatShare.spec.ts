@@ -16,6 +16,16 @@
 import { describe, it, expect } from "vitest";
 import {
   EXPIRY_PRESETS,
+  QUICK_SHARE_EXPIRY_SECS,
+  canRedactAttachments,
+  hasAttachments,
+  isOutOfDate,
+  presetOf,
+  quickShareForm,
+  shareButtonState,
+  summarizeShares,
+  switchVisibility,
+  type ShareButtonInput,
   applyVisibility,
   buildCreateRequest,
   canShareChat,
@@ -209,5 +219,125 @@ describe("chatShare", () => {
     expect(statusOfError(null)).toBeUndefined();
     expect(serverMessageOf(axiosError)).toBe("not found");
     expect(serverMessageOf(new Error("x"))).toBeUndefined();
+  });
+});
+
+describe("quick share", () => {
+  it("is an org snapshot with tool data hidden for 90 days, and no hide_attachments unless advertised", () => {
+    const body = buildCreateRequest(quickShareForm(), false, undefined, false);
+    expect(body).toEqual({
+      mode: "snapshot",
+      visibility: "org",
+      redact_tools: true,
+      expires_in_secs: QUICK_SHARE_EXPIRY_SECS,
+    });
+    expect(QUICK_SHARE_EXPIRY_SECS).toBe(90 * 86_400);
+    expect(buildCreateRequest(quickShareForm(), false, undefined, true).hide_attachments).toBe(
+      true,
+    );
+  });
+
+  it("reads attachment redaction only from an explicit true", () => {
+    expect(canRedactAttachments({ ai_share_redact_attachments: true })).toBe(true);
+    expect(canRedactAttachments({ ai_share_redact_attachments: "true" })).toBe(false);
+    expect(canRedactAttachments(undefined)).toBe(false);
+  });
+
+  it("keeps redaction when visibility switches, and bounds a public expiry", () => {
+    const form = { ...quickShareForm(), redactTools: false, expiresInSecs: 0 };
+    switchVisibility(form, "public", 30 * 86_400);
+    expect(form.redactTools).toBe(false);
+    expect(form.expiresInSecs).toBe(30 * 86_400);
+    form.redactTools = true;
+    switchVisibility(form, "org", 30 * 86_400);
+    expect(form.redactTools).toBe(true);
+  });
+});
+
+describe("shareButtonState", () => {
+  const base: ShareButtonInput = {
+    persistence: true,
+    canShare: "yes",
+    denied: false,
+    hasTurn: true,
+    running: false,
+    notSaved: false,
+    historyUnavailable: false,
+    shared: false,
+    hasAttachments: false,
+    redactAttachments: false,
+  };
+
+  it.each<[Partial<ShareButtonInput>, ReturnType<typeof shareButtonState>]>([
+    [{ persistence: false }, { kind: "absent" }],
+    [{ canShare: "no" }, { kind: "blocked", reason: "assistant.gate.noShare.tooltip" }],
+    [{ denied: true }, { kind: "blocked", reason: "assistant.gate.noShare.tooltip" }],
+    [{ hasTurn: false }, { kind: "blocked", reason: "assistant.share.nothingToShare" }],
+    [
+      { running: true, shared: true },
+      { kind: "blocked", reason: "assistant.share.waitForAnswer" },
+    ],
+    [{ notSaved: true }, { kind: "blocked", reason: "assistant.share.notSavedBlocked" }],
+    [
+      { historyUnavailable: true },
+      { kind: "blocked", reason: "assistant.share.historyUnavailable" },
+    ],
+    [{ shared: true }, { kind: "manage", tooltip: "assistant.share.manage" }],
+    [{ hasAttachments: true }, { kind: "review", tooltip: "assistant.share.reviewTooltip" }],
+    [
+      { hasAttachments: true, redactAttachments: true },
+      { kind: "quick", tooltip: "assistant.share.tooltip" },
+    ],
+    [{ canShare: "unknown" }, { kind: "quick", tooltip: "assistant.share.tooltip" }],
+  ])("%o → %o", (over, expected) => {
+    expect(shareButtonState({ ...base, ...over })).toEqual(expected);
+  });
+});
+
+describe("share summary", () => {
+  const view = {
+    id: "s1",
+    mode: "snapshot" as const,
+    visibility: "org" as const,
+    snapshot_seq: 4,
+    expires_at: 2_000_000_000_000,
+    created_at: 1_000_000,
+    updated_at: 1,
+    access_count: 0,
+    last_accessed_at: null,
+    session_id: "c1",
+    title: "t",
+    redact_tools: true,
+  };
+
+  it("summarises the first link, counts the rest and marks a stale snapshot", () => {
+    expect(summarizeShares([], 5)).toBeNull();
+    expect(summarizeShares([view, { ...view, id: "s2" }], 6)).toEqual({
+      id: "s1",
+      visibility: "org",
+      mode: "snapshot",
+      expiresAt: 2_000_000_000,
+      outOfDate: true,
+      count: 2,
+    });
+    expect(isOutOfDate(view, 4)).toBe(false);
+    expect(isOutOfDate({ ...view, mode: "live" }, 9)).toBe(false);
+    expect(isOutOfDate(view, null)).toBe(false);
+  });
+
+  it("finds the preset a link was made with", () => {
+    expect(presetOf({ expires_at: null, created_at: 0 })).toBe(0);
+    expect(presetOf({ expires_at: 86_400 * 1_000_000, created_at: 0 })).toBe(86_400);
+    expect(presetOf({ expires_at: 5 * 1_000_000, created_at: 0 })).toBeNull();
+  });
+
+  it("finds attachments in chips, images and attachment blocks of prompts only", () => {
+    const user = (extra: object) => ({ role: "user" as const, content: "hi", ...extra });
+    expect(hasAttachments([user({})])).toBe(false);
+    expect(hasAttachments([user({ images: [{ data: "", mimeType: "image/png" }] })])).toBe(true);
+    expect(hasAttachments([user({ chips: [{ id: "c" }] })] as never)).toBe(true);
+    expect(hasAttachments([{ role: "assistant", content: "x", images: [{}] }] as never)).toBe(
+      false,
+    );
   });
 });

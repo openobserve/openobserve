@@ -74,6 +74,7 @@ export {
 export { useAssistantLeaveGuard, type LeaveGuard } from "./lifecycleQuestions";
 export {
   markSignedIn,
+  runtimeHandle,
   useAssistantGate,
   useOtherAccountSignedIn,
   useSignedOutElsewhere,

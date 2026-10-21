@@ -85,6 +85,8 @@ export const assistantGlyph = {
   verified: "task-alt",
   inferred: "lightbulb-outline",
   link: "call-made",
+  warning: "warning",
+  fork: "fork-right",
 } as const satisfies Record<string, IconName>;
 
 /** The glyph of each chip kind (`40` §2.1); the chip passes it to `OTag` as `icon`. */

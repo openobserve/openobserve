@@ -146,6 +146,7 @@ defineSlots<SelectSlots>();
 
 const _fallbackId = useId();
 const inputId = computed(() => props.id ?? _fallbackId);
+const labelId = computed(() => `${inputId.value}-label`);
 
 // Dev-time warning: slot-based options with multiple/searchable require listbox
 // mode, but listboxModeEnabled requires options prop. Guide the developer early.
@@ -1206,6 +1207,7 @@ const fieldWidthClass = computed(() => {
     <!-- Label -->
     <label
       v-if="(label || $slots.tooltip) && labelPosition !== 'inside'"
+      :id="labelId"
       :for="inputId"
       :class="[
         'o-input-label text-compact flex items-center gap-1 leading-tight',
@@ -1229,9 +1231,11 @@ const fieldWidthClass = computed(() => {
     <template v-if="listboxModeEnabled">
       <PopoverRoot v-model:open="popoverOpen">
         <div ref="triggerWrapperRef" class="relative flex items-center">
+          <!-- Reka replaces the trigger id, so the label's for= never reaches it -->
           <PopoverTrigger
             type="button"
             :id="inputId"
+            :aria-labelledby="label && labelPosition !== 'inside' ? labelId : undefined"
             :name="name"
             :disabled="disabled"
             :tabindex="inputTabindex"
