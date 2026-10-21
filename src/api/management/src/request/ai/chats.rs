@@ -233,6 +233,10 @@ pub struct ChatDetailResponse {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[schema(value_type = Option<Object>)]
     pub seed: Option<Value>,
+    /// Each approval card the chat raised (`card`) and its decision (`status`, `resolved`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<Vec<Object>>)]
+    pub approvals: Option<Vec<serde_json::Value>>,
 }
 
 /// `PATCH` body: a new title, a pin, or both.
@@ -945,6 +949,7 @@ pub async fn get(
             has_more: false,
             turns: None,
             seed: None,
+            approvals: None,
         })
         .into_response();
     }
@@ -978,6 +983,7 @@ pub async fn get(
     }
     annotate_turns(&mut turns, &records, &feedback);
     let seed = row.seed.clone();
+    let approvals = chat_approvals(&org_id, &row.session_id, &user_email).await;
     Json(ChatDetailResponse {
         chat: ChatSummary::from(row).with_markers(active.as_ref(), pending.as_ref()),
         state_version: version.to_string(),
@@ -986,6 +992,7 @@ pub async fn get(
         has_more: history.has_more,
         turns: Some(turns),
         seed,
+        approvals,
     })
     .into_response()
 }
@@ -1776,6 +1783,29 @@ fn project_turns(events: &[DurableEvent]) -> Vec<Value> {
         Some(Value::Array(turns)) => turns,
         _ => Vec::new(),
     }
+}
+
+/// The approvals OpenObserve stored for the caller's chat, readable on every replica.
+async fn chat_approvals(org_id: &str, session_id: &str, user_email: &str) -> Option<Vec<Value>> {
+    match infra::table::ai_approvals::list_for_session(org_id, session_id, user_email).await {
+        Ok(rows) => Some(rows.iter().map(approval_view).collect()),
+        Err(e) => {
+            log::warn!("[AI-CHAT] approvals of {org_id}/{session_id} unreadable: {e}");
+            None
+        }
+    }
+}
+
+fn approval_view(row: &infra::table::ai_approvals::Model) -> Value {
+    let parse = |text: &str| serde_json::from_str::<Value>(text).unwrap_or(Value::Null);
+    serde_json::json!({
+        "id": row.id,
+        "status": row.status,
+        "scope": row.scope,
+        "card": parse(&row.card),
+        "resolved": row.resolved.as_deref().map_or(Value::Null, parse),
+        "expires_at": row.expires_at,
+    })
 }
 
 /// Each listed chat's running turn and pending approval: one query and one search for the page.
@@ -3145,6 +3175,7 @@ mod tests {
             has_more: false,
             turns: None,
             seed: None,
+            approvals: None,
         };
         let text = serde_json::to_string(&detail).unwrap();
         assert_eq!(text.matches("\"active_turn\"").count(), 1, "{text}");

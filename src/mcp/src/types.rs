@@ -286,6 +286,9 @@ pub struct MCPTool {
     /// Optional annotations describing tool behavior (new in 2025-11-25)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub annotations: Option<Value>,
+    /// OpenObserve's own facts about the tool (`o2/operation`, `o2/telemetry`).
+    #[serde(rename = "_meta", skip_serializing_if = "Option::is_none")]
+    pub meta: Option<Value>,
     // Internal fields for HTTP execution (not serialized to clients)
     #[serde(skip)]
     pub http_method: String,
@@ -352,6 +355,10 @@ pub struct ToolSummary {
     pub description: Option<String>,
     #[serde(rename = "inputSchema")]
     pub input_schema: Value,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub annotations: Option<Value>,
+    #[serde(rename = "_meta", skip_serializing_if = "Option::is_none")]
+    pub meta: Option<Value>,
     /// Whether this tool requires user confirmation before execution
     #[serde(
         rename = "requiresConfirmation",

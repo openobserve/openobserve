@@ -176,6 +176,9 @@ pub async fn preview_downtime(
         (status = 400, description = "Invalid request", content_type = "application/json", body = ()),
         (status = 403, description = "Forbidden or not enabled", content_type = "application/json", body = ()),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"readOnlyHint": true}))
+    )
 )]
 pub async fn downtime_resources(
     Path(org_id): Path<String>,
@@ -210,6 +213,9 @@ pub async fn downtime_resources(
         (status = 400, description = "Invalid request", content_type = "application/json", body = ()),
         (status = 403, description = "Forbidden or not enabled", content_type = "application/json", body = ()),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"readOnlyHint": true}))
+    )
 )]
 pub async fn downtime_values(
     Path(org_id): Path<String>,

@@ -242,6 +242,7 @@ mod m20261021_000003_add_hide_attachments_to_ai_chat_shares;
 mod m20261021_000004_create_ai_chat_feedback;
 mod m20261021_000005_create_ai_chat_imports;
 mod m20261021_000006_create_paid_overage_attribution;
+mod m20261021_000007_create_ai_approvals;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
 
@@ -622,6 +623,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20261021_000004_create_ai_chat_feedback::Migration),
             Box::new(m20261021_000005_create_ai_chat_imports::Migration),
             Box::new(m20261021_000006_create_paid_overage_attribution::Migration),
+            Box::new(m20261021_000007_create_ai_approvals::Migration),
         ]
     }
 }
@@ -700,6 +702,7 @@ mod tests {
         (117, "m20261020_000005_create_ai_turn_marks"),
         (118, "m20261021_000005_create_ai_chat_imports"),
         (119, "m20261021_000006_create_paid_overage_attribution"),
+        (120, "m20261021_000007_create_ai_approvals"),
     ];
 
     // Two branches that each claim the next version merge cleanly, so a reused number must fail

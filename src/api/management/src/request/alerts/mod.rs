@@ -3994,7 +3994,7 @@ pub async fn move_alerts(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "generate_sql"})),
-        ("x-o2-mcp" = json!({"description": "Generate SQL from natural language", "category": "alerts"}))
+        ("x-o2-mcp" = json!({"description": "Generate SQL from natural language", "category": "alerts", "readOnlyHint": true}))
     )
 )]
 pub async fn generate_sql(
