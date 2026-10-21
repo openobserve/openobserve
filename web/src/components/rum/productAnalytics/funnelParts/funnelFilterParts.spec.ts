@@ -679,6 +679,20 @@ describe("FunnelStepsTable step menu", () => {
     await item.trigger("click");
     expect(w.emitted("trend-from-step")).toEqual([[1]]);
   });
+
+  it("pins each row's actions cell to the end on wide screens, so ⋮ stays in view when the table scrolls", () => {
+    const w = mountTable("ok");
+    for (const i of [0, 1]) {
+      const row = w.find(dt(`rum-analytics-funnel-step-${i}`)).element;
+      let cell = w.find(dt(`rum-analytics-funnel-step-${i}-menu`)).element as HTMLElement;
+      while (cell.parentElement && cell.parentElement !== row) cell = cell.parentElement;
+      expect(cell.parentElement).toBe(row);
+      const classes = [...cell.classList];
+      expect(classes).toContain("md:sticky");
+      expect(classes.some((c) => /^(md:)?end-0$/.test(c))).toBe(true);
+      expect(classes.some((c) => /^(md:)?bg-/.test(c))).toBe(true);
+    }
+  });
 });
 
 describe("Filter all steps notice", () => {

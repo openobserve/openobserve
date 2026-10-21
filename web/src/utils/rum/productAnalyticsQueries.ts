@@ -793,18 +793,18 @@ export function stepFieldSampleSql(
 ): string {
   const preds = def.steps.map((s) => stepPredicateRaw(s, scope, events));
   const n = range1(preds.length);
-  const hit = (i: number) => `CASE WHEN ${preds[i - 1]} THEN 1 ELSE 0 END`;
-  // A row can match several steps, so each step ranks its own rows rather than the first step a row matches.
+  const hits = n.map((i) => `CASE WHEN ${preds[i - 1]} THEN 1 ELSE 0 END AS s${i}`);
+  // A row can match several steps, so each step ranks its own rows; by flag column, as a CASE partition fails DataFusion's plan check.
   const ranks = n.map(
-    (i) =>
-      `${hit(i)} AS s${i}, ROW_NUMBER() OVER (PARTITION BY ${hit(i)} ORDER BY _timestamp DESC) AS r${i}`,
+    (i) => `ROW_NUMBER() OVER (PARTITION BY s${i} ORDER BY _timestamp DESC) AS r${i}`,
   );
   // A field name is parsed to [a-z0-9_] before it gets here, so quoting it is safe.
   const cols = fields.filter((f) => has(scope, f)).map((f) => `"${f}"`);
   const picked = cols.length ? `, ${cols.join(", ")}` : "";
   const flags = n.map((i) => `s${i}`).join(", ");
   const kept = n.map((i) => `(s${i} = 1 AND r${i} <= ${Math.trunc(perStep)})`).join(" OR ");
-  return `SELECT ${flags}${picked} FROM (SELECT ${ranks.join(", ")}${picked} FROM "_rumdata" WHERE ${scopeClause(scope)} AND (${preds.join(" OR ")})) WHERE ${kept}`;
+  const flagged = `SELECT ${hits.join(", ")}${picked}, _timestamp FROM "_rumdata" WHERE ${scopeClause(scope)} AND (${preds.join(" OR ")})`;
+  return `SELECT ${flags}${picked} FROM (SELECT ${flags}, ${ranks.join(", ")}${picked} FROM (${flagged})) WHERE ${kept}`;
 }
 
 /** Top browser and device families over the scope without any exclusion, for the likely-bot suggestions. */

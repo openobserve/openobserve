@@ -191,6 +191,8 @@ const fromLabel = computed<I18nText>(() => {
     return t("rum.analytics.funnel.fromAnyStep", {
       pct: raw(formatPct(s.reached > 0 ? s.covered / s.reached : 0)),
     });
+  if (attribute.value?.s === undefined && s?.auto)
+    return t("rum.analytics.funnel.fromAutomatic", { step: s.auto });
   const step = s?.step ?? attribute.value?.s;
   return step
     ? t("rum.analytics.funnel.fromStep", { step })
@@ -282,7 +284,9 @@ const openForStep = (step: number) => {
   setOpen(true);
 };
 
-const focus = () => (chip.value ?? add.value)?.$el.focus();
+// TS's DOM lib lacks focusVisible; it shows the ring even when a mouse click led here.
+const FOCUS_RING: FocusOptions & { focusVisible: boolean } = { focusVisible: true };
+const focus = () => (chip.value ?? add.value)?.$el.focus(FOCUS_RING);
 
 // The picker's trigger turns disabled and the chip unmounts, which would drop keyboard focus to the page.
 const refocus = () => void nextTick(focus);

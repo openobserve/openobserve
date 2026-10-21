@@ -240,14 +240,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   })
                 }}</OBadge
               >
-              <span
-                v-if="compareView"
-                class="text-text-secondary text-xs"
-                data-test="rum-analytics-funnel-overall-range"
-                >{{
-                  t("rum.analytics.funnel.overallRange", { range: raw(compareView.range) })
-                }}</span
-              >
               <OBadge
                 v-if="windowBadge"
                 variant="default-soft"
@@ -263,7 +255,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :aria-expanded="!railCollapsed"
                 data-test="rum-analytics-funnel-overall-breakdown"
                 @click="showBreakdownSection"
-                >{{ t("rum.analytics.funnel.breakdownBy", { field: dimLabel }) }}</OBadge
+                >{{ t("rum.analytics.funnel.headlineBreakdown", { field: dimLabel }) }}</OBadge
               >
               <template v-if="!def.breakdown && def.steps.length > 1 && lastUnits > 0">
                 <OBadge
@@ -287,53 +279,58 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   }}</OBadge
                 >
               </template>
-              <template v-if="compareView">
-                <span
-                  v-if="compareView.data?.empty"
-                  class="text-text-secondary text-xs"
-                  data-test="rum-analytics-funnel-compare-empty"
-                  >{{
-                    t("rum.analytics.funnel.compareEmpty", {
-                      unit: unitNoun,
-                      range: raw(compareView.prevRange),
-                    })
-                  }}</span
-                >
-                <OBadge
-                  v-else-if="compareView.data?.overall && compareView.data.prevOverall !== null"
-                  :variant="changeTone(compareView.data.overall)"
-                  size="sm"
-                  data-test="rum-analytics-funnel-overall-change"
-                >
-                  <FunnelChangeCell :change="compareView.data.overall" :unit-noun="unitNoun" />
-                  <span>{{
-                    effectiveCompare === "prev"
-                      ? t("rum.analytics.funnel.overallVs", {
-                          pct: pct(compareView.data.prevOverall),
-                          range: raw(compareView.prevRange),
-                        })
-                      : t("rum.analytics.funnel.overallVsAgo", {
-                          pct: pct(compareView.data.prevOverall),
-                          label: compareView.label,
-                          range: raw(compareView.prevRange),
-                        })
-                  }}</span>
-                  <span v-if="funnelPanel.sampled > 1">{{
-                    t("rum.analytics.funnel.headlineEstimated")
-                  }}</span>
-                </OBadge>
-              </template>
-              <WhyEnteredPopover
-                v-if="!usersMode && def.steps.length > 1"
-                :count="firstUnits"
-                :app="pa.state.app"
-                :step1="firstLabel"
-                :state="whyState"
-                :lines="why"
-                :estimated="funnelPanel.sampled > 1"
-                @open="onWhyOpen"
-                @retry="loadWhy(true)"
-              />
+              <span
+                v-if="compareView || (!usersMode && def.steps.length > 1)"
+                class="flex flex-wrap items-center gap-x-2 gap-y-1"
+              >
+                <template v-if="compareView">
+                  <span
+                    v-if="compareView.data?.empty"
+                    class="text-text-secondary text-xs"
+                    data-test="rum-analytics-funnel-compare-empty"
+                    >{{
+                      t("rum.analytics.funnel.compareEmpty", {
+                        unit: unitNoun,
+                        range: raw(compareView.prevRange),
+                      })
+                    }}</span
+                  >
+                  <OBadge
+                    v-else-if="compareView.data?.overall && compareView.data.prevOverall !== null"
+                    :variant="changeTone(compareView.data.overall)"
+                    size="sm"
+                    data-test="rum-analytics-funnel-overall-change"
+                  >
+                    <FunnelChangeCell :change="compareView.data.overall" :unit-noun="unitNoun" />
+                    <span>{{
+                      effectiveCompare === "prev"
+                        ? t("rum.analytics.funnel.overallVs", {
+                            pct: pct(compareView.data.prevOverall),
+                            range: raw(compareView.prevRange),
+                          })
+                        : t("rum.analytics.funnel.overallVsAgo", {
+                            pct: pct(compareView.data.prevOverall),
+                            label: compareView.label,
+                            range: raw(compareView.prevRange),
+                          })
+                    }}</span>
+                    <span v-if="funnelPanel.sampled > 1">{{
+                      t("rum.analytics.funnel.headlineEstimated")
+                    }}</span>
+                  </OBadge>
+                </template>
+                <WhyEnteredPopover
+                  v-if="!usersMode && def.steps.length > 1"
+                  :count="firstUnits"
+                  :app="pa.state.app"
+                  :step1="firstLabel"
+                  :state="whyState"
+                  :lines="why"
+                  :estimated="funnelPanel.sampled > 1"
+                  @open="onWhyOpen"
+                  @retry="loadWhy(true)"
+                />
+              </span>
             </template>
           </span>
         </template>
@@ -392,11 +389,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               id="rum-analytics-funnel-window-select"
               :model-value="def.window"
               :options="windowOptions"
+              :searchable="false"
               size="xs"
               width="sm"
               data-test="rum-analytics-funnel-window-select"
               @update:model-value="(v) => update({ window: v as FunnelWindow })"
-            />
+            >
+              <template #trigger>{{
+                def.window === "session"
+                  ? t("rum.analytics.funnel.windowSessionShort")
+                  : windowLengths[def.window]
+              }}</template>
+            </OSelect>
           </span>
           <span class="ms-auto flex items-center gap-2" data-test="rum-analytics-funnel-compare">
             <label
@@ -410,11 +414,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :model-value="compareSelectValue"
                 :options="compareOptions"
                 :disabled="compareTooLong"
+                :searchable="false"
                 size="xs"
-                width="md"
+                width="sm"
                 data-test="rum-analytics-funnel-compare-select"
                 @update:model-value="setCompare"
-              />
+              >
+                <template #trigger>{{ compareTriggerLabel }}</template>
+              </OSelect>
               <OTooltip v-if="compareTooLong" :content="t('rum.analytics.funnel.compareTooLong')" />
             </span>
           </span>
@@ -436,8 +443,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :model-value="trend.pair.value.a"
                 :options="trend.fromOptions.value"
                 :disabled="def.steps.length < 3"
+                :searchable="false"
                 size="xs"
-                width="sm"
+                width="md"
                 data-test="rum-analytics-funnel-trend-from-select"
                 @update:model-value="trend.setFrom"
               />
@@ -453,8 +461,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :model-value="trend.pair.value.b"
                 :options="trend.toOptions.value"
                 :disabled="def.steps.length < 3"
+                :searchable="false"
                 size="xs"
-                width="sm"
+                width="md"
                 data-test="rum-analytics-funnel-trend-to-select"
                 @update:model-value="trend.setTo"
               />
@@ -470,6 +479,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 id="rum-analytics-funnel-trend-interval"
                 :model-value="pa.funnelInterval.value"
                 :options="trend.intervalOptions.value"
+                :searchable="false"
                 size="xs"
                 width="xs"
                 data-test="rum-analytics-funnel-trend-interval-select"
@@ -998,6 +1008,10 @@ const compareSelectValue = computed<FunnelCompareMode | "off">(() => {
   const mode = pa.funnelCompare.value;
   if (!mode) return "off";
   return compareTooLong.value || !pa.range.value ? mode : (effectiveCompare.value ?? mode);
+});
+const compareTriggerLabel = computed(() => {
+  const mode = compareSelectValue.value;
+  return mode === "off" ? t("rum.analytics.funnel.compareOff") : t(COMPARE_MODE_LABEL_KEYS[mode]);
 });
 const compareOptions = computed(() => {
   const cur = pa.range.value;

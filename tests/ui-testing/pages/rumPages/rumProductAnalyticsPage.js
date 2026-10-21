@@ -591,7 +591,7 @@ export class RumProductAnalyticsPage {
 
     async pickConversionWindow(value) {
         await this.pickOption('rum-analytics-funnel-window-select', { value });
-        await expect(this.funnelWindowTrigger).toHaveAttribute('data-test-selected-value', value);
+        await expect.poll(() => this.funnelFromUrl()?.w).toBe(value);
     }
 
     async pickBreakdown(dim) {
