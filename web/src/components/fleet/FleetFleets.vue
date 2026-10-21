@@ -127,57 +127,96 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <div class="grid grid-cols-1 gap-3 md:grid-cols-3">
-            <div
-              class="rounded-surface border-border-default flex flex-col gap-1 border p-3"
+          <KpiCardRow min-width="14rem">
+            <KpiCard
+              :label="t('fleet.fleets.desired')"
+              icon="rocket-launch"
+              icon-size="md"
+              label-class="text-sm font-medium text-text-secondary"
+              icon-class="bg-icon-chip-primary-bg text-icon-chip-primary-text"
               data-test="fleet-fleets-desired-card"
             >
-              <OText variant="label">{{ t("fleet.fleets.desired") }}</OText>
-              <OText variant="body-strong" data-test="fleet-fleets-desired">{{
-                fleet.desired ? versionText(fleet.desired) : t("fleet.fleets.noConfigAssigned")
-              }}</OText>
-              <span
-                v-if="activeRollout"
-                class="inline-flex flex-wrap items-center gap-2"
-                data-test="fleet-fleets-rollout-progress"
-              >
-                <OText variant="meta" class="tabular-nums">{{ progressText(activeRollout) }}</OText>
-                <OButton
-                  variant="ghost-primary"
-                  size="sm"
-                  data-test="fleet-fleets-open-rollout"
-                  @click="openRollouts(activeRollout.id)"
+              <template #value>
+                <span
+                  class="text-text-heading text-2xl leading-tight font-semibold"
+                  data-test="fleet-fleets-desired"
+                  >{{
+                    fleet.desired ? versionText(fleet.desired) : t("fleet.fleets.noConfigAssigned")
+                  }}</span
                 >
-                  {{ t("fleet.flowIssues.openRollout") }}
-                </OButton>
-              </span>
-              <OText v-else-if="!fleet.desired" variant="meta">{{
-                t("fleet.fleets.placeholderHint")
-              }}</OText>
-            </div>
-            <div
-              class="rounded-surface border-border-default flex flex-col gap-1 border p-3"
+              </template>
+              <template #footer>
+                <span
+                  v-if="activeRollout"
+                  class="inline-flex flex-wrap items-center gap-2"
+                  data-test="fleet-fleets-rollout-progress"
+                >
+                  <OText variant="meta" class="tabular-nums">{{
+                    progressText(activeRollout)
+                  }}</OText>
+                  <OButton
+                    variant="ghost-primary"
+                    size="sm"
+                    data-test="fleet-fleets-open-rollout"
+                    @click="openRollouts(activeRollout.id)"
+                  >
+                    {{ t("fleet.flowIssues.openRollout") }}
+                  </OButton>
+                </span>
+                <OText v-else-if="!fleet.desired" variant="meta">{{
+                  t("fleet.fleets.placeholderHint")
+                }}</OText>
+                <OText v-else variant="meta">{{ t("fleet.fleets.desiredHint") }}</OText>
+              </template>
+            </KpiCard>
+            <KpiCard
+              :label="t('fleet.fleets.stable')"
+              icon="verified"
+              icon-size="md"
+              label-class="text-sm font-medium text-text-secondary"
+              icon-class="bg-icon-chip-success-bg text-icon-chip-success-text"
               data-test="fleet-fleets-stable-card"
             >
-              <OText variant="label">{{ t("fleet.fleets.stable") }}</OText>
-              <OText variant="body-strong" data-test="fleet-fleets-stable">{{
-                fleet.stable ? versionText(fleet.stable) : t("fleet.fleets.noVersion")
-              }}</OText>
-              <OText variant="meta">{{ t("fleet.fleets.stableHint") }}</OText>
-            </div>
-            <div
-              class="rounded-surface border-border-default flex flex-col gap-1 border p-3"
+              <template #value>
+                <span
+                  class="text-text-heading text-2xl leading-tight font-semibold"
+                  data-test="fleet-fleets-stable"
+                  >{{
+                    fleet.stable ? versionText(fleet.stable) : t("fleet.fleets.noVersion")
+                  }}</span
+                >
+              </template>
+              <template #footer>
+                <OText variant="meta">{{ t("fleet.fleets.stableHint") }}</OText>
+              </template>
+            </KpiCard>
+            <KpiCard
+              :label="t('fleet.fleets.members')"
+              icon="dns"
+              icon-size="md"
+              label-class="text-sm font-medium text-text-secondary"
+              icon-class="bg-icon-chip-info-bg text-icon-chip-info-text"
               data-test="fleet-fleets-members-card"
             >
-              <OText variant="label">{{ t("fleet.fleets.members") }}</OText>
-              <OText variant="body-strong" class="tabular-nums" data-test="fleet-fleets-members">{{
-                t("fleet.fleets.membersOnline", { online: fleet.online, total: fleet.collectors })
-              }}</OText>
-              <OText variant="meta" class="tabular-nums">{{
-                t("fleet.fleets.atDesired", { count: fleet.atDesired, total: fleet.collectors })
-              }}</OText>
-            </div>
-          </div>
+              <template #value>
+                <span
+                  class="text-text-heading text-2xl leading-tight font-semibold tabular-nums"
+                  data-test="fleet-fleets-members"
+                  >{{
+                    t("fleet.fleets.membersOnline", {
+                      online: fleet.online,
+                      total: fleet.collectors,
+                    })
+                  }}</span
+                >
+              </template>
+              <template #footer>
+                <OText variant="meta" class="tabular-nums">{{
+                  t("fleet.fleets.atDesired", { count: fleet.atDesired, total: fleet.collectors })
+                }}</OText>
+              </template>
+            </KpiCard>
+          </KpiCardRow>
         </div>
       </template>
       <FleetCollectors
@@ -216,6 +255,8 @@ import { useRoute, useRouter } from "vue-router";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OText from "@/lib/core/Typography/OText.vue";
+import KpiCard from "@/components/common/KpiCard.vue";
+import KpiCardRow from "@/components/common/KpiCardRow.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { raw, useI18nTyped } from "@/types/i18n";

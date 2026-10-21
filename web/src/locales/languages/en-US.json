@@ -25203,7 +25203,8 @@
       "settings": "Settings",
       "settingsHint": "Leave a field empty to inherit the organization default shown in it",
       "settingsTitle": "Fleet settings",
-      "stableHint": "Collectors that join this fleet receive this version"
+      "stableHint": "Collectors that join this fleet receive this version",
+      "desiredHint": "Collectors in this fleet are moved to this version"
     },
     "configs": {
       "search": "Search configurations",
