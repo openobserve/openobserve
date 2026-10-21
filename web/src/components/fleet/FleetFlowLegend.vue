@@ -47,11 +47,11 @@ const filter = defineModel<PathSeverity | null>({ required: true });
 const { t } = useI18nTyped();
 
 const items = computed<{ key: PathSeverity; label: I18nText }[]>(() => [
+  { key: "healthy", label: t("fleet.flowIssues.legendHealthy") },
+  { key: "progress", label: t("fleet.flowIssues.legendProgress") },
   { key: "error", label: t("fleet.flowIssues.legendError") },
   { key: "warning", label: t("fleet.flowIssues.legendWarning") },
   { key: "info", label: t("fleet.flowIssues.legendInfo") },
-  { key: "progress", label: t("fleet.flowIssues.legendProgress") },
-  { key: "healthy", label: t("fleet.flowIssues.legendHealthy") },
   ...(props.counts.restricted
     ? [{ key: "restricted" as const, label: t("fleet.flow.metricsRestricted") }]
     : []),
