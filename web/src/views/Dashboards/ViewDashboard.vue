@@ -121,18 +121,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               v-if="config.isEnterprise == 'true' && arePanelsLoading"
               variant="outline-destructive"
-              size="icon-toolbar"
+              :size="isMobile ? 'icon-toolbar' : 'sm-toolbar'"
+              :class="{ 'min-w-21': !isMobile }"
               @click="cancelQuery"
+              :aria-label="t('panel.cancel')"
               data-test="dashboard-cancel-btn"
               icon-left="cancel"
             >
-              <OTooltip :content="t('panel.cancel')" />
+              <template v-if="!isMobile">{{ t("panel.cancel") }}</template>
+              <OTooltip v-else :content="t('panel.cancel')" />
             </OButton>
             <!-- Wrapper mode: a child-mode tooltip would hover-bind only the icon, not the labelled button. -->
             <OTooltip v-else :content="refreshTooltip" shortcut-id="dashboardRefresh">
               <OButton
                 :variant="refreshVariant"
                 :size="isMobile ? 'icon-toolbar' : 'sm-toolbar'"
+                :class="{ 'min-w-21': !isMobile }"
                 @click="refreshData()"
                 :disabled="arePanelsLoading"
                 :loading="arePanelsLoading"
