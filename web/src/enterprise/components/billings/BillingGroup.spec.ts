@@ -561,6 +561,21 @@ describe("BillingGroup.vue", () => {
       );
     });
 
+    it("renders the desktop Remove action as a ghost-destructive icon button", async () => {
+      ({ wrapper } = await mountBillingGroup({
+        members: [member],
+        renderTable: true,
+      }));
+
+      const removeButton = button(wrapper, "org-group-remove-member-child-1")!;
+      const removeLabel = i18n.global.t("billing.billingGroup.remove");
+      expect(removeLabel).toBe("Remove");
+      expect(removeButton.props("variant")).toBe("ghost-destructive");
+      expect(removeButton.props("size")).toBe("icon-sm");
+      expect(removeButton.attributes("title")).toBe(removeLabel);
+      expect(removeButton.attributes("aria-label")).toBe(removeLabel);
+    });
+
     it("removes the member with the right ids after the dialog is accepted, then reloads", async () => {
       billing.remove_billing_group_member.mockResolvedValue({ data: "ok" });
       ({ wrapper } = await mountBillingGroup({

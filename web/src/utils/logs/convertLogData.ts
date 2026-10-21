@@ -7,6 +7,7 @@ import { formatUnitValue, getUnitValue } from "@/utils/dashboard/convertDataInto
 import { dataZoomBrushStyle } from "@/utils/chartTheme";
 import { resolveSeverityFieldValue } from "@/utils/logs/statusParser";
 import { BREAKDOWN_EMPTY_LABEL, BREAKDOWN_EMPTY_VALUE } from "@/utils/logs/constants";
+import { getDefaultTheme } from "@/constants/themes";
 
 export const convertLogData = (
   x: any,
@@ -106,19 +107,8 @@ export const convertLogData = (
         itemStyle: params.itemStyle
           ? params.itemStyle
           : {
-              color: (() => {
-                // eslint-disable-next-line no-restricted-syntax -- reads the applied `dark` class off the document, not store.state.theme. This runs inside an ECharts formatter callback outside any component scope, where useTheme() is not callable.
-                const isDarkMode = document.documentElement.classList.contains("dark");
-                if (isDarkMode) {
-                  return getComputedStyle(document.body)
-                    .getPropertyValue("--color-theme-accent")
-                    .trim();
-                } else {
-                  return getComputedStyle(document.documentElement)
-                    .getPropertyValue("--color-theme-accent")
-                    .trim();
-                }
-              })(),
+              // Reads the applied `dark` class because this runs outside component scope, where useTheme() is unavailable.
+              color: getThemeAccentColor(document.documentElement.classList.contains("dark")),
             },
       },
     ],
@@ -171,8 +161,6 @@ const SEMANTIC_COLORS_LIGHT: Record<string, string> = {
   pending: "#FFC107",
   success: "#43A047",
   ok: "#43A047",
-  // untagged
-  [BREAKDOWN_EMPTY_LABEL]: "#BDBDBD",
 };
 
 const SEMANTIC_COLORS_DARK: Record<string, string> = {
@@ -193,13 +181,19 @@ const SEMANTIC_COLORS_DARK: Record<string, string> = {
   pending: "#D4A83A",
   success: "#4DAD55",
   ok: "#4DAD55",
-  [BREAKDOWN_EMPTY_LABEL]: "#707070",
 };
 
 export const formatCount = (value: number): string => {
   if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`;
   if (value >= 1_000) return `${(value / 1_000).toFixed(1).replace(/\.0$/, "")}k`;
   return String(value);
+};
+
+// The applied theme writes the accent on <body> in dark mode and on <html> in light mode.
+const getThemeAccentColor = (isDarkMode: boolean): string => {
+  const target = isDarkMode ? document.body : document.documentElement;
+  const accent = getComputedStyle(target).getPropertyValue("--color-theme-accent").trim();
+  return accent || getDefaultTheme()[isDarkMode ? "dark" : "light"].themeColor;
 };
 
 const getSemanticColor = (
@@ -231,10 +225,9 @@ export const convertStackedLogData = (
 
   const series = [...breakdownSeries.entries()].map(([category, values]) => {
     // Explicit check so a numeric 0 stays a real category; case is kept as the source sent it.
-    const label =
-      category === null || category === undefined || category === BREAKDOWN_EMPTY_VALUE
-        ? BREAKDOWN_EMPTY_LABEL
-        : String(category);
+    const isEmpty =
+      category === null || category === undefined || category === BREAKDOWN_EMPTY_VALUE;
+    const label = isEmpty ? BREAKDOWN_EMPTY_LABEL : String(category);
     return {
       name: label,
       type: "bar",
@@ -245,7 +238,9 @@ export const convertStackedLogData = (
         values[i] ?? 0,
       ]),
       itemStyle: {
-        color: getSemanticColor(label, isDarkTheme, palette, params.breakdownField),
+        color: isEmpty
+          ? getThemeAccentColor(isDarkTheme)
+          : getSemanticColor(label, isDarkTheme, palette, params.breakdownField),
       },
     };
   });
