@@ -3095,6 +3095,22 @@ pub static INGEST_RECORDS_DROPPED: Lazy<IntCounterVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
+/// HTTP trigger snapshots this region failed to apply; each failure is left for redelivery.
+pub static WORKFLOW_HOOK_SNAPSHOT_APPLY_FAILURES: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "workflow_hook_snapshot_apply_failures_total",
+            "Workflow HTTP trigger snapshots that failed to apply and will be redelivered"
+                .to_owned()
+                + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["origin_cluster"],
+    )
+    .expect("Metric created")
+});
+
 pub(crate) fn register(registry: &Registry) {
     // http latency
     registry
@@ -3121,6 +3137,9 @@ pub(crate) fn register(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(INGEST_RECORDS_DROPPED.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(WORKFLOW_HOOK_SNAPSHOT_APPLY_FAILURES.clone()))
         .expect("Metric registered");
 
     // ingester stats
@@ -3788,6 +3807,26 @@ mod tests {
         let _ = HTTP_RESPONSE_TIME.clone();
         let _ = GRPC_INCOMING_REQUESTS.clone();
         let _ = GRPC_RESPONSE_TIME.clone();
+    }
+
+    #[test]
+    fn workflow_hook_snapshot_apply_failures_is_registered_under_its_name() {
+        let registry = Registry::new();
+        register(&registry);
+        WORKFLOW_HOOK_SNAPSHOT_APPLY_FAILURES
+            .with_label_values(&["r1"])
+            .inc();
+        let names: Vec<String> = registry
+            .gather()
+            .iter()
+            .map(|family| family.name().to_string())
+            .collect();
+        assert!(
+            names.contains(&format!(
+                "{NAMESPACE}_workflow_hook_snapshot_apply_failures_total"
+            )),
+            "{names:?}"
+        );
     }
 
     #[test]

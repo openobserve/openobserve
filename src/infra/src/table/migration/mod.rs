@@ -233,6 +233,9 @@ mod m20261018_000001_create_slack_tables;
 mod m20261020_000001_create_eval_job_states_tables;
 mod m20261021_000001_status_pages_add_favicon_img;
 mod m20261024_000001_add_lease_to_org_cleanup_tasks;
+mod m20261026_000001_create_workflow_http_triggers;
+mod m20261026_000002_create_workflow_http_trigger_credentials;
+mod m20261026_000003_create_workflow_http_trigger_requests;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
 
@@ -399,6 +402,30 @@ pub(crate) async fn create_rum_pa_tables(db: &sea_orm::DatabaseConnection) -> Re
 #[cfg(any(test, feature = "test-utils"))]
 pub(crate) async fn create_slack_tables<C: sea_orm::ConnectionTrait>(db: &C) -> Result<(), DbErr> {
     m20261018_000001_create_slack_tables::create_all(db).await
+}
+
+/// Apply only the HTTP trigger tables and the tables they write, for tests in any crate.
+#[cfg(any(test, feature = "test-utils"))]
+pub(crate) async fn create_workflow_http_trigger_tables(
+    db: &sea_orm::DatabaseConnection,
+) -> Result<(), DbErr> {
+    use sea_orm_migration::MigrationTrait;
+    let manager = SchemaManager::new(db);
+    m20260720_000001_create_workflow_run_data_table::Migration
+        .up(&manager)
+        .await?;
+    m20260820_000003_create_llm_secrets::Migration
+        .up(&manager)
+        .await?;
+    m20261026_000001_create_workflow_http_triggers::Migration
+        .up(&manager)
+        .await?;
+    m20261026_000002_create_workflow_http_trigger_credentials::Migration
+        .up(&manager)
+        .await?;
+    m20261026_000003_create_workflow_http_trigger_requests::Migration
+        .up(&manager)
+        .await
 }
 
 pub struct Migrator;
@@ -622,6 +649,9 @@ impl MigratorTrait for Migrator {
             Box::new(m20261021_000001_status_pages_add_favicon_img::Migration),
             Box::new(m20261005_000001_create_fleet::Migration),
             Box::new(m20261024_000001_add_lease_to_org_cleanup_tasks::Migration),
+            Box::new(m20261026_000001_create_workflow_http_triggers::Migration),
+            Box::new(m20261026_000002_create_workflow_http_trigger_credentials::Migration),
+            Box::new(m20261026_000003_create_workflow_http_trigger_requests::Migration),
         ]
     }
 }
@@ -699,6 +729,10 @@ mod tests {
         (116, "m20261021_000001_status_pages_add_favicon_img"),
         (117, "m20261005_000001_create_fleet"),
         (118, "m20261024_000001_add_lease_to_org_cleanup_tasks"),
+        (
+            119,
+            "m20261026_000003_create_workflow_http_trigger_requests",
+        ),
     ];
 
     // Two branches that each claim the next version merge cleanly, so a reused number must fail

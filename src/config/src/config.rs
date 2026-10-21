@@ -115,7 +115,8 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 115: create rca_steering and add the input columns to rca_runs.
 // 116: add favicon_img to status_pages.
 // 117: create the fleet tables.
-pub const DB_SCHEMA_VERSION: u64 = 118;
+// 119: create the three workflow HTTP trigger tables.
+pub const DB_SCHEMA_VERSION: u64 = 119;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -3131,6 +3132,72 @@ pub struct Limit {
         help = "Default is 30 days, how many days in past to retain the errored workflow input files"
     )]
     pub workflow_error_retention_secs: i64,
+    #[env_config(
+        name = "ZO_WORKFLOW_HOOK_IP_RPM",
+        default = 6000,
+        help = "Requests per minute one client IP may send to workflow HTTP endpoints"
+    )]
+    pub workflow_hook_ip_rpm: u32,
+    #[env_config(
+        name = "ZO_WORKFLOW_HOOK_PREAUTH_SLOTS",
+        default = 256,
+        help = "Workflow HTTP endpoint requests read at once before authentication"
+    )]
+    pub workflow_hook_preauth_slots: usize,
+    #[env_config(
+        name = "ZO_WORKFLOW_HOOK_UNRESOLVED_IP_SLOTS",
+        default = 16,
+        help = "Pre-authentication slots shared by requests whose client IP is unknown"
+    )]
+    pub workflow_hook_unresolved_ip_slots: usize,
+    #[env_config(
+        name = "ZO_WORKFLOW_HOOK_ORG_RPM",
+        default = 1200,
+        help = "Workflow HTTP endpoint requests per minute per organization"
+    )]
+    pub workflow_hook_org_rpm: u32,
+    #[env_config(
+        name = "ZO_WORKFLOW_HOOK_ORG_BYTES_PER_MIN",
+        default = 16777216,
+        help = "Workflow HTTP endpoint body bytes per minute per organization; run history keeps about 3x this per minute for ZO_WORKFLOW_ERROR_RETAIN_DURATION"
+    )]
+    pub workflow_hook_org_bytes_per_min: u32,
+    #[env_config(
+        name = "ZO_WORKFLOW_HOOK_ORG_QUEUE_MAX",
+        default = 1000,
+        help = "Queued workflow HTTP runs allowed per organization"
+    )]
+    pub workflow_hook_org_queue_max: u64,
+    #[env_config(
+        name = "ZO_WORKFLOW_HOOK_ORG_CONCURRENCY",
+        default = 2,
+        help = "Workflow HTTP runs executing at once per organization, at most ZO_WORKFLOW_HOOK_CONCURRENCY"
+    )]
+    pub workflow_hook_org_concurrency: u64,
+    #[env_config(
+        name = "ZO_WORKFLOW_HOOK_CONCURRENCY",
+        default = 8,
+        help = "Workflow HTTP runs executing at once per region"
+    )]
+    pub workflow_hook_concurrency: u64,
+    #[env_config(
+        name = "ZO_WORKFLOW_HOOK_RUN_TIMEOUT",
+        default = 900,
+        help = "Seconds a workflow HTTP run may take before it is cancelled"
+    )]
+    pub workflow_hook_run_timeout_secs: u64,
+    #[env_config(
+        name = "ZO_WORKFLOW_HOOK_QUEUE_TTL",
+        default = 3600,
+        help = "Seconds a workflow HTTP run may wait in the queue before it expires"
+    )]
+    pub workflow_hook_queue_ttl_secs: u64,
+    #[env_config(
+        name = "ZO_WORKFLOW_HOOK_WORKER_DISABLED",
+        default = false,
+        help = "Never run the workflow HTTP worker on this node"
+    )]
+    pub workflow_hook_worker_disabled: bool,
 }
 
 #[derive(Serialize, EnvConfig, Default)]
@@ -4079,7 +4146,45 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 
     cfg.limit.editor_suggest_mode = normalize_editor_suggest_mode(&cfg.limit.editor_suggest_mode)?;
 
+    check_workflow_hook_limits(&mut cfg.limit);
+
     Ok(())
+}
+
+fn check_workflow_hook_limits(limit: &mut Limit) {
+    if limit.workflow_hook_ip_rpm == 0 {
+        limit.workflow_hook_ip_rpm = 6000;
+    }
+    if limit.workflow_hook_preauth_slots == 0 {
+        limit.workflow_hook_preauth_slots = 256;
+    }
+    if limit.workflow_hook_unresolved_ip_slots == 0 {
+        limit.workflow_hook_unresolved_ip_slots = 16;
+    }
+    if limit.workflow_hook_org_rpm == 0 {
+        limit.workflow_hook_org_rpm = 1200;
+    }
+    if limit.workflow_hook_org_bytes_per_min == 0 {
+        limit.workflow_hook_org_bytes_per_min = 16777216;
+    }
+    if limit.workflow_hook_org_queue_max == 0 {
+        limit.workflow_hook_org_queue_max = 1000;
+    }
+    if limit.workflow_hook_org_concurrency == 0 {
+        limit.workflow_hook_org_concurrency = 2;
+    }
+    if limit.workflow_hook_concurrency == 0 {
+        limit.workflow_hook_concurrency = 8;
+    }
+    if limit.workflow_hook_run_timeout_secs == 0 {
+        limit.workflow_hook_run_timeout_secs = 900;
+    }
+    if limit.workflow_hook_queue_ttl_secs == 0 {
+        limit.workflow_hook_queue_ttl_secs = 3600;
+    }
+    limit.workflow_hook_org_concurrency = limit
+        .workflow_hook_org_concurrency
+        .min(limit.workflow_hook_concurrency);
 }
 
 fn normalize_editor_suggest_mode(raw: &str) -> Result<String, anyhow::Error> {
@@ -6340,6 +6445,37 @@ mod tests {
              field on the /config payload — the per-signal flags were removed \
              when the config collapsed to a single switch"
         );
+    }
+
+    #[test]
+    fn workflow_hook_limits_replace_zeros_and_cap_org_concurrency() {
+        let mut cfg = Config::init().unwrap();
+        cfg.limit.workflow_hook_ip_rpm = 0;
+        cfg.limit.workflow_hook_org_bytes_per_min = 0;
+        cfg.limit.workflow_hook_queue_ttl_secs = 0;
+        cfg.limit.workflow_hook_concurrency = 3;
+        cfg.limit.workflow_hook_org_concurrency = 5;
+        check_limit_config(&mut cfg).unwrap();
+        assert_eq!(cfg.limit.workflow_hook_ip_rpm, 6000);
+        assert_eq!(cfg.limit.workflow_hook_org_bytes_per_min, 16_777_216);
+        assert_eq!(cfg.limit.workflow_hook_queue_ttl_secs, 3600);
+        assert_eq!(cfg.limit.workflow_hook_org_concurrency, 3);
+
+        let defaults = Config::init().unwrap().limit;
+        assert_eq!(
+            (
+                defaults.workflow_hook_org_rpm,
+                defaults.workflow_hook_org_bytes_per_min,
+                defaults.workflow_hook_org_queue_max,
+                defaults.workflow_hook_concurrency,
+                defaults.workflow_hook_org_concurrency,
+                defaults.workflow_hook_run_timeout_secs,
+                defaults.workflow_hook_preauth_slots,
+                defaults.workflow_hook_unresolved_ip_slots,
+            ),
+            (1200, 16_777_216, 1000, 8, 2, 900, 256, 16)
+        );
+        assert!(!defaults.workflow_hook_worker_disabled);
     }
 
     #[test]

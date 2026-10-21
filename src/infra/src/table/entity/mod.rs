@@ -148,5 +148,8 @@ pub mod users;
 pub mod workflow_associations;
 pub mod workflow_drafts;
 pub mod workflow_errors;
+pub mod workflow_http_trigger_credentials;
+pub mod workflow_http_trigger_requests;
+pub mod workflow_http_triggers;
 pub mod workflow_run_data;
 pub mod workflows;
