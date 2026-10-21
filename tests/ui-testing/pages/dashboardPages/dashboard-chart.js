@@ -706,15 +706,24 @@ export default class ChartTypeSelector {
   async enterCustomSQL(query) {
     await this.queryEditor.waitFor({ state: "visible", timeout: 10000 });
     await this.queryEditor.click();
-    await this.page.keyboard.press("Escape"); // dismiss any open Monaco suggestion
+    await this.dismissSuggestionsIfOpen();
     await this.page.keyboard.press("Control+a");
     await this.page.keyboard.press("Delete");
     // Use insertText (single input event) instead of type (per-character keydown events)
     // to prevent Monaco's autocomplete from accepting suggestions mid-input and
     // mangling the SQL (e.g. replacing table names with function calls).
     await this.page.keyboard.insertText(query);
-    await this.page.keyboard.press("Escape"); // dismiss any suggestion triggered at end
+    await this.dismissSuggestionsIfOpen();
     testLogger.debug('Entered custom SQL query', { query });
+  }
+
+  // Escape with no suggest widget open moves focus out of the editor, so only press it when needed.
+  async dismissSuggestionsIfOpen() {
+    const open = await this.page.evaluate(() => {
+      const widget = document.querySelector(".monaco-editor .suggest-widget");
+      return !!widget && (widget.classList.contains("visible") || widget.classList.contains("focused"));
+    });
+    if (open) await this.page.keyboard.press("Escape");
   }
 
   /**
