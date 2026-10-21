@@ -60,7 +60,7 @@ const PER_MINUTE: Record<Telemetry, I18nKey> = {
 export const SEVERITY_RING: Record<PathSeverity, string> = {
   error: "border-status-error-text ring-status-error-text/30 ring-2",
   warning: "border-status-warning-text ring-status-warning-text/30 ring-2",
-  progress: "border-teal-600 ring-teal-600/30 ring-2",
+  progress: "border-status-progress-text ring-status-progress-text/30 ring-2",
   info: "border-status-info-text ring-status-info-text/30 ring-2",
   healthy: "",
   restricted: "",
@@ -75,7 +75,7 @@ export const SIGNAL_STROKE: Record<Telemetry, string> = {
 export const SEVERITY_TEXT: Record<PathSeverity, string> = {
   error: "text-status-error-text",
   warning: "text-status-warning-text",
-  progress: "text-teal-600",
+  progress: "text-status-progress-text",
   info: "text-status-info-text",
   healthy: "text-text-secondary",
   restricted: "text-text-secondary",
@@ -84,7 +84,7 @@ export const SEVERITY_TEXT: Record<PathSeverity, string> = {
 export const SEVERITY_DOT: Record<PathSeverity, string> = {
   error: "bg-status-error-text",
   warning: "bg-status-warning-text",
-  progress: "bg-teal-600",
+  progress: "bg-status-progress-text",
   info: "bg-status-info-text",
   healthy: "bg-status-success-text",
   restricted: "bg-border-strong",

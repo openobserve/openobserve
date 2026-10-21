@@ -52,7 +52,9 @@ describe("FleetFlowLegend", () => {
     expect(w.find('[data-test="fleet-flow-legend-healthy"] .bg-status-success-text').exists()).toBe(
       true,
     );
-    expect(w.find('[data-test="fleet-flow-legend-progress"] .bg-teal-600').exists()).toBe(true);
+    expect(
+      w.find('[data-test="fleet-flow-legend-progress"] .bg-status-progress-text').exists(),
+    ).toBe(true);
   });
 
   it("toggles a level filter on click", async () => {
