@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { mount } from "@vue/test-utils";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { defineComponent, h, nextTick, ref } from "vue";
 
 import { MARKDOWN_FILL_EVENT } from "./markdown";
@@ -77,9 +77,41 @@ function harness(over: { savedTop?: number | "bottom"; follow?: boolean } = {}):
   };
 }
 
-function layout(el: HTMLElement, scrollHeight = 1000) {
+function layout(el: HTMLElement, scrollHeight = 1000, clientHeight = 200) {
   Object.defineProperty(el, "scrollHeight", { configurable: true, get: () => scrollHeight });
-  Object.defineProperty(el, "clientHeight", { configurable: true, get: () => 200 });
+  Object.defineProperty(el, "clientHeight", { configurable: true, get: () => clientHeight });
+}
+
+// jsdom never resizes, so the test reports a box's height by hand.
+class FakeResizeObserver {
+  static made: FakeResizeObserver[] = [];
+  observed = new Set<Element>();
+  constructor(private readonly callback: ResizeObserverCallback) {
+    FakeResizeObserver.made.push(this);
+  }
+  observe(node: Element) {
+    this.observed.add(node);
+    this.resize(node, 0);
+  }
+  unobserve(node: Element) {
+    this.observed.delete(node);
+  }
+  disconnect() {
+    this.observed.clear();
+  }
+  resize(target: Element, height: number) {
+    if (!this.observed.has(target)) return;
+    const entry = { target, contentRect: { height } } as unknown as ResizeObserverEntry;
+    this.callback([entry], this as unknown as ResizeObserver);
+  }
+}
+
+const realResizeObserver = globalThis.ResizeObserver;
+
+function fakeResizes(): () => FakeResizeObserver | undefined {
+  FakeResizeObserver.made = [];
+  vi.stubGlobal("ResizeObserver", FakeResizeObserver);
+  return () => FakeResizeObserver.made[FakeResizeObserver.made.length - 1];
 }
 
 function userScroll(el: HTMLElement, top: number) {
@@ -87,7 +119,22 @@ function userScroll(el: HTMLElement, top: number) {
   el.dispatchEvent(new Event("scroll"));
 }
 
+// A following reader at the bottom (800 of 1000) whose second turn starts `top` px from the viewport top when revealed.
+function revealSecond(t: Harness, top: number): HTMLElement {
+  layout(t.el);
+  t.el.scrollTop = 800;
+  const block = t.el.querySelector<HTMLElement>('[data-turn-id="t2"]')!;
+  vi.spyOn(t.el, "getBoundingClientRect").mockReturnValue({ top: 0 } as DOMRect);
+  vi.spyOn(block, "getBoundingClientRect").mockReturnValue({ top } as DOMRect);
+  t.api.reveal(block);
+  return block;
+}
+
 describe("useTranscriptScroll (`30` §1.3)", () => {
+  afterEach(() => {
+    vi.stubGlobal("ResizeObserver", realResizeObserver);
+  });
+
   it("rule 1: follows every committed batch to the bottom while following", async () => {
     const t = harness();
     layout(t.el, 1000);
@@ -306,6 +353,148 @@ describe("useTranscriptScroll (`30` §1.3)", () => {
     t.api.reveal(block);
     expect(t.el.scrollTop).toBe(800);
     t.unmount();
+  });
+
+  it("stays at the bottom when the log itself shrinks under a following reader", async () => {
+    const observer = fakeResizes();
+    const t = harness();
+    layout(t.el);
+    t.el.scrollTop = 800;
+    layout(t.el, 1000, 182);
+    observer()!.resize(t.el, 182);
+    await Promise.resolve();
+    expect(t.el.scrollTop).toBe(1000);
+    t.unmount();
+  });
+
+  it("leaves a reader who is not following where they are when the log shrinks", async () => {
+    const observer = fakeResizes();
+    const t = harness({ follow: false, savedTop: 300 });
+    layout(t.el);
+    layout(t.el, 1000, 182);
+    observer()!.resize(t.el, 182);
+    await Promise.resolve();
+    expect(t.el.scrollTop).toBe(300);
+    expect(t.follow.value).toBe(false);
+    t.unmount();
+  });
+
+  it("re-pins a following reader when a row grows with no batch, and keeps a revealed block's top in view", async () => {
+    const observer = fakeResizes();
+    const t = harness();
+    layout(t.el);
+    t.el.scrollTop = 800;
+    const block = t.el.querySelector<HTMLElement>('[data-turn-id="t2"]')!;
+    layout(t.el, 1052);
+    observer()!.resize(block, 52);
+    await Promise.resolve();
+    expect(t.el.scrollTop).toBe(1052);
+    vi.spyOn(t.el, "getBoundingClientRect").mockReturnValue({ top: 0 } as DOMRect);
+    const rect = vi.spyOn(block, "getBoundingClientRect").mockReturnValue({ top: -120 } as DOMRect);
+    t.api.reveal(block);
+    expect(t.el.scrollTop).toBe(932);
+    rect.mockReturnValue({ top: 0 } as DOMRect);
+    layout(t.el, 1052, 182);
+    observer()!.resize(t.el, 182);
+    await Promise.resolve();
+    expect(t.el.scrollTop).toBe(932);
+    t.unmount();
+  });
+
+  it("does not hold a revealed block that was already in view", async () => {
+    const observer = fakeResizes();
+    const t = harness();
+    const block = revealSecond(t, 10);
+    expect(t.el.scrollTop).toBe(800);
+    layout(t.el, 1052);
+    observer()!.resize(block, 52);
+    await Promise.resolve();
+    expect(t.el.scrollTop).toBe(1052);
+    t.unmount();
+  });
+
+  it("releases a revealed block when the reader leaves and scrolls back to the bottom", async () => {
+    const observer = fakeResizes();
+    const t = harness();
+    const block = revealSecond(t, -120);
+    expect(t.el.scrollTop).toBe(680);
+    userScroll(t.el, 600);
+    expect(t.follow.value).toBe(false);
+    userScroll(t.el, 800);
+    expect(t.follow.value).toBe(true);
+    layout(t.el, 1052);
+    observer()!.resize(block, 52);
+    await Promise.resolve();
+    expect(t.el.scrollTop).toBe(1052);
+    t.unmount();
+  });
+
+  it("releases a revealed block on Jump to latest", async () => {
+    const observer = fakeResizes();
+    const t = harness();
+    const block = revealSecond(t, -120);
+    t.api.jumpToLatest();
+    expect(t.el.scrollTop).toBe(1000);
+    layout(t.el, 1052);
+    observer()!.resize(block, 52);
+    await Promise.resolve();
+    expect(t.el.scrollTop).toBe(1052);
+    t.unmount();
+  });
+
+  it("releases a revealed block on the next committed batch", async () => {
+    const observer = fakeResizes();
+    const t = harness();
+    const block = revealSecond(t, -120);
+    t.content.value += 1;
+    await nextTick();
+    expect(t.el.scrollTop).toBe(1000);
+    layout(t.el, 1052);
+    observer()!.resize(block, 52);
+    await Promise.resolve();
+    expect(t.el.scrollTop).toBe(1052);
+    t.unmount();
+  });
+
+  it("rule 4: a log resize after a new turn keeps that turn's top in view", async () => {
+    const observer = fakeResizes();
+    const t = harness();
+    layout(t.el);
+    const second = t.el.querySelector<HTMLElement>('[data-turn-id="t2"]')!;
+    vi.spyOn(t.el, "getBoundingClientRect").mockReturnValue({ top: 0 } as DOMRect);
+    const rect = vi.spyOn(second, "getBoundingClientRect").mockReturnValue({ top: 640 } as DOMRect);
+    t.el.scrollTop = 0;
+    t.turn.value = "t2";
+    await nextTick();
+    expect(t.el.scrollTop).toBe(640);
+    rect.mockReturnValue({ top: 0 } as DOMRect);
+    layout(t.el, 1000, 182);
+    observer()!.resize(t.el, 182);
+    await Promise.resolve();
+    expect(t.el.scrollTop).toBe(640);
+    t.unmount();
+  });
+
+  it("lands on the real bottom when content grew during a smooth Jump to latest", async () => {
+    const t = harness({ follow: false, savedTop: 100 });
+    layout(t.el);
+    Object.defineProperty(t.el, "scrollTo", { configurable: true, value: vi.fn() });
+    t.el.scrollTop = 100;
+    t.api.jumpToLatest();
+    layout(t.el, 1200);
+    for (const top of [400, 700, 800]) userScroll(t.el, top);
+    await Promise.resolve();
+    expect(t.el.scrollTop).toBe(1200);
+    expect(t.follow.value).toBe(true);
+    t.unmount();
+  });
+
+  it("observes the log while mounted and disconnects on unmount", () => {
+    const observer = fakeResizes();
+    const t = harness();
+    expect(observer()?.observed.has(t.el)).toBe(true);
+    t.unmount();
+    expect(observer()?.observed.size).toBe(0);
   });
 
   it("ignores keys that did not land on the transcript itself", () => {
