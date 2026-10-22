@@ -491,6 +491,7 @@ pub fn assemble(
         })
         .collect();
     let kind = if header.incomplete_count > 0 {
+        header.attempted_revs = prior_header.as_ref().and_then(|h| h.attempted_revs);
         fail(&mut header, live, now, eff_secs, jitter, first_error);
         BuildKind::Partial
     } else {
@@ -743,6 +744,10 @@ fn fail(
     jitter: f64,
     error: Option<String>,
 ) {
+    // The streak counts failures of one set of revisions, so an edit starts it over.
+    if header.attempted_revs != Some(live.as_array()) {
+        header.fail_streak = 0;
+    }
     header.next_retry_at = Some(backoff_until(header.fail_streak, eff_secs, now, jitter));
     header.fail_streak = header.fail_streak.saturating_add(1);
     header.last_error_at = Some(now);
@@ -2194,6 +2199,51 @@ pub(super) mod tests {
         assert!(data(&due).refreshing);
         settle(flights).await;
         assert_eq!(engine.builds.load(Ordering::SeqCst), 4);
+    }
+
+    #[tokio::test]
+    async fn an_earlier_partial_failure_keeps_the_immediate_retry_after_an_edit() {
+        let link = link(json!([{ "type": "absolute", "start": 0, "end": 3_600_000_000_i64 }]));
+        let range = TimeRange::Absolute {
+            start: 0,
+            end: 3_600_000_000,
+        };
+        let dash = dashboard(&[("p1", "s1"), ("p2", "s2")]);
+        let engine = fake(&link, &dash);
+        engine
+            .classes
+            .lock()
+            .unwrap()
+            .insert("p1".into(), Class::Transient);
+        let flights = flights(8, 1);
+        let now = now_micros();
+        data(&read_at(engine, flights, &link, &dash, range, now).await);
+        assert_eq!(
+            header(&link, &range).await.fail_streak,
+            1,
+            "a partial build"
+        );
+        let mut edited = dashboard(&[("p1", "t1"), ("p2", "t2")]);
+        edited.updated_at = 2_000;
+        *engine.dashboard.lock().unwrap() = Some(edited.clone());
+        engine
+            .classes
+            .lock()
+            .unwrap()
+            .insert("p2".into(), Class::Transient);
+        let first = read_at(engine, flights, &link, &edited, range, now + SECOND).await;
+        assert!(data(&first).refreshing);
+        settle(flights).await;
+        let h = header(&link, &range).await;
+        assert_eq!(
+            (h.fail_streak, h.has_body()),
+            (1, true),
+            "the edit's own first failure"
+        );
+        let next = read_at(engine, flights, &link, &edited, range, now + 2 * SECOND).await;
+        assert!(data(&next).refreshing);
+        settle(flights).await;
+        assert_eq!(engine.builds.load(Ordering::SeqCst), 3);
     }
 
     #[tokio::test]
