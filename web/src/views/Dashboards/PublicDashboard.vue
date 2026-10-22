@@ -70,7 +70,7 @@
           <div
             v-if="updatedAge"
             class="border-button-outline-border rounded-default flex h-8 shrink-0 items-center gap-1.5 border pe-3 text-sm"
-            :class="ring ? 'ps-0.5' : 'ps-3'"
+            :class="ring ? 'ps-2' : 'ps-3'"
             data-test="dashboards-public-dashboard-meta"
           >
             <KioskCountdownRing
@@ -78,16 +78,9 @@
               :progress="ring.progress"
               :state="ring.state"
               :tooltip="ring.tooltip"
+              size="sm"
               data-test="dashboards-public-dashboard-next-refresh"
-            >
-              <OIcon
-                name="refresh"
-                size="sm"
-                :class="
-                  ring.state === 'spinning' ? 'text-accent motion-safe:animate-spin' : undefined
-                "
-              />
-            </KioskCountdownRing>
+            />
             <span
               class="text-text-secondary whitespace-nowrap"
               tabindex="0"
