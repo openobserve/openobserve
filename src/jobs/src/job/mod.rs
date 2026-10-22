@@ -506,6 +506,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(db::org_ingestion_tokens::run_splunk_token_reload());
     tokio::task::spawn(db::organization::watch());
     tokio::task::spawn(db::org_status::watch());
+    // KV reads are served from a per-node cache, so every node, routers included, must hear writes.
+    tokio::task::spawn(db::kv::watch());
     if let Err(e) = db::org_status::load_from_db().await {
         log::error!("Failed to load org status cache: {e}");
     }
@@ -1710,6 +1712,26 @@ mod tests {
         assert!(
             router_return < boot,
             "Slack tasks start only on the roles that ran them before"
+        );
+    }
+
+    #[test]
+    fn kv_watch_is_spawned_before_the_router_return() {
+        let source = include_str!("mod.rs");
+        let init = source
+            .split("pub async fn init()")
+            .nth(1)
+            .and_then(|rest| rest.split("mod tests {").next())
+            .expect("init() body");
+        let kv_watch = init
+            .find("tokio::task::spawn(db::kv::watch());")
+            .expect("init() must spawn db::kv::watch() or other nodes keep stale KV values");
+        let router_return = init
+            .find("if LOCAL_NODE.is_router() && LOCAL_NODE.is_single_role()")
+            .expect("router return in init()");
+        assert!(
+            kv_watch < router_return,
+            "routers serve the PKCE login callback, which reads the KV cache"
         );
     }
 
