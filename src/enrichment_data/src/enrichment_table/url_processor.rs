@@ -968,54 +968,6 @@ impl UrlCsvProcessor {
         }
     }
 
-    /// Validates that the URL is accessible and returns file size if available.
-    ///
-    /// This performs a HEAD request (not GET) to avoid downloading the entire file.
-    /// HEAD requests fetch only the response headers, not the body, making this
-    /// check fast and cheap even for multi-GB files.
-    ///
-    /// # Why validate before downloading
-    ///
-    /// 1. **Fail Fast**: Catch invalid URLs before starting the expensive download
-    /// 2. **Better Error Messages**: "404 Not Found" is more actionable than "unexpected end of
-    ///    stream" 10 minutes into a download
-    /// 3. **Cost Optimization**: Some CDNs charge for egress. Failed validations cost almost
-    ///    nothing compared to partial downloads.
-    ///
-    /// # Return Value
-    ///
-    /// Returns `Some(size)` if the server provides a Content-Length header,
-    /// `None` if the header is missing (common with dynamic/chunked responses).
-    /// The size can be logged for monitoring but isn't required for processing.
-    pub async fn validate_url(&self) -> Result<Option<u64>> {
-        let response = self.client.head(&self.url).send().await?;
-
-        // Check HTTP status. Anything outside 2xx range is a failure.
-        // Common failure codes:
-        // - 403 Forbidden: URL requires authentication or is not publicly accessible
-        // - 404 Not Found: Typo in URL or file was moved/deleted
-        // - 500 Server Error: Source server is having issues
-        if !response.status().is_success() {
-            return Err(anyhow!("URL returned status: {}", response.status()));
-        }
-
-        // Try to extract Content-Length header for logging/monitoring purposes.
-        // Note: This header is optional in HTTP and may be absent for:
-        // - Dynamically generated content
-        // - Servers using chunked transfer encoding
-        // - Misconfigured servers
-        //
-        // We return None instead of erroring if it's missing, since we can still
-        // stream the file without knowing its size upfront.
-        let content_length = response
-            .headers()
-            .get(reqwest::header::CONTENT_LENGTH)
-            .and_then(|v| v.to_str().ok())
-            .and_then(|v| v.parse::<u64>().ok());
-
-        Ok(content_length)
-    }
-
     /// Returns the URL being processed
     pub fn url(&self) -> &str {
         &self.url
@@ -1348,6 +1300,54 @@ impl UrlCsvProcessor {
         );
 
         Ok(batch_count)
+    }
+
+    /// Validates that the URL is accessible and returns file size if available.
+    ///
+    /// This performs a HEAD request (not GET) to avoid downloading the entire file.
+    /// HEAD requests fetch only the response headers, not the body, making this
+    /// check fast and cheap even for multi-GB files.
+    ///
+    /// # Why validate before downloading
+    ///
+    /// 1. **Fail Fast**: Catch invalid URLs before starting the expensive download
+    /// 2. **Better Error Messages**: "404 Not Found" is more actionable than "unexpected end of
+    ///    stream" 10 minutes into a download
+    /// 3. **Cost Optimization**: Some CDNs charge for egress. Failed validations cost almost
+    ///    nothing compared to partial downloads.
+    ///
+    /// # Return Value
+    ///
+    /// Returns `Some(size)` if the server provides a Content-Length header,
+    /// `None` if the header is missing (common with dynamic/chunked responses).
+    /// The size can be logged for monitoring but isn't required for processing.
+    async fn validate_url(&self) -> Result<Option<u64>> {
+        let response = self.client.head(&self.url).send().await?;
+
+        // Check HTTP status. Anything outside 2xx range is a failure.
+        // Common failure codes:
+        // - 403 Forbidden: URL requires authentication or is not publicly accessible
+        // - 404 Not Found: Typo in URL or file was moved/deleted
+        // - 500 Server Error: Source server is having issues
+        if !response.status().is_success() {
+            return Err(anyhow!("URL returned status: {}", response.status()));
+        }
+
+        // Try to extract Content-Length header for logging/monitoring purposes.
+        // Note: This header is optional in HTTP and may be absent for:
+        // - Dynamically generated content
+        // - Servers using chunked transfer encoding
+        // - Misconfigured servers
+        //
+        // We return None instead of erroring if it's missing, since we can still
+        // stream the file without knowing its size upfront.
+        let content_length = response
+            .headers()
+            .get(reqwest::header::CONTENT_LENGTH)
+            .and_then(|v| v.to_str().ok())
+            .and_then(|v| v.parse::<u64>().ok());
+
+        Ok(content_length)
     }
 }
 
