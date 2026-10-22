@@ -29,7 +29,7 @@ use hashbrown::HashMap;
 use openobserve_api_common::extractors::Headers;
 use openobserve_core::{
     auth::UserEmail,
-    profiles::query::{PROFILE_DURATION_COLUMN, is_snapshot_profile_type},
+    profiles::query::{PROFILE_DURATION_COLUMN, is_process_level_column, is_snapshot_profile_type},
 };
 use search::sql::visitor::histogram_interval::{
     convert_histogram_interval_to_seconds, generate_histogram_interval,
@@ -292,8 +292,15 @@ async fn profiles_series_impl(
     {
         return MetaHttpResponse::bad_request(format!("unknown group_by column: {col}"));
     }
-    let split = instance_split(&schema_fields, is_snapshot_profile_type(&profile_type));
-    let snapshots = split.as_ref().is_some_and(|s| s.snapshots);
+    let rate_filters = body
+        .filters
+        .iter()
+        .all(|f| label_column(&f.key).is_some_and(|col| is_process_level_column(&col)));
+    let mut split = instance_split(
+        &schema_fields,
+        is_snapshot_profile_type(&profile_type),
+        rate_filters,
+    );
     let group_col_ref = group_col.as_deref();
     let sql = series_sql(
         &stream,
@@ -307,14 +314,16 @@ async fn profiles_series_impl(
             Ok(r) => r,
             Err(response) => return response,
         };
-    // Only a rate-only split may fall back; summed snapshots would be N times too high.
-    if split.is_some() && !snapshots && response.hits.len() as i64 > max_rows {
+    // Past the row cap, drop the per-instance split: no rate, and snapshots sum as before.
+    if split.is_some() && response.hits.len() as i64 > max_rows {
         let sql = series_sql(&stream, &interval, &where_clause, group_col_ref, None);
         response = match run_profiles_sql(&sql_params, sql, max_rows + 1, http_span.clone()).await {
             Ok(r) => r,
             Err(response) => return response,
         };
+        split = None;
     }
+    let snapshots = split.as_ref().is_some_and(|s| s.snapshots);
     if response.hits.len() as i64 > max_rows {
         return MetaHttpResponse::bad_request(format!(
             "series has more than {max_rows} bucket and group rows; increase step, narrow the time range, or group by a label with fewer values"
@@ -409,9 +418,15 @@ fn parse_histogram_timestamp(hit: &config::utils::json::Value) -> Option<i64> {
     None
 }
 
-/// Rates need the duration column (absent on old data); snapshot types average per instance.
-fn instance_split(schema_fields: &[String], snapshot_type: bool) -> Option<InstanceSplit> {
-    let covered = !snapshot_type && schema_fields.iter().any(|f| f == PROFILE_DURATION_COLUMN);
+/// Rates need the duration column and process-level filters; snapshot types average per instance.
+fn instance_split(
+    schema_fields: &[String],
+    snapshot_type: bool,
+    rate_filters: bool,
+) -> Option<InstanceSplit> {
+    let covered = rate_filters
+        && !snapshot_type
+        && schema_fields.iter().any(|f| f == PROFILE_DURATION_COLUMN);
     (covered || snapshot_type).then(|| InstanceSplit {
         key_expr: instance_key_expr(schema_fields),
         covered,
@@ -751,15 +766,15 @@ mod tests {
     #[test]
     fn instance_split_needs_the_duration_column_or_a_snapshot_type() {
         let old: Vec<String> = ["value", "host_name"].map(String::from).to_vec();
-        assert!(instance_split(&old, false).is_none());
-        let inuse = instance_split(&old, true).unwrap();
+        assert!(instance_split(&old, false, true).is_none());
+        let inuse = instance_split(&old, true, true).unwrap();
         assert!(inuse.snapshots && !inuse.covered);
         assert_eq!(inuse.key_expr, r#"concat("host_name")"#);
 
         let new: Vec<String> = ["value", PROFILE_DURATION_COLUMN]
             .map(String::from)
             .to_vec();
-        let cpu = instance_split(&new, false).unwrap();
+        let cpu = instance_split(&new, false, true).unwrap();
         assert!(cpu.covered && !cpu.snapshots);
         assert_eq!(cpu.key_expr, "''");
         let inuse_sql = series_sql(
@@ -767,12 +782,22 @@ mod tests {
             "1 minute",
             "",
             None,
-            instance_split(&new, true).as_ref(),
+            instance_split(&new, true, true).as_ref(),
         );
         assert!(
             inuse_sql.contains("count(DISTINCT _timestamp) AS zo_snapshots"),
             "{inuse_sql}"
         );
         assert!(!inuse_sql.contains("zo_covered"), "{inuse_sql}");
+    }
+
+    #[test]
+    fn sample_level_filters_drop_the_rate_but_keep_snapshot_averaging() {
+        let new: Vec<String> = ["value", "host_name", PROFILE_DURATION_COLUMN]
+            .map(String::from)
+            .to_vec();
+        assert!(instance_split(&new, false, false).is_none());
+        let inuse = instance_split(&new, true, false).unwrap();
+        assert!(inuse.snapshots && !inuse.covered);
     }
 }

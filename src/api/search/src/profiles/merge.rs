@@ -238,8 +238,8 @@ async fn merge_profiles_impl(
     } = build_merge_result(&stacks, max_nodes);
 
     let total = if truncated {
-        match load_full_total(&sql_params, &stream, &where_clause, http_span).await {
-            Ok(v) => per_snapshot(v, snapshots),
+        match load_total(&sql_params, &stream, &where_clause, snapshots, http_span).await {
+            Ok(v) => v,
             Err(response) => return response,
         }
     } else {
@@ -346,6 +346,18 @@ pub(crate) async fn load_stacks(
     })
 }
 
+/// Full value of a query, on the same per-snapshot scale as its `StackSet`.
+pub(crate) async fn load_total(
+    params: &ProfilesSqlParams<'_>,
+    stream: &str,
+    where_clause: &str,
+    snapshots: f64,
+    http_span: Span,
+) -> Result<i64, Response> {
+    let total = load_full_total(params, stream, where_clause, http_span).await?;
+    Ok(per_snapshot(total, snapshots))
+}
+
 /// Average distinct snapshot timestamps per instance, at least 1.
 async fn load_avg_snapshots(
     params: &ProfilesSqlParams<'_>,
@@ -382,7 +394,8 @@ fn per_snapshot(value: i64, snapshots: f64) -> i64 {
     if snapshots <= 1.0 {
         value
     } else {
-        (value as f64 / snapshots).round() as i64
+        // Rounding a small stack to 0 would drop it from the tree; keep it visible.
+        ((value as f64 / snapshots).round() as i64).max(i64::from(value > 0))
     }
 }
 
@@ -421,5 +434,7 @@ mod tests {
         assert_eq!(average_snapshots(1, 3), 1.0);
         assert_eq!(per_snapshot(1_000, 4.0), 250);
         assert_eq!(per_snapshot(1_000, 1.0), 1_000);
+        assert_eq!(per_snapshot(1, 120.0), 1);
+        assert_eq!(per_snapshot(0, 120.0), 0);
     }
 }

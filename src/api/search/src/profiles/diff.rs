@@ -31,7 +31,7 @@ use utoipa::ToSchema;
 
 use super::{
     ProfilesQueryBody, ProfilesSqlParams, build_where_clause, check_stream_permission,
-    merge::{load_stacks, snapshot_instance_key},
+    merge::{StackSet, load_stacks, load_total, snapshot_instance_key},
     parse_required_time_range, require_profile_type_and_unit, resolve_timeout,
 };
 use crate::common::{
@@ -52,9 +52,9 @@ pub struct ProfilesDiffBody {
 pub struct ProfilesDiffResponse {
     pub unit: String,
     pub profile_type: String,
-    /// Baseline sample weight folded into `root` (`root.before_total`).
+    /// Baseline total over all its stacks; above `root.before_total` when `truncated`.
     pub baseline_total: i64,
-    /// Comparison sample weight folded into `root` (`root.total`).
+    /// Comparison total over all its stacks; above `root.total` when `truncated`.
     pub comparison_total: i64,
     /// True when either side exceeded the unique-stack limit.
     pub truncated: bool,
@@ -181,10 +181,31 @@ pub async fn diff_profiles(
             &stream,
             &comparison.where_clause,
             snapshot_key.as_deref(),
-            http_span
+            http_span.clone()
         ),
     );
     let (baseline_set, comparison_set) = match (baseline_res, comparison_res) {
+        (Ok(b), Ok(c)) => (b, c),
+        (Err(response), _) | (_, Err(response)) => return response,
+    };
+
+    let (baseline_full, comparison_full) = tokio::join!(
+        full_total(
+            &baseline_set,
+            &baseline_params,
+            &stream,
+            &baseline.where_clause,
+            http_span.clone()
+        ),
+        full_total(
+            &comparison_set,
+            &comparison_params,
+            &stream,
+            &comparison.where_clause,
+            http_span
+        ),
+    );
+    let full_totals = match (baseline_full, comparison_full) {
         (Ok(b), Ok(c)) => (b, c),
         (Err(response), _) | (_, Err(response)) => return response,
     };
@@ -195,7 +216,12 @@ pub async fn diff_profiles(
         root,
         top,
         tree_truncated,
-    } = build_diff_result(&baseline_set.stacks, &comparison_set.stacks, max_nodes);
+    } = build_diff_result(
+        &baseline_set.stacks,
+        &comparison_set.stacks,
+        full_totals,
+        max_nodes,
+    );
 
     Json(ProfilesDiffResponse {
         unit,
@@ -209,4 +235,20 @@ pub async fn diff_profiles(
         took: started.elapsed().as_millis() as u64,
     })
     .into_response()
+}
+
+/// Total over all stacks of a side capped to its heaviest ones; None when nothing was cut.
+async fn full_total(
+    set: &StackSet,
+    params: &ProfilesSqlParams<'_>,
+    stream: &str,
+    where_clause: &str,
+    http_span: Span,
+) -> Result<Option<i64>, Response> {
+    if !set.truncated {
+        return Ok(None);
+    }
+    load_total(params, stream, where_clause, set.snapshots, http_span)
+        .await
+        .map(Some)
 }

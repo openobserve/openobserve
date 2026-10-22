@@ -43,6 +43,23 @@ pub const INSTANCE_KEY_COLUMNS: &[&str] = &[
     "host_name",
     "process_pid",
 ];
+/// Columns constant within one process; filters on other columns can drop the profiled-time row.
+pub const PROCESS_LEVEL_COLUMNS: &[&str] = &[
+    "service_name",
+    "service_namespace",
+    "service_version",
+    "service_instance_id",
+    "deployment_environment",
+    "host_name",
+    "process_pid",
+    "process_executable_name",
+    "process_executable_path",
+    "container_id",
+    "k8s_namespace_name",
+    "k8s_pod_name",
+    "k8s_container_name",
+    "otel_scope_name",
+];
 
 /// Top-bar dimensions from `/profiles/meta`; not Tags Filter keys.
 pub const META_DIMENSION_COLUMNS: &[&str] = &["otel_scope_name", "service_name", "profile_type"];
@@ -419,10 +436,12 @@ pub fn build_merge_result(stacks: &[(String, i64)], max_nodes: usize) -> MergeRe
 pub fn build_diff_result(
     baseline: &[(String, i64)],
     comparison: &[(String, i64)],
+    full_totals: (Option<i64>, Option<i64>),
     max_nodes: usize,
 ) -> DiffResult {
     let mut root = fold_diff_stacks(baseline, comparison);
-    let (baseline_total, comparison_total) = (root.before_total, root.total);
+    let baseline_total = full_totals.0.unwrap_or(root.before_total);
+    let comparison_total = full_totals.1.unwrap_or(root.total);
     let top = diff_top_functions(baseline, comparison, baseline_total, comparison_total);
     let tree_truncated = max_nodes > 0
         && cut_tree(&mut root, max_nodes, |node| {
@@ -444,6 +463,10 @@ pub fn is_reserved_profile_column(name: &str) -> bool {
 
 pub fn is_meta_dimension_column(name: &str) -> bool {
     META_DIMENSION_COLUMNS.contains(&name)
+}
+
+pub fn is_process_level_column(name: &str) -> bool {
+    PROCESS_LEVEL_COLUMNS.contains(&name)
 }
 
 /// Columns shown in Tags Filter (`label_names`) and used with `/tag_values`.
@@ -535,8 +558,9 @@ fn cut_tree<T: CallNode>(root: &mut T, max_nodes: usize, weight: impl Fn(&T) -> 
         let parent = slots[idx].parent;
         let opens = usize::from(!slots[idx].node.children().is_empty());
         let closes = usize::from(slots[parent].pending == 1);
+        // A lighter candidate may still fit, e.g. a leaf that closes its parent's `other`.
         if kept + 1 + open_parents + opens - closes > max_nodes {
-            break;
+            continue;
         }
         kept += 1;
         slots[idx].kept = true;
@@ -954,7 +978,7 @@ mod tests {
     fn diff_top_orders_by_share_change() {
         let baseline = owned(&[("hot;main", 50), ("steady;main", 50)]);
         let comparison = owned(&[("hot;main", 180), ("steady;main", 18), ("fresh;main", 2)]);
-        let result = build_diff_result(&baseline, &comparison, DEFAULT_MAX_NODES);
+        let result = build_diff_result(&baseline, &comparison, (None, None), DEFAULT_MAX_NODES);
         assert_eq!((result.baseline_total, result.comparison_total), (100, 200));
         assert!(!result.tree_truncated);
         // Share change: steady 0.50->0.09, hot 0.50->0.90, fresh 0->0.01, main 1->1.
@@ -976,7 +1000,7 @@ mod tests {
     fn diff_cut_keeps_a_frame_heavy_only_in_the_baseline() {
         let baseline = owned(&[("old;main", 90), ("x0;main", 10)]);
         let comparison: Vec<(String, i64)> = (0..20).map(|i| (format!("x{i};main"), 5)).collect();
-        let result = build_diff_result(&baseline, &comparison, 5);
+        let result = build_diff_result(&baseline, &comparison, (None, None), 5);
         assert!(result.tree_truncated);
         assert_eq!(count_nodes(&result.root), 5);
         assert_diff_sums_hold(&result.root);
@@ -993,6 +1017,46 @@ mod tests {
             ),
             (95, 95, 0, 0)
         );
+    }
+
+    #[test]
+    fn diff_shares_use_full_totals_when_given() {
+        let baseline = owned(&[("a;main", 50)]);
+        let comparison = owned(&[("a;main", 50)]);
+        let result =
+            build_diff_result(&baseline, &comparison, (Some(100), None), DEFAULT_MAX_NODES);
+        assert_eq!((result.baseline_total, result.comparison_total), (100, 50));
+        let a = result.top.iter().find(|t| t.name == "a").unwrap();
+        assert_eq!((a.before_total, a.after_total), (50, 50));
+        // Share 0.5 -> 1.0 ranks `a` as changed instead of flat.
+        assert_eq!(result.top[0].name, "a");
+    }
+
+    #[test]
+    fn truncate_tree_keeps_a_lighter_node_that_still_fits() {
+        let mut root = fold_stacks([
+            ("h1;heavy;main", 30),
+            ("h2;heavy;main", 30),
+            ("leaf;main", 40),
+        ]);
+        assert!(truncate_tree(&mut root, 4));
+        assert_eq!(count_nodes(&root), 4);
+        let main = &root.children[0];
+        let names: Vec<&str> = main.children.iter().map(|c| c.name.as_str()).collect();
+        assert_eq!(names, vec!["leaf", OTHER_NODE_NAME]);
+        assert_eq!(main.children[1].total, 60);
+    }
+
+    #[test]
+    fn process_level_columns_include_instance_keys() {
+        assert!(
+            INSTANCE_KEY_COLUMNS
+                .iter()
+                .all(|c| is_process_level_column(c))
+        );
+        assert!(is_process_level_column("k8s_pod_name"));
+        assert!(!is_process_level_column("thread_name"));
+        assert!(!is_process_level_column("span_id"));
     }
 
     #[test]
