@@ -188,6 +188,14 @@ trait PanelSearch: Send + Sync {
         target: (StreamType, &str),
         probe: &AuthorizerProbe,
     ) -> Result<Vec<(StreamType, String)>, NotAvailableReason>;
+    /// [`authorize_tables`] as the publisher.
+    async fn authorize_tables(
+        &self,
+        org: &str,
+        user: &str,
+        tables: &[(String, String)],
+        probe: &AuthorizerProbe,
+    ) -> Result<(), NotAvailableReason>;
     #[allow(clippy::too_many_arguments)]
     async fn sql(
         &self,
@@ -222,6 +230,16 @@ impl PanelSearch for SearchEngine {
         probe: &AuthorizerProbe,
     ) -> Result<Vec<(StreamType, String)>, NotAvailableReason> {
         authorize_query(org, user, query_type, text, target, probe).await
+    }
+
+    async fn authorize_tables(
+        &self,
+        org: &str,
+        user: &str,
+        tables: &[(String, String)],
+        probe: &AuthorizerProbe,
+    ) -> Result<(), NotAvailableReason> {
+        authorize_tables(org, user, tables, probe).await
     }
 
     async fn sql(
@@ -367,6 +385,18 @@ impl AuthorizerProbe {
             .await
             .clone()
             .map_err(anyhow::Error::msg)
+    }
+
+    /// Why a denied check refuses: `Unauthorized`, or `BuildError` when the authorizer is down.
+    #[cfg(feature = "enterprise")]
+    async fn refusal(&self, org: &str, user_id: &str) -> NotAvailableReason {
+        match self.answers(org, user_id).await {
+            Ok(()) => NotAvailableReason::Unauthorized,
+            Err(e) => {
+                log::warn!("public dashboard authorizer did not answer: {e}");
+                NotAvailableReason::BuildError
+            }
+        }
     }
 }
 
@@ -1108,18 +1138,27 @@ pub async fn authorize_query(
                 .await
                 .is_some();
         if cipher_denied || !streams_allowed(org, user_id, typed.iter()).await {
-            return Err(match probe.answers(org, user_id).await {
-                Ok(()) => NotAvailableReason::Unauthorized,
-                Err(e) => {
-                    log::warn!("public dashboard authorizer did not answer: {e}");
-                    NotAvailableReason::BuildError
-                }
-            });
+            return Err(probe.refusal(org, user_id).await);
         }
         Ok(typed)
     }
     #[cfg(not(feature = "enterprise"))]
     Ok(typed_sources(query_type, text, target))
+}
+
+/// Checks the `(org, table)` enrichment tables a VRL function reads, as [`authorize_query`] does.
+#[cfg_attr(not(feature = "enterprise"), allow(unused_variables))]
+pub async fn authorize_tables(
+    org: &str,
+    user_id: &str,
+    tables: &[(String, String)],
+    probe: &AuthorizerProbe,
+) -> Result<(), NotAvailableReason> {
+    #[cfg(feature = "enterprise")]
+    if !tables_allowed(user_id, tables).await {
+        return Err(probe.refusal(org, user_id).await);
+    }
+    Ok(())
 }
 
 /// Re-authorizes a panel's data from its manifest; an error means the authorizer did not answer.
@@ -1139,6 +1178,7 @@ pub async fn authorize_manifest(
                 .flat_map(|d| d.sources.iter()),
         );
         let denied = !streams_allowed(org, user_id, streams).await
+            || !tables_allowed(user_id, &panel.enrichment_tables).await
             || !crate::authz::denied_named_cipher_keys(org, user_id, &panel.cipher_keys)
                 .await
                 .is_empty();
@@ -1355,6 +1395,13 @@ fn variable_edit_sources(
                         default_type: q.fields.stream_type,
                     }
                 });
+                let vrl = q.vrl_function_query.as_deref().map(str::trim);
+                if let Some(vrl) = vrl.filter(|f| !promql && !f.is_empty()) {
+                    sources.push(QuerySource::Vrl {
+                        org_id: link.org_id.clone(),
+                        source: vrl.to_string(),
+                    });
+                }
             }
         }
     }
@@ -1510,6 +1557,42 @@ async fn run_sql_panel(
         {
             return ctx.refused(panel, manifest, reason);
         }
+        if let Some(vrl) = q
+            .vrl_function_query
+            .as_deref()
+            .map(str::trim)
+            .filter(|f| !f.is_empty())
+        {
+            // The search may skip an uncompilable or SkipVRL function and serve the raw rows.
+            let tables = transform::enrichment_tables_read(vrl, &ctx.link.org_id)
+                .ok()
+                .filter(|_| !skips_vrl_in_search(vrl));
+            let Some(tables) = tables else {
+                manifest.unparsed = true;
+                return PanelRun::not_available(
+                    &panel.id,
+                    Class::Structural,
+                    NotAvailableReason::Unsupported,
+                    manifest,
+                    None,
+                );
+            };
+            manifest.enrichment_tables.extend(tables);
+            manifest.enrichment_tables.sort();
+            manifest.enrichment_tables.dedup();
+            if let Err(reason) = ctx
+                .search
+                .authorize_tables(
+                    &ctx.link.org_id,
+                    &ctx.link.published_by,
+                    &manifest.enrichment_tables,
+                    ctx.probe,
+                )
+                .await
+            {
+                return ctx.refused(panel, manifest, reason);
+            }
+        }
         let shifts = time_shifts(q, ctx.end, false);
         for shift in std::iter::once(None).chain(shifts.iter().map(Some)) {
             if ctx.family.is_cancelled() {
@@ -1553,6 +1636,18 @@ async fn run_sql_panel(
                 Ok(resp) => resp,
                 Err(e) => return ctx.panel_failed(panel, manifest, e),
             };
+            // The real tables can refuse a VRL the pre-check accepted; the search then skips it.
+            if req.query.query_fn.is_some()
+                && resp.function_error.iter().any(|e| is_vrl_diagnostic(e))
+            {
+                return PanelRun::not_available(
+                    &panel.id,
+                    Class::Structural,
+                    NotAvailableReason::Unsupported,
+                    manifest,
+                    None,
+                );
+            }
             let hits = resp.hits.len();
             // The wrapper also flags a clamped window as partial; only a real gap is retried.
             let partial = resp.is_partial
@@ -1740,6 +1835,19 @@ fn promql_request(
     }
 }
 
+/// Whether the search runs `vrl` only over its final result, decoded as `cache::search` decodes it.
+fn skips_vrl_in_search(vrl: &str) -> bool {
+    let decoded = config::utils::base64::decode_url(vrl).unwrap_or_else(|_| vrl.to_string());
+    search_service::cache::is_result_array_skip_vrl(&decoded)
+}
+
+/// A VRL compile error as the search reports it: a diagnostic that opens with a newline.
+fn is_vrl_diagnostic(error: &str) -> bool {
+    error
+        .strip_prefix('\n')
+        .is_some_and(|d| d.starts_with("error") || d.starts_with("warning"))
+}
+
 /// The search a SQL panel query runs, with the panel's VRL function applied as on the live panel.
 fn sql_request(
     ctx: &Ctx<'_>,
@@ -1786,6 +1894,12 @@ async fn fill_defaults(ctx: &Ctx<'_>, frozen: BTreeMap<String, serde_json::Value
         }
         if pending.depends_on.iter().any(|k| out.denied.contains(k)) {
             out.denied.insert(key);
+            defaults.settle(pending, None);
+            continue;
+        }
+        // A failed upstream leaves an empty value that the live picker never substitutes.
+        if pending.depends_on.iter().any(|k| out.failed.contains(k)) {
+            out.failed.insert(key);
             defaults.settle(pending, None);
             continue;
         }
@@ -2214,6 +2328,26 @@ async fn streams_allowed<'a>(
         }
     }
     true
+}
+
+/// Whether `user` may read every `(org, table)` enrichment table, each in its own org.
+#[cfg(feature = "enterprise")]
+async fn tables_allowed(user_id: &str, tables: &[(String, String)]) -> bool {
+    use crate::authz::QuerySource;
+    if tables.is_empty() {
+        return true;
+    }
+    let sources: Vec<QuerySource> = tables
+        .iter()
+        .map(|(org, name)| QuerySource::Stream {
+            org_id: org.clone(),
+            stream_type: StreamType::EnrichmentTables,
+            name: name.clone(),
+        })
+        .collect();
+    crate::authz::authorize_query_sources(user_id, &sources)
+        .await
+        .is_ok()
 }
 
 /// Confirms a denial through calls that return errors, which the permission check folds into false.
@@ -3252,8 +3386,12 @@ mod tests {
         series: usize,
         partial: bool,
         calls: AtomicUsize,
-        /// Refuses each query whose text contains the pattern, with this reason.
+        /// Refuses each query or enrichment table that contains the pattern, with this reason.
         refuse: Option<(NotAvailableReason, &'static str)>,
+        /// Fails each SQL search whose text contains the pattern.
+        fail_sql: Option<&'static str>,
+        /// Added to the errors of each SQL search sent with a VRL, as a failed compile reports it.
+        vrl_error: Option<String>,
         /// Each PromQL request as `(query, start, end, step)`.
         promql_reqs: std::sync::Mutex<Vec<(String, i64, i64, i64)>>,
     }
@@ -3276,6 +3414,21 @@ mod tests {
             }
         }
 
+        async fn authorize_tables(
+            &self,
+            _org: &str,
+            _user: &str,
+            tables: &[(String, String)],
+            _probe: &AuthorizerProbe,
+        ) -> Result<(), NotAvailableReason> {
+            match self.refuse {
+                Some((reason, pattern)) if tables.iter().any(|(_, t)| t.contains(pattern)) => {
+                    Err(reason)
+                }
+                _ => Ok(()),
+            }
+        }
+
         async fn sql(
             &self,
             _trace_id: &str,
@@ -3287,6 +3440,13 @@ mod tests {
             _info: Option<DashboardInfo>,
         ) -> Result<search::Response, String> {
             self.calls.fetch_add(1, Ordering::SeqCst);
+            if self.fail_sql.is_some_and(|p| req.query.sql.contains(p)) {
+                return Err("the search failed".to_string());
+            }
+            let vrl_error = self
+                .vrl_error
+                .iter()
+                .filter(|_| req.query.query_fn.is_some());
             Ok(search::Response {
                 hits: (0..self.hits)
                     .map(|i| json!({ "_timestamp": req.query.start_time, "n": i, "zo_sql_key": format!("v{i}") }))
@@ -3294,7 +3454,9 @@ mod tests {
                 total: self.hits,
                 histogram_interval: Some(60),
                 is_partial: self.partial,
-                function_error: vec!["a private error".into()],
+                function_error: std::iter::once("a private error".to_string())
+                    .chain(vrl_error.cloned())
+                    .collect(),
                 ..Default::default()
             })
         }
@@ -3759,6 +3921,224 @@ mod tests {
         assert_eq!(header.next_retry_at, stored.header.next_retry_at);
     }
 
+    /// Registers an empty enrichment table `name` in `o1`, so a VRL reading it compiles.
+    fn enrichment_table(name: &str) -> String {
+        use transform::enrichment::{ENRICHMENT_TABLES, StreamTable};
+        let key = format!("o1/enrichment_tables/{name}");
+        let table = StreamTable {
+            org_id: "o1".into(),
+            stream_name: name.into(),
+            data: std::sync::Arc::new(vec![]),
+        };
+        ENRICHMENT_TABLES.insert(key.clone(), table);
+        key
+    }
+
+    #[tokio::test]
+    async fn review_20261021_vrl_enrichment_must_reach_authorization() {
+        let table = enrichment_table("secret_lookup");
+        let search = FakeSearch {
+            hits: 1,
+            refuse: Some((NotAvailableReason::Unauthorized, "secret_lookup")),
+            ..Default::default()
+        };
+        let mut panel = typed_panel("p", "table", "sql", "SELECT * FROM s", None);
+        panel.queries[0].vrl_function_query = Some(
+            ".private = get_enrichment_table_record!(\"secret_lookup\", {\"k\": .k})".to_string(),
+        );
+        let run = run_one(&search, panel).await;
+        transform::enrichment::ENRICHMENT_TABLES.remove(&table);
+        assert_eq!(
+            run.class,
+            Class::Denied,
+            "the enrichment read must reach the authorizer; sources={:?}",
+            run.manifest.sources
+        );
+    }
+
+    #[tokio::test]
+    async fn a_vrl_enrichment_read_is_withdrawn_at_the_deadline_once_the_table_is_revoked() {
+        let table = enrichment_table("revocable_lookup");
+        let search = FakeSearch {
+            hits: 1,
+            ..Default::default()
+        };
+        let mut panel = typed_panel("p", "table", "sql", "SELECT * FROM \"s\"", None);
+        panel.queries[0].vrl_function_query =
+            Some(r#".x = get_enrichment_table_record!("revocable_lookup", {"k": .k})"#.into());
+        let built = run_one(&search, panel).await;
+        transform::enrichment::ENRICHMENT_TABLES.remove(&table);
+        assert_eq!(built.class, Class::Fresh);
+        let run = Run {
+            panels: vec![built],
+            ..Default::default()
+        };
+        let live = materialize::Live {
+            dashboard_updated_at: 1,
+            link_rev: 1,
+            settings_rev: 0,
+        };
+        let a = materialize::assemble(live, (10, 20), run, None, &BTreeSet::new(), 20, 0, 300, 0.0);
+        let stored = store::Stored {
+            header: a.header,
+            manifest: a.manifest,
+            body_zst: bytes::Bytes::new(),
+        };
+        assert_eq!(
+            stored.manifest.panels["p"].enrichment_tables,
+            [("o1".to_string(), "revocable_lookup".to_string())]
+        );
+        let (link, dash, _) = ctx_parts();
+        let engine = materialize::tests::fake(&link, &dash);
+        let header = authz_check::recheck(engine, &link, &stored, 100)
+            .await
+            .unwrap();
+        assert!(!header.is_withheld("p"));
+        engine
+            .denied
+            .lock()
+            .unwrap()
+            .insert("revocable_lookup".into());
+        let header = authz_check::recheck(engine, &link, &stored, 100)
+            .await
+            .unwrap();
+        assert!(header.is_withheld("p"));
+    }
+
+    #[cfg(all(feature = "enterprise", feature = "test-utils"))]
+    #[tokio::test]
+    async fn the_deadline_check_reads_each_enrichment_table_in_its_own_org() {
+        let checker = crate::authz::fake_checker();
+        let publisher = format!("{}@example.com", config::ider::uuid());
+        let panel = ManifestPanel {
+            enrichment_tables: vec![(config::DEFAULT_ORG.to_string(), "fallback_lookup".into())],
+            ..Default::default()
+        };
+        let probe = AuthorizerProbe(tokio::sync::OnceCell::new_with(Some(Ok(()))));
+        assert!(
+            !authorize_manifest("o1", &publisher, &panel, &probe)
+                .await
+                .unwrap()
+        );
+        checker.grant_read(
+            &publisher,
+            &crate::authz::TypedStream {
+                org_id: config::DEFAULT_ORG.to_string(),
+                stream_type: StreamType::EnrichmentTables,
+                name: "fallback_lookup".into(),
+            },
+        );
+        assert!(
+            authorize_manifest("o1", &publisher, &panel, &probe)
+                .await
+                .unwrap()
+        );
+    }
+
+    #[tokio::test]
+    async fn a_skip_vrl_function_is_structural_and_never_runs() {
+        let search = FakeSearch {
+            hits: 1,
+            ..Default::default()
+        };
+        let mut panel = typed_panel("p", "table", "sql", "SELECT * FROM \"s\"", None);
+        panel.queries[0].vrl_function_query = Some("#ResultArray#SkipVRL#\ndel(.email)".into());
+        let run = run_one(&search, panel).await;
+        assert_eq!(run.class, Class::Structural);
+        assert_eq!(
+            run.result.state,
+            PanelState::NotAvailable {
+                reason: NotAvailableReason::Unsupported
+            }
+        );
+        assert!(run.result.data.is_empty());
+        assert_eq!(search.calls.load(Ordering::SeqCst), 0);
+    }
+
+    #[tokio::test]
+    async fn a_vrl_that_does_not_compile_is_structural_and_never_runs() {
+        let search = FakeSearch {
+            hits: 1,
+            ..Default::default()
+        };
+        let mut panel = typed_panel("p", "table", "sql", "SELECT * FROM \"s\"", None);
+        panel.queries[0].vrl_function_query = Some(".x = get_enrichment_table_record(".into());
+        let run = run_one(&search, panel).await;
+        assert_eq!(run.class, Class::Structural);
+        assert_eq!(
+            run.result.state,
+            PanelState::NotAvailable {
+                reason: NotAvailableReason::Unsupported
+            }
+        );
+        assert!(run.manifest.unparsed);
+        assert_eq!(search.calls.load(Ordering::SeqCst), 0);
+    }
+
+    #[tokio::test]
+    async fn a_vrl_the_search_could_not_compile_is_structural_not_served() {
+        // The search's own compile against the real tables, e.g. a Geoip table refusing an index.
+        let error = transform::compile_vrl_function(". = [", "o1")
+            .err()
+            .unwrap()
+            .to_string();
+        assert!(is_vrl_diagnostic(&error), "{error:?}");
+        assert!(!is_vrl_diagnostic(search::PARTIAL_ERROR_RESPONSE_MESSAGE));
+        let search = FakeSearch {
+            hits: 1,
+            vrl_error: Some(error),
+            ..Default::default()
+        };
+        let mut panel = typed_panel("p", "table", "sql", "SELECT * FROM \"s\"", None);
+        assert_eq!(
+            run_one(&search, panel.clone()).await.class,
+            Class::Fresh,
+            "no VRL sent"
+        );
+        panel.queries[0].vrl_function_query = Some("del(.email)".into());
+        let run = run_one(&search, panel).await;
+        assert_eq!(run.class, Class::Structural);
+        assert_eq!(
+            run.result.state,
+            PanelState::NotAvailable {
+                reason: NotAvailableReason::Unsupported
+            }
+        );
+        assert!(run.result.data.is_empty());
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn a_link_edit_authorizes_the_vrl_the_build_applies() {
+        let (mut link, mut dash, _) = ctx_parts();
+        let v8 = dash.v8.as_mut().unwrap();
+        let mut panel = typed_panel(
+            "p",
+            "table",
+            "sql",
+            "SELECT * FROM s WHERE env = '$env'",
+            None,
+        );
+        panel.queries[0].vrl_function_query = Some(" .x = 1 ".into());
+        v8.tabs[0].panels = vec![panel];
+        v8.variables = Some(
+            serde_json::from_value(
+                json!({ "list": [{ "type": "custom", "name": "env", "label": "E", "value": "old" }] }),
+            )
+            .unwrap(),
+        );
+        link.frozen_variables = Some(json!({ "env": "old" }).to_string());
+        let after = BTreeMap::from([("env".to_string(), json!("new"))]);
+        let sources = variable_edit_sources(&link, &dash, &after);
+        assert!(
+            sources.contains(&crate::authz::QuerySource::Vrl {
+                org_id: "o1".into(),
+                source: ".x = 1".into(),
+            }),
+            "{sources:?}"
+        );
+    }
+
     #[tokio::test]
     async fn review_instant_promql_must_evaluate_at_end_only() {
         let search = FakeSearch {
@@ -4001,6 +4381,94 @@ mod tests {
             );
         }
         assert_eq!(search.calls.load(Ordering::SeqCst), 0, "no query ran");
+    }
+
+    #[tokio::test]
+    async fn review_20261021_chained_failure_must_not_execute_downstream_panel() {
+        let (link, _, family) = ctx_parts();
+        let dash = review_chained_dashboard();
+        let search = FakeSearch {
+            hits: 1,
+            refuse: Some((NotAvailableReason::BuildError, "secret_source")),
+            ..Default::default()
+        };
+        let ctx = ctx_with(&search, &link, &dash, &family);
+        let values = fill_defaults(&ctx, BTreeMap::new()).await;
+        assert!(values.failed.contains("a"));
+        let vars = QueryVars::new(&dash, values.values.clone(), None);
+        let tab = &dash.v8.as_ref().unwrap().tabs[0];
+        let run = run_panel(&ctx, &vars, &BTreeMap::new(), &values, tab, &tab.panels[0]).await;
+        assert_eq!(
+            run.class,
+            Class::Transient,
+            "a failed upstream values query must fail b's panel; failed={:?}, calls={}",
+            values.failed,
+            search.calls.load(Ordering::SeqCst)
+        );
+    }
+
+    #[tokio::test]
+    async fn chained_a_failed_values_query_fails_its_dependents_without_running_them() {
+        // `a` fails at its authorization, which runs no search, or at its search, which runs one.
+        let cases = [
+            (
+                Some((NotAvailableReason::BuildError, "secret_source")),
+                None,
+                0,
+            ),
+            (None, Some("secret_source"), 1),
+        ];
+        for (refuse, fail_sql, calls) in cases {
+            let (link, _, family) = ctx_parts();
+            let dash = review_chained_dashboard();
+            let search = FakeSearch {
+                hits: 1,
+                refuse,
+                fail_sql,
+                ..Default::default()
+            };
+            let ctx = ctx_with(&search, &link, &dash, &family);
+            let values = fill_defaults(&ctx, BTreeMap::new()).await;
+            assert_eq!(
+                values.failed,
+                BTreeSet::from(["a".to_string(), "b".to_string()]),
+                "{fail_sql:?}"
+            );
+            assert!(values.denied.is_empty());
+            let vars = QueryVars::new(&dash, values.values.clone(), None);
+            let tab = &dash.v8.as_ref().unwrap().tabs[0];
+            let run = run_panel(&ctx, &vars, &BTreeMap::new(), &values, tab, &tab.panels[0]).await;
+            assert_eq!(run.class, Class::Transient, "{fail_sql:?}");
+            assert_eq!(
+                run.error.as_deref(),
+                Some("a variable's values query failed")
+            );
+            assert_eq!(search.calls.load(Ordering::SeqCst), calls, "{fail_sql:?}");
+        }
+    }
+
+    #[tokio::test]
+    async fn chained_a_denied_dependency_wins_over_a_failed_one() {
+        let (link, mut dash, family) = ctx_parts();
+        dash.v8.as_mut().unwrap().variables = Some(serde_json::from_value(json!({"list":[
+            {"type":"query_values", "name":"a", "label":"A", "query_data":{"stream_type":"logs", "stream":"secret_source", "field":"tenant"}},
+            {"type":"query_values", "name":"x", "label":"X", "query_data":{"stream_type":"logs", "stream":"flaky_source", "field":"region"}},
+            {"type":"query_values", "name":"c", "label":"C", "query_data":{"stream_type":"logs", "stream":"public_source", "field":"svc", "filter":[
+                {"name":"tenant", "operator":"=", "value":"$a"}, {"name":"region", "operator":"=", "value":"$x"}]}}
+        ]})).unwrap());
+        let search = FakeSearch {
+            hits: 1,
+            refuse: Some((NotAvailableReason::Unauthorized, "secret_source")),
+            fail_sql: Some("flaky_source"),
+            ..Default::default()
+        };
+        let ctx = ctx_with(&search, &link, &dash, &family);
+        let values = fill_defaults(&ctx, BTreeMap::new()).await;
+        assert_eq!(
+            values.denied,
+            BTreeSet::from(["a".to_string(), "c".to_string()])
+        );
+        assert_eq!(values.failed, BTreeSet::from(["x".to_string()]));
     }
 
     #[tokio::test]

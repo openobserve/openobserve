@@ -1167,13 +1167,13 @@ pub(super) mod tests {
     const MIN: i64 = 60 * SECOND;
     const DAY_SECS: i64 = 86_400;
 
-    /// An in-process engine: panels end as `classes` says, streams in `denied` are refused.
+    /// An in-process engine: panels end as `classes` says; `denied` streams and tables are refused.
     pub(in super::super) struct Fake {
         link: Mutex<PublicDashboard>,
         dashboard: Mutex<Option<Dashboard>>,
         settings_rev: AtomicI64,
         classes: Mutex<BTreeMap<String, Class>>,
-        denied: Mutex<BTreeSet<String>>,
+        pub(in super::super) denied: Mutex<BTreeSet<String>>,
         /// None: the membership read fails.
         member: Mutex<Option<bool>>,
         authz_down: AtomicBool,
@@ -1278,7 +1278,11 @@ pub(super) mod tests {
                     .iter()
                     .flat_map(|d| d.sources.iter()),
             );
-            Ok(!streams.any(|(_, s)| denied.contains(s)))
+            Ok(!streams.any(|(_, s)| denied.contains(s))
+                && !panel
+                    .enrichment_tables
+                    .iter()
+                    .any(|(_, t)| denied.contains(t)))
         }
 
         async fn trial_ok(&self, _org: &str) -> bool {

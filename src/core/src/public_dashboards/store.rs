@@ -153,6 +153,9 @@ pub struct ManifestPanel {
     /// One of the panel's queries did not parse, so its streams can never be proven.
     #[serde(default)]
     pub unparsed: bool,
+    /// `(org, table)` of each enrichment table a VRL reads; a fallback table is the default org's.
+    #[serde(default)]
+    pub enrichment_tables: Vec<(String, String)>,
 }
 
 /// The private block: each panel's provenance and every values query a variable came from.
@@ -430,6 +433,17 @@ mod tests {
         assert!(decode(&Bytes::from(garbage)).is_err());
         assert!(decode(&bytes.slice(..bytes.len() - 3)).is_err());
         assert!(decode(&bytes).is_ok());
+    }
+
+    #[test]
+    fn a_manifest_written_before_enrichment_tables_still_decodes() {
+        let mut old = serde_json::to_value(manifest()).unwrap();
+        old["panels"]["p1"]
+            .as_object_mut()
+            .unwrap()
+            .remove("enrichment_tables");
+        let back: Manifest = serde_json::from_value(old).unwrap();
+        assert_eq!(back, manifest());
     }
 
     #[test]
