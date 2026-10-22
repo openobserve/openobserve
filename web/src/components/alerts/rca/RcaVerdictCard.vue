@@ -198,37 +198,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </dl>
 
-    <!-- Proposed actions: inert text; nothing runs from here (README non-goal). -->
-    <section
-      v-if="proposedActions.length"
-      data-test="rca-verdict-actions"
-      :aria-labelledby="actionsHeadingId"
-      class="flex max-w-225 flex-col gap-1.5"
-    >
-      <h3 :id="actionsHeadingId" class="text-text-secondary m-0 text-xs font-normal">
-        {{ t("alerts.incidents.rcaSummary.proposedActions") }}
-        <span class="text-text-secondary">
-          · {{ t("alerts.incidents.rcaSummary.proposedActionsNote") }}
-        </span>
-      </h3>
-      <ol class="m-0 flex list-none flex-col gap-1.5 p-0">
-        <li
-          v-for="(action, idx) in proposedActions"
-          :key="idx"
-          data-test="rca-verdict-action"
-          class="text-sm"
-        >
-          <span class="text-text-heading font-semibold">{{ action.title }}</span>
-          <span data-test="rca-verdict-action-kind" class="text-text-secondary text-xs">
-            · {{ rcaActionKindLabel(action.kind) }}
-          </span>
-          <p v-if="action.detail" class="text-text-secondary text-compact m-0 break-words">
-            {{ action.detail }}
-          </p>
-        </li>
-      </ol>
-    </section>
-
     <!-- The server refused to start a run (AI credits, paid usage declined); no run records it. -->
     <RcaBlockedBanner
       v-if="refusal"
@@ -489,7 +458,6 @@ import type {
 } from "@/services/incidents";
 import {
   RCA_OUTCOME_PILL,
-  rcaActionKindLabel,
   rcaBandLabel,
   rcaBandLevel,
   rcaUtcRange,
@@ -547,7 +515,7 @@ const props = withDefaults(
     refusal?: RcaRefusal | null;
     /** AI credits a re-analysis uses; unset outside cloud. */
     reanalyzeCreditCost?: number | null;
-    /** Impacted services and proposed actions of the shown completed run's verdict. */
+    /** Impacted services of the shown completed run's verdict. */
     verdictDetails?: RcaVerdictDetails | null;
   }>(),
   {
@@ -632,14 +600,10 @@ const partial = computed(
 );
 const graded = computed(() => outcome.value !== null);
 
-/** A graded run's stored impacted services and proposed actions. */
+/** A graded run's stored impacted services. */
 const impactedServices = computed(() =>
   graded.value ? (props.verdictDetails?.impactedServices ?? []) : [],
 );
-const proposedActions = computed(() =>
-  graded.value ? (props.verdictDetails?.proposedActions ?? []) : [],
-);
-const actionsHeadingId = useId();
 
 const pill = computed<{
   tone: RcaPillTone;

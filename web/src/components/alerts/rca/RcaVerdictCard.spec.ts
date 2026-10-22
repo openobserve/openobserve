@@ -447,13 +447,10 @@ describe("RcaVerdictCard", () => {
       expect(wrapper.emitted("show-blind-spots")).toHaveLength(1);
     });
 
-    it("B: shows the stored impacted services and proposed actions as text only", () => {
+    it("B: shows the stored impacted services; proposed actions have their own section", () => {
       const verdictDetails = {
         impactedServices: ["service=checkout-api", "service=orders-db"],
-        proposedActions: [
-          { title: "Roll back 4f2c1e", kind: "rollback", detail: "Revert the pool size change." },
-          { title: "Watch pool usage", kind: "other", detail: "" },
-        ],
+        proposedActions: [{ title: "Roll back 4f2c1e", kind: "rollback", detail: "" }],
       };
       const wrapper = mountCard({
         cardState: "analyzed",
@@ -462,18 +459,10 @@ describe("RcaVerdictCard", () => {
       });
 
       expect(text(wrapper, "rca-verdict-services")).toBe("service=checkout-api, service=orders-db");
-      const actions = wrapper.findAll('[data-test="rca-verdict-action"]');
-      expect(actions).toHaveLength(2);
-      expect(actions[0].text()).toContain("Roll back 4f2c1e");
-      expect(actions[0].find('[data-test="rca-verdict-action-kind"]').text()).toBe("· Rollback");
-      expect(actions[0].find("p").text()).toBe("Revert the pool size change.");
-      expect(actions[1].find('[data-test="rca-verdict-action-kind"]').text()).toBe("· Other");
-      expect(actions[1].find("p").exists()).toBe(false);
-      // Inert: no control runs an action.
-      expect(byTest(wrapper, "rca-verdict-actions").findAll("button, a")).toHaveLength(0);
+      expect(wrapper.text()).not.toContain("Roll back 4f2c1e");
     });
 
-    it("a run that is not graded shows no services or actions", () => {
+    it("a run that is not graded shows no services", () => {
       const verdictDetails = {
         impactedServices: ["service=checkout-api"],
         proposedActions: [{ title: "Roll back", kind: "rollback", detail: "" }],
@@ -485,7 +474,6 @@ describe("RcaVerdictCard", () => {
       });
 
       expect(byTest(wrapper, "rca-verdict-services").exists()).toBe(false);
-      expect(byTest(wrapper, "rca-verdict-actions").exists()).toBe(false);
     });
 
     it("the breakdown names the caps that lowered the band and what the next level needs (CG §5.3.4)", async () => {

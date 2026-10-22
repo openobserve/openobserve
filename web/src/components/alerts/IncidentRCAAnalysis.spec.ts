@@ -910,13 +910,13 @@ describe("IncidentRCAAnalysis", () => {
       proposedActions: [{ title: "Roll back 4f2c1e", kind: "rollback", detail: "" }],
     };
 
-    it("a graded run's card shows its stored impacted services and proposed actions", async () => {
+    it("a graded run shows its stored impacted services and, below blind spots, its proposed actions", async () => {
       answers.runSummary = rcaRunSummary();
       wrapper = mountPanel({ ...completedProps(), reportVerdict: VERDICT_DETAILS });
       await flushPromises();
 
       expect(byTest(wrapper, "rca-verdict-services").text()).toBe("service=checkout-api");
-      expect(byTest(wrapper, "rca-verdict-action").text()).toContain("Roll back 4f2c1e");
+      expect(byTest(wrapper, "rca-proposed-action").text()).toContain("Roll back 4f2c1e");
     });
 
     it("a live run never shows the earlier run's services or actions", async () => {
@@ -927,7 +927,7 @@ describe("IncidentRCAAnalysis", () => {
       await flushPromises();
 
       expect(byTest(wrapper, "rca-verdict-services").exists()).toBe(false);
-      expect(byTest(wrapper, "rca-verdict-actions").exists()).toBe(false);
+      expect(byTest(wrapper, "rca-proposed-actions").exists()).toBe(false);
     });
 
     it("legacy (VE42): the Analyzed card and the markdown report, none of the new sections", async () => {

@@ -166,6 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :triggering="triggering"
           @resume="resumeLatest"
         />
+        <RcaProposedActions v-if="proposedActions.length" :actions="proposedActions" />
         <!-- The shown run's markdown, collapsed under its structured record. -->
         <OCollapsible
           v-if="showFullReport"
@@ -317,6 +318,7 @@ import RcaBlockedBanner from "./rca/RcaBlockedBanner.vue";
 import RcaBlindSpots from "./rca/RcaBlindSpots.vue";
 import RcaEvidenceList from "./rca/RcaEvidenceList.vue";
 import RcaHypotheses from "./rca/RcaHypotheses.vue";
+import RcaProposedActions from "./rca/RcaProposedActions.vue";
 import RcaThreadColumn from "./rca/RcaThreadColumn.vue";
 import RcaGuidanceDialog from "./rca/RcaGuidanceDialog.vue";
 import RcaVerdictCard from "./rca/RcaVerdictCard.vue";
@@ -529,6 +531,10 @@ const ownReportLoading = computed(() => ownsReport.value && props.reportLoading)
 /** The shown completed run's impacted services and proposed actions (inert text). */
 const ownVerdict = computed(() =>
   ownsReport.value && cardState.value === "analyzed" ? props.reportVerdict : null,
+);
+/** A graded run's proposed actions. */
+const proposedActions = computed(() =>
+  recordSummary.value?.card.outcome ? (ownVerdict.value?.proposedActions ?? []) : [],
 );
 
 /** The latest run is paused for an answer; a picked run never is. */
