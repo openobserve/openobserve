@@ -47,7 +47,7 @@ test.describe("assistant chats in two tabs", () => {
 
   const elsewhere = (assistant) => assistant.container().locator('[data-test="assistant-shell-elsewhere"]');
 
-  test("XTAB-01 a second tab opening a running chat follows it with Send locked and Stop offered", async ({
+  test("XTAB-01 a second tab opening a running chat follows it with Send locked and Stop offered", { tag: ["@mock", "@stack-ee"] }, async ({
     context,
     page,
   }) => {
@@ -73,7 +73,7 @@ test.describe("assistant chats in two tabs", () => {
     await expect(b.composer()).toHaveValue("and the payments service?");
   });
 
-  test("XTAB-04 Stop in the second tab ends the answer in the first and says where it was stopped", async ({
+  test("XTAB-04 Stop in the second tab ends the answer in the first and says where it was stopped", { tag: ["@mock"] }, async ({
     context,
     page,
   }) => {
@@ -94,7 +94,7 @@ test.describe("assistant chats in two tabs", () => {
     await expect(elsewhere(b)).toHaveCount(0, { timeout: 30_000 });
   });
 
-  test("XTAB-06 a second tab polls a running chat every 4 s, then every 15 s, and stops at ten minutes with Refresh", async ({
+  test("XTAB-06 a second tab polls a running chat every 4 s, then every 15 s, and stops at ten minutes with Refresh", { tag: ["@mock"] }, async ({
     context,
     page,
   }) => {
@@ -144,7 +144,7 @@ test.describe("assistant chats in two tabs", () => {
     await page.evaluate(() => window.__o2mock.release?.());
   });
 
-  test("XTAB-09 a browser-only chat written from two tabs keeps every turn in order", async ({ context, page }) => {
+  test("XTAB-09 a browser-only chat written from two tabs keeps every turn in order", { tag: ["@mock"] }, async ({ context, page }) => {
     test.setTimeout(150_000);
     await start(context, page, { persistence: false });
     const a = await openOnLogs(page);
@@ -170,7 +170,7 @@ test.describe("assistant chats in two tabs", () => {
     expect(stored.rev).toBeGreaterThanOrEqual(3);
   });
 
-  test("XTAB-01 the other tab's header lights working within 500 ms of the send", async ({ context, page }) => {
+  test("XTAB-01 the other tab's header lights working within 500 ms of the send", { tag: ["@mock", "@stack-ee"] }, async ({ context, page }) => {
     await start(context, page);
     const a = await openOnLogs(page);
     const tabB = await context.newPage();
@@ -193,7 +193,7 @@ test.describe("assistant chats in two tabs", () => {
     expect(litAt - sentAt).toBeLessThanOrEqual(500);
   });
 
-  test("XTAB-02 a Send racing another device's turn is refused turn_busy, the prompt comes back and nothing is stored", async ({
+  test("XTAB-02 a Send racing another device's turn is refused turn_busy, the prompt comes back and nothing is stored", { tag: ["@mock", "@stack-ee"] }, async ({
     browser,
     context,
     page,
@@ -228,7 +228,7 @@ test.describe("assistant chats in two tabs", () => {
     await device.close();
   });
 
-  test("XTAB-06 a hidden second tab stops polling and reads once it is visible again", async ({ context, page }) => {
+  test("XTAB-06 a hidden second tab stops polling and reads once it is visible again", { tag: ["@mock"] }, async ({ context, page }) => {
     test.setTimeout(120_000);
     await start(context, page);
     const a = await openOnLogs(page);
@@ -268,7 +268,7 @@ test.describe("assistant chats in two tabs", () => {
     await page.evaluate(() => window.__o2mock.release?.());
   });
 
-  test("XTAB-09 legacyTab: a flag-off tab writing the same browser chat keeps the database at version 2 and loses no turn", async ({
+  test("XTAB-09 legacyTab: a flag-off tab writing the same browser chat keeps the database at version 2 and loses no turn", { tag: ["@mock"] }, async ({
     context,
     page,
   }) => {

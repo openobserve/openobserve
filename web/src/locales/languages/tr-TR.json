@@ -19655,7 +19655,10 @@
     "pagination": {
       "pagination": "Sayfalama",
       "previousPage": "Önceki sayfa",
-      "nextPage": "Sonraki sayfa"
+      "nextPage": "Sonraki sayfa",
+      "firstPage": "İlk sayfa",
+      "lastPage": "Son sayfa",
+      "recordsPerPage": "Sayfa başına kayıtlar"
     },
     "select": {
       "more": "daha fazla",

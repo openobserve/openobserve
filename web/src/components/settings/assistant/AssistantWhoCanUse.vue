@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #whereToGrant>
           <router-link
             v-if="page.isAdmin.value"
-            class="text-text-link hover:text-text-link-hover underline"
+            class="text-text-link-hover underline hover:no-underline"
             data-test="settings-assistant-roles-link"
             :to="{ name: 'roles', query: { org_identifier: page.org.value } }"
             >{{ whereToGrant }}</router-link

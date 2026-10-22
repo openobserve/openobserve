@@ -32,6 +32,7 @@ import {
   registerEscapeRung,
   resetAssistantShortcutsForTests,
   runEscapeLadder,
+  useAssistantOpenChord,
   useAssistantShortcuts,
 } from "./shortcuts";
 
@@ -65,16 +66,23 @@ const visible = (id: string, caps: ShortcutCapabilities) => {
   return !entry.visible || entry.visible(caps);
 };
 
-function mountShortcuts(gate: GateCode, canChat = gate === "available" || gate === "unhealthy") {
+// The header button binds the open chord and the host the rest; a layout mounts both.
+function mountShortcuts(
+  gate: GateCode,
+  canChat = gate === "available" || gate === "unhealthy",
+  layers: { chord?: boolean; host?: boolean } = { chord: true, host: true },
+) {
   const gateRef = ref(gate);
   const canChatRef = ref(canChat);
   const wrapper = mount(
     defineComponent({
       setup() {
-        useAssistantShortcuts({
+        const options = {
           gate: computed(() => gateRef.value),
           assistantCanChat: computed(() => canChatRef.value),
-        });
+        };
+        if (layers.chord) useAssistantOpenChord(options);
+        if (layers.host) useAssistantShortcuts(options);
         return () =>
           h("div", [
             h("div", { "data-assistant-root": "" }, [h("textarea", { "data-test": "composer" })]),
@@ -148,6 +156,27 @@ describe("registration", () => {
     second.wrapper.unmount();
     await flushPromises();
     expect(getManager()!.getById("assistantOpen")).toBeUndefined();
+  });
+
+  it("leaves the open chord to the header button, so the host never binds a duplicate", async () => {
+    const host = mountShortcuts("available", true, { host: true });
+    await flushPromises();
+    expect(getManager()!.getById("assistantOpen")).toBeUndefined();
+    expect(getManager()!.getById("assistantHistory")).toBeDefined();
+    host.wrapper.unmount();
+  });
+
+  it("opens from the chord before the async host has mounted", async () => {
+    const header = mountShortcuts("available", true, { chord: true });
+    await flushPromises();
+    press("i", { ctrlKey: true });
+    expect(openAssistant).toHaveBeenCalledTimes(1);
+    const host = mountShortcuts("available", true, { host: true });
+    await flushPromises();
+    press("i", { ctrlKey: true });
+    expect(openAssistant).toHaveBeenCalledTimes(2);
+    host.wrapper.unmount();
+    header.wrapper.unmount();
   });
 
   it("binds once per tab even when two layouts mount", async () => {

@@ -70,7 +70,7 @@ test.describe("assistant doors", () => {
     assistant = new AssistantPage(page);
   });
 
-  test("DOOR-01 explains a log row by keyboard in one activation", async ({ page }) => {
+  test("DOOR-01 explains a log row by keyboard in one activation", { tag: ["@mock", "@stack-ee", "@responsive"] }, async ({ page }) => {
     await gotoLogs(page);
     await focusRowToolbar(page);
     await tabTo(page, "ai-entry-log-row-explain");
@@ -104,7 +104,7 @@ test.describe("assistant doors", () => {
     return item;
   }
 
-  test("DOOR-02 Add field to chat keeps the record drawer open beside the pinned panel, ticks, and sends only on Send", async ({ page }) => {
+  test("DOOR-02 Add field to chat keeps the record drawer open beside the pinned panel, ticks, and sends only on Send", { tag: ["@mock", "@stack-ee"] }, async ({ page }) => {
     await gotoLogs(page);
     await assistant.open("header");
     const drawer = await openRecordDrawer(page);
@@ -128,7 +128,7 @@ test.describe("assistant doors", () => {
     await expect(drawer).toBeVisible();
   });
 
-  test("DOOR-02 after a reload with the panel pinned, the record drawer still stops at the panel's edge", async ({ page }) => {
+  test("DOOR-02 after a reload with the panel pinned, the record drawer still stops at the panel's edge", { tag: ["@mock", "@stack-ee"] }, async ({ page }) => {
     await gotoLogs(page);
     await assistant.open("header");
     await page.reload({ waitUntil: "domcontentloaded" });
@@ -144,7 +144,7 @@ test.describe("assistant doors", () => {
     await expect(drawer).toBeVisible();
   });
 
-  test("DOOR-02 Explain from an open record drawer opens the panel beside it without remounting the drawer", async ({ page }) => {
+  test("DOOR-02 Explain from an open record drawer opens the panel beside it without remounting the drawer", { tag: ["@mock", "@stack-ee"] }, async ({ page }) => {
     await gotoLogs(page);
     const drawer = await openRecordDrawer(page);
     const tableTab = page.locator('[data-test="log-detail-table-tab"]').first();
@@ -171,7 +171,7 @@ test.describe("assistant doors", () => {
       .toBe(true);
   });
 
-  test("DOOR-02 with the panel hidden, Add field from the record drawer leaves the toast's Open usable", async ({ page }) => {
+  test("DOOR-02 with the panel hidden, Add field from the record drawer leaves the toast's Open usable", { tag: ["@mock", "@stack-ee"] }, async ({ page }) => {
     await gotoLogs(page);
     const drawer = await openRecordDrawer(page);
     await (await fieldMenuItem(page, 0, "ai-entry-log-field-add")).click();
@@ -185,7 +185,7 @@ test.describe("assistant doors", () => {
     await expect(drawer).toBeVisible();
   });
 
-  test("DOOR-02 closing the pinned panel keeps the record drawer, its tab and the focus", async ({ page }) => {
+  test("DOOR-02 closing the pinned panel keeps the record drawer, its tab and the focus", { tag: ["@mock", "@stack-ee"] }, async ({ page }) => {
     await gotoLogs(page);
     await assistant.open("header");
     const drawer = await openRecordDrawer(page);
@@ -207,7 +207,7 @@ test.describe("assistant doors", () => {
       .toBe(true);
   });
 
-  test("DOOR-12 a second Add never removes the chip", async ({ page }) => {
+  test("DOOR-12 a second Add never removes the chip", { tag: ["@mock"] }, async ({ page }) => {
     await gotoLogs(page);
     await openRecordDrawer(page);
     await (await fieldMenuItem(page, 0, "ai-entry-log-field-add")).click();
@@ -219,7 +219,7 @@ test.describe("assistant doors", () => {
     expect(await streamRequests(page)).toBe(0);
   });
 
-  test("DOOR-03 explains three selected rows as one chip with a reproducing query, capped above 20", async ({ page }) => {
+  test("DOOR-03 explains three selected rows as one chip with a reproducing query, capped above 20", { tag: ["@mock"] }, async ({ page }) => {
     await gotoLogs(page);
     const boxes = table(page).locator('tbody [role="checkbox"]');
     for (let i = 0; i < 3; i += 1) await boxes.nth(i).click();
@@ -233,7 +233,7 @@ test.describe("assistant doors", () => {
     await expect(door).toHaveAttribute("aria-disabled", "true");
   });
 
-  test("DOOR-05 the empty-state door names SQL mode and the absolute range", async ({ page }) => {
+  test("DOOR-05 the empty-state door names SQL mode and the absolute range", { tag: ["@mock"] }, async ({ page }) => {
     await gotoLogs(page);
     await page.locator('[data-test="logs-search-bar-sql-mode-toggle-btn"]').click().catch(() => undefined);
     const editor = page.locator('[data-test="logs-search-bar-query-editor"] .monaco-editor').first();
@@ -250,7 +250,7 @@ test.describe("assistant doors", () => {
     await expect(prompt).toContainText(/\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/);
   });
 
-  test("DOOR-08 a row Explain while an answer runs is staged and sent only on Send", async ({ page }) => {
+  test("DOOR-08 a row Explain while an answer runs is staged and sent only on Send", { tag: ["@mock"] }, async ({ page }) => {
     await gotoLogs(page);
     await assistant.open("header");
     await assistant.send("first question", "slow");
@@ -262,7 +262,7 @@ test.describe("assistant doors", () => {
     expect(await streamRequests(page)).toBe(1);
   });
 
-  test("DOOR-11 a send door never sends over an unfinished draft", async ({ page }) => {
+  test("DOOR-11 a send door never sends over an unfinished draft", { tag: ["@mock"] }, async ({ page }) => {
     await gotoLogs(page);
     await assistant.open("header");
     await assistant.composer().fill("half a thought");
@@ -275,7 +275,7 @@ test.describe("assistant doors", () => {
     expect((await entryEvents(page)).at(-1)).toMatchObject({ sends: false });
   });
 
-  test("DOOR-09 every door id on Logs follows the pattern and the header keeps menu-link-ai-item", async ({ page }) => {
+  test("DOOR-09 every door id on Logs follows the pattern and the header keeps menu-link-ai-item", { tag: ["@mock"] }, async ({ page }) => {
     await gotoLogs(page);
     await focusRowToolbar(page);
     await openRecordDrawer(page);
@@ -285,7 +285,7 @@ test.describe("assistant doors", () => {
     await expect(page.locator('[data-test="menu-link-ai-item"]')).toHaveCount(1);
   });
 
-  test("DOOR-10 a deep link stages and never sends, and strips its keys", async ({ page }) => {
+  test("DOOR-10 a deep link stages and never sends, and strips its keys", { tag: ["@mock"] }, async ({ page }) => {
     await gotoLogs(page);
     await page.goto(`${harness.ENV.appUrl}/logs?org_identifier=${harness.ENV.org}&assistant=explain&object=alert&ref=does-not-exist`, {
       waitUntil: "domcontentloaded",
@@ -296,7 +296,7 @@ test.describe("assistant doors", () => {
     expect(await streamRequests(page)).toBe(0);
   });
 
-  test("DOOR-10 a deep link to a real alert stages its chip and prompt, sends nothing, and never fetches a path-shaped ref", async ({ page }) => {
+  test("DOOR-10 a deep link to a real alert stages its chip and prompt, sends nothing, and never fetches a path-shaped ref", { tag: ["@mock"] }, async ({ page }) => {
     const alert = fixture("doors-alert.json");
     const fetched = [];
     await page.context().route(/\/api\/v2\/[^/]+\/alerts\/[^?]+/, (route) => {
@@ -323,7 +323,7 @@ test.describe("assistant doors", () => {
     expect(fetched).toEqual([`/api/v2/${harness.ENV.org}/alerts/${alert.id}`]);
   });
 
-  test("DOOR-04 panel Explain sends the panel as a chip into a dashboard thread", async ({ page }) => {
+  test("DOOR-04 panel Explain sends the panel as a chip into a dashboard thread", { tag: ["@mock", "@stack-ee"] }, async ({ page }) => {
     const created = await page.request.post(api("/dashboards?folder=default"), { headers: auth(), data: fixture("doors-dashboard.json") });
     expect(created.ok()).toBe(true);
     const id = (await created.json()).v5.dashboardId;
@@ -349,7 +349,7 @@ test.describe("assistant doors", () => {
     }
   });
 
-  test("SEC-05 a secret in a row is redacted before it reaches the wire", async ({ page }) => {
+  test("SEC-05 a secret in a row is redacted before it reaches the wire", { tag: ["@mock"] }, async ({ page }) => {
     const { PAYLOADS } = await import("./harness/fixtures/payloads.mjs");
     const row = PAYLOADS.secret_in_row;
     const ingested = await page.request.post(api("/e2e_secret_row/_json"), {
@@ -376,7 +376,7 @@ test.describe("assistant doors", () => {
     expect(body).toContain("[redacted]");
   });
 
-  test("PERF-01 door activations paint their tick within 100 ms p95 at 4× CPU throttle", async ({ page }) => {
+  test("PERF-01 door activations paint their tick within 100 ms p95 at 4× CPU throttle", { tag: ["@mock"] }, async ({ page }) => {
     await gotoLogs(page);
     // The composer holds at most 20 rows, so each round starts from an empty one.
     const clearChips = () =>
@@ -428,7 +428,7 @@ test.describe("assistant doors", () => {
     if (!process.env.CI) expect(p95).toBeLessThanOrEqual(100);
   });
 
-  test("touch: the row kebab mirrors the doors below md with 2.75rem items", async ({ page }) => {
+  test("touch: the row kebab mirrors the doors below md with 2.75rem items", { tag: ["@mock"] }, async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 });
     await gotoLogs(page);
     const kebab = page.locator('[data-test="logs-search-result-row-menu"]').first();
@@ -441,7 +441,7 @@ test.describe("assistant doors", () => {
     await expect(page.locator('[role="menu"]')).toContainText("Sends this row and asks the assistant to explain it");
   });
 
-  test("DOOR-06 the DBM fix door opens its own Database thread, not the open chat", async ({ page }) => {
+  test("DOOR-06 the DBM fix door opens its own Database thread, not the open chat", { tag: ["@mock"] }, async ({ page }) => {
     const deadlocks = fixture("doors-deadlocks.json");
     deadlocks.hits[0].timestamp = (Date.now() - 10 * 60_000) * 1000;
     await page.context().route(/\/db_monitoring\/deadlocks/, (route) =>

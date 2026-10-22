@@ -112,7 +112,7 @@ test.describe("assistant incident analysis", () => {
     await mockIncident(page);
   });
 
-  test("RCA-01 the analysis streams with a status card; Stop cancels it and the incident stays actionable", async ({
+  test("RCA-01 the analysis streams with a status card; Stop cancels it and the incident stays actionable", { tag: ["@mock", "@stack-ee"] }, async ({
     page,
   }) => {
     const panel = await openAnalysis(page);
@@ -148,7 +148,7 @@ test.describe("assistant incident analysis", () => {
     await expect(acknowledge).toBeEnabled();
   });
 
-  test("RCA-02 Ask about this report opens the assistant with the incident and report chips", async ({
+  test("RCA-02 Ask about this report opens the assistant with the incident and report chips", { tag: ["@mock"] }, async ({
     page,
   }) => {
     test.setTimeout(60_000);
@@ -174,7 +174,7 @@ test.describe("assistant incident analysis", () => {
     );
   });
 
-  test("RCA-03 a re-analysis answers 202 and is followed to its end through the event log", async ({
+  test("RCA-03 a re-analysis answers 202 and is followed to its end through the event log", { tag: ["@mock"] }, async ({
     page,
   }) => {
     test.setTimeout(90_000);
@@ -214,7 +214,7 @@ test.describe("assistant incident analysis", () => {
     await expect(panel.locator('[data-test="rca-error-card"]')).toHaveCount(0);
   });
 
-  test("RCA-04 a run already in progress is its own running state with Stop, not analysis off", async ({
+  test("RCA-04 a run already in progress is its own running state with Stop, not analysis off", { tag: ["@mock"] }, async ({
     page,
   }) => {
     const panel = await openAnalysis(page);
@@ -239,7 +239,7 @@ test.describe("assistant incident analysis", () => {
     );
   });
 
-  test("RCA-05 analysis turned off for the priority and for the org are told apart", async ({
+  test("RCA-05 analysis turned off for the priority and for the org are told apart", { tag: ["@mock"] }, async ({
     page,
   }) => {
     const panel = await openAnalysis(page);
@@ -261,7 +261,7 @@ test.describe("assistant incident analysis", () => {
     );
   });
 
-  test("RCA-06 a dropped stream reconnects through the event log and catches up", async ({
+  test("RCA-06 a dropped stream reconnects through the event log and catches up", { tag: ["@mock"] }, async ({
     page,
   }) => {
     test.setTimeout(60_000);
@@ -289,7 +289,7 @@ test.describe("assistant incident analysis", () => {
     );
   });
 
-  test("RCA-07 Jump to is a full-width select on a phone and a side list on a desktop", async ({
+  test("RCA-07 Jump to is a full-width select on a phone and a side list on a desktop", { tag: ["@mock"] }, async ({
     page,
   }) => {
     test.setTimeout(60_000);
@@ -321,7 +321,7 @@ test.describe("assistant incident analysis", () => {
     await expect(panel.locator("#rca-section-2")).toBeFocused();
   });
 
-  test("RCA-08 with rca_enabled in /config the gate shows before any click", async ({
+  test("RCA-08 with rca_enabled in /config the gate shows before any click", { tag: ["@mock"] }, async ({
     context,
     page,
   }) => {
@@ -331,7 +331,7 @@ test.describe("assistant incident analysis", () => {
     await expect(panel.locator('[data-test="trigger-rca-btn"]')).toHaveCount(0);
   });
 
-  test("RCA-09 with re-analysis streaming on the server, the re-run streams like the first run", async ({
+  test("RCA-09 with re-analysis streaming on the server, the re-run streams like the first run", { tag: ["@mock"] }, async ({
     page,
   }) => {
     test.setTimeout(60_000);

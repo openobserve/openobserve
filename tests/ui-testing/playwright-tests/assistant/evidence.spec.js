@@ -60,7 +60,7 @@ test.describe("assistant evidence", () => {
     assistant = new AssistantPage(page);
   });
 
-  test("EVID-01 Open in Logs carries the exact SQL, stream and absolute range and never runs it", async ({ page }) => {
+  test("EVID-01 Open in Logs carries the exact SQL, stream and absolute range and never runs it", { tag: ["@mock", "@stack-ee"] }, async ({ page }) => {
     await openOnLogs(page);
     await ask(page, "complete");
     const block = assistant.answer().locator('[data-test="assistant-query-block"]').first();
@@ -80,7 +80,7 @@ test.describe("assistant evidence", () => {
     expect(searches.filter((body) => body.includes("approx_percentile_cont"))).toEqual([]);
   });
 
-  test("EVID-03 a claim chip opens the step it cites, expanded by call_id", async ({ page }) => {
+  test("EVID-03 a claim chip opens the step it cites, expanded by call_id", { tag: ["@mock"] }, async ({ page }) => {
     await openOnLogs(page);
     await ask(page, "cite");
     const answer = assistant.answer();
@@ -93,7 +93,7 @@ test.describe("assistant evidence", () => {
     await expect(answer.locator('[data-test="assistant-claim-2"]').first()).toHaveAttribute("data-call-id", "call_1");
   });
 
-  test("EVID-04 Re-run for now sends the same prompt over a window ending now, the draft untouched", async ({ page }) => {
+  test("EVID-04 Re-run for now sends the same prompt over a window ending now, the draft untouched", { tag: ["@mock"] }, async ({ page }) => {
     await openOnLogs(page);
     await ask(page, "complete", "why are checkout requests failing?");
     await expect(assistant.answer().locator('[data-test="assistant-turn-footer"]')).toContainText(/^Evaluated /);
@@ -108,7 +108,7 @@ test.describe("assistant evidence", () => {
     await expect(assistant.composer()).toHaveValue("half typed");
   });
 
-  test("EVID-05 an inconclusive findings card says so and asserts no cause", async ({ page }) => {
+  test("EVID-05 an inconclusive findings card says so and asserts no cause", { tag: ["@mock"] }, async ({ page }) => {
     await openOnLogs(page);
     await ask(page, "findings_inconclusive");
     const card = assistant.answer().locator('[data-test="assistant-findings"]');
@@ -120,7 +120,7 @@ test.describe("assistant evidence", () => {
     await expect(card.locator('[data-test="assistant-findings-unknown"]')).toContainText("payments pool metrics");
   });
 
-  test("EVID-06 the trail is one collapsed line, honest per step, and keyed by call_id", async ({ page }) => {
+  test("EVID-06 the trail is one collapsed line, honest per step, and keyed by call_id", { tag: ["@mock"] }, async ({ page }) => {
     await openOnLogs(page);
     await ask(page, "complete");
     const toggle = assistant.answer().locator('[data-test="assistant-trail-toggle"]');
@@ -135,7 +135,7 @@ test.describe("assistant evidence", () => {
     );
   });
 
-  test("EVID-07 a failed step stays visible under the collapsed trail and is never green", async ({ page }) => {
+  test("EVID-07 a failed step stays visible under the collapsed trail and is never green", { tag: ["@mock"] }, async ({ page }) => {
     await openOnLogs(page);
     await ask(page, "error");
     await expect(assistant.answer().locator('[data-test="assistant-trail-toggle"]')).toHaveText(
@@ -149,7 +149,7 @@ test.describe("assistant evidence", () => {
     await expect(assistant.answer().locator('[data-test="assistant-feedback"]')).toHaveCount(0);
   });
 
-  test("EVID-08 a navigation frame becomes a link card that opens only on its click", async ({ page }) => {
+  test("EVID-08 a navigation frame becomes a link card that opens only on its click", { tag: ["@mock"] }, async ({ page }) => {
     await openOnLogs(page);
     await expect.poll(() => page.url(), { timeout: 15_000 }).not.toContain("from=NaN");
     const before = page.url();
@@ -164,7 +164,7 @@ test.describe("assistant evidence", () => {
     await expect(card.locator('[data-test="assistant-link-card-outcome"]')).toHaveText(/^Opened · /);
   });
 
-  test("EVID-09 feedback renders only on a done answer and carries that turn's trace id", async ({ page }) => {
+  test("EVID-09 feedback renders only on a done answer and carries that turn's trace id", { tag: ["@mock"] }, async ({ page }) => {
     await openOnLogs(page);
     const feedback = [];
     await page.route(/\/ai\/feedback$/, async (route) => {
@@ -188,7 +188,7 @@ test.describe("assistant evidence", () => {
     await expect(down).toHaveAttribute("aria-pressed", "true");
   });
 
-  test("SEC-10 link targets are typed: the route of resource_type, the session's org, chatId only", async ({ page }) => {
+  test("SEC-10 link targets are typed: the route of resource_type, the session's org, chatId only", { tag: ["@mock"] }, async ({ page }) => {
     await openOnLogs(page);
     await ask(page, "nav_path_override");
     const card = assistant.answer().locator('[data-test="assistant-link-card"]');

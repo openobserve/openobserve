@@ -53,7 +53,7 @@ test.describe("assistant refusals and recovery", () => {
     assistant = new AssistantPage(page);
   });
 
-  test("ERR-01 an offline refusal gives everything back and waits for the network", async ({ page }) => {
+  test("ERR-01 an offline refusal gives everything back and waits for the network", { tag: ["@mock", "@responsive"] }, async ({ page }) => {
     await openOnLogs(page);
     await assistant.composer().fill("why 5xx offline?");
     await pasteImage(page);
@@ -76,7 +76,7 @@ test.describe("assistant refusals and recovery", () => {
     await expect(assistant.composer()).toBeFocused();
   });
 
-  test("ERR-02 an expired session signs in in a new tab and keeps this page and its draft", async ({ context, page }) => {
+  test("ERR-02 an expired session signs in in a new tab and keeps this page and its draft", { tag: ["@mock", "@stack-ee"] }, async ({ context, page }) => {
     await openOnLogs(page);
     await page.evaluate(() => (window.__notReloaded = true));
     await refuse(page, "unauthorized_401", "keep my draft");
@@ -89,14 +89,14 @@ test.describe("assistant refusals and recovery", () => {
     await expect(assistant.composer()).toHaveValue("keep my draft");
   });
 
-  test("ERR-03 a 403 that slipped past the gate refuses and swaps to the locked state", async ({ page }) => {
+  test("ERR-03 a 403 that slipped past the gate refuses and swaps to the locked state", { tag: ["@mock"] }, async ({ page }) => {
     await openOnLogs(page);
     await harness.nextScenario(page, "forbidden_403");
     await assistant.send("why?");
     await expect(assistant.gate()).toBeVisible();
   });
 
-  test("ERR-04 an org with the assistant off says so with the admin action", async ({ page }) => {
+  test("ERR-04 an org with the assistant off says so with the admin action", { tag: ["@mock"] }, async ({ page }) => {
     await openOnLogs(page);
     await refuse(page, "not_enabled_400");
     await expect(assistant.outcome()).toContainText("O2 Assistant is off for this organization.");
@@ -105,7 +105,7 @@ test.describe("assistant refusals and recovery", () => {
     await expect(assistant.outcomeAction()).toHaveAttribute("target", "_blank");
   });
 
-  test("ERR-05 a busy chat restores the prompt and Stop it cancels the running turn", async ({ page }) => {
+  test("ERR-05 a busy chat restores the prompt and Stop it cancels the running turn", { tag: ["@mock", "@stack-ee"] }, async ({ page }) => {
     await openOnLogs(page);
     await harness.setKnobs(page, { envelopeEnabled: true });
     await refuse(page, "lease_409", "busy prompt");
@@ -120,13 +120,13 @@ test.describe("assistant refusals and recovery", () => {
     await expect(assistant.composer()).toBeFocused();
   });
 
-  test("ERR-06 an already-submitted turn offers Reload chat", async ({ page }) => {
+  test("ERR-06 an already-submitted turn offers Reload chat", { tag: ["@mock"] }, async ({ page }) => {
     await openOnLogs(page);
     await refuse(page, "already_submitted_409");
     await expect(assistant.outcomeAction()).toHaveText("Reload chat");
   });
 
-  test("ERR-07 the turn limit refuses with Retry, in at most two lines at the sidebar width", async ({ page }) => {
+  test("ERR-07 the turn limit refuses with Retry, in at most two lines at the sidebar width", { tag: ["@mock", "@responsive"] }, async ({ page }) => {
     await openOnLogs(page);
     await refuse(page, "turn_limit");
     await expect(assistant.outcome()).toContainText("Too many answers are running. Wait for one to finish.");
@@ -136,7 +136,7 @@ test.describe("assistant refusals and recovery", () => {
     await expect(assistant.outcomeAction()).toHaveText("Retry");
   });
 
-  test("ERR-08 a rate limit counts down without announcing each tick and never sends by itself", async ({ page }) => {
+  test("ERR-08 a rate limit counts down without announcing each tick and never sends by itself", { tag: ["@mock"] }, async ({ page }) => {
     await openOnLogs(page);
     await harness.setKnobs(page, { envelopeEnabled: true });
     await refuse(page, "upstream_429");
@@ -152,7 +152,7 @@ test.describe("assistant refusals and recovery", () => {
     expect(await page.evaluate(() => window.__o2mock.requests.length)).toBe(1);
   });
 
-  test("ERR-09 credits authorization unavailable refuses with Retry on the same turn id", async ({ page }) => {
+  test("ERR-09 credits authorization unavailable refuses with Retry on the same turn id", { tag: ["@mock"] }, async ({ page }) => {
     await openOnLogs(page);
     await refuse(page, "authz_503");
     await expect(assistant.outcome()).toContainText("Couldn't check AI credits. Your message wasn't sent.");
@@ -163,7 +163,7 @@ test.describe("assistant refusals and recovery", () => {
     expect(ids[0]).toBe(ids[1]);
   });
 
-  test("ERR-10 an agent outage fails the turn and keeps the composer live", async ({ page }) => {
+  test("ERR-10 an agent outage fails the turn and keeps the composer live", { tag: ["@mock", "@stack-ee-noagent"] }, async ({ page }) => {
     await openOnLogs(page);
     await harness.nextScenario(page, "agent_503");
     await assistant.send("why?");
@@ -172,7 +172,7 @@ test.describe("assistant refusals and recovery", () => {
     await expect(assistant.composer()).toBeEditable();
   });
 
-  test("ERR-13 a denied clipboard leaves the details selectable with the manual-copy line", async ({ page }) => {
+  test("ERR-13 a denied clipboard leaves the details selectable with the manual-copy line", { tag: ["@mock"] }, async ({ page }) => {
     await page.addInitScript(() => {
       Object.defineProperty(navigator, "clipboard", {
         value: { writeText: () => Promise.reject(new Error("denied")) },
@@ -190,7 +190,7 @@ test.describe("assistant refusals and recovery", () => {
     );
   });
 
-  test("ERR-15 a 401 on Cloud keeps the page and never reaches the logout path @edition", async ({ context, page }) => {
+  test("ERR-15 a 401 on Cloud keeps the page and never reaches the logout path @edition", { tag: ["@mock"] }, async ({ context, page }) => {
     await harness.forceCloudBuild(context);
     await page.reload();
     await openOnLogs(page);

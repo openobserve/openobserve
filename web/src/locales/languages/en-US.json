@@ -9185,6 +9185,8 @@
       "failedName": "{product}, last answer failed",
       "lockedName": "{product}, locked",
       "nameOpen": "{product}, open",
+      "needsYouCountName": "{product}, needs you, {count} waiting",
+      "needsYouCountNameOpen": "{product}, needs you, {count} waiting, open",
       "needsYouName": "{product}, needs you",
       "needsYouNameOpen": "{product}, needs you, open",
       "offName": "{product}, not set up",
@@ -21913,7 +21915,10 @@
     "pagination": {
       "pagination": "Pagination",
       "previousPage": "Previous page",
-      "nextPage": "Next page"
+      "nextPage": "Next page",
+      "firstPage": "First page",
+      "lastPage": "Last page",
+      "recordsPerPage": "Records per page"
     },
     "select": {
       "more": "more",

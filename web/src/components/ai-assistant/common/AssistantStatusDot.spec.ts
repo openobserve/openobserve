@@ -83,6 +83,17 @@ describe("AssistantStatusDot", () => {
     }
   });
 
+  it("keeps dots solid and the working ring hollow in forced colours", () => {
+    for (const state of ["unread", "attention"] as const) {
+      const dot = mountDot(state).find(".rounded-full");
+      expect(dot.classes()).toContain("size-2");
+      expect(dot.classes()).toContain("forced-colors:border-4");
+    }
+    const ring = mountDot("working").find(".rounded-full").classes();
+    expect(ring).toContain("forced-colors:border");
+    expect(ring).not.toContain("forced-colors:border-4");
+  });
+
   it("hides every shape from assistive tech; the parent's name carries the state", () => {
     for (const state of SIGNALS) {
       const root = mountDot(state).get('[data-test="assistant-status-dot"]');

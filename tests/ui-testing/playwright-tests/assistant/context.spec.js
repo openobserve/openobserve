@@ -74,7 +74,7 @@ test.describe("assistant composer and context", () => {
     assistant = new AssistantPage(page);
   });
 
-  test("CTX-01 the time chip is first and the popover tells sent from not read", async ({ page }) => {
+  test("CTX-01 the time chip is first and the popover tells sent from not read", { tag: ["@mock"] }, async ({ page }) => {
     await openOnLogs(page);
     const first = assistant.chips().first();
     await expect(first).toHaveAttribute("data-test", "assistant-context-chip-time");
@@ -92,7 +92,7 @@ test.describe("assistant composer and context", () => {
     await expect(assistant.tray().locator('[data-test="assistant-context-sees"]')).toBeFocused();
   });
 
-  test("CTX-01 Tab past a chip popover's last control moves on and stays there; the time range opens by keyboard", async ({
+  test("CTX-01 Tab past a chip popover's last control moves on and stays there; the time range opens by keyboard", { tag: ["@mock"] }, async ({
     page,
   }) => {
     await openOnLogs(page);
@@ -114,7 +114,7 @@ test.describe("assistant composer and context", () => {
     await expect(page.locator('[data-test="datetimerange-popup"]')).toBeVisible();
   });
 
-  test("CTX-02 a refused turn gives back the text, the chips and the images", async ({ page }) => {
+  test("CTX-02 a refused turn gives back the text, the chips and the images", { tag: ["@mock"] }, async ({ page }) => {
     await openOnLogs(page);
     await mentionStream(page);
     await expect(assistant.chips()).toHaveCount(3);
@@ -129,7 +129,7 @@ test.describe("assistant composer and context", () => {
     await expect(page.locator('[data-test="assistant-image-strip"] li').filter({ visible: true })).toHaveCount(1);
   });
 
-  test("CTX-03 an IME Enter never sends; the Enter after composition sends once", async ({ page }) => {
+  test("CTX-03 an IME Enter never sends; the Enter after composition sends once", { tag: ["@mock"] }, async ({ page }) => {
     await openOnLogs(page);
     const box = assistant.composer();
     await box.click();
@@ -146,7 +146,7 @@ test.describe("assistant composer and context", () => {
     expect((await requests(page))[0].messages.at(-1).content).toBe("にほん");
   });
 
-  test("CTX-04 a draft survives a reload in its tab and a second tab starts empty", async ({ page, context }) => {
+  test("CTX-04 a draft survives a reload in its tab and a second tab starts empty", { tag: ["@mock"] }, async ({ page, context }) => {
     await openOnLogs(page);
     await assistant.composer().fill("half a thought");
     await page.waitForTimeout(400);
@@ -161,7 +161,7 @@ test.describe("assistant composer and context", () => {
     await second.close();
   });
 
-  test("CTX-05 caps are stated where the control is; attached data stays under 32 KB", async ({ page }) => {
+  test("CTX-05 caps are stated where the control is; attached data stays under 32 KB", { tag: ["@mock"] }, async ({ page }) => {
     await openOnLogs(page);
     await pasteImages(page, 6);
     await expect(page.locator('[data-test="assistant-image-strip"] li').filter({ visible: true })).toHaveCount(4);
@@ -171,7 +171,7 @@ test.describe("assistant composer and context", () => {
     await expect(page.locator('[data-test="o2-toast"], [role="alert"]').filter({ hasText: "images" })).toHaveCount(0);
   });
 
-  test("CTX-05 the store refuses rows past 32 KB, and a multi-row chip is cut on the wire @edition", async ({
+  test("CTX-05 the store refuses rows past 32 KB, and a multi-row chip is cut on the wire @edition", { tag: ["@mock"] }, async ({
     page,
   }) => {
     test.skip(!harness.ENV.viteDev, "stages rows through the dev server's module graph");
@@ -216,7 +216,7 @@ test.describe("assistant composer and context", () => {
     expect(new TextEncoder().encode(body).length).toBeLessThanOrEqual(32 * 1024);
   });
 
-  test("SEC-11 attached data cannot close its block @edition", async ({ page }) => {
+  test("SEC-11 attached data cannot close its block @edition", { tag: ["@mock"] }, async ({ page }) => {
     test.skip(!harness.ENV.viteDev, "stages the planted chips through the dev server's module graph");
     const planted = (await loadPayloads()).PAYLOADS.delimiter_breakout;
     await openOnLogs(page);
@@ -238,7 +238,7 @@ test.describe("assistant composer and context", () => {
     for (const block of blocks) expect(() => JSON.parse(block[3])).not.toThrow();
   });
 
-  test("ERR-14 blocked storage keeps the composer working and says drafts won't survive a reload", async ({
+  test("ERR-14 blocked storage keeps the composer working and says drafts won't survive a reload", { tag: ["@mock"] }, async ({
     page,
     context,
   }) => {

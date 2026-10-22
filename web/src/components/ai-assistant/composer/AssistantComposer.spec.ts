@@ -128,6 +128,13 @@ describe("names and regions (CT-08)", () => {
     expect(region.attributes()).toMatchObject({ role: "status", "aria-live": "polite" });
   });
 
+  it("grows the field to a 2.75 rem target below md and on coarse pointers", () => {
+    const { textarea } = setup();
+    expect(textarea().classes()).toEqual(
+      expect.arrayContaining(["max-md:min-h-11", "pointer-coarse:min-h-11"]),
+    );
+  });
+
   it("uses the static name as the placeholder while the welcome offers a ghost (IW-06 AC 1)", () => {
     const { textarea } = setup({
       ghost: { label: raw("Why errors?"), text: "Why errors?", chips: [] },

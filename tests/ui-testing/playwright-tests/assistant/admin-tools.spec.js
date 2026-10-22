@@ -28,7 +28,7 @@ test.describe("assistant settings tools", () => {
     await expect(assistant.settings(tab)).toBeVisible({ timeout: 30_000 });
   }
 
-  test("ADMIN-01 the legacy toolsets route redirects into the tab and keeps its query", async ({ context, page }) => {
+  test("ADMIN-01 the legacy toolsets route redirects into the tab and keeps its query", { tag: ["@mock", "@stack-ee"] }, async ({ context, page }) => {
     await start(context, page);
     await page.goto(url("/settings/ai_toolsets", "&action=edit&id=ts_2"), { waitUntil: "domcontentloaded" });
     await expect(page).toHaveURL(/\/settings\/assistant\/toolsets\?.*action=edit.*id=ts_2/, { timeout: 30_000 });
@@ -40,7 +40,25 @@ test.describe("assistant settings tools", () => {
     }
   });
 
-  test("ADMIN-08 the toolsets list loads without a hero flash, recovers from errors and filters", async ({ context, page }) => {
+  for (const width of [768, 1280]) {
+    test(`ADMIN-08 at ${width} the toolsets refresh button shows its exact time on hover and on focus`, { tag: ["@mock"] }, async ({ context, page }) => {
+      await start(context, page);
+      await page.setViewportSize({ width, height: 900 });
+      await openTab(page, "toolsets");
+      await expect(rows(page, "settings-assistant-toolsets-table")).toHaveCount(2, { timeout: 10_000 });
+      const refresh = control(page, "ai-toolsets-list-refresh-btn");
+      const bubble = page.locator('[data-test="o-tooltip-content"]').filter({ hasText: "Last refreshed:" });
+      await expect(refresh).not.toHaveAttribute("aria-label");
+      await refresh.hover();
+      await expect(bubble).toBeVisible();
+      await page.mouse.move(0, 0);
+      await expect(bubble).toHaveCount(0);
+      await refresh.focus();
+      await expect(bubble).toBeVisible();
+    });
+  }
+
+  test("ADMIN-08 the toolsets list loads without a hero flash, recovers from errors and filters", { tag: ["@mock"] }, async ({ context, page }) => {
     await start(context, page, { toolsetsDelayMs: 1500 });
     await page.goto(url("/settings/assistant/toolsets"), { waitUntil: "domcontentloaded" });
     await expect(control(page, "settings-assistant-toolsets-table").locator('[data-test="o2-table"]')).toHaveAttribute(
@@ -76,7 +94,7 @@ test.describe("assistant settings tools", () => {
     });
   });
 
-  test("ADMIN-08 health columns, the enabled switch and Test show only with toolset health", async ({ context, page }) => {
+  test("ADMIN-08 health columns, the enabled switch and Test show only with toolset health", { tag: ["@mock"] }, async ({ context, page }) => {
     await start(context, page, {
       toolsetHealthEnabled: true,
       toolsetTestResults: [{ ok: false, duration_ms: 90, error: { code: "unauthorized", message: "The MCP server refused the credentials." } }],
@@ -93,7 +111,7 @@ test.describe("assistant settings tools", () => {
     );
   });
 
-  test("ADMIN-09 without secret merge every secret is retyped and the mask is never sent", async ({ context, page }) => {
+  test("ADMIN-09 without secret merge every secret is retyped and the mask is never sent", { tag: ["@mock", "@stack-ee"] }, async ({ context, page }) => {
     await start(context, page);
     await openTab(page, "toolsets", "&action=edit&id=ts_2");
     await expect(control(page, "ai-toolset-retype-notice")).toBeVisible({ timeout: 30_000 });
@@ -109,7 +127,7 @@ test.describe("assistant settings tools", () => {
     expect(JSON.stringify(write.body)).not.toContain("***");
   });
 
-  test("ADMIN-09 with secret merge an untouched secret is kept without sending it", async ({ context, page }) => {
+  test("ADMIN-09 with secret merge an untouched secret is kept without sending it", { tag: ["@mock", "@stack-ee"] }, async ({ context, page }) => {
     await start(context, page, { capabilitiesEnabled: true, secretMergeEnabled: true });
     await openTab(page, "toolsets", "&action=edit&id=ts_2");
     await expect(control(page, "ai-toolset-header-0-unchanged")).toBeVisible({ timeout: 30_000 });
@@ -119,7 +137,7 @@ test.describe("assistant settings tools", () => {
     expect(state.toolsetWrites[0].body.data.headers).toEqual({ Authorization: "***" });
   });
 
-  test("ADMIN-09 with secret merge a changed URL asks for every secret again and never sends the mask", async ({ context, page }) => {
+  test("ADMIN-09 with secret merge a changed URL asks for every secret again and never sends the mask", { tag: ["@mock", "@stack-ee"] }, async ({ context, page }) => {
     await start(context, page, { capabilitiesEnabled: true, secretMergeEnabled: true });
     await openTab(page, "toolsets", "&action=edit&id=ts_2");
     await expect(control(page, "ai-toolset-header-0-unchanged")).toBeVisible({ timeout: 30_000 });
@@ -139,7 +157,7 @@ test.describe("assistant settings tools", () => {
     expect(JSON.stringify(state.toolsetWrites[0].body)).not.toContain("***");
   });
 
-  test("ADMIN-09 the key of a kept secret cannot be renamed and Cancel asks before discarding", async ({ context, page }) => {
+  test("ADMIN-09 the key of a kept secret cannot be renamed and Cancel asks before discarding", { tag: ["@mock", "@stack-ee"] }, async ({ context, page }) => {
     await start(context, page, { capabilitiesEnabled: true, secretMergeEnabled: true });
     await openTab(page, "toolsets");
     await control(page, "ai-toolset-pagerduty-edit").click({ timeout: 30_000 });
@@ -158,7 +176,7 @@ test.describe("assistant settings tools", () => {
     expect(state.toolsetWrites).toEqual([]);
   });
 
-  test("ADMIN-10 turning CLI approval off confirms with the command and allow-list", async ({ context, page }) => {
+  test("ADMIN-10 turning CLI approval off confirms with the command and allow-list", { tag: ["@mock"] }, async ({ context, page }) => {
     await start(context, page);
     await openTab(page, "toolsets", "&action=edit&id=ts_1");
     const approval = control(page, "ai-toolset-cli-approval").locator('[role="switch"]');
@@ -178,7 +196,7 @@ test.describe("assistant settings tools", () => {
     expect(state.toolsetWrites[0].body.data.requires_confirmation).toBe(false);
   });
 
-  test("ADMIN-11 revoking a standing approval removes the row with a toast", async ({ context, page }) => {
+  test("ADMIN-11 revoking a standing approval removes the row with a toast", { tag: ["@mock"] }, async ({ context, page }) => {
     await start(context, page, { grantsEnabled: true });
     await openTab(page, "permissions");
     await expect(rows(page, "settings-assistant-grants-table")).toHaveCount(2, { timeout: 30_000 });
@@ -188,20 +206,20 @@ test.describe("assistant settings tools", () => {
     expect(state.log).toContain("REVOKE grant gr_1");
   });
 
-  test("ADMIN-11 without grants the Permissions tab says so instead of listing nothing", async ({ context, page }) => {
+  test("ADMIN-11 without grants the Permissions tab says so instead of listing nothing", { tag: ["@mock"] }, async ({ context, page }) => {
     await start(context, page);
     await openTab(page, "permissions");
     await expect(control(page, "settings-assistant-grants-unsupported")).toBeVisible({ timeout: 30_000 });
   });
 
-  test("ADMIN-12 without activity the tab shows the degraded state and no rows", async ({ context, page }) => {
+  test("ADMIN-12 without activity the tab shows the degraded state and no rows", { tag: ["@mock"] }, async ({ context, page }) => {
     await start(context, page);
     await openTab(page, "activity");
     await expect(control(page, "settings-assistant-activity-unsupported")).toBeVisible({ timeout: 30_000 });
     await expect(control(page, "settings-assistant-activity-table")).toHaveCount(0);
   });
 
-  test("ADMIN-12 with activity a row is undone after a confirm", async ({ context, page }) => {
+  test("ADMIN-12 with activity a row is undone after a confirm", { tag: ["@mock"] }, async ({ context, page }) => {
     await start(context, page, { activityEnabled: true });
     await openTab(page, "activity");
     await expect(rows(page, "settings-assistant-activity-table")).toHaveCount(2, { timeout: 30_000 });
@@ -211,7 +229,7 @@ test.describe("assistant settings tools", () => {
     await expect(control(page, "settings-assistant-activity-act_1-undo")).toHaveCount(0);
   });
 
-  test("ADMIN-12 the server's activity rows render with who, approval and result", async ({ context, page }) => {
+  test("ADMIN-12 the server's activity rows render with who, approval and result", { tag: ["@mock"] }, async ({ context, page }) => {
     await start(context, page, { activityEnabled: true });
     await openTab(page, "activity");
     const table = control(page, "settings-assistant-activity-table");
@@ -240,7 +258,7 @@ test.describe("assistant settings tools", () => {
 
   const rbac = () => ({ configPatch: { ...harness.createMockState().configPatch, rbac_enabled: true } });
 
-  test("ADMIN-13 the role editor groups Assistant and LLM observability with one line each", async ({ context, page }) => {
+  test("ADMIN-13 the role editor groups Assistant and LLM observability with one line each", { tag: ["@mock", "@stack-ee"] }, async ({ context, page }) => {
     await start(context, page, rbac);
     await mockRoles(context, []);
     await page.goto(url("/iam/roles/edit/sre-oncall"), { waitUntil: "domcontentloaded" });
@@ -250,7 +268,7 @@ test.describe("assistant settings tools", () => {
     await expect(page.locator("#module-desc-ai")).toContainText("Chat with the assistant");
   });
 
-  test("ADMIN-15 Grant chat reaches the role's chat permission in three clicks", async ({ context, page }) => {
+  test("ADMIN-15 Grant chat reaches the role's chat permission in three clicks", { tag: ["@mock", "@stack-ee"] }, async ({ context, page }) => {
     const writes = [];
     await start(context, page, rbac);
     await mockRoles(context, writes);
@@ -274,7 +292,7 @@ test.describe("assistant settings tools", () => {
     expect(JSON.stringify(writes[0].body.add)).toContain("ai:");
   });
 
-  test("ADMIN-13 the MCP page links back to the assistant's toolsets", async ({ context, page }) => {
+  test("ADMIN-13 the MCP page links back to the assistant's toolsets", { tag: ["@mock", "@stack-ee"] }, async ({ context, page }) => {
     await start(context, page);
     await openTab(page, "toolsets");
     await control(page, "settings-assistant-mcp-link").click();
@@ -284,8 +302,7 @@ test.describe("assistant settings tools", () => {
     await expect(assistant.settings("toolsets")).toBeVisible({ timeout: 30_000 });
   });
 
-  test("ADMIN-14 Settings › Assistant is locked on OSS @edition", async ({ context, page }) => {
-    test.skip(!process.env.O2_VITE_DEV, "edition rewrite needs the Vite dev server");
+  test("ADMIN-14 Settings › Assistant is locked on OSS @edition", { tag: ["@mock", "@stack-oss"] }, async ({ context, page }) => {
     await start(context, page);
     await harness.forceOssBuild(context);
     await page.goto(url("/settings/general"), { waitUntil: "domcontentloaded" });

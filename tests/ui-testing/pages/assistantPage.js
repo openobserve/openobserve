@@ -1,5 +1,9 @@
 // Copyright 2026 OpenObserve Inc.
 // The one page object every assistant flow uses (99 §5); every locator is a data-test.
+import { test, expect } from "@playwright/test";
+
+// Mirrors harness/modes.mjs, which a statically imported page object cannot load (Playwright compiles it to require()).
+const STACK_MODE = !!process.env.ASSISTANT_E2E_MODE && process.env.ASSISTANT_E2E_MODE !== "mock";
 
 /** A method whose surface lands in a later work package; the spec that needs it flips with that WP. */
 function notYet(wp) {
@@ -56,8 +60,26 @@ export class AssistantPage {
     await this.container().locator('[data-test="assistant-shell-close"]').click();
   }
 
+  /** The first focusable logs row cell, after the page's own auto-run or, failing that, one run by hand. */
+  async logRowCell() {
+    const cell = this.page.locator('[data-test="logs-search-result-logs-table"] td[data-o2-focus-cell]').first();
+    if (await cell.waitFor({ state: "visible", timeout: 15_000 }).then(() => true, () => false)) return cell;
+    const run = this.page.locator('[data-test="logs-search-bar-refresh-btn"]');
+    // While a search is in flight the same button is Cancel, so clicking it then kills the auto-run.
+    await expect(run).toHaveAttribute("title", "Run query", { timeout: 30_000 });
+    await run.click();
+    await expect(cell).toBeVisible({ timeout: 30_000 });
+    return cell;
+  }
+
+  /** Drops focus to the document so a page shortcut reaches the app, without clicking whatever sits under a fixed point. */
+  async blurPage() {
+    await this.page.evaluate(() => document.activeElement instanceof HTMLElement && document.activeElement.blur());
+  }
+
   /** Types into the visible composer and presses Enter; `scenario` picks the next chat_stream answer. */
   async send(text, scenario) {
+    if (scenario && STACK_MODE) test.skip(true, `the scenario "${scenario}" is mock-only`);
     if (scenario) await this.page.evaluate((name) => (window.__o2mock.next = name), scenario);
     const box = this.composer();
     await box.click();

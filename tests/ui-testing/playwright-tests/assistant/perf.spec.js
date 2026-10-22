@@ -85,7 +85,7 @@ test.describe("assistant transcript performance", () => {
     assistant = new AssistantPage(page);
   });
 
-  test("PERF-02 a long answer streams without long tasks or input lag, parsing only the open block", async ({ page }, info) => {
+  test("PERF-02 a long answer streams without long tasks or input lag, parsing only the open block", { tag: ["@mock"] }, async ({ page }, info) => {
     await openOnLogs(page);
     // The budget is the stream's; the container's own opening work settles first.
     await page.waitForTimeout(1_500);
@@ -111,7 +111,7 @@ test.describe("assistant transcript performance", () => {
     expect(p95).toBeLessThanOrEqual(INPUT_P95_MS);
   });
 
-  test("PERF-02 fenced: an open fence renders as plain text and highlights once it closes", async ({ page }) => {
+  test("PERF-02 fenced: an open fence renders as plain text and highlights once it closes", { tag: ["@mock"] }, async ({ page }) => {
     await openOnLogs(page);
     await harness.nextScenario(page, "long_answer_fenced");
     await assistant.send("fences");
@@ -144,7 +144,7 @@ test.describe("assistant transcript performance", () => {
     ["markdown_query_examples", "Here are queries you can run", { [QUERY_BLOCK]: 40, [QUERY_HIGHLIGHTED]: 40, [PLAIN_FENCE]: 110 }],
     ["markdown_bomb_fences", "a", { [CODE_BLOCK]: 40, [PLAIN_FENCE]: 1_960 }],
   ]) {
-    test(`Rounds 4-8 ${scenario}: the main thread never takes the parse, a long mount or the fill of a scroll through the answer`, async ({ page }, info) => {
+    test(`Rounds 4-8 ${scenario}: the main thread never takes the parse, a long mount or the fill of a scroll through the answer`, { tag: ["@mock"] }, async ({ page }, info) => {
       await openOnLogs(page);
       await page.waitForTimeout(1_500);
       await observeLongTasks(page);
@@ -172,9 +172,9 @@ test.describe("assistant transcript performance", () => {
   }
 
   // The 300-message record comes from history, which renders a stored chat from WP-11 on.
-  test.fixme("PERF-03 a 300-message chat paints in 300 ms and scrolls at 60 fps (chat_300 through history, WP-11)", async () => {});
+  test.fixme("PERF-03 a 300-message chat paints in 300 ms and scrolls at 60 fps (chat_300 through history, WP-11)", { tag: ["@mock"] }, async () => {});
 
-  test("PERF-07 an open container at rest runs no interval or animation loop", async ({ page }) => {
+  test("PERF-07 an open container at rest runs no interval or animation loop", { tag: ["@mock"] }, async ({ page }) => {
     await openOnLogs(page);
     await harness.nextScenario(page, "complete");
     await assistant.send("why 5xx?");

@@ -18,7 +18,8 @@ const stubs = {
   OButton: { template: '<button v-bind="$attrs"><slot /></button>' },
   OTooltip: {
     props: ["content", "shortcutId"],
-    template: '<span data-stub-tooltip :data-shortcut="shortcutId">{{ content }}</span>',
+    template:
+      '<span><slot /><span data-stub-tooltip :data-shortcut="shortcutId">{{ content }}</span></span>',
   },
 };
 
@@ -172,6 +173,62 @@ describe("ORefreshButton", () => {
       const tip = wrapper.find("[data-stub-tooltip]");
       expect(tip.attributes("data-shortcut")).toBe("pipelinesRefresh");
       expect(tip.text()).toBe(`Last refreshed: ${new Date(ts).toLocaleTimeString()}`);
+    });
+
+    it("names the button by its visible age from md up and by the exact time elsewhere", async () => {
+      const wrapper = mount(ORefreshButton, {
+        props: { layout: "inline", lastRunAt: null },
+        global: { stubs: { OButton: stubs.OButton }, plugins: [i18n] },
+        attachTo: document.body,
+      });
+      const name = () => wrapper.get("button span.sr-only");
+      expect(wrapper.get("button").attributes("aria-label")).toBeUndefined();
+      expect(name().text()).toBe("Not yet refreshed");
+      expect(name().classes()).not.toContain("md:hidden");
+      const ts = Date.now() - 10_000;
+      await wrapper.setProps({ lastRunAt: ts });
+      expect(wrapper.get("button").attributes("aria-label")).toBeUndefined();
+      expect(wrapper.get("button span.tabular-nums").text()).toBe("10s ago");
+      expect(name().text()).toBe(`Last refreshed: ${new Date(ts).toLocaleTimeString()}`);
+      expect(name().classes()).toContain("md:hidden");
+      wrapper.unmount();
+    });
+
+    it("shows the exact time on hover and on focus of the whole button", async () => {
+      const ts = Date.now() - 10_000;
+      const wrapper = mount(ORefreshButton, {
+        props: { layout: "inline", lastRunAt: ts },
+        global: { stubs: { OButton: stubs.OButton }, plugins: [i18n] },
+        attachTo: document.body,
+      });
+      const button = wrapper.get("button").element as HTMLElement;
+      const bubble = () => document.body.querySelector('[data-test="o-tooltip-content"]');
+      expect(button.hasAttribute("data-o-tooltip-trigger")).toBe(true);
+      expect(button.hasAttribute("aria-label")).toBe(false);
+      button.dispatchEvent(new MouseEvent("mouseenter"));
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(bubble()?.textContent).toContain(
+        `Last refreshed: ${new Date(ts).toLocaleTimeString()}`,
+      );
+      button.dispatchEvent(new MouseEvent("mouseleave"));
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(bubble()).toBeNull();
+      button.focus();
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(bubble()?.textContent).toContain("Last refreshed:");
+      wrapper.unmount();
+    });
+
+    it("keeps a consumer's aria-label and class on the button, not the tooltip", () => {
+      const wrapper = mount(ORefreshButton, {
+        props: { layout: "inline" },
+        attrs: { "aria-label": "Refresh toolsets", class: "ms-2" },
+        global: globalConfig,
+      });
+      const button = wrapper.get("button");
+      expect(button.attributes("aria-label")).toBe("Refresh toolsets");
+      expect(button.classes()).toContain("ms-2");
+      expect(wrapper.find("[data-stub-tooltip]").attributes("aria-label")).toBeUndefined();
     });
 
     it("emits click, and not while loading", async () => {

@@ -92,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <s v-if="row.target.deleted" class="text-text-body">{{ row.target.name }}</s>
           <router-link
             v-else-if="safeLink(row.target.link)"
-            class="text-text-link hover:text-text-link-hover underline"
+            class="text-text-link-hover underline hover:no-underline"
             :to="safeLink(row.target.link)!"
             >{{ row.target.name }}</router-link
           >
@@ -132,7 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
           <router-link
             v-if="row.chat_id"
-            class="text-text-link hover:text-text-link-hover text-sm underline max-md:inline-flex max-md:min-h-11 max-md:items-center"
+            class="text-text-link-hover text-sm underline hover:no-underline max-md:inline-flex max-md:min-h-11 max-md:items-center"
             :to="{ name: 'assistant', params: { chatId: row.chat_id } }"
             :data-test="`settings-assistant-activity-${row.id}-chat`"
             >{{ t("assistant.activity.openChat") }}</router-link

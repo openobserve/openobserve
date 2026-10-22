@@ -100,7 +100,7 @@ test.describe("assistant inline query helper", () => {
       window.__o2mock.requests.map((r) => JSON.parse(r.body || "{}")),
     );
 
-  test("HELP-01 the helper proposes a diff; the editor is unchanged until Accept and Reject restores it", async ({
+  test("HELP-01 the helper proposes a diff; the editor is unchanged until Accept and Reject restores it", { tag: ["@mock", "@stack-ee"] }, async ({
     context,
     page,
   }) => {
@@ -120,7 +120,7 @@ test.describe("assistant inline query helper", () => {
     expect(await logsQuery(page)).toBe(before);
   });
 
-  test("HELP-05 the helper reads the editor live: an edit after open moves the mode chip and reaches the request", async ({
+  test("HELP-05 the helper reads the editor live: an edit after open moves the mode chip and reaches the request", { tag: ["@mock"] }, async ({
     context,
     page,
   }) => {
@@ -145,7 +145,7 @@ test.describe("assistant inline query helper", () => {
     expect(JSON.stringify(last)).toContain("level = 'error'");
   });
 
-  test("HELP-06 a follow-up after Accept refines the accepted query", async ({
+  test("HELP-06 a follow-up after Accept refines the accepted query", { tag: ["@mock"] }, async ({
     context,
     page,
   }) => {
@@ -170,7 +170,7 @@ test.describe("assistant inline query helper", () => {
     expect(JSON.stringify(last)).toContain("GROUP BY service_name");
   });
 
-  test("HELP-02 a helper turn is ephemeral and never lands in the sidebar's chat", async ({
+  test("HELP-02 a helper turn is ephemeral and never lands in the sidebar's chat", { tag: ["@mock", "@stack-ee"] }, async ({
     context,
     page,
   }) => {
@@ -191,7 +191,7 @@ test.describe("assistant inline query helper", () => {
     await expect(assistant.container()).not.toContainText("errors per service");
   });
 
-  test("HELP-03 an answer that needs the chat says so and hands the prompt over with its chips", async ({
+  test("HELP-03 an answer that needs the chat says so and hands the prompt over with its chips", { tag: ["@mock"] }, async ({
     context,
     page,
   }) => {
@@ -218,7 +218,7 @@ test.describe("assistant inline query helper", () => {
     await expect(assistant.chips().first()).toBeVisible();
   });
 
-  test("HELP-04 Stop cancels the server turn and nothing changes", async ({
+  test("HELP-04 Stop cancels the server turn and nothing changes", { tag: ["@mock", "@stack-ee"] }, async ({
     context,
     page,
   }) => {
@@ -239,7 +239,7 @@ test.describe("assistant inline query helper", () => {
     expect(await logsQuery(page)).toBe(before);
   });
 
-  test("ERR-11 a refusal in the helper is one line under the row with a role-aware action, never a toast", async ({
+  test("ERR-11 a refusal in the helper is one line under the row with a role-aware action, never a toast", { tag: ["@mock"] }, async ({
     context,
     page,
   }) => {
@@ -253,7 +253,7 @@ test.describe("assistant inline query helper", () => {
     await expect(page.locator('[data-test="o-toast-message"]')).toHaveCount(0);
   });
 
-  test("CONS-11 consent in the helper is a compact card in the row; Cancel reads Not sent", async ({
+  test("CONS-11 consent in the helper is a compact card in the row; Cancel reads Not sent", { tag: ["@mock"] }, async ({
     context,
     page,
   }) => {
@@ -272,7 +272,7 @@ test.describe("assistant inline query helper", () => {
     );
   });
 
-  test("A11Y-08 a docked editor with a pending approval works from the keys alone", async ({
+  test("A11Y-08 a docked editor with a pending approval works from the keys alone", { tag: ["@mock"] }, async ({
     context,
     page,
   }) => {
@@ -342,7 +342,7 @@ test.describe("assistant inline query helper", () => {
     ).toBeVisible();
   });
 
-  test("GATE-03 a viewer sees the helper door locked and the chord never opens the row", async ({
+  test("GATE-03 a viewer sees the helper door locked and the chord never opens the row", { tag: ["@mock", "@stack-ee", "@stack-cloud"] }, async ({
     context,
     page,
   }) => {
@@ -357,14 +357,10 @@ test.describe("assistant inline query helper", () => {
     expect(await page.evaluate(() => window.__o2mock.requests.length)).toBe(0);
   });
 
-  test("GATE-01 OSS renders no helper door in the editor @edition", async ({
+  test("GATE-01 OSS renders no helper door in the editor @edition", { tag: ["@mock", "@stack-oss"] }, async ({
     context,
     page,
   }) => {
-    test.skip(
-      !process.env.O2_VITE_DEV,
-      "edition rewrite needs the Vite dev server",
-    );
     await start(context, page);
     await harness.forceOssBuild(context);
     await openLogs(page, "locked");
