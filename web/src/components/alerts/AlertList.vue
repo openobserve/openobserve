@@ -979,6 +979,7 @@ import {
   computed,
   reactive,
   nextTick,
+  toRaw,
 } from "vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import type { Ref } from "vue";
@@ -2643,7 +2644,9 @@ export default defineComponent({
       if (needsSource) {
         try {
           const source = await getAlertById(row.alert_id);
-          if (request === cloneSourceRequest) toBeClonedAlert.value = source;
+          // getAlertById hands back the cached detail, and submitForm renames the copy and drops its id.
+          if (request === cloneSourceRequest)
+            toBeClonedAlert.value = structuredClone(toRaw(source));
         } finally {
           if (request === cloneSourceRequest) isCloneSourceLoading.value = false;
         }
