@@ -7741,7 +7741,14 @@
       "createForbidden": "Genel bağlantı oluşturma izniniz yok. Bir yöneticiye danışın.",
       "editForbidden": "Genel bağlantıları düzenleme izniniz yok. Bir yöneticiye danışın.",
       "saveBeforePublish": "Gösterge panosundaki değişiklikleri kaydedin, ardından yayımlayın.",
-      "upgradedToast": "Gösterge panosu güncel biçime yükseltildi."
+      "upgradedToast": "Gösterge panosu güncel biçime yükseltildi.",
+      "publisherLeft": "Yayınlayan kuruluştan ayrıldı",
+      "takeOver": "Devral",
+      "takeOverTitle": "Bu bağlantı devralınsın mı?",
+      "takeOverBody": "Yayınlayan siz olursunuz. Genel sayfa, görmenize izin verilen içeriği gösterir; bu, öncekinden daha fazla ya da daha az olabilir. URL'ye sahip herkes erişimini korur ve bağlantı hemen etkinleşir.",
+      "takeOverToast": "Bu bağlantıyı artık siz yayınlıyorsunuz",
+      "takeOverForbidden": "Genel bağlantı yayınlama izniniz yok. Bir yöneticiye danışın.",
+      "takeOverConflict": "Bu bağlantıyı başka biri önce devraldı."
     }
   },
   "panel": {

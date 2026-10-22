@@ -7741,7 +7741,14 @@
       "createForbidden": "Sie haben keine Berechtigung, öffentliche Links zu erstellen. Wenden Sie sich an einen Administrator.",
       "editForbidden": "Sie haben keine Berechtigung, öffentliche Links zu bearbeiten. Wenden Sie sich an einen Administrator.",
       "saveBeforePublish": "Speichern Sie Ihre Dashboard-Änderungen und veröffentlichen Sie dann.",
-      "upgradedToast": "Dashboard auf das aktuelle Format aktualisiert."
+      "upgradedToast": "Dashboard auf das aktuelle Format aktualisiert.",
+      "publisherLeft": "Herausgeber hat die Organisation verlassen",
+      "takeOver": "Übernehmen",
+      "takeOverTitle": "Diesen Link übernehmen?",
+      "takeOverBody": "Sie werden zum Herausgeber. Die öffentliche Seite zeigt, was Sie sehen dürfen. Das kann mehr oder weniger sein als bisher. Wer die URL hat, behält den Zugriff, und der Link ist ab sofort aktiv.",
+      "takeOverToast": "Sie veröffentlichen diesen Link jetzt",
+      "takeOverForbidden": "Sie haben keine Berechtigung, öffentliche Links zu veröffentlichen. Wenden Sie sich an einen Administrator.",
+      "takeOverConflict": "Jemand anderes hat diesen Link bereits übernommen."
     }
   },
   "panel": {

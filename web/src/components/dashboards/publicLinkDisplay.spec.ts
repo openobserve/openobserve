@@ -22,6 +22,7 @@ import {
   publicLinkColumns,
   publicLinkSearchTerm,
   publicLinkUrl,
+  takeOverError,
 } from "@/components/dashboards/publicLinkDisplay";
 import type {
   PublicLink,
@@ -116,6 +117,27 @@ describe("public link status", () => {
     expect(ids).not.toContain("updated");
     expect(publicLinkColumns(gt).find((c) => c.id === "last_viewed")?.accessorKey).toBe(
       "last_accessed_at",
+    );
+  });
+});
+
+describe("takeOverError", () => {
+  const fail = (status: number, message?: string) => ({ response: { status, data: { message } } });
+
+  it("shows the server's reason, and says someone else took over when a conflict has none", () => {
+    expect(takeOverError(fail(409, "this link was taken over by x@y.z; reload"), gt)).toBe(
+      "this link was taken over by x@y.z; reload",
+    );
+    expect(takeOverError(fail(409), gt)).toBe("Someone else took over this link first.");
+    expect(takeOverError(fail(500), gt)).toBe("Failed to update the link");
+  });
+
+  it("tells a refused caller they can't publish, or that they need edit access", () => {
+    expect(takeOverError(fail(403, "Forbidden"), gt)).toBe(
+      "You don't have permission to publish public links. Ask an admin.",
+    );
+    expect(takeOverError(fail(403, "you need edit access to this dashboard"), gt)).toBe(
+      "You need edit access to this dashboard to manage its public links.",
     );
   });
 });

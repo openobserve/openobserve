@@ -172,6 +172,30 @@ export function canPause(link: PublicLink): boolean {
   return link.status !== "expired" && link.status !== "dashboard_deleted";
 }
 
+/** Any member who isn't the publisher may take over a link that can still serve. */
+export function canTakeOver(link: PublicLink, userId: string): boolean {
+  // Basic-auth login keeps the email as typed, while published_by holds the stored one.
+  return canPause(link) && link.published_by.toLowerCase() !== userId.toLowerCase();
+}
+
+// A departed publisher's paused link can't be resumed, so taking it over is the way back.
+export function takeOverReplacesResume(link: PublicLink, userId: string): boolean {
+  return canTakeOver(link, userId) && link.publisher_left && !link.enabled;
+}
+
+/** The message for a refused takeover; a 409 means someone else took the link over first. */
+export function takeOverError(e: unknown, t: TranslateFn): I18nText {
+  const refused = forbiddenMessage(e, t, t("dashboard.publicLinks.takeOverForbidden"));
+  if (refused) return refused;
+  const response = (e as { response?: { status?: number; data?: { message?: unknown } } } | null)
+    ?.response;
+  const message = response?.data?.message;
+  if (typeof message === "string" && message) return raw(message);
+  return response?.status === 409
+    ? t("dashboard.publicLinks.takeOverConflict")
+    : t("dashboard.publicLinks.actionFailed");
+}
+
 export function pauseBlockedReason(link: PublicLink, t: TranslateFn): I18nText {
   return link.status === "expired"
     ? t("dashboard.publicLinks.pauseExpired")

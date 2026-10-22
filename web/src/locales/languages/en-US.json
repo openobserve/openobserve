@@ -7743,7 +7743,14 @@
       "createForbidden": "You don't have permission to create public links. Ask an admin.",
       "editForbidden": "You don't have permission to edit public links. Ask an admin.",
       "saveBeforePublish": "Save your dashboard changes, then publish.",
-      "upgradedToast": "Dashboard upgraded to the current format."
+      "upgradedToast": "Dashboard upgraded to the current format.",
+      "publisherLeft": "Publisher left the org",
+      "takeOver": "Take over",
+      "takeOverTitle": "Take over this link?",
+      "takeOverBody": "You become the publisher. The public page will show what you are allowed to see, which may be more or less than before. Anyone who has the URL keeps access to it, and the link goes live now.",
+      "takeOverToast": "You now publish this link",
+      "takeOverForbidden": "You don't have permission to publish public links. Ask an admin.",
+      "takeOverConflict": "Someone else took over this link first."
     }
   },
   "panel": {

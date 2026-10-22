@@ -53,6 +53,8 @@ export interface PublicLink {
   refresh_secs: number;
   expires_at: number | null;
   published_by: string;
+  /** The publisher is no longer a member of the org; the link may still be enabled while cleanup lags. */
+  publisher_left: boolean;
   updated_by: string | null;
   created_at: number;
   updated_at: number;
@@ -102,6 +104,13 @@ const public_dashboards_admin = {
     http().post<PublicLink>(`${linksPath(org, dashboardId)}/${linkId}/pause`, undefined, silent),
   resume: (org: string, dashboardId: string, linkId: string) =>
     http().post<PublicLink>(`${linksPath(org, dashboardId)}/${linkId}/resume`, undefined, silent),
+  // The server refuses with 409 when someone else took the link over since the UI showed this publisher.
+  takeOver: (org: string, dashboardId: string, linkId: string, expectedPublisher: string) =>
+    http().post<PublicLink>(
+      `${linksPath(org, dashboardId)}/${linkId}/take_over`,
+      { expected_publisher: expectedPublisher },
+      silent,
+    ),
   refresh: (org: string, dashboardId: string, linkId: string) =>
     http().post<PublicLink>(`${linksPath(org, dashboardId)}/${linkId}/refresh`, undefined, silent),
   status: (org: string, dashboardId: string, linkId: string) =>

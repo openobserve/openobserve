@@ -27,6 +27,7 @@ vi.mock("@/services/public_dashboards_admin", () => ({
     update: vi.fn(),
     pause: vi.fn(),
     resume: vi.fn(),
+    takeOver: vi.fn(),
     refresh: vi.fn(),
     status: vi.fn(),
     statusBatch: vi.fn(),
@@ -133,6 +134,7 @@ const link = (over: Partial<PublicLink> = {}): PublicLink => ({
   refresh_secs: 600,
   expires_at: null,
   published_by: "a@b.c",
+  publisher_left: false,
   updated_by: null,
   created_at: 1,
   updated_at: 1,
@@ -1131,6 +1133,93 @@ describe("PublicLinksPanel", () => {
       const w = build();
       await flushPromises();
       expect(w.find('[data-test="beta-badge"]').text()).toBe("Beta");
+    });
+  });
+
+  describe("take over", () => {
+    // The test store signs in as example@gmail.com; the fixtures publish as a@b.c.
+    const ME = "example@gmail.com";
+    const id = (row: string, suffix: string) => `dashboards-public-links-panel-${row}-${suffix}`;
+    const TAKEOVER_LINKS = [
+      link({ id: "left-paused", status: "paused", enabled: false, publisher_left: true }),
+      link({ id: "left-live", publisher_left: true }),
+      link({ id: "paused", status: "paused", enabled: false }),
+      link({ id: "live" }),
+      link({ id: "mine", published_by: ME }),
+      link({ id: "left-expired", status: "expired", enabled: false, publisher_left: true }),
+    ];
+
+    beforeEach(() => {
+      vi.mocked(admin.list).mockResolvedValue({ data: { list: TAKEOVER_LINKS } } as never);
+    });
+
+    it("marks a departed publisher's links and offers Take over in place of Resume", async () => {
+      const w = build();
+      await flushPromises();
+      expect(w.find(`[data-test="${id("left-paused", "publisher-left")}"]`).text()).toBe(
+        "Publisher left the org",
+      );
+      expect(has(w, id("left-live", "publisher-left"))).toBe(true);
+      expect(has(w, id("paused", "publisher-left"))).toBe(false);
+      expect(has(w, id("live", "publisher-left"))).toBe(false);
+
+      expect(has(w, id("left-paused", "take-over-btn"))).toBe(true);
+      expect(has(w, id("left-paused", "resume-btn"))).toBe(false);
+      expect(has(w, id("left-paused", "resume-menu"))).toBe(false);
+      expect(has(w, id("left-live", "pause-btn"))).toBe(true);
+      expect(has(w, id("left-live", "take-over-btn"))).toBe(false);
+      expect(has(w, id("left-live", "take-over-menu"))).toBe(true);
+    });
+
+    it("offers Take over only in the menu of a link someone else publishes, never to the publisher", async () => {
+      const w = build();
+      await flushPromises();
+      for (const row of ["paused", "live"]) {
+        expect(has(w, id(row, "take-over-btn"))).toBe(false);
+        expect(w.find(`[data-test="${id(row, "take-over-menu")}"]`).text()).toBe("Take over");
+      }
+      expect(has(w, id("paused", "resume-btn"))).toBe(true);
+      expect(has(w, id("live", "pause-btn"))).toBe(true);
+      for (const row of ["mine", "left-expired"]) {
+        expect(has(w, id(row, "take-over-btn"))).toBe(false);
+        expect(has(w, id(row, "take-over-menu"))).toBe(false);
+      }
+    });
+
+    it("takes over only after the confirmation and confirms with a toast", async () => {
+      vi.mocked(admin.takeOver).mockResolvedValue({
+        data: link({ id: "left-paused", published_by: ME }),
+      } as never);
+      const w = build();
+      await flushPromises();
+
+      confirm.mockResolvedValueOnce(false);
+      await w.find(`[data-test="${id("left-paused", "take-over-btn")}"]`).trigger("click");
+      await flushPromises();
+      expect(admin.takeOver).not.toHaveBeenCalled();
+
+      confirm.mockResolvedValueOnce(true);
+      await w.find(`[data-test="${id("live", "take-over-menu")}"]`).trigger("click");
+      await flushPromises();
+      expect(confirm).toHaveBeenLastCalledWith(
+        expect.objectContaining({ title: "Take over this link?", confirmLabel: "Take over" }),
+      );
+      expect(admin.takeOver).toHaveBeenCalledWith("default", "dash-1", "live", "a@b.c");
+      expect(notify.positive).toHaveBeenCalledWith("You now publish this link");
+    });
+
+    it("shows the server's message on a conflict and reloads the list", async () => {
+      vi.mocked(admin.takeOver).mockRejectedValue({
+        response: { status: 409, data: { message: "this link was taken over by x@y.z; reload" } },
+      });
+      confirm.mockResolvedValueOnce(true);
+      const w = build();
+      await flushPromises();
+      expect(admin.list).toHaveBeenCalledTimes(1);
+      await w.find(`[data-test="${id("left-paused", "take-over-btn")}"]`).trigger("click");
+      await flushPromises();
+      expect(notify.error).toHaveBeenCalledWith("this link was taken over by x@y.z; reload");
+      expect(admin.list).toHaveBeenCalledTimes(2);
     });
   });
 });

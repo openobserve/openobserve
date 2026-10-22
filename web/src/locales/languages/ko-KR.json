@@ -7741,7 +7741,14 @@
       "createForbidden": "공개 링크를 만들 권한이 없습니다. 관리자에게 문의하세요.",
       "editForbidden": "공개 링크를 편집할 권한이 없습니다. 관리자에게 문의하세요.",
       "saveBeforePublish": "대시보드 변경 사항을 저장한 후 게시하세요.",
-      "upgradedToast": "대시보드를 현재 형식으로 업그레이드했습니다."
+      "upgradedToast": "대시보드를 현재 형식으로 업그레이드했습니다.",
+      "publisherLeft": "게시자가 조직을 떠났습니다",
+      "takeOver": "인계받기",
+      "takeOverTitle": "이 링크를 인계받을까요?",
+      "takeOverBody": "본인이 게시자가 됩니다. 공개 페이지에는 본인이 볼 수 있는 내용이 표시되며, 이전보다 많거나 적을 수 있습니다. URL이 있는 사람은 계속 액세스할 수 있으며, 링크는 지금 바로 활성화됩니다.",
+      "takeOverToast": "이제 본인이 이 링크의 게시자입니다",
+      "takeOverForbidden": "공개 링크를 게시할 권한이 없습니다. 관리자에게 문의하세요.",
+      "takeOverConflict": "다른 사용자가 먼저 이 링크를 인계받았습니다."
     }
   },
   "panel": {

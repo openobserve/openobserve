@@ -28,6 +28,7 @@ vi.mock("@/services/public_dashboards_admin", () => ({
     update: vi.fn(),
     pause: vi.fn(),
     resume: vi.fn(),
+    takeOver: vi.fn(),
     refresh: vi.fn(),
     status: vi.fn(),
     statusBatch: vi.fn(),
@@ -118,6 +119,7 @@ const link = (over: Partial<PublicLink> = {}): PublicLink => ({
   refresh_secs: 600,
   expires_at: null,
   published_by: "a@b.c",
+  publisher_left: false,
   updated_by: null,
   created_at: 1,
   updated_at: 1,
@@ -577,5 +579,160 @@ describe("PublicLinksTable", () => {
     await w.findAllComponents({ name: "OEmptyState" })[0].vm.$emit("action", "clear-filters");
     await flushPromises();
     expect(rows(w)).toHaveLength(1);
+  });
+
+  describe("take over", () => {
+    // The test store signs in as example@gmail.com; the fixtures publish as a@b.c.
+    const ME = "example@gmail.com";
+    const TAKEOVER_LINKS = [
+      link({ id: "left-paused", status: "paused", enabled: false, publisher_left: true }),
+      link({ id: "left-live", publisher_left: true }),
+      link({ id: "paused", status: "paused", enabled: false }),
+      link({ id: "live" }),
+      link({ id: "mine", published_by: ME }),
+      link({ id: "left-expired", status: "expired", enabled: false, publisher_left: true }),
+      link({
+        id: "left-orphan",
+        status: "dashboard_deleted",
+        dashboard_title: null,
+        publisher_left: true,
+      }),
+    ];
+    const has = (w: ReturnType<typeof build>, id: string) => find(w, id).exists();
+
+    beforeEach(() => {
+      vi.mocked(admin.listOrg).mockResolvedValue({ data: { list: TAKEOVER_LINKS } } as never);
+    });
+
+    it("marks a departed publisher's links and offers Take over in place of Resume", async () => {
+      const w = build();
+      await flushPromises();
+      expect(find(w, "dashboards-public-links-left-paused-publisher-left").text()).toBe(
+        "Publisher left the org",
+      );
+      expect(has(w, "dashboards-public-links-left-live-publisher-left")).toBe(true);
+      for (const id of ["paused", "live", "mine"]) {
+        expect(has(w, `dashboards-public-links-${id}-publisher-left`)).toBe(false);
+      }
+
+      expect(has(w, "dashboards-public-links-left-paused-take-over-btn")).toBe(true);
+      expect(has(w, "dashboards-public-links-left-paused-resume-btn")).toBe(false);
+      expect(has(w, "dashboards-public-links-left-paused-resume-menu")).toBe(false);
+      expect(find(w, "dashboards-public-links-left-paused-take-over-menu").classes()).toContain(
+        "md:hidden",
+      );
+
+      expect(has(w, "dashboards-public-links-left-live-pause-btn")).toBe(true);
+      expect(has(w, "dashboards-public-links-left-live-take-over-btn")).toBe(false);
+      expect(find(w, "dashboards-public-links-left-live-take-over-menu").classes()).not.toContain(
+        "md:hidden",
+      );
+    });
+
+    it("offers Take over only in the menu for a live or paused link someone else publishes", async () => {
+      const w = build();
+      await flushPromises();
+      expect(has(w, "dashboards-public-links-paused-resume-btn")).toBe(true);
+      expect(has(w, "dashboards-public-links-paused-take-over-btn")).toBe(false);
+      expect(find(w, "dashboards-public-links-paused-take-over-menu").text()).toBe("Take over");
+      expect(has(w, "dashboards-public-links-live-pause-btn")).toBe(true);
+      expect(has(w, "dashboards-public-links-live-take-over-btn")).toBe(false);
+      expect(find(w, "dashboards-public-links-live-take-over-menu").classes()).not.toContain(
+        "md:hidden",
+      );
+    });
+
+    it("never offers Take over to the publisher, or on an expired or orphaned link", async () => {
+      const w = build();
+      await flushPromises();
+      expect(has(w, "dashboards-public-links-live-take-over-menu")).toBe(true);
+      for (const id of ["mine", "left-expired", "left-orphan"]) {
+        expect(has(w, `dashboards-public-links-${id}-take-over-btn`)).toBe(false);
+        expect(has(w, `dashboards-public-links-${id}-take-over-menu`)).toBe(false);
+      }
+      expect(
+        find(w, "dashboards-public-links-left-expired-resume-btn").attributes("disabled"),
+      ).toBeDefined();
+      expect(has(w, "dashboards-public-links-left-orphan-revoke-menu")).toBe(true);
+    });
+
+    it("treats a publisher who signed in with different letter case as the publisher", async () => {
+      vi.mocked(admin.listOrg).mockResolvedValue({
+        data: { list: [link({ id: "mine-cased", published_by: "Example@Gmail.com" })] },
+      } as never);
+      const w = build();
+      await flushPromises();
+      expect(has(w, "dashboards-public-links-mine-cased-pause-btn")).toBe(true);
+      expect(has(w, "dashboards-public-links-mine-cased-take-over-menu")).toBe(false);
+    });
+
+    it("takes over only after the confirmation, naming the publisher the row showed", async () => {
+      vi.mocked(admin.takeOver).mockResolvedValue({
+        data: link({ id: "left-paused", published_by: ME }),
+      } as never);
+      const invalidate = vi.spyOn(queryClient, "invalidateQueries");
+      const w = build();
+      await flushPromises();
+
+      confirm.mockResolvedValueOnce(false);
+      await find(w, "dashboards-public-links-left-paused-take-over-btn").trigger("click");
+      await flushPromises();
+      expect(admin.takeOver).not.toHaveBeenCalled();
+      expect(notify.positive).not.toHaveBeenCalled();
+
+      confirm.mockResolvedValueOnce(true);
+      await find(w, "dashboards-public-links-left-paused-take-over-btn").trigger("click");
+      await flushPromises();
+      expect(confirm).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          title: "Take over this link?",
+          message:
+            "You become the publisher. The public page will show what you are allowed to see, which may be more or less than before. Anyone who has the URL keeps access to it, and the link goes live now.",
+          confirmLabel: "Take over",
+        }),
+      );
+      expect(admin.takeOver).toHaveBeenCalledWith("default", "dash-1", "left-paused", "a@b.c");
+      expect(invalidate).toHaveBeenCalledWith(
+        expect.objectContaining({ queryKey: publicLinkKeys.all("default") }),
+      );
+      expect(notify.positive).toHaveBeenCalledWith("You now publish this link");
+    });
+
+    it("takes over a live link from the menu", async () => {
+      vi.mocked(admin.takeOver).mockResolvedValue({ data: link({ id: "live" }) } as never);
+      confirm.mockResolvedValueOnce(true);
+      const w = build();
+      await flushPromises();
+      await find(w, "dashboards-public-links-live-take-over-menu").trigger("click");
+      await flushPromises();
+      expect(admin.takeOver).toHaveBeenCalledWith("default", "dash-1", "live", "a@b.c");
+    });
+
+    it("shows the server's message on a conflict and reloads the list", async () => {
+      vi.mocked(admin.takeOver).mockRejectedValue({
+        response: { status: 409, data: { message: "this link was taken over by x@y.z; reload" } },
+      });
+      confirm.mockResolvedValueOnce(true);
+      const w = build();
+      await flushPromises();
+      expect(admin.listOrg).toHaveBeenCalledTimes(1);
+      await find(w, "dashboards-public-links-left-paused-take-over-btn").trigger("click");
+      await flushPromises();
+      expect(notify.error).toHaveBeenCalledWith("this link was taken over by x@y.z; reload");
+      expect(admin.listOrg).toHaveBeenCalledTimes(2);
+      expect(notify.positive).not.toHaveBeenCalled();
+    });
+
+    it("says the caller can't publish when the takeover is forbidden", async () => {
+      vi.mocked(admin.takeOver).mockRejectedValue({ response: { status: 403, data: {} } });
+      confirm.mockResolvedValueOnce(true);
+      const w = build();
+      await flushPromises();
+      await find(w, "dashboards-public-links-live-take-over-menu").trigger("click");
+      await flushPromises();
+      expect(notify.error).toHaveBeenCalledWith(
+        "You don't have permission to publish public links. Ask an admin.",
+      );
+    });
   });
 });

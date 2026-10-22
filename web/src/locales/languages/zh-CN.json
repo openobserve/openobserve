@@ -7741,7 +7741,14 @@
       "createForbidden": "您没有创建公开链接的权限。请联系管理员。",
       "editForbidden": "您没有编辑公开链接的权限。请联系管理员。",
       "saveBeforePublish": "请先保存仪表盘的更改，再发布。",
-      "upgradedToast": "仪表盘已升级到当前格式。"
+      "upgradedToast": "仪表盘已升级到当前格式。",
+      "publisherLeft": "发布者已离开组织",
+      "takeOver": "接管",
+      "takeOverTitle": "接管此链接？",
+      "takeOverBody": "您将成为发布者。公开页面将显示您有权查看的内容，可能比之前多或少。拥有该 URL 的任何人仍可访问，链接将立即生效。",
+      "takeOverToast": "您现在是此链接的发布者",
+      "takeOverForbidden": "您没有发布公开链接的权限。请联系管理员。",
+      "takeOverConflict": "其他人已先接管此链接。"
     }
   },
   "panel": {

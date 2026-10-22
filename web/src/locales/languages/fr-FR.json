@@ -7741,7 +7741,14 @@
       "createForbidden": "Vous n'avez pas la permission de créer des liens publics. Contactez un administrateur.",
       "editForbidden": "Vous n'avez pas la permission de modifier les liens publics. Contactez un administrateur.",
       "saveBeforePublish": "Enregistrez les modifications du tableau de bord, puis publiez.",
-      "upgradedToast": "Tableau de bord mis à niveau vers le format actuel."
+      "upgradedToast": "Tableau de bord mis à niveau vers le format actuel.",
+      "publisherLeft": "L'éditeur a quitté l'organisation",
+      "takeOver": "Prendre le relais",
+      "takeOverTitle": "Prendre le relais sur ce lien ?",
+      "takeOverBody": "Vous devenez l'éditeur. La page publique affichera ce que vous êtes autorisé à voir, ce qui peut être plus ou moins qu'avant. Toute personne disposant de l'URL y garde accès, et le lien est actif dès maintenant.",
+      "takeOverToast": "Vous publiez désormais ce lien",
+      "takeOverForbidden": "Vous n'avez pas la permission de publier des liens publics. Contactez un administrateur.",
+      "takeOverConflict": "Quelqu'un d'autre a déjà pris le relais sur ce lien."
     }
   },
   "panel": {

@@ -95,6 +95,15 @@ describe("public_dashboards_admin service", () => {
     });
   });
 
+  it("takes over one link, naming the publisher the caller saw", async () => {
+    await service.takeOver("org1", "dash1", "l1", "a@b.c");
+    expect(mockHttp.post).toHaveBeenCalledWith(
+      "/api/org1/dashboards/dash1/public_links/l1/take_over",
+      { expected_publisher: "a@b.c" },
+      { silentForbidden: true },
+    );
+  });
+
   it("reads one link's status and a batch of them for the org list", async () => {
     await service.status("org1", "dash1", "l1");
     await service.statusBatch("org1", ["l1", "l2"]);

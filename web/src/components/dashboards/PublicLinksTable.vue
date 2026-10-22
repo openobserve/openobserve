@@ -108,13 +108,25 @@
         </span>
       </template>
       <template #cell-status="{ row }">
-        <span class="inline-flex">
-          <OTag
-            type="publicLinkStatus"
-            :value="statusOf(row)"
-            :data-test="`dashboards-public-links-${row.id}-status`"
-          />
-          <OTooltip v-if="attention[row.id]" side="bottom" :content="attention[row.id]" />
+        <span class="inline-flex min-w-0 items-center gap-1.5">
+          <span class="inline-flex">
+            <OTag
+              type="publicLinkStatus"
+              :value="statusOf(row)"
+              :data-test="`dashboards-public-links-${row.id}-status`"
+            />
+            <OTooltip v-if="attention[row.id]" side="bottom" :content="attention[row.id]" />
+          </span>
+          <OBadge
+            v-if="row.publisher_left"
+            variant="warning-soft"
+            size="sm"
+            icon="person"
+            class="min-w-0"
+            :data-test="`dashboards-public-links-${row.id}-publisher-left`"
+          >
+            {{ t("dashboard.publicLinks.publisherLeft") }}
+          </OBadge>
         </span>
       </template>
       <template #cell-ranges="{ row }">
@@ -203,8 +215,22 @@
               />
             </OButton>
           </span>
+          <OButton
+            v-if="takeOverReplacesResume(row, userId)"
+            variant="ghost-success"
+            size="icon-sm"
+            icon-left="how-to-reg"
+            class="max-md:hidden"
+            :aria-label="t('dashboard.publicLinks.takeOver')"
+            :loading="busyRows.get(row.id) === 'inline'"
+            :disabled="busyRows.has(row.id)"
+            :data-test="`dashboards-public-links-${row.id}-take-over-btn`"
+            @click="takeOver(row, 'inline')"
+          >
+            <OTooltip side="bottom" :content="t('dashboard.publicLinks.takeOver')" />
+          </OButton>
           <!-- A disabled button gets no pointer events, so the reason tooltip sits on the wrapper. -->
-          <span class="inline-flex max-md:hidden">
+          <span v-else class="inline-flex max-md:hidden">
             <OTooltip v-if="!canPause(row)" side="bottom" :content="pauseBlockedReason(row, t)" />
             <OButton
               :variant="row.enabled ? 'ghost-destructive' : 'ghost-success'"
@@ -273,7 +299,7 @@
               {{ t("dashboard.publicLinks.editSettings") }}
             </ODropdownItem>
             <ODropdownItem
-              v-if="canPause(row)"
+              v-if="canPause(row) && !takeOverReplacesResume(row, userId)"
               :icon-left="row.enabled ? 'pause' : 'play-arrow'"
               class="md:hidden"
               :disabled="busyRows.has(row.id)"
@@ -283,6 +309,16 @@
               {{
                 row.enabled ? t("dashboard.publicLinks.pause") : t("dashboard.publicLinks.resume")
               }}
+            </ODropdownItem>
+            <ODropdownItem
+              v-if="canTakeOver(row, userId)"
+              icon-left="how-to-reg"
+              :class="{ 'md:hidden': takeOverReplacesResume(row, userId) }"
+              :disabled="busyRows.has(row.id)"
+              :data-test="`dashboards-public-links-${row.id}-take-over-menu`"
+              @select="takeOver(row, 'menu')"
+            >
+              {{ t("dashboard.publicLinks.takeOver") }}
             </ODropdownItem>
             <ODropdownItem
               v-if="canRefresh(row)"
@@ -350,6 +386,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -367,18 +404,22 @@ import {
   refreshPublicLinkMutation,
   revokePublicLinkMutation,
   setPublicLinkPausedMutation,
+  takeOverPublicLinkMutation,
 } from "@/services/public_dashboards.queries";
 import PublicLinksPanel from "./PublicLinksPanel.vue";
 import {
   attentionReason,
   canPause,
   canRefresh,
+  canTakeOver,
   displayStatus,
   publicLinkColumns,
   publicLinkSearchTerm,
   forbiddenMessage,
   pauseBlockedReason,
   publicLinkUrl,
+  takeOverError,
+  takeOverReplacesResume,
 } from "./publicLinkDisplay";
 import PublicLinkRangesCell from "./PublicLinkRangesCell.vue";
 import FolderIcon from "@/components/common/sidebar/FolderIcon.vue";
@@ -404,6 +445,7 @@ const { showErrorNotification, showPositiveNotification } = useNotifications();
 const { confirm } = useConfirmDialog();
 const orgId = useOrgId();
 const now = useNow();
+const userId = computed<string>(() => store.state.userInfo?.email ?? "");
 
 const timezone = computed<string>(
   () => store.state.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
@@ -463,6 +505,7 @@ const refreshLinks = () =>
 const pauseMutation = useMutation(() => setPublicLinkPausedMutation(orgId.value));
 const revokeMutation = useMutation(() => revokePublicLinkMutation(orgId.value));
 const refreshMutation = useMutation(() => refreshPublicLinkMutation(orgId.value));
+const takeOverMutation = useMutation(() => takeOverPublicLinkMutation(orgId.value));
 
 const statusFilter = ref<StatusFilter>("all");
 const searchQuery = ref("");
@@ -555,12 +598,22 @@ function serverMessage(e: unknown): I18nText {
   return raw((e as { response?: { data?: { message?: string } } })?.response?.data?.message);
 }
 
+function rowActionError(
+  e: unknown,
+  failed: I18nText = t("dashboard.publicLinks.actionFailed"),
+): I18nText {
+  return (
+    forbiddenMessage(e, t, t("dashboard.publicLinks.actionForbidden")) ??
+    (serverMessage(e) || failed)
+  );
+}
+
 // The list refetch the mutation started must land first, or the row still offers the action it just ran.
 async function runRowAction(
   link: PublicLink,
   source: RowActionSource,
   run: () => Promise<void>,
-  failed: I18nText = t("dashboard.publicLinks.actionFailed"),
+  describeError: (e: unknown) => I18nText = (e) => rowActionError(e),
 ) {
   if (busyRows.has(link.id)) return;
   busyRows.set(link.id, source);
@@ -568,10 +621,11 @@ async function runRowAction(
     await run();
     await linksQuery.refetch({ cancelRefetch: false });
   } catch (e: unknown) {
-    showErrorNotification(
-      forbiddenMessage(e, t, t("dashboard.publicLinks.actionForbidden")) ??
-        (serverMessage(e) || failed),
-    );
+    // A conflict means the row changed on the server, so the list is refetched to show its current state.
+    if ((e as { response?: { status?: number } })?.response?.status === 409) {
+      void linksQuery.refetch();
+    }
+    showErrorNotification(describeError(e));
   } finally {
     busyRows.delete(link.id);
   }
@@ -648,7 +702,26 @@ async function revokeLink(link: PublicLink) {
       await revokeMutation.mutateAsync(link);
       showPositiveNotification(t("dashboard.publicDashboard.revokedToast"));
     },
-    t("dashboard.publicDashboard.revokeFailed"),
+    (e) => rowActionError(e, t("dashboard.publicDashboard.revokeFailed")),
+  );
+}
+
+async function takeOver(link: PublicLink, source: RowActionSource) {
+  const ok = await confirm({
+    title: t("dashboard.publicLinks.takeOverTitle"),
+    message: t("dashboard.publicLinks.takeOverBody"),
+    confirmLabel: t("dashboard.publicLinks.takeOver"),
+    cancelLabel: t("common.cancel"),
+  });
+  if (!ok) return;
+  await runRowAction(
+    link,
+    source,
+    async () => {
+      await takeOverMutation.mutateAsync(link);
+      showPositiveNotification(t("dashboard.publicLinks.takeOverToast"));
+    },
+    (e) => takeOverError(e, t),
   );
 }
 </script>

@@ -7741,7 +7741,14 @@
       "createForbidden": "Nie masz uprawnień do tworzenia publicznych linków. Skontaktuj się z administratorem.",
       "editForbidden": "Nie masz uprawnień do edycji publicznych linków. Skontaktuj się z administratorem.",
       "saveBeforePublish": "Zapisz zmiany w pulpicie, a następnie opublikuj.",
-      "upgradedToast": "Pulpit został zaktualizowany do bieżącego formatu."
+      "upgradedToast": "Pulpit został zaktualizowany do bieżącego formatu.",
+      "publisherLeft": "Osoba publikująca opuściła organizację",
+      "takeOver": "Przejmij",
+      "takeOverTitle": "Przejąć ten link?",
+      "takeOverBody": "Staniesz się osobą publikującą. Strona publiczna pokaże to, co masz prawo widzieć, a to może być więcej lub mniej niż wcześniej. Każdy, kto ma URL, zachowuje dostęp, a link jest od teraz aktywny.",
+      "takeOverToast": "Teraz to Ty publikujesz ten link",
+      "takeOverForbidden": "Nie masz uprawnień do publikowania publicznych linków. Skontaktuj się z administratorem.",
+      "takeOverConflict": "Ktoś inny przejął już ten link."
     }
   },
   "panel": {

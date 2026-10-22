@@ -7741,7 +7741,14 @@
       "createForbidden": "Você não tem permissão para criar links públicos. Peça a um administrador.",
       "editForbidden": "Você não tem permissão para editar links públicos. Peça a um administrador.",
       "saveBeforePublish": "Guarde as alterações do dashboard e depois publique.",
-      "upgradedToast": "Dashboard atualizado para o formato atual."
+      "upgradedToast": "Dashboard atualizado para o formato atual.",
+      "publisherLeft": "O autor da publicação saiu da organização",
+      "takeOver": "Assumir",
+      "takeOverTitle": "Assumir este link?",
+      "takeOverBody": "Passa a ser o autor da publicação. A página pública vai mostrar o que tem permissão para ver, o que pode ser mais ou menos do que antes. Quem tiver o URL mantém o acesso, e o link fica ativo de imediato.",
+      "takeOverToast": "Passou a ser o autor da publicação deste link",
+      "takeOverForbidden": "Não tem permissão para publicar links públicos. Peça a um administrador.",
+      "takeOverConflict": "Outra pessoa já assumiu este link."
     }
   },
   "panel": {

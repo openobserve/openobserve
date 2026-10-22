@@ -7741,7 +7741,14 @@
       "createForbidden": "No tienes permiso para crear enlaces públicos. Pídeselo a un administrador.",
       "editForbidden": "No tienes permiso para editar enlaces públicos. Pídeselo a un administrador.",
       "saveBeforePublish": "Guarda los cambios del dashboard y luego publica.",
-      "upgradedToast": "Dashboard actualizado al formato actual."
+      "upgradedToast": "Dashboard actualizado al formato actual.",
+      "publisherLeft": "El publicador ha dejado la organización",
+      "takeOver": "Hacerse cargo",
+      "takeOverTitle": "¿Hacerte cargo de este enlace?",
+      "takeOverBody": "Pasarás a ser el publicador. La página pública mostrará lo que tienes permiso para ver, que puede ser más o menos que antes. Quien tenga la URL conserva el acceso, y el enlace se activa ahora.",
+      "takeOverToast": "Ahora publicas este enlace",
+      "takeOverForbidden": "No tienes permiso para publicar enlaces públicos. Pídeselo a un administrador.",
+      "takeOverConflict": "Otra persona ya se ha hecho cargo de este enlace."
     }
   },
   "panel": {

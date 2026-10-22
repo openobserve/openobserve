@@ -92,6 +92,14 @@ export const setPublicLinkPausedMutation = (org: string) =>
     meta: { invalidates: [publicLinkKeys.all(org)], silentError: true },
   });
 
+// Sends the publisher the row showed, so a takeover that lost a race is refused instead of repeated.
+export const takeOverPublicLinkMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: async (link: PublicLink): Promise<PublicLink> =>
+      (await admin.takeOver(org, link.dashboard_id, link.id, link.published_by)).data,
+    meta: { invalidates: [publicLinkKeys.all(org)], silentError: true },
+  });
+
 export const refreshPublicLinkMutation = (org: string) =>
   mutationOptions({
     mutationFn: async (link: PublicLink): Promise<PublicLink> =>

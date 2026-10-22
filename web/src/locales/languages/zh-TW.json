@@ -7736,7 +7736,14 @@
       "createForbidden": "您沒有建立公開連結的權限。請聯絡管理員。",
       "editForbidden": "您沒有編輯公開連結的權限。請聯絡管理員。",
       "saveBeforePublish": "請先儲存儀表板的變更，再發布。",
-      "upgradedToast": "儀表板已升級至目前格式。"
+      "upgradedToast": "儀表板已升級至目前格式。",
+      "publisherLeft": "發佈者已離開組織",
+      "takeOver": "接管",
+      "takeOverTitle": "要接管此連結嗎？",
+      "takeOverBody": "您將成為發佈者。公開頁面會顯示您有權檢視的內容，可能比之前多或少。擁有該 URL 的任何人仍可存取，且連結會立即生效。",
+      "takeOverToast": "您現在是此連結的發佈者",
+      "takeOverForbidden": "您沒有發佈公開連結的權限。請聯絡管理員。",
+      "takeOverConflict": "其他人已搶先接管此連結。"
     }
   },
   "panel": {
