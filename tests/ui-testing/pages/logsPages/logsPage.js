@@ -11130,24 +11130,52 @@ export class LogsPage {
      * has finished (it depends on the updateGroupedFields API call, which can be slow in CI).
      * Fails the test if the editor stays empty beyond the timeout.
      */
-    async expectQueryEditorPopulated(timeout = 30000) {
-        await this.page.waitForFunction(
-            (selector) => {
-                const host = document.querySelector(selector);
-                if (!host) return false;
-                const editors = window.monaco?.editor?.getEditors?.() ?? [];
-                for (const ed of editors) {
-                    const domNode = ed.getDomNode?.();
-                    if (domNode && host.contains(domNode)) {
-                        const val = ed.getValue();
-                        return val && val.trim().length > 0;
+    async expectQueryEditorPopulated(timeout = 60000) {
+        // 60s, not 30s: the editor fills only after makeAutoSQLQuery(), which awaits
+        // updateGroupedFields() -> loadStreamFields() -> GET /streams/{name}/schema.
+        // Under CI load that chain regularly passed 30s, which made this the flakiest
+        // wait in the Logs suite (two tests passing only on retry, a third exhausting
+        // them). Waiting on the schema response instead is not an option: useStreams
+        // caches it, so on a warm cache no request fires and the wait would hang.
+        try {
+            await this.page.waitForFunction(
+                (selector) => {
+                    const host = document.querySelector(selector);
+                    if (!host) return false;
+                    const editors = window.monaco?.editor?.getEditors?.() ?? [];
+                    for (const ed of editors) {
+                        const domNode = ed.getDomNode?.();
+                        if (domNode && host.contains(domNode)) {
+                            const val = ed.getValue();
+                            return val && val.trim().length > 0;
+                        }
                     }
-                }
-                return false;
-            },
-            '[data-test="logs-search-bar-query-editor"]',
-            { timeout, polling: 500 }
-        );
+                    return false;
+                },
+                '[data-test="logs-search-bar-query-editor"]',
+                { timeout, polling: 250 }
+            );
+        } catch (e) {
+            // Say WHICH link of the chain broke. "Timeout exceeded" alone sent a
+            // reader to the test; these three facts point at the page instead.
+            const diag = await this.page.evaluate((selector) => {
+                const host = document.querySelector(selector);
+                const editors = window.monaco?.editor?.getEditors?.() ?? [];
+                return {
+                    hostPresent: !!host,
+                    monacoLoaded: !!window.monaco,
+                    editorsInHost: host ? editors.filter((ed) => {
+                        const n = ed.getDomNode?.();
+                        return n && host.contains(n);
+                    }).length : 0,
+                };
+            }, '[data-test="logs-search-bar-query-editor"]').catch(() => null);
+            throw new Error(
+                `Query editor stayed empty after ${timeout}ms (host=${diag?.hostPresent} ` +
+                `monaco=${diag?.monacoLoaded} editors=${diag?.editorsInHost}). ` +
+                `makeAutoSQLQuery() likely never resolved — check the stream schema call.`
+            );
+        }
         testLogger.info('Query editor populated');
     }
 
