@@ -182,15 +182,16 @@ async function performDexLogin(page, baseUrl, userEmail, userPassword) {
   // Check if already logged in (valid session from previous attempt or shared cookies)
   // If the main menu is visible, skip the entire Dex flow
   const menuItem = page.locator('[data-test="menu-link-\\/-item"]');
-  const alreadyLoggedIn = await menuItem.isVisible().catch(() => false);
-  if (alreadyLoggedIn) {
+  const continueWithEmail = page.getByText('Continue with Email');
+  // A one-shot isVisible() misses a still-loading app, then waits for a Dex button that never comes.
+  await menuItem.or(continueWithEmail).first().waitFor({ state: 'visible', timeout: 30000 });
+  if (await menuItem.isVisible().catch(() => false)) {
     testLogger.info('[alpha1] Already logged in — skipping Dex flow');
     return;
   }
 
   // Step 2: Click "Continue with Email" on the Dex page
   // The page may be at /web/login (app login page with Dex button) or already on Dex
-  const continueWithEmail = page.getByText('Continue with Email');
   await continueWithEmail.waitFor({ state: 'visible', timeout: 20000 });
   testLogger.info('[alpha1] Clicking "Continue with Email"...');
   await continueWithEmail.click();
