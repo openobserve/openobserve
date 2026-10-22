@@ -67,6 +67,8 @@ import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { useI18nTyped } from "@/types/i18n";
 import {
+  tokenExpiresSoon,
+  tokenState,
   useFleetCollectors,
   useFleetTokens,
   type CollectorRow,
@@ -79,7 +81,6 @@ const emit = defineEmits<{
 }>();
 
 const DAY_MS = 86_400_000;
-const WARN_DAYS = 7;
 const MAX_NAMES = 8;
 
 interface ExpiringToken {
@@ -100,9 +101,7 @@ const items = computed<ExpiringToken[]>(() => {
     if (c.tokenId) byToken.set(c.tokenId, [...(byToken.get(c.tokenId) ?? []), c]);
   }
   return tokens.rows.value
-    .filter(
-      (tok) => !tok.revoked && tok.expiresAt !== null && tok.expiresAt <= now + WARN_DAYS * DAY_MS,
-    )
+    .filter((tok) => tokenExpiresSoon(tok, now) || tokenState(tok, now) === "expired")
     .map((token) => ({
       token,
       collectors: byToken.get(token.id) ?? [],

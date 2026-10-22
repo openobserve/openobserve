@@ -25411,7 +25411,8 @@
       "prefix": "Token",
       "revokeAffected": "No collector uses this token | {count} collector uses this token | {count} collectors use this token",
       "copyToken": "Copy token",
-      "tokenCopied": "Token copied"
+      "tokenCopied": "Token copied",
+      "expiresSoon": "Expires soon"
     },
     "tokenExpiry": {
       "title": "{count} enrollment token expires within 7 days and collectors still use it | {count} enrollment tokens expire within 7 days and collectors still use them",

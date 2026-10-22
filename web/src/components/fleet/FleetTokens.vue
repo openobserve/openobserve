@@ -141,7 +141,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <template #cell-state="{ row }">
           <span :data-test="`fleet-tokens-state-${row.id}`">
-            <OTag :variant="STATE_VARIANT[stateOf(row)]" dot :label="stateLabel(row)" />
+            <OTag
+              v-if="expiresSoon(row)"
+              variant="warning-soft"
+              dot
+              :label="t('fleet.enrollment.expiresSoon')"
+            />
+            <OTag v-else :variant="STATE_VARIANT[stateOf(row)]" dot :label="stateLabel(row)" />
           </span>
         </template>
 
@@ -154,7 +160,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #cell-expiresAt="{ row }">
-          <OTimeCell v-if="row.expiresAt" :value="row.expiresAt" unit="ms" mode="date" />
+          <span
+            v-if="row.expiresAt"
+            :class="expiresSoon(row) ? 'text-status-warning-text font-medium' : ''"
+            :data-test="`fleet-tokens-expires-${row.id}`"
+          >
+            <OTimeCell :value="row.expiresAt" unit="ms" mode="date" />
+          </span>
           <span v-else class="text-text-secondary">{{ t("fleet.enrollment.never") }}</span>
         </template>
 
@@ -227,6 +239,7 @@ import FleetTokenForm from "./FleetTokenForm.vue";
 import {
   isForbidden,
   serverMessage,
+  tokenExpiresSoon,
   tokenState,
   useFleetCollectors,
   useFleetTokens,
@@ -306,6 +319,8 @@ watch([orgId, () => props.fleetId], () => {
 });
 
 const stateOf = (row: TokenRow) => tokenState(row, Date.now());
+const expiresSoon = (row: TokenRow) =>
+  stateOf(row) === "active" && tokenExpiresSoon(row, Date.now());
 const masked = (prefix: string) => raw(`${prefix}••••••••••••`);
 const copyToken = (token: string) =>
   copyToClipboard(token, t, { successMessage: t("fleet.enrollment.tokenCopied") });

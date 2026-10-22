@@ -72,6 +72,7 @@ const tokens = [
   token({ id: "t3", name: "leaked", revoked: true }),
   token({ id: "t4", name: "full", uses: 20, max_uses: 20 }),
   token({ id: "t5", name: "other-fleet", fleet: { id: "default", name: "default" } }),
+  token({ id: "t6", name: "soon", expires_at: Date.now() + 2 * DAY }),
 ];
 
 const DrawerStub = {
@@ -184,6 +185,11 @@ describe("FleetTokens", () => {
     expect(state("t2")).toBe("Expired");
     expect(state("t3")).toBe("Revoked");
     expect(state("t4")).toBe("Exhausted");
+    expect(state("t6")).toBe("Expires soon");
+    expect(wrapper.find('[data-test="fleet-tokens-expires-t6"]').classes()).toContain(
+      "text-status-warning-text",
+    );
+    expect(wrapper.find('[data-test="fleet-tokens-expires-t1"]').exists()).toBe(false);
   });
 
   it("shows uses against the limit, or unlimited", async () => {

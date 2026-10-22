@@ -346,6 +346,19 @@ export function tokenState(
   return t.maxUses !== null && t.uses >= t.maxUses ? "exhausted" : "active";
 }
 
+export const TOKEN_EXPIRY_WARN_DAYS = 7;
+const DAY_MS = 86_400_000;
+
+/** A live token whose expiry is within the warning window; an expired one is not "soon". */
+export function tokenExpiresSoon(t: Pick<TokenRow, "revoked" | "expiresAt">, now: number): boolean {
+  return (
+    !t.revoked &&
+    t.expiresAt !== null &&
+    t.expiresAt > now &&
+    t.expiresAt <= now + TOKEN_EXPIRY_WARN_DAYS * DAY_MS
+  );
+}
+
 export function osLabel(os: string | null): string | null {
   if (!os) return null;
   return OS_LABEL[os as FleetOs] ?? os;

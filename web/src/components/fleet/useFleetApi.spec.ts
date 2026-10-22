@@ -50,6 +50,7 @@ import {
   toCollectorRow,
   toRolloutRow,
   toTokenRow,
+  tokenExpiresSoon,
   tokenState,
   useFleetRollouts,
   useFleetCollectors,
@@ -341,6 +342,20 @@ describe("toTokenRow", () => {
     expect(row.fleetId).toBe("gone");
     expect(row.fleetName).toBeNull();
     expect(row.maxUses).toBeNull();
+  });
+});
+
+describe("tokenExpiresSoon", () => {
+  const now = 1790000000000;
+  const DAY = 86_400_000;
+
+  it("is true only for a live token expiring within 7 days", () => {
+    const base = { revoked: false, expiresAt: now + 3 * DAY };
+    expect(tokenExpiresSoon(base, now)).toBe(true);
+    expect(tokenExpiresSoon({ ...base, expiresAt: now + 8 * DAY }, now)).toBe(false);
+    expect(tokenExpiresSoon({ ...base, expiresAt: now - DAY }, now)).toBe(false);
+    expect(tokenExpiresSoon({ ...base, expiresAt: null }, now)).toBe(false);
+    expect(tokenExpiresSoon({ ...base, revoked: true }, now)).toBe(false);
   });
 });
 
