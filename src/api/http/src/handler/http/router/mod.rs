@@ -2474,6 +2474,8 @@ fn is_opamp(request: &Request) -> bool {
         .path()
         .trim_end_matches('/')
         .ends_with("/v1/opamp")
+}
+
 /// Slack install and settings routes (section 7.2); the paths match the ENT `SLACK_ROUTE_ROWS`.
 #[rustfmt::skip]
 pub fn slack_routes() -> Router {
