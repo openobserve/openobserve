@@ -377,10 +377,6 @@ def test_sdr_08_search_around_is_single_stream(create_session, base_url, redacte
     assert not foreign, f"rows from other streams came back: {sorted(foreign)}"
 
 
-# ---------------------------------------------------------------------------
-# SDR-09..11 — DELETE /re_patterns/bulk
-# ---------------------------------------------------------------------------
-#
 # This route had no test of any kind. #15361 fixed a cross-org hole in it: it
 # took ids straight from the body and called `db::re_pattern::remove(&id)` with
 # no org anywhere in the path, so any org could delete any other org's patterns
