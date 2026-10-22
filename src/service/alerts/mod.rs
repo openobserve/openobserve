@@ -26,7 +26,7 @@ use config::{
         },
         cluster::RoleGroup,
         search::{SearchEventContext, SearchEventType, SqlQuery},
-        sql::resolve_stream_names,
+        sql::{TableReferenceExt, resolve_stream_names_with_type},
         stream::StreamType,
     },
     utils::{
@@ -244,30 +244,7 @@ impl QueryConditionExt for QueryCondition {
             }
         };
 
-        let stream_names = resolve_stream_names(&sql)
-            .map_err(|e| anyhow::anyhow!("Error resolving stream names in SQL query: {e}"))?;
-
-        // SQL may contain multiple stream names, check for each stream
-        // if the query period is greater than the max query range
-        for stream in stream_names.iter() {
-            if infra::schema::get_stream_schema_from_cache(org_id, stream, stream_type)
-                .await
-                .is_none()
-            {
-                return Err(anyhow::anyhow!(
-                    "Stream \"{stream}\" not found in schema, skipping alert evaluation"
-                ));
-            };
-
-            if let Some(settings) = infra::schema::get_settings(org_id, stream, stream_type).await {
-                let max_query_range = settings.max_query_range;
-                if max_query_range > 0 && trigger_condition.period > max_query_range * 60 {
-                    return Err(anyhow::anyhow!(
-                        "Query period is greater than max query range of {max_query_range} hours for stream \"{stream}\""
-                    ));
-                }
-            }
-        }
+        check_query_streams(org_id, stream_type, &sql, trigger_condition.period).await?;
 
         let mut time_diff = Duration::try_minutes(trigger_condition.period)
             .unwrap()
@@ -843,6 +820,41 @@ impl ConditionGroupExt for config::meta::alerts::ConditionItem {
     async fn to_sql(&self, schema: &Schema) -> Result<String, anyhow::Error> {
         condition_item_to_sql(self, schema).await
     }
+}
+
+/// Checks that every stream in the alert SQL exists and allows the alert period.
+async fn check_query_streams(
+    org_id: &str,
+    stream_type: StreamType,
+    sql: &str,
+    period: i64,
+) -> Result<(), anyhow::Error> {
+    let stream_refs = resolve_stream_names_with_type(sql)
+        .map_err(|e| anyhow::anyhow!("Error resolving stream names in SQL query: {e}"))?;
+
+    for stream_ref in stream_refs.iter() {
+        let stream = stream_ref.stream_name();
+        // A JOIN may name another type, e.g. "enrichment_tables".tbl in a logs alert.
+        let stream_type = stream_ref.get_stream_type(stream_type);
+        if infra::schema::get_stream_schema_from_cache(org_id, &stream, stream_type)
+            .await
+            .is_none()
+        {
+            return Err(anyhow::anyhow!(
+                "Stream \"{stream}\" not found in schema, skipping alert evaluation"
+            ));
+        };
+
+        if let Some(settings) = infra::schema::get_settings(org_id, &stream, stream_type).await {
+            let max_query_range = settings.max_query_range;
+            if max_query_range > 0 && period > max_query_range * 60 {
+                return Err(anyhow::anyhow!(
+                    "Query period is greater than max query range of {max_query_range} hours for stream \"{stream}\""
+                ));
+            }
+        }
+    }
+    Ok(())
 }
 
 /// Evaluates a list of condition items with left-to-right logical operator application
@@ -2011,5 +2023,41 @@ mod tests {
         );
 
         println!("✓ All deeply nested group tests with operator precedence passed!");
+    }
+
+    #[tokio::test]
+    async fn test_check_query_streams_join_enrichment_table() {
+        use infra::schema::{STREAM_SCHEMAS_LATEST, SchemaCache};
+
+        let org_id = "test_org_alert_join_enrich";
+        let logs_key = format!("{org_id}/{}/app", StreamType::Logs);
+        let enrich_key = format!("{org_id}/{}/geo", StreamType::EnrichmentTables);
+        let schema = Schema::new(vec![Field::new("ip", DataType::Utf8, true)]);
+        {
+            let mut w = STREAM_SCHEMAS_LATEST.write().await;
+            w.insert(logs_key.clone(), SchemaCache::new(schema.clone()));
+            w.insert(enrich_key.clone(), SchemaCache::new(schema));
+        }
+
+        let sql =
+            r#"SELECT a.ip FROM "app" AS a JOIN "enrichment_tables"."geo" AS b ON a.ip = b.ip"#;
+        let missing_sql =
+            r#"SELECT a.ip FROM "app" AS a JOIN "enrichment_tables"."nope" AS b ON a.ip = b.ip"#;
+        let ok = check_query_streams(org_id, StreamType::Logs, sql, 10).await;
+        let missing = check_query_streams(org_id, StreamType::Logs, missing_sql, 10).await;
+
+        {
+            let mut w = STREAM_SCHEMAS_LATEST.write().await;
+            w.remove(&logs_key);
+            w.remove(&enrich_key);
+        }
+
+        assert!(ok.is_ok(), "join with enrichment table rejected: {ok:?}");
+        assert!(
+            missing
+                .unwrap_err()
+                .to_string()
+                .contains("\"nope\" not found")
+        );
     }
 }
