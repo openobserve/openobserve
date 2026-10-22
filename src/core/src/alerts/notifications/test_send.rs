@@ -185,11 +185,12 @@ fn build_test_message_with_title(
 /// performs network I/O — callers that only need to assert on the rendered
 /// shape (tests, previews) should call [`build_test_message`] instead.
 pub async fn test_send(
+    org_id: &str,
     dest_type: &DestinationType,
     spec: &ContentSpec,
 ) -> Result<String, TestSendError> {
     let (title, rendered) = build_test_message_with_title(dest_type, spec)?;
-    dispatch_test_message(dest_type, &title, rendered)
+    dispatch_test_message(org_id, dest_type, &title, rendered)
         .await
         .map_err(|e| TestSendError::DispatchFailed(e.to_string()))
 }

@@ -45,8 +45,8 @@ pub enum DestinationError {
     InvalidSns,
     #[error("Email destination must have at least one email recipient")]
     EmptyEmail,
-    #[error("Email destination recipients must be part of this org")]
-    UserNotPermitted,
+    #[error("Email destination recipients must be part of this org: {0}")]
+    UserNotPermitted(String),
     #[error("Email destination must have SMTP configured")]
     SMTPUnavailable,
     #[error("Alert destination must have a template")]

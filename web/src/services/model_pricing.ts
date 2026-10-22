@@ -38,6 +38,9 @@ const modelPricing = {
   refreshBuiltIn: (org_identifier: string) => {
     return http().post(`/api/${org_identifier}/llm/models/refresh-built-in`, {});
   },
+  /** Test which rule prices `model_name`. With `match_pattern`, the response's
+   *  `captured_models` lists the known models that pattern would price if saved;
+   *  `rule_id` leaves the rule being edited out of that preview. */
   test: (
     org_identifier: string,
     data: {
@@ -45,6 +48,8 @@ const modelPricing = {
       usage?: Record<string, number>;
       timestamp?: number | null;
       attributes?: Record<string, string | number | boolean>;
+      match_pattern?: string;
+      rule_id?: string;
     },
   ) => {
     return http().post(`/api/${org_identifier}/llm/models/test`, data);

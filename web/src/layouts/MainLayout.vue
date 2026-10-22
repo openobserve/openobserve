@@ -114,6 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :alt="raw('OpenObserve')"
             />
             <OButton
+              :aria-label="t('common.close')"
               variant="ghost"
               size="icon"
               icon-left="close"

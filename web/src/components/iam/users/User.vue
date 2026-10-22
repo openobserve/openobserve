@@ -219,6 +219,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <template #trigger>
                 <OButton
+                  :aria-label="t('common.moreActions')"
                   icon-left="more-vert"
                   variant="ghost"
                   size="icon-xs-sq"

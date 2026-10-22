@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
-import { mount, flushPromises } from "@vue/test-utils";
+import { mount, flushPromises, type VueWrapper } from "@vue/test-utils";
 import { nextTick } from "vue";
 import ModelPricingEditor from "./ModelPricingEditor.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
@@ -35,6 +35,7 @@ vi.mock("@/services/model_pricing", async (importOriginal) => {
       get: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
+      test: vi.fn(),
     },
   });
 });
@@ -198,6 +199,7 @@ describe("ModelPricingEditor.vue", () => {
     mockService.get.mockResolvedValue({ data: null });
     mockService.create.mockResolvedValue({ data: { id: "new-id" } });
     mockService.update.mockResolvedValue({ data: { id: "existing-id" } });
+    mockService.test.mockResolvedValue({ data: { captured_models: [] } });
     // reset store theme defaults
     mockStore.state.theme = "light";
     mockStore.state.selectedOrganization = { identifier: "test-org" };
@@ -1803,6 +1805,97 @@ describe("ModelPricingEditor.vue", () => {
           message: expect.stringContaining("Higher Priority"),
         }),
       );
+    });
+  });
+
+  describe("Models the pattern also prices", () => {
+    const captured = (model_name: string, primary: boolean) => ({
+      model_name,
+      match_kind: primary ? "exact" : "approximate",
+      primary,
+      replaces: { name: model_name.toUpperCase(), source: "built_in" },
+    });
+    const confirmDialog = (wrapper: VueWrapper) => {
+      const dialog = wrapper
+        .findAll('[data-test-stub="o-dialog"]')
+        .find((d) => d.attributes("data-title") === "Price other models with this rule?");
+      if (!dialog) throw new Error("other-models confirm dialog is not rendered");
+      return dialog;
+    };
+
+    beforeEach(() => {
+      mockService.test.mockResolvedValue({
+        data: { captured_models: [captured("gpt-4o", true), captured("gpt-4o-mini", false)] },
+      });
+    });
+
+    it("previews the captured models and warns about the extra ones", async () => {
+      vi.useFakeTimers();
+      try {
+        const wrapper = createWrapper();
+        await flushPromises();
+        getForm(wrapper).setFieldValue("match_pattern", "^gpt-4o");
+        await nextTick();
+        await vi.advanceTimersByTimeAsync(400);
+        await flushPromises();
+
+        expect(mockService.test).toHaveBeenCalledWith("test-org", {
+          model_name: "",
+          match_pattern: "^gpt-4o",
+          rule_id: undefined,
+        });
+        expect(wrapper.find('[data-test="model-pricing-captured-gpt-4o-mini"]').exists()).toBe(
+          true,
+        );
+        expect(wrapper.find('[data-test="model-pricing-captured-warning"]').exists()).toBe(true);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("does not save when the user cancels the other-models confirmation", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      fillValid(wrapper);
+      await nextTick();
+      const submit = getForm(wrapper).handleSubmit();
+      await vi.waitFor(() => expect(confirmDialog(wrapper).attributes("data-open")).toBe("true"));
+
+      const dialog = confirmDialog(wrapper);
+      expect(dialog.text()).toContain("gpt-4o-mini");
+      await dialog.find('[data-test-stub="o-dialog-secondary"]').trigger("click");
+      await submit;
+      await flushPromises();
+
+      expect(mockService.create).not.toHaveBeenCalled();
+    });
+
+    it("saves once the user confirms the other models", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      fillValid(wrapper);
+      await nextTick();
+      const submit = getForm(wrapper).handleSubmit();
+      await vi.waitFor(() => expect(confirmDialog(wrapper).attributes("data-open")).toBe("true"));
+
+      await confirmDialog(wrapper).find('[data-test-stub="o-dialog-primary"]').trigger("click");
+      await submit;
+      await flushPromises();
+
+      expect(mockService.create).toHaveBeenCalledTimes(1);
+    });
+
+    it("saves without asking when the pattern prices only its own model", async () => {
+      mockService.test.mockResolvedValue({ data: { captured_models: [captured("gpt-4o", true)] } });
+      const wrapper = createWrapper();
+      await flushPromises();
+      fillValid(wrapper);
+      await nextTick();
+      await getForm(wrapper).handleSubmit();
+      await flushPromises();
+
+      expect(confirmDialog(wrapper).attributes("data-open")).toBe("false");
+      expect(mockService.create).toHaveBeenCalledTimes(1);
     });
   });
 

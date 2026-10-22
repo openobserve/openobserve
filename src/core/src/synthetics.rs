@@ -140,9 +140,13 @@ pub async fn notify_check_result(n: CheckNotification) {
                         n.status.to_uppercase()
                     )
                 };
-                if let Err(e) =
-                    crate::alerts::alert::dispatch_notification(destination_type, &subject, msg)
-                        .await
+                if let Err(e) = crate::alerts::alert::dispatch_notification(
+                    &n.org_id,
+                    destination_type,
+                    &subject,
+                    msg,
+                )
+                .await
                 {
                     log::error!(
                         "[synthetics] notify dest={dest_name} check={}: {e}",
@@ -1062,9 +1066,13 @@ async fn notify_location_down(
                     DestinationType::Sns(_) => text.clone(),
                     DestinationType::Http(_) => serde_json::json!({ "text": text }).to_string(),
                 };
-                if let Err(e) =
-                    crate::alerts::alert::dispatch_notification(destination_type, &subject, msg)
-                        .await
+                if let Err(e) = crate::alerts::alert::dispatch_notification(
+                    org_id,
+                    destination_type,
+                    &subject,
+                    msg,
+                )
+                .await
                 {
                     log::error!(
                         "[synthetics] location-down notify dest={dest_name} location={}: {e}",
