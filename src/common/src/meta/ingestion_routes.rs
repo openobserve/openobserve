@@ -454,7 +454,8 @@ mod tests {
 
     #[test]
     fn wrong_method_is_rejected() {
-        // PUT, DELETE and PATCH never classify, on writes or on ES stubs.
+        // Writes are POST-only; ES stubs are GET/HEAD (+POST only for the create
+        // stubs). PUT/DELETE/PATCH never classify.
         for method in [Method::PUT, Method::DELETE, Method::PATCH] {
             assert_eq!(classify_path(&method, "default/_bulk"), None);
             assert_eq!(classify_path(&method, "default/traces"), None);

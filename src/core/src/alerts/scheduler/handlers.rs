@@ -2002,46 +2002,33 @@ pub(crate) async fn impacted_services(
 ) -> Result<Vec<String>, config::meta::oncall::NoBlastRadius> {
     use config::meta::oncall::NoBlastRadius;
 
+    use crate::traces::service_graph::{
+        DEFAULT_QUERY_WINDOW_MINUTES,
+        v4::read::{callers_from, instant, q_callers, q_org_requests, scalar_sum},
+    };
+
     let Some(failing) = dimensions.get("service") else {
         return Err(NoBlastRadius::NoServiceDimension);
     };
-    // Wider than the graph view's window: a read between two aggregation writes sees nothing.
+    let range_secs = DEFAULT_QUERY_WINDOW_MINUTES * 60;
     let end = now_micros();
-    let window_micros = (o2_enterprise::enterprise::common::config::get_config()
-        .service_graph
-        .processing_interval_secs as i64)
-        .saturating_mul(2 * 1_000_000)
-        .max(crate::traces::service_graph::DEFAULT_QUERY_WINDOW_MINUTES * 60 * 1_000_000);
-    let raw = match crate::traces::service_graph::query_edges_from_stream_internal(
-        org_id,
-        None,
-        Some(end - window_micros),
-        Some(end),
-        None,
-    )
-    .await
-    {
-        Ok(e) if !e.is_empty() => e,
-        _ => return Err(NoBlastRadius::NoGraph),
+    let Ok(query) = q_callers(failing, range_secs) else {
+        return Err(NoBlastRadius::NoGraph);
     };
-    let (_, edges) = o2_enterprise::enterprise::service_graph::build_topology(
-        raw,
-        std::collections::HashMap::new(),
-    );
-    let mut callers: Vec<String> = edges
-        .iter()
-        .filter(|e| &e.to == failing)
-        .filter_map(|e| e.from.clone())
-        .filter(|from| from != failing)
-        .collect();
-    callers.sort();
-    callers.dedup();
-    if callers.is_empty() {
-        return Err(NoBlastRadius::NothingCallsIt {
-            service: failing.clone(),
-        });
+    let callers = match instant(org_id, &query, end).await {
+        Ok(rows) => callers_from(&rows, failing),
+        Err(_) => return Err(NoBlastRadius::NoGraph),
+    };
+    if !callers.is_empty() {
+        return Ok(callers);
     }
-    Ok(callers)
+    // No callers means "nothing calls it" only when the org has a graph at all.
+    match instant(org_id, &q_org_requests(range_secs), end).await {
+        Ok(rows) if scalar_sum(&rows) > 0.0 => Err(NoBlastRadius::NothingCallsIt {
+            service: failing.clone(),
+        }),
+        _ => Err(NoBlastRadius::NoGraph),
+    }
 }
 
 /// Shared by the alert and the incident path so the two cannot drift apart.
