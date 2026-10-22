@@ -68,6 +68,14 @@ export const oncallKeys = {
       quantizeRange(from, to),
       rotationId ?? "primary",
     ),
+  /** Keyed by the draft itself, so an unchanged draft is a cache hit rather than a request. */
+  resolvedSchedulePreview: (
+    org: string,
+    teamId: string,
+    from: number,
+    to: number,
+    rotation: unknown,
+  ) => orgKey(org, "oncall", "teams", teamId, "resolvedSchedulePreview", from, to, rotation),
   overrides: (org: string, teamId: string, from?: number, to?: number) =>
     orgKey(
       org,
