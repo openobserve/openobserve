@@ -1097,7 +1097,9 @@ async function getQueryData(isPagination: boolean = false, isSort: boolean = fal
           delete tracesRequestState[searchTraceId];
           if (isPagination) noteTracesPageLoad(searchTraceId, "done");
           if (!isPagination) {
-            analytics.track("traces_search_completed");
+            analytics.track("traces_search_completed", {
+              hits: searchObj.data.queryResults?.hits?.length ?? 0,
+            });
             fetchTracesCount();
           }
           correlationFilters.save().catch((e) => console.error("[correlation:save] error:", e));
