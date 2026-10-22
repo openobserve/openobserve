@@ -90,27 +90,31 @@ pub async fn validate_query_fields(
     // (e.g. ["default", "k8s_events"]). Each stream has its own set of fields in
     // sql.columns. Look up the entry matching stream_name so that fields belonging to
     // a different stream are not incorrectly checked against stream_name's schema.
-    let (target_stream, target_fields) = sql
+    let (target_stream, target_stream_type, target_fields) = sql
         .stream_names
         .iter()
         .find(|r| r.stream_name() == stream_name)
         .map(|r| {
             let fields = sql.columns.get(r).cloned().unwrap_or_default();
-            (stream_name.to_string(), fields)
+            (
+                stream_name.to_string(),
+                r.get_stream_type(stream_type),
+                fields,
+            )
         })
         .unwrap_or_else(|| {
             // stream_name not found in sql.stream_names (aliased or unresolved table).
             // Fall back to original behaviour: all tracked columns against stream_name.
             let fields = sql.columns.values().flatten().cloned().collect();
-            (stream_name.to_string(), fields)
+            (stream_name.to_string(), stream_type, fields)
         });
 
     // Step 3: Validate target stream's fields against its own schema and UDS.
-    let schema = infra::schema::get(org_id, &target_stream, stream_type)
+    let schema = infra::schema::get(org_id, &target_stream, target_stream_type)
         .await
         .map_err(|_| Error::ErrorCode(ErrorCodes::SearchStreamNotFound(target_stream.clone())))?;
 
-    let settings = infra::schema::get_settings(org_id, &target_stream, stream_type).await;
+    let settings = infra::schema::get_settings(org_id, &target_stream, target_stream_type).await;
     let uds_fields = infra::schema::get_stream_setting_defined_schema_fields(&settings);
 
     for field in target_fields {
@@ -373,6 +377,47 @@ JOIN "test1" AS b"#;
             "Expected error about field not in UDS, got: {}",
             err_msg
         );
+    }
+
+    #[tokio::test]
+    async fn test_validate_query_fields_join_enrichment_table() {
+        use arrow_schema::{DataType, Field, Schema};
+        use infra::schema::{STREAM_SCHEMAS_LATEST, SchemaCache};
+
+        let org_id = "test_org_join_enrich";
+        let logs_key = format!("{org_id}/{}/app", StreamType::Logs);
+        let enrich_key = format!("{org_id}/{}/geo", StreamType::EnrichmentTables);
+        {
+            let mut w = STREAM_SCHEMAS_LATEST.write().await;
+            w.insert(
+                logs_key.clone(),
+                SchemaCache::new(Schema::new(vec![
+                    Field::new(config::TIMESTAMP_COL_NAME, DataType::Int64, false),
+                    Field::new("ip", DataType::Utf8, true),
+                ])),
+            );
+            w.insert(
+                enrich_key.clone(),
+                SchemaCache::new(Schema::new(vec![
+                    Field::new(config::TIMESTAMP_COL_NAME, DataType::Int64, false),
+                    Field::new("addr", DataType::Utf8, true),
+                    Field::new("country", DataType::Utf8, true),
+                ])),
+            );
+        }
+
+        let sql = r#"SELECT a.ip, b.country FROM "app" AS a JOIN "enrichment_tables"."geo" AS b ON a.ip = b.addr"#;
+        let logs_res = validate_query_fields(org_id, "app", StreamType::Logs, sql).await;
+        let enrich_res = validate_query_fields(org_id, "geo", StreamType::Logs, sql).await;
+
+        {
+            let mut w = STREAM_SCHEMAS_LATEST.write().await;
+            w.remove(&logs_key);
+            w.remove(&enrich_key);
+        }
+
+        assert!(logs_res.is_ok(), "logs side failed: {logs_res:?}");
+        assert!(enrich_res.is_ok(), "enrichment side failed: {enrich_res:?}");
     }
 }
 
