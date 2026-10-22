@@ -1013,6 +1013,25 @@ const oncall = {
       { params: rotation_id ? { from, to, rotation_id } : { from, to } },
     ),
 
+  /// What `resolvedSchedule` would answer for `rotation` once saved, from the same server resolver. Writes nothing.
+  previewResolvedSchedule: ({
+    org_identifier,
+    team_id,
+    rotation,
+    from,
+    to,
+  }: {
+    org_identifier: string;
+    team_id: string;
+    rotation: Rotation;
+    from: number;
+    to: number;
+  }) =>
+    http().post<ResolvedSegment[]>(
+      `/api/${org_identifier}/oncall/teams/${encodeURIComponent(team_id)}/resolved-schedule/preview`,
+      { rotation, from, to },
+    ),
+
   /// Everything the team header needs, in one call: membership, coverage, the
   /// ladder per priority, and the window's page statistics — all computed
   /// server-side rather than derived from a fetched page.
