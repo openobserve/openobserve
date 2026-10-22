@@ -61,6 +61,16 @@ pub mod notifications;
 #[cfg(feature = "enterprise")]
 pub mod org_config;
 mod prom_rule;
+#[cfg(feature = "enterprise")]
+pub mod rca_live;
+#[cfg(feature = "enterprise")]
+pub mod rca_resume;
+#[cfg(feature = "enterprise")]
+pub mod rca_runs;
+#[cfg(feature = "enterprise")]
+pub mod rca_steering;
+#[cfg(feature = "enterprise")]
+pub mod rca_turn;
 pub mod recovery;
 pub mod scheduler;
 pub mod templates;
