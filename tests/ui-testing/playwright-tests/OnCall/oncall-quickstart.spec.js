@@ -264,13 +264,8 @@ test.describe('On-call Quick start', {
     ).toMatch(/needs someone assigned/i);
   });
 
-  /**
-   * Applying replaces every rotation the team has, so on a team that already
-   * has a schedule the confirmation is the product's own guard — not the
-   * validation §11.2 is about. Pinned separately so the two are never confused
-   * for one another again.
-   */
-  test('Save on a team that already has rotations asks before replacing them', {
+  // Applying rewrites the primary rotation's shift rules, so the confirm names it; this guard is not §11.2's validation.
+  test('Save on a team that already has rotations asks before replacing the primary rotation\'s rules', {
     tag: ['@P1'],
   }, async ({ page }, testInfo) => {
     // Seed our OWN member — listOrgUsers()[0] may belong to another worker and be
@@ -302,5 +297,9 @@ test.describe('On-call Quick start', {
       pm.oncallTeamDetailPage.getConfirmDialog(),
       'replacing an existing schedule must be confirmed first',
     ).toBeVisible({ timeout: 20000 });
+    await expect(
+      pm.oncallTeamDetailPage.getConfirmDialog(),
+      'the confirm names the rotation the server rewrites: the first stored one',
+    ).toContainText(stored.rotations[0].name);
   });
 });

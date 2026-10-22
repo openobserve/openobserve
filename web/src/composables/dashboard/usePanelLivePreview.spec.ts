@@ -99,12 +99,24 @@ describe("usePanelLivePreview", () => {
   });
 
   describe("signatures", () => {
-    it("ignores display-only query keys such as labels and the PromQL legend", () => {
+    it("ignores display-only query keys such as labels", () => {
       const panel = makePanel();
       const edited = clone(panel);
       edited.queries[0].fields.y[0].label = "Events";
-      edited.queries[0].config.promql_legend = "{{service}}";
       expect(panelPayloadSignature(edited)).toBe(panelPayloadSignature(panel));
+    });
+
+    it.each([
+      ["PromQL legend", (q: any) => (q.config.promql_legend = "{{service}}")],
+      ["PromQL query type", (q: any) => (q.config.query_type = "instant")],
+      ["time shift", (q: any) => (q.config.time_shift = [{ offSet: "1d" }])],
+      ["formula", (q: any) => (q.config.formula = "A / B")],
+      ["hidden query", (q: any) => (q.config.hide = true)],
+    ])("changes when the %s changes", (_, edit) => {
+      const panel = makePanel();
+      const edited = clone(panel);
+      edit(edited.queries[0]);
+      expect(panelPayloadSignature(edited)).not.toBe(panelPayloadSignature(panel));
     });
 
     it("changes when the generated query or step changes", () => {
@@ -309,6 +321,33 @@ describe("usePanelLivePreview", () => {
       expect(live.isPending.value).toBe(false);
       scope.stop();
     });
+
+    it.each([
+      ["legend", (q: any) => (q.config.promql_legend = "{{service}}")],
+      ["query type", (q: any) => (q.config.query_type = "instant")],
+    ])(
+      "runs a PromQL %s change live with Auto Run on, and only marks Apply pending with it off",
+      async (_, edit) => {
+        const on = setup();
+        on.live.arm();
+        edit(on.panel.queries[0]);
+        await nextTick();
+        expect(on.live.isPending.value).toBe(false);
+        vi.advanceTimersByTime(LIVE_PREVIEW_DEBOUNCE_MS);
+        expect(on.run).toHaveBeenCalledTimes(1);
+        on.scope.stop();
+
+        const off = setup();
+        off.autoRun.value = false;
+        off.live.arm();
+        edit(off.panel.queries[0]);
+        await nextTick();
+        vi.advanceTimersByTime(LIVE_PREVIEW_DEBOUNCE_MS * 2);
+        expect(off.run).not.toHaveBeenCalled();
+        expect(off.live.isPending.value).toBe(true);
+        off.scope.stop();
+      },
+    );
 
     it("only marks Apply pending while Auto Run is off, then runs once it is turned back on", async () => {
       const { panel, autoRun, run, live, scope } = setup();
