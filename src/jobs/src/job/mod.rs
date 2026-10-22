@@ -686,6 +686,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
     #[cfg(feature = "enterprise")]
     slack_hooks::register();
 
+    // Routers serve the hook routes, so the hook node tasks start before the router return.
+    #[cfg(feature = "enterprise")]
+    openobserve_core::workflows::http_trigger::spawn_node_tasks();
+
     // Router doesn't need to initialize job
     if LOCAL_NODE.is_router() && LOCAL_NODE.is_single_role() {
         return Ok(());
