@@ -1517,7 +1517,7 @@
     "shareOfCaller": "Tỷ lệ so với hàm gọi",
     "partialResult": "Đang hiển thị {percent} mẫu. Các ngăn xếp lời gọi ít gặp hơn không có trong chế độ xem này.",
     "otherFrameHint": "Các đường gọi nhỏ hơn, được gộp lại để biểu đồ chạy nhanh.",
-    "truncatedFrameHint": "Các hàm gọi vượt quá 1000 khung, bị cắt khỏi ngăn xếp này.",
+    "truncatedFrameHint": "Các caller vượt quá 1000 frame đã bị cắt khỏi stack này.",
     "smallFrames": "{count} khung nhỏ | {count} khung nhỏ",
     "smallFramesHint": "Quá hẹp để vẽ từng cái.",
     "cpuDuration": "Thời lượng CPU",

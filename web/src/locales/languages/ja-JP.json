@@ -1517,7 +1517,7 @@
     "shareOfCaller": "呼び出し元に占める割合",
     "partialResult": "サンプルの {percent} を表示しています。頻度の低いコールスタックはこのビューに含まれません。",
     "otherFrameHint": "グラフを高速に保つため、小さな呼び出しパスをまとめています。",
-    "truncatedFrameHint": "1000 フレームを超える呼び出し元は、このスタックから切り捨てられています。",
+    "truncatedFrameHint": "1000 フレームを超える呼び出し元は、このスタックから省略されています。",
     "smallFrames": "小さなフレーム {count} 個 | 小さなフレーム {count} 個",
     "smallFramesHint": "細すぎて個別に描画できません。",
     "cpuDuration": "CPU 時間",

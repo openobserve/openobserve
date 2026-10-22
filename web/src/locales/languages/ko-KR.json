@@ -1517,7 +1517,7 @@
     "shareOfCaller": "호출자 대비 비율",
     "partialResult": "샘플의 {percent} 표시 중. 덜 일반적인 호출 스택은 이 보기에서 제외됩니다.",
     "otherFrameHint": "그래프를 빠르게 유지하기 위해 작은 호출 경로를 묶었습니다.",
-    "truncatedFrameHint": "1000개 프레임을 넘는 호출자는 이 스택에서 잘렸습니다.",
+    "truncatedFrameHint": "1000개 프레임을 초과하는 호출자는 이 스택에서 잘렸습니다.",
     "smallFrames": "작은 프레임 {count}개 | 작은 프레임 {count}개",
     "smallFramesHint": "너무 얇아 하나씩 그릴 수 없습니다.",
     "cpuDuration": "CPU 지속 시간",

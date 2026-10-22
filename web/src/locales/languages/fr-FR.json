@@ -1517,7 +1517,7 @@
     "shareOfCaller": "Part de l'appelant",
     "partialResult": "{percent} des échantillons affichés. Les piles d'appels moins fréquentes sont exclues de cette vue.",
     "otherFrameHint": "Chemins d'appel plus petits, regroupés pour que le graphique reste rapide.",
-    "truncatedFrameHint": "Appelants au-delà de 1000 frames, coupés de cette pile.",
+    "truncatedFrameHint": "Les appelants au-delà de 1000 frames sont exclus de cette pile.",
     "smallFrames": "{count} petite frame | {count} petites frames",
     "smallFramesHint": "Trop fines pour être dessinées une par une.",
     "cpuDuration": "Durée CPU",

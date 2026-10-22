@@ -1517,7 +1517,7 @@
     "shareOfCaller": "Aandeel van aanroeper",
     "partialResult": "{percent} van de samples wordt getoond. Minder voorkomende call stacks zijn weggelaten uit deze weergave.",
     "otherFrameHint": "Kleinere aanroeppaden, samengevoegd zodat de grafiek snel blijft.",
-    "truncatedFrameHint": "Aanroepers voorbij 1000 frames, afgesneden van deze stack.",
+    "truncatedFrameHint": "Aanroepers na 1000 frames zijn uit deze stack verwijderd.",
     "smallFrames": "{count} kleine frame | {count} kleine frames",
     "smallFramesHint": "Te smal om afzonderlijk te tekenen.",
     "cpuDuration": "CPU-duur",
