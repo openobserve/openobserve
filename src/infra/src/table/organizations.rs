@@ -326,6 +326,25 @@ pub async fn get_by_name(org_name: &str) -> Result<Vec<OrganizationRecord>, erro
     Ok(records)
 }
 
+/// Returns `(identifier, created_at)` for each given org that exists.
+pub async fn get_created_at_for_orgs(
+    org_ids: &[String],
+) -> Result<Vec<(String, i64)>, errors::Error> {
+    if org_ids.is_empty() {
+        return Ok(vec![]);
+    }
+    let client = get_orm_client_ro().await;
+    Entity::find()
+        .filter(Column::Identifier.is_in(org_ids.to_vec()))
+        .select_only()
+        .column(Column::Identifier)
+        .column(Column::CreatedAt)
+        .into_tuple::<(String, i64)>()
+        .all(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
+}
+
 pub async fn len() -> usize {
     let client = get_orm_client_ro().await;
     let len = Entity::find().count(client).await;

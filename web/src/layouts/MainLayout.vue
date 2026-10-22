@@ -785,14 +785,23 @@ export default defineComponent({
         () => store.state.selectedOrganization?.identifier,
         () => store.state.selectedOrganization?.label,
         () => store.state.selectedOrganization?.subscription_type,
+        // Login and stored selections carry only the org identity, so read created_at from the org list too.
+        () =>
+          store.state.selectedOrganization?.created_at ??
+          (store.state.organizations ?? []).find(
+            (o: { identifier?: string }) =>
+              o?.identifier === store.state.selectedOrganization?.identifier,
+          )?.created_at,
         () => store.state.zoConfig?.rum?.enabled,
       ],
-      ([identifier, name, subscriptionType, rumEnabled]) => {
+      ([identifier, name, subscriptionType, createdAt, rumEnabled]) => {
         if (!identifier || !rumEnabled) return;
         openobserveRum.setAccount({
           id: identifier,
           name,
           subscription_type: subscriptionType,
+          // Unix microseconds, the same unit as _timestamp.
+          created_at: createdAt || undefined,
         });
       },
       { immediate: true },
@@ -1200,6 +1209,7 @@ export default defineComponent({
                 CustomerBillingObj: { subscription_type: string; note: string };
                 status: string;
                 label: string;
+                created_at?: number;
               }) => {
                 // `label` is the real name here — General.vue's delete-confirm gate matches it; disambiguation is applied only on the dropdown copy below.
                 const optiondata: any = {
@@ -1219,6 +1229,7 @@ export default defineComponent({
                   note: Object.prototype.hasOwnProperty.call(data, "CustomerBillingObj")
                     ? data.CustomerBillingObj.note
                     : "",
+                  created_at: data.created_at,
                 };
 
                 if (
@@ -1289,6 +1300,7 @@ export default defineComponent({
             note: Object.prototype.hasOwnProperty.call(data, "CustomerBillingObj")
               ? data.CustomerBillingObj.note
               : "",
+            created_at: data.created_at,
           };
           selectedOrg.value = optiondata;
           useLocalOrganization(optiondata);
