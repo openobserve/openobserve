@@ -63,8 +63,6 @@ pub struct AdmittedTurn {
     pub row: Model,
     pub owner: String,
     pub turn_id: String,
-    /// The id the turn's spans and audit record carry; returned to the browser at admission.
-    pub trace_id: String,
     pub lease: TurnLease,
     pub registration: Registration,
 }
@@ -127,6 +125,24 @@ pub async fn resolve_owner(user_email: &str) -> Result<String, AdmitError> {
 /// Admit one persisted turn under the chat's lease, as a new ownership epoch.
 #[allow(clippy::too_many_arguments)]
 pub async fn admit_turn(
+    org_id: &str,
+    session_id: Option<&str>,
+    turn_id: Option<&str>,
+    user_email: &str,
+    agent_type: &str,
+    prompt: &str,
+    trace_id: &str,
+    caps: TurnCaps,
+) -> Result<AdmittedTurn, AdmitError> {
+    admit_signed_in_turn(
+        org_id, session_id, turn_id, user_email, None, agent_type, prompt, trace_id, caps,
+    )
+    .await
+}
+
+/// [`admit_turn`] for a turn a browser sign-in started; `auth_session_id` scopes its registration.
+#[allow(clippy::too_many_arguments)]
+pub async fn admit_signed_in_turn(
     org_id: &str,
     session_id: Option<&str>,
     turn_id: Option<&str>,
@@ -197,7 +213,6 @@ pub async fn admit_turn(
             row,
             owner,
             turn_id,
-            trace_id: trace_id.to_string(),
             lease,
             registration,
         }),

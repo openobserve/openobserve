@@ -146,7 +146,7 @@ pub struct PromptRequest {
     /// A finished turn this one regenerates or edits; the new turn is appended, the original kept.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub replaces_turn_id: Option<String>,
-    /// `generate_query` runs the read-only query agent; absent or `chat` is a normal turn.
+    /// `chat` never reaches the autonomous incident agent; `rca` is refused on chat routes.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub mode: Option<ChatMode>,
     /// An ephemeral turn is never admitted, stored or titled; it may not name a saved chat.
@@ -166,6 +166,7 @@ pub struct PromptRequest {
 #[serde(rename_all = "snake_case")]
 pub enum ChatMode {
     Chat,
+    Rca,
     GenerateQuery,
     /// A mode this server does not know; the turn is refused with a typed 400, never run as chat.
     #[serde(other)]
@@ -176,6 +177,7 @@ impl ChatMode {
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Chat => "chat",
+            Self::Rca => "rca",
             Self::GenerateQuery => "generate_query",
             Self::Unsupported => "unsupported",
         }
@@ -384,8 +386,21 @@ mod tests {
     }
 
     #[test]
+    fn prompt_mode_accepts_chat_rca_and_generate_query() {
+        for (raw, mode) in [
+            ("chat", ChatMode::Chat),
+            ("rca", ChatMode::Rca),
+            ("generate_query", ChatMode::GenerateQuery),
+        ] {
+            let parsed: ChatMode = serde_json::from_value(serde_json::json!(raw)).unwrap();
+            assert_eq!(parsed, mode);
+            assert_eq!(mode.as_str(), raw);
+        }
+    }
+
+    #[test]
     fn an_unknown_mode_parses_as_unsupported_and_never_as_chat() {
-        let body = serde_json::json!({"messages": [], "mode": "rca"});
+        let body = serde_json::json!({"messages": [], "mode": "autonomous"});
         let body: PromptRequest = serde_json::from_value(body).unwrap();
         assert_eq!(body.mode, Some(ChatMode::Unsupported));
     }

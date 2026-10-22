@@ -67,7 +67,7 @@ const WEBHOOK_HOSTS: [&str; 9] = [
     "events.pagerduty.com",
 ];
 // POST tools whose last path segment names one of these only read or check.
-const READ_SEGMENTS: [&str; 16] = [
+const READ_SEGMENTS: [&str; 17] = [
     "test",
     "test_send",
     "preview",
@@ -84,6 +84,7 @@ const READ_SEGMENTS: [&str; 16] = [
     "explain",
     "validate",
     "export",
+    "generate_sql",
 ];
 const READ_PREFIXES: [&str; 4] = ["_search", "_around", "_values", "_correlate"];
 // A POST whose path names one of these removes something.

@@ -517,13 +517,6 @@ pub async fn trigger_incident_rca(
     if !o2_cfg.incidents.enabled || !o2_cfg.incidents.rca_enabled {
         return MetaHttpResponse::bad_request("RCA is not enabled");
     }
-    // Refused before a run row is written or the quota is charged.
-    if openobserve_core::ai_policy::rca_policy(&org_id)
-        .await
-        .is_none()
-    {
-        return crate::request::ai::settings::off_for_org();
-    }
 
     if !o2_cfg.ai.has_agent_target() {
         return axum::response::Response::builder()
@@ -2513,7 +2506,6 @@ mod tests {
         let conn = steering_tables().await;
         let org = steering_org("trigger202");
         steering_incident(conn, &org, "inc_1", None).await;
-        assistant_settings_cached(&org).await;
         let (status, body) = status_and_body(
             trigger_incident_rca(
                 Path((org.clone(), sid(&org, "inc_1"))),
@@ -3393,18 +3385,6 @@ mod tests {
         )
     }
 
-    /// The trigger reads the org's assistant switch from this cache; the defaults leave it on.
-    #[cfg(feature = "enterprise")]
-    async fn assistant_settings_cached(org_id: &str) {
-        common::infra::config::ORGANIZATION_SETTING
-            .write()
-            .await
-            .insert(
-                format!("/organization/setting/{org_id}"),
-                Default::default(),
-            );
-    }
-
     /// Incident and run ids are primary keys across orgs: each test's names are scoped to its org.
     #[cfg(feature = "enterprise")]
     fn sid(org_id: &str, name: &str) -> String {
@@ -4091,7 +4071,6 @@ mod tests {
         let conn = steering_tables().await;
         let org = steering_org("guidance");
         steering_incident(conn, &org, "inc_1", None).await;
-        assistant_settings_cached(&org).await;
         steering_incident(conn, &org, "inc_2", None).await;
         let trigger = |incident: &'static str, body: String| {
             trigger_incident_rca(
