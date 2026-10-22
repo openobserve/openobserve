@@ -23,18 +23,54 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="border-border-default flex flex-col gap-1 border-b pb-2.5 last:border-b-0"
       :data-test="`fleet-config-variables-${name}`"
     >
-      <OText variant="mono" truncate>{{ name }}</OText>
-      <OText variant="meta">{{ t("fleet.configs.sourceEnv") }}</OText>
+      <div class="flex items-center justify-between gap-2">
+        <OText variant="mono" truncate>{{ name }}</OText>
+        <OTag
+          size="xs"
+          :variant="SOURCE[sourceOf(name)].variant"
+          :label="t(SOURCE[sourceOf(name)].label)"
+          :data-test="`fleet-config-variables-source-${name}`"
+        />
+      </div>
+      <OText variant="meta">{{ t(SOURCE[sourceOf(name)].hint) }}</OText>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import OText from "@/lib/core/Typography/OText.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
+import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
-import { useI18nTyped } from "@/types/i18n";
+import { useI18nTyped, type I18nKey } from "@/types/i18n";
+import { HELM_ENV, INSTALL_ENV } from "../fleetInstall";
 
 defineProps<{ names: string[] }>();
 
 const { t } = useI18nTyped();
+
+type Source = "install" | "helm" | "missing";
+
+const SOURCE: Record<Source, { variant: BadgeVariant; label: I18nKey; hint: I18nKey }> = {
+  install: {
+    variant: "default-soft",
+    label: "fleet.configs.sourceInstall",
+    hint: "fleet.configs.sourceInstallHint",
+  },
+  helm: {
+    variant: "default-soft",
+    label: "fleet.configs.sourceHelm",
+    hint: "fleet.configs.sourceHelmHint",
+  },
+  missing: {
+    variant: "warning-soft",
+    label: "fleet.configs.sourceMissing",
+    hint: "fleet.configs.sourceMissingHint",
+  },
+};
+
+function sourceOf(name: string): Source {
+  if (INSTALL_ENV.includes(name)) return "install";
+  return HELM_ENV.includes(name) ? "helm" : "missing";
+}
 </script>

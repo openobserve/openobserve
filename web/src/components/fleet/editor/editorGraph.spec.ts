@@ -86,6 +86,62 @@ service:
     expect(load(graphToYaml(graph!))).toEqual(load(yaml));
   });
 
+  it("keeps lists as indexed keys and writes them back, including a list of maps", () => {
+    const yaml = `receivers:
+  filelog:
+    include: ["/var/log/pods/*/*/*.log"]
+    include_file_path: true
+    operators:
+      - type: container
+        add_metadata_from_filepath: true
+      - type: regex_parser
+        regex: ^(?P<time>\\S+)
+processors:
+  k8sattributes:
+    extract:
+      metadata: [k8s.pod.name, k8s.namespace.name]
+  resource:
+    attributes:
+      - key: env
+        value: prod
+        action: upsert
+exporters:
+  otlphttp:
+    endpoint: \${env:O2_ENDPOINT}
+    headers:
+      Authorization: \${env:O2_TOKEN}
+    retry_on_failure:
+      enabled: true
+    sending_queue: {}
+    extra: []
+service:
+  pipelines:
+    logs:
+      receivers: [filelog]
+      processors: [k8sattributes, resource]
+      exporters: [otlphttp]
+`;
+    const graph = yamlToGraph(yaml);
+    expect(graph?.components["receiver:filelog"].settings).toEqual({
+      "include[0]": "/var/log/pods/*/*/*.log",
+      include_file_path: "true",
+      "operators[0].type": "container",
+      "operators[0].add_metadata_from_filepath": "true",
+      "operators[1].type": "regex_parser",
+      "operators[1].regex": "^(?P<time>\\S+)",
+    });
+    expect(graph?.components["processor:resource"].settings).toEqual({
+      "attributes[0].key": "env",
+      "attributes[0].value": "prod",
+      "attributes[0].action": "upsert",
+    });
+    expect(graph?.components["exporter:otlphttp"].settings).toMatchObject({
+      sending_queue: "{}",
+      extra: "[]",
+    });
+    expect(load(graphToYaml(graph!))).toEqual(load(yaml));
+  });
+
   it("reads an empty document as an empty graph", () => {
     expect(yamlToGraph("")).toEqual({ components: {}, pipelines: [], extensions: [] });
   });
@@ -100,7 +156,8 @@ service:
       MINIMAL.replace("exporters:\n  debug: {}", "exporters: {}"),
     ],
     ["a null component", MINIMAL.replace("debug: {}", "debug:")],
-    ["a list in settings", MINIMAL.replace("debug: {}", "debug:\n    include: [a, b]")],
+    ["a list holding a null", MINIMAL.replace("debug: {}", "debug:\n    include: [a, null]")],
+    ["a key spelled like a list index", MINIMAL.replace("debug: {}", "debug:\n    a[0]: x")],
     ["a null leaf in settings", MINIMAL.replace("debug: {}", "debug:\n    timeout: null")],
     ["connectors", MINIMAL + "connectors:\n  count: {}\n"],
     ["service.telemetry", MINIMAL + "  telemetry:\n    logs:\n      level: debug\n"],
@@ -187,6 +244,36 @@ describe("graphToYaml", () => {
     expect(load(yaml)).toEqual({
       receivers: { otlp: {} },
       service: { pipelines: { logs: { receivers: ["otlp"] } } },
+    });
+  });
+
+  it("closes the holes left in a list and lets children replace a scalar at the same path", () => {
+    const yaml = graphToYaml(
+      graph({
+        components: {
+          "receiver:filelog": {
+            kind: "receiver",
+            id: "filelog",
+            type: "filelog",
+            settings: {
+              "include[0]": "/a.log",
+              "include[3]": "/b.log",
+              "operators[1].type": "container",
+              retry: "5s",
+              "retry.enabled": "true",
+            },
+          },
+        },
+      }),
+    );
+    expect(load(yaml)).toEqual({
+      receivers: {
+        filelog: {
+          include: ["/a.log", "/b.log"],
+          operators: [{ type: "container" }],
+          retry: { enabled: true },
+        },
+      },
     });
   });
 

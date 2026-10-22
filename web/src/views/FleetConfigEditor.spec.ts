@@ -90,8 +90,8 @@ vi.mock("@/services/fleet", () => ({
 }));
 
 const VALID = graphToYaml(SEEDS["edge-minimal"]());
-// A list inside component settings has no visual form.
-const LOSSY = "receivers:\n  filelog:\n    include: [a.log, b.log]\n";
+// Connectors have no place on the canvas, so this YAML stays in YAML mode.
+const LOSSY = "connectors:\n  count: {}\n";
 
 const detail = (over: Record<string, unknown> = {}) => ({
   id: "edge",

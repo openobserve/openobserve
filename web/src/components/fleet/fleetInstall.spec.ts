@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect } from "vitest";
-import { installCommand, opampEndpoint, resolveBaseUrl } from "./fleetInstall";
+import { INSTALL_ENV, installCommand, opampEndpoint, resolveBaseUrl } from "./fleetInstall";
 
 const target = {
   baseUrl: "https://o2.example.com",
@@ -75,6 +75,11 @@ describe("installCommand", () => {
     expect(remote).toContain("endpoint: wss://o2.example.com/api/acme/v1/opamp");
     expect(remote).not.toContain("insecure");
     expect(remote).toContain("otel-fleet-collector:latest");
+  });
+
+  it("gives the collector every variable the Variables panel calls installed", () => {
+    const cmd = installCommand("docker", target);
+    for (const name of INSTALL_ENV) expect(cmd).toContain(`${name}:`);
   });
 
   it("installs the Helm chart with the fleet collector image at the target version", () => {

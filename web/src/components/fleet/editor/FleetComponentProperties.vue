@@ -31,24 +31,73 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <div class="flex flex-col gap-3">
-      <OInput
+      <div
         v-for="key in Object.keys(component.settings)"
         :key="key"
-        :model-value="component.settings[key]"
-        @update:model-value="(v) => emit('update', key, String(v ?? ''))"
-        :label="raw(key)"
-        size="sm"
-        :help-text="
-          component.settings[key].includes('${') ? t('fleet.editor.envReference') : undefined
-        "
-        :data-test="`fleet-component-properties-field-${key}`"
-      />
+        class="flex items-end gap-1"
+        :data-test="`fleet-component-properties-row-${key}`"
+      >
+        <OInput
+          class="min-w-0 flex-1"
+          :model-value="component.settings[key]"
+          @update:model-value="(v) => emit('update', key, String(v ?? ''))"
+          :label="raw(key)"
+          size="sm"
+          :data-test="`fleet-component-properties-field-${key}`"
+        >
+          <template v-if="component.settings[key].includes('${')" #tooltip>
+            <OTooltip :content="t('fleet.editor.envReference')" />
+          </template>
+        </OInput>
+        <OButton
+          variant="ghost"
+          size="icon-sm"
+          icon-left="close"
+          :data-test="`fleet-component-properties-remove-${key}`"
+          @click="emit('removeSetting', key)"
+        >
+          <OTooltip :content="t('fleet.editor.removeSetting')" />
+        </OButton>
+      </div>
       <OText v-if="component.base" variant="meta" data-test="fleet-component-properties-from-base">
         {{ t("fleet.editor.fromBaseHint") }}
       </OText>
       <OText v-else-if="!Object.keys(component.settings).length" variant="meta">{{
         t("fleet.editor.noSettings")
       }}</OText>
+      <form
+        v-if="!component.base"
+        class="border-border-default flex flex-col gap-2 border-t pt-3"
+        data-test="fleet-component-properties-add"
+        @submit.prevent="addSetting"
+      >
+        <OInput
+          v-model="newKey"
+          :label="t('fleet.editor.settingKey')"
+          size="sm"
+          placeholder="headers.Authorization"
+          :help-text="t('fleet.editor.settingKeyHint')"
+          :error="Boolean(newKeyError)"
+          :error-message="newKeyError ?? undefined"
+          data-test="fleet-component-properties-new-key"
+        />
+        <OInput
+          v-model="newValue"
+          :label="t('fleet.editor.settingValue')"
+          size="sm"
+          data-test="fleet-component-properties-new-value"
+        />
+        <OButton
+          type="submit"
+          class="self-start"
+          variant="outline"
+          size="sm"
+          :disabled="!newKey.trim()"
+          data-test="fleet-component-properties-add-submit"
+        >
+          {{ t("fleet.editor.addSetting") }}
+        </OButton>
+      </form>
     </div>
 
     <div v-if="pipelines.length" class="flex flex-col gap-1.5">
@@ -81,12 +130,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { catalogFor, type EditorComponent, type EditorKind } from "./editorGraph";
 
@@ -95,7 +145,11 @@ const props = defineProps<{
   pipelines: string[];
   pipelineId: string | null;
 }>();
-const emit = defineEmits<{ remove: []; update: [key: string, value: string] }>();
+const emit = defineEmits<{
+  remove: [];
+  update: [key: string, value: string];
+  removeSetting: [key: string];
+}>();
 
 const { t } = useI18nTyped();
 
@@ -107,6 +161,27 @@ const CHIP: Record<EditorKind, string> = {
   exporter: "bg-icon-chip-success-bg text-icon-chip-success-text",
   extension: "bg-icon-chip-warning-bg text-icon-chip-warning-text",
 };
+
+const newKey = ref("");
+const newValue = ref("");
+
+// Dotted path with optional `[index]` segments, the shape `editorGraph` nests back into YAML.
+const SETTING_KEY = /^[\w-]+(\[\d+\])*(\.[\w-]+(\[\d+\])*)*$/;
+
+const newKeyError = computed(() => {
+  const key = newKey.value.trim();
+  if (!key) return null;
+  if (!SETTING_KEY.test(key)) return t("fleet.editor.settingInvalid");
+  return key in props.component.settings ? t("fleet.editor.settingExists") : null;
+});
+
+function addSetting() {
+  const key = newKey.value.trim();
+  if (!key || newKeyError.value) return;
+  emit("update", key, newValue.value);
+  newKey.value = "";
+  newValue.value = "";
+}
 
 const kindLabel = computed(
   () =>

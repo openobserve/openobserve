@@ -18,6 +18,8 @@ import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 
 /** The settings value standing for an empty YAML map. */
 export const EMPTY_MAP = "{}";
+/** The settings value standing for an empty YAML list. */
+export const EMPTY_LIST = "[]";
 
 export type EditorKind = "receiver" | "processor" | "exporter" | "extension";
 
@@ -95,20 +97,30 @@ export const CATALOG: CatalogItem[] = [
     "protocols.http.endpoint": "0.0.0.0:4318",
   }),
   r("prometheus", "Prometheus", "query-stats", {
-    "config.scrape_configs.job_name": "app",
-    "config.scrape_configs.scrape_interval": "30s",
+    "config.scrape_configs[0].job_name": "app",
+    "config.scrape_configs[0].scrape_interval": "30s",
+    "config.scrape_configs[0].static_configs[0].targets[0]": "localhost:9090",
   }),
   r("filelog", "File log", "description", {
-    include: "/var/log/pods/*/*/*.log",
+    "include[0]": "/var/log/pods/*/*/*.log",
     start_at: "end",
-    storage: "file_storage",
+    include_file_path: "true",
+    "operators[0].type": "container",
   }),
   r("fluentforward", "Fluent forward", "forum", { endpoint: "0.0.0.0:8006" }),
   r("docker_stats", "Docker stats", "view-in-ar", {
     endpoint: "unix:///var/run/docker.sock",
     collection_interval: "15s",
   }),
-  r("hostmetrics", "Host metrics", "memory", { collection_interval: "30s", root_path: "/hostfs" }),
+  r("hostmetrics", "Host metrics", "memory", {
+    collection_interval: "30s",
+    "scrapers.cpu": EMPTY_MAP,
+    "scrapers.memory": EMPTY_MAP,
+    "scrapers.disk": EMPTY_MAP,
+    "scrapers.filesystem": EMPTY_MAP,
+    "scrapers.network": EMPTY_MAP,
+    "scrapers.load": EMPTY_MAP,
+  }),
   r("jaeger", "Jaeger", "timeline", { "protocols.grpc.endpoint": "0.0.0.0:14250" }),
   r("zipkin", "Zipkin", "timeline", { endpoint: "0.0.0.0:9411" }),
   r("k8s_cluster", "K8s cluster", "hub", {
@@ -117,16 +129,19 @@ export const CATALOG: CatalogItem[] = [
   }),
   r("k8s_events", "K8s events", "event-note", { auth_type: "serviceAccount" }),
   r("k8sobjects", "K8s objects", "data-object", {
-    "objects.name": "pods",
-    "objects.mode": "watch",
+    auth_type: "serviceAccount",
+    "objects[0].name": "pods",
+    "objects[0].mode": "watch",
   }),
   r("kubeletstats", "Kubelet stats", "hub", {
     collection_interval: "20s",
-    endpoint: "${env:K8S_NODE_NAME}:10250",
+    endpoint: "https://${env:K8S_NODE_NAME}:10250",
     auth_type: "serviceAccount",
+    insecure_skip_verify: "true",
   }),
   r("journald", "Journald", "article", {
-    units: "kubelet, containerd",
+    "units[0]": "kubelet",
+    "units[1]": "containerd",
     directory: "/var/log/journal",
   }),
   r("syslog", "Syslog", "receipt-long", {
@@ -134,13 +149,22 @@ export const CATALOG: CatalogItem[] = [
     protocol: "rfc5424",
   }),
   r("statsd", "StatsD", "speed", { endpoint: "0.0.0.0:8125" }),
-  r("awss3", "AWS S3", "cloud-download", { "s3downloader.s3_bucket": "acme-telemetry" }),
+  r("awss3", "AWS S3", "cloud-download", {
+    "s3downloader.region": "us-east-1",
+    "s3downloader.s3_bucket": "acme-telemetry",
+    "s3downloader.s3_prefix": "telemetry",
+  }),
   r("windowseventlog", "Windows event log", "window", { channel: "System" }),
   r("postgresql", "PostgreSQL", "database", {
     endpoint: "localhost:5432",
-    username: "${env:PG_USER}",
+    username: "postgres",
+    password: "${env:PG_PASSWORD}",
   }),
-  r("mysql", "MySQL", "database", { endpoint: "localhost:3306" }),
+  r("mysql", "MySQL", "database", {
+    endpoint: "localhost:3306",
+    username: "root",
+    password: "${env:MYSQL_PASSWORD}",
+  }),
   p("batch", "Batch", "inventory-2", { timeout: "5s", send_batch_size: "8192" }),
   p("memory_limiter", "Memory limiter", "memory", {
     check_interval: "1s",
@@ -148,42 +172,69 @@ export const CATALOG: CatalogItem[] = [
     spike_limit_mib: "100",
   }),
   p("k8sattributes", "K8s attributes", "label", {
-    "extract.metadata": "k8s.pod.name, k8s.namespace.name, k8s.deployment.name",
+    auth_type: "serviceAccount",
+    "extract.metadata[0]": "k8s.pod.name",
+    "extract.metadata[1]": "k8s.namespace.name",
+    "extract.metadata[2]": "k8s.deployment.name",
   }),
   p("resource", "Resource", "tune", {
-    "attributes.key": "deployment.environment",
-    "attributes.value": "production",
-    "attributes.action": "upsert",
+    "attributes[0].key": "deployment.environment",
+    "attributes[0].value": "production",
+    "attributes[0].action": "upsert",
   }),
   p("attributes", "Attributes", "tag", {
-    "actions.key": "env",
-    "actions.value": "prod",
-    "actions.action": "insert",
+    "actions[0].key": "env",
+    "actions[0].value": "prod",
+    "actions[0].action": "insert",
   }),
   p("filter", "Filter", "filter-alt", {
-    "logs.log_record": "severity_number < SEVERITY_NUMBER_INFO",
+    "logs.log_record[0]": "severity_number < SEVERITY_NUMBER_INFO",
   }),
   p("transform", "Transform", "transform", {
-    log_statements: 'set(attributes["cluster"], "prod")',
+    "log_statements[0].context": "log",
+    "log_statements[0].statements[0]": 'set(attributes["cluster"], "prod")',
   }),
-  p("tail_sampling", "Tail sampling", "science", { decision_wait: "10s", num_traces: "50000" }),
-  p("resourcedetection", "Resource detection", "manage-search", { detectors: "env, system, ec2" }),
-  e("otlp", "OTLP", "send", { endpoint: "otel-gateway:4317", "tls.insecure": "false" }),
-  e("otlphttp", "OTLP HTTP", "cloud-upload", { endpoint: "https://collector.example.com" }),
+  p("tail_sampling", "Tail sampling", "science", {
+    decision_wait: "10s",
+    num_traces: "50000",
+    "policies[0].name": "errors",
+    "policies[0].type": "status_code",
+    "policies[0].status_code.status_codes[0]": "ERROR",
+  }),
+  p("resourcedetection", "Resource detection", "manage-search", {
+    "detectors[0]": "env",
+    "detectors[1]": "system",
+  }),
+  e("otlp", "OTLP", "send", {
+    endpoint: "otel-gateway:4317",
+    "tls.insecure": "false",
+    "headers.Authorization": "${env:OTLP_TOKEN}",
+  }),
+  e("otlphttp", "OTLP HTTP", "cloud-upload", {
+    endpoint: "https://collector.example.com",
+    "headers.Authorization": "${env:OTLP_TOKEN}",
+  }),
   e(
     "openobserve",
     "OpenObserve",
     "cloud-upload",
     {
       endpoint: "${env:O2_ENDPOINT}",
-      "headers.Authorization": "Basic ${env:O2_TOKEN}",
+      "headers.Authorization": "${env:O2_TOKEN}",
       "headers.stream-name": "default",
     },
     { type: "otlphttp", idHint: "otlphttp/openobserve" },
   ),
   e("debug", "Debug", "code", { verbosity: "basic" }),
-  e("kafka", "Kafka", "hub", { brokers: "kafka:9092", topic: "otlp_logs", encoding: "otlp_proto" }),
-  x("file_storage", "File storage", "storage", { directory: "/var/lib/otelcol/storage" }),
+  e("kafka", "Kafka", "hub", {
+    "brokers[0]": "kafka:9092",
+    topic: "otlp_logs",
+    encoding: "otlp_proto",
+  }),
+  x("file_storage", "File storage", "storage", {
+    directory: "/var/lib/opampsupervisor/storage",
+    create_directory: "true",
+  }),
   x("health_check", "Health check", "monitor-heart", { endpoint: "0.0.0.0:13133" }),
   x("pprof", "pprof", "speed", { endpoint: "localhost:1777" }),
   x("zpages", "zpages", "insights", { endpoint: "localhost:55679" }),
@@ -231,32 +282,82 @@ export function pipelinesUsing(graph: EditorGraph, key: string): string[] {
   return graph.pipelines.filter((p) => p[field]?.includes(id)).map((p) => p.id);
 }
 
-function nest(settings: Record<string, string>): Record<string, unknown> {
-  const out: Record<string, unknown> = {};
-  for (const [path, value] of Object.entries(settings)) {
-    const parts = path.split(".");
-    let cur = out as Record<string, unknown>;
-    parts.slice(0, -1).forEach((part) => {
-      cur[part] = (cur[part] as Record<string, unknown>) ?? {};
-      cur = cur[part] as Record<string, unknown>;
-    });
-    cur[parts[parts.length - 1]] = value === EMPTY_MAP ? {} : value;
+const isMap = (v: unknown): v is Record<string, unknown> =>
+  typeof v === "object" && v !== null && !Array.isArray(v);
+
+const isIdList = (v: unknown): v is string[] =>
+  Array.isArray(v) && v.every((x) => typeof x === "string");
+
+type Segment = string | number;
+
+/** `a.b[0].c` → ["a", "b", 0, "c"]. */
+function segments(path: string): Segment[] {
+  const out: Segment[] = [];
+  for (const part of path.split(".")) {
+    const name = part.replace(/(\[\d+\])+$/, "");
+    if (name) out.push(name);
+    for (const m of part.slice(name.length).matchAll(/\[(\d+)\]/g)) out.push(Number(m[1]));
   }
   return out;
 }
 
+const leaf = (value: string): unknown =>
+  value === EMPTY_MAP ? {} : value === EMPTY_LIST ? [] : value;
+
+/** Drops the holes a settings edit can leave in a list. */
+function compact(node: unknown): unknown {
+  if (Array.isArray(node)) return node.filter((x) => x !== undefined).map(compact);
+  if (isMap(node)) return Object.fromEntries(Object.entries(node).map(([k, v]) => [k, compact(v)]));
+  return node;
+}
+
+function nest(settings: Record<string, string>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [path, value] of Object.entries(settings)) {
+    const segs = segments(path);
+    let cur: Record<string, unknown> = out;
+    segs.forEach((seg, i) => {
+      if (i === segs.length - 1) {
+        cur[seg] = leaf(value);
+        return;
+      }
+      const wantList = typeof segs[i + 1] === "number";
+      // A scalar at a path that also has children loses to the children.
+      const fits = wantList ? Array.isArray(cur[seg]) : isMap(cur[seg]);
+      if (!fits) cur[seg] = wantList ? [] : {};
+      cur = cur[seg] as Record<string, unknown>;
+    });
+  }
+  return compact(out) as Record<string, unknown>;
+}
+
 const scalar = (v: string) => (/^[\w./-]+$/.test(v) ? v : JSON.stringify(v));
+
+function emitList(key: string, items: unknown[], indent: number, lines: string[]) {
+  const pad = " ".repeat(indent);
+  lines.push(`${pad}${key}:`);
+  for (const item of items) {
+    if (isMap(item) && Object.keys(item).length) {
+      const sub: string[] = [];
+      emit(item, indent + 4, sub);
+      lines.push(`${pad}  - ${sub[0].trimStart()}`, ...sub.slice(1));
+    } else if (isMap(item)) lines.push(`${pad}  - {}`);
+    else lines.push(`${pad}  - ${scalar(String(item))}`);
+  }
+}
 
 function emit(obj: Record<string, unknown>, indent: number, lines: string[]) {
   const pad = " ".repeat(indent);
   for (const [k, v] of Object.entries(obj)) {
-    if (typeof v === "object" && v !== null) {
-      if (!Object.keys(v).length) {
-        lines.push(`${pad}${k}: {}`);
-        continue;
+    if (Array.isArray(v)) {
+      if (!v.length) lines.push(`${pad}${k}: []`);
+      else emitList(k, v, indent, lines);
+    } else if (isMap(v)) {
+      if (!Object.keys(v).length) lines.push(`${pad}${k}: {}`);
+      else {
+        lines.push(`${pad}${k}:`);
+        emit(v, indent + 2, lines);
       }
-      lines.push(`${pad}${k}:`);
-      emit(v as Record<string, unknown>, indent + 2, lines);
     } else lines.push(`${pad}${k}: ${scalar(String(v))}`);
   }
 }
@@ -303,24 +404,23 @@ const SECTIONS: [string, EditorKind][] = [
   ["extensions", "extension"],
 ];
 
-const isMap = (v: unknown): v is Record<string, unknown> =>
-  typeof v === "object" && v !== null && !Array.isArray(v);
-
-const isIdList = (v: unknown): v is string[] =>
-  Array.isArray(v) && v.every((x) => typeof x === "string");
-
-/** Settings as dotted keys, or null when a graph edit could not write them back. */
-function flatten(obj: Record<string, unknown>, prefix = "", out: Record<string, string> = {}) {
-  for (const [k, v] of Object.entries(obj)) {
-    const path = prefix ? `${prefix}.${k}` : k;
-    if (v === null || Array.isArray(v)) return null;
-    if (isMap(v)) {
+/** Settings as dotted keys with `[i]` list indexes, or null when a graph edit could not write them back. */
+function flatten(obj: Record<string, unknown>): Record<string, string> | null {
+  const out: Record<string, string> = {};
+  const visit = (path: string, v: unknown): boolean => {
+    if (v === null) return false;
+    if (Array.isArray(v)) {
+      if (!v.length) out[path] = EMPTY_LIST;
+      else return v.every((item, i) => visit(`${path}[${i}]`, item));
+    } else if (isMap(v)) {
       // An empty map is a real setting (`cpu: {}` enables a scraper), kept as the literal `{}`.
       if (!Object.keys(v).length) out[path] = EMPTY_MAP;
-      else if (!flatten(v, path, out)) return null;
+      else return Object.entries(v).every(([k, c]) => visit(path ? `${path}.${k}` : k, c));
     } else out[path] = String(v);
-  }
-  return out;
+    return true;
+  };
+  if (!Object.keys(obj).length) return out;
+  return visit("", obj) ? out : null;
 }
 
 function deepEqual(a: unknown, b: unknown): boolean {

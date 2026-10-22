@@ -285,6 +285,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :pipelines="selectedPipelines"
                 :pipeline-id="selection?.pipelineId ?? null"
                 @update="updateSetting"
+                @remove-setting="removeSetting"
                 @remove="removeSelected"
               />
               <OEmptyState
@@ -822,6 +823,12 @@ function updateSetting(key: string, value: string) {
   const comp = selectedComponent.value;
   if (!graph.value || !comp || comp.settings[key] === value) return;
   commit(() => (comp.settings[key] = value));
+}
+
+function removeSetting(key: string) {
+  const comp = selectedComponent.value;
+  if (!graph.value || !comp || !(key in comp.settings)) return;
+  commit(() => delete comp.settings[key]);
 }
 
 function removeSelected() {

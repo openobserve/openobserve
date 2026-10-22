@@ -15,6 +15,11 @@
 
 export type InstallPlatform = "linux" | "macos" | "windows" | "docker" | "kubernetes";
 
+/** Environment every install command gives the collector. */
+export const INSTALL_ENV = ["O2_ENDPOINT", "O2_TOKEN"];
+/** Environment only the Helm chart adds, from the pod's downward API. */
+export const HELM_ENV = ["K8S_NODE_NAME", "K8S_POD_NAME", "K8S_NAMESPACE"];
+
 export const INSTALL_PLATFORMS: InstallPlatform[] = [
   "linux",
   "macos",
