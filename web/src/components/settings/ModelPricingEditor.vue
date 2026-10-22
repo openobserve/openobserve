@@ -231,6 +231,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                   <div class="flex shrink-0 items-center gap-2">
                     <OButton
+                      :aria-label="t('common.remove')"
                       v-if="idx > 0"
                       variant="outline-destructive"
                       size="icon"
@@ -579,6 +580,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                            push the value input / this button downward). -->
                         <div class="flex h-8.5 items-center">
                           <OButton
+                            :aria-label="t('common.remove')"
                             variant="outline-destructive"
                             size="icon"
                             type="button"
@@ -628,6 +630,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           >
                         </OFormInput>
                         <OButton
+                          :aria-label="t('common.add')"
                           variant="outline"
                           size="icon"
                           type="button"
