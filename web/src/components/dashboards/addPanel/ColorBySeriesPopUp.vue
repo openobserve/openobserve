@@ -105,6 +105,7 @@
 
               <!-- Delete series -->
               <OButton
+                :aria-label="t('common.remove')"
                 variant="ghost"
                 size="icon"
                 @click="removecolorBySeriesByIndex(index)"

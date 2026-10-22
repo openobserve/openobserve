@@ -109,7 +109,7 @@ where
 
         let method = req.method().to_string();
         let path_and_query =
-            mask_share_tokens(req.uri().path_and_query().map(|x| x.as_str()).unwrap_or(""));
+            mask_log_url(req.uri().path_and_query().map(|x| x.as_str()).unwrap_or(""));
         let uri_path = mask_share_tokens(req.uri().path());
         let version = format!("{:?}", req.version());
 
@@ -121,7 +121,7 @@ where
             .unwrap_or("-")
             .to_string();
 
-        let referer = mask_share_tokens(
+        let referer = mask_log_url(
             req.headers()
                 .get("Referer")
                 .and_then(|v| v.to_str().ok())
@@ -141,7 +141,7 @@ where
                 .iter()
                 .map(|(name, value)| {
                     let value = value.to_str().unwrap_or("-");
-                    (name.as_str().to_string(), mask_share_tokens(value))
+                    (name.as_str().to_string(), mask_log_url(value))
                 })
                 .collect()
         } else {
@@ -301,6 +301,11 @@ where
     }
 }
 
+/// `url` as the access log may write it: share tokens cut, Slack callback secrets dropped.
+pub fn mask_log_url(url: &str) -> String {
+    mask_slack_callback_query(&mask_share_tokens(url))
+}
+
 /// `path` (or a URL) with every chat share token, a bearer credential, cut to a short prefix.
 pub fn mask_share_tokens(path: &str) -> String {
     let segments: Vec<&str> = path.split('/').collect();
@@ -321,6 +326,34 @@ pub fn mask_share_tokens(path: &str) -> String {
         masked.push(format!("{prefix}…{rest}"));
     }
     masked.join("/")
+}
+
+/// A Slack callback's `code` and `state` are one-time OAuth secrets the SPA sends as Referer.
+fn mask_slack_callback_query(url: &str) -> String {
+    let Some((path, rest)) = url.split_once('?') else {
+        return url.to_string();
+    };
+    let route = path.trim_end_matches('/');
+    if !(route.contains("/slack/") && route.ends_with("/callback")) {
+        return url.to_string();
+    }
+    let (query, fragment) = match rest.split_once('#') {
+        Some((q, f)) => (q, Some(f)),
+        None => (rest, None),
+    };
+    let pairs: Vec<String> = query
+        .split('&')
+        .map(|pair| match pair.split_once('=') {
+            Some((key, _)) if matches!(key, "code" | "state") => format!("{key}=…"),
+            _ => pair.to_string(),
+        })
+        .collect();
+    let mut masked = format!("{path}?{}", pairs.join("&"));
+    if let Some(f) = fragment {
+        masked.push('#');
+        masked.push_str(f);
+    }
+    masked
 }
 
 #[cfg(test)]
@@ -359,6 +392,48 @@ mod tests {
         ] {
             assert_eq!(mask_share_tokens(untouched), untouched);
         }
+    }
+
+    #[test]
+    fn slack_callback_secrets_never_reach_the_access_log() {
+        for (url, masked) in [
+            (
+                "https://o2.test/web/slack/oauth/callback?code=c0de-123&state=s7at3",
+                "https://o2.test/web/slack/oauth/callback?code=…&state=…",
+            ),
+            (
+                "/web/slack/link/callback?state=st&code=cd#top",
+                "/web/slack/link/callback?state=…&code=…#top",
+            ),
+            (
+                "/web/slack/connect/callback?code=cd&org_identifier=default",
+                "/web/slack/connect/callback?code=…&org_identifier=default",
+            ),
+            (
+                "/web/slack/oauth/callback/?code=FAKECD2&state=FAKEST2",
+                "/web/slack/oauth/callback/?code=…&state=…",
+            ),
+            (
+                "https://o2.test/web/slack/link/callback//?state=st&code=cd#top",
+                "https://o2.test/web/slack/link/callback//?state=…&code=…#top",
+            ),
+        ] {
+            assert_eq!(mask_log_url(url), masked);
+        }
+        for untouched in [
+            "/web/logs?code=x",
+            "/api/default/slack/settings?state=on",
+            "/web/slack/oauth/callback",
+            "/web/slack/oauth/callbacks/?code=x",
+            "/web/slack/callback-info/?state=x",
+            "-",
+        ] {
+            assert_eq!(mask_log_url(untouched), untouched);
+        }
+        assert_eq!(
+            mask_log_url("/api/default/ai/shared/AbCdEfGhIjKl"),
+            "/api/default/ai/shared/AbCdEf…"
+        );
     }
 
     #[test]

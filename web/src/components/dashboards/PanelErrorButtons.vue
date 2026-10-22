@@ -121,6 +121,7 @@
       </span>
     </div>
     <OButton
+      :aria-label="t('dashboard.panelError', { message: raw(error) })"
       v-if="error"
       :key="error"
       variant="ghost-warning"
@@ -166,6 +167,7 @@
       </OTooltip>
     </OButton>
     <OButton
+      :aria-label="t('dashboard.panelWarning')"
       v-if="maxQueryRangeWarning"
       variant="ghost-warning"
       size="icon"
@@ -181,6 +183,7 @@
       </OTooltip>
     </OButton>
     <OButton
+      :aria-label="t('dashboard.panelWarning')"
       v-if="sparklineWarning"
       variant="ghost-warning"
       size="icon"
@@ -196,6 +199,7 @@
       </OTooltip>
     </OButton>
     <OButton
+      :aria-label="t('dashboard.panelWarning')"
       v-if="xAliasInconsistencyWarning"
       variant="ghost-warning"
       size="icon"
@@ -247,7 +251,7 @@
 
 <script lang="ts">
 import { computed, defineComponent, ref, type PropType } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import RelativeTime from "@/components/common/RelativeTime.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -436,6 +440,7 @@ export default defineComponent({
     };
 
     return {
+      raw,
       t,
       notices,
       collapsedTone,

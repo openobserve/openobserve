@@ -18,6 +18,8 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
+use super::rca_steering::SteerKind;
+
 /// Incident status lifecycle: Open → Acknowledged → Resolved
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "lowercase")]
@@ -248,21 +250,6 @@ impl DimensionRelationship {
     }
 }
 
-/// A superseded RCA report, retained so users can read earlier analyses.
-///
-/// Archived by [`IncidentTopology::record_rca_result`] when a newer report replaces it.
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-pub struct ArchivedRcaReport {
-    /// The full markdown report as it was generated
-    pub content: String,
-    /// Microseconds since epoch, stamped when the report was archived
-    pub archived_at: i64,
-}
-
-/// Default number of superseded RCA reports to retain per incident.
-/// Overridden by `O2_INCIDENTS_RCA_HISTORY_LIMIT`.
-pub const DEFAULT_RCA_HISTORY_LIMIT: usize = 25;
-
 /// Alert flow graph showing how alerts cascaded across services over time
 #[derive(Debug, Clone, Default, Serialize, Deserialize, ToSchema)]
 pub struct IncidentTopology {
@@ -272,41 +259,6 @@ pub struct IncidentTopology {
     pub edges: Vec<AlertEdge>,
     /// Related incident IDs (for cross-incident correlation)
     pub related_incident_ids: Vec<String>,
-    /// AI-generated root cause analysis (markdown) — the current report
-    pub suggested_root_cause: Option<String>,
-    /// Superseded reports, newest first. Bounded by the configured history limit so
-    /// this JSON column cannot grow without limit across a long-lived incident.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub previous_analyses: Vec<ArchivedRcaReport>,
-}
-
-impl IncidentTopology {
-    /// Install `content` as the current report, archiving whatever it replaces.
-    ///
-    /// The outgoing report is pushed to the front of `previous_analyses` (newest first)
-    /// and the list is truncated to `history_limit`. A `history_limit` of 0 disables
-    /// history entirely and clears any previously retained reports.
-    pub fn record_rca_result(&mut self, content: impl Into<String>, history_limit: usize) {
-        let content = content.into();
-
-        if history_limit == 0 {
-            self.previous_analyses.clear();
-        } else if let Some(prev) = self.suggested_root_cause.take() {
-            // Identical re-runs would otherwise fill the history with duplicates.
-            if !prev.is_empty() && prev != content {
-                self.previous_analyses.insert(
-                    0,
-                    ArchivedRcaReport {
-                        content: prev,
-                        archived_at: chrono::Utc::now().timestamp_micros(),
-                    },
-                );
-                self.previous_analyses.truncate(history_limit);
-            }
-        }
-
-        self.suggested_root_cause = Some(content);
-    }
 }
 
 /// Node in the alert flow graph
@@ -388,6 +340,14 @@ pub struct Incident {
     /// Set while a downtime mutes this incident (D3).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub muted_by_downtime_id: Option<String>,
+
+    /// Latest run summary, `null` when never analyzed; the detail response fills its detail
+    /// fields.
+    #[serde(default)]
+    pub rca: Option<super::rca_runs::RcaSummary>,
+    /// Why automatic analysis runs never start for this incident (`l0_off`).
+    #[serde(default)]
+    pub rca_off_reason: Option<String>,
 }
 
 /// Alert info within an incident (junction table representation)
@@ -433,75 +393,6 @@ pub struct IncidentWithAlerts {
     /// Live composite definitions for incident members (`alert_type="composite"`).
     #[serde(default)]
     pub composite_alerts: Vec<CompositeAlertSummary>,
-}
-
-/// Organization-level incident correlation configuration
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-pub struct IncidentCorrelationConfig {
-    /// Enable incident correlation for this org
-    #[serde(default)]
-    pub enabled: bool,
-
-    /// Time window for correlating alerts to same incident (minutes)
-    #[serde(default = "default_time_window")]
-    pub time_window_minutes: u64,
-
-    /// Minimum alerts to create an incident
-    #[serde(default = "default_min_alerts")]
-    pub min_alerts_for_incident: u32,
-
-    /// When to send notifications
-    #[serde(default)]
-    pub notification_strategy: NotificationStrategy,
-
-    /// Enable Service Graph topology enrichment
-    #[serde(default = "default_true")]
-    pub use_service_graph: bool,
-
-    /// Enable root cause inference
-    #[serde(default = "default_true")]
-    pub root_cause_detection: bool,
-
-    /// Auto-resolve after N minutes of no new alerts (None = use global default, 0 = disabled)
-    #[serde(default)]
-    pub auto_resolve_after_minutes: Option<i64>,
-
-    /// Time window for hierarchical incident upgrade (minutes)
-    #[serde(default = "default_upgrade_window")]
-    pub upgrade_window_minutes: u64,
-
-    /// Default severity for new incidents
-    #[serde(default)]
-    pub default_severity: IncidentSeverity,
-}
-
-impl Default for IncidentCorrelationConfig {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            time_window_minutes: default_time_window(),
-            min_alerts_for_incident: default_min_alerts(),
-            notification_strategy: NotificationStrategy::default(),
-            use_service_graph: true,
-            root_cause_detection: true,
-            auto_resolve_after_minutes: None,
-            upgrade_window_minutes: default_upgrade_window(),
-            default_severity: IncidentSeverity::default(),
-        }
-    }
-}
-
-/// Notification strategy for incidents
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum NotificationStrategy {
-    /// Only notify when a new incident is created
-    #[default]
-    NewIncidentOnly,
-    /// Notify on all updates (new alerts added, status changes)
-    AllUpdates,
-    /// No notifications
-    None,
 }
 
 /// Outcome of correlating an alert to an incident.
@@ -555,22 +446,6 @@ impl IncidentCorrelationOutcome {
             | Self::SeverityEscalated { service_name, .. } => service_name,
         }
     }
-}
-
-fn default_time_window() -> u64 {
-    60
-}
-
-fn default_min_alerts() -> u32 {
-    1
-}
-
-fn default_upgrade_window() -> u64 {
-    30
-}
-
-fn default_true() -> bool {
-    true
 }
 
 /// Whether an incident's member alert is an OpenObserve alert or an
@@ -793,6 +668,30 @@ pub enum IncidentEventType {
         user_id: Option<String>,
     },
 
+    /// A responder's steering message reached the live run. Never starts a reanalysis.
+    #[serde(rename = "ai_analysis_steered")]
+    AiAnalysisSteered {
+        run_id: String,
+        /// `stg_` + KSUID.
+        steer_id: String,
+        /// The responder who sent the message.
+        user_id: String,
+        /// `message` | `answer` | `hypothesis_action` | `guidance`.
+        kind: String,
+    },
+
+    /// The run asked the responders a question and paused. Never starts a reanalysis.
+    #[serde(rename = "ai_analysis_needs_input")]
+    AiAnalysisNeedsInput {
+        run_id: String,
+        /// `callID` of the `ask_responders` call.
+        question_id: String,
+        need: String,
+        question: String,
+        /// Answer deadline, µs.
+        deadline_at: i64,
+    },
+
     /// Forward-compatibility catch-all for event types this binary does not know.
     ///
     /// During a rolling deploy an old node reads rows written by a newer node. Without
@@ -834,6 +733,8 @@ impl IncidentEventType {
         "ai_analysis_complete",
         "ai_analysis_failed",
         "ai_analysis_cancelled",
+        "ai_analysis_steered",
+        "ai_analysis_needs_input",
     ];
 
     /// True when `raw` carries a `type` tag this binary recognizes.
@@ -963,6 +864,36 @@ impl IncidentEvent {
 
     pub fn ai_analysis_cancelled(user_id: Option<String>) -> Self {
         Self::now(IncidentEventType::AIAnalysisCancelled { user_id })
+    }
+
+    pub fn ai_analysis_steered(
+        run_id: impl Into<String>,
+        steer_id: impl Into<String>,
+        user_id: impl Into<String>,
+        kind: SteerKind,
+    ) -> Self {
+        Self::now(IncidentEventType::AiAnalysisSteered {
+            run_id: run_id.into(),
+            steer_id: steer_id.into(),
+            user_id: user_id.into(),
+            kind: kind.as_str().to_string(),
+        })
+    }
+
+    pub fn ai_analysis_needs_input(
+        run_id: impl Into<String>,
+        question_id: impl Into<String>,
+        need: impl Into<String>,
+        question: impl Into<String>,
+        deadline_at: i64,
+    ) -> Self {
+        Self::now(IncidentEventType::AiAnalysisNeedsInput {
+            run_id: run_id.into(),
+            question_id: question_id.into(),
+            need: need.into(),
+            question: question.into(),
+            deadline_at,
+        })
     }
 
     /// Increment alert count if this is an Alert event for the given alert_id.
@@ -1123,6 +1054,19 @@ mod tests {
                 error_details: None,
             },
             IncidentEventType::AIAnalysisCancelled { user_id: None },
+            IncidentEventType::AiAnalysisSteered {
+                run_id: "r".into(),
+                steer_id: "s".into(),
+                user_id: "u".into(),
+                kind: "message".into(),
+            },
+            IncidentEventType::AiAnalysisNeedsInput {
+                run_id: "r".into(),
+                question_id: "q".into(),
+                need: "n".into(),
+                question: "?".into(),
+                deadline_at: 1,
+            },
         ];
 
         let mut actual: Vec<String> = variants
@@ -1144,6 +1088,44 @@ mod tests {
             actual, expected,
             "KNOWN_TAGS is out of sync with the enum variants"
         );
+    }
+
+    /// Steering and question events serialize with their tag and round-trip to their own variant.
+    #[test]
+    fn sg5_sg42_steering_events_round_trip() {
+        use crate::meta::alerts::rca_steering::SteerKind;
+        let steered =
+            IncidentEvent::ai_analysis_steered("r1", "stg_x", "a.rao@acme.io", SteerKind::Answer);
+        let v = serde_json::to_value(&steered).unwrap();
+        assert_eq!(v["type"], "ai_analysis_steered");
+        assert_eq!(
+            v["data"],
+            serde_json::json!({"run_id": "r1", "steer_id": "stg_x",
+                               "user_id": "a.rao@acme.io", "kind": "answer"})
+        );
+        assert!(IncidentEventType::is_known_tag(&v));
+        let back: IncidentEvent = serde_json::from_value(v.clone()).unwrap();
+        assert!(matches!(
+            back.event_type,
+            IncidentEventType::AiAnalysisSteered { .. }
+        ));
+        assert_eq!(serde_json::to_value(&back).unwrap(), v);
+
+        let asked = IncidentEvent::ai_analysis_needs_input("r1", "call_7f", "pool size", "q?", 42);
+        let v = serde_json::to_value(&asked).unwrap();
+        assert_eq!(v["type"], "ai_analysis_needs_input");
+        assert_eq!(
+            v["data"],
+            serde_json::json!({"run_id": "r1", "question_id": "call_7f", "need": "pool size",
+                               "question": "q?", "deadline_at": 42})
+        );
+        assert!(IncidentEventType::is_known_tag(&v));
+        let back: IncidentEvent = serde_json::from_value(v.clone()).unwrap();
+        assert!(matches!(
+            back.event_type,
+            IncidentEventType::AiAnalysisNeedsInput { .. }
+        ));
+        assert_eq!(serde_json::to_value(&back).unwrap(), v);
     }
 
     /// Known variants must still win over the untagged catch-all.
@@ -1273,16 +1255,6 @@ mod tests {
     }
 
     #[test]
-    fn test_default_config() {
-        let config = IncidentCorrelationConfig::default();
-        assert!(!config.enabled);
-        assert_eq!(config.time_window_minutes, 60);
-        assert_eq!(config.min_alerts_for_incident, 1);
-        assert!(config.use_service_graph);
-        assert!(config.root_cause_detection);
-    }
-
-    #[test]
     fn test_incident_status_from_str_case_insensitive() {
         assert_eq!(
             "OPEN".parse::<IncidentStatus>().unwrap(),
@@ -1376,7 +1348,6 @@ mod tests {
         assert!(topology.nodes.is_empty());
         assert!(topology.edges.is_empty());
         assert!(topology.related_incident_ids.is_empty());
-        assert!(topology.suggested_root_cause.is_none());
     }
 
     #[test]
@@ -1440,8 +1411,6 @@ mod tests {
             nodes: vec![node1, node2],
             edges: vec![edge],
             related_incident_ids: vec!["incident-1".to_string()],
-            suggested_root_cause: Some("High memory usage".to_string()),
-            previous_analyses: vec![],
         };
 
         assert_eq!(topology.nodes.len(), 2);
@@ -1449,7 +1418,6 @@ mod tests {
         assert_eq!(topology.nodes[0].alert_id, "alert_cpu_high");
         assert_eq!(topology.nodes[1].service_name, "database");
         assert_eq!(topology.related_incident_ids.len(), 1);
-        assert!(topology.suggested_root_cause.is_some());
     }
 
     #[test]
@@ -1835,6 +1803,8 @@ mod tests {
             key_type: KeyType::default(),
             topology_context,
             muted_by_downtime_id: None,
+            rca: None,
+            rca_off_reason: None,
         }
     }
 
@@ -2082,26 +2052,6 @@ mod tests {
     }
 
     #[test]
-    fn test_default_time_window() {
-        assert_eq!(default_time_window(), 60);
-    }
-
-    #[test]
-    fn test_default_min_alerts() {
-        assert_eq!(default_min_alerts(), 1);
-    }
-
-    #[test]
-    fn test_default_upgrade_window() {
-        assert_eq!(default_upgrade_window(), 30);
-    }
-
-    #[test]
-    fn test_default_true() {
-        assert!(default_true());
-    }
-
-    #[test]
     fn test_incident_event_factory_resolved_with_user() {
         let event = IncidentEvent::resolved(Some("user@test.com".to_string()));
         assert!(event.timestamp > 0);
@@ -2121,83 +2071,16 @@ mod tests {
     }
 
     #[test]
-    fn test_record_rca_result_archives_previous() {
-        let mut t = IncidentTopology::default();
-
-        t.record_rca_result("first", 25);
-        assert_eq!(t.suggested_root_cause.as_deref(), Some("first"));
-        // Nothing was superseded on the very first run.
-        assert!(t.previous_analyses.is_empty());
-
-        t.record_rca_result("second", 25);
-        assert_eq!(t.suggested_root_cause.as_deref(), Some("second"));
-        assert_eq!(t.previous_analyses.len(), 1);
-        assert_eq!(t.previous_analyses[0].content, "first");
-        assert!(t.previous_analyses[0].archived_at > 0);
-    }
-
-    #[test]
-    fn test_record_rca_result_orders_newest_first() {
-        let mut t = IncidentTopology::default();
-        for r in ["r1", "r2", "r3", "r4"] {
-            t.record_rca_result(r, 25);
-        }
-
-        assert_eq!(t.suggested_root_cause.as_deref(), Some("r4"));
-        let archived: Vec<_> = t
-            .previous_analyses
-            .iter()
-            .map(|a| a.content.as_str())
-            .collect();
-        assert_eq!(archived, vec!["r3", "r2", "r1"]);
-    }
-
-    #[test]
-    fn test_record_rca_result_respects_history_limit() {
-        let mut t = IncidentTopology::default();
-        for i in 0..10 {
-            t.record_rca_result(format!("report-{i}"), 3);
-        }
-
-        assert_eq!(t.suggested_root_cause.as_deref(), Some("report-9"));
-        // Only the three most recent superseded reports survive.
-        assert_eq!(t.previous_analyses.len(), 3);
-        assert_eq!(t.previous_analyses[0].content, "report-8");
-        assert_eq!(t.previous_analyses[2].content, "report-6");
-    }
-
-    #[test]
-    fn test_record_rca_result_zero_limit_disables_history() {
-        let mut t = IncidentTopology::default();
-        t.record_rca_result("first", 25);
-        t.record_rca_result("second", 25);
-        assert_eq!(t.previous_analyses.len(), 1);
-
-        // Dropping the limit to 0 clears retained reports and stops archiving.
-        t.record_rca_result("third", 0);
-        assert_eq!(t.suggested_root_cause.as_deref(), Some("third"));
-        assert!(t.previous_analyses.is_empty());
-    }
-
-    #[test]
-    fn test_record_rca_result_skips_identical_report() {
-        let mut t = IncidentTopology::default();
-        t.record_rca_result("same", 25);
-        t.record_rca_result("same", 25);
-
-        // An unchanged re-run should not fill history with duplicates.
-        assert_eq!(t.suggested_root_cause.as_deref(), Some("same"));
-        assert!(t.previous_analyses.is_empty());
-    }
-
-    #[test]
-    fn test_topology_previous_analyses_backward_compatible() {
-        // Topology JSON written before history existed must still deserialize.
+    fn test_topology_with_pre_run_report_keys_decodes_without_owning_them() {
+        // `update_topology` carries the pre-run report keys over; the struct never writes them.
         let json = r#"{"nodes":[],"edges":[],"related_incident_ids":[],
-            "suggested_root_cause":"legacy report"}"#;
+            "suggested_root_cause":"legacy report",
+            "previous_analyses":[{"content":"older","archived_at":1}]}"#;
         let t: IncidentTopology = serde_json::from_str(json).unwrap();
-        assert_eq!(t.suggested_root_cause.as_deref(), Some("legacy report"));
-        assert!(t.previous_analyses.is_empty());
+        assert!(t.nodes.is_empty());
+        let back = serde_json::to_value(&t).unwrap();
+        assert!(back.get("suggested_root_cause").is_none());
+        assert!(back.get("previous_analyses").is_none());
     }
 
     #[test]

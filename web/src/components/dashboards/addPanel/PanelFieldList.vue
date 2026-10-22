@@ -362,6 +362,7 @@
             :content="t('common.totalFields', { count: bottomProps.totalRows })"
           />
           <OButton
+            :aria-label="t('search.firstPage')"
             variant="ghost-primary"
             size="icon-panel"
             :disabled="bottomProps.isFirstPage"
@@ -381,6 +382,7 @@
             </OButton>
           </template>
           <OButton
+            :aria-label="t('search.lastPage')"
             variant="ghost-primary"
             size="icon-panel"
             :disabled="bottomProps.isLastPage"

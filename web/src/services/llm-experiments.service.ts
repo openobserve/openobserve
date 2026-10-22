@@ -243,6 +243,8 @@ export interface ExperimentRowDetail {
   expectedOutput: unknown | null;
   trials: ExperimentResultSlot[];
   scoreSummaries: ExperimentScoreSummary[];
+  /** Per-case aggregates of the Scores the customer's own code reported. */
+  clientScoreSummaries?: ExperimentClientScoreSummary[];
 }
 
 export type ExperimentResultRowSort = "dataset" | "dispersion_desc";
@@ -326,6 +328,9 @@ export interface ExperimentResultSlot extends ExperimentSlot {
   taskStatus: "pending" | "queued" | "in_progress" | "ok" | "skipped" | "error";
   execution: ExperimentExecution | null;
   scores: ExperimentResultScore[];
+  /** Score records the customer's own code reported for this Slot. They are
+   *  not tied to a pinned Scorer, so they never appear in `scores`. */
+  clientScores?: Record<string, unknown>[];
 }
 
 export interface ExperimentResultPagination {
@@ -392,6 +397,16 @@ export interface ExperimentScoreSummary {
   noReferenceCount: number;
   noTraceCount: number;
   skippedCount: number;
+  value: Record<string, unknown> | null;
+}
+
+/** Aggregate of one client-reported dimension (a client scorer key under one
+ *  Score Config). Not comparable with a platform Scorer's summary. */
+export interface ExperimentClientScoreSummary {
+  scoreConfigId: string;
+  scoreConfigName: string;
+  clientScorerKey: string;
+  sampleCount: number;
   value: Record<string, unknown> | null;
 }
 
@@ -870,6 +885,7 @@ function normalizeResultSlot(slot: any): ExperimentResultSlot {
     taskStatus,
     execution: slot.execution ? normalizeExecution(slot.execution) : null,
     scores,
+    clientScores: value<Record<string, unknown>[]>(slot, "clientScores", "client_scores", []),
   };
 }
 
@@ -890,6 +906,16 @@ function normalizeScoreSummary(summary: any): ExperimentScoreSummary {
     noTraceCount: Number(value(summary, "noTraceCount", "no_trace_count", 0)),
     skippedCount: Number(value(summary, "skippedCount", "skipped_count", 0)),
     value: summary.value ?? null,
+  };
+}
+
+function normalizeClientScoreSummary(summary: unknown): ExperimentClientScoreSummary {
+  return {
+    scoreConfigId: String(value(summary, "scoreConfigId", "score_config_id", "")),
+    scoreConfigName: String(value(summary, "scoreConfigName", "score_config_name", "")),
+    clientScorerKey: String(value(summary, "clientScorerKey", "client_scorer_key", "")),
+    sampleCount: Number(value(summary, "sampleCount", "sample_count", 0)),
+    value: value<Record<string, unknown> | null>(summary, "value", "value", null),
   };
 }
 
@@ -959,6 +985,12 @@ export function normalizeExperimentRowDetail(input: any): ExperimentRowDetail {
     scoreSummaries: value<any[]>(input, "scoreSummaries", "score_summaries", []).map(
       normalizeScoreSummary,
     ),
+    clientScoreSummaries: value<unknown[]>(
+      input,
+      "clientScoreSummaries",
+      "client_score_summaries",
+      [],
+    ).map(normalizeClientScoreSummary),
   };
 }
 

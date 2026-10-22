@@ -216,7 +216,7 @@ const stream = {
     traceId: string;
   }) => {
     const url = `/api/${org_identifier}/query_manager/cancel`;
-    return http().put(url, [traceId]);
+    return http().put(url, [{ trace_id: traceId, org_id: org_identifier }]);
   },
 
   // HTTP/2 streaming PromQL query range endpoint with SSE

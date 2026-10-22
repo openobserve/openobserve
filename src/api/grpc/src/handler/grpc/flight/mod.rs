@@ -38,11 +38,7 @@ use tonic::{Request, Response, Status, Streaming};
 use tracing::Instrument;
 #[cfg(feature = "enterprise")]
 use {
-    o2_enterprise::enterprise::{
-        common::config::get_config as get_o2_config,
-        search::{TaskStatus, query_manager::Registration},
-    },
-    search::utils::AsyncDefer,
+    o2_enterprise::enterprise::common::config::get_config as get_o2_config,
     search_service::SEARCH_SERVER,
 };
 
@@ -118,18 +114,9 @@ impl FlightService for FlightServiceImpl {
         // https://docs.rs/tracing/latest/tracing/span/struct.Span.html#in-asynchronous-code
         let req_move = req.clone();
         let trace_id_move = trace_id.clone();
-        let result = async move {
-            #[cfg(feature = "enterprise")]
-            let _task_status = register_follower_task_status(
-                is_super_cluster,
-                &req_move.query_identifier.org_id,
-                &trace_id_move,
-            )
+        let result = async move { get_ctx_and_physical_plan(&trace_id_move, &req_move).await }
+            .instrument(span.clone())
             .await;
-            get_ctx_and_physical_plan(&trace_id_move, &req_move).await
-        }
-        .instrument(span.clone())
-        .await;
 
         // runs after the instrumented future: without in_scope the event has no current span
         span.in_scope(|| {
@@ -351,8 +338,10 @@ async fn get_ctx_and_physical_plan(
     req: &FlightSearchRequest,
 ) -> Result<PlanResult, infra::errors::Error> {
     if req.super_cluster_info.is_super_cluster {
+        // registered only while the plan is built: that is where this node waits in its work group
+        let registration = SEARCH_SERVER.register_follower(&req.query_identifier.org_id, trace_id);
         let (ctx, physical_plan, lock, scan_stats) =
-            search_service::super_cluster::follower::search(trace_id, req).await?;
+            search_service::super_cluster::follower::search(registration.tracker(), req).await?;
         Ok((ctx, physical_plan, Some(lock), scan_stats))
     } else {
         let (ctx, physical_plan, scan_stats) = grpcFlight::search(trace_id, req).await?;
@@ -368,34 +357,6 @@ async fn get_ctx_and_physical_plan(
 ) -> Result<PlanResult, infra::errors::Error> {
     let (ctx, physical_plan, scan_stats) = grpcFlight::search(trace_id, req).await?;
     Ok((ctx, physical_plan, None, scan_stats))
-}
-
-/// Registers this node's follower task status for a super cluster query and removes it when the
-/// returned defer drops, so a request cancelled during plan generation cannot leave it behind.
-#[cfg(feature = "enterprise")]
-async fn register_follower_task_status(
-    is_super_cluster: bool,
-    org_id: &str,
-    trace_id: &str,
-) -> Option<AsyncDefer> {
-    if !is_super_cluster {
-        return None;
-    }
-    let registration = SEARCH_SERVER
-        .insert_or_join(
-            org_id,
-            trace_id.to_string(),
-            TaskStatus::new_follower(vec![], false),
-        )
-        .await;
-    if registration == Registration::Joined {
-        return None;
-    }
-    let org_id = org_id.to_string();
-    let trace_id = trace_id.to_string();
-    Some(AsyncDefer::new(async move {
-        SEARCH_SERVER.remove_follower(&org_id, &trace_id).await;
-    }))
 }
 
 fn clear_session_data(trace_id: &str) {

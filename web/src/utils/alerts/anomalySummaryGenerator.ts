@@ -8,7 +8,7 @@ import { type TranslateFn } from "@/types/i18n";
 import {
   ANOMALY_DIRECTION_KEYS,
   anomalyExpectedGroupingKey,
-  anomalyTrainedK,
+  anomalySensitivityModel,
   anomalyIntervalSeconds,
   anomalyWindowShareEffective,
 } from "@/components/anomaly_detection/steps/AnomalyDetectionConfig.schema";
@@ -109,14 +109,21 @@ export function generateAnomalySummary(
       const blankToNaN = (v: unknown) =>
         v === null || v === undefined || v === "" ? NaN : Number(v);
       const bandWidth = blankToNaN(config.band_width);
-      const trainedK = anomalyTrainedK(config);
+      const model = anomalySensitivityModel(config);
+      const trainedK = model.current ? model.level : null;
       const auto =
         trainedK === null
           ? t("alerts.anomaly.sensitivityAuto")
           : t("alerts.anomaly.sensitivityAutoTrained", { k: trainedK });
       parts.push(
         t("alerts.anomaly.summaryThreshold", {
-          threshold: chip(Number.isFinite(bandWidth) ? `${bandWidth}σ` : auto),
+          threshold: chip(
+            config.band_width == null
+              ? auto
+              : Number.isFinite(bandWidth) && bandWidth >= 1 && bandWidth <= 10
+                ? `${bandWidth}σ`
+                : t("alerts.anomaly.bandWidthRange"),
+          ),
         }),
       );
     }

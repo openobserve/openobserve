@@ -58,6 +58,25 @@ describe("OInput", () => {
     expect(target.text()).toContain("Required field");
   });
 
+  it.each(["text", "textarea"] as const)(
+    "preserves caller descriptions and the built-in error for %s",
+    (type) => {
+      wrapper = mount(OInput, {
+        props: { type, id: "level", error: true, errorMessage: "Required field" },
+        attrs: { "aria-describedby": "level-help level-error level-help" },
+        slots: { append: '<span id="level-help">Choose a level</span>' },
+      });
+      const input = wrapper.find(type === "textarea" ? "textarea" : "input");
+      const ids = input.attributes("aria-describedby").split(" ");
+      expect(ids).toEqual(["level-help", "level-error"]);
+      expect(ids.map((id) => wrapper.find(`#${id}`).text())).toEqual([
+        "Choose a level",
+        "Required field",
+      ]);
+      expect(wrapper.findAll("#level-error")).toHaveLength(1);
+    },
+  );
+
   it("sets no aria-describedby when there is no error to describe", () => {
     wrapper = mount(OInput, { props: { errorMessage: "Required field" } });
     expect(wrapper.find("input").attributes("aria-describedby")).toBeUndefined();

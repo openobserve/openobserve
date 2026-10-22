@@ -307,13 +307,14 @@
               @changed="onCoversChanged"
             />
 
+            <!-- Stored rotations always pass validation, so the first is the one the server's preset rewrites. -->
             <OnCallSchedulePresets
               v-model:open="presetsOpen"
               :team-id="teamId"
               :members="members"
               :timezone="team?.timezone ?? 'UTC'"
               :viewer-timezone="store.state.timezone"
-              :rotation-count="schedule?.rotations?.length ?? 0"
+              :primary-rotation-name="schedule?.rotations?.[0]?.name ?? ''"
               @applied="onScheduleSaved"
             />
 

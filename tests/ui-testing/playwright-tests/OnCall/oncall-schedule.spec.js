@@ -39,18 +39,37 @@ const {
   allDayRestriction,
   setTeamSchedule,
   getTeamSchedule,
+  createCover,
+  api,
   baseUrl,
   orgId,
   uniqueName,
   deleteOnCallFixturesByPrefix,
+  HOUR_MICROS,
+  DAY_MICROS,
 } = require('../utils/oncall-seed.js');
-const { createOrgUser, oncallUserEmail } = require('../utils/oncall-seed-ext.js');
+const { createOrgUser, oncallUserEmail, createAbsence } = require('../utils/oncall-seed-ext.js');
 
 const PREFIX = 'e2e_oncall_sched';
 
 const workerPrefix = (testInfo) => `${PREFIX}_w${testInfo.workerIndex}`;
 
 const gate = { checked: false, available: false, reason: '' };
+
+// The drawer's list joins one holder's touching segments the way `holderStretches` in web/src/utils/oncall.ts does.
+const holderRows = (segments) => {
+  const out = [];
+  for (const s of segments) {
+    const last = out[out.length - 1];
+    const same = last && last.to === s.from && last.rotation_id === s.rotation_id &&
+      (last.user_email ?? null) === (s.user_email ?? null) &&
+      (last.rotation ?? null) === (s.rotation ?? null) &&
+      (last.override_id ?? null) === (s.override_id ?? null);
+    if (same) last.to = s.to;
+    else out.push({ ...s });
+  }
+  return out.map((s) => ({ from: s.from, to: s.to, user: s.user_email ?? null }));
+};
 
 /**
  * The org's roster.
@@ -191,8 +210,7 @@ test.describe('On-call schedules and rotations', {
     await pm.oncallTeamDetailPage.openRotationEditorFor(rotationId);
     await pm.oncallTeamDetailPage.openShiftRule(0);
 
-    // The "When it applies" section is unfolded already for a rule that carries
-    // a restriction, so the window is on screen without opening anything.
+    // A rule that carries a restriction shows its windows inline.
     const window = pm.oncallTeamDetailPage.getRuleRestriction(0, 0);
     await expect(window, 'the seeded restriction must be rendered').toBeVisible({ timeout: 20000 });
 
@@ -263,8 +281,8 @@ test.describe('On-call schedules and rotations', {
   /**
    * §8.6 — a shift rule with nobody in it is the one state that looks
    * configured on a calendar and pages nobody. The server refuses it, so the
-   * drawer has to say so beside the pick that fixes it rather than letting the
-   * save fail with a field name.
+   * drawer flags the rule's tab rather than letting the save fail with a field
+   * name.
    */
   test('§8.6 a shift rule with nobody in it is called out in the editor', {
     tag: ['@P1'],
@@ -289,7 +307,7 @@ test.describe('On-call schedules and rotations', {
     const before = await pm.oncallTeamDetailPage.countShiftRuleTabs();
     await pm.oncallTeamDetailPage.addShiftRule();
     await pm.oncallTeamDetailPage.openShiftRule(before);
-    await pm.oncallTeamDetailPage.expectRuleNeedsPeople(before);
+    await pm.oncallTeamDetailPage.expectRuleTabFlagged(before);
 
     // The stored schedule must be untouched: the warning is about a draft.
     const stored = await getTeamSchedule(page, team.id);
@@ -360,5 +378,96 @@ test.describe('On-call schedules and rotations', {
     const chart = (await pm.oncallTeamDetailPage.readTimelineLabels()).join(' | ');
     expect(chart, 'a raw address on a band is the defect, not a formatting preference')
       .not.toContain(named.email);
+  });
+
+  // ------------------------------------------------------- A5 preview parity
+
+  /**
+   * A5 — what the drawer previews for an unsaved rotation is what the calendar
+   * shows once it is saved. The cover and the absence are in the window so a
+   * preview that ignored either would disagree with the saved calendar.
+   */
+  test('A5 the drawer preview equals the saved schedule, cover and absence included', {
+    tag: ['@P1'],
+  }, async ({ page }, testInfo) => {
+    const prefix = workerPrefix(testInfo);
+    const emails = [];
+    for (const who of ['ana', 'bo', 'cy', 'di']) {
+      const { email } = await createOrgUser(page, {
+        email: oncallUserEmail(uniqueName(prefix), who),
+      });
+      emails.push(email);
+    }
+    const [ana, bo, cy, di] = emails;
+
+    const team = await createTeam(page, { name: uniqueName(prefix) });
+    const rotationId = `${prefix}_parity`;
+    const now = Date.now() * 1000;
+    // Ana holds the base from an hour ago, so her absence below has a shift to take away.
+    await setTeamSchedule(page, team.id, {
+      rotations: [rotation({
+        id: rotationId,
+        name: 'Parity',
+        members: [ana, bo],
+        shiftMicros: DAY_MICROS,
+        anchorMicros: now - HOUR_MICROS,
+      })],
+    });
+    await addTeamMembers(page, team.id, [ana, bo, cy, di]);
+    const cover = { fromMicros: now + HOUR_MICROS / 2, toMicros: now + (3 * HOUR_MICROS) / 2 };
+    await createCover(page, team.id, { userEmail: di, rotationId, ...cover });
+    const absence = { fromMicros: now + 2 * HOUR_MICROS, toMicros: now + 20 * HOUR_MICROS };
+    const away = await createAbsence(page, { userEmail: ana, ...absence });
+    expect(away.ok, `absence refused: ${away.text}`).toBe(true);
+
+    const detail = pm.oncallTeamDetailPage;
+    await detail.goto(ORG, team.id, 'schedule');
+    await detail.openScheduleTab();
+    await detail.openRotationEditorFor(rotationId);
+
+    // Office hours over the base: a second rule, staffed, restricted to the working week.
+    const office = await detail.countShiftRuleTabs();
+    await detail.addShiftRule();
+    await detail.openShiftRule(office);
+    await detail.setRuleMembers(office, [cy]);
+    const settled = page.waitForResponse((res) => {
+      if (!res.url().includes('/resolved-schedule/preview')) return false;
+      const rules = res.request().postDataJSON()?.rotation?.shift_rules ?? [];
+      return rules.length === 2 && (rules[1].restrictions ?? []).length > 0;
+    });
+    await detail.setRuleCovers(office, 'businessHours');
+    const previewResponse = await settled;
+    expect(previewResponse.ok(), 'the preview request must succeed').toBe(true);
+    const { from, to } = previewResponse.request().postDataJSON();
+    const previewed = holderRows(await previewResponse.json());
+
+    // The list shows a run of the preview's own segments once that answer has rendered.
+    await detail.showPreviewList();
+    let rows = [];
+    await expect.poll(async () => {
+      rows = await detail.readPreviewRows();
+      const at = previewed.findIndex((s) => s.from === rows[0]?.from);
+      return at >= 0 && JSON.stringify(previewed.slice(at, at + rows.length)) === JSON.stringify(rows);
+    }, { timeout: 20000, message: 'the list renders the settled preview' }).toBe(true);
+    expect(rows.length, 'the preview lists several stretches').toBeGreaterThan(2);
+    expect(rows.some((r) => r.user === di), 'the cover is in the preview').toBe(true);
+    expect(
+      rows.filter((r) => r.user === ana && r.from < absence.toMicros && r.to > absence.fromMicros),
+      'the absence is honoured in the preview',
+    ).toEqual([]);
+
+    await detail.closeRotationEditor();
+
+    const res = await api(
+      page, 'get',
+      `${baseUrl()}/api/${ORG}/oncall/teams/${encodeURIComponent(team.id)}/resolved-schedule` +
+        `?from=${from}&to=${to}&rotation_id=${encodeURIComponent(rotationId)}`,
+    );
+    expect(res.ok(), 'the saved schedule resolves').toBe(true);
+    const saved = holderRows(await res.json());
+    const start = saved.findIndex((s) => s.from === rows[0].from);
+    expect(start, 'the first previewed row starts a saved segment').toBeGreaterThanOrEqual(0);
+    expect(saved.slice(start, start + rows.length), 'preview rows equal the saved segments')
+      .toEqual(rows);
   });
 });

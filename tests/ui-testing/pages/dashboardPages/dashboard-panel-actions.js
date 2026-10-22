@@ -331,6 +331,17 @@ export default class DashboardactionPage {
     }, { timeout: 30000 });
   }
 
+  // The apply button stays enabled for ~100ms after the click, so waitForChartToRender alone can pass before the query starts and the table later resets to empty.
+  async applyAndWaitForPromQLQuery() {
+    const promqlResponse = this.page.waitForResponse(
+      (res) => res.url().includes("/prometheus/api/v1/query_range"),
+      { timeout: 30000 }
+    );
+    await this.applyDashboardBtn();
+    await (await promqlResponse).finished();
+    await this.waitForChartToRender();
+  }
+
   //Dashboard panel actions(Edit, Layout, Duplicate, Inspector, Move, Delete)
 
   // Returns the per-panel edit dropdown locator (data-test keyed by panel name)

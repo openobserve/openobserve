@@ -47,4 +47,19 @@ describe("ODropdown", () => {
     });
     expect(wrapper.find('[data-testid="content"]').exists()).toBe(true);
   });
+
+  // A caller that opens a popover from an item must be able to stop focus going back to the trigger.
+  it("forwards the content's close-auto-focus event", async () => {
+    const wrapper = mount(ODropdown, {
+      props: { open: true },
+      slots: { trigger: "<button>Open</button>", default: "<div>Menu</div>" },
+    });
+    const event = new Event("focus");
+    // The portal is stubbed with a content component, so the real content is the inner one.
+    wrapper
+      .findAllComponents({ name: "DropdownMenuContent" })
+      .at(-1)!
+      .vm.$emit("closeAutoFocus", event);
+    expect(wrapper.emitted("close-auto-focus")?.[0]).toEqual([event]);
+  });
 });

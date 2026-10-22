@@ -61,27 +61,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @trigger="refreshData"
         />
         <OButtonGroup>
-          <OButton
-            :icon-left="isAutoRunOn ? 'autorenew' : 'refresh'"
-            :variant="isVariablesChanged ? 'ghost-warning' : 'outline'"
-            size="icon-toolbar"
-            data-test="rum-performance-refresh"
-            @click="refreshData"
+          <!-- Wrapper mode: a child-mode tooltip would hover-bind only the icon, not the labelled button. -->
+          <OTooltip
+            :content="
+              isAutoRunOn
+                ? t('search.autoRunEnabled')
+                : isVariablesChanged
+                  ? t('dashboard.refreshToApplyVariableChanges')
+                  : t('dashboard.refresh')
+            "
+            :disabled="!isMobile && !isAutoRunOn && !isVariablesChanged"
           >
-            <OTooltip
-              :content="
-                isAutoRunOn
-                  ? t('search.autoRunEnabled')
-                  : isVariablesChanged
-                    ? t('dashboard.refreshToApplyVariableChanges')
-                    : t('dashboard.refresh')
-              "
-            />
-          </OButton>
+            <OButton
+              :icon-left="isAutoRunOn ? 'autorenew' : 'refresh'"
+              :variant="isVariablesChanged ? 'warning' : 'primary'"
+              :size="isMobile ? 'icon-toolbar' : 'sm-toolbar'"
+              :aria-label="t('dashboard.refresh')"
+              data-test="rum-performance-refresh"
+              @click="refreshData"
+            >
+              <template v-if="!isMobile">{{ t("dashboard.refresh") }}</template>
+            </OButton>
+          </OTooltip>
           <ODropdown v-if="isAutoRunAvailable" align="end" side="bottom">
             <template #trigger>
               <OButton
-                :variant="isVariablesChanged ? 'ghost-warning' : 'outline'"
+                :variant="isVariablesChanged ? 'warning' : 'primary'"
                 size="icon-toolbar"
                 class="w-5"
                 :aria-label="t('dashboard.viewDashboard.moreRefreshOptions')"

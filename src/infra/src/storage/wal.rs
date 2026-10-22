@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{ops::Range, sync::LazyLock as Lazy};
+use std::sync::LazyLock as Lazy;
 
 use config::get_config;
 use object_store::{
@@ -36,18 +36,12 @@ pub async fn get_opts(path: &Path, options: GetOptions) -> Result<GetResult> {
     DEFAULT.get_opts(path, options).await
 }
 
-pub async fn get_range(path: &Path, range: Range<u64>) -> Result<bytes::Bytes> {
-    DEFAULT.get_range(path, range).await
-}
-
 pub async fn head(path: &Path) -> Result<ObjectMeta> {
     DEFAULT.head(path).await
 }
 
 #[cfg(test)]
 mod tests {
-    use std::ops::Range;
-
     use object_store::GetOptions;
     use tempfile::TempDir;
 
@@ -100,22 +94,6 @@ mod tests {
         }
     }
 
-    #[tokio::test(flavor = "multi_thread")]
-    async fn test_get_range_function() {
-        let (_temp_dir, _wal_path) = setup_test_environment().await;
-        let path = Path::from("test/file.txt");
-        let range = Range { start: 0, end: 10 };
-
-        // Test with a non-existent file
-        let result = get_range(&path, range).await;
-        assert!(result.is_err());
-
-        // Verify the error is appropriate for a non-existent file
-        if let Err(e) = result {
-            assert!(matches!(e, object_store::Error::NotFound { .. }));
-        }
-    }
-
     #[tokio::test]
     async fn test_different_path_formats() {
         let (_temp_dir, _wal_path) = setup_test_environment().await;
@@ -134,27 +112,6 @@ mod tests {
 
             let head_result = head(path).await;
             assert!(head_result.is_err(), "Should fail for path: {}", path);
-        }
-    }
-
-    #[tokio::test(flavor = "multi_thread")]
-    async fn test_get_range_with_different_ranges() {
-        let (_temp_dir, _wal_path) = setup_test_environment().await;
-        let path = Path::from("test/file.txt");
-        let test_ranges = [
-            Range { start: 0, end: 10 },
-            Range { start: 10, end: 20 },
-            Range { start: 0, end: 0 }, // Empty range
-            Range {
-                start: 100,
-                end: 200,
-            },
-            Range { start: 0, end: 1 }, // Single byte range
-        ];
-
-        for range in &test_ranges {
-            let result = get_range(&path, range.clone()).await;
-            assert!(result.is_err(), "Should fail for range: {:?}", range);
         }
     }
 
@@ -183,23 +140,13 @@ mod tests {
         // Test multiple concurrent operations of the same type
         let get_futures = [get(&path), get(&path), get(&path)];
 
-        let get_range_futures = [
-            get_range(&path, Range { start: 0, end: 10 }),
-            get_range(&path, Range { start: 10, end: 20 }),
-            get_range(&path, Range { start: 20, end: 30 }),
-        ];
-
         let head_futures = [head(&path), head(&path), head(&path)];
 
         let get_results = futures::future::join_all(get_futures).await;
-        let get_range_results = futures::future::join_all(get_range_futures).await;
         let head_results = futures::future::join_all(head_futures).await;
 
         // All operations should fail with errors
         for result in get_results {
-            assert!(result.is_err());
-        }
-        for result in get_range_results {
             assert!(result.is_err());
         }
         for result in head_results {
@@ -251,10 +198,9 @@ mod tests {
         // Test that all functions return consistent error types for the same non-existent file
         let get_result = get(&path).await;
         let get_opts_result = get_opts(&path, GetOptions::default()).await;
-        let get_range_result = get_range(&path, Range { start: 0, end: 10 }).await;
         let head_result = head(&path).await;
 
-        // get, get_opts, and get_range should return NotFound errors
+        // get and get_opts should return NotFound errors
         // head returns NotImplemented as per local storage implementation
         assert!(matches!(
             get_result,
@@ -262,10 +208,6 @@ mod tests {
         ));
         assert!(matches!(
             get_opts_result,
-            Err(object_store::Error::NotFound { .. })
-        ));
-        assert!(matches!(
-            get_range_result,
             Err(object_store::Error::NotFound { .. })
         ));
         assert!(matches!(

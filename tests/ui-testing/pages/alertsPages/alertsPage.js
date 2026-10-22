@@ -275,15 +275,6 @@ export class AlertsPage {
             // Telemetry tab state selectors
             loadingSpinner: '[data-test="incident-telemetry-loading-indicator"]',
 
-            // RCA Analysis locators (inside incident detail)
-            rcaAnalysisContainer: '[data-test="rca-analysis-container"]',
-            triggerRcaButton: '[data-test="trigger-rca-btn"]',
-            rcaStreamContent: '[data-test="rca-stream-content"]',
-            rcaExistingContent: '[data-test="rca-existing-content"]',
-            rcaEmptyState: '[data-test="rca-empty-state"]',
-
-            // Table of contents locators (inside incident detail)
-            tocContainer: '[data-test="toc-container"]',
 
             // Import/Export locators
             alertImportButton: '[data-test="alert-import"]',
@@ -2921,41 +2912,6 @@ export class AlertsPage {
         testLogger.info('No triggers message visible');
     }
 
-    /**
-     * Verify RCA analysis container is visible in detail view
-     */
-    async expectRcaContainerVisible() {
-        await expect(this.page.locator(this.locators.rcaAnalysisContainer)).toBeVisible({ timeout: 10000 });
-        testLogger.info('RCA analysis container visible');
-    }
-
-    /**
-     * Check if RCA has existing content or is in empty state
-     * @returns {Promise<'content'|'empty'|'hidden'>}
-     */
-    async getRcaState() {
-        const existing = this.page.locator(this.locators.rcaExistingContent);
-        const empty = this.page.locator(this.locators.rcaEmptyState);
-
-        if (await existing.isVisible({ timeout: 3000 }).catch(() => false)) {
-            testLogger.info('RCA state: content');
-            return 'content';
-        }
-        if (await empty.isVisible({ timeout: 3000 }).catch(() => false)) {
-            testLogger.info('RCA state: empty');
-            return 'empty';
-        }
-        testLogger.info('RCA state: hidden');
-        return 'hidden';
-    }
-
-    /**
-     * Verify TOC container is visible in incident detail
-     */
-    async expectTocContainerVisible() {
-        await expect(this.page.locator(this.locators.tocContainer)).toBeVisible({ timeout: 10000 });
-        testLogger.info('TOC container visible');
-    }
 
     /**
      * Click refresh button on incidents list

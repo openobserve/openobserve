@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// Admission of persisted AI chat turns and the `/{org_id}/ai/chats` API (owner: `users.id`).
+// The `/{org_id}/ai/chats` API (owner: `users.id`) and the responses of turn admission.
 
 use axum::{
     Json,
@@ -23,28 +23,23 @@ use axum::{
 };
 use infra::table::{
     ai_chat_sessions::{self, ListCursor, Model, NO_SEQ, STATUS_ACTIVE},
-    ai_chat_turns::{
-        self, Admission, Model as TurnRecord, TURN_FAILED, TURN_INTERRUPTED, TURN_RUNNING,
-    },
+    ai_chat_turns::{self, Model as TurnRecord, TURN_FAILED, TURN_INTERRUPTED, TURN_RUNNING},
 };
 use o2_enterprise::enterprise::{
     ai::{
-        chat::{
-            lease::{self, LeaseError, TurnLease},
-            registry::{self, CancelReason, Registration, TurnCaps},
-        },
+        chat::registry::{self, CancelReason},
         client::get_agent_client,
     },
     common::config::get_config as get_o2_config,
+};
+use openobserve_core::ai_chat::admission::{
+    AdmitError, TURN_LIMIT, is_uuid, normalize_uuid, resolve_owner,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use utoipa::ToSchema;
 
 use crate::common::meta::http::HttpResponse as MetaHttpResponse;
-
-/// Browser-generated UUID of one turn, so a retried request does not run the model twice.
-pub const X_O2_ASSISTANT_TURN_ID: &str = "x-o2-assistant-turn-id";
 
 pub(super) const MAX_TITLE_CHARS: usize = 200;
 const DEFAULT_PAGE: u64 = 50;
@@ -53,31 +48,7 @@ const MAX_TURNS_PAGE: usize = 1000;
 /// A turn still marked running this long past the longest allowed turn died with its node.
 const RUNNING_GRACE_SECS: i64 = 60;
 const MICROS_PER_SEC: i64 = 1_000_000;
-const PROMPT_TITLE_CHARS: usize = 80;
-const TURN_LIMIT: &str = "turn_limit";
-const EPOCH_CONFLICT: &str = "epoch_conflict";
-
-/// Everything a persisted turn needs once admitted.
-pub struct AdmittedTurn {
-    /// The index row as this turn continues it, `session_epoch` being the turn's own epoch.
-    pub row: Model,
-    pub owner: String,
-    pub turn_id: String,
-    pub lease: TurnLease,
-    pub registration: Registration,
-}
-
-/// The request [`admit_under_lease`] records.
-struct NewTurn<'a> {
-    org_id: &'a str,
-    session_id: &'a str,
-    turn_id: &'a str,
-    owner: &'a str,
-    user_email: &'a str,
-    agent_type: &'a str,
-    prompt: &'a str,
-    trace_id: &'a str,
-}
+const TURN_ALREADY_RUNNING: &str = "turn_already_running";
 
 /// One chat in the user's list.
 #[derive(Debug, Serialize, ToSchema)]
@@ -231,34 +202,25 @@ impl std::fmt::Display for StateVersion {
     }
 }
 
-pub(super) fn is_uuid(value: &str) -> bool {
-    value.len() == 36 && uuid::Uuid::try_parse(value).is_ok()
-}
-
-/// Lowercased hyphenated UUID, so both spellings name the same chat; `None` for anything else.
-pub(super) fn normalize_uuid(value: &str) -> Option<String> {
-    is_uuid(value).then(|| value.to_ascii_lowercase())
-}
-
 /// Started-at bound (micros) below which a turn marked running is treated as dead.
 pub(super) fn running_since(now: i64) -> i64 {
     let max_turn = get_o2_config().ai.chat_max_turn_secs.max(60) as i64;
     now - (max_turn + RUNNING_GRACE_SECS) * MICROS_PER_SEC
 }
 
-/// The stable owner id for an authenticated email.
-pub async fn resolve_owner(user_email: &str) -> Result<String, Response> {
-    match infra::table::users::get_id_by_email(user_email).await {
-        Ok(Some(id)) => Ok(id),
-        Ok(None) => Err(MetaHttpResponse::forbidden(
-            "Chat history is only available to registered users",
-        )),
-        Err(e) => {
-            log::error!("[AI-CHAT] cannot resolve user id for {user_email}: {e}");
-            Err(MetaHttpResponse::service_unavailable(
-                "Chat persistence is unavailable; please retry",
-            ))
+pub(super) fn admit_error_response(error: AdmitError) -> Response {
+    match error {
+        AdmitError::InvalidSession(message) => MetaHttpResponse::bad_request(message),
+        AdmitError::NotRegistered => {
+            MetaHttpResponse::forbidden("Chat history is only available to registered users")
         }
+        AdmitError::NotFound(message) => MetaHttpResponse::not_found(message),
+        AdmitError::Busy => lease_conflict_response(),
+        AdmitError::TurnLimit(scope) => turn_limit_response(scope),
+        AdmitError::AlreadySubmitted => MetaHttpResponse::conflict(
+            "This turn was already submitted; reload the conversation to see its result",
+        ),
+        AdmitError::Unavailable(message) => MetaHttpResponse::service_unavailable(message),
     }
 }
 
@@ -309,103 +271,6 @@ pub(super) async fn load_turns(
         Some(serde_json::Value::Array(turns)) => Ok(turns),
         _ => Ok(Vec::new()),
     }
-}
-
-/// Admit one persisted turn (design §8.1) under the chat's lease, as a new ownership epoch.
-pub async fn admit_turn(
-    org_id: &str,
-    session_id: Option<&str>,
-    turn_id: Option<&str>,
-    user_email: &str,
-    agent_type: &str,
-    prompt: &str,
-    trace_id: &str,
-) -> Result<AdmittedTurn, Response> {
-    let Some(session_id) = session_id.and_then(normalize_uuid) else {
-        return Err(MetaHttpResponse::bad_request(
-            "A valid session id is required while chat persistence is enabled",
-        ));
-    };
-    let session_id = session_id.as_str();
-    let turn_id = match turn_id {
-        Some(id) => {
-            normalize_uuid(id).ok_or_else(|| MetaHttpResponse::bad_request("Invalid turn id"))?
-        }
-        None => config::ider::uuid(),
-    };
-    let owner = resolve_owner(user_email).await?;
-    let unavailable = |e: &dyn std::fmt::Display| {
-        log::error!(
-            "[AI-CHAT] [trace_id:{trace_id}] cannot admit a turn of {org_id}/{session_id}: {e}"
-        );
-        MetaHttpResponse::service_unavailable("Chat persistence is unavailable; please retry")
-    };
-    // Another user's or a deleted chat is refused before anything is created or locked.
-    if let Some(row) = ai_chat_sessions::get(org_id, session_id)
-        .await
-        .map_err(|e| unavailable(&e))?
-    {
-        check_turn_owner(&row, &owner, user_email, trace_id)?;
-    }
-    let lease = acquire_lease(org_id, session_id, trace_id).await?;
-    let registration = match registry::register_capped(
-        org_id,
-        session_id,
-        &turn_id,
-        &owner,
-        TurnCaps::from_config(),
-    ) {
-        Ok(registration) => registration,
-        Err(scope) => {
-            lease.release().await;
-            config::metrics::AI_CHAT_TURN_RESULT_TOTAL
-                .with_label_values(&[org_id, TURN_LIMIT])
-                .inc();
-            log::warn!(
-                "[AI-CHAT] [trace_id:{trace_id}] {org_id}/{session_id} refused: {scope} \
-                 active-turn limit reached"
-            );
-            return Err(turn_limit_response(scope));
-        }
-    };
-    let new_turn = NewTurn {
-        org_id,
-        session_id,
-        turn_id: &turn_id,
-        owner: &owner,
-        user_email,
-        agent_type,
-        prompt,
-        trace_id,
-    };
-    match admit_under_lease(&new_turn).await {
-        Ok(row) => Ok(AdmittedTurn {
-            row,
-            owner,
-            turn_id,
-            lease,
-            registration,
-        }),
-        Err(resp) => {
-            drop(registration);
-            lease.release().await;
-            Err(resp)
-        }
-    }
-}
-
-/// Ends a turn that never started as `failed` with nothing stored, so its id may be resubmitted.
-pub async fn abandon_turn(admitted: AdmittedTurn, error_code: &str) {
-    let AdmittedTurn {
-        row,
-        turn_id,
-        lease,
-        registration,
-        ..
-    } = admitted;
-    drop(registration);
-    fail_turn(&row.org_id, &row.session_id, &turn_id, error_code).await;
-    lease.release().await;
 }
 
 /// Projected `turns` with their turn records; turns admitted after `admitted_by` are left out.
@@ -467,7 +332,7 @@ pub async fn list(
     }
     let owner = match resolve_owner(&user_email).await {
         Ok(owner) => owner,
-        Err(resp) => return resp,
+        Err(e) => return admit_error_response(e),
     };
     let cursor = match params.cursor.as_deref().map(decode_cursor) {
         Some(None) => return MetaHttpResponse::bad_request("Invalid cursor"),
@@ -548,7 +413,7 @@ pub async fn get(
     }
     let owner = match resolve_owner(&user_email).await {
         Ok(owner) => owner,
-        Err(resp) => return resp,
+        Err(e) => return admit_error_response(e),
     };
     let row = match owned_chat(&org_id, &session_id, &owner).await {
         Ok(row) => row,
@@ -659,7 +524,7 @@ pub async fn rename(
     };
     let owner = match resolve_owner(&user_email).await {
         Ok(owner) => owner,
-        Err(resp) => return resp,
+        Err(e) => return admit_error_response(e),
     };
     match ai_chat_sessions::rename(&org_id, &session_id, &owner, title).await {
         Ok(true) => MetaHttpResponse::json(serde_json::json!({"title": title})),
@@ -708,7 +573,7 @@ pub async fn delete(
     };
     let owner = match resolve_owner(&user_email).await {
         Ok(owner) => owner,
-        Err(resp) => return resp,
+        Err(e) => return admit_error_response(e),
     };
     // Owner checked first: stopping the running turn must not be open to anyone else.
     if let Err(resp) = owned_chat(&org_id, &session_id, &owner).await {
@@ -757,7 +622,7 @@ pub async fn delete_all(Path(org_id): Path<String>, in_req: axum::extract::Reque
     }
     let owner = match resolve_owner(&user_email).await {
         Ok(owner) => owner,
-        Err(resp) => return resp,
+        Err(e) => return admit_error_response(e),
     };
     let session_ids = match openobserve_core::ai_chat::delete_all_for_user(&org_id, &owner).await {
         Ok(ids) => ids,
@@ -775,121 +640,6 @@ pub async fn delete_all(Path(org_id): Path<String>, in_req: axum::extract::Reque
         tokio::spawn(purge_replicas(org_id, session_ids, auth));
     }
     MetaHttpResponse::json(serde_json::json!({ "deleted": deleted }))
-}
-
-/// Refuses a turn on another user's chat (the id is client-supplied) or on a deleted one.
-fn check_turn_owner(
-    row: &Model,
-    owner: &str,
-    user_email: &str,
-    trace_id: &str,
-) -> Result<(), Response> {
-    if row.user_id != owner {
-        log::warn!(
-            "[AI-CHAT] [trace_id:{trace_id}] {user_email} tried to continue session {} owned by \
-             another user",
-            row.session_id
-        );
-        return Err(MetaHttpResponse::not_found("Unknown conversation"));
-    }
-    if row.status != STATUS_ACTIVE {
-        return Err(MetaHttpResponse::not_found(
-            "This conversation has been deleted",
-        ));
-    }
-    Ok(())
-}
-
-/// Records the turn and takes its epoch; runs under the lease, so the row read here is current.
-async fn admit_under_lease(turn: &NewTurn<'_>) -> Result<Model, Response> {
-    let NewTurn {
-        org_id,
-        session_id,
-        turn_id,
-        owner,
-        trace_id,
-        ..
-    } = *turn;
-    let unavailable = |what: &str, e: &dyn std::fmt::Display| {
-        log::error!("[AI-CHAT] [trace_id:{trace_id}] {what} {org_id}/{session_id}: {e}");
-        MetaHttpResponse::service_unavailable("Chat persistence is unavailable; please retry")
-    };
-    let now = config::utils::time::now_micros();
-    let row = ai_chat_sessions::get_or_create(
-        org_id,
-        session_id,
-        owner,
-        turn.user_email,
-        turn.agent_type,
-        now,
-    )
-    .await
-    .map_err(|e| unavailable("cannot read/create the index row of", &e))?;
-    check_turn_owner(&row, owner, turn.user_email, trace_id)?;
-    match ai_chat_turns::admit(org_id, session_id, turn_id, row.last_committed_seq + 1, now).await {
-        Ok(Admission::Admitted | Admission::Retried) => {}
-        Ok(Admission::AlreadySubmitted) => {
-            return Err(MetaHttpResponse::conflict(
-                "This turn was already submitted; reload the conversation to see its result",
-            ));
-        }
-        Err(e) => return Err(unavailable(&format!("cannot record turn {turn_id} of"), &e)),
-    }
-    // Every admitted turn is a new epoch, so a writer of an earlier turn is fenced (contract R3).
-    let epoch = match ai_chat_sessions::bump_epoch(org_id, session_id, row.session_epoch, now).await
-    {
-        Ok(Some(epoch)) => epoch,
-        outcome => {
-            let reason = match outcome {
-                Err(e) => e.to_string(),
-                _ => "the epoch moved under the lease".to_string(),
-            };
-            fail_turn(org_id, session_id, turn_id, EPOCH_CONFLICT).await;
-            return Err(unavailable("cannot start a new epoch of", &reason));
-        }
-    };
-    if let Err(e) = ai_chat_sessions::begin_turn(org_id, session_id, turn_id, now).await {
-        log::warn!("[AI-CHAT] cannot record the last turn of {session_id}: {e}");
-    }
-    if row.title_source.is_empty()
-        && let Some(title) = prompt_title(turn.prompt)
-        && let Err(e) = ai_chat_sessions::set_prompt_title(org_id, session_id, &title, now).await
-    {
-        // Cosmetic: the generated title replaces it shortly anyway.
-        log::warn!("[AI-CHAT] cannot set the initial title of {session_id}: {e}");
-    }
-    Ok(Model {
-        session_epoch: epoch,
-        ..row
-    })
-}
-
-async fn fail_turn(org_id: &str, session_id: &str, turn_id: &str, error_code: &str) {
-    let now = config::utils::time::now_micros();
-    if let Err(e) = ai_chat_turns::finish(
-        org_id,
-        session_id,
-        turn_id,
-        TURN_FAILED,
-        Some(error_code),
-        None,
-        None,
-        now,
-    )
-    .await
-    {
-        log::error!("[AI-CHAT] cannot release turn {turn_id} of {org_id}/{session_id}: {e}");
-    }
-}
-
-/// A new chat's provisional title: the first line of its first prompt, bounded.
-fn prompt_title(prompt: &str) -> Option<String> {
-    let line = prompt.lines().map(str::trim).find(|l| !l.is_empty())?;
-    let mut title: String = line.chars().take(PROMPT_TITLE_CHARS).collect();
-    if line.chars().count() > PROMPT_TITLE_CHARS {
-        title.push('…');
-    }
-    Some(title)
 }
 
 fn encode_cursor(row: &Model) -> String {
@@ -1101,42 +851,18 @@ fn failed_turn_message(code: Option<&str>) -> String {
     }
 }
 
-async fn acquire_lease(
-    org_id: &str,
-    session_id: &str,
-    trace_id: &str,
-) -> Result<TurnLease, Response> {
-    match lease::acquire(
-        org_id,
-        session_id,
-        get_o2_config().ai.chat_turn_lease_wait_secs,
+/// 409 with the reason in `error_code`, so the Slack bridge matches on it instead of the text.
+fn lease_conflict_response() -> Response {
+    (
+        StatusCode::CONFLICT,
+        Json(serde_json::json!({
+            "code": StatusCode::CONFLICT.as_u16(),
+            "error_code": TURN_ALREADY_RUNNING,
+            "message": "Another turn is already running in this conversation",
+        })),
     )
-    .await
-    {
-        Ok(lease) => Ok(lease),
-        Err(LeaseError::Busy) => {
-            config::metrics::AI_CHAT_TURN_LEASE_CONFLICTS_TOTAL
-                .with_label_values(&[org_id])
-                .inc();
-            config::metrics::AI_CHAT_TURN_RESULT_TOTAL
-                .with_label_values(&[org_id, "busy"])
-                .inc();
-            Err(MetaHttpResponse::conflict(
-                "Another turn is already running in this conversation",
-            ))
-        }
-        Err(LeaseError::Backend(e)) => {
-            log::error!(
-                "[AI-CHAT] [trace_id:{trace_id}] turn lease unavailable for \
-                 {org_id}/{session_id}: {e}"
-            );
-            Err(MetaHttpResponse::service_unavailable(
-                "Chat coordination is unavailable; please retry",
-            ))
-        }
-    }
+        .into_response()
 }
-
 /// 429 with the numeric HTTP code in `code` and the reason in `error_code` (E2E #5).
 fn turn_limit_response(scope: &str) -> Response {
     (
@@ -1155,17 +881,65 @@ fn turn_limit_response(scope: &str) -> Response {
 mod tests {
     use super::*;
 
-    #[test]
-    fn prompt_titles_take_the_first_line_and_are_bounded() {
-        assert_eq!(
-            prompt_title("\n  why is p99 up?\nmore"),
-            Some("why is p99 up?".into())
-        );
-        assert_eq!(prompt_title("   \n"), None);
-        let long = "x".repeat(200);
-        let title = prompt_title(&long).unwrap();
-        assert_eq!(title.chars().count(), PROMPT_TITLE_CHARS + 1);
-        assert!(title.ends_with('…'));
+    async fn body_of(resp: Response) -> Value {
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        serde_json::from_slice(&body).unwrap()
+    }
+
+    #[tokio::test]
+    async fn each_admit_error_maps_to_its_response() {
+        let cases = [
+            (
+                AdmitError::InvalidSession("Invalid session id"),
+                StatusCode::BAD_REQUEST,
+                "Invalid session id",
+            ),
+            (
+                AdmitError::NotRegistered,
+                StatusCode::FORBIDDEN,
+                "Chat history is only available to registered users",
+            ),
+            (
+                AdmitError::NotFound("Unknown conversation"),
+                StatusCode::NOT_FOUND,
+                "Unknown conversation",
+            ),
+            (
+                AdmitError::Busy,
+                StatusCode::CONFLICT,
+                "Another turn is already running in this conversation",
+            ),
+            (
+                AdmitError::AlreadySubmitted,
+                StatusCode::CONFLICT,
+                "This turn was already submitted; reload the conversation to see its result",
+            ),
+            (
+                AdmitError::Unavailable("Chat persistence is unavailable; please retry"),
+                StatusCode::SERVICE_UNAVAILABLE,
+                "Chat persistence is unavailable; please retry",
+            ),
+        ];
+        for (error, status, message) in cases {
+            let resp = admit_error_response(error);
+            assert_eq!(resp.status(), status, "{error:?}");
+            let body = body_of(resp).await;
+            assert_eq!(body["code"], status.as_u16(), "{error:?}");
+            assert_eq!(body["message"], message, "{error:?}");
+        }
+    }
+
+    #[tokio::test]
+    async fn a_turn_limit_admit_error_is_the_429() {
+        for scope in ["user", "org", "node"] {
+            let resp = admit_error_response(AdmitError::TurnLimit(scope));
+            assert_eq!(resp.status(), StatusCode::TOO_MANY_REQUESTS);
+            let body = body_of(resp).await;
+            assert_eq!(body["error_code"], TURN_LIMIT);
+            assert_eq!(body["scope"], scope);
+        }
     }
 
     #[test]
@@ -1200,6 +974,24 @@ mod tests {
         assert_eq!(body["code"], 429);
         assert_eq!(body["error_code"], "turn_limit");
         assert_eq!(body["scope"], "user");
+    }
+
+    #[tokio::test]
+    async fn a_lease_conflict_is_a_409_with_turn_already_running() {
+        let resp = lease_conflict_response();
+        assert_eq!(resp.status(), StatusCode::CONFLICT);
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let body: Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(
+            body,
+            serde_json::json!({
+                "code": 409,
+                "error_code": "turn_already_running",
+                "message": "Another turn is already running in this conversation",
+            })
+        );
     }
 
     #[test]

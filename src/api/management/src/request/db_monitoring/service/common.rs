@@ -17,6 +17,9 @@
 //! window/range math, the three search harnesses, the merge/fold/sort helpers,
 //! and the server-vantage prologue every feature module builds on.
 
+use config::utils::time::validate_time_range;
+use openobserve_core::http::map_error_to_http_response;
+
 // The models these pull in are named only from enterprise-gated bodies, so the
 // glob is genuinely unused on OSS. Keep the import (enterprise needs it) and
 // silence the OSS-only lint rather than splitting it behind a cfg.
@@ -1020,14 +1023,27 @@ async fn stats_search_once(
 
 // ─── Shared handler plumbing ─────────────────────────────────────────────────
 
-/// Resolve `(start_time, end_time)`, defaulting to the last hour.
-pub(super) fn resolve_range(start: Option<i64>, end: Option<i64>) -> (i64, i64) {
-    match (start, end) {
+/// Resolve `(start_time, end_time)`, defaulting to the last hour; a range search refuses is a 400.
+pub(super) fn resolve_range(
+    start: Option<i64>,
+    end: Option<i64>,
+) -> Result<(i64, i64), HttpResponse> {
+    let (start, end) = match (start, end) {
         (Some(s), Some(e)) => (s, e),
         _ => {
             let now = now_micros();
             (now - DEFAULT_WINDOW_MICROS, now)
         }
+    };
+    validate_time_range(start, end).map_err(MetaHttpResponse::bad_request)?;
+    Ok((start, end))
+}
+
+/// A caller-caused search error (unknown stream, missing column) keeps its `/_search` status.
+pub(super) fn search_error_response(e: anyhow::Error) -> HttpResponse {
+    match e.downcast_ref::<infra::errors::Error>() {
+        Some(err @ infra::errors::Error::ErrorCode(_)) => map_error_to_http_response(err, None),
+        _ => MetaHttpResponse::internal_error(e),
     }
 }
 
@@ -2059,7 +2075,8 @@ pub(super) async fn probe_collection(
     preds: &str,
 ) -> CollectionProbe {
     let probe_start = start_time - LIVENESS_PROBE_MICROS;
-    let probe_end = end_time + LIVENESS_PROBE_MICROS;
+    // A caller-supplied end near i64::MAX would overflow the widened window.
+    let probe_end = end_time.saturating_add(LIVENESS_PROBE_MICROS);
     let sql = build_probe_sql(stream);
     // The liveness scan and the "last one before the window" lookup are
     // independent bounded reads — run them concurrently.
@@ -2242,6 +2259,42 @@ mod tests {
                 "{bad} must be a 400"
             );
         }
+    }
+
+    #[test]
+    fn resolve_range_rejects_what_the_search_refuses() {
+        use axum::http::StatusCode;
+        for (start, end) in [(-12199442, 21415522), (0, 10), (1, -5), (10, 10), (11, 10)] {
+            let resp = resolve_range(Some(start), Some(end)).expect_err("must be a 400");
+            assert_eq!(resp.status(), StatusCode::BAD_REQUEST, "{start}..{end}");
+        }
+        assert_eq!(resolve_range(Some(1), Some(2)).ok(), Some((1, 2)));
+        let (start, end) = resolve_range(None, Some(5)).expect("defaults to the last hour");
+        assert_eq!(end - start, DEFAULT_WINDOW_MICROS);
+    }
+
+    #[test]
+    fn search_error_response_keeps_the_client_error_status() {
+        use axum::http::StatusCode;
+        use infra::errors::{Error, ErrorCodes};
+        let not_found = anyhow::Error::from(Error::ErrorCode(ErrorCodes::SearchStreamNotFound(
+            "no_such_stream".into(),
+        )));
+        assert_eq!(
+            search_error_response(not_found).status(),
+            StatusCode::BAD_REQUEST
+        );
+        let internal = anyhow::Error::from(Error::ErrorCode(ErrorCodes::ServerInternalError(
+            "x".into(),
+        )));
+        assert_eq!(
+            search_error_response(internal).status(),
+            StatusCode::INTERNAL_SERVER_ERROR
+        );
+        assert_eq!(
+            search_error_response(anyhow::anyhow!("partial response")).status(),
+            StatusCode::INTERNAL_SERVER_ERROR
+        );
     }
 
     /// The module grant skips the per-stream check, so an unpinned name reads any logs stream.

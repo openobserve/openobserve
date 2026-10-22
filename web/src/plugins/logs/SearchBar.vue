@@ -167,6 +167,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Histogram (pinned by default — see useToolbarPins) -->
           <OButton
             v-if="showPinnedHistogram"
+            as="div"
             data-test="logs-search-bar-histogram-btn"
             size="xs"
             variant="outline"
@@ -175,6 +176,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <OSwitch
               v-model="searchObj.meta.showHistogram"
+              :aria-label="t('search.showHistogramLabel')"
               :size="toolbarToggleIconOnly ? 'sm' : 'md'"
               @click.stop
             />
@@ -192,6 +194,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- SQL Mode (pinned) -->
           <OButton
             v-if="showPinnedSqlMode"
+            as="div"
             data-test="logs-search-bar-sql-mode-pinned-btn"
             size="xs"
             variant="outline"
@@ -200,6 +203,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <OSwitch
               :model-value="searchObj.meta.sqlMode"
+              :aria-label="t('search.sqlModeLabel')"
               :disabled="isSqlModeDisabled"
               :size="toolbarToggleIconOnly ? 'sm' : 'md'"
               @click.stop="!isSqlModeDisabled && (searchObj.meta.sqlMode = !searchObj.meta.sqlMode)"
@@ -211,6 +215,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Quick Mode (pinned) -->
           <OButton
             v-if="showPinnedQuickMode"
+            as="div"
             data-test="logs-search-bar-quick-mode-pinned-btn"
             size="xs"
             variant="outline"
@@ -219,6 +224,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <OSwitch
               :model-value="searchObj.meta.quickMode"
+              :aria-label="t('search.quickModeLabel')"
               :size="toolbarToggleIconOnly ? 'sm' : 'md'"
               @click.stop="handleQuickMode"
             />
@@ -907,6 +913,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Function Editor (pinned) — sits to the left of the date picker -->
         <OButton
           v-if="showPinnedFunctionEditor"
+          as="div"
           data-test="logs-search-bar-function-editor-pinned-btn"
           size="xs"
           variant="outline"
@@ -915,6 +922,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <OSwitch
             v-model="searchObj.meta.showTransformEditor"
+            :aria-label="t('search.functionEditorLabel')"
             :size="toolbarToggleIconOnly ? 'sm' : 'md'"
             @click.stop
           />
@@ -1019,6 +1027,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OButton
                       variant="ghost"
                       size="icon-xs"
+                      :aria-label="t('search.refreshCacheAndRunQuery')"
                       data-test="logs-search-bar-refresh-cache-dropdown-trigger"
                       :class="[
                         config.isEnterprise == 'true' && visualizeSearchRequestTraceIds.length
@@ -1075,6 +1084,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OButton
                       variant="ghost"
                       size="icon-xs"
+                      :aria-label="t('search.refreshCacheAndRunQuery')"
                       data-test="logs-search-bar-refresh-cache-dropdown-trigger"
                       :class="[
                         config.isEnterprise == 'true' && visualizeSearchRequestTraceIds.length
@@ -1130,15 +1140,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-cy="search-bar-refresh-button"
                 :data-run-pending="showRunQueryPending ? 'true' : undefined"
                 :aria-label="showRunQueryPending ? t('search.runQueryPendingLabel') : undefined"
-                :variant="showRunQueryPending ? 'warning' : 'primary'"
+                :variant="showRunQueryPending ? 'pending' : 'primary'"
                 :title="t('search.runQuery')"
                 size="sm-toolbar"
                 class="element-box-shadow rounded-s-default! relative h-[1.875rem]! w-[5.875rem]! rounded-e-none! p-0 px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease]"
-                :class="
+                :class="[
                   showRunQueryPending
                     ? ''
-                    : 'bg-button-primary! text-button-primary-foreground! hover:shadow-button-primary/70 hover:opacity-90 hover:shadow-md'
-                "
+                    : 'bg-button-primary! text-button-primary-foreground! hover:shadow-button-primary/70 hover:opacity-90 hover:shadow-md',
+                  showRunQueryPending ? 'border-e-button-pending-hover-bg!' : '',
+                ]"
                 @click="handleRunQueryFn()"
                 :loading="searchObj.loading || searchObj.loadingHistogram"
                 :disabled="
@@ -1164,19 +1175,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 {{ t("search.runQuery") }}
               </OButton>
-              <OSeparator class="h-[1.875rem]! w-px" vertical />
+              <OSeparator
+                v-if="!showRunQueryPending || isRunQueryCancelShown"
+                class="h-[1.875rem]! w-px"
+                vertical
+              />
               <ODropdown align="end" side="bottom">
                 <template #trigger>
                   <OButton
-                    :variant="showRunQueryPending && !isRunQueryCancelShown ? 'warning' : 'ghost'"
+                    :variant="showRunQueryPending && !isRunQueryCancelShown ? 'pending' : 'ghost'"
                     size="icon-xs"
+                    :aria-label="t('search.refreshCacheAndRunQuery')"
                     data-test="logs-search-bar-refresh-cache-dropdown-trigger"
                     :class="[
                       isRunQueryCancelShown
                         ? 'bg-cancel-query-bg! text-button-primary-foreground!'
                         : !showRunQueryPending
                           ? 'bg-button-primary! text-button-primary-foreground! hover:shadow-button-primary/70 hover:opacity-90 hover:shadow-md'
-                          : '',
+                          : showRunQueryPending
+                            ? 'border-s-0'
+                            : '',
                       'rounded-e-default! rounded-s-none!',
                     ]"
                   >

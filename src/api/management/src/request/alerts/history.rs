@@ -982,6 +982,8 @@ fn downtime_filters(downtime_id: Option<&str>, status: Option<&str>) -> String {
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json"),
+        (status = 400, description = "start_time is not before end_time", content_type = "application/json"),
+        (status = 403, description = "The caller's alert listing was refused", content_type = "application/json"),
         (status = 500, description = "Internal Server Error", content_type = "application/json"),
     ),
     extensions(
