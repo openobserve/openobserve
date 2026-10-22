@@ -66,7 +66,7 @@ describe("rcaEvidenceLink (03 VE29)", () => {
     expect(q.period).toBeUndefined();
   });
 
-  it("SQL on metrics or traces keeps the signal as stream_type and joins streams with ','", () => {
+  it("SQL on metrics or traces keeps the signal as stream_type and label, and joins streams with ','", () => {
     const link = rcaEvidenceLink(
       {
         signal: "traces",
@@ -77,6 +77,7 @@ describe("rcaEvidenceLink (03 VE29)", () => {
       },
       "acme",
     );
+    expect(link?.page).toBe("traces");
     expect(routeOf(link).path).toBe("/logs");
     expect(routeOf(link).query).toMatchObject({
       org_identifier: "acme",

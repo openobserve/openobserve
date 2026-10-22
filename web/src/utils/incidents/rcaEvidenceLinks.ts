@@ -21,7 +21,7 @@ import { raw } from "@/types/i18n";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 import type { RcaBlindSpotFix, RcaEvidenceTarget } from "@/services/incidents";
 
-/** The page an evidence link opens: the label of "Open in …". */
+/** The signal an evidence link opens: the label of "Open in …". */
 export type RcaEvidencePage = "logs" | "metrics" | "traces";
 
 export interface RcaEvidenceLink {
@@ -33,11 +33,8 @@ export interface RcaEvidenceLink {
 const NO_RANGE_PERIOD = "1h";
 
 /** Signals whose SQL the logs page can run (as its `stream_type`). */
-const SQL_STREAM_TYPE: Partial<Record<RcaEvidenceTarget["signal"], true>> = {
-  logs: true,
-  metrics: true,
-  traces: true,
-};
+const isSqlSignal = (signal: RcaEvidenceTarget["signal"]): signal is RcaEvidencePage =>
+  signal === "logs" || signal === "metrics" || signal === "traces";
 
 const hasRange = (link: RcaEvidenceTarget): boolean =>
   typeof link.start_us === "number" && typeof link.end_us === "number";
@@ -50,8 +47,8 @@ export function rcaEvidenceLink(link: RcaEvidenceTarget, org: string): RcaEviden
 
   // Logs handles SQL for all three signals; preserve the source stream type. The
   // `rca_evidence_query` type makes Logs run the query on arrival; the AI chat's
-  // `ai_chat_query` only re-applies it.
-  if (link.sql && SQL_STREAM_TYPE[link.signal]) {
+  // `ai_chat_query` only re-applies it. The label names the signal, not the page.
+  if (link.sql && isSqlSignal(link.signal)) {
     const route = buildNavigationRoute(
       {
         resource_type: link.signal,
@@ -69,7 +66,10 @@ export function rcaEvidenceLink(link: RcaEvidenceTarget, org: string): RcaEviden
       org,
     );
     return route
-      ? { page: "logs", route: { path: "/logs", query: { ...route.query, type: RCA_LOGS_TYPE } } }
+      ? {
+          page: link.signal,
+          route: { path: "/logs", query: { ...route.query, type: RCA_LOGS_TYPE } },
+        }
       : null;
   }
 
