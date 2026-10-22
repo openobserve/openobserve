@@ -199,7 +199,7 @@ describe("OTableBodyCell focusToolbar", () => {
     expect(document.activeElement).toBe(after);
   });
 
-  it("takes row checkboxes out of the tab order, names them by position, and selects on Space (V7, V8)", async () => {
+  it("takes row checkboxes out of the tab order, names them by their first cell, and selects on Space (V7, V8)", async () => {
     const table = render({ focusToolbar: true, selection: "multiple", sorting: "client" });
     await flushPromises();
     const boxes = () => [
@@ -217,15 +217,15 @@ describe("OTableBodyCell focusToolbar", () => {
     if (!cells()[0].textContent?.includes("cart")) await sort();
     await flushPromises();
     expect(boxes().map((b) => b.getAttribute("aria-label"))).toEqual([
-      "Select row 1",
-      "Select row 2",
+      "Select row cart",
+      "Select row checkout",
     ]);
     await focus(cells()[0]);
     await key(cells()[0], " ");
     expect(table.emitted("selection-change")?.at(-1)?.[0]).toEqual([rows[1]]);
   });
 
-  it("numbers row checkboxes across pages", async () => {
+  it("names each page's row checkbox by its own row across pages", async () => {
     const table = render({
       focusToolbar: true,
       selection: "multiple",
@@ -237,10 +237,10 @@ describe("OTableBodyCell focusToolbar", () => {
       document
         .querySelector('tbody [data-test^="o2-table-select-"] button[role="checkbox"]')
         ?.getAttribute("aria-label");
-    expect(name()).toBe("Select row 1");
+    expect(name()).toBe("Select row checkout");
     await table.find('[data-test="o2-table-next-page-btn"]').trigger("click");
     await flushPromises();
-    expect(name()).toBe("Select row 2");
+    expect(name()).toBe("Select row cart");
   });
 
   it("adds nothing without a hover-actions slot", async () => {

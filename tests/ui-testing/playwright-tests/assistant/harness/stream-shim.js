@@ -153,13 +153,13 @@
       const bodyText = typeof init.body === "string" ? init.body : "";
       const name = pickScenario(bodyText, new Error().stack);
       mock.requests.push({ url, scenario: name, body: bodyText, headers: init.headers, stack: new Error().stack, at: Date.now() });
-      // Tell the Node-side mock which scenario this session ran, so GET /ai/chats/{id} can replay it.
+      const httpErr = HTTP_SCENARIOS[name];
+      // Tell the Node-side mock which scenario an admitted turn ran; a refused turn never creates or runs a chat.
       try {
         const sid = (init.headers || {})["x-o2-assistant-session-id"];
         const last = (JSON.parse(bodyText || "{}").messages || []).slice(-1)[0];
-        if (sid) origFetch(new URL("/__o2mock/turn", url).href, { method: "POST", body: JSON.stringify({ session_id: sid, turn_id: (init.headers || {})["x-o2-assistant-turn-id"], scenario: name, text: String(last?.content || "") }) }).catch(() => {});
+        if (sid && !httpErr) origFetch(new URL("/__o2mock/turn", url).href, { method: "POST", body: JSON.stringify({ session_id: sid, turn_id: (init.headers || {})["x-o2-assistant-turn-id"], scenario: name, text: String(last?.content || "") }) }).catch(() => {});
       } catch (_) {}
-      const httpErr = HTTP_SCENARIOS[name];
       if (httpErr) {
         await sleep(150);
         // `repeat` keeps the scenario for the next call too (consent_twice: the same-turn retry is refused again).

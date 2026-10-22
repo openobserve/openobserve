@@ -45,6 +45,8 @@ import { isTerminal } from "./turnStates";
 
 export const LIST_REREAD_MS = 15_000;
 
+const MAX_SHARED_SIDS = 1_000;
+
 /** The list's own load state; `cached` rows render beside a server error, never a silent empty list. */
 export interface HistoryListState {
   status: "idle" | "loading" | "ready" | "error";
@@ -65,6 +67,8 @@ export function createHistoryList(ctx: HistoryCtx) {
   const fetching = ref(false);
   const observers: { observer: QueryObserver<ChatsPage>; stop: () => void }[] = [];
   const filterState = ref<HistoryFilter>({ kind: "all", q: "" });
+  // The chats the owner's share links point at; a listed row carries no share of its own.
+  const sharedSids = shallowRef<ReadonlySet<Sid>>(new Set());
   const loadedFor = ref<string | null>(null);
 
   const searchOnServer = () => deps.capability().historySearch === true;
@@ -161,7 +165,7 @@ export function createHistoryList(ctx: HistoryCtx) {
       if (kind === "pinned" && !row.pinned) return false;
       if ((kind === "editor" || kind === "alert" || kind === "incident") && row.origin !== kind)
         return false;
-      if (kind === "shared" && !row.share) return false;
+      if (kind === "shared" && !row.share && !sharedSids.value.has(row.sid)) return false;
       if (!needle || (ctx.serverMode() && searchOnServer())) return true;
       return (
         String(row.title).toLowerCase().includes(needle) || contentMatches(row.sid, needle, ctx)
@@ -229,6 +233,9 @@ export function createHistoryList(ctx: HistoryCtx) {
     storageBlocked: ctx.storageBlocked,
     ensureLoaded,
     recent: (n: number) => computed(() => rows.value.slice(0, n)),
+    noteShared(sids: readonly Sid[]) {
+      sharedSids.value = new Set(sids.slice(0, MAX_SHARED_SIDS));
+    },
     setFilter(patch: Partial<HistoryFilter>) {
       const next = { ...filterState.value, ...patch };
       const searched = next.q !== filterState.value.q;

@@ -62,16 +62,21 @@ test.describe("assistant billing @edition", () => {
     const card = control(page, "billing-ai-credits-card");
     await expect(card).toBeVisible({ timeout: 30_000 });
     const summary = control(page, "billing-ai-credits-summary");
-    await expect(summary).toContainText("1,000 included credits used · 200 billed");
-    await expect(card).toContainText("Pay as you go");
+    await expect(summary.locator('[data-test="assistant-credit-meter-text"]')).toHaveText(
+      "1,000 included credits used · 200 billed · paid usage on",
+    );
+    await expect(summary.locator('[data-test="assistant-credit-meter-mode"]')).toHaveText("Paid usage on");
     await expect(card.locator('[data-test="paid-usage-unavailable"]')).toContainText("Paid usage status unavailable");
     await expect(card.getByText("Paid usage status unavailable")).toHaveCount(1);
     await expect(card.locator('[data-test="paid-usage-retry"]')).toBeVisible();
 
     await page.goto(url("/billings/usage"), { waitUntil: "domcontentloaded" });
     const usageSummary = control(page, "billings-usage-ai-summary");
-    await expect(usageSummary).toContainText("1,000 included credits used · 200 billed", { timeout: 30_000 });
-    await expect(usageSummary).toContainText("Pay as you go");
+    await expect(usageSummary.locator('[data-test="assistant-credit-meter-text"]')).toHaveText(
+      "1,000 included credits used · 200 billed · paid usage on",
+      { timeout: 30_000 },
+    );
+    await expect(usageSummary.locator('[data-test="assistant-credit-meter-mode"]')).toHaveText("Paid usage on");
   });
 
   test("CONS-12 the paid usage switch follows the org's own flag and waits for the payer", { tag: ["@mock", "@stack-cloud"] }, async ({ context, page }) => {

@@ -72,8 +72,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="flex shrink-0 flex-wrap items-center gap-2 max-md:w-full"
         data-test="assistant-shared-actions"
       >
+        <template v-if="viewer === 'checking'" />
         <OButton
-          v-if="viewer === 'owner'"
+          v-else-if="viewer === 'owner'"
           variant="primary"
           size="sm"
           class="max-md:min-h-11 max-md:w-full"
@@ -140,7 +141,8 @@ export interface SharedChatHeaderProps {
   variant: "org" | "public";
   chat: SharedChat;
   share: { mode: "snapshot" | "live"; visibility: "org" | "public" };
-  viewer: "owner" | "member" | "signedOut" | "forked";
+  /** `checking` holds every sign-in-dependent action until the session probe settles. */
+  viewer: "owner" | "member" | "signedOut" | "forked" | "checking";
   polling: PollState;
   /** The viewer holds `ai` PUT; without it Continue is a locked line, never a 403 after a click. */
   canContinue?: boolean;

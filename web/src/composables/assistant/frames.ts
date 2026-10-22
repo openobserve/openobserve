@@ -15,6 +15,10 @@
 
 import { z } from "zod";
 
+const MAX_CONTEXT_USED = 20;
+const MAX_CONTEXT_USED_SCAN = 200;
+const MAX_CONTEXT_KEY_LENGTH = 64;
+
 // Loose objects: o2-ai adds fields without a UI release, and an extra field must never turn a frame into `unknown`.
 const statusFrameSchema = z.looseObject({
   type: z.literal("status"),
@@ -142,8 +146,13 @@ const completeFrameSchema = z.looseObject({
   persisted: z.boolean().optional(),
   /** B-02: the turn ended with no content of its own (o2-ai's empty-turn notice). */
   empty: z.boolean().optional(),
-  /** B-09: the context keys the agent used for this turn (CT-12). */
-  context_used: z.array(z.string()).optional(),
+  // Cut before any entry is read; `contextUsedKeys` skips a bad entry, never the frame.
+  context_used: z
+    .unknown()
+    .optional()
+    .transform((value) =>
+      Array.isArray(value) ? (value.slice(0, MAX_CONTEXT_USED_SCAN) as unknown[]) : undefined,
+    ),
 });
 
 const cancelledFrameSchema = z.looseObject({
@@ -196,6 +205,8 @@ const confirmationResolvedFrameSchema = z.looseObject({
   at: z.number().optional(),
   scope: z.string().optional(),
   items: z.array(z.string()).optional(),
+  expired: z.boolean().optional(),
+  withdrawn: z.boolean().optional(),
 });
 
 const queryFrameSchema = z.looseObject({
@@ -324,6 +335,25 @@ export function isUnknownFrame(frame: ParsedFrame): frame is UnknownFrame {
 /** `sync`/`sync_state` are OpenObserve's persistence feed; o2-ai owns their schema and the UI drops them. */
 export function isDroppableFrame(frame: ParsedFrame): frame is FrameOf<"sync" | "sync_state"> {
   return DROPPED_FRAME_TYPES.has(frame.type);
+}
+
+/** The keys a `complete.context_used` list marks as used, bounded; `undefined` when the field is absent. */
+export function contextUsedKeys(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const keys: string[] = [];
+  for (const entry of value.slice(0, MAX_CONTEXT_USED_SCAN)) {
+    const key = usedKeyOf(entry)?.slice(0, MAX_CONTEXT_KEY_LENGTH);
+    if (key && !keys.includes(key)) keys.push(key);
+    if (keys.length >= MAX_CONTEXT_USED) break;
+  }
+  return keys;
+}
+
+function usedKeyOf(entry: unknown): string | null {
+  if (typeof entry === "string") return entry || null;
+  if (!entry || typeof entry !== "object") return null;
+  const { key, used } = entry as { key?: unknown; used?: unknown };
+  return typeof key === "string" && key && used === true ? key : null;
 }
 
 // The incident analysis route streams `start` and `chunk`; they are the shared `status` and `message_delta`.

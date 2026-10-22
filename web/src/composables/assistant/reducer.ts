@@ -31,6 +31,7 @@ import {
   type QueryBlockData,
   type StepResult,
 } from "./evidence";
+import { contextUsedKeys } from "./frames";
 import type { ApprovalKind, ApprovalTarget } from "./assistantStore.types";
 import type {
   ConfirmationRequiredFrame,
@@ -127,6 +128,8 @@ export interface ApprovalBlockData {
   expiresAt?: number;
   /** Replayed with no decision in the record, so it renders as a record and never as a live card. */
   noDecision?: boolean;
+  /** Replayed without a resolution frame; the server's approval row says how it was answered. */
+  recorded?: { status: "approved" | "denied" | "expired" | "withdrawn"; at?: number };
 }
 
 /** `confirmation_resolved`: another tab or device answered the card. */
@@ -135,6 +138,10 @@ export interface ResolvedBlockData {
   approved: boolean;
   by?: string;
   at?: number;
+  /** Nobody answered in time; `approved` is false. */
+  expired?: boolean;
+  /** The server dropped the card because the chat moved on; `approved` is false. */
+  withdrawn?: boolean;
 }
 
 /** A quiet notice in the turn: a policy denial or a change made without a review step. */
@@ -898,11 +905,7 @@ function appendFooter(state: StreamState, data: any, extras: StreamExtras): void
   const traceId =
     typeof data.trace_id === "string" && data.trace_id ? data.trace_id : extras.traceId;
   const usage = footerUsage(data.usage ?? extras.usage);
-  const used = Array.isArray(data.context_used)
-    ? data.context_used
-        .filter((key: unknown): key is string => typeof key === "string")
-        .slice(0, 20)
-    : undefined;
+  const used = contextUsedKeys(data.context_used);
   const footer: FooterData = {
     ...(traceId && { traceId }),
     ...(extras.serverTurnId && { serverTurnId: String(extras.serverTurnId).slice(0, 64) }),
@@ -1045,6 +1048,8 @@ function typedResolved(state: StreamState, data: any, phase: StreamPhase): Strea
     approved: data.approved === true,
     ...(typeof data.by === "string" && { by: data.by.slice(0, 200) }),
     ...(typeof data.at === "number" && { at: data.at }),
+    ...(data.expired === true && { expired: true }),
+    ...(data.withdrawn === true && { withdrawn: true }),
   };
   appendBlock(state, { type: "approval_result", resolved });
   return phase === "live" ? [{ kind: "approval_resolved", frame: data }] : [];

@@ -128,6 +128,8 @@ interface Retry {
   turnId: string | null;
   decision: ApprovalDecision;
   override?: ApprovalOutcome["state"];
+  /** The card's expiry when it was first sent, so a resend that fails again re-arms it. */
+  until?: number;
 }
 
 /** The pending card of one session and its decision, for the container that shows it. */
@@ -193,6 +195,7 @@ export function createApprovalsRuntime(deps: ApprovalsDeps): ApprovalsRuntime {
     id: string,
     decision: ApprovalDecision,
     override?: ApprovalOutcome["state"],
+    retryUntil?: number,
   ): Promise<ApprovalResult> => {
     const key = keyOf(sid, id);
     const running = inFlight.get(key);
@@ -208,7 +211,7 @@ export function createApprovalsRuntime(deps: ApprovalsDeps): ApprovalsRuntime {
     const wire: ApprovalDecision = narrowed ? { approved: false, reason: "edited" } : decision;
     const state = narrowed ? "narrowed" : override;
     const pending = sessionOf(sid)?.pendingApproval;
-    const until = pending?.id === id ? pending.expiresAt : undefined;
+    const until = pending?.id === id ? pending.expiresAt : retryUntil;
     retries.delete(sid);
     deps.engine().approvalSending?.(sid);
     const promise = deps
@@ -259,6 +262,7 @@ export function createApprovalsRuntime(deps: ApprovalsDeps): ApprovalsRuntime {
         turnId: session.turnMeta.turnId,
         decision: sent.wire,
         ...(sent.state && { override: sent.state }),
+        ...(sent.until !== undefined && { until: sent.until }),
       });
     // A decision that was sent but not confirmed may have run, so the turn stops waiting on the card; one that never landed keeps the card's expiry.
     const unknown = outcome?.state === "unconfirmed";
@@ -379,7 +383,7 @@ export function createApprovalsRuntime(deps: ApprovalsDeps): ApprovalsRuntime {
       // Only the card that is still the turn's own goes again; anything else would answer whatever is pending now.
       if (!entry || !session || entry.id !== approvalId || session.pendingApproval) return;
       if (entry.turnId !== session.turnMeta.turnId) return;
-      await run(sid, approvalId, entry.decision, entry.override);
+      await run(sid, approvalId, entry.decision, entry.override, entry.until);
     },
     async askAgain(sid, approvalId) {
       const card = approvalCardOf(sessionOf(sid), approvalId);

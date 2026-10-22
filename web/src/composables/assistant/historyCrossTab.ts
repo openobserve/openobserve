@@ -55,7 +55,10 @@ export function createHistoryCrossTab(ctx: HistoryCtx, records: HistoryRecords) 
       }
       const session = ctx.session(sid);
       if (session && !session.turnMeta.ownedByThisTab)
-        session.messages = projectRecord(detail.turns ?? [], "owner", ownerOptions(ctx));
+        session.messages = projectRecord(detail.turns ?? [], "owner", {
+          ...ownerOptions(ctx),
+          ...(detail.approvals && { approvals: detail.approvals }),
+        });
       return {
         running: !!detail.active_turn,
         approval: detail.pending_approval === true,

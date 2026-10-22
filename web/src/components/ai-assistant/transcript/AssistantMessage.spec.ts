@@ -341,6 +341,26 @@ describe("AssistantMessage", () => {
       expect(cards[0].attributes("data-source")).toBe("navigation");
     });
 
+    it("renders a redacted link with the fixed label and no query, stream, window or Open", () => {
+      const wrapper = mountMessage(
+        answer([
+          {
+            type: "link",
+            link: { resourceType: "logs", action: "load_query", target: {}, redacted: true },
+          },
+        ]),
+        { readonly: true },
+      );
+      const card = wrapper.get('[data-test="assistant-link-card"]');
+      expect(card.attributes("data-kind")).toBe("redacted");
+      expect(card.get('[data-test="assistant-link-card-title"]').text()).toBe(
+        "A linked view (details hidden)",
+      );
+      expect(card.attributes("aria-label")).toBe("A linked view (details hidden)");
+      expect(card.find('[data-test="assistant-link-card-details"]').exists()).toBe(false);
+      expect(card.find("button, a").exists()).toBe(false);
+    });
+
     it("offers an allowlisted Markdown link as a captioned card and the rest as text", () => {
       const wrapper = mountLive([
         { type: "text", text: "See [it](/dashboards/view?dashboard=checkout) and [out](/logout)." },

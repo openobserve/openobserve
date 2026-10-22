@@ -231,6 +231,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :readonly="readonly"
         :copy-text="item.copyText"
         :openable="turn?.openable ?? true"
+        :redacted="item.redacted"
       />
       <component
         :is="item.component"
@@ -426,6 +427,7 @@ type Rendered =
       link: LinkTarget | null;
       source: "navigation" | "tool" | "markdown";
       copyText: string | null;
+      redacted?: boolean;
     }
   | { kind: "registered"; key: string; component: Component; block: ContentBlock };
 
@@ -538,6 +540,10 @@ function renderBlock(block: ContentBlock, index: number, links: Set<string>): Re
           ...(block.query.callId && { sourceCallId: block.query.callId }),
         },
       },
+    ];
+  if (block.type === "link" && block.link?.redacted)
+    return [
+      { kind: "link", key, link: null, source: "navigation", copyText: null, redacted: true },
     ];
   if (block.type === "link" && block.link) {
     const link = buildNavigationRoute(

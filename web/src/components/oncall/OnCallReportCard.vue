@@ -20,45 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <template v-if="assistantV2">
-    <AssistantAgentOutput
-      v-if="!loading && report"
-      kind="oncall_report"
-      :title="t('oncall.reportByAssistant', { product })"
-      :byline="byline"
-      :model="report.model || undefined"
-      :report="prose"
-      :report-id="String(report.generated_at)"
-      data-test="oncall-report-card"
-    />
-    <OCard v-else data-test="oncall-report-card">
-      <OCardSection role="body" dense class="flex flex-col gap-2">
-        <div v-if="loading" class="flex flex-col gap-2" data-test="oncall-report-loading">
-          <OSkeleton type="text" class="h-4 w-1/2" />
-          <OSkeleton type="text" class="h-4 w-5/6" />
-          <OSkeleton type="text" class="h-4 w-2/3" />
-        </div>
-        <div
-          v-else-if="error === 'failed'"
-          class="flex flex-wrap items-center gap-2"
-          data-test="oncall-report-error"
-        >
-          <OText variant="body">{{ t("oncall.reportFailed") }}</OText>
-          <OButton
-            variant="outline"
-            size="sm"
-            data-test="oncall-report-retry"
-            @click="emit('retry')"
-            >{{ t("oncall.reportTryAgain") }}</OButton
-          >
-        </div>
-        <OText v-else variant="body" class="text-text-secondary" data-test="oncall-report-empty">{{
-          t("oncall.reportNone")
-        }}</OText>
-      </OCardSection>
-    </OCard>
-  </template>
-  <OCard v-else-if="loading || report" variant="glass" data-test="oncall-report-card">
+  <OCard v-if="loading || report" variant="glass" data-test="oncall-report-card">
     <OCardSection role="header" dense class="flex-wrap">
       <OText variant="card-title">{{ t("oncall.reportTitle") }}</OText>
       <span v-if="report" class="text-text-secondary text-xs">
@@ -81,10 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, defineAsyncComponent } from "vue";
-import { isAssistantV2 } from "@/composables/assistant/flags";
-import { useAssistantName } from "@/composables/assistant/pure";
-import OButton from "@/lib/core/Button/OButton.vue";
+import { computed } from "vue";
 
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
@@ -93,37 +52,15 @@ import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import type { OnCallResponseReport } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
-import { formatOrgTime } from "@/utils/formatters";
 import { renderRcaReport } from "@/utils/incidents/rcaReportMarkdown";
 
-const props = defineProps<{
-  report: OnCallResponseReport | null;
-  loading?: boolean;
-  /** Why there is no report: none was written (404) or the read failed. */
-  error?: "missing" | "failed" | null;
-}>();
-const emit = defineEmits<{ retry: [] }>();
+const props = defineProps<{ report: OnCallResponseReport | null; loading?: boolean }>();
 
 const { t } = useI18nTyped();
-const { product } = useAssistantName();
-
-const byline = computed(() =>
-  props.report ? raw(formatOrgTime(props.report.generated_at / 1000)) : undefined,
-);
 
 // The incident drawer's renderer, so one report reads the same whichever subject
 // carried it, with the same code escaping, link policy and verdict-fence removal.
 const rendered = computed(() => (props.report?.report ? renderRcaReport(props.report.report) : ""));
-
-const AssistantAgentOutput = defineAsyncComponent(
-  () => import("@/components/ai-assistant/blocks/AssistantAgentOutput.vue"),
-);
-const assistantV2 = isAssistantV2();
-
-// The card above already renders the verdict block as a sentence, so its JSON is dropped here.
-const prose = computed(() =>
-  (props.report?.report ?? "").replace(/```json\s+verdict[\s\S]*?```/g, "").trim(),
-);
 </script>
 
 <style scoped>

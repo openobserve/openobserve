@@ -363,7 +363,8 @@ type FlatEntry = { kind: "group"; id: GroupId } | { kind: "row"; id: string; row
 </script>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, useId } from "vue";
+import { useQuery } from "@tanstack/vue-query";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, useId, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 
@@ -388,6 +389,8 @@ import OText from "@/lib/core/Typography/OText.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
+import { queryClient } from "@/composables/query/queryClient";
+import { mySharesQuery } from "@/services/ai_chat_share.queries";
 import { trackAssistant } from "@/services/assistantAnalytics";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { orgDayDistance, orgTimeZone } from "@/utils/formatters";
@@ -433,12 +436,35 @@ const listState = computed(() => history.listState.value);
 const errorWithRows = computed(
   () => listState.value.status === "error" && history.rows.value.length > 0,
 );
+// Read only while the Shared filter is on, so opening the list costs no extra request.
+const shares = useQuery(
+  computed(() => ({
+    ...mySharesQuery(org.value),
+    enabled:
+      history.mode.value === "server" && history.filter.value.kind === "shared" && !!org.value,
+  })),
+  queryClient,
+);
+watch(
+  () => shares.data.value,
+  // The server lists live links only, but a cached list can outlive a link's expiry (micros).
+  (list) =>
+    history.noteShared(
+      (list ?? [])
+        .filter((share) => share.expires_at == null || share.expires_at > Date.now() * 1_000)
+        .map((share) => share.session_id as Sid),
+    ),
+  { immediate: true },
+);
+
+// Only the server keeps share links, so a browser-only list has nothing to show as shared.
 const filterKinds = computed<HistoryFilter["kind"][]>(() => [
   "all",
   "pinned",
   "editor",
   "alert",
   "incident",
+  ...(history.mode.value === "server" ? (["shared"] as const) : []),
 ]);
 
 const accountLine = computed(() => {

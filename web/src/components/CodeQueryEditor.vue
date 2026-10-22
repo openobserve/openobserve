@@ -339,6 +339,7 @@ import { useTheme } from "@/composables/useTheme";
 import { debounce } from "lodash-es";
 import searchState from "@/composables/useLogs/searchState";
 import { useNLQuery } from "@/composables/useNLQuery";
+import { HELPER_PREFIXES } from "@/composables/assistant/pure";
 import { type I18nText, useI18nTyped, raw } from "@/types/i18n";
 import useNotifications from "@/composables/useNotifications";
 import { isAuthError } from "@/utils/authErrors";
@@ -571,22 +572,10 @@ export default defineComponent({
         const orgId = store.state.selectedOrganization?.identifier || "default";
 
         // Create language-appropriate prompt
-        let promptPrefix = "";
-        switch (currentLanguage) {
-          case "promql":
-            promptPrefix = "Generate PromQL query";
-            break;
-          case "vrl":
-            promptPrefix = "Generate VRL function";
-            break;
-          case "javascript":
-            promptPrefix = "Generate JavaScript function";
-            break;
-          case "sql":
-          default:
-            promptPrefix = "Generate SQL query";
-            break;
-        }
+        let promptPrefix = HELPER_PREFIXES.sql;
+        if (currentLanguage === "promql") promptPrefix = HELPER_PREFIXES.promql;
+        else if (currentLanguage === "vrl") promptPrefix = HELPER_PREFIXES.vrl;
+        else if (currentLanguage === "javascript") promptPrefix = HELPER_PREFIXES.js;
 
         const prompt = `${promptPrefix} : ${currentText}`;
 

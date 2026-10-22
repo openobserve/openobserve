@@ -301,6 +301,36 @@ describe("AssistantApprovalResult", () => {
     expect(line(wrapper)).toMatch(/^Approved in another tab · /);
   });
 
+  it("reads an expired or withdrawn confirmation_resolved as that, never as a denial", () => {
+    const ended = (flag: "expired" | "withdrawn") =>
+      line(
+        mountRecord(null, {
+          blocks: [
+            block,
+            { type: "approval_result", resolved: { id: "c9", approved: false, [flag]: true } },
+          ],
+        }).wrapper,
+      );
+    expect(ended("expired")).toBe("No answer in time, so the assistant didn't run this action.");
+    expect(ended("withdrawn")).toBe("This request is no longer valid. The conversation moved on.");
+  });
+
+  it("reads a replayed card's server approval row as this user's own decision", () => {
+    const recorded = (status: "approved" | "denied" | "expired" | "withdrawn", at?: number) => {
+      const approval = { ...BATCH, recorded: { status, ...(at && { at }) } };
+      return mountRecord(null, { readonly: true, blocks: [{ type: "approval", approval }] });
+    };
+    expect(line(recorded("approved", 1_760_000_000_000).wrapper)).toMatch(/^Approved · /);
+    expect(line(recorded("denied").wrapper)).toBe("Declined · nothing was changed");
+    expect(line(recorded("expired").wrapper)).toBe(
+      "No answer in time, so the assistant didn't run this action.",
+    );
+    expect(recorded("denied").wrapper.find("button, a").exists()).toBe(false);
+    expect(line(recorded("withdrawn").wrapper)).toBe(
+      "This request is no longer valid. The conversation moved on.",
+    );
+  });
+
   it("shows the waiting line with Stop for a card another tab holds", async () => {
     const evidence = fakeEvidence();
     const host = {

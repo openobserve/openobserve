@@ -251,9 +251,11 @@ describe("AssistantCreditsCard", () => {
   it("reads pay-as-you-go past the pool as included plus billed", async () => {
     const w = await mountCard({ ...STATUS, payer: null, effective: true }, usage);
     expect(assistant.usage).toHaveBeenCalledWith("acme");
-    expect(w.find('[data-test="billing-ai-credits-used"]').text()).toBe(
-      "1,000 included credits used · 200 billed",
+    expect(w.find('[data-test="assistant-credit-meter-text"]').text()).toBe(
+      "1,000 included credits used · 200 billed · paid usage on",
     );
+    expect(w.find('[data-test="assistant-credit-meter-bar"]').exists()).toBe(true);
+    expect(w.find('[data-test="assistant-credit-meter-mode"]').text()).toBe("Paid usage on");
     expect(w.text()).not.toContain("1200 / 1000");
     expect(w.find('[data-test="billing-ai-mode-line"]').text()).toContain(
       "this organization's invoice",
@@ -262,7 +264,10 @@ describe("AssistantCreditsCard", () => {
 
   it("keeps the numbers when paid usage status fails", async () => {
     const w = await mountCard(new Error("503"), usage);
-    expect(w.find('[data-test="billing-ai-credits-used"]').exists()).toBe(true);
+    expect(w.find('[data-test="assistant-credit-meter"]').attributes("data-state")).toBe("ready");
+    expect(w.find('[data-test="assistant-credit-meter-text"]').text()).toBe(
+      "1,000 included credits used · 200 billed · paid usage on",
+    );
     expect(w.find('[data-test="paid-usage-unavailable"]').text()).toContain(
       "Paid usage status unavailable",
     );
@@ -272,11 +277,15 @@ describe("AssistantCreditsCard", () => {
 
   it("says credit usage is unavailable and Retry reads it again", async () => {
     const w = await mountCard(STATUS, new Error("500"));
+    expect(w.find('[data-test="assistant-credit-meter-text"]').text()).toBe(
+      i18n.global.t("assistant.credits.meter.unavailable"),
+    );
     vi.mocked(assistant.usage).mockResolvedValue(parseAiUsage(usage));
     await w.find('[data-test="assistant-credit-meter-retry"]').trigger("click");
     await settle();
     expect(assistant.usage).toHaveBeenCalledTimes(2);
-    expect(w.find('[data-test="billing-ai-credits-used"]').exists()).toBe(true);
+    expect(w.find('[data-test="assistant-credit-meter"]').attributes("data-state")).toBe("ready");
+    expect(w.find('[data-test="assistant-credit-meter-retry"]').exists()).toBe(false);
   });
 
   it("words an exhausted contract for who is reading", async () => {

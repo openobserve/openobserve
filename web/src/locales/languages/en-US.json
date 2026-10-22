@@ -8392,7 +8392,6 @@
       },
       "subscribe": "Subscribe",
       "title": "AI credits",
-      "usageUnavailable": "Credit usage unavailable",
       "usedBilled": "{limit} included credits used · {billed} billed",
       "usedOf": "{used} of {limit} included credits used"
     },
@@ -8798,6 +8797,9 @@
         "action": "Reload chat",
         "title": "This message was already sent. Reload the chat to see its answer."
       },
+      "analysis_in_progress": {
+        "title": "An analysis of this incident is already running."
+      },
       "approval_delivery_failed": {
         "action": "Send again",
         "title": "Your decision didn't reach the assistant. Nothing was changed."
@@ -8900,6 +8902,11 @@
         },
         "title": "The AI provider failed: {reason}.",
         "titleNoReason": "The AI provider failed."
+      },
+      "rca_disabled": {
+        "action": "Ask an admin",
+        "body": "An admin can turn it on.",
+        "title": "Incident analysis is turned off."
       },
       "rate_limited": {
         "action": "Retry",
@@ -9218,6 +9225,7 @@
       "close": "Close Ask AI",
       "cost": "Uses 1 AI credit",
       "creditsExhaustedNoDate": "AI credits are used up for this organization.",
+      "creditsExhaustedResets": "AI credits are used up for this organization. They reset {date}.",
       "discarded": "Proposal discarded. Ask again to get a new one.",
       "door": "Ask AI",
       "doorTooltip": "Ask the assistant to write or change this query",
@@ -9472,6 +9480,7 @@
       "openAction": "Open",
       "opened": "Opened · {time}",
       "openIn": "Open in {explorer}",
+      "redacted": "A linked view (details hidden)",
       "unsupported": "This destination isn't supported in this version"
     },
     "mcp": {

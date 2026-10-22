@@ -34,6 +34,7 @@ const { fake, toast } = vi.hoisted(() => ({
 vi.mock("@/composables/assistant", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/composables/assistant")>()),
   useAssistantCapability: () => fake.current!.handle,
+  useAssistantHistory: () => fake.current!.history,
 }));
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast }));
 vi.mock("@/services/assistant_settings", async (importOriginal) => {
@@ -122,5 +123,39 @@ describe("HistoryTab", () => {
     fake.current = fakeAssistant("available", { isAdmin: false });
     const w = await mountTab({ ai_chat_persistence_enabled: false });
     expect(w.text()).toContain("Saved in each member's browser only");
+  });
+
+  it("offers to move this browser's chats to the server, reading them on the Settings page itself", async () => {
+    fake.current = fakeAssistant("available", { persistence: true, historyImport: true });
+    for (const id of [1, 2])
+      fake.current.db.rows.set(id, {
+        id,
+        timestamp: new Date(id).toISOString(),
+        title: `Chat ${id}`,
+        messages: [{ role: "user", content: `question ${id}` }],
+        sessionId: `0190ffff-c3d4-7e5f-8a9b-${String(id).padStart(12, "0")}`,
+        userOrgKey: fake.current.store.state.userOrgKey,
+      } as never);
+    const w = await mountTab({ ai_chat_persistence_enabled: true });
+    expect(fake.current.history.importView.value).toMatchObject({ state: "offer", count: 2 });
+    expect(w.find('[data-test="assistant-local-import-banner"]').exists()).toBe(true);
+  });
+
+  it("never offers the move to a reader who cannot chat", async () => {
+    fake.current = fakeAssistant("available", {
+      persistence: true,
+      historyImport: true,
+      canChat: "no",
+    });
+    fake.current.db.rows.set(1, {
+      id: 1,
+      timestamp: new Date(1).toISOString(),
+      title: "Chat 1",
+      messages: [{ role: "user", content: "question 1" }],
+      sessionId: "0190ffff-c3d4-7e5f-8a9b-000000000001",
+      userOrgKey: fake.current.store.state.userOrgKey,
+    } as never);
+    const w = await mountTab({ ai_chat_persistence_enabled: true });
+    expect(w.find('[data-test="assistant-local-import-banner"]').exists()).toBe(false);
   });
 });

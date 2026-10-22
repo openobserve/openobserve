@@ -80,6 +80,36 @@ test.describe("assistant evidence", () => {
     expect(searches.filter((body) => body.includes("approx_percentile_cont"))).toEqual([]);
   });
 
+  test("EVID-01 Run shows the rows inline through the reader's own search and sends no assistant turn", { tag: ["@mock"] }, async ({ page }) => {
+    await openOnLogs(page);
+    await ask(page, "complete");
+    const block = assistant.answer().locator('[data-test="assistant-query-block"]').first();
+    await expect(block).toBeVisible();
+    const searched = [];
+    // Only the block's query is answered here; the Logs page's own searches go to the server.
+    await page.route(/\/_search\b/, (route) => {
+      const body = route.request().postData() ?? "";
+      if (!body.includes("approx_percentile_cont")) return route.fallback();
+      searched.push(body);
+      return route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ took: 12, total: 2, hits: [{ service: "checkout", p95: 812 }, { service: "cart", p95: 140 }] }),
+      });
+    });
+    const turns = await page.evaluate(() => window.__o2mock.requests.length);
+    const before = page.url();
+    await block.locator('[data-test="assistant-query-run"]').click();
+    const results = block.locator('[data-test="assistant-query-results"]');
+    await expect(results).toHaveAttribute("data-state", "done", { timeout: 15_000 });
+    await expect(block.locator('[data-test="assistant-query-summary"]')).toContainText("2");
+    await expect(block.locator('[data-test="assistant-query-table"]')).toContainText("checkout");
+    await expect(block.locator('[data-test="assistant-query-table"]')).toContainText("812");
+    expect(searched).toHaveLength(1);
+    expect(page.url()).toBe(before);
+    expect(await page.evaluate(() => window.__o2mock.requests.length)).toBe(turns);
+  });
+
   test("EVID-03 a claim chip opens the step it cites, expanded by call_id", { tag: ["@mock"] }, async ({ page }) => {
     await openOnLogs(page);
     await ask(page, "cite");

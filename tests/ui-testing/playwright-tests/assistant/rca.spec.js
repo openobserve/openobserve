@@ -10,6 +10,9 @@ const loadHarness = () => import("./harness/setup.mjs");
 const INCIDENT_ID = "inc-e2e-checkout";
 
 test.describe("assistant incident analysis", () => {
+  // Every scenario drives the removed analysis tab and its stream; they return once it is ported to the incident run model.
+  test.fixme(true, "ported with the incident run model");
+
   let assistant;
   let harness;
   let state;

@@ -372,6 +372,7 @@ import {
   timeChipOf,
   timeRangeText,
   useAssistantCapability,
+  useAssistantCredits,
   useAssistantStore,
   useTurnLock,
   turnLockKey,
@@ -394,6 +395,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { trackAssistant } from "@/services/assistantAnalytics";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { doorChip, queryChip } from "@/utils/assistant/prompts/format";
+import { formatOrgDay } from "@/utils/formatters";
 
 import { readsAsPlainLanguage } from "./helperText";
 import { useInlineHelperSession, type HelperState } from "./useInlineHelperSession";
@@ -505,6 +507,11 @@ const sendBlocked = computed<I18nText | null>(() => {
 });
 const canSend = computed(() => !!text.value.trim() && !sendBlocked.value);
 const metered = computed(() => isMeteredCredit(capability.value.creditMode));
+const credits = useAssistantCredits(
+  () => org.value,
+  () => metered.value,
+  () => isAdmin.value,
+);
 const sendTooltip = computed(() => {
   if (sendBlocked.value) return sendBlocked.value;
   return metered.value ? t("assistant.helper.cost") : t("assistant.helper.doorTooltip");
@@ -895,10 +902,15 @@ function failureLine(state: Extract<HelperState, { kind: "failed" }>): Line {
     actions,
     failure: true,
   });
-  if (code === "credits_exhausted" || code === "subscription_required")
-    return failed(t("assistant.helper.creditsExhaustedNoDate"), [
-      isAdmin.value ? "manage-usage" : "ask-admin",
-    ]);
+  if (code === "credits_exhausted" || code === "subscription_required") {
+    const resetsAt = code === "credits_exhausted" ? credits.usage.value?.resetsAt : undefined;
+    return failed(
+      resetsAt === undefined
+        ? t("assistant.helper.creditsExhaustedNoDate")
+        : t("assistant.helper.creditsExhaustedResets", { date: raw(formatOrgDay(resetsAt)) }),
+      [isAdmin.value ? "manage-usage" : "ask-admin"],
+    );
+  }
   if (code === "rate_limited" || code === "turn_limit")
     return failed(
       retryWait.value > 0

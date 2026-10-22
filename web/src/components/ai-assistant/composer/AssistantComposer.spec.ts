@@ -573,6 +573,35 @@ describe("focusInput", () => {
 });
 
 describe("round 2 (U7–U9, U12, U16, U18–U19, F5, F8)", () => {
+  it("hides the predicted credits line only under a credits refusal, never under another refused code", async () => {
+    const { wrapper, store, sid } = setup();
+    store.state.capability.creditMode = "exhausted";
+    const refused = (code: string) =>
+      ({
+        state: "refused",
+        error: { code, phase: "pre_admission", retryable: false, action: "none" },
+      }) as never;
+    const helper = () => wrapper.find('[data-test="assistant-composer-helper"]');
+    store.state.sessions[sid].turn = refused("rate_limited");
+    await flushPromises();
+    expect(helper().text()).toContain("AI credits are used up for");
+    store.state.sessions[sid].turn = refused("credits_exhausted");
+    await flushPromises();
+    expect(helper().exists() && helper().text()).not.toContain("AI credits are used up for");
+    store.state.capability.creditMode = undefined;
+  });
+
+  it("keeps the used-up credits line while the chat's history is unavailable", async () => {
+    const { wrapper, store, sid } = setup();
+    store.state.capability.creditMode = "exhausted";
+    store.state.sessions[sid].record.historyUnavailable = true;
+    await flushPromises();
+    expect(wrapper.get('[data-test="assistant-composer-helper"]').text()).toContain(
+      "AI credits are used up for",
+    );
+    store.state.capability.creditMode = undefined;
+  });
+
   it("drops the swallowed-Enter reason once the answer ends and once the card resolves (U8)", async () => {
     const { wrapper, store, sid, textarea } = setup();
     store.state.sessions[sid].turn = { state: "responding" } as never;

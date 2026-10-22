@@ -54,8 +54,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="flex min-w-0 flex-col gap-1"
         data-test="agent-output-evidence"
       >
-        <li v-for="(item, i) in evidence" :key="i" class="min-w-0 break-words">
-          <OText variant="meta" as="span">{{ raw(item.text) }}</OText>
+        <li
+          v-for="(item, i) in evidence"
+          :key="i"
+          class="flex min-w-0 flex-wrap items-center gap-x-2 break-words"
+        >
+          <OText variant="meta" as="span" class="min-w-0 break-words">{{ raw(item.text) }}</OText>
+          <OButton
+            v-if="item.href"
+            variant="ghost-primary"
+            size="xs"
+            as="a"
+            :href="item.href"
+            target="_blank"
+            rel="noopener noreferrer"
+            :icon-right="assistantGlyph.newTab"
+            :aria-label="t('assistant.approval.result.open', { name: raw(item.text) })"
+            :class="['shrink-0', TOUCH_TARGET_CLASS]"
+            :data-test="`agent-output-evidence-open-${i}`"
+          >
+            {{ t("assistant.approval.open") }}
+          </OButton>
         </li>
       </ul>
       <p
@@ -102,6 +121,8 @@ export interface AgentNote {
 /** One evidence row an agent cited; rendered only when the server sends it. */
 export interface AgentEvidence {
   text: string;
+  /** Already checked by the caller to be `http(s)` or a same-origin path. */
+  href?: string;
 }
 
 export interface AssistantAgentOutputProps {
@@ -135,10 +156,13 @@ export interface AssistantAgentOutputProps {
 <script setup lang="ts">
 import { computed } from "vue";
 
+import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
+import { TOUCH_TARGET_CLASS } from "@/components/ai-assistant/common/touchTarget";
 import AssistantMessage from "@/components/ai-assistant/transcript/AssistantMessage.vue";
 import { useAssistantCapability } from "@/composables/assistant";
 import { markdownMessage } from "@/composables/assistant/pure";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OText from "@/lib/core/Typography/OText.vue";
