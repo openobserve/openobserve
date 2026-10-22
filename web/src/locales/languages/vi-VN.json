@@ -3871,7 +3871,7 @@
     "delete": "Xóa",
     "confirmDeleteHead": "Xóa stream",
     "confirmBatchDeleteHead": "Xóa các stream",
-    "confirmDeleteMsg": "Bạn có chắc chắn muốn xóa stream này?",
+    "confirmDeleteMsg": "Bạn có chắc chắn muốn xóa stream {name}?",
     "confirmBatchDeleteMsg": "Bạn có chắc chắn muốn xóa các stream đã chọn?",
     "deleteAssociatedAlertsPipelines": "Xóa tất cả Pipeline và Cảnh báo liên kết với stream",
     "cancel": "Hủy",

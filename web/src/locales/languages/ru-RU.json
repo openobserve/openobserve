@@ -3871,7 +3871,7 @@
     "delete": "Удалить",
     "confirmDeleteHead": "Удалить поток",
     "confirmBatchDeleteHead": "Удалить потоки",
-    "confirmDeleteMsg": "Вы уверены, что хотите удалить этот поток?",
+    "confirmDeleteMsg": "Вы уверены, что хотите удалить поток {name}?",
     "confirmBatchDeleteMsg": "Вы уверены, что хотите удалить выбранные потоки?",
     "deleteAssociatedAlertsPipelines": "Удалить все конвейеры и оповещения, связанные с потоком",
     "cancel": "Отмена",

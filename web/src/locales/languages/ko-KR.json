@@ -3871,7 +3871,7 @@
     "delete": "삭제",
     "confirmDeleteHead": "스트림 삭제",
     "confirmBatchDeleteHead": "스트림 삭제",
-    "confirmDeleteMsg": "정말로 이 스트림을 삭제하시겠습니까?",
+    "confirmDeleteMsg": "정말로 {name} 스트림을 삭제하시겠습니까?",
     "confirmBatchDeleteMsg": "선택한 스트림을 정말로 삭제하시겠습니까?",
     "deleteAssociatedAlertsPipelines": "스트림과 관련된 모든 파이프라인 및 알림 삭제",
     "cancel": "취소",

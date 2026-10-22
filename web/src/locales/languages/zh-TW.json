@@ -3871,7 +3871,7 @@
     "delete": "刪除",
     "confirmDeleteHead": "刪除串流",
     "confirmBatchDeleteHead": "刪除串流",
-    "confirmDeleteMsg": "確定要刪除此串流嗎？",
+    "confirmDeleteMsg": "確定要刪除 {name} 串流嗎？",
     "confirmBatchDeleteMsg": "確定要刪除已選取的串流嗎？",
     "deleteAssociatedAlertsPipelines": "刪除與此串流關聯的所有管線與警示",
     "cancel": "取消",
