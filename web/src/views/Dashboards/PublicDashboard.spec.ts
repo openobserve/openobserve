@@ -504,6 +504,9 @@ describe("PublicDashboard viewer", () => {
     const ring = () => w.findComponent(KioskCountdownRing);
     expect(ring().props("tooltip")).toBe("Next refresh in 0:10");
     expect(ring().props("state")).toBe("running");
+    expect((w.vm as unknown as { updatedExact: string }).updatedExact).toMatch(
+      /^Last refreshed: \d{2}:\d{2}:\d{2} · Next refresh in 0:10$/,
+    );
     await vi.advanceTimersByTimeAsync(3_000);
     expect(ring().props("tooltip")).toBe("Next refresh in 0:07");
   });
@@ -587,6 +590,9 @@ describe("PublicDashboard viewer", () => {
     expect(grid(w).props("currentTimeObj").__global.start_time.getTime()).toBe(1000);
     expect(grid(w).props("currentTimeObj").__global.end_time.getTime()).toBe(86_401_000);
     expect(has(w, "dashboards-public-dashboard-next-refresh")).toBe(false);
+    expect((w.vm as unknown as { updatedExact: string }).updatedExact).toMatch(
+      /^Last refreshed: \d{2}:\d{2}:\d{2}$/,
+    );
     await vi.advanceTimersByTimeAsync(59_000);
     expect(service.getData).toHaveBeenCalledTimes(1);
     await vi.advanceTimersByTimeAsync(1_000);

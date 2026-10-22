@@ -6215,6 +6215,7 @@
       "rateLimitedRetry": "Too many requests. Trying again in {time}.",
       "nextRefreshIn": "Next refresh in {time}",
       "lastUpdatedAgo": "Last updated {time}",
+      "lastRefreshedNext": "Last refreshed: {time} · {next}",
       "refreshFailed": "Some panels could not be refreshed at {time}. They show older data. Next try in {next}.",
       "refreshFailedNoRetry": "Some panels could not be refreshed at {time}. They show older data.",
       "panelFrom": "from {time}",

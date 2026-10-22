@@ -565,20 +565,22 @@ const updatedAge = computed<I18nText | "">(() => {
   return age;
 });
 
-const updatedExact = computed<I18nText>(() =>
-  t("refreshButton.lastRefreshed", {
-    time: raw(
-      formatInTimeZone((body.value?.built_at ?? 0) / 1000, viewerTimezone.value, "HH:mm:ss"),
-    ),
-  }),
-);
-
 // Counts down to fresh_until on the server's clock; an absolute range has none.
 const nextRefreshLabel = computed<I18nText | "">(() => {
   if (!body.value || body.value.refreshing) return "";
   const left = msUntil(body.value.fresh_until);
   if (left === null || left <= 0) return "";
   return t("dashboard.publicDashboard.nextRefreshIn", { time: raw(countdown(left)) });
+});
+
+// The exact build time, and when the next one is due while the range still refreshes.
+const updatedExact = computed<I18nText>(() => {
+  const time = raw(
+    formatInTimeZone((body.value?.built_at ?? 0) / 1000, viewerTimezone.value, "HH:mm:ss"),
+  );
+  return nextRefreshLabel.value
+    ? t("dashboard.publicDashboard.lastRefreshedNext", { time, next: nextRefreshLabel.value })
+    : t("refreshButton.lastRefreshed", { time });
 });
 
 // Fills toward fresh_until and spins while a refresh runs; an absolute range has no ring.
