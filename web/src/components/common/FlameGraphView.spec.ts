@@ -501,6 +501,53 @@ describe("FlameGraphView grouped frames", () => {
     expect(tip).not.toContain("Self");
   });
 
+  it("colours the first side's own graph by the same change as the diff graph", async () => {
+    // Side by Side: the tree is v1.4.0's, and after_total carries v1.5.0's time for each frame.
+    const wrapper = mount(FlameGraphView, {
+      props: {
+        root: {
+          name: "total",
+          total: 100,
+          before_total: 100,
+          after_total: 200,
+          children: [
+            { name: "json", total: 20, before_total: 20, after_total: 120 },
+            { name: "http", total: 80, before_total: 80, after_total: 80 },
+          ],
+        },
+        unitLabel: "ns",
+        summaryLabel: "v1.4.0",
+        summaryValue: "100",
+        diffBaselineTotal: 100,
+        diffComparisonTotal: 200,
+        diffLabels: { baseline: "v1.4.0", comparison: "v1.5.0" },
+      },
+      global: {
+        plugins: [i18n],
+        stubs: { ChartRenderer: ChartRendererStub, OSwitch: true, OTooltip: true },
+      },
+    });
+    await flushPromises();
+    await nextTick();
+
+    const blocks = blocksOf(wrapper);
+    const json = blocks.find((block) => block.name === "json")!;
+    // Width is v1.4.0's own time; the shares match the diff graph's: json 20% to 60%.
+    expect(json).toMatchObject({ total: 20, beforeShare: 0.2, afterShare: 0.6 });
+    expect(blocks.find((block) => block.name === "http")).toMatchObject({
+      beforeShare: 0.8,
+      afterShare: 0.4,
+    });
+    const options = (
+      wrapper.findComponent({ name: "ChartRenderer" }).props("data") as {
+        options: { tooltip: { formatter: (params: unknown) => string } };
+      }
+    ).options;
+    const tip = options.tooltip.formatter({ data: { block: json } });
+    expect(tip).toMatch(/v1\.5\.0<\/span>\s*<span[^>]*>120<\/span>\s*<span[^>]*>60\.00%/);
+    expect(tip).toContain("+40.00 pt");
+  });
+
   it("opens the tooltip above the pointer when the window has no room below it", async () => {
     const dom = document.createElement("div");
     dom.getBoundingClientRect = () => ({ left: 0, top: 500 }) as DOMRect;

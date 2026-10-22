@@ -1516,6 +1516,7 @@
     "diffSame": "No Change",
     "diffMore": "Bigger Share",
     "diffLegendHelp": "Width is {comparison}. Color shows how each function's share of the total changed from {baseline} to {comparison}.",
+    "diffLegendHelpSides": "Width is each value's own time. Color shows how each function's share of the total changed from {baseline} to {comparison}, the same in both graphs.",
     "diffSidePercent": "{side} %",
     "diffChange": "Change",
     "diffPoints": "{value} pt",

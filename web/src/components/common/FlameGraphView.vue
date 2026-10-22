@@ -261,6 +261,8 @@ export interface FlameGraphNode {
   self?: number;
   /** Baseline side of a diff tree; total and self are then the comparison side. */
   before_total?: number;
+  /** Comparison side, set when the drawn tree is the baseline side (Side by Side). */
+  after_total?: number;
   children?: FlameGraphNode[];
 }
 
@@ -327,6 +329,8 @@ const props = withDefaults(
     initialRootAtBottom?: boolean;
     /** Draw a diff tree: width is the comparison, colour the change in each frame's share. */
     diffBaselineTotal?: number | null;
+    /** The comparison side's total, when the drawn tree is not the comparison side. */
+    diffComparisonTotal?: number | null;
     /** What each side of a diff is called, as in "v1.4.0", for the tooltip's rows. */
     diffLabels?: { baseline: string; comparison: string };
   }>(),
@@ -457,14 +461,24 @@ const grandTotal = computed(() => props.root?.total || 0);
 
 const searchNeedle = computed(() => props.searchQuery.trim().toLowerCase());
 
+const diffComparisonTotal = computed(() => props.diffComparisonTotal ?? grandTotal.value);
+/** A frame's share of each side's total, 0 to 1, whichever side the tree draws. */
+const diffSharesOf = (node: FlameGraphNode) => {
+  const base = props.diffBaselineTotal ?? 0;
+  const comparison = diffComparisonTotal.value;
+  return {
+    beforeShare: base > 0 ? (node.before_total ?? 0) / base : 0,
+    afterShare: comparison > 0 ? (node.after_total ?? node.total) / comparison : 0,
+  };
+};
+
 /** The largest share change in the diff tree, so the strongest colour marks the biggest change. */
 const maxDiffChange = computed(() => {
-  const base = props.diffBaselineTotal ?? 0;
-  const total = grandTotal.value;
-  if (!props.root || base <= 0 || total <= 0) return 0;
+  if (!props.root || !props.diffBaselineTotal || diffComparisonTotal.value <= 0) return 0;
   let max = 0;
   const visit = (node: FlameGraphNode) => {
-    max = Math.max(max, Math.abs(node.total / total - (node.before_total ?? 0) / base));
+    const { beforeShare, afterShare } = diffSharesOf(node);
+    max = Math.max(max, Math.abs(afterShare - beforeShare));
     node.children?.forEach(visit);
   };
   props.root.children?.forEach(visit);
@@ -479,13 +493,8 @@ const collectBlocks = (root: FlameGraphNode | null): FlameBlock[] => {
   const rootDepth = ancestors.length;
 
   const colorFor = (name: string) => palette[paletteIndexFor(name, palette.length)];
-  const diffBase = props.diffBaselineTotal ?? 0;
-  const diffShares = (node: FlameGraphNode) => ({
-    beforeShare: diffBase > 0 ? (node.before_total ?? 0) / diffBase : 0,
-    afterShare: grandTotal.value > 0 ? node.total / grandTotal.value : 0,
-  });
   const diffFill = (node: FlameGraphNode) => {
-    const { beforeShare, afterShare } = diffShares(node);
+    const { beforeShare, afterShare } = diffSharesOf(node);
     const change = afterShare - beforeShare;
     if (Math.abs(change) < DIFF_FLOOR || maxDiffChange.value <= 0) return groupedFill;
     const strength = 0.25 + 0.75 * Math.min(1, Math.abs(change) / maxDiffChange.value);
@@ -547,7 +556,7 @@ const collectBlocks = (root: FlameGraphNode | null): FlameBlock[] => {
       self: selfOf(node),
       callerTotal,
       fill: hint ? groupedFill : isDiff ? diffFill(node) : colorFor(node.name),
-      ...(isDiff ? diffShares(node) : {}),
+      ...(isDiff ? diffSharesOf(node) : {}),
       textColor,
       matched,
       grouped: !!hint,
@@ -1003,7 +1012,7 @@ const chartData = computed(() => {
                 ) +
                 row(
                   props.diffLabels?.comparison ?? "",
-                  props.valueFormatter(block.total),
+                  props.valueFormatter(block.afterShare * diffComparisonTotal.value),
                   sharePercent(block.afterShare),
                 ) +
                 row(

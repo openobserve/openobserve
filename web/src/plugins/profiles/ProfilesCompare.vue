@@ -77,13 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("profiles.diffTable") }}
           </OToggleGroupItem>
         </OToggleGroup>
-        <!-- Hidden, not removed, in Side by Side so the toolbar keeps its layout. -->
-        <div
-          class="flex items-center gap-2 text-xs"
-          :class="{ invisible: state.display === 'sides' }"
-          :aria-hidden="state.display === 'sides'"
-          data-test="profiles-compare-legend"
-        >
+        <div class="flex items-center gap-2 text-xs" data-test="profiles-compare-legend">
           <span
             v-for="item in legend"
             :key="item.label"
@@ -95,7 +89,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               aria-hidden="true"
             />{{ item.label }}
           </span>
-          <OTooltip :content="t('profiles.diffLegendHelp', sideNames)" />
+          <OTooltip
+            :content="
+              t(
+                state.display === 'sides'
+                  ? 'profiles.diffLegendHelpSides'
+                  : 'profiles.diffLegendHelp',
+                sideNames,
+              )
+            "
+          />
         </div>
       </div>
     </div>
@@ -148,6 +151,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :root="side.root"
         :summary-label="side.name"
         :summary-value="valueFormatter(side.total)"
+        :diff-baseline-total="result.baseline_total"
+        :diff-comparison-total="result.comparison_total"
+        :diff-labels="sideNames"
         :unit-label="unitLabel"
         :value-formatter="valueFormatter"
         :search-query="searchQuery"
@@ -279,17 +285,25 @@ const sideNames = computed(() => ({
   comparison: raw(state.value.comparison ?? ""),
 }));
 
+/** A frame of one side's graph, with both sides' totals so it is coloured by the change. */
+type SideNode = ProfilesTreeNode & {
+  before_total: number;
+  after_total: number;
+  children: SideNode[];
+};
 /** One side of the diff tree as its own flame tree; frames that side never ran are dropped. */
-const sideTree = (node: ProfilesDiffNode, side: Side): ProfilesTreeNode | null => {
+const sideTree = (node: ProfilesDiffNode, side: Side): SideNode | null => {
   const total = side === "baseline" ? node.before_total : node.total;
   if (total <= 0) return null;
   const children = (node.children ?? [])
     .map((child) => sideTree(child, side))
-    .filter((child): child is ProfilesTreeNode => child !== null);
+    .filter((child): child is SideNode => child !== null);
   return {
     name: node.name,
     total,
     self: side === "baseline" ? node.before_self : node.self,
+    before_total: node.before_total,
+    after_total: node.total,
     children,
   };
 };

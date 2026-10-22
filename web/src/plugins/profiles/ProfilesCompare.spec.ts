@@ -66,7 +66,7 @@ const stubs = {
   OTooltip: true,
   CommonFlameGraph: {
     name: "FlameStub",
-    props: ["root", "diffBaselineTotal", "diffLabels", "summaryLabel"],
+    props: ["root", "diffBaselineTotal", "diffComparisonTotal", "diffLabels", "summaryLabel"],
     template: "<div />",
   },
   OTable: {
@@ -187,19 +187,31 @@ describe("ProfilesCompare", () => {
 
     const sides = wrapper.findAllComponents({ name: "FlameStub" });
     expect(sides.map((side) => side.props("summaryLabel"))).toEqual(["v1.4.0", "v1.5.0"]);
-    // The first version never ran json, so its graph leaves it out.
+    // The first version never ran json, so its graph leaves it out. Each frame keeps both
+    // sides' totals, so both graphs colour it by the same change.
     expect(sides[0].props("root")).toEqual({
       name: "total",
       total: 100,
       self: 0,
-      children: [{ name: "http", total: 100, self: 100, children: [] }],
+      before_total: 100,
+      after_total: 200,
+      children: [
+        { name: "http", total: 100, self: 100, before_total: 100, after_total: 80, children: [] },
+      ],
     });
+    for (const side of sides) {
+      expect(side.props()).toMatchObject({
+        diffBaselineTotal: 100,
+        diffComparisonTotal: 200,
+        diffLabels: { baseline: "v1.4.0", comparison: "v1.5.0" },
+      });
+    }
     expect(sides[1].props("root").children.map((c: { name: string }) => c.name)).toEqual([
       "json",
       "http",
     ]);
-    // The colour legend means nothing here, but it keeps its space so the toolbar does not shift.
-    expect(wrapper.find('[data-test="profiles-compare-legend"]').classes()).toContain("invisible");
+    // Both graphs use the diff colours, so the legend stays.
+    expect(wrapper.find('[data-test="profiles-compare-legend"]').isVisible()).toBe(true);
   });
 
   it("lists the change in each function's share in the diff table", async () => {
