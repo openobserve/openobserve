@@ -115,33 +115,12 @@ pub async fn set(template: Template) -> Result<Template, TemplateError> {
 }
 
 pub async fn delete(org_id: &str, name: &str) -> Result<(), TemplateError> {
-    // Check if template is used by any destination
-    for dest in DESTINATIONS.iter() {
-        let d = dest.value();
-        if (dest.key().starts_with(org_id) || dest.key().starts_with(DEFAULT_ORG))
-            && matches!(&d.module, Module::Alert { template: Some(t), .. } if t.eq(name))
-        {
-            return Err(TemplateError::DeleteWithDestination(dest.name.to_string()));
-        }
+    check_not_in_use(org_id, name).await?;
+
+    if !table::templates::delete(org_id, name).await? {
+        return Err(TemplateError::NotFound);
     }
-
-    // Check if template is used by any alert directly
-    let alerts_cache = ALERTS.read().await;
-    for (key, (_folder, alert)) in alerts_cache.iter() {
-        if (key.starts_with(org_id) || key.starts_with(DEFAULT_ORG))
-            && alert.template.as_ref().is_some_and(|t| t.eq(name))
-        {
-            return Err(TemplateError::DeleteWithAlert(alert.name.to_string()));
-        }
-    }
-    drop(alerts_cache);
-
-    let event_key = match table::templates::get(org_id, name).await? {
-        None => return Err(TemplateError::NotFound),
-        Some(temp) => format!("{TEMPLATE_WATCHER_PREFIX}{}/{}", temp.org_id, temp.name),
-    };
-
-    table::templates::delete(org_id, name).await?;
+    let event_key = format!("{TEMPLATE_WATCHER_PREFIX}{org_id}/{name}");
 
     // trigger watch event to update in-memory cache
     // in-cluster
@@ -314,9 +293,100 @@ pub fn get_parsed_content(template: &Template) -> Result<Arc<ContentSpec>, serde
     Ok(spec)
 }
 
+async fn check_not_in_use(org_id: &str, name: &str) -> Result<(), TemplateError> {
+    for dest in DESTINATIONS.iter() {
+        if references_from(org_id, dest.key())
+            && matches!(&dest.module, Module::Alert { template: Some(t), .. } if t == name)
+        {
+            return Err(TemplateError::DeleteWithDestination(dest.name.clone()));
+        }
+    }
+    let alerts_cache = ALERTS.read().await;
+    for (key, (_folder, alert)) in alerts_cache.iter() {
+        if references_from(org_id, key) && alert.template.as_deref() == Some(name) {
+            return Err(TemplateError::DeleteWithAlert(alert.name.clone()));
+        }
+    }
+    Ok(())
+}
+
+// A `default` template is shared by every org, so its references are checked across all orgs.
+fn references_from(org_id: &str, cache_key: &str) -> bool {
+    org_id == DEFAULT_ORG || cache_key.starts_with(&format!("{org_id}/"))
+}
+
 #[cfg(test)]
 mod tests {
+    use config::meta::{
+        alerts::alert::Alert,
+        destinations::{Destination, Module},
+        folder::Folder,
+    };
+
     use super::*;
+
+    fn seed_destination(org_id: &str, name: &str, template: &str) {
+        DESTINATIONS.insert(
+            format!("{org_id}/{name}"),
+            Destination {
+                org_id: org_id.to_string(),
+                name: name.to_string(),
+                module: Module::Alert {
+                    template: Some(template.to_string()),
+                    destination_type: Default::default(),
+                },
+                ..Default::default()
+            },
+        );
+    }
+
+    #[test]
+    fn test_references_from_matches_the_org_prefix_exactly() {
+        assert!(references_from("acme", "acme/dest"));
+        assert!(!references_from("acme", "acme2/dest"));
+        assert!(!references_from("acme2", "acme/dest"));
+        assert!(references_from(DEFAULT_ORG, "acme/dest"));
+    }
+
+    #[tokio::test]
+    async fn test_check_not_in_use_ignores_a_prefix_sibling_org() {
+        seed_destination("tpl_scope_acme2", "d", "tpl_scope_prefix_tpl");
+        assert!(
+            check_not_in_use("tpl_scope_acme", "tpl_scope_prefix_tpl")
+                .await
+                .is_ok()
+        );
+        assert!(matches!(
+            check_not_in_use("tpl_scope_acme2", "tpl_scope_prefix_tpl").await,
+            Err(TemplateError::DeleteWithDestination(d)) if d == "d"
+        ));
+    }
+
+    #[tokio::test]
+    async fn test_check_not_in_use_sees_every_org_for_a_default_template() {
+        seed_destination("tpl_scope_other", "d", "tpl_scope_shared_dest");
+        assert!(matches!(
+            check_not_in_use(DEFAULT_ORG, "tpl_scope_shared_dest").await,
+            Err(TemplateError::DeleteWithDestination(d)) if d == "d"
+        ));
+
+        let mut alert = Alert::default();
+        alert.name = "a".to_string();
+        alert.template = Some("tpl_scope_shared_alert".to_string());
+        ALERTS
+            .write()
+            .await
+            .insert("tpl_scope_other/a1".to_string(), (Folder::default(), alert));
+        assert!(matches!(
+            check_not_in_use(DEFAULT_ORG, "tpl_scope_shared_alert").await,
+            Err(TemplateError::DeleteWithAlert(a)) if a == "a"
+        ));
+        assert!(
+            check_not_in_use("tpl_scope_unrelated", "tpl_scope_shared_alert")
+                .await
+                .is_ok()
+        );
+    }
 
     #[test]
     fn test_template_error_display_empty_name() {

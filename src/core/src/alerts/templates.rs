@@ -60,6 +60,19 @@ pub(crate) fn resolve_kind(
     }
 }
 
+// Only root may reach a shared `default` template through another org's path.
+pub(crate) fn update_org(
+    path_org: &str,
+    existing_org: &str,
+    is_root: bool,
+) -> Result<String, TemplateError> {
+    if existing_org == path_org || is_root {
+        Ok(existing_org.to_string())
+    } else {
+        Err(TemplateError::NotFound)
+    }
+}
+
 pub async fn save(
     name: &str,
     mut template: Template,
@@ -99,10 +112,9 @@ pub async fn save(
         Ok(existing) => {
             if create {
                 return Err(TemplateError::AlreadyExists);
-            } else {
-                template.org_id = existing.org_id.clone(); // since org can be default
-                Some(existing)
             }
+            template.org_id = update_org(&template.org_id, &existing.org_id, is_root)?;
+            Some(existing)
         }
         Err(_) => {
             if !create {
@@ -424,6 +436,43 @@ mod tests {
         // shipped older (downgrade): never apply
         assert!(!should_apply_prebuilt(1, 2, false));
         assert!(!should_apply_prebuilt(1, 2, true));
+    }
+
+    #[test]
+    fn test_update_org_keeps_the_path_org_for_non_root() {
+        assert_eq!(update_org("acme", "acme", false).unwrap(), "acme");
+        assert!(matches!(
+            update_org("acme", DEFAULT_ORG, false),
+            Err(TemplateError::NotFound)
+        ));
+        assert_eq!(update_org("acme", DEFAULT_ORG, true).unwrap(), DEFAULT_ORG);
+    }
+
+    #[tokio::test]
+    async fn test_save_non_root_update_of_a_default_template_is_not_found() {
+        let name = "tpl_scope_shared";
+        let shared = Template {
+            org_id: DEFAULT_ORG.to_string(),
+            name: name.to_string(),
+            body: "shared".to_string(),
+            template_type: TemplateType::Http,
+            ..Default::default()
+        };
+        common::infra::config::ALERTS_TEMPLATES.insert(format!("{DEFAULT_ORG}/{name}"), shared);
+        let mut mine = Template {
+            org_id: "tpl_scope_acme".to_string(),
+            name: name.to_string(),
+            body: "mine".to_string(),
+            template_type: TemplateType::Http,
+            ..Default::default()
+        };
+        let err = save(name, mine.clone(), None, false, false)
+            .await
+            .unwrap_err();
+        assert!(matches!(err, TemplateError::NotFound), "{err}");
+        mine.org_id = DEFAULT_ORG.to_string();
+        let err = save(name, mine, None, true, false).await.unwrap_err();
+        assert!(matches!(err, TemplateError::AlreadyExists), "{err}");
     }
 
     #[test]
