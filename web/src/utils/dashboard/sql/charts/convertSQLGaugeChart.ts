@@ -18,12 +18,7 @@ import { calculateGridPositions } from "../../calculateGridForSubPlot";
 import { getSeriesColor } from "../../colorPalette";
 import { chartColor } from "@/utils/chartTheme";
 import { type SQLContext } from "../shared/types";
-import {
-  applyGaugeThresholds,
-  echartsPaletteColor,
-  gaugeDialRange,
-  getSeriesThresholds,
-} from "../../thresholds";
+import { gaugeDialRange } from "../../thresholds";
 import { createSeriesOverrideLookup, gaugeOverrideTooltip } from "../../seriesOverrides";
 
 /**
@@ -179,10 +174,5 @@ export function applyGaugeChart(ctx: SQLContext): void {
         fontSize: 12,
       },
     };
-  });
-
-  options.series.forEach((gauge: any, index: number) => {
-    const thresholds = getSeriesThresholds(panelSchema?.config, String(gaugeNames[index] ?? ""));
-    if (thresholds) applyGaugeThresholds(gauge, thresholds, echartsPaletteColor(index));
   });
 }

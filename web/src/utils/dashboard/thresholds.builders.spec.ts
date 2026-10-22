@@ -16,7 +16,7 @@
 import { describe, expect, it } from "vitest";
 import { convertMultiSQLData } from "./convertSQLData";
 import { convertPromQLData } from "./convertPromQLData";
-import { applyLineAreaThresholds } from "./thresholds";
+import { applyLineAreaThresholds, echartsPaletteColor } from "./thresholds";
 import { toSeriesOverrideEntry } from "./seriesOverrides";
 
 // Chart overrides are stored as `series` / `series_regex` entries of override_config.
@@ -247,6 +247,24 @@ describe("SQL gauge", () => {
     expect(options.series[1].data[0].itemStyle.color).toBe(RED);
     expect(options.series[0].axisLine.lineStyle.color[0]).toEqual([0.5, "rgba(34, 197, 94, 0.28)"]);
     expect(options.series[1].axisLine.lineStyle.width).toBeDefined();
+  });
+
+  it("multi-query dials below the first step keep their own palette colour", async () => {
+    const classic = { mode: "palette-classic" };
+    const panel = sqlPanel(
+      "gauge",
+      { thresholds: { steps: [{ value: 90, color: RED }] }, color: classic },
+      [
+        sqlQuery({ x: [serviceX], y: [yField()] }, { min: 0, max: 100 }),
+        sqlQuery({ x: [serviceX], y: [yField("Other")] }, { min: 0, max: 100 }),
+      ],
+    );
+    const options = await runSQL(panel, [
+      [{ x_axis_1: "alpha", y_axis_1: 30 }],
+      [{ x_axis_1: "beta", y_axis_1: 50 }],
+    ]);
+    expect(options.series[0].data[0].itemStyle.color).toBe(echartsPaletteColor(0));
+    expect(options.series[1].data[0].itemStyle.color).toBe(echartsPaletteColor(1));
   });
 });
 

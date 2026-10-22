@@ -28,7 +28,7 @@ import { calculateMetricFontSize, METRIC_SPARKLINE } from "./sql/charts/convertS
 import { calculateGridPositions, getTrellisGrid } from "./calculateGridForSubPlot";
 import { formatUnitValue, getUnitValue } from "./convertDataIntoUnitValue";
 import { escapeHtml } from "@/utils/html";
-import { applyLineAreaThresholds } from "./thresholds";
+import { applyGaugeSeriesThresholds, applyLineAreaThresholds } from "./thresholds";
 import { applySeriesOverrides } from "./seriesOverrides";
 
 /**
@@ -565,6 +565,7 @@ export const convertMultiSQLData = async (
       panelSchema?.config?.color?.colorBySeries,
       store.state.theme,
     );
+    applyGaugeSeriesThresholds(allSeries, panelSchema?.config);
     applySeriesOverrides(options[0].options, panelSchema, store.state.theme);
     return options[0];
   }
@@ -845,6 +846,9 @@ export const convertMultiSQLData = async (
   }
 
   if (options[0]?.options) {
+    if (chartType === "gauge") {
+      applyGaugeSeriesThresholds(options[0].options.series ?? [], panelSchema?.config);
+    }
     // Override colours first: a threshold step outranks them and recolours on top.
     applySeriesOverrides(options[0].options, panelSchema, store.state.theme);
     applyLineAreaThresholds(options[0].options, panelSchema);

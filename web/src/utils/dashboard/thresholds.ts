@@ -275,6 +275,14 @@ export const applyGaugeThresholds = (
   };
 };
 
+/** Applies each SQL gauge dial's steps; call it on the merged dial list, as a dial's palette fallback is its place in the whole panel. */
+export const applyGaugeSeriesThresholds = (series: any[], config: any): void => {
+  series.forEach((gauge, index) => {
+    const thresholds = getSeriesThresholds(config, String(gauge?.data?.[0]?.name ?? ""));
+    if (thresholds) applyGaugeThresholds(gauge, thresholds, echartsPaletteColor(index));
+  });
+};
+
 /** The colour ECharts gives the nth series that sets none (palette-classic). */
 export const echartsPaletteColor = (index: number): string => {
   const palette: string[] = echartsTokens.color.theme;
