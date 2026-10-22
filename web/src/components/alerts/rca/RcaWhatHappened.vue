@@ -52,10 +52,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :key="idx"
         data-test="rca-timeline-entry"
         :data-status="entry.status"
-        class="grid grid-cols-[4rem_1rem_minmax(0,1fr)] gap-x-3"
+        class="grid grid-cols-[7.5rem_1rem_minmax(0,1fr)] gap-x-3"
       >
-        <span class="text-text-secondary pt-0.5 font-mono text-xs">{{
-          formatRcaClock(entry.at)
+        <span class="text-text-secondary pt-0.5 font-mono text-xs whitespace-nowrap">{{
+          formatTimestampInTimezone(entry.at, "MMM D, HH:mm:ss", "UTC")
         }}</span>
         <span class="relative flex justify-center" aria-hidden="true">
           <span
@@ -131,7 +131,7 @@ import type {
   RcaTimelineStatus,
 } from "@/services/incidents";
 import { sortedRcaTimeline } from "@/utils/incidents/rcaSummary";
-import { formatRcaClock } from "@/utils/incidents/rcaThread";
+import { formatTimestampInTimezone } from "@/utils/date";
 import RcaEvidenceCard from "./RcaEvidenceCard.vue";
 
 const props = defineProps<{

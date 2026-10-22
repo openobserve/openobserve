@@ -65,7 +65,7 @@ describe("RcaWhatHappened (03 VE31, VE36, VE-D4)", () => {
       "likely",
     ]);
     expect(rows(wrapper)[0].text()).toContain("Deploy 4f2c1e (PR #812) rolls out to checkout-api");
-    expect(rows(wrapper)[0].text()).toContain("08:53:20");
+    expect(rows(wrapper)[0].text()).toContain("Oct 9, 08:53:20");
     expect(
       rows(wrapper).map((row) =>
         row.findAll('[data-test="rca-timeline-chip"]').map((chip) => chip.text()),
