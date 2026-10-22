@@ -4990,6 +4990,8 @@
       "idleInConfig": "{stream} ontvangt al gegevens. Controles starten zodra je de configuratie kopieert.",
       "idleMatches": "Overeenkomende streams ontvangen al gegevens. Controles starten zodra je het commando kopieert.",
       "idleMatchesConfig": "Overeenkomende streams ontvangen al gegevens. Controles starten zodra je de configuratie kopieert.",
+      "idleNew": "Checks starten wanneer je het commando kopieert.",
+      "idleNewConfig": "Checks starten wanneer je de configuratie kopieert.",
       "checkNow": "Nu controleren",
       "receivedPill": "Eerste event ontvangen",
       "receivedNewPill": "Nieuwe gegevens ontvangen",
