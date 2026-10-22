@@ -1017,7 +1017,7 @@ describe("IncidentRCAAnalysis", () => {
       });
       await flushPromises();
 
-      expect(byTest(wrapper, "rca-verdict-state").text()).toBe("Failed");
+      expect(byTest(wrapper, "rca-verdict-state").text()).toBe("Cancelled");
       expect(byTest(wrapper, "rca-verdict-headline").text()).toBe(
         "Run cancelled before a verdict. Partial results below",
       );

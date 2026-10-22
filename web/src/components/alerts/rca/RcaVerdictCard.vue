@@ -645,14 +645,11 @@ const pill = computed<{
         label: t("alerts.incidents.rcaRun.state.failed"),
       };
     default:
-      // A cancelled run with a partial record reads "Failed"; the recordless card keeps "Cancelled".
       return {
         tone: "err",
         icon: "cancel",
         spinner: false,
-        label: partial.value
-          ? t("alerts.incidents.rcaRun.state.failed")
-          : t("alerts.incidents.rcaRun.state.cancelled"),
+        label: t("alerts.incidents.rcaRun.state.cancelled"),
       };
   }
 });
