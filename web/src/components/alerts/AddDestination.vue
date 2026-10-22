@@ -140,9 +140,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
 
-            <!-- Additional Settings for Prebuilt Destinations -->
+            <!-- None of these settings apply to email destinations -->
             <div
-              v-if="showPrebuiltAdvancedSettings"
+              v-if="showPrebuiltAdvancedSettings && dtVal !== 'email'"
               class="mt-3 w-full"
               data-test="prebuilt-additional-settings"
             >
@@ -150,8 +150,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ t("alert_destinations.additional_settings") }}
               </div>
 
-              <!-- Custom Headers (hidden for email destinations) -->
-              <div v-if="dtVal !== 'email'" class="py-2">
+              <!-- Custom Headers -->
+              <div class="py-2">
                 <div class="pb-1 text-sm font-medium">
                   {{ t("alert_destinations.custom_headers") }}
                 </div>
@@ -199,7 +199,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <!-- Skip TLS Verify Toggle -->
-              <div v-if="dtVal !== 'email'" class="py-2">
+              <div class="py-2">
                 <OFormSwitch
                   data-test="add-destination-skip-tls-verify-toggle"
                   name="skip_tls_verify"

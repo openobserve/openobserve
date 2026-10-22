@@ -191,7 +191,11 @@ limitations under the License.
           >
             {{ raw("Subject: 🚨 OpenObserve Alert Notification") }}
           </div>
-          <div data-test="email-to" class="email-to text-brand-msg-meta mb-1 text-sm">
+          <div
+            v-if="recipients.length"
+            data-test="email-to"
+            class="email-to text-brand-msg-meta mb-1 text-sm"
+          >
             {{ raw(`To: ${recipients.join(", ")}`) }}
           </div>
           <div class="email-time text-brand-msg-meta mb-1 text-sm">

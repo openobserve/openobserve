@@ -1387,12 +1387,22 @@ describe("AddDestination — email destinations", () => {
     ]);
   });
 
-  it("hides Skip TLS Verify in the prebuilt email settings", async () => {
+  it("hides Additional Settings for prebuilt email, keeps it for other prebuilt types", async () => {
     wrapper = mountComp();
     await toPrebuiltEmail(wrapper);
-    expect(wrapper.find('[data-test="prebuilt-additional-settings"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="prebuilt-additional-settings"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="add-destination-skip-tls-verify-toggle"]').exists()).toBe(
       false,
+    );
+
+    const form = getForm(wrapper);
+    form.setFieldValue("destination_type", "teams");
+    form.setFieldValue("type", "http");
+    form.setFieldValue("credentials", {});
+    await flushPromises();
+    expect(wrapper.find('[data-test="prebuilt-additional-settings"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="add-destination-skip-tls-verify-toggle"]').exists()).toBe(
+      true,
     );
   });
 

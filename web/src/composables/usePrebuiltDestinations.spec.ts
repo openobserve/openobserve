@@ -931,6 +931,24 @@ describe("usePrebuiltDestinations", () => {
         expect.objectContaining({ variant: "error" }),
       );
     });
+
+    it.each([
+      [
+        "createDestination",
+        (inst: any) => inst.createDestination("slack", "s", makeSlackCredentials()),
+      ],
+      [
+        "updateDestination",
+        (inst: any) => inst.updateDestination("slack", "s", "s", makeSlackCredentials()),
+      ],
+    ])("%s still toasts and rethrows a non-object rejection", async (_name, save) => {
+      mockDestCreate.mockRejectedValue(undefined);
+      mockDestUpdate.mockRejectedValue(undefined);
+
+      await expect(save(usePrebuiltDestinations())).rejects.toBeUndefined();
+
+      expect(vi.mocked(toast)).toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
+    });
   });
 
   // -------------------------------------------------------------------------

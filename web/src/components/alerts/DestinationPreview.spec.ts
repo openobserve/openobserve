@@ -205,6 +205,11 @@ describe("DestinationPreview", () => {
     expect(wrapper.find('[data-test="email-from"]').exists()).toBe(false);
   });
 
+  it("shows no To line before any recipient is picked", () => {
+    wrapper = mountComponent({ type: "email" });
+    expect(wrapper.find('[data-test="email-to"]').exists()).toBe(false);
+  });
+
   it("should display Email body", () => {
     wrapper = mountComponent({ type: "email" });
     expect(wrapper.find('[data-test="email-body"]').exists()).toBe(true);
