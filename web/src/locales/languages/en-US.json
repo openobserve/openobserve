@@ -9552,9 +9552,7 @@
       "rcaDownload": "Download as Markdown",
       "rcaReanalyze": "Re-analyze",
       "rcaFreshAnalysis": "Fresh analysis",
-      "rcaFreshAnalysisHint": "Analyze from scratch, ignoring the previous report",
       "rcaBuildOnPrevious": "Build on previous report",
-      "rcaBuildOnPreviousHint": "Send the current report so the agent extends it",
       "rcaHistory": "Report history",
       "rcaAsk": {
         "button": "Ask about this analysis",
@@ -9627,19 +9625,16 @@
         "unblocked": "Unblocked by {author} at {time}",
         "unblockedWithNeed": "Unblocked by {author} at {time} · {need} from a human lead",
         "guidanceDialog": {
-          "title": "Re-analyze with guidance",
           "mode": "Mode",
           "freshTitle": "Fresh analysis",
           "freshHint": "Start from scratch, ignoring this report",
           "buildTitle": "Build on previous",
           "buildHint": "Send this report so the agent extends it",
-          "guidanceLabel": "Guidance",
+          "guidanceLabel": "Guidance (optional)",
           "guidancePlaceholder": "Tell the agent what to check or ignore.",
           "note": "Creates a new report version. This one stays as is.",
           "start": "Start re-analysis"
         },
-        "withGuidance": "With guidance…",
-        "withGuidanceHint": "Tell the agent what to check or ignore. Creates a new version",
         "error": {
           "runNotSteerable": "This run no longer takes messages. Re-analyze to start a new version.",
           "runClosing": "The answer window has closed and the run is closing as Blocked. Re-analyze with your message instead.",

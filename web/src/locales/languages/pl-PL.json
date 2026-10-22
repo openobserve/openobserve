@@ -9552,9 +9552,7 @@
       "rcaDownload": "Pobierz jako Markdown",
       "rcaReanalyze": "Analizuj ponownie",
       "rcaFreshAnalysis": "Nowa analiza",
-      "rcaFreshAnalysisHint": "Analizuj od zera, ignorując poprzedni raport",
       "rcaBuildOnPrevious": "Kontynuuj na podstawie poprzedniego raportu",
-      "rcaBuildOnPreviousHint": "Wyślij bieżący raport, aby agent go rozszerzył",
       "rcaHistory": "Historia raportów",
       "rcaAsk": {
         "button": "Zapytaj o tę analizę",
@@ -9627,7 +9625,6 @@
         "unblocked": "Odblokowane przez {author} o {time}",
         "unblockedWithNeed": "Odblokowane przez {author} o {time} · {need} od człowieka pełniącego rolę lidera",
         "guidanceDialog": {
-          "title": "Przeanalizuj ponownie ze wskazówkami",
           "mode": "Tryb",
           "freshTitle": "Nowa analiza",
           "freshHint": "Zacznij od zera, pomijając ten raport",
@@ -9638,8 +9635,6 @@
           "note": "Tworzy nową wersję raportu. Ta pozostaje bez zmian.",
           "start": "Rozpocznij ponowną analizę"
         },
-        "withGuidance": "Ze wskazówkami…",
-        "withGuidanceHint": "Powiedz agentowi, co sprawdzić lub pominąć. Tworzy nową wersję",
         "error": {
           "runNotSteerable": "Ten przebieg nie przyjmuje już wiadomości. Uruchom ponowną analizę, aby rozpocząć nową wersję.",
           "runClosing": "Okno odpowiedzi zostało zamknięte, a przebieg zamyka się ze statusem Zablokowany. Zamiast tego uruchom ponowną analizę z tą wiadomością.",

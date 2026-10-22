@@ -38,16 +38,16 @@ const dialog = (wrapper: VueWrapper) => wrapper.findComponent(ODialogStub);
 const guidanceBox = (wrapper: VueWrapper) => wrapper.find("textarea");
 
 describe("RcaGuidanceDialog (04 §3 frame I, SG33, SG40)", () => {
-  it("frame I: title, the two modes, Guidance and the new-version note", () => {
+  it("frame I: title, the two modes, optional Guidance and the new-version note", () => {
     const wrapper = mountDialog();
 
-    expect(dialog(wrapper).props("title")).toBe("Re-analyze with guidance");
+    expect(dialog(wrapper).props("title")).toBe("Re-analyze");
     expect(dialog(wrapper).props("primaryButtonLabel")).toBe("Start re-analysis");
     expect(wrapper.text()).toContain("Fresh analysis");
     expect(wrapper.text()).toContain("Start from scratch, ignoring this report");
     expect(wrapper.text()).toContain("Build on previous");
     expect(wrapper.text()).toContain("Send this report so the agent extends it");
-    expect(wrapper.text()).toContain("Guidance");
+    expect(wrapper.text()).toContain("Guidance (optional)");
     expect(wrapper.find('[data-test="rca-guidance-note"]').text()).toBe(
       "Creates a new report version. This one stays as is.",
     );
@@ -72,13 +72,33 @@ describe("RcaGuidanceDialog (04 §3 frame I, SG33, SG40)", () => {
     expect((guidanceBox(wrapper).element as HTMLTextAreaElement).value).toBe("second");
   });
 
-  it("Start is disabled without guidance", async () => {
+  it("Start is enabled with or without guidance, and disabled while a start is in flight", async () => {
     const wrapper = mountDialog();
-    expect(dialog(wrapper).props("primaryButtonDisabled")).toBe(true);
-    await guidanceBox(wrapper).setValue("   ");
-    expect(dialog(wrapper).props("primaryButtonDisabled")).toBe(true);
+    expect(dialog(wrapper).props("primaryButtonDisabled")).toBe(false);
     await guidanceBox(wrapper).setValue("Check the pool");
     expect(dialog(wrapper).props("primaryButtonDisabled")).toBe(false);
+    await wrapper.setProps({ triggering: true });
+    expect(dialog(wrapper).props("primaryButtonDisabled")).toBe(true);
+  });
+
+  it.each([
+    ["fresh", false],
+    ["build", true],
+  ] as const)("without guidance, %s sends no guidance field", async (mode, buildOnPrevious) => {
+    const wrapper = mountDialog();
+
+    await guidanceBox(wrapper).setValue("   ");
+    await wrapper.findComponent(ORadioGroup).vm.$emit("update:modelValue", mode);
+    await dialog(wrapper).vm.$emit("click:primary");
+
+    expect(wrapper.emitted("start")).toEqual([[{ buildOnPrevious }]]);
+  });
+
+  it("shows the re-analysis cost when it is known", () => {
+    expect(mountDialog({ creditCost: 5 }).find('[data-test="rca-guidance-cost"]').text()).toBe(
+      "· Uses 5 AI credits",
+    );
+    expect(mountDialog().find('[data-test="rca-guidance-cost"]').exists()).toBe(false);
   });
 
   it("sends {guidance} with Build on previous by default, and closes once the new run exists", async () => {

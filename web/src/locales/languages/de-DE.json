@@ -9552,9 +9552,7 @@
       "rcaDownload": "Als Markdown herunterladen",
       "rcaReanalyze": "Erneut analysieren",
       "rcaFreshAnalysis": "Neue Analyse",
-      "rcaFreshAnalysisHint": "Von Grund auf analysieren, vorherigen Bericht ignorieren",
       "rcaBuildOnPrevious": "Auf dem vorherigen Bericht aufbauen",
-      "rcaBuildOnPreviousHint": "Aktuellen Bericht senden, damit der Agent ihn erweitert",
       "rcaHistory": "Berichtsverlauf",
       "rcaAsk": {
         "button": "Zu dieser Analyse fragen",
@@ -9627,7 +9625,6 @@
         "unblocked": "Entsperrt von {author} um {time}",
         "unblockedWithNeed": "Entsperrt von {author} um {time} · {need} von einer menschlichen Leitung",
         "guidanceDialog": {
-          "title": "Mit Hinweisen neu analysieren",
           "mode": "Modus",
           "freshTitle": "Neue Analyse",
           "freshHint": "Von Grund auf neu starten, diesen Bericht ignorieren",
@@ -9638,8 +9635,6 @@
           "note": "Erstellt eine neue Version des Berichts. Diese bleibt unverändert.",
           "start": "Erneute Analyse starten"
         },
-        "withGuidance": "Mit Hinweisen …",
-        "withGuidanceHint": "Sagen Sie dem Agenten, was geprüft oder ignoriert werden soll. Erstellt eine neue Version",
         "error": {
           "runNotSteerable": "Dieser Lauf nimmt keine Nachrichten mehr an. Starten Sie eine erneute Analyse, um eine neue Version zu beginnen.",
           "runClosing": "Das Antwortfenster ist geschlossen und der Lauf wird als Blockiert beendet. Starten Sie stattdessen eine erneute Analyse mit Ihrer Nachricht.",

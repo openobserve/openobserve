@@ -25,6 +25,7 @@ vi.mock("@/services/incidents", () => ({
 }));
 
 import IncidentRCAAnalysis from "./IncidentRCAAnalysis.vue";
+import RcaGuidanceDialog from "./rca/RcaGuidanceDialog.vue";
 import i18n from "@/locales";
 import awsConfig from "@/aws-exports";
 import type { RcaAskPayload } from "@/utils/incidents/rcaAskAttachment";
@@ -214,7 +215,7 @@ describe("IncidentRCAAnalysis", () => {
       expect(wrapper.emitted("trigger-rca")).toEqual([[{ buildOnPrevious: false }]]);
     });
 
-    it("a refused re-analysis shows the blocked banner on the card and costs in the menu", async () => {
+    it("a refused re-analysis shows the blocked banner on the card and its cost in the dialog", async () => {
       wrapper = mountPanel({
         ...completedProps(),
         refusal: { ...refusal, remedy: "contact" },
@@ -225,7 +226,7 @@ describe("IncidentRCAAnalysis", () => {
       expect(
         byTest(wrapper, "rca-verdict-card").find('[data-test="rca-contact-btn"]').exists(),
       ).toBe(true);
-      expect(byTest(wrapper, "rca-reanalyze-fresh-cost").text()).toBe("Uses 5 AI credits");
+      expect(wrapper.findComponent(RcaGuidanceDialog).props("creditCost")).toBe(5);
     });
   });
 
@@ -597,12 +598,16 @@ describe("IncidentRCAAnalysis", () => {
       );
     });
 
-    it("Re-analyze emits the chosen mode", async () => {
+    it("Re-analyze opens the dialog, which can build on the completed run", async () => {
       wrapper = mountPanel(completedProps());
       await flushPromises();
+      const dialog = wrapper.findComponent(RcaGuidanceDialog);
+      expect(dialog.props("open")).toBe(false);
 
-      await byTest(wrapper, "rca-reanalyze-build").trigger("click");
-      expect(wrapper.emitted("trigger-rca")).toEqual([[{ buildOnPrevious: true }]]);
+      await byTest(wrapper, "rca-reanalyze-btn").trigger("click");
+      expect(dialog.props("open")).toBe(true);
+      expect(dialog.props("canBuildOnPrevious")).toBe(true);
+      expect(wrapper.emitted("trigger-rca")).toBeUndefined();
     });
 
     it("Cancel run emits cancel-rca while live", async () => {
@@ -650,7 +655,7 @@ describe("IncidentRCAAnalysis", () => {
       expect(byTest(wrapper, "rca-thread-empty").text()).toBe(NO_TRANSCRIPT);
       expect(byTest(wrapper, "rca-steer-composer").exists()).toBe(false);
       expect(byTest(wrapper, "rca-resume-btn").exists()).toBe(false);
-      expect(byTest(wrapper, "rca-reanalyze-build").attributes("data-disabled")).toBe("false");
+      expect(wrapper.findComponent(RcaGuidanceDialog).props("canBuildOnPrevious")).toBe(true);
     });
 
     it("the selector opens a v1 report; the picked v1 run shows its report and reads no thread", async () => {
@@ -761,7 +766,7 @@ describe("IncidentRCAAnalysis", () => {
       wrapper = mountPanel({ ...completedProps(), reportText: "", reportLoading: true });
       await flushPromises();
 
-      expect(byTest(wrapper, "rca-reanalyze-build").attributes("data-disabled")).toBe("false");
+      expect(wrapper.findComponent(RcaGuidanceDialog).props("canBuildOnPrevious")).toBe(true);
       // Copy/Download still need the text.
       expect(byTest(wrapper, "rca-copy-btn").attributes("data-disabled")).toBe("true");
     });
@@ -774,7 +779,7 @@ describe("IncidentRCAAnalysis", () => {
       });
       await flushPromises();
 
-      expect(byTest(wrapper, "rca-reanalyze-build").attributes("data-disabled")).toBe("true");
+      expect(wrapper.findComponent(RcaGuidanceDialog).props("canBuildOnPrevious")).toBe(false);
     });
 
     const statsProps = () => ({
@@ -1278,11 +1283,11 @@ describe("IncidentRCAAnalysis", () => {
       ]);
     });
 
-    it("frame I: the Re-analyze menu's 'With guidance…' opens the dialog empty", async () => {
+    it("frame I: Re-analyze opens the dialog empty", async () => {
       wrapper = mountSteerable(completedProps());
       await flushPromises();
 
-      await byTest(wrapper, "rca-reanalyze-guidance").trigger("click");
+      await byTest(wrapper, "rca-reanalyze-btn").trigger("click");
 
       const dialog = byTest(wrapper, "rca-guidance-dialog");
       expect((dialog.find("textarea").element as HTMLTextAreaElement).value).toBe("");

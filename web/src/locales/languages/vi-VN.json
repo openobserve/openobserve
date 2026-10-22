@@ -9552,9 +9552,7 @@
       "rcaDownload": "Tải xuống dạng Markdown",
       "rcaReanalyze": "Phân tích lại",
       "rcaFreshAnalysis": "Phân tích mới",
-      "rcaFreshAnalysisHint": "Phân tích từ đầu, bỏ qua báo cáo trước",
       "rcaBuildOnPrevious": "Xây dựng dựa trên báo cáo trước",
-      "rcaBuildOnPreviousHint": "Gửi báo cáo hiện tại để agent mở rộng nó",
       "rcaHistory": "Lịch sử báo cáo",
       "rcaAsk": {
         "button": "Hỏi về phân tích này",
@@ -9627,7 +9625,6 @@
         "unblocked": "Được {author} bỏ chặn lúc {time}",
         "unblockedWithNeed": "Được {author} bỏ chặn lúc {time} · cần {need} từ người phụ trách",
         "guidanceDialog": {
-          "title": "Phân tích lại với hướng dẫn",
           "mode": "Chế độ",
           "freshTitle": "Phân tích mới",
           "freshHint": "Bắt đầu lại từ đầu, bỏ qua báo cáo này",
@@ -9638,8 +9635,6 @@
           "note": "Tạo một phiên bản báo cáo mới. Bản này được giữ nguyên.",
           "start": "Bắt đầu phân tích lại"
         },
-        "withGuidance": "Kèm hướng dẫn…",
-        "withGuidanceHint": "Cho agent biết cần kiểm tra hoặc bỏ qua điều gì. Tạo một phiên bản mới",
         "error": {
           "runNotSteerable": "Lần chạy này không còn nhận tin nhắn. Hãy phân tích lại để bắt đầu phiên bản mới.",
           "runClosing": "Cửa sổ trả lời đã đóng và lần chạy đang kết thúc ở trạng thái Bị chặn. Hãy phân tích lại kèm tin nhắn của bạn.",

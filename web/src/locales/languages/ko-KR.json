@@ -9552,9 +9552,7 @@
       "rcaDownload": "Markdown으로 다운로드",
       "rcaReanalyze": "재분석",
       "rcaFreshAnalysis": "새 분석",
-      "rcaFreshAnalysisHint": "이전 보고서를 무시하고 처음부터 분석",
       "rcaBuildOnPrevious": "이전 보고서를 기반으로 작성",
-      "rcaBuildOnPreviousHint": "에이전트가 확장할 수 있도록 현재 보고서를 보냅니다",
       "rcaHistory": "보고서 기록",
       "rcaAsk": {
         "button": "이 분석에 대해 질문하기",
@@ -9627,7 +9625,6 @@
         "unblocked": "{author}님이 {time}에 차단 해제함",
         "unblockedWithNeed": "{author}님이 {time}에 차단 해제 · 사람 리드로부터 {need}",
         "guidanceDialog": {
-          "title": "가이던스로 재분석",
           "mode": "모드",
           "freshTitle": "새 분석",
           "freshHint": "이 보고서를 무시하고 처음부터 시작",
@@ -9638,8 +9635,6 @@
           "note": "새 보고서 버전을 만듭니다. 현재 버전은 그대로 유지됩니다.",
           "start": "재분석 시작"
         },
-        "withGuidance": "지침과 함께…",
-        "withGuidanceHint": "에이전트에게 확인하거나 무시할 항목을 알려주세요. 새 버전을 만듭니다",
         "error": {
           "runNotSteerable": "이 실행은 더 이상 메시지를 받지 않습니다. 새 버전을 시작하려면 재분석하세요.",
           "runClosing": "응답 시간이 종료되어 실행이 차단됨으로 종료됩니다. 대신 메시지와 함께 재분석하세요.",

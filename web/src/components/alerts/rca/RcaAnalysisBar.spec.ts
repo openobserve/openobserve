@@ -77,7 +77,6 @@ const mountBar = (props: Record<string, unknown> = {}) =>
       subtitle: "Re-analyze by j.okafor · started 7s ago",
       hasReport: true,
       hasThread: true,
-      canBuildOnPrevious: true,
       ...props,
     },
     global: { plugins: [i18n], stubs },
@@ -148,33 +147,15 @@ describe("RcaAnalysisBar (contract E5)", () => {
     expect(wrapper.emitted("cancel")).toHaveLength(1);
   });
 
-  it("when not live, Re-analyze ▾ offers Fresh and Build on previous", async () => {
+  it("when not live, Re-analyze is one button that emits reanalyze (the dialog picks the mode)", async () => {
     const wrapper = mountBar({ live: false, latestRunId: "run-1", selectedRunId: "run-1" });
 
     expect(byTest(wrapper, "rca-cancel-btn").exists()).toBe(false);
-    expect(byTest(wrapper, "rca-reanalyze-btn").text()).toContain("Re-analyze");
-    await byTest(wrapper, "rca-reanalyze-fresh").trigger("click");
-    await byTest(wrapper, "rca-reanalyze-build").trigger("click");
-    expect(wrapper.emitted("reanalyze")).toEqual([
-      [{ buildOnPrevious: false }],
-      [{ buildOnPrevious: true }],
-    ]);
+    expect(byTest(wrapper, "rca-reanalyze-btn").text()).toBe("Re-analyze");
+    expect(byTest(wrapper, "rca-reanalyze-fresh").exists()).toBe(false);
+    await byTest(wrapper, "rca-reanalyze-btn").trigger("click");
+    expect(wrapper.emitted("reanalyze")).toEqual([[]]);
   });
-
-  it.each([
-    [true, false, "false"],
-    [true, true, "false"],
-    [false, true, "true"],
-    [false, false, "true"],
-  ])(
-    "Build on previous enabled iff canBuildOnPrevious (can=%s, hasReport=%s)",
-    (canBuildOnPrevious, hasReport, disabled) => {
-      const wrapper = mountBar({ live: false, canBuildOnPrevious, hasReport });
-
-      expect(byTest(wrapper, "rca-reanalyze-build").attributes("data-disabled")).toBe(disabled);
-      expect(byTest(wrapper, "rca-reanalyze-fresh").attributes("data-disabled")).toBe("false");
-    },
-  );
 
   describe("J5: Ask about this analysis", () => {
     it("not live with canAsk: shown before Re-analyze and emits ask", async () => {
@@ -233,36 +214,6 @@ describe("RcaAnalysisBar (contract E5)", () => {
       for (const id of ["rca-copy-btn", "rca-download-btn", "rca-copy-thread-btn"]) {
         expect(byTest(wrapper, id).attributes("data-disabled")).toBe("true");
       }
-    });
-  });
-
-  describe("04 frame I: Re-analyze with guidance", () => {
-    it("the Re-analyze menu offers 'With guidance…', which emits reanalyze-guidance", async () => {
-      const wrapper = mountBar({ live: false });
-      const item = byTest(wrapper, "rca-reanalyze-guidance");
-
-      expect(item.text()).toContain("With guidance…");
-      expect(item.text()).toContain(
-        "Tell the agent what to check or ignore. Creates a new version",
-      );
-      await item.trigger("click");
-      expect(wrapper.emitted("reanalyze-guidance")).toHaveLength(1);
-    });
-  });
-
-  describe("AI credit cost", () => {
-    it("Fresh and Build on previous each show the re-analysis cost when it is known", () => {
-      const wrapper = mountBar({ live: false, reanalyzeCreditCost: 1 });
-
-      expect(byTest(wrapper, "rca-reanalyze-fresh-cost").text()).toBe("Uses 1 AI credit");
-      expect(byTest(wrapper, "rca-reanalyze-build-cost").text()).toBe("Uses 1 AI credit");
-    });
-
-    it("shows no cost when it is unknown", () => {
-      const wrapper = mountBar({ live: false });
-
-      expect(byTest(wrapper, "rca-reanalyze-fresh-cost").exists()).toBe(false);
-      expect(byTest(wrapper, "rca-reanalyze-build-cost").exists()).toBe(false);
     });
   });
 });

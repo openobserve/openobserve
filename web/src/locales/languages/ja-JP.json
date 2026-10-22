@@ -9552,9 +9552,7 @@
       "rcaDownload": "Markdown としてダウンロード",
       "rcaReanalyze": "再分析",
       "rcaFreshAnalysis": "新規分析",
-      "rcaFreshAnalysisHint": "以前のレポートを無視してゼロから分析",
       "rcaBuildOnPrevious": "前回のレポートを基に",
-      "rcaBuildOnPreviousHint": "現在のレポートを送信してエージェントに拡張させます",
       "rcaHistory": "レポート履歴",
       "rcaAsk": {
         "button": "この分析について質問",
@@ -9627,7 +9625,6 @@
         "unblocked": "{author} が {time} にブロック解除",
         "unblockedWithNeed": "{author} が {time} にブロック解除 · 人間のリードからの{need}",
         "guidanceDialog": {
-          "title": "ガイダンス付きで再分析",
           "mode": "モード",
           "freshTitle": "新規分析",
           "freshHint": "このレポートを無視して最初からやり直す",
@@ -9638,8 +9635,6 @@
           "note": "新しいレポートバージョンを作成します。このレポートはそのまま残ります。",
           "start": "再分析を開始"
         },
-        "withGuidance": "ガイダンス付きで…",
-        "withGuidanceHint": "エージェントにチェックまたは無視する内容を指示します。新しいバージョンを作成します",
         "error": {
           "runNotSteerable": "この実行はメッセージを受け付けなくなりました。新しいバージョンを開始するには再分析してください。",
           "runClosing": "回答ウィンドウが閉じ、実行はブロック状態として終了します。代わりにメッセージを添えて再分析してください。",

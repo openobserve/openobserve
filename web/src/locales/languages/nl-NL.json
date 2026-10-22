@@ -9552,9 +9552,7 @@
       "rcaDownload": "Downloaden als Markdown",
       "rcaReanalyze": "Opnieuw analyseren",
       "rcaFreshAnalysis": "Nieuwe analyse",
-      "rcaFreshAnalysisHint": "Analyseer vanaf nul, negeer het vorige rapport",
       "rcaBuildOnPrevious": "Voortbouwen op het vorige rapport",
-      "rcaBuildOnPreviousHint": "Stuur het huidige rapport zodat de agent het uitbreidt",
       "rcaHistory": "Rapportgeschiedenis",
       "rcaAsk": {
         "button": "Stel een vraag over deze analyse",
@@ -9627,7 +9625,6 @@
         "unblocked": "Gedeblokkeerd door {author} op {time}",
         "unblockedWithNeed": "Gedeblokkeerd door {author} op {time} · {need} van een menselijke lead",
         "guidanceDialog": {
-          "title": "Opnieuw analyseren met sturing",
           "mode": "Modus",
           "freshTitle": "Nieuwe analyse",
           "freshHint": "Begin opnieuw en negeer dit rapport",
@@ -9638,8 +9635,6 @@
           "note": "Maakt een nieuwe versie van het rapport. Deze blijft ongewijzigd.",
           "start": "Heranalyse starten"
         },
-        "withGuidance": "Met aanwijzingen…",
-        "withGuidanceHint": "Vertel de agent wat hij moet controleren of negeren. Maakt een nieuwe versie",
         "error": {
           "runNotSteerable": "Deze run accepteert geen berichten meer. Heranalyseer om een nieuwe versie te starten.",
           "runClosing": "Het antwoordvenster is gesloten en de run wordt afgesloten als Geblokkeerd. Heranalyseer in plaats daarvan met je bericht.",

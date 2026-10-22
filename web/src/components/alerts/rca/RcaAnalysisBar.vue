@@ -79,58 +79,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <span class="sr-only @2xl:not-sr-only">{{ t("alerts.incidents.rcaAsk.button") }}</span>
     </OButton>
 
-    <ODropdown v-if="!live" align="end" content-class="w-75">
-      <template #trigger>
-        <OButton
-          data-test="rca-reanalyze-btn"
-          variant="outline"
-          size="sm"
-          class="shrink-0"
-          :loading="triggering"
-          :disabled="resuming"
-        >
-          <OIcon name="refresh" size="sm" class="@2xl:me-1" />
-          <span class="sr-only @2xl:not-sr-only">{{ t("alerts.incidents.rcaReanalyze") }}</span>
-          <OIcon name="expand-more" size="sm" class="ms-1" />
-        </OButton>
-      </template>
-      <ODropdownItem
-        data-test="rca-reanalyze-fresh"
-        :description="t('alerts.incidents.rcaFreshAnalysisHint')"
-        @select="$emit('reanalyze', { buildOnPrevious: false })"
-      >
-        {{ t("alerts.incidents.rcaFreshAnalysis") }}
-        <span
-          v-if="reanalyzeCostLabel"
-          data-test="rca-reanalyze-fresh-cost"
-          class="text-text-secondary block text-xs"
-        >
-          {{ reanalyzeCostLabel }}
-        </span>
-      </ODropdownItem>
-      <ODropdownItem
-        data-test="rca-reanalyze-build"
-        :disabled="!canBuildOnPrevious"
-        :description="t('alerts.incidents.rcaBuildOnPreviousHint')"
-        @select="$emit('reanalyze', { buildOnPrevious: true })"
-      >
-        {{ t("alerts.incidents.rcaBuildOnPrevious") }}
-        <span
-          v-if="reanalyzeCostLabel"
-          data-test="rca-reanalyze-build-cost"
-          class="text-text-secondary block text-xs"
-        >
-          {{ reanalyzeCostLabel }}
-        </span>
-      </ODropdownItem>
-      <ODropdownItem
-        data-test="rca-reanalyze-guidance"
-        :description="t('alerts.incidents.rcaSteer.withGuidanceHint')"
-        @select="$emit('reanalyze-guidance')"
-      >
-        {{ t("alerts.incidents.rcaSteer.withGuidance") }}
-      </ODropdownItem>
-    </ODropdown>
+    <OButton
+      v-if="!live"
+      data-test="rca-reanalyze-btn"
+      variant="outline"
+      size="sm"
+      class="shrink-0"
+      icon-left="refresh"
+      :loading="triggering"
+      :disabled="resuming"
+      @click="$emit('reanalyze')"
+    >
+      <span class="sr-only @2xl:not-sr-only">{{ t("alerts.incidents.rcaReanalyze") }}</span>
+    </OButton>
 
     <ODropdown align="end" content-class="w-55">
       <template #trigger>
@@ -198,8 +159,6 @@ const props = withDefaults(
     subtitle: I18nText | string;
     /** The shown report's text is loaded (Copy, Download). */
     hasReport: boolean;
-    /** A completed run exists to build on. */
-    canBuildOnPrevious: boolean;
     hasThread: boolean;
     /** The shown run has a report or a record and AI chat is available (J5). */
     canAsk?: boolean;
@@ -207,23 +166,19 @@ const props = withDefaults(
     /** A resume is in flight: Re-analyze waits for it. */
     resuming?: boolean;
     cancelling?: boolean;
-    /** AI credits a re-analysis uses; unset outside cloud, where no cost shows. */
-    reanalyzeCreditCost?: number | null;
   }>(),
   {
     canAsk: false,
     triggering: false,
     resuming: false,
     cancelling: false,
-    reanalyzeCreditCost: null,
   },
 );
 
 defineEmits<{
   "select-run": [runId: string | null];
-  reanalyze: [options: { buildOnPrevious: boolean }];
-  /** "With guidance…": open the guidance dialog. */
-  "reanalyze-guidance": [];
+  /** Re-analyze: open the re-analysis dialog. */
+  reanalyze: [];
   cancel: [];
   "copy-report": [];
   "download-report": [];
@@ -264,9 +219,4 @@ const selectedItem = computed(() => items.value.find((item) => item.selected) ??
 const selectedIsLive = computed(() => props.live && selectedItem.value?.isLatest === true);
 
 const selectorLabel = computed(() => selectedItem.value?.label ?? t("alerts.incidents.rcaHistory"));
-
-const reanalyzeCostLabel = computed<I18nText | null>(() => {
-  const cost = props.reanalyzeCreditCost;
-  return cost ? t("alerts.incidents.rcaCreditCost", { cost }, cost) : null;
-});
 </script>

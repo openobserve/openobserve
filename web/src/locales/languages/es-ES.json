@@ -9552,9 +9552,7 @@
       "rcaDownload": "Descargar como Markdown",
       "rcaReanalyze": "Reanalizar",
       "rcaFreshAnalysis": "Análisis nuevo",
-      "rcaFreshAnalysisHint": "Analizar desde cero, ignorando el informe anterior",
       "rcaBuildOnPrevious": "Basarse en el informe anterior",
-      "rcaBuildOnPreviousHint": "Enviar el informe actual para que el agente lo extienda",
       "rcaHistory": "Historial de informes",
       "rcaAsk": {
         "button": "Preguntar sobre este análisis",
@@ -9627,7 +9625,6 @@
         "unblocked": "Desbloqueado por {author} a las {time}",
         "unblockedWithNeed": "Desbloqueado por {author} a las {time} · {need} de un responsable humano",
         "guidanceDialog": {
-          "title": "Volver a analizar con indicaciones",
           "mode": "Modo",
           "freshTitle": "Análisis desde cero",
           "freshHint": "Empezar desde cero, ignorando este informe",
@@ -9638,8 +9635,6 @@
           "note": "Crea una nueva versión del informe. Esta se mantiene tal cual.",
           "start": "Iniciar reanálisis"
         },
-        "withGuidance": "Con indicaciones…",
-        "withGuidanceHint": "Indica al agente qué comprobar o ignorar. Crea una nueva versión.",
         "error": {
           "runNotSteerable": "Esta ejecución ya no acepta mensajes. Vuelve a analizar para iniciar una nueva versión.",
           "runClosing": "La ventana para responder se ha cerrado y la ejecución se está cerrando como Bloqueada. En su lugar, vuelve a analizar con tu mensaje.",

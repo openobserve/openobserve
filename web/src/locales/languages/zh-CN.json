@@ -9552,9 +9552,7 @@
       "rcaDownload": "下载为 Markdown",
       "rcaReanalyze": "重新分析",
       "rcaFreshAnalysis": "全新分析",
-      "rcaFreshAnalysisHint": "从头分析，忽略之前的报告",
       "rcaBuildOnPrevious": "基于之前的报告",
-      "rcaBuildOnPreviousHint": "发送当前报告，以便 Agent 扩展它",
       "rcaHistory": "报告历史",
       "rcaAsk": {
         "button": "就此分析提问",
@@ -9627,7 +9625,6 @@
         "unblocked": "由 {author} 于 {time} 解除阻塞",
         "unblockedWithNeed": "由 {author} 于 {time} 解除阻塞 · 需由人工负责人提供 {need}",
         "guidanceDialog": {
-          "title": "根据引导重新分析",
           "mode": "模式",
           "freshTitle": "全新分析",
           "freshHint": "从头开始，忽略此报告",
@@ -9638,8 +9635,6 @@
           "note": "将创建新的报告版本。当前版本保持不变。",
           "start": "开始重新分析"
         },
-        "withGuidance": "附加指引…",
-        "withGuidanceHint": "告诉智能体要检查或忽略什么。将创建新版本",
         "error": {
           "runNotSteerable": "本次运行不再接收消息。请重新分析以开始新版本。",
           "runClosing": "回答窗口已关闭，本次运行将以“阻塞”状态结束。请改为重新分析并发送您的消息。",

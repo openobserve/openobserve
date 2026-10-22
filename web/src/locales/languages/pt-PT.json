@@ -9552,9 +9552,7 @@
       "rcaDownload": "Transferir como Markdown",
       "rcaReanalyze": "Reanalisar",
       "rcaFreshAnalysis": "Nova análise",
-      "rcaFreshAnalysisHint": "Analisar do zero, ignorando o relatório anterior",
       "rcaBuildOnPrevious": "Basear no relatório anterior",
-      "rcaBuildOnPreviousHint": "Enviar o relatório atual para que o agente o estenda",
       "rcaHistory": "Histórico de relatórios",
       "rcaAsk": {
         "button": "Perguntar sobre esta análise",
@@ -9627,7 +9625,6 @@
         "unblocked": "Desbloqueado por {author} às {time}",
         "unblockedWithNeed": "Desbloqueado por {author} às {time} · {need} de um responsável humano",
         "guidanceDialog": {
-          "title": "Reanalisar com orientação",
           "mode": "Modo",
           "freshTitle": "Análise nova",
           "freshHint": "Começar de novo, ignorando este relatório",
@@ -9638,8 +9635,6 @@
           "note": "Cria uma nova versão do relatório. Esta mantém-se como está.",
           "start": "Iniciar reanálise"
         },
-        "withGuidance": "Com orientação…",
-        "withGuidanceHint": "Diga ao agente o que verificar ou ignorar. Cria uma nova versão",
         "error": {
           "runNotSteerable": "Esta execução já não aceita mensagens. Reanalise para iniciar uma nova versão.",
           "runClosing": "A janela de resposta foi fechada e a execução está a terminar como Bloqueada. Reanalise com a sua mensagem.",

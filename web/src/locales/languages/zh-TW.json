@@ -9547,9 +9547,7 @@
       "rcaDownload": "下載為 Markdown",
       "rcaReanalyze": "重新分析",
       "rcaFreshAnalysis": "全新分析",
-      "rcaFreshAnalysisHint": "從頭開始分析，忽略先前的報告",
       "rcaBuildOnPrevious": "基於先前的報告",
-      "rcaBuildOnPreviousHint": "傳送目前報告以讓代理擴充它",
       "rcaHistory": "報告歷史",
       "rcaAsk": {
         "button": "詢問此分析",
@@ -9622,7 +9620,6 @@
         "unblocked": "由 {author} 於 {time} 解除阻擋",
         "unblockedWithNeed": "由 {author} 於 {time} 解除阻擋 · {need}（來自人類負責人）",
         "guidanceDialog": {
-          "title": "依指引重新分析",
           "mode": "模式",
           "freshTitle": "全新分析",
           "freshHint": "從頭開始，忽略此報告",
@@ -9633,8 +9630,6 @@
           "note": "會建立新的報告版本。此版本保持不變。",
           "start": "開始重新分析"
         },
-        "withGuidance": "透過指引…",
-        "withGuidanceHint": "告訴 AI 代理要檢查或忽略什麼。會建立新版本",
         "error": {
           "runNotSteerable": "此執行已不再接受訊息。請重新分析以開始新版本。",
           "runClosing": "回答視窗已關閉，執行將以「受阻」狀態結束。請改用您的訊息重新分析。",

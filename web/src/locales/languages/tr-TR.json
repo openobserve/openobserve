@@ -9552,9 +9552,7 @@
       "rcaDownload": "Markdown olarak indir",
       "rcaReanalyze": "Yeniden analiz et",
       "rcaFreshAnalysis": "Temiz analiz",
-      "rcaFreshAnalysisHint": "Önceki raporu yok sayarak sıfırdan analiz et",
       "rcaBuildOnPrevious": "Önceki raporun üzerine inşa et",
-      "rcaBuildOnPreviousHint": "Ajanın raporu genişletmesi için mevcut raporu gönder",
       "rcaHistory": "Rapor geçmişi",
       "rcaAsk": {
         "button": "Bu analiz hakkında soru sor",
@@ -9627,7 +9625,6 @@
         "unblocked": "{author} tarafından {time} saatinde engeli kaldırıldı",
         "unblockedWithNeed": "{author} tarafından {time} saatinde engeli kaldırıldı · bir insan liderden {need}",
         "guidanceDialog": {
-          "title": "Rehberlikle yeniden analiz et",
           "mode": "Mod",
           "freshTitle": "Sıfırdan analiz",
           "freshHint": "Sıfırdan başla, bu raporu yok say",
@@ -9638,8 +9635,6 @@
           "note": "Yeni bir rapor sürümü oluşturur. Bu rapor olduğu gibi kalır.",
           "start": "Yeniden analizi başlat"
         },
-        "withGuidance": "Yönlendirme ile…",
-        "withGuidanceHint": "Ajana neyi kontrol edeceğini veya yok sayacağını söyleyin. Yeni bir sürüm oluşturur.",
         "error": {
           "runNotSteerable": "Bu çalıştırma artık mesaj kabul etmiyor. Yeni bir sürüm başlatmak için yeniden analiz edin.",
           "runClosing": "Yanıt penceresi kapandı ve çalıştırma Bloke olarak kapanıyor. Bunun yerine mesajınızla yeniden analiz edin.",

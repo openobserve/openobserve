@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-model:open="isOpen"
     size="md"
     data-test="rca-guidance-dialog"
-    :title="t('alerts.incidents.rcaSteer.guidanceDialog.title')"
+    :title="t('alerts.incidents.rcaReanalyze')"
     :secondary-button-label="t('confirmDialog.cancel')"
     :primary-button-label="t('alerts.incidents.rcaSteer.guidanceDialog.start')"
     :primary-button-disabled="!canStart"
@@ -80,6 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <OIcon name="history" size="sm" class="shrink-0" />
         {{ t("alerts.incidents.rcaSteer.guidanceDialog.note") }}
+        <span v-if="costLabel" data-test="rca-guidance-cost">· {{ costLabel }}</span>
       </p>
     </div>
   </ODialog>
@@ -92,7 +93,7 @@ import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 import ORadio from "@/lib/forms/Radio/ORadio.vue";
 import ORadioGroup from "@/lib/forms/Radio/ORadioGroup.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import { useI18nTyped } from "@/types/i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 
 /** 1 to 2,000 characters. */
 const MAX_GUIDANCE_CHARS = 2_000;
@@ -106,14 +107,17 @@ const props = withDefaults(
     triggering?: boolean;
     /** The incident's latest run; a new id after Start means the run started. */
     latestRunId?: string | null;
+    /** AI credits a re-analysis uses; unset outside cloud, where no cost shows. */
+    creditCost?: number | null;
   }>(),
-  { initialGuidance: "", triggering: false, latestRunId: null },
+  { initialGuidance: "", triggering: false, latestRunId: null, creditCost: null },
 );
 
 const isOpen = defineModel<boolean>("open", { default: false });
 
 const emit = defineEmits<{
-  start: [options: { buildOnPrevious: boolean; guidance: string }];
+  /** `guidance` only when the box has text. */
+  start: [options: { buildOnPrevious: boolean; guidance?: string }];
 }>();
 
 const { t } = useI18nTyped();
@@ -133,9 +137,14 @@ watch(
   { immediate: true },
 );
 
-const canStart = computed(() => {
-  const text = guidance.value.trim();
-  return text.length > 0 && text.length <= MAX_GUIDANCE_CHARS && !props.triggering;
+// Guidance is optional in both modes.
+const canStart = computed(
+  () => guidance.value.trim().length <= MAX_GUIDANCE_CHARS && !props.triggering,
+);
+
+const costLabel = computed<I18nText | null>(() => {
+  const cost = props.creditCost;
+  return cost ? t("alerts.incidents.rcaCreditCost", { cost }, cost) : null;
 });
 
 // The run before Start; null while no start is pending.
@@ -144,7 +153,9 @@ const pendingFrom = ref<{ runId: string | null } | null>(null);
 const start = () => {
   if (!canStart.value) return;
   pendingFrom.value = { runId: props.latestRunId };
-  emit("start", { buildOnPrevious: mode.value === "build", guidance: guidance.value.trim() });
+  const buildOnPrevious = mode.value === "build";
+  const text = guidance.value.trim();
+  emit("start", text ? { buildOnPrevious, guidance: text } : { buildOnPrevious });
 };
 
 // Close once a new run exists (it can land after the request settles); a failed start keeps the guidance.

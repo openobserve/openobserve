@@ -73,16 +73,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :live="live"
         :subtitle="subtitle"
         :has-report="!!ownReport"
-        :can-build-on-previous="!!reportRun"
         :has-thread="!!thread && thread.transcript === 'available'"
         :can-ask="canAsk"
         :triggering="triggering"
         :resuming="resuming"
         :cancelling="cancelling"
-        :reanalyze-credit-cost="reanalyzeCreditCost"
         @select-run="$emit('view-run', $event)"
-        @reanalyze="$emit('trigger-rca', $event)"
-        @reanalyze-guidance="openGuidance('')"
+        @reanalyze="openGuidance('')"
         @cancel="$emit('cancel-rca')"
         @copy-report="copyReport"
         @download-report="downloadReport"
@@ -264,6 +261,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :can-build-on-previous="!!reportRun"
       :triggering="triggering || resuming"
       :latest-run-id="rca.run_id"
+      :credit-cost="reanalyzeCreditCost"
       @start="$emit('trigger-rca', $event)"
     />
   </div>
@@ -725,7 +723,7 @@ const unblocked = computed<RcaUnblockedLine | null>(() => {
   };
 });
 
-// "Re-analyze with guidance", from the menu or a message the run did not take.
+// Re-analyze, from the bar or with a message the run did not take.
 const guidanceOpen = ref(false);
 const guidanceText = ref("");
 const openGuidance = (text: string) => {
