@@ -22,28 +22,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @open-collector="(c) => emit('navigate', 'fleets', { fleet: c.fleetId, collector: c.id })"
       @open-tokens="(fleetId) => emit('navigate', 'fleets', { fleet: fleetId, tokens: '1' })"
     />
-    <div v-show="!expanded" class="flex shrink-0 items-start gap-2">
-      <OStatStrip
-        class="min-w-0 flex-1"
-        :items="stats"
-        compact
-        selectable
-        :selected-key="null"
-        @select="onStatSelect"
-      />
-      <ORefreshButton
-        layout="inline"
-        variant="outline"
-        :last-run-at="lastUpdatedAt || null"
-        :loading="fetching"
-        data-test="fleet-overview-refresh"
-        @click="refresh"
-      />
-    </div>
+    <OStatStrip
+      v-show="!expanded"
+      class="shrink-0"
+      :items="stats"
+      compact
+      selectable
+      :selected-key="null"
+      @select="onStatSelect"
+    />
     <FleetFlowOverview
-      ref="flowEl"
       v-model:expanded="expanded"
       class="min-h-0 flex-1"
+      @refresh="refetch"
       @navigate="(tab, query) => emit('navigate', tab, query)"
       @outdated="emit('navigate', 'fleets', { scope: 'all', status: 'outdated' })"
     />
@@ -53,7 +44,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import OContent from "@/lib/core/Content/OContent.vue";
-import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -69,14 +59,8 @@ const emit = defineEmits<{
 
 const DASH = raw("—");
 const { t } = useI18nTyped();
-const { summary, fetching, lastUpdatedAt, refetch } = useFleetSummary(FLOW_POLL_MS);
+const { summary, refetch } = useFleetSummary(FLOW_POLL_MS);
 const expanded = ref(false);
-const flowEl = ref<InstanceType<typeof FleetFlowOverview> | null>(null);
-
-function refresh() {
-  refetch();
-  flowEl.value?.refresh();
-}
 
 // The summary already covers only the fleets the caller may read; largest count first.
 const stats = computed<StatItem[]>(() => {

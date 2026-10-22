@@ -601,6 +601,8 @@ export function useFleetFlow(window: () => FleetFlowWindow) {
     flow: computed(() => (isForbidden(query.error.value) ? null : (query.data.value ?? null))),
     forbidden: computed(() => isForbidden(query.error.value)),
     loading: query.isPending,
+    fetching: query.isFetching,
+    lastUpdatedAt: query.dataUpdatedAt,
     error: query.error,
     refetch: () => query.refetch(),
   };

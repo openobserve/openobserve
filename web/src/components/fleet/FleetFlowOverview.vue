@@ -53,6 +53,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OToggleGroupItem>
         </OToggleGroup>
         <div class="flex items-center gap-2">
+          <ORefreshButton
+            layout="inline"
+            variant="outline"
+            :last-run-at="flowQuery.lastUpdatedAt.value || null"
+            :loading="flowQuery.fetching.value"
+            data-test="fleet-flow-overview-refresh"
+            @click="refresh"
+          />
           <OToggleGroup
             :model-value="timeWindow"
             mobile-dropdown
@@ -284,6 +292,7 @@ import { useRoute, useRouter } from "vue-router";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
@@ -317,6 +326,7 @@ import { useFleetFlow } from "./useFleetApi";
 const emit = defineEmits<{
   navigate: [tab: FleetTab, query: Record<string, string>];
   outdated: [];
+  refresh: [];
 }>();
 
 const expanded = defineModel<boolean>("expanded", { default: false });
@@ -404,6 +414,12 @@ const noFleets = computed(
 function retry() {
   flowQuery.refetch();
   refetchIssues();
+}
+
+// The one refresh control on the page also reloads whatever the parent shows above the map.
+function refresh() {
+  retry();
+  emit("refresh");
 }
 
 defineExpose({ refresh: retry });
