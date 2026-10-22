@@ -553,6 +553,7 @@ import {
   toRaw,
 } from "vue";
 import { useStore } from "vuex";
+import { isCancelledError } from "@tanstack/vue-query";
 import { useI18nTyped, raw, type I18nText } from "@/types/i18n";
 import { formatDate } from "@/utils/date";
 
@@ -1017,6 +1018,8 @@ export default defineComponent({
           // A folder switched away from mid-flight must not stamp over the one now active.
           if (activeFolderId.value === folderId) stampFolders([folderId ?? "default"]);
         } catch (error) {
+          // A newer folder switch cancelled this load; the newer one reports its own outcome.
+          if (isCancelledError(error)) return;
           console.error("Error loading dashboards:", error);
           forbidden.value = asCaughtError(error).response?.status === 403;
           // The grouped access toast already reports a 403; a second red toast adds nothing.
