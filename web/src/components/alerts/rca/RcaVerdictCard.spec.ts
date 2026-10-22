@@ -644,8 +644,7 @@ describe("RcaVerdictCard", () => {
         summary: rcaRunSummaryCancelled(),
       });
 
-      // A stored record reads "Failed"; the headline says it was cancelled.
-      expect(text(wrapper, "rca-verdict-state")).toBe("Failed");
+      expect(text(wrapper, "rca-verdict-state")).toBe("Cancelled");
       expect(text(wrapper, "rca-verdict-headline")).toBe(
         "Run cancelled before a verdict. Partial results below",
       );
