@@ -51,6 +51,14 @@ static WATCHERS: Lazy<RwLock<FxIndexMap<String, EventChannel>>> =
 
 type EventChannel = Arc<mpsc::Sender<Event>>;
 
+fn sync_level(wal_fsync_disabled: bool) -> SqliteSynchronous {
+    if wal_fsync_disabled {
+        SqliteSynchronous::Normal
+    } else {
+        SqliteSynchronous::Full
+    }
+}
+
 fn connect_rw() -> Pool<Sqlite> {
     let cfg = config::get_config();
     let url = format!("{}{}", cfg.common.data_db_dir, "metadata.sqlite");
@@ -64,10 +72,11 @@ fn connect_rw() -> Pool<Sqlite> {
     let idle_timeout = zero_or(cfg.limit.sql_db_connections_idle_timeout, 600);
     let max_lifetime = zero_or(cfg.limit.sql_db_connections_max_lifetime, 1800);
 
+    // Match ingestion WAL durability: Full syncs every meta COMMIT to disk.
     let db_opts = SqliteConnectOptions::from_str(&url)
         .expect("sqlite connect options create failed")
         .journal_mode(SqliteJournalMode::Wal)
-        .synchronous(SqliteSynchronous::Normal)
+        .synchronous(sync_level(cfg.common.wal_fsync_disabled))
         .locking_mode(SqliteLockingMode::Normal)
         .busy_timeout(Duration::from_secs(acquire_timeout))
         .create_if_missing(true);
@@ -1503,5 +1512,21 @@ mod tests {
 
         db.delete(key, false, false, None).await.unwrap();
         assert!(db.get_with_revision(key).await.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn test_connect_rw_sync_level() {
+        assert_eq!(sync_level(false), SqliteSynchronous::Full);
+        assert_eq!(sync_level(true), SqliteSynchronous::Normal);
+
+        let opts = SqliteConnectOptions::from_str("sqlite::memory:")
+            .unwrap()
+            .synchronous(sync_level(false));
+        let pool = SqlitePoolOptions::new().connect_with(opts).await.unwrap();
+        let sync: i32 = sqlx::query_scalar("PRAGMA synchronous")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(sync, 2);
     }
 }
