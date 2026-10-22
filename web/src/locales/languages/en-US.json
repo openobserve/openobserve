@@ -25152,7 +25152,6 @@
       "noEffectiveConfig": "The collector has not reported its effective config",
       "eventAssigned": "Configuration assigned",
       "assignment": "Assignment",
-      "assignmentDelivery": "Assignment and delivery",
       "assignmentValue": "{config} v{version}, revision {revision}",
       "consistency": "Consistency",
       "consistencyPending": "Compares this collector's reported configuration with its peers on the same version. Available in a later release.",

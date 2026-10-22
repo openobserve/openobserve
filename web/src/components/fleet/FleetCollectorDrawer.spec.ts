@@ -218,8 +218,8 @@ describe("FleetCollectorDrawer", () => {
     expect(fleet.renameCollector).toHaveBeenCalledWith(org(), "c1", "web-primary");
   });
 
-  it("traces delivery to the assignment, the remote status and the marker", async () => {
-    wrapper = mountDrawer("delivery");
+  it("traces delivery to the assignment, the remote status and the marker under Overview", async () => {
+    wrapper = mountDrawer();
     await flushPromises();
     expect(wrapper.find(sel("assignment")).text()).toBe("edge v2, revision 7");
     expect(wrapper.find(sel("remote")).text()).toContain("APPLIED");
@@ -237,7 +237,7 @@ describe("FleetCollectorDrawer", () => {
         evidence: null,
       }),
     } as any);
-    wrapper = mountDrawer("delivery");
+    wrapper = mountDrawer();
     await flushPromises();
     expect(wrapper.find(sel("delivery-error")).text()).toContain("unknown field endpiont");
     expect(wrapper.find(sel("assignment")).text()).toContain("Placeholder configuration");
@@ -355,7 +355,7 @@ describe("FleetCollectorDrawer", () => {
     wrapper = mountDrawer();
     await flushPromises();
     const names = wrapper.findAllComponents({ name: "OTab" }).map((tab) => tab.props("name"));
-    expect(names).toEqual(["overview", "metrics", "health", "delivery", "config", "history"]);
+    expect(names).toEqual(["overview", "metrics", "health", "config", "history"]);
     expect(wrapper.findComponent(MetricsStub).exists()).toBe(false);
 
     await wrapper.setProps({ initialTab: "metrics" });

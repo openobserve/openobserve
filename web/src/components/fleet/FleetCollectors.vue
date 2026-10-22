@@ -402,7 +402,7 @@ import { OS_LABEL, type FleetOs } from "./fleetFormat";
 import { isForbidden, osLabel, useFleetCollectors, type CollectorRow } from "./useFleetApi";
 
 const STATUS_FILTERS = ["offline", "degraded", "unknown", "outdated", "online"];
-const DRAWER_TABS = ["overview", "delivery", "health", "config", "history"];
+const DRAWER_TABS = ["overview", "metrics", "health", "config", "history"];
 
 const DASH = raw("—");
 

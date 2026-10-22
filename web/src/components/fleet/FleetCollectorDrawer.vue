@@ -104,7 +104,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTab name="overview" :label="t('fleet.collectors.overview')" />
         <OTab name="metrics" :label="t('fleet.collectorMetrics.tab')" />
         <OTab name="health" :label="t('fleet.collectors.health')" />
-        <OTab name="delivery" :label="t('fleet.collectors.assignmentDelivery')" />
         <OTab name="config" :label="t('fleet.collectors.effectiveConfig')" />
         <OTab name="history" :label="t('fleet.collectors.history')" />
       </OTabs>
@@ -176,6 +175,78 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span v-else class="text-text-muted">{{ t("fleet.collectors.noCapabilities") }}</span>
             </ODescriptionItem>
           </ODescriptionList>
+          <div class="flex flex-col gap-3" data-test="fleet-collector-drawer-assignment-section">
+            <OText variant="panel-title">{{ t("fleet.collectors.assignment") }}</OText>
+            <OText variant="meta" data-test="fleet-collector-drawer-evidence-line">{{
+              evidenceLine
+            }}</OText>
+            <OBanner
+              v-if="collector.delivery === 'rejected' && collector.deliveryError"
+              variant="error"
+              dense
+              preserve-whitespace
+              :content="raw(collector.deliveryError)"
+              data-test="fleet-collector-drawer-delivery-error"
+            />
+            <ODescriptionList dense>
+              <ODescriptionItem :label="t('fleet.common.configuration')">
+                <span v-if="collector.assignment" data-test="fleet-collector-drawer-assignment">{{
+                  t("fleet.collectors.assignmentValue", {
+                    config: raw(collector.assignment.config),
+                    version: collector.assignment.version,
+                    revision: collector.assignment.revision,
+                  })
+                }}</span>
+                <span
+                  v-else
+                  class="text-text-muted"
+                  data-test="fleet-collector-drawer-assignment"
+                  >{{ t("fleet.collectors.placeholderAssigned") }}</span
+                >
+              </ODescriptionItem>
+              <ODescriptionItem :label="t('fleet.collectors.delivery')">
+                <OTag
+                  v-if="collector.delivery"
+                  type="fleetDelivery"
+                  :value="collector.delivery"
+                  data-test="fleet-collector-drawer-delivery"
+                />
+                <span v-else class="text-text-muted" data-test="fleet-collector-drawer-delivery">{{
+                  DASH
+                }}</span>
+              </ODescriptionItem>
+              <ODescriptionItem :label="t('fleet.collectors.remoteStatus')">
+                <span
+                  v-if="collector.evidence?.remote_status"
+                  class="inline-flex flex-wrap items-center gap-2"
+                  data-test="fleet-collector-drawer-remote"
+                >
+                  <span>{{ collector.evidence.remote_status }}</span>
+                  <OText v-if="collector.evidence.remote_hash" variant="mono">{{
+                    collector.evidence.remote_hash
+                  }}</OText>
+                  <OTimeCell
+                    v-if="collector.evidence.remote_at"
+                    :value="collector.evidence.remote_at"
+                    unit="ms"
+                    mode="relative"
+                  />
+                </span>
+                <span v-else class="text-text-muted">{{ DASH }}</span>
+              </ODescriptionItem>
+              <ODescriptionItem :label="t('fleet.collectors.marker')">
+                <span v-if="collector.evidence?.marker" data-test="fleet-collector-drawer-marker">{{
+                  t("fleet.rollouts.publishSubtitle", {
+                    config: raw(collector.evidence.marker.config),
+                    version: collector.evidence.marker.version,
+                  })
+                }}</span>
+                <span v-else class="text-text-muted" data-test="fleet-collector-drawer-marker">{{
+                  t("fleet.collectors.noMarker")
+                }}</span>
+              </ODescriptionItem>
+            </ODescriptionList>
+          </div>
         </div>
 
         <FleetCollectorMetrics
@@ -183,84 +254,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :collector-id="collector.id"
           :collector-name="collector.name"
         />
-
-        <div v-else-if="tab === 'delivery'" class="flex flex-col gap-4">
-          <OText variant="meta" data-test="fleet-collector-drawer-evidence-line">{{
-            evidenceLine
-          }}</OText>
-          <OBanner
-            v-if="collector.delivery === 'rejected' && collector.deliveryError"
-            variant="error"
-            dense
-            preserve-whitespace
-            :content="raw(collector.deliveryError)"
-            data-test="fleet-collector-drawer-delivery-error"
-          />
-          <ODescriptionList dense>
-            <ODescriptionItem :label="t('fleet.collectors.assignment')">
-              <span v-if="collector.assignment" data-test="fleet-collector-drawer-assignment">{{
-                t("fleet.collectors.assignmentValue", {
-                  config: raw(collector.assignment.config),
-                  version: collector.assignment.version,
-                  revision: collector.assignment.revision,
-                })
-              }}</span>
-              <span v-else class="text-text-muted" data-test="fleet-collector-drawer-assignment">{{
-                t("fleet.collectors.placeholderAssigned")
-              }}</span>
-            </ODescriptionItem>
-            <ODescriptionItem :label="t('fleet.collectors.delivery')">
-              <OTag
-                v-if="collector.delivery"
-                type="fleetDelivery"
-                :value="collector.delivery"
-                data-test="fleet-collector-drawer-delivery"
-              />
-              <span v-else class="text-text-muted" data-test="fleet-collector-drawer-delivery">{{
-                DASH
-              }}</span>
-            </ODescriptionItem>
-            <ODescriptionItem :label="t('fleet.collectors.remoteStatus')">
-              <span
-                v-if="collector.evidence?.remote_status"
-                class="inline-flex flex-wrap items-center gap-2"
-                data-test="fleet-collector-drawer-remote"
-              >
-                <span>{{ collector.evidence.remote_status }}</span>
-                <OText v-if="collector.evidence.remote_hash" variant="mono">{{
-                  collector.evidence.remote_hash
-                }}</OText>
-                <OTimeCell
-                  v-if="collector.evidence.remote_at"
-                  :value="collector.evidence.remote_at"
-                  unit="ms"
-                  mode="relative"
-                />
-              </span>
-              <span v-else class="text-text-muted">{{ DASH }}</span>
-            </ODescriptionItem>
-            <ODescriptionItem :label="t('fleet.collectors.marker')">
-              <span v-if="collector.evidence?.marker" data-test="fleet-collector-drawer-marker">{{
-                t("fleet.rollouts.publishSubtitle", {
-                  config: raw(collector.evidence.marker.config),
-                  version: collector.evidence.marker.version,
-                })
-              }}</span>
-              <span v-else class="text-text-muted" data-test="fleet-collector-drawer-marker">{{
-                t("fleet.collectors.noMarker")
-              }}</span>
-            </ODescriptionItem>
-            <ODescriptionItem :label="t('fleet.collectors.lastHeartbeat')">
-              <OTimeCell
-                v-if="collector.evidence?.last_heartbeat_at"
-                :value="collector.evidence.last_heartbeat_at"
-                unit="ms"
-                mode="relative"
-              />
-              <span v-else class="text-text-muted">{{ DASH }}</span>
-            </ODescriptionItem>
-          </ODescriptionList>
-        </div>
 
         <div v-else-if="tab === 'health'" class="flex flex-col gap-5">
           <div class="flex items-center gap-2">
