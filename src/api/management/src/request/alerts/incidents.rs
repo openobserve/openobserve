@@ -2525,9 +2525,7 @@ mod tests {
         assert_eq!(runs.len(), 1, "{runs:?}");
         assert_eq!(body["run_id"], runs[0].run_id.as_str());
         assert_eq!(runs[0].state, "failed");
-        let error = runs[0]
-            .error
-            .as_ref()
+        let error = infra::table::rca_runs::decode::<serde_json::Value>(runs[0].error.as_deref())
             .expect("the failed launch is on the run");
         assert!(
             error["code"].as_str().is_some_and(|code| !code.is_empty()),
@@ -2621,7 +2619,7 @@ mod tests {
             let mut run = thread_run(&org, run_id, "inc_1", Some(session));
             run.state = "failed".to_string();
             run.report = None;
-            run.error = Some(serde_json::json!({"code": code, "reason": "r"}));
+            run.error = Some(serde_json::json!({"code": code, "reason": "r"}).to_string());
             run
         };
         for run in [
@@ -2849,11 +2847,11 @@ mod tests {
             run
         };
         let mut recorded = thread_run(&org, "run_recorded", "inc_1", Some("ses_gone"));
-        recorded.result = Some(stored_record());
+        recorded.result = Some(stored_record().to_string());
         let mut unreadable = thread_run(&org, "run_unreadable", "inc_1", None);
-        unreadable.result = Some(json!({"schema_version": "one", "ledger": 5}));
+        unreadable.result = Some(json!({"schema_version": "one", "ledger": 5}).to_string());
         let mut never_started = live("run_live_never", Some("ses_never"));
-        never_started.error = Some(json!({"code": "turn_limit", "reason": "r"}));
+        never_started.error = Some(json!({"code": "turn_limit", "reason": "r"}).to_string());
         for run in [
             recorded,
             unreadable,
@@ -3996,7 +3994,7 @@ mod tests {
         let org = steering_org("parity");
         steering_incident(conn, &org, "inc_1", Some("run_done")).await;
         let mut run = thread_run(&org, &sid(&org, "run_done"), &sid(&org, "inc_1"), None);
-        run.result = Some(stored_record());
+        run.result = Some(stored_record().to_string());
         rca_runs::Entity::insert(rca_runs::ActiveModel::from(run).reset_all())
             .exec(conn)
             .await
@@ -4175,7 +4173,8 @@ mod tests {
         if matches!(state, "running" | "waiting_input") {
             run.ended_at = None;
         }
-        run.error = error_code.map(|code| serde_json::json!({"code": code, "reason": "r"}));
+        run.error =
+            error_code.map(|code| serde_json::json!({"code": code, "reason": "r"}).to_string());
         rca_runs::Entity::insert(rca_runs::ActiveModel::from(run).reset_all())
             .exec(conn)
             .await
@@ -4660,18 +4659,16 @@ mod tests {
         assert_eq!(new_run.started_by, STEER_ROOT);
         assert_eq!(new_run.guidance, None);
         assert_eq!(
-            new_run
-                .context_used
-                .as_ref()
-                .map(|used| &used["resumed_from"]),
-            Some(&json!({"run_id": sid(&org, "run_src"), "steps": 3, "from_step": from_step})),
+            infra::table::rca_runs::decode::<serde_json::Value>(new_run.context_used.as_deref())
+                .map(|used| used["resumed_from"].clone()),
+            Some(json!({"run_id": sid(&org, "run_src"), "steps": 3, "from_step": from_step})),
             "{:?}",
             new_run.context_used
         );
         assert_eq!(new_run.state, "failed");
         assert_eq!(
-            new_run.error.as_ref().map(|error| &error["code"]),
-            Some(&json!("resume_failed"))
+            infra::table::rca_runs::error_of(new_run).map(|error| error.code),
+            Some("resume_failed".to_string())
         );
         let source = runs
             .iter()
@@ -4794,16 +4791,14 @@ mod tests {
         assert_eq!(new_run.trigger, "resume");
         assert_eq!(new_run.state, "failed");
         assert_eq!(
-            new_run.error.as_ref().map(|error| &error["code"]),
-            Some(&json!("resume_failed"))
+            infra::table::rca_runs::error_of(new_run).map(|error| error.code),
+            Some("resume_failed".to_string())
         );
         assert!(new_run.session_id.is_none());
         assert_eq!(
-            new_run
-                .context_used
-                .as_ref()
-                .map(|used| &used["resumed_from"]),
-            Some(&json!({
+            infra::table::rca_runs::decode::<serde_json::Value>(new_run.context_used.as_deref())
+                .map(|used| used["resumed_from"].clone()),
+            Some(json!({
                 "run_id": sid(&org, "run_src"),
                 "steps": 3,
                 "from_step": {"index": 4, "stage": "verify", "title": "Check the orders pool"},
@@ -4859,7 +4854,8 @@ mod tests {
             run.trigger = trigger.to_string();
             run.state = "failed".to_string();
             run.report = None;
-            run.error = Some(serde_json::json!({"code": "agent_unavailable", "reason": "r"}));
+            run.error =
+                Some(serde_json::json!({"code": "agent_unavailable", "reason": "r"}).to_string());
             if !resumed_from.is_empty() {
                 let named = if resumed_from == "run_src" {
                     sid(&org, &source)
@@ -4868,7 +4864,7 @@ mod tests {
                 };
                 run.context_used = Some(serde_json::json!({
                     "resumed_from": {"run_id": named, "steps": 1, "from_step": {"index": 2, "stage": "", "title": "t"}},
-                }));
+                }).to_string());
             }
             rca_runs::Entity::insert(rca_runs::ActiveModel::from(run).reset_all())
                 .exec(conn)

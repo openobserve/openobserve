@@ -1341,7 +1341,7 @@ mod tests {
             .col_expr(alert_incidents::Column::RcaConfidence, Expr::value("high"))
             .col_expr(
                 alert_incidents::Column::RcaSummary,
-                Expr::value(serde_json::json!({"steps": 3})),
+                Expr::value(r#"{"steps":3}"#),
             )
             .col_expr(alert_incidents::Column::RcaOffReason, Expr::value("l0_off"))
             .col_expr(
@@ -1362,7 +1362,7 @@ mod tests {
         );
         assert_eq!(row.rca_outcome.as_deref(), Some("root_cause"));
         assert_eq!(row.rca_confidence.as_deref(), Some("high"));
-        assert_eq!(row.rca_summary, Some(serde_json::json!({"steps": 3})));
+        assert_eq!(row.rca_summary.as_deref(), Some(r#"{"steps":3}"#));
         assert_eq!(row.rca_off_reason.as_deref(), Some("l0_off"));
         assert_eq!(
             row.topology_context, None,

@@ -1360,10 +1360,10 @@ impl RunEnd {
 
     /// The pending on-call records an alert run was started for.
     fn subjects(&self) -> Vec<SubjectRef> {
-        let Some(raw) = self.run.oncall_subjects.as_ref() else {
+        let Some(raw) = self.run.oncall_subjects.as_deref() else {
             return Vec::new();
         };
-        Vec::<SubjectRef>::deserialize(raw).unwrap_or_else(|e| {
+        serde_json::from_str::<Vec<SubjectRef>>(raw).unwrap_or_else(|e| {
             log::warn!(
                 "[RCA_TURN] run {} has unreadable on-call subjects: {e}",
                 self.run.run_id
@@ -1601,11 +1601,7 @@ struct Tally {
 impl Tally {
     /// A continuation counts on from the stats the run already has.
     fn resumed(run: &RunRow) -> Self {
-        let stats: RunStats = run
-            .stats
-            .as_ref()
-            .and_then(|v| RunStats::deserialize(v).ok())
-            .unwrap_or_default();
+        let stats: RunStats = runs_table::decode(run.stats.as_deref()).unwrap_or_default();
         Self {
             base_steps: stats.steps.unwrap_or(0),
             base_tool_calls: stats.tool_calls.unwrap_or(0),
@@ -1822,15 +1818,11 @@ where
         return Ok(None);
     }
     count_run_end(org_id, item.trigger, RunState::Cancelled, "");
-    let progress = run
-        .stats
-        .as_ref()
-        .and_then(|v| RunStats::deserialize(v).ok())
-        .map(|stats| ThreadStats {
-            steps: stats.steps.unwrap_or(0),
-            tool_calls: stats.tool_calls.unwrap_or(0),
-            ..Default::default()
-        });
+    let progress = runs_table::decode::<RunStats>(run.stats.as_deref()).map(|stats| ThreadStats {
+        steps: stats.steps.unwrap_or(0),
+        tool_calls: stats.tool_calls.unwrap_or(0),
+        ..Default::default()
+    });
     observe_end(
         org_id,
         RunState::Cancelled,
@@ -2766,7 +2758,10 @@ mod tests {
 
     /// `rca_summary.detail` of the incident.
     async fn list_detail(org: &str, inc: &str) -> Value {
-        let summary = incident_row(org, inc).await.rca_summary.unwrap_or_default();
+        let summary = infra::table::rca_runs::decode::<serde_json::Value>(
+            incident_row(org, inc).await.rca_summary.as_deref(),
+        )
+        .unwrap_or_default();
         summary.get("detail").cloned().unwrap_or(Value::Null)
     }
 
@@ -4496,7 +4491,9 @@ mod tests {
         assert!(run.stats.unwrap().steps.is_some(), "the turn's counts");
         let incident = incident_row(&org, &inc).await;
         assert_eq!(incident.rca_state.as_deref(), Some("waiting_input"));
-        let summary = incident.rca_summary.unwrap();
+        let summary =
+            infra::table::rca_runs::decode::<serde_json::Value>(incident.rca_summary.as_deref())
+                .unwrap();
         assert_eq!(summary["detail"], NEED);
         assert_eq!(summary["deadline_at"], deadline);
         let expected = vec![(

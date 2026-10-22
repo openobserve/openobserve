@@ -30,19 +30,24 @@ pub struct Model {
     pub outcome: Option<String>,
     pub confidence: Option<String>,
     pub report: Option<String>,
-    pub result: Option<Json>,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub result: Option<String>,
     /// `{code, reason, details, trigger_type}`.
-    pub error: Option<Json>,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub error: Option<String>,
     pub session_id: Option<String>,
     /// `{steps, tool_calls, duration_ms, tokens, credits, steered}`.
-    pub stats: Option<Json>,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub stats: Option<String>,
     pub stage: Option<String>,
     pub stage_index: Option<i16>,
     /// `{past_causes: [{id, summary}], skills: [name], toolsets: [name]}`.
-    pub context_used: Option<Json>,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub context_used: Option<String>,
     pub continuations: i16,
     /// Serialized `Vec<SubjectRef>` of an alert run's pending on-call records.
-    pub oncall_subjects: Option<Json>,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub oncall_subjects: Option<String>,
     /// Answer deadline of a `waiting_input` run, µs; NULL in every other state.
     pub input_deadline_at: Option<i64>,
     /// `callID` of the open `ask_responders` question while `waiting_input`.

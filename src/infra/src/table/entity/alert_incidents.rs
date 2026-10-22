@@ -46,7 +46,8 @@ pub struct Model {
     pub rca_outcome: Option<String>,
     pub rca_confidence: Option<String>,
     /// `RunSummaryFields` JSON.
-    pub rca_summary: Option<Json>,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub rca_summary: Option<String>,
     /// Why automatic runs never start for this incident (`l0_off`); written once at creation.
     pub rca_off_reason: Option<String>,
 }

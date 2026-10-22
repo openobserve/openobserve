@@ -41,7 +41,7 @@ use infra::table::{
     rca_steering as steering_table,
 };
 use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use tokio::sync::OnceCell;
 
 use super::{
@@ -420,8 +420,8 @@ impl<'a, R: TranscriptReader> RunParts<'a, R> {
                 ));
             }
             let version = run_version(run);
-            return Ok(match run.result.as_ref() {
-                Some(result) => match RcaRunRecord::deserialize(result) {
+            return Ok(match run.result.as_deref() {
+                Some(result) => match serde_json::from_str::<RcaRunRecord>(result) {
                     Ok(record) => rca_run::summary_from_record(run_id, state, version, &record),
                     Err(e) => {
                         log::warn!(
@@ -920,11 +920,7 @@ fn reads_session(run: &RunRow, state: RunState) -> bool {
 }
 
 fn never_started(run: &RunRow) -> bool {
-    run.error
-        .as_ref()
-        .and_then(|error| error.get("code"))
-        .and_then(serde_json::Value::as_str)
-        .is_some_and(RcaTurnError::is_start_code)
+    runs_table::error_of(run).is_some_and(|error| RcaTurnError::is_start_code(&error.code))
 }
 
 /// The version of a part built from the run row alone.

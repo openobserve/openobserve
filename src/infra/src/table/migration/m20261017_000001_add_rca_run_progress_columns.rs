@@ -81,7 +81,7 @@ fn column_def(column: RcaRuns) -> ColumnDef {
     match column {
         RcaRuns::Stage => def.text().null(),
         RcaRuns::StageIndex => def.small_integer().null(),
-        RcaRuns::ContextUsed | RcaRuns::OncallSubjects => def.json_binary().null(),
+        RcaRuns::ContextUsed | RcaRuns::OncallSubjects => def.text().null(),
         RcaRuns::Continuations => def.small_integer().not_null().default(0),
     };
     def

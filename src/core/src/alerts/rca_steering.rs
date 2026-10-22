@@ -1381,15 +1381,13 @@ async fn cancel_waiting_run(
         return Ok(None);
     }
     count_run_end(org_id, item.trigger, RunState::Cancelled, "");
-    let progress = run
-        .stats
-        .as_ref()
-        .and_then(|v| serde_json::from_value::<RunStats>(v.clone()).ok())
-        .map(|stats| crate::ai_chat::rca_thread::ThreadStats {
+    let progress = runs_table::decode::<RunStats>(run.stats.as_deref()).map(|stats| {
+        crate::ai_chat::rca_thread::ThreadStats {
             steps: stats.steps.unwrap_or(0),
             tool_calls: stats.tool_calls.unwrap_or(0),
             ..Default::default()
-        });
+        }
+    });
     rca_turn::observe_end(
         org_id,
         RunState::Cancelled,
@@ -1711,7 +1709,10 @@ mod tests {
 
     /// `rca_summary.steered_by` of the incident.
     async fn steered_by(org: &str, inc: &str) -> Vec<String> {
-        let summary = incident_row(org, inc).await.rca_summary.unwrap_or_default();
+        let summary = infra::table::rca_runs::decode::<serde_json::Value>(
+            incident_row(org, inc).await.rca_summary.as_deref(),
+        )
+        .unwrap_or_default();
         serde_json::from_value(summary["steered_by"].clone()).unwrap_or_default()
     }
 
@@ -2471,7 +2472,10 @@ mod tests {
             "a, b and d reached the agent; the answer does not count"
         );
         assert_eq!(stats.ignored_acks, Some(1));
-        let summary = incident_row(&org, &inc).await.rca_summary.unwrap();
+        let summary = infra::table::rca_runs::decode::<serde_json::Value>(
+            incident_row(&org, &inc).await.rca_summary.as_deref(),
+        )
+        .unwrap();
         assert_eq!(summary["unblocked_by"], "c.lee@acme.io");
 
         // The run ends: the rows the agent did not read are not read.
@@ -2715,7 +2719,10 @@ mod tests {
                 (SteerStatus::NotRead, Some(SteerStatusReason::RunCancelled))
             );
         }
-        let summary = incident_row(&org, &inc).await.rca_summary.unwrap();
+        let summary = infra::table::rca_runs::decode::<serde_json::Value>(
+            incident_row(&org, &inc).await.rca_summary.as_deref(),
+        )
+        .unwrap();
         assert!(summary["deadline_at"].is_null() && summary["detail"].is_null());
     }
 
@@ -2750,7 +2757,10 @@ mod tests {
         let run = stored(&org, &paused).await;
         assert_eq!(run.state, RunState::Cancelled);
         assert_eq!(run.cancelled_by.as_deref(), Some(OTHER));
-        let summary = incident_row(&org, &inc).await.rca_summary.unwrap();
+        let summary = infra::table::rca_runs::decode::<serde_json::Value>(
+            incident_row(&org, &inc).await.rca_summary.as_deref(),
+        )
+        .unwrap();
         assert_eq!(summary["detail"], RESOLVED_DETAIL);
         assert_eq!(summary["cancelled_by"], OTHER);
         assert!(summary["deadline_at"].is_null());

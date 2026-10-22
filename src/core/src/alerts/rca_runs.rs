@@ -985,8 +985,11 @@ pub(crate) mod tests {
         let row = incident_row(&org, &inc).await;
         assert_eq!(row.rca_state.as_deref(), Some("completed"));
         assert_eq!(row.rca_run_id.as_deref(), Some(run_id.as_str()));
-        assert_eq!(row.rca_summary.as_ref().unwrap()["steps"], 3);
-        assert_eq!(row.rca_summary.as_ref().unwrap()["tool_calls"], 4);
+        let summary =
+            infra::table::rca_runs::decode::<serde_json::Value>(row.rca_summary.as_deref())
+                .unwrap();
+        assert_eq!(summary["steps"], 3);
+        assert_eq!(summary["tool_calls"], 4);
         assert_eq!(completes(&timeline(&org, &inc).await), 1);
         assert_eq!(
             serde_json::to_vec(&row.topology_context).unwrap(),
@@ -1512,7 +1515,9 @@ pub(crate) mod tests {
         );
         let row = incident_row(&org, &inc).await;
         assert_eq!(row.rca_state.as_deref(), Some("cancelled"));
-        let summary = row.rca_summary.unwrap();
+        let summary =
+            infra::table::rca_runs::decode::<serde_json::Value>(row.rca_summary.as_deref())
+                .unwrap();
         assert_eq!(
             (summary["steps"].as_u64(), summary["tool_calls"].as_u64()),
             (Some(2), Some(7))
@@ -1602,7 +1607,10 @@ pub(crate) mod tests {
             (Some("metrics"), Some(6), 2)
         );
         assert_eq!(run.context_used, Some(context));
-        let summary = incident_row(&org, &inc).await.rca_summary.unwrap();
+        let summary = infra::table::rca_runs::decode::<serde_json::Value>(
+            incident_row(&org, &inc).await.rca_summary.as_deref(),
+        )
+        .unwrap();
         assert_eq!(summary["stage"], "metrics");
         assert_eq!(summary["stage_index"], 6);
         assert_eq!(summary["steps"], 3);
@@ -1701,7 +1709,7 @@ pub(crate) mod tests {
                 outcome: None,
                 confidence: None,
                 report: None,
-                result: result.then(|| serde_json::json!({"schema_version": 1})),
+                result: result.then(|| r#"{"schema_version":1}"#.to_string()),
                 error: None,
                 session_id: None,
                 stats: None,

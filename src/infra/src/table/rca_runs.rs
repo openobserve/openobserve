@@ -156,7 +156,7 @@ struct SeenSummary {
     rca_updated_at: Option<i64>,
     rca_outcome: Option<String>,
     rca_confidence: Option<String>,
-    rca_summary: Option<serde_json::Value>,
+    rca_summary: Option<String>,
 }
 
 /// `SELECT ... FOR UPDATE`, except on SQLite, which serializes writers and has no row lock.
@@ -168,13 +168,21 @@ pub(crate) fn locked<E: EntityTrait>(txn: &DatabaseTransaction, query: Select<E>
     }
 }
 
-fn decode_summary(raw: Option<&serde_json::Value>) -> RunSummaryFields {
-    raw.and_then(|v| serde_json::from_value(v.clone()).ok())
-        .unwrap_or_default()
+/// JSON columns are stored as text; an unreadable value reads as `None`.
+pub fn decode<T: serde::de::DeserializeOwned>(raw: Option<&str>) -> Option<T> {
+    raw.and_then(|v| serde_json::from_str(v).ok())
 }
 
-fn encode<T: serde::Serialize>(value: &T, what: &str) -> Result<serde_json::Value, DbErr> {
-    serde_json::to_value(value).map_err(|e| DbErr::Custom(format!("serialize {what}: {e}")))
+fn decode_summary(raw: Option<&str>) -> RunSummaryFields {
+    decode(raw).unwrap_or_default()
+}
+
+fn encode<T: serde::Serialize>(value: &T, what: &str) -> Result<String, DbErr> {
+    serde_json::to_string(value).map_err(|e| DbErr::Custom(format!("serialize {what}: {e}")))
+}
+
+fn encode_opt<T: serde::Serialize>(value: Option<&T>, what: &str) -> Result<Option<String>, DbErr> {
+    value.map(|v| encode(v, what)).transpose()
 }
 
 /// Atomically admit one run per incident and append its Begin event before pruning history.
@@ -269,7 +277,7 @@ pub async fn start_run_with<C: TransactionTrait>(
             }
         }
 
-        let seen_summary = seen.rca_summary.as_ref().map(|v| decode_summary(Some(v)));
+        let seen_summary = seen.rca_summary.as_deref().map(|v| decode_summary(Some(v)));
         let summary = RunSummaryFields {
             previous: next_previous(
                 seen.rca_run_id.as_deref(),
@@ -357,9 +365,9 @@ pub async fn start_run_with<C: TransactionTrait>(
         stats: Set(None),
         stage: Set(None),
         stage_index: Set(None),
-        context_used: Set(new.context_used.clone()),
+        context_used: Set(encode_opt(new.context_used.as_ref(), "context_used")?),
         continuations: Set(0),
-        oncall_subjects: Set(new.oncall_subjects.clone()),
+        oncall_subjects: Set(encode_opt(new.oncall_subjects.as_ref(), "oncall_subjects")?),
         input_deadline_at: Set(None),
         pending_question_id: Set(None),
         questions_asked: Set(0),
@@ -418,7 +426,7 @@ async fn fail_stale_with(
         trigger_type: None,
     };
     let stats = merge_stats(
-        run.stats.as_ref(),
+        run.stats.as_deref(),
         None,
         Some(duration_ms(run.started_at, now)),
     );
@@ -515,13 +523,11 @@ fn duration_ms(started_at_us: i64, ended_at_us: i64) -> u64 {
 
 /// Stored stats with every field of `patch` that is set, then `duration_ms` when given.
 fn merge_stats(
-    stored: Option<&serde_json::Value>,
+    stored: Option<&str>,
     patch: Option<&RunStats>,
     duration_ms: Option<u64>,
 ) -> RunStats {
-    let mut stats: RunStats = stored
-        .and_then(|v| serde_json::from_value(v.clone()).ok())
-        .unwrap_or_default();
+    let mut stats: RunStats = decode(stored).unwrap_or_default();
     if let Some(p) = patch {
         if p.steps.is_some() {
             stats.steps = p.steps;
@@ -652,7 +658,7 @@ pub async fn update_run_with<C: TransactionTrait>(
                 .select_only()
                 .column(alert_incidents::Column::RcaSummary),
         )
-        .into_tuple::<Option<serde_json::Value>>()
+        .into_tuple::<Option<String>>()
         .one(&txn)
         .await?
         else {
@@ -661,7 +667,7 @@ pub async fn update_run_with<C: TransactionTrait>(
         };
         Some((
             subject_id,
-            merge_summary(decode_summary(stored.as_ref()), &upd),
+            merge_summary(decode_summary(stored.as_deref()), &upd),
         ))
     } else {
         None
@@ -678,7 +684,7 @@ pub async fn update_run_with<C: TransactionTrait>(
                 rca_runs::Column::Stats,
             ]),
     )
-    .into_tuple::<(String, i64, Option<serde_json::Value>)>()
+    .into_tuple::<(String, i64, Option<String>)>()
     .one(&txn)
     .await?
     .filter(|(state, ..)| allowed(state.as_str())) else {
@@ -700,7 +706,7 @@ pub async fn update_run_with<C: TransactionTrait>(
     }
     if upd.stats.is_some() || terminal {
         let duration = terminal.then(|| duration_ms(started_at, now));
-        let stats = merge_stats(stored_stats.as_ref(), upd.stats.as_ref(), duration);
+        let stats = merge_stats(stored_stats.as_deref(), upd.stats.as_ref(), duration);
         update = update.col_expr(
             rca_runs::Column::Stats,
             Expr::value(encode(&stats, "stats")?),
@@ -719,7 +725,10 @@ pub async fn update_run_with<C: TransactionTrait>(
         );
     }
     if let Some(result) = upd.result.as_ref() {
-        update = update.col_expr(rca_runs::Column::Result, Expr::value(result.clone()));
+        update = update.col_expr(
+            rca_runs::Column::Result,
+            Expr::value(encode(result, "result")?),
+        );
     }
     if let Some(error) = upd.error.as_ref() {
         update = update.col_expr(
@@ -743,7 +752,7 @@ pub async fn update_run_with<C: TransactionTrait>(
     if let Some(context_used) = upd.context_used.as_ref() {
         update = update.col_expr(
             rca_runs::Column::ContextUsed,
-            Expr::value(context_used.clone()),
+            Expr::value(encode(context_used, "context_used")?),
         );
     }
     if upd.continuations_inc {
@@ -848,11 +857,11 @@ async fn final_stats_with<C: TransactionTrait>(
                 .select_only()
                 .column(alert_incidents::Column::RcaSummary),
         )
-        .into_tuple::<Option<serde_json::Value>>()
+        .into_tuple::<Option<String>>()
         .one(&txn)
         .await?
     {
-        let mut summary = decode_summary(stored.as_ref());
+        let mut summary = decode_summary(stored.as_deref());
         if let Some(p) = upd.summary.as_ref() {
             if let Some(steps) = p.steps {
                 summary.steps = steps;
@@ -890,14 +899,14 @@ async fn final_stats_with<C: TransactionTrait>(
                 rca_runs::Column::State,
             ]),
     )
-    .into_tuple::<(Option<serde_json::Value>, Option<serde_json::Value>, String)>()
+    .into_tuple::<(Option<String>, Option<String>, String)>()
     .one(&txn)
     .await?
     else {
         txn.rollback().await?;
         return Ok(false);
     };
-    let stats = merge_stats(stored_stats.as_ref(), upd.stats.as_ref(), None);
+    let stats = merge_stats(stored_stats.as_deref(), upd.stats.as_ref(), None);
     let mut update = rca_runs::Entity::update_many()
         .col_expr(
             rca_runs::Column::Stats,
@@ -908,7 +917,10 @@ async fn final_stats_with<C: TransactionTrait>(
         && state != RunState::Completed.as_str()
         && let Some(result) = upd.result.as_ref()
     {
-        update = update.col_expr(rca_runs::Column::Result, Expr::value(result.clone()));
+        update = update.col_expr(
+            rca_runs::Column::Result,
+            Expr::value(encode(result, "result")?),
+        );
     }
     update
         .filter(rca_runs::Column::RunId.eq(run_id))
@@ -1142,7 +1154,7 @@ pub async fn reopen_waiting_with<C: TransactionTrait>(
                 .select_only()
                 .column(alert_incidents::Column::RcaSummary),
         )
-        .into_tuple::<Option<serde_json::Value>>()
+        .into_tuple::<Option<String>>()
         .one(&txn)
         .await?
     } else {
@@ -1178,7 +1190,7 @@ pub async fn reopen_waiting_with<C: TransactionTrait>(
     }
 
     if let Some(stored) = incident_summary {
-        let mut summary = decode_summary(stored.as_ref());
+        let mut summary = decode_summary(stored.as_deref());
         summary.deadline_at = None;
         summary.detail = None;
         alert_incidents::Entity::update_many()
@@ -1223,20 +1235,15 @@ fn state_of(m: &Model) -> RunState {
     parse_or(&m.state, RunState::Failed, &m.run_id, "state")
 }
 
-fn error_of(m: &Model) -> Option<RunError> {
-    m.error
-        .as_ref()
-        .and_then(|v| serde_json::from_value(v.clone()).ok())
+pub fn error_of(m: &Model) -> Option<RunError> {
+    decode(m.error.as_deref())
 }
 
 /// The API form of a run.
 pub fn to_run(m: Model) -> RcaRun {
     let state = state_of(&m);
     let error = error_of(&m);
-    let stats = m
-        .stats
-        .as_ref()
-        .and_then(|v| serde_json::from_value(v.clone()).ok());
+    let stats = decode(m.stats.as_deref());
     RcaRun {
         report_format: ReportFormat::V2,
         subject_type: parse_or(
@@ -1262,13 +1269,13 @@ pub fn to_run(m: Model) -> RcaRun {
         outcome: m.outcome,
         confidence: m.confidence,
         report: m.report,
-        result: m.result,
+        result: decode(m.result.as_deref()),
         session_id: m.session_id,
         stage: m.stage,
         stage_index: m.stage_index,
-        context_used: m.context_used,
+        context_used: decode(m.context_used.as_deref()),
         continuations: m.continuations,
-        oncall_subjects: m.oncall_subjects,
+        oncall_subjects: decode(m.oncall_subjects.as_deref()),
         input_deadline_at: m.input_deadline_at,
         pending_question_id: m.pending_question_id,
         questions_asked: m.questions_asked,
@@ -1324,7 +1331,7 @@ pub fn summary_from_incident(
         updated_at,
         outcome: inc.rca_outcome.clone(),
         confidence: inc.rca_confidence.clone(),
-        summary: decode_summary(inc.rca_summary.as_ref()),
+        summary: decode_summary(inc.rca_summary.as_deref()),
         detail: None,
     })
 }
@@ -1544,7 +1551,7 @@ mod tests {
     }
 
     fn summary_of(m: &alert_incidents::Model) -> RunSummaryFields {
-        decode_summary(m.rca_summary.as_ref())
+        decode_summary(m.rca_summary.as_deref())
     }
 
     /// The seven summary columns equal the run that `rca_run_id` names.
@@ -1601,7 +1608,7 @@ mod tests {
         assert_eq!(row.state, "completed");
         assert_eq!(row.ended_at, Some(T0 + 90 * SEC));
         assert!(row.report.is_some());
-        let stats: RunStats = serde_json::from_value(row.stats.unwrap()).unwrap();
+        let stats: RunStats = decode(row.stats.as_deref()).unwrap();
         assert_eq!(stats.duration_ms, Some(90_000));
 
         let r2 = start(&db, "inc-1", T0 + 100 * SEC).await;
@@ -2162,7 +2169,7 @@ mod tests {
     }
 
     fn stats_of(m: &Model) -> RunStats {
-        serde_json::from_value(m.stats.clone().unwrap_or_default()).unwrap_or_default()
+        decode(m.stats.as_deref()).unwrap_or_default()
     }
 
     #[tokio::test]
@@ -2274,7 +2281,7 @@ mod tests {
             );
             let after = run(&db, &run_id).await.unwrap();
             let expected = (state != Completed).then(|| first.clone());
-            assert_eq!(after.result, expected, "{state}");
+            assert_eq!(decode(after.result.as_deref()), expected, "{state}");
             assert_eq!(after.state, state.as_str(), "{state}");
 
             assert!(
@@ -2284,7 +2291,7 @@ mod tests {
                 "{state}"
             );
             assert_eq!(
-                run(&db, &run_id).await.unwrap().result,
+                decode(run(&db, &run_id).await.unwrap().result.as_deref()),
                 expected,
                 "{state}: a stored result is never replaced"
             );
@@ -2338,7 +2345,7 @@ mod tests {
             (row.stage.as_deref(), row.stage_index),
             (Some("traces"), Some(4))
         );
-        assert_eq!(row.context_used, Some(context));
+        assert_eq!(decode(row.context_used.as_deref()), Some(context));
         assert_eq!(row.continuations, 2);
         let item = to_run(row);
         assert_eq!(item.continuations, 2);

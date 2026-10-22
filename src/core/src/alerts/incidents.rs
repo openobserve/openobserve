@@ -4114,7 +4114,9 @@ mod tests {
         let row = incident_row(&org, &inc).await;
         assert_eq!(row.rca_state.as_deref(), Some("cancelled"));
         assert_eq!(
-            row.rca_summary.unwrap()["cancelled_by"].as_str(),
+            infra::table::rca_runs::decode::<serde_json::Value>(row.rca_summary.as_deref())
+                .unwrap()["cancelled_by"]
+                .as_str(),
             Some("a.rao@acme.io")
         );
         let cancels: Vec<_> = timeline(&org, &inc)

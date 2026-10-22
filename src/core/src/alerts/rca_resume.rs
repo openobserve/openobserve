@@ -153,7 +153,7 @@ async fn resumable_from_rows(
     if !is_stopped(&latest) {
         return Ok(None);
     }
-    let candidate = match resumed_source(&latest) {
+    let candidate = match resumed_source(&latest).as_deref() {
         Some(source) if is_transparent_resume(replica, org_id, &latest, source).await? => {
             match listed_or_read(org_id, source, runs).await? {
                 Some(source) => source,
@@ -281,10 +281,9 @@ fn is_stopped(run: &RunRow) -> bool {
 }
 
 /// The run a Resume's lineage names.
-fn resumed_source(run: &RunRow) -> Option<&str> {
-    run.context_used
-        .as_ref()
-        .and_then(|used| used["resumed_from"]["run_id"].as_str())
+fn resumed_source(run: &RunRow) -> Option<String> {
+    let used: Value = runs_table::decode(run.context_used.as_deref())?;
+    used["resumed_from"]["run_id"].as_str().map(str::to_string)
 }
 
 /// A resume that never ran a turn must not hide its still-reusable source.
@@ -297,12 +296,12 @@ async fn is_transparent_resume<C: ConnectionTrait>(
     let item = runs_table::to_item(latest);
     if item.trigger != RunTrigger::Resume
         || !matches!(item.state, RunState::Failed | RunState::Cancelled)
-        || resumed_source(latest) != Some(run_id)
+        || resumed_source(latest).as_deref() != Some(run_id)
     {
         return Ok(false);
     }
     // Only a failed fork is sure to have run no turn; any other end is judged by its turns.
-    if error_code(latest) == Some(ERROR_RESUME_FAILED) {
+    if error_code(latest).as_deref() == Some(ERROR_RESUME_FAILED) {
         return Ok(true);
     }
     let Some(session_id) = latest.session_id.as_deref() else {
@@ -338,7 +337,7 @@ fn check_resumable(latest: bool, run: &RunRow) -> Result<(&str, RunMode), Resume
         ));
     }
     if error_code(run).is_some_and(|code| {
-        RcaTurnError::is_start_code(code) || NOT_RESUMABLE_CODES.contains(&code)
+        RcaTurnError::is_start_code(&code) || NOT_RESUMABLE_CODES.contains(&code.as_str())
     }) {
         return Err(not_resumable(
             "This analysis stopped before anything could be reused",
@@ -350,11 +349,8 @@ fn check_resumable(latest: bool, run: &RunRow) -> Result<(&str, RunMode), Resume
     Ok((session_id, item.mode))
 }
 
-fn error_code(run: &RunRow) -> Option<&str> {
-    run.error
-        .as_ref()
-        .and_then(|error| error.get("code"))
-        .and_then(Value::as_str)
+fn error_code(run: &RunRow) -> Option<String> {
+    runs_table::error_of(run).map(|error| error.code)
 }
 
 fn not_resumable(message: &str) -> ResumeError {

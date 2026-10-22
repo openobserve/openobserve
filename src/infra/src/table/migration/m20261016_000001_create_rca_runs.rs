@@ -101,7 +101,7 @@ enum AlertIncidents {
 enum ColType {
     String(u32),
     BigInt,
-    Json,
+    Text,
 }
 
 fn summary_columns() -> [(AlertIncidents, ColType); 8] {
@@ -112,7 +112,7 @@ fn summary_columns() -> [(AlertIncidents, ColType); 8] {
         (AlertIncidents::RcaUpdatedAt, ColType::BigInt),
         (AlertIncidents::RcaOutcome, ColType::String(32)),
         (AlertIncidents::RcaConfidence, ColType::String(8)),
-        (AlertIncidents::RcaSummary, ColType::Json),
+        (AlertIncidents::RcaSummary, ColType::Text),
         (AlertIncidents::RcaOffReason, ColType::String(32)),
     ]
 }
@@ -132,7 +132,7 @@ async fn add_column(
     let def = match ty {
         ColType::String(len) => def.string_len(len),
         ColType::BigInt => def.big_integer(),
-        ColType::Json => def.json_binary(),
+        ColType::Text => def.text(),
     }
     .null()
     .to_owned();
@@ -185,10 +185,10 @@ fn create_statement() -> TableCreateStatement {
         .col(ColumnDef::new(RcaRuns::Outcome).string_len(32).null())
         .col(ColumnDef::new(RcaRuns::Confidence).string_len(8).null())
         .col(ColumnDef::new(RcaRuns::Report).text().null())
-        .col(ColumnDef::new(RcaRuns::Result).json_binary().null())
-        .col(ColumnDef::new(RcaRuns::Error).json_binary().null())
+        .col(ColumnDef::new(RcaRuns::Result).text().null())
+        .col(ColumnDef::new(RcaRuns::Error).text().null())
         .col(ColumnDef::new(RcaRuns::SessionId).string_len(64).null())
-        .col(ColumnDef::new(RcaRuns::Stats).json_binary().null())
+        .col(ColumnDef::new(RcaRuns::Stats).text().null())
         .to_owned()
 }
 
@@ -256,7 +256,7 @@ mod tests {
         assert!(sql.contains("\"state\" varchar(16) NOT NULL"), "{sql}");
         assert!(sql.contains("\"ended_at\" bigint NULL"), "{sql}");
         for json in ["result", "error", "stats"] {
-            assert!(sql.contains(&format!("\"{json}\" jsonb NULL")), "{sql}");
+            assert!(sql.contains(&format!("\"{json}\" text NULL")), "{sql}");
         }
         let sql = subject_index().to_string(PostgresQueryBuilder);
         assert!(
