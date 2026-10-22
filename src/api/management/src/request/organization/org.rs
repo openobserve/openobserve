@@ -135,6 +135,14 @@ pub async fn organizations(
             }),
             Err(_) => HashMap::new(),
         };
+    let created_at_by_org: HashMap<String, i64> =
+        match infra::table::organizations::get_created_at_for_orgs(&org_ids).await {
+            Ok(rows) => rows.into_iter().collect(),
+            Err(e) => {
+                log::warn!("[ORG] failed to load org creation times: {e}");
+                HashMap::new()
+            }
+        };
 
     for org in all_orgs {
         // Hide blocked orgs (pending_deletion or deleting) from the regular org
@@ -181,6 +189,10 @@ pub async fn organizations(
                 (String::new(), String::new())
             }
         };
+        let created_at = created_at_by_org
+            .get(&org.identifier)
+            .copied()
+            .unwrap_or_default();
         let org = OrgDetails {
             id,
             identifier: org.identifier.clone(),
@@ -193,6 +205,7 @@ pub async fn organizations(
             plan: org_subscription,
             owner_email,
             owner_first_name,
+            created_at,
         };
         if !org_names.contains(&org.identifier) {
             org_names.insert(org.identifier.clone());
