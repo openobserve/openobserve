@@ -8929,6 +8929,8 @@
       "expressionPlaceholder": "es. A && B",
       "insert": "Inserisci:",
       "addAlert": "Aggiungi avviso",
+      "addUnavailableCap": "Puoi aggiungere fino a {max} avvisi.",
+      "addUnavailableNone": "Nessun altro avviso idoneo da aggiungere.",
       "removeChild": "Rimuovi il figlio {name}",
       "noChildren": "Ancora nessun sotto-avviso. Aggiungi almeno due.",
       "wouldTrigger": "Attiverebbe",

@@ -8924,6 +8924,8 @@
       "expressionPlaceholder": "例如：A && B",
       "insert": "插入：",
       "addAlert": "新增警示",
+      "addUnavailableCap": "您最多可以新增 {max} 個警示。",
+      "addUnavailableNone": "沒有更多符合條件的警示可以新增。",
       "removeChild": "移除子警示 {name}",
       "noChildren": "尚無子警示。請至少新增兩個。",
       "wouldTrigger": "會觸發",

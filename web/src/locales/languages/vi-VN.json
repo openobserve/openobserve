@@ -8929,6 +8929,8 @@
       "expressionPlaceholder": "ví dụ: A && B",
       "insert": "Chèn:",
       "addAlert": "Thêm cảnh báo",
+      "addUnavailableCap": "Bạn có thể thêm tối đa {max} cảnh báo.",
+      "addUnavailableNone": "Không còn cảnh báo nào đủ điều kiện để thêm.",
       "removeChild": "Xóa cảnh báo con {name}",
       "noChildren": "Chưa có cảnh báo con nào. Thêm ít nhất hai.",
       "wouldTrigger": "Sẽ kích hoạt",

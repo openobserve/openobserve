@@ -8929,6 +8929,8 @@
       "expressionPlaceholder": "例如：A && B",
       "insert": "插入：",
       "addAlert": "添加告警",
+      "addUnavailableCap": "最多可添加 {max} 个告警。",
+      "addUnavailableNone": "没有更多可添加的符合条件的告警。",
       "removeChild": "移除子告警 {name}",
       "noChildren": "尚无子告警。至少添加两个。",
       "wouldTrigger": "会触发",

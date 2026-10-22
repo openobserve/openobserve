@@ -8929,6 +8929,8 @@
       "expressionPlaceholder": "p. ex. A && B",
       "insert": "Insérer :",
       "addAlert": "Ajouter une alerte",
+      "addUnavailableCap": "Vous pouvez ajouter jusqu'à {max} alertes.",
+      "addUnavailableNone": "Aucune autre alerte éligible à ajouter.",
       "removeChild": "Supprimer l'enfant {name}",
       "noChildren": "Aucune sous-alerte pour l'instant. Ajoutez-en au moins deux.",
       "wouldTrigger": "Déclencherait",

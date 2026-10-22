@@ -8929,6 +8929,8 @@
       "expressionPlaceholder": "örn. A && B",
       "insert": "Ekle:",
       "addAlert": "Uyarı ekle",
+      "addUnavailableCap": "En fazla {max} uyarı ekleyebilirsiniz.",
+      "addUnavailableNone": "Eklenebilecek başka uygun uyarı yok.",
       "removeChild": "{name} alt uyarısını kaldır",
       "noChildren": "Henüz alt uyarı yok. En az iki tane ekleyin.",
       "wouldTrigger": "Tetiklenirdi",

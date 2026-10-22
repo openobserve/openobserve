@@ -8929,6 +8929,8 @@
       "expressionPlaceholder": "bijv. A && B",
       "insert": "Invoegen:",
       "addAlert": "Alarm toevoegen",
+      "addUnavailableCap": "Je kunt maximaal {max} alarmen toevoegen.",
+      "addUnavailableNone": "Er zijn geen geschikte alarmen meer om toe te voegen.",
       "removeChild": "Verwijder onderliggende alert {name}",
       "noChildren": "Nog geen sub-alarmen. Voeg er ten minste twee toe.",
       "wouldTrigger": "Zou triggeren",

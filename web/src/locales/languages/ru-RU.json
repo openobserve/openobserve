@@ -8929,6 +8929,8 @@
       "expressionPlaceholder": "например, A && B",
       "insert": "Вставить:",
       "addAlert": "Добавить оповещение",
+      "addUnavailableCap": "Можно добавить до {max} оповещений.",
+      "addUnavailableNone": "Больше нет подходящих оповещений для добавления.",
       "removeChild": "Удалить дочернее оповещение {name}",
       "noChildren": "Пока нет под-оповещений. Добавьте как минимум два.",
       "wouldTrigger": "Сработало бы",

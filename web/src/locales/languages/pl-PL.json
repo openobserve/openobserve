@@ -8929,6 +8929,8 @@
       "expressionPlaceholder": "np. A && B",
       "insert": "Wstaw:",
       "addAlert": "Dodaj alert",
+      "addUnavailableCap": "Możesz dodać maksymalnie {max} alertów.",
+      "addUnavailableNone": "Brak kolejnych kwalifikujących się alertów do dodania.",
       "removeChild": "Usuń alert podrzędny {name}",
       "noChildren": "Brak jeszcze alertów podrzędnych. Dodaj co najmniej dwa.",
       "wouldTrigger": "Wyzwoliłoby",
