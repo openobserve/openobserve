@@ -637,14 +637,6 @@ pub(crate) mod tests {
     /// A fresh org with one open incident that was never analyzed.
     pub(crate) async fn new_incident(topology: Option<serde_json::Value>) -> (String, String) {
         let org_id = format!("rca_{}", runs_table::new_run_id().to_lowercase());
-        // A turn reads the org's assistant switch from this cache; the defaults leave it on.
-        common::infra::config::ORGANIZATION_SETTING
-            .write()
-            .await
-            .insert(
-                format!("/organization/setting/{org_id}"),
-                Default::default(),
-            );
         let incident_id = add_incident(&org_id, topology).await;
         (org_id, incident_id)
     }

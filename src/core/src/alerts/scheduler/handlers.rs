@@ -2226,12 +2226,6 @@ async fn trigger_rca_for_alert_firing(
             return;
         };
 
-        if crate::ai_policy::rca_policy(&org_id).await.is_none() {
-            log::info!("[SCHEDULER trace_id {trace_id}] O2 Assistant is off for {org_id}; no RCA");
-            release_alert_firing_hold(&org_id, &opened).await;
-            return;
-        }
-
         // The agent fetches the alert by this; a record's `{source}#{firing}` is not one.
         let subject_id = alert_id.unwrap_or_else(|| representative.response.subject.subject_id());
         let subjects: Vec<config::meta::oncall::SubjectRef> =

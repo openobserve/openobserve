@@ -868,6 +868,12 @@ mod tests {
     }
 
     #[test]
+    fn generate_sql_reads_without_an_x_o2_mcp_hint() {
+        let class = ToolClass::of("post", "/api/{org_id}/alerts/generate_sql", None);
+        assert!(class.read_only && class.operation == "read" && !class.destructive);
+    }
+
+    #[test]
     fn x_o2_mcp_hints_win_over_the_method() {
         let read = McpExtension {
             read_only: Some(true),
