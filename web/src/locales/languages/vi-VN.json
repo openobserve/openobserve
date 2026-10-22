@@ -11571,6 +11571,7 @@
     },
     "add": "Thêm",
     "runQuery": "Chạy truy vấn",
+    "runQueryOptions": "Tùy chọn chạy truy vấn",
     "explorer": {
       "detail": {
         "loading": "Đang tải chi tiết chỉ số...",
