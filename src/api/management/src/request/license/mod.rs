@@ -22,6 +22,7 @@ use db::license;
 use o2_enterprise::enterprise::license::{
     LICENSE_DB_KEY, License, LicenseDecision, LicenseStatus, Waiver, check_license, get_license,
     ingestion_limit_exceeded_count, ingestion_used, license_expired, license_status,
+    pasted_key_supersedes_env,
 };
 use openobserve_api_common::extractors::Headers;
 use openobserve_core::auth::{AuthExtractor, UserEmail};
@@ -29,7 +30,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 
-const ENV_KEY_CONFLICT_MSG: &str = "This instance reads its license key from the O2_LICENSE_KEY environment variable, so a pasted key would not be used. Put the new key in O2_LICENSE_KEY and restart.";
+const ENV_KEY_CONFLICT_MSG: &str = "This instance uses the license key in the O2_LICENSE_KEY environment variable, and that key stays in use. Only a newer key for the same license, such as one carrying new waivers, can be pasted over it. To use any other key, put it in O2_LICENSE_KEY and restart.";
 
 #[derive(Serialize, Deserialize)]
 struct LicenseResponse {
@@ -44,6 +45,8 @@ struct LicenseResponse {
     base: LicenseDecision,
     evaluated_at: i64,
     env_key_active: bool,
+    /// Whether the loaded key is the `O2_LICENSE_KEY` one, i.e. no pasted key superseded it.
+    env_key_in_use: bool,
     /// Whether `POST /license/refresh` would pass both its route check and its handler check.
     can_update_license: bool,
 }
@@ -209,8 +212,15 @@ fn env_key_active(env_key: &str) -> bool {
     !env_key.is_empty()
 }
 
-fn env_key_conflict(env_key: &str, pasted: &str) -> bool {
-    env_key_active(env_key) && env_key.trim() != pasted.trim()
+// an env key that does not parse fails the loader before it reads the db, so nothing supersedes it
+fn env_key_conflict(env_key: &str, env: Option<&License>, raw: &str, pasted: &License) -> bool {
+    env_key_active(env_key)
+        && env_key.trim() != raw.trim()
+        && !env.is_some_and(|env| pasted_key_supersedes_env(env, pasted))
+}
+
+fn env_key_in_use(env_key: &str, live_key: Option<&str>) -> bool {
+    env_key_active(env_key) && live_key == Some(env_key)
 }
 
 pub async fn get_license_info(Headers(email): Headers<UserEmail>) -> Response {
@@ -222,6 +232,7 @@ pub async fn get_license_info(Headers(email): Headers<UserEmail>) -> Response {
         None => (None, None),
     };
 
+    let env_key_in_use = env_key_in_use(&o2_cfg.common.license_key, key.as_deref());
     let is_root = db::user::is_root_user(&email.user_id);
     let is_license_admin = is_root
         || check_license_permission(&email.user_id, "PUT")
@@ -251,6 +262,7 @@ pub async fn get_license_info(Headers(email): Headers<UserEmail>) -> Response {
         base,
         evaluated_at,
         env_key_active: env_key_active(&o2_cfg.common.license_key),
+        env_key_in_use,
         // check_permissions ignores is_external
         can_update_license: can_update_license(&email.user_id, is_license_admin, |auth, role| {
             openobserve_core::authz::check_permissions(&email.user_id, auth, role, false)
@@ -270,7 +282,9 @@ pub async fn store_license(
     }
 
     let o2_cfg = o2_enterprise::enterprise::common::config::get_config();
-    if env_key_conflict(&o2_cfg.common.license_key, &req.raw_key) {
+    let env_key = &o2_cfg.common.license_key;
+    let env = License::load_from_str(env_key).ok();
+    if env_key_conflict(env_key, env.as_ref(), &req.raw_key, &req.key) {
         return MetaHttpResponse::conflict(ENV_KEY_CONFLICT_MSG);
     }
 
@@ -389,6 +403,7 @@ mod tests {
             base,
             evaluated_at,
             env_key_active: false,
+            env_key_in_use: false,
             can_update_license: is_license_admin,
         })
         .unwrap()
@@ -544,6 +559,7 @@ mod tests {
             base,
             evaluated_at,
             env_key_active: false,
+            env_key_in_use: false,
             can_update_license: false,
         })
         .unwrap();
@@ -569,19 +585,52 @@ mod tests {
         assert!(d["limit_today_gb"].is_null());
     }
 
+    fn lic(license_id: &str, rev: i64) -> License {
+        let mut l = stored_license().1;
+        l.license_id = license_id.to_string();
+        l.rev = rev;
+        l
+    }
+
     #[test]
     fn test_env_key_conflict_only_when_env_set_and_different() {
-        assert!(!env_key_conflict("", "eyJ.new"));
-        assert!(!env_key_conflict("eyJ.same", " eyJ.same "));
-        assert!(env_key_conflict("eyJ.old", "eyJ.new"));
+        let pasted = lic("lic-1", 0);
+        assert!(!env_key_conflict("", None, "eyJ.new", &pasted));
+        assert!(!env_key_conflict("eyJ.same", None, " eyJ.same ", &pasted));
+        assert!(env_key_conflict("eyJ.old", None, "eyJ.new", &pasted));
+    }
+
+    #[test]
+    fn test_a_newer_key_for_the_env_license_is_no_conflict() {
+        let env = lic("lic-1", 2);
+        let conflict =
+            |pasted: License| env_key_conflict("eyJ.old", Some(&env), "eyJ.new", &pasted);
+        assert!(!conflict(lic("lic-1", 3)));
+        assert!(conflict(lic("lic-1", 2)));
+        assert!(conflict(lic("lic-1", 1)));
+        assert!(conflict(lic("lic-2", 9)));
     }
 
     #[test]
     fn test_env_key_is_active_exactly_when_the_loader_reads_it() {
+        let pasted = lic("lic-1", 0);
         for (env_key, active) in [("", false), ("  ", true), ("eyJ.k", true)] {
             assert_eq!(env_key_active(env_key), active, "{env_key:?}");
-            assert_eq!(env_key_conflict(env_key, "eyJ.new"), active, "{env_key:?}");
+            assert_eq!(
+                env_key_conflict(env_key, None, "eyJ.new", &pasted),
+                active,
+                "{env_key:?}"
+            );
         }
+    }
+
+    #[test]
+    fn test_env_key_in_use_only_while_it_is_the_loaded_key() {
+        assert!(env_key_in_use("eyJ.env", Some("eyJ.env")));
+        assert!(!env_key_in_use("eyJ.env", Some("eyJ.pasted")));
+        assert!(!env_key_in_use("eyJ.env", None));
+        assert!(!env_key_in_use("", Some("")));
+        assert!(!env_key_in_use("", None));
     }
 
     #[test]
@@ -598,10 +647,12 @@ mod tests {
             base: LicenseDecision::default(),
             evaluated_at: 0,
             env_key_active: true,
+            env_key_in_use: true,
             can_update_license: false,
         })
         .unwrap();
         assert_eq!(json["env_key_active"], true);
+        assert_eq!(json["env_key_in_use"], true);
     }
 
     // a watcher fills these caches on a running node; a miss here would go to the database
