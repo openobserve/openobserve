@@ -287,7 +287,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon name="more-vert" size="sm" />
               <span
                 v-if="showDraftDot"
-                class="bg-accent pointer-events-none absolute end-1 top-1 size-2 rounded-full in-[.fullscreen]:hidden"
+                class="bg-warning ring-status-warning-text pointer-events-none absolute end-1 top-1 size-2 rounded-full ring-1 in-[.fullscreen]:hidden"
                 aria-hidden="true"
                 data-test="dashboard-panel-draft-dot"
               />
@@ -306,7 +306,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span
                   role="img"
                   :aria-label="t('dashboard.panelDraft.panelDot')"
-                  class="bg-accent size-2 shrink-0 rounded-full"
+                  class="bg-warning ring-status-warning-text size-2 shrink-0 rounded-full ring-1"
                   data-test="dashboard-panel-edit-draft-dot"
                 />
               </OTooltip>
