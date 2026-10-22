@@ -85,12 +85,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           variant="primary"
           size="sm-action"
-          :disabled="state === 'noProvider' || !draftPhone.trim()"
+          :disabled="state === 'noProvider' || !draftPhone.trim() || sendWaiting"
           :loading="sending"
           data-test="oncall-phone-send"
           @click="sendCode"
         >
-          {{ t("oncall.phoneSendCode") }}
+          {{
+            sendWaiting
+              ? t("oncall.phoneResendIn", { time: raw(formatCountdown(resendLeft)) })
+              : t("oncall.phoneSendCode")
+          }}
         </OButton>
         <OButton
           v-if="editing && contact.phone"
@@ -199,7 +203,13 @@ import {
 import type { Contact } from "@/ts/interfaces/oncall";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
-import { formatCountdown, phoneCardState, phoneRefusalText, refusalOf } from "@/utils/oncall";
+import {
+  formatCountdown,
+  phoneCardState,
+  phoneRefusalText,
+  refusalOf,
+  samePhone,
+} from "@/utils/oncall";
 
 // The server's minimum gap between two codes for one number (R17).
 const RESEND_SECS = 60;
@@ -232,12 +242,17 @@ const error = ref<I18nText | null>(null);
 const sending = ref(false);
 const confirming = ref(false);
 const resendAt = ref(0);
+const countdownPhone = ref("");
 const now = ref(Date.now());
 
 const state = computed(() =>
   contact.value ? phoneCardState(contact.value, codeSent.value, editing.value) : null,
 );
 const resendLeft = computed(() => Math.max(0, Math.ceil((resendAt.value - now.value) / 1000)));
+// The server's gap is per number, so a different number may be sent at once.
+const sendWaiting = computed(
+  () => resendLeft.value > 0 && samePhone(draftPhone.value, countdownPhone.value),
+);
 
 watch(
   () => contact.value?.phone,
@@ -249,7 +264,8 @@ watch(
 
 let timer: ReturnType<typeof setInterval> | undefined;
 
-function startCountdown(secs: number) {
+function startCountdown(phone: string, secs: number) {
+  countdownPhone.value = phone;
   now.value = Date.now();
   resendAt.value = now.value + secs * 1000;
   clearInterval(timer);
@@ -278,19 +294,24 @@ function cancelChange() {
   editing.value = false;
 }
 
-async function requestCode() {
+async function requestCode(phone: string) {
   try {
     await sendCodeWrite.mutateAsync();
     code.value = "";
     codeSent.value = true;
-    startCountdown(RESEND_SECS);
+    startCountdown(phone, RESEND_SECS);
   } catch (err) {
     const refusal = refusalOf(err);
-    if (refusal?.retry_after_secs !== undefined) startCountdown(refusal.retry_after_secs);
+    if (refusal?.retry_after_secs !== undefined) startCountdown(phone, refusal.retry_after_secs);
     // A code sent under a minute ago is still valid, so its box opens instead of an error.
     if (refusal?.reason === "too_soon" && refusal.retry_after_secs !== undefined) {
       codeSent.value = true;
       return;
+    }
+    // The server stored the undelivered code, so no code works yet the 60 s gap still runs.
+    if (refusal?.reason === "number_rejected" || refusal?.reason === "provider_unavailable") {
+      codeSent.value = false;
+      startCountdown(phone, RESEND_SECS);
     }
     error.value = errorText(err, t("oncall.phoneSendFailed"));
   }
@@ -316,7 +337,7 @@ async function sendCode() {
     editing.value = false;
     // An unchanged number, or one proved in another org, keeps its proof (V5).
     if (saved.phone_is_pageable) return;
-    await requestCode();
+    await requestCode(saved.phone ?? "");
   } finally {
     sending.value = false;
   }
@@ -326,7 +347,7 @@ async function resend() {
   error.value = null;
   sending.value = true;
   try {
-    await requestCode();
+    await requestCode(contact.value?.phone ?? "");
   } finally {
     sending.value = false;
   }

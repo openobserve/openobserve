@@ -1996,6 +1996,12 @@ export function phoneRefusalText(t: TranslateFn, body: VerificationRefusalBody):
   }
 }
 
+/** Whether two typed numbers are one number once the server strips spaces and `-().`. [pure] */
+export function samePhone(a: string, b: string): boolean {
+  const compact = (p: string) => p.replace(/[\s\-().]/g, "");
+  return compact(a) !== "" && compact(a) === compact(b);
+}
+
 /** Seconds as `m:ss`, or `h:mm:ss` from an hour up. [pure] */
 export function formatCountdown(secs: number): string {
   const s = Math.max(0, Math.ceil(secs));

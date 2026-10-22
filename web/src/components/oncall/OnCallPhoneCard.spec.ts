@@ -22,7 +22,13 @@ import oncallService from "@/services/oncall";
 import store from "@/test/unit/helpers/store";
 import type { Contact, RefusalReason, VerificationRefusalBody } from "@/ts/interfaces/oncall";
 import type { TranslateFn } from "@/types/i18n";
-import { formatCountdown, phoneCardState, phoneRefusalText, refusalOf } from "@/utils/oncall";
+import {
+  formatCountdown,
+  phoneCardState,
+  phoneRefusalText,
+  refusalOf,
+  samePhone,
+} from "@/utils/oncall";
 
 vi.mock("@/services/oncall", () => ({
   default: {
@@ -152,6 +158,18 @@ describe("formatCountdown", () => {
   });
 });
 
+describe("samePhone", () => {
+  it.each([
+    ["+14155550134", "+14155550134", true],
+    ["+1 (415) 555-0134", "+14155550134", true],
+    ["  +1.415.555.0134 ", "+14155550134", true],
+    ["+14155550199", "+14155550134", false],
+    ["", "", false],
+  ])("%j vs %j is %s", (a, b, expected) => {
+    expect(samePhone(a, b)).toBe(expected);
+  });
+});
+
 describe("phoneCardState", () => {
   it.each([
     [
@@ -246,6 +264,73 @@ describe("OnCallPhoneCard", () => {
 
     await vi.advanceTimersByTimeAsync(18_000);
     expect(find(w, "resend").text()).toBe("Resend in 0:42");
+  });
+
+  it("after a send, Send code waits out the countdown for that number only", async () => {
+    const w = await render(contact());
+    service.setContact.mockResolvedValue({ data: UNVERIFIED } as any);
+    service.sendContactCode.mockResolvedValue({ data: undefined } as any);
+    service.getContact.mockResolvedValue({ data: UNVERIFIED } as any);
+    await find(w, "input").setValue(PHONE);
+    await find(w, "send").trigger("click");
+    await flushPromises();
+
+    await find(w, "change").trigger("click");
+    await find(w, "input").setValue("+1 415 555 0134");
+    expect(find(w, "send").attributes("disabled")).toBeDefined();
+    expect(find(w, "send").text()).toBe("Resend in 1:00");
+
+    await find(w, "input").setValue("+14155550199");
+    expect(find(w, "send").attributes("disabled")).toBeUndefined();
+    expect(find(w, "send").text()).toBe("Send code");
+
+    await find(w, "input").setValue(PHONE);
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(find(w, "send").attributes("disabled")).toBeUndefined();
+  });
+
+  it("a failed resend drops the code box, since the old code no longer matches", async () => {
+    const w = await render(contact());
+    service.setContact.mockResolvedValue({ data: UNVERIFIED } as any);
+    service.sendContactCode.mockResolvedValue({ data: undefined } as any);
+    service.getContact.mockResolvedValue({ data: UNVERIFIED } as any);
+    await find(w, "input").setValue(PHONE);
+    await find(w, "send").trigger("click");
+    await flushPromises();
+
+    await vi.advanceTimersByTimeAsync(60_000);
+    service.sendContactCode.mockRejectedValue(refusal({ reason: "number_rejected" }));
+    await find(w, "resend").trigger("click");
+    await flushPromises();
+
+    expect(find(w, "error").text()).toBe(
+      "This number cannot receive texts. Check it and try again.",
+    );
+    expect(find(w, "code").exists()).toBe(false);
+    expect(w.text()).not.toContain("Code sent to");
+    // The undelivered code still starts the server's gap, so a send now would read as too_soon.
+    expect(find(w, "send").attributes("disabled")).toBeDefined();
+    expect(find(w, "send").text()).toBe("Resend in 1:00");
+  });
+
+  it("a resend refused by a daily limit keeps the box, since nothing replaced the code", async () => {
+    const w = await render(contact());
+    service.setContact.mockResolvedValue({ data: UNVERIFIED } as any);
+    service.sendContactCode.mockResolvedValue({ data: undefined } as any);
+    service.getContact.mockResolvedValue({ data: UNVERIFIED } as any);
+    await find(w, "input").setValue(PHONE);
+    await find(w, "send").trigger("click");
+    await flushPromises();
+
+    await vi.advanceTimersByTimeAsync(60_000);
+    service.sendContactCode.mockRejectedValue(
+      refusal({ reason: "user_daily_limit", retry_after_secs: 3600 }, 429),
+    );
+    await find(w, "resend").trigger("click");
+    await flushPromises();
+
+    expect(find(w, "error").exists()).toBe(true);
+    expect(find(w, "code").exists()).toBe(true);
   });
 
   it("a number proved in another org needs no code", async () => {
