@@ -9958,6 +9958,8 @@
         "citedNotVerified": "مُستشهد به ولكن غير مُتحقق منه",
         "unverifiedNotRun": "لم يتم التشغيل",
         "unverifiedFailed": "فشل",
+        "unverifiedAmbiguous": "غامض",
+        "unverifiedRef": "[ref {ref}]",
         "signal": {
           "logs": "السجلات",
           "metrics": "المقاييس",

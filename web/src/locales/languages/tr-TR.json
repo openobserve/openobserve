@@ -9958,6 +9958,8 @@
         "citedNotVerified": "Belirtildi ancak doğrulanmadı",
         "unverifiedNotRun": "Çalıştırılmadı",
         "unverifiedFailed": "Başarısız",
+        "unverifiedAmbiguous": "Belirsiz",
+        "unverifiedRef": "[ref {ref}]",
         "signal": {
           "logs": "Günlükler",
           "metrics": "Metrikler",

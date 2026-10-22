@@ -22,8 +22,7 @@ use utoipa::ToSchema;
 use super::{EvidenceLedger, Polarity, Strength, TimeWindow};
 use crate::meta::{
     oncall::confidence::{
-        SignalClass, ToolCallRecord, UnverifiedCitation, is_prometheus_tool, match_citation,
-        signal_class,
+        CallLog, SignalClass, ToolCallRecord, UnverifiedCitation, is_prometheus_tool, signal_class,
     },
     sql::resolve_stream_names,
 };
@@ -291,18 +290,16 @@ fn traces_summary(body: &Value) -> Option<(String, Option<u64>)> {
     Some((plural(traces, "trace", "traces"), Some(traces)))
 }
 
-fn shell_summary(body: &Value) -> (String, Option<u64>) {
+fn shell_summary(tool: &str, body: &Value) -> (String, Option<u64>) {
     let text = match body {
         Value::String(s) => s.as_str(),
         _ => body
             .get("output")
+            .or_else(|| body.get("stdout"))
             .and_then(Value::as_str)
             .unwrap_or_default(),
     };
-    let exit = body
-        .pointer("/metadata/exit")
-        .and_then(Value::as_i64)
-        .unwrap_or(0);
+    let exit = exit_code(tool, body.get("metadata"), body).unwrap_or(0);
     let lines = text.lines().count() as u64;
     (
         format!("exit {exit} · {}", plural(lines, "line", "lines")),
@@ -310,9 +307,20 @@ fn shell_summary(body: &Value) -> (String, Option<u64>) {
     )
 }
 
+/// A shell or `cli_*` call's exit code: bash's `metadata.exit`, else a CLI result's `return_code`.
+pub fn exit_code(tool: &str, metadata: Option<&Value>, body: &Value) -> Option<i64> {
+    if !is_shell_tool(tool) {
+        return None;
+    }
+    metadata
+        .and_then(|m| m.get("exit"))
+        .or_else(|| body.get("return_code"))
+        .and_then(Value::as_i64)
+}
+
 pub fn summarize_result(tool: &str, output: &Value) -> (String, Option<u64>) {
     if is_shell_tool(tool) {
-        return shell_summary(output);
+        return shell_summary(tool, output);
     }
     let body = decode_output(output);
     let specific = if is_prometheus_tool(tool) {
@@ -518,21 +526,16 @@ pub fn build_evidence(
         citations: Vec<Citation>,
     }
 
+    let calls = CallLog::new(tool_log);
     let mut accs: Vec<Acc<'_>> = Vec::new();
     let mut by_call: HashMap<&str, usize> = HashMap::new();
     let mut unverified = Vec::new();
     for h in ledger.map(|l| l.hypotheses.as_slice()).unwrap_or_default() {
         for item in &h.evidence {
-            let record = match match_citation(&item.tool, &item.query, tool_log) {
+            let record = match calls.verify(item) {
                 Ok(record) => record,
                 Err(reason) => {
-                    unverified.push(UnverifiedCitation {
-                        hypothesis_id: h.id.clone(),
-                        evidence_id: item.id.clone(),
-                        tool: item.tool.clone(),
-                        query: item.query.clone(),
-                        reason,
-                    });
+                    unverified.push(UnverifiedCitation::of(&h.id, item, reason));
                     continue;
                 }
             };
@@ -600,7 +603,7 @@ mod tests {
     use super::*;
     use crate::meta::oncall::{
         confidence::UnverifiedReason,
-        rca_run::fixtures::{BASH, PROM, SQL, hyp, item, ledger_of, logs, prom, rec, shell},
+        rca_run::fixtures::{BASH, PROM, SQL, cited, hyp, item, ledger_of, logs, prom, rec, shell},
     };
 
     /// `e2` on `h1` and `e7` on `h4` that both match `c9` merge into one entry.
@@ -1213,6 +1216,7 @@ mod tests {
                     hypothesis_id: "h1".into(),
                     evidence_id: "e7".into(),
                     tool: PROM.into(),
+                    call_ref: None,
                     query: "never ran".into(),
                     reason: UnverifiedReason::NotRun,
                 },
@@ -1220,6 +1224,7 @@ mod tests {
                     hypothesis_id: "h1".into(),
                     evidence_id: "e8".into(),
                     tool: BASH.into(),
+                    call_ref: None,
                     query: "gh pr diff 812".into(),
                     reason: UnverifiedReason::Failed,
                 },
@@ -1232,6 +1237,44 @@ mod tests {
         assert_eq!(
             serde_json::to_value(UnverifiedReason::Failed).unwrap(),
             json!("failed")
+        );
+    }
+
+    /// The same SQL over a baseline and the incident window: each ref links its own call.
+    #[test]
+    fn refs_link_each_citation_to_the_call_it_names() {
+        let ledger = ledger_of(&[hyp(
+            1,
+            "h1",
+            "root_cause",
+            vec![
+                cited("e1", SQL, "incident", "supports"),
+                cited("e2", SQL, "baseline", "contradicts"),
+                cited("e3", SQL, "never", "supports"),
+            ],
+        )]);
+        let log = [
+            logs("baseline", "SELECT count(*) FROM app", 1),
+            logs("incident", "SELECT count(*) FROM app", 2),
+        ];
+        let (entries, unverified) = build_evidence(ledger.as_ref(), &log);
+        assert_eq!(
+            entries
+                .iter()
+                .map(|e| (e.ids[0].as_str(), e.call_id.as_str()))
+                .collect::<Vec<_>>(),
+            [("e2", "baseline"), ("e1", "incident")]
+        );
+        assert_eq!(
+            unverified
+                .iter()
+                .map(|u| (u.evidence_id.as_str(), u.reason))
+                .collect::<Vec<_>>(),
+            [("e3", UnverifiedReason::NotRun)]
+        );
+        assert_eq!(
+            unverified[0].call_ref.as_deref(),
+            Some(crate::meta::oncall::confidence::call_ref("never").as_str())
         );
     }
 

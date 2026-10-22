@@ -9958,6 +9958,8 @@
         "citedNotVerified": "Cited but not verified",
         "unverifiedNotRun": "Not run",
         "unverifiedFailed": "Failed",
+        "unverifiedAmbiguous": "Ambiguous",
+        "unverifiedRef": "[ref {ref}]",
         "signal": {
           "logs": "Logs",
           "metrics": "Metrics",

@@ -18,7 +18,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use crate::meta::oncall::confidence::MatchKey;
+use crate::meta::oncall::confidence::{MatchKey, is_call_ref};
 
 /// Most hypotheses kept for one run.
 pub const MAX_HYPOTHESES: usize = 10;
@@ -87,6 +87,10 @@ pub enum Strength {
 pub struct EvidenceItem {
     pub id: String,
     pub tool: String,
+    /// The cited call's ref; runs before refs cite by `query` instead.
+    #[serde(default, rename = "ref", skip_serializing_if = "Option::is_none")]
+    pub call_ref: Option<String>,
+    #[serde(default)]
     pub query: String,
     pub polarity: Polarity,
     pub strength: Strength,
@@ -291,10 +295,19 @@ fn lenient_micros<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Option<i64>,
 struct EvidenceInput {
     id: String,
     tool: String,
+    #[serde(default, rename = "ref")]
+    call_ref: Option<String>,
+    #[serde(default)]
     query: String,
     polarity: Polarity,
     strength: Strength,
     observation: String,
+}
+
+impl EvidenceInput {
+    fn ref_is_well_formed(&self) -> bool {
+        self.call_ref.as_deref().is_none_or(is_call_ref)
+    }
 }
 
 #[derive(Deserialize)]
@@ -309,8 +322,10 @@ struct BlindSpotInput {
 /// A valid `record_hypothesis` input, else `None`.
 fn parse_hypothesis(input: &serde_json::Value) -> Option<HypothesisInput> {
     let h = HypothesisInput::deserialize(input).ok()?;
-    let valid =
-        numbered_id(&h.id, 'h', 99) && h.evidence.iter().all(|e| numbered_id(&e.id, 'e', 999));
+    let valid = numbered_id(&h.id, 'h', 99)
+        && h.evidence
+            .iter()
+            .all(|e| numbered_id(&e.id, 'e', 999) && e.ref_is_well_formed());
     valid.then_some(h)
 }
 
@@ -320,19 +335,29 @@ fn parse_blind_spot(input: &serde_json::Value) -> Option<BlindSpotInput> {
     numbered_id(&b.id, 'b', MAX_BLIND_SPOTS as u32).then_some(b)
 }
 
+/// What a citation names: a call ref, or (runs before refs) a key argument.
+#[derive(Debug, Clone, PartialEq)]
+enum CitedCall {
+    Ref(String),
+    Query(MatchKey),
+}
+
 #[derive(Debug, Clone, PartialEq)]
 struct CitedItem {
     id: String,
     tool: String,
-    query: MatchKey,
+    call: CitedCall,
 }
 
 impl CitedItem {
-    fn of(id: &str, tool: &str, query: &str) -> Self {
+    fn of(id: &str, tool: &str, call_ref: Option<&str>, query: &str) -> Self {
         Self {
             id: id.to_string(),
             tool: tool.strip_prefix("o2_").unwrap_or(tool).to_string(),
-            query: MatchKey::of(query),
+            call: match call_ref {
+                Some(r) => CitedCall::Ref(r.to_string()),
+                None => CitedCall::Query(MatchKey::of(query)),
+            },
         }
     }
 }
@@ -415,13 +440,14 @@ impl Builder {
                 let query = cut_bytes(e.query, MAX_QUERY_BYTES, F_QUERY, &mut cuts);
                 let observation =
                     cut_chars(e.observation, MAX_TEXT_CHARS, F_OBSERVATION, &mut cuts);
-                // The first definition of an id with this tool and query sets its observation.
-                let (first_cited_seq, observation) =
-                    self.cite(CitedItem::of(&e.id, &e.tool, &query), call.seq, observation);
+                // The first definition of an id with this tool and cited call sets its observation.
+                let cited = CitedItem::of(&e.id, &e.tool, e.call_ref.as_deref(), &query);
+                let (first_cited_seq, observation) = self.cite(cited, call.seq, observation);
                 EvidenceItem {
                     first_cited_seq,
                     id: e.id,
                     tool: e.tool,
+                    call_ref: e.call_ref,
                     query,
                     polarity: e.polarity,
                     strength: e.strength,
@@ -543,7 +569,7 @@ pub fn build_ledger(
     }
 
     for item in b.hypotheses.iter_mut().flat_map(|h| h.evidence.iter_mut()) {
-        let key = CitedItem::of(&item.id, &item.tool, &item.query);
+        let key = CitedItem::of(&item.id, &item.tool, item.call_ref.as_deref(), &item.query);
         if let Some((_, seq, _)) = b.first_cited.iter().find(|(k, ..)| *k == key) {
             item.first_cited_seq = *seq;
         }
@@ -872,7 +898,7 @@ mod tests {
         assert_eq!(counts.left_testing, 1);
     }
 
-    /// Invalid ids and unknown enum values are dropped and counted per tool.
+    /// Invalid ids and refs and unknown enum values are dropped and counted per tool.
     #[test]
     fn invalid_calls_are_dropped_and_counted() {
         let calls = [
@@ -894,6 +920,12 @@ mod tests {
                 vec![item("e1", PROM, "q", "proves", "decisive")],
             ),
             hyp_input(8, json!({"id": "h1", "status": "testing"})),
+            hyp_input(
+                8,
+                json!({"id": "h1", "statement": "s", "status": "testing", "reason": "r",
+                       "evidence": [{"id": "e1", "tool": PROM, "ref": "TKX3UH", "polarity": "supports",
+                                     "strength": "decisive", "observation": "o"}]}),
+            ),
             hyp(9, "h2", "testing", vec![]),
             spot(10, "b11", "logs", "none", "t"),
             spot(11, "b1", "dns", "none", "t"),
@@ -910,7 +942,7 @@ mod tests {
         assert_eq!(
             counts.invalid_calls,
             vec![
-                ("record_hypothesis".to_string(), 8),
+                ("record_hypothesis".to_string(), 9),
                 ("record_blind_spot".to_string(), 3)
             ]
         );

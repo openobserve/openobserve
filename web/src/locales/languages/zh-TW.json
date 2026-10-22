@@ -9953,6 +9953,8 @@
         "citedNotVerified": "已引用但未驗證",
         "unverifiedNotRun": "未執行",
         "unverifiedFailed": "失敗",
+        "unverifiedAmbiguous": "不明確",
+        "unverifiedRef": "[ref {ref}]",
         "signal": {
           "logs": "日誌",
           "metrics": "指標",

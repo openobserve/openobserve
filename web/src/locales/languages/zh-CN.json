@@ -9958,6 +9958,8 @@
         "citedNotVerified": "已引用但未验证",
         "unverifiedNotRun": "未运行",
         "unverifiedFailed": "失败",
+        "unverifiedAmbiguous": "不明确",
+        "unverifiedRef": "[ref {ref}]",
         "signal": {
           "logs": "日志",
           "metrics": "指标",

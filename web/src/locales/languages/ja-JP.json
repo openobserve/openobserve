@@ -9958,6 +9958,8 @@
         "citedNotVerified": "引用済みだが未検証",
         "unverifiedNotRun": "未実行",
         "unverifiedFailed": "失敗",
+        "unverifiedAmbiguous": "曖昧",
+        "unverifiedRef": "[ref {ref}]",
         "signal": {
           "logs": "ログ",
           "metrics": "メトリクス",

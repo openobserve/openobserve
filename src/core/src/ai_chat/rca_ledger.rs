@@ -23,8 +23,8 @@ use config::{
         oncall::{
             confidence::{ToolCallRecord, signal_class, stream_type},
             rca_run::{
-                LedgerCall, LedgerTool, RcaSubmit, evidence_target, observed_window, parse_submit,
-                summarize_result,
+                LedgerCall, LedgerTool, RcaSubmit, evidence_target, exit_code, observed_window,
+                parse_submit, summarize_result,
             },
         },
     },
@@ -342,7 +342,7 @@ pub fn decode_run(events: &[DurableEvent]) -> RunTranscript {
 
 /// The tool log entry of a visible tool part that completed or failed.
 fn tool_record(call: &ToolPart<'_>) -> Option<ToolCallRecord> {
-    let success = match call.status {
+    let completed = match call.status {
         "completed" => true,
         "error" => false,
         _ => return None,
@@ -353,22 +353,27 @@ fn tool_record(call: &ToolPart<'_>) -> Option<ToolCallRecord> {
     let target = evidence_target(call.tool, &input);
     let empty = Map::new();
     let state = call.state.unwrap_or(&empty);
-    let (result_summary, result_count, error_type, observed) = if success {
-        let body = tool_body(state);
-        let (summary, count) = summarize_result(call.tool, &body);
-        (
-            summary,
-            count,
-            None,
-            observed_window(call.tool, &body, &target),
-        )
-    } else {
-        (
+    let body = completed.then(|| tool_body(state));
+    let failure = body
+        .as_ref()
+        .and_then(|body| completed_call_failure(call.tool, state, body));
+    let success = completed && failure.is_none();
+    let (result_summary, result_count, error_type, observed) = match (body, failure) {
+        (Some(body), None) => {
+            let (summary, count) = summarize_result(call.tool, &body);
+            (
+                summary,
+                count,
+                None,
+                observed_window(call.tool, &body, &target),
+            )
+        }
+        (_, failure) => (
             String::new(),
             None,
-            Some(error_text(state.get("error"))),
+            Some(failure.unwrap_or_else(|| error_text(state.get("error")))),
             None,
-        )
+        ),
     };
     let started_at = call.started_at();
     let duration_ms = started_at.zip(call.ended_at()).map_or(0, |(start, end)| {
@@ -389,6 +394,16 @@ fn tool_record(call: &ToolPart<'_>) -> Option<ToolCallRecord> {
         observed,
         result_summary,
     })
+}
+
+/// Why a completed shell or `cli_*` call failed: a non-zero exit, or the CLI endpoint's error.
+fn completed_call_failure(tool: &str, state: &Map<String, Value>, body: &Value) -> Option<String> {
+    match exit_code(tool, state.get("metadata"), body) {
+        Some(0) => None,
+        Some(code) => Some(format!("exit {code}")),
+        None if tool.starts_with("cli_") => body.get("error").map(|e| error_text(Some(e))),
+        None => None,
+    }
 }
 
 #[cfg(test)]
@@ -940,6 +955,97 @@ pub(crate) mod tests {
             ]
         );
         assert_eq!(run.tool_log[0].signal, SignalClass::Infra);
+    }
+
+    /// A shell or CLI call that exits non-zero, or whose CLI endpoint failed, ran but read nothing.
+    #[test]
+    fn a_completed_call_that_exited_non_zero_failed() {
+        let mut s = Session::new();
+        s.message("msg_a1", "assistant", json!({"created": T}));
+        for (id, tool, output) in [
+            (
+                "prt_c1",
+                "shell",
+                json!({"output": "diff --git", "metadata": {"exit": 0}}),
+            ),
+            (
+                "prt_c2",
+                "shell",
+                json!({"output": "HTTP 403", "metadata": {"exit": 1}}),
+            ),
+            (
+                "prt_c3",
+                "cli_gh",
+                json!({"output": "{\"return_code\": 0, \"stdout\": \"a\\nb\"}"}),
+            ),
+            (
+                "prt_c4",
+                "cli_gh",
+                json!({"output": "{\"return_code\": 2, \"stderr\": \"no\"}"}),
+            ),
+            (
+                "prt_c5",
+                "cli_gh",
+                json!({"output": "{\"error\": \"HTTP 502\"}"}),
+            ),
+        ] {
+            s.tool(
+                "msg_a1",
+                id,
+                tool,
+                "completed",
+                json!({"command": "gh pr diff 812"}),
+                output,
+                100,
+                110,
+            );
+        }
+        let run = decode_run(&s.events);
+        let log: Vec<(bool, Option<&str>, &str)> = run
+            .tool_log
+            .iter()
+            .map(|r| {
+                (
+                    r.success,
+                    r.error_type.as_deref(),
+                    r.result_summary.as_str(),
+                )
+            })
+            .collect();
+        assert_eq!(
+            log,
+            [
+                (true, None, "exit 0 · 1 line"),
+                (false, Some("exit 1"), ""),
+                (true, None, "exit 0 · 2 lines"),
+                (false, Some("exit 2"), ""),
+                (false, Some("HTTP 502"), ""),
+            ]
+        );
+    }
+
+    /// The `[ref …]` line o2-ai appends does not break reading the result.
+    #[test]
+    fn a_result_with_its_ref_line_still_parses() {
+        let mut s = Session::new();
+        s.message("msg_a1", "assistant", json!({"created": T}));
+        let mut output = hits(3);
+        output["output"] = json!(format!(
+            "{}\n\n[ref tkx3uh]",
+            output["output"].as_str().unwrap()
+        ));
+        s.tool(
+            "msg_a1",
+            "prt_c1",
+            "o2_SearchSQL",
+            "completed",
+            search_sql("SELECT 1"),
+            output,
+            100,
+            110,
+        );
+        let run = decode_run(&s.events);
+        assert_eq!(run.tool_log[0].result_count, Some(3));
     }
 
     // ---- steering and questions in the transcript ----

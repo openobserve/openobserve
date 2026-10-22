@@ -50,6 +50,14 @@ const UNVERIFIED: RcaUnverifiedCitation[] = [
     query: "SELECT * FROM flags",
     reason: "failed",
   },
+  {
+    hypothesis_id: "h1",
+    evidence_id: "e11",
+    tool: "SearchSQL",
+    ref: "ccglip",
+    query: "",
+    reason: "ambiguous",
+  },
 ];
 
 const mountList = (evidence = SEVEN, unverified = UNVERIFIED) =>
@@ -119,10 +127,11 @@ describe("RcaEvidenceList (03 VE23–VE30)", () => {
     const wrapper = mountList();
     const section = wrapper.find('[data-test="rca-unverified"]');
 
-    expect(section.find("h4").text()).toMatch(/^Cited but not verified\s*2$/);
+    expect(section.find("h4").text()).toMatch(/^Cited but not verified\s*3$/);
     const rows = section.findAll('[data-test="rca-unverified-entry"]');
     expect(rows[0].text()).toMatch(/^e9\s*PrometheusRangeQuery\s*Not run\s*avg\(node_cpu\)$/);
     expect(rows[1].text()).toMatch(/^e10\s*SearchSQL\s*Failed\s*SELECT \* FROM flags$/);
+    expect(rows[2].text()).toMatch(/^e11\s*SearchSQL\s*\[ref ccglip\]\s*Ambiguous$/);
     expect(section.find("a").exists()).toBe(false);
     expect(section.find("button").exists()).toBe(false);
     wrapper.unmount();

@@ -17,9 +17,12 @@
 
 use std::collections::HashMap;
 
-use config::utils::{
-    json::{Map, Value, json},
-    redact::redact_internal_details,
+use config::{
+    meta::oncall::confidence::strip_call_ref,
+    utils::{
+        json::{Map, Value, json},
+        redact::redact_internal_details,
+    },
 };
 use o2_enterprise::enterprise::ai::chat::batcher::DurableEvent;
 
@@ -1103,6 +1106,7 @@ pub(crate) fn coerce_tool_output(output: Option<&Value>, metadata: Value) -> Map
     match output {
         Some(Value::Object(m)) => return m.clone(),
         Some(Value::String(text)) => {
+            let text = strip_call_ref(text);
             let stripped = py_strip(text);
             if (stripped.starts_with('{') || stripped.starts_with('['))
                 && let Ok(parsed) = config::utils::json::from_str::<Value>(stripped)
@@ -1113,7 +1117,7 @@ pub(crate) fn coerce_tool_output(output: Option<&Value>, metadata: Value) -> Map
                 wrapped.insert("output".into(), parsed);
                 return wrapped;
             }
-            wrapped.insert("output".into(), Value::String(text.clone()));
+            wrapped.insert("output".into(), Value::String(text.to_string()));
             if truthy(&metadata) {
                 wrapped.insert("metadata".into(), metadata);
             }

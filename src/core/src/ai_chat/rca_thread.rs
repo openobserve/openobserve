@@ -19,7 +19,7 @@ use config::{
     meta::{
         alerts::rca_steering::SteerKind,
         oncall::{
-            confidence::{KEY_ARG_MAX_BYTES, cut_bytes, is_prometheus_tool},
+            confidence::{KEY_ARG_MAX_BYTES, cut_bytes, is_prometheus_tool, strip_call_ref},
             rca_run::summarize_result,
         },
     },
@@ -834,7 +834,7 @@ pub(crate) fn error_text(error: Option<&Value>) -> String {
 
 fn raw_output(state: &Map<String, Value>) -> Option<String> {
     let text = match (state.get("output"), state.get("error")) {
-        (Some(Value::String(s)), _) => s.clone(),
+        (Some(Value::String(s)), _) => strip_call_ref(s).to_string(),
         (Some(other), _) if !other.is_null() => other.to_string(),
         // An error can carry internal paths; show it as the step's error text does.
         (_, Some(error)) if truthy(error) => redact_internal_details(&extract_error_message(error)),

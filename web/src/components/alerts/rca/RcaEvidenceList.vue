@@ -143,13 +143,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               item.evidence_id
             }}</span>
             <span class="text-text-secondary font-mono">{{ item.tool }}</span>
-            <RcaPill tone="warn-dash">
-              {{
-                item.reason === "failed"
-                  ? t("alerts.incidents.rcaSummary.unverifiedFailed")
-                  : t("alerts.incidents.rcaSummary.unverifiedNotRun")
-              }}
-            </RcaPill>
+            <span
+              v-if="item.ref"
+              data-test="rca-unverified-ref"
+              class="text-text-secondary font-mono"
+              >{{ t("alerts.incidents.rcaSummary.unverifiedRef", { ref: item.ref }) }}</span
+            >
+            <RcaPill tone="warn-dash">{{ reasonLabel(item.reason) }}</RcaPill>
           </div>
           <pre
             v-if="item.query"
@@ -224,6 +224,17 @@ const setRowRef = (number: number, el: Element | ComponentPublicInstance | null)
 };
 
 const unverifiedSection = ref<HTMLElement | null>(null);
+
+const reasonLabel = (reason: RcaUnverifiedCitation["reason"]) => {
+  switch (reason) {
+    case "failed":
+      return t("alerts.incidents.rcaSummary.unverifiedFailed");
+    case "ambiguous":
+      return t("alerts.incidents.rcaSummary.unverifiedAmbiguous");
+    case "not_run":
+      return t("alerts.incidents.rcaSummary.unverifiedNotRun");
+  }
+};
 
 /** Opens entry `number` and scrolls it into view (a thread chip). */
 const openEntry = async (number: number) => {

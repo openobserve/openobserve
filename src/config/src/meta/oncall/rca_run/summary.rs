@@ -30,7 +30,8 @@ use crate::meta::{
     oncall::{
         agent::{ChangeKind, Confidence},
         confidence::{
-            ConfidenceBreakdown, SignalClass, ToolCallRecord, UnverifiedCitation, min_band,
+            ConfidenceBreakdown, DATA_WINDOW_SLACK_US, SignalClass, ToolCallRecord,
+            UnverifiedCitation, min_band, names_change,
         },
     },
 };
@@ -211,16 +212,17 @@ fn numbers_of<'a>(
         .collect()
 }
 
-/// Confirmed/refuted require verified evidence; otherwise show unverified.
+/// Confirmed/refuted require every cited id to be verified evidence; otherwise show unverified.
 pub(super) fn timeline_view(
     timeline: &[TimelineEntry],
     evidence: &[EvidenceEntry],
+    unverified: &[UnverifiedCitation],
+    cited_calls: &[ToolCallRecord],
 ) -> Vec<SummaryTimelineEntry> {
     let mut view: Vec<SummaryTimelineEntry> = timeline
         .iter()
         .map(|t| {
-            let evidence_numbers = numbers_of(&t.evidence_ids, evidence);
-            let verified = !evidence_numbers.is_empty();
+            let verified = timeline_entry_verified(t, evidence, unverified, cited_calls);
             let status = match t.status {
                 TimelineStatus::Likely => TimelineView::Likely,
                 TimelineStatus::Confirmed if verified => TimelineView::Confirmed,
@@ -231,12 +233,46 @@ pub(super) fn timeline_view(
                 at: t.at_us,
                 text: t.text.clone(),
                 status,
-                evidence_numbers,
+                evidence_numbers: numbers_of(&t.evidence_ids, evidence),
             }
         })
         .collect();
     view.sort_by_key(|t| t.at);
     view
+}
+
+/// Each id names one evidence entry and no failed citation, and a cited data window covers `at`.
+fn timeline_entry_verified(
+    entry: &TimelineEntry,
+    evidence: &[EvidenceEntry],
+    unverified: &[UnverifiedCitation],
+    cited_calls: &[ToolCallRecord],
+) -> bool {
+    if entry.evidence_ids.is_empty() {
+        return false;
+    }
+    let mut windows = Vec::new();
+    for id in &entry.evidence_ids {
+        let mut holders = evidence.iter().filter(|e| e.ids.contains(id));
+        let (Some(held), None) = (holders.next(), holders.next()) else {
+            return false;
+        };
+        if unverified.iter().any(|u| u.evidence_id == *id) {
+            return false;
+        }
+        if let Some(window) = cited_calls
+            .iter()
+            .find(|r| r.call_id == held.call_id)
+            .and_then(ToolCallRecord::data_window)
+        {
+            windows.push(window);
+        }
+    }
+    windows.is_empty()
+        || windows.iter().any(|w| {
+            w.start.saturating_sub(DATA_WINDOW_SLACK_US) <= entry.at_us
+                && entry.at_us <= w.end.saturating_add(DATA_WINDOW_SLACK_US)
+        })
 }
 
 /// Ranked by status rank and `first_seen_seq`, then `symptom`, then `ruled_out`.
@@ -297,7 +333,12 @@ fn hypotheses_view(
 }
 
 // A waiting run has no stored verdict, so a shown change is either read or not read.
-fn shown_change_state(ledger: &EvidenceLedger, evidence: &[EvidenceEntry]) -> ShownChangeState {
+fn shown_change_state(
+    ledger: &EvidenceLedger,
+    evidence: &[EvidenceEntry],
+    cited_calls: &[ToolCallRecord],
+    reference: &str,
+) -> ShownChangeState {
     let cause = |id: &str| {
         ledger.hypotheses.iter().any(|h| {
             h.id == id
@@ -307,9 +348,14 @@ fn shown_change_state(ledger: &EvidenceLedger, evidence: &[EvidenceEntry]) -> Sh
                 )
         })
     };
+    let reads_reference = |e: &EvidenceEntry| {
+        cited_calls
+            .iter()
+            .any(|r| r.call_id == e.call_id && names_change(reference, &r.key_arg))
+    };
     let read = evidence
         .iter()
-        .filter(|e| e.target == SignalClass::Change)
+        .filter(|e| e.target == SignalClass::Change && reads_reference(e))
         .flat_map(|e| &e.citations)
         .any(|c| c.polarity == Polarity::Supports && cause(&c.hypothesis_id));
     if read {
@@ -385,7 +431,12 @@ pub fn summary_from_record(
             reference: c.reference.clone(),
             author: c.author.clone(),
             occurred_at: c.occurred_at,
-            shown_state: shown_change_state(ledger, &record.evidence),
+            shown_state: shown_change_state(
+                ledger,
+                &record.evidence,
+                &record.cited_calls,
+                &c.reference,
+            ),
             lead_author: steering_lead(ledger, &record.steer_authors),
         });
     let card = SummaryCard {
@@ -419,7 +470,12 @@ pub fn summary_from_record(
         not_modified: false,
         legacy: false,
         card,
-        timeline: timeline_view(&record.timeline, &record.evidence),
+        timeline: timeline_view(
+            &record.timeline,
+            &record.evidence,
+            &record.unverified,
+            &record.cited_calls,
+        ),
         hypotheses: hypotheses_view(
             ledger,
             &record.evidence,
@@ -516,6 +572,7 @@ mod tests {
             logs("l1", "SELECT * FROM app", 2),
             shell("d1", "gh pr diff 812", 3, true),
             shell("d2", "gh pr diff 900", 4, false),
+            shell("d3", "gh pr diff 901", 5, true),
         ]
     }
 
@@ -844,6 +901,11 @@ mod tests {
             shown(vec![diff("gh pr diff 900", "supports")], "root_cause", &[]).shown_state,
             ShownChangeState::NotRead
         );
+        // The diff read is another change's.
+        assert_eq!(
+            shown(vec![diff("gh pr diff 901", "supports")], "root_cause", &[]).shown_state,
+            ShownChangeState::NotRead
+        );
         assert_eq!(
             shown(
                 vec![diff("gh pr diff 812", "contradicts")],
@@ -934,5 +996,62 @@ mod tests {
         r.answer_deadline_need = Some("Owner of the pool change".into());
         let s = summary_from_record("r", RunState::Completed, "v".into(), &r);
         assert_eq!(s.card.needs.as_deref(), Some("Owner of the pool change"));
+    }
+
+    #[test]
+    fn a_confirmed_timeline_entry_needs_every_id_verified_and_its_time_covered() {
+        use crate::meta::oncall::rca_run::{TimeWindow, fixtures::RUN_END_US};
+
+        const MIN: i64 = 60_000_000;
+        let calls = [
+            hyp(
+                1,
+                "h1",
+                "root_cause",
+                vec![
+                    item("e1", PROM, "pool_active", "supports", "decisive"),
+                    item("e2", SQL, "SELECT * FROM app", "supports", "decisive"),
+                    item("e3", SQL, "SELECT * FROM app", "supports", "decisive"),
+                    item("e4", PROM, "never", "supports", "decisive"),
+                ],
+            ),
+            // e2 again, naming another call: the id no longer says which call.
+            hyp(
+                2,
+                "h2",
+                "ruled_out",
+                vec![item("e2", BASH, "gh pr diff 812", "rules_out", "decisive")],
+            ),
+        ];
+        let (ledger, ..) = build_ledger(&calls, Some(RUN_END_US));
+        let mut log = log();
+        log[0].observed = Some(TimeWindow {
+            start: 10 * MIN,
+            end: 20 * MIN,
+        });
+        let (evidence, unverified) = build_evidence(ledger.as_ref(), &log);
+        let status = |at_us: i64, ids: &[&str]| {
+            let entry = TimelineEntry {
+                at_us,
+                text: String::new(),
+                status: TimelineStatus::Confirmed,
+                evidence_ids: ids.iter().map(|id| id.to_string()).collect(),
+            };
+            timeline_view(&[entry], &evidence, &unverified, &log)[0].status
+        };
+        use TimelineView::{Confirmed, Unverified};
+        assert_eq!(status(15 * MIN, &["e1"]), Confirmed);
+        assert_eq!(status(21 * MIN, &["e1"]), Confirmed, "within a minute");
+        assert_eq!(status(22 * MIN, &["e1"]), Unverified);
+        assert_eq!(
+            status(99 * MIN, &["e3"]),
+            Confirmed,
+            "the call has no window"
+        );
+        assert_eq!(status(15 * MIN, &["e1", "e3"]), Confirmed);
+        assert_eq!(status(30 * MIN, &["e1", "e3"]), Unverified);
+        assert_eq!(status(15 * MIN, &["e1", "e4"]), Unverified);
+        assert_eq!(status(15 * MIN, &["e2"]), Unverified);
+        assert_eq!(status(15 * MIN, &["e9"]), Unverified);
     }
 }

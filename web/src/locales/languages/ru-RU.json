@@ -9958,6 +9958,8 @@
         "citedNotVerified": "Указано, но не проверено",
         "unverifiedNotRun": "Не запускалось",
         "unverifiedFailed": "Ошибка",
+        "unverifiedAmbiguous": "Неоднозначно",
+        "unverifiedRef": "[ref {ref}]",
         "signal": {
           "logs": "Логи",
           "metrics": "Метрики",

@@ -568,8 +568,10 @@ export interface RcaUnverifiedCitation {
   hypothesis_id: string;
   evidence_id: string;
   tool: string;
+  /** The cited call's ref; runs before refs cite by `query`. */
+  ref?: string;
   query: string;
-  reason: "not_run" | "failed";
+  reason: "not_run" | "failed" | "ambiguous";
 }
 
 export interface RcaBlindSpot {

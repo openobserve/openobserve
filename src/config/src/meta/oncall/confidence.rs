@@ -15,16 +15,17 @@
 
 //! Code grades an RCA verdict's confidence band from recorded evidence and the tool calls that ran.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use utoipa::ToSchema;
 
 use super::{
     agent::Confidence,
     rca_run::{
-        BlindSpot, BlindSpotAxis, EvidenceLedger, EvidenceTarget, HypothesisStatus, OutcomeReason,
-        Polarity, RcaOutcome, Strength, SubmittedVerdict, TimeWindow, subject,
+        BlindSpot, BlindSpotAxis, EvidenceItem, EvidenceLedger, EvidenceTarget, HypothesisStatus,
+        OutcomeReason, Polarity, RcaOutcome, Strength, SubmittedVerdict, TimeWindow, subject,
     },
 };
 use crate::meta::alerts::rca_steering::STEER_ID_PREFIX;
@@ -32,8 +33,8 @@ use crate::meta::alerts::rca_steering::STEER_ID_PREFIX;
 /// Statements of ruled-out hypotheses in a grade are cut to this many chars.
 const RULED_OUT_MAX_CHARS: usize = 80;
 
-/// Slack for `impact.window` past the observed data: one minute of rounding and sample spacing.
-const IMPACT_WINDOW_SLACK_US: i64 = 60_000_000;
+/// Slack around a call's data window: one minute of rounding and sample spacing.
+pub const DATA_WINDOW_SLACK_US: i64 = 60_000_000;
 
 /// The tools whose signal class comes from their `type` argument.
 const SEARCH_TOOLS: [&str; 4] = [
@@ -77,6 +78,10 @@ const LINE_RANGE_ARGS: [&str; 2] = ["start_line", "end_line"];
 
 /// The longest key argument a tool record keeps; citations are cut the same way.
 pub const KEY_ARG_MAX_BYTES: usize = 4 * 1024;
+
+/// Characters of a call ref; o2-ai's `call-ref.mjs` derives the same ref from the same `callID`.
+const CALL_REF_ALPHABET: &[u8; 32] = b"abcdefghijklmnopqrstuvwxyz234567";
+const CALL_REF_LEN: usize = 6;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
@@ -122,7 +127,7 @@ pub struct ToolCallRecord {
     /// The `type` argument of the SearchSQL family.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub stream_type: Option<String>,
-    /// `state.status == "completed"`.
+    /// `state.status == "completed"` and, for a shell or `cli_*` call, exit code 0.
     pub success: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub result_count: Option<u64>,
@@ -138,13 +143,28 @@ pub struct ToolCallRecord {
     pub result_summary: String,
 }
 
+impl ToolCallRecord {
+    /// The observed data timestamps, else the queried range unless the result had no rows.
+    pub fn data_window(&self) -> Option<TimeWindow> {
+        self.observed.or(
+            match (self.result_count, self.target.start_us, self.target.end_us) {
+                (Some(0), ..) => None,
+                (_, Some(start), Some(end)) => Some(TimeWindow { start, end }),
+                _ => None,
+            },
+        )
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum UnverifiedReason {
-    /// No call with the same tool and key argument ran.
+    /// No call with the cited ref (or the same tool and key argument) ran.
     NotRun,
     /// Matching calls ran, and all of them failed.
     Failed,
+    /// The cited ref names more than one call.
+    Ambiguous,
 }
 
 impl UnverifiedReason {
@@ -152,6 +172,7 @@ impl UnverifiedReason {
         match self {
             Self::NotRun => "not_run",
             Self::Failed => "failed",
+            Self::Ambiguous => "ambiguous",
         }
     }
 }
@@ -162,8 +183,66 @@ pub struct UnverifiedCitation {
     pub hypothesis_id: String,
     pub evidence_id: String,
     pub tool: String,
+    #[serde(default, rename = "ref", skip_serializing_if = "Option::is_none")]
+    pub call_ref: Option<String>,
+    #[serde(default)]
     pub query: String,
     pub reason: UnverifiedReason,
+}
+
+impl UnverifiedCitation {
+    pub fn of(hypothesis_id: &str, item: &EvidenceItem, reason: UnverifiedReason) -> Self {
+        Self {
+            hypothesis_id: hypothesis_id.to_string(),
+            evidence_id: item.id.clone(),
+            tool: item.tool.clone(),
+            call_ref: item.call_ref.clone(),
+            query: item.query.clone(),
+            reason,
+        }
+    }
+}
+
+/// The tool log with each call's ref, computed once per verification pass.
+pub struct CallLog<'a> {
+    log: &'a [ToolCallRecord],
+    refs: HashMap<String, Vec<&'a ToolCallRecord>>,
+}
+
+impl<'a> CallLog<'a> {
+    pub fn new(log: &'a [ToolCallRecord]) -> Self {
+        let mut refs: HashMap<String, Vec<&'a ToolCallRecord>> = HashMap::new();
+        for record in log {
+            refs.entry(call_ref(&record.call_id))
+                .or_default()
+                .push(record);
+        }
+        Self { log, refs }
+    }
+
+    /// The one call an item cites: by its ref, else (runs before refs) by its key argument.
+    pub fn verify(&self, item: &EvidenceItem) -> Result<&'a ToolCallRecord, UnverifiedReason> {
+        let Some(cited) = item.call_ref.as_deref() else {
+            return match_citation(&item.tool, &item.query, self.log);
+        };
+        let records = self.refs.get(cited).map(Vec::as_slice).unwrap_or_default();
+        let Some(first) = records.first() else {
+            return Err(UnverifiedReason::NotRun);
+        };
+        // A forked session can replay one call, so records that share a call id are one call.
+        if records.iter().any(|r| r.call_id != first.call_id) {
+            return Err(UnverifiedReason::Ambiguous);
+        }
+        let tool = item.tool.strip_prefix("o2_").unwrap_or(&item.tool);
+        if !(first.tool == tool || toolset_tool(&first.tool) == Some(tool)) {
+            return Err(UnverifiedReason::NotRun);
+        }
+        records
+            .iter()
+            .find(|r| r.success)
+            .copied()
+            .ok_or(UnverifiedReason::Failed)
+    }
 }
 
 /// A grading rule that fired.
@@ -547,6 +626,31 @@ pub fn cut_bytes(s: &str, max: usize) -> &str {
     &s[..end]
 }
 
+/// A tool call's citation ref: the top 30 bits of SHA-256 of its call id, as 6 base32 chars.
+pub fn call_ref(call_id: &str) -> String {
+    let digest = Sha256::digest(call_id.as_bytes());
+    let bits = u32::from_be_bytes([digest[0], digest[1], digest[2], digest[3]]) >> 2;
+    (0..CALL_REF_LEN)
+        .map(|i| char::from(CALL_REF_ALPHABET[((bits >> (25 - 5 * i)) & 31) as usize]))
+        .collect()
+}
+
+/// Whether `s` has the shape of a call ref.
+pub fn is_call_ref(s: &str) -> bool {
+    s.len() == CALL_REF_LEN && s.bytes().all(|b| CALL_REF_ALPHABET.contains(&b))
+}
+
+/// `output` without the `[ref xxxxxx]` line o2-ai appends to every tool result for citation.
+pub fn strip_call_ref(output: &str) -> &str {
+    let body = output.trim_end();
+    let (head, last) = body.rsplit_once('\n').unwrap_or(("", body));
+    let is_marker = last
+        .strip_prefix("[ref ")
+        .and_then(|rest| rest.strip_suffix(']'))
+        .is_some_and(is_call_ref);
+    if is_marker { head.trim_end() } else { output }
+}
+
 /// Same bare tool and normalized, cut key argument; earliest success wins, else `Failed`/`NotRun`.
 /// A citation of a code toolset call also matches by what the call read ([code_citation_matches]).
 pub fn match_citation<'a>(
@@ -649,27 +753,20 @@ pub fn grade_confidence(
     let hypotheses = ledger.map(|l| l.hypotheses.as_slice()).unwrap_or_default();
 
     // Verify every item of every hypothesis.
+    let calls = CallLog::new(tool_log);
     let mut unverified = Vec::new();
     let verified: Vec<Vec<Option<&ToolCallRecord>>> = hypotheses
         .iter()
         .map(|h| {
             h.evidence
                 .iter()
-                .map(
-                    |item| match match_citation(&item.tool, &item.query, tool_log) {
-                        Ok(record) => Some(record),
-                        Err(reason) => {
-                            unverified.push(UnverifiedCitation {
-                                hypothesis_id: h.id.clone(),
-                                evidence_id: item.id.clone(),
-                                tool: item.tool.clone(),
-                                query: item.query.clone(),
-                                reason,
-                            });
-                            None
-                        }
-                    },
-                )
+                .map(|item| match calls.verify(item) {
+                    Ok(record) => Some(record),
+                    Err(reason) => {
+                        unverified.push(UnverifiedCitation::of(&h.id, item, reason));
+                        None
+                    }
+                })
                 .collect()
         })
         .collect();
@@ -733,10 +830,14 @@ pub fn grade_confidence(
     if ledger.is_none() {
         shared_floors.push(GradeReason::NoLedger);
     }
-    // The suspect change belongs to one of the causes, so a read by any cause counts.
-    let change_read = graded_ids
-        .iter()
-        .any(|&i| items_of(i).any(|(_, _, signal)| signal == SignalClass::Change));
+    // The suspect change belongs to one of the causes, so a read of it by any cause counts.
+    let change_read = verdict.suspect_change.as_ref().is_some_and(|change| {
+        graded_ids.iter().any(|&i| {
+            verified[i].iter().flatten().any(|r| {
+                r.signal == SignalClass::Change && names_change(&change.reference, &r.key_arg)
+            })
+        })
+    });
     let change_unreachable = blind_spots.iter().any(|b| b.axis == BlindSpotAxis::Change);
     let impact_outside =
         impact_outside_evidence(verdict, verified.iter().flatten().flatten().copied());
@@ -875,21 +976,14 @@ fn impact_outside_evidence<'a>(
     };
     let covered = verified
         .filter(|r| r.signal.counts())
-        .filter_map(|r| {
-            r.observed
-                .or(match (r.result_count, r.target.start_us, r.target.end_us) {
-                    (Some(0), ..) => None,
-                    (_, Some(start), Some(end)) => Some(TimeWindow { start, end }),
-                    _ => None,
-                })
-        })
+        .filter_map(ToolCallRecord::data_window)
         .reduce(|a, b| TimeWindow {
             start: a.start.min(b.start),
             end: a.end.max(b.end),
         });
     covered.is_some_and(|c| {
-        window.start < c.start.saturating_sub(IMPACT_WINDOW_SLACK_US)
-            || window.end > c.end.saturating_add(IMPACT_WINDOW_SLACK_US)
+        window.start < c.start.saturating_sub(DATA_WINDOW_SLACK_US)
+            || window.end > c.end.saturating_add(DATA_WINDOW_SLACK_US)
     })
 }
 
@@ -908,6 +1002,63 @@ pub fn apply_outcome(grade: &mut ConfidenceGrade, outcome: RcaOutcome, reason: O
     if !grade.reasons.contains(&GradeReason::NoConfirmedCause) {
         grade.reasons.push(GradeReason::NoConfirmedCause);
     }
+}
+
+/// Whether a diff read's key argument names `reference`: its PR number or SHA, else all of it.
+pub fn names_change(reference: &str, key_arg: &str) -> bool {
+    let reference = reference.trim();
+    if reference.is_empty() {
+        return false;
+    }
+    let read: Vec<String> = tokens(key_arg).map(str::to_ascii_lowercase).collect();
+    let prs = pr_numbers(reference);
+    let shas: Vec<String> = tokens(reference)
+        .filter(|t| is_sha(t))
+        .map(str::to_ascii_lowercase)
+        .collect();
+    if prs.is_empty() && shas.is_empty() {
+        return key_arg
+            .to_ascii_lowercase()
+            .contains(&reference.to_ascii_lowercase());
+    }
+    read.iter().any(|t| {
+        prs.contains(&t.as_str())
+            || (is_sha(t) && shas.iter().any(|s| s.starts_with(t) || t.starts_with(s)))
+    })
+}
+
+/// Alphanumeric runs of `s`.
+fn tokens(s: &str) -> impl Iterator<Item = &str> {
+    s.split(|c: char| !c.is_ascii_alphanumeric())
+        .filter(|t| !t.is_empty())
+}
+
+/// PR numbers a reference names: `#812`, `PR 812`, `pull/812`, `MR !812`.
+fn pr_numbers(reference: &str) -> Vec<&str> {
+    let is_number = |t: &str| t.bytes().all(|b| b.is_ascii_digit());
+    let mut numbers: Vec<&str> = reference
+        .split(['#', '!'])
+        .skip(1)
+        .filter_map(|rest| rest.split(|c: char| !c.is_ascii_digit()).next())
+        .filter(|t| !t.is_empty())
+        .collect();
+    let words: Vec<&str> = tokens(reference).collect();
+    for pair in words.windows(2) {
+        let names_pr = ["pr", "pull", "pulls", "mr"]
+            .iter()
+            .any(|w| pair[0].eq_ignore_ascii_case(w));
+        if names_pr && is_number(pair[1]) && !numbers.contains(&pair[1]) {
+            numbers.push(pair[1]);
+        }
+    }
+    numbers
+}
+
+/// A hex run of commit-SHA length with at least one digit, so a plain word is not one.
+fn is_sha(t: &str) -> bool {
+    (7..=40).contains(&t.len())
+        && t.bytes().all(|b| b.is_ascii_hexdigit())
+        && t.bytes().any(|b| b.is_ascii_digit())
 }
 
 /// `gh pr diff`, `gh api …/commits/<sha>`, `git show`, `git diff`; not commit lists.
@@ -997,6 +1148,103 @@ mod tests {
             match_citation(PROM, "SELECT * FROM t", &log),
             Err(UnverifiedReason::NotRun)
         );
+    }
+
+    /// The vectors are shared with o2-ai's `call-ref.mjs` tests, so both sides derive one ref.
+    #[test]
+    fn call_refs_match_the_agent_plugin() {
+        assert_eq!(call_ref("call_00_R2kN2KqPypQ2Ejqtjtkf9715"), "tkx3uh");
+        assert_eq!(call_ref("toolu_01A09q90qw90lq917835lq9"), "kfr7ab");
+        assert_eq!(call_ref("call_1"), "oqmw7z");
+    }
+
+    #[test]
+    fn only_a_trailing_ref_line_is_stripped_from_tool_output() {
+        assert_eq!(strip_call_ref("{\"a\":1}\n\n[ref tkx3uh]"), "{\"a\":1}");
+        assert_eq!(strip_call_ref("a\nb\n[ref tkx3uh]\n"), "a\nb");
+        assert_eq!(strip_call_ref("[ref tkx3uh]"), "");
+        for kept in [
+            "a\n[ref TKX3UH]",
+            "a\n[ref tkx3u]",
+            "a [ref tkx3uh]",
+            "a\n[ref tkx3uh] tail",
+        ] {
+            assert_eq!(strip_call_ref(kept), kept);
+        }
+    }
+
+    /// A ref binds to its own call even when another call ran the same query.
+    #[test]
+    fn a_ref_cites_exactly_one_call() {
+        let log = [
+            rec("c1", SQL, "SELECT 1", json!({}), 1, true),
+            rec("c2", SQL, "SELECT 1", json!({}), 2, true),
+            rec("c3", PROM, "up", json!({}), 3, false),
+            // call_20569 and call_23557 share the ref `ccglip`.
+            prom("call_20569", "a", 4),
+            prom("call_23557", "b", 5),
+            // A forked session replays a call under the same id.
+            rec("c4", PROM, "c", json!({}), 6, false),
+            prom("c4", "c", 7),
+        ];
+        let calls = CallLog::new(&log);
+        let verify = |tool: &str, call_ref: Option<String>, query: &str| {
+            calls
+                .verify(&EvidenceItem {
+                    id: "e1".into(),
+                    tool: tool.into(),
+                    call_ref,
+                    query: query.into(),
+                    polarity: Polarity::Supports,
+                    strength: Strength::Decisive,
+                    observation: String::new(),
+                    first_cited_seq: 1,
+                })
+                .map(|r| (r.call_id.as_str(), r.started_at_us))
+        };
+        assert_eq!(verify(SQL, Some(call_ref("c2")), ""), Ok(("c2", 2)));
+        assert_eq!(verify(SQL, None, "SELECT 1"), Ok(("c1", 1)));
+        assert_eq!(
+            verify(PROM, Some(call_ref("c3")), ""),
+            Err(UnverifiedReason::Failed)
+        );
+        assert_eq!(
+            verify(PROM, Some(call_ref("c2")), "SELECT 1"),
+            Err(UnverifiedReason::NotRun)
+        );
+        assert_eq!(
+            verify(SQL, Some("aaaaaa".into()), ""),
+            Err(UnverifiedReason::NotRun)
+        );
+        assert_eq!(call_ref("call_20569"), call_ref("call_23557"));
+        assert_eq!(
+            verify(PROM, Some(call_ref("call_20569")), ""),
+            Err(UnverifiedReason::Ambiguous)
+        );
+        assert_eq!(verify(PROM, Some(call_ref("c4")), ""), Ok(("c4", 7)));
+    }
+
+    #[test]
+    fn a_diff_read_names_the_change_by_pr_number_or_sha() {
+        for (reference, key_arg, names) in [
+            ("PR #812", "gh pr diff 812 --repo o2/app", true),
+            ("PR #812", "gh pr diff 900", false),
+            ("pull/812", "gh api repos/o2/app/pulls/812/files", true),
+            ("MR !812", "glab mr diff 812", true),
+            ("PR #812", "gh pr diff 8120", false),
+            ("checkout-api@4f2c1e9", "git show 4f2c1e9a77", true),
+            ("4f2c1e9a77", r#"{"sha":"4f2c1e9"}"#, true),
+            ("4f2c1e9", "git show 4f2c1e8", false),
+            ("querier v0.14.2", "git diff v0.14.1 querier v0.14.2", true),
+            ("querier v0.14.2", "git diff v0.14.1 v0.14.3", false),
+            ("  ", "git diff", false),
+        ] {
+            assert_eq!(
+                names_change(reference, key_arg),
+                names,
+                "{reference} / {key_arg}"
+            );
+        }
     }
 
     /// `o2_` prefix, 4 KiB cut, JSON compared as values.
@@ -1262,11 +1510,11 @@ mod tests {
         }
     }
 
-    /// A toolset code read verifies but adds no class; a toolset diff is a decisive `change`.
+    /// A toolset code read verifies but adds no class; a toolset diff of the suspect is `change`.
     #[test]
     fn toolset_code_reads_verify_and_toolset_diffs_read_the_suspect_change() {
         let file = r#"{"path":"src/payment/charge.js"}"#;
-        let commit = r#"{"sha":"4f2c1e"}"#;
+        let commit = r#"{"sha":"4f2c1e9"}"#;
         let tool_log = [
             prom("m1", "pool_active", 1),
             rec(
@@ -1281,13 +1529,13 @@ mod tests {
                 "d1",
                 "orca-demo-code_git_show",
                 commit,
-                json!({"sha": "4f2c1e"}),
+                json!({"sha": "4f2c1e9"}),
                 3,
                 true,
             ),
             logs("l1", "SELECT * FROM app", 4),
         ];
-        let grade_with = |cause_item: serde_json::Value| {
+        let grade_with = |cause_item: serde_json::Value, reference: &str| {
             let calls = [
                 hyp(
                     1,
@@ -1313,7 +1561,9 @@ mod tests {
                 Some(crate::meta::oncall::rca_run::fixtures::RUN_END_US),
             );
             let mut verdict = named(Confidence::High);
-            verdict.suspect_change = Some(suspect(SuspectChangeState::Confirmed));
+            let mut change = suspect(SuspectChangeState::Confirmed);
+            change.reference = reference.into();
+            verdict.suspect_change = Some(change);
             grade_confidence(
                 &verdict,
                 ledger.as_ref(),
@@ -1323,7 +1573,7 @@ mod tests {
             )
         };
 
-        let code = grade_with(decisive("e2", "read_file", file));
+        let code = grade_with(decisive("e2", "read_file", file), "4f2c1e9");
         assert!(code.unverified.is_empty(), "{:?}", code.unverified);
         assert_eq!(code.decisive_classes, vec![SignalClass::Metrics]);
         assert_eq!(
@@ -1335,7 +1585,7 @@ mod tests {
         );
         assert_eq!(code.graded, Confidence::Medium);
 
-        let diff = grade_with(decisive("e2", "git_show", commit));
+        let diff = grade_with(decisive("e2", "git_show", commit), "checkout-api@4f2c1e9");
         assert!(diff.unverified.is_empty(), "{:?}", diff.unverified);
         assert_eq!(
             diff.decisive_classes,
@@ -1346,6 +1596,17 @@ mod tests {
             vec![GradeReason::TwoDecisiveClassesAndRuledOut]
         );
         assert_eq!(diff.graded, Confidence::High);
+
+        // The diff read is not the suspect change's.
+        let other = grade_with(decisive("e2", "git_show", commit), "PR #812");
+        assert_eq!(
+            other.reasons,
+            vec![
+                GradeReason::TwoDecisiveClassesAndRuledOut,
+                GradeReason::SuspectChangeNotRead
+            ]
+        );
+        assert_eq!(other.graded, Confidence::Medium);
     }
 
     fn log() -> Vec<ToolCallRecord> {
@@ -1927,6 +2188,7 @@ mod tests {
                     hypothesis_id: "h1".into(),
                     evidence_id: format!("e{i}"),
                     tool: PROM.into(),
+                    call_ref: None,
                     query: "q".into(),
                     reason: UnverifiedReason::NotRun,
                 })

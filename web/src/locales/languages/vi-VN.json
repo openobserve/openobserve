@@ -9958,6 +9958,8 @@
         "citedNotVerified": "Được trích dẫn nhưng chưa xác minh",
         "unverifiedNotRun": "Chưa chạy",
         "unverifiedFailed": "Thất bại",
+        "unverifiedAmbiguous": "Không rõ ràng",
+        "unverifiedRef": "[ref {ref}]",
         "signal": {
           "logs": "Nhật ký",
           "metrics": "Chỉ số",

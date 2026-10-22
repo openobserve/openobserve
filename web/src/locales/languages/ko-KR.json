@@ -9958,6 +9958,8 @@
         "citedNotVerified": "인용되었지만 검증되지 않음",
         "unverifiedNotRun": "실행되지 않음",
         "unverifiedFailed": "실패",
+        "unverifiedAmbiguous": "모호함",
+        "unverifiedRef": "[ref {ref}]",
         "signal": {
           "logs": "로그",
           "metrics": "메트릭",

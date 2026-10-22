@@ -24,7 +24,7 @@ mod summary;
 
 pub use evidence::{
     Citation, EvidenceEntry, EvidenceTarget, build_evidence, evidence_kind, evidence_target,
-    observed_window, summarize_result,
+    exit_code, observed_window, summarize_result,
 };
 pub use ledger::{
     BlindSpot, BlindSpotAxis, BlindSpotFix, EvidenceItem, EvidenceLedger, Hypothesis,
@@ -637,19 +637,20 @@ pub fn record_run_end(input: &RunEndInput) -> RunEndResult {
         .zip(grade.as_ref())
         .map(|(v, g)| to_analysis_verdict(v, g, &evidence));
     let timeline = submit.map(|s| s.timeline.clone()).unwrap_or_default();
-    let timeline_unverified = summary::timeline_view(&timeline, &evidence)
-        .iter()
-        .filter(|t| t.status == TimelineView::Unverified)
-        .count() as u32;
-    let summary_detail = match outcome {
-        Some((RcaOutcome::Blocked, _)) => Some(blocked_detail(&blind_spots)),
-        _ => None,
-    };
-    let cited_calls = evidence
+    let cited_calls: Vec<ToolCallRecord> = evidence
         .iter()
         .filter_map(|e| input.tool_log.iter().find(|r| r.call_id == e.call_id))
         .cloned()
         .collect();
+    let timeline_unverified =
+        summary::timeline_view(&timeline, &evidence, &unverified, &cited_calls)
+            .iter()
+            .filter(|t| t.status == TimelineView::Unverified)
+            .count() as u32;
+    let summary_detail = match outcome {
+        Some((RcaOutcome::Blocked, _)) => Some(blocked_detail(&blind_spots)),
+        _ => None,
+    };
     let steer_authors: BTreeMap<String, String> = ledger
         .iter()
         .flat_map(|l| &l.hypotheses)
@@ -738,6 +739,18 @@ pub(crate) mod fixtures {
             "query": query,
             "polarity": polarity,
             "strength": strength,
+            "observation": format!("{id} obs"),
+        })
+    }
+
+    /// One evidence item that cites call `call_id` by its ref.
+    pub(crate) fn cited(id: &str, tool: &str, call_id: &str, polarity: &str) -> Value {
+        json!({
+            "id": id,
+            "tool": tool,
+            "ref": crate::meta::oncall::confidence::call_ref(call_id),
+            "polarity": polarity,
+            "strength": "decisive",
             "observation": format!("{id} obs"),
         })
     }
@@ -1952,7 +1965,7 @@ mod tests {
             assert!(!serde_json::to_string(&verdict).unwrap().contains("http"));
         }
 
-        /// A confirmed entry whose ids did not verify shows Unverified, and is counted.
+        /// A confirmed entry with any id that did not verify shows Unverified, and is counted.
         #[test]
         fn unverified_timeline_entries_are_counted() {
             let calls = [hyp(
@@ -1996,7 +2009,7 @@ mod tests {
                 EndedBy::Agent,
                 true,
             );
-            assert_eq!(r.timeline_unverified, 2);
+            assert_eq!(r.timeline_unverified, 3);
             let view = summary_from_record(
                 "r1",
                 crate::meta::alerts::rca_runs::RunState::Completed,
@@ -2011,7 +2024,7 @@ mod tests {
             assert_eq!(
                 shown,
                 vec![
-                    ("a", TimelineView::Confirmed, vec![1]),
+                    ("a", TimelineView::Unverified, vec![1]),
                     ("b", TimelineView::Unverified, vec![]),
                     ("c", TimelineView::Unverified, vec![]),
                     ("d", TimelineView::Likely, vec![]),
