@@ -50,6 +50,8 @@ export interface DropdownProps {
 
 export interface DropdownEmits {
   (e: "update:open", value: boolean): void;
+  /** Fired as the menu closes and focus would return to the trigger; `preventDefault()` keeps it where an item moved it. */
+  (e: "close-auto-focus", event: Event): void;
 }
 
 export interface DropdownSlots {
