@@ -242,7 +242,11 @@ const SIGNAL_CLASSES = [
 const _c12: Complete<RcaSignalClass, typeof SIGNAL_CLASSES> = true;
 
 type UnverifiedReason = RcaUnverifiedCitation["reason"];
-const UNVERIFIED_REASONS = ["not_run", "failed"] as const satisfies readonly UnverifiedReason[];
+const UNVERIFIED_REASONS = [
+  "not_run",
+  "failed",
+  "ambiguous",
+] as const satisfies readonly UnverifiedReason[];
 const _c13: Complete<UnverifiedReason, typeof UNVERIFIED_REASONS> = true;
 
 const incidentTypes = ts.createSourceFile(
